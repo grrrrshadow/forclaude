@@ -494,3 +494,36 @@ změny sleduje git tohoto repozitáře). `build-windows.yml` upraven, aby
 defaultně stavěl `openttd/` z tohoto repa; možnost stavět z libovolného
 externího zdroje (`source_repo`/`source_ref`) zůstává zachovaná pro
 srovnávací/ověřovací buildy čistého vanilla kódu.
+
+## Postup implementace (průběžně doplňovat)
+
+- ✅ **`TryConsistSplice`** vytažen z `CmdMoveRailVehicle` (čistý refaktoring,
+  ověřeno buildem i ručním testem v depu — beze změny chování).
+- ✅ **`CMD_COUPLE_TRAINS` / `GetTrainCouplePartner`** — první funkční verze
+  spojování na trati. Zatím jen nejjednodušší geometrie: `v` dojíždí zezadu
+  a je zablokovaný stojícím vlakem před sebou, oba stejným směrem (typický
+  případ pro odtah — dojíždějící mašinka). Adjacency přes
+  `FollowTrainReservation` (existující enginová funkce, ne pixely — viz Bug
+  C). Obecný případ "čelně proti sobě" zatím záměrně chybí, bude
+  samostatný krok.
+- ✅ **Tlačítko "Couple"** v okně vozidla (`WID_VV_COUPLE`), aktivní jen
+  když `GetTrainCouplePartner` najde partnera. Čistě na klik — konzole
+  nejde použít (Winlator), takže testování je čistě myší.
+- ⏭️ **Další v pořadí:** `CMD_DECOUPLE_TRAIN` (rozpojení na trati) a obecný
+  případ orientace (spojení proti sobě, s reverzem jedné strany).
+- ⏭️ Až couple/decouple na trati budou stabilní: napojení na `Order`
+  systém (couple/decouple parametry z menu příkazů) a samotná tow logika
+  (breakdown hook, "Service" order pro odtahovou mašinku v depu).
+
+### Jak otestovat `CMD_COUPLE_TRAINS`
+
+1. V depu (vanilla, už funguje) rozdělit/postavit dvě samostatné soupravy.
+2. Obě vyjet z depa na stejnou trať.
+3. Druhou (zadní) poslat příkazem tak, aby dojela a zastavila se těsně za
+   první (normální herní chování, žádný speciální krok — hra sama
+   zablokuje druhý vlak před prvním).
+4. Kliknout na druhý (zadní) vlak → v okně vozidla by mělo být aktivní
+   tlačítko "Couple" → kliknout.
+5. Očekávaný výsledek: obě soupravy se spojí do jedné, přesně jako
+   výsledek přesunu v depu (statistiky, příkazy, unit number se převezmou
+   podle stejné logiky jako `CmdMoveRailVehicle`).
