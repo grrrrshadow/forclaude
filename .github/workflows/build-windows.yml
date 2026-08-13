@@ -40,7 +40,10 @@ on:
 jobs:
   windows:
     name: Windows (${{ inputs.arch || 'x64' }})
-    runs-on: windows-latest
+    # Pinned (not windows-latest): see BUILD_NOTES.md run #2 — a newer MSVC
+    # toolset removes stdext::checked_array_iterator, which breaks building
+    # the pinned vcpkg breakpad port (2023.06.01) with C2653/C2065/C2059.
+    runs-on: windows-2022
 
     steps:
     - name: Checkout OpenTTD source

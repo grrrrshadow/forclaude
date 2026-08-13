@@ -84,6 +84,40 @@ bez OpenTTD interních tajných klíčů — viz níže).
 11. **Nahrání artefaktů** — bundle (zip), samostatný `openttd.exe`, a
     symboly, jako výstupy GitHub Actions run (ke stažení z UI).
 
+## Zásadní poznatek: `windows-latest` není bezpečné pro reprodukovatelnost
+
+Run #2 (viz tabulka výše) odhalil důležitou věc, kterou je potřeba mít na
+paměti pořád, i po úpravách kódu OpenTTD:
+
+`runs-on: windows-latest` je pohyblivý cíl — GitHub pod tímto názvem časem
+vymění celý image (aktuálně obsahuje Visual Studio "18" Enterprise, MSVC
+toolset `14.51.36231`, mnohem novější než VS2022, kterou OpenTTD 15.3
+oficiálně používal při vydání 2026-04-04). Novější MSVC odstranil
+zastaralou STL kompatibilitu `stdext::checked_array_iterator`. Zdrojový kód
+knihovny **breakpad**, tak jak je zamčený ve `vcpkg.json` (port
+`2023.06.01`, přes `builtin-baseline`), ji používá v
+`src/client/windows/crash_generation/minidump_generator.cc:183` — s novým
+kompilátorem to spadne na:
+
+```
+error C2653: 'stdext': is not a class or namespace name
+error C2065: 'checked_array_iterator': undeclared identifier
+error C2059: syntax error: '>'
+```
+
+Tohle **není chyba v OpenTTD kódu ani v našem workflow** — je to nekompatibilita
+mezi starým vcpkg portem a novým MSVC kompilátorem, která by časem začala
+škobrtat i oficiálnímu OpenTTD CI (pokud a dokud OpenTTD nezvýší
+`builtin-baseline` na novější breakpad, nebo GitHub nezmění, co `windows-latest`
+znamená).
+
+**Řešení:** connect runner připnutý na `windows-2022` (konkrétní, stabilní
+image), místo pohyblivého `windows-latest`. Tohle je přesně ten typ
+"detailu, co si musíme pamatovat", o který šlo od začátku — bez tohoto
+zápisu by se stejná chyba mohla objevit znovu v budoucnu a vypadat jako
+chyba v našich úpravách kódu, i když by šlo jen o to, že se pod nohama
+změnil build runner.
+
 ## Co jsme vědomě vynechali a proč
 
 - **NSIS instalátor** (`-DOPTION_USE_NSIS=ON`) — instalátor se v oficiálním
@@ -125,9 +159,10 @@ Log jednotlivých spuštění (doplňovat po každém běhu):
 | # | Datum | source_ref | arch | Výsledek | Poznámka |
 |---|-------|-----------|------|----------|----------|
 | 1 | 2026-08-13 | (prázdné → viz poznámka) | (prázdné → viz poznámka) | ❌ selhalo | Spuštěno přes `push` trigger (workaround, viz níže), ne přes `workflow_dispatch` → `inputs.*` byly prázdné. Krok "Checkout OpenTTD source" proto checkoutnul náš vlastní repo `forclaude` místo `OpenTTD/OpenTTD`. CMake selhal: `CMake Error: The source directory "D:/a/forclaude/forclaude" does not appear to contain CMakeLists.txt.` OpenTTD zdroj se vůbec nestáhl, jde o chybu naší pipeline (workflow file), ne o OpenTTD kód. **Oprava:** přidány fallback výrazy `${{ inputs.X || 'default' }}` na všech místech, kde se `inputs.*` používá, aby workflow fungoval správně i bez `workflow_dispatch` vstupů (commit "Add fallback defaults..."). |
-| 2 | — | 15.3 | x64 | | ověřovací běh po opravě fallbacků |
-| 3 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
-| 4 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
+| 2 | 2026-08-13 | 15.3 (push, s fallbackem) | x64 | ❌ selhalo | Checkout, vcpkg i "Build tools" proběhly správně (fallback fungoval). Spadl krok "Build OpenTTD" při kompilaci vcpkg závislosti **breakpad**: `error C2653: 'stdext'...`, `error C2065: 'checked_array_iterator'...`. Příčina: `windows-latest` teď nese mnohem novější MSVC, který odstranil starou STL kompatibilitu, kterou používá pinned verze breakpad portu. Detailní rozbor viz sekce "Zásadní poznatek: windows-latest není bezpečné..." níže. **Oprava:** `runs-on` připnuto na `windows-2022`. |
+| 3 | 2026-08-13 | 15.3 (workflow_dispatch) | x64 | (běželo souběžně s #2, výsledek nedohledán) | Spuštěno pro ověření, že `workflow_dispatch` API dispatch teď funguje (potvrzeno — `run_workflow` vrátil "queued" místo 404). Spuštěno na `windows-latest` ještě před opravou runneru, takže pravděpodobně narazilo na stejnou breakpad/MSVC chybu jako #2, ale nebylo to explicitně dohledáno (přešli jsme rovnou k opravě a běhu #4). |
+| 4 | — | 15.3 | x64 | | ověřovací běh po připnutí `windows-2022` |
+| 5 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
 
 Až tu budeme mít 2-3 zelené, identické běhy, přesuneme se k úpravám kódu
 (vlastní fork/branch zdrojáků OpenTTD v tomto repu) a workflow přesměrujeme
