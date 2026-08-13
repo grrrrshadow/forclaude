@@ -76,7 +76,10 @@ jobs:
       shell: bash
       run: |
         echo "::group::Install choco dependencies"
-        choco install pandoc
+        # pandoc is optional (only used to generate COPYING.rtf in the
+        # bundle, see BUILD_NOTES.md); don't fail the whole build if
+        # Chocolatey's registry has a transient hiccup finding it.
+        choco install pandoc || echo "pandoc install failed, continuing without it (optional dependency)"
         echo "::endgroup::"
 
         echo "::group::Install breakpad dependencies"
