@@ -247,6 +247,8 @@ enum Commands : uint8_t {
 	CMD_FORCE_TRAIN_PROCEED,          ///< proceed a train to pass a red signal
 	CMD_REVERSE_TRAIN_DIRECTION,      ///< turn a train around
 
+	CMD_COUPLE_TRAINS,                ///< couple a stopped train to another stopped train ahead of it, on the open track
+
 	CMD_CLEAR_ORDER_BACKUP,           ///< clear the order backup of a given user/tile
 	CMD_MODIFY_ORDER,                 ///< modify an order (like set full-load)
 	CMD_SKIP_TO_ORDER,                ///< skip an order to the next of specific one

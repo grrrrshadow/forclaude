@@ -1447,6 +1447,87 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 }
 
 /**
+ * Find the train, if any, that a stopped train @p v could couple to: the
+ * train directly ahead of @p v on the track it is stopped on.
+ *
+ * This deliberately does not compare x_pos/y_pos pixel distances (see
+ * FEATURE_DESIGN_COUPLING_TOW.md, "Bug C" in the reference patch that
+ * inspired this feature) — it reuses #FollowTrainReservation, the same
+ * tile/trackdir/reservation-based function the game already uses
+ * elsewhere to find a train blocking the path ahead. That makes this
+ * exact and independent of rounding, at the cost of only recognising a
+ * partner while @p v still has a live reservation up to it (which is the
+ * normal case for a train that stopped because another train is blocking
+ * its path).
+ *
+ * This first version only recognises the simplest and most common
+ * coupling geometry: @p v approaching from behind and being blocked by a
+ * stationary train ahead, both facing the same direction (e.g. a rescue
+ * engine catching up to a broken-down train). Meeting nose-to-nose from
+ * opposite directions is intentionally out of scope here; see the design
+ * doc for the follow-up plan.
+ *
+ * @param v the (potential) rear train looking to couple; must be the
+ *          front of its own consist
+ * @return the front of the train immediately ahead that @p v can couple
+ *         to, or nullptr if there is none
+ */
+Train *GetTrainCouplePartner(const Train *v)
+{
+	if (!v->IsFrontEngine()) return nullptr;
+	if (v->vehstatus.Test(VehState::Crashed)) return nullptr;
+	if (v->cur_speed != 0) return nullptr;
+
+	Vehicle *train_on_res = nullptr;
+	FollowTrainReservation(v, &train_on_res);
+	if (train_on_res == nullptr || train_on_res->type != VEH_TRAIN) return nullptr;
+
+	Train *partner = Train::From(train_on_res)->First();
+	if (partner == v->First()) return nullptr; // that reservation just leads back to ourselves
+	if (partner->owner != v->owner) return nullptr;
+	if (partner->vehstatus.Test(VehState::Crashed)) return nullptr;
+	if (partner->cur_speed != 0) return nullptr;
+
+	return partner;
+}
+
+/**
+ * Couple a stopped train to another stopped train immediately ahead of it
+ * on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
+ * consists inside a depot). See #GetTrainCouplePartner for exactly which
+ * geometry is currently recognised, and FEATURE_DESIGN_COUPLING_TOW.md for
+ * the full design this is one piece of.
+ *
+ * @param flags  type of operation
+ * @param veh_id the rear train initiating the coupling
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	Train *partner = GetTrainCouplePartner(v);
+	if (partner == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER);
+
+	/* Re-check ownership of the partner explicitly: GetTrainCouplePartner()
+	 * already requires matching owners, but CheckOwnership() also handles
+	 * the "spectator"/deity edge cases that a plain == comparison would not. */
+	ret = CheckOwnership(partner->owner);
+	if (ret.Failed()) return ret;
+
+	Train *src = v->GetFirstEnginePart();
+	Train *dst = partner->Last()->GetLastEnginePart();
+
+	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
+
+	return TryConsistSplice(flags, src, dst, true);
+}
+
+/**
  * Sell a (single) train wagon/engine.
  * @param flags type of operation
  * @param t     the train wagon to sell

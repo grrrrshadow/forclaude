@@ -2847,6 +2847,14 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 				NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_VV_FORCE_PROCEED), SetMinimalSize(18, 18),
 											SetSpriteTip(SPR_IGNORE_SIGNALS, STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP),
 			EndContainer(),
+			/* For trains only, 'couple to train ahead' button. Only shown
+			 * (enabled) once GetTrainCouplePartner() finds a partner; see
+			 * FEATURE_DESIGN_COUPLING_TOW.md. Sprite reused from Clone as a
+			 * placeholder pending dedicated art. */
+			NWidget(NWID_SELECTION, INVALID_COLOUR, WID_VV_COUPLE_SEL),
+				NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_VV_COUPLE), SetMinimalSize(18, 18),
+											SetSpriteTip(SPR_CLONE_TRAIN, STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP),
+			EndContainer(),
 			NWidget(NWID_SELECTION, INVALID_COLOUR, WID_VV_SELECT_REFIT_TURN),
 				NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_VV_REFIT), SetMinimalSize(18, 18), SetSpriteTip(SPR_REFIT_VEHICLE),
 				NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_VV_TURN_AROUND), SetMinimalSize(18, 18),
@@ -3020,15 +3028,18 @@ public:
 			case VEH_TRAIN:
 				this->GetWidget<NWidgetCore>(WID_VV_TURN_AROUND)->SetToolTip(STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP);
 				this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(0);
+				this->GetWidget<NWidgetStacked>(WID_VV_COUPLE_SEL)->SetDisplayedPlane(0);
 				break;
 
 			case VEH_ROAD:
 				this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(SZSP_NONE);
+				this->GetWidget<NWidgetStacked>(WID_VV_COUPLE_SEL)->SetDisplayedPlane(SZSP_NONE);
 				break;
 
 			case VEH_SHIP:
 			case VEH_AIRCRAFT:
 				this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(SZSP_NONE);
+				this->GetWidget<NWidgetStacked>(WID_VV_COUPLE_SEL)->SetDisplayedPlane(SZSP_NONE);
 				this->SelectPlane(SEL_RT_REFIT);
 				break;
 
@@ -3068,6 +3079,7 @@ public:
 				break;
 
 			case WID_VV_FORCE_PROCEED:
+			case WID_VV_COUPLE:
 				if (v->type != VEH_TRAIN) {
 					size.height = 0;
 					size.width = 0;
@@ -3095,6 +3107,7 @@ public:
 		if (v->type == VEH_TRAIN) {
 			this->SetWidgetLoweredState(WID_VV_FORCE_PROCEED, Train::From(v)->force_proceed == TFP_SIGNAL);
 			this->SetWidgetDisabledState(WID_VV_FORCE_PROCEED, !is_localcompany);
+			this->SetWidgetDisabledState(WID_VV_COUPLE, !is_localcompany || GetTrainCouplePartner(Train::From(v)) == nullptr);
 		}
 
 		if (v->type == VEH_TRAIN || v->type == VEH_ROAD) {
@@ -3301,6 +3314,10 @@ public:
 			case WID_VV_FORCE_PROCEED: // force proceed
 				assert(v->type == VEH_TRAIN);
 				Command<CMD_FORCE_TRAIN_PROCEED>::Post(STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL, v->tile, v->index);
+				break;
+			case WID_VV_COUPLE: // couple to train ahead
+				assert(v->type == VEH_TRAIN);
+				Command<CMD_COUPLE_TRAINS>::Post(STR_ERROR_CAN_T_COUPLE_TRAIN, v->tile, v->index);
 				break;
 		}
 	}
