@@ -1218,66 +1218,43 @@ static void NormaliseTrainHead(Train *head)
  * @param move_chain move all vehicles following the source vehicle
  * @return the cost of this operation or an error
  */
-CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleID dest_veh, bool move_chain)
+/**
+ * Try to splice two (possibly single-vehicle) consists into a new
+ * arrangement: move the chain starting at (or just) @p src to right after
+ * @p dst (or make it a standalone train/free wagon chain if @p dst is
+ * nullptr), validate the result, and either commit it or roll both sides
+ * back to their original state.
+ *
+ * This is the shared core of #CmdMoveRailVehicle (rearranging a consist in
+ * a depot) and is intended to be reused, unchanged, by future commands that
+ * splice consists in other contexts (e.g. coupling/decoupling on the open
+ * track) — see FEATURE_DESIGN_COUPLING_TOW.md. Callers are responsible for
+ * any preconditions specific to their context (e.g. "must be stopped in a
+ * depot" for #CmdMoveRailVehicle, or "must be stopped and adjacent on
+ * matching track" for an on-track coupling command); this function itself
+ * makes no assumption about *where* the vehicles are, only about their
+ * consist structure.
+ *
+ * Nothing outside the vehicle chain (e.g. track reservations) is touched
+ * here — by design, so there is nothing beyond #RestoreTrainBackup that a
+ * caller ever needs to roll back. Callers that need to mutate other state
+ * as part of the same logical operation must do so only after this
+ * function has reported success.
+ *
+ * @param flags      type of operation
+ * @param src        the first vehicle of the chain to move (after any
+ *                   articulated-part/rear-dualheaded resolution the caller
+ *                   has already done)
+ * @param dst        the vehicle to place @p src's chain after, or nullptr
+ *                   to make it standalone
+ * @param move_chain move the complete chain starting at src, not just src
+ * @return the cost of this operation or an error
+ */
+static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain)
 {
-	Train *src = Train::GetIfValid(src_veh);
-	if (src == nullptr) return CMD_ERROR;
-
-	CommandCost ret = CheckOwnership(src->owner);
-	if (ret.Failed()) return ret;
-
-	/* Do not allow moving crashed vehicles inside the depot, it is likely to cause asserts later */
-	if (src->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-
-	/* if nothing is selected as destination, try and find a matching vehicle to drag to. */
-	Train *dst;
-	if (dest_veh == VehicleID::Invalid()) {
-		dst = (src->IsEngine() || flags.Test(DoCommandFlag::AutoReplace)) ? nullptr : FindGoodVehiclePos(src);
-	} else {
-		dst = Train::GetIfValid(dest_veh);
-		if (dst == nullptr) return CMD_ERROR;
-
-		ret = CheckOwnership(dst->owner);
-		if (ret.Failed()) return ret;
-
-		/* Do not allow appending to crashed vehicles, too */
-		if (dst->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	}
-
-	/* if an articulated part is being handled, deal with its parent vehicle */
-	src = src->GetFirstEnginePart();
-	if (dst != nullptr) {
-		dst = dst->GetFirstEnginePart();
-	}
-
-	/* don't move the same vehicle.. */
-	if (src == dst) return CommandCost();
-
 	/* locate the head of the two chains */
 	Train *src_head = src->First();
-	Train *dst_head;
-	if (dst != nullptr) {
-		dst_head = dst->First();
-		if (dst_head->tile != src_head->tile) return CMD_ERROR;
-		/* Now deal with articulated part of destination wagon */
-		dst = dst->GetLastEnginePart();
-	} else {
-		dst_head = nullptr;
-	}
-
-	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
-
-	/* When moving all wagons, we can't have the same src_head and dst_head */
-	if (move_chain && src_head == dst_head) return CommandCost();
-
-	/* When moving a multiheaded part to be place after itself, bail out. */
-	if (!move_chain && dst != nullptr && dst->IsRearDualheaded() && src == dst->other_multiheaded_part) return CommandCost();
-
-	/* Check if all vehicles in the source train are stopped inside a depot. */
-	if (!src_head->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
-
-	/* Check if all vehicles in the destination train are stopped inside a depot. */
-	if (dst_head != nullptr && !dst_head->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
+	Train *dst_head = (dst != nullptr) ? dst->First() : nullptr;
 
 	/* First make a backup of the order of the trains. That way we can do
 	 * whatever we want with the order and later on easily revert. */
@@ -1306,7 +1283,7 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 		/* If the autoreplace flag is set we do not need to test for the validity
 		 * because we are going to revert the train to its original state. As we
 		 * assume the original state was correct autoreplace can skip this. */
-		ret = ValidateTrains(original_dst_head, dst_head, original_src_head, src_head, true);
+		CommandCost ret = ValidateTrains(original_dst_head, dst_head, original_src_head, src_head, true);
 		if (ret.Failed()) {
 			/* Restore the train we had. */
 			RestoreTrainBackup(original_src);
@@ -1402,6 +1379,71 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 	}
 
 	return CommandCost();
+}
+
+CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleID dest_veh, bool move_chain)
+{
+	Train *src = Train::GetIfValid(src_veh);
+	if (src == nullptr) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(src->owner);
+	if (ret.Failed()) return ret;
+
+	/* Do not allow moving crashed vehicles inside the depot, it is likely to cause asserts later */
+	if (src->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
+
+	/* if nothing is selected as destination, try and find a matching vehicle to drag to. */
+	Train *dst;
+	if (dest_veh == VehicleID::Invalid()) {
+		dst = (src->IsEngine() || flags.Test(DoCommandFlag::AutoReplace)) ? nullptr : FindGoodVehiclePos(src);
+	} else {
+		dst = Train::GetIfValid(dest_veh);
+		if (dst == nullptr) return CMD_ERROR;
+
+		ret = CheckOwnership(dst->owner);
+		if (ret.Failed()) return ret;
+
+		/* Do not allow appending to crashed vehicles, too */
+		if (dst->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
+	}
+
+	/* if an articulated part is being handled, deal with its parent vehicle */
+	src = src->GetFirstEnginePart();
+	if (dst != nullptr) {
+		dst = dst->GetFirstEnginePart();
+	}
+
+	/* don't move the same vehicle.. */
+	if (src == dst) return CommandCost();
+
+	/* locate the head of the two chains, purely to run the depot-specific
+	 * preconditions below; TryConsistSplice() will compute them again. */
+	Train *src_head = src->First();
+	Train *dst_head;
+	if (dst != nullptr) {
+		dst_head = dst->First();
+		if (dst_head->tile != src_head->tile) return CMD_ERROR;
+		/* Now deal with articulated part of destination wagon */
+		dst = dst->GetLastEnginePart();
+	} else {
+		dst_head = nullptr;
+	}
+
+	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
+
+	/* When moving all wagons, we can't have the same src_head and dst_head */
+	if (move_chain && src_head == dst_head) return CommandCost();
+
+	/* When moving a multiheaded part to be place after itself, bail out. */
+	if (!move_chain && dst != nullptr && dst->IsRearDualheaded() && src == dst->other_multiheaded_part) return CommandCost();
+
+	/* Check if all vehicles in the source train are stopped inside a depot. */
+	if (!src_head->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
+
+	/* Check if all vehicles in the destination train are stopped inside a depot. */
+	if (dst_head != nullptr && !dst_head->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
+
+	return TryConsistSplice(flags, src, dst, move_chain);
 }
 
 /**
