@@ -145,20 +145,20 @@ jobs:
     - name: Store bundles
       uses: actions/upload-artifact@v5
       with:
-        name: openttd-windows-${{ inputs.arch || 'x64' }}
+        name: openttd-windows-${{ inputs.arch || 'x64' }}-run${{ github.run_number }}
         path: build/bundles
         retention-days: 14
 
     - name: Store raw exe
       uses: actions/upload-artifact@v5
       with:
-        name: openttd-exe-${{ inputs.arch || 'x64' }}
+        name: openttd-exe-${{ inputs.arch || 'x64' }}-run${{ github.run_number }}
         path: build/openttd.exe
         retention-days: 14
 
     - name: Store symbols
       uses: actions/upload-artifact@v5
       with:
-        name: symbols-windows-${{ inputs.arch || 'x64' }}
+        name: symbols-windows-${{ inputs.arch || 'x64' }}-run${{ github.run_number }}
         path: build/symbols
         retention-days: 14

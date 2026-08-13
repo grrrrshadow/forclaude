@@ -213,6 +213,29 @@ jen pro účely typu "porovnat checksum/verzi exe", ne pro spuštění.
 není, to je normální i u oficiálního instalátoru; hra si je nabídne
 stáhnout sama při prvním spuštění.)
 
+**Potvrzeno (2026-08-13):** `openttd-exe-x64` (run #4) skutečně obsahoval
+jen samotné `openttd.exe`, žádné složky navíc — sedí to s rozborem výše i
+s rozdílem velikosti (6,48 MB vs. 11,2 MB u plného bundlu). Samotný exe se
+nezkoušel spouštět izolovaně zvlášť — je to bit-identický soubor jako ten
+uvnitř bundlu, který už otestovaný byl (hra naběhla, mapa se vygenerovala).
+
+**Proč musí `lang/` být vždy ze stejné kompilace jako `openttd.exe`:**
+OpenTTD si hlídá konzistenci mezi zkompilovaným exe a jazykovými soubory —
+každý `.lng` soubor (vygenerovaný nástrojem `strgen` z `lang/*.txt` při
+buildu) nese identifikátor/verzi řetězců, kterou musí `openttd.exe` po
+startu ověřit; pokud nesedí (např. by se vzal `lang/` z jiné verze/buildu),
+OpenTTD danou language soubor odmítne jako neplatný. Nejde o licenční
+ochranu (jak by mohla znít chybová hláška při prvním dojmu), ale o
+kontrolu konzistence build artefaktů. Praktický důsledek pro nás: **při
+každé nové kompilaci (obzvlášť až budeme upravovat kód a měnit řetězce)
+musí uživatel vždy použít `lang/` z toho samého buildu**, nikdy
+recyklovaný ze staršího běhu.
+
+**Pojmenování artefaktů:** od tohoto commitu obsahují názvy artefaktů
+i číslo běhu (`-run<N>`, např. `openttd-exe-x64-run7`), aby bylo na první
+pohled jasné, ze kterého běhu který soubor pochází, i když jich bude na
+GitHubu najednou víc.
+
 ## Otevřené otázky / TODO
 
 - [ ] Spustit build poprvé a zaznamenat výsledek/čas/případné chyby do
