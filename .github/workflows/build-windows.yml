@@ -1,0 +1,161 @@
+name: Build OpenTTD (Windows)
+
+# Manual build of an OpenTTD source tree into a Windows openttd.exe.
+#
+# This intentionally mirrors the steps OpenTTD's own official release
+# workflow (.github/workflows/release-windows.yml in OpenTTD/OpenTTD) uses
+# for its "windows" job, so the resulting binary is built the same way as
+# the one distributed from openttd.org. See BUILD_NOTES.md in this repo
+# for the full rationale and the differences from the upstream workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        description: 'Source repository to build (owner/repo)'
+        required: false
+        default: 'OpenTTD/OpenTTD'
+      source_ref:
+        description: 'Git ref (tag/branch/commit) to build'
+        required: false
+        default: '15.3'
+      arch:
+        description: 'Target architecture'
+        required: true
+        default: 'x64'
+        type: choice
+        options:
+          - x64
+          - x86
+          - arm64
+
+jobs:
+  windows:
+    name: Windows (${{ inputs.arch }})
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout OpenTTD source
+      uses: actions/checkout@v6
+      with:
+        repository: ${{ inputs.source_repo }}
+        ref: ${{ inputs.source_ref }}
+        # Full history + tags, so CMake's FindVersion.cmake can run
+        # `git describe`/`git name-rev` and detect the version the same
+        # way it would for an official checkout (e.g. "15.3").
+        fetch-depth: 0
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Enable Rust cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Setup vcpkg
+      id: vcpkg
+      uses: OpenTTD/actions/setup-vcpkg@v6
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        echo "::group::Install choco dependencies"
+        choco install pandoc
+        echo "::endgroup::"
+
+        echo "::group::Install breakpad dependencies"
+        cargo install --locked dump_syms
+        echo "::endgroup::"
+
+    - name: Install MSVC problem matcher
+      uses: ammaraskar/msvc-problem-matcher@master
+
+    - name: Configure developer command prompt for tools
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Build tools
+      shell: bash
+      run: |
+        mkdir build-host
+        cd build-host
+
+        echo "::group::CMake"
+        cmake ${GITHUB_WORKSPACE} \
+          -GNinja \
+          -DOPTION_TOOLS_ONLY=ON \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        cmake --build . --target tools
+        echo "::endgroup::"
+
+    - name: Configure developer command prompt for ${{ inputs.arch }}
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: ${{ inputs.arch }}
+
+    - name: Build OpenTTD
+      shell: bash
+      run: |
+        mkdir build
+        cd build
+
+        echo "::group::CMake"
+        cmake ${GITHUB_WORKSPACE} \
+          -GNinja \
+          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-windows-static \
+          -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}" \
+          -DHOST_BINARY_DIR=${GITHUB_WORKSPACE}/build-host \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        cmake --build . --target openttd
+        echo "::endgroup::"
+
+    - name: Create breakpad symbols
+      shell: bash
+      run: |
+        cd build
+        dump_syms openttd.pdb --inlines --store symbols
+
+    - name: Create bundles
+      shell: bash
+      run: |
+        cd ${GITHUB_WORKSPACE}/build
+
+        echo "::group::Run CPack"
+        cpack
+        echo "::endgroup::"
+
+        echo "::group::Move PDB and exe to symbols"
+        PDB_FOLDER=$(find symbols -mindepth 2 -type d)
+        cp openttd.pdb ${PDB_FOLDER}/
+
+        EXE_FOLDER=symbols/openttd.exe/$(grep "INFO CODE_ID" symbols/*/*/openttd.sym | cut -d\  -f3)
+        mkdir -p ${EXE_FOLDER}
+        cp openttd.exe ${EXE_FOLDER}/
+        echo "::endgroup::"
+
+    - name: Store bundles
+      uses: actions/upload-artifact@v5
+      with:
+        name: openttd-windows-${{ inputs.arch }}
+        path: build/bundles
+        retention-days: 14
+
+    - name: Store raw exe
+      uses: actions/upload-artifact@v5
+      with:
+        name: openttd-exe-${{ inputs.arch }}
+        path: build/openttd.exe
+        retention-days: 14
+
+    - name: Store symbols
+      uses: actions/upload-artifact@v5
+      with:
+        name: symbols-windows-${{ inputs.arch }}
+        path: build/symbols
+        retention-days: 14

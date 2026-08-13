@@ -1,0 +1,151 @@
+# OpenTTD Windows Build — poznámky a postup
+
+Cíl: mít **stoprocentně reprodukovatelný** postup kompilace OpenTTD pro
+Windows (openttd.exe), postavený na oficiálním buildovacím postupu OpenTTD,
+tak abychom nejdřív ověřili, že umíme zkompilovat čistý (vanilla) zdrojový
+kód bez chyb — a teprve pak začali upravovat kód hry. Díky tomu, když po
+úpravě kódu build spadne, víme jistě, že chyba je v našich úpravách, ne
+v nestabilním/nedeterministickém CI postupu.
+
+## Zdroj
+
+- Oficiální repozitář: `OpenTTD/OpenTTD` (https://github.com/OpenTTD/OpenTTD)
+- Verze: **15.3** (vydáno 2026-04-04, autor releasu PeterN)
+- Tag: `15.3`
+- Commit, na který tag `15.3` ukazuje: `14ec60f248547d4d062a1160f0fc26d742319888`
+  (zaznamenáno při přípravě tohoto postupu — pokud by GitHub Actions checkout
+  vytáhl jiný commit pro tag `15.3`, je to signál, že se tag přesunul/je
+  něco jinak, a je potřeba to prošetřit).
+- Žádné git submoduly nejsou potřeba (`.gitmodules` v repu není).
+
+## Odkud vychází náš postup
+
+Vycházel jsem přímo z oficiálních GitHub Actions workflow souborů v tagu
+`15.3` repozitáře `OpenTTD/OpenTTD`:
+
+- `.github/workflows/release.yml` — hlavní orchestrátor releasu (spouští
+  source/docs/linux/macos/windows/windows-store joby a pak uploady na
+  CDN/Steam/GOG/Windows Store).
+- `.github/workflows/release-source.yml` — připraví zdrojový tarball,
+  vygeneruje verzi/changelog, odstraní `.git` z distribuovaného archivu.
+- `.github/workflows/release-windows.yml` — **toto je job, který reálně
+  produkuje `openttd.exe`, který se stahuje z openttd.org.**
+- `docs/../COMPILING.md`, `vcpkg.json`, `cmake/scripts/FindVersion.cmake` —
+  pro pochopení závislostí a jak se určuje verze.
+
+Náš workflow `.github/workflows/build-windows.yml` je zjednodušená, ale
+věrná kopie kroků z `release-windows.yml` (job `windows`, větev "bez
+instalátoru", protože instalátor a podepisování stejně nejde replikovat
+bez OpenTTD interních tajných klíčů — viz níže).
+
+## Přesné kroky, které oficiální build dělá (a náš taky)
+
+1. **Checkout zdroje.** Oficiálně: stažení připraveného `source.tar.gz`
+   (bez `.git`, ale s vygenerovaným `.ottdrev` souborem obsahujícím verzi).
+   My místo toho děláme přímý `actions/checkout` na `OpenTTD/OpenTTD` s
+   `ref: 15.3` a `fetch-depth: 0` (celá historie + tagy). Důvod: CMake
+   (`cmake/scripts/FindVersion.cmake`) při přítomnosti `.git` adresáře sám
+   spustí `git name-rev --tags` a zjistí verzi `15.3` stejně, jako by to
+   udělal oficiální postup z `.ottdrev`. Funkčně stejný výsledek, o krok
+   jednodušší pipeline.
+2. **Rust toolchain** (`dtolnay/rust-toolchain@stable`) + cache
+   (`Swatinem/rust-cache@v2`) — OpenTTD používá Rust pro část nástrojů
+   (breakpad symbol dumping).
+3. **vcpkg setup** přes `OpenTTD/actions/setup-vcpkg@v6` — oficiální akce
+   OpenTTD projektu, stará se o instalaci vcpkg a jeho cache. `vcpkg.json`
+   v kořeni repozitáře určuje přesné závislosti (breakpad, liblzma, libpng,
+   lzo, opusfile, zlib pro Windows) a je zamčený na
+   `builtin-baseline: b2cb0da531c2f1f740045bfe7c4dac59f0b2b69c` — tedy
+   přesná verze vcpkg registru, ne "nejnovější, co je zrovna k dispozici".
+4. **Choco závislosti:** `pandoc` (nepovinné — generuje `COPYING.rtf` do
+   balíčku, build bez něj neselže, ale pro věrnost ho instalujeme).
+   Vynechali jsme `nsis`, protože nestavíme instalátor (viz níže).
+5. **`cargo install dump_syms`** — nástroj pro generování breakpad symbolů
+   z `.pdb`, použitý později pro ladění pádů.
+6. **MSVC problem matcher** (`ammaraskar/msvc-problem-matcher@master`) —
+   jen kosmetika, zvýrazní chyby kompilátoru v logu GitHub Actions.
+7. **Build "host tools"** — nejdřív se v `build-host/` zkompiluje `tools`
+   target (`-DOPTION_TOOLS_ONLY=ON`), tedy nástroje jako `strgen`, které
+   generují zdrojáky (string tabulky) pro hlavní build. Tohle se dělá
+   v `x64` dev prostředí bez ohledu na cílovou architekturu.
+8. **Hlavní build** — nastaví se MSVC dev prostředí pro cílovou architekturu
+   (`x64`/`x86`/`arm64`) a spustí se:
+   ```
+   cmake <zdroj> -GNinja \
+     -DVCPKG_TARGET_TRIPLET=<arch>-windows-static \
+     -DCMAKE_TOOLCHAIN_FILE=<vcpkg toolchain z kroku 3> \
+     -DHOST_BINARY_DIR=<build-host adresář z kroku 7> \
+     -DCMAKE_BUILD_TYPE=RelWithDebInfo
+   cmake --build . --target openttd
+   ```
+9. **Breakpad symboly** — `dump_syms openttd.pdb --inlines --store symbols`.
+10. **CPack** — vytvoří distribuční balíček (zip) stejně jako oficiální
+    build; přesune `.pdb` a `.exe` do složky symbolů podle jejich CODE_ID.
+11. **Nahrání artefaktů** — bundle (zip), samostatný `openttd.exe`, a
+    symboly, jako výstupy GitHub Actions run (ke stažení z UI).
+
+## Co jsme vědomě vynechali a proč
+
+- **NSIS instalátor** (`-DOPTION_USE_NSIS=ON`) — instalátor se v oficiálním
+  postupu buildí jen pro tagované release verze. Nám stačí samotný
+  `openttd.exe`; instalátor je jen "obalovač" kolem stejného exe.
+- **Azure code signing** — oficiální build podepisuje `.exe`/instalátor
+  certifikátem OpenTTD projektu (`os/windows/sign.bat` + Azure Key Vault
+  secrets). Tenhle klíč nemáme a mít nemůžeme. Důsledek: Windows SmartScreen
+  může při prvním spuštění ukázat "neznámý vydavatel" — funkčnost programu
+  to nijak neovlivňuje.
+- **survey_key** — oficiální build generuje a vkládá "survey key" (pro
+  anonymní telemetrii OpenTTD projektu) přes jejich privátní signing klíč.
+  My necháváme `OPTION_SURVEY_KEY` na výchozí hodnotě (prázdno) — to je
+  přesně to, co se stane i official CI, když běží ve forku bez nastavené
+  `SURVEY_TYPE` proměnné. Nemá to žádný vliv na funkčnost hry.
+- **Ostatní platformy a joby** (`release-docs`, `release-linux`,
+  `release-macos`, `release-windows-store`, `upload-cdn`, `upload-steam`,
+  `upload-gog`, `upload-windows-store`) — netýkají se Windows `openttd.exe`,
+  vyžadují další tajné klíče/účty (Steam, GOG, Microsoft Store, OpenTTD CDN),
+  které nemáme a nepotřebujeme.
+- **Matice architektur** — oficiální build dělá `x86`, `x64` i `arm64`
+  najednou. Náš workflow to umí taky (vstupní parametr `arch`), ale zatím
+  spouštíme jen `x64` (běžná 64bit Windows architektura), dokud nemáme
+  ověřeno, že je pipeline stabilní a opakovatelná. Jakmile to potvrdíme,
+  můžeme přidat i `x86`/`arm64` do jednoho společného runu (matrix).
+
+## Reprodukovatelnost — jak to ověřujeme
+
+Workflow (`build-windows.yml`) se spouští ručně (`workflow_dispatch`) se
+vstupy `source_repo`, `source_ref`, `arch` — výchozí hodnoty odpovídají
+přesně `OpenTTD/OpenTTD` na tagu `15.3`, `x64`. Dokud neupravujeme kód,
+každé spuštění se stejnými vstupy musí dát **funkčně stejný** `openttd.exe`
+(stejná verze nástrojů/závislostí je zamčená přes `vcpkg.json`
+`builtin-baseline`, `dtolnay/rust-toolchain@stable` a `windows-latest`
+runner OS image).
+
+Log jednotlivých spuštění (doplňovat po každém běhu):
+
+| # | Datum | source_ref | arch | Výsledek | Poznámka |
+|---|-------|-----------|------|----------|----------|
+| 1 | — | 15.3 | x64 | *zatím nespuštěno* | první ověřovací běh |
+| 2 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
+| 3 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
+
+Až tu budeme mít 2-3 zelené, identické běhy, přesuneme se k úpravám kódu
+(vlastní fork/branch zdrojáků OpenTTD v tomto repu) a workflow přesměrujeme
+na náš vlastní zdroj místo `OpenTTD/OpenTTD`.
+
+## Jak spustit build
+
+1. GitHub → repozitář `grrrrshadow/forclaude` → záložka **Actions**.
+2. Vlevo vybrat workflow **"Build OpenTTD (Windows)"**.
+3. Tlačítko **"Run workflow"** → ponechat výchozí hodnoty
+   (`OpenTTD/OpenTTD`, `15.3`, `x64`) → **Run workflow**.
+4. Po doběhnutí (běžně cca 15-25 minut kvůli kompilaci vcpkg závislostí a
+   samotné hry) stáhnout artefakt `openttd-exe-x64` ze stránky daného běhu.
+
+## Otevřené otázky / TODO
+
+- [ ] Spustit build poprvé a zaznamenat výsledek/čas/případné chyby do
+      tabulky výše.
+- [ ] Spustit ještě 2× pro potvrzení reprodukovatelnosti.
+- [ ] Rozhodnout, jak budeme vendorovat zdrojový kód OpenTTD do tohoto repa
+      až začneme dělat úpravy (fork OpenTTD/OpenTTD vs. vlastní strom
+      v tomto repu).
