@@ -171,18 +171,20 @@ na náš vlastní zdroj místo `OpenTTD/OpenTTD`.
 
 ## Jak spustit build
 
-Poznámka: GitHub Actions REST API (spouštění/list běhů) je pro toto
-propojení (session ↔ GitHub) nedostupné — volání vrací 404 i s Actions
-povoleným v nastavení repozitáře. Proto workflow běží na `push` na tuto
-branch místo ručního "Run workflow" tlačítka/API dispatch. Když bude
-potřeba build znovu spustit, provede se to dalším pushnutím (typicky beze
-změny obsahu, jen prázdný/drobný commit).
+Poznámka k historii: zpočátku GitHub Actions REST API pro toto propojení
+(session ↔ GitHub) vracelo 404 i s Actions povoleným v nastavení
+repozitáře (viz run #1-#2, kde jsme workflow spouštěli přes `push` na
+branch jako workaround). Po chvíli se povolení propsalo a `workflow_dispatch`
+API dispatch (`run_workflow`) začal fungovat normálně (run #3 dál) — `push`
+trigger byl proto z workflow souboru odstraněn, protože zbytečně spouštěl
+build i při commitech, které se buildu netýkaly (např. run #5, zrušen jako
+duplicitní s #4).
 
 1. GitHub → repozitář `grrrrshadow/forclaude` → záložka **Actions**.
 2. Vlevo vybrat workflow **"Build OpenTTD (Windows)"**.
 3. Tlačítko **"Run workflow"** → ponechat výchozí hodnoty
    (`OpenTTD/OpenTTD`, `15.3`, `x64`) → **Run workflow**.
-   (Alternativa/fallback, pokud jednou budeš chtít spustit build i ty sám.)
+   (Nebo přes GitHub API `workflow_dispatch` — takhle build spouštím já.)
 4. Po doběhnutí (běžně cca 15-25 minut kvůli kompilaci vcpkg závislostí a
    samotné hry) stáhnout artefakt `openttd-exe-x64` ze stránky daného běhu.
 

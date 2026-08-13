@@ -9,14 +9,6 @@ name: Build OpenTTD (Windows)
 # for the full rationale and the differences from the upstream workflow.
 
 on:
-  # The GitHub connection this session uses can push commits, but does not
-  # currently have permission to call the Actions API (list/dispatch runs
-  # returns 404 even with Actions enabled on the repo). Until that's
-  # resolved, every push to this branch re-triggers the build so it can be
-  # started without going through the Actions UI or the dispatch API.
-  push:
-    branches:
-      - claude/github-connection-check-m6m898
   workflow_dispatch:
     inputs:
       source_repo:
