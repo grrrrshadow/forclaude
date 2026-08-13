@@ -186,7 +186,32 @@ duplicitní s #4).
    (`OpenTTD/OpenTTD`, `15.3`, `x64`) → **Run workflow**.
    (Nebo přes GitHub API `workflow_dispatch` — takhle build spouštím já.)
 4. Po doběhnutí (běžně cca 15-25 minut kvůli kompilaci vcpkg závislostí a
-   samotné hry) stáhnout artefakt `openttd-exe-x64` ze stránky daného běhu.
+   samotné hry) stáhnout artefakt ze stránky daného běhu — **pro spuštění
+   hry stahuj `openttd-windows-x64` (celý CPack bundle), ne
+   `openttd-exe-x64`** (viz poznámka níže).
+
+## Důležité: samotný `openttd.exe` nejde spustit izolovaně
+
+`install(DIRECTORY ... lang, baseset, ai, game ...)` v
+`cmake/InstallAndPackage.cmake` ukazuje, že `openttd.exe` očekává vedle
+sebe složky `lang/` (zkompilované jazykové řetězce), `baseset/`, `ai/` a
+`game/`. Artefakt `openttd-exe-x64` z našeho workflow (krok "Store raw
+exe") kopíruje jen `build/openttd.exe` samotné, bez těchto složek — spuštění
+samotného exe pak selže na chybějící "language" soubory. Tohle **není**
+problém s licencí/copyrightem originálních jazykových souborů (ty jsou
+plně open-source součást OpenTTD zdrojáku, na rozdíl od grafiky/zvuků
+originální Transport Tycoon Deluxe, kde licence skutečně hraje roli a
+proto existuje samostatný svobodný OpenGFX/OpenSFX projekt) — je to čistě
+o tom, že jsme poslali špatný artefakt.
+
+**Pro reálné spuštění a otestování hry vždy používej `openttd-windows-x64`**
+(CPack bundle, obsahuje exe + lang/baseset/ai/game pohromadě) — rozbalit
+celou složku a spustit `openttd.exe` zevnitř. `openttd-exe-x64` má smysl
+jen pro účely typu "porovnat checksum/verzi exe", ne pro spuštění.
+
+(Base grafika/zvuk pro samotnou hratelnost — OpenGFX apod. — v bundlu
+není, to je normální i u oficiálního instalátoru; hra si je nabídne
+stáhnout sama při prvním spuštění.)
 
 ## Otevřené otázky / TODO
 
