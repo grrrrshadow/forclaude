@@ -379,10 +379,11 @@ pohyb, neresetuje aktuální cíl/order), takže tohle nepotřebuje žádnou
 speciální logiku navíc — je to zadarmo díky tomu, jak breakdown systém
 už funguje.
 
-*Poznámka/návrh k doplnění:* pokud je v okamžiku poruchy A k dispozici
-víc volných odtahů v depech, navrhuju vybrat ten **nejbližší** — dej
-vědět, jestli s tím souhlasíš, nebo to má být jinak (např. podle pořadí
-v seznamu vozidel).
+**Rozhodnuto:** pokud je v okamžiku poruchy A k dispozici víc volných
+odtahů v depech, vybere se ten **nejbližší** (vzdálenost po trati/cestě k
+A, ne vzdušnou čarou — upřesníme při implementaci, ale záměr je
+"nejbližší reálně dosažitelný", ne jen geometricky nejbližší depo, které
+třeba ani nemá spojení).
 
 ### 5. Fronta při víc poruchách najednou → **žádná fronta**
 
