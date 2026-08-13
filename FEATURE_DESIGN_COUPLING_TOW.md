@@ -306,27 +306,107 @@ Navrhovaná state-machine (na vysoké úrovni, k diskuzi):
   15.3 (nekopírovat starý přístup).
 - Nové řetězce do `lang/english.txt` pro GUI.
 
-## Otevřené otázky pro diskuzi (schválně nerozhoduji sám)
+## Rozhodnutí padlá v diskuzi (2026-08-13)
 
-1. **Patch vs. přímá úprava zdrojáku:** psal jsi, že si nejsi jistý, jestli
-   dělat patch. Já bych doporučil **přímou úpravu forkovaného zdrojového
-   stromu** (ne .patch/.diff soubory) — je to jednodušší na vývoj a
-   ladění, a GitHub Actions build, co už máme, umí stavět z libovolného
-   zdroje/branch. Nevýhoda: budoucí rebase na novější OpenTTD verze bude
-   manuální práce. Souhlasíš s tímhle směrem?
-2. **Multiplayer determinismus:** OpenTTD je navržené tak, že every
-   `Command` musí být deterministický napříč klienty (kvůli
-   synchronizaci multiplayeru). Hraješ jen singleplayer, nebo má smysl
-   dbát na multiplayer-safe determinismus (žádné `Random()` mimo
-   commandy, žádné čtení lokálního stavu klienta v command logice)? Tohle
-   dost ovlivní, jak moc přísně to musíme psát.
-3. **Spouštěč odtahové služby:** company-wide nastavení ("máme odtahovou
-   službu")? Per-vlak nastavení? Nová kategorie vozidla/depo? Potřebuju
-   vědět, jak přesně si to představuješ v menu.
-4. **Co když se porouchá i odtahová mašinka** cestou k porouchanému vlaku?
-   Vanilla fallback (počká a jede sama), nebo potřebuje záložní odtah?
-5. **Kolik odtahových mašinek najednou** — fronta požadavků na odtah, když
-   je jich víc najednou porouchaných a odtahů málo?
+### 1. Patch vs. přímá úprava zdrojáku → **přímá úprava**
+
+Originál je vždy dostupný na GitHubu (OpenTTD/OpenTTD), takže není důvod
+udržovat samostatný .patch/.diff — přímá úprava forkovaného zdrojového
+stromu je jednodušší na vývoj i ladění a je to "o jednu problematickou
+operaci míň" (aplikace patche na měnící se strom). Náš build pipeline
+(`build-windows.yml`) to zvládne stavět z libovolného zdroje/branch beze
+změny.
+
+### 2. Multiplayer determinismus → **ano, musí být multiplayer-safe**
+
+Hráno i v síti (sdílené koleje mezi hráči plánované jako další krok), takže
+nový kód musí být deterministický napříč klienty stejně jako zbytek hry.
+K tomu jsem při studiu zdrojáku 15.3 našel důležitou, konkrétní věc,
+kterou musíme respektovat — **další konkrétní past k tomu, čemu se
+vyhnout** (v `src/core/random_func.hpp`):
+
+```cpp
+extern Randomizer _random;              // "Random used in the game state calculations"
+extern Randomizer _interactive_random;  // "Random used everywhere else, where it does
+                                         //  not (directly) influence the game state"
+```
+
+OpenTTD má **dva** generátory náhodných čísel: `Random()` (synchronizovaný
+napříč klienty, bezpečný pro cokoliv, co ovlivňuje herní stav — vanilla
+`CheckVehicleBreakdown()` ho takhle používá při rozhodování o poruše) a
+`InteractiveRandom()` (lokální, NENÍ synchronizovaný, používat jen pro
+věci co neovlivňují herní stav, např. čistě kosmetické efekty na
+klientovi). Záměna těchto dvou je klasický zdroj desyncu v multiplayeru u
+patchů/modů. **Pravidlo pro náš kód:** cokoliv, co rozhoduje o dostupnosti
+odtahu, výběru odtahové mašinky, atd., musí používat `Random()`
+(synchronizovaný), nikdy `InteractiveRandom()`.
+
+Zároveň to neznamená, že úplně všechno musí jít přes `Command`: pravidelná
+per-tick simulace (jako dnešní `HandleBreakdown()`/pohyb vlaků) běží
+identicky na všech klientech už dnes, aniž by to byl `Command` — je to
+jen deterministický kód nad synchronizovaným stavem + synchronizovaným
+RNG. Nová logika odtahu (kontrola dostupnosti, výběr nejbližší volné
+mašinky, atd.) může fungovat stejně — jako součást běžné per-tick
+simulace, ne jako zvláštní `Command`. `Command` potřebujeme jen pro věci,
+které iniciuje hráč kliknutím (dát příkaz "Service", ruční couple/decouple).
+
+### 3. Spouštěč odtahové služby → **vyhrazený příkaz v pořadí, odtahová mašinka čeká v depu**
+
+Nový typ příkazu (pracovně "Service"/"Wait for breakdown") v seznamu
+příkazů odtahové mašinky. Mašinka s tímhle příkazem **stojí v depu** a
+čeká — to je hezké, protože depo je zároveň i cíl, kam se nakonec odtažená
+porucha odveze, takže odtahová mašinka má vždy jasně definovaný "domov".
+
+### 4. Porucha odtahové mašinky cestou k poruše → **vanilla fallback pro odtah, ale se zásadní podmínkou pro tu PŮVODNÍ poruchu**
+
+Když odtah T1 jede zachránit porouchaný vlak A a T1 samo cestou spadne do
+poruchy: T1 se chová přesně jako běžný porouchaný vlak (počká si
+`breakdown_delay`, jede dál sama, žádný "odtah pro odtah").
+
+Kritickou věc jsi ale správně pojmenoval: **jakmile je T1 vlaku A
+přiřazena, A musí čekat na TOHLE konkrétní T1 bez časového limitu a bez
+tichého návratu k vlastnímu pohybu** — i kdyby T1 zdrželo vlastní
+poruchou. Kdyby A mělo možnost "to už čekám dost dlouho, pojedu si sám",
+mohlo by se přesně stát to, co jsi popsal: T1 by pak dojelo na místo s
+příkazem "couple" a nikdo by tam nebyl. Jakmile je tedy odtah přiřazený,
+je to závazek na obou stranách, dokud se buď nespojí, nebo hráč
+ručně nezasáhne (zruší službu, prodá vozidlo, apod.).
+
+Po vlastním zotavení T1 z poruchy: **T1 prostě pokračuje ve svém aktuálně
+rozjetém pohybu k A** — nemusí se nejdřív vracet do svého depa. Vanilla
+`HandleBreakdown()` už dnes funguje přesně takhle (porucha jen pozastaví
+pohyb, neresetuje aktuální cíl/order), takže tohle nepotřebuje žádnou
+speciální logiku navíc — je to zadarmo díky tomu, jak breakdown systém
+už funguje.
+
+*Poznámka/návrh k doplnění:* pokud je v okamžiku poruchy A k dispozici
+víc volných odtahů v depech, navrhuju vybrat ten **nejbližší** — dej
+vědět, jestli s tím souhlasíš, nebo to má být jinak (např. podle pořadí
+v seznamu vozidel).
+
+### 5. Fronta při víc poruchách najednou → **žádná fronta**
+
+Pokud v okamžiku poruchy není žádný volný odtah, vlak se rovnou chová
+jako ve vanille (chvíli počká, pak jede dál sám) — nečeká, až se nějaký
+odtah uvolní později. Nejjednodušší a nejméně konfliktní varianta, přesně
+jak jsi navrhl.
+
+### 6. Automatický odhad počtu vagonků k odpojení (Bug E) → **nižší priorita**
+
+Vysvětlil jsi, že jsi ve starém patchi vždy zadával explicitní počet
+vagonků a fungovalo to dobře — takže "auto" odhad bez potvrzení není
+problém, který jsi v praxi řešil. Necháme explicitní zadání počtu jako
+hlavní/výchozí cestu (tak jak to znáš a funguje), auto-odhad zůstane jen
+jako nepovinná pomůcka do budoucna, ne prioritní část návrhu.
+
+### Poznámka do budoucna (nerozhodujeme teď)
+
+Zmínil jsi sdílení kolejí mezi hráči jako další krok po tomhle. Nebudu to
+teď navrhovat, ale budu na to myslet při psaní kódu, aby couple/decouple/
+odtah nepředpokládaly bez důvodu "všechny vlaky na trati patří jedné
+firmě" tam, kde to není nutné (typicky u výpočtu adjacency/orientace —
+tam na vlastnictví nezáleží; záleží na něm až u otázek typu "kdo smí s kým
+couplovat" nebo "kdo platí za odtah", což teď neřešíme).
 
 ## Co bude další krok
 
