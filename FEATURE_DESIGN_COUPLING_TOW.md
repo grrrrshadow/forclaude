@@ -409,10 +409,88 @@ firmě" tam, kde to není nutné (typicky u výpočtu adjacency/orientace —
 tam na vlastnictví nezáleží; záleží na něm až u otázek typu "kdo smí s kým
 couplovat" nebo "kdo platí za odtah", což teď neřešíme).
 
-## Co bude další krok
+## Technický plán — soubory, funkce, Command ID
 
-Až tohle probereme a doladíme rozhodnutí výše, napíšu konkrétní seznam
-souborů/funkcí/Command ID a teprve pak začnu psát kód — postupně, jednu
-ucelenou část (nejspíš nejdřív sdílený `TryConsistSplice` základ, protože
-na něm stojí obě featury) a vždy s buildem přes náš zavedený CI pipeline,
-abychom hned viděli, jestli něco nerozbilo kompilaci.
+Ověřeno přímo v `src/command_type.h` a `src/train_cmd.h`, jak se v 15.3
+dnes registruje nový příkaz (na příkladu `CMD_MOVE_RAIL_VEHICLE`):
+
+1. Nová hodnota v `enum Commands` (`command_type.h`).
+2. Deklarace `CommandCost CmdXxx(DoCommandFlags flags, ...);` v
+   `train_cmd.h`.
+3. `DEF_CMD_TRAIT(CMD_XXX, CmdXxx, CommandFlag::Location, CommandType::VehicleManagement)`
+   ve stejném souboru.
+4. Tělo v `train_cmd.cpp`.
+5. Volání přes `Command<CMD_XXX>::Do(DoCommandFlag::Execute, ...)` (interně)
+   nebo `::Post(...)` (z GUI, s chybovou hláškou).
+
+### Nové Command ID (návrh, čísla/pořadí upřesním při psaní)
+
+| Command | Účel | Kdo volá |
+|---|---|---|
+| `CMD_COUPLE_TRAINS` | Spojit dvě soupravy na trati | hráč (GUI) i naše per-tick tow logika |
+| `CMD_DECOUPLE_TRAIN` | Rozpojit soupravu na trati | hráč (GUI) |
+| `CMD_MODIFY_ORDER` (existující, rozšířit) | Nastavit parametry couple/decouple/service orderu | hráč (GUI, order window) |
+
+Odtah **nepotřebuje vlastní couple/decouple Command** — jakmile tow
+dorazí k porouchanému vlaku, zavolá stejný `CMD_COUPLE_TRAINS` jako hráč
+by zavolal ručně (jen ho spustí naše per-tick simulace, ne kliknutí).
+Stejně tak rozpojení v depu po opravě je stejný `CMD_DECOUPLE_TRAIN`. To
+je přesně ten "jeden sdílený mechanismus místo čtyř kopií" z návrhu výše.
+
+### Sdílené primitivum: `TryConsistSplice`
+
+Návrh umístění: nová statická funkce v `train_cmd.cpp`, vedle
+`ArrangeTrains`/`ValidateTrains`/`MakeTrainBackup`/`RestoreTrainBackup`
+(existující funkce, které využije beze změny). Návrh signatury:
+
+```cpp
+/**
+ * Zkusí přeuspořádat dvě soupravy (spojit, nebo rozpojit v daném bodě) a
+ * validovat výsledek. Při neúspěchu obě soupravy symetricky vrátí do
+ * původního stavu. Nemutuje nic mimo vozidlový řetězec (žádná rezervace
+ * trati) — to je odpovědnost volajícího, provést až PO úspěšném volání.
+ */
+static bool TryConsistSplice(Train **head_a, Train *split_point_a,
+                              Train **head_b, Train *split_point_b,
+                              bool move_chain);
+```
+
+Použije se z:
+- refaktorovaného `CmdMoveRailVehicle` (beze změny chování — jen extrakce
+  existující logiky, viz "První krok" níže),
+- nového `CmdCoupleTrains` (couple na trati),
+- nového `CmdDecoupleTrain` (decouple na trati),
+- per-tick tow logiky (couple s porouchaným vlakem, decouple v depu po
+  opravě).
+
+### Nová pole (návrh, upřesním při psaní konkrétní části)
+
+- `Train`: stav "čeká na odtah" (enum/bit), `assigned_tow` (VehicleID
+  přiřazeného odtahu nebo `VehicleID::Invalid()`), uložený
+  `VehicleOrderID` pro návrat k původním příkazům po opravě.
+- `Order`: vlastní (ne sdílené, viz Bug D) pole pro couple/decouple
+  parametry a pro nový "Service"/tow-wait order typ.
+- `saveload/vehicle_sl.cpp`, `saveload/order_sl.cpp`: nová pole = nová
+  savegame chunk verze, podle dnešních zvyklostí 15.3 (ne postup starého
+  patche).
+- `lang/english.txt`: nové řetězce pro GUI (chybové hlášky, popisky
+  příkazů).
+
+## První krok implementace — čistý refaktoring, žádná nová funkčnost
+
+Než přidáme jakékoliv nové chování, uděláme **jeden samostatný commit**,
+který jen vytáhne existující logiku z `CmdMoveRailVehicle` do
+`TryConsistSplice` a `CmdMoveRailVehicle` ji zavolá — beze změny chování.
+Cíl: mít jistotu, že extrakce je bezpečná (build zůstane zelený, hra se
+chová identicky), než na tomhle základu stavíme cokoliv nového. Tohle je
+přesně ten "nejdřív se nauč kompilovat beze změny kódu" princip z úvodu
+projektu, aplikovaný teď i na první krok úpravy kódu samotného.
+
+## Vendorování zdroje do tohoto repozitáře
+
+Zdroj OpenTTD 15.3 (commit `14ec60f248547d4d062a1160f0fc26d742319888`)
+zkopírován do `openttd/` v tomto repu (bez `.git` historie OpenTTD — naše
+změny sleduje git tohoto repozitáře). `build-windows.yml` upraven, aby
+defaultně stavěl `openttd/` z tohoto repa; možnost stavět z libovolného
+externího zdroje (`source_repo`/`source_ref`) zůstává zachovaná pro
+srovnávací/ověřovací buildy čistého vanilla kódu.

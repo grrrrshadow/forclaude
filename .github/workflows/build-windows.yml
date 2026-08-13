@@ -12,11 +12,11 @@ on:
   workflow_dispatch:
     inputs:
       source_repo:
-        description: 'Source repository to build (owner/repo)'
+        description: 'Override: build an external repository instead of the vendored openttd/ in this repo (owner/repo, e.g. for comparison against upstream vanilla)'
         required: false
-        default: 'OpenTTD/OpenTTD'
+        default: ''
       source_ref:
-        description: 'Git ref (tag/branch/commit) to build'
+        description: 'Git ref (tag/branch/commit) to build, only used together with source_repo'
         required: false
         default: '15.3'
       arch:
@@ -38,15 +38,29 @@ jobs:
     runs-on: windows-2022
 
     steps:
-    - name: Checkout OpenTTD source
+    - name: Checkout this repository (vendored OpenTTD source lives in openttd/)
+      uses: actions/checkout@v6
+
+    - name: Checkout external OpenTTD source (only if source_repo override given)
+      if: inputs.source_repo != ''
       uses: actions/checkout@v6
       with:
-        repository: ${{ inputs.source_repo || 'OpenTTD/OpenTTD' }}
+        repository: ${{ inputs.source_repo }}
         ref: ${{ inputs.source_ref || '15.3' }}
         # Full history + tags, so CMake's FindVersion.cmake can run
         # `git describe`/`git name-rev` and detect the version the same
         # way it would for an official checkout (e.g. "15.3").
         fetch-depth: 0
+        path: external-openttd-src
+
+    - name: Select source directory
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.source_repo }}" ]; then
+          echo "SOURCE_DIR=external-openttd-src" >> "$GITHUB_ENV"
+        else
+          echo "SOURCE_DIR=openttd" >> "$GITHUB_ENV"
+        fi
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -84,7 +98,7 @@ jobs:
         cd build-host
 
         echo "::group::CMake"
-        cmake ${GITHUB_WORKSPACE} \
+        cmake ${GITHUB_WORKSPACE}/${SOURCE_DIR} \
           -GNinja \
           -DOPTION_TOOLS_ONLY=ON \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -106,7 +120,7 @@ jobs:
         cd build
 
         echo "::group::CMake"
-        cmake ${GITHUB_WORKSPACE} \
+        cmake ${GITHUB_WORKSPACE}/${SOURCE_DIR} \
           -GNinja \
           -DVCPKG_TARGET_TRIPLET=${{ inputs.arch || 'x64' }}-windows-static \
           -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}" \
