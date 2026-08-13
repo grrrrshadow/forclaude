@@ -124,9 +124,10 @@ Log jednotlivých spuštění (doplňovat po každém běhu):
 
 | # | Datum | source_ref | arch | Výsledek | Poznámka |
 |---|-------|-----------|------|----------|----------|
-| 1 | — | 15.3 | x64 | *zatím nespuštěno* | první ověřovací běh |
-| 2 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
+| 1 | 2026-08-13 | (prázdné → viz poznámka) | (prázdné → viz poznámka) | ❌ selhalo | Spuštěno přes `push` trigger (workaround, viz níže), ne přes `workflow_dispatch` → `inputs.*` byly prázdné. Krok "Checkout OpenTTD source" proto checkoutnul náš vlastní repo `forclaude` místo `OpenTTD/OpenTTD`. CMake selhal: `CMake Error: The source directory "D:/a/forclaude/forclaude" does not appear to contain CMakeLists.txt.` OpenTTD zdroj se vůbec nestáhl, jde o chybu naší pipeline (workflow file), ne o OpenTTD kód. **Oprava:** přidány fallback výrazy `${{ inputs.X || 'default' }}` na všech místech, kde se `inputs.*` používá, aby workflow fungoval správně i bez `workflow_dispatch` vstupů (commit "Add fallback defaults..."). |
+| 2 | — | 15.3 | x64 | | ověřovací běh po opravě fallbacků |
 | 3 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
+| 4 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
 
 Až tu budeme mít 2-3 zelené, identické běhy, přesuneme se k úpravám kódu
 (vlastní fork/branch zdrojáků OpenTTD v tomto repu) a workflow přesměrujeme

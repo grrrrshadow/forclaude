@@ -39,15 +39,15 @@ on:
 
 jobs:
   windows:
-    name: Windows (${{ inputs.arch }})
+    name: Windows (${{ inputs.arch || 'x64' }})
     runs-on: windows-latest
 
     steps:
     - name: Checkout OpenTTD source
       uses: actions/checkout@v6
       with:
-        repository: ${{ inputs.source_repo }}
-        ref: ${{ inputs.source_ref }}
+        repository: ${{ inputs.source_repo || 'OpenTTD/OpenTTD' }}
+        ref: ${{ inputs.source_ref || '15.3' }}
         # Full history + tags, so CMake's FindVersion.cmake can run
         # `git describe`/`git name-rev` and detect the version the same
         # way it would for an official checkout (e.g. "15.3").
@@ -99,10 +99,10 @@ jobs:
         cmake --build . --target tools
         echo "::endgroup::"
 
-    - name: Configure developer command prompt for ${{ inputs.arch }}
+    - name: Configure developer command prompt for ${{ inputs.arch || 'x64' }}
       uses: ilammy/msvc-dev-cmd@v1
       with:
-        arch: ${{ inputs.arch }}
+        arch: ${{ inputs.arch || 'x64' }}
 
     - name: Build OpenTTD
       shell: bash
@@ -113,7 +113,7 @@ jobs:
         echo "::group::CMake"
         cmake ${GITHUB_WORKSPACE} \
           -GNinja \
-          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-windows-static \
+          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch || 'x64' }}-windows-static \
           -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}" \
           -DHOST_BINARY_DIR=${GITHUB_WORKSPACE}/build-host \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -150,20 +150,20 @@ jobs:
     - name: Store bundles
       uses: actions/upload-artifact@v5
       with:
-        name: openttd-windows-${{ inputs.arch }}
+        name: openttd-windows-${{ inputs.arch || 'x64' }}
         path: build/bundles
         retention-days: 14
 
     - name: Store raw exe
       uses: actions/upload-artifact@v5
       with:
-        name: openttd-exe-${{ inputs.arch }}
+        name: openttd-exe-${{ inputs.arch || 'x64' }}
         path: build/openttd.exe
         retention-days: 14
 
     - name: Store symbols
       uses: actions/upload-artifact@v5
       with:
-        name: symbols-windows-${{ inputs.arch }}
+        name: symbols-windows-${{ inputs.arch || 'x64' }}
         path: build/symbols
         retention-days: 14
