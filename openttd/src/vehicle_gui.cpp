@@ -3189,6 +3189,9 @@ public:
 			}
 
 			case OT_LOADING:
+				if (v->type == VEH_TRAIN && (v->current_order.ShouldWaitForCouple() || v->current_order.ShouldGoToCouple())) {
+					return GetString(STR_VEHICLE_STATUS_WAITING_FOR_COUPLE);
+				}
 				return GetString(STR_VEHICLE_STATUS_LOADING_UNLOADING);
 
 			case OT_GOTO_WAYPOINT:
