@@ -633,3 +633,48 @@ srovnávací/ověřovací buildy čistého vanilla kódu.
   ozubeným kolečkem). Úvodní GUI před generováním mapy zatím neřešit.
   **Tohle je velký, samostatný kus práce** — potřebuje se probrat a
   naplánovat zvlášť, ne narychlo přimíchat do bezpečnostní opravy.
+
+## Poznatek: jak poznat, jestli hraješ NÁŠ build (2026-08-14)
+
+Uživatel při testu omylem spouštěl starou referenční kompilaci
+Palo123YPS (větev `Decouple`, commit `g251e5384`, datum 2018-08-14), ne
+náš `forclaude` build — a chvíli si myslel, že testuje naše změny.
+Poznat se to dá spolehlivě podle verze v hlavním menu:
+
+- Náš vendorovaný zdroj v `openttd/` v tomhle repu **nemá vlastní
+  `.git`** (schválně, viz `VENDORED_SOURCE.md`). `FindVersion.cmake`
+  proto nemůže spustit `git describe` a spadne do fallbacku
+  `REV_VERSION = "norev0000"` (viz
+  `openttd/cmake/scripts/FindVersion.cmake:118`). Náš build tedy VŽDY
+  ukazuje `norev0000` v hlavním menu, nikdy datum/větev/hash.
+- Formát `<datum>-<větev>-g<hash>` (přesně to, co bylo na screenshotu)
+  vzniká jen když se kompiluje ze skutečného git repozitáře s historií
+  — to je Palo123YPS build, ne náš.
+
+**Důsledek:** hlášené "zamčené čudlíky ve špatné poloze" (otáčení
+povoleno) a bohaté orders GUI ze screenshotu patří k tomu starému
+referenčnímu buildu, ne k našemu kódu. V našem zdroji jsem znovu
+zkontroloval hodnoty:
+- `difficulty.line_reverse_mode` ("Disallow train reversing in
+  stations"): `def = true` (zákaz zapnutý) — bezpečný stav, zamčeno.
+- `pf.reverse_at_signals` ("Automatic reversing at signals"):
+  `def = false` (vypnuto) — bezpečný stav, zamčeno.
+Obě natvrdo needitovatelné přes `SettingDesc::IsEditable()`. Pokud by
+se stejný problém objevil i v exe s verzí `norev0000`, jde o skutečný
+bug a je potřeba to nahlásit znovu.
+
+**Doporučený postup příště:** před testem zkontrolovat verzi v hlavním
+menu (musí být `norev0000`), teprve pak testovat a hlásit chování.
+
+## Otevřený bod: odtah a už obsazená jednosměrná trať
+
+Uživatel upozornil na scénář, který návrh exclusive-reservation řeší
+jen částečně: na jednosměrné (semaforama chráněné) trati mezi depem
+odtahovky a místem poruchy mohou stát/jet JINÉ vlaky ještě předtím, než
+k poruše vůbec dojde. Rezervace celé zpáteční cesty pro odtahovku
+nezaručuje, že cesta TAM bude volná — odtahovka může uvíznout za jiným
+vlakem, který jí zablokuje jednosměrný semafor směrem k poruše.
+Návrh tedy musí počítat s tím, že odtahovka prostě čeká (stojí, dokud
+se cesta neuvolní běžným provozem), stejně jako by čekal kterýkoli jiný
+vlak před obsazeným blokem — žádné obcházení kolizní ochrany. Zůstává
+otevřené pro fázi, kdy se bude tow reálně implementovat.
