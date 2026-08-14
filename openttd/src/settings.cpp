@@ -893,6 +893,12 @@ void IniSaveWindowSettings(IniFile &ini, std::string_view grpname, WindowDesc *d
  */
 bool SettingDesc::IsEditable(bool do_command) const
 {
+	/* Locked off (greyed out, not removed - see the "Locked on/off" note
+	 * added to their help text): a train reversing at a station or signal
+	 * can drive straight into wagons a decouple order just left behind.
+	 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (this->GetName() == "difficulty.line_reverse_mode" || this->GetName() == "pf.reverse_at_signals") return false;
+
 	if (!do_command && !this->flags.Test(SettingFlag::NoNetworkSync) && _networking && !_network_server && !this->flags.Test(SettingFlag::PerCompany)) return false;
 	if (do_command && this->flags.Test(SettingFlag::NoNetworkSync)) return false;
 	if (this->flags.Test(SettingFlag::NetworkOnly) && !_networking && _game_mode != GM_MENU) return false;

@@ -1352,7 +1352,7 @@ STR_CONFIG_SETTING_RECESSIONS                                   :Recessions: {ST
 STR_CONFIG_SETTING_RECESSIONS_HELPTEXT                          :If enabled, recessions may occur periodically. During a recession all production is significantly lower (it returns to previous level when the recession is over)
 
 STR_CONFIG_SETTING_TRAIN_REVERSING                              :Disallow train reversing in stations: {STRING2}
-STR_CONFIG_SETTING_TRAIN_REVERSING_HELPTEXT                     :If enabled, trains will not reverse in non-terminus stations, even if there is a shorter path to their next destination when reversing
+STR_CONFIG_SETTING_TRAIN_REVERSING_HELPTEXT                     :If enabled, trains will not reverse in non-terminus stations, even if there is a shorter path to their next destination when reversing. {WHITE}Locked on: you are playing with decouple orders, and a train reversing here can drive straight into wagons it just left behind
 
 STR_CONFIG_SETTING_DISASTERS                                    :Disasters: {STRING2}
 STR_CONFIG_SETTING_DISASTERS_HELPTEXT                           :Toggle disasters which may occasionally block or destroy vehicles or infrastructure
@@ -2195,7 +2195,7 @@ STR_CONFIG_SETTING_AI_NPC                                       :Computer player
 STR_CONFIG_SETTING_NETWORK                                      :Network
 
 STR_CONFIG_SETTING_REVERSE_AT_SIGNALS                           :Automatic reversing at signals: {STRING2}
-STR_CONFIG_SETTING_REVERSE_AT_SIGNALS_HELPTEXT                  :Allow trains to reverse on a signal, if they waited there a long time
+STR_CONFIG_SETTING_REVERSE_AT_SIGNALS_HELPTEXT                  :Allow trains to reverse on a signal, if they waited there a long time. {WHITE}Locked off: you are playing with decouple orders, and a train reversing here can drive straight into wagons it just left behind
 
 STR_CONFIG_SETTING_QUERY_CAPTION                                :{WHITE}Change setting value
 
