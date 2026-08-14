@@ -2542,6 +2542,8 @@ static bool CheckTrainStayInDepot(Train *v)
 	return false;
 }
 
+static bool IsRailStationPlatformOccupied(TileIndex tile);
+
 /**
  * Clear the reservation of \a tile that was just left by a wagon on \a track_dir.
  * @param v %Train owning the reservation.
@@ -2575,8 +2577,16 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 	} else if (IsRailStationTile(tile)) {
 		TileIndex new_tile = TileAddByDiagDir(tile, dir);
 		/* If the new tile is not a further tile of the same station, we
-		 * clear the reservation for the whole platform. */
-		if (!IsCompatibleTrainStationTile(new_tile, tile)) {
+		 * clear the reservation for the whole platform -- but only if no
+		 * other train is still standing on it (mirrors the "only if free"
+		 * check just above for tunnels/bridges, and the same check used
+		 * when a wagon is deleted, see IsRailStationPlatformOccupied()).
+		 * Without this, a "free wagon" chain left behind by a decouple
+		 * order loses its PBS reservation the instant the rest of the
+		 * train it was split from leaves the platform, even though it is
+		 * still physically standing there. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (!IsCompatibleTrainStationTile(new_tile, tile) && !IsRailStationPlatformOccupied(tile)) {
 			SetRailStationPlatformReservation(tile, ReverseDiagDir(dir), false);
 		}
 	} else {
