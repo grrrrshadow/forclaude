@@ -385,31 +385,49 @@ A, ne vzdušnou čarou — upřesníme při implementaci, ale záměr je
 "nejbližší reálně dosažitelný", ne jen geometricky nejbližší depo, které
 třeba ani nemá spojení).
 
-### Důležitý postřeh: jednosměrné semafory a směr odtahu (2026-08-14)
+### Jednosměrné semafory a směr odtahu (2026-08-14, opraveno)
 
-Upozornil jsi na reálný problém: pokud odtah T1 dojede k poruše A a mezi
-nimi jsou jednosměrné semafory, T1 se nemůže vrátit tudy, kudy přijel
-(semafory to nepustí). Navržené řešení, se kterým souhlasím a beru jako
-závazné pro implementaci: **odtah nikdy nemá "couvat" zpátky tam, odkud
-přijel.** Místo toho:
+Původní verze tohohle bodu (níže přeškrtnuto pro záznam) byla špatně
+domyšlená. Skutečný problém: odtah T1 dojede k poruše A po nějaké trati —
+tou samou tratí se ale typicky musí **vrátit zpátky** (domovské depo bývá
+přesně tam, odkud T1 přijelo, ne dál "dopředu" ve směru, kterým A
+původně jelo). Jednosměrné semafory na téhle trati T1 pustí tam, ale ne
+zpátky — to je reálný, běžný stav věcí v normální hře (T1 se přece
+vydává z depa "dopředu" po vlastní trati, ne po cizí).
 
-- Odtah přijíždí k poruše **zezadu** (ve směru, kterým porouchaný vlak A
-  původně jel) — to je přesně ta nejjednodušší geometrie, kterou už mám
-  hotovou v `GetTrainCouplePartner`/`CMD_COUPLE_TRAINS` (dojíždějící vlak
-  zezadu, stejný směr, žádný reverz). Není to jen zjednodušení pro první
-  verzi — je to **správné a jediné bezpečné řešení** vzhledem k
-  jednosměrným semaforům.
-- Jakmile se spojí, bereme A za "spravené" (opravu nemusíme čekat až v
-  depu) a **celá souprava (A vpředu, T1 vzadu jako tlačící odtah)
-  pokračuje dál dopředu**, ve směru, kterým A původně jelo — ne zpátky.
-  Do depa (na opravu/rozpojení) dojedou dál po trati tímhle směrem, ne
-  návratem stejnou cestou.
-- V depu se rozpojí a oba pokračují podle svých vlastních příkazů.
+~~odtah nikdy nemá couvat zpátky tam, odkud přijel~~ — **zrušeno,
+nahrazeno níže.**
 
-Tohle zároveň zjednodušuje dřívější rozhodnutí (bod 4 výše) — "T1
-pokračuje ve svém aktuálně rozjetém pohybu k A" zůstává v platnosti, jen
-upřesňujeme, že **po spojení se nikdy nikdo neotáčí**, jede se dál týmž
-směrem, kterým se k sobě dojeli.
+**Nové řešení (dvě části, obě potřeba):**
+
+1. **Odtah dostane absolutní výjimku z pravidel jednosměrných semaforů**
+   pro cestu zpátky s připojenou poruchou. Ne jako obecné "ignoruj
+   semafory" pravidlo přidané do celého signalizačního systému (to by
+   bylo riskantní a plošné), ale jako **přehrání přesné cesty, kterou T1
+   už jednou bezpečně projelo, pozpátku** — žádné nové hledání cesty,
+   žádné vyhodnocování semaforů na zpáteční cestě vůbec, protože ta cesta
+   už byla prokazatelně bezpečná (T1 po ní právě přijelo). Prakticky:
+   zaznamenat sled dlaždic/směrů, kterými T1 jelo k poruše, a po spojení
+   ho jen přehrát obráceně místo běžného pohybového/pathfinding kódu.
+   Funguje to i s vypnutým globálním nastavením "otáčení na semaforech" —
+   je to specifická vlastnost odtahu při návratu s poruchou, ne změna
+   herního nastavení.
+2. **Vizuálně se souprava neotáčí** — po spojení se odtah + porouchaný
+   vlak chová jako obousměrná souprava s lokomotivou na obou koncích
+   ("top and tail", běžná reálná železniční praxe), ne jako jedna
+   souprava co se otočí a jede opačně. Vanilla 15.3 tohle dnes neumí (jen
+   "multiheaded" dvojice lokomotiv koupené jako pár mají grafiku pro obě
+   strany, není to obecný nástroj). Budeme muset přidat vlastní obdobu
+   toho, co měl starý patch (`VRF_REVERSE_DIRECTION` — bit "tahle
+   konkrétní jednotka je vizuálně otočená, i když souprava/pohyb jede
+   jinam") — **ale s ponaučením z Bug A**: ten flag smí ovlivnit jen
+   vykreslení, nikdy nesmí přepsat skutečný `direction` (přesně tam
+   starý patch udělal chybu, co způsobovala "výbuchy").
+
+Tohle je větší kus enginové práce (nová vlastnost vozidla + úprava
+vykreslování + záznam/přehrávání cesty) — bude to samostatný krok až po
+tom, co budeme mít stabilní couple/decouple. Zapsáno teď, abychom na to
+nezapomněli a nenavrhli tow logiku, která by na tohle nebrala ohled.
 
 ### 5. Fronta při víc poruchách najednou → **žádná fronta**
 
