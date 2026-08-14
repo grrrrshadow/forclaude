@@ -398,20 +398,30 @@ vydává z depa "dopředu" po vlastní trati, ne po cizí).
 ~~odtah nikdy nemá couvat zpátky tam, odkud přijel~~ — **zrušeno,
 nahrazeno níže.**
 
-**Nové řešení (dvě části, obě potřeba):**
+~~přehrání přesné cesty pozpátku, žádné vyhodnocování semaforů na
+zpáteční cestě vůbec~~ — **zrušeno, opraveno níže.** Tohle bylo
+nebezpečně špatně: "přehrát cestu a nevyhodnocovat semafory" by
+znamenalo ignorovat i to, k čemu semafory doopravdy slouží — nejde jen o
+povolený směr, ale o **ochranu proti tomu, aby dva vlaky byly ve stejném
+úseku trati zároveň.** Kdyby odtah jel zpátky bez ohledu na semafory,
+mohl by se čelně srazit s vlakem, který mezitím tou samou tratí jede
+správným směrem. Díky za odchycení, tohle by bez opravy skončilo přesně
+tím druhem "vlak vybouchne" bugu, kterému se celou dobu snažíme
+vyhnout.
 
-1. **Odtah dostane absolutní výjimku z pravidel jednosměrných semaforů**
-   pro cestu zpátky s připojenou poruchou. Ne jako obecné "ignoruj
-   semafory" pravidlo přidané do celého signalizačního systému (to by
-   bylo riskantní a plošné), ale jako **přehrání přesné cesty, kterou T1
-   už jednou bezpečně projelo, pozpátku** — žádné nové hledání cesty,
-   žádné vyhodnocování semaforů na zpáteční cestě vůbec, protože ta cesta
-   už byla prokazatelně bezpečná (T1 po ní právě přijelo). Prakticky:
-   zaznamenat sled dlaždic/směrů, kterými T1 jelo k poruše, a po spojení
-   ho jen přehrát obráceně místo běžného pohybového/pathfinding kódu.
-   Funguje to i s vypnutým globálním nastavením "otáčení na semaforech" —
-   je to specifická vlastnost odtahu při návratu s poruchou, ne změna
-   herního nastavení.
+**Opravené řešení (dvě části, obě potřeba):**
+
+1. **Odtah si musí celou zpáteční cestu nejdřív rezervovat jako
+   výhradní**, ještě než se s poruchou vydá zpátky — přesně to samé, co
+   dnes dělá rezervační systém pro běžnou jízdu vpřed (jeden vlak = jeden
+   rezervovaný úsek, nikdo jiný do něj nesmí vjet), jen rozšířené tak, aby
+   šlo rezervovat i proti směru jednosměrného semaforu. Nejde o "vypnutí"
+   kolizní ochrany — ta zůstává plně v platnosti (žádný jiný vlak do
+   rezervovaného úseku nevjede, počká na jeho hranici stejně, jako dnes
+   čeká na obsazený úsek) — jen umožňujeme, aby si rezervaci mohl v tomhle
+   jednom případě vzít vlak jedoucí "špatným" směrem. Tohle je jediný
+   bezpečný způsob, jak dovolit odtahu vrátit se stejnou tratí, ne
+   obcházení semaforů jako takové.
 2. **Vizuálně se souprava neotáčí** — po spojení se odtah + porouchaný
    vlak chová jako obousměrná souprava s lokomotivou na obou koncích
    ("top and tail", běžná reálná železniční praxe), ne jako jedna
@@ -424,10 +434,12 @@ nahrazeno níže.**
    vykreslení, nikdy nesmí přepsat skutečný `direction` (přesně tam
    starý patch udělal chybu, co způsobovala "výbuchy").
 
-Tohle je větší kus enginové práce (nová vlastnost vozidla + úprava
-vykreslování + záznam/přehrávání cesty) — bude to samostatný krok až po
-tom, co budeme mít stabilní couple/decouple. Zapsáno teď, abychom na to
-nezapomněli a nenavrhli tow logiku, která by na tohle nebrala ohled.
+Tohle je větší kus enginové práce (nová vlastnost vozidla pro
+vykreslování + rozšíření rezervačního systému o rezervaci proti směru
+jednosměrného semaforu, se zachovanou kolizní ochranou) — bude to
+samostatný krok až po tom, co budeme mít stabilní couple/decouple.
+Zapsáno teď, abychom na to nezapomněli a nenavrhli tow logiku, která by
+na tohle nebrala ohled.
 
 ### 5. Fronta při víc poruchách najednou → **žádná fronta**
 
