@@ -565,6 +565,16 @@ bool AfterLoadGame()
 	/* The LFSR used in RunTileLoop iteration cannot have a zeroed state, make it non-zeroed. */
 	if (_cur_tileloop_tile == 0) _cur_tileloop_tile = TileIndex{1};
 
+	/* difficulty.line_reverse_mode and pf.reverse_at_signals are hard-locked
+	 * via SettingDesc::IsEditable() so the player can never toggle them, but
+	 * a savegame made before the lock existed (or on another build) can
+	 * still carry the dangerous saved value. Force the safe value on every
+	 * load, unconditionally, regardless of savegame version -- this is a
+	 * safety invariant, not a compatibility upgrade. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	_settings_game.difficulty.line_reverse_mode = true;
+	_settings_game.pf.reverse_at_signals = false;
+
 	if (IsSavegameVersionBefore(SLV_98)) _gamelog.Oldver();
 
 	_gamelog.TestRevision();

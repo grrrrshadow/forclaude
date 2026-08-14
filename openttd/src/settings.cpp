@@ -952,6 +952,15 @@ static void ValidateSettings()
 			_settings_newgame.difficulty.quantity_sea_lakes == CUSTOM_SEA_LEVEL_NUMBER_DIFFICULTY) {
 		_settings_newgame.difficulty.quantity_sea_lakes = CUSTOM_SEA_LEVEL_MIN_PERCENTAGE;
 	}
+
+	/* These two are hard-locked via SettingDesc::IsEditable() so the player
+	 * can never toggle them in the GUI, but that alone doesn't fix an
+	 * openttd.cfg that already has the dangerous value saved from before
+	 * the lock existed. Force the safe value here too, every time
+	 * settings are loaded, so "locked" actually means locked to the safe
+	 * state. See FEATURE_DESIGN_COUPLING_TOW.md. */
+	_settings_newgame.difficulty.line_reverse_mode = true;
+	_settings_newgame.pf.reverse_at_signals = false;
 }
 
 static void AILoadConfig(const IniFile &ini, std::string_view grpname)
