@@ -2425,11 +2425,15 @@ void Vehicle::HandleLoading(bool mode)
 
 			/* If this order wants to couple with a partner train before
 			 * leaving, keep waiting (loaded and ready, but not departing)
-			 * until one shows up right ahead of us. When it does, couple
+			 * until one shows up right next to us. When it does, couple
 			 * with it now, while both are still stopped here, then
-			 * continue departing as a single (longer) consist. See
+			 * continue departing as a single (longer) consist. Applies
+			 * both to a train sitting still on a "wait to couple" order
+			 * and to one that actively travelled here on a "go to
+			 * couple" order (see CheckReverseTrain() in train_cmd.cpp for
+			 * the reversal-permission half of that). See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (this->type == VEH_TRAIN && this->current_order.ShouldWaitForCouple()) {
+			if (this->type == VEH_TRAIN && (this->current_order.ShouldWaitForCouple() || this->current_order.ShouldGoToCouple())) {
 				Train *t = Train::From(this);
 				if (GetTrainCouplePartner(t) == nullptr) return;
 				CmdCoupleTrains(DoCommandFlag::Execute, t->index);

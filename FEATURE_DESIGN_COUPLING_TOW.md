@@ -716,3 +716,53 @@ velký projekt jako odtah — zůstává jako možné budoucí rozšíření, al
 díky opravě výše (obousměrná detekce partnera) už není pro samotné
 spojování potřeba: nezáleží, kterým směrem je která souprava otočená,
 stačí fyzická blízkost.
+
+## "Go to couple" příkaz (run #18): jak to řešil Paolo123YPS a proč to nepotřebuje beta16
+
+Uživatel se ptal, jestli nejde použít couvání tak, jak ho měl
+Paolo123YPS, místo portování celého "backwards driving" z beta16.
+Stáhl jsem si jejich `Decouple` větev a podíval se na `OT_GOTO_COUPLE`
+přímo v kódu (`order_cmd.cpp`, `train_cmd.cpp`,
+`pathfinder/yapf/yapf_rail.cpp`). Zjištění: **žádné skutečné couvání
+tam není.** Je to jen:
+
+1. Vlastní typ příkazu `OT_GOTO_COUPLE` s vlastním YAPF pathfinderem
+   (`CYapfCouple`/`DoTrainCouplePathfind`), který hledá cestu k
+   PARTNEROVI (jinému vlaku) jako cíli, ne k pevné dlaždici.
+2. Výjimka `may_reverse = ... || v->current_order.IsType(OT_GOTO_COUPLE)`
+   — dovolí témuž, už ve vanille odjakživa existujícímu mechanismu
+   volby couvání (magic-flip, ne skutečná jízda pozadu), aby se použil
+   i pro tenhle příkaz, i kdyby jinak nebyl "nejkratší cestou".
+3. Povinné otočení na konci koleje (`TrainApproachingLineEnd` →
+   `ReverseTrainDirection`) funguje úplně stejně jako vždy — to není
+   vázané na žádné nastavení, děje se to vždycky, i u nás. Přesně tohle
+   se uživateli spustilo při ručním testu — jenže vlak neměl žádný cíl
+   směřující k partnerovi, tak po otočení pokračoval jinam.
+
+Jinými slovy: stačí dát vlaku SKUTEČNÝ cíl (stanici/místo, kde partner
+stojí) a normální, ve vanille odjakživa existující otáčení (povinné na
+konci koleje, volitelné jako zkratka jinde) ho tam dostane samo,
+včetně otočení, když je potřeba. Žádná nová vrstva pohybu není
+potřeba — to je přesně to, co dělá beta16 zbytečně velkým pro naši
+potřebu.
+
+**Implementace v1 (hotovo):** nový příkaz "Go to couple"
+(`WID_O_GOTO_COUPLE`, pole `Order::go_to_couple`, `MOF_GOTO_COUPLE`) —
+zatím funguje stejně jako "Wait to couple" (při příjezdu/zastavení
+čeká, dokud se nenajde partner přes `GetTrainCouplePartner`, pak
+spojí), ale navíc:
+- má vlastní tlačítko/popisek v GUI, aby to vypadalo jako u
+  Paolo123YPS (samostatný řádek v seznamu příkazů),
+- prolamuje zámek `difficulty.line_reverse_mode` výhradně pro tenhle
+  příkaz (`CheckReverseTrain()` v `train_cmd.cpp`) — bezpečnostní zámek
+  chrání proti NEÚMYSLNÉMU otočení do vagonků po decouplu; úmyslné
+  otočení kvůli příkazu, jehož smysl je právě dojet k partnerovi, není
+  ten případ.
+
+**Co ještě chybí (budoucí rozšíření, ne blokující):** vlastní
+pathfinder hledající NEJBLIŽŠÍHO vhodného partnera jako cíl (jejich
+`CYapfCouple`/`CYapfDestinationTrainRailT`) — zatím se "Go to couple"
+musí zadat na konkrétní stanici, kde partner už stojí, ne "najeď k
+nejbližšímu vhodnému vlaku kdekoliv". Tohle je přesně ta část, co se
+bude hodit pro odtah (najít nejbližší porouchaný vlak) — nechávám jako
+navazující krok, ne součást v1.

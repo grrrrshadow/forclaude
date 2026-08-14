@@ -4706,7 +4706,10 @@ STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}When lea
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Enter number of vehicles to keep (0 = don't decouple)
 
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Wait to couple
-STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at this station until a stopped train arrives immediately ahead to couple with, then continue as one consist
+STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at this station until a stopped train arrives immediately next to us to couple with, then continue as one consist
+
+STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
+STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and a train reversing here can drive straight into wagons it just left behind
 

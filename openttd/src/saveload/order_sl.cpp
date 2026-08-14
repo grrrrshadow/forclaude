@@ -231,6 +231,7 @@ public:
 		 * FEATURE_DESIGN_COUPLING_TOW.md. */
 		SLE_VAR(Order, decouple_count, SLE_UINT8),
 		SLE_VAR(Order, wait_for_couple, SLE_BOOL),
+		SLE_VAR(Order, go_to_couple, SLE_BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

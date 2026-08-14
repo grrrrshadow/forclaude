@@ -1186,7 +1186,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE) return CMD_ERROR;
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1339,6 +1339,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_WAIT_COUPLE:
 			if (v->type != VEH_TRAIN) return CMD_ERROR;
 			break;
+
+		case MOF_GOTO_COUPLE:
+			if (v->type != VEH_TRAIN) return CMD_ERROR;
+			break;
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -1441,6 +1445,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_WAIT_COUPLE:
 				order->SetWaitForCouple(data != 0);
+				break;
+
+			case MOF_GOTO_COUPLE:
+				order->SetGoToCouple(data != 0);
 				break;
 
 			default: NOT_REACHED();

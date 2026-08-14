@@ -1061,7 +1061,10 @@ public:
 		if (decouple_sel != nullptr) {
 			bool show_decouple = this->vehicle->type == VEH_TRAIN && order != nullptr && order->IsType(OT_GOTO_STATION);
 			decouple_sel->SetDisplayedPlane(show_decouple ? 0 : SZSP_NONE);
-			if (show_decouple) this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
+			if (show_decouple) {
+				this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
+				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE, order->ShouldGoToCouple());
+			}
 		}
 
 		this->SetDirty();
@@ -1344,6 +1347,13 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
 				Command<CMD_MODIFY_ORDER>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_WAIT_COUPLE, order->ShouldWaitForCouple() ? 0 : 1);
+				break;
+			}
+
+			case WID_O_GOTO_COUPLE: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				Command<CMD_MODIFY_ORDER>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
 				break;
 			}
 
@@ -1657,6 +1667,8 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetStringTip(STR_JUST_STRING, STR_ORDER_DECOUPLE_COUNT_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_O_WAIT_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

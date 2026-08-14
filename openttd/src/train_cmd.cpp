@@ -3167,7 +3167,14 @@ bool TryPathReserve(Train *v, bool mark_as_stuck, bool first_tile_okay)
 
 static bool CheckReverseTrain(const Train *v)
 {
-	if (_settings_game.difficulty.line_reverse_mode != 0 ||
+	/* difficulty.line_reverse_mode is hard-locked on (see
+	 * SettingDesc::IsEditable() in settings.cpp) to stop a train
+	 * reversing *unintentionally* into wagons a decouple order left
+	 * behind. A "go to couple" order reversing on purpose, because
+	 * that is the whole point of the order, is not that -- carve out
+	 * an explicit exception rather than weakening the general lock.
+	 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+	if ((_settings_game.difficulty.line_reverse_mode != 0 && !v->current_order.ShouldGoToCouple()) ||
 			v->track == TRACK_BIT_DEPOT || v->track == TRACK_BIT_WORMHOLE ||
 			!(v->direction & 1)) {
 		return false;
