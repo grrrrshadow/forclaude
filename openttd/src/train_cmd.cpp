@@ -1369,6 +1369,22 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 		if (src_head != nullptr) src_head->First()->MarkDirty();
 		if (dst_head != nullptr) dst_head->First()->MarkDirty();
 
+		/* Splitting a consist can leave a headless "free wagon" chain
+		 * standing on ordinary reservable track (e.g. a station platform)
+		 * instead of a depot -- something that never happens in vanilla,
+		 * where free wagons only ever exist inside a depot (where track
+		 * reservation is irrelevant, see the TRACK_BIT_DEPOT case in
+		 * Train::ReserveTrackUnderConsist()). Nothing else in the engine
+		 * actively maintains reservation under a stationary, engineless
+		 * consist -- the only other caller of ReserveTrackUnderConsist()
+		 * is crash handling, re-asserting it for exactly the same reason
+		 * ("Crash() clears the reservation!"). Re-assert it here for both
+		 * halves of the split so a PBS signal elsewhere can never read a
+		 * decoupled train's tiles as free and route another train through
+		 * it. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (src_head != nullptr) src_head->ReserveTrackUnderConsist();
+		if (dst_head != nullptr) dst_head->ReserveTrackUnderConsist();
+
 		/* We are undoubtedly changing something in the depot and train list. */
 		InvalidateWindowData(WC_VEHICLE_DEPOT, src->tile);
 		InvalidateWindowClassesData(WC_TRAINS_LIST, 0);

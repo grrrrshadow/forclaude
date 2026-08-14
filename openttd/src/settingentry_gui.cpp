@@ -282,8 +282,16 @@ void SettingEntry::DrawSetting(GameSettings *settings_ptr, int left, int right, 
 	auto [min_val, max_val] = sd->GetRange();
 	int32_t value = sd->Read(ResolveObject(settings_ptr, sd));
 	if (sd->IsBoolSetting()) {
-		/* Draw checkbox for boolean-value either on/off */
-		DrawBoolButton(buttons_left, button_y, COLOUR_YELLOW, COLOUR_MAUVE, value != 0, editable);
+		/* Draw checkbox for boolean-value either on/off. difficulty.line_reverse_mode
+		 * is worded as a negative ("Disallow ..."), so its safe, locked value is
+		 * true -- which would otherwise draw green and read at a glance as
+		 * "reversing is on". Force it to draw the same grey/"off" way as the
+		 * sibling pf.reverse_at_signals lock (false there is the safe value) so
+		 * both locked settings look consistently "off". This is purely a visual
+		 * override; the actual stored value driving gameplay is untouched. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		bool visual_state = value != 0 && sd->GetName() != "difficulty.line_reverse_mode";
+		DrawBoolButton(buttons_left, button_y, COLOUR_YELLOW, COLOUR_MAUVE, visual_state, editable);
 	} else if (sd->flags.Test(SettingFlag::GuiDropdown)) {
 		/* Draw [v] button for settings of an enum-type */
 		DrawDropDownButton(buttons_left, button_y, COLOUR_YELLOW, state != 0, editable);
