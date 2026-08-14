@@ -230,6 +230,7 @@ public:
 		 * in-class default (0 = "don't decouple") applies on load. See
 		 * FEATURE_DESIGN_COUPLING_TOW.md. */
 		SLE_VAR(Order, decouple_count, SLE_UINT8),
+		SLE_VAR(Order, wait_for_couple, SLE_BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

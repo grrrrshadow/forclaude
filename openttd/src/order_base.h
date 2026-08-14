@@ -65,6 +65,15 @@ private:
 	 */
 	uint8_t decouple_count = 0;
 
+	/**
+	 * If true, delay leaving this station until a compatible stopped
+	 * train arrives immediately ahead to couple with (see
+	 * GetTrainCouplePartner() and FEATURE_DESIGN_COUPLING_TOW.md).
+	 * Dedicated field, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D").
+	 */
+	bool wait_for_couple = false;
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -155,6 +164,12 @@ public:
 
 	/** Set how many vehicles to keep when decoupling on departure; 0 disables decoupling for this order. */
 	inline void SetDecoupleCount(uint8_t count) { this->decouple_count = count; }
+
+	/** Should we delay leaving this station until a partner train arrives to couple with? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldWaitForCouple() const { return this->wait_for_couple; }
+
+	/** Set whether to delay leaving this station until a partner train arrives to couple with. */
+	inline void SetWaitForCouple(bool wait) { this->wait_for_couple = wait; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?

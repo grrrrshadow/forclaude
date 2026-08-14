@@ -1055,12 +1055,13 @@ public:
 		/* Disable list of vehicles with the same shared orders if there is no list */
 		this->SetWidgetDisabledState(WID_O_SHARED_ORDER_LIST, !shared_orders);
 
-		/* Decouple row: trains only, and only for a selected 'goto station'
-		 * order. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		/* Decouple/couple row: trains only, and only for a selected 'goto
+		 * station' order. See FEATURE_DESIGN_COUPLING_TOW.md. */
 		NWidgetStacked *decouple_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE);
 		if (decouple_sel != nullptr) {
 			bool show_decouple = this->vehicle->type == VEH_TRAIN && order != nullptr && order->IsType(OT_GOTO_STATION);
 			decouple_sel->SetDisplayedPlane(show_decouple ? 0 : SZSP_NONE);
+			if (show_decouple) this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
 		}
 
 		this->SetDirty();
@@ -1336,6 +1337,13 @@ public:
 				assert(order != nullptr);
 				this->querying_decouple_count = true;
 				ShowQueryString(GetString(STR_JUST_INT, order->GetDecoupleCount()), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				break;
+			}
+
+			case WID_O_WAIT_COUPLE: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				Command<CMD_MODIFY_ORDER>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_WAIT_COUPLE, order->ShouldWaitForCouple() ? 0 : 1);
 				break;
 			}
 
@@ -1641,12 +1649,14 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_O_SHARED_ORDER_LIST), SetAspect(1), SetSpriteTip(SPR_SHARED_ORDERS_ICON, STR_ORDERS_VEH_WITH_SHARED_ORDERS_LIST_TOOLTIP),
 	EndContainer(),
 
-	/* Decouple row: only shown for a selected 'goto station' order. See
-	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	/* Decouple/couple row: only shown for a selected 'goto station' order.
+	 * See FEATURE_DESIGN_COUPLING_TOW.md. */
 	NWidget(NWID_SELECTION, INVALID_COLOUR, WID_O_SEL_DECOUPLE),
-		NWidget(NWID_HORIZONTAL),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_O_DECOUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_JUST_STRING, STR_ORDER_DECOUPLE_COUNT_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_O_WAIT_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

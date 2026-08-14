@@ -2423,6 +2423,18 @@ void Vehicle::HandleLoading(bool mode)
 			/* Not the first call for this tick, or still loading */
 			if (mode || !this->vehicle_flags.Test(VehicleFlag::LoadingFinished) || this->current_order_time < wait_time) return;
 
+			/* If this order wants to couple with a partner train before
+			 * leaving, keep waiting (loaded and ready, but not departing)
+			 * until one shows up right ahead of us. When it does, couple
+			 * with it now, while both are still stopped here, then
+			 * continue departing as a single (longer) consist. See
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (this->type == VEH_TRAIN && this->current_order.ShouldWaitForCouple()) {
+				Train *t = Train::From(this);
+				if (GetTrainCouplePartner(t) == nullptr) return;
+				CmdCoupleTrains(DoCommandFlag::Execute, t->index);
+			}
+
 			this->PlayLeaveStationSound();
 
 			this->LeaveStation();
