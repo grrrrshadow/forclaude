@@ -615,3 +615,21 @@ srovnávací/ověřovací buildy čistého vanilla kódu.
 5. Očekávaný výsledek: obě soupravy se spojí do jedné, přesně jako
    výsledek přesunu v depu (statistiky, příkazy, unit number se převezmou
    podle stejné logiky jako `CmdMoveRailVehicle`).
+
+## Otevřené body k pauze (2026-08-14, konec usage limitu)
+
+- ✅ **Bezpečnostní oprava:** `difficulty.line_reverse_mode` (otáčení ve
+  stanicích) a `pf.reverse_at_signals` (otáčení na semaforech) natvrdo
+  zamčeny přes `SettingDesc::IsEditable()` — vlak po decouplu mohl
+  narazit do vagonků, co za sebou nechal. Nastavení zůstává v menu
+  viditelné (jen zašedlé), s vysvětlivkou v nápovědě dole.
+- ⏭️ **Velký požadavek na GUI reskin (zatím nerozpracováno):** uživatel
+  chce Order okno chovat se stylově jako v Palo123YPS (klik na stanici →
+  nový řádek s decouple/couple parametry — blízké tomu, co dnes máme,
+  ale styl/vzhled má sedět na starý patch), přebrat grafiku horní lišty
+  ikon (výstavba, finance, atd.) z Palo123YPS, analyzovat rozdíl mezi
+  semaforovými systémy 15.3 a Palo123YPS a případně přebrat semafory +
+  jejich GUI z Palo123YPS. Z 15.3 chce zachovat jen GUI nastavení (pod
+  ozubeným kolečkem). Úvodní GUI před generováním mapy zatím neřešit.
+  **Tohle je velký, samostatný kus práce** — potřebuje se probrat a
+  naplánovat zvlášť, ne narychlo přimíchat do bezpečnostní opravy.
