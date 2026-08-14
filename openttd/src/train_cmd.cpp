@@ -1528,6 +1528,40 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 }
 
 /**
+ * Decouple a stopped train down to its front @p keep_count "real"
+ * (non-articulated-part) vehicles, splitting the rest off into a new
+ * standalone train left behind. Called from #Vehicle::LeaveStation when
+ * the order just finished has Order::ShouldDecoupleOnDeparture() set; see
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * If @p keep_count is 0 or is not achievable with the train's current
+ * length (e.g. the consist has since been shortened, or it's a
+ * multiheaded engine that can't be split at that point), this silently
+ * does nothing rather than failing loudly - the order's decouple count is
+ * a per-order setting that can outlive changes to the consist it was set
+ * on, similar to how e.g. full-load orders don't error on a consist that
+ * can never fill up.
+ *
+ * @param v          front of the consist that just finished loading
+ * @param keep_count number of vehicles to keep at the front
+ */
+void TryDecoupleAtStation(Train *v, uint8_t keep_count)
+{
+	if (keep_count == 0) return;
+	if (v->vehstatus.Test(VehState::Crashed)) return;
+
+	Train *split_point = v;
+	for (uint8_t i = 0; i < keep_count; i++) {
+		split_point = split_point->GetNextVehicle();
+		if (split_point == nullptr) return; // consist has fewer than keep_count vehicles
+	}
+
+	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
+
+	TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
+}
+
+/**
  * Sell a (single) train wagon/engine.
  * @param flags type of operation
  * @param t     the train wagon to sell

@@ -54,6 +54,17 @@ private:
 	uint16_t travel_time = 0; ///< How long in ticks the journey to this destination should take.
 	uint16_t max_speed = UINT16_MAX; ///< How fast the vehicle may go on the way to the destination.
 
+	/**
+	 * Number of vehicles to keep at the front of the consist when leaving
+	 * this order's station; 0 (the default, unaffected by any pre-existing
+	 * order/savegame) means "don't decouple". Deliberately its own field,
+	 * not packed into `flags` alongside unrelated per-order-type data --
+	 * see FEATURE_DESIGN_COUPLING_TOW.md, "Bug D" for why that aliasing
+	 * bit-packing approach caused real bugs in the patch this feature is
+	 * inspired by.
+	 */
+	uint8_t decouple_count = 0;
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -127,6 +138,23 @@ public:
 	inline CargoType GetRefitCargo() const { return this->refit_cargo; }
 
 	void SetRefit(CargoType cargo);
+
+	/**
+	 * Should the consist decouple down to #GetDecoupleCount vehicles when
+	 * leaving this order's station?
+	 * @pre IsType(OT_GOTO_STATION)
+	 */
+	inline bool ShouldDecoupleOnDeparture() const { return this->decouple_count > 0; }
+
+	/**
+	 * How many vehicles (counted from the front) to keep when decoupling
+	 * on departure; only meaningful if #ShouldDecoupleOnDeparture.
+	 * @pre IsType(OT_GOTO_STATION)
+	 */
+	inline uint8_t GetDecoupleCount() const { return this->decouple_count; }
+
+	/** Set how many vehicles to keep when decoupling on departure; 0 disables decoupling for this order. */
+	inline void SetDecoupleCount(uint8_t count) { this->decouple_count = count; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?

@@ -4701,6 +4701,10 @@ STR_ORDER_CONDITIONAL_COMPARATOR_IS_FALSE                       :is false
 STR_ORDER_CONDITIONAL_VALUE_TOOLTIP                             :{BLACK}The value to compare the vehicle data against
 STR_ORDER_CONDITIONAL_VALUE_CAPT                                :{WHITE}Enter value to compare against
 
+STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Decouple: {NUM}
+STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}When leaving this station, keep this many vehicles at the front and leave the rest behind, decoupled. 0 means don't decouple
+STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Enter number of vehicles to keep (0 = don't decouple)
+
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
 STR_ORDERS_SKIP_TOOLTIP                                         :{BLACK}Skip the current order, and start the next. Ctrl+Click to skip to the selected order
 

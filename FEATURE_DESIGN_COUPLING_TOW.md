@@ -385,6 +385,32 @@ A, ne vzdušnou čarou — upřesníme při implementaci, ale záměr je
 "nejbližší reálně dosažitelný", ne jen geometricky nejbližší depo, které
 třeba ani nemá spojení).
 
+### Důležitý postřeh: jednosměrné semafory a směr odtahu (2026-08-14)
+
+Upozornil jsi na reálný problém: pokud odtah T1 dojede k poruše A a mezi
+nimi jsou jednosměrné semafory, T1 se nemůže vrátit tudy, kudy přijel
+(semafory to nepustí). Navržené řešení, se kterým souhlasím a beru jako
+závazné pro implementaci: **odtah nikdy nemá "couvat" zpátky tam, odkud
+přijel.** Místo toho:
+
+- Odtah přijíždí k poruše **zezadu** (ve směru, kterým porouchaný vlak A
+  původně jel) — to je přesně ta nejjednodušší geometrie, kterou už mám
+  hotovou v `GetTrainCouplePartner`/`CMD_COUPLE_TRAINS` (dojíždějící vlak
+  zezadu, stejný směr, žádný reverz). Není to jen zjednodušení pro první
+  verzi — je to **správné a jediné bezpečné řešení** vzhledem k
+  jednosměrným semaforům.
+- Jakmile se spojí, bereme A za "spravené" (opravu nemusíme čekat až v
+  depu) a **celá souprava (A vpředu, T1 vzadu jako tlačící odtah)
+  pokračuje dál dopředu**, ve směru, kterým A původně jelo — ne zpátky.
+  Do depa (na opravu/rozpojení) dojedou dál po trati tímhle směrem, ne
+  návratem stejnou cestou.
+- V depu se rozpojí a oba pokračují podle svých vlastních příkazů.
+
+Tohle zároveň zjednodušuje dřívější rozhodnutí (bod 4 výše) — "T1
+pokračuje ve svém aktuálně rozjetém pohybu k A" zůstává v platnosti, jen
+upřesňujeme, že **po spojení se nikdy nikdo neotáčí**, jede se dál týmž
+směrem, kterým se k sobě dojeli.
+
 ### 5. Fronta při víc poruchách najednou → **žádná fronta**
 
 Pokud v okamžiku poruchy není žádný volný odtah, vlak se rovnou chová
@@ -506,14 +532,46 @@ srovnávací/ověřovací buildy čistého vanilla kódu.
   `FollowTrainReservation` (existující enginová funkce, ne pixely — viz Bug
   C). Obecný případ "čelně proti sobě" zatím záměrně chybí, bude
   samostatný krok.
-- ✅ **Tlačítko "Couple"** v okně vozidla (`WID_VV_COUPLE`), aktivní jen
-  když `GetTrainCouplePartner` najde partnera. Čistě na klik — konzole
-  nejde použít (Winlator), takže testování je čistě myší.
-- ⏭️ **Další v pořadí:** `CMD_DECOUPLE_TRAIN` (rozpojení na trati) a obecný
-  případ orientace (spojení proti sobě, s reverzem jedné strany).
-- ⏭️ Až couple/decouple na trati budou stabilní: napojení na `Order`
-  systém (couple/decouple parametry z menu příkazů) a samotná tow logika
-  (breakdown hook, "Service" order pro odtahovou mašinku v depu).
+- ✅ **Tlačítko "Couple"** v okně vozidla (`WID_VV_COUPLE`) — **zavrženo po
+  testu**: uživatel ho neviděl/nemohl vyvolat, testování mimo běžné herní
+  situace (bez semaforů apod.) navíc nemá vypovídací hodnotu. Kód
+  ponechán (neškodí, může se hodit), ale další testování se přesouvá na
+  skutečné napojení do `Order` systému níže.
+- ✅ **Decouple jako vlastnost normálního "jet do stanice" příkazu**
+  (ne nový `OrderType`!) — bezpečnější návrh než plánovaný `OT_DECOUPLE`:
+  nová dedikovaná pole `Order::decouple_count` (vlastní úložiště, ne
+  sdílené bity — viz Bug D), `MOF_DECOUPLE_COUNT` v `CmdModifyOrder`,
+  uložení do save (CH_TABLE chunk, staré savy dostanou default 0 =
+  vypnuto), a spouštěcí háček přímo v `Vehicle::LeaveStation()` (jediné
+  dobře definované místo "vlak právě odjíždí ze stanice", žádná nová
+  detekce příjezdu od nuly). GUI: nový řádek v okně příkazů, viditelný jen
+  pro vlak + "jet do stanice" příkaz, tlačítko otevře dialog na zadání
+  čísla (přes `ShowQueryString`, stejný mechanismus jako u podmínkových
+  příkazů) — psaní čísla funguje (jen herní konzole je ve Winlatoru
+  rozbitá, běžná textová pole ne).
+- ✅ **Postřeh o jednosměrných semaforech u odtahu zapracován do designu**
+  (viz sekce výše) — odtah se nikdy nevrací stejnou cestou, jede dál
+  dopředu s "opraveným" vlakem připojeným vzadu.
+- ⏭️ **Další v pořadí:** ruční otestovat decouple (viz recept níže), pak
+  `CMD_DECOUPLE_TRAIN` na trati (mimo stanice, pro obecné rozpojení) a
+  obecný případ orientace couplingu (spojení proti sobě, s reverzem jedné
+  strany).
+- ⏭️ Až couple/decouple budou stabilní: samotná tow logika (breakdown
+  hook, "Service" order pro odtahovou mašinku v depu, výběr nejbližší
+  odtahovky).
+
+### Jak otestovat decouple (nové, přes Order okno)
+
+1. Vlak s alespoň 2 vozidly, v jeho příkazech vyber řádek "jet do
+   stanice X" (klikni na ten řádek v seznamu příkazů).
+2. Dole v okně příkazů by se měl objevit nový řádek s tlačítkem
+   "Decouple: 0".
+3. Klikni na něj → napiš číslo (kolik vozidel ponechat vepředu) → potvrď.
+4. Vlak nech dojet a odjet z té stanice normálně (naložit/vyložit jak má).
+5. Očekávaný výsledek: při odjezdu ze stanice se od zbytku vlaku oddělí
+   vozidla za zadaným počtem a zůstanou stát na místě jako samostatná
+   souprava (bez příkazů — ty si nastavíš ručně); přední část pokračuje
+   dál podle svých příkazů.
 
 ### Jak otestovat `CMD_COUPLE_TRAINS`
 

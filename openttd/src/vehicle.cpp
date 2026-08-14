@@ -2368,6 +2368,16 @@ void Vehicle::LeaveStation()
 			TriggerStationAnimation(st, this->tile, StationAnimationTrigger::VehicleDeparts);
 		}
 
+		/* If this order asked to decouple down to a given number of
+		 * vehicles, do it now, right before actually leaving - see
+		 * FEATURE_DESIGN_COUPLING_TOW.md. MakeLeaveStation() above only
+		 * resets `type`/`flags`; decouple_count is its own field (not
+		 * packed into `flags`, see the "Bug D" writeup) so it's still
+		 * intact here. */
+		if (this->current_order.ShouldDecoupleOnDeparture()) {
+			TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount());
+		}
+
 		Train::From(this)->flags.Set(VehicleRailFlag::LeavingStation);
 	}
 	if (this->type == VEH_ROAD && !this->vehstatus.Test(VehState::Crashed)) {

@@ -71,6 +71,7 @@ bool TrainOnCrossing(TileIndex tile);
 void NormalizeTrainVehInDepot(const Train *u);
 
 Train *GetTrainCouplePartner(const Train *v);
+void TryDecoupleAtStation(Train *v, uint8_t keep_count);
 
 /** Variables that are cached to improve performance and such */
 struct TrainCache {

@@ -225,6 +225,11 @@ public:
 		SLE_VAR(Order, wait_time,   SLE_UINT16),
 		SLE_VAR(Order, travel_time, SLE_UINT16),
 		SLE_VAR(Order, max_speed,   SLE_UINT16),
+		/* This is a CH_TABLE chunk: fields are matched by name, so saves
+		 * from before this field existed simply don't have it and the
+		 * in-class default (0 = "don't decouple") applies on load. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		SLE_VAR(Order, decouple_count, SLE_UINT8),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 
