@@ -678,3 +678,41 @@ Návrh tedy musí počítat s tím, že odtahovka prostě čeká (stojí, dokud
 se cesta neuvolní běžným provozem), stejně jako by čekal kterýkoli jiný
 vlak před obsazeným blokem — žádné obcházení kolizní ochrany. Zůstává
 otevřené pro fázi, kdy se bude tow reálně implementovat.
+
+## Coupling: detekce partnera funguje v obou směrech (run #17)
+
+Test ukázal, že "wait to couple" nefungovalo, když druhý vlak přijel
+zezadu (vzhledem k tomu, kterým směrem byla čekající mašinka otočená) —
+`GetTrainCouplePartner()` hledal partnera jen dopředu, přes
+`FollowTrainReservation()`. Uživatel musel čekající mašinku ručně
+otáčet, aby "dozadu" ukazovala tam, odkud měl přijet druhý vlak — což
+je přesně ta ruční obsluha, které se chceme vyhnout ("pro mě je
+složité ovládat vlak ručně a snažit se vyvolat couple").
+
+Řešení: `FollowTrainReservation()` (pbs.cpp/pbs.h) dostal nový
+parametr `from_rear` — když je `true`, sleduje rezervaci od PŘEDU k
+ZADU konzistu (tedy hledá dozadu) místo od zadu dopředu.
+`GetTrainCouplePartner()` teď zkusí napřed dopředu, a pokud nic
+nenajde, zkusí dozadu; vrací i informaci, kterým směrem partnera našel
+(`partner_is_behind`), aby `CmdCoupleTrains()` mohl správně určit, které
+straně se má připojit druhá souprava (vedoucí vlak si nechá svůj přední
+konec, druhý se přiřadí vzadu). Žádné ruční otáčení už není potřeba —
+stačí přijet a zastavit vedle čekající mašinky odkudkoliv.
+
+**Odbočka k "musí couvat":** uživatel zkoušel ručně přijíždějící
+mašinku otočit na konci koleje, aby jela "pozadu" k čekající — ale ve
+vanilla 15.3 (a v naší vendorované verzi) žádné skutečné couvání
+neexistuje, otočení je vždy okamžitý "magic flip" (vlak se přeorientuje
+a dál jede vždy předkem, ve směru jízdy). To NENÍ bug, je to
+standardní chování enginu už od nepaměti. Skutečné couvání (lokomotiva
+zůstává vzadu, konzist fyzicky jede pozpátku) přidal až upstream
+OpenTTD nedávno ("push-pull" / "backwards driving", červen 2026,
+[oznámení](https://www.openttd.org/news/2026/06/25/backwards-driving),
+[PR #15379](https://github.com/OpenTTD/OpenTTD/pull/15379),
+[PR #15391](https://github.com/OpenTTD/OpenTTD/pull/15391)) — vyžaduje
+obousměrnou lokomotivu nebo NewGRF-označený "cab" vagon a zapíná se
+herním nastavením. Portovat tohle do naší 15.3 by byl srovnatelně
+velký projekt jako odtah — zůstává jako možné budoucí rozšíření, ale
+díky opravě výše (obousměrná detekce partnera) už není pro samotné
+spojování potřeba: nezáleží, kterým směrem je která souprava otočená,
+stačí fyzická blízkost.

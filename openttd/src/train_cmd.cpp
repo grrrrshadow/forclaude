@@ -1463,8 +1463,9 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 }
 
 /**
- * Find the train, if any, that a stopped train @p v could couple to: the
- * train directly ahead of @p v on the track it is stopped on.
+ * Find the train, if any, that a stopped train @p v could couple to:
+ * another stopped train immediately adjacent to it on the track, either
+ * ahead of or behind @p v.
  *
  * This deliberately does not compare x_pos/y_pos pixel distances (see
  * FEATURE_DESIGN_COUPLING_TOW.md, "Bug C" in the reference patch that
@@ -1476,26 +1477,37 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
  * normal case for a train that stopped because another train is blocking
  * its path).
  *
- * This first version only recognises the simplest and most common
- * coupling geometry: @p v approaching from behind and being blocked by a
- * stationary train ahead, both facing the same direction (e.g. a rescue
- * engine catching up to a broken-down train). Meeting nose-to-nose from
- * opposite directions is intentionally out of scope here; see the design
- * doc for the follow-up plan.
+ * Both directions are checked (front first, then rear) because which way
+ * either train happens to be facing shouldn't matter for coupling -- real
+ * locomotives are frequently bidirectional, and requiring the player to
+ * manually turn a train around to match a specific facing just to trigger
+ * a couple is exactly the kind of friction this feature exists to remove.
+ * Meeting nose-to-nose from opposite directions (i.e. neither train's
+ * front or rear is adjacent to the other, they're pointed at each other
+ * mid-track) is intentionally still out of scope; see the design doc for
+ * the follow-up plan.
  *
- * @param v the (potential) rear train looking to couple; must be the
- *          front of its own consist
- * @return the front of the train immediately ahead that @p v can couple
- *         to, or nullptr if there is none
+ * @param v the train looking to couple; must be the front of its own consist
+ * @param partner_is_behind if non-null, set to true if the returned partner
+ *        was found behind @p v (partner's front adjacent to v's rear)
+ *        rather than ahead of it (the more common case)
+ * @return the front of the adjacent train that @p v can couple to, or
+ *         nullptr if there is none
  */
-Train *GetTrainCouplePartner(const Train *v)
+Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 {
 	if (!v->IsFrontEngine()) return nullptr;
 	if (v->vehstatus.Test(VehState::Crashed)) return nullptr;
 	if (v->cur_speed != 0) return nullptr;
 
+	bool behind = false;
 	Vehicle *train_on_res = nullptr;
 	FollowTrainReservation(v, &train_on_res);
+	if (train_on_res == nullptr || train_on_res->type != VEH_TRAIN) {
+		train_on_res = nullptr;
+		FollowTrainReservation(v, &train_on_res, true);
+		behind = true;
+	}
 	if (train_on_res == nullptr || train_on_res->type != VEH_TRAIN) return nullptr;
 
 	Train *partner = Train::From(train_on_res)->First();
@@ -1504,18 +1516,19 @@ Train *GetTrainCouplePartner(const Train *v)
 	if (partner->vehstatus.Test(VehState::Crashed)) return nullptr;
 	if (partner->cur_speed != 0) return nullptr;
 
+	if (partner_is_behind != nullptr) *partner_is_behind = behind;
 	return partner;
 }
 
 /**
- * Couple a stopped train to another stopped train immediately ahead of it
- * on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
+ * Couple a stopped train to another stopped train immediately adjacent to
+ * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
  * geometry is currently recognised, and FEATURE_DESIGN_COUPLING_TOW.md for
  * the full design this is one piece of.
  *
  * @param flags  type of operation
- * @param veh_id the rear train initiating the coupling
+ * @param veh_id the train initiating the coupling
  * @return the cost of this operation or an error
  */
 CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
@@ -1526,7 +1539,8 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 
-	Train *partner = GetTrainCouplePartner(v);
+	bool partner_is_behind = false;
+	Train *partner = GetTrainCouplePartner(v, &partner_is_behind);
 	if (partner == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER);
 
 	/* Re-check ownership of the partner explicitly: GetTrainCouplePartner()
@@ -1535,8 +1549,13 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	ret = CheckOwnership(partner->owner);
 	if (ret.Failed()) return ret;
 
-	Train *src = v->GetFirstEnginePart();
-	Train *dst = partner->Last()->GetLastEnginePart();
+	/* Whichever train is physically leading keeps its front; the other
+	 * one's whole consist gets spliced onto its rear. */
+	Train *leading = partner_is_behind ? v : partner;
+	Train *trailing = partner_is_behind ? partner : v;
+
+	Train *src = trailing->GetFirstEnginePart();
+	Train *dst = leading->Last()->GetLastEnginePart();
 
 	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
 
