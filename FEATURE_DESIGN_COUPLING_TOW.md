@@ -842,3 +842,42 @@ vytáhl do `GetReverseCheckOrigins()`, ať se nekopíruje.
 Tohle by měla být ta chybějící druhá polovina — bez ní pathfinder sice
 "věděl", že cesta k partnerovi existuje po otočení, ale nic vlak
 k tomu otočení nedonutilo.
+
+## KONEC AKTIVNÍHO VÝVOJE NA 15.3 — přechod na OpenTTD 16.0-beta2 (2026-08-15)
+
+Tahle větev (`backup-15.3-decouple`) je od teď **záloha, ne aktivní
+vývoj**. Uživatel se rozhodl přejít na OpenTTD 16.0-beta2 jako nový
+základ — hlavní důvody: (1) skutečné couvání vlaků (`DrivingBackwards`)
+místo magic-flipu, což uživatel výslovně vyžaduje ("nikdy se nesmí
+sama otočit"), a (2) NewGRF kompatibilita s CZTR grafikami, které
+cílí přímo na beta16 schéma příznaků (`HasCab`, `DrivingBackwards` bit
+11 v proměnné 0xFE) — vlastní reimplementace na 15.3 by riskovala
+nekompatibilitu s jejich skutečnými budoucími GRF soubory.
+
+Zůstává tu ale zachované, protože: (a) hodně z toho (rozšíření
+`Order` o nová pole místo nových `OrderType`, `TryConsistSplice`,
+`GetTrainCouplePartner`, PBS opravy, catalog chyb z Paolo123YPS) je
+znovupoužitelná ZNALOST i logika při portování na beta16, a (b) pořád
+je otevřená možnost, že se ukáže, že beta16 je moc velké sousto a
+vrátíme se sem.
+
+### Poslední test na 15.3 (build #21, commit `4389108`) — pro záznam
+
+Test proběhl na téhle (teď už zamrzlé) verzi, ještě před rozhodnutím
+přejít na beta16:
+
+- **"Go to couple" pořád dělal magic-flip** na konci koleje, ne
+  couvání — to je přesně ten nedostatek 15.3, co vedl k rozhodnutí
+  přejít na beta16. Na směrování/waypoint po cestě nepočkal na
+  vagonky a k nádraží necouval, i když měl "go to couple" příkaz.
+- Stavový řádek u čekajícího vlaku ukazuje "Waiting for couple" i pro
+  vlak s "go to couple" příkazem (ne jen "wait to couple") — to je
+  očekávané, obě sdílí stejný "čekám na partnera" stav, jakmile
+  zastaví.
+- **Nový poznatek k zapamatování pro beta16:** odpojené vagonky po
+  decouplu NEMAJÍ žádné příkazy (schválně, podle původního návrhu —
+  hráč si je nastavuje ručně). Uživatel chce, aby po odpojení
+  automaticky dostaly "waiting for couple" stav hned, bez ručního
+  nastavování příkazu. To je otevřený požadavek pro budoucí
+  implementaci na beta16, ne bug v 15.3 — 15.3 se chovala podle
+  původního návrhu, jen návrh už neodpovídá tomu, co uživatel chce.
