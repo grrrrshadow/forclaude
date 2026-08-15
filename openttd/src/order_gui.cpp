@@ -288,6 +288,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 						line += GetString(STR_ORDER_STOP_LOCATION_NEAR_END + to_underlying(order->GetStopLocation()));
 					}
 				}
+
+				/* Make a "go to couple" order read as its own kind of order
+				 * in the list, matching Palo123YPS's GUI, without it
+				 * actually being a separate OrderType. See
+				 * FEATURE_DESIGN_COUPLING_TOW.md. */
+				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
 			}
 			break;
 		}
@@ -536,6 +542,8 @@ private:
 	};
 
 	int selected_order = -1;
+	/** Is the currently-open query string editing the decouple count (WID_O_DECOUPLE_COUNT) rather than a conditional order value (WID_O_COND_VALUE)? Both use the same OnQueryTextFinished. */
+	bool querying_decouple_count = false;
 	VehicleOrderID order_over = INVALID_VEH_ORDER_ID; ///< Order over which another order is dragged, \c INVALID_VEH_ORDER_ID if none.
 	OrderPlaceObjectState goto_type = OPOS_NONE;
 	const Vehicle *vehicle = nullptr; ///< Vehicle owning the orders being displayed and manipulated.
@@ -1064,6 +1072,18 @@ public:
 		/* Disable list of vehicles with the same shared orders if there is no list */
 		this->SetWidgetDisabledState(WID_O_SHARED_ORDER_LIST, !shared_orders);
 
+		/* Decouple/couple row: trains only, and only for a selected 'goto
+		 * station' order. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		NWidgetStacked *decouple_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE);
+		if (decouple_sel != nullptr) {
+			bool show_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
+			decouple_sel->SetDisplayedPlane(show_decouple ? 0 : SZSP_NONE);
+			if (show_decouple) {
+				this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
+				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE, order->ShouldGoToCouple());
+			}
+		}
+
 		this->SetDirty();
 	}
 
@@ -1163,6 +1183,13 @@ public:
 				if (order->GetDepotActionType().Test(OrderDepotActionFlag::Unbunch)) return GetString(STR_ORDER_DROP_UNBUNCH);
 
 				return GetString(STR_ORDER_DROP_GO_ALWAYS_DEPOT);
+			}
+
+			case WID_O_DECOUPLE_COUNT: {
+				VehicleOrderID sel = this->OrderGetSel();
+				const Order *order = this->vehicle->GetOrder(sel);
+				if (order == nullptr || !order->IsType(OT_GOTO_STATION)) return {};
+				return GetString(STR_ORDER_DECOUPLE_COUNT, order->GetDecoupleCount());
 			}
 
 			default:
@@ -1321,7 +1348,30 @@ public:
 				assert(order != nullptr);
 				uint value = order->GetConditionValue();
 				if (order->GetConditionVariable() == OrderConditionVariable::MaxSpeed) value = ConvertSpeedToDisplaySpeed(value, this->vehicle->type);
+				this->querying_decouple_count = false;
 				ShowQueryString(GetString(STR_JUST_INT, value), STR_ORDER_CONDITIONAL_VALUE_CAPT, 5, this, CS_NUMERAL, {});
+				break;
+			}
+
+			case WID_O_DECOUPLE_COUNT: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				this->querying_decouple_count = true;
+				ShowQueryString(GetString(STR_JUST_INT, order->GetDecoupleCount()), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				break;
+			}
+
+			case WID_O_WAIT_COUPLE: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_WAIT_COUPLE, order->ShouldWaitForCouple() ? 0 : 1);
+				break;
+			}
+
+			case WID_O_GOTO_COUPLE: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
 				break;
 			}
 
@@ -1338,6 +1388,11 @@ public:
 		VehicleOrderID sel = this->OrderGetSel();
 		auto value = ParseInteger(*str, 10, true);
 		if (!value.has_value()) return;
+
+		if (this->querying_decouple_count) {
+			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_DECOUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
+			return;
+		}
 
 		switch (this->vehicle->GetOrder(sel)->GetConditionVariable()) {
 			case OrderConditionVariable::MaxSpeed:
@@ -1622,6 +1677,19 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 			EndContainer(),
 		EndContainer(),
 		NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_O_SHARED_ORDER_LIST), SetAspect(1), SetSpriteTip(SPR_SHARED_ORDERS_ICON, STR_ORDERS_VEH_WITH_SHARED_ORDERS_LIST_TOOLTIP),
+	EndContainer(),
+
+	/* Decouple/couple row: only shown for a selected 'goto station' order.
+	 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_JUST_STRING, STR_ORDER_DECOUPLE_COUNT_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_WAIT_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
 	EndContainer(),
 
 	/* Second button row. */

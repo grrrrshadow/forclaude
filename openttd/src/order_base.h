@@ -55,6 +55,41 @@ private:
 	uint16_t travel_time = 0; ///< How long in ticks the journey to this destination should take.
 	uint16_t max_speed = UINT16_MAX; ///< How fast the vehicle may go on the way to the destination.
 
+	/**
+	 * Number of vehicles to keep at the front of the consist when leaving
+	 * this order's station; 0 (the default, unaffected by any pre-existing
+	 * order/savegame) means "don't decouple". Deliberately its own field,
+	 * not packed into `flags` alongside unrelated per-order-type data --
+	 * see FEATURE_DESIGN_COUPLING_TOW.md, "Bug D" for why that aliasing
+	 * bit-packing approach caused real bugs in the patch this feature is
+	 * inspired by.
+	 */
+	uint8_t decouple_count = 0;
+
+	/**
+	 * If true, delay leaving this station until a compatible stopped
+	 * train arrives immediately ahead to couple with (see
+	 * GetTrainCouplePartner() and FEATURE_DESIGN_COUPLING_TOW.md).
+	 * Dedicated field, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D").
+	 */
+	bool wait_for_couple = false;
+
+	/**
+	 * If true, this order's destination is a place to meet and couple
+	 * with a partner train, rather than an ordinary stop. Unlike
+	 * #wait_for_couple (which just delays departure once already
+	 * stopped), this also allows the train to reverse to reach that
+	 * destination -- normal reversal-at-signals/reversal-in-stations
+	 * safety locks only guard *unintended* reversal risking a crash
+	 * into wagons left behind by a decouple order; reversing on
+	 * purpose, under a player-given order whose entire point is to
+	 * reach a coupling partner, is not that. Dedicated field, not
+	 * packed into `flags` -- same rationale as decouple_count ("Bug D").
+	 * See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool go_to_couple = false;
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -128,6 +163,35 @@ public:
 	inline CargoType GetRefitCargo() const { return this->refit_cargo; }
 
 	void SetRefit(CargoType cargo);
+
+	/**
+	 * Should the consist decouple down to #GetDecoupleCount vehicles when
+	 * leaving this order's station?
+	 * @pre IsType(OT_GOTO_STATION)
+	 */
+	inline bool ShouldDecoupleOnDeparture() const { return this->decouple_count > 0; }
+
+	/**
+	 * How many vehicles (counted from the front) to keep when decoupling
+	 * on departure; only meaningful if #ShouldDecoupleOnDeparture.
+	 * @pre IsType(OT_GOTO_STATION)
+	 */
+	inline uint8_t GetDecoupleCount() const { return this->decouple_count; }
+
+	/** Set how many vehicles to keep when decoupling on departure; 0 disables decoupling for this order. */
+	inline void SetDecoupleCount(uint8_t count) { this->decouple_count = count; }
+
+	/** Should we delay leaving this station until a partner train arrives to couple with? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldWaitForCouple() const { return this->wait_for_couple; }
+
+	/** Set whether to delay leaving this station until a partner train arrives to couple with. */
+	inline void SetWaitForCouple(bool wait) { this->wait_for_couple = wait; }
+
+	/** Is this order's destination a place to travel to (reversing along the way if needed) in order to couple with a partner train there? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldGoToCouple() const { return this->go_to_couple; }
+
+	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
+	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?

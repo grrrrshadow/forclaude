@@ -1190,7 +1190,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD) return CMD_ERROR;
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1332,6 +1332,24 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_COND_DESTINATION:
 			if (data >= v->GetNumOrders()) return CMD_ERROR;
 			break;
+
+		case MOF_DECOUPLE_COUNT:
+			/* Not validated against the vehicle's current length: the
+			 * order can be edited ahead of the consist changing, and an
+			 * unreachable count is handled leniently (decoupling is
+			 * simply skipped) at execution time in Vehicle::LeaveStation,
+			 * rather than rejected here. */
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (data > UINT8_MAX) return CMD_ERROR;
+			break;
+
+		case MOF_WAIT_COUPLE:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			break;
+
+		case MOF_GOTO_COUPLE:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			break;
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -1427,6 +1445,18 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_COND_DESTINATION:
 				order->SetConditionSkipToOrder(data);
+				break;
+
+			case MOF_DECOUPLE_COUNT:
+				order->SetDecoupleCount(static_cast<uint8_t>(data));
+				break;
+
+			case MOF_WAIT_COUPLE:
+				order->SetWaitForCouple(data != 0);
+				break;
+
+			case MOF_GOTO_COUPLE:
+				order->SetGoToCouple(data != 0);
 				break;
 
 			default: NOT_REACHED();

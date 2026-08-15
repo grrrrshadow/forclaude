@@ -71,6 +71,10 @@ void GetTrainSpriteSize(EngineID engine, uint &width, uint &height, int &xoffs, 
 bool TrainOnCrossing(TileIndex tile);
 void NormalizeTrainVehInDepot(const Train *u);
 
+Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
+bool IsAdjacentToCouplePartner(const Train *v, TileIndex tile, Trackdir td);
+void TryDecoupleAtStation(Train *v, uint8_t keep_count);
+
 /** Variables that are cached to improve performance and such */
 struct TrainCache {
 	/** Cached wagon override spritegroup. */

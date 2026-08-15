@@ -4533,6 +4533,7 @@ STR_VEHICLE_VIEW_CLONE_SHIP_INFO                                :{BLACK}Buy a co
 STR_VEHICLE_VIEW_CLONE_AIRCRAFT_INFO                            :{BLACK}Buy a copy of the aircraft. Ctrl+Click to share orders. Also press Shift to show cost estimate only
 
 STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Force train to proceed without waiting for signal to clear it
+STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Couple this train to the stopped train immediately ahead of it
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reverse direction of train
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Force vehicle to turn around
 STR_VEHICLE_VIEW_ORDER_LOCATION_TOOLTIP                         :{BLACK}Centre main view on order destination. Ctrl+Click to open a new viewport on the order destination's location
@@ -4563,6 +4564,7 @@ STR_VEHICLE_VIEW_AIRCRAFT_STATUS_START_STOP_TOOLTIP             :{BLACK}Current 
 
 # Messages in the start stop button in the vehicle view
 STR_VEHICLE_STATUS_LOADING_UNLOADING                            :{LTBLUE}Loading / Unloading
+STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Waiting for couple
 STR_VEHICLE_STATUS_LEAVING                                      :{LTBLUE}Leaving
 STR_VEHICLE_STATUS_WAITING_UNBUNCHING                           :{LTBLUE}Waiting to unbunch
 STR_VEHICLE_STATUS_CRASHED                                      :{RED}Crashed!
@@ -4777,6 +4779,17 @@ STR_ORDER_CONDITIONAL_COMPARATOR_IS_FALSE                       :is false
 
 STR_ORDER_CONDITIONAL_VALUE_TOOLTIP                             :{BLACK}The value to compare the vehicle data against
 STR_ORDER_CONDITIONAL_VALUE_CAPT                                :{WHITE}Enter value to compare against
+
+STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Decouple: {NUM}
+STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}When leaving this station, keep this many vehicles at the front and leave the rest behind, decoupled. 0 means don't decouple
+STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Enter number of vehicles to keep (0 = don't decouple)
+
+STR_ORDER_WAIT_COUPLE                                           :{BLACK}Wait to couple
+STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at this station until a stopped train arrives immediately next to us to couple with, then continue as one consist
+
+STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
+STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
+STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
 
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
 STR_ORDERS_SKIP_TOOLTIP                                         :{BLACK}Skip the current order, and start the next. Ctrl+Click to skip to the selected order
@@ -5280,6 +5293,8 @@ STR_ERROR_INCOMPATIBLE_RAIL_TYPES                               :incompatible ra
 
 STR_ERROR_CAN_T_MOVE_VEHICLE                                    :Can't move vehicle...
 STR_ERROR_REAR_ENGINE_FOLLOW_FRONT                              :the rear engine will always follow its front counterpart
+STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Can't couple train...
+STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... no stopped train immediately ahead to couple with
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

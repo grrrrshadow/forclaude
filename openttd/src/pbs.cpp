@@ -296,16 +296,30 @@ static void CheckTrainsOnTrack(FindTrainOnTrackInfo &info, TileIndex tile)
  *
  * @param consist the vehicle
  * @param train_on_res Is set to a train we might encounter
+ * @param from_rear Follow the reservation from the physical back of the
+ *        consist (Last()) instead of its moving front -- e.g. to look for
+ *        a coupling partner behind a stationary train (see
+ *        GetTrainCouplePartner() in train_cmd.cpp). This is about which
+ *        physical END of the vehicle chain to start from, unrelated to
+ *        GetMovingFront()/GetMovingBack() (which are about current travel
+ *        direction, meaningless for a train that's stopped).
  * @returns The last tile of the reservation or the current train tile if no reservation present.
  */
-PBSTileInfo FollowTrainReservation(const Train *consist, Vehicle **train_on_res)
+PBSTileInfo FollowTrainReservation(const Train *consist, Vehicle **train_on_res, bool from_rear)
 {
 	assert(consist->type == VehicleType::Train);
 
-	const Train *moving_front = consist->GetMovingFront();
-
-	TileIndex tile = moving_front->tile;
-	Trackdir trackdir = moving_front->GetVehicleTrackdir();
+	TileIndex tile;
+	Trackdir trackdir;
+	if (from_rear) {
+		const Train *rear = consist->Last();
+		tile = rear->tile;
+		trackdir = ReverseTrackdir(rear->GetVehicleTrackdir());
+	} else {
+		const Train *moving_front = consist->GetMovingFront();
+		tile = moving_front->tile;
+		trackdir = moving_front->GetVehicleTrackdir();
+	}
 
 	if (IsRailDepotTile(tile) && GetDepotReservationTrackBits(tile).None()) return PBSTileInfo(tile, trackdir, false);
 

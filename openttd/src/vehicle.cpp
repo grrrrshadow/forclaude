@@ -2413,6 +2413,16 @@ void Vehicle::LeaveStation()
 			TriggerStationAnimation(st, tile, StationAnimationTrigger::VehicleDeparts);
 		}
 
+		/* If this order asked to decouple down to a given number of
+		 * vehicles, do it now, right before actually leaving - see
+		 * FEATURE_DESIGN_COUPLING_TOW.md. MakeLeaveStation() above only
+		 * resets `type`/`flags`; decouple_count is its own field (not
+		 * packed into `flags`, see the "Bug D" writeup) so it's still
+		 * intact here. */
+		if (this->current_order.ShouldDecoupleOnDeparture()) {
+			TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount());
+		}
+
 		Train::From(this)->flags.Set(VehicleRailFlag::LeavingStation);
 	}
 	if (this->type == VehicleType::Road && !this->vehstatus.Test(VehState::Crashed)) {
@@ -2457,6 +2467,22 @@ void Vehicle::HandleLoading(bool mode)
 
 			/* Not the first call for this tick, or still loading */
 			if (mode || !this->vehicle_flags.Test(VehicleFlag::LoadingFinished) || this->current_order_time < wait_time) return;
+
+			/* If this order wants to couple with a partner train before
+			 * leaving, keep waiting (loaded and ready, but not departing)
+			 * until one shows up right next to us. When it does, couple
+			 * with it now, while both are still stopped here, then
+			 * continue departing as a single (longer) consist. Applies
+			 * both to a train sitting still on a "wait to couple" order
+			 * and to one that actively travelled here on a "go to
+			 * couple" order (see CheckReverseTrain() in train_cmd.cpp for
+			 * the reversal-permission half of that). See
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (this->type == VehicleType::Train && (this->current_order.ShouldWaitForCouple() || this->current_order.ShouldGoToCouple())) {
+				Train *t = Train::From(this);
+				if (GetTrainCouplePartner(t) == nullptr) return;
+				CmdCoupleTrains(DoCommandFlag::Execute, t->index);
+			}
 
 			this->PlayLeaveStationSound();
 

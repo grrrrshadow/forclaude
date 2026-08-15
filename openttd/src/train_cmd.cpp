@@ -1245,6 +1245,8 @@ static void NormaliseTrainHead(Train *head)
 	head->unitnumber = Company::Get(head->owner)->freeunits[head->type].UseID(GetFreeUnitNumber(VehicleType::Train));
 }
 
+static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain);
+
 /**
  * Move a rail vehicle around inside the depot.
  * @param flags type of operation
@@ -1289,7 +1291,8 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 	/* don't move the same vehicle.. */
 	if (src == dst) return CommandCost();
 
-	/* locate the head of the two chains */
+	/* locate the head of the two chains, purely to run the depot-specific
+	 * preconditions below; TryConsistSplice() will compute them again. */
 	Train *src_head = src->First();
 	Train *dst_head;
 	if (dst != nullptr) {
@@ -1314,6 +1317,35 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 
 	/* Check if all vehicles in the destination train are stopped inside a depot. */
 	if (dst_head != nullptr && !dst_head->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
+
+	return TryConsistSplice(flags, src, dst, move_chain);
+}
+
+/**
+ * Split/splice two train consists into a new arrangement: move @p src
+ * (and, if @p move_chain, everything following it) to right after
+ * @p dst. Shared primitive behind every operation that mutates train
+ * consists -- inside a depot (#CmdMoveRailVehicle) as well as coupling/
+ * decoupling on the open track (#CmdCoupleTrains, decouple-on-departure
+ * orders). Always backs up both sides, always validates before
+ * committing, always restores both sides symmetrically on failure --
+ * see FEATURE_DESIGN_COUPLING_TOW.md ("Bug B" in the reference patch
+ * this design avoids: an asymmetric backup/rollback that only restored
+ * one side of a failed split).
+ *
+ * @param flags      type of operation
+ * @param src        the vehicle (and possibly its trailing chain) to move
+ * @param dst        the vehicle after which @p src should be inserted,
+ *                   or nullptr to make @p src (and chain) a new standalone train
+ * @param move_chain if true, move @p src and everything following it;
+ *                   otherwise just @p src (and any of its articulated parts)
+ * @return the cost of this operation or an error
+ */
+static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain)
+{
+	/* locate the head of the two chains */
+	Train *src_head = src->First();
+	Train *dst_head = (dst != nullptr) ? dst->First() : nullptr;
 
 	/* First make a backup of the order of the trains. That way we can do
 	 * whatever we want with the order and later on easily revert. */
@@ -1342,7 +1374,7 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 		/* If the autoreplace flag is set we do not need to test for the validity
 		 * because we are going to revert the train to its original state. As we
 		 * assume the original state was correct autoreplace can skip this. */
-		ret = ValidateTrains(original_dst_head, dst_head, original_src_head, src_head, true);
+		CommandCost ret = ValidateTrains(original_dst_head, dst_head, original_src_head, src_head, true);
 		if (ret.Failed()) {
 			/* Restore the train we had. */
 			RestoreTrainBackup(original_src);
@@ -1428,6 +1460,22 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 		if (src_head != nullptr) src_head->First()->MarkDirty();
 		if (dst_head != nullptr) dst_head->First()->MarkDirty();
 
+		/* Splitting a consist can leave a headless "free wagon" chain
+		 * standing on ordinary reservable track (e.g. a station platform)
+		 * instead of a depot -- something that never happens in vanilla,
+		 * where free wagons only ever exist inside a depot (where track
+		 * reservation is irrelevant, see the TRACK_BIT_DEPOT case in
+		 * Train::ReserveTrackUnderConsist()). Nothing else in the engine
+		 * actively maintains reservation under a stationary, engineless
+		 * consist -- the only other caller of ReserveTrackUnderConsist()
+		 * is crash handling, re-asserting it for exactly the same reason
+		 * ("Crash() clears the reservation!"). Re-assert it here for both
+		 * halves of the split so a PBS signal elsewhere can never read a
+		 * decoupled train's tiles as free and route another train through
+		 * it. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (src_head != nullptr) src_head->ReserveTrackUnderConsist();
+		if (dst_head != nullptr) dst_head->ReserveTrackUnderConsist();
+
 		/* We are undoubtedly changing something in the depot and train list. */
 		InvalidateWindowData(WindowClass::VehicleDepot, src->tile);
 		InvalidateWindowClassesData(WindowClass::TrainList, 0);
@@ -1438,6 +1486,171 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 	}
 
 	return CommandCost();
+}
+
+/**
+ * Find the train, if any, that a stopped train @p v could couple to:
+ * another stopped train immediately adjacent to it on the track, either
+ * ahead of or behind @p v.
+ *
+ * This deliberately does not compare x_pos/y_pos pixel distances (see
+ * FEATURE_DESIGN_COUPLING_TOW.md, "Bug C" in the reference patch that
+ * inspired this feature) — it reuses #FollowTrainReservation, the same
+ * tile/trackdir/reservation-based function the game already uses
+ * elsewhere to find a train blocking the path ahead. That makes this
+ * exact and independent of rounding, at the cost of only recognising a
+ * partner while @p v still has a live reservation up to it (which is the
+ * normal case for a train that stopped because another train is blocking
+ * its path).
+ *
+ * Both directions are checked (front first, then rear) because which way
+ * either train happens to be facing shouldn't matter for coupling -- real
+ * locomotives are frequently bidirectional, and requiring the player to
+ * manually turn a train around to match a specific facing just to trigger
+ * a couple is exactly the kind of friction this feature exists to remove.
+ * Meeting nose-to-nose from opposite directions (i.e. neither train's
+ * front or rear is adjacent to the other, they're pointed at each other
+ * mid-track) is intentionally still out of scope; see the design doc for
+ * the follow-up plan.
+ *
+ * @param v the train looking to couple; must be the front of its own consist
+ * @param partner_is_behind if non-null, set to true if the returned partner
+ *        was found behind @p v (partner's front adjacent to v's rear)
+ *        rather than ahead of it (the more common case)
+ * @return the front of the adjacent train that @p v can couple to, or
+ *         nullptr if there is none
+ */
+Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
+{
+	if (!v->IsFrontEngine()) return nullptr;
+	if (v->vehstatus.Test(VehState::Crashed)) return nullptr;
+	if (v->cur_speed != 0) return nullptr;
+
+	bool behind = false;
+	Vehicle *train_on_res = nullptr;
+	FollowTrainReservation(v, &train_on_res);
+	if (train_on_res == nullptr || train_on_res->type != VehicleType::Train) {
+		train_on_res = nullptr;
+		FollowTrainReservation(v, &train_on_res, true);
+		behind = true;
+	}
+	if (train_on_res == nullptr || train_on_res->type != VehicleType::Train) return nullptr;
+
+	Train *partner = Train::From(train_on_res)->First();
+	if (partner == v->First()) return nullptr; // that reservation just leads back to ourselves
+	if (partner->owner != v->owner) return nullptr;
+	if (partner->vehstatus.Test(VehState::Crashed)) return nullptr;
+	if (partner->cur_speed != 0) return nullptr;
+
+	if (partner_is_behind != nullptr) *partner_is_behind = behind;
+	return partner;
+}
+
+/**
+ * Is the tile immediately beyond (@p tile, @p td) occupied by a stopped
+ * train that @p v could couple with? Used by #CYapfDestinationCoupleRailT
+ * (yapf_destrail.hpp) to let the pathfinder treat "stop right next to a
+ * partner train" as a valid destination -- something no other search in
+ * this game does, since every other destination type deliberately avoids
+ * routing onto/next to an occupied tile. Deliberately mirrors the
+ * validity checks in #GetTrainCouplePartner exactly, so a route the
+ * pathfinder finds here is guaranteed to still be couplable once the
+ * train actually arrives. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v    the train searching for a route to a coupling partner
+ * @param tile candidate tile the search has reached
+ * @param td   the trackdir the search is facing on that tile
+ * @return true if the very next tile ahead has a valid partner on it
+ */
+bool IsAdjacentToCouplePartner(const Train *v, TileIndex tile, Trackdir td)
+{
+	TileIndex next_tile = TileAddByDiagDir(tile, TrackdirToExitdir(td));
+	for (const Vehicle *u : VehiclesOnTile(next_tile)) {
+		if (u->type != VehicleType::Train) continue;
+		const Train *partner = Train::From(u)->First();
+		if (partner == v->First()) continue; // that's us
+		if (partner->owner != v->owner) continue;
+		if (partner->vehstatus.Test(VehState::Crashed)) continue;
+		if (partner->cur_speed != 0) continue;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Couple a stopped train to another stopped train immediately adjacent to
+ * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
+ * consists inside a depot). See #GetTrainCouplePartner for exactly which
+ * geometry is currently recognised, and FEATURE_DESIGN_COUPLING_TOW.md for
+ * the full design this is one piece of.
+ *
+ * @param flags  type of operation
+ * @param veh_id the train initiating the coupling
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	bool partner_is_behind = false;
+	Train *partner = GetTrainCouplePartner(v, &partner_is_behind);
+	if (partner == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER);
+
+	/* Re-check ownership of the partner explicitly: GetTrainCouplePartner()
+	 * already requires matching owners, but CheckOwnership() also handles
+	 * the "spectator"/deity edge cases that a plain == comparison would not. */
+	ret = CheckOwnership(partner->owner);
+	if (ret.Failed()) return ret;
+
+	/* Whichever train is physically leading keeps its front; the other
+	 * one's whole consist gets spliced onto its rear. */
+	Train *leading = partner_is_behind ? v : partner;
+	Train *trailing = partner_is_behind ? partner : v;
+
+	Train *src = trailing->GetFirstEnginePart();
+	Train *dst = leading->Last()->GetLastEnginePart();
+
+	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
+
+	return TryConsistSplice(flags, src, dst, true);
+}
+
+/**
+ * Decouple a stopped train down to its front @p keep_count "real"
+ * (non-articulated-part) vehicles, splitting the rest off into a new
+ * standalone train left behind. Called from #Vehicle::LeaveStation when
+ * the order just finished has Order::ShouldDecoupleOnDeparture() set; see
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * If @p keep_count is 0 or is not achievable with the train's current
+ * length (e.g. the consist has since been shortened, or it's a
+ * multiheaded engine that can't be split at that point), this silently
+ * does nothing rather than failing loudly - the order's decouple count is
+ * a per-order setting that can outlive changes to the consist it was set
+ * on, similar to how e.g. full-load orders don't error on a consist that
+ * can never fill up.
+ *
+ * @param v          front of the consist that just finished loading
+ * @param keep_count number of vehicles to keep at the front
+ */
+void TryDecoupleAtStation(Train *v, uint8_t keep_count)
+{
+	if (keep_count == 0) return;
+	if (v->vehstatus.Test(VehState::Crashed)) return;
+
+	Train *split_point = v;
+	for (uint8_t i = 0; i < keep_count; i++) {
+		split_point = split_point->GetNextVehicle();
+		if (split_point == nullptr) return; // consist has fewer than keep_count vehicles
+	}
+
+	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
+
+	TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
 }
 
 /**
@@ -2419,6 +2632,8 @@ static bool CheckTrainStayInDepot(Train *v)
  * @param tile Tile with reservation to clear.
  * @param track_dir Track direction to clear.
  */
+static bool IsRailStationPlatformOccupied(TileIndex tile);
+
 static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_dir)
 {
 	DiagDirection dir = TrackdirToExitdir(track_dir);
@@ -2446,8 +2661,16 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 	} else if (IsRailStationTile(tile)) {
 		TileIndex new_tile = TileAddByDiagDir(tile, dir);
 		/* If the new tile is not a further tile of the same station, we
-		 * clear the reservation for the whole platform. */
-		if (!IsCompatibleTrainStationTile(new_tile, tile)) {
+		 * clear the reservation for the whole platform -- but only if no
+		 * other train is still standing on it (mirrors the "only if free"
+		 * check just above for tunnels/bridges, and the same check used
+		 * when a wagon is deleted, see IsRailStationPlatformOccupied()).
+		 * Without this, a "free wagon" chain left behind by a decouple
+		 * order loses its PBS reservation the instant the rest of the
+		 * train it was split from leaves the platform, even though it is
+		 * still physically standing there. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (!IsCompatibleTrainStationTile(new_tile, tile) && !IsRailStationPlatformOccupied(tile)) {
 			SetRailStationPlatformReservation(tile, ReverseDiagDir(dir), false);
 		}
 	} else {
