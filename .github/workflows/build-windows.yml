@@ -32,10 +32,18 @@ on:
 jobs:
   windows:
     name: Windows (${{ inputs.arch || 'x64' }})
-    # Pinned (not windows-latest): see BUILD_NOTES.md run #2 — a newer MSVC
-    # toolset removes stdext::checked_array_iterator, which breaks building
-    # the pinned vcpkg breakpad port (2023.06.01) with C2653/C2065/C2059.
-    runs-on: windows-2022
+    # Pinned to windows-2022 for the vendored 15.3 source: see BUILD_NOTES.md
+    # run #2 — a newer MSVC toolset removes stdext::checked_array_iterator,
+    # which breaks building the pinned vcpkg breakpad port (2023.06.01) with
+    # C2653/C2065/C2059.
+    #
+    # For an external source_repo override (used to verify newer OpenTTD
+    # versions, e.g. 16.0-beta2), use windows-latest instead: that source
+    # pulls its own newer vcpkg baseline (so the old breakpad problem above
+    # doesn't apply), and its C++20 EnumBitSet constexpr constructors need a
+    # newer MSVC than windows-2022 ships — hit as C2131 "expression did not
+    # evaluate to a constant" in src/signal.cpp when tried on windows-2022.
+    runs-on: ${{ inputs.source_repo != '' && 'windows-latest' || 'windows-2022' }}
 
     steps:
     - name: Checkout this repository (vendored OpenTTD source lives in openttd/)

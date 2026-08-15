@@ -241,7 +241,31 @@ i číslo běhu (`-run<N>`, např. `openttd-exe-x64-run7`), aby bylo na první
 pohled jasné, ze kterého běhu který soubor pochází, i když jich bude na
 GitHubu najednou víc.
 
-## Otevřené otázky / TODO
+## Ověřování OpenTTD 16.0-beta2 jako budoucí základ (2026-08-15)
+
+Než jsme se rozhodli přejít z vendorované 15.3 na 16.0-beta2 (kvůli
+skutečnému couvání vlaků a NewGRF kompatibilitě s CZTR — viz
+`FEATURE_DESIGN_COUPLING_TOW.md`), první krok byl stejný jako na
+začátku celého projektu: ověřit, že to umíme spolehlivě zkompilovat,
+než se čehokoliv dotkneme.
+
+**Run #22 (`source_repo=OpenTTD/OpenTTD`, `source_ref=16.0-beta2`) selhal:**
+```
+src/signal.cpp(42): error C2131: expression did not evaluate to a constant
+```
+Chyba je v `EnumBitSet<Trackdir>::EnumBitSet(std::initializer_list<...>)`
+— constexpr konstruktor, který náš pinovaný `windows-2022` runner
+(MSVC 19.44) neumí vyhodnotit za compile-time. Je to zrcadlový problém
+k tomu, co jsme řešili na začátku s breakpadem: tehdy byl
+`windows-latest` moc NOVÝ pro starý (2023) vcpkg port breakpadu, teď je
+náš pinovaný `windows-2022` moc STARÝ pro nový (2026) C++20 kód
+beta16. Beta16 navíc táhne svůj vlastní, novější vcpkg baseline, takže
+starý důvod pro pinování (breakpad) se na něj vůbec nevztahuje.
+
+**Oprava:** `runs-on` je teď podmíněný podle toho, jestli se použije
+`source_repo` override — vendorovaná 15.3 (výchozí) zůstává na
+`windows-2022` beze změny, externí zdroj (dnes používaný jen pro
+ověřování beta16) jede na `windows-latest`.
 
 - [ ] Spustit build poprvé a zaznamenat výsledek/čas/případné chyby do
       tabulky výše.
