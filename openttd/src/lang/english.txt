@@ -4791,6 +4791,8 @@ STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to co
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
 
+STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and an autonomous reversal here could drive straight into wagons a train just left behind
+
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
 STR_ORDERS_SKIP_TOOLTIP                                         :{BLACK}Skip the current order, and start the next. Ctrl+Click to skip to the selected order
 

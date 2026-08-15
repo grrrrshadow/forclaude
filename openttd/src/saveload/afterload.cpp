@@ -3465,6 +3465,20 @@ bool AfterLoadGame()
 		}
 	}
 
+	/* difficulty.train_flip_reverse_allowed and pf.reverse_at_signals are
+	 * hard-locked via SettingDesc::IsEditable() so the player can never
+	 * toggle them, but a savegame made before the lock existed (or on
+	 * another build) can still carry a dangerous saved value -- and the
+	 * migration above (train_flip_reverse_allowed from old
+	 * line_reverse_mode, and reverse_at_signals from old Yapp-era wait
+	 * counters) runs earlier in this function and would otherwise
+	 * overwrite a value forced any earlier. Force the safe values here,
+	 * last, unconditionally, regardless of savegame version -- this is a
+	 * safety invariant, not a compatibility upgrade. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	_settings_game.difficulty.train_flip_reverse_allowed = TrainFlipReversingAllowed::None;
+	_settings_game.pf.reverse_at_signals = false;
+
 	return true;
 }
 

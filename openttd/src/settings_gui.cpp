@@ -746,7 +746,16 @@ struct GameOptionsWindow : Window {
 					if (FillDrawPixelInfo(&tmp_dpi, r)) {
 						AutoRestoreBackup dpi_backup(_cur_dpi, &tmp_dpi);
 						int scrolls_pos = this->vscroll_description->GetPosition() * GetCharacterHeight(FontSize::Normal);
-						DrawStringMultiLine(0, r.Width() - 1, -scrolls_pos, r.Height() - 1, sd->GetHelp(), TextColour::White);
+						/* Not localised on purpose: this warning must show
+						 * up regardless of UI language, without relying on
+						 * every translation file being kept in sync. See
+						 * FEATURE_DESIGN_COUPLING_TOW.md. */
+						std::string help_text = GetString(sd->GetHelp());
+						if (sd->GetName() == "difficulty.train_flip_reverse_allowed" || sd->GetName() == "pf.reverse_at_signals") {
+							help_text += '\n';
+							help_text += GetString(STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS);
+						}
+						DrawStringMultiLine(0, r.Width() - 1, -scrolls_pos, r.Height() - 1, help_text, TextColour::White);
 					}
 				}
 				break;

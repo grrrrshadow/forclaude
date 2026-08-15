@@ -2648,7 +2648,7 @@ static bool CheckTrainStayInDepot(Train *v)
  * @param tile Tile with reservation to clear.
  * @param track_dir Track direction to clear.
  */
-static bool IsRailStationPlatformOccupied(TileIndex tile);
+static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore = nullptr);
 
 static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_dir)
 {
@@ -2678,15 +2678,24 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 		TileIndex new_tile = TileAddByDiagDir(tile, dir);
 		/* If the new tile is not a further tile of the same station, we
 		 * clear the reservation for the whole platform -- but only if no
-		 * other train is still standing on it (mirrors the "only if free"
+		 * OTHER train is still standing on it (mirrors the "only if free"
 		 * check just above for tunnels/bridges, and the same check used
 		 * when a wagon is deleted, see IsRailStationPlatformOccupied()).
 		 * Without this, a "free wagon" chain left behind by a decouple
 		 * order loses its PBS reservation the instant the rest of the
 		 * train it was split from leaves the platform, even though it is
 		 * still physically standing there. See
-		 * FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (!IsCompatibleTrainStationTile(new_tile, tile) && !IsRailStationPlatformOccupied(tile)) {
+		 * FEATURE_DESIGN_COUPLING_TOW.md.
+		 *
+		 * "Other" is the operative word: v itself is still passing
+		 * through/leaving the platform when this runs (this is called
+		 * per-tile as its rear vacates each one), so on a platform longer
+		 * than one tile, v's own remaining wagons are still physically on
+		 * other platform tiles at this exact moment. Without excluding v,
+		 * the occupancy check would see "occupied" (by v itself, mid-
+		 * departure) and never clear the reservation behind ANY train on
+		 * a multi-tile platform -- not just decoupled ones. */
+		if (!IsCompatibleTrainStationTile(new_tile, tile) && !IsRailStationPlatformOccupied(tile, v)) {
 			SetRailStationPlatformReservation(tile, ReverseDiagDir(dir), false);
 		}
 	} else {
@@ -3931,15 +3940,20 @@ reverse_train_direction:
 	return false;
 }
 
-static bool IsRailStationPlatformOccupied(TileIndex tile)
+static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore)
 {
 	TileIndexDiff delta = TileOffsByAxis(GetRailStationAxis(tile));
+	const Train *ignore_first = ignore != nullptr ? ignore->First() : nullptr;
+
+	auto is_other_train = [ignore_first](const Vehicle *u) {
+		return u->type == VehicleType::Train && Train::From(u)->First() != ignore_first;
+	};
 
 	for (TileIndex t = tile; IsCompatibleTrainStationTile(t, tile); t -= delta) {
-		if (HasVehicleOnTile(t, IsTrain)) return true;
+		if (HasVehicleOnTile(t, is_other_train)) return true;
 	}
 	for (TileIndex t = tile + delta; IsCompatibleTrainStationTile(t, tile); t += delta) {
-		if (HasVehicleOnTile(t, IsTrain)) return true;
+		if (HasVehicleOnTile(t, is_other_train)) return true;
 	}
 
 	return false;

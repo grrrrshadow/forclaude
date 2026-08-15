@@ -919,6 +919,16 @@ void IniSaveWindowSettings(IniFile &ini, std::string_view grpname, WindowDesc *d
  */
 bool SettingDesc::IsEditable(bool do_command) const
 {
+	/* Locked off (greyed out, not removed - see the "Locked" note added
+	 * to the settings GUI's help text for these two): even with real
+	 * backward driving (no more instant "flip" reorientation) making an
+	 * actual crash into left-behind wagons far less likely, autonomous
+	 * reversal decisions at stations/signals should stay off entirely
+	 * while playing with decouple orders -- the player wants trains to
+	 * only ever reverse on their own command or an explicit "go to
+	 * couple" order. See FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (this->GetName() == "difficulty.train_flip_reverse_allowed" || this->GetName() == "pf.reverse_at_signals") return false;
+
 	if (!do_command && !this->flags.Test(SettingFlag::NoNetworkSync) && _networking && !_network_server && !this->flags.Test(SettingFlag::PerCompany)) return false;
 	if (do_command && this->flags.Test(SettingFlag::NoNetworkSync)) return false;
 	if (this->flags.Test(SettingFlag::NetworkOnly) && !_networking && _game_mode != GameMode::Menu) return false;
@@ -972,6 +982,15 @@ static void ValidateSettings()
 			_settings_newgame.difficulty.quantity_sea_lakes == CUSTOM_SEA_LEVEL_NUMBER_DIFFICULTY) {
 		_settings_newgame.difficulty.quantity_sea_lakes = CUSTOM_SEA_LEVEL_MIN_PERCENTAGE;
 	}
+
+	/* These two are hard-locked via SettingDesc::IsEditable() so the player
+	 * can never toggle them in the GUI, but that alone doesn't fix an
+	 * openttd.cfg that already has a dangerous value saved from before the
+	 * lock existed. Force the safe value here too, every time settings are
+	 * loaded, so "locked" actually means locked to the safe state. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	_settings_newgame.difficulty.train_flip_reverse_allowed = TrainFlipReversingAllowed::None;
+	_settings_newgame.pf.reverse_at_signals = false;
 }
 
 static void AILoadConfig(const IniFile &ini, std::string_view grpname)
