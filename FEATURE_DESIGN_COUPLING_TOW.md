@@ -766,3 +766,45 @@ musí zadat na konkrétní stanici, kde partner už stojí, ne "najeď k
 nejbližšímu vhodnému vlaku kdekoliv". Tohle je přesně ta část, co se
 bude hodit pro odtah (najít nejbližší porouchaný vlak) — nechávám jako
 navazující krok, ne součást v1.
+
+## Skutečná příčina "u vagonku bouchla, nespojila se" (test po run #18)
+
+Test ukázal, že v1 výše nestačila: mašinka odmítala vyjet z depa (musel
+se to protlačit přes semafor ručně) a po vynuceném vyjetí u vagonků
+nabourala, aniž by se pokusila spojit. Příčina: **žádný pathfinder v
+téhle hře neumí zacílit na dlaždici hned vedle obsazené dlaždice** —
+každé normální hledání cesty se tomu záměrně vyhýbá (přesně to chrání
+vlaky před srážkou). Když má "go to couple" příkaz jako cíl normální
+stanici, kde už partner stojí, `ChooseTrainTrack`/`ExtendTrainReservation`
+narazí na obsazenou kolej, nenajde žádný "bezpečný" bod k zastavení, a
+vlak označí jako zaseklý (`MarkTrainAsStuck`) — přesně to viděl
+uživatel. Vynucené vyjetí přes semafor pak jelo bez jakékoliv rezervace
+= bez ochrany = srážka. To není bug v "couvání", je to mezera v tom, co
+vůbec pathfinder umí považovat za platný cíl.
+
+**Implementace (hotovo, viz commit):** postavil jsem vlastní YAPF
+destination typ `CYapfDestinationCoupleRailT` (`yapf_destrail.hpp`) —
+kopie existujícího `CYapfDestinationAnySafeTileRailT`, ale
+`PfDetectDestination` místo "je to bezpečné a volné místo" kontroluje
+"je hned vedle mě zaparkovaný platný partner" — přes novou funkci
+`IsAdjacentToCouplePartner()` (`train_cmd.cpp`, zrcadlí přesně
+validační podmínky z `GetTrainCouplePartner()`, aby cesta, kterou
+pathfinder najde, šla opravdu dokončit spojením). "Follow" část (jak
+se prochází koleje)
+jsem nemusel psát znovu — `CYapfFollowAnySafeTileRailT` je už dost
+obecná, jen jsem ji spároval s novým destination typem
+(`CYapfCoupleRail`/`CYapfCoupleRailNo90`, přesně podle vzoru
+`CYapfAnySafeTileRail`). Nová vstupní funkce
+`YapfTrainFindCouplePosition()` (`yapf_rail.cpp`/`yapf.h`) se volá z
+`ChooseTrainTrack()` jako záložní krok TĚSNĚ předtím, než by se vlak
+normálně označil za zaseklý — ale jen pro vlaky s `go_to_couple`
+příkazem, takže normální vlaky se chovají naprosto stejně jako dřív.
+
+Tohle by mělo vyřešit i to, proč vlak nechtěl vyjet z depa (stejná
+mezera, jen dřív v cestě) — depo taky potřebuje projít
+`ChooseTrainTrack`, aby vlak vůbec vyjel.
+
+Vedlejší drobnost ze stejného testu: přidal jsem i text "(go to
+couple)" za řádek příkazu v seznamu, ať to vypadá jako u Paolo123YPS
+(vlastní řádek), i když je to pořád technicky flag na normálním
+příkazu "Jet do stanice", ne nový typ příkazu.

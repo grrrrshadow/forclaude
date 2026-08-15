@@ -4711,6 +4711,7 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
+STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
 
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and a train reversing here can drive straight into wagons it just left behind
 

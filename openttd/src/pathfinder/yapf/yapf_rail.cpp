@@ -576,6 +576,13 @@ struct CYapfAnyDepotRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfAnyDepotRailN
 struct CYapfAnySafeTileRail     : CYapfRailBase<CYapfRail_TypesT<CYapfAnySafeTileRail    , CFollowTrackFreeRail    , CYapfDestinationAnySafeTileRailT , CYapfFollowAnySafeTileRailT>> {};
 struct CYapfAnySafeTileRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfAnySafeTileRailNo90, CFollowTrackFreeRailNo90, CYapfDestinationAnySafeTileRailT , CYapfFollowAnySafeTileRailT>> {};
 
+/* "Go to couple" destination: reuses the exact same generic path-following
+ * and reservation machinery as CYapfAnySafeTileRail above (CFollowTrackFreeRail
+ * / CYapfFollowAnySafeTileRailT), just with a different idea of what counts
+ * as "arrived" -- see CYapfDestinationCoupleRailT in yapf_destrail.hpp. */
+struct CYapfCoupleRail     : CYapfRailBase<CYapfRail_TypesT<CYapfCoupleRail    , CFollowTrackFreeRail    , CYapfDestinationCoupleRailT , CYapfFollowAnySafeTileRailT>> {};
+struct CYapfCoupleRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfCoupleRailNo90, CFollowTrackFreeRailNo90, CYapfDestinationCoupleRailT , CYapfFollowAnySafeTileRailT>> {};
+
 
 Track YapfTrainChooseTrack(const Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool &path_found, bool reserve_track, PBSTileInfo *target, TileIndex *dest)
 {
@@ -657,6 +664,18 @@ bool YapfTrainFindNearestSafeTile(const Train *v, TileIndex tile, Trackdir td, b
 	return _settings_game.pf.forbid_90_deg
 		? CYapfAnySafeTileRailNo90::stFindNearestSafeTile(v, tile, td, override_railtype)
 		: CYapfAnySafeTileRail::stFindNearestSafeTile(v, tile, td, override_railtype);
+}
+
+/**
+ * Find and reserve a path to stop immediately next to a coupling partner
+ * train, reversing along the way if that is what it takes to get there.
+ * See #CYapfDestinationCoupleRailT and FEATURE_DESIGN_COUPLING_TOW.md.
+ */
+bool YapfTrainFindCouplePosition(const Train *v, TileIndex tile, Trackdir td)
+{
+	return _settings_game.pf.forbid_90_deg
+		? CYapfCoupleRailNo90::stFindNearestSafeTile(v, tile, td, false)
+		: CYapfCoupleRail::stFindNearestSafeTile(v, tile, td, false);
 }
 
 /** if any track changes, this counter is incremented - that will invalidate segment cost cache */

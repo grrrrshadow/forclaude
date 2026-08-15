@@ -287,6 +287,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 						line += GetString(STR_ORDER_STOP_LOCATION_NEAR_END + to_underlying(order->GetStopLocation()));
 					}
 				}
+
+				/* Make a "go to couple" order read as its own kind of order
+				 * in the list, matching Palo123YPS's GUI, without it
+				 * actually being a separate OrderType. See
+				 * FEATURE_DESIGN_COUPLING_TOW.md. */
+				if (v->type == VEH_TRAIN && order->ShouldGoToCouple()) line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
 			}
 			break;
 		}

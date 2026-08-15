@@ -1521,6 +1521,37 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 }
 
 /**
+ * Is the tile immediately beyond (@p tile, @p td) occupied by a stopped
+ * train that @p v could couple with? Used by #CYapfDestinationCoupleRailT
+ * (yapf_destrail.hpp) to let the pathfinder treat "stop right next to a
+ * partner train" as a valid destination -- something no other search in
+ * this game does, since every other destination type deliberately avoids
+ * routing onto/next to an occupied tile. Deliberately mirrors the
+ * validity checks in #GetTrainCouplePartner exactly, so a route the
+ * pathfinder finds here is guaranteed to still be couplable once the
+ * train actually arrives. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v    the train searching for a route to a coupling partner
+ * @param tile candidate tile the search has reached
+ * @param td   the trackdir the search is facing on that tile
+ * @return true if the very next tile ahead has a valid partner on it
+ */
+bool IsAdjacentToCouplePartner(const Train *v, TileIndex tile, Trackdir td)
+{
+	TileIndex next_tile = TileAddByDiagDir(tile, TrackdirToExitdir(td));
+	for (const Vehicle *u : VehiclesOnTile(next_tile)) {
+		if (u->type != VEH_TRAIN) continue;
+		const Train *partner = Train::From(u)->First();
+		if (partner == v->First()) continue; // that's us
+		if (partner->owner != v->owner) continue;
+		if (partner->vehstatus.Test(VehState::Crashed)) continue;
+		if (partner->cur_speed != 0) continue;
+		return true;
+	}
+	return false;
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -3014,6 +3045,25 @@ static Track ChooseTrainTrack(Train *v, TileIndex tile, DiagDirection enterdir, 
 
 	/* A path was found, but could not be reserved. */
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
+		/* Every normal pathfinder deliberately avoids ending a route next
+		 * to an occupied tile -- that is what keeps trains from routing
+		 * into each other. A "go to couple" order's entire point is to
+		 * stop right next to another (stopped, compatible) train, so it
+		 * can never succeed through the normal path above. Fall back to
+		 * the couple-aware pathfinder, which treats that as the goal
+		 * instead of an obstacle, before giving up and marking the train
+		 * stuck. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (v->current_order.ShouldGoToCouple()) {
+			PBSTileInfo origin = FollowTrainReservation(v);
+			if (YapfTrainFindCouplePosition(v, origin.tile, origin.trackdir)) {
+				TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
+				best_track = FindFirstTrack(res);
+				TryReserveRailTrack(v->tile, TrackdirToTrack(v->GetVehicleTrackdir()));
+				if (got_reservation != nullptr) *got_reservation = true;
+				if (changed_signal) MarkTileDirtyByTile(tile);
+				return best_track;
+			}
+		}
 		if (mark_stuck) MarkTrainAsStuck(v);
 		FreeTrainTrackReservation(v);
 		return best_track;
