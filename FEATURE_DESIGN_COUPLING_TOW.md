@@ -808,3 +808,37 @@ Vedlejší drobnost ze stejného testu: přidal jsem i text "(go to
 couple)" za řádek příkazu v seznamu, ať to vypadá jako u Paolo123YPS
 (vlastní řádek), i když je to pořád technicky flag na normálním
 příkazu "Jet do stanice", ne nový typ příkazu.
+
+## Proč pořád couvá jen "z donucení" (test po run #20): chybějící druhá polovina
+
+I s pathfinderem výše zůstala mašinka stát na semaforu ("Čekám na
+volnou cestu") a bez couvnutí — teprve vynucené vyjetí skončilo
+srážkou. Důvod: v enginu jsou DVĚ oddělené věci, co s otáčením souvisí,
+a opravil jsem zatím jen jednu.
+
+1. **Kde se REZERVUJE cesta** (`ChooseTrainTrack`) — to už umí najít
+   partnera jako cíl (oprava výše).
+2. **Kde se ROZHODUJE, jestli se má vlak vůbec otočit** — samostatná
+   funkce `YapfTrainCheckReverse()`, volaná každý tik z
+   `TrainLocoHandler`, PŘED tím, než se `ChooseTrainTrack` vůbec
+   zavolá. Ta porovnává "cena cesty dopředu" vs. "cena cesty po
+   otočení" — ale porovnávala to vždycky vůči BĚŽNÉMU cíli příkazu
+   (stanici), ne vůči partnerovi. Takže i když jsem odemkl zámek
+   `line_reverse_mode` pro "go to couple", vlak se otočit nerozhodl,
+   protože jeho vlastní srovnání nákladů netušilo, že "otočit se" by
+   ho přiblížilo k partnerovi — porovnávalo to se stejnou "nedosažitelnou"
+   stanicí jako běžná rezervace.
+
+**Oprava:** nová dvojice `CYapfCoupleReverseRail`/`CYapfCoupleReverseRailNo90`
+(stejný `CYapfDestinationCoupleRailT` cíl jako předtím, ale spárovaný s
+`CYapfFollowRailT` — tam žije `CheckReverseTrain`/`stCheckReverseTrain`,
+na "any safe tile" follow typu není). Nová funkce
+`YapfTrainCheckReverseForCouple()` (zrcadlí `YapfTrainCheckReverse()`
+1:1, jen s jiným párem struktur) a `CheckReverseTrain()` v
+`train_cmd.cpp` ji teď volá místo normální verze, když má vlak "go to
+couple" příkaz. Sdílenou část výpočtu (tunely/mosty, penalizace) jsem
+vytáhl do `GetReverseCheckOrigins()`, ať se nekopíruje.
+
+Tohle by měla být ta chybějící druhá polovina — bez ní pathfinder sice
+"věděl", že cesta k partnerovi existuje po otočení, ale nic vlak
+k tomu otočení nedonutilo.

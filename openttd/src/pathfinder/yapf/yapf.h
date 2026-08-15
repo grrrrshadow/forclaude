@@ -87,6 +87,16 @@ FindDepotData YapfTrainFindNearestDepot(const Train *v, int max_distance);
 bool YapfTrainCheckReverse(const Train *v);
 
 /**
+ * Same as YapfTrainCheckReverse(), but comparing against a coupling
+ * partner instead of the train's ordinary order destination. Only
+ * meaningful for a train executing a "go to couple" order. See
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ * @param v the train looking for its coupling partner
+ * @return true if reversing gets it closer to that partner
+ */
+bool YapfTrainCheckReverseForCouple(const Train *v);
+
+/**
  * Try to extend the reserved path of a train to the nearest safe tile using YAPF.
  *
  * @param v    The train that needs to find a safe tile.

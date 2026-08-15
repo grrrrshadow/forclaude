@@ -583,6 +583,20 @@ struct CYapfAnySafeTileRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfAnySafeTil
 struct CYapfCoupleRail     : CYapfRailBase<CYapfRail_TypesT<CYapfCoupleRail    , CFollowTrackFreeRail    , CYapfDestinationCoupleRailT , CYapfFollowAnySafeTileRailT>> {};
 struct CYapfCoupleRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfCoupleRailNo90, CFollowTrackFreeRailNo90, CYapfDestinationCoupleRailT , CYapfFollowAnySafeTileRailT>> {};
 
+/* Same CYapfDestinationCoupleRailT destination as above, but paired with
+ * CYapfFollowRailT (like the normal CYapfRail) instead of
+ * CYapfFollowAnySafeTileRailT, because stCheckReverseTrain()/
+ * CheckReverseTrain() -- the "would reversing get me there better" cost
+ * comparison used by YapfTrainCheckReverseForCouple() below -- lives on
+ * CYapfFollowRailT, not on the "any safe tile" follow type. Without this,
+ * a go-to-couple train would never actually decide to flip around in the
+ * first place: YapfTrainCheckReverse() always compares against the
+ * train's ordinary order destination, which -- same as normal path
+ * reservation -- can't recognise "next to an occupied tile" as
+ * reachable at all. See FEATURE_DESIGN_COUPLING_TOW.md. */
+struct CYapfCoupleReverseRail     : CYapfRailBase<CYapfRail_TypesT<CYapfCoupleReverseRail    , CFollowTrackRail    , CYapfDestinationCoupleRailT, CYapfFollowRailT>> {};
+struct CYapfCoupleReverseRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfCoupleReverseRailNo90, CFollowTrackRailNo90, CYapfDestinationCoupleRailT, CYapfFollowRailT>> {};
+
 
 Track YapfTrainChooseTrack(const Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool &path_found, bool reserve_track, PBSTileInfo *target, TileIndex *dest)
 {
@@ -593,7 +607,16 @@ Track YapfTrainChooseTrack(const Train *v, TileIndex tile, DiagDirection enterdi
 	return (td_ret != INVALID_TRACKDIR) ? TrackdirToTrack(td_ret) : FindFirstTrack(tracks);
 }
 
-bool YapfTrainCheckReverse(const Train *v)
+/** Shared setup for YapfTrainCheckReverse()/YapfTrainCheckReverseForCouple(): the two possible origins (as-is vs. reversed) and the wormhole penalty between them. */
+struct ReverseCheckOrigins {
+	TileIndex tile;
+	Trackdir td;
+	TileIndex tile_rev;
+	Trackdir td_rev;
+	int reverse_penalty;
+};
+
+static ReverseCheckOrigins GetReverseCheckOrigins(const Train *v)
 {
 	const Train *last_veh = v->Last();
 
@@ -639,11 +662,31 @@ bool YapfTrainCheckReverse(const Train *v)
 	/* slightly hackish: If the pathfinders finds a path, the cost of the first node is tested to distinguish between forward- and reverse-path. */
 	if (reverse_penalty == 0) reverse_penalty = 1;
 
-	bool reverse = _settings_game.pf.forbid_90_deg
-		? CYapfRailNo90::stCheckReverseTrain(v, tile, td, tile_rev, td_rev, reverse_penalty)
-		: CYapfRail::stCheckReverseTrain(v, tile, td, tile_rev, td_rev, reverse_penalty);
+	return {tile, td, tile_rev, td_rev, reverse_penalty};
+}
 
-	return reverse;
+bool YapfTrainCheckReverse(const Train *v)
+{
+	ReverseCheckOrigins o = GetReverseCheckOrigins(v);
+
+	return _settings_game.pf.forbid_90_deg
+		? CYapfRailNo90::stCheckReverseTrain(v, o.tile, o.td, o.tile_rev, o.td_rev, o.reverse_penalty)
+		: CYapfRail::stCheckReverseTrain(v, o.tile, o.td, o.tile_rev, o.td_rev, o.reverse_penalty);
+}
+
+/**
+ * Same comparison as YapfTrainCheckReverse(), but asking "would reversing
+ * get me closer to my coupling partner" instead of "...to my ordinary
+ * order destination". See CYapfCoupleReverseRail above and
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ */
+bool YapfTrainCheckReverseForCouple(const Train *v)
+{
+	ReverseCheckOrigins o = GetReverseCheckOrigins(v);
+
+	return _settings_game.pf.forbid_90_deg
+		? CYapfCoupleReverseRailNo90::stCheckReverseTrain(v, o.tile, o.td, o.tile_rev, o.td_rev, o.reverse_penalty)
+		: CYapfCoupleReverseRail::stCheckReverseTrain(v, o.tile, o.td, o.tile_rev, o.td_rev, o.reverse_penalty);
 }
 
 FindDepotData YapfTrainFindNearestDepot(const Train *v, int max_penalty)

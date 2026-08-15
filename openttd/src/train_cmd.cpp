@@ -3232,6 +3232,13 @@ static bool CheckReverseTrain(const Train *v)
 
 	assert(v->track != TRACK_BIT_NONE);
 
+	/* A go-to-couple train comparing against its ordinary order
+	 * destination would never find reversing worthwhile, for the same
+	 * reason normal path reservation can't reach the partner either:
+	 * see YapfTrainFindCouplePosition() above and
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (v->current_order.ShouldGoToCouple()) return YapfTrainCheckReverseForCouple(v);
+
 	return YapfTrainCheckReverse(v);
 }
 
