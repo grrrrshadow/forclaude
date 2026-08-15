@@ -5,7 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file autoreplace_sl.cpp Code handling saving and loading of autoreplace rules */
+/** @file autoreplace_sl.cpp Code handling saving and loading of autoreplace rules. */
 
 #include "../stdafx.h"
 
@@ -17,16 +17,16 @@
 #include "../safeguards.h"
 
 static const SaveLoad _engine_renew_desc[] = {
-	    SLE_VAR(EngineRenew, from,     SLE_UINT16),
-	    SLE_VAR(EngineRenew, to,       SLE_UINT16),
+	    SLE_VAR(EngineRenew, from,     VarTypes::U16),
+	    SLE_VAR(EngineRenew, to,       VarTypes::U16),
 
-	    SLE_REF(EngineRenew, next,     REF_ENGINE_RENEWS),
-	SLE_CONDVAR(EngineRenew, group_id, SLE_UINT16, SLV_60, SL_MAX_VERSION),
-	SLE_CONDVAR(EngineRenew, replace_when_old, SLE_BOOL, SLV_175, SL_MAX_VERSION),
+	    SLE_REF(EngineRenew, next,     SLRefType::EngineRenew),
+	SLE_CONDVAR(EngineRenew, group_id, VarTypes::U16, SaveLoadVersion::VehicleGroups, SaveLoadVersion::MaxVersion),
+	SLE_CONDVAR(EngineRenew, replace_when_old, VarTypes::BOOL, SaveLoadVersion::AutoreplaceWhenOldTreeLimit, SaveLoadVersion::MaxVersion),
 };
 
 struct ERNWChunkHandler : ChunkHandler {
-	ERNWChunkHandler() : ChunkHandler('ERNW', CH_TABLE) {}
+	ERNWChunkHandler() : ChunkHandler('ERNW', ChunkType::Table) {}
 
 	void Save() const override
 	{
@@ -45,13 +45,13 @@ struct ERNWChunkHandler : ChunkHandler {
 		int index;
 
 		while ((index = SlIterateArray()) != -1) {
-			EngineRenew *er = new (EngineRenewID(index)) EngineRenew();
+			EngineRenew *er = EngineRenew::CreateAtIndex(EngineRenewID(index));
 			SlObject(er, slt);
 
 			/* Advanced vehicle lists, ungrouped vehicles got added */
-			if (IsSavegameVersionBefore(SLV_60)) {
+			if (IsSavegameVersionBefore(SaveLoadVersion::VehicleGroups)) {
 				er->group_id = ALL_GROUP;
-			} else if (IsSavegameVersionBefore(SLV_71)) {
+			} else if (IsSavegameVersionBefore(SaveLoadVersion::UngroupedVehicles)) {
 				if (er->group_id == DEFAULT_GROUP) er->group_id = ALL_GROUP;
 			}
 		}

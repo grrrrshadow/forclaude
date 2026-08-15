@@ -600,6 +600,7 @@ STR_AIRCRAFT_MENU_AIRPORT_CONSTRUCTION                          :Stavba letišt�
 STR_LANDSCAPING_MENU_LANDSCAPING                                :Úpravy krajiny
 STR_LANDSCAPING_MENU_PLANT_TREES                                :Vysadit stromy
 STR_LANDSCAPING_MENU_PLACE_SIGN                                 :Umístit nápis
+STR_LANDSCAPING_MENU_PLACE_OBJECT                               :Umístit objekt
 
 # Music menu
 STR_TOOLBAR_SOUND_MUSIC                                         :Zvuk/Hudba
@@ -717,7 +718,6 @@ STR_GRAPH_LAST_24_MONTHS                                        :{TINY_FONT}{BLA
 STR_GRAPH_LAST_24_QUARTERS                                      :{TINY_FONT}{BLACK}6 let (čtvrtletně)
 STR_GRAPH_LAST_24_YEARS                                         :{TINY_FONT}{BLACK}24 let (ročně)
 
-STR_GRAPH_TOGGLE_RANGE                                          :Zobrazit nebo skrýt graf pro tento rozsah dat
 STR_GRAPH_SELECT_SCALE                                          :Změnit vodorovné měřítko grafu
 
 STR_GRAPH_CARGO_PAYMENT_RATES_CAPTION                           :{WHITE}Ceny za přepravu nákladu
@@ -740,6 +740,7 @@ STR_GRAPH_INDUSTRY_RANGE_WAITING                                :Čeká
 STR_GRAPH_TOWN_CARGO_CAPTION                                    :{WHITE}{TOWN} - historie nákladu
 STR_GRAPH_TOWN_RANGE_PRODUCED                                   :Vyprodukováno
 STR_GRAPH_TOWN_RANGE_TRANSPORTED                                :Přepraveno
+STR_GRAPH_TOWN_RANGE_DELIVERED                                  :Doručeno
 
 STR_GRAPH_PERFORMANCE_DETAIL_TOOLTIP                            :{BLACK}Zobrazit podrobné hodnocení výkonu
 
@@ -1438,8 +1439,13 @@ STR_CONFIG_SETTING_CONSTRUCTION_COSTS_HIGH                      :vysoký
 STR_CONFIG_SETTING_RECESSIONS                                   :Krize: {STRING}
 STR_CONFIG_SETTING_RECESSIONS_HELPTEXT                          :Pokud jsou krize zapnuty, mohou se občas objevit krize. Během krize je snížena veškerá produkce. Po krizi se opět vrátí do původních hodnot
 
-STR_CONFIG_SETTING_TRAIN_REVERSING                              :Zakázat otáčení vlaků ve stanicích: {STRING}
-STR_CONFIG_SETTING_TRAIN_REVERSING_HELPTEXT                     :Pokud je zapnuto, vlaky se nebudou otáčet v nekoncových stanicích ani pokud by to zkrátilo cestu k dalšímu cíli
+STR_CONFIG_SETTING_TRAIN_FLIP_REVERSE                           :Umožnit vlakům otáčení při obratu: {STRING}
+STR_CONFIG_SETTING_TRAIN_FLIP_REVERSE_HELPTEXT                  :Zvolte, kde mohou vlaky obrátit směr jízdy. Při volbě „Vše" se vlaky mohou otočit kdekoli. Při volbě „Pouze na konci trati" se vlaky neotočí ve stanicích, pokud je možná cesta vpřed. Při volbě „Žádné" se vlaky nemohou otočit a v případě potřeby pojedou pozpátku, ale sníženou rychlostí, pokud zadní vozidlo nemá řídicí kabinu.
+
+###length 3
+STR_CONFIG_SETTING_TRAIN_FLIP_REVERSE_ALL                       :Kdekoliv
+STR_CONFIG_SETTING_TRAIN_FLIP_REVERSE_END_OF_LINE_ONLY          :Jen na konci tratě
+STR_CONFIG_SETTING_TRAIN_FLIP_REVERSE_NONE                      :Nikde
 
 STR_CONFIG_SETTING_DISASTERS                                    :Katastrofy: {STRING}
 STR_CONFIG_SETTING_DISASTERS_HELPTEXT                           :Katastrofy, které mohou občas zablokovat či zničit vozidla nebo infrastrukturu
@@ -1644,6 +1650,9 @@ STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE                         :Násobek produk
 STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_HELPTEXT                :Násobit produkci nákladu průmyslem tímto procentem.
 STR_CONFIG_SETTING_CARGO_SCALE_VALUE                            :{NUM} %
 
+###setting-zero-is-special
+STR_CONFIG_SETTING_CARGO_AGING_RATE_ZERO                        :Žádná degradace
+
 STR_CONFIG_SETTING_AUTORENEW_VEHICLE                            :Automaticky nahradit dopravní prostředek, když zestárne: {STRING}
 STR_CONFIG_SETTING_AUTORENEW_VEHICLE_HELPTEXT                   :Pokud je zapnuto, vozidla na konci své plánované životnosti budou automaticky nahrazena, když jsou splněny podmínky pro automatické obnovení.
 
@@ -1685,7 +1694,7 @@ STR_CONFIG_SETTING_LAND_GENERATOR_HELPTEXT                      :Originální ge
 STR_CONFIG_SETTING_LAND_GENERATOR_ORIGINAL                      :původní
 STR_CONFIG_SETTING_LAND_GENERATOR_TERRA_GENESIS                 :TerraGenesis
 
-STR_CONFIG_SETTING_TERRAIN_TYPE                                 :Druh terénu: {STRING}
+STR_CONFIG_SETTING_TERRAIN_TYPE                                 :Výchozí maximální výška terénu: {STRING}
 STR_CONFIG_SETTING_TERRAIN_TYPE_HELPTEXT                        :Zvol výšku hor a kopců v terénu
 
 STR_CONFIG_SETTING_INDUSTRY_DENSITY                             :Množství průmyslu: {STRING}
@@ -1712,6 +1721,14 @@ STR_CONFIG_SETTING_ROUGHNESS_OF_TERRAIN_VERY_SMOOTH             :velmi rovná
 STR_CONFIG_SETTING_ROUGHNESS_OF_TERRAIN_SMOOTH                  :rovná
 STR_CONFIG_SETTING_ROUGHNESS_OF_TERRAIN_ROUGH                   :členitá
 STR_CONFIG_SETTING_ROUGHNESS_OF_TERRAIN_VERY_ROUGH              :velmi členitá
+
+STR_CONFIG_SETTING_AVERAGE_HEIGHT                               :Průměrná výška: {STRING}
+STR_CONFIG_SETTING_AVERAGE_HEIGHT_HELPTEXT                      :Vyber průměrnou výšku terénu. Volba 'automaticky' nastaví výchozí výšku na základě klimatu: 'nížiny' pro subtropické klima, 'střední polohy' pro mírné klima a zemi hraček a 'náhorní plošiny' pro klima subarktické.
+###length 4
+STR_CONFIG_SETTING_AVERAGE_HEIGHT_AUTO                          :automaticky
+STR_CONFIG_SETTING_AVERAGE_HEIGHT_LOWLANDS                      :nížiny
+STR_CONFIG_SETTING_AVERAGE_HEIGHT_NORMAL                        :střední polohy
+STR_CONFIG_SETTING_AVERAGE_HEIGHT_PLATEAUS                      :náhorní plošiny
 
 STR_CONFIG_SETTING_VARIETY                                      :Rozmanitost umisťování: {STRING}
 STR_CONFIG_SETTING_VARIETY_HELPTEXT                             :Vyberte, zda mapa obsahuje jak hory, tak i rovinaté oblasti. Čím vyšší je rozmanitost, tím více rozdílů v nadmořské výšce mezi horskými a rovinatými oblastmi.
@@ -1871,12 +1888,12 @@ STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Zobrazit předp
 STR_CONFIG_SETTING_QUICKGOTO                                    :Rychlejší zadávání příkazů pro vozidla: {STRING}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Předvybere "jet do" po otevření okna jízdního řádu
 
-STR_CONFIG_SETTING_DEFAULT_RAIL_TYPE                            :Výchozí druh kolejí (v nové hře/po načtení hry): {STRING}
-STR_CONFIG_SETTING_DEFAULT_RAIL_TYPE_HELPTEXT                   :Zvol typ kolejí, který bude vybrán po započetí či nahrání hry. "První dostupný" zvolí nejstarší typ, "poslední dostupný" zvolí nejnovější typ a "nejvíce používaný" zvolí typ kolejí, který je v aktuální hře nejvíce používaný.
+STR_CONFIG_SETTING_DEFAULT_RAIL_ROAD_TYPE                       :Vychozí typ kolejí, silnic, a tramvajových tratí (po vytvoření nebo načtení hry): {STRING}
+STR_CONFIG_SETTING_DEFAULT_RAIL_ROAD_TYPE_HELPTEXT              :Typ železnice, silnice a tramvaje, který se vybere po spuštění nebo načtení hry. „První dostupný" vybere nejstarší typ kolejí, „Poslední dostupný" vybere nejnovější typ kolejí a „Nejpoužívanější" vybere typ, který je aktuálně nejvíce používaný.
 ###length 3
-STR_CONFIG_SETTING_DEFAULT_RAIL_TYPE_FIRST                      :první dostupný
-STR_CONFIG_SETTING_DEFAULT_RAIL_TYPE_LAST                       :poslední dostupný
-STR_CONFIG_SETTING_DEFAULT_RAIL_TYPE_MOST_USED                  :nejpoužívanější
+STR_CONFIG_SETTING_DEFAULT_RAIL_ROAD_TYPE_FIRST                 :První dostupný
+STR_CONFIG_SETTING_DEFAULT_RAIL_ROAD_TYPE_LAST                  :Poslední dostupný
+STR_CONFIG_SETTING_DEFAULT_RAIL_ROAD_TYPE_MOST_USED             :Nejvíce používaný
 
 STR_CONFIG_SETTING_SHOW_TRACK_RESERVATION                       :Vyznačovat rezervovanou trať: {STRING}
 STR_CONFIG_SETTING_SHOW_TRACK_RESERVATION_HELPTEXT              :Vyznačí rezervovanou trať jinou barvou tak, aby bylo snadnější zjišťování důvodů, proč vlak odmítá vjet do určitého úseku tratě
@@ -1982,6 +1999,9 @@ STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :Pokud je zapnut
 
 STR_CONFIG_SETTING_WAGONSPEEDLIMITS                             :Zapnout omezení rychlosti vagonů: {STRING}
 STR_CONFIG_SETTING_WAGONSPEEDLIMITS_HELPTEXT                    :Pokud zapnuto, použije rychlostní omezení vagónů při stanovení maximální rychlosti vlaku
+
+STR_CONFIG_SETTING_AIRCRAFT_RANGE                               :Maximální dolet letadel: {STRING}
+STR_CONFIG_SETTING_AIRCRAFT_RANGE_HELPTEXT                      :Pokus povoleno, NewGRFs budou možna omezovat maximální doletovou vzdálenost letadel
 
 STR_CONFIG_SETTING_DISABLE_ELRAILS                              :Vypnout elektrickou železnici: {STRING}
 STR_CONFIG_SETTING_DISABLE_ELRAILS_HELPTEXT                     :Zapnutí této možnosti odstraní potřebu elektrifikované trati pro elektrické lokomotivy
@@ -2177,6 +2197,8 @@ STR_CONFIG_SETTING_LARGER_TOWNS_VALUE                           :1 z {COMMA}
 STR_CONFIG_SETTING_LARGER_TOWNS_DISABLED                        :Žádné
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER                         :Činitel základní velikosti města: {STRING}
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Průměrná velikost větších měst v porovnání s ostatními městy na začátku hry
+STR_CONFIG_SETTING_TOWN_MIN_DISTANCE                            :Minimální vzdálenost mezi městy: {STRING}
+STR_CONFIG_SETTING_TOWN_MIN_DISTANCE_HELPTEXT                   :Nastav minimální vzdálenost mezi městy pro generování mapy a náhodné zakládání
 
 STR_CONFIG_SETTING_LINKGRAPH_RECALC_INTERVAL                    :Aktualizovat graf spojení každých: {STRING}
 STR_CONFIG_SETTING_LINKGRAPH_RECALC_INTERVAL_HELPTEXT           :{BLACK}Doba mezi následnými přepočty grafu spojení. Každý přepočet počítá plány pro jednu komponentu grafu. To znamená, že hodnota X v tomto nastavení neznamená, že se celý graf aktualizuje každých X sekund. Aktualizuje se pouze jedna část. Čím kratší dobu nastavíte, tím více procesorového času bude potřeba k výpočtu. Čím delší dobu nastavíte, tím déle bude trvat, než začne distribuce nákladu na nových trasách.
@@ -2192,16 +2214,16 @@ STR_CONFIG_SETTING_DISTRIBUTION_ARMOURED_HELPTEXT               :Třída náklad
 STR_CONFIG_SETTING_DISTRIBUTION_DEFAULT                         :Módy distribuce pro ostatní třídy nákladu: {STRING}
 STR_CONFIG_SETTING_DISTRIBUTION_DEFAULT_HELPTEXT                :"Asymetrický" znamená, že v obou směrech může být zasláno libovolné množství nákladu. "Manuální" znamená, že u těchto nákladů nebude probíhat žádná automatická distribuce.
 ###length 3
-STR_CONFIG_SETTING_DISTRIBUTION_MANUAL                          :manuální
+STR_CONFIG_SETTING_DISTRIBUTION_MANUAL                          :Manuální
 STR_CONFIG_SETTING_DISTRIBUTION_ASYMMETRIC                      :Asymmetrický
-STR_CONFIG_SETTING_DISTRIBUTION_SYMMETRIC                       :rovnoměrný
+STR_CONFIG_SETTING_DISTRIBUTION_SYMMETRIC                       :Symetrický
 
 STR_CONFIG_SETTING_LINKGRAPH_ACCURACY                           :Přesnost distribuce: {STRING}
 STR_CONFIG_SETTING_LINKGRAPH_ACCURACY_HELPTEXT                  :Čím vyšší hodnotu nastavíte, tím více procesorového času zabere výpočet grafu propojení. Pokud výpočet trvá příliš dlouho, můžete zaznamenat prodlevy (lagy). Nastavíte-li však nízkou hodnotu, bude distribuce nepřesná a náklad nemusí být odesílán na místa, kam by podle vašeho očekávání měl směřovat.
 
 STR_CONFIG_SETTING_DEMAND_DISTANCE                              :Vliv vzdálenosti na poptávku: {STRING}
 STR_CONFIG_SETTING_DEMAND_DISTANCE_HELPTEXT                     :Pokud nastavíte tuto hodnotu na vyšší než 0, bude mít vzdálenost mezi výchozí stanicí A a možným cílem B vliv na množství nákladu odeslaného z A do B. Čím dále je B od A, tím méně nákladu bude odesláno. Čím vyšší hodnotu nastavíte, tím méně nákladu bude posíláno do vzdálených stanic a o více nákladu do stanic blízkých.
-STR_CONFIG_SETTING_DEMAND_SIZE                                  :Množství vracejícího se nákladu pro rovnoměrný mód: {STRING}
+STR_CONFIG_SETTING_DEMAND_SIZE                                  :Množství vracejícího se nákladu pro symetrický mód: {STRING}
 STR_CONFIG_SETTING_DEMAND_SIZE_HELPTEXT                         :Nastavením této hodnoty na méně než 100 % se bude symetrická distribuce chovat více jako asymetrická. Při odeslání určitého množství nákladu do stanice bude vynuceně posíláno zpět méně nákladu. Pokud nastavíte 0 %, bude se symetrická distribuce chovat přesně jako asymetrická.
 
 STR_CONFIG_SETTING_SHORT_PATH_SATURATION                        :Vytížení kratších tras před využitím kapacitnějších tras: {STRING}
@@ -2304,7 +2326,7 @@ STR_CONFIG_ERROR_INVALID_BASE_GRAPHICS_NOT_FOUND                :{WHITE}... igno
 STR_CONFIG_ERROR_INVALID_BASE_SOUNDS_NOT_FOUND                  :{WHITE}... ignorování základní hudební sady '{STRING}': nenalezeno
 STR_CONFIG_ERROR_INVALID_BASE_MUSIC_NOT_FOUND                   :{WHITE}... ignorování základní hudební sady '{STRING}': nenalezeno
 
-# Video initalization errors
+# Video initialization errors
 STR_VIDEO_DRIVER_ERROR                                          :{WHITE}Chyba v nastavení zobrazení...
 STR_VIDEO_DRIVER_ERROR_NO_HARDWARE_ACCELERATION                 :{WHITE}... nebyla nalezena kompatibilní grafická karta. Hardwarová akcelerace zakázána
 STR_VIDEO_DRIVER_ERROR_HARDWARE_ACCELERATION_CRASH              :{WHITE}... grafická karta způsobila pád hry. Hadwarová akcelerace byla zakázána
@@ -2562,15 +2584,13 @@ STR_NETWORK_CONNECTING_WAITING                                  :{BLACK}{NUM} kl
 STR_NETWORK_CONNECTING_DOWNLOADING_1                            :{BLACK}{BYTES} staženo
 STR_NETWORK_CONNECTING_DOWNLOADING_2                            :{BLACK}{BYTES} / {BYTES} staženo
 
-###length 8
+###length 6
 STR_NETWORK_CONNECTING_1                                        :{BLACK}(1/6) Připojování...
 STR_NETWORK_CONNECTING_2                                        :{BLACK}(2/6) Ověřování...
 STR_NETWORK_CONNECTING_3                                        :{BLACK}(3/6) Čekání...
 STR_NETWORK_CONNECTING_4                                        :{BLACK}(4/6) Stahování mapy...
 STR_NETWORK_CONNECTING_5                                        :{BLACK}(5/6) Zpracovávání dat...
 STR_NETWORK_CONNECTING_6                                        :{BLACK}(6/6) Registrování...
-STR_NETWORK_CONNECTING_SPECIAL_1                                :{BLACK}Přijímání informací o hře...
-STR_NETWORK_CONNECTING_SPECIAL_2                                :{BLACK}Přijímání informací o společnosti...
 
 STR_NETWORK_CONNECTION_DISCONNECT                               :{BLACK}Odpojit se
 
@@ -2624,6 +2644,8 @@ STR_NETWORK_CLIENT_LIST_SERVER_CONNECTION_TYPE_TURN             :{BLACK}Přes re
 STR_NETWORK_CLIENT_LIST_ADMIN_CLIENT_KICK                       :Vyhodit
 STR_NETWORK_CLIENT_LIST_ADMIN_CLIENT_BAN                        :Ban
 STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_RESET                     :Smazat
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_ALLOW_ANY                 :Povolit všechny klienty
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_ALLOW_LISTED              :Povolit pouze zobrazené klienty
 
 STR_NETWORK_CLIENT_LIST_ASK_CAPTION                             :{WHITE}Administrátorská akce
 STR_NETWORK_CLIENT_LIST_ASK_CLIENT_KICK                         :{YELLOW}Opravdu chceš vyhodit hráče '{STRING}'?
@@ -2672,8 +2694,8 @@ STR_NETWORK_ERROR_LOSTCONNECTION                                :{WHITE}Síť - 
 STR_NETWORK_ERROR_SAVEGAMEERROR                                 :{WHITE}Nelze nahrát uloženou hru ze serveru
 STR_NETWORK_ERROR_SERVER_START                                  :{WHITE}Nelze spustit server
 STR_NETWORK_ERROR_SERVER_ERROR                                  :{WHITE}Vznikla chyba v protokolu a naše spojení je přerušeno
-STR_NETWORK_ERROR_BAD_PLAYER_NAME                               :{WHITE}Tvé herní jméno nebylo nastaveno. Jméno může být nastaveno v horní části okna pro více hráčů.
-STR_NETWORK_ERROR_BAD_SERVER_NAME                               :{WHITE}Název tvého serveru nebyl nastaven. Název je možné nastavit na horním okraji Multiplayer okna.
+STR_NETWORK_ERROR_BAD_PLAYER_NAME                               :Tvé herní jméno nebylo nastaveno. Jméno může být nastaveno v horní části okna pro více hráčů.
+STR_NETWORK_ERROR_BAD_SERVER_NAME                               :Název tvého serveru nebyl nastaven. Název je možné nastavit na horním okraji Multiplayer okna.
 STR_NETWORK_ERROR_WRONG_REVISION                                :{WHITE}Revize hry tohoto klienta neodpovídá revizi hry na serveru
 STR_NETWORK_ERROR_WRONG_PASSWORD                                :{WHITE}Špatné heslo
 STR_NETWORK_ERROR_NOT_ON_ALLOW_LIST                             :{WHITE}Nejsi na seznamu povolených klientů
@@ -2935,18 +2957,38 @@ STR_PICKER_PREVIEW_SHRINK_TOOLTIP                               :Snížit výšk
 STR_PICKER_PREVIEW_EXPAND                                       :+
 STR_PICKER_PREVIEW_EXPAND_TOOLTIP                               :Zvýšit výšku náhledových obrázků. Klikni s Ctrl pro maximální výšku
 
+STR_PICKER_DEFAULT_COLLECTION                                   :Výchozí kolekce
+STR_PICKER_SELECT_COLLECTION_TOOLTIP                            :Vybrat kolekci
+STR_PICKER_COLLECTION_ADD                                       :Přidat
+STR_PICKER_COLLECTION_ADD_TOOLTIP                               :Vytvořit novou kolekci
+STR_PICKER_COLLECTION_RENAME                                    :Přejmenovat
+STR_PICKER_COLLECTION_RENAME_TOOLTIP                            :Přejmenovat kolekci
+STR_PICKER_COLLECTION_DELETE                                    :Odstranit
+STR_PICKER_COLLECTION_DELETE_TOOLTIP                            :Smazat kolekci
+
+STR_PICKER_COLLECTION_RENAME_QUERY                              :Přejmenovat kolekci
+STR_PICKER_COLLECTION_DELETE_QUERY                              :Odstranit kolekci
+STR_PICKER_COLLECTION_DELETE_QUERY_TEXT                         :{YELLOW}Opravdu chceš smazat tuto kolekci?
+STR_PICKER_COLLECTION_DELETE_QUERY_DISABLED_TEXT                :{YELLOW}Opravdu chceš smazat tuto kolekci? Nacházejí se v ní prvky z deaktivovyných NewGRF!
+
 STR_PICKER_STATION_CLASS_TOOLTIP                                :Vyber typ stanice pro zobrazení
 STR_PICKER_STATION_TYPE_TOOLTIP                                 :Zvol typ stanice pro stavbu. Podrž Ctrl pro přidaní nebo odebrání z oblíbených položek
+STR_PICKER_STATION_COLLECTION_TOOLTIP                           :Výběr kolekce stanic pro zobrazení
 STR_PICKER_WAYPOINT_CLASS_TOOLTIP                               :Vyber typ směrování pro zobrazení
 STR_PICKER_WAYPOINT_TYPE_TOOLTIP                                :Zvol typ směrování sta stavbu. Podrž Shift pro přidání nebo odebrání z oblíbených položek
+STR_PICKER_WAYPOINT_COLLECTION_TOOLTIP                          :Vybrat kolekci bodů pro zobrazení
 STR_PICKER_ROADSTOP_BUS_CLASS_TOOLTIP                           :Vyber typ autobusové zastávky pro zobrazení
 STR_PICKER_ROADSTOP_BUS_TYPE_TOOLTIP                            :Zvol typ autobusové zastávky pro stavbu. Podrž Ctrl pro přidání nebo odebrání z oblíbených položek
+STR_PICKER_ROADSTOP_BUS_COLLECTION_TOOLTIP                      :Vybrat kolekci autobusových zastávek pro zobrazení
 STR_PICKER_ROADSTOP_TRUCK_CLASS_TOOLTIP                         :Vyber typ nákladní rampy pro zobrazení
 STR_PICKER_ROADSTOP_TRUCK_TYPE_TOOLTIP                          :Vyber typ nákladní rampy pro stavbu. Podrž Ctrl pro přidaní nebo odebrání z oblíbených položek
+STR_PICKER_ROADSTOP_TRUCK_COLLECTION_TOOLTIP                    :Vybrat kolekci nákladních ramp pro zobrazení
 STR_PICKER_OBJECT_CLASS_TOOLTIP                                 :Vyber typ objektu pro zobrazení
 STR_PICKER_OBJECT_TYPE_TOOLTIP                                  :Vyber objekt, který chceš stavět. Podrž Ctrl pro přidaní nebo odebrání z oblíbených položek nebo úhlopříčný výběr. Pro zobrazení odhadu ceny podrž i Shift.
+STR_PICKER_OBJECT_COLLECTION_TOOLTIP                            :Vybrat kolekci objektů pro zobrazení
 STR_PICKER_HOUSE_CLASS_TOOLTIP                                  :Vyber městskou zónu pro zobrazení
 STR_PICKER_HOUSE_TYPE_TOOLTIP                                   :Zvol typ domu pro stavbu. Podrž Shift pro přidání nebo odebrání z oblíbených položek
+STR_PICKER_HOUSE_COLLECTION_TOOLTIP                             :Výběr kolekce domů pro zobrazení
 
 STR_HOUSE_PICKER_CAPTION                                        :Výběr domu
 STR_HOUSE_PICKER_NAME                                           :{BLACK}Název: {GOLD}{STRING}
@@ -3139,6 +3181,8 @@ STR_TERRAFORM_TOOLTIP_PLACE_ROCKY_AREAS_ON_LANDSCAPE            :{BLACK}Umístit
 STR_TERRAFORM_TOOLTIP_DEFINE_DESERT_AREA                        :{BLACK}Vytvořit pouštní oblast{}S přidrženým CTRL ji odstraníš
 STR_TERRAFORM_TOOLTIP_INCREASE_SIZE_OF_LAND_AREA                :{BLACK}Zvětšit oblast země pro snížení/zvýšení
 STR_TERRAFORM_TOOLTIP_DECREASE_SIZE_OF_LAND_AREA                :{BLACK}Zmenšit oblast země pro snížení/zvýšení
+STR_TERRAFORM_TOOLTIP_LOWER_A_CORNER_OF_LAND                    :{BLACK}Snížit bod nebo oblast země. Je li rozsah 1x1, přetáhni pro snížení terénu na úroveň prvního vybraného bodu. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
+STR_TERRAFORM_TOOLTIP_RAISE_A_CORNER_OF_LAND                    :{BLACK}Zvýšit bod nebo oblast země. Je li rozsah 1x1, přetáhni pro snížení terénu na úroveň prvního vybraného bodu. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_TERRAFORM_TOOLTIP_GENERATE_RANDOM_LAND                      :{BLACK}Generovat náhodnou zemi
 STR_TERRAFORM_SE_NEW_WORLD                                      :{BLACK}Vytvořit nový scénář
 STR_TERRAFORM_RESET_LANDSCAPE                                   :{BLACK}Smazat krajinu
@@ -3477,7 +3521,8 @@ STR_MAPGEN_DESERT_COVERAGE                                      :{BLACK}Pokrytí
 STR_MAPGEN_DESERT_COVERAGE_UP_TOOLTIP                           :{BLACK}Zvětšit pokrytí pouštěmi o deset procent
 STR_MAPGEN_DESERT_COVERAGE_DOWN_TOOLTIP                         :{BLACK}Zmenšit pokrytí pouštěmi o deset procent
 STR_MAPGEN_DESERT_COVERAGE_TEXT                                 :{BLACK}{NUM}%
-STR_MAPGEN_TERRAIN_TYPE                                         :{BLACK}Typ krajiny:
+STR_MAPGEN_TERRAIN_TYPE                                         :{BLACK}Maximální výška:
+STR_MAPGEN_AVERAGE_HEIGHT                                       :{BLACK}Průměrná výška:
 STR_MAPGEN_SEA_LEVEL                                            :{BLACK}Četnost jezer:
 STR_MAPGEN_SEA_LEVEL_TOOLTIP                                    :{BLACK}Zvol úroveň moře
 STR_MAPGEN_QUANTITY_OF_RIVERS                                   :{BLACK}Řeky:
@@ -3749,7 +3794,7 @@ STR_NEWGRF_LIST_COMPATIBLE                                      :{YELLOW}jsou do
 STR_NEWGRF_LIST_MISSING                                         :{RED}některé chybějí
 
 # NewGRF 'it's broken' warnings
-STR_NEWGRF_BROKEN                                               :{WHITE}Chování grafiky '{0:STRING}' by mohlo způsobit desynchronizaci a/nebo pád hry
+STR_NEWGRF_BROKEN                                               :Chování grafiky '{0:STRING}' by mohlo způsobit desynchronizaci a/nebo pád hry
 STR_NEWGRF_BROKEN_POWERED_WAGON                                 :{WHITE}Změnil se stav lokomotivy '{1:ENGINE}', když nebyla v depu
 STR_NEWGRF_BROKEN_VEHICLE_LENGTH                                :{WHITE}Změnilo délku vozidla '{1:ENGINE}', když nebylo v depu
 STR_NEWGRF_BROKEN_CAPACITY                                      :{WHITE}Změnila se kapacita vozidla '{1:ENGINE}', i když nebylo v depu nebo nebylo přestavováno
@@ -3786,6 +3831,7 @@ STR_EDIT_SIGN_CAPTION                                           :{WHITE}Upravit 
 STR_EDIT_SIGN_LOCATION_TOOLTIP                                  :{BLACK}Vystředit pohled na značku. Podrž Ctrl pro otevření nového pohledu
 STR_EDIT_SIGN_NEXT_SIGN_TOOLTIP                                 :{BLACK}Na další návěstidlo
 STR_EDIT_SIGN_PREVIOUS_SIGN_TOOLTIP                             :{BLACK}Na předešlé návěstidlo
+STR_EDIT_SIGN_TEXT_COLOUR_TOOLTIP                               :{BLACK}Barva textu cedule
 
 STR_EDIT_SIGN_SIGN_OSKTITLE                                     :{BLACK}Zadej název pro značku
 
@@ -4232,7 +4278,7 @@ STR_GROUP_LIVERY_TOOLTIP                                        :{BLACK}Změnit 
 STR_GROUP_REPLACE_PROTECTION_TOOLTIP                            :{BLACK}Kliknutím ochráníte tuto skupinu před globálním automatickým nahrazováním. Ctrl+klik ochrání i podskupiny.
 
 STR_QUERY_GROUP_DELETE_CAPTION                                  :{WHITE}Smazat Skupinu
-STR_GROUP_DELETE_QUERY_TEXT                                     :{WHITE}Jste si jist, že chcete smazat tuto skupinu a všechny její podskupiny?
+STR_GROUP_DELETE_QUERY_TEXT                                     :{WHITE}Opravdu chcetš smazat tuto skupinu a všechny její podskupiny?
 
 STR_GROUP_ADD_SHARED_VEHICLE                                    :Přidat sdílená vozidla
 STR_GROUP_REMOVE_ALL_VEHICLES                                   :Odstranit všechna vozidla
@@ -4291,6 +4337,19 @@ STR_PURCHASE_INFO_MAX_TE                                        :{BLACK}Max. ta�
 STR_PURCHASE_INFO_AIRCRAFT_RANGE                                :{BLACK}Dosah: {GOLD}{COMMA} polí
 STR_PURCHASE_INFO_AIRCRAFT_TYPE                                 :{BLACK}Typ letadla: {GOLD}{STRING}
 STR_PURCHASE_INFO_RAILTYPES                                     :{BLACK}Druhy kolejí: {GOLD}{STRING}
+
+# Vehicle sort details
+STR_PURCHASE_SORT_DETAILS_COST                                  :{CURRENCY_LONG}
+STR_PURCHASE_SORT_DETAILS_SPEED                                 :{VELOCITY}
+STR_PURCHASE_SORT_DETAILS_POWER                                 :{POWER}
+STR_PURCHASE_SORT_DETAILS_MAX_TE                                :{FORCE}
+STR_PURCHASE_SORT_DETAILS_INTRO_DATE                            :{NUM}
+STR_PURCHASE_SORT_DETAILS_RUNNINGCOST_YEAR                      :{CURRENCY_LONG}/rok
+STR_PURCHASE_SORT_DETAILS_RUNNINGCOST_PERIOD                    :{CURRENCY_LONG}/období
+STR_PURCHASE_SORT_DETAILS_RELIABILITY                           :{COMMA}%
+STR_PURCHASE_SORT_DETAILS_POWER_VS_RUNNING_COST                 :{DECIMAL}
+STR_PURCHASE_SORT_DETAILS_AIRCRAFT_RANGE                        :{COMMA} políček
+STR_PURCHASE_SORT_DETAILS_CAPACITY                              :{COMMA}
 
 ###length 3
 STR_CARGO_TYPE_FILTER_ALL                                       :Všechny druhy nákladu
@@ -4376,7 +4435,7 @@ STR_DEPOT_VEHICLE_TOOLTIP_CARGO                                 :{}{CARGO_LONG} 
 
 ###length VEHICLE_TYPES
 STR_DEPOT_TRAIN_LIST_TOOLTIP                                    :{BLACK}Vlaky - přetáhněte vozidlo levým tlačítkem myši pro přidání/odebrání z vlaku, klikněte pravým tlačítkem pro zobrazení informací. Při stisknutí Ctrl+Kliku aplikujte tuto funkci na následující řetězec
-STR_DEPOT_ROAD_VEHICLE_LIST_TOOLTIP                             :{BLACK}Vozidla - klepni pravým na vozidlo pro informace
+STR_DEPOT_ROAD_VEHICLE_LIST_TOOLTIP                             :{BLACK}Vozidla - klikni pravým na vozidlo pro informace
 STR_DEPOT_SHIP_LIST_TOOLTIP                                     :{BLACK}Lodě - klepni pravým naloď pro informace
 STR_DEPOT_AIRCRAFT_LIST_TOOLTIP                                 :{BLACK}Letadlo - klepni pravým na letadlo pro informace
 
@@ -4451,7 +4510,15 @@ STR_DEPOT_SELL_CONFIRMATION_TEXT                                :{YELLOW}Chceš 
 
 # Engine preview window
 STR_ENGINE_PREVIEW_CAPTION                                      :{WHITE}Zpráva od výrobce dopravních prostředků
+STR_ENGINE_PREVIEW_CAPTION_COUNT                                :{WHITE}Zpráva od výrobce dopravních prostředků ({COMMA} z {COMMA})
 STR_ENGINE_PREVIEW_MESSAGE                                      :{GOLD}Právě jsme vyvinuli nov{G ý ou é é é é á} {STRING.acc}. Měl byste zájem o roční výhradní právo na používání tohoto prostředku, aby byl otestován před uvedením na trh?
+
+STR_ENGINE_PREVIEW_PREVIOUS                                     :Předchozí
+STR_ENGINE_PREVIEW_PREVIOUS_TOOLTIP                             :Klikni pro přechod na předchozí vozidlo
+STR_ENGINE_PREVIEW_NEXT                                         :Další
+STR_ENGINE_PREVIEW_NEXT_TOOLTIP                                 :Klikni pro přechod na další vozidlo
+STR_ENGINE_PREVIEW_ENGINE_LIST                                  :{COMMA}: {ENGINE}
+STR_ENGINE_PREVIEW_ENGINE_LIST_TOOLTIP                          :Klikni pro skok na nové vozidlo
 
 STR_ENGINE_PREVIEW_RAILROAD_LOCOMOTIVE                          :{G=f}lokomotiva
 STR_ENGINE_PREVIEW_RAILROAD_LOCOMOTIVE.acc                      :lokomotivu
@@ -4632,7 +4699,7 @@ STR_VEHICLE_INFO_PROFIT_THIS_YEAR_LAST_YEAR                     :{BLACK}Letošn�
 STR_VEHICLE_INFO_PROFIT_THIS_YEAR_LAST_YEAR_MIN_PERFORMANCE     :{BLACK}Letošní zisk: {LTBLUE}{CURRENCY_LONG} (vloni: {CURRENCY_LONG}) {BLACK}Min. výkon: {LTBLUE}{POWER_TO_WEIGHT}
 STR_VEHICLE_INFO_PROFIT_THIS_PERIOD_LAST_PERIOD                 :{BLACK}Zisk v tomto období: {LTBLUE}{CURRENCY_LONG} (minulé období: {CURRENCY_LONG})
 STR_VEHICLE_INFO_PROFIT_THIS_PERIOD_LAST_PERIOD_MIN_PERFORMANCE :{BLACK}Zisk v tomto období: {LTBLUE}{CURRENCY_LONG} (minulé období: {CURRENCY_LONG}) {BLACK}Min. výkon: {LTBLUE}{POWER_TO_WEIGHT}
-STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Spolehlivost: {LTBLUE}{COMMA}%  {BLACK}Poruch od posledního servisu: {LTBLUE}{COMMA}
+STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Spolehlivost: {LTBLUE}{COMMA}% (max: {COMMA}%)  {BLACK}Poruch od posledního servisu: {LTBLUE}{COMMA}
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Koupeno: {LTBLUE}{NUM}{BLACK} Cena: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Kapacita: {LTBLUE}nic{STRING}
@@ -4772,7 +4839,7 @@ STR_ORDER_HANGAR_ACTION_TOOLTIP                                 :{BLACK}Vyber p�
 STR_ORDER_CONDITIONAL_VARIABLE_TOOLTIP                          :{BLACK}Vlastnost vozidla, podle které přeskakovat
 
 # Conditional order variables, must follow order of OrderConditionVariable enum
-###length 8
+###length 9
 STR_ORDER_CONDITIONAL_LOAD_PERCENTAGE                           :Procento naložení
 STR_ORDER_CONDITIONAL_RELIABILITY                               :Spolehlivost
 STR_ORDER_CONDITIONAL_MAX_SPEED                                 :Maximální rychlost
@@ -4781,6 +4848,7 @@ STR_ORDER_CONDITIONAL_REQUIRES_SERVICE                          :Vyžaduje údr�
 STR_ORDER_CONDITIONAL_UNCONDITIONALLY                           :Vždy
 STR_ORDER_CONDITIONAL_REMAINING_LIFETIME                        :Zbývající životnost (v letech)
 STR_ORDER_CONDITIONAL_MAX_RELIABILITY                           :Nejvyšší dosažitelná spolehlivost
+STR_ORDER_CONDITIONAL_DRIVING_BACKWARDS                         :Jízda dozadu
 ###next-name-looks-similar
 
 STR_ORDER_CONDITIONAL_COMPARATOR_TOOLTIP                        :{BLACK}Jak porovnat vlastnost vozidla se zadanou hodnotou
@@ -4800,6 +4868,7 @@ STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Přesko�
 STR_ORDERS_SKIP_TOOLTIP                                         :{BLACK}Přeskočit příkaz a jít na další. Pomocí CTRL + kliknutí se přeskočí na vybraný příkaz
 
 STR_ORDERS_DELETE_BUTTON                                        :{BLACK}Smazat
+STR_ORDERS_DELETE_ALL_BUTTON                                    :{BLACK}Smazat vše
 STR_ORDERS_DELETE_TOOLTIP                                       :{BLACK}Smazat označený příkaz
 STR_ORDERS_DELETE_ALL_TOOLTIP                                   :{BLACK}Smazat všechny příkazy
 STR_ORDERS_STOP_SHARING_BUTTON                                  :{BLACK}Zastavit sdílení
@@ -5078,7 +5147,7 @@ STR_MESSAGE_ESTIMATED_INCOME                                    :{WHITE}Odhadova
 
 # Saveload messages
 STR_ERROR_SAVE_STILL_IN_PROGRESS                                :{WHITE}Ukládání ještě běží,{}počkej prosím, než doběhne!
-STR_ERROR_AUTOSAVE_FAILED                                       :{WHITE}Automatické uložení selhalo
+STR_ERROR_AUTOSAVE_FAILED                                       :Automatické uložení selhalo
 STR_ERROR_UNABLE_TO_READ_DRIVE                                  :{BLACK}Nelze číst z jednotky
 STR_ERROR_GAME_SAVE_FAILED                                      :{WHITE}Uložení hry selhalo...
 STR_ERROR_UNABLE_TO_DELETE_FILE                                 :{WHITE}Nelze smazat soubor
@@ -5128,17 +5197,17 @@ STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}Zpráva
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}Mimo okraj mapy
 STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP                              :{WHITE}Moc blízko k okraji mapy
-STR_ERROR_NOT_ENOUGH_CASH_REQUIRES_CURRENCY                     :{WHITE}Nedostatek peněz - je potřeba {CURRENCY_LONG}
+STR_ERROR_NOT_ENOUGH_CASH_REQUIRES_CURRENCY                     :Nedostatek peněz - je potřeba {CURRENCY_LONG}
 STR_ERROR_FLAT_LAND_REQUIRED                                    :{WHITE}Je potřeba plochá země
 STR_ERROR_LAND_SLOPED_IN_WRONG_DIRECTION                        :{WHITE}Země skloněna nesprávným směrem
 STR_ERROR_CAN_T_DO_THIS                                         :{WHITE}Tohle nelze provést...
 STR_ERROR_BUILDING_MUST_BE_DEMOLISHED                           :{WHITE}Budova musí být nejprve zničena
-STR_ERROR_BUILDING_IS_PROTECTED                                 :{WHITE}... budova je chráněná
+STR_ERROR_BUILDING_IS_PROTECTED                                 :budova je chráněná
 STR_ERROR_CAN_T_CLEAR_THIS_AREA                                 :{WHITE}Nelze vyčistit tuto oblast...
 STR_ERROR_SITE_UNSUITABLE                                       :{WHITE}... nepoužitelné místo
 STR_ERROR_ALREADY_BUILT                                         :{WHITE}... již vystavěno
 STR_ERROR_OWNED_BY                                              :{WHITE}... vlastněno {STRING}
-STR_ERROR_AREA_IS_OWNED_BY_ANOTHER                              :{WHITE}... území vlastní jiná společnost
+STR_ERROR_AREA_IS_OWNED_BY_ANOTHER                              :území je vlastněno jinou společností
 STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... dosažen limit pro úpravu terénu
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... dosažen limit pro čištění dláždic
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... výsadba stromů dosáhla limitu
@@ -5150,7 +5219,7 @@ STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}Nelze v 
 STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS                 :{WHITE}Místní správa města {TOWN} odmítla vydat povolení
 STR_ERROR_LOCAL_AUTHORITY_REFUSES_AIRPORT                       :{WHITE}Místní správa města {TOWN} zakazuje stavbu dalšího letiště v tomto městě
 STR_ERROR_LOCAL_AUTHORITY_REFUSES_NOISE                         :{WHITE}Zastupitelstvo města {TOWN} odmítá vydat povolení na stavbu letiště kvůli hlukovým limitům
-STR_ERROR_BRIBE_FAILED                                          :{WHITE}Tvůj pokus o úplatek byl objeven regionálním vyšetřovatelem
+STR_ERROR_BRIBE_FAILED                                          :Tvůj pokus o úplatek byl objeven regionálním vyšetřovatelem
 
 # Levelling errors
 STR_ERROR_CAN_T_RAISE_LAND_HERE                                 :{WHITE}Zde nelze zvednout terén...
@@ -5161,6 +5230,7 @@ STR_ERROR_ALREADY_AT_SEA_LEVEL                                  :{WHITE}... již
 STR_ERROR_TOO_HIGH                                              :{WHITE}... příliš vysoko
 STR_ERROR_ALREADY_LEVELLED                                      :{WHITE}... už je plochý
 STR_ERROR_BRIDGE_TOO_HIGH_AFTER_LOWER_LAND                      :{WHITE}Most by po této úpravě byl příliš vysoko.
+STR_ERROR_MUST_DEMOLISH_RIVER_FIRST                             :je nutné neprve odstranit řeku
 
 # Company related errors
 STR_ERROR_CAN_T_CHANGE_COMPANY_NAME                             :{WHITE}Nelze přejmenovat společnost...
@@ -5181,7 +5251,6 @@ STR_ERROR_CAN_T_GENERATE_TOWN                                   :{WHITE}Nelze vy
 STR_ERROR_CAN_T_RENAME_TOWN                                     :{WHITE}Nelze přejmenovat město...
 STR_ERROR_CAN_T_FOUND_TOWN_HERE                                 :{WHITE}Zde nelze postavit město...
 STR_ERROR_CAN_T_EXPAND_TOWN                                     :{WHITE}Město nemůže být rozšířeno...
-STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB                          :{WHITE}... moc blízko k okraji mapy
 STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN                             :{WHITE}... moc blízko k jinému městu
 STR_ERROR_TOO_MANY_TOWNS                                        :{WHITE}... příliš mnoho měst
 STR_ERROR_NO_SPACE_FOR_TOWN                                     :{WHITE}... na mapě už není místo
@@ -5206,7 +5275,7 @@ STR_ERROR_CAN_ONLY_BE_BUILT_IN_TOWNS                            :{WHITE}... mů�
 STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_TOWN_CENTER                    :{WHITE}... může být postaveno pouze poblíž centra města
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :{WHITE}... může se postavit jen v nížinách
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :{WHITE}... může být umístěno pouze poblíž okrajů mapy
-STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :{WHITE}... les lze vysadit pouze nad sněžnou čárou
+STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :Les lze vysadit pouze nad sněžnou čárou
 STR_ERROR_CAN_ONLY_BE_BUILT_ABOVE_SNOW_LINE                     :{WHITE}... může být postaven pouze nad sněžnou čarou
 STR_ERROR_CAN_ONLY_BE_BUILT_BELOW_SNOW_LINE                     :{WHITE}... může být postaven pouze pod sněžnou čarou
 
@@ -5216,15 +5285,15 @@ STR_ERROR_NO_SUITABLE_PLACES_FOR_INDUSTRIES                     :{WHITE}Na mapě
 STR_ERROR_NO_SUITABLE_PLACES_FOR_INDUSTRIES_EXPLANATION         :{WHITE}Pro získání lepší mapy změňte parametry jejího generování
 
 # Station construction related errors
-STR_ERROR_CAN_T_BUILD_RAILROAD_STATION                          :{WHITE}Zde nelze postavit nádraží...
-STR_ERROR_CAN_T_BUILD_BUS_STATION                               :{WHITE}Nelze postavit autobusovou stanici...
+STR_ERROR_CAN_T_BUILD_RAILROAD_STATION                          :Zde nelze postavit nádraží…
+STR_ERROR_CAN_T_BUILD_BUS_STATION                               :Nelze postavit autobusovou stanici…
 STR_ERROR_CAN_T_BUILD_TRUCK_STATION                             :{WHITE}Nelze postavit nákladovou rampu...
 STR_ERROR_CAN_T_BUILD_PASSENGER_TRAM_STATION                    :{WHITE}Nelze postavit tramvajovou stanici pro cestující...
-STR_ERROR_CAN_T_BUILD_CARGO_TRAM_STATION                        :{WHITE}Nelze postavit nákladovou tramvajovou stanici...
+STR_ERROR_CAN_T_BUILD_CARGO_TRAM_STATION                        :Nelze postavit nákladovou tramvajovou stanici…
 STR_ERROR_CAN_T_BUILD_DOCK_HERE                                 :{WHITE}Zde nelze postavit přístav...
-STR_ERROR_CAN_T_BUILD_AIRPORT_HERE                              :{WHITE}Zde nelze postavit letiště...
+STR_ERROR_CAN_T_BUILD_AIRPORT_HERE                              :Zde nelze postavit letiště…
 
-STR_ERROR_ADJOINS_MORE_THAN_ONE_EXISTING                        :{WHITE}Spojuje více jak jedno existující nádraží nebo nákladovou rampu...
+STR_ERROR_ADJOINS_MORE_THAN_ONE_EXISTING                        :spojuje více jak jedno existující nádraží nebo nákladovou rampu...
 STR_ERROR_STATION_TOO_SPREAD_OUT                                :{WHITE}... stanice je příliš rozlehlá
 STR_ERROR_STATION_DISALLOWED_NUMBER_TRACKS                      :{WHITE}... nepodporovaný počet kolejí
 STR_ERROR_STATION_DISALLOWED_LENGTH                             :{WHITE}... nepodporovaná délka
@@ -5243,7 +5312,7 @@ STR_ERROR_DRIVE_THROUGH_JUNCTION                                :{WHITE}... prů
 
 # Station destruction related errors
 STR_ERROR_CAN_T_REMOVE_PART_OF_STATION                          :{WHITE}Nelze odstranit část stanice...
-STR_ERROR_MUST_REMOVE_RAILWAY_STATION_FIRST                     :{WHITE}Je nejprve nutno odstranit stanici
+STR_ERROR_MUST_REMOVE_RAILWAY_STATION_FIRST                     :Je nejprve nutno odstranit stanici
 STR_ERROR_CAN_T_REMOVE_BUS_STATION                              :{WHITE}Nelze odstranit autobusovou zastávku...
 STR_ERROR_CAN_T_REMOVE_TRUCK_STATION                            :{WHITE}Nelze odstranit nákladovou rampu...
 STR_ERROR_CAN_T_REMOVE_PASSENGER_TRAM_STATION                   :{WHITE}Nelze zbourat tramvajovou stanici pro cestující...
@@ -5252,12 +5321,12 @@ STR_ERROR_MUST_REMOVE_ROAD_STOP_FIRST                           :{WHITE}Je nutn�
 STR_ERROR_THERE_IS_NO_STATION                                   :{WHITE}... není zde žádná stanice
 
 STR_ERROR_MUST_DEMOLISH_RAILROAD                                :{WHITE}Je nutné nejprve zničit stanici
-STR_ERROR_MUST_DEMOLISH_BUS_STATION_FIRST                       :{WHITE}Je nutné nejprve zničit autobusovou zastávku
+STR_ERROR_MUST_DEMOLISH_BUS_STATION_FIRST                       :je nutné nejprve odstranit autobusovou zastávku
 STR_ERROR_MUST_DEMOLISH_TRUCK_STATION_FIRST                     :{WHITE}Je nutné nejprve zničit nákladovou rampu
 STR_ERROR_MUST_DEMOLISH_PASSENGER_TRAM_STATION_FIRST            :{WHITE}Je nutné nejdříve zbourat tramvajovou stanici pro cestující
-STR_ERROR_MUST_DEMOLISH_CARGO_TRAM_STATION_FIRST                :{WHITE}Je nutné nejdříve zbourat nákladní tramvajovou stanici
+STR_ERROR_MUST_DEMOLISH_CARGO_TRAM_STATION_FIRST                :je nutné nejprve odstranit nákladní tramvajovou stanici
 STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :{WHITE}Je nutné nejprve zničit dok
-STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :{WHITE}Je nutné nejprve zničit letiště
+STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :je nutné nejprve zničit letiště
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :{WHITE}Sousedí s více než jedním existujícím bodem na trase
@@ -5271,7 +5340,7 @@ STR_ERROR_CAN_T_MOVE_WAYPOINT_NAME                              :{WHITE}Nelze po
 
 STR_ERROR_CAN_T_REMOVE_RAIL_WAYPOINT                            :{WHITE}Zde nelze zbourat směrování...
 STR_ERROR_CAN_T_REMOVE_ROAD_WAYPOINT                            :{WHITE}Zde nelze odstranit směrovaní...
-STR_ERROR_MUST_REMOVE_RAILWAYPOINT_FIRST                        :{WHITE}Je nutné nejprve zničit směrování
+STR_ERROR_MUST_REMOVE_RAILWAYPOINT_FIRST                        :Je nutné nejprve odstranit směrování
 STR_ERROR_MUST_REMOVE_ROADWAYPOINT_FIRST                        :{WHITE}Je nutné nejprve odstranit směrování
 STR_ERROR_BUOY_IN_THE_WAY                                       :{WHITE}... bójka v cestě
 STR_ERROR_BUOY_IS_IN_USE                                        :{WHITE}... bójka je používána jinou společností!
@@ -5297,8 +5366,9 @@ STR_ERROR_INCOMPATIBLE_RAIL_TYPES                               :Neslučitelné 
 
 STR_ERROR_CAN_T_MOVE_VEHICLE                                    :{WHITE}Nelze přesunout vozidlo...
 STR_ERROR_REAR_ENGINE_FOLLOW_FRONT                              :{WHITE}Zadní stroj vždy doprovází svůj protějšek vepředu
-STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :{WHITE}Nelze najít cestu do místního depa...
-STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :{WHITE}Nelze najít místní garáž
+STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :nelze najít cestu do místního depa...
+STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :nelze najít místní garáž
+STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :nepodařilo se najít místní hangár
 
 STR_ERROR_DEPOT_WRONG_DEPOT_TYPE                                :Nevhodný druh depa
 
@@ -5320,12 +5390,12 @@ STR_ERROR_AUTOREPLACE_INCOMPATIBLE_REFIT                        :{WHITE}Nové vo
 STR_ERROR_IMPOSSIBLE_TRACK_COMBINATION                          :{WHITE}Nemožná kombinace kolejí
 STR_ERROR_MUST_REMOVE_SIGNALS_FIRST                             :{WHITE}Je nutné nejprve odstranit semafor
 STR_ERROR_NO_SUITABLE_RAILROAD_TRACK                            :{WHITE}Žádné použitelné koleje
-STR_ERROR_MUST_REMOVE_RAILROAD_TRACK                            :{WHITE}Je nutné nejprve odstranit koleje
+STR_ERROR_MUST_REMOVE_RAILROAD_TRACK                            :Je nutné nejprve odstranit koleje
 STR_ERROR_CROSSING_ON_ONEWAY_ROAD                               :{WHITE}Silnice je jednosměrná nebo zablokovaná
 STR_ERROR_CROSSING_DISALLOWED_RAIL                              :{WHITE}Tento typ kolejí nedovoluje výstavbu železničních přejezdů
 STR_ERROR_CROSSING_DISALLOWED_ROAD                              :{WHITE}Tento typ silnice nedovoluje výstavbu železničních přejezdů.
 STR_ERROR_CAN_T_BUILD_SIGNALS_HERE                              :{WHITE}Zde nelze postavit semafory...
-STR_ERROR_CAN_T_BUILD_RAILROAD_TRACK                            :{WHITE}Zde nelze postavit koleje...
+STR_ERROR_CAN_T_BUILD_RAILROAD_TRACK                            :Zde nelze postavit koleje…
 STR_ERROR_CAN_T_REMOVE_RAILROAD_TRACK                           :{WHITE}Odsud nelze odstranit koleje...
 STR_ERROR_CAN_T_REMOVE_SIGNALS_FROM                             :{WHITE}Odsud nelze odstranit semafory...
 STR_ERROR_SIGNAL_CAN_T_CONVERT_SIGNALS_HERE                     :{WHITE}Zde nelze změnit návěstidla...
@@ -5349,7 +5419,7 @@ STR_ERROR_NO_SUITABLE_ROAD                                      :{WHITE}Neexistu
 STR_ERROR_NO_SUITABLE_TRAMWAY                                   :{WHITE}Neexistuje vhodná tramvajová trať
 
 # Waterway construction errors
-STR_ERROR_CAN_T_BUILD_CANALS                                    :{WHITE}Zde nelze postavit průplav...
+STR_ERROR_CAN_T_BUILD_CANALS                                    :Zde nelze postavit průplav…
 STR_ERROR_CAN_T_BUILD_LOCKS                                     :{WHITE}Zde nelze postavit zdymadlo...
 STR_ERROR_CAN_T_PLACE_RIVERS                                    :{WHITE}Zde nelze vytvořit řeku...
 STR_ERROR_MUST_BE_BUILT_ON_WATER                                :{WHITE}... musí být postaven na vodě
@@ -5357,8 +5427,8 @@ STR_ERROR_CAN_T_BUILD_ON_WATER                                  :{WHITE}... nelz
 STR_ERROR_CAN_T_BUILD_ON_SEA                                    :{WHITE}... nelze stavět na otevřeném moři
 STR_ERROR_CAN_T_BUILD_ON_CANAL                                  :{WHITE}... nelze stavět na průplavu
 STR_ERROR_CAN_T_BUILD_ON_RIVER                                  :{WHITE}... nelze stavět na řece
-STR_ERROR_MUST_DEMOLISH_CANAL_FIRST                             :{WHITE}Nejprve je třeba zničit průplav
-STR_ERROR_CAN_T_BUILD_AQUEDUCT_HERE                             :{WHITE}Zde nelze postavit akvadukt...
+STR_ERROR_MUST_DEMOLISH_CANAL_FIRST                             :je nutné nejprve odstranit kanál
+STR_ERROR_CAN_T_BUILD_AQUEDUCT_HERE                             :Zde nelze postavit akvadukt…
 
 # Tree related errors
 STR_ERROR_TREE_ALREADY_HERE                                     :{WHITE}... strom už tu je
@@ -5366,8 +5436,8 @@ STR_ERROR_TREE_WRONG_TERRAIN_FOR_TREE_TYPE                      :{WHITE}... nevh
 STR_ERROR_CAN_T_PLANT_TREE_HERE                                 :{WHITE}Zde nelze vysadit strom...
 
 # Bridge related errors
-STR_ERROR_CAN_T_BUILD_BRIDGE_HERE                               :{WHITE}Zde nelze postavit most...
-STR_ERROR_MUST_DEMOLISH_BRIDGE_FIRST                            :{WHITE}Je nutné nejprve zničit most
+STR_ERROR_CAN_T_BUILD_BRIDGE_HERE                               :Zde nelze postavit most…
+STR_ERROR_MUST_DEMOLISH_BRIDGE_FIRST                            :je nutné nejprve odstranit most
 STR_ERROR_CAN_T_START_AND_END_ON                                :{WHITE}Nelze začít a skončit na stejném místě
 STR_ERROR_BRIDGEHEADS_NOT_SAME_HEIGHT                           :{WHITE}Nájezdy na most nejsou ve stejné výšce
 STR_ERROR_BRIDGE_TOO_LOW_FOR_TERRAIN                            :{WHITE}Most je pro terén moc nízký
@@ -5410,14 +5480,14 @@ STR_ERROR_YOU_ALREADY_OWN_IT                                    :{WHITE}... již
 STR_ERROR_BUILD_OBJECT_LIMIT_REACHED                            :{WHITE}... dosažen limit pro výstavbu objektů
 
 # Group related errors
-STR_ERROR_GROUP_CAN_T_CREATE                                    :{WHITE}Nelze vytvořit skupinu...
-STR_ERROR_GROUP_CAN_T_DELETE                                    :{WHITE}Nelze vymazat skupinu...
+STR_ERROR_GROUP_CAN_T_CREATE                                    :Nelze vytvořit skupinu…
+STR_ERROR_GROUP_CAN_T_DELETE                                    :Nelze vymazat skupinu…
 STR_ERROR_GROUP_CAN_T_RENAME                                    :{WHITE}Nelze přejmenovat skupinu...
 STR_ERROR_GROUP_CAN_T_SET_PARENT                                :{WHITE}Nelze nastavit nadřazenou skupinu
 STR_ERROR_GROUP_CAN_T_SET_PARENT_RECURSION                      :{WHITE}... skupina nemůže patřit do skupiny, která patří pod ní
-STR_ERROR_GROUP_CAN_T_REMOVE_ALL_VEHICLES                       :{WHITE}Nelze odstranit všechna vozidla ze skupiny...
-STR_ERROR_GROUP_CAN_T_ADD_VEHICLE                               :{WHITE}Nelze přidat vozidlo do skupiny...
-STR_ERROR_GROUP_CAN_T_ADD_SHARED_VEHICLE                        :{WHITE}Nelze přidat sdílená vozidla do skupiny...
+STR_ERROR_GROUP_CAN_T_REMOVE_ALL_VEHICLES                       :Nelze odstranit všechna vozidla ze skupiny…
+STR_ERROR_GROUP_CAN_T_ADD_VEHICLE                               :Nelze přidat vozidlo do skupiny…
+STR_ERROR_GROUP_CAN_T_ADD_SHARED_VEHICLE                        :Nelze přidat sdílená vozidla do skupiny…
 
 # Generic vehicle errors
 
@@ -5425,7 +5495,7 @@ STR_ERROR_GROUP_CAN_T_ADD_SHARED_VEHICLE                        :{WHITE}Nelze p�
 STR_ERROR_TRAIN_IN_THE_WAY                                      :{WHITE}V cestě je vlak
 STR_ERROR_ROAD_VEHICLE_IN_THE_WAY                               :{WHITE}Silniční vozidlo v cestě
 STR_ERROR_SHIP_IN_THE_WAY                                       :{WHITE}Loď v cestě
-STR_ERROR_AIRCRAFT_IN_THE_WAY                                   :{WHITE}Letadlo v cestě
+STR_ERROR_AIRCRAFT_IN_THE_WAY                                   :letadlo v cestě
 
 ###length VEHICLE_TYPES
 STR_ERROR_RAIL_VEHICLE_NOT_AVAILABLE                            :{WHITE}Vozidlo není dostupné
@@ -5523,8 +5593,8 @@ STR_ERROR_CAN_T_MOVE_THIS_ORDER                                 :{WHITE}Nelze p�
 STR_ERROR_CAN_T_SKIP_ORDER                                      :{WHITE}Nelze přeskočit současný příkaz...
 STR_ERROR_CAN_T_SKIP_TO_ORDER                                   :{WHITE}Nelze přeskočit na označený příkaz...
 STR_ERROR_CAN_T_COPY_SHARE_ORDER                                :{WHITE}... prostředek se nedostane do všech stanic
-STR_ERROR_CAN_T_ADD_ORDER                                       :{WHITE}... do této stanice se prostředek nedostane
-STR_ERROR_CAN_T_ADD_ORDER_SHARED                                :{WHITE}... do této stanice se prostředek sdílející tento příkaz nedostane
+STR_ERROR_CAN_T_ADD_ORDER                                       :Do této stanice se vozidlo nedostane
+STR_ERROR_CAN_T_ADD_ORDER_SHARED                                :Vozidlo sdílející tento příkaz se to této stanice nedostane
 STR_ERROR_CAN_T_COPY_ORDER_VEHICLE_LIST                         :{WHITE}... ne všechna vozidla mají stejné příkazy
 STR_ERROR_CAN_T_SHARE_ORDER_VEHICLE_LIST                        :{WHITE}... ne všechna vozidla sdílí příkazy
 
@@ -6185,7 +6255,8 @@ STR_LORRY                                                       :{BLACK}{LORRY}
 STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
-STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} {YELLOW}({VELOCITY})
+STR_TOOLBAR_ROADTYPE_VELOCITY                                   :{STRING} {YELLOW}({VELOCITY})
 
 STR_BADGE_NAME_LIST                                             :{STRING}: {GOLD}{STRING}
 STR_BADGE_CONFIG_MENU_TOOLTIP                                   :Otevřít nastavení odznaků
@@ -6195,4 +6266,3 @@ STR_BADGE_CONFIG_FILTERS                                        :{WHITE}Filtr od
 STR_BADGE_CONFIG_PREVIEW                                        :Náhled obrázku
 STR_BADGE_CONFIG_NAME                                           :Jméno
 STR_BADGE_FILTER_ANY_LABEL                                      :{G 0 Jakýkoliv Jakákoliv Jakékoliv Jacíkoliv Jakékoliv Jakékoliv Jakékoliv} {STRING}
-STR_BADGE_FILTER_IS_LABEL                                       :{STRING} je {STRING}

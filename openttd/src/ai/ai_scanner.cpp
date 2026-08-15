@@ -5,7 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file ai_scanner.cpp allows scanning AI scripts */
+/** @file ai_scanner.cpp Allows scanning AI scripts. */
 
 #include "../stdafx.h"
 #include <ranges>
@@ -53,7 +53,7 @@ void AIScannerInfo::RegisterAPI(class Squirrel &engine)
 
 AIInfo *AIScannerInfo::SelectRandomAI() const
 {
-	if (_game_mode == GM_MENU) {
+	if (_game_mode == GameMode::Menu) {
 		Debug(script, 0, "The intro game should not use AI, loading 'dummy' AI.");
 		return this->info_dummy.get();
 	}

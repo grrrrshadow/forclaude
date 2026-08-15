@@ -9,13 +9,23 @@ v nestabilním/nedeterministickém CI postupu.
 
 ## Zdroj
 
+**Aktuální vendorovaný zdroj (od 2026-08-15): OpenTTD 16.0-beta2**, ne
+15.3 — viz `openttd/VENDORED_SOURCE.md` pro důvod přechodu (skutečné
+couvání vlaků + NewGRF kompatibilita s CZTR). Práce na 15.3 zůstává
+zachovaná na větvi `backup-15.3-decouple`. Zbytek téhle sekce (postup,
+kroky, poznatky o `windows-2022` vs. `windows-latest`) popisuje, jak
+jsme k tomuhle bodu došli — zůstává jako historický záznam, principy
+(ověřit reprodukovatelnost před úpravou kódu) platí beze změny i pro
+beta16.
+
 - Oficiální repozitář: `OpenTTD/OpenTTD` (https://github.com/OpenTTD/OpenTTD)
-- Verze: **15.3** (vydáno 2026-04-04, autor releasu PeterN)
-- Tag: `15.3`
-- Commit, na který tag `15.3` ukazuje: `14ec60f248547d4d062a1160f0fc26d742319888`
-  (zaznamenáno při přípravě tohoto postupu — pokud by GitHub Actions checkout
-  vytáhl jiný commit pro tag `15.3`, je to signál, že se tag přesunul/je
-  něco jinak, a je potřeba to prošetřit).
+- Původní verze (viz `backup-15.3-decouple`): **15.3** (vydáno
+  2026-04-04, autor releasu PeterN), tag `15.3`, commit
+  `14ec60f248547d4d062a1160f0fc26d742319888`.
+- Aktuální verze: **16.0-beta2**, tag `16.0-beta2`, commit
+  `e4620d5832de45b5e0a4c4c1d4581684364ea082` (zaznamenáno při
+  vendorování — pokud by GitHub Actions checkout vytáhl jiný commit pro
+  tento tag, je to signál, že se tag přesunul/je něco jinak).
 - Žádné git submoduly nejsou potřeba (`.gitmodules` v repu není).
 
 ## Odkud vychází náš postup

@@ -5,7 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file rail_type.h The different types of rail */
+/** @file rail_type.h The different types of rail. */
 
 #ifndef RAIL_TYPE_H
 #define RAIL_TYPE_H
@@ -32,9 +32,7 @@ enum RailType : uint8_t {
 	INVALID_RAILTYPE  = 0xFF,       ///< Flag for invalid railtype
 };
 
-/** Allow incrementing of Track variables */
-DECLARE_INCREMENT_DECREMENT_OPERATORS(RailType)
-
+/** Bitset of \c RailType elements. */
 using RailTypes = EnumBitSet<RailType, uint64_t>;
 
 static constexpr RailTypes INVALID_RAILTYPES{UINT64_MAX};

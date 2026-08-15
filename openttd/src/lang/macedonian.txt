@@ -861,6 +861,8 @@ STR_CONFIG_SETTING_REALISTIC                                    :Реален
 
 
 
+###length 3
+
 
 
 ###setting-zero-is-special
@@ -928,6 +930,8 @@ STR_CONFIG_SETTING_INFRASTRUCTURE_MAINTENANCE                   :Инфраст�
 ###setting-zero-is-special
 
 
+###setting-zero-is-special
+
 
 ###length 2
 
@@ -947,6 +951,8 @@ STR_CONFIG_SETTING_GRAPH_LINE_THICKNESS                         :Дебелин�
 
 
 
+
+###length 4
 
 ###length 4
 
@@ -1034,6 +1040,7 @@ STR_CONFIG_SETTING_SCRIPT_MAX_OPCODES                           :#ОПкодов
 ###length 3
 
 ###setting-zero-is-special
+
 
 
 
@@ -1156,7 +1163,7 @@ STR_CONFIG_ERROR_INVALID_GRF_UNKNOWN                            :непозна�
 STR_CONFIG_ERROR_INVALID_SAVEGAME_COMPRESSION_LEVEL             :{WHITE}... ниво на компресија '{STRING}' не е валидна
 STR_CONFIG_ERROR_INVALID_SAVEGAME_COMPRESSION_ALGORITHM         :{WHITE}... спаси играта формат '{STRING}' не е достапен. се врати на '{STRING}'
 
-# Video initalization errors
+# Video initialization errors
 
 # Intro window
 
@@ -1213,7 +1220,7 @@ STR_NETWORK_SERVER_LIST_MAP_SIZE_SHORT                          :{BLACK}{COMMA}x
 # Network connecting window
 
 
-###length 8
+###length 6
 
 
 
@@ -1296,6 +1303,8 @@ STR_RAIL_TOOLBAR_TOOLTIP_BUILD_AUTORAIL                         :{BLACK}Изгр
 # Rail waypoint construction window
 
 # Rail station construction window
+
+
 
 
 
@@ -1708,6 +1717,8 @@ STR_BUY_VEHICLE_AIRCRAFT_CAPTION                                :Нов авио
 
 STR_PURCHASE_INFO_AIRCRAFT_RANGE                                :{BLACK}Опсег: {GOLD}{COMMA} плочки
 
+# Vehicle sort details
+
 ###length 3
 
 ###length VEHICLE_TYPES
@@ -1779,6 +1790,7 @@ STR_DEPOT_AIRCRAFT_LOCATION_TOOLTIP                             :{BLACK}Цент
 
 
 # Engine preview window
+
 
 
 
@@ -1898,7 +1910,7 @@ STR_ORDER_INDEX                                                 :{COMMA}:{NBSP}
 
 
 # Conditional order variables, must follow order of OrderConditionVariable enum
-###length 8
+###length 9
 ###next-name-looks-similar
 
 
@@ -2028,7 +2040,6 @@ STR_ERROR_ALREADY_LEVELLED                                      :{WHITE}... ве
 STR_ERROR_CAN_T_GENERATE_TOWN                                   :{WHITE}Не може да се направи град
 STR_ERROR_CAN_T_FOUND_TOWN_HERE                                 :{WHITE}Овде не може да се изгради град...
 STR_ERROR_CAN_T_EXPAND_TOWN                                     :{WHITE}Не може да се прошири градот...
-STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB                          :{WHITE}... премногу блиску до крајот на мапата
 STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN                             :{WHITE}... премногу блиску до друг град
 STR_ERROR_TOO_MANY_TOWNS                                        :{WHITE}... премногу градови
 STR_ERROR_STATUE_NO_SUITABLE_PLACE                              :{WHITE}... не постои такво место за статуа во центарот на градот

@@ -5,7 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file hotkeys.cpp Implementation of hotkey related functions */
+/** @file hotkeys.cpp Implementation of hotkey related functions. */
 
 #include "stdafx.h"
 #include "openttd.h"
@@ -257,6 +257,7 @@ HotkeyList::HotkeyList(const std::string &ini_group, const std::vector<Hotkey> &
 	_hotkey_lists->push_back(this);
 }
 
+/** Remove ourselves from the global hotkey list. */
 HotkeyList::~HotkeyList()
 {
 	_hotkey_lists->erase(std::ranges::find(*_hotkey_lists, this));
@@ -314,7 +315,7 @@ int HotkeyList::CheckMatch(uint16_t keycode, bool global_only) const
 static void SaveLoadHotkeys(bool save)
 {
 	IniFile ini{};
-	ini.LoadFromDisk(_hotkeys_file, NO_DIRECTORY);
+	ini.LoadFromDisk(_hotkeys_file, Subdirectory::None);
 
 	for (HotkeyList *list : *_hotkey_lists) {
 		if (save) {
@@ -346,7 +347,7 @@ void HandleGlobalHotkeys([[maybe_unused]] char32_t key, uint16_t keycode)
 		if (list->global_hotkey_handler == nullptr) continue;
 
 		int hotkey = list->CheckMatch(keycode, true);
-		if (hotkey >= 0 && (list->global_hotkey_handler(hotkey) == ES_HANDLED)) return;
+		if (hotkey >= 0 && (list->global_hotkey_handler(hotkey) == EventState::Handled)) return;
 	}
 }
 

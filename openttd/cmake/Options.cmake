@@ -56,17 +56,37 @@ function(set_options)
 
     option(OPTION_DEDICATED "Build dedicated server only (no GUI)" OFF)
     option(OPTION_INSTALL_FHS "Install with Filesystem Hierarchy Standard folders" ${DEFAULT_OPTION_INSTALL_FHS})
-    option(OPTION_USE_ASSERTS "Use assertions; leave enabled for nightlies, betas, and RCs" OFF)
+    option(OPTION_USE_ASSERTS "Use assertions; leave enabled for nightlies, betas, and RCs" ON)
     option(OPTION_USE_NSIS "Use NSIS to create windows installer; enable only for stable releases" OFF)
     option(OPTION_TOOLS_ONLY "Build only tools target" OFF)
     option(OPTION_DOCS_ONLY "Build only docs target" OFF)
     option(OPTION_ALLOW_INVALID_SIGNATURE "Allow loading of content with invalid signatures" OFF)
+    option(OPTION_LINE_IN_DOXYGEN_WARNINGS "Print line number in doxygen warnings" ON)
 
     if (OPTION_DOCS_ONLY)
         set(OPTION_TOOLS_ONLY ON PARENT_SCOPE)
     endif()
 
+    if (OPTION_LINE_IN_DOXYGEN_WARNINGS)
+        set(DOXYGEN_WARN_FORMAT_LINE "line" PARENT_SCOPE)
+    endif()
+
     option(OPTION_SURVEY_KEY "Survey-key to use for the opt-in survey (empty if you have none)" "")
+    option(OPTION_DOXYGEN_WARN_FILE "File to write doxygen warnings into (if empty warnings are written to standard error)" "")
+    option(OPTION_DOXYGEN_GS_WARN_FILE "File to write doxygen warnings from game script docs into (if empty warnings are written to standard error)" "")
+    option(OPTION_DOXYGEN_AI_WARN_FILE "File to write doxygen warnings from AI docs into (if empty warnings are written to standard error)" "")
+
+    if(OPTION_DOXYGEN_WARN_FILE)
+	    set(DOXYGEN_WARN_FILE ${CMAKE_BINARY_DIR}/${OPTION_DOXYGEN_WARN_FILE} PARENT_SCOPE)
+    endif()
+
+    if(OPTION_DOXYGEN_GS_WARN_FILE)
+        set(DOXYGEN_GS_WARN_FILE ${CMAKE_BINARY_DIR}/${OPTION_DOXYGEN_GS_WARN_FILE} PARENT_SCOPE)
+    endif()
+
+    if(OPTION_DOXYGEN_AI_WARN_FILE)
+        set(DOXYGEN_AI_WARN_FILE ${CMAKE_BINARY_DIR}/${OPTION_DOXYGEN_AI_WARN_FILE} PARENT_SCOPE)
+    endif()
 endfunction()
 
 # Show the values of the generic options.
