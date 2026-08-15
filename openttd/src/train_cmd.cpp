@@ -1246,6 +1246,7 @@ static void NormaliseTrainHead(Train *head)
 }
 
 static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain);
+static void TrainEnterStation(Train *consist, StationID station);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -1634,6 +1635,13 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
  * on, similar to how e.g. full-load orders don't error on a consist that
  * can never fill up.
  *
+ * Right after the split, the left-behind remainder is given a synthetic
+ * "wait to couple" order at the station it's still standing on, so it
+ * immediately reads as "Waiting for couple" (rather than "No orders") and
+ * is ready to accept a partner the moment one becomes adjacent -- matching
+ * the mental model that a decoupled remainder is always left in a state
+ * ready to be picked up again. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
  * @param v          front of the consist that just finished loading
  * @param keep_count number of vehicles to keep at the front
  */
@@ -1651,6 +1659,14 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count)
 	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
 
 	TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
+
+	Train *remainder = split_point->First();
+	if (IsRailStationTile(remainder->tile)) {
+		StationID station = GetStationIndex(remainder->tile);
+		remainder->current_order.MakeGoToStation(station);
+		remainder->current_order.SetWaitForCouple(true);
+		TrainEnterStation(remainder, station);
+	}
 }
 
 /**
@@ -2685,7 +2701,15 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
  */
 void FreeTrainTrackReservation(const Train *consist)
 {
-	assert(consist->IsFrontEngine());
+	/* A headless "free wagon" chain left behind by a decouple order (see
+	 * FEATURE_DESIGN_COUPLING_TOW.md) can now be found here via
+	 * GetTrainForReservation() from track/tunnel/station edit commands --
+	 * something that could never happen in vanilla, where every standalone
+	 * train on open track was guaranteed to have a front engine. Such a
+	 * chain isn't moving and isn't following a path forward; its own
+	 * under-body reservation is set once by ReserveTrackUnderConsist() and
+	 * isn't this function's concern, so just no-op instead of asserting. */
+	if (!consist->IsFrontEngine()) return;
 
 	const Train *moving_front = consist->GetMovingFront();
 	TileIndex tile = moving_front->tile;
@@ -3076,6 +3100,25 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 	/* A path was found, but could not be reserved. */
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
+		/* Every normal pathfinder deliberately avoids ending a route next
+		 * to an occupied tile -- that is what keeps trains from routing
+		 * into each other. A "go to couple" order's entire point is to
+		 * stop right next to another (stopped, compatible) train, so it
+		 * can never succeed through the normal path above. Fall back to
+		 * the couple-aware pathfinder, which treats that as the goal
+		 * instead of an obstacle, before giving up and marking the train
+		 * stuck. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (consist->current_order.ShouldGoToCouple()) {
+			PBSTileInfo origin = FollowTrainReservation(consist);
+			if (YapfTrainFindCouplePosition(consist, origin.tile, origin.trackdir)) {
+				TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
+				best_track = FindFirstTrack(res);
+				TryReserveRailTrack(consist->tile, TrackdirToTrack(consist->GetVehicleTrackdir()));
+				if (got_reservation != nullptr) *got_reservation = true;
+				if (changed_signal) MarkTileDirtyByTile(tile);
+				return best_track;
+			}
+		}
 		if (mark_stuck) MarkTrainAsStuck(consist);
 		FreeTrainTrackReservation(consist);
 		return best_track;
@@ -3162,7 +3205,13 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
  */
 bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 {
-	assert(consist->IsFrontEngine());
+	/* See the matching comment in FreeTrainTrackReservation(): a headless
+	 * "free wagon" chain can reach here the same way (e.g. via
+	 * GetTrainForReservation() when nearby track is edited). It isn't
+	 * driving anywhere, so there's no path ahead of it to reserve --
+	 * treat that as trivial success rather than asserting or marking it
+	 * stuck. See FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (!consist->IsFrontEngine()) return true;
 
 	const Train *moving_front = consist->GetMovingFront();
 
