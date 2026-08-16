@@ -3719,6 +3719,27 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					chosen_track = ChooseTrainTrack(first, gp.new_tile, enterdir, bits, false, nullptr, true);
 					assert(chosen_track.Any(bits | GetReservedTrackbits(gp.new_tile)));
 
+					/* Never physically enter a tile held by a headless "free
+					 * wagon" chain left behind by a decouple order, even
+					 * under Force Proceed. Force Proceed is meant to bypass
+					 * being stuck on an overly-cautious PBS signal, at the
+					 * well-understood vanilla risk of running into another
+					 * train that happens to be genuinely in the way -- but a
+					 * player has no way to anticipate which direction a
+					 * train will approach a station from (it may route via
+					 * a depot, or a less congested line, and arrive from an
+					 * unexpected side), so a collision with wagons left
+					 * behind by an earlier, unrelated decouple order would
+					 * be baffling rather than an accepted risk. See
+					 * FEATURE_DESIGN_COUPLING_TOW.md. */
+					for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
+						if (u->type != VehicleType::Train) continue;
+						const Train *t = Train::From(u)->First();
+						if (t == first || t->IsFrontEngine()) continue;
+						MarkTrainAsStuck(first);
+						return false;
+					}
+
 					if (first->force_proceed != TFP_NONE && IsPlainRailTile(gp.new_tile) && HasSignals(gp.new_tile)) {
 						/* For each signal we find decrease the counter by one.
 						 * We start at two, so the first signal we pass decreases
