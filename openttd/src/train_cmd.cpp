@@ -3134,22 +3134,35 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		 * destination. See FEATURE_DESIGN_COUPLING_TOW.md. */
 		if (consist->current_order.ShouldGoToCouple()) {
 			PBSTileInfo origin = FollowTrainReservation(consist);
+			TrackBits res{};
 			if (YapfTrainFindCouplePosition(consist, origin.tile, origin.trackdir)) {
-				TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
+				/* The search reserves a fresh route from wherever our
+				 * reservation currently ends towards the partner, which
+				 * doesn't necessarily pass through this specific tile in
+				 * the direction the caller is asking about right now
+				 * (e.g. it may need to go a different way than we're
+				 * currently facing) -- verify before trusting it, rather
+				 * than handing the caller an empty track selection, which
+				 * trips its "did we actually get a usable track" assert. */
+				res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
+			}
+			if (res.Any()) {
 				best_track = FindFirstTrack(res);
 				TryReserveRailTrack(consist->tile, TrackdirToTrack(consist->GetVehicleTrackdir()));
 				if (got_reservation != nullptr) *got_reservation = true;
 				if (changed_signal) MarkTileDirtyByTile(tile);
 				return best_track;
 			}
-			/* No partner reachable right now (e.g. it hasn't been
-			 * decoupled there yet) -- wait at the last safe position
-			 * instead of falling through to the normal search below,
-			 * which has no concept of "this specific platform" and would
-			 * happily settle for any other free one. The train re-tries
-			 * this same couple-aware search every time it's re-evaluated
-			 * (normal stuck-train retry cadence), so it starts moving on
-			 * its own the moment a partner does show up. See
+			/* Either no partner is reachable right now (e.g. it hasn't
+			 * been decoupled there yet), or the route the search found
+			 * doesn't pass through this tile the way the caller expects
+			 * -- wait at the last safe position instead of falling
+			 * through to the normal search below, which has no concept
+			 * of "this specific platform" and would happily settle for
+			 * any other free one. The train re-tries this same
+			 * couple-aware search every time it's re-evaluated (normal
+			 * stuck-train retry cadence), so it starts moving on its own
+			 * once a valid route to the partner opens up. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (mark_stuck) MarkTrainAsStuck(consist);
 			FreeTrainTrackReservation(consist);
