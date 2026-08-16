@@ -4576,6 +4576,7 @@ STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Waiting
 STR_VEHICLE_STATUS_AIRCRAFT_TOO_FAR                             :{ORANGE}Too far to next destination
 
 STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL                      :{LTBLUE}{1:VELOCITY} - Heading for {0:STATION}
+STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL                       :{LTBLUE}{1:VELOCITY} - Going to couple at {0:STATION}
 STR_VEHICLE_STATUS_NO_ORDERS_VEL                                :{LTBLUE}{VELOCITY} - No orders
 STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL                     :{LTBLUE}{1:VELOCITY} - Heading for {0:WAYPOINT}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL                        :{ORANGE}{1:VELOCITY} - Heading for {0:DEPOT}

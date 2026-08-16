@@ -3231,6 +3231,9 @@ public:
 
 		switch (v->current_order.GetType()) {
 			case OT_GOTO_STATION:
+				if (v->type == VehicleType::Train && v->current_order.ShouldGoToCouple() && !v->vehicle_flags.Test(VehicleFlag::PathfinderLost)) {
+					return GetString(STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL, v->current_order.GetDestination(), PackVelocity(v->GetDisplaySpeed(), v->type));
+				}
 				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_STATION_VEL : STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL,
 					v->current_order.GetDestination(), PackVelocity(v->GetDisplaySpeed(), v->type));
 

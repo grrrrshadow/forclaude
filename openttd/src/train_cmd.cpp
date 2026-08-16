@@ -3120,6 +3120,42 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	}
 
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
+		/* A "go to couple" order's entire point is to stop right next to
+		 * another (stopped, compatible) train -- but the normal
+		 * destination search just below accepts ANY valid, reservable
+		 * platform tile at the target station, with no notion of
+		 * preferring one valid platform over another. On a multi-platform
+		 * station this means it will happily commit to a free platform
+		 * instead of the specific, occupied one the partner is actually
+		 * on, arriving at the wrong spot and then waiting forever with no
+		 * partner ever adjacent. Try the couple-aware pathfinder FIRST,
+		 * before the normal search below gets a chance to lock in the
+		 * wrong platform as an entirely valid (just not what we want)
+		 * destination. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (consist->current_order.ShouldGoToCouple()) {
+			PBSTileInfo origin = FollowTrainReservation(consist);
+			if (YapfTrainFindCouplePosition(consist, origin.tile, origin.trackdir)) {
+				TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
+				best_track = FindFirstTrack(res);
+				TryReserveRailTrack(consist->tile, TrackdirToTrack(consist->GetVehicleTrackdir()));
+				if (got_reservation != nullptr) *got_reservation = true;
+				if (changed_signal) MarkTileDirtyByTile(tile);
+				return best_track;
+			}
+			/* No partner reachable right now (e.g. it hasn't been
+			 * decoupled there yet) -- wait at the last safe position
+			 * instead of falling through to the normal search below,
+			 * which has no concept of "this specific platform" and would
+			 * happily settle for any other free one. The train re-tries
+			 * this same couple-aware search every time it's re-evaluated
+			 * (normal stuck-train retry cadence), so it starts moving on
+			 * its own the moment a partner does show up. See
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (mark_stuck) MarkTrainAsStuck(consist);
+			FreeTrainTrackReservation(consist);
+			return best_track;
+		}
+
 		/* Pathfinders are able to tell that route was only 'guessed'. */
 		bool      path_found = true;
 		TileIndex new_tile = res_dest.tile;
@@ -3134,25 +3170,6 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 	/* A path was found, but could not be reserved. */
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
-		/* Every normal pathfinder deliberately avoids ending a route next
-		 * to an occupied tile -- that is what keeps trains from routing
-		 * into each other. A "go to couple" order's entire point is to
-		 * stop right next to another (stopped, compatible) train, so it
-		 * can never succeed through the normal path above. Fall back to
-		 * the couple-aware pathfinder, which treats that as the goal
-		 * instead of an obstacle, before giving up and marking the train
-		 * stuck. See FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (consist->current_order.ShouldGoToCouple()) {
-			PBSTileInfo origin = FollowTrainReservation(consist);
-			if (YapfTrainFindCouplePosition(consist, origin.tile, origin.trackdir)) {
-				TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
-				best_track = FindFirstTrack(res);
-				TryReserveRailTrack(consist->tile, TrackdirToTrack(consist->GetVehicleTrackdir()));
-				if (got_reservation != nullptr) *got_reservation = true;
-				if (changed_signal) MarkTileDirtyByTile(tile);
-				return best_track;
-			}
-		}
 		if (mark_stuck) MarkTrainAsStuck(consist);
 		FreeTrainTrackReservation(consist);
 		return best_track;
@@ -3737,7 +3754,21 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						const Train *t = Train::From(u)->First();
 						if (t == first || t->IsFrontEngine()) continue;
 						MarkTrainAsStuck(first);
-						return false;
+						/* Reuse the same halt mechanism as every other
+						 * "can't enter this tile" case in this function
+						 * (goto invalid_rail below), instead of a bare
+						 * `return false`: that path also zeroes cur_speed/
+						 * subspeed, which matters here because Force
+						 * Proceed keeps resetting VehicleRailFlag::Stuck
+						 * every tick (see TrainLocoHandler) and the outer
+						 * per-tick movement loop in TrainLocoHandler keeps
+						 * calling TrainController based on cur_speed alone,
+						 * ignoring TrainController's return value -- a bare
+						 * `return false` that left speed untouched let the
+						 * train's existing momentum carry it into the
+						 * wagons on a later sub-step within the very same
+						 * tick. */
+						goto invalid_rail;
 					}
 
 					if (first->force_proceed != TFP_NONE && IsPlainRailTile(gp.new_tile) && HasSignals(gp.new_tile)) {
