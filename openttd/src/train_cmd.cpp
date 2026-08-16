@@ -3163,10 +3163,19 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			 * couple-aware search every time it's re-evaluated (normal
 			 * stuck-train retry cadence), so it starts moving on its own
 			 * once a valid route to the partner opens up. See
-			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			 * FEATURE_DESIGN_COUPLING_TOW.md.
+			 *
+			 * Return FindFirstTrack(tracks), not best_track: best_track
+			 * is only ever set above when tracks.Count() == 1, so at a
+			 * junction with more than one option it's still
+			 * Track::Invalid here, which fails this call's caller's
+			 * "did we get a usable track" assert. FindFirstTrack(tracks)
+			 * matches the same "give up, but still hand back a valid
+			 * placeholder" pattern the reservation-failed case above
+			 * already uses. */
 			if (mark_stuck) MarkTrainAsStuck(consist);
 			FreeTrainTrackReservation(consist);
-			return best_track;
+			return FindFirstTrack(tracks);
 		}
 
 		/* Pathfinders are able to tell that route was only 'guessed'. */
@@ -3185,7 +3194,19 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
 		if (mark_stuck) MarkTrainAsStuck(consist);
 		FreeTrainTrackReservation(consist);
-		return best_track;
+		/* Return FindFirstTrack(tracks), not best_track: best_track is
+		 * only set above when tracks.Count() == 1 or when the pathfind
+		 * result's tile happened to match our own (new_tile == tile).
+		 * At a junction with more than one option, reached via a
+		 * different tile-matching outcome, best_track can still be
+		 * Track::Invalid here, which fails this call's caller's "did we
+		 * get a usable track" assert (TrainController, right after
+		 * ChooseTrainTrack returns) -- something the headless-wagon
+		 * quick-return check above (see FEATURE_DESIGN_COUPLING_TOW.md)
+		 * makes reachable in more cases than before, by no longer
+		 * quick-returning past this whole function for a tile whose
+		 * reservation turns out to belong to a decoupled wagon chain. */
+		return FindFirstTrack(tracks);
 	}
 
 	/* No possible reservation target found, we are probably lost. */
@@ -3198,11 +3219,13 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			TryReserveRailTrack(moving_front->tile, TrackdirToTrack(moving_front->GetVehicleTrackdir()));
 			if (got_reservation != nullptr) *got_reservation = true;
 			if (changed_signal) MarkTileDirtyByTile(tile);
-		} else {
-			FreeTrainTrackReservation(consist);
-			if (mark_stuck) MarkTrainAsStuck(consist);
+			return best_track;
 		}
-		return best_track;
+		FreeTrainTrackReservation(consist);
+		if (mark_stuck) MarkTrainAsStuck(consist);
+		/* See the FindFirstTrack(tracks) comments above: best_track can
+		 * still be Track::Invalid here, which fails the caller's assert. */
+		return FindFirstTrack(tracks);
 	}
 
 	if (got_reservation != nullptr) *got_reservation = true;
