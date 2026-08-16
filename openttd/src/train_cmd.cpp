@@ -3033,7 +3033,32 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	/* Don't use tracks here as the setting to forbid 90 deg turns might have been switched between reservation and now. */
 	TrackBits res_tracks = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
 	/* Do we have a suitable reserved track? */
-	if (res_tracks.Any()) return FindFirstTrack(res_tracks);
+	if (res_tracks.Any()) {
+		/* A reservation on this tile isn't necessarily still ours to
+		 * trust blindly: a headless "free wagon" chain left behind by a
+		 * decouple order can hold a live, legitimate reservation
+		 * directly adjacent to ours (see FEATURE_DESIGN_COUPLING_TOW.md)
+		 * -- something that could never happen in vanilla, where a
+		 * reservation is a plain per-tile boolean with no owner, so any
+		 * reserved tile reachable this way was always safely assumed to
+		 * be part of our own already-secured path. Without this check, a
+		 * train departing (or reversing) right next to wagons it (or a
+		 * sibling train) just left behind inherits their reservation as
+		 * if it were its own and drives straight through them. If a
+		 * genuinely different train is physically standing on this
+		 * tile, fall through to the normal pathfinding/reservation
+		 * logic below instead, which correctly treats an occupied tile
+		 * as blocked (or safely marks us stuck) rather than driving
+		 * straight through it. */
+		bool tile_held_by_other_train = false;
+		for (const Vehicle *u : VehiclesOnTile(tile)) {
+			if (u->type != VehicleType::Train) continue;
+			if (Train::From(u)->First() == consist->First()) continue;
+			tile_held_by_other_train = true;
+			break;
+		}
+		if (!tile_held_by_other_train) return FindFirstTrack(res_tracks);
+	}
 
 	/* Quick return in case only one possible track is available */
 	if (tracks.Count() == 1) {
