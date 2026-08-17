@@ -3336,8 +3336,42 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	 * Exit here as doing any further reservations will probably just
 	 * make matters worse. */
 	if (other_train != nullptr && other_train->index != consist->index) {
-		if (mark_as_stuck) MarkTrainAsStuck(consist);
-		return false;
+		if (Train::From(other_train)->First()->IsFrontEngine()) {
+			/* Genuinely blocked by a real, driving train -- nothing
+			 * useful to do but wait, exactly as before. */
+			if (mark_as_stuck) MarkTrainAsStuck(consist);
+			return false;
+		}
+		/* Blocked only by a headless "free wagon" chain left behind by
+		 * a decouple order: unlike a real train, there is often a way
+		 * around. Give the full pathfinder in ChooseTrainTrack() a
+		 * fresh chance to find one from our actual current position
+		 * (not the stale `origin` above, which can extend right into
+		 * the wagon's own tiles, since reservation is a plain per-tile
+		 * boolean with no owner and the wagon's reservation reads as
+		 * contiguous with ours) -- it now treats a headless wagon's
+		 * tile as effectively impassable during the search itself,
+		 * instead of giving up immediately the way this function
+		 * otherwise would. Mirrors the "reservation found, try to
+		 * extend it" call a few lines below. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		DiagDirection exitdir = TrackdirToExitdir(moving_front->GetVehicleTrackdir());
+		TileIndex new_tile = TileAddByDiagDir(moving_front->tile, exitdir);
+		TrackBits reachable = TrackdirBitsToTrackBits(GetTileTrackStatus(new_tile, TransportType::Rail, RoadTramType::Invalid).trackdirs & DiagdirReachesTrackdirs(exitdir));
+		if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(new_tile))) {
+			reachable.Reset(TrackCrossesTracks(TrackdirToTrack(moving_front->GetVehicleTrackdir())));
+		}
+
+		bool res_made = false;
+		ChooseTrainTrack(consist, new_tile, exitdir, reachable, true, &res_made, mark_as_stuck);
+		if (!res_made) return false;
+
+		if (consist->flags.Test(VehicleRailFlag::Stuck)) {
+			consist->wait_counter = 0;
+			SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+		}
+		consist->flags.Reset(VehicleRailFlag::Stuck);
+		return true;
 	}
 	/* If we have a reserved path and the path ends at a safe tile, we are finished already. */
 	if (origin.okay && (moving_front->tile != origin.tile || first_tile_okay)) {
