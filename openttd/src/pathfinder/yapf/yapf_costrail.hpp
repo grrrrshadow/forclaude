@@ -12,6 +12,8 @@
 
 
 #include "../../pbs.h"
+#include "../../train.h"
+#include "../../vehicle_func.h"
 #include "../follow_track.hpp"
 #include "../pathfinder_type.h"
 #include "yapf_type.hpp"
@@ -182,6 +184,28 @@ public:
 	 */
 	inline int ReservationCost(Node &n, TileIndex tile, Trackdir trackdir, int skipped)
 	{
+		/* A headless "free wagon" chain left behind by a decouple order
+		 * can hold a live reservation that a normal (non-couple) search
+		 * should treat as effectively impassable, not just a mild
+		 * PBS-crossing penalty -- and unlike the ordinary case below,
+		 * this check must NOT be gated behind "we recently passed a PBS
+		 * signal within the lookahead window", since a decoupled train
+		 * can be sitting right where we just departed from with no
+		 * intervening signal at all. Without this, the search still
+		 * prefers a shorter route straight through the wagons (the
+		 * ordinary reservation penalty either doesn't apply here or
+		 * isn't steep enough to matter), finds it can't actually be
+		 * reserved once ExtendTrainReservation() tries, and gives up
+		 * instead of trying the genuinely different route around that
+		 * this search never considered. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (TrackOverlapsTracks(GetReservedTrackbits(tile), TrackdirToTrack(trackdir))) {
+			for (const Vehicle *u : VehiclesOnTile(tile)) {
+				if (u->type != VehicleType::Train) continue;
+				if (!Train::From(u)->First()->IsFrontEngine()) return YAPF_INFINITE_PENALTY;
+			}
+		}
+
 		if (n.num_signals_passed >= this->sig_look_ahead_costs.size() / 2) return 0;
 		if (!IsPbsSignal(n.last_signal_type)) return 0;
 
