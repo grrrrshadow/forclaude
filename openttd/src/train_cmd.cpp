@@ -1658,6 +1658,23 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count)
 
 	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
 
+	/* Release the whole train's current reservation before splitting,
+	 * not just what's about to become each half's own footprint. A
+	 * train stopped at a station commonly holds a PBS reservation
+	 * extending some distance beyond its own physical body (the normal
+	 * "safe waiting position" lookahead) -- TryConsistSplice() below
+	 * only ever re-asserts reservation for each new consist's own
+	 * tiles (via ReserveTrackUnderConsist()), so any such excess was
+	 * never released by anything and just sat there, phantom, forever
+	 * (visible in-game as a reserved-looking track segment past the
+	 * decoupled wagons with nothing on it) -- and then confused later
+	 * pathfinding attempts that ran into it. v is still one whole train
+	 * with a normal front engine here, so this safely clears
+	 * everything; TryConsistSplice() re-reserves exactly what each half
+	 * actually needs from a clean slate right after. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	FreeTrainTrackReservation(v);
+
 	TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
 
 	Train *remainder = split_point->First();
