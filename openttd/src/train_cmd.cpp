@@ -3081,12 +3081,24 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	if (do_track_reservation) {
 		res_dest = ExtendTrainReservation(consist, &tracks, &dest_enterdir);
 		if (res_dest.tile == INVALID_TILE) {
-			/* Reservation failed? */
-			if (mark_stuck) MarkTrainAsStuck(consist);
-			if (changed_signal) SetSignalStateByTrackdir(tile, TrackEnterdirToTrackdir(best_track, enterdir), SignalState::Red);
-			return FindFirstTrack(tracks);
-		}
-		if (res_dest.okay) {
+			/* ExtendTrainReservation() only walks a single, choice-free
+			 * track run and gives up outright the moment it can't
+			 * reserve the very next tile -- by design, since in vanilla
+			 * a blocked straight run with no junction in between
+			 * genuinely has no alternative route. That assumption
+			 * breaks for a headless "free wagon" chain (left behind by
+			 * a decouple order) sitting directly ahead with no junction
+			 * in between: there is often still a way around, via an
+			 * earlier junction this quick walk never got the chance to
+			 * consider. Retry from our actual current position with the
+			 * full pathfinder (handled uniformly below, same as the
+			 * "found a target, but it wasn't safe" case) instead of
+			 * giving up immediately -- if that also fails, we still end
+			 * up correctly marked stuck a few lines down. See
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			res_dest = PBSTileInfo(tile, Trackdir::Invalid, false);
+			dest_enterdir = enterdir;
+		} else if (res_dest.okay) {
 			/* Got a valid reservation that ends at a safe target, quick exit. */
 			if (got_reservation != nullptr) *got_reservation = true;
 			if (changed_signal) MarkTileDirtyByTile(tile);
