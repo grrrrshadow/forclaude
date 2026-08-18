@@ -1647,27 +1647,6 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 }
 
 /**
- * Is the tile immediately beyond (@p tile, @p td) occupied by a stopped
- * train that @p v could couple with? Used by #CYapfDestinationCoupleRailT
- * (yapf_destrail.hpp) to let the pathfinder treat "stop right next to a
- * partner train" as a valid destination -- something no other search in
- * this game does, since every other destination type deliberately avoids
- * routing onto/next to an occupied tile. Deliberately mirrors the
- * validity checks in #GetTrainCouplePartner exactly, so a route the
- * pathfinder finds here is guaranteed to still be couplable once the
- * train actually arrives. See FEATURE_DESIGN_COUPLING_TOW.md.
- *
- * @param v    the train searching for a route to a coupling partner
- * @param tile candidate tile the search has reached
- * @param td   the trackdir the search is facing on that tile
- * @return true if the very next tile ahead has a valid partner on it
- */
-bool IsAdjacentToCouplePartner(const Train *v, TileIndex tile, Trackdir td)
-{
-	return FindCouplePartnerOnAdjacentTile(v, tile, td) != nullptr;
-}
-
-/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -3315,60 +3294,21 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	}
 
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
-		/* A "go to couple" order's entire point is to stop right next to
-		 * another (stopped, compatible) train -- but the normal
-		 * destination search just below accepts ANY valid, reservable
-		 * platform tile at the target station, with no notion of
-		 * preferring one valid platform over another. On a multi-platform
-		 * station this means it will happily commit to a free platform
-		 * instead of the specific, occupied one the partner is actually
-		 * on, arriving at the wrong spot and then waiting forever with no
-		 * partner ever adjacent. Try the couple-aware pathfinder FIRST,
-		 * before the normal search below gets a chance to lock in the
-		 * wrong platform as an entirely valid (just not what we want)
-		 * destination. See FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (consist->current_order.ShouldGoToCouple()) {
-			PBSTileInfo origin = FollowTrainReservation(consist);
-			TrackBits res{};
-			if (YapfTrainFindCouplePosition(consist, origin.tile, origin.trackdir)) {
-				/* The search reserves a fresh route from wherever our
-				 * reservation currently ends towards the partner, which
-				 * doesn't necessarily pass through this specific tile in
-				 * the direction the caller is asking about right now
-				 * (e.g. it may need to go a different way than we're
-				 * currently facing) -- verify before trusting it, rather
-				 * than handing the caller an empty track selection, which
-				 * trips its "did we actually get a usable track" assert. */
-				res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
-			}
-			if (res.Any()) {
-				best_track = FindFirstTrack(res);
-				TryReserveRailTrack(consist->tile, TrackdirToTrack(consist->GetVehicleTrackdir()));
-				if (got_reservation != nullptr) *got_reservation = true;
-				if (changed_signal) MarkTileDirtyByTile(tile);
-				return best_track;
-			}
-			/* Either no partner is reachable right now (e.g. it hasn't
-			 * been decoupled there yet), or the route the search found
-			 * doesn't pass through this tile the way the caller expects
-			 * -- wait at the last safe position instead of falling
-			 * through to the normal search below, which has no concept
-			 * of "this specific platform" and would happily settle for
-			 * any other free one. The train re-tries this same
-			 * couple-aware search every time it's re-evaluated (normal
-			 * stuck-train retry cadence), so it starts moving on its own
-			 * once a valid route to the partner opens up. See
-			 * FEATURE_DESIGN_COUPLING_TOW.md.
-			 *
-			 * Return a track from `tracks_on_tile`, not best_track:
-			 * best_track is only ever set above when tracks.Count() == 1,
-			 * so at a junction with more than one option it's still
-			 * Track::Invalid here, which fails our caller's "did we get a
-			 * usable track" assert. */
-			if (mark_stuck) MarkTrainAsStuck(consist);
-			FreeTrainTrackReservation(consist);
-			return FindFirstTrack(tracks_on_tile);
-		}
+		/* A "go to couple" order deliberately goes through the ordinary
+		 * station pathfinder below, exactly like any other "go to station"
+		 * order. What makes it find the partner rather than the first free
+		 * platform is that the destination test itself is narrowed to the
+		 * platform the partner stands on (see couple_at_dest_station in
+		 * CYapfDestinationTileOrStationRailT, yapf_destrail.hpp) -- so the
+		 * whole journey, across junctions and signals and however far away
+		 * the station is, is planned by the one search that is actually
+		 * built for travelling to a station. An earlier attempt to instead
+		 * divert go-to-couple into a dedicated "stop next to a partner"
+		 * search here was a dead end: that search looks for a tile
+		 * immediately adjacent to the partner, which is a local
+		 * nearest-safe-tile query and cannot navigate to a station on the
+		 * other side of the map, so the train simply never set off. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
 
 		/* Pathfinders are able to tell that route was only 'guessed'. */
 		bool      path_found = true;

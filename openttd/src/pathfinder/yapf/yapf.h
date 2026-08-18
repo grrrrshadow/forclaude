@@ -99,16 +99,4 @@ bool YapfTrainCheckReverse(const Train *v);
  */
 bool YapfTrainFindNearestSafeTile(const Train *v, TileIndex tile, Trackdir td, bool override_railtype);
 
-/**
- * Try to extend the reserved path of a train executing a "go to couple"
- * order all the way to a tile immediately next to its coupling partner,
- * reversing along the way if needed. See FEATURE_DESIGN_COUPLING_TOW.md.
- *
- * @param v    The train looking for a route to its coupling partner.
- * @param tile Last tile of the current reserved path.
- * @param td   Last trackdir of the current reserved path.
- * @return True if a path to a spot next to the partner could be reserved.
- */
-bool YapfTrainFindCouplePosition(const Train *v, TileIndex tile, Trackdir td);
-
 #endif /* YAPF_H */

@@ -104,50 +104,6 @@ public:
 	}
 };
 
-/**
- * Destination for a "go to couple" order: the tile immediately before a
- * stopped train we can couple with. Every other destination type in this
- * file deliberately steers away from occupied tiles -- this is the one
- * exception, on purpose, only ever used for a train executing an explicit
- * go-to-couple order. See #IsAdjacentToCouplePartner (train_cmd.cpp) and
- * FEATURE_DESIGN_COUPLING_TOW.md.
- */
-template <class Types>
-class CYapfDestinationCoupleRailT : public CYapfDestinationRailBase {
-public:
-	typedef typename Types::Tpf Tpf; ///< the pathfinder class (derived from THIS class)
-	typedef typename Types::NodeList::Item Node; ///< this will be our node type
-	typedef typename Node::Key Key; ///< key to hash tables
-
-	/** to access inherited path finder */
-	Tpf &Yapf()
-	{
-		return *static_cast<Tpf *>(this);
-	}
-
-	/** Called by YAPF to detect if node ends in the desired destination */
-	inline bool PfDetectDestination(Node &n)
-	{
-		return this->PfDetectDestination(n.GetLastTile(), n.GetLastTrackdir());
-	}
-
-	/** Called by YAPF to detect if node ends in the desired destination */
-	inline bool PfDetectDestination(TileIndex tile, Trackdir td)
-	{
-		return IsAdjacentToCouplePartner(Yapf().GetVehicle(), tile, td);
-	}
-
-	/**
-	 * Called by YAPF to calculate cost estimate. Calculates distance to the destination
-	 *  adds it to the actual cost from origin and stores the sum to the Node::estimate.
-	 */
-	inline bool PfCalcEstimate(Node &n)
-	{
-		n.estimate = n.cost;
-		return true;
-	}
-};
-
 template <class Types>
 class CYapfDestinationTileOrStationRailT : public CYapfDestinationRailBase {
 public:
