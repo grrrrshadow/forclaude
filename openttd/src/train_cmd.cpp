@@ -2926,6 +2926,55 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 }
 
 /**
+ * Release a reservation that starts at @p tile but that no train's own
+ * reservation connects to, and which #FreeTrainTrackReservation therefore can
+ * never reach: that function only ever walks forward from a train's own
+ * position, so it cleans up nothing that isn't contiguous with the train.
+ *
+ * Normally no such reservation can exist -- the pathfinder is only ever asked
+ * to reserve onward from a point #ExtendTrainReservation already reserved
+ * contiguously from the train. This feature breaks that invariant on purpose
+ * in one place (see #ChooseTrainTrack: when the quick, choice-free walk of
+ * ExtendTrainReservation is blocked outright by a decoupled wagon chain, the
+ * full pathfinder is asked to look for a way around starting from a tile the
+ * train hasn't reached yet), so it also has to be able to undo it. Leaving it
+ * behind is what showed up in-game as a phantom reserved track sticking out of
+ * a station past decoupled wagons, with nothing standing on it. See
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v The train the (failed) reservation was being made for.
+ * @param tile First tile of the orphaned reservation.
+ * @param enterdir Direction the path would have been entered from.
+ */
+static void FreeOrphanedReservation(const Train *v, TileIndex tile, DiagDirection enterdir)
+{
+	TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
+	if (res.None()) return;
+
+	CFollowTrackRail ft(v);
+	TileIndex cur_tile = tile;
+	Trackdir cur_td = TrackEnterdirToTrackdir(FindFirstTrack(res), enterdir);
+
+	/* Bounded purely as a belt-and-braces guard against a pathological
+	 * looping layout; a reservation is always finite in practice. */
+	for (uint safety = 0; safety < 1024; safety++) {
+		UnreserveRailTrack(cur_tile, TrackdirToTrack(cur_td));
+
+		if (!ft.Follow(cur_tile, cur_td)) break;
+		/* Stop at any choice: beyond a junction we can no longer tell
+		 * which way (if any) the orphaned path actually went. */
+		if (ft.new_td_bits.Count() != 1) break;
+
+		cur_tile = ft.new_tile;
+		cur_td = FindFirstTrackdir(ft.new_td_bits);
+
+		/* Stop as soon as the path stops being reserved -- anything past
+		 * that point was never ours. */
+		if (!HasReservedTracks(cur_tile, TrackBits{TrackdirToTrack(cur_td)})) break;
+	}
+}
+
+/**
  * Try to reserve any path to a safe tile, ignoring the vehicle's destination.
  * Safe tiles are tiles in front of a signal, depots and station tiles at end of line.
  *
@@ -3047,6 +3096,25 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 	if (got_reservation != nullptr) *got_reservation = false;
 
+	/* ExtendTrainReservation() below OVERWRITES `tracks` with the track
+	 * bits of whatever choice tile it stopped at, which is a *different*
+	 * tile further along the path -- not `tile`. Our caller
+	 * (TrainController) asserts that whatever Track we return actually
+	 * exists on `tile`, so every "give up, but hand back a usable
+	 * placeholder" return below has to use the original set, not the
+	 * overwritten one. Vanilla never hit this because its only such return
+	 * sits before the overwrite can happen (ExtendTrainReservation leaves
+	 * `tracks` untouched when it fails outright); the extra give-up paths
+	 * this feature added are all *after* it. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	const TrackBits tracks_on_tile = tracks;
+
+	/* Set when we ask the pathfinder to reserve onward from a tile the
+	 * train hasn't reached yet, leaving a reservation that isn't
+	 * contiguous with the train. See where it is set, and
+	 * FreeOrphanedReservation(). */
+	bool speculative_reservation = false;
+
 	/* Don't use tracks here as the setting to forbid 90 deg turns might have been switched between reservation and now. */
 	TrackBits res_tracks = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
 	/* Do we have a suitable reserved track? */
@@ -3112,9 +3180,18 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			 * "found a target, but it wasn't safe" case) instead of
 			 * giving up immediately -- if that also fails, we still end
 			 * up correctly marked stuck a few lines down. See
-			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			 * FEATURE_DESIGN_COUPLING_TOW.md.
+			 *
+			 * This makes the pathfind below start from a tile the train
+			 * has NOT reached yet, with nothing of ours reserved leading
+			 * up to it -- so whatever it reserves is not contiguous with
+			 * the train and FreeTrainTrackReservation() can't clean it up
+			 * if we end up giving up. Remember that, so the give-up path
+			 * can release it explicitly instead of leaving a phantom
+			 * reserved track behind. */
 			res_dest = PBSTileInfo(tile, Trackdir::Invalid, false);
 			dest_enterdir = enterdir;
+			speculative_reservation = true;
 		} else if (res_dest.okay) {
 			/* Got a valid reservation that ends at a safe target, quick exit. */
 			if (got_reservation != nullptr) *got_reservation = true;
@@ -3194,17 +3271,14 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			 * once a valid route to the partner opens up. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md.
 			 *
-			 * Return FindFirstTrack(tracks), not best_track: best_track
-			 * is only ever set above when tracks.Count() == 1, so at a
-			 * junction with more than one option it's still
-			 * Track::Invalid here, which fails this call's caller's
-			 * "did we get a usable track" assert. FindFirstTrack(tracks)
-			 * matches the same "give up, but still hand back a valid
-			 * placeholder" pattern the reservation-failed case above
-			 * already uses. */
+			 * Return a track from `tracks_on_tile`, not best_track:
+			 * best_track is only ever set above when tracks.Count() == 1,
+			 * so at a junction with more than one option it's still
+			 * Track::Invalid here, which fails our caller's "did we get a
+			 * usable track" assert. */
 			if (mark_stuck) MarkTrainAsStuck(consist);
 			FreeTrainTrackReservation(consist);
-			return FindFirstTrack(tracks);
+			return FindFirstTrack(tracks_on_tile);
 		}
 
 		/* Pathfinders are able to tell that route was only 'guessed'. */
@@ -3223,19 +3297,12 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
 		if (mark_stuck) MarkTrainAsStuck(consist);
 		FreeTrainTrackReservation(consist);
-		/* Return FindFirstTrack(tracks), not best_track: best_track is
-		 * only set above when tracks.Count() == 1 or when the pathfind
-		 * result's tile happened to match our own (new_tile == tile).
-		 * At a junction with more than one option, reached via a
-		 * different tile-matching outcome, best_track can still be
-		 * Track::Invalid here, which fails this call's caller's "did we
-		 * get a usable track" assert (TrainController, right after
-		 * ChooseTrainTrack returns) -- something the headless-wagon
-		 * quick-return check above (see FEATURE_DESIGN_COUPLING_TOW.md)
-		 * makes reachable in more cases than before, by no longer
-		 * quick-returning past this whole function for a tile whose
-		 * reservation turns out to belong to a decoupled wagon chain. */
-		return FindFirstTrack(tracks);
+		if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
+		/* Use tracks_on_tile, not best_track and not the (by now
+		 * overwritten) `tracks`: best_track can still be Track::Invalid
+		 * here, and `tracks` may describe a different tile entirely --
+		 * both fail our caller's "did we get a usable track" assert. */
+		return FindFirstTrack(tracks_on_tile);
 	}
 
 	/* No possible reservation target found, we are probably lost. */
@@ -3251,10 +3318,10 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			return best_track;
 		}
 		FreeTrainTrackReservation(consist);
+		if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 		if (mark_stuck) MarkTrainAsStuck(consist);
-		/* See the FindFirstTrack(tracks) comments above: best_track can
-		 * still be Track::Invalid here, which fails the caller's assert. */
-		return FindFirstTrack(tracks);
+		/* See the tracks_on_tile comments above. */
+		return FindFirstTrack(tracks_on_tile);
 	}
 
 	if (got_reservation != nullptr) *got_reservation = true;
@@ -3710,6 +3777,24 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 
 	/* Happens when there is a train under bridge next to bridge head */
 	if (abs(v->z_pos - moving_front->z_pos) > 5) return 0;
+
+	/* Reaching a headless "free wagon" chain we were deliberately sent to
+	 * pick up is not a collision -- it is the whole point of the order.
+	 * Coupling happens by touching, so the two consists necessarily end up
+	 * within the proximity this function otherwise treats as a crash. Stop
+	 * dead instead; TrainLocoHandler() performs the actual coupling on the
+	 * next tick, once nothing is iterating over these vehicles any more
+	 * (splicing two consists here, mid-collision-scan, would pull the list
+	 * apart under the caller's feet). See FEATURE_DESIGN_COUPLING_TOW.md. */
+	Train *first = moving_front->First();
+	Train *other = Train::From(v)->First();
+	if ((first->current_order.ShouldGoToCouple() || first->current_order.ShouldWaitForCouple()) &&
+			!other->IsFrontEngine() && other->cur_speed == 0 &&
+			!other->vehstatus.Test(VehState::Crashed)) {
+		first->cur_speed = 0;
+		first->subspeed = 0;
+		return 0;
+	}
 
 	/* Crash both trains. Two statements required to guarantee execution
 	 * order because RandomRange() is involved. */
@@ -4476,6 +4561,21 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 
 	/* train is broken down? */
 	if (consist->HandleBreakdown()) return true;
+
+	/* A train on a couple order that has come to a stop against its
+	 * partner couples with it now. This is the moment the two consists are
+	 * physically touching but nothing is iterating over either of them, so
+	 * it is safe to splice them (CheckTrainCollision deliberately only
+	 * stops the train and defers to here -- see the matching comment
+	 * there). Covers a train that drove here under a "go to couple" order
+	 * as well as one already parked on "wait to couple" that a partner has
+	 * since been pushed up against. See FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (consist->cur_speed == 0 &&
+			(consist->current_order.ShouldGoToCouple() || consist->current_order.ShouldWaitForCouple()) &&
+			GetTrainCouplePartner(consist) != nullptr) {
+		CmdCoupleTrains(DoCommandFlag::Execute, consist->index);
+		return true;
+	}
 
 	if (consist->flags.Test(VehicleRailFlag::Reversing) && consist->cur_speed == 0) {
 		ReverseTrainDirection(consist);
