@@ -1490,7 +1490,7 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 }
 
 /**
- * Find the train, if any, standing on @p tile that @p v could couple to.
+ * Could @p v couple to @p partner, ignoring where either of them is?
  *
  * This is the single place that decides what counts as a valid coupling
  * partner; everything else that asks the question (whether a partner is
@@ -1499,6 +1499,23 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
  * route to a spot where the coupling would then be refused, and the
  * coupling can never refuse a spot the pathfinder deliberately aimed for.
  * See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v       the train looking to couple
+ * @param partner candidate partner, front of its own consist (may be nullptr)
+ * @return true if the two could be coupled
+ */
+static bool IsValidCouplePartner(const Train *v, const Train *partner)
+{
+	if (partner == nullptr) return false;
+	if (partner == v->First()) return false; // that's us
+	if (partner->owner != v->owner) return false;
+	if (partner->vehstatus.Test(VehState::Crashed)) return false;
+	if (partner->cur_speed != 0) return false;
+	return true;
+}
+
+/**
+ * Find the train, if any, standing on @p tile that @p v could couple to.
  *
  * @param v    the train looking to couple
  * @param tile the tile to inspect
@@ -1511,11 +1528,7 @@ static Train *FindCouplePartnerOnTile(const Train *v, TileIndex tile)
 	for (Vehicle *u : VehiclesOnTile(tile)) {
 		if (u->type != VehicleType::Train) continue;
 		Train *partner = Train::From(u)->First();
-		if (partner == v->First()) continue; // that's us
-		if (partner->owner != v->owner) continue;
-		if (partner->vehstatus.Test(VehState::Crashed)) continue;
-		if (partner->cur_speed != 0) continue;
-		return partner;
+		if (IsValidCouplePartner(v, partner)) return partner;
 	}
 	return nullptr;
 }
@@ -1581,22 +1594,46 @@ bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
 }
 
 /**
+ * Look for a coupling partner off one end of @p v: first along whatever
+ * reservation leads away from that end, then on the tile immediately beyond
+ * where that reservation stops.
+ *
+ * The second step is not a fallback for exotic cases, it is the normal one.
+ * A reservation walk that finds no other train very often just arrives back
+ * at @p v itself, because a train parked against a partner holds no
+ * reservation past the tile it is standing on -- the next tile is occupied,
+ * and an occupied tile cannot be reserved. "The walk came back to me" must
+ * therefore mean "keep looking", not "there is nobody there"; treating it as
+ * an answer is what stopped a train that had driven right up to its wagons
+ * from ever coupling to them. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v         the train looking to couple
+ * @param from_rear search off the rear of the consist instead of the front
+ * @return the front of the partner train, or nullptr
+ */
+static Train *FindCouplePartnerAlongReservation(const Train *v, bool from_rear)
+{
+	Vehicle *train_on_res = nullptr;
+	PBSTileInfo res = FollowTrainReservation(v, &train_on_res, from_rear);
+
+	if (train_on_res != nullptr && train_on_res->type == VehicleType::Train) {
+		Train *partner = Train::From(train_on_res)->First();
+		if (IsValidCouplePartner(v, partner)) return partner;
+	}
+
+	return FindCouplePartnerOnAdjacentTile(v, res.tile, res.trackdir);
+}
+
+/**
  * Find the train, if any, that a stopped train @p v could couple to:
  * another stopped train immediately adjacent to it on the track, either
  * ahead of or behind @p v.
  *
  * This deliberately does not compare x_pos/y_pos pixel distances (see
  * FEATURE_DESIGN_COUPLING_TOW.md, "Bug C" in the reference patch that
- * inspired this feature) — it reuses #FollowTrainReservation, the same
- * tile/trackdir/reservation-based function the game already uses
- * elsewhere to find a train blocking the path ahead, falling back to
- * #FindCouplePartnerOnAdjacentTile for the tile just beyond wherever that
- * reservation walk stopped (which is where a partner standing on open
- * track actually is -- see that function). That makes this exact and
- * independent of rounding, at the cost of only recognising a partner while
- * @p v still has a live reservation leading up to it (which is the normal
- * case for a train that stopped because another train is blocking its
- * path).
+ * inspired this feature) — it works purely in tiles and trackdirs, which is
+ * exact and independent of rounding. See #FindCouplePartnerAlongReservation
+ * for how each end is searched.
  *
  * Both directions are checked (front first, then rear) because which way
  * either train happens to be facing shouldn't matter for coupling -- real
@@ -1622,25 +1659,12 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 	if (v->cur_speed != 0) return nullptr;
 
 	bool behind = false;
-	Vehicle *train_on_res = nullptr;
-	PBSTileInfo res = FollowTrainReservation(v, &train_on_res);
-	Train *partner = (train_on_res != nullptr && train_on_res->type == VehicleType::Train) ?
-			Train::From(train_on_res)->First() : nullptr;
-	if (partner == nullptr) partner = FindCouplePartnerOnAdjacentTile(v, res.tile, res.trackdir);
+	Train *partner = FindCouplePartnerAlongReservation(v, false);
 	if (partner == nullptr) {
-		train_on_res = nullptr;
-		res = FollowTrainReservation(v, &train_on_res, true);
-		partner = (train_on_res != nullptr && train_on_res->type == VehicleType::Train) ?
-				Train::From(train_on_res)->First() : nullptr;
-		if (partner == nullptr) partner = FindCouplePartnerOnAdjacentTile(v, res.tile, res.trackdir);
+		partner = FindCouplePartnerAlongReservation(v, true);
 		behind = true;
 	}
 	if (partner == nullptr) return nullptr;
-
-	if (partner == v->First()) return nullptr; // that reservation just leads back to ourselves
-	if (partner->owner != v->owner) return nullptr;
-	if (partner->vehstatus.Test(VehState::Crashed)) return nullptr;
-	if (partner->cur_speed != 0) return nullptr;
 
 	if (partner_is_behind != nullptr) *partner_is_behind = behind;
 	return partner;
