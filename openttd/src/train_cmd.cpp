@@ -1490,6 +1490,42 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 }
 
 /**
+ * Find the train, if any, sitting on the tile immediately beyond @p tile in
+ * the direction @p td exits towards, that @p v could couple to.
+ *
+ * A tile occupied by another train can never itself be reserved, so a
+ * reservation walk that stops at @p tile (the last tile it could reserve)
+ * always stops one tile short of a partner standing on open track just
+ * beyond it -- this checks that next tile explicitly. It is the same
+ * adjacency the go-to-couple pathfinder's destination test already relies
+ * on to pick where to stop a train short of its target (see
+ * #IsAdjacentToCouplePartner, which is now a thin wrapper around this), so
+ * #GetTrainCouplePartner reuses it as a fallback rather than inventing a
+ * second notion of "reached the partner". See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v    the train looking to couple
+ * @param tile tile the search has reached
+ * @param td   the trackdir the search is facing on that tile
+ * @return the front of the partner train on the adjacent tile, or nullptr
+ */
+static Train *FindCouplePartnerOnAdjacentTile(const Train *v, TileIndex tile, Trackdir td)
+{
+	if (tile == INVALID_TILE) return nullptr;
+
+	TileIndex next_tile = TileAddByDiagDir(tile, TrackdirToExitdir(td));
+	for (Vehicle *u : VehiclesOnTile(next_tile)) {
+		if (u->type != VehicleType::Train) continue;
+		Train *partner = Train::From(u)->First();
+		if (partner == v->First()) continue; // that's us
+		if (partner->owner != v->owner) continue;
+		if (partner->vehstatus.Test(VehState::Crashed)) continue;
+		if (partner->cur_speed != 0) continue;
+		return partner;
+	}
+	return nullptr;
+}
+
+/**
  * Find the train, if any, that a stopped train @p v could couple to:
  * another stopped train immediately adjacent to it on the track, either
  * ahead of or behind @p v.
@@ -1498,11 +1534,14 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
  * FEATURE_DESIGN_COUPLING_TOW.md, "Bug C" in the reference patch that
  * inspired this feature) — it reuses #FollowTrainReservation, the same
  * tile/trackdir/reservation-based function the game already uses
- * elsewhere to find a train blocking the path ahead. That makes this
- * exact and independent of rounding, at the cost of only recognising a
- * partner while @p v still has a live reservation up to it (which is the
- * normal case for a train that stopped because another train is blocking
- * its path).
+ * elsewhere to find a train blocking the path ahead, falling back to
+ * #FindCouplePartnerOnAdjacentTile for the tile just beyond wherever that
+ * reservation walk stopped (which is where a partner standing on open
+ * track actually is -- see that function). That makes this exact and
+ * independent of rounding, at the cost of only recognising a partner while
+ * @p v still has a live reservation leading up to it (which is the normal
+ * case for a train that stopped because another train is blocking its
+ * path).
  *
  * Both directions are checked (front first, then rear) because which way
  * either train happens to be facing shouldn't matter for coupling -- real
@@ -1529,15 +1568,20 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 
 	bool behind = false;
 	Vehicle *train_on_res = nullptr;
-	FollowTrainReservation(v, &train_on_res);
-	if (train_on_res == nullptr || train_on_res->type != VehicleType::Train) {
+	PBSTileInfo res = FollowTrainReservation(v, &train_on_res);
+	Train *partner = (train_on_res != nullptr && train_on_res->type == VehicleType::Train) ?
+			Train::From(train_on_res)->First() : nullptr;
+	if (partner == nullptr) partner = FindCouplePartnerOnAdjacentTile(v, res.tile, res.trackdir);
+	if (partner == nullptr) {
 		train_on_res = nullptr;
-		FollowTrainReservation(v, &train_on_res, true);
+		res = FollowTrainReservation(v, &train_on_res, true);
+		partner = (train_on_res != nullptr && train_on_res->type == VehicleType::Train) ?
+				Train::From(train_on_res)->First() : nullptr;
+		if (partner == nullptr) partner = FindCouplePartnerOnAdjacentTile(v, res.tile, res.trackdir);
 		behind = true;
 	}
-	if (train_on_res == nullptr || train_on_res->type != VehicleType::Train) return nullptr;
+	if (partner == nullptr) return nullptr;
 
-	Train *partner = Train::From(train_on_res)->First();
 	if (partner == v->First()) return nullptr; // that reservation just leads back to ourselves
 	if (partner->owner != v->owner) return nullptr;
 	if (partner->vehstatus.Test(VehState::Crashed)) return nullptr;
@@ -1565,17 +1609,7 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
  */
 bool IsAdjacentToCouplePartner(const Train *v, TileIndex tile, Trackdir td)
 {
-	TileIndex next_tile = TileAddByDiagDir(tile, TrackdirToExitdir(td));
-	for (const Vehicle *u : VehiclesOnTile(next_tile)) {
-		if (u->type != VehicleType::Train) continue;
-		const Train *partner = Train::From(u)->First();
-		if (partner == v->First()) continue; // that's us
-		if (partner->owner != v->owner) continue;
-		if (partner->vehstatus.Test(VehState::Crashed)) continue;
-		if (partner->cur_speed != 0) continue;
-		return true;
-	}
-	return false;
+	return FindCouplePartnerOnAdjacentTile(v, tile, td) != nullptr;
 }
 
 /**
