@@ -32,6 +32,7 @@ enum class EndSegmentReason : uint8_t {
 	FirstTwoWayRed, ///< first signal was 2-way and it was red
 	LookAheadEnd, ///< we have just passed the last look-ahead signal
 	TargetReached, ///< we have just reached the destination
+	BlockedByFreeWagons, ///< a headless (engineless) consist stands here and will never move on its own
 };
 
 /** Bitset of \c EndSegmentReason elements. */
@@ -64,6 +65,7 @@ static constexpr EndSegmentReasons ESRF_ABORT_PF_MASK = {
 	EndSegmentReason::PathTooLong,
 	EndSegmentReason::InfiniteLoop,
 	EndSegmentReason::FirstTwoWayRed,
+	EndSegmentReason::BlockedByFreeWagons,
 };
 
 inline std::string ValueStr(EndSegmentReasons flags)
@@ -71,7 +73,8 @@ inline std::string ValueStr(EndSegmentReasons flags)
 	static const std::initializer_list<const std::string_view> end_segment_reason_names = {
 		"DEAD_END", "RAIL_TYPE", "INFINITE_LOOP", "SEGMENT_TOO_LONG", "CHOICE_FOLLOWS",
 		"DEPOT", "WAYPOINT", "STATION", "SAFE_TILE",
-		"PATH_TOO_LONG", "FIRST_TWO_WAY_RED", "LOOK_AHEAD_END", "TARGET_REACHED"
+		"PATH_TOO_LONG", "FIRST_TWO_WAY_RED", "LOOK_AHEAD_END", "TARGET_REACHED",
+		"BLOCKED_BY_FREE_WAGONS"
 	};
 
 	return fmt::format("0x{:04X} ({})", flags.base(), ComposeName(flags, end_segment_reason_names, "UNK"));

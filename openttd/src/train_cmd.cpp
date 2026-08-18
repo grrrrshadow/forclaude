@@ -1490,18 +1490,45 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 }
 
 /**
+ * Find the train, if any, standing on @p tile that @p v could couple to.
+ *
+ * This is the single place that decides what counts as a valid coupling
+ * partner; everything else that asks the question (whether a partner is
+ * adjacent, whether one is somewhere on a platform, whether one can be
+ * coupled to right now) goes through here, so the pathfinder can never
+ * route to a spot where the coupling would then be refused, and the
+ * coupling can never refuse a spot the pathfinder deliberately aimed for.
+ * See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v    the train looking to couple
+ * @param tile the tile to inspect
+ * @return the front of the partner train on that tile, or nullptr
+ */
+static Train *FindCouplePartnerOnTile(const Train *v, TileIndex tile)
+{
+	if (tile == INVALID_TILE) return nullptr;
+
+	for (Vehicle *u : VehiclesOnTile(tile)) {
+		if (u->type != VehicleType::Train) continue;
+		Train *partner = Train::From(u)->First();
+		if (partner == v->First()) continue; // that's us
+		if (partner->owner != v->owner) continue;
+		if (partner->vehstatus.Test(VehState::Crashed)) continue;
+		if (partner->cur_speed != 0) continue;
+		return partner;
+	}
+	return nullptr;
+}
+
+/**
  * Find the train, if any, sitting on the tile immediately beyond @p tile in
  * the direction @p td exits towards, that @p v could couple to.
  *
  * A tile occupied by another train can never itself be reserved, so a
  * reservation walk that stops at @p tile (the last tile it could reserve)
  * always stops one tile short of a partner standing on open track just
- * beyond it -- this checks that next tile explicitly. It is the same
- * adjacency the go-to-couple pathfinder's destination test already relies
- * on to pick where to stop a train short of its target (see
- * #IsAdjacentToCouplePartner, which is now a thin wrapper around this), so
- * #GetTrainCouplePartner reuses it as a fallback rather than inventing a
- * second notion of "reached the partner". See FEATURE_DESIGN_COUPLING_TOW.md.
+ * beyond it -- this checks that next tile explicitly. See
+ * #FindCouplePartnerOnTile and FEATURE_DESIGN_COUPLING_TOW.md.
  *
  * @param v    the train looking to couple
  * @param tile tile the search has reached
@@ -1512,17 +1539,45 @@ static Train *FindCouplePartnerOnAdjacentTile(const Train *v, TileIndex tile, Tr
 {
 	if (tile == INVALID_TILE) return nullptr;
 
-	TileIndex next_tile = TileAddByDiagDir(tile, TrackdirToExitdir(td));
-	for (Vehicle *u : VehiclesOnTile(next_tile)) {
-		if (u->type != VehicleType::Train) continue;
-		Train *partner = Train::From(u)->First();
-		if (partner == v->First()) continue; // that's us
-		if (partner->owner != v->owner) continue;
-		if (partner->vehstatus.Test(VehState::Crashed)) continue;
-		if (partner->cur_speed != 0) continue;
-		return partner;
+	return FindCouplePartnerOnTile(v, TileAddByDiagDir(tile, TrackdirToExitdir(td)));
+}
+
+/**
+ * Is a train @p v could couple to standing anywhere on the station platform
+ * that @p tile is part of?
+ *
+ * A "go to couple" order can only name a station, but a station usually has
+ * several platforms and only one of them has the partner on it. The
+ * pathfinder's destination test (#CYapfDestinationTileOrStationRailT in
+ * yapf_destrail.hpp) uses this to accept only that one platform, instead of
+ * the first reservable platform of the station it happens to reach -- which
+ * is what made a go-to-couple train drive to an empty platform and then sit
+ * there with no partner ever becoming adjacent.
+ *
+ * The whole platform is checked rather than just the single tile the search
+ * stopped on, because the track follower skips across a station platform in
+ * one step: the tile the search reports is the far end of the platform, not
+ * the tile next to the wagons standing part-way along it. See
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v    the train looking to couple
+ * @param tile any tile of the platform to inspect
+ * @return true if a valid partner stands somewhere on that platform
+ */
+bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
+{
+	if (!IsRailStationTile(tile)) return false;
+
+	TileIndexDiff delta = TileOffsByAxis(GetRailStationAxis(tile));
+
+	if (FindCouplePartnerOnTile(v, tile) != nullptr) return true;
+	for (TileIndex t = tile + delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, tile); t += delta) {
+		if (FindCouplePartnerOnTile(v, t) != nullptr) return true;
 	}
-	return nullptr;
+	for (TileIndex t = tile - delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, tile); t -= delta) {
+		if (FindCouplePartnerOnTile(v, t) != nullptr) return true;
+	}
+	return false;
 }
 
 /**

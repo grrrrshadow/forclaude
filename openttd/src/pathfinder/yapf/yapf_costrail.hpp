@@ -175,6 +175,44 @@ public:
 	}
 
 	/**
+	 * Is @p tile occupied by a headless "free wagon" chain -- a consist with no
+	 * front engine, left behind on the open track by a decouple order?
+	 *
+	 * Such a chain is a permanent obstruction, and that is what makes it
+	 * different from every other train in the game: an ordinary train is on its
+	 * way somewhere and the tile it sits on frees up by itself, so the
+	 * pathfinder is right to route through it and let the signalling sort out
+	 * the waiting. A chain with no engine will never move again on its own, so
+	 * a route through it is a route the train can never actually drive.
+	 * Treating it as merely expensive (a large but finite penalty) is not
+	 * enough: when the blocked way is the *only* way forward, the search still
+	 * returns it as the best path and reserves it, and since the train then
+	 * cannot pass the wagons, that reservation is left sticking out beyond them
+	 * with nothing standing on it. Callers see it as a phantom reserved track
+	 * leading out of a station past decoupled wagons. So the tile has to be
+	 * genuinely impassable, which #EndSegmentReason::BlockedByFreeWagons makes
+	 * it. See FEATURE_DESIGN_COUPLING_TOW.md.
+	 *
+	 * Gated on the tile being reserved purely to keep the vehicle lookup off
+	 * the hot path: a stationary consist always holds a reservation under
+	 * itself (Train::ReserveTrackUnderConsist), so this never misses one.
+	 *
+	 * @param tile The tile to look at.
+	 * @param trackdir The chosen track direction at the tile.
+	 * @return true if the tile can never be driven through.
+	 */
+	inline bool IsBlockedByFreeWagons(TileIndex tile, Trackdir trackdir) const
+	{
+		if (!TrackOverlapsTracks(GetReservedTrackbits(tile), TrackdirToTrack(trackdir))) return false;
+
+		for (const Vehicle *u : VehiclesOnTile(tile)) {
+			if (u->type != VehicleType::Train) continue;
+			if (!Train::From(u)->First()->IsFrontEngine()) return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Calculate the cost for reserved tiles, including skipped ones.
 	 * @param n The current node.
 	 * @param tile The start tile to look at.
@@ -184,28 +222,6 @@ public:
 	 */
 	inline int ReservationCost(Node &n, TileIndex tile, Trackdir trackdir, int skipped)
 	{
-		/* A headless "free wagon" chain left behind by a decouple order
-		 * can hold a live reservation that a normal (non-couple) search
-		 * should treat as effectively impassable, not just a mild
-		 * PBS-crossing penalty -- and unlike the ordinary case below,
-		 * this check must NOT be gated behind "we recently passed a PBS
-		 * signal within the lookahead window", since a decoupled train
-		 * can be sitting right where we just departed from with no
-		 * intervening signal at all. Without this, the search still
-		 * prefers a shorter route straight through the wagons (the
-		 * ordinary reservation penalty either doesn't apply here or
-		 * isn't steep enough to matter), finds it can't actually be
-		 * reserved once ExtendTrainReservation() tries, and gives up
-		 * instead of trying the genuinely different route around that
-		 * this search never considered. See
-		 * FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (TrackOverlapsTracks(GetReservedTrackbits(tile), TrackdirToTrack(trackdir))) {
-			for (const Vehicle *u : VehiclesOnTile(tile)) {
-				if (u->type != VehicleType::Train) continue;
-				if (!Train::From(u)->First()->IsFrontEngine()) return YAPF_INFINITE_PENALTY;
-			}
-		}
-
 		if (n.num_signals_passed >= this->sig_look_ahead_costs.size() / 2) return 0;
 		if (!IsPbsSignal(n.last_signal_type)) return 0;
 
@@ -433,6 +449,18 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 			segment_cost += Yapf().ReservationCost(n, cur.tile, cur.td, follower->tiles_skipped);
 
 			end_segment_reason = segment.end_segment_reason;
+
+			/* A headless consist parked here blocks this way for good. Set on
+			 * the local reason rather than on the (cacheable) segment, because
+			 * unlike every other abort reason this one depends on where a
+			 * vehicle happens to be standing right now, and the segment cache
+			 * is only invalidated by track layout changes -- it would happily
+			 * keep reporting a dead end long after the wagons were collected.
+			 * BlockedByFreeWagons is deliberately absent from ESRF_CACHED_MASK
+			 * for that reason. See IsBlockedByFreeWagons(). */
+			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td)) {
+				end_segment_reason.Set(EndSegmentReason::BlockedByFreeWagons);
+			}
 
 			/* Tests for 'potential target' reasons to close the segment. */
 			if (cur.tile == prev.tile) {

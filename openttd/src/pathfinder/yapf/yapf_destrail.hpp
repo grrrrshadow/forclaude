@@ -160,6 +160,7 @@ protected:
 	TrackdirBits dest_trackdirs;
 	StationID dest_station_id;
 	bool any_depot;
+	bool couple_at_dest_station; ///< Destination station only counts on the platform holding our coupling partner.
 
 	/** @copydoc CYapfBaseT::Yapf */
 	Tpf &Yapf()
@@ -171,6 +172,7 @@ public:
 	void SetDestination(const Train *v)
 	{
 		this->any_depot = false;
+		this->couple_at_dest_station = false;
 		switch (v->current_order.GetType()) {
 			case OT_GOTO_WAYPOINT:
 				if (!Waypoint::Get(v->current_order.GetDestination().ToStationID())->IsSingleTile()) {
@@ -187,6 +189,11 @@ public:
 				this->dest_tile = CalcClosestStationTile(v->current_order.GetDestination().ToStationID(), v->GetMovingFront()->tile, v->current_order.IsType(OT_GOTO_STATION) ? StationType::Rail : StationType::RailWaypoint);
 				this->dest_station_id = v->current_order.GetDestination().ToStationID();
 				this->dest_trackdirs = INVALID_TRACKDIR_BIT;
+				/* A "go to couple" order names a station, but the point of it
+				 * is a specific consist standing at that station, not the
+				 * station itself. Remember to narrow the destination test to
+				 * the platform actually holding it. */
+				this->couple_at_dest_station = v->current_order.IsType(OT_GOTO_STATION) && v->current_order.ShouldGoToCouple();
 				break;
 
 			case OT_GOTO_DEPOT:
@@ -214,9 +221,22 @@ public:
 	inline bool PfDetectDestination(TileIndex tile, Trackdir td)
 	{
 		if (this->dest_station_id != StationID::Invalid()) {
-			return HasStationTileRail(tile)
-				&& (GetStationIndex(tile) == this->dest_station_id)
-				&& (GetRailStationTrack(tile) == TrackdirToTrack(td));
+			if (!HasStationTileRail(tile)
+					|| (GetStationIndex(tile) != this->dest_station_id)
+					|| (GetRailStationTrack(tile) != TrackdirToTrack(td))) {
+				return false;
+			}
+
+			/* Any platform of the station will do -- unless we were sent here
+			 * to couple, in which case only the one our partner is standing
+			 * on is of any use. Without this the search settles for whichever
+			 * platform it reaches first (an empty one is cheaper, having no
+			 * reservation to cross), the train arrives at the wrong platform,
+			 * and then waits forever for a partner that is never going to
+			 * become adjacent. See FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (this->couple_at_dest_station) return IsCouplePartnerOnPlatform(Yapf().GetVehicle(), tile);
+
+			return true;
 		}
 
 		if (this->any_depot) {
