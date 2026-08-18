@@ -193,21 +193,33 @@ public:
 	 * genuinely impassable, which #EndSegmentReason::BlockedByFreeWagons makes
 	 * it. See FEATURE_DESIGN_COUPLING_TOW.md.
 	 *
-	 * Gated on the tile being reserved purely to keep the vehicle lookup off
+	 * The skipped tiles have to be walked as well, exactly like
+	 * #IsAnyStationTileReserved does and for the same reason: the track
+	 * follower crosses a whole station platform in a single step, so the tile
+	 * this is called with is the far end of the platform, and wagons standing
+	 * part-way along it are never the tile being looked at. Checking only that
+	 * one tile silently misses every consist parked in a platform -- which is
+	 * exactly where a decouple order leaves one.
+	 *
+	 * Gated on each tile being reserved purely to keep the vehicle lookup off
 	 * the hot path: a stationary consist always holds a reservation under
 	 * itself (Train::ReserveTrackUnderConsist), so this never misses one.
 	 *
-	 * @param tile The tile to look at.
+	 * @param tile The last tile of the step.
 	 * @param trackdir The chosen track direction at the tile.
-	 * @return true if the tile can never be driven through.
+	 * @param skipped The number of tiles the path follower skipped to get here.
+	 * @return true if any of those tiles can never be driven through.
 	 */
-	inline bool IsBlockedByFreeWagons(TileIndex tile, Trackdir trackdir) const
+	inline bool IsBlockedByFreeWagons(TileIndex tile, Trackdir trackdir, int skipped) const
 	{
-		if (!TrackOverlapsTracks(GetReservedTrackbits(tile), TrackdirToTrack(trackdir))) return false;
+		TileIndexDiff diff = TileOffsByDiagDir(TrackdirToExitdir(ReverseTrackdir(trackdir)));
+		for (; skipped >= 0; skipped--, tile += diff) {
+			if (GetReservedTrackbits(tile).None()) continue;
 
-		for (const Vehicle *u : VehiclesOnTile(tile)) {
-			if (u->type != VehicleType::Train) continue;
-			if (!Train::From(u)->First()->IsFrontEngine()) return true;
+			for (const Vehicle *u : VehiclesOnTile(tile)) {
+				if (u->type != VehicleType::Train) continue;
+				if (!Train::From(u)->First()->IsFrontEngine()) return true;
+			}
 		}
 		return false;
 	}
@@ -458,7 +470,7 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 			 * keep reporting a dead end long after the wagons were collected.
 			 * BlockedByFreeWagons is deliberately absent from ESRF_CACHED_MASK
 			 * for that reason. See IsBlockedByFreeWagons(). */
-			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td)) {
+			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td, follower->tiles_skipped)) {
 				end_segment_reason.Set(EndSegmentReason::BlockedByFreeWagons);
 			}
 
