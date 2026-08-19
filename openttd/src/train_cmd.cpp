@@ -1712,14 +1712,19 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * window trips assert(v->IsPrimaryVehicle()) the moment it is touched.
 	 * That is what coupling to the far side of a decoupled rake produced.
 	 *
-	 * So the engine always takes the head. When that puts it at the physical
-	 * rear, the merged train is one that pushes rather than pulls, which
-	 * OpenTTD represents with VehicleFlag::DrivingBackwards -- the chain still
-	 * starts at the engine, while GetMovingFront() reports the far end. No
-	 * vehicle has to move for this; only which end is called the front
-	 * changes. */
-	bool engine_pushes = !leading->IsFrontEngine() && trailing->IsFrontEngine();
-	if (engine_pushes) std::swap(leading, trailing);
+	 * So the engine always takes the head.
+	 *
+	 * This can leave the engine at the physical rear, i.e. a train that pushes
+	 * rather than pulls. OpenTTD has one correct way to establish that state
+	 * (ReverseTrainDirection, which clears the path reservation, updates every
+	 * vehicle via UpdateStatusAfterSwap and re-runs ConsistChanged, and picks
+	 * between backing up and physically flipping the consist according to the
+	 * player's train_flip_reverse_allowed setting). Setting the flag directly
+	 * instead does none of that and corrupts the per-vehicle track bits, which
+	 * is what made TrackBitsToTrack() assert. Nothing here does it at all for
+	 * now: getting it right means going through that function, deliberately,
+	 * rather than half-way. See FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (!leading->IsFrontEngine() && trailing->IsFrontEngine()) std::swap(leading, trailing);
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();
@@ -1730,11 +1735,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	ret = TryConsistSplice(flags, src, dst, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
 
-	if (engine_pushes) {
-		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards);
-		new_head->UpdatePosition();
-		new_head->MarkDirty();
-	}
+	/* The coupling this order asked for has happened, so the order is done.
+	 * Left set, the merged train goes on reading itself as still waiting for a
+	 * partner and simply stands there for good -- it has no reason left to
+	 * move and never advances to whatever the engine was supposed to do next.
+	 * Clearing it on the current order only, not in the order list, so a train
+	 * looping back round to this order couples again as intended. */
+	new_head->current_order.SetGoToCouple(false);
+	new_head->current_order.SetWaitForCouple(false);
 
 	return ret;
 }
