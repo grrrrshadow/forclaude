@@ -11,6 +11,7 @@
 #include "error.h"
 #include "articulated_vehicles.h"
 #include "command_func.h"
+#include "core/backup_type.hpp"
 #include "error_func.h"
 #include "pathfinder/yapf/yapf.hpp"
 #include "news_func.h"
@@ -4626,8 +4627,19 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	if (consist->cur_speed == 0 &&
 			(consist->current_order.ShouldGoToCouple() || consist->current_order.ShouldWaitForCouple()) &&
 			GetTrainCouplePartner(consist) != nullptr) {
-		CmdCoupleTrains(DoCommandFlag::Execute, consist->index);
-		return true;
+		/* Commands check ownership against the company that is "current" right
+		 * now, which during a vehicle tick is simply whatever ran last -- not
+		 * necessarily the owner of the train being ticked. Without restoring
+		 * it, CmdCoupleTrains() fails its very first check and does nothing,
+		 * silently, on every single tick. Autoreplace and order refits back it
+		 * up in exactly the same way for exactly this reason (see
+		 * CallVehicleTicks and ProcessOrders in vehicle.cpp). */
+		AutoRestoreBackup cur_company(_current_company, consist->owner);
+
+		/* Only claim the tick if the coupling really happened. Returning
+		 * unconditionally would leave a train that cannot couple for some
+		 * other reason frozen here for good, doing nothing else ever again. */
+		if (CmdCoupleTrains(DoCommandFlag::Execute, consist->index).Succeeded()) return true;
 	}
 
 	if (consist->flags.Test(VehicleRailFlag::Reversing) && consist->cur_speed == 0) {
