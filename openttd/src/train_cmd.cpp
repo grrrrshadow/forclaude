@@ -1700,17 +1700,43 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	ret = CheckOwnership(partner->owner);
 	if (ret.Failed()) return ret;
 
-	/* Whichever train is physically leading keeps its front; the other
-	 * one's whole consist gets spliced onto its rear. */
+	/* Whichever train is physically leading would naturally keep its front,
+	 * with the other one's whole consist spliced onto its rear. */
 	Train *leading = partner_is_behind ? v : partner;
 	Train *trailing = partner_is_behind ? partner : v;
+
+	/* ... except that the head of the merged chain has to be an engine. A
+	 * chain heading with a wagon is not a train at all but a "free wagon" set
+	 * (NormaliseSubtypes decides exactly that way): it stops being a primary
+	 * vehicle, so it loses its orders, refuses new ones, and the vehicle
+	 * window trips assert(v->IsPrimaryVehicle()) the moment it is touched.
+	 * That is what coupling to the far side of a decoupled rake produced.
+	 *
+	 * So the engine always takes the head. When that puts it at the physical
+	 * rear, the merged train is one that pushes rather than pulls, which
+	 * OpenTTD represents with VehicleFlag::DrivingBackwards -- the chain still
+	 * starts at the engine, while GetMovingFront() reports the far end. No
+	 * vehicle has to move for this; only which end is called the front
+	 * changes. */
+	bool engine_pushes = !leading->IsFrontEngine() && trailing->IsFrontEngine();
+	if (engine_pushes) std::swap(leading, trailing);
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();
 
 	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
 
-	return TryConsistSplice(flags, src, dst, true);
+	Train *new_head = leading;
+	ret = TryConsistSplice(flags, src, dst, true);
+	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
+
+	if (engine_pushes) {
+		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards);
+		new_head->UpdatePosition();
+		new_head->MarkDirty();
+	}
+
+	return ret;
 }
 
 /**
