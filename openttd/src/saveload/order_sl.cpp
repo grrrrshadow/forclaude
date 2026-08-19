@@ -232,6 +232,7 @@ public:
 		SLE_VAR(Order, decouple_count, VarTypes::U8),
 		SLE_VAR(Order, wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Order, go_to_couple, VarTypes::BOOL),
+		SLE_VAR(Order, turn_around_in_depot, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

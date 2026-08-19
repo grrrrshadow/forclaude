@@ -90,6 +90,25 @@ private:
 	 */
 	bool go_to_couple = false;
 
+	/**
+	 * If true, a train visiting this depot turns around there, ending up
+	 * facing the way it came from.
+	 *
+	 * The engine's own rule is that a train always leaves a depot facing
+	 * forwards, turning it around on the way in if that is what it takes, on
+	 * the grounds that this lets a player straighten out a confused train.
+	 * That is fine for a visit the player asked for, but a train also enters
+	 * depots on its own for scheduled servicing -- and a train that went in
+	 * reversing and came back out the other way round has had a setup the
+	 * player never touched quietly rearranged underneath them. Which is worse
+	 * the more the layout depends on which way round a train is, and this
+	 * feature makes that matter a great deal. So turning around is something a
+	 * depot does on request, not by itself. Dedicated field, not packed into
+	 * `flags` -- same rationale as decouple_count ("Bug D"). See
+	 * FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool turn_around_in_depot = false;
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -192,6 +211,12 @@ public:
 
 	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
 	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }
+
+	/** Should a train visiting this depot turn around there? @pre IsType(OT_GOTO_DEPOT) */
+	inline bool ShouldTurnAroundInDepot() const { return this->turn_around_in_depot; }
+
+	/** Set whether a train visiting this depot turns around there. */
+	inline void SetTurnAroundInDepot(bool turn) { this->turn_around_in_depot = turn; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?

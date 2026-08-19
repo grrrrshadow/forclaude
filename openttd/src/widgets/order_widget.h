@@ -41,6 +41,7 @@ enum OrderWidgets : WidgetID {
 	WID_O_DECOUPLE_COUNT,            ///< Set how many vehicles to keep when decoupling on departure from this station order.
 	WID_O_WAIT_COUPLE,               ///< Toggle waiting at this station for a partner train to couple with.
 	WID_O_GOTO_COUPLE,               ///< Toggle travelling to this station (reversing if needed) to couple with a partner train there.
+	WID_O_TURN_AROUND_DEPOT,         ///< Toggle turning the train around while it is in this depot.
 };
 
 #endif /* WIDGETS_ORDER_WIDGET_H */

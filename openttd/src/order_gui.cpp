@@ -324,6 +324,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			if (order->GetDepotActionType().Test(OrderDepotActionFlag::Unbunch)) {
 				line += GetString(STR_ORDER_WAIT_TO_UNBUNCH);
 			}
+
+			/* Turning around is about where the train ends up, not about how
+			 * long it takes, so it has no place in the timetable window. */
+			if (!timetable && v->type == VehicleType::Train && order->ShouldTurnAroundInDepot()) {
+				line += GetString(STR_ORDER_TURN_AROUND_DEPOT_SUFFIX);
+			}
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -539,6 +545,10 @@ private:
 		/* WID_O_SEL_BOTTOM_MIDDLE */
 		DP_BOTTOM_MIDDLE_DELETE       = 0, ///< Display 'delete' in the middle button of the bottom row of the vehicle order window.
 		DP_BOTTOM_MIDDLE_STOP_SHARING = 1, ///< Display 'stop sharing' in the middle button of the bottom row of the vehicle order window.
+
+		/* WID_O_SEL_DECOUPLE */
+		DP_COUPLE_ROW_STATION = 0, ///< Display the decouple/couple buttons for a train's station order.
+		DP_COUPLE_ROW_DEPOT   = 1, ///< Display the turn-around button for a train's depot order.
 	};
 
 	int selected_order = -1;
@@ -1072,15 +1082,21 @@ public:
 		/* Disable list of vehicles with the same shared orders if there is no list */
 		this->SetWidgetDisabledState(WID_O_SHARED_ORDER_LIST, !shared_orders);
 
-		/* Decouple/couple row: trains only, and only for a selected 'goto
-		 * station' order. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		/* Couple row: trains only. Station orders get the decouple/couple
+		 * buttons, depot orders the turn-around one, anything else nothing at
+		 * all. See FEATURE_DESIGN_COUPLING_TOW.md. */
 		NWidgetStacked *decouple_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE);
 		if (decouple_sel != nullptr) {
-			bool show_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
-			decouple_sel->SetDisplayedPlane(show_decouple ? 0 : SZSP_NONE);
-			if (show_decouple) {
+			bool is_train = this->vehicle->type == VehicleType::Train && order != nullptr;
+			if (is_train && order->IsType(OT_GOTO_STATION)) {
+				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_STATION);
 				this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
 				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE, order->ShouldGoToCouple());
+			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
+				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
+				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
+			} else {
+				decouple_sel->SetDisplayedPlane(SZSP_NONE);
 			}
 		}
 
@@ -1372,6 +1388,13 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
+				break;
+			}
+
+			case WID_O_TURN_AROUND_DEPOT: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot() ? 0 : 1);
 				break;
 			}
 
@@ -1679,8 +1702,9 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_O_SHARED_ORDER_LIST), SetAspect(1), SetSpriteTip(SPR_SHARED_ORDERS_ICON, STR_ORDERS_VEH_WITH_SHARED_ORDERS_LIST_TOOLTIP),
 	EndContainer(),
 
-	/* Decouple/couple row: only shown for a selected 'goto station' order.
-	 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+	/* Couple row: trains only. Which buttons it holds depends on what kind of
+	 * order is selected -- station orders get the decouple/couple ones, depot
+	 * orders the turn-around one. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
@@ -1689,6 +1713,10 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

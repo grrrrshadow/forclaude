@@ -4620,6 +4620,7 @@ STR_VEHICLE_VIEW_CLONE_AIRCRAFT_INFO                            :{BLACK}Vytvoři
 
 STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Donuť vlak pokračovat bez čekání na povolení od semaforu
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Otočit vlak
+STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Spojit tento vlak se stojícím vlakem hned před ním
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Otoč vozidlo
 STR_VEHICLE_VIEW_ORDER_LOCATION_TOOLTIP                         :{BLACK}Vycentrovat hlavní zobrazení na cíl objednávky. Ctrl+Klik pro otevření nového zobrazení na umístění cíle pokynu.
 
@@ -4663,6 +4664,8 @@ STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL                      :{LTBLUE}Míří
 STR_VEHICLE_STATUS_NO_ORDERS_VEL                                :{LTBLUE}{VELOCITY} - Žádné příkazy
 STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL                     :{LTBLUE}Míří do {WAYPOINT}, {VELOCITY}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL                        :{ORANGE}Míří do {DEPOT}, {VELOCITY}
+STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Čeká na spojení
+STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL                       :{LTBLUE}{1:VELOCITY} - Jede se spojit do {0:STATION}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL                :{LTBLUE}Údržba v {DEPOT}, {VELOCITY}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_UNBUNCH_VEL                :{LTBLUE}Poslat do servisu a vytvořit rozestup v {DEPOT}, {VELOCITY}
 
@@ -4905,6 +4908,17 @@ STR_ORDER_REFIT_STOP_ORDER                                      :{SPACE}(Přesta
 STR_ORDER_STOP_ORDER                                            :{SPACE}(Zastávka)
 
 STR_ORDER_WAIT_TO_UNBUNCH                                       :{SPACE}(Počkat na vyrovnání rozestupů)
+STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Otočit
+STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Otočit vlak v tomto depu, takže z něj vyjede čelem tam, odkud přijel. Bez toho vyjede tak, jak vjel, aby se vlak poslaný na údržbu sám od sebe neotočil
+STR_ORDER_TURN_AROUND_DEPOT_SUFFIX                              :{SPACE}(a otočit)
+STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
+STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Při odjezdu z této stanice ponechat vepředu tento počet vozidel a zbytek nechat odpojený stát. 0 znamená neodpojovat
+STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Zadej počet vozidel, která zůstanou (0 = neodpojovat)
+STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
+STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v této stanici, dokud vedle nezastaví vlak, se kterým se dá spojit, a pak pokračovat jako jedna souprava
+STR_ORDER_GOTO_COUPLE                                           :{BLACK}Jet se spojit
+STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i couváním) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
+STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(jet se spojit)
 
 STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
 STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(Nemůže použít stanici){POP_COLOUR} {STRING} {STATION}
@@ -5577,6 +5591,8 @@ STR_ERROR_NO_TOWN_ROADTYPES_AVAILABLE_YET_EXPLANATION           :{WHITE}Začni h
 # Specific vehicle errors
 STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL                          :{WHITE}Nelze nechat vlak projet semafory v nebezpečí...
 STR_ERROR_CAN_T_REVERSE_DIRECTION_TRAIN                         :{WHITE}Nelze obrátit vlak...
+STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Nelze spojit vlak...
+STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned před ním nestojí žádný vlak ke spojení
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

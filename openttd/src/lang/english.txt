@@ -4792,6 +4792,10 @@ STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to co
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
 
+STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Turn around
+STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Turn the train around while it is in this depot, so it leaves facing the way it came from. Without this it leaves the way it went in, so that a train sent for servicing is not silently turned round
+STR_ORDER_TURN_AROUND_DEPOT_SUFFIX                              :{SPACE}(and turn around)
+
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and an autonomous reversal here could drive straight into wagons a train just left behind
 
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
