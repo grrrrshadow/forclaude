@@ -3054,8 +3054,16 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 			Train *consist = Train::From(v)->First();
 			/* A train comes back out of a depot the same way round it went
 			 * in: the end that led the way in leads the way out again, so one
-			 * that reversed in reverses out. Reversing every vehicle's facing
-			 * is all that takes -- which end leads is left alone.
+			 * that reversed in reverses out.
+			 *
+			 * The two outcomes are mirrors of each other and only ever one of
+			 * them is done. Reversing every vehicle's facing turns the
+			 * direction of travel round and leaves the leading end as it was,
+			 * which keeps the train the same way round. Flipping which end
+			 * leads turns the direction of travel round on its own and swaps
+			 * the ends besides, which turns the train round. Doing both cancels
+			 * the direction of travel back to what it was and drives the train
+			 * at the dead end.
 			 *
 			 * A depot holds the whole train on one hidden tile, so it has no
 			 * extent there and either end is free to come out first; that is
@@ -3073,11 +3081,12 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 			 * order, or by hand with the reverse button while the train is
 			 * stopped inside. See Order::ShouldTurnAroundInDepot() and
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			for (Train *u = consist; u != nullptr; u = u->Next()) {
-				u->direction = ReverseDir(u->direction);
-			}
 			if (consist->current_order.IsType(OT_GOTO_DEPOT) && consist->current_order.ShouldTurnAroundInDepot()) {
 				consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
+			} else {
+				for (Train *u = consist; u != nullptr; u = u->Next()) {
+					u->direction = ReverseDir(u->direction);
+				}
 			}
 			VehicleEnterDepot(consist);
 		}
