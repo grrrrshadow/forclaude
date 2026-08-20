@@ -3393,7 +3393,11 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		 * properly or stops the train. */
 		Track res_track = FindFirstTrack(res_tracks);
 		Trackdir res_td = TrackEnterdirToTrackdir(res_track, enterdir);
-		bool red_signal_ahead = HasSignalOnTrackdir(tile, res_td) && GetSignalStateByTrackdir(tile, res_td) == SignalState::Red;
+		/* Only plain rail carries signals, and HasSignalOnTrackdir() asserts
+		 * rather than answering for anything else -- this tile is just as
+		 * likely to be a station, a depot or a bridge head. */
+		bool red_signal_ahead = IsTileType(tile, TileType::Railway) &&
+				HasSignalOnTrackdir(tile, res_td) && GetSignalStateByTrackdir(tile, res_td) == SignalState::Red;
 
 		if (!tile_held_by_other_train && !red_signal_ahead) return res_track;
 	}
