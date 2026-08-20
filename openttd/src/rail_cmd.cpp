@@ -3052,20 +3052,37 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 		v->vehstatus.Set(VehState::Hidden);
 		if (v->GetMovingNext() == nullptr) {
 			Train *consist = Train::From(v)->First();
-			/* Leaving a depot assumes the train ends up facing out of it, so
-			 * this turning is not optional decoration: skipping it leaves a
-			 * train pointing into the dead end and the exit path then works
-			 * from a direction that cannot be driven. Making a depot preserve
-			 * which way round a train is -- worth having, since a train sent
-			 * for scheduled servicing should not come back rearranged -- means
-			 * teaching the exit path to handle a train that stays reversed,
-			 * not just skipping this. See FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
-				consist->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
-			} else {
-				for (Train *u = consist; u != nullptr; u = u->Next()) {
-					u->direction = ReverseDir(u->direction);
+			/* A depot is a dead end, so by default a train bounces off it the
+			 * same way it bounces off the end of a line: the flag that says
+			 * which way it is driving flips, and nothing else changes. A train
+			 * that drove in comes back out reversing, and one that reversed in
+			 * comes out driving forwards -- either way it leaves the way it
+			 * arrived, with the same vehicle still at the same end.
+			 *
+			 * That flip is the whole of it. Leaving a depot works from the
+			 * train's direction of travel, so simply not turning it (as an
+			 * earlier attempt did) points it into the dead end instead; and
+			 * the exit path already follows GetMovingNext(), so it copes with
+			 * a train that leaves reversing.
+			 *
+			 * Turning the train round properly -- ending up facing the other
+			 * way, which is what the engine used to do to every train that
+			 * entered, on the grounds that it lets a player straighten out a
+			 * confused one -- is worth having, but as something a player asks
+			 * for. A train goes to a depot on its own for scheduled servicing
+			 * too, and coming back rearranged from that quietly breaks a setup
+			 * nobody touched. See Order::ShouldTurnAroundInDepot() and
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (consist->current_order.IsType(OT_GOTO_DEPOT) && consist->current_order.ShouldTurnAroundInDepot()) {
+				if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
+					consist->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+				} else {
+					for (Train *u = consist; u != nullptr; u = u->Next()) {
+						u->direction = ReverseDir(u->direction);
+					}
 				}
+			} else {
+				consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
 			}
 			VehicleEnterDepot(consist);
 		}

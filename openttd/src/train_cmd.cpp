@@ -2400,7 +2400,25 @@ static void ReverseTrainDirection(Train *consist)
 {
 	Train *moving_front = consist->GetMovingFront();
 	if (IsRailDepotTile(moving_front->tile)) {
-		if (IsWholeTrainInsideDepot(consist)) return;
+		if (IsWholeTrainInsideDepot(consist)) {
+			/* Everything below works on where vehicles sit along the track and
+			 * which tiles they occupy, none of which means anything for a
+			 * train that is entirely inside a depot: its vehicles are hidden,
+			 * all on the one tile. Doing none of it used to mean the reverse
+			 * button simply did nothing here, which is unhelpful, because a
+			 * depot is the one place where turning a train round is trivially
+			 * safe. All that has to change is which end leads out, and that is
+			 * the same flag a dead end flips. See
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
+			consist->flags.Flip(VehicleRailFlag::Reversed);
+			consist->flags.Reset(VehicleRailFlag::Reversing);
+			consist->ConsistChanged(CCF_TRACK);
+			for (Train *u = consist; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
+			InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
+			SetWindowDirty(WindowClass::VehicleView, consist->index);
+			return;
+		}
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
 	}
 
