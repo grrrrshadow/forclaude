@@ -1515,7 +1515,10 @@ static constexpr std::initializer_list<NWidgetPart> _nested_station_builder_widg
 
 /** High level window description of the station-build window (default & newGRF) */
 static WindowDesc _station_builder_desc(
-	WindowPosition::Automatic, "build_station_rail", 0, 0,
+	/* Aligned to the toolbar rather than placed automatically: automatic
+	 * placement drops it wherever there is room, which is often right over the
+	 * piece of map the player opened it to build on. */
+	WindowPosition::AlignToolbar, "build_station_rail", 0, 0,
 	WindowClass::BuildStation, WindowClass::BuildToolbar,
 	WindowDefaultFlag::Construction,
 	_nested_station_builder_widgets,
