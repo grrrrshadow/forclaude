@@ -101,6 +101,15 @@ void DrawTrainImage(const Train *v, const Rect &r, VehicleID selection, EngineIm
 	bool rtl = _current_text_dir == TD_RTL;
 	Direction dir = rtl ? Direction::E : Direction::W;
 
+	/* The chain is always drawn head-first, but the head is not always the
+	 * end that leads: a train that has been turned round drives from its last
+	 * vehicle. Draw such a train facing the other way, so which end will come
+	 * out of the depot first is visible without moving anything about. Note
+	 * this is on top of the per-vehicle VehicleRailFlag::Flipped mirroring
+	 * that Train::GetImage() already applies, which says how one vehicle sits
+	 * in the chain rather than which way the whole train goes. */
+	if (v->IsDrivingBackwards()) dir = ReverseDir(dir);
+
 	DrawPixelInfo tmp_dpi;
 	/* Position of highlight box */
 	int highlight_l = 0;

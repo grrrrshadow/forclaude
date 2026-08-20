@@ -1248,6 +1248,9 @@ static void NormaliseTrainHead(Train *head)
 
 static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain);
 static void TrainEnterStation(Train *consist, StationID station);
+static void AdvanceWagonsBeforeSwap(Train *moving_front);
+static void AdvanceWagonsAfterSwap(Train *moving_front);
+void ReverseTrainSwapVehicles(Train *v);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -1753,6 +1756,102 @@ static void CloseUpCoupledConsist(Train *consist)
 }
 
 /**
+ * Squared pixel distance between two vehicles, used only to compare which of
+ * two ends of a consist is the nearer one.
+ */
+static int64_t DistanceSquaredBetweenVehicles(const Train *a, const Train *b)
+{
+	int64_t x_diff = a->x_pos - b->x_pos;
+	int64_t y_diff = a->y_pos - b->y_pos;
+	return x_diff * x_diff + y_diff * y_diff;
+}
+
+/**
+ * Turn a consist round where it stands, so that its vehicle list runs the
+ * other way along the track while its head stays its head.
+ *
+ * A train's vehicle list has to run the same way round as its vehicles
+ * physically lie: the vehicle after another in the list is the one behind it
+ * on the track. Coupling two consists appends one list to the other, so that
+ * only holds if the two already happen to lie the right way round -- and when
+ * an engine reaches a rake from the end it did not leave by, they do not. The
+ * list would then claim the far wagon is the one next to the engine, the wagon
+ * behind the join would look for the track connecting it to a vehicle a whole
+ * rake away, find none, and the game would assert in TrainController().
+ *
+ * This is vanilla's own reversal primitive: it swaps where the vehicles sit
+ * (first with last, second with second-last, ...) and reverses each one's
+ * facing, which leaves the list order untouched -- so the head keeps being the
+ * head, which coupling depends on -- while the list now runs the other way
+ * along the rails. The AdvanceWagons* pair around it is what closes the
+ * spacing up again when the vehicles are not all the same length.
+ *
+ * @param consist Head of the consist to turn round.
+ */
+static void FlipConsistAlongTrack(Train *consist)
+{
+	Train *moving_front = consist->GetMovingFront();
+
+	AdvanceWagonsBeforeSwap(moving_front);
+	ReverseTrainSwapVehicles(consist);
+	AdvanceWagonsAfterSwap(moving_front);
+
+	consist->flags.Flip(VehicleRailFlag::Reversed);
+	consist->ConsistChanged(CCF_TRACK);
+	for (Train *u = consist; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
+}
+
+/**
+ * Bring every vehicle's recorded facing into line with the chain it now sits
+ * in, after two consists have been joined.
+ *
+ * Within one train each vehicle's direction points from the back of the train
+ * towards its front, i.e. from a vehicle towards the one before it in the
+ * list. Two consists that met never agreed on that: an engine that drove up to
+ * a rake nose first is facing the exact opposite way to the wagons it has just
+ * been joined to. Left alone that is a train whose halves disagree about which
+ * way is forwards, and the movement code has no way to make sense of it.
+ *
+ * Reversing such a vehicle's direction is only a change of bookkeeping -- it
+ * has not turned round, it is standing still -- so its Flipped flag is toggled
+ * to match. GetImage() reverses the direction again for a flipped vehicle, so
+ * the picture on screen does not change at all; what changes is that the train
+ * now agrees with itself. And that flag is exactly the truth of the matter: an
+ * engine coupled to its wagons the other way round is an engine running
+ * flipped, which is also what makes it visible as such in the depot list.
+ *
+ * @param consist Head of the freshly joined consist.
+ */
+static void NormaliseCoupledConsistFacing(Train *consist)
+{
+	for (Train *u = consist; u != nullptr; u = u->Next()) {
+		/* Line each vehicle up against the one ahead of it in the list. The
+		 * head has none, so it uses the one behind it and the opposite sense:
+		 * its facing points away from the body of the train. */
+		const Train *ahead = u->Previous();
+		const Train *reference = (ahead != nullptr) ? ahead : u->Next();
+		if (reference == nullptr) break; // A single vehicle has nothing to disagree with.
+
+		int towards_x = reference->x_pos - u->x_pos;
+		int towards_y = reference->y_pos - u->y_pos;
+		if (ahead == nullptr) {
+			towards_x = -towards_x;
+			towards_y = -towards_y;
+		}
+
+		/* Only a facing that points the opposite way is wrong. A vehicle on a
+		 * curve is up to 45 degrees off the line to its neighbour and is
+		 * perfectly correct, so compare the two as directions and not for
+		 * equality. */
+		TileIndexDiffC facing = TileIndexDiffCByDir(u->direction);
+		if (facing.x * towards_x + facing.y * towards_y >= 0) continue;
+
+		u->direction = ReverseDir(u->direction);
+		u->flags.Flip(VehicleRailFlag::Flipped);
+	}
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -1781,35 +1880,17 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	ret = CheckOwnership(partner->owner);
 	if (ret.Failed()) return ret;
 
-	/* Whichever train is physically leading would naturally keep its front,
-	 * with the other one's whole consist spliced onto its rear. */
+	/* The head of the merged chain has to be an engine. A chain heading with a
+	 * wagon is not a train at all but a "free wagon" set (NormaliseSubtypes
+	 * decides exactly that way): it stops being a primary vehicle, so it loses
+	 * its orders, refuses new ones, and the vehicle window trips
+	 * assert(v->IsPrimaryVehicle()) the moment it is touched. So the engine
+	 * takes the head, whichever of the two trains it happens to be and
+	 * whichever end it arrived from -- the geometry is made to fit around that
+	 * below, rather than the other way round. */
 	Train *leading = partner_is_behind ? v : partner;
 	Train *trailing = partner_is_behind ? partner : v;
-
-	/* ... except that the head of the merged chain has to be an engine. A
-	 * chain heading with a wagon is not a train at all but a "free wagon" set
-	 * (NormaliseSubtypes decides exactly that way): it stops being a primary
-	 * vehicle, so it loses its orders, refuses new ones, and the vehicle
-	 * window trips assert(v->IsPrimaryVehicle()) the moment it is touched.
-	 * That is what coupling to the far side of a decoupled rake produced.
-	 *
-	 * So the engine must end up at the head -- and the head is fixed by the
-	 * geometry, because the chain has to run the same way round as the
-	 * vehicles physically lie. When the engine reaches its partner from the
-	 * end it did not leave by, those two demands contradict each other: the
-	 * partner is the one physically in front, so it takes the head, and the
-	 * head is then a wagon.
-	 *
-	 * Making that case work means rebuilding the merged consist's facing so
-	 * the chain can run the other way, and repeated attempts at it have all
-	 * produced trains the movement code then choked on -- the vehicles of the
-	 * two consists do not start out facing the same way (an engine that
-	 * arrived from the far end is already turned relative to its partner), so
-	 * there is nothing uniform to flip. Rather than hand back a consist that
-	 * looks joined and then asserts a few tiles later, refuse the coupling and
-	 * leave both trains as they were. The order stays live, so nothing is
-	 * lost: the engine simply waits, as it did before it got here. See
-	 * FEATURE_DESIGN_COUPLING_TOW.md for what doing this properly needs. */
+	if (!leading->IsFrontEngine()) std::swap(leading, trailing);
 	if (!leading->IsFrontEngine()) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END);
 
 	/* Some gap is normal -- a train cannot reserve the tile its partner stands
@@ -1817,6 +1898,24 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
 	 * of closing up should be asked to cover. */
 	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		/* Splicing appends the trailing list to the end of the leading one, so
+		 * the two ends that meet in the middle have to be the two ends that
+		 * meet on the rails: the leading train's last vehicle and the trailing
+		 * train's first. Either train may be lying the other way round -- an
+		 * engine that comes back to a rake from the end it did not leave by is
+		 * the whole point of this -- and each one that is gets turned round
+		 * where it stands first. Measuring it rather than deriving it from
+		 * which way anything faces keeps this right for a train that reversed
+		 * on its way here, which is the usual case. */
+		if (DistanceSquaredBetweenVehicles(leading->First(), trailing) < DistanceSquaredBetweenVehicles(leading->Last(), trailing)) {
+			FlipConsistAlongTrack(leading);
+		}
+		if (DistanceSquaredBetweenVehicles(trailing->Last(), leading) < DistanceSquaredBetweenVehicles(trailing->First(), leading)) {
+			FlipConsistAlongTrack(trailing);
+		}
+	}
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();
@@ -1826,6 +1925,18 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	Train *new_head = leading;
 	ret = TryConsistSplice(flags, src, dst, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
+
+	/* The two halves still disagree about which way is forwards; settle that
+	 * before anything reads the merged train's facing. */
+	NormaliseCoupledConsistFacing(new_head);
+
+	/* Every vehicle now faces away from the wagons behind it, so the train
+	 * pulls its new load back the way the engine came in -- which is the only
+	 * way out of a platform it reached nose first anyway. Whatever the engine
+	 * was doing to get here, backing up included, is over. */
+	new_head->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	new_head->flags.Reset(VehicleRailFlag::Reversing);
+	new_head->ConsistChanged(CCF_TRACK);
 
 	/* The two halves were joined across a gap; walk it shut before anything
 	 * tries to drive this train. */
@@ -3208,6 +3319,19 @@ static void FreeOrphanedReservation(const Train *v, TileIndex tile, DiagDirectio
 	/* Bounded purely as a belt-and-braces guard against a pathological
 	 * looping layout; a reservation is always finite in practice. */
 	for (uint safety = 0; safety < 1024; safety++) {
+		/* Never strip the reservation off a tile a train is standing on.
+		 * A stationary consist keeps its own tiles reserved from underneath
+		 * itself (Train::ReserveTrackUnderConsist()), and that reservation is
+		 * contiguous with whatever the speculative path reserved up to it, so
+		 * without this the walk runs straight on under a waiting train and
+		 * unreserves it tile by tile. The train stays where it is but becomes
+		 * invisible to every signal and pathfinder that asks the map instead
+		 * of the vehicle list: the platform reads free, the protecting signal
+		 * turns green, and the next train is routed into it and crashes.
+		 * Anything reserved from an occupied tile onwards was never ours
+		 * anyway, so stopping here loses nothing. */
+		if (EnsureNoTrainOnTrackBits(cur_tile, TrackBits{TrackdirToTrack(cur_td)}).Failed()) break;
+
 		UnreserveRailTrack(cur_tile, TrackdirToTrack(cur_td));
 
 		if (!ft.Follow(cur_tile, cur_td)) break;
