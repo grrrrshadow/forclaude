@@ -2481,7 +2481,30 @@ void Vehicle::HandleLoading(bool mode)
 			if (this->type == VehicleType::Train && (this->current_order.ShouldWaitForCouple() || this->current_order.ShouldGoToCouple())) {
 				Train *t = Train::From(this);
 				if (GetTrainCouplePartner(t) == nullptr) return;
-				CmdCoupleTrains(DoCommandFlag::Execute, t->index);
+				/* Commands check ownership against whichever company is current,
+				 * which during a vehicle tick is whatever ran last rather than
+				 * this train's owner -- back it up as the tick loop does
+				 * elsewhere, or the coupling fails its first check and silently
+				 * does nothing. */
+				AutoRestoreBackup cur_company(_current_company, t->owner);
+				if (CmdCoupleTrains(DoCommandFlag::Execute, t->index).Failed()) return;
+			}
+
+			/* Reverse out of this station rather than carrying on the way we
+			 * are facing, if the order asks for it. Setting the flag rather
+			 * than turning the train here lets the ordinary reversal path do
+			 * it on the next tick, exactly as it does for the reverse button
+			 * and for reaching a dead end -- and that path is the one that
+			 * keeps the consist self-consistent.
+			 *
+			 * Only for a plain station stop: an order that also couples or
+			 * decouples here already decides for itself which way the train
+			 * leaves, and those work as they are, so this stays out of them.
+			 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (this->type == VehicleType::Train && this->current_order.ShouldReverseOutOfStation() &&
+					!this->current_order.ShouldGoToCouple() && !this->current_order.ShouldWaitForCouple() &&
+					this->current_order.GetDecoupleCount() == 0) {
+				Train::From(this)->flags.Set(VehicleRailFlag::Reversing);
 			}
 
 			this->PlayLeaveStationSound();

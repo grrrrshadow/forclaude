@@ -109,6 +109,20 @@ private:
 	 */
 	bool turn_around_in_depot = false;
 
+	/**
+	 * If true, a train leaving this station reverses out of it rather than
+	 * carrying on the way it was facing.
+	 *
+	 * A train that has just left wagons behind here, or picked some up, very
+	 * often wants to go back the way it came; left to itself it instead looks
+	 * for a way round, which may be a long way round or may not exist. Reversing
+	 * is something the game already does perfectly well at a dead end, so this
+	 * just asks for the same thing at a place the player chooses. Dedicated
+	 * field, not packed into `flags` -- same rationale as decouple_count
+	 * ("Bug D"). See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool reverse_out_of_station = false;
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -217,6 +231,12 @@ public:
 
 	/** Set whether a train visiting this depot turns around there. */
 	inline void SetTurnAroundInDepot(bool turn) { this->turn_around_in_depot = turn; }
+
+	/** Should a train leaving this station reverse out of it? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldReverseOutOfStation() const { return this->reverse_out_of_station; }
+
+	/** Set whether a train leaving this station reverses out of it. */
+	inline void SetReverseOutOfStation(bool reverse) { this->reverse_out_of_station = reverse; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?

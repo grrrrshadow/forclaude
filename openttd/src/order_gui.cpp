@@ -294,6 +294,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * actually being a separate OrderType. See
 				 * FEATURE_DESIGN_COUPLING_TOW.md. */
 				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+
+				/* Reversing out is about where the train goes next, not about
+				 * how long it stays, so it has no place in the timetable. */
+				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation()) {
+					line += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
+				}
 			}
 			break;
 		}
@@ -1092,6 +1098,12 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_STATION);
 				this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
 				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE, order->ShouldGoToCouple());
+				/* Reversing out is for a plain stop. An order that also
+				 * couples or decouples here already decides which way the
+				 * train leaves, so the choice does not apply. */
+				bool plain_stop = !order->ShouldGoToCouple() && !order->ShouldWaitForCouple() && order->GetDecoupleCount() == 0;
+				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !plain_stop);
+				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, plain_stop && order->ShouldReverseOutOfStation());
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
@@ -1388,6 +1400,13 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
+				break;
+			}
+
+			case WID_O_REVERSE_OUT: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, order->ShouldReverseOutOfStation() ? 0 : 1);
 				break;
 			}
 
@@ -1713,6 +1732,8 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_REVERSE_OUT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_REVERSE_OUT, STR_ORDER_REVERSE_OUT_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),

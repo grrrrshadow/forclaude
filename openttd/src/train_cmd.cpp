@@ -46,7 +46,6 @@
 
 static Track ChooseTrainTrack(Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool force_res, bool *got_reservation, bool mark_stuck);
 static bool TrainCheckIfLineEnds(Train *v, bool reverse = true);
-static void UpdateStatusAfterSwap(Train *v, bool reverse);
 bool TrainController(Train *v, Vehicle *nomove, bool reverse = true); // Also used in vehicle_sl.cpp.
 static TileIndex TrainApproachingCrossingTile(const Train *v);
 static void CheckIfTrainNeedsService(Train *v);
@@ -1713,9 +1712,24 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * window trips assert(v->IsPrimaryVehicle()) the moment it is touched.
 	 * That is what coupling to the far side of a decoupled rake produced.
 	 *
-	 * So the engine always takes the head. */
-	bool turn_consist_around = !leading->IsFrontEngine() && trailing->IsFrontEngine();
-	if (turn_consist_around) std::swap(leading, trailing);
+	 * So the engine must end up at the head -- and the head is fixed by the
+	 * geometry, because the chain has to run the same way round as the
+	 * vehicles physically lie. When the engine reaches its partner from the
+	 * end it did not leave by, those two demands contradict each other: the
+	 * partner is the one physically in front, so it takes the head, and the
+	 * head is then a wagon.
+	 *
+	 * Making that case work means rebuilding the merged consist's facing so
+	 * the chain can run the other way, and repeated attempts at it have all
+	 * produced trains the movement code then choked on -- the vehicles of the
+	 * two consists do not start out facing the same way (an engine that
+	 * arrived from the far end is already turned relative to its partner), so
+	 * there is nothing uniform to flip. Rather than hand back a consist that
+	 * looks joined and then asserts a few tiles later, refuse the coupling and
+	 * leave both trains as they were. The order stays live, so nothing is
+	 * lost: the engine simply waits, as it did before it got here. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md for what doing this properly needs. */
+	if (!leading->IsFrontEngine()) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END);
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();
@@ -1725,40 +1739,6 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	Train *new_head = leading;
 	ret = TryConsistSplice(flags, src, dst, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
-
-	/* Taking the head off the other consist means the chain now runs opposite
-	 * to the way the vehicles physically lie: the engine sits at the end the
-	 * train arrived from, with its partner's vehicles extending ahead of it,
-	 * while the consist as a whole still faces the way the engine drove in.
-	 *
-	 * The layout rule the game works to is that GetMovingFront() leads and
-	 * every GetMovingNext() sits further back, against the direction of
-	 * travel. Working that through for this geometry, the consist has to end
-	 * up facing the opposite way whether it is going to pull its new vehicles
-	 * or push them -- that part is not a choice. What VehicleFlag::DrivingBackwards
-	 * then selects is only which of the two it does, and we leave it clear so
-	 * the engine leads and pulls.
-	 *
-	 * Turning it round is per-vehicle facing only, with nothing moving:
-	 * UpdateStatusAfterSwap re-registers each vehicle on its tile and refreshes
-	 * it in place. Note this is deliberately not ReverseTrainDirection(), which
-	 * assumes it starts from a consist that is already self-consistent -- ours
-	 * is not, which is the whole reason for doing this. See
-	 * FEATURE_DESIGN_COUPLING_TOW.md. */
-	if (turn_consist_around) {
-		FreeTrainTrackReservation(new_head);
-
-		for (Train *u = new_head; u != nullptr; u = u->Next()) {
-			if (u->gv_flags.Any({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown})) {
-				u->gv_flags.Flip({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown});
-			}
-			UpdateStatusAfterSwap(u, true);
-		}
-
-		new_head->flags.Flip(VehicleRailFlag::Reversed);
-		new_head->ConsistChanged(CCF_TRACK);
-		new_head->ReserveTrackUnderConsist();
-	}
 
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a

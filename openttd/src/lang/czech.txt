@@ -4911,6 +4911,9 @@ STR_ORDER_WAIT_TO_UNBUNCH                                       :{SPACE}(Počkat
 STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Otočit
 STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Otočit vlak v tomto depu, takže z něj vyjede čelem tam, odkud přijel. Bez toho vyjede tak, jak vjel, aby se vlak poslaný na údržbu sám od sebe neotočil
 STR_ORDER_TURN_AROUND_DEPOT_SUFFIX                              :{SPACE}(a otočit)
+STR_ORDER_REVERSE_OUT                                           :{BLACK}Vycouvat
+STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Při odjezdu z této stanice vycouvat, místo aby vlak pokračoval směrem, kterým je otočený, a hledal cestu okolo
+STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(a vycouvat)
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Při odjezdu z této stanice ponechat vepředu tento počet vozidel a zbytek nechat odpojený stát. 0 znamená neodpojovat
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Zadej počet vozidel, která zůstanou (0 = neodpojovat)
@@ -5593,6 +5596,7 @@ STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL                          :{WHITE}Nelze ne
 STR_ERROR_CAN_T_REVERSE_DIRECTION_TRAIN                         :{WHITE}Nelze obrátit vlak...
 STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Nelze spojit vlak...
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned před ním nestojí žádný vlak ke spojení
+STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... mašinka by skončila za vagonky, což zatím není podporováno
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

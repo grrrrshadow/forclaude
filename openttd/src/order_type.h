@@ -174,6 +174,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_WAIT_COUPLE,     ///< Toggle whether to wait at this station for a partner train to couple with.
 	MOF_GOTO_COUPLE,     ///< Toggle whether this order's destination is a place to travel to (reversing if needed) to couple with a partner train there.
 	MOF_TURN_AROUND_DEPOT,///< Toggle whether a train visiting this depot turns around there.
+	MOF_REVERSE_OUT,     ///< Toggle whether a train leaving this station reverses out of it.
 	MOF_END
 };
 

@@ -42,6 +42,7 @@ enum OrderWidgets : WidgetID {
 	WID_O_WAIT_COUPLE,               ///< Toggle waiting at this station for a partner train to couple with.
 	WID_O_GOTO_COUPLE,               ///< Toggle travelling to this station (reversing if needed) to couple with a partner train there.
 	WID_O_TURN_AROUND_DEPOT,         ///< Toggle turning the train around while it is in this depot.
+	WID_O_REVERSE_OUT,               ///< Toggle reversing out of this station on departure.
 };
 
 #endif /* WIDGETS_ORDER_WIDGET_H */

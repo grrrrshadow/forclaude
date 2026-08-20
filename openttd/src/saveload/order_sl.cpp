@@ -233,6 +233,7 @@ public:
 		SLE_VAR(Order, wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Order, go_to_couple, VarTypes::BOOL),
 		SLE_VAR(Order, turn_around_in_depot, VarTypes::BOOL),
+		SLE_VAR(Order, reverse_out_of_station, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 
