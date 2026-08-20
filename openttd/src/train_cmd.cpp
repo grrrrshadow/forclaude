@@ -3764,6 +3764,10 @@ void Train::ReserveTrackUnderConsist() const
 			case TrackBits{Track::Depot}.base():
 				break;
 			default:
+				/* Diagnostic: TrackBitsToTrack() is shared by several call
+				 * sites, so its own assert cannot say which one tripped.
+				 * Assert here too, to name this one. */
+				assert(u->track.Count() == 1 && !u->track.Any({Track::Wormhole, Track::Depot}));
 				TryReserveRailTrack(u->tile, TrackBitsToTrack(u->track));
 				break;
 		}
@@ -4113,6 +4117,8 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						}
 						goto reverse_train_direction;
 					} else {
+						/* Diagnostic: see the matching note in ReserveTrackUnderConsist(). */
+						assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 						TryReserveRailTrack(gp.new_tile, TrackBitsToTrack(chosen_track), false);
 					}
 				} else {
@@ -4149,6 +4155,8 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				}
 
 				/* Update XY to reflect the entrance to the new tile, and select the direction to use */
+				/* Diagnostic: see the matching note in ReserveTrackUnderConsist(). */
+				assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 				Direction chosen_dir = VehicleEnterTileCoordinates(gp, enterdir, TrackBitsToTrack(chosen_track));
 
 				/* Call the landscape function and tell it that the vehicle entered the tile */

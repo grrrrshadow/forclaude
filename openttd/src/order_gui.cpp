@@ -1093,12 +1093,13 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_STATION);
 				this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
 				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE, order->ShouldGoToCouple());
-				/* Reversing out is for a plain stop. An order that also
-				 * couples or decouples here already decides which way the
-				 * train leaves, so the choice does not apply. */
-				bool plain_stop = !order->ShouldGoToCouple() && !order->ShouldWaitForCouple() && order->GetDecoupleCount() == 0;
-				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !plain_stop);
-				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, plain_stop && order->ShouldReverseOutOfStation());
+				/* Reversing out combines fine with coupling here -- a train
+				 * that has just picked wagons up very often wants to go back
+				 * the way it came. Only decoupling blocks the choice, because
+				 * there the train already leaves the right way by itself. */
+				bool can_reverse_out = order->GetDecoupleCount() == 0;
+				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
+				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && order->ShouldReverseOutOfStation());
 			} else {
 				decouple_sel->SetDisplayedPlane(SZSP_NONE);
 			}

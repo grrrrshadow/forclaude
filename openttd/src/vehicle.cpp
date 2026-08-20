@@ -2497,12 +2497,12 @@ void Vehicle::HandleLoading(bool mode)
 			 * and for reaching a dead end -- and that path is the one that
 			 * keeps the consist self-consistent.
 			 *
-			 * Only for a plain station stop: an order that also couples or
-			 * decouples here already decides for itself which way the train
-			 * leaves, and those work as they are, so this stays out of them.
+			 * This combines with coupling on purpose: a train that has just
+			 * collected wagons here very often wants to go back the way it
+			 * came. Decoupling is the exception -- there the train already
+			 * leaves the right way by itself, so the choice is not offered.
 			 * See FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (this->type == VehicleType::Train && this->current_order.ShouldReverseOutOfStation() &&
-					!this->current_order.ShouldGoToCouple() && !this->current_order.ShouldWaitForCouple() &&
 					this->current_order.GetDecoupleCount() == 0) {
 				Train::From(this)->flags.Set(VehicleRailFlag::Reversing);
 			}
