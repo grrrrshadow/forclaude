@@ -2595,6 +2595,22 @@ static bool IsWholeTrainInsideDepot(const Train *v)
 }
 
 /**
+ * Is any part of this train still standing inside a depot?
+ *
+ * A train inside a depot is hidden on a single tile and has no extent, and a
+ * train outside one lies along the track: those are two different worlds, and
+ * a train leaving a depot is in both at once for a few ticks. Anything that
+ * rearranges a train has to keep away from it while that lasts.
+ */
+static bool IsAnyPartInsideDepot(const Train *v)
+{
+	for (const Train *u = v; u != nullptr; u = u->Next()) {
+		if (u->track == Track::Depot) return true;
+	}
+	return false;
+}
+
+/**
  * Turn a train around.
  * @param consist %Train to turn around.
  */
@@ -2602,6 +2618,17 @@ static void ReverseTrainDirection(Train *consist)
 {
 	Train *moving_front = consist->GetMovingFront();
 	if (IsRailDepotTile(moving_front->tile)) {
+		/* A train on its way out of a depot is half in a world where it has no
+		 * extent and half in one where it lies along the track, and everything
+		 * below assumes one or the other. Turning it round here mangles the
+		 * consist: the vehicles still hidden inside end up on the wrong side of
+		 * the ones already out, and the first of them to be moved cannot find
+		 * any track that connects it to the vehicle ahead. Leave it alone and
+		 * let it finish coming out -- there is nothing to gain by turning a
+		 * train round at the exact moment it is leaving, and the player asked
+		 * for it to leave this way. */
+		if (!IsWholeTrainInsideDepot(consist) && IsAnyPartInsideDepot(consist)) return;
+
 		if (IsWholeTrainInsideDepot(consist)) {
 			/* Everything below works on where vehicles sit along the track and
 			 * which tiles they occupy, none of which means anything for a
@@ -3516,7 +3543,15 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			tile_held_by_other_train = true;
 			break;
 		}
-		if (!tile_held_by_other_train) return FindFirstTrack(res_tracks);
+		/* And more than one reserved track reachable from here means we cannot
+		 * tell which of them is ours either. In vanilla picking the first would
+		 * be harmless, because every reserved tile a train could reach this way
+		 * was part of its own path; here the second one can belong to a train
+		 * standing further down a platform, and taking it drives us into that
+		 * train -- past a signal that is green because the path it guards
+		 * really is reserved, just not by us. Let the pathfinder below work it
+		 * out instead. */
+		if (!tile_held_by_other_train && res_tracks.Count() == 1) return FindFirstTrack(res_tracks);
 	}
 
 	/* Quick return in case only one possible track is available */
@@ -3842,6 +3877,17 @@ static bool CheckReverseTrain(const Train *consist)
 			!IsDiagonalDirection(moving_front->GetMovingDirection())) {
 		return false;
 	}
+
+	/* Checking the leading end alone is not enough any more. A train used to
+	 * be turned round on its way into a depot so that it always came out
+	 * leading with its head, and the head is what that check looks at; now
+	 * that a train keeps the way round it went in, the end coming out first
+	 * may be the far end of the chain while the head is still inside. Turning
+	 * a train round in that state tears the consist apart, so wait until all
+	 * of it is out. Which way round a train leaves a depot is the player's
+	 * choice here, made with the order flag or the reverse button, and not
+	 * something to be second-guessed on the way out. */
+	if (IsAnyPartInsideDepot(consist)) return false;
 
 	assert(moving_front->track.Any());
 
@@ -4256,8 +4302,31 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				if (v->IsMovingFront()) {
 					/* Currently the locomotive is active. Determine which one of the
 					 * available tracks to choose */
+					bool was_stuck = first->flags.Test(VehicleRailFlag::Stuck);
 					chosen_track = ChooseTrainTrack(first, gp.new_tile, enterdir, bits, false, nullptr, true);
 					assert(chosen_track.Any(bits | GetReservedTrackbits(gp.new_tile)));
+
+					/* When ChooseTrainTrack() cannot find or reserve a path it
+					 * marks the train stuck and hands back a track only so that
+					 * something valid comes out of it -- a placeholder, not a
+					 * decision. Vanilla gets away with driving on regardless
+					 * because the track it hands back is the one guarded by the
+					 * signal that stopped it, so the red-signal check just below
+					 * halts the train anyway. That does not hold once the
+					 * placeholder is picked from the tile rather than from a
+					 * failed path: it can be any track on the tile, including
+					 * one that is clear and green, or one belonging to a
+					 * one-way line pointing the other way. The train then
+					 * drives somewhere it never chose and nothing has reserved
+					 * -- straight into an occupied platform, in the case that
+					 * showed this up. Being stuck means staying put, so stay
+					 * put and let the retry in TrainLocoHandler sort it out. */
+					if (!was_stuck && first->flags.Test(VehicleRailFlag::Stuck)) {
+						first->cur_speed = 0;
+						first->subspeed = 0;
+						first->wait_counter = 0;
+						return false;
+					}
 
 					/* Never physically enter a tile held by a headless "free
 					 * wagon" chain left behind by a decouple order, even
