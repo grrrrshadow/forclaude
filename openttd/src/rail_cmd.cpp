@@ -3052,25 +3052,32 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 		v->vehstatus.Set(VehState::Hidden);
 		if (v->GetMovingNext() == nullptr) {
 			Train *consist = Train::From(v)->First();
-			/* A train always leaves a depot with First() at the head, because
-			 * that is what the leaving code works on: it unhides First() and
-			 * gives it a track. Clearing the driving-backwards flag is what
-			 * keeps that true, so it is not decoration -- a train let out of a
-			 * depot still marked as reversing has the wrong vehicle sent out
-			 * first, and comes apart a few tiles later.
+			/* A train comes back out of a depot the same way round it went
+			 * in: the end that led the way in leads the way out again, so one
+			 * that reversed in reverses out. Reversing every vehicle's facing
+			 * is all that takes -- which end leads is left alone.
 			 *
-			 * Which means bringing a train out the same way round it went in
-			 * cannot be done by holding on to that flag, however much it looks
-			 * like it should be: the exit path has to learn to lead with the
-			 * other end first, and that is a separate piece of work. Until
-			 * then this stays as the engine has always done it. See
+			 * A depot holds the whole train on one hidden tile, so it has no
+			 * extent there and either end is free to come out first; that is
+			 * what makes this a choice rather than something geometry decides.
+			 * It does need the leaving code to send out whichever end leads
+			 * rather than always the head of the chain, which is why
+			 * CheckTrainStayInDepot works from GetMovingFront().
+			 *
+			 * The engine used to bring every train out facing forwards,
+			 * turning round any that had reversed in, on the grounds that it
+			 * lets a player straighten out a confused one. But trains visit
+			 * depots on their own for scheduled servicing, and one that comes
+			 * back the other way round has had a working setup quietly
+			 * rearranged. So turning round happens when it is asked for: by the
+			 * order, or by hand with the reverse button while the train is
+			 * stopped inside. See Order::ShouldTurnAroundInDepot() and
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
-				consist->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
-			} else {
-				for (Train *u = consist; u != nullptr; u = u->Next()) {
-					u->direction = ReverseDir(u->direction);
-				}
+			for (Train *u = consist; u != nullptr; u = u->Next()) {
+				u->direction = ReverseDir(u->direction);
+			}
+			if (consist->current_order.IsType(OT_GOTO_DEPOT) && consist->current_order.ShouldTurnAroundInDepot()) {
+				consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
 			}
 			VehicleEnterDepot(consist);
 		}

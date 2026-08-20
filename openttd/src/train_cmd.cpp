@@ -2886,13 +2886,22 @@ static bool CheckTrainStayInDepot(Train *v)
 	v->PlayLeaveStationSound();
 	SetWindowClassesDirty(WindowClass::TrainList);
 
-	v->track = AxisToTrack(DiagDirToAxis(DirToDiagDir(v->direction)));
+	/* Whichever end is going to lead is the one that comes out, which is not
+	 * always the head of the chain: a train that reversed in leads with its
+	 * other end. Giving the track to and unhiding the head regardless is what
+	 * used to force every train to be turned round on the way in, so that the
+	 * assumption held. Everything below this that is about the train as a whole
+	 * -- its speed, its acceleration -- still belongs to the head. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	Train *moving_front = v->GetMovingFront();
 
-	v->vehstatus.Reset(VehState::Hidden);
+	moving_front->track = AxisToTrack(DiagDirToAxis(DirToDiagDir(moving_front->direction)));
+
+	moving_front->vehstatus.Reset(VehState::Hidden);
 	v->cur_speed = 0;
 
-	v->UpdateViewport(true, true);
-	v->UpdatePosition();
+	moving_front->UpdateViewport(true, true);
+	moving_front->UpdatePosition();
 	UpdateSignalsOnSegment(v->tile, DiagDirection::Invalid, v->owner);
 	v->UpdateAcceleration();
 	InvalidateWindowData(WindowClass::VehicleDepot, v->tile);
