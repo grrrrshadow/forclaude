@@ -1717,22 +1717,35 @@ static bool AreConsistsCloseEnoughToCouple(const Train *a, const Train *b)
  * case. See FEATURE_DESIGN_COUPLING_TOW.md.
  *
  * @param consist The merged train.
- * @param appended First vehicle of the part that was just attached.
  */
-static void CloseUpCoupledConsist(Train *consist, Train *appended)
+static void CloseUpCoupledConsist(Train *consist)
 {
 	/* Bounded well above the tile-and-a-bit any real gap can be, purely so a
 	 * consist that somehow refuses to close cannot spin here forever. */
 	for (uint step = 0; step < 4 * TILE_SIZE; step++) {
-		const Train *ahead = appended->GetMovingPrev();
-		if (ahead == nullptr) break;
+		/* Find the first place the train is further apart than it should be.
+		 * Walking in movement order rather than chain order matters: the two
+		 * run opposite ways round for a train that is driving backwards, and
+		 * TrainController() moves a vehicle and everything behind it in
+		 * movement order -- hand it the wrong end and it drags the wrong half
+		 * of the train. Most couplings happen to a reversing train, so that is
+		 * the common case, not the exception. */
+		Train *behind_gap = nullptr;
+		for (Train *u = consist->GetMovingFront(); u != nullptr; u = u->GetMovingNext()) {
+			Train *next = u->GetMovingNext();
+			if (next == nullptr) break;
 
-		int x_diff = ahead->x_pos - appended->x_pos;
-		int y_diff = ahead->y_pos - appended->y_pos;
-		int want = ahead->CalcNextVehicleOffset();
-		if (x_diff * x_diff + y_diff * y_diff <= want * want) break;
+			int x_diff = u->x_pos - next->x_pos;
+			int y_diff = u->y_pos - next->y_pos;
+			int want = u->CalcNextVehicleOffset();
+			if (x_diff * x_diff + y_diff * y_diff > want * want) {
+				behind_gap = next;
+				break;
+			}
+		}
+		if (behind_gap == nullptr) break;
 
-		if (!TrainController(appended, nullptr)) break;
+		if (!TrainController(behind_gap, nullptr)) break;
 	}
 
 	consist->ConsistChanged(CCF_TRACK);
@@ -1811,13 +1824,12 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
 
 	Train *new_head = leading;
-	Train *appended = src;
 	ret = TryConsistSplice(flags, src, dst, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
 
 	/* The two halves were joined across a gap; walk it shut before anything
 	 * tries to drive this train. */
-	CloseUpCoupledConsist(new_head, appended);
+	CloseUpCoupledConsist(new_head);
 
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
