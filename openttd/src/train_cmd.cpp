@@ -3518,41 +3518,24 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 	/* Don't use tracks here as the setting to forbid 90 deg turns might have been switched between reservation and now. */
 	TrackBits res_tracks = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
-	/* Do we have a suitable reserved track? */
-	if (res_tracks.Any()) {
-		/* A reservation on this tile isn't necessarily still ours to
-		 * trust blindly: a headless "free wagon" chain left behind by a
-		 * decouple order can hold a live, legitimate reservation
-		 * directly adjacent to ours (see FEATURE_DESIGN_COUPLING_TOW.md)
-		 * -- something that could never happen in vanilla, where a
-		 * reservation is a plain per-tile boolean with no owner, so any
-		 * reserved tile reachable this way was always safely assumed to
-		 * be part of our own already-secured path. Without this check, a
-		 * train departing (or reversing) right next to wagons it (or a
-		 * sibling train) just left behind inherits their reservation as
-		 * if it were its own and drives straight through them. If a
-		 * genuinely different train is physically standing on this
-		 * tile, fall through to the normal pathfinding/reservation
-		 * logic below instead, which correctly treats an occupied tile
-		 * as blocked (or safely marks us stuck) rather than driving
-		 * straight through it. */
-		bool tile_held_by_other_train = false;
-		for (const Vehicle *u : VehiclesOnTile(tile)) {
-			if (u->type != VehicleType::Train) continue;
-			if (Train::From(u)->First() == consist->First()) continue;
-			tile_held_by_other_train = true;
-			break;
-		}
-		/* And more than one reserved track reachable from here means we cannot
-		 * tell which of them is ours either. In vanilla picking the first would
-		 * be harmless, because every reserved tile a train could reach this way
-		 * was part of its own path; here the second one can belong to a train
-		 * standing further down a platform, and taking it drives us into that
-		 * train -- past a signal that is green because the path it guards
-		 * really is reserved, just not by us. Let the pathfinder below work it
-		 * out instead. */
-		if (!tile_held_by_other_train && res_tracks.Count() == 1) return FindFirstTrack(res_tracks);
-	}
+	/* Do we have a suitable reserved track?
+	 *
+	 * This is what keeps a train on the path it reserved: having planned and
+	 * reserved a route, at every tile of it the train simply takes the track
+	 * that is already reserved instead of asking the pathfinder again. Falling
+	 * through to the pathfinder here is not a cautious choice, it is a
+	 * different route -- the search runs afresh, returns whatever looks best
+	 * from this tile now, and the train drives off its own reserved path and
+	 * onto a track nothing has secured for it. Which is how a train that had
+	 * correctly reserved its way out of a station drove straight on into a
+	 * one-way line and hit an oncoming one.
+	 *
+	 * So no condition belongs here. Refusing to enter a tile is a separate
+	 * matter from choosing a track and is handled where the train physically
+	 * enters one (see the free-wagon check in TrainController), which is the
+	 * only place that can refuse without sending the train somewhere else
+	 * instead. */
+	if (res_tracks.Any()) return FindFirstTrack(res_tracks);
 
 	/* Quick return in case only one possible track is available */
 	if (tracks.Count() == 1) {
