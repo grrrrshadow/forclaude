@@ -296,8 +296,13 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
 
 				/* Reversing out is about where the train goes next, not about
-				 * how long it stays, so it has no place in the timetable. */
-				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation()) {
+				 * how long it stays, so it has no place in the timetable. Nor
+				 * is it shown when the order decouples here, because then it is
+				 * not carried out -- an order saved before the two were made
+				 * exclusive can still have both set, and saying so would be a
+				 * plain lie about what the train is going to do. */
+				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation() &&
+						order->GetDecoupleCount() == 0) {
 					line += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
 				}
 			}
@@ -1097,9 +1102,14 @@ public:
 				 * that has just picked wagons up very often wants to go back
 				 * the way it came. Only decoupling blocks the choice, because
 				 * there the train already leaves the right way by itself. */
+				/* The two exclude each other, so whichever is set greys the
+				 * other out. Decoupling already leaves the train facing the
+				 * right way by itself, and asking it to reverse out on top of
+				 * that would undo exactly that. */
 				bool can_reverse_out = order->GetDecoupleCount() == 0;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && order->ShouldReverseOutOfStation());
+				this->SetWidgetDisabledState(WID_O_DECOUPLE_COUNT, order->ShouldReverseOutOfStation());
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
