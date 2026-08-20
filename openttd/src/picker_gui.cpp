@@ -223,7 +223,9 @@ void PickerWindow::ConstructWindow()
 	if (this->has_class_picker) {
 		this->GetWidget<NWidgetCore>(WID_PW_CLASS_LIST)->SetToolTip(this->callbacks.GetClassTooltip());
 
-		this->querystrings[WID_PW_CLASS_FILTER] = &this->class_editbox;
+		/* The name filters are left out of the layout (see MakePickerClassWidgets),
+		 * so only hook the edit box up when one is actually there. */
+		if (this->GetWidget<NWidgetBase>(WID_PW_CLASS_FILTER) != nullptr) this->querystrings[WID_PW_CLASS_FILTER] = &this->class_editbox;
 	} else {
 		if (auto *nwid = this->GetWidget<NWidgetStacked>(WID_PW_CLASS_SEL); nwid != nullptr) {
 			/* Check the container orientation. MakeNWidgets adds an additional NWID_VERTICAL container so we check the grand-parent. */
@@ -261,7 +263,7 @@ void PickerWindow::ConstructWindow()
 		auto *matrix = this->GetWidget<NWidgetMatrix>(WID_PW_TYPE_MATRIX);
 		matrix->SetScrollbar(this->GetScrollbar(WID_PW_TYPE_SCROLL));
 
-		this->querystrings[WID_PW_TYPE_FILTER] = &this->type_editbox;
+		if (this->GetWidget<NWidgetBase>(WID_PW_TYPE_FILTER) != nullptr) this->querystrings[WID_PW_TYPE_FILTER] = &this->type_editbox;
 	} else {
 		if (auto *nwid = this->GetWidget<NWidgetStacked>(WID_PW_TYPE_SEL); nwid != nullptr) {
 			/* Check the container orientation. MakeNWidgets adds an additional NWID_VERTICAL container so we check the grand-parent. */
@@ -720,9 +722,11 @@ EventState PickerWindow::OnHotkey(int hotkey)
 	switch (hotkey) {
 		case PCWHK_FOCUS_FILTER_BOX:
 			/* Cycle between the two edit boxes. */
-			if (this->has_type_picker && (this->nested_focus == nullptr || this->nested_focus->GetIndex() != WID_PW_TYPE_FILTER)) {
+			if (this->has_type_picker && this->GetWidget<NWidgetBase>(WID_PW_TYPE_FILTER) != nullptr &&
+					(this->nested_focus == nullptr || this->nested_focus->GetIndex() != WID_PW_TYPE_FILTER)) {
 				this->SetFocusedWidget(WID_PW_TYPE_FILTER);
-			} else if (this->has_class_picker && (this->nested_focus == nullptr || this->nested_focus->GetIndex() != WID_PW_CLASS_FILTER)) {
+			} else if (this->has_class_picker && this->GetWidget<NWidgetBase>(WID_PW_CLASS_FILTER) != nullptr &&
+					(this->nested_focus == nullptr || this->nested_focus->GetIndex() != WID_PW_CLASS_FILTER)) {
 				this->SetFocusedWidget(WID_PW_CLASS_FILTER);
 			}
 			SetFocusedWindow(this);
@@ -962,9 +966,6 @@ std::unique_ptr<NWidgetBase> MakePickerClassWidgets()
 	static constexpr std::initializer_list<NWidgetPart> picker_class_widgets = {
 		NWidget(NWID_SELECTION, Colours::Invalid, WID_PW_CLASS_SEL),
 			NWidget(NWID_VERTICAL),
-				NWidget(WWT_PANEL, Colours::DarkGreen),
-					NWidget(WWT_EDITBOX, Colours::DarkGreen, WID_PW_CLASS_FILTER), SetMinimalSize(144, 0), SetPadding(2), SetFill(1, 0), SetStringTip(STR_LIST_FILTER_OSKTITLE, STR_LIST_FILTER_TOOLTIP),
-				EndContainer(),
 				/* Collection view */
 				NWidget(NWID_VERTICAL),
 					NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
@@ -998,9 +999,6 @@ std::unique_ptr<NWidgetBase> MakePickerTypeWidgets()
 		NWidget(NWID_SELECTION, Colours::Invalid, WID_PW_TYPE_SEL),
 			NWidget(NWID_VERTICAL),
 				NWidget(NWID_HORIZONTAL),
-					NWidget(WWT_PANEL, Colours::DarkGreen),
-						NWidget(WWT_EDITBOX, Colours::DarkGreen, WID_PW_TYPE_FILTER), SetPadding(2), SetResize(1, 0), SetFill(1, 0), SetStringTip(STR_LIST_FILTER_OSKTITLE, STR_LIST_FILTER_TOOLTIP),
-					EndContainer(),
 					NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_PW_CONFIGURE_BADGES), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON), SetResize(0, 0), SetFill(0, 1), SetSpriteTip(SPR_EXTRA_MENU, STR_BADGE_CONFIG_MENU_TOOLTIP),
 				EndContainer(),
 				NWidget(NWID_VERTICAL, NWidContainerFlag{}, WID_PW_BADGE_FILTER),

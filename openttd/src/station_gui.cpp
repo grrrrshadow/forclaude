@@ -442,8 +442,11 @@ public:
 		this->FinishInitNested(window_number);
 		this->owner = this->window_number;
 
-		this->querystrings[WID_STL_FILTER] = &this->name_editbox;
-		this->name_editbox.cancel_button = QueryString::ACTION_CLEAR;
+		/* Only hook the edit box up when the layout actually has one. */
+		if (this->GetWidget<NWidgetBase>(WID_STL_FILTER) != nullptr) {
+			this->querystrings[WID_STL_FILTER] = &this->name_editbox;
+			this->name_editbox.cancel_button = QueryString::ACTION_CLEAR;
+		}
 
 		if (this->filter.cargoes == ALL_CARGOTYPES) this->filter.cargoes = _cargo_mask;
 
@@ -804,7 +807,10 @@ static constexpr std::initializer_list<NWidgetPart> _nested_company_stations_wid
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_STL_SORTBY), SetMinimalSize(0, 12), SetStringTip(STR_BUTTON_SORT_BY, STR_TOOLTIP_SORT_ORDER),
 		NWidget(WWT_DROPDOWN, Colours::Grey, WID_STL_SORTDROPBTN), SetMinimalSize(0, 12), SetStringTip(STR_SORT_BY_NAME, STR_TOOLTIP_SORT_CRITERIA), // widget_data gets overwritten.
-		NWidget(WWT_EDITBOX, Colours::Grey, WID_STL_FILTER), SetFill(1, 0), SetResize(1, 0), SetStringTip(STR_LIST_FILTER_OSKTITLE, STR_LIST_FILTER_TOOLTIP),
+		/* Filtering the list by name is deliberately left out for now: it is new
+		 * in 16.0-beta2 and reported to crash. Putting the edit box back is all
+		 * it takes to restore it once that is sorted out upstream. */
+		NWidget(WWT_PANEL, Colours::Grey), SetFill(1, 0), SetResize(1, 0), EndContainer(),
 	EndContainer(),
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PANEL, Colours::Grey, WID_STL_LIST), SetMinimalSize(346, 125), SetResize(1, 10), SetToolTip(STR_STATION_LIST_TOOLTIP), SetScrollbar(WID_STL_SCROLLBAR), EndContainer(),
