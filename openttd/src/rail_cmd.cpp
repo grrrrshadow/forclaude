@@ -3052,36 +3052,29 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 		v->vehstatus.Set(VehState::Hidden);
 		if (v->GetMovingNext() == nullptr) {
 			Train *consist = Train::From(v)->First();
-			/* A depot is a dead end, so by default a train bounces off it the
-			 * same way it bounces off the end of a line: the flag that says
-			 * which way it is driving flips, and nothing else changes. A train
-			 * that drove in comes back out reversing, and one that reversed in
-			 * comes out driving forwards -- either way it leaves the way it
-			 * arrived, with the same vehicle still at the same end.
+			/* A train leaves a depot the same way round it arrived: the end
+			 * that led the way in leads the way out again. Reversing every
+			 * vehicle's facing is all that takes. A depot holds the whole train
+			 * on one hidden tile, so it has no extent there and either end is
+			 * free to come out first -- which is why this is a choice at all,
+			 * and why it is not enough to simply leave the train alone. Leaving
+			 * a depot works from the direction of travel, so a train whose
+			 * facing was never reversed just drives at the dead end.
 			 *
-			 * That flip is the whole of it. Leaving a depot works from the
-			 * train's direction of travel, so simply not turning it (as an
-			 * earlier attempt did) points it into the dead end instead; and
-			 * the exit path already follows GetMovingNext(), so it copes with
-			 * a train that leaves reversing.
-			 *
-			 * Turning the train round properly -- ending up facing the other
-			 * way, which is what the engine used to do to every train that
-			 * entered, on the grounds that it lets a player straighten out a
-			 * confused one -- is worth having, but as something a player asks
-			 * for. A train goes to a depot on its own for scheduled servicing
-			 * too, and coming back rearranged from that quietly breaks a setup
-			 * nobody touched. See Order::ShouldTurnAroundInDepot() and
+			 * The engine used to bring every train out facing forwards, turning
+			 * round any that had reversed in, on the grounds that this lets a
+			 * player straighten out a confused one. But trains visit depots on
+			 * their own for scheduled servicing, and one that comes back the
+			 * other way round has had a setup nobody touched quietly
+			 * rearranged. So turning round is what the order asks for, and
+			 * flipping which end leads is exactly that. A player can also do it
+			 * by hand with the reverse button while the train is stopped
+			 * inside. See Order::ShouldTurnAroundInDepot() and
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			for (Train *u = consist; u != nullptr; u = u->Next()) {
+				u->direction = ReverseDir(u->direction);
+			}
 			if (consist->current_order.IsType(OT_GOTO_DEPOT) && consist->current_order.ShouldTurnAroundInDepot()) {
-				if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
-					consist->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
-				} else {
-					for (Train *u = consist; u != nullptr; u = u->Next()) {
-						u->direction = ReverseDir(u->direction);
-					}
-				}
-			} else {
 				consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
 			}
 			VehicleEnterDepot(consist);
