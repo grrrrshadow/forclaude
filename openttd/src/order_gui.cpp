@@ -331,11 +331,6 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				line += GetString(STR_ORDER_WAIT_TO_UNBUNCH);
 			}
 
-			/* Turning around is about where the train ends up, not about how
-			 * long it takes, so it has no place in the timetable window. */
-			if (!timetable && v->type == VehicleType::Train && order->ShouldTurnAroundInDepot()) {
-				line += GetString(STR_ORDER_TURN_AROUND_DEPOT_SUFFIX);
-			}
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -1104,9 +1099,6 @@ public:
 				bool plain_stop = !order->ShouldGoToCouple() && !order->ShouldWaitForCouple() && order->GetDecoupleCount() == 0;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !plain_stop);
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, plain_stop && order->ShouldReverseOutOfStation());
-			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
-				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
-				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
 			} else {
 				decouple_sel->SetDisplayedPlane(SZSP_NONE);
 			}

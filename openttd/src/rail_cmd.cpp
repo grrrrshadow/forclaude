@@ -3052,26 +3052,19 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 		v->vehstatus.Set(VehState::Hidden);
 		if (v->GetMovingNext() == nullptr) {
 			Train *consist = Train::From(v)->First();
-			/* A depot turns a train around only when its order asks it to.
-			 *
-			 * Doing it unconditionally (so that trains always drive forwards
-			 * out of a depot, letting a player straighten out a confused
-			 * train) is fine for a visit the player asked for, but trains also
-			 * enter depots by themselves for scheduled servicing: one that
-			 * went in reversing came back out the other way round, silently
-			 * rearranging a setup the player never touched. With decouple and
-			 * couple orders in play, which way round a train is matters a
-			 * great deal, so that is a real hazard rather than a convenience.
-			 * The turning is available on request instead -- see
-			 * Order::ShouldTurnAroundInDepot() and
-			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (consist->current_order.IsType(OT_GOTO_DEPOT) && consist->current_order.ShouldTurnAroundInDepot()) {
-				if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
-					consist->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
-				} else {
-					for (Train *u = consist; u != nullptr; u = u->Next()) {
-						u->direction = ReverseDir(u->direction);
-					}
+			/* Leaving a depot assumes the train ends up facing out of it, so
+			 * this turning is not optional decoration: skipping it leaves a
+			 * train pointing into the dead end and the exit path then works
+			 * from a direction that cannot be driven. Making a depot preserve
+			 * which way round a train is -- worth having, since a train sent
+			 * for scheduled servicing should not come back rearranged -- means
+			 * teaching the exit path to handle a train that stays reversed,
+			 * not just skipping this. See FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
+				consist->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+			} else {
+				for (Train *u = consist; u != nullptr; u = u->Next()) {
+					u->direction = ReverseDir(u->direction);
 				}
 			}
 			VehicleEnterDepot(consist);
