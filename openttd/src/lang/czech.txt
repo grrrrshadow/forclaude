@@ -5597,7 +5597,7 @@ STR_ERROR_CAN_T_REVERSE_DIRECTION_TRAIN                         :{WHITE}Nelze ob
 STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Nelze spojit vlak...
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned před ním nestojí žádný vlak ke spojení
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... mašinka by skončila za vagonky, což zatím není podporováno
-STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je mezi nimi ještě mezera
+STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je moc daleko na spojení
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

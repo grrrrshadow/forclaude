@@ -1672,37 +1672,71 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 }
 
 /**
- * Are these two consists actually touching, rather than merely a tile apart?
+ * Is @p b close enough to @p a that coupling them should pull the two together,
+ * rather than drag vehicles across the map?
  *
- * Coupling splices one chain onto the end of another and leaves every vehicle
- * where it stands, which is only right if the two ends are already against each
- * other. Join across a gap and the result is a train with a hole in it, and a
- * wagon that has to work out which track connects it to the vehicle ahead then
- * finds no track at all -- see the assert in TrainController. So the gap has to
- * be gone before the two become one train.
- *
- * Measured the same way #CheckTrainCollision decides two vehicles are touching,
- * so the point at which a train stops itself against its partner and the point
- * at which it may couple to it are the same point. See
- * FEATURE_DESIGN_COUPLING_TOW.md.
+ * A train stops short of its partner by roughly a tile, because it cannot
+ * reserve the tile the partner stands on, so some gap is normal and expected.
+ * This only rejects the absurd, and is deliberately generous.
  *
  * @param a One consist.
  * @param b The other consist.
- * @return true if some vehicle of each is up against the other.
+ * @return true if the two are near enough to be closed up.
  */
-static bool AreConsistsTouching(const Train *a, const Train *b)
+static bool AreConsistsCloseEnoughToCouple(const Train *a, const Train *b)
 {
 	for (const Train *u = a; u != nullptr; u = u->Next()) {
 		for (const Train *w = b; w != nullptr; w = w->Next()) {
-			if (abs(u->z_pos - w->z_pos) > 5) continue;
+			if (abs(u->z_pos - w->z_pos) > 8) continue;
 
 			int x_diff = u->x_pos - w->x_pos;
 			int y_diff = u->y_pos - w->y_pos;
-			int min_diff = (u->gcache.cached_veh_length + 1) / 2 + (w->gcache.cached_veh_length + 1) / 2;
-			if (x_diff * x_diff + y_diff * y_diff <= min_diff * min_diff) return true;
+			int reach = 2 * TILE_SIZE;
+			if (x_diff * x_diff + y_diff * y_diff <= reach * reach) return true;
 		}
 	}
 	return false;
+}
+
+/**
+ * Pull a freshly coupled part up against the rest of its train, closing the gap
+ * the coupling was made across.
+ *
+ * Splicing two consists together moves nothing, so the join is only sound if
+ * they were already touching -- and they never are. A train cannot reserve the
+ * tile its partner occupies, so it stops about a tile short, and joining there
+ * produces a train with a hole in it. A wagon behind that hole then has to work
+ * out which track connects it to the vehicle ahead, finds none, and the game
+ * asserts a few tiles later. So the hole has to be walked shut.
+ *
+ * This mirrors #AdvanceWagonsAfterSwap, which closes the same kind of spacing
+ * gap after a consist is rearranged, but is kept as its own copy rather than
+ * bent to fit: that one computes an exact differential from vehicle lengths for
+ * a train whose parts are already snug, which is not the situation here, and
+ * TrainController() is used by the whole game and is no place for our special
+ * case. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param consist The merged train.
+ * @param appended First vehicle of the part that was just attached.
+ */
+static void CloseUpCoupledConsist(Train *consist, Train *appended)
+{
+	/* Bounded well above the tile-and-a-bit any real gap can be, purely so a
+	 * consist that somehow refuses to close cannot spin here forever. */
+	for (uint step = 0; step < 4 * TILE_SIZE; step++) {
+		const Train *ahead = appended->GetMovingPrev();
+		if (ahead == nullptr) break;
+
+		int x_diff = ahead->x_pos - appended->x_pos;
+		int y_diff = ahead->y_pos - appended->y_pos;
+		int want = ahead->CalcNextVehicleOffset();
+		if (x_diff * x_diff + y_diff * y_diff <= want * want) break;
+
+		if (!TrainController(appended, nullptr)) break;
+	}
+
+	consist->ConsistChanged(CCF_TRACK);
+	consist->UpdateViewport(true, true);
 }
 
 /**
@@ -1765,13 +1799,11 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * FEATURE_DESIGN_COUPLING_TOW.md for what doing this properly needs. */
 	if (!leading->IsFrontEngine()) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END);
 
-	/* Splicing leaves every vehicle where it stands, so the two ends have to be
-	 * against each other already. A train stops one tile short of its partner
-	 * whenever it cannot reserve the tile the partner occupies, and joining
-	 * across that gap makes a train with a hole in it -- which crashes as soon
-	 * as the wagon behind the hole has to work out what track connects it to
-	 * the vehicle ahead. Wait instead. */
-	if (!AreConsistsTouching(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+	/* Some gap is normal -- a train cannot reserve the tile its partner stands
+	 * on, so it stops about a tile short and the two are closed up after the
+	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
+	 * of closing up should be asked to cover. */
+	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();
@@ -1779,8 +1811,13 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
 
 	Train *new_head = leading;
+	Train *appended = src;
 	ret = TryConsistSplice(flags, src, dst, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
+
+	/* The two halves were joined across a gap; walk it shut before anything
+	 * tries to drive this train. */
+	CloseUpCoupledConsist(new_head, appended);
 
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
