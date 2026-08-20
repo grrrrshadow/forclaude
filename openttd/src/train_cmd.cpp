@@ -1672,6 +1672,40 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind)
 }
 
 /**
+ * Are these two consists actually touching, rather than merely a tile apart?
+ *
+ * Coupling splices one chain onto the end of another and leaves every vehicle
+ * where it stands, which is only right if the two ends are already against each
+ * other. Join across a gap and the result is a train with a hole in it, and a
+ * wagon that has to work out which track connects it to the vehicle ahead then
+ * finds no track at all -- see the assert in TrainController. So the gap has to
+ * be gone before the two become one train.
+ *
+ * Measured the same way #CheckTrainCollision decides two vehicles are touching,
+ * so the point at which a train stops itself against its partner and the point
+ * at which it may couple to it are the same point. See
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param a One consist.
+ * @param b The other consist.
+ * @return true if some vehicle of each is up against the other.
+ */
+static bool AreConsistsTouching(const Train *a, const Train *b)
+{
+	for (const Train *u = a; u != nullptr; u = u->Next()) {
+		for (const Train *w = b; w != nullptr; w = w->Next()) {
+			if (abs(u->z_pos - w->z_pos) > 5) continue;
+
+			int x_diff = u->x_pos - w->x_pos;
+			int y_diff = u->y_pos - w->y_pos;
+			int min_diff = (u->gcache.cached_veh_length + 1) / 2 + (w->gcache.cached_veh_length + 1) / 2;
+			if (x_diff * x_diff + y_diff * y_diff <= min_diff * min_diff) return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -1730,6 +1764,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * lost: the engine simply waits, as it did before it got here. See
 	 * FEATURE_DESIGN_COUPLING_TOW.md for what doing this properly needs. */
 	if (!leading->IsFrontEngine()) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END);
+
+	/* Splicing leaves every vehicle where it stands, so the two ends have to be
+	 * against each other already. A train stops one tile short of its partner
+	 * whenever it cannot reserve the tile the partner occupies, and joining
+	 * across that gap makes a train with a hole in it -- which crashes as soon
+	 * as the wagon behind the hole has to work out what track connects it to
+	 * the vehicle ahead. Wait instead. */
+	if (!AreConsistsTouching(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();

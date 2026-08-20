@@ -5307,6 +5307,7 @@ STR_ERROR_REAR_ENGINE_FOLLOW_FRONT                              :the rear engine
 STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Can't couple train...
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... no stopped train immediately ahead to couple with
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... the engine would end up behind the wagons, which is not supported yet
+STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... there is still a gap between them
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

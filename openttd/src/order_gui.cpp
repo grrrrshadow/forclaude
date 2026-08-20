@@ -1100,6 +1100,9 @@ public:
 				bool can_reverse_out = order->GetDecoupleCount() == 0;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && order->ShouldReverseOutOfStation());
+			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
+				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
+				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
 			} else {
 				decouple_sel->SetDisplayedPlane(SZSP_NONE);
 			}
