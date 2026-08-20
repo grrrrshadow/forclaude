@@ -1742,7 +1742,13 @@ static Point LocalGetWindowPlacement(const WindowDesc &desc, int16_t sm_width, i
 	if (desc.parent_cls != WindowClass::None && (w = FindWindowById(desc.parent_cls, window_number)) != nullptr) {
 		bool rtl = _current_text_dir == TD_RTL;
 		if (desc.parent_cls == WindowClass::BuildToolbar || desc.parent_cls == WindowClass::ScenarioGenerateLandscape) {
-			pt.x = w->left + (rtl ? w->width - default_width : 0);
+			/* Hung under the far end of the toolbar rather than its near end.
+			 * These are the windows that pick what to build -- a station
+			 * layout, a signal type, a bridge -- so they are open at exactly
+			 * the moment the player is looking at the piece of map they mean
+			 * to build on, and opening over it is the one place they must not
+			 * be. The far end keeps them clear of it. */
+			pt.x = w->left + (rtl ? 0 : w->width - default_width);
 			pt.y = w->top + w->height;
 			return pt;
 		} else {
