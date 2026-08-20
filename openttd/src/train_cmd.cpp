@@ -3383,7 +3383,19 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			tile_held_by_other_train = true;
 			break;
 		}
-		if (!tile_held_by_other_train) return FindFirstTrack(res_tracks);
+		/* The same shortcut also has to refuse a reservation that is simply
+		 * not ours, on a tile with nothing standing on it -- exactly what a
+		 * decouple can leave lying about. A train never passes a red signal on
+		 * its own reservation, because reserving through a signal is what turns
+		 * it green; so a red one ahead is proof the reservation belongs to
+		 * somebody else, and taking the shortcut would drive straight past it.
+		 * Falling through to the pathfinder below either secures the path
+		 * properly or stops the train. */
+		Track res_track = FindFirstTrack(res_tracks);
+		Trackdir res_td = TrackEnterdirToTrackdir(res_track, enterdir);
+		bool red_signal_ahead = HasSignalOnTrackdir(tile, res_td) && GetSignalStateByTrackdir(tile, res_td) == SignalState::Red;
+
+		if (!tile_held_by_other_train && !red_signal_ahead) return res_track;
 	}
 
 	/* Quick return in case only one possible track is available */
