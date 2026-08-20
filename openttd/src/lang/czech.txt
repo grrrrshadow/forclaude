@@ -1769,6 +1769,8 @@ STR_CONFIG_SETTING_SERVICEATHELIPAD_HELPTEXT                    :Helikoptéra na
 
 STR_CONFIG_SETTING_LINK_TERRAFORM_TOOLBAR                       :Otevírat lištu na úpravy terénu s lištami na výstavbu tratí/silnic atd.: {STRING}
 STR_CONFIG_SETTING_LINK_TERRAFORM_TOOLBAR_HELPTEXT              :Při otevírání lišty výstavby automaticky otevřít lištu s úpravami terénu.
+STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END                         :Otevírat okna výstavby na vzdáleném konci lišty: {STRING}
+STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END_HELPTEXT                :Okna, ve kterých se vybírá, co se má postavit (uspořádání nádraží, typ návěstidla, most), se pověsí pod vzdálený konec lišty místo pod její bližší konec, aby nezakrývala místo na mapě, kam se staví. Když se současně otevírá i lišta úprav terénu, počítá se vzdálený konec obou dohromady.
 
 STR_CONFIG_SETTING_SMALLMAP_LAND_COLOUR                         :Barva země v mapě: {STRING}
 STR_CONFIG_SETTING_SMALLMAP_LAND_COLOUR_HELPTEXT                :Barva terénu na malé mapě

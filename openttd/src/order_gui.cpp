@@ -336,6 +336,13 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				line += GetString(STR_ORDER_WAIT_TO_UNBUNCH);
 			}
 
+			/* Turning around in the depot says which way the train comes out
+			 * of it, not how long it stays, so it has no place in the
+			 * timetable. See FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (!timetable && v->type == VehicleType::Train && order->ShouldTurnAroundInDepot()) {
+				line += GetString(STR_ORDER_TURN_AROUND_DEPOT_SUFFIX);
+			}
+
 			break;
 
 		case OT_GOTO_WAYPOINT:

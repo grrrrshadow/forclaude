@@ -228,6 +228,7 @@ struct GUISettings {
 	uint8_t errmsg_duration; ///< duration of error message
 	uint16_t hover_delay_ms; ///< time required to activate a hover event, in milliseconds
 	bool link_terraform_toolbar; ///< display terraform toolbar when displaying rail, road, water and airport toolbars
+	bool build_window_far_end; ///< hang the station/signal/bridge picker windows under the far end of their toolbar instead of the near end
 	uint8_t smallmap_land_colour; ///< colour used for land and heightmap at the smallmap
 	uint8_t linkgraph_colours; ///< linkgraph overlay colours
 	ViewportScrollMode scroll_mode; ///< viewport scroll mode

@@ -2898,6 +2898,17 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_COUPLE), SetMinimalSize(18, 18),
 											SetSpriteTip(SPR_CLONE_TRAIN, STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP),
 			EndContainer(),
+			/* For trains only, a second 'turn around' button. The one below is
+			 * swapped out for 'refit' as soon as the train stands in a depot,
+			 * which is exactly where turning it by hand has to stay possible:
+			 * a depot never turns a train by itself, so this button and the
+			 * "turn around" order flag are the only two ways round. Cloned
+			 * rather than folded into the existing selection so that refitting
+			 * in the depot is not lost. See FEATURE_DESIGN_COUPLING_TOW.md. */
+			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_TURN_AROUND_DEPOT_SEL),
+				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND_DEPOT), SetMinimalSize(18, 18),
+											SetSpriteTip(SPR_FORCE_VEHICLE_TURN, STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP),
+			EndContainer(),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_REFIT_TURN),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_REFIT), SetMinimalSize(18, 18), SetSpriteTip(SPR_REFIT_VEHICLE),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND), SetMinimalSize(18, 18),
@@ -3095,6 +3106,9 @@ public:
 
 			default: NOT_REACHED();
 		}
+		/* Shown only once the train actually stands in a depot; UpdatePlanes()
+		 * takes it from here. */
+		this->GetWidget<NWidgetStacked>(WID_VV_TURN_AROUND_DEPOT_SEL)->SetDisplayedPlane(SZSP_NONE);
 		this->FinishInitNested(window_number);
 		this->owner = v->owner;
 		this->GetWidget<NWidgetViewport>(WID_VV_VIEWPORT)->InitializeViewport(this, static_cast<VehicleID>(this->window_number), ScaleZoomGUI(_vehicle_view_zoom_levels[v->type]));
@@ -3164,6 +3178,7 @@ public:
 			this->SetWidgetLoweredState(WID_VV_FORCE_PROCEED, Train::From(v)->force_proceed == TFP_SIGNAL);
 			this->SetWidgetDisabledState(WID_VV_FORCE_PROCEED, !is_localcompany);
 			this->SetWidgetDisabledState(WID_VV_COUPLE, !is_localcompany || GetTrainCouplePartner(Train::From(v)) == nullptr);
+			this->SetWidgetDisabledState(WID_VV_TURN_AROUND_DEPOT, !is_localcompany);
 		}
 
 		if (v->type == VehicleType::Train || v->type == VehicleType::Road) {
@@ -3385,6 +3400,10 @@ public:
 					Command<Commands::ReverseTrainDirection>::Post(_vehicle_msg_translation_table[VCT_CMD_TURN_AROUND][v->type], v->tile, v->index, false);
 				}
 				break;
+			case WID_VV_TURN_AROUND_DEPOT: // turn around while standing in a depot
+				assert(v->type == VehicleType::Train);
+				Command<Commands::ReverseTrainDirection>::Post(_vehicle_msg_translation_table[VCT_CMD_TURN_AROUND][v->type], v->tile, v->index, false);
+				break;
 			case WID_VV_FORCE_PROCEED: // force proceed
 				assert(v->type == VehicleType::Train);
 				Command<Commands::ForceTrainProceed>::Post(STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL, v->tile, v->index);
@@ -3463,6 +3482,16 @@ public:
 			if (nwi->shown_plane + SEL_RT_BASEPLANE != plane) {
 				this->SelectPlane(plane);
 			}
+		}
+
+		/* Turning a train by hand has to stay possible exactly where the
+		 * button above disappears, because a depot never turns a train by
+		 * itself. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		nwi = this->GetWidget<NWidgetStacked>(WID_VV_TURN_AROUND_DEPOT_SEL);
+		int depot_turn_plane = (v->type == VehicleType::Train && veh_stopped) ? 0 : SZSP_NONE;
+		if (nwi->shown_plane != depot_turn_plane) {
+			nwi->SetDisplayedPlane(depot_turn_plane);
+			this->ReInit();
 		}
 	}
 

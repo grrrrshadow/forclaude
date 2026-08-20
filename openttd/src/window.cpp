@@ -1742,14 +1742,35 @@ static Point LocalGetWindowPlacement(const WindowDesc &desc, int16_t sm_width, i
 	if (desc.parent_cls != WindowClass::None && (w = FindWindowById(desc.parent_cls, window_number)) != nullptr) {
 		bool rtl = _current_text_dir == TD_RTL;
 		if (desc.parent_cls == WindowClass::BuildToolbar || desc.parent_cls == WindowClass::ScenarioGenerateLandscape) {
-			/* Hung under the far end of the toolbar rather than its near end.
-			 * These are the windows that pick what to build -- a station
-			 * layout, a signal type, a bridge -- so they are open at exactly
-			 * the moment the player is looking at the piece of map they mean
-			 * to build on, and opening over it is the one place they must not
-			 * be. The far end keeps them clear of it. */
-			pt.x = w->left + (rtl ? 0 : w->width - default_width);
 			pt.y = w->top + w->height;
+
+			if (!_settings_client.gui.build_window_far_end) {
+				/* Vanilla: hung under the near end of the toolbar. */
+				pt.x = w->left;
+				return pt;
+			}
+
+			/* Hung under the far end of the toolbar instead. These are the
+			 * windows that pick what to build -- a station layout, a signal
+			 * type, a bridge -- so they open at exactly the moment the player
+			 * is looking at the piece of map they mean to build on, and
+			 * opening over it is the one place they must not be. The far end
+			 * keeps them clear of it.
+			 *
+			 * The landscaping toolbar opens alongside the construction one
+			 * when gui.link_terraform_toolbar is set, so measure the far end
+			 * across both: the player sees one row of tools, and the picker
+			 * belongs under the end of that row, not under the end of
+			 * whichever half happens to be its parent. */
+			int row_left = w->left;
+			int row_right = w->left + w->width;
+			const Window *terraform = FindWindowByClass(WindowClass::ScenarioGenerateLandscape);
+			if (terraform != nullptr && terraform != w && terraform->top == w->top) {
+				row_left = std::min(row_left, terraform->left);
+				row_right = std::max(row_right, terraform->left + terraform->width);
+			}
+
+			pt.x = rtl ? row_left : row_right - default_width;
 			return pt;
 		} else {
 			/* Position child window with offset of closebox, but make sure that either closebox or resizebox is visible

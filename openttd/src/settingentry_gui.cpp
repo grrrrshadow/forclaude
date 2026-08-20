@@ -646,6 +646,7 @@ SettingsContainer &GetSettingsTree()
 			SettingsPage *construction = interface->Add(new SettingsPage(STR_CONFIG_SETTING_INTERFACE_CONSTRUCTION));
 			{
 				construction->Add(new SettingEntry("gui.link_terraform_toolbar"));
+				construction->Add(new SettingEntry("gui.build_window_far_end"));
 				construction->Add(new SettingEntry("gui.persistent_buildingtools"));
 				construction->Add(new SettingEntry("gui.default_rail_road_type"));
 				construction->Add(new SettingEntry("gui.semaphore_build_before"));

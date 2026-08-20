@@ -1190,11 +1190,11 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_REVERSE_OUT) return CMD_ERROR;
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
-			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION) return CMD_ERROR;
+			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -1497,6 +1497,23 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					(u->current_order.IsType(OT_GOTO_STATION) || u->current_order.IsType(OT_LOADING)) &&
 					u->current_order.GetLoadType() != order->GetLoadType()) {
 				u->current_order.SetLoadType(order->GetLoadType());
+			}
+
+			/* The order just edited may be the one the vehicle is carrying out
+			 * right now, and the coupling flags are read off current_order at
+			 * the moment it arrives -- not off the order list. Keep the live
+			 * copy in step, so a flag toggled while the train is already on
+			 * its way still takes effect on this trip rather than the next
+			 * one. See FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (sel_ord == u->cur_real_order_index && u->type == VehicleType::Train) {
+				if (u->current_order.IsType(OT_GOTO_DEPOT) && order->IsType(OT_GOTO_DEPOT)) {
+					u->current_order.SetTurnAroundInDepot(order->ShouldTurnAroundInDepot());
+				} else if ((u->current_order.IsType(OT_GOTO_STATION) || u->current_order.IsType(OT_LOADING)) && order->IsType(OT_GOTO_STATION)) {
+					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
+					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
+					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
+					u->current_order.SetReverseOutOfStation(order->ShouldReverseOutOfStation());
+				}
 			}
 
 			/* Unbunching data is no longer valid. */
