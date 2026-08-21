@@ -1125,6 +1125,25 @@ public:
 			}
 		}
 
+		/* The decoupling settings only mean anything once decoupling is on, so
+		 * the row carrying them is there only then. The switch itself lives in
+		 * the bottom button row, with the other things done to a whole order
+		 * rather than to how it is carried out. */
+		NWidgetStacked *decouple_row = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_ROW);
+		bool decoupling = this->vehicle->type == VehicleType::Train && order != nullptr &&
+				order->IsType(OT_GOTO_STATION) && order->GetDecoupleCount() != 0;
+		if (decouple_row != nullptr) {
+			int want = decoupling ? 0 : SZSP_NONE;
+			if (decouple_row->shown_plane != want) {
+				decouple_row->SetDisplayedPlane(want);
+				this->ReInit();
+			}
+		}
+
+		bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
+		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple || order->ShouldReverseOutOfStation());
+		this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
+
 		this->SetDirty();
 	}
 
@@ -1391,6 +1410,19 @@ public:
 				if (order->GetConditionVariable() == OrderConditionVariable::MaxSpeed) value = ConvertSpeedToDisplaySpeed(value, this->vehicle->type);
 				this->querying_decouple_count = false;
 				ShowQueryString(GetString(STR_JUST_INT, value), STR_ORDER_CONDITIONAL_VALUE_CAPT, 5, this, CS_NUMERAL, {});
+				break;
+			}
+
+			case WID_O_DECOUPLE: {
+				const Order *o = this->vehicle->GetOrder(this->OrderGetSel());
+				if (o == nullptr) break;
+				/* Switching decoupling on asks for one vehicle to be left
+				 * behind, the smallest thing it can mean; the count button on
+				 * the row that appears is where a different number is chosen.
+				 * Switching it off puts the count back to none, which is what
+				 * "no decoupling" is. */
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+						this->OrderGetSel(), MOF_DECOUPLE_COUNT, o->GetDecoupleCount() != 0 ? 0 : 1);
 				break;
 			}
 
@@ -1739,8 +1771,6 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 	 * orders the turn-around one. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
-													SetStringTip(STR_JUST_STRING, STR_ORDER_DECOUPLE_COUNT_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_WAIT_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
@@ -1754,18 +1784,34 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		EndContainer(),
 	EndContainer(),
 
+	/* Decoupling row: appears only once decoupling has been switched on for
+	 * this order, so an order that does not decouple does not carry a row of
+	 * settings for something it is not going to do. */
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE_ROW),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_JUST_STRING, STR_ORDER_DECOUPLE_COUNT_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+	EndContainer(),
+
 	/* Second button row. */
 	NWidget(NWID_HORIZONTAL),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_SKIP_BUTTON, STR_ORDERS_SKIP_TOOLTIP), SetResize(1, 0),
+			/* Switching decoupling on belongs with the other things done to a
+			 * whole order rather than with its settings, and putting it here
+			 * keeps the row above for what decoupling is actually going to do.
+			 * All four are narrowed so the row stays the width it was. */
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_DECOUPLE), SetMinimalSize(93, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_TOOLTIP), SetResize(1, 0),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_BOTTOM_MIDDLE),
-				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(124, 12), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(93, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_DELETE_BUTTON, STR_ORDERS_DELETE_TOOLTIP), SetResize(1, 0),
-				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_STOP_SHARING), SetMinimalSize(124, 12), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_STOP_SHARING), SetMinimalSize(93, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_STOP_SHARING_BUTTON, STR_ORDERS_STOP_SHARING_TOOLTIP), SetResize(1, 0),
 			EndContainer(),
-			NWidget(NWID_BUTTON_DROPDOWN, Colours::Grey, WID_O_GOTO), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(NWID_BUTTON_DROPDOWN, Colours::Grey, WID_O_GOTO), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_GO_TO_BUTTON, STR_ORDERS_GO_TO_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),

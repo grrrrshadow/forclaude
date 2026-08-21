@@ -4872,6 +4872,8 @@ STR_ORDER_CONDITIONAL_VALUE_TOOLTIP                             :{BLACK}Hodnota,
 STR_ORDER_CONDITIONAL_VALUE_CAPT                                :{WHITE}Zadej hodnotu pro srovnávání
 
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Přeskočit
+STR_ORDERS_DECOUPLE_BUTTON                                      :{BLACK}Odpojit
+STR_ORDERS_DECOUPLE_TOOLTIP                                     :{BLACK}Nechat na této stanici část vlaku. Kolik jich zůstane, se nastaví na řádku, který se objeví
 STR_ORDERS_SKIP_TOOLTIP                                         :{BLACK}Přeskočit příkaz a jít na další. Pomocí CTRL + kliknutí se přeskočí na vybraný příkaz
 
 STR_ORDERS_DELETE_BUTTON                                        :{BLACK}Smazat

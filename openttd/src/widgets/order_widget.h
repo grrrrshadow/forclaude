@@ -38,6 +38,8 @@ enum OrderWidgets : WidgetID {
 	WID_O_SEL_BOTTOM_MIDDLE,         ///< #NWID_SELECTION widget for the middle part of the bottom row of the 'your train' order window.
 	WID_O_SHARED_ORDER_LIST,         ///< Open list of shared vehicles.
 	WID_O_SEL_DECOUPLE,              ///< #NWID_SELECTION widget for the 'decouple'/'wait to couple'/'go to couple' row, trains + station orders only.
+	WID_O_DECOUPLE,                  ///< Toggle decoupling wagons at this station.
+	WID_O_SEL_DECOUPLE_ROW,          ///< #NWID_SELECTION widget for the row of decoupling settings, shown once decoupling is on.
 	WID_O_DECOUPLE_COUNT,            ///< Set how many vehicles to keep when decoupling on departure from this station order.
 	WID_O_WAIT_COUPLE,               ///< Toggle waiting at this station for a partner train to couple with.
 	WID_O_GOTO_COUPLE,               ///< Toggle travelling to this station (reversing if needed) to couple with a partner train there.

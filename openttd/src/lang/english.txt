@@ -4807,6 +4807,8 @@ STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(and rev
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and an autonomous reversal here could drive straight into wagons a train just left behind
 
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
+STR_ORDERS_DECOUPLE_BUTTON                                      :{BLACK}Decouple
+STR_ORDERS_DECOUPLE_TOOLTIP                                     :{BLACK}Leave part of the train behind at this station. How much is left is set on the row that appears
 STR_ORDERS_SKIP_TOOLTIP                                         :{BLACK}Skip the current order, and start the next. Ctrl+Click to skip to the selected order
 
 STR_ORDERS_DELETE_BUTTON                                        :{BLACK}Delete
