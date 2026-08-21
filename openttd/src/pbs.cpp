@@ -427,6 +427,17 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), forbid_90deg)) ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(trackdir));
 	if (ft.new_td_bits.None()) return include_line_end;
 
+	/* Pulled up against the consist we came to couple to. This is the end of
+	 * the journey, so it is a place to end a path -- and it has to be said
+	 * here, not only where a waiting position is checked for being free.
+	 * Otherwise the search keeps extending the path looking for somewhere safe
+	 * to stop, walks into the partner's own tiles, cannot reserve them because
+	 * the partner is standing on them, and gives up: the train is left waiting
+	 * at the last signal before the station for a path that will never come,
+	 * because what is in its way is what it was sent for. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) return true;
+
 	if (ft.new_td_bits.Count() == 1) {
 		Trackdir td = FindFirstTrackdir(ft.new_td_bits);
 		/* PBS signal on next trackdir? Safe position. */
