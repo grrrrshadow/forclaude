@@ -52,3 +52,39 @@ Vlak #2 „Čeká na poruchu" (odtahovka v depu).
 **Pořadí ikonek v okně mašinky** — když je mašinka mimo depo, prohodit mezi
 sebou ikonky „otočit" a „odtah": otočit nahoře, odtah dole. Aby bylo pokud
 možno stejné pořadí venku i v depu.
+
+### Třetí kolo poznámek k #65
+
+**Pořadí ikonek v okně mašinky mimo depo** má být shora dolů:
+do depa, semafor, otočit, odtah, příkazy, detaily.
+V depu jsou ikonky ve správném pořadí.
+
+**Zašedlá „service" i venku i v depu, když má mašinka příkazy** — ať hráč
+vidí, že tam je něco nového.
+
+**Zatmavování čudlíku odtah funguje dobře.** Dám příkaz a ikonka odtahu je
+hned zabarvená. Smažu příkazy, ikonka odtahu jde zmáčknout a dole v okně
+mašinky se píše „Čeká na poruchu". To je dobrý.
+
+**Odtahovka ještě nejezdí odtahovat** — ještě nemáme doladěné couple.
+Až bude couple doladěné, a to se blíží.
+
+**Poskočení příkazu po spojení:** příkaz nepřeskočí po spojení na další
+příkaz, ale poskočí při dalším průjezdu nádražím — takže to není rozbité
+hodně.
+
+**Decouple a nakládání:** vagonky po decouple nezdědí od mašinky příkaz
+„nenakládat" ani „plně naložit".
+- Když je příkaz „plně naložit", mašinka se neodpojí, dokud není vagonek plný.
+- Když je příkaz „nenakládat", mašinka se odpojí hned a vagonky nakládají.
+
+**Go to couple na nakládající vagon** — mašinka se připojí k vagonkům
+a odveze je.
+
+**Nabouraná mašinka** zmizí za půl roku stejně jako porouchaná, a zůstane
+tam kouř jako po porouchané.
+
+**Ikonka pro odtah:** hráč dodal ikonku 12×12 pixelů (kladivo).
+Někam se musí napsat atribuce: `icon8.com hammer`.
+Poznámka: samotný soubor s ikonkou zatím není v repozitáři — až na to
+dojde, bude potřeba dostat PNG sem, aby se dalo přidat do openttd.grf.
