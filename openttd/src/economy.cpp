@@ -1858,7 +1858,15 @@ static void LoadUnloadVehicle(Vehicle *front)
 	} else {
 		UpdateLoadUnloadTicks(front, st, 20); // We need the ticks for link refreshing.
 		bool finished_loading = true;
-		if (front->current_order.IsFullLoadOrder()) {
+		/* A train that is going to leave its wagons here does not wait for them
+		 * to fill first. The cargo it would be waiting on belongs to the very
+		 * vehicles it is about to uncouple and leave behind, so waiting means
+		 * standing on the platform holding a signal for as long as it takes to
+		 * fill wagons it is not going to take anywhere. They keep loading on
+		 * their own once they have been left, under the same orders (see
+		 * TryDecoupleAtStation), so nothing is lost by going now. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (front->current_order.IsFullLoadOrder() && !front->current_order.ShouldDecoupleOnDeparture()) {
 			if (front->current_order.GetLoadType() == OrderLoadType::FullLoadAny) {
 				/* if the aircraft carries passengers and is NOT full, then
 				 * continue loading, no matter how much mail is in */

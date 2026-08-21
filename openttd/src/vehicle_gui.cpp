@@ -3562,6 +3562,14 @@ static WindowDesc _train_view_desc(
  */
 void ShowVehicleViewWindow(const Vehicle *v)
 {
+	/* This window is built for something that can be given orders, started and
+	 * stopped, and sent places. A headless rake of wagons left standing on a
+	 * platform is none of those things, and the window asserts the moment one
+	 * of its buttons is pressed. Vanilla never had to say so, because free
+	 * wagons only ever existed inside a depot, where they cannot be clicked on
+	 * to open a window in the first place. */
+	if (!v->IsPrimaryVehicle()) return;
+
 	AllocateWindowDescFront<VehicleViewWindow>((v->type == VehicleType::Train) ? _train_view_desc : _vehicle_view_desc, v->index);
 }
 
