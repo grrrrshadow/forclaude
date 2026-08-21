@@ -248,6 +248,12 @@ struct SelectGameWindow : public Window {
 
 		bool missing_lang = _current_language->missing >= _settings_client.gui.missing_strings_threshold && !IsReleasedVersion();
 		this->GetWidget<NWidgetStacked>(WID_SGI_TRANSLATION_SELECTION)->SetDisplayedPlane(missing_lang ? 0 : SZSP_NONE);
+
+		/* Coupling changes what a consist is and how one is taken apart, and
+		 * none of that has been looked at for keeping two clients in step yet.
+		 * Rather than let a game desync halfway through and take the players'
+		 * work with it, close multiplayer off until it has been. */
+		this->SetWidgetDisabledState(WID_SGI_PLAY_NETWORK, true);
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override

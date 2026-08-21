@@ -1481,6 +1481,18 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 		if (src_head != nullptr) src_head->ReserveTrackUnderConsist();
 		if (dst_head != nullptr) dst_head->ReserveTrackUnderConsist();
 
+		/* A loading indicator belongs to the head of a consist and is taken
+		 * down when that consist leaves the station. Splicing can retire a head
+		 * without it ever leaving: coupling turns the other train's head into
+		 * an ordinary vehicle in the middle of a load. Its indicator would then
+		 * hang over the platform for the rest of the game, reading 0% at a
+		 * train that has long since gone, with nothing left to update or remove
+		 * it. Take them all down; LoadUnloadVehicle() puts one back on the next
+		 * tick for whichever consist is still loading. */
+		for (Train *head : {original_src_head, original_dst_head, src_head, dst_head}) {
+			if (head != nullptr) HideFillingPercent(&head->fill_percent_te_id);
+		}
+
 		/* We are undoubtedly changing something in the depot and train list. */
 		InvalidateWindowData(WindowClass::VehicleDepot, src->tile);
 		InvalidateWindowClassesData(WindowClass::TrainList, 0);
@@ -2636,10 +2648,22 @@ static void ReverseTrainDirection(Train *consist)
 			 * all on the one tile. Doing none of it used to mean the reverse
 			 * button simply did nothing here, which is unhelpful, because a
 			 * depot is the one place where turning a train round is trivially
-			 * safe. All that has to change is which end leads out, and that is
-			 * the same flag a dead end flips. See
+			 * safe.
+			 *
+			 * What has to change is which end leads out -- but a depot has one
+			 * way out, and a train parked in one is always left with its
+			 * leading end facing that way, whichever end that is. Flipping
+			 * which end leads without turning the vehicles round leaves the new
+			 * leading end facing the dead end instead, and the train drives
+			 * straight at the back wall and stops there. So both are done, the
+			 * same pair of mirrored operations a depot entrance chooses
+			 * between, here applied together: swap the leading end, and turn
+			 * every vehicle round so that end still faces out. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
+			for (Train *u = consist; u != nullptr; u = u->Next()) {
+				u->direction = ReverseDir(u->direction);
+			}
 			consist->flags.Flip(VehicleRailFlag::Reversed);
 			consist->flags.Reset(VehicleRailFlag::Reversing);
 			consist->ConsistChanged(CCF_TRACK);
