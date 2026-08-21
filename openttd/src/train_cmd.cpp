@@ -279,6 +279,16 @@ int GetTrainStopLocation(StationID station_id, TileIndex tile, const Train *movi
 		osl = OrderStopLocation::FarEnd;
 	} else if (consist->current_order.IsType(OT_GOTO_STATION) && consist->current_order.GetDestination() == station_id) {
 		osl = consist->current_order.GetStopLocation();
+
+		/* A train that came to couple is not stopping at a place on the
+		 * platform, it is stopping against the consist it came for, and that
+		 * is as far along as it can get. Stopping where an ordinary arrival
+		 * would - in the middle by default - leaves it standing most of a
+		 * platform short of its partner, too far away to couple to, so it
+		 * finishes loading and leaves again having done nothing. The wagons
+		 * themselves are what stops it before the far end. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (consist->current_order.ShouldGoToCouple()) osl = OrderStopLocation::FarEnd;
 	}
 
 	/* The stop location of the FRONT! of the train */
