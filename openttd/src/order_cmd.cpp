@@ -25,6 +25,7 @@
 #include "order_backup.h"
 #include "cheat_type.h"
 #include "order_cmd.h"
+#include "train.h"
 #include "train_cmd.h"
 
 #include "table/strings.h"
@@ -836,6 +837,19 @@ CommandCost CmdInsertOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	if (v->orders == nullptr && !OrderList::CanAllocateItem()) return CommandCost(STR_ERROR_NO_MORE_SPACE_FOR_ORDERS);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
+		/* Giving a train orders takes it off rescue duty. A rescue engine is
+		 * on call in its depot and has nowhere it is supposed to be going, so
+		 * the two cannot both be true; standing it down here means the player
+		 * simply writes orders and the train stops being a rescue engine,
+		 * rather than being told it has to be stood down first. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
+			v->vehicle_flags.Reset(VehicleFlag::RescueEngine);
+			Train::From(v)->rescue_home_depot = INVALID_TILE;
+			Train::From(v)->rescue_target = VehicleID::Invalid();
+			InvalidateWindowData(WindowClass::VehicleView, v->index);
+		}
+
 		InsertOrder(v, Order(new_order), sel_ord);
 	}
 

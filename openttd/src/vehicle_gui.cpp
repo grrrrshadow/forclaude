@@ -2901,14 +2901,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND_DEPOT), SetMinimalSize(18, 18),
 											SetSpriteTip(SPR_FORCE_VEHICLE_TURN, STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP),
 			EndContainer(),
-			/* For trains only, 'this one is the rescue engine'. Shown only in a
-			 * depot, because that is where a rescue engine lives: it is a
-			 * standing arrangement, not an order, so it is set once and stays
-			 * set. Sprite reused as a placeholder pending dedicated art. See
+			/* For trains only, 'this one is the rescue engine'. Kept in place
+			 * for every train and greyed out rather than hidden away when it
+			 * cannot be used, so the window does not change size as a train
+			 * drives in and out of a depot. It is a standing arrangement
+			 * rather than an order, so it is set once and stays set. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_RESCUE_ENGINE_SEL),
 				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_RESCUE_ENGINE), SetMinimalSize(18, 18),
-											SetSpriteTip(SPR_IMG_LANDSCAPING, STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP),
+											SetSpriteTip(SPR_WARNING_SIGN, STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP),
 			EndContainer(),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_REFIT_TURN),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_REFIT), SetMinimalSize(18, 18), SetSpriteTip(SPR_REFIT_VEHICLE),
@@ -3104,10 +3105,11 @@ public:
 
 			default: NOT_REACHED();
 		}
-		/* Both shown only once the train actually stands in a depot;
-		 * UpdatePlanes() takes it from here. */
+		/* The turn-around button is shown only once the train actually stands
+		 * in a depot; UpdatePlanes() takes it from here. The rescue one stays
+		 * put for every train and greys out instead. */
 		this->GetWidget<NWidgetStacked>(WID_VV_TURN_AROUND_DEPOT_SEL)->SetDisplayedPlane(SZSP_NONE);
-		this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(SZSP_NONE);
+		this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(v->type == VehicleType::Train ? 0 : SZSP_NONE);
 		this->FinishInitNested(window_number);
 		this->owner = v->owner;
 		this->GetWidget<NWidgetViewport>(WID_VV_VIEWPORT)->InitializeViewport(this, static_cast<VehicleID>(this->window_number), ScaleZoomGUI(_vehicle_view_zoom_levels[v->type]));
@@ -3175,12 +3177,12 @@ public:
 		if (v->type == VehicleType::Train) {
 			this->SetWidgetLoweredState(WID_VV_FORCE_PROCEED, Train::From(v)->force_proceed == TFP_SIGNAL);
 			this->SetWidgetDisabledState(WID_VV_FORCE_PROCEED, !is_localcompany);
-			/* A train with orders of its own cannot also be on call, so the
-			 * button greys out rather than failing when pressed. It stays
-			 * available to a train that already is one, so standing it down is
-			 * never blocked. */
+			/* A rescue engine is stationed in a depot and has no orders of its
+			 * own, so the button is only live where that is true: a train that
+			 * is out on the line, or that has been given orders, cannot be put
+			 * on call. Greyed rather than refused when pressed. */
 			bool is_rescue = v->vehicle_flags.Test(VehicleFlag::RescueEngine);
-			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany || (!is_rescue && v->GetNumOrders() != 0));
+			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany || !v->IsStoppedInDepot() || v->GetNumOrders() != 0);
 			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, is_rescue);
 			this->SetWidgetDisabledState(WID_VV_TURN_AROUND_DEPOT, !is_localcompany);
 		}
@@ -3507,15 +3509,6 @@ public:
 			this->ReInit();
 		}
 
-		/* Making a train the rescue engine is a standing arrangement rather
-		 * than an order, and the depot is where that arrangement lives, so the
-		 * button appears in the same place and at the same time as the one
-		 * above. See FEATURE_DESIGN_COUPLING_TOW.md. */
-		nwi = this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL);
-		if (nwi->shown_plane != depot_turn_plane) {
-			nwi->SetDisplayedPlane(depot_turn_plane);
-			this->ReInit();
-		}
 	}
 
 	/**
