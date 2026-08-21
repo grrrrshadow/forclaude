@@ -1508,6 +1508,24 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 			if (head != nullptr) HideFillingPercent(&head->fill_percent_te_id);
 		}
 
+		/* And a consist that is loading is on its station's list of loading
+		 * vehicles, which it comes off when it leaves. A retired head never
+		 * leaves either, and an ordinary vehicle left on that list is never
+		 * given a new loading countdown, so the station trips over it on its
+		 * next load cycle -- assert(v->load_unload_ticks != 0) in
+		 * LoadUnloadStation(), which is what crashed the game on coupling to a
+		 * train that was still loading. Take it off the list the same way
+		 * leaving does, cargo payment and reservation included. */
+		for (Train *head : {original_src_head, original_dst_head}) {
+			if (head == nullptr || head->IsFrontEngine()) continue;
+			if (!Station::IsValidID(head->last_station_visited)) continue;
+			Station *st = Station::Get(head->last_station_visited);
+			st->loading_vehicles.remove(head);
+			head->CancelReservation(StationID::Invalid(), st);
+			delete head->cargo_payment;
+			head->last_station_visited = StationID::Invalid();
+		}
+
 		/* We are undoubtedly changing something in the depot and train list. */
 		InvalidateWindowData(WindowClass::VehicleDepot, src->tile);
 		InvalidateWindowClassesData(WindowClass::TrainList, 0);

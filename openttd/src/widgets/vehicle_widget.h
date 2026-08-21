@@ -28,8 +28,6 @@ enum VehicleViewWidgets : WidgetID {
 	WID_VV_TURN_AROUND,        ///< Turn this vehicle around.
 	WID_VV_FORCE_PROCEED,      ///< Force this vehicle to pass a signal at danger.
 	WID_VV_FORCE_PROCEED_SEL,  ///< Container for 'force proceed' button, which can be hidden.
-	WID_VV_COUPLE,             ///< Couple this train to another stopped train immediately ahead of it.
-	WID_VV_COUPLE_SEL,         ///< Container for 'couple' button, which can be hidden.
 	WID_VV_TURN_AROUND_DEPOT,  ///< Turn this train around while it stands in a depot.
 	WID_VV_TURN_AROUND_DEPOT_SEL, ///< Container for the in-depot 'turn around' button, which can be hidden.
 	WID_VV_RESCUE_ENGINE,      ///< Station this train in its depot as a rescue engine.

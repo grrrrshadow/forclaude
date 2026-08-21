@@ -2890,14 +2890,6 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_FORCE_PROCEED), SetMinimalSize(18, 18),
 											SetSpriteTip(SPR_IGNORE_SIGNALS, STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP),
 			EndContainer(),
-			/* For trains only, 'couple to train ahead' button. Only shown
-			 * (enabled) once GetTrainCouplePartner() finds a partner; see
-			 * FEATURE_DESIGN_COUPLING_TOW.md. Sprite reused from Clone as a
-			 * placeholder pending dedicated art. */
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_COUPLE_SEL),
-				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_COUPLE), SetMinimalSize(18, 18),
-											SetSpriteTip(SPR_CLONE_TRAIN, STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP),
-			EndContainer(),
 			/* For trains only, a second 'turn around' button. The one below is
 			 * swapped out for 'refit' as soon as the train stands in a depot,
 			 * which is exactly where turning it by hand has to stay possible:
@@ -3098,18 +3090,15 @@ public:
 			case VehicleType::Train:
 				this->GetWidget<NWidgetCore>(WID_VV_TURN_AROUND)->SetToolTip(STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP);
 				this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(0);
-				this->GetWidget<NWidgetStacked>(WID_VV_COUPLE_SEL)->SetDisplayedPlane(0);
 				break;
 
 			case VehicleType::Road:
 				this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(SZSP_NONE);
-				this->GetWidget<NWidgetStacked>(WID_VV_COUPLE_SEL)->SetDisplayedPlane(SZSP_NONE);
 				break;
 
 			case VehicleType::Ship:
 			case VehicleType::Aircraft:
 				this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(SZSP_NONE);
-				this->GetWidget<NWidgetStacked>(WID_VV_COUPLE_SEL)->SetDisplayedPlane(SZSP_NONE);
 				this->SelectPlane(SEL_RT_REFIT);
 				break;
 
@@ -3154,7 +3143,6 @@ public:
 				break;
 
 			case WID_VV_FORCE_PROCEED:
-			case WID_VV_COUPLE:
 				if (v->type != VehicleType::Train) {
 					size.height = 0;
 					size.width = 0;
@@ -3187,7 +3175,6 @@ public:
 		if (v->type == VehicleType::Train) {
 			this->SetWidgetLoweredState(WID_VV_FORCE_PROCEED, Train::From(v)->force_proceed == TFP_SIGNAL);
 			this->SetWidgetDisabledState(WID_VV_FORCE_PROCEED, !is_localcompany);
-			this->SetWidgetDisabledState(WID_VV_COUPLE, !is_localcompany || GetTrainCouplePartner(Train::From(v)) == nullptr);
 			/* A train with orders of its own cannot also be on call, so the
 			 * button greys out rather than failing when pressed. It stays
 			 * available to a train that already is one, so standing it down is
@@ -3424,10 +3411,6 @@ public:
 			case WID_VV_FORCE_PROCEED: // force proceed
 				assert(v->type == VehicleType::Train);
 				Command<Commands::ForceTrainProceed>::Post(STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL, v->tile, v->index);
-				break;
-			case WID_VV_COUPLE: // couple to train ahead
-				assert(v->type == VehicleType::Train);
-				Command<Commands::CoupleTrains>::Post(STR_ERROR_CAN_T_COUPLE_TRAIN, v->tile, v->index);
 				break;
 			case WID_VV_RESCUE_ENGINE: // station here as a rescue engine, or stand down
 				assert(v->type == VehicleType::Train);
