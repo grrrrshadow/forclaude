@@ -2884,37 +2884,30 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_DEPOT_CLONE),
 				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_GOTO_DEPOT), SetMinimalSize(18, 18), SetSpriteTip(SPR_EMPTY /* filled later */),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_CLONE), SetMinimalSize(18, 18), SetSpriteTip(SPR_EMPTY /* filled later */),
+				/* Third plane, trains only: refit moves up here while the train
+				 * stands in a depot, which frees the row below to hold the turn
+				 * button at all times. See below and
+				 * FEATURE_DESIGN_COUPLING_TOW.md. */
+				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_REFIT_IN_DEPOT), SetMinimalSize(18, 18), SetSpriteTip(SPR_REFIT_VEHICLE),
 			EndContainer(),
 			/* For trains only, 'ignore signal' button. */
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_FORCE_PROCEED_SEL),
 				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_FORCE_PROCEED), SetMinimalSize(18, 18),
 											SetSpriteTip(SPR_IGNORE_SIGNALS, STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP),
 			EndContainer(),
-			/* For trains only, a second 'turn around' button. The one below is
-			 * swapped out for 'refit' as soon as the train stands in a depot,
-			 * which is exactly where turning it by hand has to stay possible:
-			 * a depot never turns a train by itself, so this button and the
-			 * "turn around" order flag are the only two ways round. Cloned
-			 * rather than folded into the existing selection so that refitting
-			 * in the depot is not lost. See FEATURE_DESIGN_COUPLING_TOW.md. */
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_TURN_AROUND_DEPOT_SEL),
-				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND_DEPOT), SetMinimalSize(18, 18),
-											SetSpriteTip(SPR_FORCE_VEHICLE_TURN, STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP),
-			EndContainer(),
-			/* For trains only, 'this one is the rescue engine'. Kept in place
-			 * for every train and greyed out rather than hidden away when it
-			 * cannot be used, so the window does not change size as a train
-			 * drives in and out of a depot. It is a standing arrangement
-			 * rather than an order, so it is set once and stays set. See
-			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_RESCUE_ENGINE_SEL),
-				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_RESCUE_ENGINE), SetMinimalSize(18, 18),
-											SetSpriteTip(SPR_WARNING_SIGN, STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP),
-			EndContainer(),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_REFIT_TURN),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_REFIT), SetMinimalSize(18, 18), SetSpriteTip(SPR_REFIT_VEHICLE),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND), SetMinimalSize(18, 18),
 												SetSpriteTip(SPR_FORCE_VEHICLE_TURN, STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP),
+			EndContainer(),
+			/* For trains only, 'this one is the rescue engine'. Kept in place
+			 * and greyed out rather than hidden away when it cannot be used, so
+			 * the window does not change size as a train drives in and out of a
+			 * depot. It is a standing arrangement rather than an order, so it
+			 * is set once and stays set. See FEATURE_DESIGN_COUPLING_TOW.md. */
+			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_RESCUE_ENGINE_SEL),
+				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_RESCUE_ENGINE), SetMinimalSize(18, 18),
+											SetSpriteTip(SPR_WARNING_SIGN, STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP),
 			EndContainer(),
 			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SHOW_ORDERS), SetMinimalSize(18, 18), SetSpriteTip(SPR_SHOW_ORDERS),
 			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SHOW_DETAILS), SetMinimalSize(18, 18), SetSpriteTip(SPR_SHOW_VEHICLE_DETAILS),
@@ -3031,6 +3024,7 @@ private:
 	enum PlaneSelections : uint8_t {
 		SEL_DC_GOTO_DEPOT,  ///< Display 'goto depot' button in #WID_VV_SELECT_DEPOT_CLONE stacked widget.
 		SEL_DC_CLONE,       ///< Display 'clone vehicle' button in #WID_VV_SELECT_DEPOT_CLONE stacked widget.
+		SEL_DC_REFIT,       ///< Display 'refit' button in #WID_VV_SELECT_DEPOT_CLONE stacked widget (trains in a depot).
 
 		SEL_RT_REFIT,       ///< Display 'refit' button in #WID_VV_SELECT_REFIT_TURN stacked widget.
 		SEL_RT_TURN_AROUND, ///< Display 'turn around' button in #WID_VV_SELECT_REFIT_TURN stacked widget.
@@ -3049,6 +3043,7 @@ private:
 		switch (plane) {
 			case SEL_DC_GOTO_DEPOT:
 			case SEL_DC_CLONE:
+			case SEL_DC_REFIT:
 				this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE)->SetDisplayedPlane(plane - SEL_DC_BASEPLANE);
 				break;
 
@@ -3105,10 +3100,8 @@ public:
 
 			default: NOT_REACHED();
 		}
-		/* The turn-around button is shown only once the train actually stands
-		 * in a depot; UpdatePlanes() takes it from here. The rescue one stays
-		 * put for every train and greys out instead. */
-		this->GetWidget<NWidgetStacked>(WID_VV_TURN_AROUND_DEPOT_SEL)->SetDisplayedPlane(SZSP_NONE);
+		/* The rescue button stays put for every train and greys out instead of
+		 * coming and going, so the window keeps one size. */
 		this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(v->type == VehicleType::Train ? 0 : SZSP_NONE);
 		this->FinishInitNested(window_number);
 		this->owner = v->owner;
@@ -3184,7 +3177,6 @@ public:
 			bool is_rescue = v->vehicle_flags.Test(VehicleFlag::RescueEngine);
 			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany || !v->IsStoppedInDepot() || v->GetNumOrders() != 0);
 			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, is_rescue);
-			this->SetWidgetDisabledState(WID_VV_TURN_AROUND_DEPOT, !is_localcompany);
 		}
 
 		if (v->type == VehicleType::Train || v->type == VehicleType::Road) {
@@ -3414,7 +3406,6 @@ public:
 					Command<Commands::ReverseTrainDirection>::Post(_vehicle_msg_translation_table[VCT_CMD_TURN_AROUND][v->type], v->tile, v->index, false);
 				}
 				break;
-			case WID_VV_TURN_AROUND_DEPOT: // turn around while standing in a depot
 				assert(v->type == VehicleType::Train);
 				Command<Commands::ReverseTrainDirection>::Post(_vehicle_msg_translation_table[VCT_CMD_TURN_AROUND][v->type], v->tile, v->index, false);
 				break;
@@ -3485,29 +3476,29 @@ public:
 		/* Widget WID_VV_GOTO_DEPOT must be hidden if the vehicle is already stopped in depot.
 		 * Widget WID_VV_CLONE_VEH should then be shown, since cloning is allowed only while in depot and stopped.
 		 */
-		PlaneSelections plane = veh_stopped ? SEL_DC_CLONE : SEL_DC_GOTO_DEPOT;
+		/* Refit takes this row for a train standing in a depot, which leaves
+		 * the row below free to hold the turn-around button at all times --
+		 * turning a train by hand has to stay possible in a depot, since a
+		 * depot never turns one by itself. What that costs is the clone button
+		 * for trains, and it costs nothing: the depot window a train has to be
+		 * standing in to be cloned has a clone button of its own. Other
+		 * vehicle types keep the vanilla arrangement. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		bool train_in_depot = v->type == VehicleType::Train && v->IsStoppedInDepot();
+		PlaneSelections plane = train_in_depot ? SEL_DC_REFIT : (veh_stopped ? SEL_DC_CLONE : SEL_DC_GOTO_DEPOT);
 		NWidgetStacked *nwi = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE); // Selection widget 'send to depot' / 'clone'.
 		if (nwi->shown_plane + SEL_DC_BASEPLANE != plane) {
 			this->SelectPlane(plane);
 		}
 		/* The same system applies to widget WID_VV_REFIT_VEH and VVW_WIDGET_TURN_AROUND.*/
 		if (v->IsGroundVehicle()) {
-			plane = veh_stopped ? SEL_RT_REFIT : SEL_RT_TURN_AROUND;
+			plane = (veh_stopped && !train_in_depot) ? SEL_RT_REFIT : SEL_RT_TURN_AROUND;
 			nwi = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN);
 			if (nwi->shown_plane + SEL_RT_BASEPLANE != plane) {
 				this->SelectPlane(plane);
 			}
 		}
 
-		/* Turning a train by hand has to stay possible exactly where the
-		 * button above disappears, because a depot never turns a train by
-		 * itself. See FEATURE_DESIGN_COUPLING_TOW.md. */
-		nwi = this->GetWidget<NWidgetStacked>(WID_VV_TURN_AROUND_DEPOT_SEL);
-		int depot_turn_plane = (v->type == VehicleType::Train && veh_stopped) ? 0 : SZSP_NONE;
-		if (nwi->shown_plane != depot_turn_plane) {
-			nwi->SetDisplayedPlane(depot_turn_plane);
-			this->ReInit();
-		}
 
 	}
 

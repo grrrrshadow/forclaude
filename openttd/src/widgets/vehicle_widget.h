@@ -28,8 +28,7 @@ enum VehicleViewWidgets : WidgetID {
 	WID_VV_TURN_AROUND,        ///< Turn this vehicle around.
 	WID_VV_FORCE_PROCEED,      ///< Force this vehicle to pass a signal at danger.
 	WID_VV_FORCE_PROCEED_SEL,  ///< Container for 'force proceed' button, which can be hidden.
-	WID_VV_TURN_AROUND_DEPOT,  ///< Turn this train around while it stands in a depot.
-	WID_VV_TURN_AROUND_DEPOT_SEL, ///< Container for the in-depot 'turn around' button, which can be hidden.
+	WID_VV_REFIT_IN_DEPOT,     ///< Open the refit window; the copy that shares a row with 'goto depot' while a train stands in a depot.
 	WID_VV_RESCUE_ENGINE,      ///< Station this train in its depot as a rescue engine.
 	WID_VV_RESCUE_ENGINE_SEL,  ///< Container for the 'rescue engine' button, which can be hidden.
 	WID_VV_HONK_HORN,          ///< Honk the vehicles horn (not drawn on UI, only used for hotkey).

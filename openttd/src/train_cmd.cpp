@@ -26,6 +26,7 @@
 #include "game/game.hpp"
 #include "newgrf_station.h"
 #include "effectvehicle_func.h"
+#include "effectvehicle_base.h"
 #include "network/network.h"
 #include "core/random_func.hpp"
 #include "company_base.h"
@@ -1946,7 +1947,15 @@ bool TrainAwaitsRescue(Train *v)
 		 * smoking. */
 		if (!v->vehstatus.Test(VehState::Hidden) && (v->tick_counter & 0xFF) == 0 &&
 				!EngInfo(v->engine_type)->misc_flags.Test(EngineMiscFlag::NoBreakdownSmoke)) {
-			CreateEffectVehicleRel(v, 4, 4, 5, EV_BREAKDOWN_SMOKE);
+			/* Each puff counts its own animation_state down and deletes
+			 * itself when it reaches zero. Leaving it at zero does not mean
+			 * "no time", it means the very first decrement goes below zero and
+			 * wraps, so the puff never expires -- which is why the smoke
+			 * outlived the breakdown and hung over the track for good. Give it
+			 * a life a little longer than the gap between puffs, so the trail
+			 * is continuous while the wait lasts and gone shortly after. */
+			EffectVehicle *smoke = CreateEffectVehicleRel(v, 4, 4, 5, EV_BREAKDOWN_SMOKE);
+			if (smoke != nullptr) smoke->animation_state = 0x140;
 		}
 		return true;
 	}
@@ -2793,7 +2802,16 @@ static void ReverseTrainDirection(Train *consist)
 		 * let it finish coming out -- there is nothing to gain by turning a
 		 * train round at the exact moment it is leaving, and the player asked
 		 * for it to leave this way. */
-		if (!IsWholeTrainInsideDepot(consist) && IsAnyPartInsideDepot(consist)) return;
+		/* Standing in a depot is the one place a train can be turned round for
+		 * nothing, because it has no extent there. On its way out it does: the
+		 * moment it is started, it is a train partly in a world where it lies
+		 * along the track, even while every vehicle is still hidden on the
+		 * depot tile waiting its turn to come out. Turning it then leaves the
+		 * vehicles still inside on the wrong side of those already out, and it
+		 * jams on the first tile. Being stopped is exactly the line between
+		 * the two, and it is the line the player sees: it is when the train
+		 * stops saying it is stopped that turning it stops being free. */
+		if (IsAnyPartInsideDepot(consist) && !(IsWholeTrainInsideDepot(consist) && consist->vehstatus.Test(VehState::Stopped))) return;
 
 		if (IsWholeTrainInsideDepot(consist)) {
 			/* Everything below works on where vehicles sit along the track and
