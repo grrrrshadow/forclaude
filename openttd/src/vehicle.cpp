@@ -1428,6 +1428,9 @@ bool Vehicle::HandleBreakdown()
 			if ((this->tick_counter & (this->type == VehicleType::Train ? 3 : 1)) == 0) {
 				if (--this->breakdown_delay == 0) {
 					this->breakdown_ctr = 0;
+					/* The trouble is over, so the wait to be fetched is over
+					 * with it and the next breakdown starts its own. */
+					if (this->type == VehicleType::Train) Train::From(this)->First()->rescue_deadline = TimerGameEconomy::Date{};
 					this->MarkDirty();
 					SetWindowDirty(WindowClass::VehicleView, this->index);
 				}

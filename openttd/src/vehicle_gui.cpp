@@ -3226,6 +3226,14 @@ public:
 
 		if (v->type != VehicleType::Aircraft && v->breakdown_ctr == 1) return GetString(STR_VEHICLE_STATUS_BROKEN_DOWN);
 
+		/* A rescue engine standing in its depot is not idle, it is on call.
+		 * Saying so is the only way to tell one apart from a train that has
+		 * simply been parked and forgotten. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine) && v->IsStoppedInDepot()) {
+			return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
+		}
+
 		if (v->vehstatus.Test(VehState::Stopped) && (!mouse_over_start_stop || v->IsStoppedInDepot())) {
 			if (v->type != VehicleType::Train) return GetString(STR_VEHICLE_STATUS_STOPPED);
 			if (v->cur_speed != 0) return GetString(STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL, PackVelocity(v->GetDisplaySpeed(), v->type));

@@ -1941,10 +1941,16 @@ bool TrainAwaitsRescue(Train *v)
 		return true;
 	}
 
-	/* Waited long enough. Give up on being fetched and let the breakdown run
-	 * its course, which is what clears the line. */
-	v->rescue_deadline = TimerGameEconomy::Date{};
-	SetWindowDirty(WindowClass::VehicleView, v->index);
+	/* Waited long enough. Give up on being fetched and let vanilla run its
+	 * course, which is what clears the line.
+	 *
+	 * The deadline deliberately stays where it is rather than being cleared.
+	 * Clearing it would read as "nothing is wrong here" to the next call a
+	 * moment later, which would set a fresh deadline and start the wait over:
+	 * a crashed train would lose one wagon every half year instead of one
+	 * every few ticks, which is indistinguishable from never. It is cleared
+	 * where the trouble actually ends -- the breakdown lifting, or the depot
+	 * putting the train right. */
 	return false;
 }
 
@@ -1989,7 +1995,11 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 		v->rescue_home_depot = rescue ? v->tile : INVALID_TILE;
 		v->rescue_target = VehicleID::Invalid();
 
-		SetWindowDirty(WindowClass::VehicleView, v->index);
+		/* The vehicle window works out which of its buttons are lowered in
+		 * UpdateButtons(), which only runs on an invalidate. Merely marking
+		 * the window dirty repaints it exactly as it was, so the button would
+		 * spring back up and pressing it would look like it did nothing. */
+		InvalidateWindowData(WindowClass::VehicleView, v->index);
 		SetWindowDirty(WindowClass::VehicleDepot, v->tile);
 		SetWindowClassesDirty(WindowClass::TrainList);
 	}
