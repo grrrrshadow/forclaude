@@ -869,3 +869,80 @@ Co z toho už umí spojování: připojení k porouchané soupravě, odvoz a
 rozpojení v depu jsou přesně to, co dělá couple/decouple. Nové je hlavně
 ta služba kolem — stav "odtahovka", vyslání, jízda proti jednosměrkám,
 kouř a ta pojistka.
+
+### Odtahovka — těžká místa
+
+Průzkum kódu, ne hotové řešení. Body A a C jsou ty, kde se rozhoduje,
+jestli je celá věc postavitelná rozumně, nebo se rozleze po celém enginu.
+
+#### A. Havarovaný vlak se z principu nedá pohnout
+
+Vanilla nedělá z havárie stav vlaku, ale konec vlaku:
+
+* `TrainLocoHandler()` se u havarovaného vlaku hned vrátí přes
+  `HandleCrashedTrain()` a k pohybové části se nikdy nedostane.
+* `Train::GetVehicleTrackdir()` vrátí havarovanému vozu `Trackdir::Invalid` —
+  takový vůz nemá směr po koleji, takže s ním neumí pracovat rezervace,
+  návěstidla ani sledovač cesty.
+* `Train::Crash()` uvolní rezervaci vlaku *a* políčka pod ním.
+* `IsValidCouplePartner()` i `TryConsistSplice()` havarovaný vůz odmítají.
+* `HandleCrashedTrain()` po `crash_anim_pos >= 4440` maže vagony po jednom.
+
+Odtáhnout vrak proto není "přidat příznak". Jsou dvě cesty:
+
+**1. Vrak zůstane havarovaný a odtahovka ho veze.** Hlava spojené soupravy
+je odtahovka, takže `TrainLocoHandler()` běží normálně — jenže každý
+havarovaný vůz v řetězu pořád vrací neplatný směr a pohybové pomocné
+funkce ho přeskakují. Znamenalo by to výjimky na mnoha místech enginu.
+
+**2. Vrak přestane být "havarovaný" ve chvíli připojení** a dostane místo
+toho vlastní stav "vrak", který řeší jen vzhled a to, že se v depu sešrotuje.
+Tím se z něj stane obyčejná bezhlavá souprava a všechno existující —
+rezervace pod ní, spojení, rozpojení, pohyb — funguje beze změny.
+Je to přesně to "vem existující mechanismus, klonuj ho a uprav kopii".
+Musí se doladit dvě věci: šedou barvu vybírá `PALETTE_CRASH` podle
+`VehState::Crashed`, takže volba palety se musí ptát i na nový stav; a
+`crash_anim_pos` se musí zmrazit, aby vagony nemizely, dokud je odtah na
+cestě — od toho je ta půlroční pojistka.
+
+**Doporučuju 2.** Cesta 1 rozseje výjimky po celém enginu a každá z nich je
+místo, kde to za měsíc spadne.
+
+#### B. "Nejbližší" musí znamenat dojezdné, ne blízké
+
+Vzdušná čára může vést přes řeku. Nejbližší depo pro odtah se spočítá
+pathfinderem (`YapfTrainFindNearestDepot`) jednou při vyslání a zapamatuje
+se. Výběr odtahovky obráceně: pathfindit ze všech odtahovek na mapě je
+drahé, takže seřadit podle vzdušné čáry a ověřit jednu cestu; když
+neprojde, vzít další v pořadí.
+
+#### C. Jízda proti jednosměrným návěstidlům
+
+Sledovač cesty jednosměrné návěstidlo proti směru odmítá
+(`HasOnewaySignalBlockingTrackdir`) a YAPF to má i v ceně. Odtahovka
+potřebuje povolení, na které se musí ptát obě místa.
+
+Bezpečnostní argument, proč to není nebezpečné: odtahovka pořád ctí
+rezervace a červenou. Smí tedy vjet jen na kolej, kterou si nikdo jiný
+nezarezervoval — protijedoucí vlak tak nekončí čelním střetem, ale
+vzájemným čekáním.
+
+#### D. Uváznutí
+
+Vlaky nahromaděné za porouchaným můžou stát přesně na koleji, kterou
+odtahovka potřebuje. Únikový východ je ta pojistka: když se odtah do
+půl roku nedostane, porucha se spraví sama a vrak začne mizet po
+vanilla způsobu, čímž se trať uvolní. Proto se půlrok počítá od poruchy,
+ne od vyslání — jak jsi to zadal.
+
+#### E. Uložení do savu
+
+Do savegame musí jít: příznak "tohle je odtahovka", její domovské depo,
+ke které nehodě je přiřazená, a odpočet u nehody. Pojmenovaná pole
+v `CH_TABLE` chunku jako u příkazů, aby se staré savy načetly
+s výchozími hodnotami.
+
+#### F. Čím se měří půl roku
+
+Musí to být kalendářní čas hry, ne herní ticky, aby se to chovalo stejně
+při jakémkoli nastavení délky dne.
