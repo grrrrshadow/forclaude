@@ -2154,7 +2154,7 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
  * @param v          front of the consist that just finished loading
  * @param keep_count number of vehicles to keep at the front
  */
-void TryDecoupleAtStation(Train *v, uint8_t keep_count)
+void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type)
 {
 	if (keep_count == 0) return;
 	if (v->vehstatus.Test(VehState::Crashed)) return;
@@ -2191,6 +2191,14 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count)
 		StationID station = GetStationIndex(remainder->tile);
 		remainder->current_order.MakeGoToStation(station);
 		remainder->current_order.SetWaitForCouple(true);
+		/* The wagons keep being handled the way the train was told to handle
+		 * them here. They are the same wagons at the same platform a moment
+		 * later, so an order not to load that applied to them while they were
+		 * coupled has to go on applying once they are not -- otherwise the
+		 * engine departs under orders not to load and the wagons it left
+		 * behind start filling up on their own. */
+		remainder->current_order.SetLoadType(load_type);
+		remainder->current_order.SetUnloadType(unload_type);
 		TrainEnterStation(remainder, station);
 	}
 }

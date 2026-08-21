@@ -75,7 +75,7 @@ void NormalizeTrainVehInDepot(const Train *u);
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
-void TryDecoupleAtStation(Train *v, uint8_t keep_count);
+void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type);
 
 /** Variables that are cached to improve performance and such */
 struct TrainCache {

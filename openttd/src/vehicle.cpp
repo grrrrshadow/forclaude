@@ -2430,7 +2430,14 @@ void Vehicle::LeaveStation()
 		 * packed into `flags`, see the "Bug D" writeup) so it's still
 		 * intact here. */
 		if (this->current_order.ShouldDecoupleOnDeparture()) {
-			TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount());
+			/* MakeLeaveStation() above has already reset the loading fields
+			 * of current_order, so how this train was told to handle cargo
+			 * here has to be read back off the order it is actually working
+			 * through, and handed to the wagons being left behind. */
+			const Order *real_order = this->GetOrder(this->cur_real_order_index);
+			TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount(),
+					real_order != nullptr ? real_order->GetLoadType() : OrderLoadType::LoadIfPossible,
+					real_order != nullptr ? real_order->GetUnloadType() : OrderUnloadType::UnloadIfPossible);
 		}
 
 		Train::From(this)->flags.Set(VehicleRailFlag::LeavingStation);
