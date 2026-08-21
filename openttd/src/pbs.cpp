@@ -472,5 +472,16 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	ft.new_td_bits &= DiagdirReachesTrackdirs(ft.exitdir);
 	if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), forbid_90deg)) ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(trackdir));
 
-	return !HasReservedTracks(ft.new_tile, TrackdirBitsToTrackBits(ft.new_td_bits));
+	if (!HasReservedTracks(ft.new_tile, TrackdirBitsToTrackBits(ft.new_td_bits))) return true;
+
+	/* The next tile being taken is normally the whole point of not stopping
+	 * here: a train that waits with something reserved right in front of it is
+	 * a train that is going to have to wait again in a worse place. A train on
+	 * its way to couple is the exception, because what is standing there is
+	 * what it came for. Refusing to stop short of its own partner leaves it
+	 * waiting at the last signal before the station for a path that can never
+	 * clear, since the wagons it is going to collect are not going to move on
+	 * their own. Pulling up against them is exactly right, and coupling takes
+	 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
+	return v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile);
 }
