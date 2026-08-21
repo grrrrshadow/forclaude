@@ -29,3 +29,26 @@ Jede se spojit do Sindinghattan východ", Vlak #9 „Porucha".
 Takhle vypadá okno mašinky ve vanille. Dole je místo na ikonku service.
 Zachovej velikost okna — máme okno větší na výšku, jsou tam ikonky
 zatmavené v depu i mimo depo.
+
+### Druhé kolo poznámek k #65
+
+**Couple popředu** — dobrý na všech čtyřech nástupištích. Nikomu příkaz
+neposkočil na další příkaz „jeď do depa", stejně jako u couple pozadu.
+
+**Screenshot 1 — otáčení při výjezdu z depa.** Už to funguje líp, ale ještě
+se mi povede to zaseknout na první dlaždici.
+
+Nápověda hráče, kde ta chvíle je: *„jestli hledáš chvíli, od které
+implementovat tuto zdařilou opravu, tak to je přesně ta chvíle, kdy mašinka
+v depu přestane psát ve svém okně Zastaveno."*
+
+Opět: při hromadném výjezdu z depa se mašinky s příkazem „jet se spojit"
+připojily zezadu k vlaku před sebou.
+
+Co je na screenshotu 1 vidět: Vlak #6 „Nelze dosáhnout Sindinghattan
+východ, 0 km/h", Vlak #3 „Míří do Železniční depo Canington, 0 km/h",
+Vlak #2 „Čeká na poruchu" (odtahovka v depu).
+
+**Pořadí ikonek v okně mašinky** — když je mašinka mimo depo, prohodit mezi
+sebou ikonky „otočit" a „odtah": otočit nahoře, odtah dole. Aby bylo pokud
+možno stejné pořadí venku i v depu.
