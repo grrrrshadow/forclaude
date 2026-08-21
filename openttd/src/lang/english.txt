@@ -4536,6 +4536,7 @@ STR_VEHICLE_VIEW_CLONE_AIRCRAFT_INFO                            :{BLACK}Buy a co
 
 STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Force train to proceed without waiting for signal to clear it
 STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Couple this train to the stopped train immediately ahead of it
+STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Station this train in this depot as a rescue engine. It waits here and is sent out to fetch trains that break down or crash, and returns here afterwards
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reverse direction of train
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Force vehicle to turn around
 STR_VEHICLE_VIEW_ORDER_LOCATION_TOOLTIP                         :{BLACK}Centre main view on order destination. Ctrl+Click to open a new viewport on the order destination's location
@@ -5310,6 +5311,9 @@ STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Can't co
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... no stopped train immediately ahead to couple with
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... the engine would end up behind the wagons, which is not supported yet
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... it is too far away to couple to
+STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Can't station this train as a rescue engine...
+STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... it has to be standing in a depot
+STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... a rescue engine waits for a call-out and cannot have orders of its own
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

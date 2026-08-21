@@ -18,6 +18,7 @@
 #include "engine_base.h"
 #include "rail_map.h"
 #include "ground_vehicle.hpp"
+#include "timer/timer_game_economy.h"
 
 struct Train;
 
@@ -72,6 +73,7 @@ bool TrainOnCrossing(TileIndex tile);
 void NormalizeTrainVehInDepot(const Train *u);
 
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
+bool TrainAwaitsRescue(Train *v);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
 void TryDecoupleAtStation(Train *v, uint8_t keep_count);
 
@@ -113,6 +115,13 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 
 	TrackBits track{}; ///< On which track the train currently is.
 	TrainForceProceeding force_proceed{}; ///< How the train should behave when it encounters next obstacle.
+
+	/* Rescue towing. See FEATURE_DESIGN_COUPLING_TOW.md. Only ever set on the
+	 * head of a consist; the first two on a rescue engine, the last on the
+	 * casualty it is being sent to. */
+	TileIndex rescue_home_depot = INVALID_TILE; ///< Depot a rescue engine is stationed at and returns to when it is done.
+	VehicleID rescue_target = VehicleID::Invalid(); ///< Casualty a rescue engine has been sent to fetch, so no two are sent to the same one.
+	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
 	/** Create new Train object. @copydoc GroundVehicle::GroundVehicle */
 	Train(VehicleID index) : GroundVehicleBase(index) {}

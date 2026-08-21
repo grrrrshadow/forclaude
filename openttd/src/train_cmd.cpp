@@ -1878,6 +1878,107 @@ static void NormaliseCoupledConsistFacing(Train *consist)
 	}
 }
 
+/** How long a casualty waits to be fetched before sorting itself out the vanilla way. */
+static constexpr int RESCUE_DEADLINE_DAYS = EconomyTime::DAYS_IN_ECONOMY_YEAR / 2;
+
+/**
+ * Should this broken-down train stay broken down and wait to be fetched?
+ *
+ * A vanilla breakdown fixes itself after a short delay, which leaves nothing
+ * for a rescue engine to be sent to. A train that is waiting for one therefore
+ * stays broken until it is fetched -- but not for ever: if no rescue engine
+ * can reach it, or the player has none, the deadline runs out and the
+ * breakdown clears itself as it always did, so a line can never be blocked
+ * permanently by a feature the player did not set up. The deadline is measured
+ * from the breakdown rather than from a rescue engine setting off, so a
+ * casualty nobody is coming for is not stuck waiting for a call-out that will
+ * never happen. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v The broken-down train (its head).
+ * @return true if the breakdown should be kept.
+ */
+bool TrainAwaitsRescue(Train *v)
+{
+	v = v->First();
+
+	/* A rescue engine that breaks down on its way to a casualty is not a
+	 * casualty waiting for itself. It fixes itself the vanilla way. */
+	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
+
+	if (v->rescue_deadline == TimerGameEconomy::Date{}) {
+		v->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+
+	if (TimerGameEconomy::date < v->rescue_deadline) {
+		/* Vanilla puffs smoke once, for as long as the breakdown was going to
+		 * last. A breakdown that now lasts until someone comes would go quiet
+		 * long before that, and a silent stationary train in the middle of a
+		 * line tells the player nothing about why it is there. Keep it
+		 * smoking. */
+		if (!v->vehstatus.Test(VehState::Hidden) && (v->tick_counter & 0xFF) == 0 &&
+				!EngInfo(v->engine_type)->misc_flags.Test(EngineMiscFlag::NoBreakdownSmoke)) {
+			CreateEffectVehicleRel(v, 4, 4, 5, EV_BREAKDOWN_SMOKE);
+		}
+		return true;
+	}
+
+	/* Waited long enough. Give up on being fetched and let the breakdown run
+	 * its course, which is what clears the line. */
+	v->rescue_deadline = TimerGameEconomy::Date{};
+	SetWindowDirty(WindowClass::VehicleView, v->index);
+	return false;
+}
+
+/**
+ * Station a train in the depot it is standing in as a rescue engine, or stand
+ * it back down again.
+ *
+ * A rescue engine is not doing a job, it is on call: it waits in its depot
+ * until something breaks down or crashes, goes and fetches it, and comes back
+ * here. That is a standing arrangement rather than an order, which is why it
+ * is set once from the vehicle window and stays set, and why a train that has
+ * orders of its own cannot be one -- it would have two contradictory ideas of
+ * where it ought to be. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param flags type of operation
+ * @param veh_id the train to station (or stand down)
+ * @param rescue whether it is to be a rescue engine
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsFrontEngine()) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (rescue) {
+		/* Standing one down is always allowed, whatever state it is in --
+		 * otherwise a train could get stuck being a rescue engine. Only
+		 * taking the job on has conditions. */
+		if (!v->IsInDepot() || !v->vehstatus.Test(VehState::Stopped)) return CommandCost(STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT);
+		if (v->GetNumOrders() != 0) return CommandCost(STR_ERROR_RESCUE_ENGINE_HAS_ORDERS);
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		v->vehicle_flags.Set(VehicleFlag::RescueEngine, rescue);
+		/* Where it lives, and so where it comes back to. Taking it from
+		 * where the train is standing rather than from an order means a
+		 * player moves a rescue engine simply by driving it to another
+		 * depot and stationing it there. */
+		v->rescue_home_depot = rescue ? v->tile : INVALID_TILE;
+		v->rescue_target = VehicleID::Invalid();
+
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+		SetWindowDirty(WindowClass::VehicleDepot, v->tile);
+		SetWindowClassesDirty(WindowClass::TrainList);
+	}
+
+	return CommandCost();
+}
+
 /**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
@@ -4795,6 +4896,19 @@ static bool HandleCrashedTrain(Train *v)
 	if (state <= 240 && !(v->tick_counter & 3)) ChangeTrainDirRandomly(v);
 
 	if (state >= 4440 && !(v->tick_counter & 0x1F)) {
+		/* Wagons vanishing one by one is what clears a wreck off the line when
+		 * nothing else will. A wreck that is going to be fetched should arrive
+		 * at the depot whole, though -- a player who set up a rescue engine
+		 * should get the whole train towed away, not whatever is left of it by
+		 * the time help arrives. So hold the counter here while the wait is
+		 * still on, and let it run once the wait is given up. Same deadline as
+		 * a breakdown, and given up in the same way. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (TrainAwaitsRescue(v)) {
+			v->crash_anim_pos = state - 1;
+			return true;
+		}
+
 		bool ret = v->Next() != nullptr;
 		DeleteLastWagon(v);
 		return ret;

@@ -27,6 +27,8 @@ enum class VehicleFlag : uint8_t {
 	ServiceIntervalIsCustom = 8, ///< Service interval is custom.
 	ServiceIntervalIsPercent = 9, ///< Service interval is percent.
 	DrivingBackwards = 10, ///< Vehicle is driving backwards.
+	RescueEngine = 11, ///< Train waits in its depot to be sent out to fetch broken-down and crashed trains.
+	Wreck = 12, ///< What is left of a crashed train once a rescue engine has taken charge of it: no longer crashing, but still wreckage, and scrapped rather than repaired when it reaches a depot.
 };
 
 /** Bitset of \c VehicleFlag elements. */

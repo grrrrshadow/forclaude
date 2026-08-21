@@ -4623,6 +4623,7 @@ STR_VEHICLE_VIEW_CLONE_AIRCRAFT_INFO                            :{BLACK}Vytvoři
 STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Donuť vlak pokračovat bez čekání na povolení od semaforu
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Otočit vlak
 STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Spojit tento vlak se stojícím vlakem hned před ním
+STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Určit tento vlak jako odtahovku v tomto depu. Čeká tady, vyjíždí pro porouchané a havarované vlaky a potom se sem vrací
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Otoč vozidlo
 STR_VEHICLE_VIEW_ORDER_LOCATION_TOOLTIP                         :{BLACK}Vycentrovat hlavní zobrazení na cíl objednávky. Ctrl+Klik pro otevření nového zobrazení na umístění cíle pokynu.
 
@@ -5600,6 +5601,9 @@ STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Nelze sp
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned před ním nestojí žádný vlak ke spojení
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... mašinka by skončila za vagonky, což zatím není podporováno
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je moc daleko na spojení
+STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto vlaku nelze udělat odtahovku...
+STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... musí stát v depu
+STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... odtahovka čeká na zavolání a nemůže mít vlastní příkazy
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

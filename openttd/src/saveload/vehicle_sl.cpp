@@ -814,6 +814,13 @@ public:
 		 SLE_CONDVAR(Train, flags, VarTypes::U16, SaveLoadVersion::Yapp, SaveLoadVersion::MaxVersion),
 		 SLE_CONDVAR(Train, wait_counter, VarTypes::U16, SaveLoadVersion::SplitLoadWaitCounters, SaveLoadVersion::MaxVersion),
 		 SLE_CONDVAR(Train, gv_flags, VarTypes::U16, SaveLoadVersion::RvRealisticAcceleration, SaveLoadVersion::MaxVersion),
+
+		/* Rescue towing. Saved by name in a table chunk, so a game saved
+		 * before this feature existed loads with all three left at their
+		 * defaults: no rescue engine, no casualty, no deadline running. */
+		     SLE_VAR(Train, rescue_home_depot, VarTypes::U32),
+		     SLE_VAR(Train, rescue_target,     VarTypes::U32),
+		     SLE_VAR(Train, rescue_deadline,   VarTypes::I32),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 

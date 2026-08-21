@@ -251,6 +251,7 @@ enum class Commands : uint8_t {
 	ForceTrainProceed, ///< proceed a train to pass a red signal
 	ReverseTrainDirection, ///< turn a train around
 	CoupleTrains, ///< couple two trains together
+	SetRescueEngine, ///< station a train in its depot as a rescue engine
 
 	ClearOrderBackup, ///< clear the order backup of a given user/tile
 	ModifyOrder, ///< modify an order (like set full-load)

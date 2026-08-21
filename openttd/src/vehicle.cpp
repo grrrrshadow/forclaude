@@ -1417,6 +1417,13 @@ bool Vehicle::HandleBreakdown()
 			/* Aircraft breakdowns end only when arriving at the airport */
 			if (this->type == VehicleType::Aircraft) return false;
 
+			/* A vanilla breakdown fixes itself after a short delay, which
+			 * leaves nothing for a rescue engine to be sent to. A train that
+			 * is waiting to be fetched therefore stays broken down until it
+			 * is - or until it gives up waiting. See
+			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (this->type == VehicleType::Train && TrainAwaitsRescue(Train::From(this))) return true;
+
 			/* For trains this function is called twice per tick, so decrease v->breakdown_delay at half the rate */
 			if ((this->tick_counter & (this->type == VehicleType::Train ? 3 : 1)) == 0) {
 				if (--this->breakdown_delay == 0) {

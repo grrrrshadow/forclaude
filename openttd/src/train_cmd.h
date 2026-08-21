@@ -22,11 +22,13 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 CommandCost CmdForceTrainProceed(DoCommandFlags flags, VehicleID veh_id);
 CommandCost CmdReverseTrainDirection(DoCommandFlags flags, VehicleID veh_id, bool reverse_single_veh);
 CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id);
+CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue);
 
 DEF_CMD_TRAIT(Commands::MoveRailVehicle, CmdMoveRailVehicle, CommandFlag::Location, CommandType::VehicleConstruction)
 DEF_CMD_TRAIT(Commands::ForceTrainProceed, CmdForceTrainProceed, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::ReverseTrainDirection, CmdReverseTrainDirection, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::CoupleTrains, CmdCoupleTrains, CommandFlag::Location, CommandType::VehicleConstruction)
+DEF_CMD_TRAIT(Commands::SetRescueEngine, CmdSetRescueEngine, CommandFlag::Location, CommandType::VehicleManagement)
 
 void CcBuildWagon(Commands, const CommandCost &result, VehicleID new_veh_id, uint, uint16_t, CargoArray, TileIndex tile, EngineID, bool, CargoType, ClientID);
 
