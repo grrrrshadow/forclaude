@@ -101,14 +101,29 @@ void DrawTrainImage(const Train *v, const Rect &r, VehicleID selection, EngineIm
 	bool rtl = _current_text_dir == TD_RTL;
 	Direction dir = rtl ? Direction::E : Direction::W;
 
-	/* The chain is always drawn head-first, but the head is not always the
-	 * end that leads: a train that has been turned round drives from its last
-	 * vehicle. Draw such a train facing the other way, so which end will come
-	 * out of the depot first is visible without moving anything about. Note
-	 * this is on top of the per-vehicle VehicleRailFlag::Flipped mirroring
-	 * that Train::GetImage() already applies, which says how one vehicle sits
-	 * in the chain rather than which way the whole train goes. */
-	if (v->IsDrivingBackwards()) dir = ReverseDir(dir);
+	/* Draw the train in the order it will move, not the order its vehicle list
+	 * happens to run in, so that the end which goes first is always the one
+	 * drawn first. A train that has been turned round leads with its last
+	 * vehicle, and drawing it head-first regardless showed an engine at the
+	 * front of the picture that is in fact going to come out of the depot
+	 * last -- which is exactly what a player looks at the picture to find out.
+	 *
+	 * Reversing the direction the vehicles are drawn facing goes with it: each
+	 * one's recorded facing is relative to the vehicle list, so listing them
+	 * the other way round turns each of them round too. An engine that leaves
+	 * first is then drawn at the left facing left, and one that leaves last at
+	 * the right facing right, with its nose pointing away from the way the
+	 * train is going -- which is what driving backwards looks like. This is on
+	 * top of the per-vehicle VehicleRailFlag::Flipped mirroring that
+	 * Train::GetImage() already applies, which says how one vehicle sits in
+	 * the list rather than which way the whole train goes. */
+	bool backwards = v->IsDrivingBackwards();
+	if (backwards) dir = ReverseDir(dir);
+
+	/* The head's index is the sentinel for "drop at the end of the train", so
+	 * it has to be read before v starts walking the chain. */
+	bool drag_at_end_of_train = (drag_dest == v->index);
+	if (backwards) v = v->Last();
 
 	DrawPixelInfo tmp_dpi;
 	/* Position of highlight box */
@@ -129,8 +144,7 @@ void DrawTrainImage(const Train *v, const Rect &r, VehicleID selection, EngineIm
 		int y = r.Height() / 2;
 		bool sel_articulated = false;
 		bool dragging = (drag_dest != VehicleID::Invalid());
-		bool drag_at_end_of_train = (drag_dest == v->index); // Head index is used to mark dragging at end of train.
-		for (; v != nullptr && (rtl ? px > 0 : px < max_width); v = v->Next()) {
+		for (; v != nullptr && (rtl ? px > 0 : px < max_width); v = backwards ? v->Previous() : v->Next()) {
 			if (dragging && !drag_at_end_of_train && drag_dest == v->index) {
 				/* Highlight the drag-and-drop destination inside the train. */
 				int drag_hlight_width = HighlightDragPosition(px, max_width, y, selection, _cursor.vehchain);

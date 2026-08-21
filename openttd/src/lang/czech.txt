@@ -1770,7 +1770,7 @@ STR_CONFIG_SETTING_SERVICEATHELIPAD_HELPTEXT                    :Helikoptéra na
 STR_CONFIG_SETTING_LINK_TERRAFORM_TOOLBAR                       :Otevírat lištu na úpravy terénu s lištami na výstavbu tratí/silnic atd.: {STRING}
 STR_CONFIG_SETTING_LINK_TERRAFORM_TOOLBAR_HELPTEXT              :Při otevírání lišty výstavby automaticky otevřít lištu s úpravami terénu.
 STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END                         :Otevírat okna výstavby na vzdáleném konci lišty: {STRING}
-STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END_HELPTEXT                :Každé okno, ve kterém se vybírá, co se má postavit (uspořádání nádraží, typ návěstidla, most, depo), se pověsí pod vzdálený konec své lišty místo pod její bližší konec, aby nezakrývalo místo na mapě, kam se staví. Když se současně otevírá i lišta úprav terénu, počítá se vzdálený konec obou dohromady. Určeno pro hraní na mobilu nebo tabletu, kde je mapa malá a okno uprostřed nenechá kam ťukat.
+STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END_HELPTEXT                :Pro hráče na mobilu: nástroje výstavby depa, stanice, návěstidel a směrování budou zarovnány k pravému okraji displeje, aby nezakrývaly místo na mapě, kam se staví. Když se současně otevírá i lišta úprav terénu, zarovná se okno k pravému okraji pod ni.
 
 STR_CONFIG_SETTING_SMALLMAP_LAND_COLOUR                         :Barva země v mapě: {STRING}
 STR_CONFIG_SETTING_SMALLMAP_LAND_COLOUR_HELPTEXT                :Barva terénu na malé mapě

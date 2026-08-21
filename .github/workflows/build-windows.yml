@@ -78,7 +78,7 @@ jobs:
         # cmake/scripts/FindVersion.cmake) -- it's read before the
         # norev0000 fallback, so this shows a readable, build-specific
         # string in the main menu / window title instead.
-        printf 'openttd16.0-beta2 decouple by Karel M\xc3\xa1cha #%s\t%s\t1\t%s\t0\t0\n' \
+        printf 'OpenTTD 16 beta 2 Decouple by Karel M\xc3\xa1cha #%s\t%s\t1\t%s\t0\t0\n' \
           "${{ github.run_number }}" \
           "$(date -u +%Y%m%d)" \
           "${GITHUB_SHA:0:10}" \

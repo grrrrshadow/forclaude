@@ -1693,7 +1693,7 @@ STR_CONFIG_SETTING_SERVICEATHELIPAD_HELPTEXT                    :Service helicop
 STR_CONFIG_SETTING_LINK_TERRAFORM_TOOLBAR                       :Link landscape toolbar to rail/road/water/airport toolbars: {STRING2}
 STR_CONFIG_SETTING_LINK_TERRAFORM_TOOLBAR_HELPTEXT              :When opening a construction toolbar for a transport type, also open the toolbar for terraforming
 STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END                         :Open construction windows at the far end of their toolbar: {STRING2}
-STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END_HELPTEXT                :Hang every window that picks what to build (station layout, signal type, bridge, depot) under the far end of its toolbar instead of the near end, so it stays clear of the part of the map being built on. When the landscaping toolbar is opened alongside, the far end of both together is used. Meant for playing on a phone or tablet, where the map is small and a window in the middle of it leaves nowhere to tap
+STR_CONFIG_SETTING_BUILD_WINDOW_FAR_END_HELPTEXT                :For playing on a phone: the depot, station, signal and waypoint construction tools are aligned to the right-hand edge of the display, so they stay clear of the part of the map being built on. When the landscaping toolbar is opened alongside, the window is aligned to the right-hand edge underneath it
 
 STR_CONFIG_SETTING_SMALLMAP_LAND_COLOUR                         :Land colour used at the smallmap: {STRING2}
 STR_CONFIG_SETTING_SMALLMAP_LAND_COLOUR_HELPTEXT                :Colour of the terrain in the smallmap

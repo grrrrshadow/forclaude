@@ -210,8 +210,18 @@ public:
 	 * @param skipped The number of tiles the path follower skipped to get here.
 	 * @return true if any of those tiles can never be driven through.
 	 */
-	inline bool IsBlockedByFreeWagons(TileIndex tile, Trackdir trackdir, int skipped) const
+	inline bool IsBlockedByFreeWagons(TileIndex tile, Trackdir trackdir, int skipped)
 	{
+		/* Unless reaching such a chain is the whole point of the journey. A
+		 * train on a "go to couple" order is going to a rake of wagons, and a
+		 * rake of wagons waiting to be collected is headless by definition, so
+		 * treating one as impassable walls off the very destination being
+		 * searched for. The search then has to leave the station and come back
+		 * for another approach before it finds a way in, which is the lap of
+		 * the station such a train was seen to make before settling on the
+		 * right platform. */
+		if (Yapf().GetVehicle()->current_order.ShouldGoToCouple()) return false;
+
 		TileIndexDiff diff = TileOffsByDiagDir(TrackdirToExitdir(ReverseTrackdir(trackdir)));
 		for (; skipped >= 0; skipped--, tile += diff) {
 			if (GetReservedTrackbits(tile).None()) continue;

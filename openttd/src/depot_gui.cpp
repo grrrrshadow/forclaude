@@ -561,9 +561,15 @@ struct DepotWindow : Window {
 		/* Account for the header */
 		x -= this->header_width;
 
-		/* find the vehicle in this row that was clicked */
-		const Train *wagon = Train::From(vehicle);
-		for (; wagon != nullptr; wagon = wagon->Next()) {
+		/* Find the vehicle in this row that was clicked. Walk the row the same
+		 * way DrawTrainImage() draws it -- in the order the train will move,
+		 * which for a train that has been turned round runs the other way
+		 * along the vehicle list -- so that what is clicked is what is under
+		 * the pointer. */
+		const Train *train = Train::From(vehicle);
+		bool backwards = train->IsDrivingBackwards();
+		const Train *wagon = backwards ? train->Last() : train;
+		for (; wagon != nullptr; wagon = backwards ? wagon->Previous() : wagon->Next()) {
 			x -= wagon->GetDisplayImageWidth();
 			if (x < 0) break;
 		}
