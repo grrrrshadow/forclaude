@@ -946,3 +946,71 @@ s výchozími hodnotami.
 
 Musí to být kalendářní čas hry, ne herní ticky, aby se to chovalo stejně
 při jakémkoli nastavení délky dne.
+
+---
+
+## Předloha Palo123: jak vypadá okno příkazů u nich
+
+Zdroj: `Palo123/OpenTTD-YPS`, větev `Decouple-wip`, `src/order_gui.cpp`
+a `src/lang/english.txt`. **Klonuje se takhle** (proxy to pustí, jen to
+nejde přes `add_repo`, ten odmítá cizího vlastníka):
+
+```
+git clone --depth 1 --branch Decouple-wip https://github.com/Palo123/OpenTTD-YPS.git
+```
+
+Tohle je referenční *vzhled pro hráče*, ne nutně referenční řešení —
+implementaci mají jinou (viz sekce výše o `OT_GOTO_COUPLE`).
+
+### Rozložení řádků
+
+Nad seznamem příkazů mají **tři vzájemně se vylučující řádky** (každý
+je vlastní `NWID_HORIZONTAL` uvnitř `WID_O_SEL_TOP_ROW_GROUNDVEHICLE`),
+z nichž je vždy vidět jen jeden:
+
+1. **řádek stanice / depa** — jako ve vanille
+   (nonstop | naložit-nebo-přestavba | vyložit-nebo-servis | přestavba)
+2. **řádek podmíněného příkazu** — jako ve vanille
+3. **řádek couple** — tři čudlíky à 124 px:
+   `WID_O_COUPLE_LOAD` | `WID_O_COUPLE_CARGO` | `WID_O_COUPLE_VALUE`
+4. **řádek decouple** — tři čudlíky à 124 px:
+   `WID_O_ORDERS_FIRST` | `WID_O_ORDERS_SECOND` | `WID_O_DECOUPLE_VALUE`
+
+Samotné zapnutí decouple je `WID_O_DECOUPLE` — a ten **není nahoře**,
+je v *dolní* řadě čudlíků vedle „Přeskočit":
+`Přeskočit | Decouple | Smazat/Stop sharing | Jet do`.
+
+### Co který čudlík je
+
+| widget | popisek | co dělá |
+|---|---|---|
+| `WID_O_DECOUPLE` | `Decouple` | zapíná odpojení na stanici (dolní řada) |
+| `WID_O_DECOUPLE_VALUE` | `Units decouple` | kolik vozů odpojit |
+| `WID_O_ORDERS_FIRST` | `First: Keep orders` | co s příkazy první části |
+| `WID_O_ORDERS_SECOND` | `Second: Keep orders` | co s příkazy druhé části |
+| `WID_O_COUPLE_LOAD` | `Couple empty` | které vagonky brát |
+| `WID_O_COUPLE_CARGO` | `Cargo type` | podle druhu nákladu |
+| `WID_O_COUPLE_VALUE` | `Units couple` | kolik vozů připojit |
+
+### Obsah rozbalovacích nabídek
+
+`WID_O_COUPLE_LOAD` (`_order_couple_load_drowdown`):
+`Couple any` / `Couple empty` / `Couple full`
+→ **„plné nebo prázdné" znamená: které stojící vagonky si vzít.**
+Ne „počkej, až budou plné".
+
+`WID_O_ORDERS_FIRST` a `WID_O_ORDERS_SECOND`
+(`_order_decouple_orders_drowdown`):
+`Keep orders` / `Keep and no loading` / `Inherit` / `Wait for couple`
+→ obě půlky rozpojeného vlaku si zvlášť volí, co se stane s příkazy.
+`Inherit` je to dědění, které jsme právě udělali natvrdo; `Wait for
+couple` je náš `wait_for_couple`, který dáváme odpojeným vagonkům vždy.
+
+### Co z toho u nás chybí
+
+- `Cargo type` u couple — vybírat partnera podle nákladu.
+- `Units couple` — připojit jen část stojící soupravy.
+- `Couple any / empty / full`.
+- Volba, co se stane s příkazy **obou** půlek po decouple; my dáváme
+  první půlce její vlastní příkazy a druhé natvrdo „wait for couple"
+  plus zděděné nakládání.
