@@ -842,3 +842,30 @@ vytáhl do `GetReverseCheckOrigins()`, ať se nekopíruje.
 Tohle by měla být ta chybějící druhá polovina — bez ní pathfinder sice
 "věděl", že cesta k partnerovi existuje po otočení, ale nic vlak
 k tomu otočení nedonutilo.
+
+---
+
+## Odtahovka (service / odtah porouchaných a havarovaných vlaků)
+
+Odsouhlasený návrh. **Zatím není nic z toho postavené** — tohle je zadání,
+ne popis hotového stavu.
+
+| | |
+|---|---|
+| Označení | Čudlík v okně mašinky, aktivní jen když stojí v depu. Je to stav mašinky, ne příkaz — odtahovka příkazy nemá, jen čeká. |
+| Kdy vyjede | Jakmile se v její společnosti něco porouchá nebo havaruje. |
+| Která z nich | Nejbližší volná. Když žádná volná není, porucha počká, až se některá vrátí. |
+| Kudy | Smí jet proti jednosměrným návěstidlům — to není červená. Červenou nejezdí. |
+| Co udělá | Připojí se k porouchané/havarované soupravě (stejný mechanismus jako couple). |
+| Kam ji odveze | Do nejbližšího depa. |
+| Porucha v depu | Rozpojí se, porucha se zruší, opravená mašinka odjede po svých příkazech. |
+| Havárie v depu | Celá souprava i s vagonky zmizí. |
+| Návrat | Do depa, ze kterého vyjela — zapamatuje si ho při vyslání a vrátí se tam, i kdyby bylo daleko. |
+| Porouchaná souprava | Normální barva, kouří (nebo jiný znak poruchy) od chvíle poruchy a celou dobu odtahu. |
+| Havarovaná souprava | Šedá jako po srážce, celá i s vagonky — vagonky nemizí. |
+| Pojistka | Půl roku herního času od chvíle poruchy (ne od vyslání). Pak se porucha spraví sama a trosky začnou mizet po vagonkách jako ve vanille. Půl roku je schválně dlouho, aby byl čas to ladit a testovat. |
+
+Co z toho už umí spojování: připojení k porouchané soupravě, odvoz a
+rozpojení v depu jsou přesně to, co dělá couple/decouple. Nové je hlavně
+ta služba kolem — stav "odtahovka", vyslání, jízda proti jednosměrkám,
+kouř a ta pojistka.

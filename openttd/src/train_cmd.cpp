@@ -1481,6 +1481,21 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 		if (src_head != nullptr) src_head->ReserveTrackUnderConsist();
 		if (dst_head != nullptr) dst_head->ReserveTrackUnderConsist();
 
+		/* Inside a depot a train has no extent -- every vehicle sits hidden on
+		 * the one tile -- so which way its vehicles face is not a fact about
+		 * where they are but a convention, and it is that convention, together
+		 * with which end leads, that says which way the train will drive out.
+		 * A vehicle put into a depot is faced the way the depot faces, which is
+		 * the convention for a train that has not been turned round. Add one to
+		 * a train that has, and the train ends up with vehicles facing both
+		 * ways: the end that leads reads its own facing, gets the wrong answer,
+		 * and drives at the back wall. Face every vehicle the way its head
+		 * faces. */
+		for (Train *head : {src_head, dst_head}) {
+			if (head == nullptr || head->track != Track::Depot) continue;
+			for (Train *u = head->Next(); u != nullptr; u = u->Next()) u->direction = head->direction;
+		}
+
 		/* A loading indicator belongs to the head of a consist and is taken
 		 * down when that consist leaves the station. Splicing can retire a head
 		 * without it ever leaving: coupling turns the other train's head into
