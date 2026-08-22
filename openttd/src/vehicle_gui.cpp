@@ -3041,6 +3041,11 @@ static bool IsVehicleRefittable(const Vehicle *v)
 static bool ShowsRescueEngineButton(const Vehicle *v)
 {
 	if (v->type != VehicleType::Train) return false;
+
+	/* One that has been called out is out on the line, and calling it back has
+	 * to stay possible from here -- it is the only place that says so. */
+	if (IsOnRescueRun(Train::From(v))) return true;
+
 	if (!v->IsInDepot()) return false;
 
 	/* One that is already on call has to be able to stand down again, and by
@@ -3254,9 +3259,18 @@ public:
 		 * stopped, because that is the plain truth and the flag is still on
 		 * in the background. Releasing the brake is what puts it on call, and
 		 * it is the player who does that. See FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine) &&
-				v->IsInDepot() && !v->vehstatus.Test(VehState::Stopped)) {
-			return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
+		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
+			/* One that has been called out says so, whether it is on its way to
+			 * the casualty or bringing it in. Neither is anything the ordinary
+			 * order line could describe, since a rescue engine has no orders. */
+			if (IsOnRescueRun(Train::From(v))) {
+				const Train *casualty = Train::GetIfValid(Train::From(v)->rescue_target);
+				bool in_tow = casualty != nullptr && casualty->First() == v;
+				return GetString(in_tow ? STR_VEHICLE_STATUS_RESCUE_TOWING : STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY);
+			}
+			if (v->IsInDepot() && !v->vehstatus.Test(VehState::Stopped)) {
+				return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
+			}
 		}
 
 		if (v->vehstatus.Test(VehState::Stopped) && (!mouse_over_start_stop || v->IsStoppedInDepot())) {
@@ -3288,6 +3302,11 @@ public:
 		switch (v->current_order.GetType()) {
 			case OT_GOTO_STATION:
 				if (v->type == VehicleType::Train && v->current_order.ShouldGoToCouple() && !v->vehicle_flags.Test(VehicleFlag::PathfinderLost)) {
+					/* A train told to go and collect wagons does not set off
+					 * until there are wagons for it to collect that nobody else
+					 * is already on the way for. Standing still with no reason
+					 * given looks like a fault, so give the reason. */
+					if (!HasCoupleTarget(Train::From(v))) return GetString(STR_VEHICLE_STATUS_WAITING_FOR_WAGONS);
 					return GetString(STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL, v->current_order.GetDestination(), PackVelocity(v->GetDisplaySpeed(), v->type));
 				}
 				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_STATION_VEL : STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL,

@@ -64,6 +64,22 @@ struct TileHighlightData {
 	HighLightStyle drawstyle;      ///< Lower bits 0-3 are reserved for detailed highlight information.
 	HighLightStyle next_drawstyle; ///< Queued, but not yet drawn style.
 
+	/**
+	 * The style that was on screen when the button went down, kept for as long
+	 * as the drag has not left the tile it started on.
+	 *
+	 * Which piece of track a tile gets is decided by where in the tile the
+	 * pointer is, and that decision is made again on every frame of a drag. A
+	 * drag that has not gone anywhere should not be deciding anything: the
+	 * answer is already on the screen, the player pressed on it, and asking
+	 * again can only produce a different one. It does, too. The choice between
+	 * the upper and the lower half of a tile is read off the vertical screen
+	 * axis, and that axis is where the height of the land is folded in, so the
+	 * point the pointer is taken to be at can sit on either side of the line
+	 * without the pointer having moved at all.
+	 */
+	HighLightStyle press_drawstyle;
+
 	HighLightStyle place_mode;     ///< Method which is used to place the selection.
 	WindowClass window_class;      ///< The \c WindowClass of the window that is responsible for the selection mode.
 	WindowNumber window_number;    ///< The \c WindowNumber of the window that is responsible for the selection mode.

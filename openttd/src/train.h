@@ -75,7 +75,12 @@ void NormalizeTrainVehInDepot(const Train *u);
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
 bool IsWholeTrainInsideDepot(const Train *v);
+bool HasCoupleTarget(const Train *v);
+bool IsWaitingToBeRescued(const Train *v);
+bool IsOnRescueRun(const Train *v);
+void HandleRescueEngineInDepot(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
+bool IsRescueTargetOnTile(const Train *v, TileIndex tile);
 void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type);
 
 /** Variables that are cached to improve performance and such */
@@ -123,6 +128,18 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	TileIndex rescue_home_depot = INVALID_TILE; ///< Depot a rescue engine is stationed at and returns to when it is done.
 	VehicleID rescue_target = VehicleID::Invalid(); ///< Casualty a rescue engine has been sent to fetch, so no two are sent to the same one.
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
+
+	/**
+	 * Which engine has spoken for this rake of wagons, set on the rake itself.
+	 *
+	 * An engine sent to collect wagons has nowhere to stop once it has set off
+	 * -- reaching them is the whole route -- and nowhere else to go if it finds
+	 * them gone, so two engines sent to the same rake means one of them with no
+	 * errand and no way to end it. The first to want a rake takes it, and the
+	 * rake is no longer offered to anyone else until that engine has it or has
+	 * given up. See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	VehicleID couple_claim = VehicleID::Invalid();
 
 	/** Create new Train object. @copydoc GroundVehicle::GroundVehicle */
 	Train(VehicleID index) : GroundVehicleBase(index) {}

@@ -37,6 +37,7 @@
 #include "newgrf_debug.h"
 #include "framerate_type.h"
 #include "train_cmd.h"
+#include "vehicle_cmd.h"
 #include "misc_cmd.h"
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_economy.h"
@@ -1569,6 +1570,122 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 }
 
 /**
+ * Is this train sitting somewhere on the line waiting for a rescue engine?
+ *
+ * Broken down or wrecked, still within the time it is prepared to wait, and
+ * out on the network rather than tucked away in a depot where nothing needs
+ * fetching. See TrainAwaitsRescue() for the waiting itself.
+ *
+ * @param v the train, front of its consist
+ * @return whether it is a casualty an engine could be sent to
+ */
+bool IsWaitingToBeRescued(const Train *v)
+{
+	if (!v->IsFrontEngine()) return false;
+	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
+	if (v->IsInDepot()) return false;
+	if (v->breakdown_ctr != 1 && !v->vehstatus.Test(VehState::Crashed)) return false;
+	if (v->rescue_deadline == TimerGameEconomy::Date{}) return false;
+	return TimerGameEconomy::date < v->rescue_deadline;
+}
+
+/**
+ * Is this rescue engine out on a call, either on its way to a casualty or
+ * bringing one in?
+ *
+ * @param v the train, front of its consist
+ * @return whether it is in the middle of a rescue
+ */
+bool IsOnRescueRun(const Train *v)
+{
+	return v->IsFrontEngine() && v->vehicle_flags.Test(VehicleFlag::RescueEngine) &&
+			v->rescue_target != VehicleID::Invalid();
+}
+
+/**
+ * Has the engine that spoke for this rake stopped coming for it?
+ *
+ * A claim is only worth as much as the engine behind it. One that has been
+ * sold, crashed, or given something else to do is not coming, and the rake it
+ * spoke for would otherwise stand there claimed by a ghost for the rest of the
+ * game with no engine able to touch it.
+ *
+ * @param rake the front of a headless rake
+ * @return whether its claim should be let go
+ */
+static bool IsCoupleClaimStale(const Train *rake)
+{
+	if (rake->couple_claim == VehicleID::Invalid()) return false;
+
+	const Train *claimer = Train::GetIfValid(rake->couple_claim);
+	if (claimer == nullptr) return true;
+	if (!claimer->IsFrontEngine()) return true;
+	if (claimer->vehstatus.Test(VehState::Crashed)) return true;
+	return !claimer->current_order.ShouldGoToCouple();
+}
+
+/**
+ * Does the rake @p rake answer the description the order @p order gives of
+ * what it is going to collect?
+ *
+ * Three filters: how full the wagons are, what they carry, and how many of
+ * them there are. Each narrows the choice further and each is free to be set
+ * or left alone; every combination is allowed. Left alone, nothing is asked
+ * and the first rake waiting will do.
+ *
+ * They pick which rake to fetch. They never pick part of one -- a rake either
+ * answers and is collected whole, or it does not and is left where it stands.
+ * Taking a train apart is what the decoupling order is for.
+ *
+ * @param order the order doing the collecting
+ * @param rake  the front of a headless rake waiting to be collected
+ * @return whether the rake is what the order asked for
+ */
+static bool MatchesCoupleFilter(const Order &order, const Train *rake)
+{
+	switch (order.GetCoupleLoad()) {
+		case OrderCoupleLoad::Any:
+			break;
+
+		case OrderCoupleLoad::Empty:
+			for (const Train *u = rake; u != nullptr; u = u->Next()) {
+				if (u->cargo.StoredCount() != 0) return false;
+			}
+			break;
+
+		case OrderCoupleLoad::Full:
+			/* Room left anywhere means it is not full. A vehicle that carries
+			 * nothing at all -- a brake van, say -- has no room either, so it
+			 * neither makes a rake full nor stops it being full. */
+			for (const Train *u = rake; u != nullptr; u = u->Next()) {
+				if (u->cargo.StoredCount() < u->cargo_cap) return false;
+			}
+			break;
+
+		default: NOT_REACHED();
+	}
+
+	if (IsValidCargoType(order.GetCoupleCargo())) {
+		bool carries_it = false;
+		for (const Train *u = rake; u != nullptr; u = u->Next()) {
+			if (u->cargo_type == order.GetCoupleCargo() && u->cargo_cap != 0) {
+				carries_it = true;
+				break;
+			}
+		}
+		if (!carries_it) return false;
+	}
+
+	if (order.GetCoupleCount() != 0) {
+		uint count = 0;
+		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;
+		if (count != order.GetCoupleCount()) return false;
+	}
+
+	return true;
+}
+
+/**
  * Could @p v couple to @p partner, ignoring where either of them is?
  *
  * This is the single place that decides what counts as a valid coupling
@@ -1588,6 +1705,14 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	if (partner == nullptr) return false;
 	if (partner == v->First()) return false; // that's us
 	if (partner->owner != v->owner) return false;
+
+	/* A rescue engine sent to fetch a particular train couples to that train
+	 * and to nothing else. What it is going to fetch is a casualty by
+	 * definition -- broken down or wrecked, an engine at its head, none of
+	 * which describes wagons waiting to be collected -- so it is answered here
+	 * on its own terms and none of the ordinary conditions apply to it. */
+	if (v->First()->rescue_target == partner->index) return IsOnRescueRun(v->First());
+
 	if (partner->vehstatus.Test(VehState::Crashed)) return false;
 	if (partner->cur_speed != 0) return false;
 	/* A train that has anything to do with a depot is not standing anywhere to
@@ -1611,7 +1736,78 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	if (partner->IsFrontEngine()) return false;
 	if (!partner->IsFreeWagon()) return false;
 	if (!partner->current_order.ShouldWaitForCouple()) return false;
-	return true;
+
+	/* And it must not already be somebody else's errand. */
+	if (partner->couple_claim != VehicleID::Invalid() && partner->couple_claim != v->First()->index &&
+			!IsCoupleClaimStale(partner)) {
+		return false;
+	}
+
+	return MatchesCoupleFilter(v->First()->current_order, partner);
+}
+
+/**
+ * Find the rake a train under a "go to couple" order is going to fetch,
+ * speaking for it if nobody has yet.
+ *
+ * An engine sent to collect wagons has nowhere to stop once it has set off --
+ * reaching them is the whole route, and the rules that let it pull up against
+ * them are the rules that let it past the signals guarding the platform. It
+ * has nowhere else to go either, since the order names wagons and not a place
+ * to be. So two engines sent to the same rake means one of them arriving to
+ * find nothing, with no way to stop and nothing to do instead. The first to
+ * want a rake speaks for it, and it is offered to nobody else until that
+ * engine has it or has given up.
+ *
+ * @param v the train, front of its consist, on a "go to couple" order
+ * @return the rake it is to fetch, or nullptr if there is nothing for it
+ */
+static Train *FindOrClaimCoupleTarget(Train *v)
+{
+	StationID dest = v->current_order.GetDestination().ToStationID();
+	Train *unclaimed = nullptr;
+
+	for (Train *rake : Train::Iterate()) {
+		if (!rake->IsFreeWagon()) continue;
+		if (rake->owner != v->owner) continue;
+		if (!rake->current_order.ShouldWaitForCouple()) continue;
+		if (rake->last_station_visited != dest) continue;
+
+		if (IsCoupleClaimStale(rake)) rake->couple_claim = VehicleID::Invalid();
+
+		if (rake->couple_claim == v->index) return rake; // already ours
+		if (rake->couple_claim != VehicleID::Invalid()) continue; // somebody else's
+		if (!MatchesCoupleFilter(v->current_order, rake)) continue;
+
+		if (unclaimed == nullptr) unclaimed = rake;
+	}
+
+	if (unclaimed != nullptr) unclaimed->couple_claim = v->index;
+	return unclaimed;
+}
+
+/**
+ * Is there a rake waiting for this train to come and fetch it?
+ *
+ * Asks the question without answering it in the affirmative for anything that
+ * is not already this train's, so it can be asked from anywhere -- the vehicle
+ * window, for one -- without quietly speaking for a rake as a side effect.
+ *
+ * @param v the train, front of its consist
+ * @return whether it has something to go and collect
+ */
+bool HasCoupleTarget(const Train *v)
+{
+	if (!v->current_order.ShouldGoToCouple()) return false;
+
+	StationID dest = v->current_order.GetDestination().ToStationID();
+	for (const Train *rake : Train::Iterate()) {
+		if (rake->couple_claim != v->index) continue;
+		if (!rake->IsFreeWagon()) continue;
+		if (rake->last_station_visited != dest) continue;
+		return true;
+	}
+	return false;
 }
 
 /**
@@ -1677,6 +1873,33 @@ static Train *FindCouplePartnerOnAdjacentTile(const Train *v, TileIndex tile, Tr
  * @param tile any tile of the platform to inspect
  * @return true if a valid partner stands somewhere on that platform
  */
+/**
+ * Is the casualty this rescue engine was called out to standing on this tile?
+ *
+ * A casualty is wherever it broke down, which is out on the open line and not
+ * at a station, so the platform rule that lets a collecting engine pull up
+ * against wagons has nothing to say about it. The same reasoning does: the
+ * thing in the way is the thing that was sent for, so stopping short of it is
+ * the end of the journey and not a place to be turned away from.
+ *
+ * @param v    the train asking, any part of it
+ * @param tile the tile being considered as somewhere to stop
+ * @return whether that tile is where the casualty is
+ */
+bool IsRescueTargetOnTile(const Train *v, TileIndex tile)
+{
+	const Train *tow = v->First();
+	if (!IsOnRescueRun(tow)) return false;
+
+	const Train *casualty = Train::GetIfValid(tow->rescue_target);
+	if (casualty == nullptr || casualty->First() == tow) return false;
+
+	for (const Train *u = casualty->First(); u != nullptr; u = u->Next()) {
+		if (u->tile == tile) return true;
+	}
+	return false;
+}
+
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
 {
 	if (!IsRailStationTile(tile)) return false;
@@ -2059,7 +2282,13 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 		 * player moves a rescue engine simply by driving it to another
 		 * depot and stationing it there. */
 		v->rescue_home_depot = rescue ? v->tile : INVALID_TILE;
-		v->rescue_target = VehicleID::Invalid();
+		/* Standing one down in the middle of a call-out lets go of the errand --
+		 * unless the casualty is already coupled on behind, in which case
+		 * forgetting about it would leave it merged into this train for good,
+		 * with the orders it is carrying nowhere to go back to. Then the
+		 * call-out is seen through to the depot and ends there. */
+		Train *casualty = Train::GetIfValid(v->rescue_target);
+		if (rescue || casualty == nullptr || casualty->First() != v) v->rescue_target = VehicleID::Invalid();
 
 		/* The vehicle window works out which of its buttons are lowered in
 		 * UpdateButtons(), which only runs on an invalidate. Merely marking
@@ -2092,6 +2321,163 @@ static bool IsConsistStandingAtStation(const Train *consist, StationID station)
 		if (IsRailStationTileOfStation(u->tile, station)) return true;
 	}
 	return false;
+}
+
+/**
+ * Send an idle rescue engine out to the nearest train that is waiting to be
+ * fetched.
+ *
+ * Called from the engine's own tick while it stands on call in its depot, so
+ * the work of looking scales with the number of rescue engines a player has
+ * set up -- which is a handful -- rather than with the number of things that
+ * could go wrong.
+ *
+ * It is given no orders. A casualty is a place on the map and not a station,
+ * and an order names a station; what it is given instead is the tile, and
+ * being on a call is what keeps that tile from being wiped by the order code
+ * (see ProcessOrders). Two engines are never sent to the same casualty.
+ *
+ * @param tow the rescue engine, front of its consist
+ */
+static void TryDispatchRescueEngine(Train *tow)
+{
+	if (tow->rescue_target != VehicleID::Invalid()) return;
+	if (!tow->IsInDepot()) return;
+	/* Looking means reading every train in the game twice over, and a train
+	 * that has just broken down is in no hurry. Once every few seconds is
+	 * often enough, and the counter is the train's own, so every client works
+	 * it out on the same tick. */
+	if ((tow->tick_counter & 0x3F) != 0) return;
+	/* Brake off is what puts one on call; a rescue engine standing with its
+	 * brake on is parked, not waiting. */
+	if (tow->vehstatus.Test(VehState::Stopped)) return;
+	if (tow->GetNumOrders() != 0) return;
+
+	Train *nearest = nullptr;
+	uint nearest_distance = UINT_MAX;
+	for (Train *casualty : Train::Iterate()) {
+		if (casualty->owner != tow->owner) continue;
+		if (!IsWaitingToBeRescued(casualty)) continue;
+
+		/* Somebody else's call-out. */
+		bool taken = false;
+		for (const Train *other : Train::Iterate()) {
+			if (other->rescue_target == casualty->index) {
+				taken = true;
+				break;
+			}
+		}
+		if (taken) continue;
+
+		uint distance = DistanceManhattan(tow->tile, casualty->tile);
+		if (distance < nearest_distance) {
+			nearest = casualty;
+			nearest_distance = distance;
+		}
+	}
+
+	if (nearest == nullptr) return;
+
+	tow->rescue_target = nearest->index;
+	tow->SetDestTile(nearest->tile);
+	tow->current_order.MakeDummy();
+	InvalidateWindowData(WindowClass::VehicleView, tow->index);
+	SetWindowDirty(WindowClass::VehicleDepot, tow->tile);
+}
+
+/**
+ * Deal with a rescue engine that has just come to a stand in a depot.
+ *
+ * Two things bring one here. It has towed a casualty in, in which case the
+ * casualty is put down: repaired and sent on its way again where it left off,
+ * or, if it was a wreck, scrapped -- a depot is where a wreck stops being
+ * something the line has to work around. Or it has simply got itself home
+ * afterwards, in which case it goes back on call.
+ *
+ * @param tow the train that has entered the depot, front of its consist
+ */
+void HandleRescueEngineInDepot(Train *tow)
+{
+	if (!tow->IsFrontEngine()) return;
+	if (!tow->vehicle_flags.Test(VehicleFlag::RescueEngine)) return;
+
+	if (tow->rescue_target == VehicleID::Invalid()) {
+		/* Home again with nothing in tow: back on call. Entering a depot always
+		 * stops a vehicle, and a stopped rescue engine reads as parked rather
+		 * than waiting, so let the brake off again. */
+		if (tow->tile == tow->rescue_home_depot) {
+			tow->current_order.MakeDummy();
+			tow->vehstatus.Reset(VehState::Stopped);
+			InvalidateWindowData(WindowClass::VehicleView, tow->index);
+		}
+		return;
+	}
+
+	Train *casualty = Train::GetIfValid(tow->rescue_target);
+	tow->rescue_target = VehicleID::Invalid();
+
+	/* Nothing was ever picked up -- the casualty was sold, or sorted itself out
+	 * before this engine got there. Nothing to put down. */
+	if (casualty != nullptr && casualty->First() == tow && casualty != tow) {
+		bool wrecked = casualty->vehstatus.Test(VehState::Crashed);
+
+		/* Split it back off. It is standing in a depot, which is where taking
+		 * trains apart is an ordinary thing to do. */
+		TryConsistSplice(DoCommandFlag::Execute, casualty, nullptr, true);
+
+		/* If for any reason it would not come apart, leave it exactly where it
+		 * is rather than acting on a train that is still half of another one.
+		 * Scrapping from the middle of a consist, or handing orders to a
+		 * vehicle that is not the head of anything, does lasting damage. */
+		if (casualty->First() != casualty) return;
+
+		if (wrecked) {
+			/* A wreck brought into a depot is scrapped there. */
+			delete casualty;
+			casualty = nullptr;
+		} else {
+			/* Whatever was wrong with it is put right, as a depot puts anything
+			 * right, and it carries on from the order it had got to. Its orders
+			 * were carried here by the engine that fetched it, so that the
+			 * merge could not throw them away; hand them back. */
+			casualty->breakdown_ctr = 0;
+			casualty->breakdown_delay = 0;
+			casualty->rescue_deadline = TimerGameEconomy::Date{};
+
+			if (tow->GetNumOrders() != 0) {
+				casualty->AddToShared(tow);
+				casualty->cur_real_order_index = tow->cur_real_order_index;
+				casualty->cur_implicit_order_index = tow->cur_implicit_order_index;
+				DeleteVehicleOrders(tow, false, false);
+			}
+
+			casualty->vehstatus.Reset(VehState::Stopped);
+			casualty->ConsistChanged(CCF_ARRANGE);
+			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
+		}
+	}
+
+	/* Anything the casualty left on this engine goes now, whether the handover
+	 * happened or not, so it is back to being an engine with no errand. */
+	if (tow->GetNumOrders() != 0) DeleteVehicleOrders(tow, false, false);
+
+	/* Home if this is not home, otherwise straight back on call. Named
+	 * explicitly rather than asking for the nearest depot: it lives in one
+	 * particular depot, that is where the player put it, and the nearest one is
+	 * the one it is standing in. */
+	if (tow->tile != tow->rescue_home_depot && IsRailDepotTile(tow->rescue_home_depot)) {
+		tow->current_order.MakeGoToDepot(GetDepotIndex(tow->rescue_home_depot), OrderDepotTypeFlags{},
+				OrderNonStopFlags{}, OrderDepotActionFlags{OrderDepotActionFlag::Halt});
+		tow->SetDestTile(tow->rescue_home_depot);
+		tow->vehstatus.Reset(VehState::Stopped);
+	} else {
+		tow->current_order.MakeDummy();
+		tow->vehstatus.Reset(VehState::Stopped);
+	}
+
+	InvalidateWindowData(WindowClass::VehicleView, tow->index);
+	SetWindowDirty(WindowClass::VehicleDepot, tow->tile);
+	SetWindowClassesDirty(WindowClass::TrainList);
 }
 
 /**
@@ -2136,6 +2522,16 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (!leading->IsFrontEngine()) std::swap(leading, trailing);
 	if (!leading->IsFrontEngine()) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END);
 
+	/* On a rescue the two ends are both engines, so the rule above settles
+	 * nothing: geometry would hand the head to whichever happens to be in
+	 * front, and that could be a train that has broken down or been wrecked and
+	 * is in no state to drive anything anywhere. The engine that came to fetch
+	 * takes the head. */
+	Train *tow = nullptr;
+	if (IsOnRescueRun(v->First()) && v->First()->rescue_target == partner->index) tow = v->First();
+	if (IsOnRescueRun(partner) && partner->rescue_target == v->First()->index) tow = partner;
+	if (tow != nullptr && leading != tow) std::swap(leading, trailing);
+
 	/* Some gap is normal -- a train cannot reserve the tile its partner stands
 	 * on, so it stops about a tile short and the two are closed up after the
 	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
@@ -2165,6 +2561,22 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	Train *dst = leading->Last()->GetLastEnginePart();
 
 	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
+
+	/* Joining two consists throws away the orders of whichever of them stops
+	 * being a train of its own, and on a rescue that is the casualty -- whose
+	 * orders are the whole reason it is worth fetching rather than scrapping.
+	 * Hand them to the engine doing the fetching before the join, by sharing:
+	 * a shared list outlives any one vehicle leaving it, so the join has
+	 * nothing to throw away, and the depot hands them back at the other end.
+	 * See HandleRescueEngineInDepot(). */
+	if (tow != nullptr && flags.Test(DoCommandFlag::Execute)) {
+		Train *casualty = Train::GetIfValid(tow->rescue_target);
+		if (casualty != nullptr && casualty->GetNumOrders() != 0 && tow->orders == nullptr) {
+			tow->AddToShared(casualty);
+			tow->cur_real_order_index = casualty->cur_real_order_index;
+			tow->cur_implicit_order_index = casualty->cur_implicit_order_index;
+		}
+	}
 
 	Train *new_head = leading;
 	ret = TryConsistSplice(flags, src, dst, true);
@@ -2245,6 +2657,16 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * only thing wrong with it was when it was worked out. */
 	FreeTrainTrackReservation(new_head);
 	new_head->ReserveTrackUnderConsist();
+
+	/* A rescue engine has what it came for. Where it takes it is the nearest
+	 * depot -- a casualty is fetched to get it off the line, and the nearest
+	 * way off the line is the best one. What happens to it there is
+	 * HandleRescueEngineInDepot()'s business. */
+	if (tow != nullptr) {
+		AutoRestoreBackup cur_company(_current_company, new_head->owner);
+		Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, new_head->index,
+				DepotCommandFlags{DepotCommandFlag::DontCancel}, VehicleListIdentifier{});
+	}
 
 	return ret;
 }
@@ -4562,6 +4984,16 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 		return 0;
 	}
 
+	/* Nor is reaching the casualty a rescue engine was called out to. That one
+	 * does have an engine at its head and may well be a wreck already, so it
+	 * fails every test above; what makes it not a collision is that this engine
+	 * was sent to it by name. */
+	if (first->rescue_target == other->index && IsOnRescueRun(first) && other->cur_speed == 0) {
+		first->cur_speed = 0;
+		first->subspeed = 0;
+		return 0;
+	}
+
 	/* Crash both trains. Two statements required to guarantee execution
 	 * order because RandomRange() is involved. */
 	uint num_victims = TrainCrashed(moving_front->First());
@@ -5377,7 +5809,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * as well as one already parked on "wait to couple" that a partner has
 	 * since been pushed up against. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (consist->cur_speed == 0 &&
-			(consist->current_order.ShouldGoToCouple() || consist->current_order.ShouldWaitForCouple()) &&
+			(consist->current_order.ShouldGoToCouple() || consist->current_order.ShouldWaitForCouple() ||
+			 IsOnRescueRun(consist)) &&
 			GetTrainCouplePartner(consist) != nullptr) {
 		/* Commands check ownership against the company that is "current" right
 		 * now, which during a vehicle tick is simply whatever ran last -- not
@@ -5394,12 +5827,37 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (CmdCoupleTrains(DoCommandFlag::Execute, consist->index).Succeeded()) return true;
 	}
 
+	/* Everything a rescue engine does while standing in a depot happens here,
+	 * and here on purpose: a moment in the tick when nothing is walking along
+	 * the consist, so taking one apart is safe. Doing it as the train came
+	 * through the depot door would be doing it from inside the very loop that
+	 * is stepping over its vehicles. Putting a casualty down is exactly that
+	 * kind of surgery, which is why coupling waits for this moment too. */
+	if (consist->vehicle_flags.Test(VehicleFlag::RescueEngine) && consist->IsInDepot() && consist->cur_speed == 0) {
+		if (consist->rescue_target != VehicleID::Invalid()) {
+			HandleRescueEngineInDepot(consist);
+			return true;
+		}
+		TryDispatchRescueEngine(consist);
+	}
+
 	if (consist->flags.Test(VehicleRailFlag::Reversing) && consist->cur_speed == 0) {
 		ReverseTrainDirection(consist);
 	}
 
 	/* exit if train is stopped */
 	if (consist->vehstatus.Test(VehState::Stopped) && consist->cur_speed == 0) return true;
+
+	/* A train told to go and collect wagons does not set off until it has a
+	 * rake to collect, and once it has one, that rake is nobody else's. Asked
+	 * only of a train standing still, so an engine already on its way is never
+	 * halted in the middle of the line by this; and the answer is remembered on
+	 * the rake, so asking again on the next tick returns the same one. See
+	 * FindOrClaimCoupleTarget(). */
+	if (consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0 &&
+			FindOrClaimCoupleTarget(consist) == nullptr) {
+		return true;
+	}
 
 	bool valid_order = !consist->current_order.IsType(OT_NOTHING) && consist->current_order.GetType() != OT_CONDITIONAL;
 	if (ProcessOrders(consist) && CheckReverseTrain(consist)) {

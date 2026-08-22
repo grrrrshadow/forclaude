@@ -123,6 +123,24 @@ private:
 	 */
 	bool reverse_out_of_station = false;
 
+	/**
+	 * What a "go to couple" order will accept when it gets there: how full the
+	 * wagons are, what they are carrying, and how many of them there are.
+	 *
+	 * Three filters, each one narrowing the choice further, every combination
+	 * allowed and none ruling any other out. Left as they are, the order takes
+	 * the first rake waiting at its destination, which is what it always did.
+	 *
+	 * They filter which rake the train sets out for. They never say to take
+	 * part of one: a rake either matches and is collected whole, or it does not
+	 * and is left alone. Splitting a train up is what the decoupling order is
+	 * for. Dedicated fields, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D"). See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	OrderCoupleLoad couple_load = OrderCoupleLoad::Any;
+	CargoType couple_cargo = INVALID_CARGO; ///< Cargo the wagons have to carry; INVALID_CARGO for any.
+	uint8_t couple_count = 0;               ///< How many vehicles the rake has to have; 0 for any.
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -233,6 +251,21 @@ public:
 	inline void SetTurnAroundInDepot(bool turn) { this->turn_around_in_depot = turn; }
 
 	/** Should a train leaving this station reverse out of it? @pre IsType(OT_GOTO_STATION) */
+	/** How full the wagons this order will collect have to be. */
+	inline OrderCoupleLoad GetCoupleLoad() const { return this->couple_load; }
+	/** Set how full the wagons this order will collect have to be. */
+	inline void SetCoupleLoad(OrderCoupleLoad load) { this->couple_load = load; }
+
+	/** Cargo the wagons this order will collect have to carry, or INVALID_CARGO for any. */
+	inline CargoType GetCoupleCargo() const { return this->couple_cargo; }
+	/** Set the cargo the wagons this order will collect have to carry. */
+	inline void SetCoupleCargo(CargoType cargo) { this->couple_cargo = cargo; }
+
+	/** How many vehicles the rake this order will collect has to have, or 0 for any. */
+	inline uint8_t GetCoupleCount() const { return this->couple_count; }
+	/** Set how many vehicles the rake this order will collect has to have. */
+	inline void SetCoupleCount(uint8_t count) { this->couple_count = count; }
+
 	inline bool ShouldReverseOutOfStation() const { return this->reverse_out_of_station; }
 
 	/** Set whether a train leaving this station reverses out of it. */

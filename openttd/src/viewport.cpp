@@ -2679,6 +2679,7 @@ void TileHighlightData::Reset()
 	this->pos.y = 0;
 	this->new_pos.x = 0;
 	this->new_pos.y = 0;
+	this->press_drawstyle = HT_NONE;
 }
 
 /**
@@ -2872,6 +2873,9 @@ void VpStartPlaceSizing(TileIndex tile, ViewportPlaceMethod method, ViewportDrag
 		 * when there is not yet a drawn one to take it from. */
 		HighLightStyle drawn = (_thd_drawn.drawstyle & HT_DRAG_MASK) != HT_NONE ? _thd_drawn.drawstyle : _thd.drawstyle;
 		_thd.next_drawstyle = drawn | others;
+		/* And hold on to it, so a drag that never leaves this tile cannot
+		 * decide otherwise later. See TileHighlightData::press_drawstyle. */
+		_thd.press_drawstyle = _thd.next_drawstyle;
 	} else {
 		_thd.place_mode = HT_SPECIAL | others;
 		_thd.next_drawstyle = HT_POINT | others;
@@ -3229,7 +3233,17 @@ static void CalcRaildirsDrawstyle(int x, int y, int method)
 		}
 	} else if (TileVirtXY(_thd.selstart.x, _thd.selstart.y) == TileVirtXY(x, y)) { // check if we're only within one tile
 		if (method & VPM_RAILDIRS) {
-			b = GetAutorailHT(x, y);
+			/* The drag has not left the tile it started on, so it is not a drag
+			 * at all yet -- it is the press, still being held. The piece of
+			 * track was settled then, on what the player was looking at, and
+			 * working it out again from where the pointer is taken to be now
+			 * can only overrule it. That is what made a held button show one
+			 * piece and lay another: the marker jumped as the button went down,
+			 * stayed jumped for as long as it was held, and returned when it
+			 * was let go, all without the pointer moving. Whatever is being
+			 * held is what was drawn. */
+			b = _thd.press_drawstyle;
+			if ((b & HT_DRAG_MASK) == HT_NONE) b = GetAutorailHT(x, y);
 		} else { // rect for autosignals on one tile
 			b = HT_RECT;
 		}
@@ -3541,6 +3555,9 @@ EventState VpHandlePlaceSizingDrag()
 
 	/* Mouse button released. */
 	_special_mouse_mode = SpecialMouseMode::None;
+	/* Whatever was being held is no longer being held; the next press settles
+	 * its own piece of track. See TileHighlightData::press_drawstyle. */
+	_thd.press_drawstyle = HT_NONE;
 	if (_special_mouse_mode == SpecialMouseMode::Dragging) return EventState::Handled;
 
 	/* Keep the selected tool, but reset it to the original mode. */

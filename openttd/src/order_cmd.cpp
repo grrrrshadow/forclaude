@@ -1204,7 +1204,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT) return CMD_ERROR;
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1385,6 +1386,24 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
 			if (data != 0 && (order->ShouldWaitForCouple() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
 			break;
+
+		/* The three filters on what a coupling order will collect. They only
+		 * mean anything to an order that is going to collect something, and
+		 * each is free to be set or left alone independently of the others. */
+		case MOF_COUPLE_LOAD:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (data >= to_underlying(OrderCoupleLoad::End)) return CMD_ERROR;
+			break;
+
+		case MOF_COUPLE_CARGO:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (CargoType(data) != INVALID_CARGO && CargoType(data) >= NUM_CARGO) return CMD_ERROR;
+			break;
+
+		case MOF_COUPLE_COUNT:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (data > UINT8_MAX) return CMD_ERROR;
+			break;
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -1502,6 +1521,18 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				order->SetReverseOutOfStation(data != 0);
 				break;
 
+			case MOF_COUPLE_LOAD:
+				order->SetCoupleLoad(static_cast<OrderCoupleLoad>(data));
+				break;
+
+			case MOF_COUPLE_CARGO:
+				order->SetCoupleCargo(CargoType(data));
+				break;
+
+			case MOF_COUPLE_COUNT:
+				order->SetCoupleCount(static_cast<uint8_t>(data));
+				break;
+
 			default: NOT_REACHED();
 		}
 
@@ -1538,6 +1569,9 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
 					u->current_order.SetReverseOutOfStation(order->ShouldReverseOutOfStation());
+					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
+					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
+					u->current_order.SetCoupleCount(order->GetCoupleCount());
 				}
 			}
 
@@ -2183,6 +2217,14 @@ bool UpdateOrderDest(Vehicle *v, const Order *order, int conditional_depth, bool
  */
 bool ProcessOrders(Vehicle *v)
 {
+	/* A rescue engine on its way to a casualty is not working through an order
+	 * list -- it has none, that is one of the conditions of being one. What it
+	 * has is a tile to reach, because a casualty is a place on the map and an
+	 * order names a station. Left to this function that tile would be wiped on
+	 * the next tick as "no orders, nowhere to go", and the engine would wander.
+	 * See TryDispatchRescueEngine() and FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (v->type == VehicleType::Train && v->GetNumOrders() == 0 && IsOnRescueRun(Train::From(v))) return false;
+
 	switch (v->current_order.GetType()) {
 		case OT_GOTO_DEPOT:
 			/* Let a depot order in the orderlist interrupt. */

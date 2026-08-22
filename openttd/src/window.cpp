@@ -3024,24 +3024,6 @@ void HandleMouseEvents()
 		double_click_time = std::chrono::steady_clock::now();
 		double_click_pos = _cursor.pos;
 		_left_button_clicked = true;
-
-		/* The left button is master: pressing it lets the right button up.
-		 *
-		 * The right button is held down to drag the map about, and its release
-		 * does not always arrive -- the drag can carry the pointer off the
-		 * window, or the press and the release can be reported by different
-		 * devices. The button is then stuck down as far as the game is
-		 * concerned, and a stuck right button swallows every left click there
-		 * is: the scroll handler claims the mouse first (see
-		 * HandleViewportScroll) and MouseLoop never gets as far as dispatching
-		 * the click. Nothing releases it either, because the release already
-		 * came and went.
-		 *
-		 * A left click is a plain statement that the player is not dragging
-		 * the map any more, so let it say so. Clearing the right button here
-		 * ends the scroll on the same pass and the click goes through. */
-		_right_button_down = false;
-		_right_button_clicked = false;
 	} else if (_right_button_clicked) {
 		_right_button_clicked = false;
 		click = MouseClick::Right;

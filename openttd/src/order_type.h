@@ -82,6 +82,23 @@ enum class OrderLoadType : uint8_t {
 };
 
 /**
+ * How full the wagons a "go to couple" order sends a train to fetch have to
+ * be, for that train to accept them.
+ *
+ * One of three filters an order can put on what it will collect, alongside the
+ * cargo they carry and how many of them there are. Every combination is
+ * allowed and each one only narrows the choice further; a filter nothing is
+ * set on takes the first rake that is waiting. See
+ * FEATURE_DESIGN_COUPLING_TOW.md.
+ */
+enum class OrderCoupleLoad : uint8_t {
+	Any = 0,   ///< However full they are.
+	Empty = 1, ///< Only wagons carrying nothing at all.
+	Full = 2,  ///< Only wagons that have no room left.
+	End,       ///< End marker.
+};
+
+/**
  * Non-stop order flags.
  */
 enum class OrderNonStopFlag : uint8_t {
@@ -175,6 +192,9 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_GOTO_COUPLE,     ///< Toggle whether this order's destination is a place to travel to (reversing if needed) to couple with a partner train there.
 	MOF_TURN_AROUND_DEPOT,///< Toggle whether a train visiting this depot turns around there.
 	MOF_REVERSE_OUT,     ///< Toggle whether a train leaving this station reverses out of it.
+	MOF_COUPLE_LOAD,     ///< Passes an OrderCoupleLoad: how full the wagons to be collected have to be.
+	MOF_COUPLE_CARGO,    ///< Passes a CargoType the wagons to be collected have to carry, or INVALID_CARGO for any.
+	MOF_COUPLE_COUNT,    ///< Change how many vehicles the rake to be collected has to have (0 = any).
 	MOF_END
 };
 

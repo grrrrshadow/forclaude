@@ -180,6 +180,28 @@ static const StringID _order_conditional_condition[] = {
 extern uint ConvertSpeedToDisplaySpeed(uint speed, VehicleType type);
 extern uint ConvertDisplaySpeedToSpeed(uint speed, VehicleType type);
 
+/** How full the wagons a coupling order will collect have to be; indexed by OrderCoupleLoad. */
+static const StringID _order_couple_load_dropdown[] = {
+	STR_ORDER_COUPLE_LOAD_ANY,
+	STR_ORDER_COUPLE_LOAD_EMPTY,
+	STR_ORDER_COUPLE_LOAD_FULL,
+};
+
+/**
+ * Build the list of cargoes a coupling order can ask for: every cargo in the
+ * game, plus asking for none in particular.
+ * @return the list to show
+ */
+static DropDownList BuildCoupleCargoDropDown()
+{
+	DropDownList list;
+	list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_CARGO_ANY, INVALID_CARGO, false));
+	for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
+		list.push_back(MakeDropDownListStringItem(cs->name, cs->Index(), false));
+	}
+	return list;
+}
+
 static const StringID _order_depot_action_dropdown[] = {
 	STR_ORDER_DROP_GO_ALWAYS_DEPOT,
 	STR_ORDER_DROP_SERVICE_DEPOT,
@@ -293,7 +315,22 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * in the list, matching Palo123YPS's GUI, without it
 				 * actually being a separate OrderType. See
 				 * FEATURE_DESIGN_COUPLING_TOW.md. */
-				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
+					line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+
+					/* And what it is going to accept, for each filter that has
+					 * been set. Read off the line, a whole list of orders says
+					 * at a glance which engine is going for which wagons. */
+					if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
+						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
+					}
+					if (IsValidCargoType(order->GetCoupleCargo())) {
+						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
+					}
+					if (order->GetCoupleCount() != 0) {
+						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
+					}
+				}
 
 				/* Waiting for a couple had no way of showing at all, so the
 				 * only place it could be read was a button that speaks for one
@@ -581,6 +618,8 @@ private:
 	int selected_order = -1;
 	/** Is the currently-open query string editing the decouple count (WID_O_DECOUPLE_COUNT) rather than a conditional order value (WID_O_COND_VALUE)? Both use the same OnQueryTextFinished. */
 	bool querying_decouple_count = false;
+	/** Same again for the number of vehicles a coupling order will accept (WID_O_COUPLE_COUNT). */
+	bool querying_couple_count = false;
 	VehicleOrderID order_over = INVALID_VEH_ORDER_ID; ///< Order over which another order is dragged, \c INVALID_VEH_ORDER_ID if none.
 	OrderPlaceObjectState goto_type = OPOS_NONE;
 	const Vehicle *vehicle = nullptr; ///< Vehicle owning the orders being displayed and manipulated.
@@ -1161,6 +1200,16 @@ public:
 				order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
 		this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
 
+		/* What a coupling order will accept is only worth showing on an order
+		 * that is going to collect something. An order that is not carries no
+		 * settings for what it is not going to do. */
+		NWidgetStacked *filter_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_COUPLE_FILTER);
+		if (filter_sel != nullptr) {
+			bool collecting = this->vehicle->type == VehicleType::Train && order != nullptr &&
+					order->IsType(OT_GOTO_STATION) && order->ShouldGoToCouple();
+			if (filter_sel->SetDisplayedPlane(collecting ? 0 : SZSP_NONE)) this->ReInit();
+		}
+
 		this->SetDirty();
 	}
 
@@ -1260,6 +1309,26 @@ public:
 				if (order->GetDepotActionType().Test(OrderDepotActionFlag::Unbunch)) return GetString(STR_ORDER_DROP_UNBUNCH);
 
 				return GetString(STR_ORDER_DROP_GO_ALWAYS_DEPOT);
+			}
+
+			case WID_O_COUPLE_LOAD: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) return {};
+				return GetString(STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
+			}
+
+			case WID_O_COUPLE_CARGO: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) return {};
+				if (!IsValidCargoType(order->GetCoupleCargo())) return GetString(STR_ORDER_COUPLE_CARGO_ANY);
+				return GetString(STR_ORDER_COUPLE_CARGO_TYPE, CargoSpec::Get(order->GetCoupleCargo())->name);
+			}
+
+			case WID_O_COUPLE_COUNT: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) return {};
+				if (order->GetCoupleCount() == 0) return GetString(STR_ORDER_COUPLE_COUNT_ANY);
+				return GetString(STR_ORDER_COUPLE_COUNT_BUTTON, order->GetCoupleCount());
 			}
 
 			default:
@@ -1419,6 +1488,7 @@ public:
 				uint value = order->GetConditionValue();
 				if (order->GetConditionVariable() == OrderConditionVariable::MaxSpeed) value = ConvertSpeedToDisplaySpeed(value, this->vehicle->type);
 				this->querying_decouple_count = false;
+				this->querying_couple_count = false;
 				ShowQueryString(GetString(STR_JUST_INT, value), STR_ORDER_CONDITIONAL_VALUE_CAPT, 5, this, CS_NUMERAL, {});
 				break;
 			}
@@ -1439,6 +1509,7 @@ public:
 					break;
 				}
 				this->querying_decouple_count = true;
+				this->querying_couple_count = false;
 				ShowQueryString(GetString(STR_JUST_INT, order->GetDecoupleCount()), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				break;
 			}
@@ -1471,6 +1542,24 @@ public:
 				break;
 			}
 
+			case WID_O_COUPLE_LOAD:
+				ShowDropDownMenu(this, _order_couple_load_dropdown, to_underlying(this->vehicle->GetOrder(this->OrderGetSel())->GetCoupleLoad()), WID_O_COUPLE_LOAD, 0, 0);
+				break;
+
+			case WID_O_COUPLE_CARGO:
+				ShowDropDownList(this, BuildCoupleCargoDropDown(),
+						this->vehicle->GetOrder(this->OrderGetSel())->GetCoupleCargo(), WID_O_COUPLE_CARGO);
+				break;
+
+			case WID_O_COUPLE_COUNT: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				assert(order != nullptr);
+				this->querying_decouple_count = false;
+				this->querying_couple_count = true;
+				ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				break;
+			}
+
 			case WID_O_SHARED_ORDER_LIST:
 				ShowVehicleListWindow(this->vehicle);
 				break;
@@ -1487,6 +1576,11 @@ public:
 
 		if (this->querying_decouple_count) {
 			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_DECOUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
+			return;
+		}
+
+		if (this->querying_couple_count) {
+			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
 			return;
 		}
 
@@ -1534,6 +1628,14 @@ public:
 
 			case WID_O_DEPOT_ACTION:
 				this->OrderClick_Service(static_cast<OrderDepotAction>(index));
+				break;
+
+			case WID_O_COUPLE_LOAD:
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_COUPLE_LOAD, index);
+				break;
+
+			case WID_O_COUPLE_CARGO:
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_COUPLE_CARGO, index);
 				break;
 
 			case WID_O_REFIT_DROPDOWN:
@@ -1812,6 +1914,22 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+	EndContainer(),
+
+	/* What a coupling order will accept when it gets there: how full the wagons
+	 * are, what they carry, and how many of them there are. Only there while an
+	 * order is actually going to collect something -- an order that is not
+	 * carries no settings for what it is not going to do. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_COUPLE_FILTER),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_LOAD), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetToolTip(STR_ORDER_COUPLE_LOAD_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_CARGO), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetToolTip(STR_ORDER_COUPLE_CARGO_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_COUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_COUPLE_COUNT_BUTTON, STR_ORDER_COUPLE_COUNT_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

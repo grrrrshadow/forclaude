@@ -4577,6 +4577,8 @@ STR_VEHICLE_STATUS_CRASHED                                      :{RED}Crashed!
 STR_VEHICLE_STATUS_BROKEN_DOWN                                  :{RED}Broken down
 STR_VEHICLE_STATUS_STOPPED                                      :{RED}Stopped
 STR_VEHICLE_STATUS_RESCUE_ON_CALL                               :{BLACK}On call for breakdowns
+STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}On the way to a stranded train
+STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Towing a train to a depot
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}No power
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Waiting for free path
@@ -4798,6 +4800,22 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
+STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Wagons: any
+STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Wagons: empty
+STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Wagons: full
+STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Only collect wagons that are this full. Combines with the other two settings; each one narrows the choice further
+STR_ORDER_COUPLE_CARGO_ANY                                      :{BLACK}Cargo: any
+STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Cargo: {STRING}
+STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Only collect wagons carrying this cargo. Combines with the other two settings; each one narrows the choice further
+STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vehicles: {NUM}
+STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vehicles: any
+STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Only collect a rake of exactly this many vehicles. The whole rake is taken; leaving part of it behind is what a decoupling order is for. Zero means any number
+STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Enter number of vehicles the rake must have (0 = any)
+STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}(cargo {STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} vehicles)
+STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting for wagons to collect
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})

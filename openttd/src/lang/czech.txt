@@ -4659,6 +4659,8 @@ STR_VEHICLE_STATUS_CRASHED                                      :{RED}Nehoda!
 STR_VEHICLE_STATUS_BROKEN_DOWN                                  :{RED}Porucha
 STR_VEHICLE_STATUS_STOPPED                                      :{RED}Zastaveno
 STR_VEHICLE_STATUS_RESCUE_ON_CALL                               :{BLACK}Čeká na poruchu
+STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}Jede k porouchanému vlaku
+STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuje vlak do depa
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Čekám na volnou cestu
@@ -4931,6 +4933,22 @@ STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat n
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v této stanici, dokud vedle nezastaví vlak, se kterým se dá spojit, a pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Jet se spojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i couváním) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
+STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
+STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
+STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Vagony: plné
+STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Odvézt jen takto naložené vagony. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
+STR_ORDER_COUPLE_CARGO_ANY                                      :{BLACK}Náklad: jakýkoliv
+STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Náklad: {STRING}
+STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Odvézt jen vagony s tímto nákladem. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
+STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vozů: {NUM}
+STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vozů: libovolně
+STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Odvézt jen řadu, která má přesně tolik vozů. Bere se celá řada; nechat část stát umí příkaz odpojit. Nula znamená libovolný počet
+STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má řada mít (0 = libovolně)
+STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}(náklad {STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} vozů)
+STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(jet se spojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})

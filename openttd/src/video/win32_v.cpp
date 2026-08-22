@@ -578,9 +578,14 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 
 		case WM_LBUTTONUP:
-			ReleaseCapture();
 			_left_button_down = false;
 			_left_button_clicked = false;
+			/* Capture is a single thing, not one per button: releasing it while
+			 * the other button is still held throws away the grab that button
+			 * is relying on, and the message saying it was let go then goes to
+			 * whatever window the pointer has since wandered over. That button
+			 * stays down as far as this program is concerned, for good. */
+			if (!_right_button_down) ReleaseCapture();
 			HandleMouseEvents();
 			return 0;
 
@@ -592,9 +597,19 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 
 		case WM_RBUTTONUP:
-			ReleaseCapture();
 			_right_button_down = false;
+			if (!_left_button_down) ReleaseCapture();
 			HandleMouseEvents();
+			return 0;
+
+		case WM_CAPTURECHANGED:
+			/* The grab has gone, so any message saying a button was let go can
+			 * no longer be counted on to arrive. Read the buttons back off the
+			 * system rather than believing what was last seen. */
+			_left_button_down = (GetKeyState(VK_LBUTTON) & 0x8000) != 0;
+			_right_button_down = (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
+			if (!_left_button_down) _left_button_clicked = false;
+			if (!_right_button_down) _right_button_clicked = false;
 			return 0;
 
 		case WM_MOUSELEAVE:
@@ -607,6 +622,28 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_MOUSEMOVE: {
 			int x = (int16_t)LOWORD(lParam);
 			int y = (int16_t)HIWORD(lParam);
+
+			/* Every mouse movement says which buttons are held down right now,
+			 * and that is worth more than remembering what the last press and
+			 * release message happened to say. A release can go missing --
+			 * pressed on one device and let go on another, let go while the
+			 * grab on the window had been dropped, let go outside the window
+			 * altogether -- and then a button that nobody is holding is held
+			 * down for ever. That is a map that goes on being dragged about
+			 * with no finger on the screen, and every click swallowed by a
+			 * drag that is not happening.
+			 *
+			 * Only ever let this take a button back up. Putting one down on
+			 * the strength of a movement would invent a press that was never
+			 * made, and a press is something the player does deliberately. */
+			if (_left_button_down && (wParam & MK_LBUTTON) == 0) {
+				_left_button_down = false;
+				_left_button_clicked = false;
+			}
+			if (_right_button_down && (wParam & MK_RBUTTON) == 0) {
+				_right_button_down = false;
+				_right_button_clicked = false;
+			}
 
 			/* If the mouse was not in the window and it has moved it means it has
 			 * come into the window, so start drawing the mouse. Also start
