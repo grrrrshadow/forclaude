@@ -1033,14 +1033,23 @@ tam, kde přestal. Tohle je ta varianta, na které musí stát odtah:
 porouchaný vlak si své příkazy nese celou dobu sám, nikam se
 nepřesouvají.
 
-Odtah, jak je napsaný po buildu #72, tohle nesplňuje — příkazy
-poškozeného vlaku vozí s sebou odtahovka, protože spojení dvou souprav
-zahodí příkazy té, která přestala být vlastním vlakem. Je to náhradní
-řešení, ne to správné. Správné je nejdřív umět "mašinka k mašince" tak,
-aby si při spojení oba nechali svoje, a odtah z toho pak vyplyne sám.
+**Postaveno po buildu #72.** Mašinka pohlcená do cizího vlaku si nechává
+příkazy, číslo i jméno a jen podle nich nejede, dokud je součástí cizí
+soupravy. Dřív se to všechno zahazovalo, a číslo se zahozením uvolní
+dalšímu vlaku — takže se ta mašinka nemohla vrátit ani jako ona sama.
+Zároveň to řeší synchronizaci ve hře více hráčů: žádná nová id se
+nerozdávají, všechno si drží to svoje.
 
-Odtah je proto odložený, dokud tohle nestojí. Do té doby platí aspoň:
-odtahovku, která už někoho táhne, nejde odvolat — musí ho dovézt.
+Vede vždycky ta s "jet se spojit"; ta s "čekat na spojení" jede jako
+vagony. Rozpojuje se příkazem "Odpojit" s počtem, který si vedoucí
+nechá. Odpojené části, která má vepředu mašinku, se **příkaz posune na
+další** — ten, na kterém čekala, je splněný — a pokud další příkaz jmenuje
+stanici, ve které zrovna stojí, odbaví ho na místě, místo aby pro něj
+objížděla nádraží. Spojený vlak má výkon obou mašinek, protože obě
+fyzicky jedou v soupravě.
 
-**Netestováno:** "jet se spojit" mašinka k mašince ještě nikdo
-nezkoušel.
+Odtah z toho vyplynul sám: porouchaný vlak si své příkazy nese celou
+dobu, nikam se nepřesouvají. Odtahovku, která už někoho táhne, nejde
+odvolat — musí ho dovézt.
+
+**Filtr počtu vozů počítá i mašinku:** mašinka a tři vagony jsou N=4.

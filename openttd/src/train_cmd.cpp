@@ -1260,7 +1260,7 @@ static void NormaliseTrainHead(Train *head)
 	head->unitnumber = Company::Get(head->owner)->freeunits[head->type].UseID(GetFreeUnitNumber(VehicleType::Train));
 }
 
-static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain);
+static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain, bool keep_absorbed_identity = false);
 static void TrainEnterStation(Train *consist, StationID station);
 static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
@@ -1359,9 +1359,16 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
  *                   or nullptr to make @p src (and chain) a new standalone train
  * @param move_chain if true, move @p src and everything following it;
  *                   otherwise just @p src (and any of its articulated parts)
+ * @param keep_absorbed_identity if true, an engine that stops being the head of
+ *                   its own train keeps its orders, its number and its name
+ *                   instead of having them thrown away -- for a coupling that
+ *                   is meant to come apart again, where the engine is still the
+ *                   train it was and is only travelling as part of another one.
+ *                   Rearranging a train in a depot passes false: there the
+ *                   engine really has stopped being a train of its own.
  * @return the cost of this operation or an error
  */
-static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain)
+static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain, bool keep_absorbed_identity)
 {
 	/* locate the head of the two chains */
 	Train *src_head = src->First();
@@ -1449,11 +1456,24 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 				src_head->orders = src->orders;
 				if (src_head->orders != nullptr) src_head->AddToShared(src);
 				src_head->CopyVehicleConfigAndStatistics(src);
+			} else if (keep_absorbed_identity) {
+				/* Two trains joining to run as one for a while, and this is the
+				 * one that is going to travel as somebody else's wagons. It is
+				 * still the train it was: it keeps its orders, its number and
+				 * its name, and simply does nothing about any of them until it
+				 * is put down again. Nothing reads them in the meantime -- only
+				 * the head of a train is asked what it is supposed to be doing.
+				 *
+				 * Throwing them away is what made this impossible before. A
+				 * number thrown away is a number handed out again to something
+				 * else, so the train could not even come back as itself. See
+				 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			} else {
+				/* Remove stuff not valid anymore for non-front engines. */
+				DeleteVehicleOrders(src);
+				src->ReleaseUnitNumber();
+				src->name.clear();
 			}
-			/* Remove stuff not valid anymore for non-front engines. */
-			DeleteVehicleOrders(src);
-			src->ReleaseUnitNumber();
-			src->name.clear();
 		}
 
 		/* We weren't a front engine but are becoming one. So
@@ -1555,6 +1575,10 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 				u->couple_claim = VehicleID::Invalid();
 
 				if (u->IsFrontEngine() || u->IsFreeWagon()) continue;
+				/* An engine travelling as somebody else's wagons keeps its
+				 * orders, so it also keeps a "waiting to be collected" order
+				 * that is no longer true. It has been collected. */
+				u->current_order.SetWaitForCouple(false);
 
 				if (Station::IsValidID(u->last_station_visited)) {
 					Station *st = Station::Get(u->last_station_visited);
@@ -1743,9 +1767,12 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	 * is not a crash, this is what I came for" only covers a headless rake.
 	 * Worse, the collecting engine kept seeing a partner in wagons that had
 	 * already been collected by somebody else, so it never gave up on them. */
-	if (partner->IsFrontEngine()) return false;
-	if (!partner->IsFreeWagon()) return false;
 	if (!partner->current_order.ShouldWaitForCouple()) return false;
+	/* Either a rake of wagons or a whole train of its own that is waiting to be
+	 * picked up and carried along as part of a bigger one. Two little trains
+	 * joining to run as one is the same arrangement as an engine collecting
+	 * wagons, seen from the other end. */
+	if (!partner->IsFreeWagon() && !partner->IsFrontEngine()) return false;
 
 	/* And it must not already be somebody else's errand. */
 	if (partner->couple_claim != VehicleID::Invalid() && partner->couple_claim != v->First()->index &&
@@ -1778,7 +1805,10 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 	Train *unclaimed = nullptr;
 
 	for (Train *rake : Train::Iterate()) {
-		if (!rake->IsFreeWagon()) continue;
+		/* Wagons waiting to be collected, or a whole little train waiting to be
+		 * carried along as part of a bigger one. */
+		if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
+		if (rake == v) continue;
 		if (rake->owner != v->owner) continue;
 		if (!rake->current_order.ShouldWaitForCouple()) continue;
 		if (rake->last_station_visited != dest) continue;
@@ -1813,7 +1843,8 @@ bool HasCoupleTarget(const Train *v)
 	StationID dest = v->current_order.GetDestination().ToStationID();
 	for (const Train *rake : Train::Iterate()) {
 		if (rake->couple_claim != v->index) continue;
-		if (!rake->IsFreeWagon()) continue;
+		if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
+		if (!rake->current_order.ShouldWaitForCouple()) continue;
 		if (rake->last_station_visited != dest) continue;
 		return true;
 	}
@@ -2456,29 +2487,17 @@ void HandleRescueEngineInDepot(Train *tow)
 			casualty = nullptr;
 		} else {
 			/* Whatever was wrong with it is put right, as a depot puts anything
-			 * right, and it carries on from the order it had got to. Its orders
-			 * were carried here by the engine that fetched it, so that the
-			 * merge could not throw them away; hand them back. */
+			 * right, and it carries on from the order it had got to. It has had
+			 * its own orders the whole way -- being towed does not take a train's
+			 * orders off it, see TryConsistSplice. */
 			casualty->breakdown_ctr = 0;
 			casualty->breakdown_delay = 0;
 			casualty->rescue_deadline = TimerGameEconomy::Date{};
-
-			if (tow->GetNumOrders() != 0) {
-				casualty->AddToShared(tow);
-				casualty->cur_real_order_index = tow->cur_real_order_index;
-				casualty->cur_implicit_order_index = tow->cur_implicit_order_index;
-				DeleteVehicleOrders(tow, false, false);
-			}
-
 			casualty->vehstatus.Reset(VehState::Stopped);
 			casualty->ConsistChanged(CCF_ARRANGE);
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		}
 	}
-
-	/* Anything the casualty left on this engine goes now, whether the handover
-	 * happened or not, so it is back to being an engine with no errand. */
-	if (tow->GetNumOrders() != 0) DeleteVehicleOrders(tow, false, false);
 
 	/* Home if this is not home, otherwise straight back on call. Named
 	 * explicitly rather than asking for the nearest depot: it lives in one
@@ -2551,6 +2570,17 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (IsOnRescueRun(partner) && partner->rescue_target == v->First()->index) tow = partner;
 	if (tow != nullptr && leading != tow) std::swap(leading, trailing);
 
+	/* Same question when two ordinary trains join: which of them drives the
+	 * result. Geometry would hand it to whichever happens to be in front, and
+	 * that is not a decision -- it is an accident of which way they were
+	 * pointing. The one that came to collect leads, and the one that was
+	 * waiting to be collected travels as its wagons until it is put down again.
+	 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+	Train *collector = nullptr;
+	if (v->First()->current_order.ShouldGoToCouple()) collector = v->First();
+	else if (partner->current_order.ShouldGoToCouple()) collector = partner;
+	if (collector != nullptr && collector->IsFrontEngine() && leading != collector) std::swap(leading, trailing);
+
 	/* Some gap is normal -- a train cannot reserve the tile its partner stands
 	 * on, so it stops about a tile short and the two are closed up after the
 	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
@@ -2581,24 +2611,15 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 
 	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
 
-	/* Joining two consists throws away the orders of whichever of them stops
-	 * being a train of its own, and on a rescue that is the casualty -- whose
-	 * orders are the whole reason it is worth fetching rather than scrapping.
-	 * Hand them to the engine doing the fetching before the join, by sharing:
-	 * a shared list outlives any one vehicle leaving it, so the join has
-	 * nothing to throw away, and the depot hands them back at the other end.
-	 * See HandleRescueEngineInDepot(). */
-	if (tow != nullptr && flags.Test(DoCommandFlag::Execute)) {
-		Train *casualty = Train::GetIfValid(tow->rescue_target);
-		if (casualty != nullptr && casualty->GetNumOrders() != 0 && tow->orders == nullptr) {
-			tow->AddToShared(casualty);
-			tow->cur_real_order_index = casualty->cur_real_order_index;
-			tow->cur_implicit_order_index = casualty->cur_implicit_order_index;
-		}
-	}
-
+	/* Every coupling done here is meant to come apart again, so whichever train
+	 * ends up travelling as the other one's wagons stays the train it was: it
+	 * keeps its orders, its number and its name and simply does nothing about
+	 * them until it is put down. That is what makes two little trains able to
+	 * run as one and then go their separate ways again, and it is what lets a
+	 * fetched casualty carry its own orders rather than having them handed
+	 * about. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	Train *new_head = leading;
-	ret = TryConsistSplice(flags, src, dst, true);
+	ret = TryConsistSplice(flags, src, dst, true, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
 
 	/* The two halves still disagree about which way is forwards; settle that
@@ -2728,6 +2749,10 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
 
+	/* Which end leads belongs to the whole train and has to be handed on to the
+	 * part being put down before the front engine's own copy is reset below. */
+	bool was_driving_backwards = v->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
+
 	/* Release the whole train's current reservation before splitting,
 	 * not just what's about to become each half's own footprint. A
 	 * train stopped at a station commonly holds a PBS reservation
@@ -2775,6 +2800,55 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	/* Nobody has spoken for these wagons yet; whatever this vehicle was doing
 	 * in an earlier life is over. */
 	remainder->couple_claim = VehicleID::Invalid();
+
+	/* It leaves the same way round as the train it was part of. Which end leads
+	 * is a property of the whole train, and the part being put down is still
+	 * lying the way it was lying a moment ago. */
+	remainder->vehicle_flags.Set(VehicleFlag::DrivingBackwards, was_driving_backwards);
+
+	/* What is put down is not always wagons. Two little trains can join to run
+	 * as one big one, and when they come apart the one that was travelling as
+	 * wagons is a train again -- it kept its orders all along (see
+	 * TryConsistSplice) and now goes back to working through them.
+	 *
+	 * The order it was standing on when it was picked up is done: it waited
+	 * there, it was collected, and it has been carried to wherever it is now.
+	 * So it moves on to the next one. And if that next order names the very
+	 * station it has just been put down at, it works through it here rather
+	 * than driving off to reach somewhere it has never left -- the same lap
+	 * round the station that collecting used to make. */
+	if (remainder->IsFrontEngine()) {
+		remainder->ConsistChanged(CCF_TRACK);
+
+		if (IsRailStationTile(remainder->tile) && remainder->GetNumOrders() != 0) {
+			StationID station = GetStationIndex(remainder->tile);
+			remainder->last_station_visited = station;
+			remainder->DeleteUnreachedImplicitOrders();
+			remainder->IncrementImplicitOrderIndex();
+			remainder->UpdateRealOrderIndex();
+
+			const Order *next = remainder->GetOrder(remainder->cur_real_order_index);
+			if (next != nullptr && next->IsType(OT_GOTO_STATION) && next->GetDestination().ToStationID() == station &&
+					IsRailStationTileOfStation(remainder->GetMovingFront()->tile, station)) {
+				remainder->current_order = *next;
+				remainder->current_order.SetGoToCouple(false);
+				remainder->current_order.SetWaitForCouple(false);
+				TrainEnterStation(remainder, station);
+			} else {
+				UpdateVehicleTimetable(remainder, true);
+				remainder->current_order.Free();
+				remainder->SetDestTile(INVALID_TILE);
+			}
+		} else {
+			remainder->current_order.Free();
+			remainder->SetDestTile(INVALID_TILE);
+		}
+
+		FreeTrainTrackReservation(remainder);
+		remainder->ReserveTrackUnderConsist();
+		return;
+	}
+
 	if (IsRailStationTile(remainder->tile)) {
 		StationID station = GetStationIndex(remainder->tile);
 		remainder->current_order.MakeGoToStation(station);
