@@ -2488,6 +2488,21 @@ static void PlaceObject()
 		pt.y += TILE_SIZE / 2;
 	}
 
+	/* Build on the tile the white marker is drawn on, not on whatever tile the
+	 * cursor happens to be over at this instant. The two are worked out the
+	 * same way from the same cursor position, so they agree -- but the marker
+	 * is redrawn once a frame while a click is dealt with the moment it
+	 * arrives, so a pointer that moves between the two leaves the player
+	 * looking at one tile and building on the next. Near the middle of a tile
+	 * that is invisible; near an edge it lands a tile away, which is what a
+	 * player sees as the game building somewhere other than where it said it
+	 * would. The sub-tile position is kept, since tools that care which half of
+	 * a tile was clicked still need it. */
+	if ((_thd.drawstyle & HT_DRAG_MASK) != HT_NONE) {
+		pt.x = _thd.pos.x + (pt.x & TILE_UNIT_MASK);
+		pt.y = _thd.pos.y + (pt.y & TILE_UNIT_MASK);
+	}
+
 	_tile_fract_coords.x = pt.x & TILE_UNIT_MASK;
 	_tile_fract_coords.y = pt.y & TILE_UNIT_MASK;
 
