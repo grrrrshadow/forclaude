@@ -1127,7 +1127,16 @@ public:
 				 * other out. Decoupling already leaves the train facing the
 				 * right way by itself, and asking it to reverse out on top of
 				 * that would undo exactly that. */
-				bool can_reverse_out = order->GetDecoupleCount() == 0;
+				/* Waiting for a couple is the opposite of going to find one, so
+				 * the two exclude each other. And a train left waiting to be
+				 * collected does not get to decide how it leaves: whoever
+				 * couples to it brings the orders, and reversing out is one of
+				 * them. */
+				bool waiting = order->ShouldWaitForCouple();
+				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE, waiting);
+				this->SetWidgetDisabledState(WID_O_WAIT_COUPLE, order->ShouldGoToCouple() || order->ShouldReverseOutOfStation());
+
+				bool can_reverse_out = order->GetDecoupleCount() == 0 && !waiting;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && order->ShouldReverseOutOfStation());
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {

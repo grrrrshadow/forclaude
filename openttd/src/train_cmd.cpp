@@ -1262,6 +1262,7 @@ static void TrainEnterStation(Train *consist, StationID station);
 static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
+static bool IsAnyPartInsideDepot(const Train *v);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -1571,6 +1572,12 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	if (partner->owner != v->owner) return false;
 	if (partner->vehstatus.Test(VehState::Crashed)) return false;
 	if (partner->cur_speed != 0) return false;
+	/* A train that has anything to do with a depot is not standing anywhere to
+	 * be coupled to. One on its way out is halfway between two worlds, and one
+	 * inside has no position at all -- grabbing either by the tail drags it
+	 * back into the depot, brake and all, which is what was seen to happen to a
+	 * train reversing in while engines came past under a coupling order. */
+	if (IsAnyPartInsideDepot(partner)) return false;
 	return true;
 }
 
@@ -2769,7 +2776,7 @@ static void AdvanceWagonsAfterSwap(Train *moving_front)
 	}
 }
 
-static bool IsWholeTrainInsideDepot(const Train *v)
+bool IsWholeTrainInsideDepot(const Train *v)
 {
 	for (const Train *u = v; u != nullptr; u = u->Next()) {
 		if (u->track != Track::Depot || u->tile != v->tile) return false;

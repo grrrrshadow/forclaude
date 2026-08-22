@@ -47,6 +47,11 @@ void BuildDepotVehicleList(VehicleType type, TileIndex tile, VehicleList *engine
 
 	for (Vehicle *v : VehiclesOnTile(tile)) {
 		if (v->type != type || !v->IsInDepot()) continue;
+		/* A train counts as being in the depot only once all of it is: while
+		 * it is still coming in or going out it lies along the track outside,
+		 * and a depot list showing it there cannot show which way round it is
+		 * or let it be taken apart. */
+		if (v->type == VehicleType::Train && !IsWholeTrainInsideDepot(Train::From(v))) continue;
 
 		if (type == VehicleType::Train) {
 			const Train *t = Train::From(v);
