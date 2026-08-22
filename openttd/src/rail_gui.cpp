@@ -403,7 +403,13 @@ static void HandleAutodirPlacement()
 	Track trackstat = static_cast<Track>( _thd.drawstyle & HT_DIR_MASK); // 0..5
 
 	if (_thd.drawstyle & HT_RAIL) { // one tile case
-		GenericPlaceRail(TileVirtXY(_thd.selend.x, _thd.selend.y), trackstat);
+		/* Take the tile from the marker, the same place the piece of track just
+		 * came from. _thd.selend is where the pointer was when the button came
+		 * up, while drawstyle is what was last drawn -- two different moments,
+		 * so a pointer that moved in between gives the piece chosen for one
+		 * tile and lays it on another. What the marker shows is what gets
+		 * built. */
+		GenericPlaceRail(TileVirtXY(_thd.pos.x, _thd.pos.y), trackstat);
 		return;
 	}
 
