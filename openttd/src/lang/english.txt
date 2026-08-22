@@ -5342,6 +5342,7 @@ STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Can't st
 STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... it has to be standing in a depot
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... a rescue engine waits for a call-out and cannot have orders of its own
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... a rescue engine goes out to fetch a train and has to be on its own
+STR_ERROR_RESCUE_ENGINE_IS_TOWING                               :{WHITE}... it is towing a train and has to bring that in first
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

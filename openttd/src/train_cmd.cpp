@@ -2273,9 +2273,22 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 
+	if (!rescue) {
+		/* One that has a casualty coupled on behind it has to see the job
+		 * through. Letting go of it here would leave the casualty merged into
+		 * this train with nothing left that knows to put it down again -- and
+		 * the train it used to be would never come back. It can be stood down
+		 * on the way out, before it has picked anything up, and it can be stood
+		 * down once it has handed its load over. */
+		const Train *in_tow = Train::GetIfValid(v->rescue_target);
+		if (in_tow != nullptr && in_tow != v && in_tow->First() == v) {
+			return CommandCost(STR_ERROR_RESCUE_ENGINE_IS_TOWING);
+		}
+	}
+
 	if (rescue) {
-		/* Standing one down is always allowed, whatever state it is in --
-		 * otherwise a train could get stuck being a rescue engine. Only
+		/* Standing one down is otherwise always allowed, whatever state it is
+		 * in -- otherwise a train could get stuck being a rescue engine. Only
 		 * taking the job on has conditions. */
 		if (!v->IsInDepot() || !v->vehstatus.Test(VehState::Stopped)) return CommandCost(STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT);
 		if (v->GetNumOrders() != 0) return CommandCost(STR_ERROR_RESCUE_ENGINE_HAS_ORDERS);
@@ -2292,13 +2305,9 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 		 * player moves a rescue engine simply by driving it to another
 		 * depot and stationing it there. */
 		v->rescue_home_depot = rescue ? v->tile : INVALID_TILE;
-		/* Standing one down in the middle of a call-out lets go of the errand --
-		 * unless the casualty is already coupled on behind, in which case
-		 * forgetting about it would leave it merged into this train for good,
-		 * with the orders it is carrying nowhere to go back to. Then the
-		 * call-out is seen through to the depot and ends there. */
-		Train *casualty = Train::GetIfValid(v->rescue_target);
-		if (rescue || casualty == nullptr || casualty->First() != v) v->rescue_target = VehicleID::Invalid();
+		/* Standing one down in the middle of a call-out lets go of the errand.
+		 * One that is already towing cannot get here at all -- see above. */
+		v->rescue_target = VehicleID::Invalid();
 
 		/* The vehicle window works out which of its buttons are lowered in
 		 * UpdateButtons(), which only runs on an invalidate. Merely marking

@@ -5632,6 +5632,7 @@ STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto
 STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... musí stát v depu
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... odtahovka čeká na zavolání a nemůže mít vlastní příkazy
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... odtahovka jezdí pro vlaky a musí být sama
+STR_ERROR_RESCUE_ENGINE_IS_TOWING                               :{WHITE}... právě odtahuje vlak a musí ho nejdřív dovézt
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

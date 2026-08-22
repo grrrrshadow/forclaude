@@ -3204,7 +3204,11 @@ public:
 			 * button is in the window (see ShowsRescueEngineButton), so where
 			 * it is shown it is usable, and all that is left to check is who
 			 * owns the train. */
-			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany);
+			/* One that is already towing a casualty has to bring it in before it
+			 * can be stood down, so the button is there but dead until it has. */
+			const Train *in_tow = Train::GetIfValid(Train::From(v)->rescue_target);
+			bool towing = in_tow != nullptr && in_tow != v && in_tow->First() == v;
+			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany || towing);
 			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, v->vehicle_flags.Test(VehicleFlag::RescueEngine));
 		}
 

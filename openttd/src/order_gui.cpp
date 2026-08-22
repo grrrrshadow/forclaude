@@ -620,6 +620,8 @@ private:
 	bool querying_decouple_count = false;
 	/** Same again for the number of vehicles a coupling order will accept (WID_O_COUPLE_COUNT). */
 	bool querying_couple_count = false;
+	/** The filter row has appeared or gone, so the window has to be laid out again at a moment when nothing is being delivered to it. */
+	bool couple_filter_resized = false;
 	VehicleOrderID order_over = INVALID_VEH_ORDER_ID; ///< Order over which another order is dragged, \c INVALID_VEH_ORDER_ID if none.
 	OrderPlaceObjectState goto_type = OPOS_NONE;
 	const Vehicle *vehicle = nullptr; ///< Vehicle owning the orders being displayed and manipulated.
@@ -862,6 +864,12 @@ public:
 		this->vscroll = this->GetScrollbar(WID_O_SCROLLBAR);
 		if (NWidgetCore *nwid = this->GetWidget<NWidgetCore>(WID_O_DEPOT_ACTION); nwid != nullptr) {
 			nwid->SetToolTip(STR_ORDER_TRAIN_DEPOT_ACTION_TOOLTIP + to_underlying(v->type));
+		}
+		/* The filter row belongs to an order that is going to collect something,
+		 * and no order is selected yet. Saying so before the window is laid out
+		 * means it is built the right height from the first frame. */
+		if (NWidgetStacked *filter_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_COUPLE_FILTER); filter_sel != nullptr) {
+			filter_sel->SetDisplayedPlane(SZSP_NONE);
 		}
 		this->FinishInitNested(v->index);
 
@@ -1207,7 +1215,15 @@ public:
 		if (filter_sel != nullptr) {
 			bool collecting = this->vehicle->type == VehicleType::Train && order != nullptr &&
 					order->IsType(OT_GOTO_STATION) && order->ShouldGoToCouple();
-			if (filter_sel->SetDisplayedPlane(collecting ? 0 : SZSP_NONE)) this->ReInit();
+			/* A row coming and going changes how tall the window is, and that is
+			 * a re-layout. It cannot be done here: this runs from inside a click
+			 * being handed to this very window, and moving every widget out from
+			 * under a click that is halfway through being delivered leaves the
+			 * press landing on whatever has since slid into that spot -- or on
+			 * nothing. Which is why not one button in the window could be
+			 * pressed. Note it and do it in OnMouseLoop, once the click is
+			 * finished with. */
+			if (filter_sel->SetDisplayedPlane(collecting ? 0 : SZSP_NONE)) this->couple_filter_resized = true;
 		}
 
 		this->SetDirty();
@@ -1809,6 +1825,16 @@ public:
 	{
 		/* Update the scroll bar */
 		this->vscroll->SetCapacityFromWidget(this, WID_O_ORDER_LIST, WidgetDimensions::scaled.framerect.Vertical());
+	}
+
+	void OnMouseLoop() override
+	{
+		/* Between frames, with no click on its way in and nothing being drawn:
+		 * the one safe moment to move every widget in the window. */
+		if (this->couple_filter_resized) {
+			this->couple_filter_resized = false;
+			this->ReInit();
+		}
 	}
 
 	static inline HotkeyList hotkeys{"order", {

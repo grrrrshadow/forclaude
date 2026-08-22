@@ -1014,3 +1014,33 @@ couple` je náš `wait_for_couple`, který dáváme odpojeným vagonkům vždy.
 - Volba, co se stane s příkazy **obou** půlek po decouple; my dáváme
   první půlce její vlastní příkazy a druhé natvrdo „wait for couple"
   plus zděděné nakládání.
+
+## Dva druhy "jet se spojit" (rozhodnuto při testu buildu #72)
+
+Až dosud se "jet se spojit" chápalo jen jedním způsobem: mašinka jede
+k bezhlavé řadě vagonků. Tak je to ale jen půlka věci a plete se to do
+odtahu. Jsou to dva různé případy a každý má jiné pravidlo pro příkazy.
+
+**Mašinka k vagonkům.** Vagonky nejsou vlak a nemají vlastní příkazy;
+přebírají příkaz od mašinky, která je tam nechala — "jeď do stanice
+a nalož plné". Až jsou plné, příkaz jim poskočí na "čekat na spojení"
+a od té chvíle čekají na odvoz. Tak to má i Palo123. Příkazy tedy patří
+tomu, kdo je vytvořil, a vagonky si je jen půjčují.
+
+**Mašinka k mašince.** Oba jsou plnohodnotné vlaky a **oba si své
+příkazy nechávají**. Spojení je dočasné; až se rozpojí, každý pokračuje
+tam, kde přestal. Tohle je ta varianta, na které musí stát odtah:
+porouchaný vlak si své příkazy nese celou dobu sám, nikam se
+nepřesouvají.
+
+Odtah, jak je napsaný po buildu #72, tohle nesplňuje — příkazy
+poškozeného vlaku vozí s sebou odtahovka, protože spojení dvou souprav
+zahodí příkazy té, která přestala být vlastním vlakem. Je to náhradní
+řešení, ne to správné. Správné je nejdřív umět "mašinka k mašince" tak,
+aby si při spojení oba nechali svoje, a odtah z toho pak vyplyne sám.
+
+Odtah je proto odložený, dokud tohle nestojí. Do té doby platí aspoň:
+odtahovku, která už někoho táhne, nejde odvolat — musí ho dovézt.
+
+**Netestováno:** "jet se spojit" mašinka k mašince ještě nikdo
+nezkoušel.
