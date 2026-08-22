@@ -4796,6 +4796,7 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
+STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and decouple {NUM})
 
 STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Turn around

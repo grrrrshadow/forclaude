@@ -295,6 +295,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * FEATURE_DESIGN_COUPLING_TOW.md. */
 				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
 
+				/* Waiting for a couple had no way of showing at all, so the
+				 * only place it could be read was a button that speaks for one
+				 * order at a time. Everything an order is going to do belongs
+				 * on its own line, where a whole list can be read at once. */
+				if (v->type == VehicleType::Train && order->ShouldWaitForCouple()) line += GetString(STR_ORDER_WAIT_COUPLE_SUFFIX);
+
 				/* Reversing out is about where the train goes next, not about
 				 * how long it stays, so it has no place in the timetable. Nor
 				 * is it shown when the order decouples here, because then it is

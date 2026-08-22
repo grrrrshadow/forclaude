@@ -4929,6 +4929,7 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Jet se spojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i couváním) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(jet se spojit)
+STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a odpojit {NUM})
 
 STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
