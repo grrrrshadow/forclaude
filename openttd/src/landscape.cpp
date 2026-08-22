@@ -141,20 +141,38 @@ Point InverseRemapCoords2(int x, int y, bool clamp_to_map, bool *clamped)
 		if (clamped != nullptr) *clamped = (pt.x != old_pt.x) || (pt.y != old_pt.y);
 	}
 
-	/* Now find the Z-world coordinate by fix point iteration.
-	 * This is a bit tricky because the tile height is non-continuous at foundations.
-	 * The clicked point should be approached from the back, otherwise there are regions that are not clickable.
-	 * (FOUNDATION_HALFTILE_LOWER on SLOPE_STEEP_S hides north halftile completely)
-	 * So give it a z-malus of 4 in the first iterations. */
+	/* A point on the screen does not name one point in the world: everything
+	 * along one line maps to it, with the world x and y both growing by one for
+	 * every step of height, because that is what raising ground does to where a
+	 * tile is drawn. What was clicked is where that line first meets the
+	 * ground, seen from the front -- the highest such crossing, since anything
+	 * lower is hidden behind the hillside.
+	 *
+	 * So walk the line down from the top of the world and stop at the first
+	 * height where the ground has caught up with it. Coming down rather than up
+	 * is what makes this pick the visible surface, and testing the ground
+	 * against the line is what makes it exact.
+	 *
+	 * This used to be a fixed-point iteration that guessed at the crossing, and
+	 * because it could land in a place it could not get out of, it was given a
+	 * deliberate downward nudge of four to approach "from the back". That nudge
+	 * is a lie about where the pointer is, and it shows near the edges of a
+	 * tile and anywhere the ground steps: what the player aims at and what the
+	 * game picks are a tile apart. There is nothing to trade away here -- the
+	 * hidden regions the nudge was protecting are exactly the ones this finds
+	 * properly. */
+	auto ground_at = [&](int step) {
+		return clamp_to_map
+				? GetSlopePixelZ(Clamp(pt.x + step, min_coord, max_x), Clamp(pt.y + step, min_coord, max_y)) / 2
+				: GetSlopePixelZOutsideMap(pt.x + step, pt.y + step) / 2;
+	};
+
 	int z = 0;
-	if (clamp_to_map) {
-		for (int i = 0; i < 5; i++) z = GetSlopePixelZ(Clamp(pt.x + std::max(z, 4) - 4, min_coord, max_x), Clamp(pt.y + std::max(z, 4) - 4, min_coord, max_y)) / 2;
-		for (int m = 3; m > 0; m--) z = GetSlopePixelZ(Clamp(pt.x + std::max(z, m) - m, min_coord, max_x), Clamp(pt.y + std::max(z, m) - m, min_coord, max_y)) / 2;
-		for (int i = 0; i < 5; i++) z = GetSlopePixelZ(Clamp(pt.x + z,             min_coord, max_x), Clamp(pt.y + z,             min_coord, max_y)) / 2;
-	} else {
-		for (int i = 0; i < 5; i++) z = GetSlopePixelZOutsideMap(pt.x + std::max(z, 4) - 4, pt.y + std::max(z, 4) - 4) / 2;
-		for (int m = 3; m > 0; m--) z = GetSlopePixelZOutsideMap(pt.x + std::max(z, m) - m, pt.y + std::max(z, m) - m) / 2;
-		for (int i = 0; i < 5; i++) z = GetSlopePixelZOutsideMap(pt.x + z,             pt.y + z            ) / 2;
+	for (int step = CeilDiv(_settings_game.construction.map_height_limit * TILE_HEIGHT, 2); step >= 0; step--) {
+		if (ground_at(step) >= step) {
+			z = step;
+			break;
+		}
 	}
 
 	pt.x += z;
