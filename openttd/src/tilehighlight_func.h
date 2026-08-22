@@ -31,4 +31,19 @@ void UpdateTileSelection();
 
 extern TileHighlightData _thd;
 
+/**
+ * The tile marker as it stood on the frame before this one -- which is to say,
+ * as the player last saw it on screen.
+ *
+ * A click has to be answered with what the player was looking at when they
+ * pressed, not with where the marker has since moved to. Both are worked out
+ * from the pointer, and the pointer can move between the frame that was drawn
+ * and the frame that handles the press: on a touch screen it reliably does,
+ * because the finger settles as it comes down. #UpdateTileSelection() runs
+ * before clicks are dispatched, so by the time a build command is put
+ * together, #_thd already describes a marker the player has never seen. This
+ * is the one they did see. See #PlaceObject().
+ */
+extern TileHighlightData _thd_drawn;
+
 #endif /* TILEHIGHLIGHT_FUNC_H */

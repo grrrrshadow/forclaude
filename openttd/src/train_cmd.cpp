@@ -12,6 +12,7 @@
 #include "articulated_vehicles.h"
 #include "command_func.h"
 #include "core/backup_type.hpp"
+#include "economy_base.h"
 #include "error_func.h"
 #include "pathfinder/yapf/yapf.hpp"
 #include "news_func.h"
@@ -39,6 +40,7 @@
 #include "misc_cmd.h"
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_economy.h"
+#include "timetable.h"
 
 #include "table/strings.h"
 #include "table/train_sprites.h"
@@ -1538,6 +1540,16 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 			head->last_station_visited = StationID::Invalid();
 		}
 
+		/* A rake of wagons waiting to be collected has a window of its own
+		 * (see IsWaitingWagonChain), and being collected is exactly what has
+		 * just happened to it: it is part of a train now, and its former head
+		 * is an ordinary vehicle in the middle of one. The window has nothing
+		 * left to show, so it goes. */
+		for (Train *head : {original_src_head, original_dst_head}) {
+			if (head == nullptr || head->IsFrontEngine()) continue;
+			CloseWindowById(WindowClass::VehicleView, head->index);
+		}
+
 		/* We are undoubtedly changing something in the depot and train list. */
 		InvalidateWindowData(WindowClass::VehicleDepot, src->tile);
 		InvalidateWindowClassesData(WindowClass::TrainList, 0);
@@ -2013,6 +2025,10 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 		 * taking the job on has conditions. */
 		if (!v->IsInDepot() || !v->vehstatus.Test(VehState::Stopped)) return CommandCost(STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT);
 		if (v->GetNumOrders() != 0) return CommandCost(STR_ERROR_RESCUE_ENGINE_HAS_ORDERS);
+		/* It has to leave at a moment's notice and bring something back, so it
+		 * cannot already be pulling something: wagons rule it out exactly as
+		 * orders do. */
+		if (v->GetNextUnit() != nullptr) return CommandCost(STR_ERROR_RESCUE_ENGINE_HAS_WAGONS);
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -2034,6 +2050,27 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 	}
 
 	return CommandCost();
+}
+
+/**
+ * Is @p tile a rail station tile belonging to station @p station?
+ */
+static bool IsRailStationTileOfStation(TileIndex tile, StationID station)
+{
+	return IsRailStationTile(tile) && GetStationIndex(tile) == station;
+}
+
+/**
+ * Is any part of @p consist standing on a platform of station @p station?
+ * Being merely near it does not count; the vehicle has to be on the station's
+ * own tiles.
+ */
+static bool IsConsistStandingAtStation(const Train *consist, StationID station)
+{
+	for (const Train *u = consist; u != nullptr; u = u->Next()) {
+		if (IsRailStationTileOfStation(u->tile, station)) return true;
+	}
+	return false;
 }
 
 /**
@@ -2134,8 +2171,48 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * move and never advances to whatever the engine was supposed to do next.
 	 * Clearing it on the current order only, not in the order list, so a train
 	 * looping back round to this order couples again as intended. */
+	bool was_go_to_couple = new_head->current_order.ShouldGoToCouple();
 	new_head->current_order.SetGoToCouple(false);
 	new_head->current_order.SetWaitForCouple(false);
+
+	/* A train that came here under a "go to couple" order has now done what
+	 * that order asked, so the order is finished and the next one is due.
+	 *
+	 * Nothing else will conclude that for it. A train only moves on from a
+	 * station order by arriving: the platform's own tile handler notices the
+	 * front reach the stop location, the train loads, and departing advances
+	 * the order. But a train sent to collect wagons stops when it touches
+	 * them, which is short of the stop location while they are standing in
+	 * the rest of the platform, so that handler never fires. The order stays
+	 * current, the train still reads it as "get to this station", and off it
+	 * goes -- round the loop and back to the same platform, whose only
+	 * purpose is to finally trigger the arrival that lets the order advance.
+	 * That is the pointless lap round the station.
+	 *
+	 * Whether it happens depends only on how far into the platform the wagons
+	 * are: a train that happened to stop exactly on the stop location does
+	 * arrive, loads, and couples from the loading code instead, which departs
+	 * normally and advances the order by itself. Same order, same wagons,
+	 * different platform -- which is why some platforms looked fine.
+	 *
+	 * So do here what arriving would have done. If the train is standing in
+	 * the station it was sent to, let it enter properly, cargo handling and
+	 * all; that is the same route the lucky platforms take. If it is short of
+	 * the platform, there is nothing to load at, so just mark the station
+	 * reached and let the next order be picked up. */
+	if (was_go_to_couple && new_head->current_order.IsType(OT_GOTO_STATION)) {
+		StationID dest = new_head->current_order.GetDestination().ToStationID();
+		if (IsConsistStandingAtStation(new_head, dest)) {
+			if (IsRailStationTileOfStation(new_head->GetMovingFront()->tile, dest)) {
+				TrainEnterStation(new_head, dest);
+			} else {
+				new_head->DeleteUnreachedImplicitOrders();
+				new_head->last_station_visited = dest;
+				UpdateVehicleTimetable(new_head, true);
+				new_head->IncrementImplicitOrderIndex();
+			}
+		}
+	}
 
 	/* Throw away the path this train was following and let it be planned
 	 * again. It was planned while the wagons now being carried were still a
@@ -2793,8 +2870,16 @@ static void AdvanceWagonsAfterSwap(Train *moving_front)
 
 bool IsWholeTrainInsideDepot(const Train *v)
 {
-	for (const Train *u = v; u != nullptr; u = u->Next()) {
-		if (u->track != Track::Depot || u->tile != v->tile) return false;
+	/* Whichever part of the train was handed in, the question is about all of
+	 * it, so start from the head. Walking from somewhere in the middle would
+	 * answer for the tail only -- and a train reversing into a depot puts its
+	 * tail in first, so that answer comes back "yes, all in" while most of the
+	 * train is still out on the track behind. */
+	const Train *head = v->First();
+	TileIndex tile = head->tile;
+	for (const Train *u = head; u != nullptr; u = u->Next()) {
+		if (u->track != Track::Depot) return false;
+		if (u->tile != tile) return false;
 	}
 	return true;
 }

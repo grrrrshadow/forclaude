@@ -2982,7 +2982,8 @@ void CcStartStopVehicle(Commands, const CommandCost &result, VehicleID veh_id, b
 	if (result.Failed()) return;
 
 	const Vehicle *v = Vehicle::GetIfValid(veh_id);
-	if (v == nullptr || !IsCompanyBuildableVehicleType(v) || !v->IsPrimaryVehicle() || v->owner != _local_company) return;
+	if (v == nullptr || !IsCompanyBuildableVehicleType(v) || v->owner != _local_company) return;
+	if (!v->IsPrimaryVehicle() && !IsWaitingWagonChain(v)) return;
 
 	StringID msg = v->vehstatus.Test(VehState::Stopped) ? STR_VEHICLE_COMMAND_STOPPED : STR_VEHICLE_COMMAND_STARTED;
 	const Vehicle *moving_front = v->GetMovingFront();
@@ -2997,7 +2998,10 @@ void CcStartStopVehicle(Commands, const CommandCost &result, VehicleID veh_id, b
  */
 void StartStopVehicle(const Vehicle *v, bool texteffect)
 {
-	assert(v->IsPrimaryVehicle());
+	/* Wagons left standing on a platform to be collected load cargo like any
+	 * other vehicle at a station, so they can be told to stop doing it. See
+	 * IsWaitingWagonChain(). */
+	assert(v->IsPrimaryVehicle() || IsWaitingWagonChain(v));
 	Command<Commands::StartStopVehicle>::Post(_vehicle_msg_translation_table[VCT_CMD_START_STOP][v->type], texteffect ? CcStartStopVehicle : nullptr, v->tile, v->index, false);
 }
 
@@ -3015,6 +3019,39 @@ static bool IsVehicleRefittable(const Vehicle *v)
 	} while (v->IsGroundVehicle() && (v = v->Next()) != nullptr);
 
 	return false;
+}
+
+/**
+ * Should the vehicle view window offer the rescue-engine button at all?
+ *
+ * The button is not greyed out when it cannot be used -- it is not there.
+ * Either a train can be put on call, in which case the button is shown and the
+ * clone button steps aside for it, or it cannot, in which case the window is
+ * the vanilla one, clone button and all. A dead button that is only ever grey
+ * for most trains tells the player nothing and takes the clone button's place
+ * for nothing.
+ *
+ * A rescue engine leaves at a moment's notice and brings a train back, so it
+ * has to be waiting in a depot with nothing else to do and nothing already in
+ * tow: orders rule it out, and so do wagons. Outside a depot the window is
+ * left exactly as vanilla draws it.
+ *
+ * @param v The vehicle the window is showing.
+ * @return Whether the button belongs in the window.
+ */
+static bool ShowsRescueEngineButton(const Vehicle *v)
+{
+	if (v->type != VehicleType::Train) return false;
+	if (!v->IsInDepot()) return false;
+
+	/* One that is already on call has to be able to stand down again, and by
+	 * then it is unbraked and waiting rather than stopped, so it fails the
+	 * conditions for taking the job on in the first place. */
+	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return true;
+
+	if (!v->vehstatus.Test(VehState::Stopped)) return false;
+	if (v->GetNumOrders() != 0) return false;
+	return Train::From(v)->GetNextUnit() == nullptr;
 }
 
 /** Window manager class for viewing a vehicle. */
@@ -3100,9 +3137,21 @@ public:
 
 			default: NOT_REACHED();
 		}
-		/* The rescue button stays put for every train and greys out instead of
-		 * coming and going, so the window keeps one size. */
-		this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(v->type == VehicleType::Train ? 0 : SZSP_NONE);
+		/* Whether the rescue button is there at all is decided by
+		 * ShowsRescueEngineButton(); UpdatePlanes keeps it in step from here
+		 * on, but the first answer has to be in before the window is laid out
+		 * or the layout is built around a button that is not there. */
+		this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(ShowsRescueEngineButton(v) ? 0 : SZSP_NONE);
+
+		/* Same for the button column of a rake of wagons waiting to be
+		 * collected: none of it applies, so the window is laid out without it
+		 * from the start rather than being rebuilt a moment later. */
+		if (IsWaitingWagonChain(v)) {
+			this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE)->SetDisplayedPlane(SZSP_NONE);
+			this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(SZSP_NONE);
+			this->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN)->SetDisplayedPlane(SZSP_NONE);
+		}
+
 		this->FinishInitNested(window_number);
 		this->owner = v->owner;
 		this->GetWidget<NWidgetViewport>(WID_VV_VIEWPORT)->InitializeViewport(this, static_cast<VehicleID>(this->window_number), ScaleZoomGUI(_vehicle_view_zoom_levels[v->type]));
@@ -3158,6 +3207,19 @@ public:
 		bool is_localcompany = v->owner == _local_company;
 		bool refittable_and_stopped_in_depot = IsVehicleRefittable(v);
 
+		/* Wagons waiting to be collected keep only the buttons that mean
+		 * something for them; the rest of the column is not in the window at
+		 * all (see UpdatePlanes) and the two that are not in a selection
+		 * widget are greyed instead. There are no orders to show and no
+		 * details page that would say anything an engineless rake can act on. */
+		if (IsWaitingWagonChain(v)) {
+			this->SetWidgetDisabledState(WID_VV_RENAME, true);
+			this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, true);
+			this->SetWidgetDisabledState(WID_VV_SHOW_DETAILS, true);
+			this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);
+			return;
+		}
+
 		this->SetWidgetDisabledState(WID_VV_RENAME, !is_localcompany);
 		this->SetWidgetDisabledState(WID_VV_GOTO_DEPOT, !is_localcompany);
 		this->SetWidgetDisabledState(WID_VV_REFIT, !refittable_and_stopped_in_depot || !is_localcompany);
@@ -3170,13 +3232,12 @@ public:
 		if (v->type == VehicleType::Train) {
 			this->SetWidgetLoweredState(WID_VV_FORCE_PROCEED, Train::From(v)->force_proceed == TFP_SIGNAL);
 			this->SetWidgetDisabledState(WID_VV_FORCE_PROCEED, !is_localcompany);
-			/* A rescue engine is stationed in a depot and has no orders of its
-			 * own, so the button is only live where that is true: a train that
-			 * is out on the line, or that has been given orders, cannot be put
-			 * on call. Greyed rather than refused when pressed. */
-			bool is_rescue = v->vehicle_flags.Test(VehicleFlag::RescueEngine);
-			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany || !v->IsStoppedInDepot() || v->GetNumOrders() != 0);
-			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, is_rescue);
+			/* Whether a train can be put on call at all decides whether this
+			 * button is in the window (see ShowsRescueEngineButton), so where
+			 * it is shown it is usable, and all that is left to check is who
+			 * owns the train. */
+			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany);
+			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, v->vehicle_flags.Test(VehicleFlag::RescueEngine));
 		}
 
 		if (v->type == VehicleType::Train || v->type == VehicleType::Road) {
@@ -3203,6 +3264,9 @@ public:
 		if (widget != WID_VV_CAPTION) return this->Window::GetWidgetString(widget, stringid);
 
 		const Vehicle *v = Vehicle::Get(this->window_number);
+		/* A rake of wagons has no unit number to be called by -- that belongs
+		 * to the engine that left it here and went on without it. */
+		if (IsWaitingWagonChain(v)) return GetString(STR_VEHICLE_VIEW_WAGONS_CAPTION);
 		return GetString(STR_VEHICLE_VIEW_CAPTION, v->index);
 	}
 
@@ -3235,7 +3299,11 @@ public:
 		if (v->vehstatus.Test(VehState::Stopped) && (!mouse_over_start_stop || v->IsStoppedInDepot())) {
 			if (v->type != VehicleType::Train) return GetString(STR_VEHICLE_STATUS_STOPPED);
 			if (v->cur_speed != 0) return GetString(STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL, PackVelocity(v->GetDisplaySpeed(), v->type));
-			if (Train::From(v)->gcache.cached_power == 0) return GetString(STR_VEHICLE_STATUS_TRAIN_NO_POWER);
+			/* Wagons standing on their own have no engine and are not waiting
+			 * for one to be added -- they are waiting for one to come and
+			 * fetch them. Telling the player they have no power would be
+			 * reporting the obvious as a fault. */
+			if (Train::From(v)->gcache.cached_power == 0 && !IsWaitingWagonChain(v)) return GetString(STR_VEHICLE_STATUS_TRAIN_NO_POWER);
 			return GetString(STR_VEHICLE_STATUS_STOPPED);
 		}
 
@@ -3285,6 +3353,13 @@ public:
 
 			case OT_LOADING:
 				if (v->type == VehicleType::Train && (v->current_order.ShouldWaitForCouple() || v->current_order.ShouldGoToCouple())) {
+					/* Wagons standing here on their own are working through the
+					 * cargo handling the engine that left them here was working
+					 * through, which is the one thing about them the player
+					 * cannot read off anywhere else -- they have no order list
+					 * to look in. */
+					if (v->current_order.IsFullLoadOrder()) return GetString(STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_FULL_LOAD);
+					if (v->current_order.GetLoadType() == OrderLoadType::NoLoad) return GetString(STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_NO_LOAD);
 					return GetString(STR_VEHICLE_STATUS_WAITING_FOR_COUPLE);
 				}
 				return GetString(STR_VEHICLE_STATUS_LOADING_UNLOADING);
@@ -3477,18 +3552,44 @@ public:
 		const Vehicle *v = Vehicle::Get(this->window_number);
 		bool veh_stopped = v->IsStoppedInDepot();
 
+		/* Wagons waiting to be collected can be looked at and told to stop
+		 * loading, and that is all. They have no orders, no engine and nowhere
+		 * of their own to go, so every button about those is taken out of the
+		 * window rather than left there doing nothing. What is left is the
+		 * viewport, the status line and the start/stop bar. */
+		if (IsWaitingWagonChain(v)) {
+			bool changed = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE)->SetDisplayedPlane(SZSP_NONE);
+			changed |= this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(SZSP_NONE);
+			changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN)->SetDisplayedPlane(SZSP_NONE);
+			changed |= this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(SZSP_NONE);
+			if (changed) this->ReInit();
+			return;
+		}
+
 		/* Widget WID_VV_GOTO_DEPOT must be hidden if the vehicle is already stopped in depot.
 		 * Widget WID_VV_CLONE_VEH should then be shown, since cloning is allowed only while in depot and stopped.
 		 */
-		/* Refit takes this row for a train standing in a depot, which leaves
-		 * the row below free to hold the turn-around button at all times --
-		 * turning a train by hand has to stay possible in a depot, since a
-		 * depot never turns one by itself. What that costs is the clone button
-		 * for trains, and it costs nothing: the depot window a train has to be
-		 * standing in to be cloned has a clone button of its own. Other
-		 * vehicle types keep the vanilla arrangement. See
+		/* The rescue button and the clone button are the two states of this
+		 * window, and never both. A train that can be put on call gets the
+		 * rescue button, and the clone button steps aside for it: refit takes
+		 * the clone button's row, which leaves the row below free for the
+		 * turn-around button, so turning a train by hand stays possible in a
+		 * depot -- a depot never turns one by itself. Nothing is lost by
+		 * dropping clone there: the depot window a train has to be standing in
+		 * to be cloned has a clone button of its own.
+		 *
+		 * Any other train, and every other vehicle type, gets the window
+		 * vanilla draws, clone button and all. See
 		 * FEATURE_DESIGN_COUPLING_TOW.md. */
-		bool train_in_depot = v->type == VehicleType::Train && v->IsStoppedInDepot();
+		bool show_rescue = ShowsRescueEngineButton(v);
+		if (this->GetWidget<NWidgetStacked>(WID_VV_RESCUE_ENGINE_SEL)->SetDisplayedPlane(show_rescue ? 0 : SZSP_NONE)) {
+			/* A row appearing or disappearing changes the window's size, which
+			 * only a re-layout works out; selecting a plane on its own would
+			 * leave the old size behind. */
+			this->ReInit();
+		}
+
+		bool train_in_depot = show_rescue;
 		PlaneSelections plane = train_in_depot ? SEL_DC_REFIT : (veh_stopped ? SEL_DC_CLONE : SEL_DC_GOTO_DEPOT);
 		NWidgetStacked *nwi = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE); // Selection widget 'send to depot' / 'clone'.
 		if (nwi->shown_plane + SEL_DC_BASEPLANE != plane) {
@@ -3566,13 +3667,16 @@ static WindowDesc _train_view_desc(
  */
 void ShowVehicleViewWindow(const Vehicle *v)
 {
-	/* This window is built for something that can be given orders, started and
-	 * stopped, and sent places. A headless rake of wagons left standing on a
-	 * platform is none of those things, and the window asserts the moment one
-	 * of its buttons is pressed. Vanilla never had to say so, because free
+	/* This window is built for something that can be given orders and sent
+	 * places, which a headless rake of wagons cannot. But wagons left standing
+	 * on a platform waiting to be collected do load cargo, and the player has
+	 * to be able to see that and put a stop to it, so they get the window too
+	 * -- with everything that does not apply to them left out of it, see
+	 * VehicleViewWindow::UpdatePlanes. Anything else without an engine at the
+	 * front has no window at all; vanilla never had to say so, because free
 	 * wagons only ever existed inside a depot, where they cannot be clicked on
-	 * to open a window in the first place. */
-	if (!v->IsPrimaryVehicle()) return;
+	 * to open one in the first place. */
+	if (!v->IsPrimaryVehicle() && !IsWaitingWagonChain(v)) return;
 
 	AllocateWindowDescFront<VehicleViewWindow>((v->type == VehicleType::Train) ? _train_view_desc : _vehicle_view_desc, v->index);
 }

@@ -1119,26 +1119,31 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_STATION);
 				this->SetWidgetLoweredState(WID_O_WAIT_COUPLE, order->ShouldWaitForCouple());
 				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE, order->ShouldGoToCouple());
-				/* Reversing out combines fine with coupling here -- a train
-				 * that has just picked wagons up very often wants to go back
-				 * the way it came. Only decoupling blocks the choice, because
-				 * there the train already leaves the right way by itself. */
-				/* The two exclude each other, so whichever is set greys the
-				 * other out. Decoupling already leaves the train facing the
-				 * right way by itself, and asking it to reverse out on top of
-				 * that would undo exactly that. */
-				/* Waiting for a couple is the opposite of going to find one, so
-				 * the two exclude each other. And a train left waiting to be
-				 * collected does not get to decide how it leaves: whoever
-				 * couples to it brings the orders, and reversing out is one of
-				 * them. */
-				bool waiting = order->ShouldWaitForCouple();
-				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE, waiting);
-				this->SetWidgetDisabledState(WID_O_WAIT_COUPLE, order->ShouldGoToCouple() || order->ShouldReverseOutOfStation());
 
-				bool can_reverse_out = order->GetDecoupleCount() == 0 && !waiting;
+				/* Three things one order cannot do at once. Waiting to be
+				 * collected is the opposite of going to collect, and both are
+				 * the opposite of leaving part of the train behind -- an order
+				 * cannot both hand vehicles over and take them on. Whichever
+				 * of the three is set greys the other two out.
+				 *
+				 * Reversing out is a fourth, and combines fine with coupling:
+				 * a train that has just picked wagons up very often wants to
+				 * go back the way it came. It is only decoupling and waiting
+				 * that rule it out -- a decoupling train already leaves facing
+				 * the right way, and a train waiting to be collected does not
+				 * decide how it leaves at all, since whoever couples to it
+				 * brings the orders. */
+				bool waiting = order->ShouldWaitForCouple();
+				bool collecting = order->ShouldGoToCouple();
+				bool decoupling = order->GetDecoupleCount() != 0;
+				bool reversing_out = order->ShouldReverseOutOfStation();
+
+				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE, waiting || decoupling);
+				this->SetWidgetDisabledState(WID_O_WAIT_COUPLE, collecting || decoupling || reversing_out);
+
+				bool can_reverse_out = !decoupling && !waiting;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
-				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && order->ShouldReverseOutOfStation());
+				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && reversing_out);
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
@@ -1152,7 +1157,8 @@ public:
 		bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
 		bool decoupling = can_decouple && order->GetDecoupleCount() != 0;
 
-		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple || order->ShouldReverseOutOfStation());
+		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
+				order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
 		this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
 
 		this->SetDirty();
@@ -1422,7 +1428,16 @@ public:
 				assert(order != nullptr);
 				/* One button for the whole thing: it asks how many vehicles the
 				 * train keeps here, and nought is how decoupling is switched
-				 * off again. */
+				 * off again.
+				 *
+				 * Pressed while it is already on, it simply switches decoupling
+				 * off. There is nothing left to ask at that point, and a number
+				 * box standing in the way of turning something off is a box that
+				 * only ever gets a nought typed into it. */
+				if (order->GetDecoupleCount() != 0) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 0);
+					break;
+				}
 				this->querying_decouple_count = true;
 				ShowQueryString(GetString(STR_JUST_INT, order->GetDecoupleCount()), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				break;

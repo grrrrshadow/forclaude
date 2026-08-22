@@ -4669,6 +4669,9 @@ STR_VEHICLE_STATUS_NO_ORDERS_VEL                                :{LTBLUE}{VELOCI
 STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL                     :{LTBLUE}Míří do {WAYPOINT}, {VELOCITY}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL                        :{ORANGE}Míří do {DEPOT}, {VELOCITY}
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Čeká na spojení
+STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_FULL_LOAD                 :{LTBLUE}Čeká na spojení (plně naložit)
+STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_NO_LOAD                   :{LTBLUE}Čeká na spojení (nenakládat)
+STR_VEHICLE_VIEW_WAGONS_CAPTION                                 :{WHITE}Vagony čekají na odvoz
 STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL                       :{LTBLUE}{1:VELOCITY} - Jede se spojit do {0:STATION}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL                :{LTBLUE}Údržba v {DEPOT}, {VELOCITY}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_UNBUNCH_VEL                :{LTBLUE}Poslat do servisu a vytvořit rozestup v {DEPOT}, {VELOCITY}
@@ -5610,6 +5613,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je m
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto vlaku nelze udělat odtahovku...
 STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... musí stát v depu
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... odtahovka čeká na zavolání a nemůže mít vlastní příkazy
+STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... odtahovka jezdí pro vlaky a musí být sama
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

@@ -4568,6 +4568,9 @@ STR_VEHICLE_VIEW_AIRCRAFT_STATUS_START_STOP_TOOLTIP             :{BLACK}Current 
 # Messages in the start stop button in the vehicle view
 STR_VEHICLE_STATUS_LOADING_UNLOADING                            :{LTBLUE}Loading / Unloading
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Waiting for couple
+STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_FULL_LOAD                 :{LTBLUE}Waiting for couple (full load)
+STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_NO_LOAD                   :{LTBLUE}Waiting for couple (no loading)
+STR_VEHICLE_VIEW_WAGONS_CAPTION                                 :{WHITE}Wagons waiting to be collected
 STR_VEHICLE_STATUS_LEAVING                                      :{LTBLUE}Leaving
 STR_VEHICLE_STATUS_WAITING_UNBUNCHING                           :{LTBLUE}Waiting to unbunch
 STR_VEHICLE_STATUS_CRASHED                                      :{RED}Crashed!
@@ -5320,6 +5323,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... it i
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Can't station this train as a rescue engine...
 STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... it has to be standing in a depot
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... a rescue engine waits for a call-out and cannot have orders of its own
+STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... a rescue engine goes out to fetch a train and has to be on its own
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

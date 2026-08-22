@@ -398,18 +398,18 @@ static void DoRailroadTrack(Track track)
 	}
 }
 
-static void HandleAutodirPlacement()
+static void HandleAutodirPlacement(TileIndex start_tile)
 {
 	Track trackstat = static_cast<Track>( _thd.drawstyle & HT_DIR_MASK); // 0..5
 
 	if (_thd.drawstyle & HT_RAIL) { // one tile case
-		/* Take the tile from the marker, the same place the piece of track just
-		 * came from. _thd.selend is where the pointer was when the button came
-		 * up, while drawstyle is what was last drawn -- two different moments,
-		 * so a pointer that moved in between gives the piece chosen for one
-		 * tile and lays it on another. What the marker shows is what gets
-		 * built. */
-		GenericPlaceRail(TileVirtXY(_thd.pos.x, _thd.pos.y), trackstat);
+		/* Lay it on the tile the button went down on, which is the tile the
+		 * piece of track was chosen for. The alternative, the northern corner
+		 * of the selection, is the same tile right up until the pointer drifts
+		 * while the button is held -- and then it is the tile the pointer
+		 * drifted to, so the piece the player picked gets laid one tile away
+		 * from where they picked it. */
+		GenericPlaceRail(start_tile, trackstat);
 		return;
 	}
 
@@ -422,12 +422,14 @@ static void HandleAutodirPlacement()
  * If one tile marked abort and use GenericPlaceSignals()
  * else use CmdBuildSingleSignal() or CmdRemoveSingleSignal() in rail_cmd.cpp to build many signals
  */
-static void HandleAutoSignalPlacement()
+static void HandleAutoSignalPlacement(TileIndex start_tile)
 {
 	Track track = static_cast<Track>(_thd.drawstyle & HT_DIR_MASK); // 0..5
 
 	if ((_thd.drawstyle & HT_DRAG_MASK) == HT_RECT) { // one tile case
-		GenericPlaceSignals(TileVirtXY(_thd.selend.x, _thd.selend.y));
+		/* The tile the button went down on, not where the pointer ended up
+		 * once it came back up again. */
+		GenericPlaceSignals(start_tile);
 		return;
 	}
 
@@ -773,11 +775,11 @@ struct BuildRailToolbarWindow : Window {
 					break;
 
 				case DDSP_PLACE_RAIL:
-					HandleAutodirPlacement();
+					HandleAutodirPlacement(start_tile);
 					break;
 
 				case DDSP_BUILD_SIGNALS:
-					HandleAutoSignalPlacement();
+					HandleAutoSignalPlacement(start_tile);
 					break;
 
 				case DDSP_DEMOLISH_AREA:

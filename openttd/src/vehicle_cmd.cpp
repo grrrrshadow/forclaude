@@ -585,7 +585,13 @@ CommandCost CmdStartStopVehicle(DoCommandFlags flags, VehicleID veh_id, bool eva
 	if (!flags.Test(DoCommandFlag::AutoReplace)) evaluate_startstop_cb = true;
 
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
-	if (v == nullptr || !IsCompanyBuildableVehicleType(v) || !v->IsPrimaryVehicle()) return CMD_ERROR;
+	/* Wagons left standing on a platform waiting to be collected are the one
+	 * engineless thing the player can stop and start: they load cargo where
+	 * they stand, and stopping them is how that is called off. See
+	 * IsWaitingWagonChain(). */
+	if (v == nullptr || !IsCompanyBuildableVehicleType(v)) return CMD_ERROR;
+	bool waiting_wagons = IsWaitingWagonChain(v);
+	if (!v->IsPrimaryVehicle() && !waiting_wagons) return CMD_ERROR;
 
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
@@ -594,7 +600,10 @@ CommandCost CmdStartStopVehicle(DoCommandFlags flags, VehicleID veh_id, bool eva
 
 	switch (v->type) {
 		case VehicleType::Train:
-			if (v->vehstatus.Test(VehState::Stopped) && Train::From(v)->gcache.cached_power == 0) return CommandCost(STR_ERROR_TRAIN_START_NO_POWER);
+			/* Wagons have no engine and never will have; refusing to release
+			 * their brake for want of power would mean they could be stopped
+			 * once and never started again. */
+			if (!waiting_wagons && v->vehstatus.Test(VehState::Stopped) && Train::From(v)->gcache.cached_power == 0) return CommandCost(STR_ERROR_TRAIN_START_NO_POWER);
 			break;
 
 		case VehicleType::Ship:

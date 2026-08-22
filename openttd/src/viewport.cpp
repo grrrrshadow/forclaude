@@ -191,6 +191,7 @@ static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, 
 static ViewportDrawer _vd;
 
 TileHighlightData _thd;
+TileHighlightData _thd_drawn;
 static TileInfo _cur_ti;
 bool _draw_bounding_boxes = false;
 bool _draw_dirty_blocks = false;
@@ -2488,19 +2489,26 @@ static void PlaceObject()
 		pt.y += TILE_SIZE / 2;
 	}
 
-	/* Build on the tile the white marker is drawn on, not on whatever tile the
-	 * cursor happens to be over at this instant. The two are worked out the
-	 * same way from the same cursor position, so they agree -- but the marker
-	 * is redrawn once a frame while a click is dealt with the moment it
-	 * arrives, so a pointer that moves between the two leaves the player
-	 * looking at one tile and building on the next. Near the middle of a tile
-	 * that is invisible; near an edge it lands a tile away, which is what a
-	 * player sees as the game building somewhere other than where it said it
-	 * would. The sub-tile position is kept, since tools that care which half of
-	 * a tile was clicked still need it. */
-	if ((_thd.drawstyle & HT_DRAG_MASK) != HT_NONE) {
-		pt.x = _thd.pos.x + (pt.x & TILE_UNIT_MASK);
-		pt.y = _thd.pos.y + (pt.y & TILE_UNIT_MASK);
+	/* Build on the tile the white marker was drawn on, not on whatever tile
+	 * the cursor happens to be over at this instant.
+	 *
+	 * The two are worked out the same way from the same cursor position, so
+	 * they agree -- as long as the cursor has not moved. It moves constantly:
+	 * the marker is drawn once a frame, and by the time the press that follows
+	 * that frame is dealt with, the pointer has been read again. Pressing is
+	 * itself what moves it on a touch screen, where the contact patch shifts
+	 * as the finger comes down and lifts again. Near the middle of a tile that
+	 * is invisible; near an edge it lands a tile away, and the player sees the
+	 * game build somewhere other than where it said it would.
+	 *
+	 * So the answer does not come from asking where the pointer is now. It
+	 * comes from the marker the player was actually looking at when they
+	 * pressed, which is the one from before this frame moved anything. The
+	 * sub-tile position is kept, since tools that care which half of a tile
+	 * was clicked still need it. */
+	if ((_thd_drawn.drawstyle & HT_DRAG_MASK) != HT_NONE) {
+		pt.x = _thd_drawn.pos.x + (pt.x & TILE_UNIT_MASK);
+		pt.y = _thd_drawn.pos.y + (pt.y & TILE_UNIT_MASK);
 	}
 
 	_tile_fract_coords.x = pt.x & TILE_UNIT_MASK;
@@ -2705,6 +2713,13 @@ void UpdateTileSelection()
 	int x1;
 	int y1;
 
+	/* Keep what the marker looked like before this frame moves it. That is the
+	 * marker the player is looking at when they press, because the frame they
+	 * are looking at was drawn from it -- and this runs before a press is
+	 * dealt with, so from here on #_thd describes a marker nobody has seen
+	 * yet. Anything a click builds is built from this copy. */
+	_thd_drawn = _thd;
+
 	if (_thd.freeze) return;
 
 	HighLightStyle new_drawstyle = HT_NONE;
@@ -2849,7 +2864,14 @@ void VpStartPlaceSizing(TileIndex tile, ViewportPlaceMethod method, ViewportDrag
 		_thd.next_drawstyle = HT_RECT | others;
 	} else if (_thd.place_mode & (HT_RAIL | HT_LINE)) {
 		_thd.place_mode = HT_SPECIAL | others;
-		_thd.next_drawstyle = _thd.drawstyle | others;
+		/* Which piece of track this is going to be was decided when the marker
+		 * was drawn, so take it from the marker that was drawn rather than
+		 * working it out again from a pointer that has moved since. The one
+		 * the player pressed on is the one they were looking at. Falling back
+		 * to the current marker covers the first frame of a newly picked tool,
+		 * when there is not yet a drawn one to take it from. */
+		HighLightStyle drawn = (_thd_drawn.drawstyle & HT_DRAG_MASK) != HT_NONE ? _thd_drawn.drawstyle : _thd.drawstyle;
+		_thd.next_drawstyle = drawn | others;
 	} else {
 		_thd.place_mode = HT_SPECIAL | others;
 		_thd.next_drawstyle = HT_POINT | others;

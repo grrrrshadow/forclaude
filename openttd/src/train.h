@@ -376,4 +376,28 @@ protected: // These functions should not be called outside acceleration code.
 	}
 };
 
+/**
+ * Is this a headless rake of wagons standing out on the network -- one left
+ * behind by a decoupling train, waiting for an engine to come and collect it?
+ *
+ * Vanilla only ever has engineless wagons inside a depot, where they are
+ * inert: they cannot be clicked on the map, they load nothing and they go
+ * nowhere. Wagons left on a platform are none of those things. They stand at a
+ * station and take on cargo, and the player has to be able to see what they
+ * are doing and tell them to stop. So they count as something the player deals
+ * with directly, in the few places that decide whether a vehicle can be looked
+ * at and started or stopped -- and nowhere else, because in every other
+ * respect they are still not a train.
+ *
+ * @param v The vehicle to test; may be any part, the question is about the
+ *          consist it belongs to.
+ * @return Whether this is such a rake.
+ */
+inline bool IsWaitingWagonChain(const Vehicle *v)
+{
+	if (v->type != VehicleType::Train) return false;
+	const Train *head = Train::From(v)->First();
+	return head->IsFreeWagon() && !head->IsInDepot();
+}
+
 #endif /* TRAIN_H */

@@ -1355,21 +1355,24 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * rather than rejected here. */
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data > UINT8_MAX) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldGoToCouple())) return CMD_ERROR;
 			break;
 
-		/* Waiting to be collected is the opposite of going to collect, and a
-		 * train that is waiting does not decide how it leaves either -- whoever
-		 * couples to it brings the orders, and reversing out is one of them.
-		 * The buttons grey each other out, but the rule belongs here as well:
+		/* Waiting to be collected is the opposite of going to collect, and
+		 * both are the opposite of leaving part of the train behind: one
+		 * order cannot both hand vehicles over and take them on. A train that
+		 * is waiting does not decide how it leaves either -- whoever couples
+		 * to it brings the orders, and reversing out is one of them. The
+		 * buttons grey each other out, but the rule belongs here as well:
 		 * greying is how it is shown, this is what makes it true. */
 		case MOF_WAIT_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (data != 0 && (order->ShouldGoToCouple() || order->ShouldReverseOutOfStation())) return CMD_ERROR;
+			if (data != 0 && (order->ShouldGoToCouple() || order->ShouldReverseOutOfStation() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
 			break;
 
 		case MOF_GOTO_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (data != 0 && order->ShouldWaitForCouple()) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
 			break;
 
 		case MOF_TURN_AROUND_DEPOT:
