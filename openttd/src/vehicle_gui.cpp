@@ -3220,11 +3220,15 @@ public:
 
 		if (v->type != VehicleType::Aircraft && v->breakdown_ctr == 1) return GetString(STR_VEHICLE_STATUS_BROKEN_DOWN);
 
-		/* A rescue engine standing in its depot is not idle, it is on call.
-		 * Saying so is the only way to tell one apart from a train that has
-		 * simply been parked and forgotten. See
-		 * FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine) && v->IsStoppedInDepot()) {
+		/* A rescue engine waiting in its depot is not idle, it is on call, and
+		 * saying so is the only way to tell one apart from a train that has
+		 * simply been parked and forgotten. It says it only once the player
+		 * has released the brake, though: a train that is stopped says it is
+		 * stopped, because that is the plain truth and the flag is still on
+		 * in the background. Releasing the brake is what puts it on call, and
+		 * it is the player who does that. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine) &&
+				v->IsInDepot() && !v->vehstatus.Test(VehState::Stopped)) {
 			return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
 		}
 

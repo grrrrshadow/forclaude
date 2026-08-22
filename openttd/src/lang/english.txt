@@ -4786,6 +4786,7 @@ STR_ORDER_CONDITIONAL_VALUE_TOOLTIP                             :{BLACK}The valu
 STR_ORDER_CONDITIONAL_VALUE_CAPT                                :{WHITE}Enter value to compare against
 
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Decouple: {NUM}
+STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}How many to leave
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}When leaving this station, keep this many vehicles at the front and leave the rest behind, decoupled. 0 means don't decouple
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Enter number of vehicles to keep (0 = don't decouple)
 
@@ -4795,6 +4796,7 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    : (go to couple)
+STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and decouple {NUM})
 
 STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Turn around
 STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Turn the train around while it is in this depot, so it leaves facing the way it came from. Without this it leaves the way it went in, so that a train sent for servicing is not silently turned round

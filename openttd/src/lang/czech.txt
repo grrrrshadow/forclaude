@@ -4921,6 +4921,7 @@ STR_ORDER_REVERSE_OUT                                           :{BLACK}Vycouvat
 STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Při odjezdu z této stanice vycouvat, místo aby vlak pokračoval směrem, kterým je otočený, a hledal cestu okolo
 STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(a vycouvat)
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
+STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Kolik nechat
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Při odjezdu z této stanice ponechat vepředu tento počet vozidel a zbytek nechat odpojený stát. 0 znamená neodpojovat
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Zadej počet vozidel, která zůstanou (0 = neodpojovat)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
@@ -4928,6 +4929,7 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Jet se spojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i couváním) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(jet se spojit)
+STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a odpojit {NUM})
 
 STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
 STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(Nemůže použít stanici){POP_COLOUR} {STRING} {STATION}
