@@ -2801,6 +2801,38 @@ static bool IsAnyPartInsideDepot(const Train *v)
 }
 
 /**
+ * Would turning this train round drive it into a headless consist standing
+ * right behind it?
+ *
+ * A train that cannot find a path is left stuck, and a train that stays stuck
+ * long enough turns itself round to try the other way -- sound enough when
+ * what is behind it is open track. It is not sound when what is behind it is
+ * the rake of wagons the train itself has just uncoupled and left standing
+ * there: turning round drives straight into them. The check that refuses to
+ * enter a headless chain's tile cannot help here, because after decoupling the
+ * two are touching and often share a tile, so there is no new tile to refuse.
+ *
+ * @param consist The stuck train.
+ * @return true if there is a headless consist immediately behind it.
+ */
+static bool WouldReverseIntoFreeWagons(const Train *consist)
+{
+	const Train *back = consist->GetMovingBack();
+	Trackdir td = back->GetVehicleTrackdir();
+	if (td == Trackdir::Invalid) return false;
+
+	for (const TileIndex tile : {back->tile, TileAddByDiagDir(back->tile, TrackdirToExitdir(ReverseTrackdir(td)))}) {
+		for (const Vehicle *u : VehiclesOnTile(tile)) {
+			if (u->type != VehicleType::Train) continue;
+			const Train *t = Train::From(u)->First();
+			if (t == consist->First() || t->IsFrontEngine()) continue;
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Turn a train around.
  * @param consist %Train to turn around.
  */
@@ -5259,7 +5291,9 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (!turn_around && consist->wait_counter % _settings_game.pf.path_backoff_interval != 0 && consist->force_proceed == TFP_NONE) return true;
 		if (!TryPathReserve(consist)) {
 			/* Still stuck. */
-			if (turn_around) ReverseTrainDirection(consist);
+			/* Turning round to try the other way is no use when the other
+			 * way is blocked by the wagons this train has just left there. */
+			if (turn_around && !WouldReverseIntoFreeWagons(consist)) ReverseTrainDirection(consist);
 
 			if (consist->flags.Test(VehicleRailFlag::Stuck) && consist->wait_counter > 2 * _settings_game.pf.wait_for_pbs_path * Ticks::DAY_TICKS) {
 				/* Show message to player. */
