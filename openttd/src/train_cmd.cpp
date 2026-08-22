@@ -1830,38 +1830,41 @@ static int64_t DistanceSquaredBetweenVehicles(const Train *a, const Train *b)
 }
 
 /**
- * Turn a consist round where it stands, so that its vehicle list runs the
- * other way along the track while its head stays its head.
+ * Reverse the order of a consist's vehicle list, leaving every vehicle exactly
+ * where it stands.
  *
- * A train's vehicle list has to run the same way round as its vehicles
- * physically lie: the vehicle after another in the list is the one behind it
- * on the track. Coupling two consists appends one list to the other, so that
- * only holds if the two already happen to lie the right way round -- and when
- * an engine reaches a rake from the end it did not leave by, they do not. The
- * list would then claim the far wagon is the one next to the engine, the wagon
- * behind the join would look for the track connecting it to a vehicle a whole
- * rake away, find none, and the game would assert in TrainController().
+ * A train's vehicle list has to run the same way along the track as its
+ * vehicles physically lie, so joining two consists that lie the opposite way
+ * round to each other needs one of them turned round. There are two ways to do
+ * that, and only one of them is right here. Vanilla's #ReverseTrainSwapVehicles
+ * keeps the list order and swaps where the vehicles sit -- first with last,
+ * second with second-last -- which turns the train round on the ground. Doing
+ * that to a rake of wagons waiting at a platform is absurd: the wagons visibly
+ * swap places with each other while standing still, and an engine that decides
+ * anything by it is letting the wagons dictate to it.
  *
- * This is vanilla's own reversal primitive: it swaps where the vehicles sit
- * (first with last, second with second-last, ...) and reverses each one's
- * facing, which leaves the list order untouched -- so the head keeps being the
- * head, which coupling depends on -- while the list now runs the other way
- * along the rails. The AdvanceWagons* pair around it is what closes the
- * spacing up again when the vehicles are not all the same length.
+ * So this does the mirror image. Nothing moves; the list is relinked back to
+ * front, so it runs the other way while every vehicle stays put. Articulated
+ * parts and the two halves of a dual-headed engine keep their own order inside
+ * the unit they belong to, which is what GetNextVehicle() and
+ * GetLastEnginePart() are for.
  *
- * @param consist Head of the consist to turn round.
+ * @param head Head of the consist to relink.
+ * @return The new head, which is what used to be the last unit.
  */
-static void FlipConsistAlongTrack(Train *consist)
+static Train *ReverseConsistOrder(Train *head)
 {
-	Train *moving_front = consist->GetMovingFront();
+	std::vector<Train *> units;
+	for (Train *u = head; u != nullptr; u = u->GetNextVehicle()) units.push_back(u);
+	if (units.size() < 2) return head;
 
-	AdvanceWagonsBeforeSwap(moving_front);
-	ReverseTrainSwapVehicles(consist);
-	AdvanceWagonsAfterSwap(moving_front);
+	for (Train *u : units) RemoveFromConsist(u);
 
-	consist->flags.Flip(VehicleRailFlag::Reversed);
-	consist->ConsistChanged(CCF_TRACK);
-	for (Train *u = consist; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
+	Train *new_head = units.back();
+	for (size_t i = units.size() - 1; i > 0; i--) {
+		InsertInConsist(units[i]->GetLastEnginePart(), units[i - 1]);
+	}
+	return new_head;
 }
 
 /**
@@ -2087,15 +2090,16 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		 * meet on the rails: the leading train's last vehicle and the trailing
 		 * train's first. Either train may be lying the other way round -- an
 		 * engine that comes back to a rake from the end it did not leave by is
-		 * the whole point of this -- and each one that is gets turned round
-		 * where it stands first. Measuring it rather than deriving it from
-		 * which way anything faces keeps this right for a train that reversed
-		 * on its way here, which is the usual case. */
+		 * the whole point of this -- and the one that is has its list relinked
+		 * back to front, which moves nothing. Measuring which ends face each
+		 * other rather than deriving it from which way anything faces keeps
+		 * this right for a train that reversed on its way here, which is the
+		 * usual case. */
 		if (DistanceSquaredBetweenVehicles(leading->First(), trailing) < DistanceSquaredBetweenVehicles(leading->Last(), trailing)) {
-			FlipConsistAlongTrack(leading);
+			leading = ReverseConsistOrder(leading);
 		}
 		if (DistanceSquaredBetweenVehicles(trailing->Last(), leading) < DistanceSquaredBetweenVehicles(trailing->First(), leading)) {
-			FlipConsistAlongTrack(trailing);
+			trailing = ReverseConsistOrder(trailing);
 		}
 	}
 
