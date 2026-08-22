@@ -3088,6 +3088,13 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 					u->direction = ReverseDir(u->direction);
 				}
 			}
+			/* A train in a depot is parked, not on its way anywhere, so it
+			 * holds no path. Whatever it still had reserved when it arrived
+			 * has to go back, or it is left behind as track marked taken with
+			 * nothing standing on it and nothing coming to release it -- which
+			 * is what other trains then follow into the depot. */
+			FreeTrainTrackReservation(consist);
+
 			VehicleEnterDepot(consist);
 		}
 		v->tile = tile;
