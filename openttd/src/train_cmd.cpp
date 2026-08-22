@@ -2137,6 +2137,17 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	new_head->current_order.SetGoToCouple(false);
 	new_head->current_order.SetWaitForCouple(false);
 
+	/* Throw away the path this train was following and let it be planned
+	 * again. It was planned while the wagons now being carried were still a
+	 * separate headless consist standing in the way -- impassable, so anything
+	 * leading past them was ruled out and the search settled on a way round.
+	 * That obstacle has just become part of this train, so the route it forced
+	 * is a route around nothing: the train sets off, goes the long way, and
+	 * comes back past the platform facing exactly as it did when it left. The
+	 * only thing wrong with it was when it was worked out. */
+	FreeTrainTrackReservation(new_head);
+	new_head->ReserveTrackUnderConsist();
+
 	return ret;
 }
 
