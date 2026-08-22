@@ -4300,9 +4300,19 @@ uint Train::Crash(bool flooded)
 	if (this->IsFrontEngine()) {
 		victims += 2; // driver
 
-		/* Remove the reserved path in front of the train if it is not stuck.
-		 * Also clear all reserved tracks the train is currently on. */
-		if (!this->flags.Test(VehicleRailFlag::Stuck)) FreeTrainTrackReservation(this);
+		/* Remove the reserved path in front of the train, and all the tracks it
+		 * is standing on.
+		 *
+		 * Vanilla skips the path for a stuck train, on the grounds that a stuck
+		 * train has no path to give back. That holds while being stuck is a
+		 * moment's hesitation at a signal. It stops holding here, where a train
+		 * that cannot find a route stays stuck for good and is left standing
+		 * with whatever it had reserved -- and if it then crashes, that
+		 * reservation outlives it. What is left is a stretch of track marked
+		 * taken with nothing on it and nothing coming to release it, which is
+		 * what a player sees as trains queueing between signals for no reason
+		 * at all. Give it back whatever the train's state was. */
+		FreeTrainTrackReservation(this);
 		for (const Train *v = this; v != nullptr; v = v->Next()) {
 			ClearPathReservation(v, v->tile, v->GetVehicleTrackdir());
 			if (IsTileType(v->tile, TileType::TunnelBridge)) {
