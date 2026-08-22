@@ -88,3 +88,32 @@ tam kouř jako po porouchané.
 Někam se musí napsat atribuce: `icon8.com hammer`.
 Poznámka: samotný soubor s ikonkou zatím není v repozitáři — až na to
 dojde, bude potřeba dostat PNG sem, aby se dalo přidat do openttd.grf.
+
+## Build #68 (commit 08a9123)
+
+**Go to couple popředu i pozadu** — 3. a 4. peron objede zbytečně nádraží
+dokola. (Známý otevřený problém.)
+
+**Screenshot 1 — pád, `train_cmd.cpp:4657`**
+`assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}))`
+Hromadný výjezd z depa, mašinky s příkazem „jet se spojit" ztratily
+orientaci: nejedou přes směrování se otočit, jedou rovnou spojit.
+
+**Screenshot 2 — decouple bez cesty do depa.** Hráčská chyba (obráceně
+otočený jednosměrný semafor), cesta do depa neexistovala. Jsou rozpojené,
+stalo se to při odjezdu. **Podstata: neměla kudy jet.**
+
+**Screenshot 3 — okno depa.** Vlak 3 má menu v pořádku, Vlak 2 má
+rozpadlý poslední řádek. Stačí kliknout na příkazy a srovná se to.
+
+**Okno příkazů na zastávce:**
+- spodní velký čudlík „Odpojit: N" smazat úplně
+- zadávání počtu vagonků má vyskočit po klepnutí na malý čudlík „Odpojit"
+- prohodit čudlíky „Odpojit" a „Vycouvat" — fungují dobře, jen si vymění místo
+- „odpojit" není v závorce v příkazech
+
+**Odtahovka** nejede odtahovat, když je někde porucha nebo bouračka.
+(Vyslání zatím není postavené.)
+
+**Čeština:** příkaz „jeď do depa" má v závorce „(Zastávka)", ve vanille
+tam má být „(Zastavit)".

@@ -301,6 +301,14 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * on its own line, where a whole list can be read at once. */
 				if (v->type == VehicleType::Train && order->ShouldWaitForCouple()) line += GetString(STR_ORDER_WAIT_COUPLE_SUFFIX);
 
+				/* How many vehicles stay with the train belongs on the order
+				 * line with everything else the order is going to do. A button
+				 * speaks for the one order selected, so a train that decouples
+				 * at several stations learned nothing from it about any. */
+				if (!timetable && v->type == VehicleType::Train && order->GetDecoupleCount() != 0) {
+					line += GetString(STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+				}
+
 				/* Reversing out is about where the train goes next, not about
 				 * how long it stays, so it has no place in the timetable. Nor
 				 * is it shown when the order decouples here, because then it is
@@ -1122,7 +1130,6 @@ public:
 				bool can_reverse_out = order->GetDecoupleCount() == 0;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && order->ShouldReverseOutOfStation());
-				this->SetWidgetDisabledState(WID_O_DECOUPLE_COUNT, order->ShouldReverseOutOfStation());
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
@@ -1136,18 +1143,8 @@ public:
 		bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
 		bool decoupling = can_decouple && order->GetDecoupleCount() != 0;
 
-		NWidgetStacked *decouple_row = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_ROW);
-		if (decouple_row != nullptr) {
-			int want = can_decouple ? 0 : SZSP_NONE;
-			if (decouple_row->shown_plane != want) {
-				decouple_row->SetDisplayedPlane(want);
-				this->ReInit();
-			}
-		}
-
 		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple || order->ShouldReverseOutOfStation());
 		this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
-		this->SetWidgetDisabledState(WID_O_DECOUPLE_COUNT, !decoupling);
 
 		this->SetDirty();
 	}
@@ -1248,13 +1245,6 @@ public:
 				if (order->GetDepotActionType().Test(OrderDepotActionFlag::Unbunch)) return GetString(STR_ORDER_DROP_UNBUNCH);
 
 				return GetString(STR_ORDER_DROP_GO_ALWAYS_DEPOT);
-			}
-
-			case WID_O_DECOUPLE_COUNT: {
-				VehicleOrderID sel = this->OrderGetSel();
-				const Order *order = this->vehicle->GetOrder(sel);
-				if (order == nullptr || !order->IsType(OT_GOTO_STATION)) return {};
-				return GetString(STR_ORDER_DECOUPLE_COUNT, order->GetDecoupleCount());
 			}
 
 			default:
@@ -1419,21 +1409,11 @@ public:
 			}
 
 			case WID_O_DECOUPLE: {
-				const Order *o = this->vehicle->GetOrder(this->OrderGetSel());
-				if (o == nullptr) break;
-				/* Switching decoupling on asks for one vehicle to be left
-				 * behind, the smallest thing it can mean; the count button on
-				 * the row that appears is where a different number is chosen.
-				 * Switching it off puts the count back to none, which is what
-				 * "no decoupling" is. */
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
-						this->OrderGetSel(), MOF_DECOUPLE_COUNT, o->GetDecoupleCount() != 0 ? 0 : 1);
-				break;
-			}
-
-			case WID_O_DECOUPLE_COUNT: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
+				/* One button for the whole thing: it asks how many vehicles the
+				 * train keeps here, and nought is how decoupling is switched
+				 * off again. */
 				this->querying_decouple_count = true;
 				ShowQueryString(GetString(STR_JUST_INT, order->GetDecoupleCount()), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				break;
@@ -1776,12 +1756,11 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_SKIP_BUTTON, STR_ORDERS_SKIP_TOOLTIP), SetResize(1, 0),
-			/* Switching decoupling on belongs with the other things done to a
-			 * whole order rather than with its settings, and putting it here
-			 * keeps the row above for what decoupling is actually going to do.
-			 * All four are narrowed so the row stays the width it was. */
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_DECOUPLE), SetMinimalSize(93, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_TOOLTIP), SetResize(1, 0),
+			/* Reversing out of a station is done to a whole order the way
+			 * skipping and deleting are, so it sits with them. All four are
+			 * narrowed so the row stays the width it was. */
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_REVERSE_OUT), SetMinimalSize(93, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_REVERSE_OUT, STR_ORDER_REVERSE_OUT_TOOLTIP), SetResize(1, 0),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_BOTTOM_MIDDLE),
 				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(93, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_DELETE_BUTTON, STR_ORDERS_DELETE_TOOLTIP), SetResize(1, 0),
@@ -1799,26 +1778,16 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 	 * orders the turn-around one. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_WAIT_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_WAIT_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_WAIT_COUPLE, STR_ORDER_WAIT_COUPLE_TOOLTIP), SetResize(1, 0),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_GOTO_COUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_TOOLTIP), SetResize(1, 0),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_REVERSE_OUT), SetMinimalSize(124, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDER_REVERSE_OUT, STR_ORDER_REVERSE_OUT_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_DECOUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
-		EndContainer(),
-	EndContainer(),
-
-	/* Decoupling row: appears only once decoupling has been switched on for
-	 * this order, so an order that does not decouple does not carry a row of
-	 * settings for something it is not going to do. */
-	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE_ROW),
-		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
-													SetStringTip(STR_JUST_STRING, STR_ORDER_DECOUPLE_COUNT_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

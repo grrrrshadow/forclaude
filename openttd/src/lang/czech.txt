@@ -4911,7 +4911,7 @@ STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT
 
 STR_ORDER_REFIT_ORDER                                           :{SPACE}(Přestavět na {STRING})
 STR_ORDER_REFIT_STOP_ORDER                                      :{SPACE}(Přestavět na {STRING} a zastavit)
-STR_ORDER_STOP_ORDER                                            :{SPACE}(Zastávka)
+STR_ORDER_STOP_ORDER                                            :{SPACE}(Zastavit)
 
 STR_ORDER_WAIT_TO_UNBUNCH                                       :{SPACE}(Počkat na vyrovnání rozestupů)
 STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Otočit
