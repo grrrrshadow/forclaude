@@ -1516,38 +1516,44 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 		 * an ordinary vehicle in the middle of a load. Its indicator would then
 		 * hang over the platform for the rest of the game, reading 0% at a
 		 * train that has long since gone, with nothing left to update or remove
-		 * it. Take them all down; LoadUnloadVehicle() puts one back on the next
-		 * tick for whichever consist is still loading. */
-		for (Train *head : {original_src_head, original_dst_head, src_head, dst_head}) {
-			if (head != nullptr) HideFillingPercent(&head->fill_percent_te_id);
-		}
+		 * it.
+		 *
+		 * Which vehicle is carrying that indicator cannot be worked out from
+		 * the heads the splice was given. Joining two consists that lie
+		 * opposite ways round relinks one of them back to front first, and that
+		 * moves its head to the other end of the list -- so on a platform
+		 * approached from one side the retired head is one of the heads named
+		 * here, and on a platform approached from the other side it is a
+		 * vehicle somewhere in the middle. Mirror-image platforms, and the
+		 * indicator was only ever cleaned up on one of them. So walk the
+		 * finished consists end to end and take down whatever is found;
+		 * LoadUnloadVehicle() puts one back on the next tick for whichever
+		 * consist is still loading.
+		 *
+		 * The same applies to the station's list of loading vehicles, which a
+		 * consist comes off when it leaves. A retired head never leaves, and an
+		 * ordinary vehicle left on that list is never given a new loading
+		 * countdown, so the station trips over it on its next load cycle --
+		 * assert(v->load_unload_ticks != 0) in LoadUnloadStation(), which is
+		 * what crashed the game on coupling to a train that was still loading.
+		 * Take it off the same way leaving does, cargo payment and reservation
+		 * included. And a rake waiting to be collected has a window of its own
+		 * (see IsWaitingWagonChain) which now has nothing left to show. */
+		for (Train *head : {src_head, dst_head}) {
+			if (head == nullptr) continue;
+			for (Train *u = head->First(); u != nullptr; u = u->Next()) {
+				HideFillingPercent(&u->fill_percent_te_id);
+				if (u->IsFrontEngine() || u->IsFreeWagon()) continue;
 
-		/* And a consist that is loading is on its station's list of loading
-		 * vehicles, which it comes off when it leaves. A retired head never
-		 * leaves either, and an ordinary vehicle left on that list is never
-		 * given a new loading countdown, so the station trips over it on its
-		 * next load cycle -- assert(v->load_unload_ticks != 0) in
-		 * LoadUnloadStation(), which is what crashed the game on coupling to a
-		 * train that was still loading. Take it off the list the same way
-		 * leaving does, cargo payment and reservation included. */
-		for (Train *head : {original_src_head, original_dst_head}) {
-			if (head == nullptr || head->IsFrontEngine()) continue;
-			if (!Station::IsValidID(head->last_station_visited)) continue;
-			Station *st = Station::Get(head->last_station_visited);
-			st->loading_vehicles.remove(head);
-			head->CancelReservation(StationID::Invalid(), st);
-			delete head->cargo_payment;
-			head->last_station_visited = StationID::Invalid();
-		}
-
-		/* A rake of wagons waiting to be collected has a window of its own
-		 * (see IsWaitingWagonChain), and being collected is exactly what has
-		 * just happened to it: it is part of a train now, and its former head
-		 * is an ordinary vehicle in the middle of one. The window has nothing
-		 * left to show, so it goes. */
-		for (Train *head : {original_src_head, original_dst_head}) {
-			if (head == nullptr || head->IsFrontEngine()) continue;
-			CloseWindowById(WindowClass::VehicleView, head->index);
+				if (Station::IsValidID(u->last_station_visited)) {
+					Station *st = Station::Get(u->last_station_visited);
+					st->loading_vehicles.remove(u);
+					u->CancelReservation(StationID::Invalid(), st);
+					delete u->cargo_payment;
+					u->last_station_visited = StationID::Invalid();
+				}
+				CloseWindowById(WindowClass::VehicleView, u->index);
+			}
 		}
 
 		/* We are undoubtedly changing something in the depot and train list. */
@@ -1590,6 +1596,21 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	 * back into the depot, brake and all, which is what was seen to happen to a
 	 * train reversing in while engines came past under a coupling order. */
 	if (IsAnyPartInsideDepot(partner)) return false;
+
+	/* And it has to be something that is actually waiting to be collected: a
+	 * rake of wagons with no engine, left at a platform under a "wait to be
+	 * coupled" order.
+	 *
+	 * Without this, any train of ours standing still anywhere counted as a
+	 * partner -- an engine that has just finished collecting its wagons, or one
+	 * sitting broken down on the line. An engine on its way to couple then
+	 * drove at it and the two collided, because the exception that says "this
+	 * is not a crash, this is what I came for" only covers a headless rake.
+	 * Worse, the collecting engine kept seeing a partner in wagons that had
+	 * already been collected by somebody else, so it never gave up on them. */
+	if (partner->IsFrontEngine()) return false;
+	if (!partner->IsFreeWagon()) return false;
+	if (!partner->current_order.ShouldWaitForCouple()) return false;
 	return true;
 }
 
@@ -2284,6 +2305,30 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	FreeTrainTrackReservation(v);
 
 	TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
+
+	/* The engine keeps the front of the list and the wagons it is leaving are
+	 * everything behind it, so whichever way the train came in, the way out is
+	 * the end the engine is on.
+	 *
+	 * That matters for a train that reversed in. It drove in led by its last
+	 * vehicle, and going on being led by its last vehicle now means being led
+	 * straight at the wagons it has just put down -- a headless rake, which the
+	 * route search treats as solid, so no route out exists at all and the
+	 * engine simply stands there waiting for a path that can never come.
+	 * Leading with its own end instead takes it back out the way it came in,
+	 * which is the only way out of a platform it backed into.
+	 *
+	 * Nothing is turned round on the ground by this. A train that reverses in
+	 * is already sitting with its nose pointing back out; driving backwards is
+	 * the state of leading with the other end, and that state is what ends
+	 * here. For a train that arrived nose first there was never anything to
+	 * change. Coupling settles the same question the same way at its end -- see
+	 * CmdCoupleTrains(). */
+	v->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	v->flags.Reset(VehicleRailFlag::Reversing);
+	v->ConsistChanged(CCF_TRACK);
+	FreeTrainTrackReservation(v);
+	v->ReserveTrackUnderConsist();
 
 	Train *remainder = split_point->First();
 	if (IsRailStationTile(remainder->tile)) {
