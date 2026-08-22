@@ -1544,6 +1544,16 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 			if (head == nullptr) continue;
 			for (Train *u = head->First(); u != nullptr; u = u->Next()) {
 				HideFillingPercent(&u->fill_percent_te_id);
+
+				/* A rake that has been collected is not waiting for anybody any
+				 * more, so the engine written on it has to come off with
+				 * everything else. Left there it is a claim on a vehicle that is
+				 * no longer a rake at all -- harmless while it stays part of this
+				 * train, but it comes back to life the day this vehicle is put
+				 * down somewhere as a rake again, already spoken for by an engine
+				 * that has long since finished with it. */
+				u->couple_claim = VehicleID::Invalid();
+
 				if (u->IsFrontEngine() || u->IsFreeWagon()) continue;
 
 				if (Station::IsValidID(u->last_station_visited)) {
@@ -2753,6 +2763,9 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	v->ReserveTrackUnderConsist();
 
 	Train *remainder = split_point->First();
+	/* Nobody has spoken for these wagons yet; whatever this vehicle was doing
+	 * in an earlier life is over. */
+	remainder->couple_claim = VehicleID::Invalid();
 	if (IsRailStationTile(remainder->tile)) {
 		StationID station = GetStationIndex(remainder->tile);
 		remainder->current_order.MakeGoToStation(station);
