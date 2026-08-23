@@ -1053,3 +1053,64 @@ dobu, nikam se nepřesouvají. Odtahovku, která už někoho táhne, nejde
 odvolat — musí ho dovézt.
 
 **Filtr počtu vozů počítá i mašinku:** mašinka a tři vagony jsou N=4.
+
+## Zkušební sestava nádraží — jak stojí vagonky a co z toho plyne
+
+Testuje se pořád jedna a ta samá situace, takže tohle je pevný popis, ne
+poznámka k jednomu testu. Bez něj se úkoly o geometrii nedají řešit.
+
+**Čtyři nástupiště, číslovaná shora dolů 1 až 4.** Na každém stojí řada
+vagonků. Mašinka, která je tam nechala, stála:
+
+- na **1 a 2** u **pravého** konce řady,
+- na **3 a 4** u **levého** konce řady.
+
+**Do stanice se vjíždí zprava, tedy pohybem doleva.** Vždycky. Liší se jen
+to, jestli je mašinka v tom pohybu napřed nebo vzadu:
+
+- na **1 a 2** mašinka **nacouvá** (jede přes směrování, které ji otočí),
+  takže je vlečeným koncem a skončí vpravo, vagonky vlevo od ní;
+- na **3 a 4** mašinka jede **popředu** (na směrování nebyla), takže je
+  vedoucím koncem a skončí vlevo, vagonky vpravo od ní.
+
+Odpojená mašinka má na všech čtyřech nástupištích **nos pryč od vagonků**.
+Liší se jen to, na kterém konci stojí.
+
+### Dvě veličiny, které se nesmí plést
+
+Vlak je popsaný dvěma nezávislými věcmi a většina chyb v tomhle projektu
+vznikla tím, že se jedna vydávala za druhou:
+
+- **hlava / konec** — pořadí seznamu vozů. Couváním se nemění.
+- **vedoucí / vlečený konec** — který konec jede napřed. To je směr jízdy.
+- **nos** — kam míří jeden konkrétní vůz. Couvání s ním nehýbe; mění jen
+  to, který konec vede.
+
+Řada vagonků po odpojení zdědí obojí od vlaku, ze kterého vznikla:
+
+| nástupiště | hlava řady | vedoucí konec |
+|---|---|---|
+| 1 a 2 | vpravo (u mašinky) | vlevo |
+| 3 a 4 | vlevo (u mašinky) | vlevo |
+
+**Na 1 a 2 míří hlava a vedoucí konec na opačné konce. Na 3 a 4 na ten
+samý.** To je celé to "zrcadlo", o kterém je v testech pořád řeč.
+
+### Pravidlo, které z toho plyne
+
+Jakékoliv pravidlo, které **jmenuje konec** — "vezmi hlavu", "podívej se na
+první vůz" — je na jedné dvojici nástupišť správně a na druhé přesně
+naopak. Proto oprava jedné dvojice rozbíjí druhou, donekonečna.
+
+**Nikdy nejmenovat konec.** Buď projít celou soupravu, nebo si přečíst
+obě veličiny a jednu odvodit z druhé. Tak se spravil ukazatel naložení,
+který zůstával viset na 3 a 4: přestalo se uklízet "hlavu" a začala se
+procházet celá souprava od konce ke konci.
+
+### Co tohle pravidlo dnes porušuje
+
+`NormaliseCoupledConsistFacing()` po spojení projde vlak a přetočí nosy
+tak, aby všechny mířily k hlavě seznamu a hlava nosem ven. Hned za ní se
+nastaví, že vede hlava seznamu. **Nic z toho neměří skutečnost — nařizuje
+ji podle pořadí seznamu.** Je to předpoklad převlečený za výpočet a je to
+jmenování konce v nejčistší podobě.
