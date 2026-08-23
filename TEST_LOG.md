@@ -227,3 +227,30 @@ porouchaná a nikdy neodjede. Odtahovka proto stála zaseknutá u
 posledního návěstidla před ní. Bezhlavá řada vagonků už tuhle výjimku
 měla; teď platí pro cokoliv, s čím se ten vlak smí spojit. Trať se
 zarezervuje kousek před porouchanou a zbytek obstará spojení.
+
+
+## Zámek trati po spojení, který nikdy nezmizel
+
+Trať se uvolňuje tak, že se jde od vedoucího konce vlaku **dopředu** po
+zamluvených dlaždicích. Dosáhne se tím jen na cestu, po které vlak
+teprve pojede.
+
+Do 6b25fef spojený vlak vždycky jel hlavou napřed — bylo to tam
+natvrdo napsané. Uvolnění po spojení bylo napsané pro tenhle stav, a na
+nástupištích, kde hlava náhodou byla tím koncem, kterým mašinka přijela,
+to vycházelo.
+
+6b25fef začal vedoucí konec **měřit**, protože spojený vlak musí
+vyjet tudy, kudy sběrná mašinka přijela. Tím se na půlce nástupišť
+vedoucí konec obrátil — a cesta, po které mašinka přijela, se ocitla
+**za** vlakem. Uvolnění po ní nikdy nešlo. Zůstala zamluvená do konce
+hry: spojený vlak po ní nemohl odjet a žádný jiný vlak tudy taky nesměl.
+
+Chyba byla v tom uvolnění celou dobu; jenom se neprojevila, dokud byl
+vlak nucený zůstat otočený jedním směrem. Změnil jsem, co znamená
+"vpředu", a nepřesunul jsem jediné místo, které na tom stojí.
+
+Uvolňuje se to teď **před** spojením, dokud oba vlaky ještě stojí tak,
+jak přijely. Nezáleží pak na tom, jestli mašinka přijela popředu nebo
+pozadu — nepojmenovává se žádný konec, každý vlak uvolní to, co sám
+drží.

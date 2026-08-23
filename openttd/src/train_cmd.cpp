@@ -2755,6 +2755,24 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
+		/* Let go of the track each of them was holding, and do it now, before
+		 * anything about either train changes.
+		 *
+		 * Track is released by walking forward from the end that leads, along
+		 * the reservation, until it runs out. That only reaches the path a train
+		 * is about to drive over. A moment from now this train leads with its
+		 * other end -- it has to leave the way it came in -- so the way it came
+		 * in stops being in front of it and becomes something behind it that
+		 * nothing will ever walk along again. It stayed reserved for the rest of
+		 * the game: the joined train could not leave over it, and no other train
+		 * could ever use it either.
+		 *
+		 * Done here, while both trains still face the way they arrived, so what
+		 * is released is exactly what each of them holds. See
+		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		FreeTrainTrackReservation(v->First());
+		FreeTrainTrackReservation(partner);
+
 		/* Splicing appends the trailing list to the end of the leading one, so
 		 * the two ends that meet in the middle have to be the two ends that
 		 * meet on the rails: the leading train's last vehicle and the trailing
@@ -2880,15 +2898,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		}
 	}
 
-	/* Throw away the path this train was following and let it be planned
-	 * again. It was planned while the wagons now being carried were still a
-	 * separate headless consist standing in the way -- impassable, so anything
-	 * leading past them was ruled out and the search settled on a way round.
-	 * That obstacle has just become part of this train, so the route it forced
-	 * is a route around nothing: the train sets off, goes the long way, and
-	 * comes back past the platform facing exactly as it did when it left. The
-	 * only thing wrong with it was when it was worked out. */
-	FreeTrainTrackReservation(new_head);
+	/* Both paths were thrown away before the splice, so the route this train was
+	 * following is gone and will be planned again from here. That is wanted for
+	 * its own sake as well: the old route was worked out while the wagons now
+	 * being carried were a separate headless consist standing in the way --
+	 * impassable, so anything leading past them was ruled out and the search
+	 * settled on a way round. That obstacle has just become part of this train,
+	 * so the route it forced is a route around nothing. All that is left to do
+	 * is hold the ground the joined train is standing on. */
 	new_head->ReserveTrackUnderConsist();
 
 	/* A rescue engine has what it came for. Where it takes it is the nearest
