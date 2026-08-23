@@ -1055,12 +1055,28 @@ CommandCost CmdSkipToOrder(DoCommandFlags flags, VehicleID veh_id, VehicleOrderI
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 
-	if (v == nullptr || !IsCompanyBuildableVehicleType(v) || !v->IsPrimaryVehicle() || sel_ord == v->cur_implicit_order_index || sel_ord >= v->GetNumOrders() || v->GetNumOrders() < 2) return CMD_ERROR;
+	if (v == nullptr || !IsCompanyBuildableVehicleType(v)) return CMD_ERROR;
+	/* A rake of wagons waiting at a platform carries two orders -- the job the
+	 * engine left it doing here, and waiting to be collected -- so that this
+	 * button is how the player moves it from one to the other. It is not a
+	 * primary vehicle and never will be, so it is named here. See
+	 * TryDecoupleAtStation(). */
+	bool waiting_wagons = IsWaitingWagonChain(v);
+	if (!v->IsPrimaryVehicle() && !waiting_wagons) return CMD_ERROR;
+	if (sel_ord == v->cur_implicit_order_index || sel_ord >= v->GetNumOrders() || v->GetNumOrders() < 2) return CMD_ERROR;
 
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
+		/* A rake stays where it is and goes on standing at the platform; what
+		 * changes is which of its two orders it is working on. Leaving the
+		 * station would be leaving for nowhere -- it has no engine. */
+		if (waiting_wagons) {
+			AdoptWagonRakeOrder(Train::From(v), sel_ord);
+			return CommandCost();
+		}
+
 		if (v->current_order.IsType(OT_LOADING)) v->LeaveStation();
 
 		v->cur_implicit_order_index = v->cur_real_order_index = sel_ord;
@@ -1192,7 +1208,12 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	if (mof >= MOF_END) return CMD_ERROR;
 
 	Vehicle *v = Vehicle::GetIfValid(veh);
-	if (v == nullptr || !IsCompanyBuildableVehicleType(v) || !v->IsPrimaryVehicle()) return CMD_ERROR;
+	/* A rake of wagons waiting at a platform carries one order so the player can
+	 * read it and change it -- chiefly to say "never mind the load, take them
+	 * away". It is not a primary vehicle and never will be, so it is named here
+	 * rather than being let in by the general test. See TryDecoupleAtStation(). */
+	if (v == nullptr || !IsCompanyBuildableVehicleType(v)) return CMD_ERROR;
+	if (!v->IsPrimaryVehicle() && !IsWaitingWagonChain(v)) return CMD_ERROR;
 
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;

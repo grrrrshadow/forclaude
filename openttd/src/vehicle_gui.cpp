@@ -3182,7 +3182,10 @@ public:
 		 * details page that would say anything an engineless rake can act on. */
 		if (IsWaitingWagonChain(v)) {
 			this->SetWidgetDisabledState(WID_VV_RENAME, true);
-			this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, true);
+			/* The orders button stays: a rake carries the one order the engine
+			 * left it with, and opening it is how the player says "never mind
+			 * the load, take them away". */
+			this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, !is_localcompany);
 			this->SetWidgetDisabledState(WID_VV_SHOW_DETAILS, true);
 			this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);
 			return;

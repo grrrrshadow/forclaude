@@ -1995,6 +1995,8 @@ STR_CONFIG_SETTING_SERVINT_DISABLED                             :Vypnuto
 
 STR_CONFIG_SETTING_NOSERVICE                                    :Vypnout servisy, když jsou vypnuty poruchy: {STRING}
 STR_CONFIG_SETTING_NOSERVICE_HELPTEXT                           :Pokud je zapnuto a zároveň jsou vypnuty poruchy, vozidla nebudou vůbec jezdit do servisu, protože se nemohou nikdy porouchat
+STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Zamluvit náklad pro vozidlo, které ho nakládá: {STRING}
+STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :Zapnuto: vozidlo čekající na plné naložení si náklad ve stanici zamluví pro sebe, takže na vozidla u ostatních nástupišť nezbyde nic, dokud neodjede. Vypnuto: ve stanici nakládají všichni najednou a dělí se o to, co tam je
 
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY               :Pomalejší nakládání u vlaků delších než stanice: {STRING}
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :Pokud je zapnuto, u vlaků delší než stanice je nakládání pomalejší než u vlaků, které se do stanice vejdou. Nastavení neovlivňuje hledání cesty.

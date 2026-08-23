@@ -159,3 +159,34 @@ vagonků smí najet kdokoliv", takže do stojících vagonků šlo beztrestně
 narazit čímkoliv. Nově platí jen pro tu jednu dvojici, která si o sobě ví:
 mašinka a to, co si zamluvila. Kdokoliv jiný bourá, jak má. Tím to platí
 stejně pro vagonky i pro čekající vlaky a nemusí se to řešit dvakrát.
+
+## Úkoly 3, 4, 5 — co se udělalo
+
+**Úkol 3 — vagonky mají dva příkazy.** Odpojená řada teď dostane skutečný
+seznam dvou příkazů: nejdřív to, co jí mašinka nechala za práci na téhle
+stanici, a za tím "čekat na spojení". Hráč si otevře běžné okno příkazů
+(ikonka příkazy je v okně vagonků odemčená) a **zmáčkne běžné Přeskočit**,
+když chce vagonky odvézt dřív, než se naloží — třeba když zrušili průmysl
+a už není co nakládat. Žádné zvláštní tlačítko.
+
+Automaticky se to posune samo, jakmile je nakládání opravdu hotové.
+
+A "čekat na spojení" **současně s nakládáním** platí jen tehdy, když hráč
+nedal naložit plné. Když dal, má řada práci k dokončení a partnerem se
+stává až potom. Dřív byla nastavená obojí najednou, což je špatně a
+umožňovalo to odvézt poloprázdnou řadu.
+
+**Úkol 4 — nakládání ve stanici.** Ta funkce ve hře je a jmenuje se
+`order.improved_load`. Zapnutá dělá to, že vozidlo čekající na plné
+naložení si náklad ve stanici zamluví pro sebe, takže na vozidla u
+ostatních nástupišť nezbyde nic, dokud neodjede. Vypnutá nechá nakládat
+všechny najednou a dělit se o to, co tam je. **Neodstranili ji, jen jí
+sebrali popisek**, takže se v nastavení nedala najít a šla nastavit jen
+konzolí. Popisek dostala zpátky a je v nastavení hry.
+
+**Úkol 5 — posun mapy pravým tlačítkem.** Řešeno v kódu hry, ne v ovladači.
+Dvě tažení mapy naráz nemohou být rozdělaná, a z těch dvou vyhrává to,
+které hráč právě začal — takže **stisk levého tlačítka ukončí tažení
+pravým**. Tím se z toho dostane i tehdy, když hra považuje pravé tlačítko
+za držené a nikdo ho nedrží: jakmile tažení skončí, další začne až po
+novém stisku pravého, takže zaseklý příznak nemá čeho se držet.

@@ -1918,6 +1918,8 @@ STR_CONFIG_SETTING_SERVINT_DISABLED                             :Disabled
 
 STR_CONFIG_SETTING_NOSERVICE                                    :Disable servicing when breakdowns set to none: {STRING2}
 STR_CONFIG_SETTING_NOSERVICE_HELPTEXT                           :When enabled, vehicles do not get serviced if they cannot break down
+STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Reserve cargo for the vehicle loading it: {STRING}
+STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :When on, a vehicle waiting for a full load claims the cargo at the station for itself, so vehicles at other platforms get none until it leaves. When off, everything at the station loads at the same time and shares whatever is there
 
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY               :Loading speed penalty for trains that are longer than the station: {STRING2}
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :When enabled, trains which are too long for the station load more slowly than a train which fits the station. This setting does not affect pathfinding

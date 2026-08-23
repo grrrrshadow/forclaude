@@ -77,6 +77,7 @@ bool TrainAwaitsRescue(Train *v);
 bool IsWholeTrainInsideDepot(const Train *v);
 bool HasCoupleTarget(const Train *v);
 bool IsWaitingToBeCoupled(const Train *v);
+void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index);
 bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);
 void HandleRescueEngineInDepot(Train *tow);

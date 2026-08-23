@@ -1574,6 +1574,12 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 				 * that has long since finished with it. */
 				u->couple_claim = VehicleID::Invalid();
 
+				/* The one order a rake carried so the player could read and
+				 * change it goes when the rake does. An engine keeps its own
+				 * (see the note in TryConsistSplice); a rake has nothing to come
+				 * back to. */
+				if (u->IsFreeWagon() && u->orders != nullptr) DeleteVehicleOrders(u);
+
 				if (u->IsFrontEngine() || u->IsFreeWagon()) continue;
 				/* An engine travelling as somebody else's wagons keeps its
 				 * orders, so it also keeps a "waiting to be collected" order
@@ -1634,6 +1640,37 @@ bool IsOnRescueRun(const Train *v)
 {
 	return v->IsFrontEngine() && v->vehicle_flags.Test(VehicleFlag::RescueEngine) &&
 			v->rescue_target != VehicleID::Invalid();
+}
+
+/**
+ * Move a rake of wagons on to one of the orders it is carrying.
+ *
+ * A rake left at a platform carries two: the job the engine left it doing
+ * here, and waiting to be collected. Nothing works through that list by itself
+ * -- only the head of a train is asked what to do next, and a rake has no
+ * engine at its head -- so both ways of moving between them, the loading
+ * finishing and the player pressing Skip, come through here.
+ *
+ * What actually changes is the live order the rake is working on, since that is
+ * what everything else reads. The list index is kept in step so the window
+ * shows the right line.
+ *
+ * @param rake  the rake, its head
+ * @param index which of its orders to take up
+ */
+void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index)
+{
+	const Order *order = rake->GetOrder(index);
+	if (order == nullptr) return;
+
+	rake->cur_real_order_index = rake->cur_implicit_order_index = index;
+	rake->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
+	rake->current_order.SetLoadType(order->GetLoadType());
+	rake->current_order.SetUnloadType(order->GetUnloadType());
+	if (order->ShouldWaitForCouple()) rake->vehicle_flags.Set(VehicleFlag::LoadingFinished);
+
+	InvalidateVehicleOrder(rake, VIWD_MODIFY_ORDERS);
+	InvalidateWindowData(WindowClass::VehicleView, rake->index);
 }
 
 /**
@@ -1718,9 +1755,13 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake)
 			break;
 
 		case OrderCoupleLoad::Full:
-			/* Room left anywhere means it is not full. A vehicle that carries
-			 * nothing at all -- a brake van, say -- has no room either, so it
-			 * neither makes a rake full nor stops it being full. */
+			/* A rake the player has called done counts as full whatever is in
+			 * it: it has finished what it was told to do here and nothing more
+			 * is going into it. See CmdFinishWagonLoading(). */
+			if (rake->current_order.GetLoadType() == OrderLoadType::NoLoad) break;
+			/* Otherwise, room left anywhere means it is not full. A vehicle that
+			 * carries nothing at all -- a brake van, say -- has no room either,
+			 * so it neither makes a rake full nor stops it being full. */
 			for (const Train *u = rake; u != nullptr; u = u->Next()) {
 				if (u->cargo.StoredCount() < u->cargo_cap) return false;
 			}
@@ -2949,15 +2990,55 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	if (IsRailStationTile(remainder->tile)) {
 		StationID station = GetStationIndex(remainder->tile);
 		remainder->current_order.MakeGoToStation(station);
-		remainder->current_order.SetWaitForCouple(true);
 		/* The wagons keep being handled the way the train was told to handle
 		 * them here. They are the same wagons at the same platform a moment
 		 * later, so an order not to load that applied to them while they were
 		 * coupled has to go on applying once they are not -- otherwise the
 		 * engine departs under orders not to load and the wagons it left
-		 * behind start filling up on their own. */
+		 * behind start filling up on their own.
+		 *
+		 * And that order is theirs to finish before they are anybody's to
+		 * collect. Wagons told to fill up are doing a job here, not waiting;
+		 * only once the job is done do they become something an engine can be
+		 * sent for. Saying both at once -- filling up and waiting -- was wrong
+		 * and is what let a half-loaded rake be carried off. See Train::Tick(),
+		 * which is where the one turns into the other. */
 		remainder->current_order.SetLoadType(load_type);
 		remainder->current_order.SetUnloadType(unload_type);
+
+		/* Told to fill up, the rake has a job to finish here and is not waiting
+		 * for anybody until it is done. Told anything else, there is nothing to
+		 * finish, so it is waiting from the moment it is put down. */
+		remainder->current_order.SetWaitForCouple(!remainder->current_order.IsFullLoadOrder());
+
+		/* And the rake gets a real pair of orders: what the engine left it doing
+		 * here, and then waiting to be collected. Two orders, so the player can
+		 * open the ordinary orders window and press the ordinary Skip button to
+		 * go from the first to the second -- which is how you say "never mind
+		 * the load, take them away" when the industry that was filling them has
+		 * closed. No special button anywhere, and the same shape the reference
+		 * has.
+		 *
+		 * Nothing works through this list on its own: only the head of a train
+		 * is ever asked what to do next, and a rake has no engine at its head.
+		 * It is there to be read, skipped, and edited. Train::Tick() moves it on
+		 * from the first to the second when the loading really does finish. */
+		if (remainder->orders == nullptr) {
+			Order job = remainder->current_order;
+			job.SetWaitForCouple(false);
+
+			Order waiting{};
+			waiting.MakeGoToStation(station);
+			waiting.SetLoadType(OrderLoadType::NoLoad);
+			waiting.SetUnloadType(OrderUnloadType::NoUnload);
+			waiting.SetWaitForCouple(true);
+
+			InsertOrder(remainder, std::move(job), 0);
+			InsertOrder(remainder, std::move(waiting), 1);
+			remainder->cur_real_order_index = remainder->cur_implicit_order_index =
+					remainder->current_order.ShouldWaitForCouple() ? 1 : 0;
+		}
+
 		TrainEnterStation(remainder, station);
 	}
 }
@@ -6227,6 +6308,17 @@ bool Train::Tick()
 		if (!TrainLocoHandler(this, false)) return false;
 
 		return TrainLocoHandler(this, true);
+	} else if (this->IsFreeWagon() && !this->vehstatus.Test(VehState::Crashed)) {
+		/* A rake of wagons left at a platform works through the order the engine
+		 * left it with -- fill up, or take nothing -- and only when that is done
+		 * does it become something waiting to be collected. Nobody else will
+		 * notice that moment for it: a rake has no engine at its head, so none
+		 * of the code that moves a train on from one thing to the next is ever
+		 * asked about it. This is the one place it gets a look in. */
+		if (this->current_order.IsType(OT_LOADING) && !this->current_order.ShouldWaitForCouple() &&
+				this->vehicle_flags.Test(VehicleFlag::LoadingFinished)) {
+			AdoptWagonRakeOrder(this, 1);
+		}
 	} else if (this->IsFreeWagon() && this->vehstatus.Test(VehState::Crashed)) {
 		/* Delete flooded standalone wagon chain */
 		if (++this->crash_anim_pos >= 4400) {
