@@ -218,8 +218,12 @@ zápis a druhý nechává. Zůstala tak mašinka, která už pro nic nejede, ale
 pro kód srážky pořád "cíl měla" — proto neboural. Ruší se to teď na
 jednom místě a z obou stran.
 
-**Odtahovka nevyjela vůbec.** Dvě podmínky si odporovaly: přijmout službu
-šlo jen se zataženou brzdou (stojící v depu), a vyjet k poruše jen s
-brzdou puštěnou. Kdo jen zmáčkl tlačítko, měl mašinku, která službu má a
-nikdy nevyjede. Tlačítko teď brzdu pustí — jeden stisk je celá domluva a
-okno hned hlásí, že je na příjmu.
+**Odtahovka nevyjela vůbec.** Rezervace trati se ptá, jestli cestě
+nepřekáží jiný vlak, a když ano, označí vlak za zaseknutý a čeká, až
+překážka odjede. To je správně pro každý vlak kromě jednoho: pro ten,
+pro který jsme vyjeli. Porouchaná mašinka má vpředu mašinku, takže se
+čte jako obyčejná překážka — a čekat na ni nemá smysl, protože je
+porouchaná a nikdy neodjede. Odtahovka proto stála zaseknutá u
+posledního návěstidla před ní. Bezhlavá řada vagonků už tuhle výjimku
+měla; teď platí pro cokoliv, s čím se ten vlak smí spojit. Trať se
+zarezervuje kousek před porouchanou a zbytek obstará spojení.

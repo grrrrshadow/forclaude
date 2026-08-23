@@ -2495,16 +2495,6 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 		 * One that is already towing cannot get here at all -- see above. */
 		EndRescueErrand(v);
 
-		/* Being on call means standing in the depot with the brake off, ready to
-		 * leave; a rescue engine with the brake on is parked and is not going
-		 * anywhere. Taking the job on has to be allowed only while the train is
-		 * stopped, because that is what makes it a train with nothing else to do
-		 * -- and those two together meant the engine could never set off at all:
-		 * the one condition to accept the job was the one condition that stops it
-		 * being done. The button lets the brake off, so one press is the whole
-		 * arrangement and the window says it is on call straight away. */
-		if (rescue) v->vehstatus.Reset(VehState::Stopped);
-
 		/* The vehicle window works out which of its buttons are lowered in
 		 * UpdateButtons(), which only runs on an invalidate. Merely marking
 		 * the window dirty repaints it exactly as it was, so the button would
@@ -4931,7 +4921,17 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	 * Exit here as doing any further reservations will probably just
 	 * make matters worse. */
 	if (other_train != nullptr && other_train->index != consist->index) {
-		if (Train::From(other_train)->First()->IsFrontEngine()) {
+		/* Blocked by the very train we were sent to fetch is not being blocked
+		 * at all -- it is arriving. A casualty has an engine at its head, so
+		 * "blocked by a real train, nothing to do but wait" is exactly what
+		 * this reads as, and waiting is the one thing that cannot work: what
+		 * is in the way is broken down and is never going to move. The engine
+		 * was marked stuck at the last signal before it and stood there for
+		 * good. Give the search below the same fresh chance a headless rake
+		 * gets; it stops the path short of the casualty and coupling takes
+		 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
+		if (Train::From(other_train)->First()->IsFrontEngine() &&
+				!IsValidCouplePartner(consist, Train::From(other_train)->First())) {
 			/* Genuinely blocked by a real, driving train -- nothing
 			 * useful to do but wait, exactly as before. */
 			if (mark_as_stuck) MarkTrainAsStuck(consist);
