@@ -1430,7 +1430,13 @@ bool Vehicle::HandleBreakdown()
 					this->breakdown_ctr = 0;
 					/* The trouble is over, so the wait to be fetched is over
 					 * with it and the next breakdown starts its own. */
-					if (this->type == VehicleType::Train) Train::From(this)->First()->rescue_deadline = TimerGameEconomy::Date{};
+					if (this->type == VehicleType::Train) {
+						Train *head = Train::From(this)->First();
+						head->rescue_deadline = TimerGameEconomy::Date{};
+						/* Going again under its own steam, so it is not waiting
+						 * for anybody to come and fetch it any more. */
+						head->current_order.SetWaitForCouple(false);
+					}
 					this->MarkDirty();
 					SetWindowDirty(WindowClass::VehicleView, this->index);
 				}
@@ -2495,7 +2501,7 @@ void Vehicle::HandleLoading(bool mode)
 			 * couple" order (see CheckReverseTrain() in train_cmd.cpp for
 			 * the reversal-permission half of that). See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (this->type == VehicleType::Train && (this->current_order.ShouldWaitForCouple() || this->current_order.ShouldGoToCouple())) {
+			if (this->type == VehicleType::Train && (IsWaitingToBeCoupled(Train::From(this)) || this->current_order.ShouldGoToCouple())) {
 				Train *t = Train::From(this);
 				if (GetTrainCouplePartner(t) == nullptr) return;
 				/* Commands check ownership against whichever company is current,

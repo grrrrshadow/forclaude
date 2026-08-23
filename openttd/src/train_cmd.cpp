@@ -1637,6 +1637,33 @@ bool IsOnRescueRun(const Train *v)
 }
 
 /**
+ * Is this consist standing where it is, waiting for somebody to come and
+ * collect it?
+ *
+ * The flag on its own is not enough. It is set on an order well before the
+ * train gets there, so a train still on its way to the station -- or sitting
+ * in a depot about to set off -- would read as waiting and be coupled to on
+ * the spot. That is how engines leaving a depot together ended up glued into
+ * one train before any of them had gone anywhere.
+ *
+ * What makes it true is the flag plus being unable to go anywhere: either
+ * standing in the station it was sent to, working through the order there, or
+ * stranded -- broken down or wrecked. A stranded train is waiting to be
+ * collected in the plainest sense there is, which is why a rescue engine needs
+ * no machinery of its own to recognise one. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * @param v any part of the consist
+ * @return whether it is standing there to be collected
+ */
+bool IsWaitingToBeCoupled(const Train *v)
+{
+	const Train *head = v->First();
+	if (!head->current_order.ShouldWaitForCouple()) return false;
+	if (head->current_order.IsType(OT_LOADING)) return true;
+	return head->breakdown_ctr == 1 || head->vehstatus.Test(VehState::Crashed);
+}
+
+/**
  * Has the engine that spoke for this rake stopped coming for it?
  *
  * A claim is only worth as much as the engine behind it. One that has been
@@ -1655,7 +1682,10 @@ static bool IsCoupleClaimStale(const Train *rake)
 	if (claimer == nullptr) return true;
 	if (!claimer->IsFrontEngine()) return true;
 	if (claimer->vehstatus.Test(VehState::Crashed)) return true;
-	return !claimer->current_order.ShouldGoToCouple();
+	/* The two halves of the claim have to agree. If the engine no longer says
+	 * it is coming for this rake -- it was given other orders, or it has
+	 * already collected something -- then it is not coming. */
+	return claimer->couple_target != rake->index;
 }
 
 /**
@@ -1767,20 +1797,27 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	 * is not a crash, this is what I came for" only covers a headless rake.
 	 * Worse, the collecting engine kept seeing a partner in wagons that had
 	 * already been collected by somebody else, so it never gave up on them. */
-	if (!partner->current_order.ShouldWaitForCouple()) return false;
+	if (!IsWaitingToBeCoupled(partner)) return false;
 	/* Either a rake of wagons or a whole train of its own that is waiting to be
 	 * picked up and carried along as part of a bigger one. Two little trains
 	 * joining to run as one is the same arrangement as an engine collecting
 	 * wagons, seen from the other end. */
 	if (!partner->IsFreeWagon() && !partner->IsFrontEngine()) return false;
 
+	/* Once this train has chosen what it is going for, nothing else will do.
+	 * Without that, the route search would happily settle on some other rake
+	 * that also passes the filter, and the train would end up driving to
+	 * whatever it had reserved instead of to what it had picked. */
+	const Train *head = v->First();
+	if (head->couple_target != VehicleID::Invalid()) return partner->index == head->couple_target;
+
 	/* And it must not already be somebody else's errand. */
-	if (partner->couple_claim != VehicleID::Invalid() && partner->couple_claim != v->First()->index &&
+	if (partner->couple_claim != VehicleID::Invalid() && partner->couple_claim != head->index &&
 			!IsCoupleClaimStale(partner)) {
 		return false;
 	}
 
-	return MatchesCoupleFilter(v->First()->current_order, partner);
+	return MatchesCoupleFilter(head->current_order, partner);
 }
 
 /**
@@ -1810,19 +1847,27 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 		if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
 		if (rake == v) continue;
 		if (rake->owner != v->owner) continue;
-		if (!rake->current_order.ShouldWaitForCouple()) continue;
+		if (!IsWaitingToBeCoupled(rake)) continue;
 		if (rake->last_station_visited != dest) continue;
 
 		if (IsCoupleClaimStale(rake)) rake->couple_claim = VehicleID::Invalid();
 
-		if (rake->couple_claim == v->index) return rake; // already ours
+		if (rake->couple_claim == v->index) {
+			v->couple_target = rake->index; // already ours
+			return rake;
+		}
 		if (rake->couple_claim != VehicleID::Invalid()) continue; // somebody else's
 		if (!MatchesCoupleFilter(v->current_order, rake)) continue;
 
 		if (unclaimed == nullptr) unclaimed = rake;
 	}
 
-	if (unclaimed != nullptr) unclaimed->couple_claim = v->index;
+	if (unclaimed != nullptr) {
+		unclaimed->couple_claim = v->index;
+		v->couple_target = unclaimed->index;
+	} else {
+		v->couple_target = VehicleID::Invalid();
+	}
 	return unclaimed;
 }
 
@@ -1844,7 +1889,7 @@ bool HasCoupleTarget(const Train *v)
 	for (const Train *rake : Train::Iterate()) {
 		if (rake->couple_claim != v->index) continue;
 		if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
-		if (!rake->current_order.ShouldWaitForCouple()) continue;
+		if (!IsWaitingToBeCoupled(rake)) continue;
 		if (rake->last_station_visited != dest) continue;
 		return true;
 	}
@@ -2246,6 +2291,20 @@ bool TrainAwaitsRescue(Train *v)
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 	}
 
+	/* A train stranded on the line is waiting to be collected, in the plainest
+	 * sense of the words, so it says so on its order and needs nothing else. An
+	 * engine coming to fetch it then treats it exactly as it treats wagons
+	 * waiting at a platform -- same partner test, same approach, same coupling
+	 * -- and rescue stops being a case of its own.
+	 *
+	 * Nothing about this shows in the window: what a vehicle is reported as
+	 * doing puts a breakdown and a wreck ahead of any order, so it goes on
+	 * saying broken down or crashed, which is what the player needs to see. */
+	if (!v->current_order.ShouldWaitForCouple()) {
+		v->current_order.SetWaitForCouple(true);
+		v->current_order.SetGoToCouple(false);
+	}
+
 	if (TimerGameEconomy::date < v->rescue_deadline) {
 		/* Vanilla puffs smoke once, for as long as the breakdown was going to
 		 * last. A breakdown that now lasts until someone comes would go quiet
@@ -2429,6 +2488,10 @@ static void TryDispatchRescueEngine(Train *tow)
 	if (nearest == nullptr) return;
 
 	tow->rescue_target = nearest->index;
+	/* Spoken for, in the same words every other coupling uses: the casualty
+	 * says which engine is coming and the engine says what it is going for. */
+	tow->couple_target = nearest->index;
+	nearest->couple_claim = tow->index;
 	tow->SetDestTile(nearest->tile);
 	tow->current_order.MakeDummy();
 	InvalidateWindowData(WindowClass::VehicleView, tow->index);
@@ -2493,6 +2556,8 @@ void HandleRescueEngineInDepot(Train *tow)
 			casualty->breakdown_ctr = 0;
 			casualty->breakdown_delay = 0;
 			casualty->rescue_deadline = TimerGameEconomy::Date{};
+			/* Collected and put right, so it is no longer waiting for anybody. */
+			casualty->current_order.SetWaitForCouple(false);
 			casualty->vehstatus.Reset(VehState::Stopped);
 			casualty->ConsistChanged(CCF_ARRANGE);
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
@@ -2581,6 +2646,12 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	else if (partner->current_order.ShouldGoToCouple()) collector = partner;
 	if (collector != nullptr && collector->IsFrontEngine() && leading != collector) std::swap(leading, trailing);
 
+	/* How the collecting train came in. Read now, before any relinking below
+	 * moves a head about, because the way out of the platform is measured
+	 * against it -- see the note where the joined train's leading end is
+	 * settled. */
+	Direction arrived_heading = (collector != nullptr ? collector : leading)->GetMovingDirection();
+
 	/* Some gap is normal -- a train cannot reserve the tile its partner stands
 	 * on, so it stops about a tile short and the two are closed up after the
 	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
@@ -2622,21 +2693,47 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	ret = TryConsistSplice(flags, src, dst, true, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
 
-	/* The two halves still disagree about which way is forwards; settle that
-	 * before anything reads the merged train's facing. */
+	/* The vehicles of the two halves point every which way relative to each
+	 * other; line them up along the list so nothing reads a nose that
+	 * contradicts its neighbours. */
 	NormaliseCoupledConsistFacing(new_head);
 
-	/* Every vehicle now faces away from the wagons behind it, so the train
-	 * pulls its new load back the way the engine came in -- which is the only
-	 * way out of a platform it reached nose first anyway. Whatever the engine
-	 * was doing to get here, backing up included, is over. */
-	new_head->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	/* Which end of the joined train leads is a separate question, and it is not
+	 * one to answer from the order of the list.
+	 *
+	 * A train is described by two things that have nothing to do with each
+	 * other: the order of its vehicles, and which end goes first when it moves.
+	 * Coupling does not change the first and reversing does not change the
+	 * second. On a platform reached by backing in, those two point at opposite
+	 * ends of the train; on one reached nose first, at the same end. So any
+	 * rule that names an end -- "the head leads" -- is right on one and
+	 * backwards on the other, which is why fixing one kind of platform kept
+	 * breaking the other.
+	 *
+	 * So measure it. The joined train has to leave the platform by the way the
+	 * collecting train came in, because that is the way it got in past
+	 * everything else; therefore it leads with the end that was trailing on the
+	 * way in. Whether that end happens to be the head of the list is not asked
+	 * and does not matter.
+	 *
+	 * Compared as a direction rather than for equality: a vehicle on a curve is
+	 * up to 45 degrees off and is perfectly correct. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	TileIndexDiffC nose = TileIndexDiffCByDir(new_head->direction);
+	TileIndexDiffC leaving = TileIndexDiffCByDir(ReverseDir(arrived_heading));
+	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, nose.x * leaving.x + nose.y * leaving.y < 0);
+
 	new_head->flags.Reset(VehicleRailFlag::Reversing);
 	new_head->ConsistChanged(CCF_TRACK);
 
 	/* The two halves were joined across a gap; walk it shut before anything
 	 * tries to drive this train. */
 	CloseUpCoupledConsist(new_head);
+
+	/* It has what it came for, so it is not coming for anything any more. The
+	 * matching half written on the collected train is rubbed out by the splice.
+	 */
+	new_head->couple_target = VehicleID::Invalid();
 
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
@@ -5072,9 +5169,7 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 	 * apart under the caller's feet). See FEATURE_DESIGN_COUPLING_TOW.md. */
 	Train *first = moving_front->First();
 	Train *other = Train::From(v)->First();
-	if ((first->current_order.ShouldGoToCouple() || first->current_order.ShouldWaitForCouple()) &&
-			!other->IsFrontEngine() && other->cur_speed == 0 &&
-			!other->vehstatus.Test(VehState::Crashed)) {
+	if ((first->couple_target == other->index || other->couple_target == first->index) && other->cur_speed == 0) {
 		first->cur_speed = 0;
 		first->subspeed = 0;
 		return 0;
@@ -5905,7 +6000,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * as well as one already parked on "wait to couple" that a partner has
 	 * since been pushed up against. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (consist->cur_speed == 0 &&
-			(consist->current_order.ShouldGoToCouple() || consist->current_order.ShouldWaitForCouple() ||
+			(consist->current_order.ShouldGoToCouple() || IsWaitingToBeCoupled(consist) ||
 			 IsOnRescueRun(consist)) &&
 			GetTrainCouplePartner(consist) != nullptr) {
 		/* Commands check ownership against the company that is "current" right
@@ -5952,6 +6047,17 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * FindOrClaimCoupleTarget(). */
 	if (consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0 &&
 			FindOrClaimCoupleTarget(consist) == nullptr) {
+		/* And it holds no track while it waits. Reserving first and choosing
+		 * afterwards was the whole trouble: the path was held against every
+		 * other train for as long as the wait lasted, and when the choice was
+		 * finally made the train went to what it had reserved rather than to
+		 * what it had chosen. Nothing is reserved until there is something to
+		 * reserve it for. Not every tick -- there is nothing to release most of
+		 * the time. */
+		if ((consist->tick_counter & 0x1F) == 0) {
+			FreeTrainTrackReservation(consist);
+			consist->ReserveTrackUnderConsist();
+		}
 		return true;
 	}
 

@@ -117,3 +117,45 @@ rozpadlý poslední řádek. Stačí kliknout na příkazy a srovná se to.
 
 **Čeština:** příkaz „jeď do depa" má v závorce „(Zastávka)", ve vanille
 tam má být „(Zastavit)".
+
+## Build po plánku nádraží — co se opravilo a proč
+
+Zápisy k úkolům 1, 2, 6, 7, 8 z posledního kola testů. Úkoly 3, 4 a 5 se
+ještě dodělávají, odtah (jízda) se podle pokynu nemění.
+
+**Úkol 2 — příkaz po spojení na 3 a 4.** Kód po spojení nezjišťoval, který
+konec vlaku vede, on to nařizoval podle pořadí seznamu: "vede hlava". Na
+nástupištích, kam se nacouvá, míří hlava a vedoucí konec na opačné strany;
+na těch, kam se jede popředu, na tu samou. Takže pravidlo pojmenovávající
+konec sedělo na jedné dvojici a bylo obrácené na druhé — a oprava jedné
+dvojice rozbíjela druhou donekonečna. Teď se to měří: spojený vlak vyjíždí
+tou stranou, kterou spojující mašinka přijela, tedy vede konec, který jí
+byl při příjezdu vlečený. Na obou dvojicích to vyjde správně a nikde se
+nejmenuje hlava ani konec seznamu.
+
+**Úkol 8 — spojení už v depu.** "Čekat na spojení" je na příkazu dávno
+předtím, než vlak někam dojede, takže mašinka cestou i v depu četla, že
+čeká, a slepila se s první, na kterou narazila. Nově to platí, jen když
+vlak opravdu nemůže nikam jet: buď stojí v cílové stanici a odbavuje se
+tam, nebo je porouchaný či havarovaný.
+
+**Úkol 6 — odtah bez zvláštního kódu.** Porouchaná i havarovaná mašinka
+teď dostane "čekat na spojení" na svůj příkaz. V okně se dál píše porucha
+nebo havárie, protože ty mají v hlášení přednost před příkazem. Odtah tím
+přestává být zvláštní případ: jede po stejném hledání partnera, stejném
+přiblížení a stejném spojení jako všechno ostatní. Příznak se ruší, jakmile
+vlak zase jede sám.
+
+**Úkol 1 — nejdřív cíl, potom rezervace.** Zamluvení bylo zapsané jen na
+vagoncích, takže hledání cesty o něm nevědělo a mířilo ke kterékoliv jiné
+volné řadě, která prošla filtrem. Mašinka si tak zamluvila jednu řadu
+a trať si zarezervovala k jiné. Zamluvení se teď píše na obě strany —
+řada ví, kdo pro ni jede, a mašinka ví, pro co jede — a jakmile má vybráno,
+nic jiného pro ni partner není. Dokud vybráno nemá, nedrží před sebou
+žádnou trať.
+
+**Úkol 7 — výjimka ze srážky byla plošná.** Říkala "do bezhlavé řady
+vagonků smí najet kdokoliv", takže do stojících vagonků šlo beztrestně
+narazit čímkoliv. Nově platí jen pro tu jednu dvojici, která si o sobě ví:
+mašinka a to, co si zamluvila. Kdokoliv jiný bourá, jak má. Tím to platí
+stejně pro vagonky i pro čekající vlaky a nemusí se to řešit dvakrát.

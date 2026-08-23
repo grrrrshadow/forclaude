@@ -76,6 +76,7 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
 bool IsWholeTrainInsideDepot(const Train *v);
 bool HasCoupleTarget(const Train *v);
+bool IsWaitingToBeCoupled(const Train *v);
 bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);
 void HandleRescueEngineInDepot(Train *tow);
@@ -140,6 +141,22 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	 * given up. See FEATURE_DESIGN_COUPLING_TOW.md.
 	 */
 	VehicleID couple_claim = VehicleID::Invalid();
+
+	/**
+	 * Which rake this engine has spoken for, set on the engine itself.
+	 *
+	 * The other half of the same fact, written down twice on purpose. The rake
+	 * carries the name of the engine so that no second engine takes it; the
+	 * engine carries the name of the rake so that it knows, without going
+	 * looking, that it already has one and which one.
+	 *
+	 * That second half is what stops it setting off before the choice is made.
+	 * Reserving track first and choosing afterwards meant the track was held
+	 * against everybody else while nothing was decided, and then the engine
+	 * went to whatever it had reserved rather than to what it had chosen. So:
+	 * choose first, then reserve, then move.
+	 */
+	VehicleID couple_target = VehicleID::Invalid();
 
 	/** Create new Train object. @copydoc GroundVehicle::GroundVehicle */
 	Train(VehicleID index) : GroundVehicleBase(index) {}
