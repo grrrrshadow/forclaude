@@ -623,28 +623,6 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			int x = (int16_t)LOWORD(lParam);
 			int y = (int16_t)HIWORD(lParam);
 
-			/* Every mouse movement says which buttons are held down right now,
-			 * and that is worth more than remembering what the last press and
-			 * release message happened to say. A release can go missing --
-			 * pressed on one device and let go on another, let go while the
-			 * grab on the window had been dropped, let go outside the window
-			 * altogether -- and then a button that nobody is holding is held
-			 * down for ever. That is a map that goes on being dragged about
-			 * with no finger on the screen, and every click swallowed by a
-			 * drag that is not happening.
-			 *
-			 * Only ever let this take a button back up. Putting one down on
-			 * the strength of a movement would invent a press that was never
-			 * made, and a press is something the player does deliberately. */
-			if (_left_button_down && (wParam & MK_LBUTTON) == 0) {
-				_left_button_down = false;
-				_left_button_clicked = false;
-			}
-			if (_right_button_down && (wParam & MK_RBUTTON) == 0) {
-				_right_button_down = false;
-				_right_button_clicked = false;
-			}
-
 			/* If the mouse was not in the window and it has moved it means it has
 			 * come into the window, so start drawing the mouse. Also start
 			 * tracking the mouse for exiting the window */
@@ -1054,6 +1032,30 @@ void VideoDriver_Win32Base::InputLoop()
 		_dirkeys.Set(DirectionKey::Down, GetAsyncKeyState(VK_DOWN));
 	} else {
 		_dirkeys.Reset();
+	}
+
+	/* And the mouse buttons, for the same reason everything above is read
+	 * rather than remembered. A remembered state is only ever as good as the
+	 * stream of messages it was built from, and a release can go missing: let
+	 * go outside the window, let go while the grab on the window had been
+	 * dropped, pressed on one device and let go on another. Then the button is
+	 * held down as far as this program is concerned, for ever, with nothing in
+	 * the game able to put it right -- which is a map that goes on being
+	 * dragged about with nobody touching anything.
+	 *
+	 * Only ever let this take a button back up. Putting one down would invent a
+	 * press nobody made, and a press is what starts things.
+	 *
+	 * Which physical button is the logical left one depends on whether the
+	 * player has swapped them, and the message stream is already in logical
+	 * terms, so ask the same question the same way. */
+	bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+	if (_left_button_down && !(this->has_focus && GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) < 0)) {
+		_left_button_down = false;
+		_left_button_clicked = false;
+	}
+	if (_right_button_down && !(this->has_focus && GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) < 0)) {
+		_right_button_down = false;
 	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();

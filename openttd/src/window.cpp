@@ -2476,24 +2476,6 @@ static EventState HandleViewportScroll()
 
 	if (!_scrolling_viewport) return EventState::NotHandled;
 
-	/* Two ways of dragging the map about cannot both be under way at once, and
-	 * of the two the one the player has just started wins. Pressing the left
-	 * button therefore ends a drag being done with the right one.
-	 *
-	 * This is also the way out of a right button that is held down as far as
-	 * this program is concerned while nobody is holding it. Whether that
-	 * happens because a release went missing on the way in is not something
-	 * that can be settled from here -- what can be settled is that the map
-	 * should not go on being dragged by it. Once this drag has ended, only a
-	 * fresh press of the right button starts another, so a button that is stuck
-	 * down has nothing left to hold on to. */
-	if (_left_button_down && _settings_client.gui.scroll_mode != ViewportScrollMode::MapLMB && !scrollwheel_scrolling) {
-		_cursor.fix_at = false;
-		_scrolling_viewport = false;
-		_last_scroll_window = nullptr;
-		return EventState::NotHandled;
-	}
-
 	/* When we don't have a last scroll window we are starting to scroll.
 	 * When the last scroll window and this are not the same we went
 	 * outside of the window and should not left-mouse scroll anymore. */

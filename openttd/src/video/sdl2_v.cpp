@@ -425,27 +425,6 @@ bool VideoDriver_SDL_Base::PollEvent()
 			int32_t x = ev.motion.x;
 			int32_t y = ev.motion.y;
 
-			/* Every movement says which buttons are held down right now, and
-			 * that is worth more than remembering what the last press and
-			 * release said. A release can go missing -- pressed on one device
-			 * and let go on another, or let go outside the window -- and then a
-			 * button nobody is holding stays down for ever: a map that goes on
-			 * being dragged with no finger on the screen, and every click
-			 * swallowed by a drag that is not happening. Only ever let this
-			 * take a button back up; putting one down would invent a press
-			 * nobody made. */
-			if (!_rightclick_emulate) {
-				uint32_t buttons = ev.motion.state;
-				if (_left_button_down && (buttons & SDL_BUTTON_LMASK) == 0) {
-					_left_button_down = false;
-					_left_button_clicked = false;
-				}
-				if (_right_button_down && (buttons & SDL_BUTTON_RMASK) == 0) {
-					_right_button_down = false;
-					_right_button_clicked = false;
-				}
-			}
-
 			if (_cursor.fix_at) {
 				/* Get all queued mouse events now in case we have to warp the cursor. In the
 				 * end, we only care about the current mouse position and not bygone events. */
@@ -692,6 +671,23 @@ void VideoDriver_SDL_Base::InputLoop()
 	_dirkeys.Set(DirectionKey::Up, keys[SDL_SCANCODE_UP]);
 	_dirkeys.Set(DirectionKey::Right, keys[SDL_SCANCODE_RIGHT]);
 	_dirkeys.Set(DirectionKey::Down, keys[SDL_SCANCODE_DOWN]);
+
+	/* And the mouse buttons, for the same reason everything above is read
+	 * rather than remembered: a release can go missing, and then the button is
+	 * held down as far as this program is concerned with nothing able to put it
+	 * right. Only ever let this take a button back up; putting one down would
+	 * invent a press nobody made. Skipped while a right click is being faked
+	 * from a modifier, where there is no real button to ask about. */
+	if (!_rightclick_emulate) {
+		uint32_t buttons = SDL_GetMouseState(nullptr, nullptr);
+		if (_left_button_down && (buttons & SDL_BUTTON_LMASK) == 0) {
+			_left_button_down = false;
+			_left_button_clicked = false;
+		}
+		if (_right_button_down && (buttons & SDL_BUTTON_RMASK) == 0) {
+			_right_button_down = false;
+		}
+	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
 }
