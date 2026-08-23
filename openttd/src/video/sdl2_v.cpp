@@ -677,15 +677,37 @@ void VideoDriver_SDL_Base::InputLoop()
 	 * held down as far as this program is concerned with nothing able to put it
 	 * right. Only ever let this take a button back up; putting one down would
 	 * invent a press nobody made. Skipped while a right click is being faked
-	 * from a modifier, where there is no real button to ask about. */
+	 * from a modifier, where there is no real button to ask about.
+	 *
+	 * And a button is only ever taken back up once this has seen it down at
+	 * least once. Where the pointer is not a mouse, a press can arrive as an
+	 * event without the system's own idea of the buttons ever changing; asked
+	 * about such a button this reads "not held" the whole time it is held, and
+	 * taking that at face value would cancel the press the moment it is made.
+	 * Either the system knows about the button and can be trusted to say when
+	 * it is let go, or it does not and is left alone entirely. */
 	if (!_rightclick_emulate) {
 		uint32_t buttons = SDL_GetMouseState(nullptr, nullptr);
-		if (_left_button_down && (buttons & SDL_BUTTON_LMASK) == 0) {
+		static bool seen_left_down = false;
+		static bool seen_right_down = false;
+
+		bool left_held = (buttons & SDL_BUTTON_LMASK) != 0;
+		bool right_held = (buttons & SDL_BUTTON_RMASK) != 0;
+
+		if (!_left_button_down) seen_left_down = false;
+		if (left_held) seen_left_down = true;
+		if (_left_button_down && seen_left_down && !left_held) {
 			_left_button_down = false;
 			_left_button_clicked = false;
+			seen_left_down = false;
 		}
-		if (_right_button_down && (buttons & SDL_BUTTON_RMASK) == 0) {
+
+		if (!_right_button_down) seen_right_down = false;
+		if (right_held) seen_right_down = true;
+		if (_right_button_down && seen_right_down && !right_held) {
 			_right_button_down = false;
+			_right_button_clicked = false;
+			seen_right_down = false;
 		}
 	}
 

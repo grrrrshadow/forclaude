@@ -521,6 +521,19 @@ static void SetDarkModeForWindow(HWND hWnd, bool dark_mode)
 #endif /* defined(NTDDI_WIN10) */
 }
 
+/**
+ * Is either mouse button held down, according to the system rather than to
+ * anything this program has remembered?
+ *
+ * GetKeyState() answers in logical terms -- it already accounts for a player
+ * who has swapped the buttons round -- and answers as of the message being
+ * handled, which is exactly the moment being asked about.
+ */
+static bool AnyMouseButtonHeld()
+{
+	return (GetKeyState(VK_LBUTTON) & 0x8000) != 0 || (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
+}
+
 LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	static uint32_t keycode = 0;
@@ -584,8 +597,15 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * the other button is still held throws away the grab that button
 			 * is relying on, and the message saying it was let go then goes to
 			 * whatever window the pointer has since wandered over. That button
-			 * stays down as far as this program is concerned, for good. */
-			if (!_right_button_down) ReleaseCapture();
+			 * stays down as far as this program is concerned, for good.
+			 *
+			 * Ask the system which buttons are down rather than reading what we
+			 * remember. What we remember is exactly what can be wrong here --
+			 * that is the whole reason the buttons are read afresh every frame
+			 * -- and a button we have wrongly written off as up is a button
+			 * whose grab we would throw away while it is still held, losing the
+			 * very message that would have put it right. */
+			if (!AnyMouseButtonHeld()) ReleaseCapture();
 			HandleMouseEvents();
 			return 0;
 
@@ -598,7 +618,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		case WM_RBUTTONUP:
 			_right_button_down = false;
-			if (!_left_button_down) ReleaseCapture();
+			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
 			return 0;
 
@@ -1048,14 +1068,39 @@ void VideoDriver_Win32Base::InputLoop()
 	 *
 	 * Which physical button is the logical left one depends on whether the
 	 * player has swapped them, and the message stream is already in logical
-	 * terms, so ask the same question the same way. */
+	 * terms, so ask the same question the same way.
+	 *
+	 * And do not believe a source that has never shown itself able to see the
+	 * thing being asked about. Where the pointer is not a mouse -- a touch
+	 * screen, an on-screen button, a remote desktop -- a press can arrive as a
+	 * message without the system's own idea of the buttons ever changing. Asked
+	 * about such a button, this reads "not held" the whole time it is held, and
+	 * taking that at face value cancels the press the moment it is made. So a
+	 * button is only taken back up once this has seen it down at least once:
+	 * either the system knows about the button, in which case it can be trusted
+	 * to say when it is let go, or it does not, in which case it is left alone
+	 * entirely and the messages have it to themselves exactly as before. */
 	bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
-	if (_left_button_down && !(this->has_focus && GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) < 0)) {
+	static bool seen_left_down = false;
+	static bool seen_right_down = false;
+
+	bool left_held = this->has_focus && GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) < 0;
+	bool right_held = this->has_focus && GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) < 0;
+
+	if (!_left_button_down) seen_left_down = false;
+	if (left_held) seen_left_down = true;
+	if (_left_button_down && seen_left_down && !left_held) {
 		_left_button_down = false;
 		_left_button_clicked = false;
+		seen_left_down = false;
 	}
-	if (_right_button_down && !(this->has_focus && GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) < 0)) {
+
+	if (!_right_button_down) seen_right_down = false;
+	if (right_held) seen_right_down = true;
+	if (_right_button_down && seen_right_down && !right_held) {
 		_right_button_down = false;
+		_right_button_clicked = false;
+		seen_right_down = false;
 	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();

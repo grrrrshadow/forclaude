@@ -254,3 +254,27 @@ Uvolňuje se to teď **před** spojením, dokud oba vlaky ještě stojí tak,
 jak přijely. Nezáleží pak na tom, jestli mašinka přijela popředu nebo
 pozadu — nepojmenovává se žádný konec, každý vlak uvolní to, co sám
 drží.
+
+
+## Pravé tlačítko se po mé opravě zaseklo víc — proč
+
+Dvě věci, obě moje.
+
+**Ptal jsem se zdroje, který o tom tlačítku nemusí nic vědět.** Čtení
+stavu tlačítek každý snímek se ptá systému. Když ale ukazatel není myš —
+dotykový displej, tlačítko na obrazovce, vzdálená plocha — může stisk
+přijít jako zpráva, aniž by se představa systému o tlačítkách vůbec
+změnila. Na takové tlačítko systém celou dobu odpovídá "nedrží se", a
+brát to vážně znamená stisk zrušit v okamžiku, kdy vznikne. Nově se
+tlačítko zvedne, až když ho tohle čtení aspoň jednou vidělo dole: buď o
+něm systém ví a pak se dá věřit i tomu, že řekne, kdy se pustilo, nebo o
+něm neví a pak se ho tohle nedotkne vůbec a zprávy si to řídí samy jako
+předtím.
+
+**Zahodil jsem úchop okna kvůli tomu, čemu se nedá věřit.** Úchop (grab)
+je jeden, ne jeden na tlačítko. Puštění tlačítka ho smí zrušit, jen když
+už se nedrží nic — jinak se zahodí úchop, na kterém stojí to druhé
+tlačítko, a zpráva o jeho puštění pak jde do okna, nad které se ukazatel
+mezitím dostal. Tam se ztratí a tlačítko zůstane dole navždy. Rozhodovalo
+se to podle **zapamatovaného** stavu, a zapamatovaný stav je právě to, co
+tady bývá špatně. Ptá se to teď systému.
