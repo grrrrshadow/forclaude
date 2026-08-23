@@ -1701,6 +1701,28 @@ bool IsWaitingToBeCoupled(const Train *v)
 }
 
 /**
+ * Is this train party to a coupling at all -- either the one that came to
+ * collect, or the one standing there to be collected?
+ *
+ * Two entirely different pieces of code have to agree about this and they were
+ * each written to their own list of conditions. One is the exception that says
+ * a train pulling up against its partner is not a collision; the other is the
+ * moment the coupling is actually performed. When the first says yes and the
+ * second says no, the train neither crashes nor couples -- it simply carries on
+ * through what it came for, which is what a rescue engine was seen to do to the
+ * train it had been sent to fetch. They ask this now, so they cannot differ.
+ *
+ * @param v any part of the consist
+ * @return whether a coupling is this train's business
+ */
+static bool IsPartyToACoupling(const Train *v)
+{
+	const Train *head = v->First();
+	return head->current_order.ShouldGoToCouple() || head->couple_target != VehicleID::Invalid() ||
+			IsOnRescueRun(head) || IsWaitingToBeCoupled(head);
+}
+
+/**
  * Has the engine that spoke for this rake stopped coming for it?
  *
  * A claim is only worth as much as the engine behind it. One that has been
@@ -1810,6 +1832,13 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	if (partner == nullptr) return false;
 	if (partner == v->First()) return false; // that's us
 	if (partner->owner != v->owner) return false;
+
+	/* And this train has to be here for a coupling in the first place. Without
+	 * that the question is only ever asked of trains that are, so nothing was
+	 * asking it; now that the collision exception asks as well, it is asked of
+	 * every train that comes near another one. An engine simply passing a rake
+	 * of wagons is not collecting them. */
+	if (!IsPartyToACoupling(v)) return false;
 
 	/* A rescue engine sent to fetch a particular train couples to that train
 	 * and to nothing else. What it is going to fetch is a casualty by
@@ -2381,6 +2410,32 @@ bool TrainAwaitsRescue(Train *v)
 }
 
 /**
+ * Let go of a call-out, from either end.
+ *
+ * An errand is written down twice -- the engine says what it is going for and
+ * the casualty says who is coming -- so ending it means rubbing out both.
+ * Leaving half of it behind leaves an engine that is no longer coming for
+ * anything still recognised as coming for it: it would go on being excused from
+ * crashing into that train, and would still couple to it if it happened to
+ * touch it. And the casualty would go on being spoken for by an engine that has
+ * been given something else to do, so nobody else would be sent.
+ *
+ * One place does it, because there is more than one way to end an errand: the
+ * player stands the engine down, or writes it orders, and both mean the same
+ * thing here.
+ *
+ * @param tow the rescue engine, front of its consist
+ */
+void EndRescueErrand(Train *tow)
+{
+	Train *casualty = Train::GetIfValid(tow->rescue_target);
+	if (casualty != nullptr && casualty->couple_claim == tow->index) casualty->couple_claim = VehicleID::Invalid();
+
+	tow->rescue_target = VehicleID::Invalid();
+	tow->couple_target = VehicleID::Invalid();
+}
+
+/**
  * Station a train in the depot it is standing in as a rescue engine, or stand
  * it back down again.
  *
@@ -2438,7 +2493,17 @@ CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool resc
 		v->rescue_home_depot = rescue ? v->tile : INVALID_TILE;
 		/* Standing one down in the middle of a call-out lets go of the errand.
 		 * One that is already towing cannot get here at all -- see above. */
-		v->rescue_target = VehicleID::Invalid();
+		EndRescueErrand(v);
+
+		/* Being on call means standing in the depot with the brake off, ready to
+		 * leave; a rescue engine with the brake on is parked and is not going
+		 * anywhere. Taking the job on has to be allowed only while the train is
+		 * stopped, because that is what makes it a train with nothing else to do
+		 * -- and those two together meant the engine could never set off at all:
+		 * the one condition to accept the job was the one condition that stops it
+		 * being done. The button lets the brake off, so one press is the whole
+		 * arrangement and the window says it is on call straight away. */
+		if (rescue) v->vehstatus.Reset(VehState::Stopped);
 
 		/* The vehicle window works out which of its buttons are lowered in
 		 * UpdateButtons(), which only runs on an invalidate. Merely marking
@@ -2568,7 +2633,7 @@ void HandleRescueEngineInDepot(Train *tow)
 	}
 
 	Train *casualty = Train::GetIfValid(tow->rescue_target);
-	tow->rescue_target = VehicleID::Invalid();
+	EndRescueErrand(tow);
 
 	/* Nothing was ever picked up -- the casualty was sold, or sorted itself out
 	 * before this engine got there. Nothing to put down. */
@@ -3023,7 +3088,16 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 		 * is ever asked what to do next, and a rake has no engine at its head.
 		 * It is there to be read, skipped, and edited. Train::Tick() moves it on
 		 * from the first to the second when the loading really does finish. */
-		if (remainder->orders == nullptr) {
+		/* An order list is a pooled object, and the pool insists on being asked
+		 * whether it has room before anything is taken from it -- CanAllocateItem()
+		 * is not advice, it is the permission the allocation itself checks for,
+		 * and taking without asking is what brought the game down the moment an
+		 * engine put its wagons down. Every other place that gives a vehicle its
+		 * first order asks first (see CmdInsertOrder); this one has to as well,
+		 * and if the answer is no the rake simply goes without a written list.
+		 * It is still standing there waiting to be collected either way -- that
+		 * lives on the order it is working from, not on the list. */
+		if (remainder->orders == nullptr && OrderList::CanAllocateItem()) {
 			Order job = remainder->current_order;
 			job.SetWaitForCouple(false);
 
@@ -5240,27 +5314,23 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 	/* Happens when there is a train under bridge next to bridge head */
 	if (abs(v->z_pos - moving_front->z_pos) > 5) return 0;
 
-	/* Reaching a headless "free wagon" chain we were deliberately sent to
-	 * pick up is not a collision -- it is the whole point of the order.
-	 * Coupling happens by touching, so the two consists necessarily end up
-	 * within the proximity this function otherwise treats as a crash. Stop
-	 * dead instead; TrainLocoHandler() performs the actual coupling on the
-	 * next tick, once nothing is iterating over these vehicles any more
-	 * (splicing two consists here, mid-collision-scan, would pull the list
-	 * apart under the caller's feet). See FEATURE_DESIGN_COUPLING_TOW.md. */
+	/* Reaching the consist we were deliberately sent to pick up is not a
+	 * collision -- it is the whole point of the order. Coupling happens by
+	 * touching, so the two necessarily end up within the proximity this
+	 * function otherwise treats as a crash. Stop dead instead; TrainLocoHandler()
+	 * performs the actual coupling on the next tick, once nothing is iterating
+	 * over these vehicles any more (splicing two consists here, mid-collision-scan,
+	 * would pull the list apart under the caller's feet).
+	 *
+	 * The question asked is the same one the coupling itself asks: are these two
+	 * a pair that may couple, right now. Anything narrower and the two can
+	 * disagree -- the crash is called off and then nothing couples, so the train
+	 * quietly drives on through what it came for. Anything wider and trains that
+	 * have no business with each other stop being able to crash at all. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	Train *first = moving_front->First();
 	Train *other = Train::From(v)->First();
-	if ((first->couple_target == other->index || other->couple_target == first->index) && other->cur_speed == 0) {
-		first->cur_speed = 0;
-		first->subspeed = 0;
-		return 0;
-	}
-
-	/* Nor is reaching the casualty a rescue engine was called out to. That one
-	 * does have an engine at its head and may well be a wreck already, so it
-	 * fails every test above; what makes it not a collision is that this engine
-	 * was sent to it by name. */
-	if (first->rescue_target == other->index && IsOnRescueRun(first) && other->cur_speed == 0) {
+	if (other->cur_speed == 0 && (IsValidCouplePartner(first, other) || IsValidCouplePartner(other, first))) {
 		first->cur_speed = 0;
 		first->subspeed = 0;
 		return 0;
@@ -6080,9 +6150,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * there). Covers a train that drove here under a "go to couple" order
 	 * as well as one already parked on "wait to couple" that a partner has
 	 * since been pushed up against. See FEATURE_DESIGN_COUPLING_TOW.md. */
-	if (consist->cur_speed == 0 &&
-			(consist->current_order.ShouldGoToCouple() || IsWaitingToBeCoupled(consist) ||
-			 IsOnRescueRun(consist)) &&
+	if (consist->cur_speed == 0 && IsPartyToACoupling(consist) &&
 			GetTrainCouplePartner(consist) != nullptr) {
 		/* Commands check ownership against the company that is "current" right
 		 * now, which during a vehicle tick is simply whatever ran last -- not

@@ -190,3 +190,36 @@ které hráč právě začal — takže **stisk levého tlačítka ukončí taž
 pravým**. Tím se z toho dostane i tehdy, když hra považuje pravé tlačítko
 za držené a nikdo ho nedrží: jakmile tažení skončí, další začne až po
 novém stisku pravého, takže zaseklý příznak nemá čeho se držet.
+
+## Pád při odpojení a odtah, který projel skrz
+
+**Pád hry, jakmile mašinka odpojila vagonky.** `Assertion failed ... pool_func.hpp:119: this->checked != 0`. Seznam příkazů je objekt z fondu
+(pool) a ten fond trvá na tom, aby se ho někdo předem zeptal, jestli má
+místo. `CanAllocateItem()` není rada, je to povolení, které si sama
+alokace kontroluje. Odpojení dávalo řadě vagonků její dva příkazy, a
+neptalo se — jako jediné místo ve hře. Všude jinde se ptají
+(`CmdInsertOrder`, `CmdSellRailWagon`). Když se místo najde, řada dostane
+seznam; když ne, obejde se bez něj a čeká dál, protože čekání sedí na
+živém příkazu, ne na seznamu.
+
+**Odtahovka projela skrz porouchanou mašinku.** Nebourala a nespojila —
+vypadla mezi. Příčina: dvě různá místa se ptala na dvě různé věci.
+Výjimka ze srážky se ptala, jestli má jeden z nich zapsaného toho druhého
+jako cíl; spojení se ptalo, jestli je vlak na výjezdu k poruše nebo má
+příkaz jet spojit. Když se ty dvě odpovědi rozešly, srážka se odvolala a
+spojení se nekonalo. Nově se obě ptají jednou funkcí: *smí tihle dva teď
+spolu spojit?* Nemohou se rozejít, protože je to jedna otázka. Kdo do
+spojení nepatří, bourá — porouchaná mašinka i vagonky na peronu.
+
+**Zápis o výjezdu se rušil jen z poloviny.** Výjezd je zapsaný dvakrát:
+mašinka si píše, pro co jede, a porouchaná si píše, kdo pro ni jede.
+Postavit odtahovku mimo službu nebo jí zadat příkazy maže jen ten první
+zápis a druhý nechává. Zůstala tak mašinka, která už pro nic nejede, ale
+pro kód srážky pořád "cíl měla" — proto neboural. Ruší se to teď na
+jednom místě a z obou stran.
+
+**Odtahovka nevyjela vůbec.** Dvě podmínky si odporovaly: přijmout službu
+šlo jen se zataženou brzdou (stojící v depu), a vyjet k poruše jen s
+brzdou puštěnou. Kdo jen zmáčkl tlačítko, měl mašinku, která službu má a
+nikdy nevyjede. Tlačítko teď brzdu pustí — jeden stisk je celá domluva a
+okno hned hlásí, že je na příjmu.

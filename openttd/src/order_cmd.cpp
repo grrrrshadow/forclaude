@@ -846,7 +846,7 @@ CommandCost CmdInsertOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		if (v->type == VehicleType::Train && v->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
 			v->vehicle_flags.Reset(VehicleFlag::RescueEngine);
 			Train::From(v)->rescue_home_depot = INVALID_TILE;
-			Train::From(v)->rescue_target = VehicleID::Invalid();
+			EndRescueErrand(Train::From(v));
 			InvalidateWindowData(WindowClass::VehicleView, v->index);
 		}
 

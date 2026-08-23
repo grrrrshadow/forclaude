@@ -81,6 +81,7 @@ void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index);
 bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);
 void HandleRescueEngineInDepot(Train *tow);
+void EndRescueErrand(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
 bool IsRescueTargetOnTile(const Train *v, TileIndex tile);
 void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type);
