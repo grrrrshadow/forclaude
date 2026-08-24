@@ -6229,11 +6229,11 @@ STR_FORMAT_WAYPOINT_NAME_SERIAL                                 :Směrování {T
 
 ###length 6
 STR_FORMAT_DEPOT_NAME_TRAIN                                     :Železniční depo {TOWN}
-STR_FORMAT_DEPOT_NAME_TRAIN_SERIAL                              :Železniční depo č. {1:COMMA} {0:TOWN}
+STR_FORMAT_DEPOT_NAME_TRAIN_SERIAL                              :Železniční depo {0:TOWN} č. {1:COMMA}
 STR_FORMAT_DEPOT_NAME_ROAD_VEHICLE                              :Silniční depo {TOWN}
-STR_FORMAT_DEPOT_NAME_ROAD_VEHICLE_SERIAL                       :Silniční depo č. {1:COMMA} {0:TOWN}
+STR_FORMAT_DEPOT_NAME_ROAD_VEHICLE_SERIAL                       :Silniční depo {0:TOWN} č. {1:COMMA}
 STR_FORMAT_DEPOT_NAME_SHIP                                      :Lodní depo {TOWN}
-STR_FORMAT_DEPOT_NAME_SHIP_SERIAL                               :Lodní depo č. {1:COMMA} {0:TOWN}
+STR_FORMAT_DEPOT_NAME_SHIP_SERIAL                               :Lodní depo {0:TOWN} č. {1:COMMA}
 ###next-name-looks-similar
 
 STR_FORMAT_DEPOT_NAME_AIRCRAFT                                  :Hangár {STATION}

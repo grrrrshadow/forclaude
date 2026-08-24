@@ -2837,6 +2837,21 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	TileIndexDiffC leaving = TileIndexDiffCByDir(ReverseDir(arrived_heading));
 	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, nose.x * leaving.x + nose.y * leaving.y < 0);
 
+	/* Unless only one end of the joined train has a driving cab, in which case
+	 * that end leads and there is nothing to measure. A train nobody can see out
+	 * of runs at walking pace, and which way round a train runs has to be
+	 * something a player can say in advance rather than something that falls out
+	 * of where the wagons happened to be standing.
+	 *
+	 * When both ends have one -- which is what collecting an engine from the far
+	 * end of a train makes it, a push-pull set -- neither is worse than the
+	 * other, and the way it came in is the way that is known to be passable. */
+	bool head_leads = new_head->CanLeadTrain();
+	bool tail_leads = new_head->Last()->CanLeadTrain();
+	if (head_leads != tail_leads) {
+		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, tail_leads);
+	}
+
 	new_head->flags.Reset(VehicleRailFlag::Reversing);
 	new_head->ConsistChanged(CCF_TRACK);
 

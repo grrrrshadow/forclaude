@@ -2467,6 +2467,33 @@ static EventState HandleActiveWidget()
 }
 
 /**
+ * End a map drag that has no button holding it up any more.
+ *
+ * The drag is kept alive by HandleViewportScroll(), which is last in a queue of
+ * handlers, each of which may claim the event and return before it. Every one of
+ * them is a left-button mode -- dragging a window, dragging in a list, laying
+ * track -- so while any of those is live, nothing asks whether the map drag
+ * should still be going, and it goes on for as long as the other mode lasts.
+ * The map slides about under a button nobody is holding, and it only stops when
+ * something else ends that other mode, which is why a stray click on the left
+ * button appears to cure it.
+ *
+ * Ending a mode must not sit behind another mode's early return. Asked here,
+ * first, before anything can claim the event. See FEATURE_DESIGN_COUPLING_TOW.md.
+ */
+static void EndViewportScrollIfLetGo()
+{
+	if (!_scrolling_viewport) return;
+
+	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
+	if (_settings_client.gui.scroll_mode == ViewportScrollMode::MapLMB ? _left_button_down : _right_button_down) return;
+
+	_cursor.fix_at = false;
+	_scrolling_viewport = false;
+	_last_scroll_window = nullptr;
+}
+
+/**
  * Handle viewport scrolling with the mouse.
  * @return State of handling the event.
  */
@@ -2903,6 +2930,8 @@ static void MouseLoop(MouseClick click, int mousewheel)
 
 	HandlePlacePresize();
 	UpdateTileSelection();
+
+	EndViewportScrollIfLetGo();
 
 	if (VpHandlePlaceSizingDrag()  == EventState::Handled) return;
 	if (HandleMouseDragDrop()      == EventState::Handled) return;

@@ -618,14 +618,23 @@ bool YapfTrainCheckReverse(const Train *v)
 
 	int reverse_penalty = 0;
 
-	/* Consider whether the train might back up at reduced speed. */
-	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None && !v->Last()->CanLeadTrain()) {
-		constexpr int DRIVING_BACKWARDS_PENALTY = 100 * YAPF_TILE_LENGTH;
-
-		if (!v->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
-			/* We're currently driving forwards at full speed, and would rather not reverse if possible. */
-			reverse_penalty += DRIVING_BACKWARDS_PENALTY;
-		}
+	/* The cab leads. Not a preference, a rule.
+	 *
+	 * A train whose leading end has no driving cab is a train nobody is looking
+	 * out of, and it is held to walking pace for exactly that reason. Whether it
+	 * ends up in that state must not depend on what a route happens to cost:
+	 * a player has to be able to say which way round their train will run, and
+	 * "it went backwards because that came out cheaper this time" is not
+	 * something anyone can predict or plan around.
+	 *
+	 * Said as a cost, the way everything in a path search is said, and set far
+	 * beyond anything a route can add up to, so the only thing that can outweigh
+	 * it is there being no forward route at all. That is a terminus, and backing
+	 * out of a terminus is the one time driving backwards is right -- the player
+	 * built the dead end and sent the train into it. */
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None &&
+			!v->Last()->CanLeadTrain() && !v->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
+		reverse_penalty += 1000 * YAPF_INFINITE_PENALTY;
 	}
 
 	if (moving_front->track == Track::Wormhole) {
