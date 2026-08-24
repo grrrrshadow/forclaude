@@ -248,6 +248,14 @@ tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
 - **Překážkou není to, pro co jsem přijel.** Rezervace trati se ptá, jestli
   v cestě nestojí jiný vlak, a když ano, označí vlak za zaseknutý a čeká.
   Porouchaná mašinka je ale vlak, který nikdy neodjede.
+- **Odtahovka řekne v okně, proč nikam nejela.** Pět podmínek vyslání
+  o sobě nedávalo vědět, takže „ona prostě stojí" bylo všechno, co šlo
+  nahlásit. Píše to místo, které rozhoduje, ne druhá kopie těch podmínek
+  napsaná jinde — jinak by okno mohlo tvrdit něco jiného, než hra dělá.
+  Čtyři odpovědi: *má příkazy* · *jede tam jiná* · *vidí poruchu ale
+  nesmí* (něco porouchaného je, ale nepočítá se jako k odvezení — cizí
+  firma, v depu, nebo mu vypršela lhůta) · a prosté *čeká na poruchu*
+  (nikde není nic porouchaného).
 - Pojistka: **půl roku herního času od poruchy** (ne od vyslání). Pak se
   porucha spraví sama a trosky začnou mizet po vanilla způsobu, čímž se
   trať uvolní.

@@ -2636,16 +2636,34 @@ static void TryDispatchRescueEngine(Train *tow)
 	 * often enough, and the counter is the train's own, so every client works
 	 * it out on the same tick. */
 	if ((tow->tick_counter & 0x3F) != 0) return;
+
+	/* Every way out of here writes down which one it was, and the vehicle window
+	 * reads it back. An engine on call that never leaves is otherwise a closed
+	 * box: five conditions have to hold and not one of them says a word, so
+	 * "it just sits there" is all anyone can report. The place that decides is
+	 * the place that says so, rather than a second copy of the same conditions
+	 * written somewhere else to explain the first. */
+	auto hold = [&](RescueHold reason) { tow->rescue_hold = reason; };
+
 	/* Brake off is what puts one on call; a rescue engine standing with its
 	 * brake on is parked, not waiting. */
-	if (tow->vehstatus.Test(VehState::Stopped)) return;
-	if (tow->GetNumOrders() != 0) return;
+	if (tow->vehstatus.Test(VehState::Stopped)) return hold(RescueHold::Braked);
+	if (tow->GetNumOrders() != 0) return hold(RescueHold::HasOrders);
 
 	Train *nearest = nullptr;
 	uint nearest_distance = UINT_MAX;
+	bool saw_trouble = false;
+	bool saw_casualty = false;
 	for (Train *casualty : Train::Iterate()) {
+		/* Anything wrong anywhere, whoever it belongs to and wherever it is.
+		 * Told apart from "waiting to be fetched" so that an engine which never
+		 * leaves says which of the two it is looking at, rather than the same
+		 * "nothing to do" for both. */
+		if (casualty->IsFrontEngine() && (casualty->breakdown_ctr == 1 || casualty->vehstatus.Test(VehState::Crashed))) saw_trouble = true;
+
 		if (casualty->owner != tow->owner) continue;
 		if (!IsWaitingToBeRescued(casualty)) continue;
+		saw_casualty = true;
 
 		/* Somebody else's call-out. */
 		bool taken = false;
@@ -2664,7 +2682,12 @@ static void TryDispatchRescueEngine(Train *tow)
 		}
 	}
 
-	if (nearest == nullptr) return;
+	if (nearest == nullptr) {
+		if (saw_casualty) return hold(RescueHold::AllTaken);
+		return hold(saw_trouble ? RescueHold::NotEligible : RescueHold::NobodyWaiting);
+	}
+
+	tow->rescue_hold = RescueHold::None;
 
 	tow->rescue_target = nearest->index;
 	/* Spoken for, in the same words every other coupling uses: the casualty
@@ -5359,6 +5382,18 @@ uint Train::Crash(bool flooded)
 
 		/* Remove the loading indicators (if any) */
 		HideFillingPercent(&this->fill_percent_te_id);
+
+		/* And it starts waiting to be fetched now, not later. The wait was being
+		 * started from the place where a wreck begins losing its wagons one at a
+		 * time, which is a long way off; until then nothing counted a wreck as
+		 * something to send an engine to, so nothing was ever sent to one. A
+		 * broken-down train starts its wait the moment it breaks down and this is
+		 * the same moment for a wreck. */
+		if (!this->vehicle_flags.Test(VehicleFlag::RescueEngine) && this->rescue_deadline == TimerGameEconomy::Date{}) {
+			this->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+			this->current_order.SetWaitForCouple(true);
+			this->current_order.SetGoToCouple(false);
+		}
 	}
 
 	victims += this->GroundVehicleBase::Crash(flooded);

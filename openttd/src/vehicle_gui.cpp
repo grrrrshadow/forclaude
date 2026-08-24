@@ -3276,7 +3276,17 @@ public:
 				return GetString(in_tow ? STR_VEHICLE_STATUS_RESCUE_TOWING : STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY);
 			}
 			if (v->IsInDepot() && !v->vehstatus.Test(VehState::Stopped)) {
-				return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
+				/* And why it is still standing here, if something is keeping it.
+				 * Read back from the code that decides rather than worked out a
+				 * second time, so the window cannot say one thing while the game
+				 * does another. */
+				switch (Train::From(v)->rescue_hold) {
+					case RescueHold::HasOrders: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS);
+					case RescueHold::AllTaken: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN);
+					case RescueHold::NotEligible: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE);
+					case RescueHold::NobodyWaiting: return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
+					default: return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
+				}
 			}
 		}
 

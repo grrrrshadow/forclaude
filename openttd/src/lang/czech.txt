@@ -4675,6 +4675,9 @@ STR_VEHICLE_STATUS_CRASHED                                      :{RED}Nehoda!
 STR_VEHICLE_STATUS_BROKEN_DOWN                                  :{RED}Porucha
 STR_VEHICLE_STATUS_STOPPED                                      :{RED}Zastaveno
 STR_VEHICLE_STATUS_RESCUE_ON_CALL                               :{BLACK}Čeká na poruchu
+STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS                           :{BLACK}Čeká na poruchu, ale má příkazy
+STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN                            :{BLACK}Čeká na poruchu, jede tam jiná
+STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE                     :{BLACK}Čeká na poruchu, vidí poruchu ale nesmí
 STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}Jede k porouchanému vlaku
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuje vlak do depa
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje

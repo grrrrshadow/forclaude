@@ -107,6 +107,22 @@ struct TrainCache {
 };
 
 /**
+ * Why a rescue engine standing on call has not been sent to anything.
+ *
+ * An engine that never leaves is otherwise a closed box, and "it just sits
+ * there" is all anyone can report about it. Written down by the code that
+ * decides, read back by the window.
+ */
+enum class RescueHold : uint8_t {
+	None,          ///< Nothing holding it; it is out or about to be.
+	Braked,        ///< Standing with its brake on, so it is parked rather than waiting.
+	HasOrders,     ///< Has orders of its own, which a rescue engine cannot have.
+	NobodyWaiting, ///< Nothing anywhere is broken down or wrecked.
+	NotEligible,   ///< Something is, but it does not count as waiting to be fetched.
+	AllTaken,      ///< Something is waiting, but another engine is already going for it.
+};
+
+/**
  * 'Train' is either a loco or a wagon.
  */
 struct Train final : public GroundVehicle<Train, VehicleType::Train> {
@@ -130,6 +146,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	 * casualty it is being sent to. */
 	TileIndex rescue_home_depot = INVALID_TILE; ///< Depot a rescue engine is stationed at and returns to when it is done.
 	VehicleID rescue_target = VehicleID::Invalid(); ///< Casualty a rescue engine has been sent to fetch, so no two are sent to the same one.
+	RescueHold rescue_hold = RescueHold::None; ///< NOSAVE: why an engine on call has not been sent anywhere, so the window can say so.
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
 	/**

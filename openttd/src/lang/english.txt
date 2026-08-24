@@ -4593,6 +4593,9 @@ STR_VEHICLE_STATUS_CRASHED                                      :{RED}Crashed!
 STR_VEHICLE_STATUS_BROKEN_DOWN                                  :{RED}Broken down
 STR_VEHICLE_STATUS_STOPPED                                      :{RED}Stopped
 STR_VEHICLE_STATUS_RESCUE_ON_CALL                               :{BLACK}On call for breakdowns
+STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS                           :{BLACK}On call, but it has orders
+STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN                            :{BLACK}On call, another engine is going
+STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE                     :{BLACK}On call, sees trouble but cannot go
 STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}On the way to a stranded train
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Towing a train to a depot
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
