@@ -44,7 +44,33 @@ rozbiju tím věc, která fungovala. Přesně to se stalo s plánkem nádraží
 6. **Nepapírovat příznaky.** Hledá se příčina. Když je oprava jen
    ošetření následku, řeknu to nahlas.
 
-## 0.3 Zkušební nádraží — plánek
+## 0.3 Na čem to celé stojí
+
+Dvě věci, a ani jedna z nich není náš vynález:
+
+**Palo123 je inspirace.** Odtud je, jak to má vypadat a co to má umět pro
+hráče — okno příkazů, „jet se spojit", „čekat na spojení", odpojit s
+počtem, filtr podle nákladu. Není to předloha kódu: jejich větev je
+z prosince 2020, z doby před přepsáním celého systému příkazů, takže se
+dnes ani nepřeloží. Bere se **co dělají a jak to vypadá**, ne řádky.
+Podrobně v kapitole 9.
+
+**Couvání je vanilkové z beta 16, i s příznaky.** Kvůli tomu se šlo
+z 15.3 na beta 16. Ve hře už je:
+
+- skutečná jízda pozpátku (`DrivingBackwards`) místo magického přehození
+  celé soupravy,
+- GRF příznak **řídicí kabiny** (`HasCab`), který umí udělat vedoucí
+  i z nemotorového vozu — tedy řídicí vůz,
+- otázka „umí tenhle konec vést vlak?" (`CanLeadTrain`),
+- **ořez rychlosti na 32 km/h**, když vpředu kabina není,
+- nastavení, jestli se vlak smí otáčet (u nás zamčené na „Nikde").
+
+**Nic z toho se nepíše znovu.** Naše práce je použít to správně —
+především se po spojení **ptát**, ne nařizovat. Podrobně v kapitolách 1
+a 8.
+
+## 0.4 Zkušební nádraží — plánek
 
 Testuje se pořád ta samá situace. Bez tohohle se úkoly o spojování číst
 nedají.
@@ -66,7 +92,7 @@ to, jestli je mašinka v tom pohybu napřed nebo vzadu:
 Odpojená mašinka má na všech čtyřech nástupištích **nos pryč od vagonků**.
 Liší se jen konec, na kterém stojí.
 
-## 0.4 Pravidlo zrcadla
+## 0.5 Pravidlo zrcadla
 
 Vlak je popsaný **dvěma nezávislými veličinami** a většina chyb v tomhle
 projektu vznikla tím, že se jedna vydávala za druhou:
