@@ -276,7 +276,15 @@ bool FiosFileScanner::AddFile(const std::string &filename, size_t, const std::st
 		 * is the later one is the thing a player actually wants to know, and a
 		 * name does not say it. Local time, and the hour of a twenty-four hour
 		 * day, so it cannot be read two ways. */
-		std::time_t written = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(write_time));
+		/* The file's clock and the wall clock count from different starting
+		 * points, and the standard way of converting between them is not
+		 * available on every compiler. Asking both what time it is now and
+		 * carrying the difference across is, and a save's minute is not worth
+		 * more precision than that. */
+		auto now_file = std::filesystem::file_time_type::clock::now();
+		auto now_wall = std::chrono::system_clock::now();
+		auto written_wall = std::chrono::time_point_cast<std::chrono::system_clock::duration>(now_wall + (write_time - now_file));
+		std::time_t written = std::chrono::system_clock::to_time_t(written_wall);
 		fios->mtime_text = fmt::format("{:%d.%m.%Y  %H:%M}", fmt::localtime(written));
 	}
 

@@ -1794,6 +1794,8 @@ STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Kterým tlačí
 ###length 4
 STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Pravým tlačítkem myši
 STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Levým tlačítkem myši
+STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Pohyb v pohledu pomocí pravého tlačítka myši, poloha myši uzamčena
+STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Pohyb v mapě pomocí pravého tlačítka myši, poloha myši uzamčena
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Plynulé posouvání po mapě: {STRING}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Ovládá jak se hlavní pohled posouvá na specifické místo na mapě, kliknutím na minimapu nebo spuštěním příkazu na posun na specifický objekt na mapě. Pokud zapnuto, pohled se posouvá plynule, pokud vypnuto, skáče pohled přímo na cílové místo
@@ -3498,7 +3500,7 @@ STR_SAVELOAD_LOAD_TOOLTIP                                       :{BLACK}Rozehrá
 STR_SAVELOAD_LOAD_HEIGHTMAP_TOOLTIP                             :{BLACK}Načíst označenou výškovou mapu
 STR_SAVELOAD_LOAD_TOWN_DATA_TOOLTIP                             :{BLACK}Načíst data vybraného města
 STR_SAVELOAD_DETAIL_CAPTION                                     :{BLACK}Vlastnosti hry
-STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Uloženo: {RAW_STRING}
+STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Uloženo: {STRING}
 STR_SAVELOAD_DETAIL_NOT_AVAILABLE                               :{BLACK}Není dostupná žádná informace
 STR_SAVELOAD_DETAIL_COMPANY_INDEX                               :{SILVER}{COMMA}: {WHITE}{STRING}
 STR_SAVELOAD_DETAIL_GRFSTATUS                                   :{SILVER}Grafiky: {WHITE}{STRING}

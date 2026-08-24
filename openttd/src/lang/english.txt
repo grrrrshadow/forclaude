@@ -1717,6 +1717,8 @@ STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Which mouse but
 ###length 4
 STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Right mouse button
 STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Left mouse button
+STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Move viewport with RMB, mouse position locked
+STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Move map with RMB, mouse position locked
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Smooth viewport scrolling: {STRING2}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Control how the main view scrolls to a specific position when clicking on the smallmap or when issuing a command to scroll to a specific object on the map. If enabled, the viewport scrolls smoothly, if disabled it jumps directly to the targeted spot
