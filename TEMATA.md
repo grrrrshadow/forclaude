@@ -370,6 +370,22 @@ kterému jsme došli sami.
   objektů) a `track_func.h:168` (žádaná jedna kolej, dostala se jiná
   množina). Potřebuju `crash.log` — píše se do složky k `openttd.cfg`, ale
   jen když se po tom hlášení nechá hra sama doběhnout.
+
+  Co už se o tom `track_func.h:168` ví, bez logu:
+
+  - Hlásí se ta hláška **z `TrackBitsToTrack()` samotné**, ne z mého
+    diagnostického assertu v `Train::ReserveTrackUnderConsist()`. Ten by
+    ohlásil `train_cmd.cpp` a ohlásil by se dřív. **Takže to není
+    `ReserveTrackUnderConsist()`** — a to je půlka podezřelých pryč.
+  - Zbývají místa, která tu funkci volají: `DeleteLastWagon()`
+    (`train_cmd.cpp`, maže vozy havarovaného vlaku po jednom),
+    dvě místa v `TrainController()` s `chosen_track`, `signal.cpp` a
+    `rail_cmd.cpp`.
+  - `DeleteLastWagon()` je nejpodezřelejší: pro tunel/most má výjimku a
+    o depu **ví** — o pár řádků níž se na depo ptá ve smyčce — ale samo
+    volání `TrackBitsToTrack()` je nad tím a nechráněné. Vůz v depu tedy
+    tu podmínku poruší. Že se u nás havarovaný vlak v depu ocitnout může,
+    je novinka, kterou přinesl odtah.
 - Po načtení savu odjely ze stanice mašinky, které čekaly na spojení —
   poskočil jim příkaz.
 - Peron 1 a 2 při spojení mašinka+mašinka: výbuchy, po načtení savu
