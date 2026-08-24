@@ -8,6 +8,11 @@ toho, čeho se týkají.
 - Jak se staví Windows build → `BUILD_NOTES.md`
 - Odkud je zdroj hry → `openttd/VENDORED_SOURCE.md`
 
+**Pozor při čtení návrhového dokumentu:** je psaný jako návrh před psaním
+kódu a některá místa v něm popisují jako budoucí práci věci, které jsou
+dávno hotové, nebo naopak takové, které se nakonec dělat nemusely (viz
+4.1). Co platí **teď**, je tady ve stromu.
+
 ---
 
 # 0. START — tohle čti první
@@ -224,6 +229,25 @@ tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
   jeho stav. Rozbor v `FEATURE_DESIGN_COUPLING_TOW.md`, sekce „Odtahovka —
   těžká místa", bod A.
 
+## 4.1 Dvě velké věci z návrhu, které se nakonec dělat nemusely
+
+Stojí za zapamatování, protože v návrhovém dokumentu jsou pořád popsané
+jako nutná práce, a nejsou.
+
+**Rezervace proti jednosměrnému návěstidlu.** Návrh počítal s tím, že
+odtahovka se musí vrátit tou samou tratí, po které přijela — do svého
+domovského depa — a proti jednosměrkám to nejde. Řešit se to mělo
+rozšířením rezervačního systému. **Odpadlo tím, že se nevrací:** vlak
+s poruchou jede do **nejbližšího** depa, protože smysl odtahu je dostat
+ho z trati, a nejbližší cesta z trati je ta nejlepší. Domovské depo si
+odtahovka hledá až potom, sama a prázdná.
+
+**Vlastní příznak „tenhle vůz je vizuálně otočený".** Návrh ho chtěl kvůli
+tomu, aby spojená dvojice vypadala jako souprava s mašinkou na obou
+koncích. **Odpadlo přechodem na beta 16**, kde je skutečná jízda
+pozpátku. Zároveň tím zmizelo riziko chyby A ze starého patche — příznak,
+který měl ovlivnit jen vykreslení, tam přepisoval skutečný směr jízdy.
+
 ---
 
 # 5. Myš, kurzor, stavba
@@ -346,6 +370,18 @@ sekce „Předloha Palo123".
 Podstatné: **nikdy neotáčejí celý vlak.** To je to samé rozhodnutí, ke
 kterému jsme došli sami.
 
+**Ta jejich větev je z prosince 2020**, tedy z doby OpenTTD 1.10/12.0. Od
+té doby se v OpenTTD přepsal celý systém příkazů, takže se ten kód dnes
+ani nepřeloží. Není to „chybí pár drobností" — je to jiný jazyk. Bere se
+z toho tedy **co dělají a jak to vypadá**, ne řádky.
+
+Kde se u nich dá koukat: `order_gui.cpp`, `order_cmd.cpp`, `train_cmd.cpp`,
+`pathfinder/yapf/yapf_rail.cpp`, `lang/english.txt`.
+
+Nejcennější jsou jejich vlastní commity, které začínají „Fix: crash..." —
+autor v nich sám pojmenoval, co opravoval. Odtud je těch šest pravidel
+v kapitole 11.
+
 ---
 
 # 10. Build a repozitář
@@ -382,7 +418,23 @@ kterému jsme došli sami.
 - **`GetTileTrackStatus` na dlaždici s depem** vrátí i depo — komu stačí
   jedna kolej, tomu to spadne na `TrackBitsToTrack()`.
 
-## 11.1 Šest pravidel, která vyplynula ze starého patche
+## 11.1 Vzor, na kterém stojí spojování
+
+Vanilla ho má odjakživa v `CmdMoveRailVehicle` — to je přetahování vagonků
+v okně depa:
+
+1. zálohovat **oba** vlaky (`MakeTrainBackup`),
+2. přeuspořádat řetězce (`ArrangeTrains`),
+3. ověřit výsledek (`ValidateTrains`),
+4. při chybě obnovit **oba**, teprve při úspěchu provést viditelné
+   následky.
+
+`TryConsistSplice()` je tenhle vzor vytažený ven, aby ho mohlo použít i
+spojování na trati, rozpojování a odtah. Rozdíl proti depu je jediný: depo
+vyžaduje `IsStoppedInDepot()`, na trati to nahrazuje blízkost, nulová
+rychlost a orientace.
+
+## 11.2 Šest pravidel, která vyplynula ze starého patche
 
 Rozbor je ve `FEATURE_DESIGN_COUPLING_TOW.md`, „Zásadní zjištění č. 3".
 Tady jsou závěry, protože platí pro cokoliv nového:
