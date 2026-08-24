@@ -116,7 +116,12 @@ DEFINE_POOL_METHOD(AllocationResult<Tindex>)::GetNew(size_t size)
 	size_t index = this->FindFirstFree();
 
 #ifdef WITH_ASSERT
-	assert(this->checked != 0);
+	/* Name the pool. Taking from a pool without asking it for room first is a
+	 * mistake in the caller, and the caller is what has to be found; the bare
+	 * assert says only that somebody, somewhere, did it. */
+	if (this->checked == 0) [[unlikely]] {
+		FatalError("{} pool: allocating without asking CanAllocateItem() first", this->name);
+	}
 	this->checked--;
 #endif /* WITH_ASSERT */
 	if (index == NO_FREE_ITEM) {

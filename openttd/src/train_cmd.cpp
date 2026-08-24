@@ -5869,6 +5869,9 @@ static void DeleteLastWagon(Train *v)
 		trackbits = DiagDirToDiagTrack(GetRailDepotDirection(tile));
 	}
 
+	/* Diagnostic: TrackBitsToTrack() is shared by several call sites, so its own
+	 * assert cannot say which one tripped. Assert here too, to name this one. */
+	assert(trackbits.Count() == 1 && !trackbits.Any({Track::Wormhole, Track::Depot}));
 	Track track = TrackBitsToTrack(trackbits);
 	if (HasReservedTracks(tile, trackbits)) {
 		UnreserveRailTrack(tile, track);

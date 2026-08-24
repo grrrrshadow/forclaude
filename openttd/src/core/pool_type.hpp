@@ -11,6 +11,7 @@
 #define POOL_TYPE_HPP
 
 #include "enum_type.hpp"
+#include "../error_func.h"
 
 /** Various types of a pool. */
 enum class PoolType : uint8_t {
@@ -171,7 +172,15 @@ public:
 	 */
 	inline Titem *Get(size_t index)
 	{
-		assert(index < this->first_unused);
+#ifdef WITH_ASSERT
+		/* Say which pool and which index. On its own "index < first_unused" says
+		 * neither, and a crash report that names neither is a day of guessing at
+		 * which of a hundred lookups it was. An index far past the end is almost
+		 * always an Invalid() id that got this far instead of being checked. */
+		if (index >= this->first_unused) [[unlikely]] {
+			FatalError("{} pool: asked for index {}, only {} have ever been used", this->name, index, this->first_unused);
+		}
+#endif /* WITH_ASSERT */
 		return this->data[index];
 	}
 
