@@ -159,7 +159,27 @@ Vede vždycky ta s „jet se spojit". Spojený vlak má výkon obou mašinek.
   vedoucího konce; po spojení už vede druhý konec, takže cesta, kterou
   mašinka přijela, zůstane za vlakem a nikdy se neuvolní.
 
-## 2.3 Vedoucí konec po spojení
+## 2.3 Co je z 15.3 pryč a nemá se to vracet
+
+Na 15.3 byl kolem spojování postavený **vlastní hledač cesty** — vlastní
+typ cíle `CYapfDestinationCoupleRailT`, `IsAdjacentToCouplePartner()`,
+`YapfTrainFindCouplePosition()`, `YapfTrainCheckReverseForCouple()`.
+Důvod: běžné hledání cesty se úmyslně vyhýbá obsazené dlaždici, takže
+neumí zacílit na místo hned vedle partnera, a vlak skončil jako zaseknutý.
+
+**V beta16 z toho nezůstalo nic a je to tak dobře.** Nahradily to dvě
+mnohem menší věci:
+
+- cíl je normální stanice, jen **zúžený na to nástupiště, kde partner
+  stojí** (`couple_at_dest_station` v `yapf_destrail.hpp`),
+- a povolení **zastavit těsně před partnerem** v `pbs.cpp`
+  (`IsSafeWaitingPosition`, `IsWaitingPositionFree`).
+
+Kdyby se ta stará cesta chtěla vracet, tohle je důvod, proč ne: byla to
+celá souběžná kopie hledání cesty, kterou by bylo potřeba držet v souladu
+s tou pravou.
+
+## 2.4 Vedoucí konec po spojení
 
 Má-li kabinu jen jeden konec, vede ten. Mají-li ji oba — a to je přesně to,
 co z vlaku udělá připojení mašinky z druhé strany, tedy push-pull — jede se
@@ -362,6 +382,33 @@ kterému jsme došli sami.
 - **`GetTileTrackStatus` na dlaždici s depem** vrátí i depo — komu stačí
   jedna kolej, tomu to spadne na `TrackBitsToTrack()`.
 
+## 11.1 Šest pravidel, která vyplynula ze starého patche
+
+Rozbor je ve `FEATURE_DESIGN_COUPLING_TOW.md`, „Zásadní zjištění č. 3".
+Tady jsou závěry, protože platí pro cokoliv nového:
+
+- **Vykreslování nesmí měnit herní stav.** Starý patch přepisoval
+  `this->direction` uvnitř funkce, která má jen spočítat obálku pro sprite.
+  Cokoliv, co ji zavolalo, otočilo vlaku skutečný směr jízdy. Odpovídá to
+  hlášeným „výbuchům". Co jen počítá odvozenou hodnotu, bere vozidlo přes
+  `const*`, ať to hlídá překladač.
+- **Jedno sdílené primitivum, ne čtyři kopie.** Spojení, rozpojení,
+  připojení odtahu a jeho odpojení mají jednu cestu kódu
+  (`TryConsistSplice`), která vždycky zálohuje **obě** strany, vždycky
+  validuje před zápisem a vždycky se symetricky vrátí. Starý patch měl
+  couple pečlivý a decouple ledabylý — v jednom souboru.
+- **Sousednost se čte z topologie, ne z pixelů.** Porovnávat pixelovou
+  vzdálenost na přesnou rovnost selže na oblouku, u článkových vozidel
+  nebo o jeden pixel. Dlaždice a trackdir jsou diskrétní.
+- **Žádné sdílené bity mezi různými typy příkazů.** Starý patch četl ten
+  samý rozsah bitů jako „kolik vozů odpojit" i „kolik připojit". Po změně
+  typu příkazu se pak četlo smetí jako platná hodnota. Pole příkazu jsou
+  vlastní členy.
+- **Odhad se hráči ukáže, nikdy se nepoužije potichu.**
+- **Nic nevratného před validací.** Rezervace trati není součástí zálohy
+  vozidel, takže se nedá vrátit. Řeší se to pořadím: nejdřív jen čtení a
+  kontrola, teprve po ní zápis. Pak není co vracet.
+
 ---
 
 # 12. Otevřené
@@ -381,11 +428,23 @@ kterému jsme došli sami.
     (`train_cmd.cpp`, maže vozy havarovaného vlaku po jednom),
     dvě místa v `TrainController()` s `chosen_track`, `signal.cpp` a
     `rail_cmd.cpp`.
-  - `DeleteLastWagon()` je nejpodezřelejší: pro tunel/most má výjimku a
-    o depu **ví** — o pár řádků níž se na depo ptá ve smyčce — ale samo
-    volání `TrackBitsToTrack()` je nad tím a nechráněné. Vůz v depu tedy
-    tu podmínku poruší. Že se u nás havarovaný vlak v depu ocitnout může,
-    je novinka, kterou přinesl odtah.
+  - `DeleteLastWagon()` mělo tu samou díru: pro tunel/most výjimku mělo a
+    o depu **vědělo** — o pár řádků níž se na depo ptá ve smyčce — ale
+    samo volání `TrackBitsToTrack()` bylo nad tím a nechráněné. Že se u
+    nás havarovaný vlak v depu ocitnout může, je novinka, kterou přinesl
+    odtah. **Opraveno** (`e842ce1`), ale jestli to byl ten pád ze
+    screenshotu, ověřené není.
+  - **Ta samá hláška už jednou byla, a stojí v `TEST_LOG.md`:** build #68,
+    `assert(chosen_track.Count() == 1 && !chosen_track.Any({Wormhole,
+    Depot}))`, situace **hromadný výjezd z depa**, mašinky s příkazem „jet
+    se spojit" ztratily orientaci. To je ta samá podmínka, jen tenkrát ji
+    ohlásil diagnostický assert nad `chosen_track` a dnes ji hlásí
+    `TrackBitsToTrack()` samotná. A poslední hlášení je zase z hromadného
+    výjezdu z depa.
+
+    **Takže druhý kandidát jsou obě místa v `TrainController()`, která
+    předávají `chosen_track`** — a ta sedí na situaci líp než mazání
+    havarovaných vozů. Kdyby se hledalo znovu, začít tady.
 - Po načtení savu odjely ze stanice mašinky, které čekaly na spojení —
   poskočil jim příkaz.
 - Peron 1 a 2 při spojení mašinka+mašinka: výbuchy, po načtení savu
