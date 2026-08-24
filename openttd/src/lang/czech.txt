@@ -1333,6 +1333,8 @@ STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}Žádná
 # Settings tree in the Game Options window
 STR_CONFIG_SETTING_FILTER_TITLE                                 :Filtrovat:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :Rozbalit vše
+STR_CONFIG_SETTING_SAVE_CONFIG                                  :Uložit nastavení
+STR_CONFIG_SETTING_SAVE_CONFIG_TOOLTIP                          :{BLACK}Zapsat nastavení do souboru hned, ne až se hra zavře
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :Sbalit vše
 STR_CONFIG_SETTING_RESET_ALL                                    :Vymazat všechny hodnoty
 STR_CONFIG_SETTING_NO_EXPLANATION_AVAILABLE_HELPTEXT            :(žádné vysvětlení není k dispozici)
@@ -3485,6 +3487,7 @@ STR_SAVELOAD_LOAD_TOOLTIP                                       :{BLACK}Rozehrá
 STR_SAVELOAD_LOAD_HEIGHTMAP_TOOLTIP                             :{BLACK}Načíst označenou výškovou mapu
 STR_SAVELOAD_LOAD_TOWN_DATA_TOOLTIP                             :{BLACK}Načíst data vybraného města
 STR_SAVELOAD_DETAIL_CAPTION                                     :{BLACK}Vlastnosti hry
+STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Uloženo: {RAW_STRING}
 STR_SAVELOAD_DETAIL_NOT_AVAILABLE                               :{BLACK}Není dostupná žádná informace
 STR_SAVELOAD_DETAIL_COMPANY_INDEX                               :{SILVER}{COMMA}: {WHITE}{STRING}
 STR_SAVELOAD_DETAIL_GRFSTATUS                                   :{SILVER}Grafiky: {WHITE}{STRING}

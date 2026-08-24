@@ -582,6 +582,14 @@ public:
 		tr.bottom -= GetCharacterHeight(FontSize::Normal) - 1;
 		if (tr.top > tr.bottom) return;
 
+		/* When it was written. Shown for any file, including one the game cannot
+		 * read the inside of, because the clock does not depend on that. */
+		if (!this->selected->mtime_text.empty()) {
+			DrawString(tr, GetString(STR_SAVELOAD_DETAIL_SAVED_AT, this->selected->mtime_text));
+			tr.top += GetCharacterHeight(FontSize::Normal);
+			if (tr.top > tr.bottom) return;
+		}
+
 		if (!_load_check_data.checkable) {
 			/* Old savegame, no information available */
 			DrawString(tr, STR_SAVELOAD_DETAIL_NOT_AVAILABLE);

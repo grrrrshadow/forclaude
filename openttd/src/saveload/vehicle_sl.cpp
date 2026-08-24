@@ -726,6 +726,24 @@ public:
 		SLE_CONDVAR(Vehicle, current_order.wait_time, VarTypes::U16, SaveLoadVersion::Timetables, SaveLoadVersion::MaxVersion),
 		SLE_CONDVAR(Vehicle, current_order.travel_time, VarTypes::U16, SaveLoadVersion::Timetables, SaveLoadVersion::MaxVersion),
 		SLE_CONDVAR(Vehicle, current_order.max_speed, VarTypes::U16, SaveLoadVersion::CurrentOrderMaxSpeed, SaveLoadVersion::MaxVersion),
+
+		/* The order a vehicle is working on right now is a copy, not a pointer
+		 * into the list, so everything it carries has to be saved here as well
+		 * as in the list -- and everything this feature added was saved in the
+		 * list only. A game saved and loaded therefore came back with all of it
+		 * rubbed off the live order: a train standing on "wait for couple"
+		 * stopped knowing it was waiting and left, one on its way to collect
+		 * forgot what it had set out to do, and one that was to put wagons down
+		 * on arrival simply did not. Same list of fields as the one in
+		 * order_sl.cpp, and for the same reason. */
+		SLE_VAR(Vehicle, current_order.decouple_count, VarTypes::U8),
+		SLE_VAR(Vehicle, current_order.wait_for_couple, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.go_to_couple, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.turn_around_in_depot, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.reverse_out_of_station, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.couple_load, VarTypes::U8),
+		SLE_VAR(Vehicle, current_order.couple_cargo, VarTypes::U8),
+		SLE_VAR(Vehicle, current_order.couple_count, VarTypes::U8),
 		SLE_CONDVAR(Vehicle, timetable_start, VarFileType::I32 | VarMemType::U64, SaveLoadVersion::TimetableStart, SaveLoadVersion::TimetableStartTicks),
 		SLE_CONDVAR(Vehicle, timetable_start, VarTypes::U64, SaveLoadVersion::TimetableStartTicks, SaveLoadVersion::MaxVersion),
 

@@ -78,6 +78,12 @@ extern LoadCheckData _load_check_data;
 struct FiosItem {
 	FiosType type;
 	int64_t mtime;
+	/**
+	 * When the file was last written, ready to show. Worked out once while the
+	 * list is built rather than each time the panel is drawn, and left empty for
+	 * anything that is not a file.
+	 */
+	std::string mtime_text;
 	EncodedString title;
 	std::string name;
 };

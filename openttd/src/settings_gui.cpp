@@ -17,6 +17,7 @@
 #include "network/network_content.h"
 #include "town.h"
 #include "settings_internal.h"
+#include "settings_func.h"
 #include "strings_func.h"
 #include "window_func.h"
 #include "string_func.h"
@@ -1203,6 +1204,12 @@ struct GameOptionsWindow : Window {
 				this->InvalidateData();
 				break;
 
+			case WID_GO_SAVE_CONFIG:
+				/* Settings are ordinarily written out when the game exits, which
+				 * is no use to anyone whose game does not get that far. */
+				SaveToConfig();
+				break;
+
 			case WID_GO_RESET_ALL:
 				ShowQuery(
 					GetEncodedString(STR_CONFIG_SETTING_RESET_ALL_CONFIRMATION_DIALOG_CAPTION),
@@ -1846,6 +1853,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_game_options_widgets
 					NWidget(WWT_PUSHTXTBTN, GAME_OPTIONS_BUTTON, WID_GO_EXPAND_ALL), SetStringTip(STR_CONFIG_SETTING_EXPAND_ALL), SetFill(1, 0), SetResize(1, 0),
 					NWidget(WWT_PUSHTXTBTN, GAME_OPTIONS_BUTTON, WID_GO_COLLAPSE_ALL), SetStringTip(STR_CONFIG_SETTING_COLLAPSE_ALL), SetFill(1, 0), SetResize(1, 0),
 					NWidget(WWT_PUSHTXTBTN, GAME_OPTIONS_BUTTON, WID_GO_RESET_ALL), SetStringTip(STR_CONFIG_SETTING_RESET_ALL), SetFill(1, 0), SetResize(1, 0),
+					NWidget(WWT_PUSHTXTBTN, GAME_OPTIONS_BUTTON, WID_GO_SAVE_CONFIG), SetStringTip(STR_CONFIG_SETTING_SAVE_CONFIG, STR_CONFIG_SETTING_SAVE_CONFIG_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 				EndContainer(),
 
 				NWidget(WWT_EMPTY, Colours::Invalid, WID_GO_SETTING_PROPERTIES), SetFill(1, 0), SetResize(1, 0),

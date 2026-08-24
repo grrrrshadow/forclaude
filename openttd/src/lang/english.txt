@@ -1253,6 +1253,8 @@ STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}No suita
 # Settings tree in the Game Options window
 STR_CONFIG_SETTING_FILTER_TITLE                                 :Filter:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :Expand all
+STR_CONFIG_SETTING_SAVE_CONFIG                                  :Save settings
+STR_CONFIG_SETTING_SAVE_CONFIG_TOOLTIP                          :{BLACK}Write the settings out to the configuration file now, rather than when the game closes
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :Collapse all
 STR_CONFIG_SETTING_RESET_ALL                                    :Reset all values
 STR_CONFIG_SETTING_NO_EXPLANATION_AVAILABLE_HELPTEXT            :(no explanation available)
@@ -3402,6 +3404,7 @@ STR_SAVELOAD_LOAD_TOOLTIP                                       :{BLACK}Load the
 STR_SAVELOAD_LOAD_HEIGHTMAP_TOOLTIP                             :{BLACK}Load the selected heightmap
 STR_SAVELOAD_LOAD_TOWN_DATA_TOOLTIP                             :{BLACK}Load the selected town data
 STR_SAVELOAD_DETAIL_CAPTION                                     :{BLACK}Game Details
+STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Saved: {RAW_STRING}
 STR_SAVELOAD_DETAIL_NOT_AVAILABLE                               :{BLACK}No information available
 STR_SAVELOAD_DETAIL_COMPANY_INDEX                               :{SILVER}{COMMA}: {WHITE}{STRING1}
 STR_SAVELOAD_DETAIL_GRFSTATUS                                   :{SILVER}NewGRF: {WHITE}{STRING}

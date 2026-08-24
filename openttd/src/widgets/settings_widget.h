@@ -80,6 +80,7 @@ enum GameOptionsWidgets : WidgetID {
 	WID_GO_EXPAND_ALL,         ///< Expand all button.
 	WID_GO_COLLAPSE_ALL,       ///< Collapse all button.
 	WID_GO_RESET_ALL,          ///< Reset all button.
+	WID_GO_SAVE_CONFIG,        ///< Write the settings out to the config file now.
 	WID_GO_RESTRICT_CATEGORY,  ///< Label upfront to the category drop-down box to restrict the list of settings to show
 	WID_GO_RESTRICT_TYPE,      ///< Label upfront to the type drop-down box to restrict the list of settings to show
 	WID_GO_RESTRICT_DROPDOWN,  ///< The drop down box to restrict the list of settings

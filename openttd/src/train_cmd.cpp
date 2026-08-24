@@ -15,6 +15,7 @@
 #include "economy_base.h"
 #include "error_func.h"
 #include "pathfinder/yapf/yapf.hpp"
+#include "pathfinder/follow_track.hpp"
 #include "news_func.h"
 #include "company_func.h"
 #include "newgrf_sound.h"
@@ -399,6 +400,44 @@ uint16_t Train::GetCurveSpeedLimit() const
  * Calculates the maximum speed of the vehicle under its current conditions.
  * @return Maximum speed of the vehicle.
  */
+/**
+ * How many tiles ahead of the train the next level crossing is, if one is close.
+ *
+ * Only the plain run of track is followed: at a junction, or anywhere the way
+ * ahead is not a single obvious continuation, the search gives up rather than
+ * guessing which way the train will go. Bounded to a handful of tiles, because
+ * this is asked once a tick for every moving train.
+ *
+ * The tile the train's leading end is standing on is not counted -- a train that
+ * has reached a crossing is on it, not approaching it, and has nothing left to
+ * slow down for.
+ *
+ * @param moving_front the leading end of the train
+ * @param max_tiles how far ahead to bother looking
+ * @return tiles to the crossing, or -1 if there is none within reach
+ */
+static int DistanceToLevelCrossingAhead(const Train *moving_front, int max_tiles)
+{
+	if (moving_front->track == Track::Depot || moving_front->track == Track::Wormhole) return -1;
+
+	CFollowTrackRail ft(moving_front);
+	TileIndex tile = moving_front->tile;
+	Trackdir td = moving_front->GetVehicleTrackdir();
+	if (td == Trackdir::Invalid) return -1;
+
+	for (int tiles = 1; tiles <= max_tiles; tiles++) {
+		if (!ft.Follow(tile, td)) return -1;
+		if (IsLevelCrossingTile(ft.new_tile)) return tiles;
+
+		/* Only carry on where there is exactly one way onwards. */
+		if (ft.new_td_bits.Count() != 1) return -1;
+		tile = ft.new_tile;
+		td = FindFirstTrackdir(ft.new_td_bits);
+	}
+
+	return -1;
+}
+
 int Train::GetCurrentMaxSpeed() const
 {
 	const Train *moving_front = this->GetMovingFront();
@@ -441,6 +480,28 @@ int Train::GetCurrentMaxSpeed() const
 		/* Vehicle is on the middle part of a bridge. */
 		if (u->track == Track::Wormhole && !u->vehstatus.Test(VehState::Hidden)) {
 			max_speed = std::min<int>(max_speed, GetBridgeSpec(GetBridgeType(u->tile))->speed);
+		}
+	}
+
+	/* Ease down for a level crossing and take it at two thirds of what the train
+	 * can do. A train crossing a road at full line speed is the one place where
+	 * the game asks nothing of a driver who in life would be looking out for the
+	 * barriers being down and for whatever is still on the crossing.
+	 *
+	 * The braking itself is left to the game: the ceiling comes down gradually
+	 * as the crossing gets nearer, in the same shape as the one for a station
+	 * ahead, so the train starts slowing far enough back instead of standing on
+	 * the brakes at the last tile. Once its leading end is on the crossing there
+	 * is nothing ahead to slow for and it opens up again. */
+	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
+		int crossing_speed = this->vcache.cached_max_speed * 2 / 3;
+		if (max_speed > crossing_speed) {
+			/* Look only as far as the train would need to shed the difference. */
+			int look_ahead = std::min(8, (max_speed - crossing_speed) / 25 + 2);
+			int distance_to_go = DistanceToLevelCrossingAhead(moving_front, look_ahead);
+			if (distance_to_go >= 0) {
+				max_speed = std::min(max_speed, crossing_speed + 25 * distance_to_go);
+			}
 		}
 	}
 

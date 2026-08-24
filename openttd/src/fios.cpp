@@ -12,6 +12,7 @@
 #include "core/string_consumer.hpp"
 #include "fileio_func.h"
 #include "fios.h"
+#include "3rdparty/fmt/chrono.h"
 #include "network/network_content.h"
 #include "screenshot.h"
 #include "string_func.h"
@@ -270,6 +271,13 @@ bool FiosFileScanner::AddFile(const std::string &filename, size_t, const std::st
 		fios->mtime = 0;
 	} else {
 		fios->mtime = std::chrono::duration_cast<std::chrono::milliseconds>(write_time.time_since_epoch()).count();
+
+		/* And the same moment in words. Which of two saves made on the same day
+		 * is the later one is the thing a player actually wants to know, and a
+		 * name does not say it. Local time, and the hour of a twenty-four hour
+		 * day, so it cannot be read two ways. */
+		std::time_t written = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(write_time));
+		fios->mtime_text = fmt::format("{:%Y-%m-%d %H:%M}", fmt::localtime(written));
 	}
 
 	fios->type = type;
