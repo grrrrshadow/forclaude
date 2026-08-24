@@ -1206,8 +1206,11 @@ struct GameOptionsWindow : Window {
 
 			case WID_GO_SAVE_CONFIG:
 				/* Settings are ordinarily written out when the game exits, which
-				 * is no use to anyone whose game does not get that far. */
+				 * is no use to anyone whose game does not get that far. Say so
+				 * afterwards: a button that writes a file and gives no sign is a
+				 * button nobody can tell they have pressed. */
 				SaveToConfig();
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_SAVE_CONFIG_DONE), {}, WarningLevel::Info);
 				break;
 
 			case WID_GO_RESET_ALL:

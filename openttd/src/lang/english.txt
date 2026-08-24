@@ -1255,6 +1255,7 @@ STR_CONFIG_SETTING_FILTER_TITLE                                 :Filter:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :Expand all
 STR_CONFIG_SETTING_SAVE_CONFIG                                  :Save settings
 STR_CONFIG_SETTING_SAVE_CONFIG_TOOLTIP                          :{BLACK}Write the settings out to the configuration file now, rather than when the game closes
+STR_CONFIG_SETTING_SAVE_CONFIG_DONE                             :{WHITE}Settings written to the configuration file
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :Collapse all
 STR_CONFIG_SETTING_RESET_ALL                                    :Reset all values
 STR_CONFIG_SETTING_NO_EXPLANATION_AVAILABLE_HELPTEXT            :(no explanation available)
@@ -1713,12 +1714,13 @@ STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREY_TO_RED                :Grey to red
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREYSCALE                  :Greyscale
 
 STR_CONFIG_SETTING_SCROLLMODE                                   :Drag the map with: {STRING2}
-STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Which mouse button drags the map about. The view follows the hand either way
+STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :How dragging the map about behaves. The first keeps the pointer where the drag began without the game moving it, which is the one to use where the game cannot move the pointer -- a touch screen, a remote desktop. The rest are the game's own choices
 ###length 4
-STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Right mouse button
-STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Left mouse button
+STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Right mouse button, pointer stays put
 STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Move viewport with RMB, mouse position locked
 STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Move map with RMB, mouse position locked
+STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Move map with RMB
+STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Move map with LMB
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Smooth viewport scrolling: {STRING2}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Control how the main view scrolls to a specific position when clicking on the smallmap or when issuing a command to scroll to a specific object on the map. If enabled, the viewport scrolls smoothly, if disabled it jumps directly to the targeted spot

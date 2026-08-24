@@ -1524,13 +1524,20 @@ public:
 					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 0);
 					break;
 				}
+				/* Switch it on at one first, and only then ask. One -- the
+				 * engine keeps itself and puts everything behind it down -- is
+				 * what is wanted nearly every time, and a number box is not
+				 * something to have to work through to get it.
+				 *
+				 * It has to be this way round: a query box calls back only when
+				 * the text is changed, so a box that opens already saying the
+				 * right answer does nothing at all when it is accepted. Setting
+				 * it first means accepting the box leaves it at one, and typing
+				 * something else changes it. */
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 1);
+
 				this->querying_decouple_count = true;
 				this->querying_couple_count = false;
-				/* Offer one rather than the nought it is switched off with. The
-				 * number asked for is how many vehicles the train keeps, and
-				 * keeping the engine alone -- putting everything behind it down
-				 * -- is the ordinary thing to want. Offering nought offers the
-				 * one answer that means "never mind". */
 				ShowQueryString(GetString(STR_JUST_INT, 1), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				break;
 			}

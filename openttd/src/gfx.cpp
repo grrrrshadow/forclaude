@@ -1769,7 +1769,7 @@ bool CursorVars::UpdateCursorPosition(int x, int y)
 	this->delta.y = y - this->pos.y;
 
 	if (this->fix_at) {
-		return this->delta.x != 0 || this->delta.y != 0;
+		return this->warp_back && (this->delta.x != 0 || this->delta.y != 0);
 	} else if (this->pos.x != x || this->pos.y != y) {
 		this->dirty = true;
 		this->pos.x = x;

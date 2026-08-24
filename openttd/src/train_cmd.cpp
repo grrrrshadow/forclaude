@@ -488,20 +488,18 @@ int Train::GetCurrentMaxSpeed() const
 	 * the game asks nothing of a driver who in life would be looking out for the
 	 * barriers being down and for whatever is still on the crossing.
 	 *
-	 * The braking itself is left to the game: the ceiling comes down gradually
-	 * as the crossing gets nearer, in the same shape as the one for a station
-	 * ahead, so the train starts slowing far enough back instead of standing on
-	 * the brakes at the last tile. Once its leading end is on the crossing there
-	 * is nothing ahead to slow for and it opens up again. */
+	 * Two tiles out the ceiling drops to two thirds and stays there, rather than
+	 * easing down over a longer run: a train that shaves a little off over half a
+	 * dozen tiles is a train that looks like it is doing nothing at all, and the
+	 * point of slowing down for a crossing is that it can be seen. The braking
+	 * itself is still the game's own -- a ceiling below the current speed is what
+	 * makes a train brake. Once its leading end is on the crossing there is
+	 * nothing ahead to slow for and it opens up again. */
 	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
+		constexpr int CROSSING_LOOK_AHEAD = 2;
 		int crossing_speed = this->vcache.cached_max_speed * 2 / 3;
-		if (max_speed > crossing_speed) {
-			/* Look only as far as the train would need to shed the difference. */
-			int look_ahead = std::min(8, (max_speed - crossing_speed) / 25 + 2);
-			int distance_to_go = DistanceToLevelCrossingAhead(moving_front, look_ahead);
-			if (distance_to_go >= 0) {
-				max_speed = std::min(max_speed, crossing_speed + 25 * distance_to_go);
-			}
+		if (max_speed > crossing_speed && DistanceToLevelCrossingAhead(moving_front, CROSSING_LOOK_AHEAD) >= 0) {
+			max_speed = crossing_speed;
 		}
 	}
 

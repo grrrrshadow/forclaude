@@ -176,8 +176,11 @@ enum class OrderReviewSystem : uint8_t {
 
 /** Settings relating to viewport/smallmap scrolling. */
 enum class ViewportScrollMode : uint8_t {
-	RMB, ///< The map is dragged with the right mouse button held.
-	LMB, ///< The map is dragged with the left mouse button held.
+	RMBPinned, ///< Right mouse button; the pointer stays where it was pressed and the game never moves it itself.
+	ViewportRMBFixed, ///< Viewport moves with mouse movement on holding right mouse button, cursor position is fixed.
+	MapRMBFixed, ///< Map moves with mouse movement on holding right mouse button, cursor position is fixed.
+	MapRMB, ///< Map moves with mouse movement on holding right mouse button, cursor moves.
+	MapLMB, ///< Map moves with mouse movement on holding left mouse button, cursor moves.
 	End, ///< Number of scroll mode settings.
 };
 

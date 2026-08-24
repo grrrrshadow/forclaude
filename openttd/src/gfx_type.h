@@ -126,6 +126,17 @@ struct CursorVars {
 	Point delta;                  ///< relative mouse movement in this tick
 	int wheel;                    ///< mouse wheel movement
 	bool fix_at;                  ///< mouse is moving, but cursor is not (used for scrolling)
+	/**
+	 * Whether the pointer is to be put back where it was while it is fixed.
+	 *
+	 * Two separate things are wanted from fixing the pointer: that the game's own
+	 * cursor stays where the drag began, and that the pointer on the screen is
+	 * moved back to it. The first is what makes a drag work; the second is the
+	 * game reaching out and moving the pointer, which it cannot rely on being
+	 * able to do, and where that half works the drag behaves differently from one
+	 * moment to the next. They are asked for separately.
+	 */
+	bool warp_back;
 
 	/* 2D wheel scrolling for moving around the map */
 	bool wheel_moved;
