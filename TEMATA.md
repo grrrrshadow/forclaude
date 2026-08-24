@@ -256,6 +256,20 @@ tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
   nesmí* (něco porouchaného je, ale nepočítá se jako k odvezení — cizí
   firma, v depu, nebo mu vypršela lhůta) · a prosté *čeká na poruchu*
   (nikde není nic porouchaného).
+- **Vyslání se dělo v depu a v depu se hned rušilo.** Tohle byla ta
+  skutečná příčina toho, že odtahovka nikdy nikam nevyjela, ať bylo
+  porouchaných vlaků kolik chtělo. Obsluha „odtahovka stojí v depu
+  s úkolem" byla napsaná pro jeden případ — *dovezla porouchanou, je
+  hotovo* — a předpokládala, že když má odtahovka cíl a stojí v depu, tak
+  se právě vrátila. Jenže cíl se přiděluje **taky v depu**, takže hned
+  následující tik viděl slovo od slova ten samý stav a přečetl čerstvý
+  úkol jako splněný: zrušil ho, uvolnil porouchanou a nechal odtahovku
+  „čekat na poruchu". Znovu a znovu, úkol nikdy nepřežil jeden tik.
+  **Ty dva stavy rozlišuje jediná otázka: je porouchaná zapřažená za mnou?**
+  Splněný úkol ji má v soupravě, čerstvý ji má pořád venku na trati.
+  Druhá půlka téže chyby: obsluha si brala celý tik pro sebe, takže se
+  odtahovka nikdy nedostala k místu, které vypouští vlaky z depa. Tik si
+  bere jen tehdy, když opravdu něco udělala.
 - Pojistka: **půl roku herního času od poruchy** (ne od vyslání). Pak se
   porucha spraví sama a trosky začnou mizet po vanilla způsobu, čímž se
   trať uvolní.
@@ -522,7 +536,66 @@ dokud v kontejneru není `grfcodec`. Stejný problém jako u kladívka odtahu.
 
 ---
 
-# 12. Otevřené
+# 12. Blueprint (Spaceone)
+
+## 12.1 Odkud je a co s ním smíme
+
+Patch **Blueprint** pro OpenTTD 15.3.
+
+- Autor: **Spaceone**, na GitHubu **age77**
+- Zdroj: <https://github.com/age77/openttd-15.3-blueprint>
+- Licence: **GPL v2**, stejná jako má sama hra. Píše to jeho `README.md`
+  („GPL v2, the same as OpenTTD itself") a každý přidaný zdrojový soubor
+  nese obvyklou hlavičku OpenTTD. `patch/blueprint.patch` je podle autora
+  úplný odpovídající zdroj.
+
+**Smíme ho použít**, když zůstanou hlavičky a autorství. Jméno autora patří
+do hlaviček přebraných souborů a sem.
+
+Soubor s patchem se v repozitáři nenechává — jakmile je port hotový, mizí.
+Odkaz nahoře je to, co má zůstat.
+
+## 12.2 Proč nahrazuje moji verzi kopírování
+
+Moje `copypaste_gui.cpp` (kapitola 11.3) umí kopírovat jen v rámci jedné
+rozehrané hry. Chtěné je přenést plochu **do jiné hry**, tedy uložit ji do
+souboru. To Blueprint už umí, a k tomu:
+
+- **8 pojmenovaných slotů** (`NUM_BLUEPRINT_SLOTS`),
+- plocha až **255 × 255** (`MAX_BLUEPRINT_DIMENSION`),
+- posun výšky **±8**, s vlastním režimem terénních úprav
+  (`BlueprintTerraformMode`), takže se plocha dá položit i tam, kde terén
+  přesně nesedí,
+- **soubor** ve vlastní složce (`BLUEPRINT_DIR`), formát `OTTD-BPSET-1;`
+  a base64; jeden výřez jde i přes schránku jako `OTTD-BP-1;` + base64,
+- 16 vlastních ikon 20 × 20,
+- vlastní test (`src/tests/blueprint.cpp`).
+
+Psát tohle znovu nemá smysl.
+
+## 12.3 Co port obnáší
+
+Je to **104 souborů a zhruba 8 500 řádků proti 15.3**. Autor sám píše, že
+se to musí **portovat, ne aplikovat** — mezi 15.3 a beta 16 se hodně
+přejmenovalo (výčtové typy na `enum class`, příznaky na `BaseBitSet`,
+`VehicleID::Invalid()` a spol.).
+
+Postup, jakým to jde dělat po kusech a průběžně to překládat:
+
+1. datový model výřezu a jeho čtení z mapy,
+2. ukládání a načítání souboru,
+3. stavění zpět (obyčejnými stavebními příkazy, jako v 11.3),
+4. okno a ikony,
+5. terénní režim s posunem výšky,
+6. teprve nakonec zahodit `copypaste_gui.cpp`.
+
+Ikony jsou stejný problém jako u kladívka odtahu: bez `grfcodec`
+v kontejneru se vlastní sprity nepřidají, takže se do té doby půjčuje
+existující.
+
+---
+
+# 13. Otevřené
 
 - Pády po spojení a rozpojení: `pool_type.hpp:174` (sáhnutí mimo seznam
   objektů) a `track_func.h:168` (žádaná jedna kolej, dostala se jiná

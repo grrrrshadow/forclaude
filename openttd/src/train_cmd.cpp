@@ -2699,7 +2699,7 @@ static void TryDispatchRescueEngine(Train *tow)
 }
 
 /**
- * Deal with a rescue engine that has just come to a stand in a depot.
+ * Deal with a rescue engine standing in a depot with a call-out on it.
  *
  * Two things bring one here. It has towed a casualty in, in which case the
  * casualty is put down: repaired and sent on its way again where it left off,
@@ -2707,12 +2707,26 @@ static void TryDispatchRescueEngine(Train *tow)
  * something the line has to work around. Or it has simply got itself home
  * afterwards, in which case it goes back on call.
  *
- * @param tow the train that has entered the depot, front of its consist
+ * There is a third thing that looks exactly like the first two from here and
+ * is the opposite of both: an engine that has only just been given the job and
+ * has not left yet. A call-out is handed out while the engine stands in its
+ * depot, so on the very next tick it is a rescue engine, in a depot, with a
+ * rescue target -- word for word the state of one that has come home. Without
+ * telling the two apart, every call-out was read as a finished errand and
+ * rubbed out the tick after it was written, so no engine ever left, and the
+ * window went on saying "on call" because that is what it truthfully was again
+ * a tick later. What separates them is whether the casualty is actually
+ * coupled on behind: a finished errand has it in hand, a fresh one has it
+ * still out on the line.
+ *
+ * @param tow the train standing in the depot, front of its consist
+ * @return whether the errand was dealt with here; false means the engine has
+ *         somewhere to go and must be left alone to go there
  */
-void HandleRescueEngineInDepot(Train *tow)
+bool HandleRescueEngineInDepot(Train *tow)
 {
-	if (!tow->IsFrontEngine()) return;
-	if (!tow->vehicle_flags.Test(VehicleFlag::RescueEngine)) return;
+	if (!tow->IsFrontEngine()) return false;
+	if (!tow->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
 
 	if (tow->rescue_target == VehicleID::Invalid()) {
 		/* Home again with nothing in tow: back on call. Entering a depot always
@@ -2723,15 +2737,22 @@ void HandleRescueEngineInDepot(Train *tow)
 			tow->vehstatus.Reset(VehState::Stopped);
 			InvalidateWindowData(WindowClass::VehicleView, tow->index);
 		}
-		return;
+		return true;
 	}
 
 	Train *casualty = Train::GetIfValid(tow->rescue_target);
+	bool in_tow = casualty != nullptr && casualty != tow && casualty->First() == tow;
+
+	/* Still to be fetched, so the job is not over and there is nothing here to
+	 * put down. Say so rather than doing anything: the caller has to let the
+	 * engine reach the code that lets a train out of a depot. */
+	if (!in_tow && casualty != nullptr && IsWaitingToBeRescued(casualty->First())) return false;
+
 	EndRescueErrand(tow);
 
 	/* Nothing was ever picked up -- the casualty was sold, or sorted itself out
 	 * before this engine got there. Nothing to put down. */
-	if (casualty != nullptr && casualty->First() == tow && casualty != tow) {
+	if (in_tow) {
 		bool wrecked = casualty->vehstatus.Test(VehState::Crashed);
 
 		/* Split it back off. It is standing in a depot, which is where taking
@@ -2742,7 +2763,7 @@ void HandleRescueEngineInDepot(Train *tow)
 		 * is rather than acting on a train that is still half of another one.
 		 * Scrapping from the middle of a consist, or handing orders to a
 		 * vehicle that is not the head of anything, does lasting damage. */
-		if (casualty->First() != casualty) return;
+		if (casualty->First() != casualty) return true;
 
 		if (wrecked) {
 			/* A wreck brought into a depot is scrapped there. */
@@ -2781,6 +2802,7 @@ void HandleRescueEngineInDepot(Train *tow)
 	InvalidateWindowData(WindowClass::VehicleView, tow->index);
 	SetWindowDirty(WindowClass::VehicleDepot, tow->tile);
 	SetWindowClassesDirty(WindowClass::TrainList);
+	return true;
 }
 
 /**
@@ -6336,11 +6358,16 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * is stepping over its vehicles. Putting a casualty down is exactly that
 	 * kind of surgery, which is why coupling waits for this moment too. */
 	if (consist->vehicle_flags.Test(VehicleFlag::RescueEngine) && consist->IsInDepot() && consist->cur_speed == 0) {
+		/* Only the tick that actually does something is claimed. An engine that
+		 * has just been given a call-out is standing here with the job on it
+		 * and nothing to hand over; claiming its tick would stop it ever
+		 * reaching the code that lets a train out of a depot, and it would
+		 * stand in the doorway with its call-out for good. */
 		if (consist->rescue_target != VehicleID::Invalid()) {
-			HandleRescueEngineInDepot(consist);
-			return true;
+			if (HandleRescueEngineInDepot(consist)) return true;
+		} else {
+			TryDispatchRescueEngine(consist);
 		}
-		TryDispatchRescueEngine(consist);
 	}
 
 	if (consist->flags.Test(VehicleRailFlag::Reversing) && consist->cur_speed == 0) {
