@@ -743,6 +743,12 @@ enum class WindowClass : uint16_t {
 	 */
 	Help,
 
+	/**
+	 * Copy and paste a patch of map; %Window numbers:
+	 *   - 0 = #CopyPasteWidgets
+	 */
+	CopyPaste,
+
 	Invalid = 0xFFFF, ///< Invalid window.
 };
 

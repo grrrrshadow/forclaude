@@ -489,6 +489,31 @@ Tady jsou závěry, protože platí pro cokoliv nového:
 
 ---
 
+# 11.3 Kopírovat a vložit plochu
+
+Nástroj v liště terénních úprav. Označí se plocha, přečte se, co na ní stojí,
+a jinde se to postaví znovu.
+
+**Co se pamatuje, je seznam věcí k postavení, ne obrázek mapy.** Vkládání je
+proto obyčejné stavební příkazy jeden po druhém, přesně jako by to hráč
+kladl ručně: stojí to, co to stojí, ctí to vlastnictví, odmítne to, co
+terén neunese, a funguje to i ve hře více hráčů. Nic tam nezapisuje do
+mapy samo.
+
+V první verzi se přenáší **koleje, návěstidla, silnice, tramvajové tratě a
+depa**. Nádraží, mosty a tunely ne — nádraží patří ke stanici a most i tunel
+mají dva konce, z nichž v označené ploše může být jen jeden, a půlka mostu
+není nic, co by šlo postavit.
+
+Návěstidla se stavějí až po kolejích a přenáší se u nich i **přesná dvojice
+bitů** (`signals_copy`), takže se strana, na kterou návěstidlo kouká,
+nehádá.
+
+Ikonka je zatím vypůjčená (`SPR_IMG_LANDSCAPING`) — vlastní se přidat nedá,
+dokud v kontejneru není `grfcodec`. Stejný problém jako u kladívka odtahu.
+
+---
+
 # 12. Otevřené
 
 - Pády po spojení a rozpojení: `pool_type.hpp:174` (sáhnutí mimo seznam

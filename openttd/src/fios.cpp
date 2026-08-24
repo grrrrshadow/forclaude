@@ -277,7 +277,7 @@ bool FiosFileScanner::AddFile(const std::string &filename, size_t, const std::st
 		 * name does not say it. Local time, and the hour of a twenty-four hour
 		 * day, so it cannot be read two ways. */
 		std::time_t written = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(write_time));
-		fios->mtime_text = fmt::format("{:%Y-%m-%d %H:%M}", fmt::localtime(written));
+		fios->mtime_text = fmt::format("{:%d.%m.%Y  %H:%M}", fmt::localtime(written));
 	}
 
 	fios->type = type;

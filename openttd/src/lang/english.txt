@@ -3078,6 +3078,17 @@ STR_LANDSCAPING_TOOLBAR                                         :{WHITE}Landscap
 STR_LANDSCAPING_TOOLTIP_LOWER_A_CORNER_OF_LAND                  :{BLACK}Lower a corner of land. Click+Drag to lower the first selected corner and level the selected area to the new corner height. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
 STR_LANDSCAPING_TOOLTIP_RAISE_A_CORNER_OF_LAND                  :{BLACK}Raise a corner of land. Click+Drag to raise the first selected corner and level the selected area to the new corner height. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
 STR_LANDSCAPING_LEVEL_LAND_TOOLTIP                              :{BLACK}Level an area of land to the height of the first selected corner. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
+STR_COPY_PASTE_CAPTION                                          :{WHITE}Copy and paste
+STR_COPY_PASTE_NOTHING_COPIED                                   :{BLACK}Nothing copied yet
+STR_COPY_PASTE_AREA_COPIED                                      :{BLACK}Copied {NUM}x{NUM}, {NUM} tiles with something on them
+STR_COPY_PASTE_COPY_BUTTON                                      :Copy
+STR_COPY_PASTE_COPY_TOOLTIP                                     :{BLACK}Drag out a patch of map and remember the track, road and depots on it
+STR_COPY_PASTE_PASTE_BUTTON                                     :Paste
+STR_COPY_PASTE_PASTE_TOOLTIP                                    :{BLACK}Build what was copied. The pointer shows where it will go; click to build it
+STR_COPY_PASTE_CLEAR_BUTTON                                     :Forget
+STR_COPY_PASTE_CLEAR_TOOLTIP                                    :{BLACK}Forget what was copied
+STR_LANDSCAPING_COPY_PASTE_TOOLTIP                              :{BLACK}Copy a patch of track and road and build it again elsewhere
+STR_ERROR_CAN_T_PASTE_AREA                                      :{WHITE}Can't build what was copied here...
 STR_LANDSCAPING_TOOLTIP_PURCHASE_LAND                           :{BLACK}Purchase land for future use. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
 
 # Object construction window

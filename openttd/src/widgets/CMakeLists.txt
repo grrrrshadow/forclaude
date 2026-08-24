@@ -51,6 +51,7 @@ add_files(
     statusbar_widget.h
     story_widget.h
     subsidy_widget.h
+    copypaste_widget.h
     terraform_widget.h
     timetable_widget.h
     toolbar_widget.h

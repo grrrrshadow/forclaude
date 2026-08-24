@@ -498,6 +498,8 @@ add_files(
     tar_type.h
     terraform_cmd.cpp
     terraform_cmd.h
+    copypaste_gui.cpp
+    copypaste_func.h
     terraform_gui.cpp
     terraform_gui.h
     textbuf.cpp

@@ -3155,6 +3155,17 @@ STR_LANDSCAPING_TOOLBAR                                         :{WHITE}Úpravy 
 STR_LANDSCAPING_TOOLTIP_LOWER_A_CORNER_OF_LAND                  :{BLACK}Snížit roh země. Tažení sníží první vybraný roh a vybranou oblast na jeho novou výšku. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_LANDSCAPING_TOOLTIP_RAISE_A_CORNER_OF_LAND                  :{BLACK}Zvýšit roh země. Tažení zvyšuje první vybraný roh a vybranou oblast na jeho novou výšku. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_LANDSCAPING_LEVEL_LAND_TOOLTIP                              :{BLACK}Srovnat terén na výšku prvního vybraného rohu. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
+STR_COPY_PASTE_CAPTION                                          :{WHITE}Kopírovat a vložit
+STR_COPY_PASTE_NOTHING_COPIED                                   :{BLACK}Zatím nic zkopírováno
+STR_COPY_PASTE_AREA_COPIED                                      :{BLACK}Zkopírováno {NUM}x{NUM}, {NUM} dlaždic s obsahem
+STR_COPY_PASTE_COPY_BUTTON                                      :Kopírovat
+STR_COPY_PASTE_COPY_TOOLTIP                                     :{BLACK}Označ plochu na mapě a zapamatuj si koleje, silnice a depa na ní
+STR_COPY_PASTE_PASTE_BUTTON                                     :Vložit
+STR_COPY_PASTE_PASTE_TOOLTIP                                    :{BLACK}Postavit, co bylo zkopírováno. Kurzor ukazuje, kam to přijde; klepnutím se to postaví
+STR_COPY_PASTE_CLEAR_BUTTON                                     :Zapomenout
+STR_COPY_PASTE_CLEAR_TOOLTIP                                    :{BLACK}Zapomenout, co bylo zkopírováno
+STR_LANDSCAPING_COPY_PASTE_TOOLTIP                              :{BLACK}Zkopírovat kus kolejí a silnic a postavit ho jinde
+STR_ERROR_CAN_T_PASTE_AREA                                      :{WHITE}Zde nelze postavit zkopírovanou plochu...
 STR_LANDSCAPING_TOOLTIP_PURCHASE_LAND                           :{BLACK}Zakoupit pozemek pro budoucí užití. Podrž Shift pro zobrazení odhadu ceny
 
 # Object construction window

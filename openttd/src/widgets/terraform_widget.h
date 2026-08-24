@@ -22,6 +22,7 @@ enum TerraformToolbarWidgets : WidgetID {
 	WID_TT_PLANT_TREES,                       ///< Plant trees button (note: opens separate window, no place-push-button).
 	WID_TT_PLACE_SIGN,                        ///< Place sign button.
 	WID_TT_PLACE_OBJECT,                      ///< Place object button.
+	WID_TT_COPY_PASTE,                        ///< Copy a patch of map and build it again elsewhere (note: opens separate window, no place-push-button).
 };
 
 /** Widgets of the #ScenarioEditorLandscapeGenerationWindow class. */
