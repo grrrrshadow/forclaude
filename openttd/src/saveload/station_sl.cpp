@@ -650,7 +650,7 @@ public:
 		    SLE_VAR(Station, time_since_unload,          VarTypes::U8),
 		    SLE_VAR(Station, last_vehicle_type,          VarTypes::U8),
 		    SLE_VAR(Station, had_vehicle_of_type,        VarTypes::U8),
-		    SLE_VAR(Station, load_all_at_once,           VarTypes::U8),
+		    SLE_VAR(Station, gradual_load_differs,       VarTypes::U8),
 		SLE_REFLIST(Station, loading_vehicles,           SLRefType::Vehicle),
 		SLE_CONDVAR(Station, always_accepted, VarFileType::U32 | VarMemType::U64, SaveLoadVersion::TownAcceptance, SaveLoadVersion::ExtendCargotypes),
 		SLE_CONDVAR(Station, always_accepted, VarTypes::U64, SaveLoadVersion::ExtendCargotypes, SaveLoadVersion::MaxVersion),

@@ -448,7 +448,7 @@ int Train::GetCurrentMaxSpeed() const
 
 	/* If the train is going backwards, without a leading cab, restrict its speed. */
 	if (!moving_front->CanLeadTrain()) {
-		constexpr int BACKWARDS_NO_CAB_SPEED_LIMIT = 32;
+		constexpr int BACKWARDS_NO_CAB_SPEED_LIMIT = 42;
 		max_speed = std::min<int>(max_speed, BACKWARDS_NO_CAB_SPEED_LIMIT);
 	}
 
@@ -1266,6 +1266,7 @@ static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
 static bool IsAnyPartInsideDepot(const Train *v);
+static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -1696,8 +1697,29 @@ bool IsWaitingToBeCoupled(const Train *v)
 {
 	const Train *head = v->First();
 	if (!head->current_order.ShouldWaitForCouple()) return false;
+
+	/* A rake with no engine at its head cannot go anywhere whatever its order
+	 * says, so for it the flag is the whole of the answer. This is the ordinary
+	 * case -- wagons left at a platform -- and it has to hold once they have
+	 * finished loading just as much as while they are still at it. Asking only
+	 * about loading made a rake disappear the moment it was done: the engine
+	 * sent to collect it then had a destination that matched nowhere, found no
+	 * route to it, reserved nothing, and drove on without one. */
+	if (head->IsFreeWagon()) return true;
+
+	/* Stranded is the same thing said another way. */
+	if (head->breakdown_ctr == 1 || head->vehstatus.Test(VehState::Crashed)) return true;
+
+	/* A train that can drive counts only once it has got where it was sent and
+	 * come to a stand. The flag sits on the order long before that, so without
+	 * this a train still on its way -- or standing in a depot about to leave --
+	 * reads as waiting and gets coupled to on the spot, which is how engines
+	 * leaving a depot together glued themselves into one train. */
+	if (head->cur_speed != 0) return false;
+	if (IsAnyPartInsideDepot(head)) return false;
 	if (head->current_order.IsType(OT_LOADING)) return true;
-	return head->breakdown_ctr == 1 || head->vehstatus.Test(VehState::Crashed);
+	if (!head->current_order.IsType(OT_GOTO_STATION)) return false;
+	return IsConsistStandingAtStation(head, head->current_order.GetDestination().ToStationID());
 }
 
 /**

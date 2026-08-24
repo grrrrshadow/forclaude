@@ -2876,7 +2876,7 @@ CommandCost CmdSetStationGradualLoad(DoCommandFlags flags, StationID station_id,
 	if (ret.Failed()) return ret;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		st->load_all_at_once = !gradual;
+		st->gradual_load_differs = gradual != _settings_game.order.improved_load;
 		SetWindowWidgetDirty(WindowClass::StationView, st->index, WID_SV_GRADUAL_LOAD);
 	}
 	return CommandCost();

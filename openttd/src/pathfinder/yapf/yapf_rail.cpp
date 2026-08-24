@@ -618,22 +618,23 @@ bool YapfTrainCheckReverse(const Train *v)
 
 	int reverse_penalty = 0;
 
-	/* The cab leads. Not a preference, a rule.
+	/* A train keeps going the way it is pointing. Not a preference, a rule.
 	 *
-	 * A train whose leading end has no driving cab is a train nobody is looking
-	 * out of, and it is held to walking pace for exactly that reason. Whether it
-	 * ends up in that state must not depend on what a route happens to cost:
-	 * a player has to be able to say which way round their train will run, and
-	 * "it went backwards because that came out cheaper this time" is not
-	 * something anyone can predict or plan around.
+	 * Which way round a train runs has to be something a player can say in
+	 * advance. "It turned round because that came out cheaper this time" is not
+	 * something anyone can predict or plan a network around, and it is worse
+	 * still for a train with no driving cab at the far end, which is then held
+	 * to walking pace for the rest of its journey with nobody looking out of the
+	 * front. So no train turns round on the line, whether it is hauling anything
+	 * or running light.
 	 *
 	 * Said as a cost, the way everything in a path search is said, and set far
 	 * beyond anything a route can add up to, so the only thing that can outweigh
-	 * it is there being no forward route at all. That is a terminus, and backing
-	 * out of a terminus is the one time driving backwards is right -- the player
-	 * built the dead end and sent the train into it. */
-	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None &&
-			!v->Last()->CanLeadTrain() && !v->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
+	 * it is there being no forward route at all. That is a dead end -- the end
+	 * of the track, or a terminus platform -- and coming back out of one is the
+	 * one time turning round is right, because the player built it and sent the
+	 * train into it. */
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None) {
 		reverse_penalty += 1000 * YAPF_INFINITE_PENALTY;
 	}
 

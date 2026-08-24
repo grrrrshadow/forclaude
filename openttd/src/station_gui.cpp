@@ -1477,12 +1477,10 @@ struct StationViewWindow : public Window {
 		this->SetWidgetDisabledState(WID_SV_CATCHMENT, st->facilities.None());
 		this->SetWidgetLoweredState(WID_SV_CATCHMENT, _viewport_highlight_station == st);
 
-		/* Loading in turn is switched on for the whole game in the settings, and
-		 * this station either goes along with that or is excused from it. With
-		 * the game-wide switch off there is nothing to be excused from, so the
-		 * button says so by standing up and greyed out rather than pretending to
-		 * be a choice. */
-		this->SetWidgetDisabledState(WID_SV_GRADUAL_LOAD, st->owner != _local_company || !_settings_game.order.improved_load);
+		/* Always a choice, whichever way the game-wide setting is left. That
+		 * setting says which way a station starts out; this says what this one
+		 * does. */
+		this->SetWidgetDisabledState(WID_SV_GRADUAL_LOAD, st->owner != _local_company);
 		this->SetWidgetLoweredState(WID_SV_GRADUAL_LOAD, StationLoadsInTurn(st));
 
 		this->DrawWidgets();

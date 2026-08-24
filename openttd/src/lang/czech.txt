@@ -1787,13 +1787,11 @@ STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREEN_TO_BLUE              :Zelená na modr
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREY_TO_RED                :Šedá až červená
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREYSCALE                  :Stupně šedi
 
-STR_CONFIG_SETTING_SCROLLMODE                                   :Reakce pohledů na scrollování: {STRING}
-STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Reakce na scrollování v mapě. Možnost uzamknout ukazatel nemusí fungovat na všech systémech, jako jsou třeba dotykové obrazovky, webové verze, Linux s grafickými prostředími používajícími Wayland a další
+STR_CONFIG_SETTING_SCROLLMODE                                   :Posouvání mapy: {STRING}
+STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Kterým tlačítkem myši se posouvá mapa. Pohled jde za rukou v obou případech
 ###length 4
-STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Pohyb v pohledu pomocí pravého tlačítka myši, poloha myši uzamčena
-STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Pohyb v mapě pomocí pravého tlačítka myši, poloha myši uzamčena
-STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Pohyb v mapě pomocí pravého tlačítka myši
-STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Pohyb v mapě pomocí levého tlačítka myši
+STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Pravým tlačítkem myši
+STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Levým tlačítkem myši
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Plynulé posouvání po mapě: {STRING}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Ovládá jak se hlavní pohled posouvá na specifické místo na mapě, kliknutím na minimapu nebo spuštěním příkazu na posun na specifický objekt na mapě. Pokud zapnuto, pohled se posouvá plynule, pokud vypnuto, skáče pohled přímo na cílové místo
@@ -4011,7 +4009,7 @@ STR_STATION_VIEW_EXCLUSIVE_RIGHTS_COMPANY                       :Společnost {YE
 
 STR_STATION_VIEW_RATINGS_BUTTON                                 :{BLACK}Hodnocení
 STR_STATION_VIEW_GRADUAL_LOAD_BUTTON                            :Postupně
-STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP                           :{BLACK}Postupné nakládání
+STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP                           :{BLACK}Postupně nakládat
 STR_STATION_VIEW_RATINGS_TOOLTIP                                :{BLACK}Ukázat hodnocení společností
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MONTH                     :{BLACK}Dodávka za měsíc a místní hodnocení:
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MINUTE                    :{BLACK}Dodávka za minutu a místní hodnocení:

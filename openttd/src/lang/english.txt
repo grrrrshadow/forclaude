@@ -1710,13 +1710,11 @@ STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREEN_TO_BLUE              :Green to blue
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREY_TO_RED                :Grey to red
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREYSCALE                  :Greyscale
 
-STR_CONFIG_SETTING_SCROLLMODE                                   :Viewport scroll behaviour: {STRING2}
-STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Behaviour when scrolling the map. The "mouse position locked" options don't work on all systems, like web-based versions, touchscreens, Linux with Wayland, and others
+STR_CONFIG_SETTING_SCROLLMODE                                   :Drag the map with: {STRING2}
+STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Which mouse button drags the map about. The view follows the hand either way
 ###length 4
-STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Move viewport with RMB, mouse position locked
-STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Move map with RMB, mouse position locked
-STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Move map with RMB
-STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Move map with LMB
+STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Right mouse button
+STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Left mouse button
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Smooth viewport scrolling: {STRING2}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Control how the main view scrolls to a specific position when clicking on the smallmap or when issuing a command to scroll to a specific object on the map. If enabled, the viewport scrolls smoothly, if disabled it jumps directly to the targeted spot
@@ -1918,7 +1916,7 @@ STR_CONFIG_SETTING_SERVINT_DISABLED                             :Disabled
 
 STR_CONFIG_SETTING_NOSERVICE                                    :Disable servicing when breakdowns set to none: {STRING2}
 STR_CONFIG_SETTING_NOSERVICE_HELPTEXT                           :When enabled, vehicles do not get serviced if they cannot break down
-STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Load one vehicle at a time at stations: {STRING}
+STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Load one vehicle at a time at stations: {STRING2}
 STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :When on, a station loads one vehicle at a time. A vehicle waiting for a full load claims what is at the station for itself and fills up completely, while vehicles at the other platforms get nothing until their turn comes; first to arrive is first to load. When off, everything loads at the same time and shares whatever is there, so a full load takes longer to assemble but nobody stands idle. This is the game-wide setting; a single station is let out of it with the In turn button in its own window
 
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY               :Loading speed penalty for trains that are longer than the station: {STRING2}
@@ -3928,7 +3926,7 @@ STR_STATION_VIEW_EXCLUSIVE_RIGHTS_COMPANY                       :{YELLOW}{COMPAN
 
 STR_STATION_VIEW_RATINGS_BUTTON                                 :{BLACK}Ratings
 STR_STATION_VIEW_GRADUAL_LOAD_BUTTON                            :In turn
-STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP                           :{BLACK}Load one vehicle at a time here
+STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP                           :{BLACK}Load in turn
 STR_STATION_VIEW_RATINGS_TOOLTIP                                :{BLACK}Show station ratings
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MONTH                     :{BLACK}Supply per month and local rating:
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MINUTE                    :{BLACK}Supply per minute and local rating:

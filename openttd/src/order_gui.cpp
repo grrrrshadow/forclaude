@@ -1526,7 +1526,12 @@ public:
 				}
 				this->querying_decouple_count = true;
 				this->querying_couple_count = false;
-				ShowQueryString(GetString(STR_JUST_INT, order->GetDecoupleCount()), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				/* Offer one rather than the nought it is switched off with. The
+				 * number asked for is how many vehicles the train keeps, and
+				 * keeping the engine alone -- putting everything behind it down
+				 * -- is the ordinary thing to want. Offering nought offers the
+				 * one answer that means "never mind". */
+				ShowQueryString(GetString(STR_JUST_INT, 1), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				break;
 			}
 

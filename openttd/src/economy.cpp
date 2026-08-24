@@ -1553,17 +1553,18 @@ struct ReserveCargoAction {
 /**
  * Does this station load one vehicle at a time?
  *
- * Switched on for the whole game in the settings, and switched off for a single
- * station by the button in its window. On, a vehicle waiting for a full load
- * claims what is at the station for itself and everything else waits its turn;
- * off, everyone loads together and shares whatever is there.
+ * The setting says which way a station starts out and the button in its own
+ * window says whether this one was told otherwise, so changing the setting
+ * moves every station nobody has spoken about. On, a vehicle waiting for a full
+ * load claims what is at the station for itself and everything else waits its
+ * turn; off, everyone loads together and shares whatever is there.
  *
  * @param st the station
  * @return whether cargo is claimed by one vehicle at a time here
  */
 bool StationLoadsInTurn(const Station *st)
 {
-	return _settings_game.order.improved_load && !st->load_all_at_once;
+	return _settings_game.order.improved_load != st->gradual_load_differs;
 }
 
 /**

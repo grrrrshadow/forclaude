@@ -1874,7 +1874,6 @@ public:
 
 	void OnScroll(Point delta) override
 	{
-		if (_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed || _settings_client.gui.scroll_mode == ViewportScrollMode::MapRMBFixed) _cursor.fix_at = true;
 
 		/* While tile is at (delta.x, delta.y)? */
 		int sub;
