@@ -375,6 +375,7 @@ enum class Commands : uint8_t {
 	SetTimetableStart, ///< set the date that a timetable should start
 
 	OpenCloseAirport, ///< open/close an airport to incoming aircraft
+	SetStationGradualLoad, ///< let a station out of loading one vehicle at a time, or put it back in
 
 	CreateLeagueTable, ///< create a new league table
 	CreateLeagueTableElement, ///< create a new element in a league table

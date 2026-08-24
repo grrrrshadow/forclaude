@@ -31,6 +31,7 @@ CommandCost CmdRemoveRoadStop(DoCommandFlags flags, TileIndex tile, uint8_t widt
 CommandCost CmdRenameStation(DoCommandFlags flags, StationID station_id, const std::string &text);
 std::tuple<CommandCost, StationID> CmdMoveStationName(DoCommandFlags flags, StationID station_id, TileIndex tile);
 CommandCost CmdOpenCloseAirport(DoCommandFlags flags, StationID station_id);
+CommandCost CmdSetStationGradualLoad(DoCommandFlags flags, StationID station_id, bool gradual);
 
 DEF_CMD_TRAIT(Commands::BuildAirport, CmdBuildAirport, CommandFlags({CommandFlag::Auto, CommandFlag::NoWater}), CommandType::LandscapeConstruction)
 DEF_CMD_TRAIT(Commands::BuildDock, CmdBuildDock, CommandFlag::Auto, CommandType::LandscapeConstruction)
@@ -41,6 +42,7 @@ DEF_CMD_TRAIT(Commands::RemoveRoadStop, CmdRemoveRoadStop, {}, CommandType::Land
 DEF_CMD_TRAIT(Commands::RenameStation, CmdRenameStation, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::MoveStationName, CmdMoveStationName, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::OpenCloseAirport, CmdOpenCloseAirport, {}, CommandType::RouteManagement)
+DEF_CMD_TRAIT(Commands::SetStationGradualLoad, CmdSetStationGradualLoad, {}, CommandType::RouteManagement)
 
 void CcMoveStationName(Commands, const CommandCost &result, StationID station_id);
 

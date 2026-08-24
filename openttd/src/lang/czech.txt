@@ -1995,8 +1995,8 @@ STR_CONFIG_SETTING_SERVINT_DISABLED                             :Vypnuto
 
 STR_CONFIG_SETTING_NOSERVICE                                    :Vypnout servisy, když jsou vypnuty poruchy: {STRING}
 STR_CONFIG_SETTING_NOSERVICE_HELPTEXT                           :Pokud je zapnuto a zároveň jsou vypnuty poruchy, vozidla nebudou vůbec jezdit do servisu, protože se nemohou nikdy porouchat
-STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Zamluvit náklad pro vozidlo, které ho nakládá: {STRING}
-STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :Zapnuto: vozidlo čekající na plné naložení si náklad ve stanici zamluví pro sebe, takže na vozidla u ostatních nástupišť nezbyde nic, dokud neodjede. Vypnuto: ve stanici nakládají všichni najednou a dělí se o to, co tam je
+STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Postupné nakládání ve stanicích: {STRING}
+STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :Zapnuto: ve stanici se nakládá po jednom. Vozidlo, které čeká na plné naložení, si zboží ve stanici zamluví pro sebe a naloží se celé; vozidla u ostatních nástupišť zatím nedostanou nic a čekají, až na ně přijde řada. Kdo přijel dřív, naloží dřív. Vypnuto: nakládají všichni najednou a dělí se o to, co ve stanici je, takže se plná souprava skládá pomaleji, ale nikdo nestojí naprázdno. Tohle je nastavení pro celou hru; jednotlivou stanici z něj vyjmeš čudlíkem Postupně v jejím okně
 
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY               :Pomalejší nakládání u vlaků delších než stanice: {STRING}
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :Pokud je zapnuto, u vlaků delší než stanice je nakládání pomalejší než u vlaků, které se do stanice vejdou. Nastavení neovlivňuje hledání cesty.
@@ -4010,6 +4010,8 @@ STR_STATION_VIEW_EXCLUSIVE_RIGHTS_SELF                          :{BLACK}Tato sta
 STR_STATION_VIEW_EXCLUSIVE_RIGHTS_COMPANY                       :Společnost {YELLOW}{COMPANY}{BLACK} koupila v tomto městě výhradní přepravní práva.
 
 STR_STATION_VIEW_RATINGS_BUTTON                                 :{BLACK}Hodnocení
+STR_STATION_VIEW_GRADUAL_LOAD_BUTTON                            :Postupně
+STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP                           :{BLACK}Postupné nakládání na téhle stanici. Vozidlo čekající na plné naložení si náklad ve stanici zamluví pro sebe a vozidla u ostatních nástupišť čekají, až na ně přijde řada. Vypnuto: nakládá se tu všechno naráz a dělí se o to, co tam je. Jde nastavit, jen když je postupné nakládání zapnuté v nastavení hry pro celou hru
 STR_STATION_VIEW_RATINGS_TOOLTIP                                :{BLACK}Ukázat hodnocení společností
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MONTH                     :{BLACK}Dodávka za měsíc a místní hodnocení:
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MINUTE                    :{BLACK}Dodávka za minutu a místní hodnocení:

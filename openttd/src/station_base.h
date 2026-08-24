@@ -553,6 +553,18 @@ public:
 	uint8_t time_since_load = 0;
 	uint8_t time_since_unload = 0;
 
+	/**
+	 * This station is excused from loading one vehicle at a time.
+	 *
+	 * Loading in turn is switched on for the whole game in the settings; this
+	 * is how a single station is let out of it, because a station is where the
+	 * player can see the difference and where it matters. Stored as the
+	 * exception rather than as the state, so it means the same thing whichever
+	 * way the game-wide setting is left, and so a savegame made before this
+	 * existed loads as "no exceptions", which is what it was.
+	 */
+	bool load_all_at_once = false;
+
 	VehicleType last_vehicle_type = VehicleType::Invalid;
 	std::list<Vehicle *> loading_vehicles{};
 	std::array<GoodsEntry, NUM_CARGO> goods; ///< Goods at this station

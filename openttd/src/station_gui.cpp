@@ -872,6 +872,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_station_view_widgets
 					SetStringTip(STR_STATION_VIEW_CLOSE_AIRPORT, STR_STATION_VIEW_CLOSE_AIRPORT_TOOLTIP),
 		EndContainer(),
 		NWidget(WWT_TEXTBTN, Colours::Grey, WID_SV_CATCHMENT), SetMinimalSize(45, 12), SetResize(1, 0), SetFill(1, 1), SetStringTip(STR_BUTTON_CATCHMENT, STR_TOOLTIP_CATCHMENT),
+		NWidget(WWT_TEXTBTN, Colours::Grey, WID_SV_GRADUAL_LOAD), SetMinimalSize(45, 12), SetResize(1, 0), SetFill(1, 1), SetStringTip(STR_STATION_VIEW_GRADUAL_LOAD_BUTTON, STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SV_TRAINS), SetAspect(WidgetDimensions::ASPECT_VEHICLE_ICON), SetFill(0, 1), SetStringTip(STR_TRAIN, STR_STATION_VIEW_SCHEDULED_TRAINS_TOOLTIP),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SV_ROADVEHS), SetAspect(WidgetDimensions::ASPECT_VEHICLE_ICON), SetFill(0, 1), SetStringTip(STR_LORRY, STR_STATION_VIEW_SCHEDULED_ROAD_VEHICLES_TOOLTIP),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SV_SHIPS), SetAspect(WidgetDimensions::ASPECT_VEHICLE_ICON), SetFill(0, 1), SetStringTip(STR_SHIP, STR_STATION_VIEW_SCHEDULED_SHIPS_TOOLTIP),
@@ -1476,6 +1477,14 @@ struct StationViewWindow : public Window {
 		this->SetWidgetDisabledState(WID_SV_CATCHMENT, st->facilities.None());
 		this->SetWidgetLoweredState(WID_SV_CATCHMENT, _viewport_highlight_station == st);
 
+		/* Loading in turn is switched on for the whole game in the settings, and
+		 * this station either goes along with that or is excused from it. With
+		 * the game-wide switch off there is nothing to be excused from, so the
+		 * button says so by standing up and greyed out rather than pretending to
+		 * be a choice. */
+		this->SetWidgetDisabledState(WID_SV_GRADUAL_LOAD, st->owner != _local_company || !_settings_game.order.improved_load);
+		this->SetWidgetLoweredState(WID_SV_GRADUAL_LOAD, StationLoadsInTurn(st));
+
 		this->DrawWidgets();
 
 		if (!this->IsShaded()) {
@@ -2039,6 +2048,10 @@ struct StationViewWindow : public Window {
 
 			case WID_SV_CLOSE_AIRPORT:
 				Command<Commands::OpenCloseAirport>::Post(this->window_number);
+				break;
+
+			case WID_SV_GRADUAL_LOAD:
+				Command<Commands::SetStationGradualLoad>::Post(this->window_number, !this->IsWidgetLowered(WID_SV_GRADUAL_LOAD));
 				break;
 
 			case WID_SV_TRAINS:   // Show list of scheduled trains to this station

@@ -2854,6 +2854,35 @@ CommandCost CmdOpenCloseAirport(DoCommandFlags flags, StationID station_id)
 }
 
 /**
+ * Let this station out of loading one vehicle at a time, or put it back in.
+ *
+ * Loading in turn is switched on for the whole game in the settings. Which
+ * station wants it, though, is a question about that station: a terminus where
+ * a full load is being assembled wants it, and a busy through station where
+ * everything should just fill up together does not. So the setting says what
+ * the player wants by default and this says where they want something else.
+ *
+ * @param flags Operation to perform.
+ * @param station_id Station to change.
+ * @param gradual Whether this station is to load one vehicle at a time.
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdSetStationGradualLoad(DoCommandFlags flags, StationID station_id, bool gradual)
+{
+	if (!Station::IsValidID(station_id)) return CMD_ERROR;
+	Station *st = Station::Get(station_id);
+
+	CommandCost ret = CheckOwnership(st->owner);
+	if (ret.Failed()) return ret;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		st->load_all_at_once = !gradual;
+		SetWindowWidgetDirty(WindowClass::StationView, st->index, WID_SV_GRADUAL_LOAD);
+	}
+	return CommandCost();
+}
+
+/**
  * Tests whether the company's vehicles have this station in orders
  * @param station station ID
  * @param include_company If true only check vehicles of \a company, if false only check vehicles of other companies

@@ -1551,6 +1551,22 @@ struct ReserveCargoAction {
 };
 
 /**
+ * Does this station load one vehicle at a time?
+ *
+ * Switched on for the whole game in the settings, and switched off for a single
+ * station by the button in its window. On, a vehicle waiting for a full load
+ * claims what is at the station for itself and everything else waits its turn;
+ * off, everyone loads together and shares whatever is there.
+ *
+ * @param st the station
+ * @return whether cargo is claimed by one vehicle at a time here
+ */
+bool StationLoadsInTurn(const Station *st)
+{
+	return _settings_game.order.improved_load && !st->load_all_at_once;
+}
+
+/**
  * Reserves cargo if the full load order and improved_load is set or if the
  * current order allows autorefit.
  * @param st Station where the consist is loading at the moment.
@@ -1617,7 +1633,7 @@ static void LoadUnloadVehicle(Vehicle *front)
 	front->GetNextStoppingStation(next_station);
 	bool use_autorefit = front->current_order.IsRefit() && front->current_order.GetRefitCargo() == CARGO_AUTO_REFIT;
 	CargoArray consist_capleft{};
-	if (_settings_game.order.improved_load && use_autorefit ?
+	if (StationLoadsInTurn(st) && use_autorefit ?
 			front->cargo_payment == nullptr : (front->current_order.IsFullLoadOrder())) {
 		ReserveConsist(st, front,
 				(use_autorefit && front->load_unload_ticks != 0) ? &consist_capleft : nullptr,

@@ -1918,8 +1918,8 @@ STR_CONFIG_SETTING_SERVINT_DISABLED                             :Disabled
 
 STR_CONFIG_SETTING_NOSERVICE                                    :Disable servicing when breakdowns set to none: {STRING2}
 STR_CONFIG_SETTING_NOSERVICE_HELPTEXT                           :When enabled, vehicles do not get serviced if they cannot break down
-STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Reserve cargo for the vehicle loading it: {STRING}
-STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :When on, a vehicle waiting for a full load claims the cargo at the station for itself, so vehicles at other platforms get none until it leaves. When off, everything at the station loads at the same time and shares whatever is there
+STR_CONFIG_SETTING_IMPROVEDLOAD                                 :Load one vehicle at a time at stations: {STRING}
+STR_CONFIG_SETTING_IMPROVEDLOAD_HELPTEXT                        :When on, a station loads one vehicle at a time. A vehicle waiting for a full load claims what is at the station for itself and fills up completely, while vehicles at the other platforms get nothing until their turn comes; first to arrive is first to load. When off, everything loads at the same time and shares whatever is there, so a full load takes longer to assemble but nobody stands idle. This is the game-wide setting; a single station is let out of it with the In turn button in its own window
 
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY               :Loading speed penalty for trains that are longer than the station: {STRING2}
 STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :When enabled, trains which are too long for the station load more slowly than a train which fits the station. This setting does not affect pathfinding
@@ -3927,6 +3927,8 @@ STR_STATION_VIEW_EXCLUSIVE_RIGHTS_SELF                          :{BLACK}This sta
 STR_STATION_VIEW_EXCLUSIVE_RIGHTS_COMPANY                       :{YELLOW}{COMPANY}{BLACK} bought exclusive transport rights in this town.
 
 STR_STATION_VIEW_RATINGS_BUTTON                                 :{BLACK}Ratings
+STR_STATION_VIEW_GRADUAL_LOAD_BUTTON                            :In turn
+STR_STATION_VIEW_GRADUAL_LOAD_TOOLTIP                           :{BLACK}Load one vehicle at a time here. A vehicle waiting for a full load claims what is at the station for itself, and vehicles at the other platforms wait their turn. Switched off, everything here loads together and shares whatever is there. Only available while loading in turn is switched on for the whole game in the settings
 STR_STATION_VIEW_RATINGS_TOOLTIP                                :{BLACK}Show station ratings
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MONTH                     :{BLACK}Supply per month and local rating:
 STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_MINUTE                    :{BLACK}Supply per minute and local rating:

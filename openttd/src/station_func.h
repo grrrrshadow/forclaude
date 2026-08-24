@@ -64,4 +64,6 @@ inline Money StationMaintenanceCost(uint32_t num)
 
 Money AirportMaintenanceCost(Owner owner);
 
+bool StationLoadsInTurn(const Station *st);
+
 #endif /* STATION_FUNC_H */

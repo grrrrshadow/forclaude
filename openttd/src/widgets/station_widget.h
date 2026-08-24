@@ -30,6 +30,7 @@ enum StationViewWidgets : WidgetID {
 	WID_SV_SHIPS,              ///< List of scheduled ships button.
 	WID_SV_PLANES,             ///< List of scheduled planes button.
 	WID_SV_CATCHMENT,          ///< Toggle catchment area highlight.
+	WID_SV_GRADUAL_LOAD,       ///< Toggle loading one vehicle at a time at this station.
 };
 
 /** Widgets of the #CompanyStationsWindow class. */
