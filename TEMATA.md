@@ -450,6 +450,53 @@ v kapitole 11.
 - Ze souborů repozitáře byl kdy smazaný jen `TEST_LOG.md` (commit
   `af780c3`) a je zpátky, obsahově shodný s tím, co bylo smazáno.
 
+## 10.2 Vlastní ikonky: `grfcodec` v kontejneru je
+
+Dlouho jsem si myslel, že vlastní sprity přidat nejde. Šlo to celou dobu:
+**`apt-get install grfcodec`** (balík je i s `nforenum`). Je to obyčejný
+balík distribuce, jen jsem se na něj nepodíval.
+
+Jak se ikonka přidá:
+
+1. obrázek do `media/baseset/openttd/`, **8bpp v DOS paletě**, průhledno
+   je index 0,
+2. řádek do `media/baseset/openttd/openttdgui.nfo` — `-1 sprites/<jméno>.png
+   8bpp <x> <y> <š> <v> 0 0 normal` — a o jedna výš číslo v hlavičce
+   (`05 15 \b <počet>`),
+3. jméno souboru do `media/baseset/openttd/CMakeLists.txt`,
+4. `OPENTTD_SPRITE_COUNT` v `src/table/sprites.h` o jedna výš a nová
+   konstanta `SPR_...  = SPR_OPENTTD_BASE + <index>`,
+5. přeložit — CMake si `grfcodec` najde sám a `openttd.grf` i
+   `openttd.grf.hash` přepíše **ve zdrojovém stromu**. Obojí se commituje,
+   protože **CI `grfcodec` nemá** a bere hotový soubor z gitu.
+
+Kontrola, že to vyšlo: `grfcodec -d openttd.grf` a v `sprites/openttd.nfo`
+se podívat na blok `05 15`.
+
+**Ověřeno, že `grfcodec` reprodukuje původní soubory bajt po bajtu** —
+`orig_extra.grf` se po přegenerování nezměnil ani o bit. Přegenerování
+tedy nic nerozbije.
+
+### Co udělat s obrázkem, než se z něj stane sprite
+
+Ikonka z icons8 je 16 × 16 PNG s průhledností a **vyhlazenými okraji**.
+Ani jedno ve spritu nepřežije a naslepo převedená vypadá hrozně:
+
+- **Poloprůhledné pixely se musí useknout.** Hra nezná „napůl"; nechá je
+  plné, takže je z vyhlazeného okraje špinavý lem.
+- **Barvy se musí přichytit jen na šedou a dřevěnou řadu palety.** DOS
+  paleta má málo neutrálních šedí, takže když se převod nechá vybírat
+  volně, měkký šedý okraj skončí na nejbližší **modré** a celá ikonka má
+  fialový lem. Tohle byl ten viditelný problém.
+- **Kolem tvaru patří tmavá obrysová linka**, jak ji má každá ikonka ve
+  hře. Bez ní se nářadí ztratí v šedi tlačítka, na kterém sedí.
+
+Dělá to `media/baseset/openttd/openttdgui_rescue.py`, takže se to dá
+zopakovat i pro další ikonku.
+
+**16 × 16 je správná velikost** — tlačítko v okně vozidla je 18 × 18
+a lem si vezme po pixelu z každé strany.
+
 ---
 
 # 11. Pasti v enginu
@@ -582,20 +629,17 @@ větve, ne naše.
 ## 12.4 Ikonky
 
 **Ikonky jsou skutečné, ne vypůjčené** — 16 vlastních spritů 20 × 20.
-Podařilo se to bez `grfcodec`, který v kontejneru není: sprity jsou
-uložené v `media/baseset/openttd.grf`, a ten soubor je v beta 16 **bajt
-po bajtu stejný** jako v 15.3. Binární část patche na něj tedy sedne
-přesně tak, jak byla napsaná.
-
-Tohle je zároveň návod pro kladívko odtahu: dokud `grfcodec` chybí, jde
-sprity přidat jen hotové, ne z obrázku.
+Napoprvé se to povedlo i bez `grfcodec`: sprity jsou uložené hotové
+v `media/baseset/openttd.grf` a ten soubor je v beta 16 **bajt po bajtu
+stejný** jako v 15.3, takže binární část patche na něj sedla přesně tak,
+jak byla napsaná. Od té doby je `grfcodec` v kontejneru (viz 10.2) a
+sprity se dají přidávat normálně.
 
 ## 12.5 Kde to je
 
-- **Horní lišta, čtvrtá ikonka zprava** (mezi úpravami krajiny a hudbou).
-  Na úzké obrazovce se horní lišta zalamuje do dvou řad a tam se tahle
-  ikonka nevejde — proto je i druhá cesta:
-- **v liště úprav krajiny**, na místě, kde bývalo moje kopírování.
+**Horní lišta, čtvrtá ikonka zprava** (mezi úpravami krajiny a hudbou),
+a nikde jinde. V liště úprav krajiny to zkusmo bylo taky, ale ta lišta
+zůstává vanilková.
 
 ---
 
@@ -655,6 +699,4 @@ sprity přidat jen hotové, ne z obrázku.
 - Peron 1 a 2 při spojení mašinka+mašinka: výbuchy, po načtení savu
   zamrzání.
 - Otočit směr na první dlaždici od depa zamrazí vlak.
-- Ikonka `icons8-hammer-and-wrench-16.png` není zapojená (v kontejneru
-  není `grfcodec`); až bude, patří k ní uvést `icon8.com hammer`.
 - Odpojení přeskočené při prvním příjezdu po načtení hry.

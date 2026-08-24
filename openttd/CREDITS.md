@@ -62,3 +62,21 @@
 - All Translators - For their support to make OpenTTD a truly international game
 - Bug Reporters - Thanks for all bug reports
 - Chris Sawyer - For an amazing game!
+
+### Work by others carried in this build:
+
+This is not the stock OpenTTD source. Alongside the coupling, decoupling and
+rescue-tow work written for this repository, it carries other people's work,
+which stays theirs and is named here.
+
+- Spaceone (GitHub: age77) - The Blueprint patch: copy and paste of your own
+  infrastructure, with named slots, rotation and reflection, landscape
+  adjustment, and export to a file or the clipboard. Written for OpenTTD 15.3
+  and ported here to 16.0-beta2; GPL v2, the same licence as OpenTTD itself.
+  Original at https://github.com/age77/openttd-15.3-blueprint
+- Icons8 (https://icons8.com) - The hammer-and-wrench artwork the rescue-engine
+  button is drawn from.
+- Palo123 - The coupling and decoupling patch this repository's own version of
+  the feature takes its shape from: what the player sees and what the orders
+  can say. None of its code is used - it predates the rewrite of OpenTTD's
+  command system - but the design is theirs.

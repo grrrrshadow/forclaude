@@ -485,7 +485,7 @@ STR_TOOLBAR_TOOLTIP_BUILD_TRAMWAYS                              :{BLACK}Výstavb
 STR_TOOLBAR_TOOLTIP_BUILD_SHIP_DOCKS                            :{BLACK}Budovat vodní cesty
 STR_TOOLBAR_TOOLTIP_BUILD_AIRPORTS                              :{BLACK}Stavět letiště
 STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Otevřít nástrojovou lištu na úpravu terénu, výsadbu stromů nebo umístit ceduli
-STR_TOOLBAR_TOOLTIP_BLUEPRINT                                   :{BLACK}Otevřít lištu plánků pro kopírování a vkládání staveb
+STR_TOOLBAR_TOOLTIP_BLUEPRINT                                   :{BLACK}Blueprint copy/paste: zkopírovat kus toho, co jsi postavil, a postavit ho jinde, nebo v jiné hře
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Otevřít zvukové/hudební okno
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Otevřít poslední zprávu/zprávu o novinkách, historii zpráv nebo smazat všechny zprávy
 STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}Informace o území, snímek obrazovky, zásluhy na vývoj OpenTTD nebo vývojářské nástroje
@@ -3160,10 +3160,8 @@ STR_LANDSCAPING_TOOLBAR                                         :{WHITE}Úpravy 
 STR_LANDSCAPING_TOOLTIP_LOWER_A_CORNER_OF_LAND                  :{BLACK}Snížit roh země. Tažení sníží první vybraný roh a vybranou oblast na jeho novou výšku. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_LANDSCAPING_TOOLTIP_RAISE_A_CORNER_OF_LAND                  :{BLACK}Zvýšit roh země. Tažení zvyšuje první vybraný roh a vybranou oblast na jeho novou výšku. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_LANDSCAPING_LEVEL_LAND_TOOLTIP                              :{BLACK}Srovnat terén na výšku prvního vybraného rohu. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
-STR_LANDSCAPING_TOOLTIP_SHOW_BLUEPRINT_TOOLBAR                  :{BLACK}Otevřít lištu plánků pro kopírování a vkládání staveb
-
 # Blueprint toolbar
-STR_BLUEPRINT_TOOLBAR                                           :{WHITE}Plánek
+STR_BLUEPRINT_TOOLBAR                                           :{WHITE}Blueprint copy/paste
 STR_BLUEPRINT_SLOT                                              :{BLACK}{NUM}
 STR_BLUEPRINT_HEIGHT_POSITIVE                                   :{YELLOW}+{NUM}
 STR_BLUEPRINT_HEIGHT_NEGATIVE                                   :{YELLOW}-{NUM}

@@ -410,7 +410,7 @@ STR_TOOLBAR_TOOLTIP_BUILD_TRAMWAYS                              :{BLACK}Build tr
 STR_TOOLBAR_TOOLTIP_BUILD_SHIP_DOCKS                            :{BLACK}Build waterway infrastructure
 STR_TOOLBAR_TOOLTIP_BUILD_AIRPORTS                              :{BLACK}Build airports
 STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Open landscaping menu, tree menu, or place a sign
-STR_TOOLBAR_TOOLTIP_BLUEPRINT                                   :{BLACK}Show blueprint toolbar for copying and pasting infrastructure
+STR_TOOLBAR_TOOLTIP_BLUEPRINT                                   :{BLACK}Blueprint copy/paste: copy a piece of what you have built and build it again elsewhere, or in another game
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Open sound/music window
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Open last message/news report, messages history or delete all messages
 STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}Open land information, screenshot menu, OpenTTD credits, or developer tools
@@ -3083,10 +3083,8 @@ STR_LANDSCAPING_TOOLBAR                                         :{WHITE}Landscap
 STR_LANDSCAPING_TOOLTIP_LOWER_A_CORNER_OF_LAND                  :{BLACK}Lower a corner of land. Click+Drag to lower the first selected corner and level the selected area to the new corner height. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
 STR_LANDSCAPING_TOOLTIP_RAISE_A_CORNER_OF_LAND                  :{BLACK}Raise a corner of land. Click+Drag to raise the first selected corner and level the selected area to the new corner height. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
 STR_LANDSCAPING_LEVEL_LAND_TOOLTIP                              :{BLACK}Level an area of land to the height of the first selected corner. Ctrl+Click+Drag to select the area diagonally. Also press Shift to show cost estimate only
-STR_LANDSCAPING_TOOLTIP_SHOW_BLUEPRINT_TOOLBAR                  :{BLACK}Show blueprint toolbar for copying and pasting infrastructure
-
 # Blueprint toolbar
-STR_BLUEPRINT_TOOLBAR                                           :{WHITE}Blueprint
+STR_BLUEPRINT_TOOLBAR                                           :{WHITE}Blueprint copy/paste
 STR_BLUEPRINT_SLOT                                              :{BLACK}{NUM}
 STR_BLUEPRINT_HEIGHT_POSITIVE                                   :{YELLOW}+{NUM}
 STR_BLUEPRINT_HEIGHT_NEGATIVE                                   :{YELLOW}-{NUM}

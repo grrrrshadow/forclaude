@@ -2889,7 +2889,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 				 * the window otherwise. The two never show together. See
 				 * ShowsRescueEngineButton() and FEATURE_DESIGN_COUPLING_TOW.md. */
 				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_RESCUE_ENGINE), SetMinimalSize(18, 18),
-											SetSpriteTip(SPR_WARNING_SIGN, STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP),
+											SetSpriteTip(SPR_IMG_RESCUE_ENGINE, STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP),
 			EndContainer(),
 			/* For trains only, 'ignore signal' button. */
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_FORCE_PROCEED_SEL),
