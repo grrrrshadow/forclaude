@@ -359,6 +359,32 @@ std::optional<std::string> GetClipboardContents()
 	return result;
 }
 
+/**
+ * Put text on the clipboard.
+ * @param contents The text to put on the clipboard.
+ * @return Whether the clipboard accepted the text.
+ */
+bool SetClipboardContents(const std::string &contents)
+{
+	if (!OpenClipboard(nullptr)) return false;
+	EmptyClipboard();
+
+	std::wstring wide = OTTD2FS(contents);
+	HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, (wide.size() + 1) * sizeof(wchar_t));
+	if (mem == nullptr) {
+		CloseClipboard();
+		return false;
+	}
+	wchar_t *buf = static_cast<wchar_t *>(GlobalLock(mem));
+	std::copy_n(wide.c_str(), wide.size() + 1, buf);
+	GlobalUnlock(mem);
+
+	bool ok = SetClipboardData(CF_UNICODETEXT, mem) != nullptr;
+	if (!ok) GlobalFree(mem);
+	CloseClipboard();
+	return ok;
+}
+
 
 /**
  * Convert to OpenTTD's encoding from a wide string.

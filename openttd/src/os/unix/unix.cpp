@@ -217,6 +217,20 @@ std::optional<std::string> GetClipboardContents()
 
 	return std::nullopt;
 }
+
+/**
+ * Put text on the clipboard.
+ * @param contents The text to put on the clipboard.
+ * @return Whether the clipboard accepted the text.
+ */
+bool SetClipboardContents([[maybe_unused]] const std::string &contents)
+{
+#ifdef WITH_SDL2
+	return SDL_SetClipboardText(contents.c_str()) == 0;
+#else
+	return false;
+#endif
+}
 #endif
 
 

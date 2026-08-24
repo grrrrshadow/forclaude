@@ -14,6 +14,7 @@
 #include "dropdown_type.h"
 
 struct Window *ShowBuildRailToolbar(RailType railtype);
+RailType GetCurrentRailType();
 void ReinitGuiAfterToggleElrail(bool disable);
 void ResetSignalVariant(int32_t = 0);
 void InitializeSignalGui();

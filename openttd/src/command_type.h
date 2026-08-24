@@ -383,6 +383,8 @@ enum class Commands : uint8_t {
 	UpdateLeagueTableElementScore, ///< update the score of a league table element
 	RemoveLeagueTableElement, ///< remove a league table element
 
+	PasteBlueprint, ///< paste a blueprint onto the map
+
 	End, ///< @important Must ALWAYS be on the end of this list!! (period)
 };
 

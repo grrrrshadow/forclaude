@@ -8,7 +8,7 @@
 /** @file terraform_gui.cpp GUI related to terraforming the map. */
 
 #include "stdafx.h"
-#include "copypaste_func.h"
+#include "blueprint_gui.h"
 #include "core/backup_type.hpp"
 #include "clear_map.h"
 #include "company_func.h"
@@ -233,8 +233,8 @@ struct TerraformToolbarWindow : Window {
 				ShowBuildObjectPicker();
 				break;
 
-			case WID_TT_COPY_PASTE: // Copy and paste a patch of map
-				ShowCopyPasteToolbar();
+			case WID_TT_SHOW_BLUEPRINT: // Show blueprint toolbar button
+				ShowBlueprintToolbar();
 				break;
 
 			default: NOT_REACHED();
@@ -368,8 +368,8 @@ static constexpr std::initializer_list<NWidgetPart> _nested_terraform_widgets = 
 			NWidget(WWT_PUSHIMGBTN, Colours::DarkGreen, WID_TT_PLACE_OBJECT), SetToolbarMinimalSize(1),
 								SetFill(0, 1), SetSpriteTip(SPR_IMG_TRANSMITTER, STR_SCENEDIT_TOOLBAR_PLACE_OBJECT_TOOLTIP),
 		EndContainer(),
-		NWidget(WWT_PUSHIMGBTN, Colours::DarkGreen, WID_TT_COPY_PASTE), SetToolbarMinimalSize(1),
-								SetFill(0, 1), SetSpriteTip(SPR_IMG_LANDSCAPING, STR_LANDSCAPING_COPY_PASTE_TOOLTIP),
+		NWidget(WWT_PUSHIMGBTN, Colours::DarkGreen, WID_TT_SHOW_BLUEPRINT), SetToolbarMinimalSize(1),
+								SetFill(0, 1), SetSpriteTip(SPR_BLUEPRINT_TOOLBAR, STR_LANDSCAPING_TOOLTIP_SHOW_BLUEPRINT_TOOLBAR),
 	EndContainer(),
 };
 

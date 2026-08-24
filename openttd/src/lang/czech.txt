@@ -485,6 +485,7 @@ STR_TOOLBAR_TOOLTIP_BUILD_TRAMWAYS                              :{BLACK}Výstavb
 STR_TOOLBAR_TOOLTIP_BUILD_SHIP_DOCKS                            :{BLACK}Budovat vodní cesty
 STR_TOOLBAR_TOOLTIP_BUILD_AIRPORTS                              :{BLACK}Stavět letiště
 STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Otevřít nástrojovou lištu na úpravu terénu, výsadbu stromů nebo umístit ceduli
+STR_TOOLBAR_TOOLTIP_BLUEPRINT                                   :{BLACK}Otevřít lištu plánků pro kopírování a vkládání staveb
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Otevřít zvukové/hudební okno
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Otevřít poslední zprávu/zprávu o novinkách, historii zpráv nebo smazat všechny zprávy
 STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}Informace o území, snímek obrazovky, zásluhy na vývoj OpenTTD nebo vývojářské nástroje
@@ -3159,17 +3160,67 @@ STR_LANDSCAPING_TOOLBAR                                         :{WHITE}Úpravy 
 STR_LANDSCAPING_TOOLTIP_LOWER_A_CORNER_OF_LAND                  :{BLACK}Snížit roh země. Tažení sníží první vybraný roh a vybranou oblast na jeho novou výšku. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_LANDSCAPING_TOOLTIP_RAISE_A_CORNER_OF_LAND                  :{BLACK}Zvýšit roh země. Tažení zvyšuje první vybraný roh a vybranou oblast na jeho novou výšku. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
 STR_LANDSCAPING_LEVEL_LAND_TOOLTIP                              :{BLACK}Srovnat terén na výšku prvního vybraného rohu. Ctrl vybírá diagonální oblast. Podrž Shift pro zobrazení odhadu ceny
-STR_COPY_PASTE_CAPTION                                          :{WHITE}Kopírovat a vložit
-STR_COPY_PASTE_NOTHING_COPIED                                   :{BLACK}Zatím nic zkopírováno
-STR_COPY_PASTE_AREA_COPIED                                      :{BLACK}Zkopírováno {NUM}x{NUM}, {NUM} dlaždic s obsahem
-STR_COPY_PASTE_COPY_BUTTON                                      :Kopírovat
-STR_COPY_PASTE_COPY_TOOLTIP                                     :{BLACK}Označ plochu na mapě a zapamatuj si koleje, silnice a depa na ní
-STR_COPY_PASTE_PASTE_BUTTON                                     :Vložit
-STR_COPY_PASTE_PASTE_TOOLTIP                                    :{BLACK}Postavit, co bylo zkopírováno. Kurzor ukazuje, kam to přijde; klepnutím se to postaví
-STR_COPY_PASTE_CLEAR_BUTTON                                     :Zapomenout
-STR_COPY_PASTE_CLEAR_TOOLTIP                                    :{BLACK}Zapomenout, co bylo zkopírováno
-STR_LANDSCAPING_COPY_PASTE_TOOLTIP                              :{BLACK}Zkopírovat kus kolejí a silnic a postavit ho jinde
-STR_ERROR_CAN_T_PASTE_AREA                                      :{WHITE}Zde nelze postavit zkopírovanou plochu...
+STR_LANDSCAPING_TOOLTIP_SHOW_BLUEPRINT_TOOLBAR                  :{BLACK}Otevřít lištu plánků pro kopírování a vkládání staveb
+
+# Blueprint toolbar
+STR_BLUEPRINT_TOOLBAR                                           :{WHITE}Plánek
+STR_BLUEPRINT_SLOT                                              :{BLACK}{NUM}
+STR_BLUEPRINT_HEIGHT_POSITIVE                                   :{YELLOW}+{NUM}
+STR_BLUEPRINT_HEIGHT_NEGATIVE                                   :{YELLOW}-{NUM}
+STR_BLUEPRINT_EXPORT                                            :{BLACK}Uložit
+STR_BLUEPRINT_IMPORT                                            :{BLACK}Načíst
+STR_BLUEPRINT_EXPORT_IMPORT                                     :{BLACK}Ulož/Nač
+STR_BLUEPRINT_INFO_VERSION                                      :{WHITE}Blueprint (autor Spaceone), verze {RAW_STRING}
+STR_BLUEPRINT_EXPORT_MENU_SLOT                                  :Uložit aktivní přihrádku...
+STR_BLUEPRINT_EXPORT_MENU_ALL                                   :Uložit všechny přihrádky do souboru...
+STR_BLUEPRINT_IMPORT_MENU_SLOT                                  :Načíst do aktivní přihrádky...
+STR_BLUEPRINT_IMPORT_MENU_ALL                                   :Načíst všechny přihrádky ze souboru...
+STR_BLUEPRINT_EXPORT_CAPTION                                    :{WHITE}Uložit plánek
+STR_BLUEPRINT_IMPORT_CAPTION                                    :{WHITE}Načíst plánek
+STR_BLUEPRINT_COPY_TO_CLIPBOARD                                 :{BLACK}Kopírovat do schránky
+STR_BLUEPRINT_PASTE_FROM_CLIPBOARD                              :{BLACK}Vložit ze schránky
+STR_BLUEPRINT_QUERY_OVERWRITE_CAPTION                           :{WHITE}Přepsat plánek?
+STR_BLUEPRINT_QUERY_OVERWRITE                                   :{YELLOW}V aktivní přihrádce už plánek je. Chceš ho přepsat?
+STR_BLUEPRINT_QUERY_OVERWRITE_ALL_CAPTION                       :{WHITE}Přepsat všechny plánky?
+STR_BLUEPRINT_QUERY_OVERWRITE_ALL                               :{YELLOW}Tímto se přepíše obsah všech přihrádek. Chceš pokračovat?
+STR_BLUEPRINT_QUERY_RENAME_CAPTION                              :{WHITE}Přejmenovat plánek
+STR_BLUEPRINT_QUERY_EXPORT_FILE_CAPTION                         :{WHITE}Uložit všechny plánky do souboru
+STR_BLUEPRINT_QUERY_IMPORT_FILE_CAPTION                         :{WHITE}Načíst všechny plánky ze souboru
+STR_BLUEPRINT_QUERY_OVERWRITE_FILE_CAPTION                      :{WHITE}Přepsat soubor?
+STR_BLUEPRINT_QUERY_OVERWRITE_FILE                              :{YELLOW}Soubor s tímto jménem už existuje. Chceš ho přepsat?
+STR_BLUEPRINT_TOOLTIP_SLOT                                      :{BLACK}Přepnout na tuto přihrádku. Když má jméno nebo obsah, ukáže se po najetí myší jméno a náhled. Dvojklikem se přejmenuje
+STR_BLUEPRINT_TOOLTIP_EXPORT_IMPORT                             :{BLACK}Uložit nebo načíst plánky
+STR_BLUEPRINT_TOOLTIP_FILE_LIST                                 :{BLACK}Klepnutím na soubor ho vybereš, klepnutím na složku ji otevřeš
+STR_BLUEPRINT_TOOLTIP_COPY                                      :{BLACK}Označ plochu svých staveb, která se zkopíruje do aktivní přihrádky
+STR_BLUEPRINT_TOOLTIP_PASTE                                     :{BLACK}Postavit na mapě obsah aktivní přihrádky
+STR_BLUEPRINT_TOOLTIP_PASTE_RAIL                                :{BLACK}Vkládat železnici
+STR_BLUEPRINT_TOOLTIP_PASTE_ROAD                                :{BLACK}Vkládat silnice a tramvaje
+STR_BLUEPRINT_TOOLTIP_PASTE_WATER                               :{BLACK}Vkládat vodní cesty
+STR_BLUEPRINT_TOOLTIP_PASTE_AIR                                 :{BLACK}Vkládat letiště
+STR_BLUEPRINT_TOOLTIP_CONVERT_RAILTYPE                          :{BLACK}Při vkládání převést koleje na právě zvolený druh
+STR_BLUEPRINT_TOOLTIP_MIRROR_SIGNALS                            :{BLACK}Při vkládání otočit návěstidla na opačnou stranu
+STR_BLUEPRINT_TOOLTIP_UPGRADE_BRIDGES                           :{BLACK}Při vkládání postavit nejrychlejší dostupné mosty
+STR_BLUEPRINT_TOOLTIP_WITH_STATIONS                             :{BLACK}Vkládat i nádraží a stanoviště
+STR_BLUEPRINT_TOOLTIP_TERRAFORM                                 :{BLACK}Při vkládání upravit terén. Klepnutím se přepíná: bez úprav, jen pod stavbami, celá plocha
+STR_BLUEPRINT_TOOLTIP_TRANSFORMATION                            :{BLACK}Současné otočení, klepnutím se zruší
+STR_BLUEPRINT_TOOLTIP_ROTATE_CCW                                :{BLACK}Otočit plánek o 90 stupňů proti směru hodinových ručiček
+STR_BLUEPRINT_TOOLTIP_ROTATE_CW                                 :{BLACK}Otočit plánek o 90 stupňů po směru hodinových ručiček
+STR_BLUEPRINT_TOOLTIP_REFLECT_NW_SE                             :{BLACK}Zrcadlit plánek podle osy severozápad-jihovýchod
+STR_BLUEPRINT_TOOLTIP_REFLECT_NE_SW                             :{BLACK}Zrcadlit plánek podle osy severovýchod-jihozápad
+STR_BLUEPRINT_TOOLTIP_HEIGHT_DISPLAY                            :{BLACK}O kolik výškových stupňů se plánek posune při vkládání
+STR_BLUEPRINT_TOOLTIP_HEIGHT_UP                                 :{BLACK}Vložit plánek výš
+STR_BLUEPRINT_TOOLTIP_HEIGHT_DOWN                               :{BLACK}Vložit plánek níž
+STR_BLUEPRINT_TOOLTIP_INFO                                      :{BLACK}Informace o rozšíření Blueprint
+STR_BLUEPRINT_ERROR_NOTHING_TO_COPY                             :{WHITE}Na označené ploše nejsou žádné tvoje stavby
+STR_BLUEPRINT_ERROR_CLIPBOARD_EXPORT                            :{WHITE}Plánek se nepodařilo zkopírovat do schránky
+STR_BLUEPRINT_ERROR_CLIPBOARD_PASTE                             :{WHITE}Schránka je prázdná
+STR_BLUEPRINT_ERROR_INVALID_TEXT                                :{WHITE}Tento text není platný plánek
+STR_BLUEPRINT_ERROR_INVALID_FILE_NAME                           :{WHITE}Neplatné jméno souboru
+STR_BLUEPRINT_ERROR_FILE_NOT_FOUND                              :{WHITE}Soubor s plánky nenalezen, nebo to plánky nejsou
+STR_BLUEPRINT_ERROR_FILE_WRITE                                  :{WHITE}Soubor s plánky se nepodařilo zapsat
+STR_BLUEPRINT_ERROR_AREA_TOO_LARGE                              :{WHITE}Označená plocha je na zkopírování moc velká
+STR_BLUEPRINT_ERROR_TOO_LARGE                                   :{WHITE}Plánek je moc velký na vložení ve hře více hráčů
+STR_ERROR_CAN_T_PASTE_BLUEPRINT                                 :{WHITE}Sem plánek vložit nelze...
 STR_LANDSCAPING_TOOLTIP_PURCHASE_LAND                           :{BLACK}Zakoupit pozemek pro budoucí užití. Podrž Shift pro zobrazení odhadu ceny
 
 # Object construction window

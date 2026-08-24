@@ -129,6 +129,7 @@ enum ViewportDragDropSelectionProcess : uint8_t {
 	DDSP_CREATE_RIVER,         ///< Create rivers
 	DDSP_PLANT_TREES,          ///< Plant trees
 	DDSP_BUILD_BRIDGE,         ///< Bridge placement
+	DDSP_BLUEPRINT_COPY,       ///< Select an area to copy into a blueprint slot
 	DDSP_BUILD_OBJECT,         ///< Build an object
 	DDSP_PLACE_HOUSE,          ///< Place a house
 

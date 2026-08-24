@@ -511,31 +511,6 @@ Tady jsou závěry, protože platí pro cokoliv nového:
 
 ---
 
-# 11.3 Kopírovat a vložit plochu
-
-Nástroj v liště terénních úprav. Označí se plocha, přečte se, co na ní stojí,
-a jinde se to postaví znovu.
-
-**Co se pamatuje, je seznam věcí k postavení, ne obrázek mapy.** Vkládání je
-proto obyčejné stavební příkazy jeden po druhém, přesně jako by to hráč
-kladl ručně: stojí to, co to stojí, ctí to vlastnictví, odmítne to, co
-terén neunese, a funguje to i ve hře více hráčů. Nic tam nezapisuje do
-mapy samo.
-
-V první verzi se přenáší **koleje, návěstidla, silnice, tramvajové tratě a
-depa**. Nádraží, mosty a tunely ne — nádraží patří ke stanici a most i tunel
-mají dva konce, z nichž v označené ploše může být jen jeden, a půlka mostu
-není nic, co by šlo postavit.
-
-Návěstidla se stavějí až po kolejích a přenáší se u nich i **přesná dvojice
-bitů** (`signals_copy`), takže se strana, na kterou návěstidlo kouká,
-nehádá.
-
-Ikonka je zatím vypůjčená (`SPR_IMG_LANDSCAPING`) — vlastní se přidat nedá,
-dokud v kontejneru není `grfcodec`. Stejný problém jako u kladívka odtahu.
-
----
-
 # 12. Blueprint (Spaceone)
 
 ## 12.1 Odkud je a co s ním smíme
@@ -552,46 +527,75 @@ Patch **Blueprint** pro OpenTTD 15.3.
 **Smíme ho použít**, když zůstanou hlavičky a autorství. Jméno autora patří
 do hlaviček přebraných souborů a sem.
 
-Soubor s patchem se v repozitáři nenechává — jakmile je port hotový, mizí.
-Odkaz nahoře je to, co má zůstat.
+Soubor s patchem už v repozitáři není — po přenesení se smazal, jak bylo
+domluveno. Odkaz nahoře je to, co zůstalo.
 
-## 12.2 Proč nahrazuje moji verzi kopírování
+## 12.2 Proč nahradil moji verzi kopírování
 
-Moje `copypaste_gui.cpp` (kapitola 11.3) umí kopírovat jen v rámci jedné
-rozehrané hry. Chtěné je přenést plochu **do jiné hry**, tedy uložit ji do
-souboru. To Blueprint už umí, a k tomu:
+Moje `copypaste_gui.cpp` uměla kopírovat jen v rámci jedné rozehrané hry.
+Chtěné bylo přenést plochu **do jiné hry**, tedy uložit ji do souboru. To
+Blueprint umí, a k tomu spoustu dalšího, takže moje verze je pryč a nic
+z ní nezbylo.
 
-- **8 pojmenovaných slotů** (`NUM_BLUEPRINT_SLOTS`),
+Co je ve hře teď:
+
+- **8 přihrádek** (`NUM_BLUEPRINT_SLOTS`), každá se dá pojmenovat
+  (dvojklik na číslo),
 - plocha až **255 × 255** (`MAX_BLUEPRINT_DIMENSION`),
-- posun výšky **±8**, s vlastním režimem terénních úprav
-  (`BlueprintTerraformMode`), takže se plocha dá položit i tam, kde terén
-  přesně nesedí,
-- **soubor** ve vlastní složce (`BLUEPRINT_DIR`), formát `OTTD-BPSET-1;`
-  a base64; jeden výřez jde i přes schránku jako `OTTD-BP-1;` + base64,
-- 16 vlastních ikon 20 × 20,
-- vlastní test (`src/tests/blueprint.cpp`).
+- **otáčení a zrcadlení** — čtyři otočení po 90° a dvě osy zrcadlení,
+  správně se přitom otáčí i koleje, návěstidla, výhybky depa a silnice,
+- posun výšky **±8** a tři režimy úprav terénu: žádné, jen pod stavbami,
+  celá plocha (`BlueprintTerraformMode`),
+- **soubor** ve složce `blueprint` vedle `openttd.cfg` — uloží se všech
+  osm přihrádek najednou (formát `OTTD-BPSET-1;` a base64); jedna
+  přihrádka jde i přes schránku jako `OTTD-BP-1;` + base64,
+- **náhled v mapě** ještě před klepnutím: koleje se kreslí jako čáry,
+  ostatní stavby jako obdélníky, a co se na dané místo nevejde, svítí
+  červeně,
+- kopíruje se **železnice, návěstidla, silnice a tramvaje, depa, kanály,
+  zdymadla, loděnice, mosty a tunely, nádraží a stanoviště, přístavy,
+  bóje a letiště** — všechno, co patří hráči.
 
-Psát tohle znovu nemá smysl.
+Vkládání jsou pořád **obyčejné stavební příkazy jeden po druhém**, přesně
+jako by to hráč kladl ručně: stojí to, co to stojí, ctí to vlastnictví,
+odmítne to, co terén neunese, a funguje to i ve hře více hráčů. Co se
+nevejde, se přeskočí — nevypíše se u toho chyba za chybou.
 
-## 12.3 Co port obnáší
+## 12.3 Co bylo potřeba přepsat při přenosu z 15.3
 
-Je to **104 souborů a zhruba 8 500 řádků proti 15.3**. Autor sám píše, že
-se to musí **portovat, ne aplikovat** — mezi 15.3 a beta 16 se hodně
-přejmenovalo (výčtové typy na `enum class`, příznaky na `BaseBitSet`,
-`VehicleID::Invalid()` a spol.).
+Patch je proti 15.3 a mezi ní a beta 16 se hodně přejmenovalo. Nešlo tedy
+nic „přiložit", muselo se to přepsat. Skoro všechno bylo mechanické:
 
-Postup, jakým to jde dělat po kusech a průběžně to překládat:
+- výčtové typy jsou dnes `enum class` (`Track::X` místo `TRACK_X`,
+  `TileType::Railway` místo `MP_RAILWAY`, `Commands::BuildRail` místo
+  `CMD_BUILD_SINGLE_RAIL`, a tak dokola),
+- `TrackBits` a `RoadBits` jsou dnes bitové množiny, ne čísla — takže se
+  nedají sčítat s příznakovým bitem náhledu; ten se nastavuje zvlášť,
+- pole indexovaná výčtem potřebují `TrackIndexArray` nebo `to_underlying`,
+- **příkazy na most a tunel dostávají druh koleje a druh silnice zvlášť**,
+  místo jednoho společného čísla.
 
-1. datový model výřezu a jeho čtení z mapy,
-2. ukládání a načítání souboru,
-3. stavění zpět (obyčejnými stavebními příkazy, jako v 11.3),
-4. okno a ikony,
-5. terénní režim s posunem výšky,
-6. teprve nakonec zahodit `copypaste_gui.cpp`.
+Dvě věci z původního patche se **nepřebíraly schválně**: přejmenování
+titulku hlavního menu a titulku okna hry na „Blueprint". To je značka jeho
+větve, ne naše.
 
-Ikony jsou stejný problém jako u kladívka odtahu: bez `grfcodec`
-v kontejneru se vlastní sprity nepřidají, takže se do té doby půjčuje
-existující.
+## 12.4 Ikonky
+
+**Ikonky jsou skutečné, ne vypůjčené** — 16 vlastních spritů 20 × 20.
+Podařilo se to bez `grfcodec`, který v kontejneru není: sprity jsou
+uložené v `media/baseset/openttd.grf`, a ten soubor je v beta 16 **bajt
+po bajtu stejný** jako v 15.3. Binární část patche na něj tedy sedne
+přesně tak, jak byla napsaná.
+
+Tohle je zároveň návod pro kladívko odtahu: dokud `grfcodec` chybí, jde
+sprity přidat jen hotové, ne z obrázku.
+
+## 12.5 Kde to je
+
+- **Horní lišta, čtvrtá ikonka zprava** (mezi úpravami krajiny a hudbou).
+  Na úzké obrazovce se horní lišta zalamuje do dvou řad a tam se tahle
+  ikonka nevejde — proto je i druhá cesta:
+- **v liště úprav krajiny**, na místě, kde bývalo moje kopírování.
 
 ---
 

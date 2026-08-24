@@ -84,6 +84,12 @@ add_files(
     base_media_sounds.h
     base_station_base.h
     bitmap_type.h
+    blueprint.cpp
+    blueprint.h
+    blueprint_cmd.h
+    blueprint_gui.cpp
+    blueprint_gui.h
+    blueprint_version.h
     bmp.cpp
     bmp.h
     bootstrap_gui.cpp
@@ -498,8 +504,6 @@ add_files(
     tar_type.h
     terraform_cmd.cpp
     terraform_cmd.h
-    copypaste_gui.cpp
-    copypaste_func.h
     terraform_gui.cpp
     terraform_gui.h
     textbuf.cpp

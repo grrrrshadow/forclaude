@@ -17,6 +17,7 @@
 #include "../airport_cmd.h"
 #include "../aircraft_cmd.h"
 #include "../autoreplace_cmd.h"
+#include "../blueprint_cmd.h"
 #include "../company_cmd.h"
 #include "../depot_cmd.h"
 #include "../dock_cmd.h"

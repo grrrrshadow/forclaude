@@ -744,10 +744,22 @@ enum class WindowClass : uint16_t {
 	Help,
 
 	/**
-	 * Copy and paste a patch of map; %Window numbers:
-	 *   - 0 = #CopyPasteWidgets
+	 * Blueprint (copy and paste) toolbar; %Window numbers:
+	 *   - 0 = #BlueprintToolbarWidgets
 	 */
-	CopyPaste,
+	BlueprintToolbar,
+
+	/**
+	 * Blueprint text export/import dialog; %Window numbers:
+	 *   - 0 = #BlueprintTextWidgets
+	 */
+	BlueprintText,
+
+	/**
+	 * Blueprint export/import-all-slots file dialog; %Window numbers:
+	 *   - 0 = #BlueprintFileWidgets
+	 */
+	BlueprintFile,
 
 	Invalid = 0xFFFF, ///< Invalid window.
 };

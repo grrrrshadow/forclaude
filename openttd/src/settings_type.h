@@ -279,6 +279,15 @@ struct GUISettings {
 	bool station_dragdrop; ///< whether drag and drop is enabled for stations
 	bool station_show_coverage; ///< whether to highlight coverage area
 	bool persistent_buildingtools; ///< keep the building tools active after usage
+	bool blueprint_paste_rail; ///< Blueprint: paste rail transport infrastructure
+	bool blueprint_paste_road; ///< Blueprint: paste road transport infrastructure
+	bool blueprint_paste_water; ///< Blueprint: paste water transport infrastructure
+	bool blueprint_paste_air; ///< Blueprint: paste airports
+	bool blueprint_convert_railtype; ///< Blueprint: convert pasted rail to the current rail type
+	bool blueprint_mirror_signals; ///< Blueprint: mirror pasted signals
+	bool blueprint_upgrade_bridges; ///< Blueprint: upgrade pasted bridges
+	bool blueprint_with_stations; ///< Blueprint: paste stations and waypoints too
+	uint8_t blueprint_terraform_mode; ///< Blueprint: terraforming while pasting (0 none, 1 minimal, 2 full)
 	bool expenses_layout; ///< layout of expenses window
 	uint32_t last_newgrf_count; ///< the numbers of NewGRFs we found during the last scan
 	uint8_t missing_strings_threshold; ///< the number of missing strings before showing the warning

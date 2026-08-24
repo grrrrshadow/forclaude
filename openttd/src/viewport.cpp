@@ -62,6 +62,7 @@
 
 #include "stdafx.h"
 #include "core/backup_type.hpp"
+#include "blueprint_gui.h"
 #include "landscape.h"
 #include "viewport_func.h"
 #include "station_base.h"
@@ -76,6 +77,7 @@
 #include "zoom_func.h"
 #include "vehicle_func.h"
 #include "company_func.h"
+#include "track_func.h"
 #include "waypoint_func.h"
 #include "window_func.h"
 #include "tilehighlight_func.h"
@@ -1003,6 +1005,33 @@ static void DrawAutorailSelection(const TileInfo *ti, HighLightStyle highlight_s
 	DrawSelectionSprite(image, _thd.make_square_red ? PALETTE_SEL_TILE_RED : pal, ti, 7, foundation_part);
 }
 
+/**
+ * Draw the blueprint paste preview overlays on a tile inside the selection.
+ * @param ti Tile that is being drawn.
+ */
+static void DrawBlueprintPastePreview(const TileInfo *ti)
+{
+	const BlueprintPastePreview *preview = GetBlueprintPastePreview(TileVirtXY(_thd.pos.x, _thd.pos.y));
+	if (preview == nullptr) return;
+
+	int dx = (ti->x - _thd.pos.x) / static_cast<int>(TILE_SIZE);
+	int dy = (ti->y - _thd.pos.y) / static_cast<int>(TILE_SIZE);
+	if (dx < 0 || dy < 0 || dx >= preview->width || dy >= preview->height) return;
+
+	size_t index = static_cast<size_t>(dy) * preview->width + dx;
+	uint8_t overlay = preview->tiles[index];
+	if (index < preview->blocked.size() && preview->blocked[index]) {
+		/* This part cannot be built at the current position. */
+		DrawTileSelectionRect(ti, PALETTE_SEL_TILE_RED);
+	} else if (HasBit(overlay, BLUEPRINT_PREVIEW_HIGHLIGHT_BIT)) {
+		DrawTileSelectionRect(ti, PALETTE_SEL_TILE_BLUE);
+	}
+
+	for (Track track : TrackBits(static_cast<uint8_t>(GB(overlay, 0, 6)))) {
+		DrawAutorailSelection(ti, _autorail_type[to_underlying(track)][0]);
+	}
+}
+
 /** Types of tile highlight. */
 enum class TileHighlightType : uint8_t {
 	None, ///< No tile highlight.
@@ -1145,6 +1174,7 @@ static void DrawTileSelection(const TileInfo *ti)
 draw_inner:
 		if (_thd.drawstyle & HT_RECT) {
 			if (!is_redsq) DrawTileSelectionRect(ti, _thd.make_square_red ? PALETTE_SEL_TILE_RED : PAL_NONE);
+			DrawBlueprintPastePreview(ti);
 		} else if (_thd.drawstyle & HT_POINT) {
 			/* Figure out the Z coordinate for the single dot. */
 			int z = 0;
