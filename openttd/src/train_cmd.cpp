@@ -5856,6 +5856,17 @@ static void DeleteLastWagon(Train *v)
 	if (trackbits == Track::Wormhole) {
 		/* Vehicle is inside a wormhole, v->track contains no useful value then. */
 		trackbits = DiagDirToDiagTrack(GetTunnelBridgeDirection(tile));
+	} else if (trackbits == Track::Depot) {
+		/* Nor inside a depot: "in a depot" is all that field says there, and
+		 * asking it which single track that is brings the game down. A depot
+		 * tile has exactly one, the one leading out of the door, so say so --
+		 * the same answer the tunnel case above gives, for the same reason.
+		 *
+		 * Vanilla never had to: a wreck could not get into a depot, and the
+		 * only way one can now is that something went and fetched it. The loop
+		 * below already knew depots were possible here and stepped around them;
+		 * this call is above it and did not. */
+		trackbits = DiagDirToDiagTrack(GetRailDepotDirection(tile));
 	}
 
 	Track track = TrackBitsToTrack(trackbits);
