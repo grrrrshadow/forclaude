@@ -496,6 +496,23 @@ Tady jsou závěry, protože platí pro cokoliv nového:
   množina). Potřebuju `crash.log` — píše se do složky k `openttd.cfg`, ale
   jen když se po tom hlášení nechá hra sama doběhnout.
 
+  **Ze `crash.log` (build #78) se stack trace nedozvíme a nikdy nedozvíme.**
+  V logu je `"stacktrace": []` — prázdné pole, ne „nepovedlo se to
+  posbírat". Hra si výpis zásobníku dělá přes systémovou knihovnu
+  `dbghelp.dll`; když ji nenajde nebo v ní nenajde funkce, celý ten krok
+  **tiše přeskočí** a nechá prázdné pole. Přesně to se stalo. Vyloučeno
+  je přitom to, co by člověk čekal: assert **není** slepá ulička bez
+  kontextu — `abort()` se odchytí a převede na skutečnou výjimku
+  s platným kontextem, takže kdyby ta knihovna byla, výpis by tam byl.
+
+  **Důsledek: hlášku si musí nést informaci sama.** Proto se fond od
+  `0afcee0` pojmenuje i s indexem. Řádek `reason` v logu je totiž to
+  jediné, co se odtamtud spolehlivě dozvíme.
+
+  Co ještě log řekl: verze `b1178bc` (tedy bez opravy vraku v depu a bez
+  toho pojmenování), Windows 7 SP1, dvě železniční neštěstí krátce
+  předtím, šest vlaků, a `_current_company` mimo firmu.
+
   Co už se o tom `track_func.h:168` ví, bez logu:
 
   - Hlásí se ta hláška **z `TrackBitsToTrack()` samotné**, ne z mého
