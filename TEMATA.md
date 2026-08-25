@@ -94,6 +94,16 @@ to, jestli je mašinka v tom pohybu napřed nebo vzadu:
 Odpojená mašinka má na všech čtyřech nástupištích **nos pryč od vagonků**.
 Liší se jen konec, na kterém stojí.
 
+**Rozpojování se netestuje tady.** Spojená dvojice z tohohle nádraží odjede
+na **druhé nádraží s jedním nástupištěm** a rozpojuje se tam. Plánek výš
+tedy platí pro to, **jak byla souprava složená**, ne pro místo, kde se
+rozpojuje — a to je na něm to důležité: podle toho, na kterém nástupišti
+se spojovala, má hlavu na jedné nebo na druhé straně, a to si veze s sebou.
+
+Takže i u chyby, která se stane až na tom druhém nádraží, platí pravidlo
+0.6 — jen se neptám „na kterém nástupišti to bouchlo", ale **„na kterém
+nástupišti byla ta souprava spojená"**.
+
 ## 0.5 Pravidlo zrcadla
 
 Vlak je popsaný **dvěma nezávislými veličinami** a většina chyb v tomhle
