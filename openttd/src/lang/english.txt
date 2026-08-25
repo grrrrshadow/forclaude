@@ -1718,9 +1718,9 @@ STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREY_TO_RED                :Grey to red
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREYSCALE                  :Greyscale
 
 STR_CONFIG_SETTING_SCROLLMODE                                   :Drag the map with: {STRING2}
-STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :How dragging the map about behaves. The first is the game's ordinary right-button drag with one fault taken out: the button cannot get stuck holding a drag nobody is holding any more, and pressing the left button ends one that has. The rest are the game's own choices, left exactly as they are
+STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :How dragging the map about behaves. The first is the game's own default on Windows with one fault taken out: the button cannot get stuck holding a drag nobody is holding any more, and pressing the left button ends one that has. The rest are the game's own choices, left exactly as they are
 ###length 4
-STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Right mouse button, without the button sticking
+STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Move viewport with RMB, mouse position locked, without the button sticking
 STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Move viewport with RMB, mouse position locked
 STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Move map with RMB, mouse position locked
 STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Move map with RMB

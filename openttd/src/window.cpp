@@ -2545,10 +2545,11 @@ static EventState HandleViewportScroll()
 		_cursor.v_wheel = std::modf(_cursor.v_wheel, &temp);
 		_cursor.h_wheel = std::modf(_cursor.h_wheel, &temp);
 	} else {
-		/* Ours drags the map, which is what the game does by default; only its
-		 * own first choice moves the view instead, which is the other way
-		 * round. */
-		if (_settings_client.gui.scroll_mode != ViewportScrollMode::ViewportRMBFixed) {
+		/* Ours moves the view, which is what the game does by default on
+		 * Windows; the choices that move the ground under it instead are the
+		 * other way round. */
+		if (_settings_client.gui.scroll_mode != ViewportScrollMode::ViewportRMBFixed &&
+				_settings_client.gui.scroll_mode != ViewportScrollMode::RMBPinned) {
 			delta.x = -_cursor.delta.x;
 			delta.y = -_cursor.delta.y;
 		} else {
@@ -3005,13 +3006,13 @@ static void MouseLoop(MouseClick click, int mousewheel)
 				if (!w->flags.Test(WindowFlag::DisableVpScroll) &&
 						_settings_client.gui.scroll_mode != ViewportScrollMode::MapLMB) {
 					_scrolling_viewport = true;
-					/* Ours holds the pointer nowhere and moves it nowhere: the
-					 * game's own two "position locked" choices are the ones that
-					 * freeze the drawn cursor and put the pointer back to it
-					 * every frame, and ours is the plain drag with neither. That
-					 * is the whole difference between it and them -- the only
-					 * thing ours changes is that the button cannot get stuck. */
-					_cursor.fix_at = (_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed ||
+					/* Ours locks the pointer, exactly as the game's own default
+					 * on Windows does: the drawn cursor stays where the drag
+					 * began and the pointer is put back to it every frame, which
+					 * is what makes it genuinely stay still. The only thing ours
+					 * changes is that the button cannot get stuck. */
+					_cursor.fix_at = (_settings_client.gui.scroll_mode == ViewportScrollMode::RMBPinned ||
+							_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed ||
 							_settings_client.gui.scroll_mode == ViewportScrollMode::MapRMBFixed);
 					DispatchRightClickEvent(w, x - w->left, y - w->top);
 					return;

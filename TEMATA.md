@@ -335,36 +335,53 @@ který měl ovlivnit jen vykreslení, tam přepisoval skutečný směr jízdy.
 
 ## 5.0 Co je „naše" nastavení posunu mapy
 
-V nabídce je **pět** voleb. První je naše, je přednastavená, a je to
-**obyčejné vanilkové tažení pravým tlačítkem — jen bez zasekávání
-tlačítka.** Nic víc. Kurzor se hýbe s rukou, mapa jede pod ním, ukazatel
-nikam neskáče. Pod ní jsou **všechny čtyři vanilkové volby beze změny**,
-včetně toho zasekávání: jsou v seznamu proto, aby se dalo srovnávat, a
-volba pojmenovaná jako hry se musí chovat jako hra.
+V nabídce je **pět** voleb. První je naše a je přednastavená. Je to
+**to, co má hra sama na Windows přednastavené — jen bez zasekávání
+tlačítka.** Nic víc a nic jinýho.
 
-Proto je oprava zasekávání (`EndViewportScrollIfLetGo`) zapnutá **jen pro
-naši volbu**. To je celý rozdíl mezi ní a vanilkovou.
+Pod ní jsou **všechny čtyři vanilkové volby beze změny**, včetně toho
+zasekávání: jsou v seznamu proto, aby se dalo srovnávat, a volba
+pojmenovaná jako hry se musí chovat jako hra. Proto je oprava zasekávání
+(`EndViewportScrollIfLetGo`) zapnutá **jen pro naši volbu**. To je celý
+rozdíl mezi ní a vanilkovou.
 
-**Dvakrát jsem to zkazil tím, že jsem si k tomu přimyslel víc, než bylo
-domluvené**, a stálo to dvě kola:
+**Pozor: vanilla má dva výchozí stavy.** V `gui_settings.ini` jsou dva
+bloky téhož nastavení:
+
+- `ifdef UNIX` → `MapRMB` (mapa jede, **kurzor se hýbe**),
+- `ifndef UNIX`, tedy Windows → `ViewportRMBFixed` (jede pohled,
+  **poloha myši uzamčena**).
+
+Hraje se na Windows, takže „jako vanilla" znamená **uzamčený kurzor
+a pohyb pohledu**. Já se podíval jen na první blok, prohlásil jsem opak
+a spletl se; správně to řekl uživatel.
+
+**Uzamčený kurzor znamená, že hra ukazatel každý snímek vrací zpátky.**
+To vracení je právě to, čím ukazatel doopravdy stojí — ne to, že se
+nakreslený kurzor nehýbe.
+
+**Třikrát jsem to zkazil tím, že jsem si k tomu přimyslel víc, než bylo
+domluvené:**
 
 1. **Zamrazil jsem kurzor a zároveň vypnul vracení ukazatele.** Nakreslený
-   kurzor hry pak stál, ale skutečný ukazatel Windows utíkal pryč a nebyl
-   vidět; po puštění tlačítka byl někde jinde. Vanilla ho vrací zpátky
-   každý snímek, a právě to je to, čím doopravdy stojí.
+   kurzor pak stál, ale skutečný ukazatel Windows utíkal pryč a nebyl
+   vidět; po puštění tlačítka byl někde jinde.
 2. **Pak jsem „opravoval", že mapa jezdí moc rychle**, a přepsal počítání
    pohybu na „proti minulému snímku". To je správně jen tam, kde se
    ukazatel nevrací. Kde se vrací, vyrobí to vracení samo stejně velký
    pohyb na opačnou stranu — takže tím byly rozbité **i všechny vanilkové
-   volby**, a nešly testovat.
+   volby** a nešly testovat.
+3. **Pak jsem naši volbu udělal s volným kurzorem**, protože jsem si
+   spletl výchozí stav.
 
-Obojí je pryč. `gfx.cpp`, `gfx_type.h` i `smallmap_gui.cpp` jsou zase
-**bajt po bajtu vanilkové** a ve `window.cpp` nezůstala v posunu mapy
-jediná změněná řádka kódu — jen komentáře a to jedno přidané volání.
+`gfx.cpp`, `gfx_type.h` i `smallmap_gui.cpp` jsou zase **bajt po bajtu
+vanilkové** a ve `window.cpp` je v posunu mapy jediná přidaná věc to
+volání navíc; zbytek jsou dvě podmínky rozšířené o naši volbu.
 
 **Poučení, ne technické:** když se řekne „jako vanilla, jen bez téhle
-jedné chyby", tak se **nesmí přidat nic jiného**. Každý můj nápad navíc
-tam byl chyba.
+jedné chyby", tak se **nesmí přidat nic jiného** — a napřed se zjistí, co
+vanilla na téhle platformě doopravdy dělá, ne co dělá na první, na kterou
+padne oko.
 
 ## 5.1 Zaseknutý čudlík posunu mapy
 
