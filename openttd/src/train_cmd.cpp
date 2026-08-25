@@ -1074,6 +1074,24 @@ static void NormaliseDualHeads(Train *t)
  * Normalise the sub types of the parts in this chain.
  * @param chain the chain to normalise.
  */
+/**
+ * Is there an engine anywhere in this chain, wherever it sits in the list?
+ *
+ * Not the same question as "is this a train", which only looks at the head.
+ * A train that has been carried along as another one's wagons can come apart
+ * lying the other way round in the list, engine last, and it is still a train.
+ *
+ * @param chain Any vehicle of the chain.
+ * @return Whether any vehicle in it is an engine.
+ */
+static bool ChainHasEngine(const Train *chain)
+{
+	for (const Train *u = chain->First(); u != nullptr; u = u->Next()) {
+		if (u->IsEngine()) return true;
+	}
+	return false;
+}
+
 static void NormaliseSubtypes(Train *chain)
 {
 	/* Nothing to do */
@@ -1644,8 +1662,17 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 				/* The one order a rake carried so the player could read and
 				 * change it goes when the rake does. An engine keeps its own
 				 * (see the note in TryConsistSplice); a rake has nothing to come
-				 * back to. */
-				if (u->IsFreeWagon() && u->orders != nullptr) DeleteVehicleOrders(u);
+				 * back to.
+				 *
+				 * "A rake" has to mean a chain with no engine anywhere in it,
+				 * not one that merely has a wagon at the head of its list. A
+				 * train that was collected and carried along can come out of the
+				 * splice lying the other way round in the list -- its engine at
+				 * the tail -- and that reads as a rake to everything that only
+				 * looks at the head. Throwing its orders away on that reading is
+				 * how a whole train was turned into a nameless set of wagons
+				 * standing at a platform. */
+				if (u->IsFreeWagon() && u->orders != nullptr && !ChainHasEngine(u)) DeleteVehicleOrders(u);
 
 				if (u->IsFrontEngine() || u->IsFreeWagon()) continue;
 				/* An engine travelling as somebody else's wagons keeps its
@@ -3190,14 +3217,49 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	v->ReserveTrackUnderConsist();
 
 	Train *remainder = split_point->First();
+
+	/* What has just been put down may be a whole train lying the other way
+	 * round in the list, with its engine at the tail.
+	 *
+	 * That is not a mistake anybody made; it is how it was picked up. Coupling
+	 * has to put the two halves into the list in the order they physically
+	 * stand on the track, and when a train is collected off the end that faces
+	 * the collecting engine, its own list order is the reverse of the joined
+	 * train's. Nothing put it back, because while it was being carried nothing
+	 * needed it to: it was somebody else's wagons.
+	 *
+	 * Now it is a train again, and everything in the game that asks "is this a
+	 * train" asks the head of the list and nothing else. Left as it is, it is a
+	 * nameless set of wagons standing at a platform -- which is exactly what
+	 * was seen, and only ever on the platforms where the two met that way
+	 * round.
+	 *
+	 * So the list is turned round. Nothing moves: the vehicles stay on the
+	 * tiles they are standing on and only their order in the list changes,
+	 * which is the whole of what ReverseConsistOrder() does. Two things have to
+	 * follow it, and both are bookkeeping about the list rather than about the
+	 * ground: each vehicle's recorded facing, which is expressed as "towards
+	 * the one ahead of me in the list", and which end leads, which is expressed
+	 * as "the head" or "the tail". The physical end that leads has not changed,
+	 * so the flag that names it by list position has to. */
+	bool remainder_reversed = false;
+	if (!remainder->IsFrontEngine() && ChainHasEngine(remainder)) {
+		remainder = ReverseConsistOrder(remainder);
+		NormaliseSubtypes(remainder);
+		NormaliseCoupledConsistFacing(remainder);
+		remainder_reversed = true;
+	}
+
 	/* Nobody has spoken for these wagons yet; whatever this vehicle was doing
 	 * in an earlier life is over. */
 	remainder->couple_claim = VehicleID::Invalid();
 
 	/* It leaves the same way round as the train it was part of. Which end leads
 	 * is a property of the whole train, and the part being put down is still
-	 * lying the way it was lying a moment ago. */
-	remainder->vehicle_flags.Set(VehicleFlag::DrivingBackwards, was_driving_backwards);
+	 * lying the way it was lying a moment ago -- unless its list has just been
+	 * turned round, in which case the same end of it is now the other end of
+	 * the list. */
+	remainder->vehicle_flags.Set(VehicleFlag::DrivingBackwards, was_driving_backwards != remainder_reversed);
 
 	/* What is put down is not always wagons. Two little trains can join to run
 	 * as one big one, and when they come apart the one that was travelling as

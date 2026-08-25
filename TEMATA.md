@@ -196,6 +196,26 @@ Vede vždycky ta s „jet se spojit". Spojený vlak má výkon obou mašinek.
 
 ## 2.2 Pravidla, která platí
 
+- **Sebraný vlak leží ve výpisu obráceně a musí se otočit zpátky.** Spojení
+  musí složit oba díly do seznamu v tom pořadí, v jakém fyzicky stojí na
+  koleji. Když se vlak sbírá za ten konec, který míří ke sběrné mašince, je
+  jeho vlastní pořadí v tom společném seznamu **opačné** — mašinka mu skončí
+  na konci místo v čele. Dokud jede jako cizí vagony, nikomu to nevadí.
+  Jenže po rozpojení se **všechno ve hře ptá jen hlavy seznamu**, jestli je
+  tohle vlak — takže se z celého vlaku stane bezejmenná řada vagonků stojící
+  na nástupišti. A jen na těch nástupištích, kde se ty dva potkaly tímhle
+  koncem, což je přesně pravidlo 0.6.
+
+  Při rozpojení se tedy seznam otočí (`ReverseConsistOrder`). **Nic se
+  nehýbe**, vozy zůstávají na svých dlaždicích, mění se jen pořadí. Musí za
+  tím jít dvě věci, obě jsou účetnictví o seznamu, ne o zemi: natočení
+  každého vozu (`NormaliseCoupledConsistFacing`, počítá se „směrem
+  k tomu přede mnou v seznamu") a příznak, který konec vede — ten se
+  jmenuje „hlava" nebo „konec", takže když se seznam otočí a fyzicky vedoucí
+  konec zůstane stejný, **příznak se musí přehodit**.
+- **„Řada vagonků" znamená chybějící mašinku v celém řetězu, ne vagon
+  v čele.** Na tom se zahazovaly příkazy: řetěz s mašinkou na konci vypadal
+  jako řada vagonků a přišel o ně.
 - **Kdo čeká na spojení, si nic neplánuje.** Nehledá cestu, nerezervuje
   trať, jen drží zem, na které stojí. Příkazy mu přiveze ta mašinka, co si
   pro něj přijede. Stačilo zbourat kus trati a všechny čekající mašinky ve
