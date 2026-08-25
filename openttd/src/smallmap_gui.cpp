@@ -1856,10 +1856,6 @@ public:
 	{
 		if (widget != WID_SM_MAP || _scrolling_viewport) return false;
 
-		if (_settings_client.gui.scroll_mode != ViewportScrollMode::MapRMB) {
-			_cursor.fix_at = true;
-			_cursor.warp_back = _settings_client.gui.scroll_mode != ViewportScrollMode::RMBPinned;
-		}
 		_scrolling_viewport = true;
 		return true;
 	}

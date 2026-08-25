@@ -1795,9 +1795,9 @@ STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREY_TO_RED                :Šedá až čer
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREYSCALE                  :Stupně šedi
 
 STR_CONFIG_SETTING_SCROLLMODE                                   :Posouvání mapy: {STRING}
-STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Jak se chová posouvání mapy. První volba nechá kurzor tam, kde tažení začalo, a hra s ním sama nehýbe — to je ta pro případy, kdy hra ukazatelem hýbat nemůže, třeba na dotykovém displeji nebo na vzdálené ploše. Ostatní jsou volby, které má hra sama
+STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Jak se chová posouvání mapy. První volba je obyčejné tažení pravým tlačítkem tak, jak ho má hra, jen bez jedné chyby: tlačítko se nemůže zaseknout a držet tažení, které už nikdo nedrží, a když se to přesto stane, stisk levého tlačítka to ukončí. Ostatní jsou volby, které má hra sama, nechané přesně tak, jak jsou
 ###length 4
-STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Pravým tlačítkem, kurzor zůstane na místě
+STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Pravým tlačítkem myši, bez zasekávání tlačítka
 STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Pohyb v pohledu pomocí pravého tlačítka myši, poloha myši uzamčena
 STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Pohyb v mapě pomocí pravého tlačítka myši, poloha myši uzamčena
 STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Pohyb v mapě pomocí pravého tlačítka myši

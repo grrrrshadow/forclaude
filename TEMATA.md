@@ -333,21 +333,38 @@ který měl ovlivnit jen vykreslení, tam přepisoval skutečný směr jízdy.
 
 # 5. Myš, kurzor, stavba
 
-## 5.0 Rychlost posunu mapy
+## 5.0 Co je „naše" nastavení posunu mapy
 
-Když se ukazatel při tažení nevrací zpátky (a u nás se nevrací schválně,
-protože sahat po myši a přemisťovat ji je ta půlka, na kterou se nedá
-spolehnout), musí se posun počítat **od minulého snímku**, ne od místa,
-kde tažení začalo. Hra si drží `_cursor.pos` na místě stisku, protože tam
-kreslí kurzor; vanilla si může dovolit počítat rozdíl proti němu, protože
-ukazatel tam každý snímek vrací, takže rozdíl je pohyb za jeden snímek.
-Bez toho vracení ukazatel odejde a rozdíl je **celá ušlá vzdálenost od
-stisku** — a ta se použije znovu na každém snímku. Malý pohyb rukou pak
-uveze mapu přes celý svět.
+V nabídce je **pět** voleb. První je naše, je přednastavená, a je to
+**obyčejné vanilkové tažení pravým tlačítkem — jen bez zasekávání
+tlačítka.** Nic víc. Kurzor se hýbe s rukou, mapa jede pod ním, ukazatel
+nikam neskáče. Pod ní jsou **všechny čtyři vanilkové volby beze změny**,
+včetně toho zasekávání: jsou v seznamu proto, aby se dalo srovnávat, a
+volba pojmenovaná jako hry se musí chovat jako hra.
 
-Odtud `CursorVars::last_seen`: dokud je ukazatel volný, drží se s ním
-v kroku, takže první „zafixovaný" snímek měří proti tomu, kde ukazatel
-opravdu byl, a nikdo nemusí hlídat okamžik, kdy se fixace zapne.
+Proto je oprava zasekávání (`EndViewportScrollIfLetGo`) zapnutá **jen pro
+naši volbu**. To je celý rozdíl mezi ní a vanilkovou.
+
+**Dvakrát jsem to zkazil tím, že jsem si k tomu přimyslel víc, než bylo
+domluvené**, a stálo to dvě kola:
+
+1. **Zamrazil jsem kurzor a zároveň vypnul vracení ukazatele.** Nakreslený
+   kurzor hry pak stál, ale skutečný ukazatel Windows utíkal pryč a nebyl
+   vidět; po puštění tlačítka byl někde jinde. Vanilla ho vrací zpátky
+   každý snímek, a právě to je to, čím doopravdy stojí.
+2. **Pak jsem „opravoval", že mapa jezdí moc rychle**, a přepsal počítání
+   pohybu na „proti minulému snímku". To je správně jen tam, kde se
+   ukazatel nevrací. Kde se vrací, vyrobí to vracení samo stejně velký
+   pohyb na opačnou stranu — takže tím byly rozbité **i všechny vanilkové
+   volby**, a nešly testovat.
+
+Obojí je pryč. `gfx.cpp`, `gfx_type.h` i `smallmap_gui.cpp` jsou zase
+**bajt po bajtu vanilkové** a ve `window.cpp` nezůstala v posunu mapy
+jediná změněná řádka kódu — jen komentáře a to jedno přidané volání.
+
+**Poučení, ne technické:** když se řekne „jako vanilla, jen bez téhle
+jedné chyby", tak se **nesmí přidat nic jiného**. Každý můj nápad navíc
+tam byl chyba.
 
 ## 5.1 Zaseknutý čudlík posunu mapy
 

@@ -2480,21 +2480,25 @@ static EventState HandleActiveWidget()
  *
  * Ending a mode must not sit behind another mode's early return. Asked here,
  * first, before anything can claim the event. See FEATURE_DESIGN_COUPLING_TOW.md.
+ *
+ * Asked only for our own drag mode. The game's own four are left exactly as
+ * they are, sticking button and all -- that is what they are in the list for,
+ * and a setting labelled as the game's own has to behave like it. Ours is the
+ * same drag with this one fault taken out, and that is the whole difference
+ * between them.
  */
 static void EndViewportScrollIfLetGo()
 {
+	if (_settings_client.gui.scroll_mode != ViewportScrollMode::RMBPinned) return;
 	if (!_scrolling_viewport) return;
 
 	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
-	bool held = _settings_client.gui.scroll_mode == ViewportScrollMode::MapLMB ? _left_button_down : _right_button_down;
 
-	/* And the other button ends it. Two drags of the map cannot both be under
+	/* And the left button ends it. Two drags of the map cannot both be under
 	 * way, and of the two the one just started wins. It is also the way out if
-	 * the game ever believes a button is held that nobody is holding: a press of
-	 * the other one puts a stop to it. */
-	bool other_pressed = _settings_client.gui.scroll_mode == ViewportScrollMode::MapLMB ? _right_button_down : _left_button_down;
-
-	if (held && !other_pressed) return;
+	 * the game ever believes the right button is held that nobody is holding:
+	 * a press of the left one puts a stop to it. */
+	if (_right_button_down && !_left_button_down) return;
 
 	_cursor.fix_at = false;
 	_scrolling_viewport = false;
@@ -2541,15 +2545,15 @@ static EventState HandleViewportScroll()
 		_cursor.v_wheel = std::modf(_cursor.v_wheel, &temp);
 		_cursor.h_wheel = std::modf(_cursor.h_wheel, &temp);
 	} else {
-		/* Ours and the game's own first choice move the view; the rest move the
-		 * ground under it, which is the other way round. */
-		if (_settings_client.gui.scroll_mode == ViewportScrollMode::RMBPinned ||
-				_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed) {
-			delta.x = _cursor.delta.x;
-			delta.y = _cursor.delta.y;
-		} else {
+		/* Ours drags the map, which is what the game does by default; only its
+		 * own first choice moves the view instead, which is the other way
+		 * round. */
+		if (_settings_client.gui.scroll_mode != ViewportScrollMode::ViewportRMBFixed) {
 			delta.x = -_cursor.delta.x;
 			delta.y = -_cursor.delta.y;
+		} else {
+			delta.x = _cursor.delta.x;
+			delta.y = _cursor.delta.y;
 		}
 	}
 
@@ -3001,15 +3005,14 @@ static void MouseLoop(MouseClick click, int mousewheel)
 				if (!w->flags.Test(WindowFlag::DisableVpScroll) &&
 						_settings_client.gui.scroll_mode != ViewportScrollMode::MapLMB) {
 					_scrolling_viewport = true;
-					/* The pointer stays where the drag began in every mode but the
-					 * one that lets it wander. Ours pins it without the game
-					 * moving the pointer itself -- reaching out and putting the
-					 * pointer back is the half that cannot be relied on, and a
-					 * pointer that wanders off to the edge of the map takes the
-					 * drag with it. */
-					ViewportScrollMode mode = _settings_client.gui.scroll_mode;
-					_cursor.fix_at = mode != ViewportScrollMode::MapRMB;
-					_cursor.warp_back = mode != ViewportScrollMode::RMBPinned;
+					/* Ours holds the pointer nowhere and moves it nowhere: the
+					 * game's own two "position locked" choices are the ones that
+					 * freeze the drawn cursor and put the pointer back to it
+					 * every frame, and ours is the plain drag with neither. That
+					 * is the whole difference between it and them -- the only
+					 * thing ours changes is that the button cannot get stuck. */
+					_cursor.fix_at = (_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed ||
+							_settings_client.gui.scroll_mode == ViewportScrollMode::MapRMBFixed);
 					DispatchRightClickEvent(w, x - w->left, y - w->top);
 					return;
 				}

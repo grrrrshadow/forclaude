@@ -1765,27 +1765,12 @@ void CursorVars::UpdateCursorPositionRelative(int delta_x, int delta_y)
  */
 bool CursorVars::UpdateCursorPosition(int x, int y)
 {
-	if (this->fix_at) {
-		/* Movement since the pointer was last looked at, which is the same as
-		 * movement away from the anchor only while the pointer is being put
-		 * back there. See CursorVars::last_seen. */
-		this->delta.x = x - this->last_seen.x;
-		this->delta.y = y - this->last_seen.y;
-		this->last_seen.x = x;
-		this->last_seen.y = y;
-		return this->warp_back && (this->delta.x != 0 || this->delta.y != 0);
-	}
-
-	/* Kept in step with the pointer whenever it is free, so that the first
-	 * fixed frame measures against where the pointer actually was. Nothing
-	 * then has to notice the moment the pointer becomes fixed. */
-	this->last_seen.x = x;
-	this->last_seen.y = y;
-
 	this->delta.x = x - this->pos.x;
 	this->delta.y = y - this->pos.y;
 
-	if (this->pos.x != x || this->pos.y != y) {
+	if (this->fix_at) {
+		return this->delta.x != 0 || this->delta.y != 0;
+	} else if (this->pos.x != x || this->pos.y != y) {
 		this->dirty = true;
 		this->pos.x = x;
 		this->pos.y = y;
