@@ -3,6 +3,19 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #84 (commit 10e9f89) — otevřené, na příště
+
+**Odložený vlak vybuchuje při dalším spojování.** Po rozpojení odjela
+mašinka do depa a na místě zůstal stát jen přitažený vlak. Ten pak při
+připojování dalšího vlaku začal vybuchovat. Hráč to nechává na příští
+kolo.
+
+Co k tomu vím předem, než se do toho pustím: tenhle build je první, ve
+kterém je odložená souprava otáčena zpátky v seznamu a ve kterém je
+havárie stavem vlaku místo jeho konce. Obojí sahá přesně na to, co ten
+odložený vlak je, takže se hledá tam — a podle pravidla 0.6 bude první
+otázka, na kterém nástupišti byla ta souprava **spojená**.
+
 ## Build #65 (commit 59798a3)
 
 **Couple pozadu** — dobrý na všech čtyřech nástupištích. Všem čtyřem
