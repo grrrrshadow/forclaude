@@ -2381,11 +2381,15 @@ static int64_t DistanceSquaredBetweenVehicles(const Train *a, const Train *b)
  * @param head Head of the consist to relink.
  * @return The new head, which is what used to be the last unit.
  */
+static void NormaliseCoupledConsistFacing(Train *consist);
+
 static Train *ReverseConsistOrder(Train *head)
 {
 	std::vector<Train *> units;
 	for (Train *u = head; u != nullptr; u = u->GetNextVehicle()) units.push_back(u);
 	if (units.size() < 2) return head;
+
+	bool driving_backwards = head->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
 
 	for (Train *u : units) RemoveFromConsist(u);
 
@@ -2393,6 +2397,48 @@ static Train *ReverseConsistOrder(Train *head)
 	for (size_t i = units.size() - 1; i > 0; i--) {
 		InsertInConsist(units[i]->GetLastEnginePart(), units[i - 1]);
 	}
+
+	/* Nothing has moved: the vehicles are on the tiles they were on and the
+	 * same physical end of the train still leads. But which end that is is
+	 * written down as "the head" or "the tail" -- a place in the list -- and
+	 * the list has just been turned round, so the writing has to be turned
+	 * round with it or it now names the other end.
+	 *
+	 * This belongs here rather than at each call, because forgetting it is
+	 * invisible until a train drives off the wrong way, and it has been
+	 * forgotten twice already. */
+	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, !driving_backwards);
+
+	return new_head;
+}
+
+/**
+ * Put the engine of a chain at the head of its list, turning the list round if
+ * that is where the engine is not.
+ *
+ * A train that has travelled as another one's wagons can come apart lying the
+ * other way round in the list, engine last. Everything in the game that asks
+ * whether something is a train asks the head of the list and nothing else, so
+ * in that state a whole train reads as a nameless set of wagons -- it loses its
+ * orders, it cannot be driven, and the code that puts it down gives up on it
+ * half way through.
+ *
+ * Nothing moves here. The vehicles stay on the tiles they are standing on and
+ * only their order in the list changes, along with the two pieces of
+ * bookkeeping that are written in terms of that order: which end leads, and
+ * which way each vehicle is recorded as facing.
+ *
+ * @param chain Head of the chain that has just been put down.
+ * @return Its head afterwards, which is a different vehicle if the list was
+ *         turned round.
+ */
+static Train *MakeEngineLeadTheList(Train *chain)
+{
+	if (chain->IsFrontEngine() || !ChainHasEngine(chain)) return chain;
+
+	Train *new_head = ReverseConsistOrder(chain);
+	NormaliseSubtypes(new_head);
+	NormaliseCoupledConsistFacing(new_head);
 	return new_head;
 }
 
@@ -2805,6 +2851,19 @@ bool HandleRescueEngineInDepot(Train *tow)
 		/* Split it back off. It is standing in a depot, which is where taking
 		 * trains apart is an ordinary thing to do. */
 		TryConsistSplice(DoCommandFlag::Execute, casualty, nullptr, true);
+
+		/* And put it back the right way round in the list, for the same reason
+		 * it has to be done when a train is decoupled at a platform: it was
+		 * picked up off the end facing the engine that came for it, so its own
+		 * order in the joined train's list was the reverse of its own, and
+		 * being carried never needed that put right.
+		 *
+		 * Left as it was, the vehicle this function is holding is not the head
+		 * of anything and the test below gives up on it -- so the casualty is
+		 * left half repaired and half handed over, and the rescue engine is
+		 * left holding an errand it has already finished. Which is exactly what
+		 * "they swapped roles" looks like from the outside. */
+		casualty = MakeEngineLeadTheList(casualty->First());
 
 		/* If for any reason it would not come apart, leave it exactly where it
 		 * is rather than acting on a train that is still half of another one.
@@ -3251,24 +3310,19 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * the one ahead of me in the list", and which end leads, which is expressed
 	 * as "the head" or "the tail". The physical end that leads has not changed,
 	 * so the flag that names it by list position has to. */
-	bool remainder_reversed = false;
-	if (!remainder->IsFrontEngine() && ChainHasEngine(remainder)) {
-		remainder = ReverseConsistOrder(remainder);
-		NormaliseSubtypes(remainder);
-		NormaliseCoupledConsistFacing(remainder);
-		remainder_reversed = true;
-	}
+	/* It leaves the same way round as the train it was part of. Which end leads
+	 * is a property of the whole train, and the part being put down is still
+	 * lying the way it was lying a moment ago.
+	 *
+	 * Written down before the list is turned round below, because that is what
+	 * turns this round with it. */
+	remainder->vehicle_flags.Set(VehicleFlag::DrivingBackwards, was_driving_backwards);
+
+	remainder = MakeEngineLeadTheList(remainder);
 
 	/* Nobody has spoken for these wagons yet; whatever this vehicle was doing
 	 * in an earlier life is over. */
 	remainder->couple_claim = VehicleID::Invalid();
-
-	/* It leaves the same way round as the train it was part of. Which end leads
-	 * is a property of the whole train, and the part being put down is still
-	 * lying the way it was lying a moment ago -- unless its list has just been
-	 * turned round, in which case the same end of it is now the other end of
-	 * the list. */
-	remainder->vehicle_flags.Set(VehicleFlag::DrivingBackwards, was_driving_backwards != remainder_reversed);
 
 	/* What is put down is not always wagons. Two little trains can join to run
 	 * as one big one, and when they come apart the one that was travelling as
@@ -4553,6 +4607,15 @@ void FreeTrainTrackReservation(const Train *consist)
 	const Train *moving_front = consist->GetMovingFront();
 	TileIndex tile = moving_front->tile;
 	Trackdir td = moving_front->GetVehicleTrackdir();
+
+	/* Some vehicles have no answer to "which way are you pointing" -- vanilla
+	 * gives none for anything it counts as wreckage. Walking a reservation from
+	 * a non-answer puts the game down at the first place that tries to turn it
+	 * into a piece of track, and that is a whole class of crash rather than one
+	 * bug: the callers of this are all over the place and none of them can be
+	 * expected to have checked. There is also nothing sensible to do with such
+	 * a train, so nothing is what is done. */
+	if (!IsValidTrackdir(td)) return;
 	bool free_tile = tile != moving_front->tile || !(IsRailStationTile(moving_front->tile) || IsTileType(moving_front->tile, TileType::TunnelBridge));
 	StationID station_id = IsRailStationTile(moving_front->tile) ? GetStationIndex(moving_front->tile) : StationID::Invalid();
 
@@ -5195,6 +5258,10 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 		consist->ReserveTrackUnderConsist();
 		return true;
 	}
+
+	/* And nothing that cannot say which way it is pointing gets a path found
+	 * for it; see the matching note in FreeTrainTrackReservation(). */
+	if (!IsValidTrackdir(consist->GetMovingFront()->GetVehicleTrackdir())) return false;
 
 	const Train *moving_front = consist->GetMovingFront();
 

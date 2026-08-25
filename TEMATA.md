@@ -196,6 +196,24 @@ Vede vždycky ta s „jet se spojit". Spojený vlak má výkon obou mašinek.
 
 ## 2.2 Pravidla, která platí
 
+- **Otočení seznamu není hotové bez příznaku, který vede.** `DrivingBackwards`
+  se jmenuje „hlava" nebo „konec" — je to místo v seznamu. Když se seznam
+  otočí a fyzicky vedoucí konec zůstane stejný, musí se ten příznak přehodit
+  s ním. Zapomněl jsem na to dvakrát, tak to teď dělá přímo
+  `ReverseConsistOrder()` a zapomenout na to už nejde.
+- **Otočit odloženou soupravu zpátky se musí na dvou místech, ne na jednom.**
+  Při rozpojení ve stanici i **v depu**, kde odtahovka odkládá porouchanou.
+  V depu to chybělo a vypadalo to takhle: porouchaná nebyla hlavou ničeho,
+  test „nerozpadlo se to?" ji zahodil a odjelo se od toho v půlce — zůstala
+  napůl spravená a odtahovka držela úkol, který už splnila. Zvenčí to vypadá
+  jako **„vyměnili si role"**. Obojí teď dělá jedna funkce
+  `MakeEngineLeadTheList()`.
+- **Kdo neumí říct, kam míří, se na nic neptá.** Vanilla nedává směr ničemu,
+  co považuje za vrak, a každé místo, které z toho dělá kolej, na tom spadne
+  (`track_func.h:237`). Není to jedna chyba, je to celá třída: volajících je
+  spousta a žádný z nich to nekontroluje. Ptají se proto
+  `FreeTrainTrackReservation()` a `TryPathReserve()` samy a v tom případě
+  nedělají nic.
 - **Sebraný vlak leží ve výpisu obráceně a musí se otočit zpátky.** Spojení
   musí složit oba díly do seznamu v tom pořadí, v jakém fyzicky stojí na
   koleji. Když se vlak sbírá za ten konec, který míří ke sběrné mašince, je
