@@ -76,7 +76,7 @@ which stays theirs and is named here.
   Original at https://github.com/age77/openttd-15.3-blueprint
 - Icons8 (https://icons8.com) - The hammer-and-wrench artwork the rescue-engine
   button is drawn from.
-- Palo123 - The coupling and decoupling patch this repository's own version of
+- Palo123, also known as karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's
   command system - but the design is theirs.

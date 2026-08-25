@@ -48,7 +48,7 @@ rozbiju tím věc, která fungovala. Přesně to se stalo s plánkem nádraží
 
 Dvě věci, a ani jedna z nich není náš vynález:
 
-**Palo123 je inspirace.** Odtud je, jak to má vypadat a co to má umět pro
+**Palo123 (podepisuje se i jako karn) je inspirace.** Odtud je, jak to má vypadat a co to má umět pro
 hráče — okno příkazů, „jet se spojit", „čekat na spojení", odpojit s
 počtem, filtr podle nákladu. Není to předloha kódu: jejich větev je
 z prosince 2020, z doby před přepsáním celého systému příkazů, takže se
@@ -63,7 +63,9 @@ z 15.3 na beta 16. Ve hře už je:
 - GRF příznak **řídicí kabiny** (`HasCab`), který umí udělat vedoucí
   i z nemotorového vozu — tedy řídicí vůz,
 - otázka „umí tenhle konec vést vlak?" (`CanLeadTrain`),
-- **ořez rychlosti na 32 km/h**, když vpředu kabina není,
+- **ořez rychlosti**, když vpředu kabina není (vanilkových 42 jednotek,
+  tedy asi 68 km/h — hra počítá rychlost v imperiální jednotce, km/h je
+  jednotka krát 1,609),
 - nastavení, jestli se vlak smí otáčet (u nás zamčené na „Nikde").
 
 **Nic z toho se nepíše znovu.** Naše práce je použít to správně —
@@ -116,6 +118,18 @@ správně a na druhé přesně naopak. Proto oprava jedné dvojice donekonečna
 rozbíjela druhou. Buď se projde celá souprava, nebo se přečtou obě
 veličiny a jedna se odvodí z druhé.
 
+## 0.6 Podle kterých nástupišť to zlobí se pozná, co je špatně
+
+Tohle je z nádraží nejužitečnější věc a vyplývá přímo ze zrcadla. Nádraží
+je postavené tak, že **směr** mají všechna čtyři nástupiště stejný,
+**hlavu** mají 1 a 2 na opačné straně než 3 a 4. Takže:
+
+- **zlobí to na všech čtyřech nástupištích → problém je ve směru;**
+- **zlobí to jen na 1 a 2, nebo jen na 3 a 4 → problém je v hlavě.**
+
+Než začnu hledat, zeptám se, na kterých nástupištích se to děje. Odpověď
+rozdělí podezřelé na půl dřív, než otevřu jediný soubor.
+
 ---
 
 # 1. Vlak: směr, couvání, otáčení
@@ -137,8 +151,9 @@ veličiny a jedna se odvodí z druhé.
   nevede **žádná** cesta.
 - Ta jediná výjimka je **hlavové nádraží**. Tam vlak vycouvá a je to
   správně — hráč ten slepý konec postavil schválně.
-- **Snížená rychlost 32 km/h**, když vedoucí konec nemá řídicí kabinu,
-  **zůstává**. Je to vanilkové a je to správně: nikdo nekouká dopředu.
+- **Snížená rychlost**, když vedoucí konec nemá řídicí kabinu,
+  **zůstává**. Je to vanilkové (42 jednotek, asi 68 km/h) a je to správně:
+  nikdo nekouká dopředu.
 - **Depo je zatáčka.** Vjezd ani výjezd nemění, který konec vede, takže
   vlak vjede mašinkou napřed a vyjede mašinkou napřed, jen míří na druhou
   stranu. Nic se přitom nepřehazuje.
@@ -171,6 +186,18 @@ Vede vždycky ta s „jet se spojit". Spojený vlak má výkon obou mašinek.
 
 ## 2.2 Pravidla, která platí
 
+- **Kdo čeká na spojení, si nic neplánuje.** Nehledá cestu, nerezervuje
+  trať, jen drží zem, na které stojí. Příkazy mu přiveze ta mašinka, co si
+  pro něj přijede. Stačilo zbourat kus trati a všechny čekající mašinky ve
+  stanici se rozběhly hledat novou cestu a rezervovat si ji — vlak, který
+  nikam nepojede, přitom nesmí držet trať, na kterou se stojí fronta.
+  Výjimka je nakládání: to je jeho vlastní věc a doběhne samo.
+- **„Překážka je to, pro co jsem přijel" musí znamenat právě ten jeden
+  vlak.** Ptát se místo toho „byl by ten vpředu dobrý partner?" je jiná,
+  mnohem širší otázka: dvě mašinky, obě zaparkované a čekající, projdou tou
+  zkouškou každá na té druhé. Mašinka pak brala cizí stojící vlak za svůj
+  cíl, hledání cesty ji pustilo za něj a jela po trati proti němu. Cíl je
+  zapsaný jménem (`couple_target`, `rescue_target`) — tak se čte jméno.
 - **Nejdřív se najde partner podle filtru, pak se teprve rezervuje trať.**
   Obráceně se držela trať proti všem ostatním, dokud nebylo rozhodnuto, a
   pak vlak jel k tomu, co si zarezervoval, místo k tomu, co si vybral.
@@ -270,6 +297,12 @@ tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
   Druhá půlka téže chyby: obsluha si brala celý tik pro sebe, takže se
   odtahovka nikdy nedostala k místu, které vypouští vlaky z depa. Tik si
   bere jen tehdy, když opravdu něco udělala.
+- **Odtahovka bez úkolu musí v depu držet sama sebe.** Být ve službě
+  znamená stát v depu s puštěnou brzdou — jenže vlak, který stojí v depu
+  s puštěnou brzdou, je jinak vlak, co se chystá vyjet, a hra ho pustí
+  ven. Dřív ho tam držela ta samá věc, co rušila čerstvý úkol (viz výš),
+  takže když ta odpadla, odtahovka začala vyjíždět bez nehody a psala
+  „žádné příkazy". Ty dva případy se teď rozlišují, ne slučují.
 - Pojistka: **půl roku herního času od poruchy** (ne od vyslání). Pak se
   porucha spraví sama a trosky začnou mizet po vanilla způsobu, čímž se
   trať uvolní.
@@ -299,6 +332,22 @@ který měl ovlivnit jen vykreslení, tam přepisoval skutečný směr jízdy.
 ---
 
 # 5. Myš, kurzor, stavba
+
+## 5.0 Rychlost posunu mapy
+
+Když se ukazatel při tažení nevrací zpátky (a u nás se nevrací schválně,
+protože sahat po myši a přemisťovat ji je ta půlka, na kterou se nedá
+spolehnout), musí se posun počítat **od minulého snímku**, ne od místa,
+kde tažení začalo. Hra si drží `_cursor.pos` na místě stisku, protože tam
+kreslí kurzor; vanilla si může dovolit počítat rozdíl proti němu, protože
+ukazatel tam každý snímek vrací, takže rozdíl je pohyb za jeden snímek.
+Bez toho vracení ukazatel odejde a rozdíl je **celá ušlá vzdálenost od
+stisku** — a ta se použije znovu na každém snímku. Malý pohyb rukou pak
+uveze mapu přes celý svět.
+
+Odtud `CursorVars::last_seen`: dokud je ukazatel volný, drží se s ním
+v kroku, takže první „zafixovaný" snímek měří proti tomu, kde ukazatel
+opravdu byl, a nikdo nemusí hlídat okamžik, kdy se fixace zapne.
 
 ## 5.1 Zaseknutý čudlík posunu mapy
 
@@ -501,6 +550,18 @@ a lem si vezme po pixelu z každé strany.
 
 # 11. Pasti v enginu
 
+- **Kdo zrovna jedná, se musí říct nahlas.** `_current_company` není
+  „vlastník vlaku, který se právě tiká" — je to prostě to, co běželo
+  naposledy, a v tiku vozidla to bývá **nikdo** (`OWNER_NONE`, číslo 16).
+  Kdo z tiku sáhne na cokoliv, co se na tu proměnnou ptá, položí hru:
+  přidělení čísla nové soupravě při rozpojení jde přes
+  `GetFreeUnitNumber()`, ta se ptá na `Company::Get(_current_company)`,
+  a seznam firem na „nikoho" odpoví pádem
+  (`Company pool: asked for index 16`). Stejná past dvakrát: nejdřív
+  u spojování (příkaz tiše propadl na kontrole vlastníka), pak
+  u rozpojování (pád). Léčí se jedním řádkem
+  `AutoRestoreBackup cur_company(_current_company, v->owner);` na začátku
+  každé funkce, která z tiku mění soupravu.
 - **Fond objektů se musí ptát předem.** `OrderList::CanAllocateItem()` není
   rada, je to povolení, které si sama alokace kontroluje
   (`assert(this->checked != 0)`). Kdo si vezme seznam příkazů bez zeptání,
@@ -637,9 +698,14 @@ sprity se dají přidávat normálně.
 
 ## 12.5 Kde to je
 
-**Horní lišta, čtvrtá ikonka zprava** (mezi úpravami krajiny a hudbou),
-a nikde jinde. V liště úprav krajiny to zkusmo bylo taky, ale ta lišta
-zůstává vanilková.
+**V nabídce úprav krajiny na horní liště**, hned pod „Vysadit stromy",
+a nikde jinde. Vlastní ikonka na horní liště i tlačítko v liště úprav
+krajiny byly zkusmo taky; obojí je pryč, obě lišty jsou vanilkové.
+
+Položka v nabídce má **číslo 4**, i když je v seznamu druhá. Kam se
+v nabídce vykreslí, určuje pořadí přidávání; číslo je jen to, čím se
+odpovídá na kliknutí. Přečíslovat kvůli jednomu řádku čtyři vanilkové
+akce nemá smysl.
 
 ---
 

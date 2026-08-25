@@ -485,7 +485,6 @@ STR_TOOLBAR_TOOLTIP_BUILD_TRAMWAYS                              :{BLACK}Výstavb
 STR_TOOLBAR_TOOLTIP_BUILD_SHIP_DOCKS                            :{BLACK}Budovat vodní cesty
 STR_TOOLBAR_TOOLTIP_BUILD_AIRPORTS                              :{BLACK}Stavět letiště
 STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Otevřít nástrojovou lištu na úpravu terénu, výsadbu stromů nebo umístit ceduli
-STR_TOOLBAR_TOOLTIP_BLUEPRINT                                   :{BLACK}Blueprint copy/paste: zkopírovat kus toho, co jsi postavil, a postavit ho jinde, nebo v jiné hře
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Otevřít zvukové/hudební okno
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Otevřít poslední zprávu/zprávu o novinkách, historii zpráv nebo smazat všechny zprávy
 STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}Informace o území, snímek obrazovky, zásluhy na vývoj OpenTTD nebo vývojářské nástroje
@@ -600,6 +599,7 @@ STR_AIRCRAFT_MENU_AIRPORT_CONSTRUCTION                          :Stavba letišt�
 # Landscaping menu
 STR_LANDSCAPING_MENU_LANDSCAPING                                :Úpravy krajiny
 STR_LANDSCAPING_MENU_PLANT_TREES                                :Vysadit stromy
+STR_LANDSCAPING_MENU_BLUEPRINT                                  :Blueprint copy/paste
 STR_LANDSCAPING_MENU_PLACE_SIGN                                 :Umístit nápis
 STR_LANDSCAPING_MENU_PLACE_OBJECT                               :Umístit objekt
 
@@ -1485,6 +1485,9 @@ STR_CONFIG_SETTING_SMOKE_AMOUNT_HELPTEXT                        :Množství kou�
 
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL                     :Model akcelerace vlaků: {STRING}
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Zvolit fyzikální model pro zrychlení vlaků. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů, například délky a tažné síly.
+
+STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Vlak spomalí před silničním přejezdem: {STRING}
+STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :Vlak na nebezpečném úseku spomalí, pod silničním nadjezdem jede normálně. Strojvedoucí předvídá, auta uvízlá na přejezdu spůsobí menší škody.
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Model zrychlování silničních vozidel: {STRING}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Zvolit fyzikální model pro zrychlení silničních vozidel. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů.

@@ -495,9 +495,16 @@ int Train::GetCurrentMaxSpeed() const
 	 * itself is still the game's own -- a ceiling below the current speed is what
 	 * makes a train brake. Once its leading end is on the crossing there is
 	 * nothing ahead to slow for and it opens up again. */
-	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
+	if (_settings_game.vehicle.train_slow_for_level_crossing &&
+			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
 		constexpr int CROSSING_LOOK_AHEAD = 2;
-		int crossing_speed = this->vcache.cached_max_speed * 2 / 3;
+		/* Two thirds of what the train can do, but never below this: a slow
+		 * train easing off to a crawl for every crossing would spend its life
+		 * doing it, and a shunter that already cannot reach this has nothing to
+		 * ease off from. The game counts speed in the imperial unit, so this is
+		 * 55 km/h. */
+		constexpr int CROSSING_SPEED_FLOOR = 34;
+		int crossing_speed = std::max(this->vcache.cached_max_speed * 2 / 3, CROSSING_SPEED_FLOOR);
 		if (max_speed > crossing_speed && DistanceToLevelCrossingAhead(moving_front, CROSSING_LOOK_AHEAD) >= 0) {
 			max_speed = crossing_speed;
 		}
@@ -2740,6 +2747,10 @@ bool HandleRescueEngineInDepot(Train *tow)
 		return true;
 	}
 
+	/* Putting a casualty down is the same surgery as decoupling, and asks the
+	 * game the same question about who is acting. See TryDecoupleAtStation(). */
+	AutoRestoreBackup cur_company(_current_company, tow->owner);
+
 	Train *casualty = Train::GetIfValid(tow->rescue_target);
 	bool in_tow = casualty != nullptr && casualty != tow && casualty->First() == tow;
 
@@ -3091,6 +3102,15 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 {
 	if (keep_count == 0) return;
 	if (v->vehstatus.Test(VehState::Crashed)) return;
+
+	/* Taking a train apart is the same work the move command does, and parts of
+	 * that work ask the game which company is acting -- handing out a unit
+	 * number to the half that becomes a train of its own reads it straight from
+	 * _current_company. During a vehicle tick that is simply whatever ran last,
+	 * which is regularly nobody at all, and asking the company list for "nobody"
+	 * puts the game down on the spot. It is the same trap CmdCoupleTrains() is
+	 * called through, and the same answer: say who is acting before acting. */
+	AutoRestoreBackup cur_company(_current_company, v->First()->owner);
 
 	Train *split_point = v;
 	for (uint8_t i = 0; i < keep_count; i++) {
@@ -5088,8 +5108,19 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 		 * good. Give the search below the same fresh chance a headless rake
 		 * gets; it stops the path short of the casualty and coupling takes
 		 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
-		if (Train::From(other_train)->First()->IsFrontEngine() &&
-				!IsValidCouplePartner(consist, Train::From(other_train)->First())) {
+		/* "The very train we were sent to fetch" has to mean that one and no
+		 * other. Asking whether the train in the way would make a fine partner
+		 * is a different question with a much wider answer: two engines both
+		 * parked waiting to be fetched each pass that test on the other, so an
+		 * engine that had come to a stand somewhere quite innocent counted as
+		 * an arrival, the search was let past it, and a train drove down the
+		 * line at a stranger. What this train is going for is written down --
+		 * it is claimed, by name -- so read the name. */
+		const Train *ahead = Train::From(other_train)->First();
+		const Train *head = consist->First();
+		bool is_our_errand = ahead->index == head->couple_target || ahead->index == head->rescue_target;
+
+		if (ahead->IsFrontEngine() && !is_our_errand) {
 			/* Genuinely blocked by a real, driving train -- nothing
 			 * useful to do but wait, exactly as before. */
 			if (mark_as_stuck) MarkTrainAsStuck(consist);
@@ -6367,6 +6398,16 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			if (HandleRescueEngineInDepot(consist)) return true;
 		} else {
 			TryDispatchRescueEngine(consist);
+
+			/* Nothing to go to, so it does not go. Being on call is standing
+			 * in a depot with the brake off waiting for something to happen,
+			 * and a train standing in a depot with the brake off is otherwise
+			 * a train about to leave: the code further down lets it out, and
+			 * out it went, with no orders and nowhere to be. What used to keep
+			 * it in was this block claiming the tick whatever happened, which
+			 * had to stop because it also kept in the engine that had just
+			 * been given a job. So the two are told apart here instead. */
+			if (consist->rescue_target == VehicleID::Invalid()) return true;
 		}
 	}
 
@@ -6392,6 +6433,26 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * what it had chosen. Nothing is reserved until there is something to
 		 * reserve it for. Not every tick -- there is nothing to release most of
 		 * the time. */
+		if ((consist->tick_counter & 0x1F) == 0) {
+			FreeTrainTrackReservation(consist);
+			consist->ReserveTrackUnderConsist();
+		}
+		return true;
+	}
+
+	/* And the same for the train at the other end of that arrangement: one
+	 * waiting to be fetched plans nothing at all. It is not going anywhere
+	 * under its own steam -- whoever comes for it brings the orders -- so it
+	 * has no business looking for a way out, and every reason not to: a train
+	 * that is never going to move must not be holding track that other trains
+	 * are queueing for. Demolishing a piece of line was enough to set every
+	 * waiting engine in the station looking for a new way round and reserving
+	 * one. It keeps hold of the ground it is standing on and nothing else.
+	 *
+	 * Not while it is still loading: the order says wait to be fetched, but
+	 * the cargo going aboard is the train's own business and finishes on its
+	 * own. */
+	if (consist->cur_speed == 0 && !consist->current_order.IsType(OT_LOADING) && IsWaitingToBeCoupled(consist)) {
 		if ((consist->tick_counter & 0x1F) == 0) {
 			FreeTrainTrackReservation(consist);
 			consist->ReserveTrackUnderConsist();

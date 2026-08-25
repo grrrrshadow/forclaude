@@ -1001,6 +1001,11 @@ static CallBackFunction ToolbarForestClick(Window *w)
 	DropDownList list;
 	list.push_back(MakeDropDownListIconItem(SPR_IMG_LANDSCAPING, PAL_NONE, STR_LANDSCAPING_MENU_LANDSCAPING, 0));
 	list.push_back(MakeDropDownListIconItem(SPR_IMG_PLANTTREES, PAL_NONE, STR_LANDSCAPING_MENU_PLANT_TREES, 1));
+	/* Numbered past the stock entries rather than slotted in among them: where
+	 * it sits in the menu is a matter of the order things are added, and the
+	 * number is what the click is answered by. Renumbering the stock entries to
+	 * make room would rename four actions to move one line. */
+	list.push_back(MakeDropDownListIconItem(SPR_BLUEPRINT_TOOLBAR, PAL_NONE, STR_LANDSCAPING_MENU_BLUEPRINT, 4));
 	list.push_back(MakeDropDownListIconItem(SPR_IMG_SIGN, PAL_NONE, STR_LANDSCAPING_MENU_PLACE_SIGN, 2));
 	if (ObjectClass::GetUIClassCount() != 0) {
 		list.push_back(MakeDropDownListIconItem(SPR_IMG_TRANSMITTER, PAL_NONE, STR_LANDSCAPING_MENU_PLACE_OBJECT, 3));
@@ -1022,16 +1027,8 @@ static CallBackFunction MenuClickForest(int index)
 		case 1: ShowBuildTreesToolbar(); break;
 		case 2: return SelectSignTool();
 		case 3: ShowBuildObjectPicker(); break;
+		case 4: ShowBlueprintToolbar(); break;
 	}
-	return CallBackFunction::None;
-}
-
-/* --- Blueprint button --- */
-
-static CallBackFunction ToolbarBlueprintClick(Window *w)
-{
-	ShowBlueprintToolbar();
-	w->HandleButtonClick(WID_TN_BLUEPRINT);
 	return CallBackFunction::None;
 }
 
@@ -1376,10 +1373,9 @@ static MenuClickedProc * const _menu_clicked_procs[] = {
 	MenuClickBuildWater,  // 24
 	MenuClickBuildAir,    // 25
 	MenuClickForest,      // 26
-	nullptr,              // 27
-	MenuClickMusicWindow, // 28
-	MenuClickNewspaper,   // 29
-	MenuClickHelp,        // 30
+	MenuClickMusicWindow, // 27
+	MenuClickNewspaper,   // 28
+	MenuClickHelp,        // 29
 };
 
 /** Full blown container to make it behave exactly as we want :) */
@@ -1828,7 +1824,6 @@ class NWidgetMainToolbarContainer : public NWidgetToolbarContainer {
 			WID_TN_WATER,
 			WID_TN_AIR,
 			WID_TN_LANDSCAPE,
-			WID_TN_BLUEPRINT,
 			WID_TN_MUSIC_SOUND,
 			WID_TN_MESSAGES,
 			WID_TN_HELP
@@ -2007,7 +2002,6 @@ static ToolbarButtonProc * const _toolbar_button_procs[] = {
 	ToolbarBuildWaterClick,
 	ToolbarBuildAirClick,
 	ToolbarForestClick,
-	ToolbarBlueprintClick,
 	ToolbarMusicClick,
 	ToolbarNewspaperClick,
 	ToolbarHelpClick,
@@ -2038,7 +2032,7 @@ struct MainToolbarWindow : Window {
 		/* If spectator, disable all construction buttons
 		 * ie : Build road, rail, ships, airports and landscaping
 		 * Since enabled state is the default, just disable when needed */
-		this->SetWidgetsDisabledState(_local_company == COMPANY_SPECTATOR, WID_TN_RAILS, WID_TN_ROADS, WID_TN_TRAMS, WID_TN_WATER, WID_TN_AIR, WID_TN_LANDSCAPE, WID_TN_BLUEPRINT);
+		this->SetWidgetsDisabledState(_local_company == COMPANY_SPECTATOR, WID_TN_RAILS, WID_TN_ROADS, WID_TN_TRAMS, WID_TN_WATER, WID_TN_AIR, WID_TN_LANDSCAPE);
 		/* disable company list drop downs, if there are no companies */
 		this->SetWidgetsDisabledState(Company::GetNumItems() == 0, WID_TN_STATIONS, WID_TN_FINANCES, WID_TN_TRAINS, WID_TN_ROADVEHS, WID_TN_SHIPS, WID_TN_AIRCRAFT);
 
@@ -2226,7 +2220,6 @@ static constexpr std::tuple<WidgetID, WidgetType, SpriteID> _toolbar_button_spri
 	{WID_TN_WATER,        WWT_IMGBTN,     SPR_IMG_BUILDWATER},
 	{WID_TN_AIR,          WWT_IMGBTN,     SPR_IMG_BUILDAIR},
 	{WID_TN_LANDSCAPE,    WWT_IMGBTN,     SPR_IMG_LANDSCAPING},
-	{WID_TN_BLUEPRINT,    WWT_PUSHIMGBTN, SPR_BLUEPRINT_TOOLBAR},
 	{WID_TN_MUSIC_SOUND,  WWT_IMGBTN,     SPR_IMG_MUSIC},
 	{WID_TN_MESSAGES,     WWT_IMGBTN,     SPR_IMG_MESSAGES},
 	{WID_TN_HELP,         WWT_IMGBTN,     SPR_IMG_QUERY},

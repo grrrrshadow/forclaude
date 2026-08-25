@@ -137,6 +137,20 @@ struct CursorVars {
 	 * moment to the next. They are asked for separately.
 	 */
 	bool warp_back;
+	/**
+	 * Where the pointer was the last time it was looked at, while it is fixed
+	 * and not being put back.
+	 *
+	 * #pos stays at the point the drag began, because that is where the cursor
+	 * is drawn. When the pointer is put back there every frame the two are the
+	 * same thing and the movement since the last frame is simply the distance
+	 * from #pos. When it is not put back, the pointer walks away and that
+	 * distance becomes the whole distance travelled since the button went
+	 * down -- applied again on every frame, which sends the map across the
+	 * world for a small movement of the hand. So the last position is kept
+	 * separately and the movement measured against that.
+	 */
+	Point last_seen;
 
 	/* 2D wheel scrolling for moving around the map */
 	bool wheel_moved;

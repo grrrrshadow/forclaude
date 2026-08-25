@@ -609,6 +609,7 @@ struct VehicleSettings {
 	uint8_t max_train_length; ///< maximum length for trains
 	uint8_t smoke_amount; ///< amount of smoke/sparks locomotives produce
 	AccelerationModel train_acceleration_model; ///< realistic acceleration for trains
+	bool train_slow_for_level_crossing; ///< trains ease off before a level crossing
 	AccelerationModel roadveh_acceleration_model; ///< realistic acceleration for road vehicles
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration
