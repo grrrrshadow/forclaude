@@ -130,15 +130,27 @@ veličiny a jedna se odvodí z druhé.
 
 ## 0.6 Podle kterých nástupišť to zlobí se pozná, co je špatně
 
-Tohle je z nádraží nejužitečnější věc a vyplývá přímo ze zrcadla. Nádraží
-je postavené tak, že **směr** mají všechna čtyři nástupiště stejný,
-**hlavu** mají 1 a 2 na opačné straně než 3 a 4. Takže:
+**Tohle je nástroj na hledání, ne pravidlo hry.** Platí o *našem zkušebním
+nádraží* a nikde jinde. Hráč si postaví nádraží, jaké chce, a žádné číslo
+nástupiště pro hru nic neznamená — **v kódu se na nástupiště neptá nic a
+ptát nesmí.** Kdyby se někdy stalo, že se chování hry liší podle toho, na
+kterém nástupišti vlak stojí, je to chyba, ne vlastnost.
+
+Proč to funguje: to nádraží je schválně postavené tak, že **směr** mají
+všechna čtyři nástupiště stejný a **hlavu** mají 1 a 2 na opačné straně než
+3 a 4. Je to tedy pokus, který ty dvě veličiny odděluje. Odtud:
 
 - **zlobí to na všech čtyřech nástupištích → problém je ve směru;**
 - **zlobí to jen na 1 a 2, nebo jen na 3 a 4 → problém je v hlavě.**
 
 Než začnu hledat, zeptám se, na kterých nástupištích se to děje. Odpověď
-rozdělí podezřelé na půl dřív, než otevřu jediný soubor.
+rozdělí podezřelé na půl dřív, než otevřu jediný soubor. Na jiném nádraží
+ta zkratka prostě neplatí a hledá se normálně — nic se tím nerozbije.
+
+**Co drží kód nezávislý na nádraží, je pravidlo 0.5:** nikdy nejmenovat
+konec. Všechno se rozhoduje měřením — které konce jsou si blíž, kterým
+směrem vlak přijel, který konec má řídicí kabinu. Dokud to tak zůstane, je
+jedno, jak si kdo nádraží postaví.
 
 ---
 
