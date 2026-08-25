@@ -8,6 +8,7 @@
 /** @file console_cmds.cpp Implementation of the console hooks. */
 
 #include "stdafx.h"
+#include "train.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
 #include "debug.h"
@@ -354,6 +355,42 @@ static bool ConZoomToLevel(std::span<std::string_view> argv)
 	}
 
 	return false;
+}
+
+/**
+ * Turn the depot-doorway lock on the reverse button on or off.
+ *
+ * A train standing half in and half out of a depot has its turn-round button
+ * greyed out, because asking for it there is what freezes a train. This lets
+ * that button be pressed anyway, which is the only way to work on the freeze.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConDepotDoorstepReverse(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Allow the turn-round button while a train straddles a depot doorway.");
+		IConsolePrint(CC_HELP, "Usage: 'depo123' to flip it, or 'depo123 on' / 'depo123 off'.");
+		return true;
+	}
+
+	if (argv.size() >= 2) {
+		if (argv[1] == "on" || argv[1] == "1") {
+			_allow_reverse_on_depot_doorstep = true;
+		} else if (argv[1] == "off" || argv[1] == "0") {
+			_allow_reverse_on_depot_doorstep = false;
+		} else {
+			return false;
+		}
+	} else {
+		_allow_reverse_on_depot_doorstep = !_allow_reverse_on_depot_doorstep;
+	}
+
+	IConsolePrint(CC_DEFAULT, "Turning round on a depot doorway is now {}.",
+			_allow_reverse_on_depot_doorstep ? "allowed" : "blocked");
+	/* The button is drawn from this, so every open vehicle window has to be
+	 * told to look again. */
+	InvalidateWindowClassesData(WindowClass::VehicleView);
+	return true;
 }
 
 /**
@@ -3115,4 +3152,6 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("newgrf_profile",          ConNewGRFProfile,    ConHookNewGRFDeveloperTool);
 
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
+
+	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 }

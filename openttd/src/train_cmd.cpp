@@ -3897,6 +3897,12 @@ bool IsWholeTrainInsideDepot(const Train *v)
  * a train leaving a depot is in both at once for a few ticks. Anything that
  * rearranges a train has to keep away from it while that lasts.
  */
+/**
+ * Whether the turn-round button stays usable while a train straddles a depot
+ * doorway. Off by default; the console command "depo123" turns it back on.
+ */
+bool _allow_reverse_on_depot_doorstep = false;
+
 static bool IsAnyPartInsideDepot(const Train *v)
 {
 	for (const Train *u = v; u != nullptr; u = u->Next()) {
@@ -5096,6 +5102,28 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	 * treat that as trivial success rather than asserting or marking it
 	 * stuck. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (!consist->IsFrontEngine()) return true;
+
+	/* And a train waiting to be fetched is not driving anywhere either. It is
+	 * standing on a platform until an engine comes for it, and the orders that
+	 * take it away are that engine's, not its own, so there is no route ahead
+	 * of it to find and nothing it may hold against anybody.
+	 *
+	 * This has to be answered here and not in the train's own tick, because
+	 * most of the asking is done from outside it. Demolishing a piece of line
+	 * frees the reservation of whichever train was holding the removed track
+	 * and then asks that train to find itself a new way -- and so do removing a
+	 * depot, a station, a tunnel, a bridge. That is why it was always the first
+	 * waiting train behind the demolition, on every platform alike: nothing to
+	 * do with which end its engine is on, it was simply told to.
+	 *
+	 * It does take back the ground it is standing on, which the caller has
+	 * usually just released, and reports success: there was nothing to fail
+	 * at. See rail_cmd.cpp, tunnelbridge_cmd.cpp and station_cmd.cpp for the
+	 * places that ask. */
+	if (IsWaitingToBeCoupled(consist)) {
+		consist->ReserveTrackUnderConsist();
+		return true;
+	}
 
 	const Train *moving_front = consist->GetMovingFront();
 

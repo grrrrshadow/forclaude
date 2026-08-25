@@ -3819,6 +3819,7 @@ STR_SPRITE_ALIGNER_GOTO_CAPTION                                 :{WHITE}Jít na 
 # NewGRF (self) generated warnings/errors
 STR_NEWGRF_ERROR_MSG_INFO                                       :{SILVER}{STRING}
 STR_NEWGRF_ERROR_MSG_WARNING                                    :{RED}Varování: {SILVER}{STRING}
+STR_NEWGRF_ERROR_WAGON_CARGO_EXCEPTION                          :cztr wagons cargo už funguje se všemi průmysly a s FIRS také funguje
 STR_NEWGRF_ERROR_MSG_ERROR                                      :{RED}Chyba: {SILVER}{STRING}
 STR_NEWGRF_ERROR_MSG_FATAL                                      :{RED}Závažná chyba: {SILVER}{STRING}
 STR_NEWGRF_ERROR_FATAL_POPUP                                    :{WHITE}V NewGRF "{STRING}" se vyskytla kritická chyba:{}{STRING}

@@ -3216,7 +3216,16 @@ public:
 		}
 
 		if (v->type == VehicleType::Train || v->type == VehicleType::Road) {
-			this->SetWidgetDisabledState(WID_VV_TURN_AROUND, !is_localcompany);
+			/* Greyed out while a train stands across a depot doorway. Inside a
+			 * depot the button flips the order of the vehicles, out on the line
+			 * it changes which end leads, and both are fine; half in and half
+			 * out is neither, and asking for it there is what freezes a train.
+			 * Until that is fixed properly the button says so by being dead,
+			 * the way every other button in the game says it. It can be turned
+			 * back on from the console to work on the freeze -- see
+			 * _allow_reverse_on_depot_doorstep. */
+			bool on_the_doorstep = !_allow_reverse_on_depot_doorstep && IsTrainAcrossDepotDoorway(v);
+			this->SetWidgetDisabledState(WID_VV_TURN_AROUND, !is_localcompany || on_the_doorstep);
 		}
 
 		this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);

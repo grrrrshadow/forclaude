@@ -446,6 +446,46 @@ protected: // These functions should not be called outside acceleration code.
  *          consist it belongs to.
  * @return Whether this is such a rake.
  */
+/**
+ * Whether the button that turns a train round is left usable while the train is
+ * half in a depot.
+ *
+ * A testing switch, not a setting: the console command "depo123" flips it. It
+ * exists because turning a train round on the depot doorstep is what freezes
+ * one, and the freeze has to stay reachable to be worked on.
+ */
+extern bool _allow_reverse_on_depot_doorstep;
+
+/**
+ * Is this train standing across a depot doorway -- some of it inside, some of
+ * it out?
+ *
+ * The two ordinary places are both fine to turn a train round in: inside a
+ * depot the whole train is on one tile and turning it round reverses the order
+ * of its vehicles, and out on the line turning it round changes which end
+ * leads. The doorway is neither, and asking for either there is what puts a
+ * train to sleep, so the button is greyed out while a train is in it.
+ *
+ * @param v The train; may be any part, the question is about the whole consist.
+ * @return Whether part of it is in a depot and part of it is not.
+ */
+inline bool IsTrainAcrossDepotDoorway(const Vehicle *v)
+{
+	if (v->type != VehicleType::Train) return false;
+
+	bool any_in = false;
+	bool any_out = false;
+	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
+		if (Train::From(u)->track == Track::Depot) {
+			any_in = true;
+		} else {
+			any_out = true;
+		}
+		if (any_in && any_out) return true;
+	}
+	return false;
+}
+
 inline bool IsWaitingWagonChain(const Vehicle *v)
 {
 	if (v->type != VehicleType::Train) return false;

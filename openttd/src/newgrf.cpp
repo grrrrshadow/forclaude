@@ -857,6 +857,83 @@ static void FinaliseCanals()
 }
 
 /** Check for invalid engines */
+/**
+ * Let every wagon of one particular NewGRF carry every cargo the game has.
+ *
+ * CZTR Wagons-Cargo is a set of Czech wagons whose author gave each of them
+ * only the cargoes of the industries it was drawn for. That makes the whole set
+ * useless with any other industry set, and with FIRS in particular, for a
+ * reason that has nothing to do with the wagons themselves: they are ordinary
+ * open, covered and tank wagons and there is no reason a box van should refuse
+ * a cargo because the set does not know about the industry that made it.
+ *
+ * So this is a named exception, not a rule: it names one GRF, by its id and by
+ * its name together, and does nothing at all to anything else. The name is
+ * checked as well as the id so that a later version of the set -- which may
+ * well have fixed this itself -- is left alone rather than quietly overridden.
+ *
+ * The GRF still loads normally and is marked in the list with a warning saying
+ * what was done, because a game that silently rewrites somebody's NewGRF is a
+ * game that cannot be reasoned about.
+ */
+static void ApplyWagonCargoException()
+{
+	/* Written the way it reads in the file: "MI\x02\x13". The id is stored the
+	 * other way round in memory, which is why the debug prints swap it too. */
+	static constexpr GrfID EXCEPTION_GRFID = 0x4D490213;
+	static const std::string_view EXCEPTION_NAME = "CZTR Wagons-Cargo 1.0.0";
+
+	GRFConfig *config = nullptr;
+	for (const auto &c : _grfconfig) {
+		if (c->status != GRFStatus::Activated) continue;
+		if (std::byteswap(c->ident.grfid) != EXCEPTION_GRFID) continue;
+		if (c->GetName() != EXCEPTION_NAME) continue;
+		config = c.get();
+		break;
+	}
+	if (config == nullptr) return;
+
+	/* What to work out a capacity from when a wagon has none of its own for
+	 * the cargo it ends up carrying. The game scales a wagon's capacity by the
+	 * cargo it is refitted to, and a wagon with nothing to scale stays at
+	 * nothing, so it needs a number to start from: the original coal wagon's,
+	 * looked up rather than written down here so it cannot drift out of step
+	 * with the game. */
+	uint16_t coal_capacity = 0;
+	for (const Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Train || e->GetGRF() != nullptr) continue;
+		if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+		if (GetActiveCargoLabel(e->info.cargo_label) != CT_COAL) continue;
+		coal_capacity = e->VehInfo<RailVehicleInfo>().capacity;
+		if (coal_capacity != 0) break;
+	}
+
+	uint changed = 0;
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Train) continue;
+		const GRFFile *file = e->GetGRF();
+		if (file == nullptr || std::byteswap(file->grfid) != EXCEPTION_GRFID) continue;
+
+		RailVehicleInfo &rvi = e->VehInfo<RailVehicleInfo>();
+		if (rvi.railveh_type != RailVehicleType::Wagon) continue;
+
+		if (rvi.capacity == 0) rvi.capacity = coal_capacity;
+
+		e->info.refit_mask = CargoTypes{_cargo_mask};
+		/* Something has to be the cargo it is built carrying, and what it was
+		 * built carrying may not be in this game at all. */
+		if (!IsValidCargoType(e->info.cargo_type) || !e->info.refit_mask.Test(e->info.cargo_type)) {
+			if (e->info.refit_mask.Any()) e->info.cargo_type = *e->info.refit_mask.begin();
+		}
+		changed++;
+	}
+
+	if (changed == 0) return;
+
+	auto &error = config->errors.emplace_back(STR_NEWGRF_ERROR_MSG_WARNING, 0);
+	error.message = STR_NEWGRF_ERROR_WAGON_CARGO_EXCEPTION;
+}
+
 static void FinaliseEngineArray()
 {
 	for (Engine *e : Engine::Iterate()) {
@@ -1651,6 +1728,9 @@ static void AfterLoadGRFs()
 
 	/* Pre-calculate all refit masks after loading GRF files. */
 	CalculateRefitMasks();
+
+	/* And then the one named exception to them. */
+	ApplyWagonCargoException();
 
 	/* Polish engines */
 	FinaliseEngineArray();

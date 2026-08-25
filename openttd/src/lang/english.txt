@@ -3736,6 +3736,7 @@ STR_SPRITE_ALIGNER_GOTO_CAPTION                                 :{WHITE}Go to sp
 # NewGRF (self) generated warnings/errors
 STR_NEWGRF_ERROR_MSG_INFO                                       :{SILVER}{RAW_STRING}
 STR_NEWGRF_ERROR_MSG_WARNING                                    :{RED}Warning: {SILVER}{RAW_STRING}
+STR_NEWGRF_ERROR_WAGON_CARGO_EXCEPTION                          :CZTR Wagons-Cargo now works with every industry set, and with FIRS as well
 STR_NEWGRF_ERROR_MSG_ERROR                                      :{RED}Error: {SILVER}{RAW_STRING}
 STR_NEWGRF_ERROR_MSG_FATAL                                      :{RED}Fatal: {SILVER}{RAW_STRING}
 STR_NEWGRF_ERROR_FATAL_POPUP                                    :The NewGRF "{RAW_STRING}" has returned a fatal error: {}{STRING5}
