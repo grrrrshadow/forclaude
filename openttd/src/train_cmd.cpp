@@ -1718,7 +1718,7 @@ bool IsWaitingToBeRescued(const Train *v)
 	if (!v->IsFrontEngine()) return false;
 	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
 	if (v->IsInDepot()) return false;
-	if (v->breakdown_ctr != 1 && !v->vehstatus.Test(VehState::Crashed)) return false;
+	if (v->breakdown_ctr != 1 && !v->IsWrecked()) return false;
 	if (v->rescue_deadline == TimerGameEconomy::Date{}) return false;
 	return TimerGameEconomy::date < v->rescue_deadline;
 }
@@ -1801,7 +1801,7 @@ bool IsWaitingToBeCoupled(const Train *v)
 	if (head->IsFreeWagon()) return true;
 
 	/* Stranded is the same thing said another way. */
-	if (head->breakdown_ctr == 1 || head->vehstatus.Test(VehState::Crashed)) return true;
+	if (head->breakdown_ctr == 1 || head->IsWrecked()) return true;
 
 	/* A train that can drive counts only once it has got where it was sent and
 	 * come to a stand. The flag sits on the order long before that, so without
@@ -1855,7 +1855,7 @@ static bool IsCoupleClaimStale(const Train *rake)
 	const Train *claimer = Train::GetIfValid(rake->couple_claim);
 	if (claimer == nullptr) return true;
 	if (!claimer->IsFrontEngine()) return true;
-	if (claimer->vehstatus.Test(VehState::Crashed)) return true;
+	if (claimer->vehstatus.Test(VehState::Crashed) || claimer->IsWrecked()) return true;
 	/* The two halves of the claim have to agree. If the engine no longer says
 	 * it is coming for this rake -- it was given other orders, or it has
 	 * already collected something -- then it is not coming. */
@@ -1962,6 +1962,8 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	 * on its own terms and none of the ordinary conditions apply to it. */
 	if (v->First()->rescue_target == partner->index) return IsOnRescueRun(v->First());
 
+	/* A wreck is not excluded -- fetching one is the whole point. Only vanilla's
+	 * own kind of wreckage, which nothing can do anything with, still is. */
 	if (partner->vehstatus.Test(VehState::Crashed)) return false;
 	if (partner->cur_speed != 0) return false;
 	/* A train that has anything to do with a depot is not standing anywhere to
@@ -2445,7 +2447,7 @@ static void NormaliseCoupledConsistFacing(Train *consist)
 }
 
 /** How long a casualty waits to be fetched before sorting itself out the vanilla way. */
-static constexpr int RESCUE_DEADLINE_DAYS = EconomyTime::DAYS_IN_ECONOMY_YEAR / 2;
+static constexpr int RESCUE_DEADLINE_DAYS = EconomyTime::DAYS_IN_ECONOMY_YEAR / 4;
 
 /**
  * Should this broken-down train stay broken down and wait to be fetched?
@@ -2691,7 +2693,7 @@ static void TryDispatchRescueEngine(Train *tow)
 		 * Told apart from "waiting to be fetched" so that an engine which never
 		 * leaves says which of the two it is looking at, rather than the same
 		 * "nothing to do" for both. */
-		if (casualty->IsFrontEngine() && (casualty->breakdown_ctr == 1 || casualty->vehstatus.Test(VehState::Crashed))) saw_trouble = true;
+		if (casualty->IsFrontEngine() && (casualty->breakdown_ctr == 1 || casualty->IsWrecked())) saw_trouble = true;
 
 		if (casualty->owner != tow->owner) continue;
 		if (!IsWaitingToBeRescued(casualty)) continue;
@@ -2791,7 +2793,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 	/* Nothing was ever picked up -- the casualty was sold, or sorted itself out
 	 * before this engine got there. Nothing to put down. */
 	if (in_tow) {
-		bool wrecked = casualty->vehstatus.Test(VehState::Crashed);
+		bool wrecked = casualty->IsWrecked();
 
 		/* Split it back off. It is standing in a depot, which is where taking
 		 * trains apart is an ordinary thing to do. */
@@ -3150,7 +3152,7 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type)
 {
 	if (keep_count == 0) return;
-	if (v->vehstatus.Test(VehState::Crashed)) return;
+	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return;
 
 	/* Taking a train apart is the same work the move command does, and parts of
 	 * that work ask the game which company is acting -- handing out a unit
@@ -5510,6 +5512,42 @@ void Train::ReserveTrackUnderConsist() const
  * @param flooded Crash was caused by flooding.
  * @return Number of people killed.
  */
+/**
+ * Make the mess a crash leaves on the ground.
+ *
+ * Vanilla spends a wreck's whole life doing this: it shakes for a while, puffs
+ * small explosions at random for two hundred ticks and then sheds a wagon every
+ * so often until there is nothing left. None of that can happen here, because
+ * here a crashed train stands still and waits to be fetched, so all of it has
+ * to happen at once instead -- otherwise a crash is a train that quietly turns
+ * grey and nothing else, which reads as a bug rather than as a disaster.
+ *
+ * A bang at each end, and smoke over the ground around it: one plume for each
+ * vehicle, so a long train makes a long mess, thrown up to three tiles clear of
+ * the train itself.
+ *
+ * @param v The train that has just crashed, its head.
+ */
+static void ScatterWreckage(Train *v)
+{
+	if (!v->vehstatus.Test(VehState::Hidden)) CreateEffectVehicleRel(v, 4, 4, 8, EV_EXPLOSION_LARGE);
+
+	Train *last = v->Last();
+	if (last != v && !last->vehstatus.Test(VehState::Hidden)) CreateEffectVehicleRel(last, 4, 4, 8, EV_EXPLOSION_LARGE);
+
+	/* Three tiles, in the units the effect offsets are given in. */
+	static constexpr int SCATTER = 3 * static_cast<int>(TILE_SIZE);
+
+	for (Train *u = v; u != nullptr; u = u->Next()) {
+		if (u->vehstatus.Test(VehState::Hidden)) continue;
+		CreateEffectVehicleRel(u,
+				static_cast<int8_t>(RandomRange(2 * SCATTER + 1) - SCATTER),
+				static_cast<int8_t>(RandomRange(2 * SCATTER + 1) - SCATTER),
+				static_cast<int8_t>(RandomRange(8) + 5),
+				EV_BREAKDOWN_SMOKE);
+	}
+}
+
 uint Train::Crash(bool flooded)
 {
 	uint victims = 0;
@@ -5559,9 +5597,56 @@ uint Train::Crash(bool flooded)
 		}
 	}
 
-	victims += this->GroundVehicleBase::Crash(flooded);
+	/* What stood here was Vehicle::Crash(), which marks every vehicle of the
+	 * train VehState::Crashed. That one flag is the whole of what vanilla means
+	 * by a wreck, and it takes everything else with it: from the moment it is
+	 * set the train has no direction, no path and no future. It shakes, it
+	 * sheds a wagon at a time and then it is gone, and nothing can be done with
+	 * it in the meantime -- which is exactly the trouble, because the one thing
+	 * we want done with it is to have it towed away.
+	 *
+	 * It was also the source of a whole family of crashes of the game itself.
+	 * Ask a vehicle marked that way which way it is pointing and the answer is
+	 * "nowhere", and every piece of track code that then tries to turn that
+	 * answer into a piece of track falls over on the spot. That never happened
+	 * in vanilla because nothing ever asks -- a wreck is finished with. Here a
+	 * rescue engine couples one onto itself and drives away with it, so a great
+	 * deal asks.
+	 *
+	 * So a crash is a state an ordinary train is in, not the end of one. It
+	 * stops where it stands, it goes grey, it says it has crashed, the player
+	 * cannot drive it, and it waits to be fetched. Everything else about it is
+	 * still an ordinary train, which is what makes towing it possible at all
+	 * and what makes the game stop falling over. */
+	uint pass = 0;
+	for (Train *u = this; u != nullptr; u = u->Next()) {
+		/* Reserved cargo is not handed back, so count what is aboard rather
+		 * than what is settled. */
+		if (IsCargoInClass(u->cargo_type, CargoClass::Passengers)) pass += u->cargo.TotalCount();
+		u->vehicle_flags.Set(VehicleFlag::Wreck);
+		u->MarkAllViewportsDirty();
+	}
 
-	this->crash_anim_pos = flooded ? 4000 : 1; // max 4440, disappear pretty fast when flooded
+	this->vehstatus.Set(VehState::Stopped);
+	this->cur_speed = 0;
+	this->subspeed = 0;
+
+	SetWindowClassesDirty(WindowClass::TrainList);
+	SetWindowWidgetDirty(WindowClass::VehicleView, this->index, WID_VV_START_STOP);
+	SetWindowDirty(WindowClass::VehicleDetails, this->index);
+	InvalidateWindowData(WindowClass::VehicleView, this->index);
+
+	delete this->cargo_payment;
+	assert(this->cargo_payment == nullptr); // cleared by ~CargoPayment
+
+	ScatterWreckage(this);
+
+	/* Flooding used to be the quick way out -- the train was made to vanish
+	 * almost at once. It has nowhere quick to go now, so it waits like any
+	 * other wreck; the water is not going to move it either. */
+	(void)flooded;
+
+	victims += RandomRange(pass + 1); // Randomise deceased passengers.
 	return victims;
 }
 
@@ -5576,7 +5661,7 @@ static uint TrainCrashed(Train *v)
 	uint victims = 0;
 
 	/* do not crash train twice */
-	if (!v->vehstatus.Test(VehState::Crashed)) {
+	if (!v->IsWrecked()) {
 		victims = v->Crash();
 		TileIndex tile = v->GetMovingFront()->tile;
 		AI::NewEvent(v->owner, new ScriptEventVehicleCrashed(v->index, tile, ScriptEventVehicleCrashed::CRASH_TRAIN, victims, v->owner));
@@ -6730,6 +6815,21 @@ bool Train::Tick()
 
 	if (this->IsFrontEngine()) {
 		PerformanceAccumulator framerate(PerformanceElement::GameLoopTrains);
+
+		/* A wreck nobody came for clears itself off the line. Vanilla does this
+		 * by shedding a wagon at a time until there is none left, which cannot
+		 * be borrowed here: a wreck of ours is a whole train standing still and
+		 * a rescue engine may be on its way to it, and it should arrive to find
+		 * the whole train and not what is left of it. So it simply waits out
+		 * the same deadline a breakdown waits, and then goes. Only asked of a
+		 * train that is still standing on its own -- one that has been coupled
+		 * to a rescue engine is not the head of anything and never gets here,
+		 * which is what makes being fetched in time mean something. */
+		if (this->IsWrecked() && this->rescue_deadline != TimerGameEconomy::Date{} &&
+				TimerGameEconomy::date >= this->rescue_deadline) {
+			delete this;
+			return false;
+		}
 
 		if (!this->vehstatus.Test(VehState::Stopped) || this->cur_speed > 0) this->running_ticks++;
 

@@ -3264,7 +3264,7 @@ public:
 	{
 		text_colour = TextColour::Black;
 
-		if (v->vehstatus.Test(VehState::Crashed)) return GetString(STR_VEHICLE_STATUS_CRASHED);
+		if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return GetString(STR_VEHICLE_STATUS_CRASHED);
 
 		if (v->type != VehicleType::Aircraft && v->breakdown_ctr == 1) return GetString(STR_VEHICLE_STATUS_BROKEN_DOWN);
 
@@ -3813,7 +3813,7 @@ void SetMouseCursorVehicle(const Vehicle *v, EngineImageType image_type)
 	while (v != nullptr) {
 		if (total_width >= ScaleSpriteTrad(2 * (int)VEHICLEINFO_FULL_VEHICLE_WIDTH)) break;
 
-		PaletteID pal = v->vehstatus.Test(VehState::Crashed) ? PALETTE_CRASH : GetVehiclePalette(v);
+		PaletteID pal = (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) ? PALETTE_CRASH : GetVehiclePalette(v);
 		VehicleSpriteSeq seq;
 
 		if (rotor_seq) {
@@ -3828,7 +3828,7 @@ void SetMouseCursorVehicle(const Vehicle *v, EngineImageType image_type)
 		if (v->type == VehicleType::Train) x_offs = Train::From(v)->GetCursorImageOffset();
 
 		for (uint i = 0; i < seq.count; ++i) {
-			PaletteID pal2 = v->vehstatus.Test(VehState::Crashed) || !seq.seq[i].pal ? pal : seq.seq[i].pal;
+			PaletteID pal2 = v->vehstatus.Test(VehState::Crashed) || v->IsWrecked() || !seq.seq[i].pal ? pal : seq.seq[i].pal;
 			_cursor.sprites.emplace_back(seq.seq[i].sprite, pal2, rtl ? (-total_width + x_offs) : (total_width + x_offs), y_offset);
 		}
 

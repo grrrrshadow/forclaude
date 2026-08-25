@@ -598,6 +598,13 @@ CommandCost CmdStartStopVehicle(DoCommandFlags flags, VehicleID veh_id, bool eva
 
 	if (v->vehstatus.Test(VehState::Crashed)) return CommandCost(STR_ERROR_VEHICLE_IS_DESTROYED);
 
+	/* A train that has crashed is an ordinary train in every way but this one:
+	 * it is not going anywhere under its own steam. It can be looked at, its
+	 * orders can be read and copied out of it, and an engine can be sent to
+	 * fetch it -- but the player does not simply start it up and drive off in a
+	 * wreck. See Train::Crash(). */
+	if (v->IsWrecked()) return CommandCost(STR_ERROR_TRAIN_HAS_CRASHED);
+
 	switch (v->type) {
 		case VehicleType::Train:
 			/* Wagons have no engine and never will have; refusing to release

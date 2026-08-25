@@ -5684,6 +5684,7 @@ STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}Příli�
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}Nelze změnit interval oprav...
 
 STR_ERROR_VEHICLE_IS_DESTROYED                                  :{WHITE}... vozidlo bylo zničeno
+STR_ERROR_TRAIN_HAS_CRASHED                                     :{WHITE}... vlak havaroval a čeká na odtah
 
 STR_ERROR_CAN_T_CLONE_VEHICLE_LIST                              :{WHITE}... všechna vozidla nejsou identická
 

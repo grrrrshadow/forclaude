@@ -517,6 +517,16 @@ public:
 	}
 
 	/**
+	 * Has this vehicle been in a crash?
+	 *
+	 * Not the same question as VehState::Crashed, which is vanilla's way of
+	 * saying "this is wreckage now" and takes everything else away with it. A
+	 * train of ours that has crashed goes on being a train -- see
+	 * Train::Crash() -- and this is what says that it has crashed.
+	 */
+	inline bool IsWrecked() const { return this->vehicle_flags.Test(VehicleFlag::Wreck); }
+
+	/**
 	 * Gets the speed in km-ish/h that can be sent into string parameters for string processing.
 	 * @return the vehicle's speed
 	 */

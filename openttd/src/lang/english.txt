@@ -5611,6 +5611,7 @@ STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :too many vehicl
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :Can't change servicing interval...
 
 STR_ERROR_VEHICLE_IS_DESTROYED                                  :vehicle is destroyed
+STR_ERROR_TRAIN_HAS_CRASHED                                     :{WHITE}... the train has crashed and is waiting to be towed away
 
 STR_ERROR_CAN_T_CLONE_VEHICLE_LIST                              :not all vehicles are identical
 

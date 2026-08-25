@@ -613,6 +613,7 @@ private:
 		/* WID_O_SEL_DECOUPLE */
 		DP_COUPLE_ROW_STATION = 0, ///< Display the decouple/couple buttons for a train's station order.
 		DP_COUPLE_ROW_DEPOT   = 1, ///< Display the turn-around button for a train's depot order.
+		DP_COUPLE_ROW_EMPTY   = 2, ///< Hold the row's height open when it has no buttons to show.
 	};
 
 	int selected_order = -1;
@@ -1195,7 +1196,14 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
 			} else {
-				decouple_sel->SetDisplayedPlane(SZSP_NONE);
+				/* Nothing to put in the row -- a waypoint order, the end of the
+				 * list, a vehicle that is not a train -- but the row stays open
+				 * all the same. Taking its height away instead makes the whole
+				 * window jump to a different size as the player clicks from one
+				 * order to the next, and everything below it walks up and down
+				 * the screen. An empty strip is not pretty; a window that will
+				 * not hold still is worse. */
+				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_EMPTY);
 			}
 		}
 
@@ -1952,6 +1960,11 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+		/* The same height with nothing in it, so the window does not change
+		 * size as the player clicks from one order to another. */
+		NWidget(NWID_HORIZONTAL),
+			NWidget(NWID_SPACER), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

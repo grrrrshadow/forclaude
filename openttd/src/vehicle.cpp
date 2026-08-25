@@ -1120,7 +1120,7 @@ static void DoDrawVehicle(const Vehicle *v)
 {
 	PaletteID pal = PAL_NONE;
 
-	if (v->vehstatus.Test(VehState::DefaultPalette)) pal = v->vehstatus.Test(VehState::Crashed) ? PALETTE_CRASH : GetVehiclePalette(v);
+	if (v->vehstatus.Test(VehState::DefaultPalette)) pal = (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) ? PALETTE_CRASH : GetVehiclePalette(v);
 
 	/* Check whether the vehicle shall be transparent due to the game state */
 	bool shadowed = v->vehstatus.Test(VehState::Shadow);

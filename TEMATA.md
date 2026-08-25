@@ -336,9 +336,39 @@ tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
 - Pojistka: **půl roku herního času od poruchy** (ne od vyslání). Pak se
   porucha spraví sama a trosky začnou mizet po vanilla způsobu, čímž se
   trať uvolní.
-- Vrak se z principu nedá pohnout — vanilla z havárie dělá konec vlaku, ne
-  jeho stav. Rozbor v `FEATURE_DESIGN_COUPLING_TOW.md`, sekce „Odtahovka —
-  těžká místa", bod A.
+## 4.2 Havárie je stav vlaku, ne jeho konec
+
+Tohle bylo dlouho vedené jako „vrak se z principu nedá pohnout". **Už
+neplatí — přepsali jsme, co havárie je.**
+
+Vanilla nasadí havarovanému vlaku příznak `VehState::Crashed` a tím mu vezme
+všechno ostatní: od té chvíle nemá směr, nemá cestu a nemá budoucnost. Třese
+se, ztrácí po jednom voze a zmizí, a mezitím se s ním nedá dělat nic — což je
+přesně problém, protože jediné, co s ním chceme dělat, je odtáhnout ho.
+
+Byl to zároveň zdroj celé rodiny **pádů hry**. Zeptej se takového vozu, kam
+míří, a odpověď je „nikam"; každé místo, které z té odpovědi dělá kolej, na
+tom spadne (`track_func.h:237`). Ve vanille se nikdo neptá, protože vrak je
+věc odepsaná. U nás si ho odtahovka připojí k sobě a odjede s ním, takže se
+ptá spousta míst.
+
+**Takže havarovaný vlak žádný `VehState::Crashed` nedostane.** Dostane
+`VehicleFlag::Wreck` a zůstane obyčejným vlakem:
+
+- zastaví, kde stojí, a **zešedne** (`PALETTE_CRASH`, ptá se `IsWrecked()`),
+- v okně píše **havárie**,
+- **hráč s ním nemůže odjet** — příkaz start ho odmítne. Kouknout se do něj
+  a zkopírovat z něj příkazy jde.
+- **čeká na odtah**, přesně jako porouchaný,
+- výbuch na obou koncích a **kouř kolem** — jeden obláček na každý vůz, až
+  tři dlaždice od vlaku. Vanilla to rozpouští do stovek tiků, my musíme
+  všechno naráz, jinak je z havárie jen vlak, co potichu zešedl.
+- noviny s počtem mrtvých jsou beze změny,
+- **po třech měsících**, když nikdo nepřijede, zmizí. Ne po vozech —
+  odtahovka má přijet k celému vlaku, ne k tomu, co z něj zbylo.
+
+`HandleCrashedTrain()` a `DeleteLastWagon()` tím pádem pro naše vraky
+neběží vůbec.
 
 ## 4.1 Dvě velké věci z návrhu, které se nakonec dělat nemusely
 
