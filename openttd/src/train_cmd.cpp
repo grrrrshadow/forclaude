@@ -3056,9 +3056,31 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * being carried were a separate headless consist standing in the way --
 	 * impassable, so anything leading past them was ruled out and the search
 	 * settled on a way round. That obstacle has just become part of this train,
-	 * so the route it forced is a route around nothing. All that is left to do
-	 * is hold the ground the joined train is standing on. */
+	 * so the route it forced is a route around nothing. Hold the ground the
+	 * joined train is standing on, and then ask for a way out of it. */
 	new_head->ReserveTrackUnderConsist();
+
+	/* Asking is the part that was missing, and it let a train drive out of a
+	 * platform on no reservation at all.
+	 *
+	 * One place in the game reserves a way out for a train that is standing in
+	 * a station and about to go, and it is reached only when the train is
+	 * marked as leaving. Every ordinary departure passes through
+	 * Vehicle::LeaveStation(), which sets that mark. A train that couples does
+	 * not: it never arrived in the usual sense, its old path was thrown away
+	 * for the splice, and the order it was working on was concluded here by
+	 * hand. So it stood there holding its own two tiles, and then simply set
+	 * off -- across the throat of the station, against the traffic, with
+	 * nothing reserved in front of it, until it met a signal and the ordinary
+	 * machinery took over. What it met on the way was somebody else's problem.
+	 *
+	 * So it leaves the way everything else leaves. Not while it is loading:
+	 * then it really is standing in a station with time to spare, the normal
+	 * departure is still to come, and a path reserved now would be held
+	 * against everyone else for as long as the loading lasts. */
+	if (!new_head->current_order.IsType(OT_LOADING)) {
+		new_head->flags.Set(VehicleRailFlag::LeavingStation);
+	}
 
 	/* A rescue engine has what it came for. Where it takes it is the nearest
 	 * depot -- a casualty is fetched to get it off the line, and the nearest
