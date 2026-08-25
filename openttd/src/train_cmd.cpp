@@ -2446,7 +2446,14 @@ static void NormaliseCoupledConsistFacing(Train *consist)
 	}
 }
 
-/** How long a casualty waits to be fetched before sorting itself out the vanilla way. */
+/**
+ * How long a casualty waits to be fetched before sorting itself out the vanilla
+ * way: three months of game time, counted from the trouble rather than from a
+ * rescue engine setting off. One length for both kinds of casualty -- a
+ * breakdown and a crash wait exactly as long -- because from the player's side
+ * they are the same wait, and two different lengths would only be something to
+ * guess at.
+ */
 static constexpr int RESCUE_DEADLINE_DAYS = EconomyTime::DAYS_IN_ECONOMY_YEAR / 4;
 
 /**

@@ -333,7 +333,8 @@ tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
   ven. Dřív ho tam držela ta samá věc, co rušila čerstvý úkol (viz výš),
   takže když ta odpadla, odtahovka začala vyjíždět bez nehody a psala
   „žádné příkazy". Ty dva případy se teď rozlišují, ne slučují.
-- Pojistka: **půl roku herního času od poruchy** (ne od vyslání). Pak se
+- Pojistka: **tři měsíce herního času od poruchy** (ne od vyslání) — stejně
+  dlouho jako u havárie, je to jedna lhůta pro obojí. Pak se
   porucha spraví sama a trosky začnou mizet po vanilla způsobu, čímž se
   trať uvolní.
 ## 4.2 Havárie je stav vlaku, ne jeho konec
