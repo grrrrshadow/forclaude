@@ -147,6 +147,27 @@ Než začnu hledat, zeptám se, na kterých nástupištích se to děje. Odpově
 rozdělí podezřelé na půl dřív, než otevřu jediný soubor. Na jiném nádraží
 ta zkratka prostě neplatí a hledá se normálně — nic se tím nerozbije.
 
+### 0.6b Třetí veličina: **kam ten vlak pojede dál**
+
+Ty dvě veličiny výš nejsou všechno a **výsledek, který nesedí ani na jeden
+z těch dvou vzorců, ještě neznamená, že je měření vadné.** Vlaky, které na
+nástupištích čekají na spojení, nikam nejedou — ale **mají v příkazech
+další cíl, a ten je na každém nástupišti na jiné straně**:
+
+- **nástupiště 1** — nejbližší cíl **vlevo**,
+- **nástupiště 2** — nejbližší cíl **vpravo**,
+- **nástupiště 3 a 4** — mašinky mají hlavu vlevo, cíle taky každá na jinou
+  stranu, a **spojuje se tam k jejich vagonkům zezadu vlaku**.
+
+Proto může jedno nástupiště ze čtyř dopadnout jinak než ostatní, aniž by to
+byla náhoda: **liší se tím, kterou stranou má spojený vlak odjet.** Přesně
+tak vyšla tabulka spojení v `TEST_LOG.md` u buildu #85, kde jako jediná
+prošla dvojka — a byla to právě ta se směrem odjezdu opačným než jednička.
+
+Do tabulky podezřelých tedy patří i **spor mezi tím, kudy spojený vlak
+podle nás má odjet (tou cestou, kterou přijela mašinka), a tím, kudy
+opravdu potřebuje jet dál.**
+
 **Co drží kód nezávislý na nádraží, je pravidlo 0.5:** nikdy nejmenovat
 konec. Všechno se rozhoduje měřením — které konce jsou si blíž, kterým
 směrem vlak přijel, který konec má řídicí kabinu. Dokud to tak zůstane, je
@@ -975,6 +996,39 @@ nese hlava; články jen dělají délku.
 Grafika hlavy vede přes výchozí skupinu `0xFD` → `0xCE` → `0xD3` →
 sada spritů `0x0000`, kde je v 8bpp jen bod 1×1 a skutečný obrázek je až
 ve 32bpp (`zin4`). Tak to má celá sada, i vagony, které fungují.
+
+---
+
+# 1.4 Vanilkové „otočení na místě" se u nás nemůže stát vůbec
+
+Důležité při hledání, ať se to nehledá tam, kde to není. Hra má dva
+způsoby, jak obrátit vlak:
+
+1. **couvání** — vlak se nepohne a jen začne jet druhým koncem,
+2. **otočení na místě** (`ReverseTrainSwapVehicles`) — vozy si vestoje
+   vymění místa, první s posledním. To je ten „magic flip".
+
+Volání číslo 2 je v celém `train_cmd.cpp` **jediné** a je zahrazené
+podmínkou, ve které je i nastavení `difficulty.train_flip_reverse_allowed`.
+A to nastavení je u nás **natvrdo zamčené na `None`** — nedá se přepnout
+v nabídce a při každém načtení hry se bezpodmínečně přepíše zpátky. Tím je
+ta podmínka **vždycky** splněná první částí, takže:
+
+- **vlak se u nás nikdy neotočí na místě, vždycky jen začne couvat;**
+- **na `CanLeadTrain()` se v tom rozhodování nikdy nedojde** — je až za
+  tím nastavením.
+
+Z toho plyne i to, že sebrání příznaku „má kabinu" GRFům (13.5) na tohle
+rozhodování **nemá vliv žádný**. Vliv má jinde: na rychlostní postih vlaku
+bez kabiny a na naše pravidlo, který konec vede spojený vlak.
+
+Ani přerovnání směrů při spojení (`NormaliseCoupledConsistFacing`) viditelné
+otočení způsobit nemůže: `Train::GetImage()` u otočeného vozu sám obrací
+směr pohledu, takže se obrácení směru a přehození příznaku vzájemně vyruší.
+
+**Takže když hráč uvidí, že se vlak otočil, není to vanilkové otočení.**
+Zbývají naše vlastní věci: přepojení seznamu (`ReverseConsistOrder`) a
+otočení v depu — a to druhé je zahrazené na „celý vlak uvnitř depa".
 
 ---
 
