@@ -1420,7 +1420,12 @@ private:
 		for (const auto &c : _all_grfs) {
 			if (std::ranges::any_of(this->actives, [&c](const auto &gc) { return gc->ident.HasGrfIdentifier(c->ident.grfid, &c->ident.md5sum); })) continue;
 
-			if (_settings_client.gui.newgrf_show_old_versions) {
+			/* The one set the game has a named exception for is always offered, whatever the
+			 * setting says. Its author has published a newer version, so hiding old versions
+			 * -- which is what the game does by default -- hides exactly the release the
+			 * exception was written for, and the player would have to go and edit openttd.cfg
+			 * to get at it. See ApplyWagonCargoException(). */
+			if (_settings_client.gui.newgrf_show_old_versions || IsWagonCargoExceptionGrf(*c)) {
 				this->avails.push_back(c.get());
 			} else {
 				const GRFConfig *best = FindGRFConfig(c->ident.grfid, c->flags.Test(GRFConfigFlag::Invalid) ? FindGRFConfigMode::Newest : FindGRFConfigMode::NewestValid);

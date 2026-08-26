@@ -250,4 +250,6 @@ void ShowNewGRFError();
 GrfSpecFeature GetGrfSpecFeature(VehicleType type);
 VehicleType GetVehicleType(GrfSpecFeature feature);
 
+bool IsWagonCargoExceptionGrf(const struct GRFConfig &config);
+
 #endif /* NEWGRF_H */

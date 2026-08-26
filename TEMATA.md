@@ -897,6 +897,20 @@ nastavovala náklady vozidlu, které už bylo vypnuté. Proto je výjimka
 rozdělená na dvě půlky: `PrepareWagonCargoException()` rozšíří náklady
 **před** výpočtem, `ApplyWagonCargoException()` dodělá zbytek po něm.
 
+## 13.2b Ta verze musí být v seznamu vidět
+
+Hra má v seznamu NewGRF nastavení „zobrazovat staré verze" a **implicitně
+je vypnuté** — z každého GRF se nabídne jen ta nejnovější verze. Autor
+mezitím vydal 1.1.0, takže se hráči skryje přesně ta verze, pro kterou je
+výjimka napsaná, a dostal by se k ní jedině ruční úpravou `openttd.cfg`.
+Do `.cfg` hráč chodit nemá.
+
+Proto je v `newgrf_gui.cpp` v `BuildAvailables()` druhá půlka té samé
+jmenovité výjimky: tenhle jeden GRF se do nabídky dá vždycky, ať je to
+nastavení jakékoli. Rozhoduje o tom `IsWagonCargoExceptionGrf()`
+v `newgrf.cpp` — jedno a to samé místo pro obě půlky, aby se nemohly
+rozejít.
+
 ## 13.3 Kapacita: sada odpovídá nulou
 
 41 vagonů té sady má v nastavení `cargo_capacity: 1` a k tomu obě

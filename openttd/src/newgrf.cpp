@@ -890,6 +890,17 @@ static constexpr GrfID WAGON_CARGO_EXCEPTION_GRFID = 0x4D490213;
 static const std::string_view WAGON_CARGO_EXCEPTION_NAME = "CZTR Wagons-Cargo 1.0.0";
 
 /**
+ * Is this the one NewGRF the wagon-cargo exception is written for?
+ * @param config NewGRF to test.
+ * @note Both the id and the name are checked, so that the exception reaches exactly the
+ *       one release it was written for and no other.
+ */
+bool IsWagonCargoExceptionGrf(const GRFConfig &config)
+{
+	return std::byteswap(config.ident.grfid) == WAGON_CARGO_EXCEPTION_GRFID && config.GetName() == WAGON_CARGO_EXCEPTION_NAME;
+}
+
+/**
  * Find the activated NewGRF the wagon-cargo exception is written for.
  * @return Its configuration, or nullptr when it is not in this game.
  */
@@ -897,8 +908,7 @@ static GRFConfig *FindWagonCargoExceptionGrf()
 {
 	for (const auto &c : _grfconfig) {
 		if (c->status != GRFStatus::Activated) continue;
-		if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) continue;
-		if (c->GetName() != WAGON_CARGO_EXCEPTION_NAME) continue;
+		if (!IsWagonCargoExceptionGrf(*c)) continue;
 		return c.get();
 	}
 	return nullptr;
