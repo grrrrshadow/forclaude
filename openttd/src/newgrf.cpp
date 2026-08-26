@@ -869,10 +869,11 @@ static void FinaliseCanals()
  *
  * So this is a named exception, not a rule: it names one GRF, by its id and by
  * its name together, and does nothing at all to anything else. The name is
- * checked as well as the id, but without its version number: this is a private
- * arrangement for one player's own game and it should hold for whichever copy
- * of the set they happen to have loaded. Anyone else gets the set exactly as
- * its author published it.
+ * checked as well as the id, and with its version number, so that this reaches
+ * exactly the one release that needs it. The author has since published 1.1.0
+ * and that one is to be left alone entirely -- whatever it does, it does on its
+ * own terms, and a game that quietly rewrites a newer set than the one it was
+ * told about is a game nobody can reason about.
  *
  * The GRF still loads normally and is marked in the list with a warning saying
  * what was done, because a game that silently rewrites somebody's NewGRF is a
@@ -883,13 +884,13 @@ static void ApplyWagonCargoException()
 	/* Written the way it reads in the file: "MI\x02\x13". The id is stored the
 	 * other way round in memory, which is why the debug prints swap it too. */
 	static constexpr GrfID EXCEPTION_GRFID = 0x4D490213;
-	static const std::string_view EXCEPTION_NAME = "CZTR Wagons-Cargo";
+	static const std::string_view EXCEPTION_NAME = "CZTR Wagons-Cargo 1.0.0";
 
 	GRFConfig *config = nullptr;
 	for (const auto &c : _grfconfig) {
 		if (c->status != GRFStatus::Activated) continue;
 		if (std::byteswap(c->ident.grfid) != EXCEPTION_GRFID) continue;
-		if (!c->GetName().starts_with(EXCEPTION_NAME)) continue;
+		if (c->GetName() != EXCEPTION_NAME) continue;
 		config = c.get();
 		break;
 	}
