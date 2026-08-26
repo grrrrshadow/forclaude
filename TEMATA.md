@@ -942,6 +942,24 @@ původního uhelného vagonu a **jejich zpětná volání o kapacitě se přesta
 brát v potaz** (`Engine::ignore_capacity_callback`). Vagony, které skutečnou
 kapacitu uvedly (57, 60, 200 …), se nechávají být i s vanilkovým chováním.
 
+**Kapacitu dostane jen vagon, který jde koupit.** Delší vagony sada skládá
+z hlavy a jednoho či dvou **neviditelných článků** (`" Invisible"`,
+instance 0x00AF a 0x00B0 u Uacs), a ty mají tu jedničku taky. Kdyby každý
+z nich dostal uhelnou kapacitu, jeden vagon by vezl za dva za tři. Článek
+se od vagonu pozná tím, že **není dostupný v žádném podnebí** — právě to
+z něj dělá článek a ne vozidlo.
+
+## 13.2d Jak Uacs vypadá zevnitř
+
+Užitečné pro hledání: Uacs je instance `0x00B1` a je **kloubový**. Zpětné
+volání `0x16` (skupina `0xD4`) vrací pro článek 1 instanci `0x00B0` a pro
+článek 2 instanci `0x00AF`, oba pojmenované `" Invisible"`. Vlastní obrázek
+nese hlava; články jen dělají délku.
+
+Grafika hlavy vede přes výchozí skupinu `0xFD` → `0xCE` → `0xD3` →
+sada spritů `0x0000`, kde je v 8bpp jen bod 1×1 a skutečný obrázek je až
+ve 32bpp (`zin4`). Tak to má celá sada, i vagony, které fungují.
+
 ---
 
 # 14. Statistika firmy podle TTDPatch

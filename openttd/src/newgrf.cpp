@@ -1041,8 +1041,15 @@ static void ApplyWagonCargoException()
 
 		/* A wagon with a capacity of one is a wagon whose capacity was meant to come from
 		 * the callbacks, and the callbacks say zero. The wagons that do state a real
-		 * capacity keep it, and keep the game's ordinary handling with it. */
-		if (rvi.capacity <= 1 && coal_capacity != 0) {
+		 * capacity keep it, and keep the game's ordinary handling with it.
+		 *
+		 * Only a wagon the player can actually buy gets this. The set builds its longer
+		 * wagons out of an engine and one or more invisible articulated parts, and those
+		 * parts declare a capacity of one as well; giving each of them a coal wagon's load
+		 * would make one wagon carry two or three wagons' worth. A part is not available in
+		 * any climate -- that is what makes it a part rather than a vehicle -- so that is
+		 * what tells the two apart. */
+		if (rvi.capacity <= 1 && coal_capacity != 0 && e->info.climates.Any()) {
 			rvi.capacity = coal_capacity;
 			e->ignore_capacity_callback = true;
 		}
