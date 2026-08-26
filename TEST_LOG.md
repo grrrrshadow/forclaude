@@ -3,6 +3,46 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #85 — podrobná tabulka výbuchů při spojení mašinky s vlakem
+
+**Tohle je měření, které se v minulém kole ztratilo. Nesmí se ztratit
+znovu a hráč ho nemá čím opakovat.**
+
+Netýká se připojování vagonků — to je v pořádku. Měřilo se spojení
+**mašinky s vlakem**. „V" = odvezla, „B" = výbuch. První písmeno je
+standardní zkušební nádraží (čtyři nástupiště), druhé je nádraží pro
+rozpojení (jedno nástupiště). Kde je jen jedno písmeno, na druhé nádraží
+se to už nedostalo. Na rozpojení zatím nikdy nejede ze směrování.
+
+| jak se mašinka spojila | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| předkem (komínkem napřed) | V B | V B | V B | V B |
+| zadkem, ze směrování | B | V B | B | B |
+| otočená v depu, předkem | B | V B | B | B |
+| otočená v depu, zadkem | V | V | V | V |
+
+Nádraží pro rozpojení bylo ke konci ucpané vraky, takže poslední řádek
+druhé písmeno nemá; podle hráče by bouchly taky, ale neměřilo se to, tak
+se s tím nepočítá.
+
+**Co z těch čísel plyne, ještě než se sáhne do kódu:**
+
+- **Tabulka je sama se sebou v souladu.** „Otočená v depu + zadkem" dopadá
+  přesně jako „normální + předkem", a „otočená v depu + předkem" přesně
+  jako „normální + zadkem". Otočení v depu obrátí, kterým fyzickým koncem
+  mašinka na soupravu dojede — takže obě dvojice popisují tu samou situaci
+  na kolejích. **Není to tedy náhoda ani šum, je to opakovatelný jev, a
+  závisí jen na tom, kterým koncem mašinka soupravu potká.**
+- **Na standardním nádraží** projde spojení vždy, když mašinka dojede
+  komínkem k soupravě. Když dojede druhým koncem, bouchne to na
+  nástupištích **1, 3 a 4, a na 2 ne**.
+- To „a na 2 ne" nesedí ani na jeden vzorec z pravidla 0.6: není to všechna
+  čtyři (směr) ani dvojice 1+2 nebo 3+4 (hlava). Nástupiště 2 je samo o
+  sobě, a to je vlastní stopa — buď je na dvojce něco jinak, nebo je to
+  něco, co na dvojce jen o vlásek nevyjde.
+- **Na nádraží pro rozpojení** bouchne spojení předkem na **všech čtyřech**
+  původních nástupištích. Podle pravidla 0.6 je to problém ve směru.
+
 ## Build #84 (commit 10e9f89) — otevřené, na příště
 
 **Odložený vlak vybuchuje při dalším spojování.** Po rozpojení odjela
