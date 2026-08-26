@@ -1486,6 +1486,8 @@ STR_CONFIG_SETTING_SMOKE_AMOUNT_HELPTEXT                        :Množství kou�
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL                     :Model akcelerace vlaků: {STRING}
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Zvolit fyzikální model pro zrychlení vlaků. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů, například délky a tažné síly.
 
+STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING                          :Vlaky čekají na odtah: {STRING}
+STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING_HELPTEXT                 :Porouchaný nebo havarovaný vlak zůstane stát a čeká, až pro něj přijede odtahovka, místo aby se sám spravil nebo se na místě rozpadl. Vypnuto se porucha i havárie chovají jako v neupravené hře
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Vlak spomalí před silničním přejezdem: {STRING}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :Vlak na nebezpečném úseku spomalí, pod silničním nadjezdem jede normálně. Strojvedoucí předvídá, auta uvízlá na přejezdu spůsobí menší škody.
 
@@ -3760,6 +3762,7 @@ STR_NEWGRF_SETTINGS_INCOMPATIBLE                                :{RED}Není komp
 
 # NewGRF save preset window
 STR_SAVE_PRESET_CAPTION                                         :{WHITE}Uložit předvolby
+STR_CONSOLE_PROMPT_CAPTION                                      :{WHITE}Příkaz konzole
 STR_SAVE_PRESET_LIST_TOOLTIP                                    :{BLACK}Seznam předvoleb k dispozici, vyber jednu pro zkopírování do uložené hry vybrané níže
 STR_SAVE_PRESET_TITLE                                           :{BLACK}Vlož název pro předvolby
 STR_SAVE_PRESET_EDITBOX_TOOLTIP                                 :{BLACK}Aktuálně zvolený název pro předvolby
@@ -4736,6 +4739,7 @@ STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS                           :{BLACK}Čeká n
 STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN                            :{BLACK}Čeká na poruchu, jede tam jiná
 STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE                     :{BLACK}Čeká na poruchu, vidí poruchu ale nesmí
 STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}Jede k porouchanému vlaku
+STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Má výjezd, nemůže z depa
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuje vlak do depa
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu

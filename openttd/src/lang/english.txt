@@ -1406,6 +1406,8 @@ STR_CONFIG_SETTING_SMOKE_AMOUNT_HELPTEXT                        :Set how much sm
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL                     :Train acceleration model: {STRING2}
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Select the physics model for train acceleration. The "original" model penalises slopes equally for all vehicles. The "realistic" model penalises slopes and curves depending on various properties of the consist, like length and tractive effort
 
+STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING                          :Trains wait to be towed away: {STRING2}
+STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING_HELPTEXT                 :A train that has broken down or crashed stays where it is and waits for a rescue engine to fetch it, instead of repairing itself or falling apart where it stands. Turned off, breakdowns and crashes behave as they do in the unmodified game
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Trains slow down before a level crossing: {STRING2}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :A train eases off where the line is dangerous, and runs normally under a road bridge. The driver looks ahead, and a car caught on the crossing comes off more lightly
 
@@ -3677,6 +3679,7 @@ STR_NEWGRF_SETTINGS_INCOMPATIBLE                                :{RED}Incompatib
 
 # NewGRF save preset window
 STR_SAVE_PRESET_CAPTION                                         :{WHITE}Save preset
+STR_CONSOLE_PROMPT_CAPTION                                      :{WHITE}Console command
 STR_SAVE_PRESET_LIST_TOOLTIP                                    :{BLACK}List of available presets, select one to copy it to the save name below
 STR_SAVE_PRESET_TITLE                                           :{BLACK}Enter a name for the preset
 STR_SAVE_PRESET_EDITBOX_TOOLTIP                                 :{BLACK}Currently selected name for the preset to save
@@ -4654,6 +4657,7 @@ STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS                           :{BLACK}On call,
 STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN                            :{BLACK}On call, another engine is going
 STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE                     :{BLACK}On call, sees trouble but cannot go
 STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}On the way to a stranded train
+STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Called out, cannot leave the depot
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Towing a train to a depot
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}No power

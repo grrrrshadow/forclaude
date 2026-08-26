@@ -869,8 +869,10 @@ static void FinaliseCanals()
  *
  * So this is a named exception, not a rule: it names one GRF, by its id and by
  * its name together, and does nothing at all to anything else. The name is
- * checked as well as the id so that a later version of the set -- which may
- * well have fixed this itself -- is left alone rather than quietly overridden.
+ * checked as well as the id, but without its version number: this is a private
+ * arrangement for one player's own game and it should hold for whichever copy
+ * of the set they happen to have loaded. Anyone else gets the set exactly as
+ * its author published it.
  *
  * The GRF still loads normally and is marked in the list with a warning saying
  * what was done, because a game that silently rewrites somebody's NewGRF is a
@@ -881,13 +883,13 @@ static void ApplyWagonCargoException()
 	/* Written the way it reads in the file: "MI\x02\x13". The id is stored the
 	 * other way round in memory, which is why the debug prints swap it too. */
 	static constexpr GrfID EXCEPTION_GRFID = 0x4D490213;
-	static const std::string_view EXCEPTION_NAME = "CZTR Wagons-Cargo 1.0.0";
+	static const std::string_view EXCEPTION_NAME = "CZTR Wagons-Cargo";
 
 	GRFConfig *config = nullptr;
 	for (const auto &c : _grfconfig) {
 		if (c->status != GRFStatus::Activated) continue;
 		if (std::byteswap(c->ident.grfid) != EXCEPTION_GRFID) continue;
-		if (c->GetName() != EXCEPTION_NAME) continue;
+		if (!c->GetName().starts_with(EXCEPTION_NAME)) continue;
 		config = c.get();
 		break;
 	}
@@ -920,6 +922,36 @@ static void ApplyWagonCargoException()
 		if (rvi.capacity == 0) rvi.capacity = coal_capacity;
 
 		e->info.refit_mask = CargoTypes{_cargo_mask};
+
+		/* Letting a wagon carry a cargo the set never drew it carrying leaves
+		 * it with nothing to be drawn as, and an invisible wagon is worse than
+		 * one that cannot be refitted. The set does have pictures -- one per
+		 * cargo it was drawn for -- so the newly allowed cargoes borrow the
+		 * first of them.
+		 *
+		 * The first picture the set defines, not the first cargo of this game:
+		 * a wagon may well be drawn for a cargo that this game's industry set
+		 * does not have at all, and that picture is still the right one to
+		 * borrow. Looking only among cargoes that exist here would find nothing
+		 * and leave the wagon invisible, which is exactly what happened.
+		 *
+		 * Every cargo therefore looks like whichever one the wagon was drawn
+		 * for first. There is nothing else to look like. */
+		const SpriteGroup *borrowed = nullptr;
+		for (CargoType cargo : EnumRange(NUM_CARGO)) {
+			const SpriteGroup *group = e->grf_prop.GetSpriteGroup(cargo);
+			if (group != nullptr) {
+				borrowed = group;
+				break;
+			}
+		}
+		if (borrowed == nullptr) borrowed = e->grf_prop.GetSpriteGroup(CargoGRFFileProps::SG_DEFAULT);
+
+		if (borrowed != nullptr) {
+			for (CargoType cargo : EnumRange(NUM_CARGO)) {
+				if (e->grf_prop.GetSpriteGroup(cargo) == nullptr) e->grf_prop.SetSpriteGroup(cargo, borrowed);
+			}
+		}
 		/* Something has to be the cargo it is built carrying, and what it was
 		 * built carrying may not be in this game at all. */
 		if (!IsValidCargoType(e->info.cargo_type) || !e->info.refit_mask.Test(e->info.cargo_type)) {

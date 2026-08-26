@@ -1082,6 +1082,30 @@ CommandCost CmdSkipToOrder(DoCommandFlags flags, VehicleID veh_id, VehicleOrderI
 		v->cur_implicit_order_index = v->cur_real_order_index = sel_ord;
 		v->UpdateRealOrderIndex();
 
+		/* Skipping past a coupling order has to take the coupling with it.
+		 *
+		 * The order the train is working on is a copy, and the copy is what the
+		 * game reads. A train told to go and collect wagons stands still until
+		 * it has found some, and that waiting is decided from the copy -- so
+		 * moving the list on underneath it changed nothing: the train went on
+		 * waiting for wagons that its new order says nothing about, and never
+		 * reached the point where a new order is picked up at all. From the
+		 * player's side the engine simply froze the moment they tried to call
+		 * the job off, which is the one moment they most needed it not to.
+		 *
+		 * The claim goes with it. A rake that was spoken for by this engine is
+		 * nobody's again, or no other engine will ever be sent for it. */
+		if (v->type == VehicleType::Train) {
+			Train *t = Train::From(v);
+			if (t->couple_target != VehicleID::Invalid()) {
+				Train *claimed = Train::GetIfValid(t->couple_target);
+				if (claimed != nullptr && claimed->couple_claim == t->index) claimed->couple_claim = VehicleID::Invalid();
+				t->couple_target = VehicleID::Invalid();
+			}
+			t->current_order.SetGoToCouple(false);
+			t->current_order.SetWaitForCouple(false);
+		}
+
 		/* Unbunching data is no longer valid. */
 		v->ResetDepotUnbunching();
 

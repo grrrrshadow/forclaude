@@ -3282,7 +3282,16 @@ public:
 			if (IsOnRescueRun(Train::From(v))) {
 				const Train *casualty = Train::GetIfValid(Train::From(v)->rescue_target);
 				bool in_tow = casualty != nullptr && casualty->First() == v;
-				return GetString(in_tow ? STR_VEHICLE_STATUS_RESCUE_TOWING : STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY);
+				if (in_tow) return GetString(STR_VEHICLE_STATUS_RESCUE_TOWING);
+
+				/* On its way is not the same as still standing in the shed with
+				 * the job in its hand. Saying "on the way" for both leaves the
+				 * player watching an engine that says it is going somewhere and
+				 * plainly is not, with nothing to report but that. Being given
+				 * the job and getting out of the door are two different things
+				 * and they fail for different reasons. */
+				if (v->IsInDepot()) return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE);
+				return GetString(STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY);
 			}
 			if (v->IsInDepot() && !v->vehstatus.Test(VehState::Stopped)) {
 				/* And why it is still standing here, if something is keeping it.

@@ -1961,10 +1961,14 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
-		/* The same height with nothing in it, so the window does not change
-		 * size as the player clicks from one order to another. */
+		/* The same height with nothing in it, so the window does not change size
+		 * as the player clicks from one order to another. A panel rather than a
+		 * gap: a gap is a hole in the window with the desktop showing through,
+		 * which looks like something missing rather than like a row with
+		 * nothing in it. */
 		NWidget(NWID_HORIZONTAL),
-			NWidget(NWID_SPACER), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
+			EndContainer(),
 		EndContainer(),
 	EndContainer(),
 

@@ -1985,6 +1985,17 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	 * Worse, the collecting engine kept seeing a partner in wagons that had
 	 * already been collected by somebody else, so it never gave up on them. */
 	if (!IsWaitingToBeCoupled(partner)) return false;
+
+	/* A casualty is a rescue engine's business and nobody else's. A train that
+	 * has broken down or crashed does count as waiting to be fetched -- that is
+	 * what puts it on a rescue engine's list -- but an ordinary engine sent to
+	 * collect wagons must not take one for what it came for. It has no way to
+	 * put it down again and no reason to be near it; what it does instead is
+	 * drive straight into it, and one wreck at a station becomes two.
+	 *
+	 * The rescue engine reaches its casualty by the answer given further up,
+	 * where it is named outright, so this takes nothing away from it. */
+	if (partner->breakdown_ctr == 1 || partner->IsWrecked()) return false;
 	/* Either a rake of wagons or a whole train of its own that is waiting to be
 	 * picked up and carried along as part of a bigger one. Two little trains
 	 * joining to run as one is the same arrangement as an engine collecting
@@ -2522,6 +2533,10 @@ bool TrainAwaitsRescue(Train *v)
 {
 	v = v->First();
 
+	/* Turned off, nothing waits for anybody: a breakdown mends itself and a
+	 * crash falls apart where it stands, exactly as in the unmodified game. */
+	if (!_settings_game.vehicle.train_rescue_towing) return false;
+
 	/* A rescue engine that breaks down on its way to a casualty is not a
 	 * casualty waiting for itself. It fixes itself the vanilla way. */
 	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
@@ -2886,6 +2901,16 @@ bool HandleRescueEngineInDepot(Train *tow)
 			/* Collected and put right, so it is no longer waiting for anybody. */
 			casualty->current_order.SetWaitForCouple(false);
 			casualty->vehstatus.Reset(VehState::Stopped);
+
+			/* And it takes its orders up again from the beginning of whichever
+			 * one it had got to, rather than from the copy it was carrying when
+			 * it broke down. That copy is a snapshot of a journey that ended on
+			 * the open line half a year ago; a train left holding one has
+			 * nothing to do and stands in the depot doing it. Cleared, the
+			 * ordinary order machinery reads the list on the next tick. */
+			casualty->current_order.Free();
+			casualty->SetDestTile(INVALID_TILE);
+			casualty->force_proceed = TFP_NONE;
 			casualty->ConsistChanged(CCF_ARRANGE);
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		}
@@ -5609,14 +5634,18 @@ static void ScatterWreckage(Train *v)
 	Train *last = v->Last();
 	if (last != v && !last->vehstatus.Test(VehState::Hidden)) CreateEffectVehicleRel(last, 4, 4, 8, EV_EXPLOSION_LARGE);
 
-	/* Three tiles, in the units the effect offsets are given in. */
-	static constexpr int SCATTER = 3 * static_cast<int>(TILE_SIZE);
-
+	/* Three tiles out on the open line, but only one at a station: a platform
+	 * is a small place with a lot on it, and smoke thrown three tiles from a
+	 * train standing at one covers the whole station and everything working in
+	 * it. Asked of each vehicle where it stands, so a train lying half out of a
+	 * station makes its mess accordingly. */
 	for (Train *u = v; u != nullptr; u = u->Next()) {
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
+
+		int scatter = static_cast<int>(TILE_SIZE) * (IsRailStationTile(u->tile) ? 1 : 3);
 		CreateEffectVehicleRel(u,
-				static_cast<int8_t>(RandomRange(2 * SCATTER + 1) - SCATTER),
-				static_cast<int8_t>(RandomRange(2 * SCATTER + 1) - SCATTER),
+				static_cast<int8_t>(RandomRange(2 * scatter + 1) - scatter),
+				static_cast<int8_t>(RandomRange(2 * scatter + 1) - scatter),
 				static_cast<int8_t>(RandomRange(8) + 5),
 				EV_BREAKDOWN_SMOKE);
 	}
@@ -5692,6 +5721,15 @@ uint Train::Crash(bool flooded)
 	 * cannot drive it, and it waits to be fetched. Everything else about it is
 	 * still an ordinary train, which is what makes towing it possible at all
 	 * and what makes the game stop falling over. */
+	/* Turned off, a crash is what it is in the unmodified game: wreckage that
+	 * shakes itself to pieces and is gone. Nothing is going to come for it, so
+	 * there is nothing for it to wait as. */
+	if (!_settings_game.vehicle.train_rescue_towing) {
+		victims += this->GroundVehicleBase::Crash(flooded);
+		this->crash_anim_pos = flooded ? 4000 : 1; // max 4440, disappear pretty fast when flooded
+		return victims;
+	}
+
 	uint pass = 0;
 	for (Train *u = this; u != nullptr; u = u->Next()) {
 		/* Reserved cargo is not handed back, so count what is aboard rather
@@ -6899,10 +6937,29 @@ bool Train::Tick()
 		 * train that is still standing on its own -- one that has been coupled
 		 * to a rescue engine is not the head of anything and never gets here,
 		 * which is what makes being fetched in time mean something. */
-		if (this->IsWrecked() && this->rescue_deadline != TimerGameEconomy::Date{} &&
-				TimerGameEconomy::date >= this->rescue_deadline) {
-			delete this;
-			return false;
+		if (this->IsWrecked()) {
+			/* Start the clock here if nothing else did. It is set when the
+			 * crash happens, but several things clear it again -- a breakdown
+			 * ending, an errand being called off -- and a wreck that has lost
+			 * its clock is a wreck that stands on the line for ever. Only the
+			 * first one ever cleared itself away; the rest simply stayed. */
+			if (this->rescue_deadline == TimerGameEconomy::Date{}) {
+				this->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+			}
+
+			if (TimerGameEconomy::date >= this->rescue_deadline) {
+				/* Hand back the ground it was standing on before it goes.
+				 * Nothing else will: vanilla gives a wreck's track back a
+				 * wagon at a time as it falls apart, and this one does not
+				 * fall apart. Left reserved, it is a piece of line marked
+				 * taken with nothing on it and nothing coming to release it. */
+				FreeTrainTrackReservation(this);
+				for (const Train *u = this; u != nullptr; u = u->Next()) {
+					ClearPathReservation(u, u->tile, u->GetVehicleTrackdir());
+				}
+				delete this;
+				return false;
+			}
 		}
 
 		if (!this->vehstatus.Test(VehState::Stopped) || this->cur_speed > 0) this->running_ticks++;

@@ -27,6 +27,8 @@
 #include "timer/timer_window.h"
 
 #include "widgets/console_widget.h"
+#include "widgets/misc_widget.h"
+#include "querystring_gui.h"
 
 #include "table/strings.h"
 
@@ -145,6 +147,8 @@ static WindowDesc _console_window_desc(
 	_nested_console_window_widgets
 );
 
+static void ShowConsoleCommandPrompt(Window *console);
+
 struct IConsoleWindow : Window
 {
 	static size_t scroll;
@@ -158,6 +162,34 @@ struct IConsoleWindow : Window
 
 		this->InitNested(0);
 		ResizeWindow(this, _screen.width, _screen.height / 3);
+
+		/* The console draws its own command line and reads the keyboard itself,
+		 * which leaves nothing for the game's own keyboard to type into: that
+		 * one types into an edit box, and there is no edit box here. On a
+		 * machine with no keyboard the console was therefore something that
+		 * could be opened and read but never used.
+		 *
+		 * So it is given a line to type on. Only where the game's keyboard is
+		 * switched on at all -- a player who has one of their own gets the
+		 * console exactly as it was, with nothing popping up in front of it. */
+		if (_settings_client.gui.osk_activation != OskActivation::Disabled) ShowConsoleCommandPrompt(this);
+	}
+
+	/**
+	 * A line typed on the game's own keyboard is run as though it had been
+	 * typed here, and the line is offered again straight away, so that it
+	 * behaves like a prompt rather than like a one-shot question. Closing it
+	 * ends that; the console itself stays open.
+	 */
+	void OnQueryTextFinished(std::optional<std::string> str) override
+	{
+		if (!str.has_value()) return;
+
+		if (!str->empty()) {
+			IConsolePrint(CC_COMMAND, "] {}", *str);
+			IConsoleCmdExec(*str);
+		}
+		if (_iconsole_mode != IConsoleMode::Closed) ShowConsoleCommandPrompt(this);
 	}
 
 	void OnInit() override
@@ -380,6 +412,22 @@ struct IConsoleWindow : Window
 };
 
 size_t IConsoleWindow::scroll = 0;
+
+/**
+ * Offer a line to type a console command on, with the game's own keyboard
+ * already open over it.
+ *
+ * @param console The console window the answer comes back to.
+ */
+static void ShowConsoleCommandPrompt(Window *console)
+{
+	ShowQueryString({}, STR_CONSOLE_PROMPT_CAPTION, ICON_CMDLN_SIZE, console, CS_ALPHANUMERAL, {});
+
+	/* Straight away rather than waiting to be tapped: the whole reason this
+	 * line exists is that there is no other keyboard to reach for. */
+	Window *w = FindWindowById(WindowClass::QueryString, 0);
+	if (w != nullptr) ShowOnScreenKeyboard(w, WID_QS_TEXT);
+}
 
 void IConsoleGUIInit()
 {
