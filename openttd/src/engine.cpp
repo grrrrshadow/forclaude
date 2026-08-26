@@ -166,6 +166,22 @@ Engine::Engine(EngineID index, VehicleType type, uint16_t local_id) : EnginePool
 }
 
 /**
+ * Capacity of the original game's coal truck, read from the original vehicle table.
+ *
+ * Read from the table rather than from the engine pool, because the pool holds the
+ * *game's* engines: a NewGRF that redefines the original wagons -- which is how a wagon
+ * set replaces them -- has overwritten the pool's numbers by the time anyone asks, and
+ * may have hidden every un-modified wagon there was. The table is what the game itself
+ * was compiled from and nothing rewrites it. Used by the wagon-cargo exception; see
+ * ApplyWagonCargoException().
+ */
+uint16_t GetOriginalCoalWagonCapacity()
+{
+	/* Global original engine id 29 is the temperate climate's Coal Truck. */
+	return _orig_rail_vehicle_info[29].capacity;
+}
+
+/**
  * Checks whether the engine is a valid (non-articulated part of an) engine.
  * @return true if enabled
  */

@@ -985,6 +985,42 @@ vagonu dal (sypké / kusové / kapalné), **než** je rozšíření přepíše, 
 `ApplyWagonCargoException()` z nich vybírá. Teprve když ve hře žádný náklad
 těch tříd není, sáhne se po prvním, který je.
 
+## 13.2e Ověřeno spuštěním, ne jen čtením
+
+Hráč nahrál skutečný `.grf` (155 MB) a FIRS 3.0.12 jako přílohu GitHub
+release `newgrf` — do repozitáře se nevejde, release unese 2 GB. Hraje
+s FIRS, **parametr 0 „Economy" = 5 (Extreme)**. Kontejner pustí ven jen
+GitHub, takže tudy vede cesta i příště.
+
+Z toho se povedlo hru poprvé spustit tady (headless, OpenGFX postavené ze
+zdrojů přes pip nml) a výjimka má trvalý tichý výpis
+(`-d grf=2`, řádky „Wagon exception: engine …").
+
+**Co spuštění odhalilo: sada přepisuje původní vanilkové vagony.**
+Definuje vlastnosti přímo na původních ID (0x1B–0x26…), takže v enginovém
+poolu **není jediný vagon bez GRF** — a hledání „vanilkového uhelného
+vagonu" v poolu nemělo co najít, `coal_capacity` zůstala 0 a Uacs vozil 1.
+Kapacita se teď bere z **původní tabulky vozidel** (`GetOriginalCoalWagonCapacity()`,
+globální původní id 29 „Coal Truck", 30 jednotek), kterou žádný GRF
+přepsat nemůže.
+
+## 13.2f Čtyři vagony se ptají rovnou na náklad, ne na podtyp
+
+Nad rozebraným `.yagl` běží simulátor řetězů skupin (vazby čísel skupin
+v pořadí souboru, vyhodnocení výhybek) — `sim.py` ve scratchpadu; kdyby
+se ztratil, dá se napsat znovu podle 13.1. Co změřil na skutečné sadě:
+
+- **73 vagonů ze 77** s podtypem 0 dojde na obrázek → lež o podtypu stačí.
+- **Uacs s podtypem 1** dojde na „výsledek callbacku" → selhání → náhradní
+  sprity. Přesně ta diagnostická mašinka; s podtypem 0 dojde na obrázek.
+- **4 vagony — M, Z, Ztr, Ztr/Ztrc — na podtyp nekoukají vůbec.** Větví se
+  rovnou na **var 0x47 (druh nákladu přeložený tabulkou sady)** a neznámý
+  náklad padá do slepé uličky bez ohledu na podtyp.
+
+Proto lže i var 0x47: vagon s nenakresleným nákladem hlásí svůj **první
+nakreslený** náklad (třídy, váhu i přeložený slot toho nákladu). Simulátor
+potvrdil, že se známým slotem dojdou všechny čtyři na obrázek.
+
 ## 13.3 Kapacita: sada odpovídá nulou
 
 41 vagonů té sady má v nastavení `cargo_capacity: 1` a k tomu obě

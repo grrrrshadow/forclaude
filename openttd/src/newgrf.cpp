@@ -1028,16 +1028,11 @@ static void ApplyWagonCargoException()
 	GRFConfig *config = FindWagonCargoExceptionGrf();
 	if (config == nullptr) return;
 
-	/* What to give a wagon that has no capacity of its own. Looked up rather than written
-	 * down here so it cannot drift out of step with the game. */
-	uint16_t coal_capacity = 0;
-	for (const Engine *e : Engine::Iterate()) {
-		if (e->type != VehicleType::Train || e->GetGRF() != nullptr) continue;
-		if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
-		if (GetActiveCargoLabel(e->info.cargo_label) != CT_COAL) continue;
-		coal_capacity = e->VehInfo<RailVehicleInfo>().capacity;
-		if (coal_capacity != 0) break;
-	}
+	/* What to give a wagon that has no capacity of its own: the original coal truck's,
+	 * read from the original vehicle table. Not from the engine pool -- this very set
+	 * redefines the original wagons, so by now the pool holds its numbers, not the
+	 * game's, and there may be no unmodified wagon left in it at all. */
+	uint16_t coal_capacity = GetOriginalCoalWagonCapacity();
 
 	uint changed = 0;
 	for (Engine *e : Engine::Iterate()) {
@@ -1080,6 +1075,9 @@ static void ApplyWagonCargoException()
 		CargoType cargo = PickWagonCargoExceptionDefaultCargo(e);
 		if (IsValidCargoType(cargo)) e->info.cargo_type = cargo;
 		changed++;
+
+		Debug(grf, 2, "Wagon exception: engine {:#x} capacity {} default cargo {} drawn cargoes {} climates {:#x}",
+				e->grf_prop.local_id, rvi.capacity, e->info.cargo_type, e->drawn_cargoes.Count(), e->info.climates.base());
 	}
 
 	_wagon_cargo_exception_state.clear();

@@ -550,14 +550,29 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			 * ww - cargo unit weight in 1/16 tons, same as cargo prop. 0F.
 			 * cccc - the cargo class value of the cargo transported by the vehicle.
 			 */
-			const CargoSpec *cs = CargoSpec::Get(v->cargo_type);
+			CargoType cargo_type = v->cargo_type;
+
+			/* A wagon of the borrowed set carrying a cargo its author never drew answers
+			 * with the first cargo he did draw. Several of that set's wagons pick their
+			 * picture by this very variable -- a switch per cargo slot, everything else
+			 * falling through to a dead end -- so an unknown cargo is drawn as no picture
+			 * at all and the vehicle falls back to the sprites of whatever it was
+			 * substituted from. The cargo subtype variable tells the same lie for the
+			 * same reason; see ApplyWagonCargoException(). */
+			const Engine *e = v->GetEngine();
+			if (e->has_drawn_cargoes && e->drawn_cargoes.Any() &&
+					(!IsValidCargoType(cargo_type) || !e->drawn_cargoes.Test(cargo_type))) {
+				cargo_type = *e->drawn_cargoes.begin();
+			}
+
+			const CargoSpec *cs = CargoSpec::Get(cargo_type);
 
 			/* Note:
 			 * For translating the cargo type we need to use the GRF which is resolving the variable, which
 			 * is object->ro.grffile.
 			 * In case of CBID_TRAIN_ALLOW_WAGON_ATTACH this is not the same as v->GetGRF().
 			 */
-			return (cs->classes.base() << 16) | (cs->weight << 8) | object->ro.grffile->cargo_map[v->cargo_type];
+			return (cs->classes.base() << 16) | (cs->weight << 8) | object->ro.grffile->cargo_map[cargo_type];
 		}
 
 		case 0x48: return v->GetEngine()->flags.base(); // Vehicle Type Info
