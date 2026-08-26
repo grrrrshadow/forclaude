@@ -855,7 +855,69 @@ akce nemá smysl.
 
 ---
 
-# 13. Otevřené
+# 13. CZTR Wagons-Cargo — jmenovitá výjimka pro jeden GRF
+
+Výjimka je v `newgrf.cpp` a je **jmenovitá**: platí pro GRF id `MI\x02\x13`
+(`0x4D490213`) **a zároveň** pro jméno `CZTR Wagons-Cargo 1.0.0`. Verze
+1.1.0 se nesmí dotknout ničím.
+
+Sada je ve hře v `CZTR_Wagons_cargo.yagl` (rozebraný GRF, 145 553 řádků).
+Odtud se dá zjistit všechno, co následuje.
+
+## 13.1 Grafika podle nákladu v té sadě **není**
+
+Každý `feature_graphics<Trains>` (Action 3) v tom souboru má
+`default_set_id` a nanejvýš jednu položku `0xFF` (nákupní seznam). Seznam
+`cargo_types` je **prázdný u všech vagonů bez výjimky**. Výhybka uvnitř té
+jedné skupiny se ptá na to, **jak je vagon plný** (var `0x61` dělený na
+procenta), ne na to, co veze.
+
+Důsledek: **nemá se odkud brát grafika pro nový náklad a není pro co ji
+brát.** Vagon vezoucí náklad, který autor nikdy nenakreslil, vypadá úplně
+stejně jako ten samý vagon vezoucí náklad, který nakreslil.
+
+Kopírování skupin spritů podle nákladu, které tu jednu dobu bylo
+(`SetSpriteGroup(cargo, …)`), tedy nikdy nic nedělalo — kopírovalo
+výchozí skupinu na místo, kam se stejně nikdo nedívá. Je pryč.
+
+## 13.2 Proč Uacs nebyl v depu ke koupení
+
+`CalculateRefitMasks()` končí řádkem, který **vypne vozidlo**, kterému
+nezbyl žádný platný náklad: vymaže mu podnebí, ve kterých je dostupné, a
+tím zmizí ze seznamu v depu. Vypnuté vozidlo už nic pozdějšího nevzkřísí.
+
+Vagony té sady jsou omezené na sypké náklady a k tomu mají seznam nákladů,
+které vézt nesmí. S jiným průmyslem, než pro jaký byly kresleny, ten
+seznam může pokrýt **všechny** sypké náklady, které ve hře jsou. Uacs a
+Falls se v tom seznamu liší o jediné číslo — a to stačí na to, aby jeden
+zbyl a druhý ne.
+
+Moje původní oprava běžela **až po** `CalculateRefitMasks()`, takže
+nastavovala náklady vozidlu, které už bylo vypnuté. Proto je výjimka
+rozdělená na dvě půlky: `PrepareWagonCargoException()` rozšíří náklady
+**před** výpočtem, `ApplyWagonCargoException()` dodělá zbytek po něm.
+
+## 13.3 Kapacita: sada odpovídá nulou
+
+41 vagonů té sady má v nastavení `cargo_capacity: 1` a k tomu obě
+zpětná volání o kapacitě odpovídají nulou:
+
+- volání `0x36` (změna nastavení) pro nastavení `0x14` (kapacita) → `0x8000`,
+  tedy návratová hodnota 0 — v souboru 84×,
+- volání `0x15` (kapacita po přeložení) → `0x8000`, tedy 0 — v souboru 42×.
+
+`Engine::CanCarryCargo()` se přitom dívá jen na **nastavení**, ne na
+volání, takže vagon projde jako schopný vézt náklad a pak veze nulu.
+
+Proto stará podmínka `if (rvi.capacity == 0)` nikdy nevyskočila: nastavení
+není nula, je jedna. Nově dostanou vagony s kapacitou 0 nebo 1 kapacitu
+původního uhelného vagonu a **jejich zpětná volání o kapacitě se přestanou
+brát v potaz** (`Engine::ignore_capacity_callback`). Vagony, které skutečnou
+kapacitu uvedly (57, 60, 200 …), se nechávají být i s vanilkovým chováním.
+
+---
+
+# 14. Otevřené
 
 - Pády po spojení a rozpojení: `pool_type.hpp:174` (sáhnutí mimo seznam
   objektů) a `track_func.h:168` (žádaná jedna kolej, dostala se jiná

@@ -239,7 +239,7 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 	}
 
 	/* Check the refit capacity callback if we are not in the default configuration, or if we are using the new multiplier algorithm. */
-	if (this->info.callback_mask.Test(VehicleCallbackMask::RefitCapacity) &&
+	if (!this->ignore_capacity_callback && this->info.callback_mask.Test(VehicleCallbackMask::RefitCapacity) &&
 			(new_multipliers || default_cargo != cargo_type || (v != nullptr && v->cargo_subtype != 0))) {
 		uint16_t callback = GetVehicleCallback(CBID_VEHICLE_REFIT_CAPACITY, 0, 0, this->index, v);
 		if (callback != CALLBACK_FAILED) return callback;
@@ -250,7 +250,8 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 	uint extra_mail_cap = 0;
 	switch (this->type) {
 		case VehicleType::Train:
-			capacity = GetEngineProperty(this->index, PROP_TRAIN_CARGO_CAPACITY,        this->VehInfo<RailVehicleInfo>().capacity, v);
+			capacity = this->ignore_capacity_callback ? this->VehInfo<RailVehicleInfo>().capacity
+					: GetEngineProperty(this->index, PROP_TRAIN_CARGO_CAPACITY,        this->VehInfo<RailVehicleInfo>().capacity, v);
 
 			/* In purchase list add the capacity of the second head. Always use the plain property for this. */
 			if (v == nullptr && this->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Multihead) capacity += this->VehInfo<RailVehicleInfo>().capacity;

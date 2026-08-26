@@ -73,6 +73,13 @@ public:
 	std::vector<WagonOverride> overrides{};
 	std::vector<BadgeID> badges{};
 
+	/**
+	 * NOSAVE. Take the capacity from the property and do not ask the NewGRF about it.
+	 * Set only for the wagons of the one NewGRF that answers both capacity callbacks
+	 * with zero and would otherwise carry nothing at all; see ApplyWagonCargoException().
+	 */
+	bool ignore_capacity_callback = false;
+
 private:
 	/** Vehicle-type specific information. */
 	std::variant<std::monostate, RailVehicleInfo, RoadVehicleInfo, ShipVehicleInfo, AircraftVehicleInfo> vehicle_info{};
