@@ -2521,7 +2521,12 @@ static void EndViewportScrollIfLetGo()
 	if (!was_scrolling || _cursor.delta.x != 0 || _cursor.delta.y != 0) last_movement = now;
 	was_scrolling = true;
 
-	constexpr auto STILL_LONG_ENOUGH = std::chrono::milliseconds(1000);
+	/* A second was long enough to prove the idea and too long to live with: a stuck
+	 * button holds the map for that whole second every time it sticks, and it sticks
+	 * when the hand is busy. A third of a second is still far longer than any gap
+	 * between two frames of a drag that is really happening, so a real drag does not
+	 * notice it, and a stuck one is let go of almost at once. */
+	constexpr auto STILL_LONG_ENOUGH = std::chrono::milliseconds(350);
 	bool gone_quiet = now - last_movement > STILL_LONG_ENOUGH;
 
 	/* And the left button ends it. Two drags of the map cannot both be under

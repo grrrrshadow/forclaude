@@ -18,9 +18,23 @@ které kolej jeho předchůdce vůbec nenabízí, takže po tom `&` nezbylo nic.
 Není to tedy rezervace ani volba cesty; **je rozbitá geometrie vlaku** —
 vůz a jeho předchůdce stojí tak, že je žádná kolej nespojuje.
 
-Okolnosti podle hráče: mašinka se otočila ve stanici (na hlavovém nádraží
-se má otáčet odrazem na konci), potom pád. **Bez mašinek CZTR problém
-mizí.** Vlak pak taky nechtěl odjet vyložit na další stanici.
+Okolnosti podle hráče: mašinka **nacouvala ze směrování** a udělala „magic
+flip", potom pád. Na hlavovém nádraží se má otáčet odrazem na konci.
+**Bez mašinek CZTR problém mizí.** Vlak pak taky nechtěl odjet vyložit na
+další stanici.
+
+**Kde ten „magic flip" může vzniknout — prohledáno:** vanilkové fyzické
+otočení vlaku (`ReverseTrainSwapVehicles`, vozy si vymění místa vestoje)
+má v celém souboru **jediné volání**, a to je zahrazené podmínkou, která
+vlak jedoucí pozpátku posílá druhou větví — takže **vlak, který nacouval,
+tudy fyzicky otočit nejde.**
+
+Zbývá tedy **naše vlastní přerovnání seznamu** (`ReverseConsistOrder`),
+které nic nepohne a jen přepojí seznam odzadu dopředu. To se volá při
+spojování, při rozpojování a při přebírání vedení v depu. Když se spustí
+ve chvíli, kdy soupravy neleží tak, jak předpokládá, vznikne vlak, jehož
+pořadí v seznamu neodpovídá tomu, jak stojí na kolejích — **a to je přesně
+ta rozbitá geometrie, kterou hlásí assert.** Tam se hledá dál.
 
 ## Build #85 — podrobná tabulka výbuchů při spojení mašinky s vlakem
 

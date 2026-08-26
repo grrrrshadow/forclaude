@@ -928,46 +928,47 @@ static bool IsWagonCargoExceptionWagon(const Engine *e)
 	return e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
 }
 
-/**
- * What each of the exception's wagons was drawn to carry, kept from before the cargoes are
- * widened so that the wagon can still be built carrying something that suits it.
- * Filled by PrepareWagonCargoException() and emptied again by ApplyWagonCargoException().
- */
-static std::map<EngineID, CargoClasses> _wagon_cargo_exception_classes;
+/** What PrepareWagonCargoException() has to keep for ApplyWagonCargoException() to use. */
+struct WagonCargoExceptionState {
+	CargoClasses classes; ///< The cargo classes the author gave the wagon.
+	LandscapeTypes climates; ///< The climates the wagon is available in.
+};
 
 /**
- * Widen the cargoes of the exception's wagons before the game works its refit masks out.
+ * Per wagon of the exception's set, what it looked like before the game narrowed it down.
+ * Filled by PrepareWagonCargoException() and emptied again by ApplyWagonCargoException().
+ */
+static std::map<EngineID, WagonCargoExceptionState> _wagon_cargo_exception_state;
+
+/**
+ * Note what the exception's wagons look like before the game narrows them down.
  *
- * This has to happen first. CalculateRefitMasks() ends by disabling any vehicle whose
- * cargoes have all been narrowed away -- it empties the climates the vehicle is available
- * in, which takes it out of the depot list for good -- and the set does narrow some of its
- * wagons down to nothing: they are restricted to bulk cargo and then given a list of
- * cargoes they must never carry, and with an industry set the wagon was not drawn for,
- * that list can cover every bulk cargo the game has. Uacs is one such wagon.
+ * Two things have to be read here and cannot be read afterwards.
+ *
+ * The climates a wagon is available in, because CalculateRefitMasks() ends by emptying them
+ * for any vehicle whose cargoes have all been narrowed away, and an emptied vehicle is out
+ * of the depot list for good. The set does narrow some of its wagons down to nothing: they
+ * are restricted to bulk cargo and then given a list of cargoes they must never carry, and
+ * with an industry set the wagon was not drawn for, that list can cover every bulk cargo the
+ * game has. Uacs is one such wagon.
+ *
+ * And the cargo classes the author gave the wagon, which are the only thing that says
+ * whether it is an open wagon, a van or a tanker.
+ *
+ * Deliberately nothing else: the refit mask the game works out from the set's own properties
+ * is exactly the list of cargoes the author drew this wagon carrying, and that list is what
+ * ApplyWagonCargoException() needs to be able to tell a cargo the set knows from one it does
+ * not. Widening anything here would destroy it before it could be read.
  */
 static void PrepareWagonCargoException()
 {
-	_wagon_cargo_exception_classes.clear();
+	_wagon_cargo_exception_state.clear();
 	if (FindWagonCargoExceptionGrf() == nullptr) return;
 
 	for (Engine *e : Engine::Iterate()) {
 		if (!IsWagonCargoExceptionWagon(e)) continue;
 
-		GRFTempEngineData &gted = _gted[e->index];
-
-		/* What the author drew the wagon for. Widening the cargoes throws this away, and it
-		 * is the only thing that says whether this is an open wagon, a van or a tanker, so
-		 * it is kept for choosing the cargo the wagon is built carrying. */
-		_wagon_cargo_exception_classes[e->index] = gted.cargo_allowed;
-
-		/* Include everything, exclude nothing, and say the wagon is refittable so that
-		 * the game does not fall back to "default cargo only". */
-		gted.ctt_include_mask = CargoTypes{_cargo_mask};
-		gted.ctt_exclude_mask = {};
-		gted.refittability = GRFTempEngineData::Refittability::NonEmpty;
-
-		/* The set's own refit callback would take the cargoes straight back out again. */
-		e->info.callback_mask.Reset(VehicleCallbackMask::CustomRefit);
+		_wagon_cargo_exception_state[e->index] = {_gted[e->index].cargo_allowed, e->info.climates};
 	}
 }
 
@@ -989,11 +990,11 @@ static void PrepareWagonCargoException()
  */
 static CargoType PickWagonCargoExceptionDefaultCargo(const Engine *e)
 {
-	auto found = _wagon_cargo_exception_classes.find(e->index);
-	if (found != std::end(_wagon_cargo_exception_classes) && found->second.Any()) {
+	auto found = _wagon_cargo_exception_state.find(e->index);
+	if (found != std::end(_wagon_cargo_exception_state) && found->second.classes.Any()) {
 		for (const CargoSpec *cs : CargoSpec::Iterate()) {
 			if (!e->info.refit_mask.Test(cs->Index())) continue;
-			if (cs->classes.Any(found->second)) return cs->Index();
+			if (cs->classes.Any(found->second.classes)) return cs->Index();
 		}
 	}
 
@@ -1011,11 +1012,16 @@ static CargoType PickWagonCargoExceptionDefaultCargo(const Engine *e)
  * their refit mask. Their capacity is therefore taken from the original coal wagon and the
  * callbacks are left unasked.
  *
- * Nothing is done here about graphics. The set has no picture of its own for any cargo:
- * every one of its Action 3s lists a default group and, at most, a purchase group, and the
- * group picks the sprites by how full the wagon is, never by what is in it. So there is
- * nothing to borrow from and nothing to borrow for -- a wagon carrying a cargo the author
- * never drew looks exactly like the same wagon carrying one he did.
+ * The graphics are settled here too, and not the way the Action 3s suggest. None of them
+ * names a picture per cargo -- every one lists a default group and, at most, a purchase
+ * group -- but inside those groups the set switches on the *cargo subtype*, which is what
+ * a refit to a cargo the set knows sets, and which is therefore a picture per cargo by
+ * another route. Carrying a cargo the author never drew, the wagon keeps whatever subtype it
+ * had, that subtype names a picture that is not in this group, and the vehicle falls back to
+ * the sprites of whatever it was substituted from: it is drawn as an entirely different
+ * vehicle. So the cargoes the author did draw are noted here, and a wagon carrying anything
+ * else is shown to its NewGRF as having no subtype at all, which lands it on the first
+ * picture it has. See the cargo subtype variable in newgrf_engine.cpp.
  */
 static void ApplyWagonCargoException()
 {
@@ -1049,25 +1055,34 @@ static void ApplyWagonCargoException()
 		 * would make one wagon carry two or three wagons' worth. A part is not available in
 		 * any climate -- that is what makes it a part rather than a vehicle -- so that is
 		 * what tells the two apart. */
+		auto found = _wagon_cargo_exception_state.find(e->index);
+
+		/* The climates go back the way the author wrote them. A wagon left with no cargo has
+		 * had them emptied by now, and an emptied wagon cannot be bought however many cargoes
+		 * are handed to it afterwards. */
+		if (found != std::end(_wagon_cargo_exception_state)) e->info.climates = found->second.climates;
+
 		if (rvi.capacity <= 1 && coal_capacity != 0 && e->info.climates.Any()) {
 			rvi.capacity = coal_capacity;
 			e->ignore_capacity_callback = true;
 		}
+
+		/* Read before widening: what the mask says now is exactly the cargoes the author drew
+		 * this wagon carrying, which is the only way to tell those from the rest afterwards. */
+		e->drawn_cargoes = e->info.refit_mask;
+		e->has_drawn_cargoes = true;
 
 		/* Every cargo this game has, whoever brought it -- which is what _cargo_mask is. */
 		e->info.refit_mask = CargoTypes{_cargo_mask};
 
 		/* Something has to be the cargo it is built carrying, and what it was
 		 * built carrying may not be in this game at all. */
-		if (!IsValidCargoType(e->info.cargo_type) || !e->info.refit_mask.Test(e->info.cargo_type) ||
-				_wagon_cargo_exception_classes.contains(e->index)) {
-			CargoType cargo = PickWagonCargoExceptionDefaultCargo(e);
-			if (IsValidCargoType(cargo)) e->info.cargo_type = cargo;
-		}
+		CargoType cargo = PickWagonCargoExceptionDefaultCargo(e);
+		if (IsValidCargoType(cargo)) e->info.cargo_type = cargo;
 		changed++;
 	}
 
-	_wagon_cargo_exception_classes.clear();
+	_wagon_cargo_exception_state.clear();
 
 	if (changed == 0) return;
 

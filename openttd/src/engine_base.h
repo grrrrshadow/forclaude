@@ -80,6 +80,16 @@ public:
 	 */
 	bool ignore_capacity_callback = false;
 
+	/**
+	 * NOSAVE. The cargoes this vehicle's NewGRF drew it carrying, kept only for the wagons
+	 * of the one set the wagon-cargo exception is for. Carrying anything else, the vehicle
+	 * is shown to its NewGRF as having no cargo subtype, because the subtype is how that set
+	 * picks a picture and a subtype meant for another cargo picks none at all. Only meaningful
+	 * where #has_drawn_cargoes is set; see ApplyWagonCargoException().
+	 */
+	CargoTypes drawn_cargoes{};
+	bool has_drawn_cargoes = false;
+
 private:
 	/** Vehicle-type specific information. */
 	std::variant<std::monostate, RailVehicleInfo, RoadVehicleInfo, ShipVehicleInfo, AircraftVehicleInfo> vehicle_info{};

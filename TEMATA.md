@@ -864,21 +864,37 @@ Výjimka je v `newgrf.cpp` a je **jmenovitá**: platí pro GRF id `MI\x02\x13`
 Sada je ve hře v `CZTR_Wagons_cargo.yagl` (rozebraný GRF, 145 553 řádků).
 Odtud se dá zjistit všechno, co následuje.
 
-## 13.1 Grafika podle nákladu v té sadě **není**
+## 13.1 Grafika podle nákladu tam je, jen jinudy — přes **podtyp nákladu**
 
-Každý `feature_graphics<Trains>` (Action 3) v tom souboru má
-`default_set_id` a nanejvýš jednu položku `0xFF` (nákupní seznam). Seznam
-`cargo_types` je **prázdný u všech vagonů bez výjimky**. Výhybka uvnitř té
-jedné skupiny se ptá na to, **jak je vagon plný** (var `0x61` dělený na
-procenta), ne na to, co veze.
+**Tahle kapitola tvrdila opak a bylo to špatně. Tady je, co platí.**
 
-Důsledek: **nemá se odkud brát grafika pro nový náklad a není pro co ji
-brát.** Vagon vezoucí náklad, který autor nikdy nenakreslil, vypadá úplně
-stejně jako ten samý vagon vezoucí náklad, který nakreslil.
+Co jsem si ověřil správně: každý `feature_graphics<Trains>` (Action 3) má
+`default_set_id` a nanejvýš jednu položku `0xFF` (nákupní seznam), seznam
+`cargo_types` je prázdný u všech vagonů. Z toho jsem usoudil, že grafika na
+nákladu nezávisí. **To byl chybný závěr — díval jsem se jen o patro výš.**
+
+Uvnitř těch skupin se sada ptá na **`variable[0xF2]`, což je podtyp nákladu
+(`cargo_subtype`)** — v tom souboru 32×, s několika větvemi na různé sady
+spritů. A podtyp je právě to, co nastaví přestavba na náklad, který sada
+zná. **Takže obrázek podle nákladu tam je, jen se k němu nejde přes
+Action 3, ale přes podtyp.**
+
+Co se stane s nákladem, který autor nenakreslil: vagon si nechá podtyp,
+který měl předtím, ten ukazuje na obrázek, který v téhle skupině není, a
+vozidlo spadne na sprity toho, čím bylo nahrazeno — **vykreslí se jako
+úplně jiné vozidlo.** Přesně to je ta „diagnostická mašinka".
+
+**Oprava:** `ApplyWagonCargoException()` si zapamatuje, které náklady
+autor nakreslil (je to přesně ten seznam přeložení, který hra spočítá
+z vlastností sady, **než** ho rozšíříme), a vagon vezoucí cokoli jiného se
+svému GRF hlásí **bez podtypu**. Tím padne na první obrázek, který má —
+což je přesně to, co bylo od začátku zadané: *„vemeš první náklad, který
+vagonek má definovaný, a grafiku toho nákladu dáš všem novým nákladům."*
 
 Kopírování skupin spritů podle nákladu, které tu jednu dobu bylo
-(`SetSpriteGroup(cargo, …)`), tedy nikdy nic nedělalo — kopírovalo
-výchozí skupinu na místo, kam se stejně nikdo nedívá. Je pryč.
+(`SetSpriteGroup(cargo, …)`), opravdu nikdy nic nedělalo — kopírovalo
+výchozí skupinu na místo, kam se nikdo nedívá. To je pryč a vracet se
+nemá; ta věc se řeší podtypem, ne skupinami.
 
 ## 13.2 Proč Uacs nebyl v depu ke koupení
 

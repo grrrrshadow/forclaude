@@ -899,7 +899,18 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case 0x6F: break; // not implemented
 		case 0x70: break; // not implemented
 		case 0x71: break; // not implemented
-		case 0x72: return v->cargo_subtype;
+		case 0x72: {
+			/* A wagon of the borrowed set carrying a cargo its author never drew it carrying
+			 * has no subtype that means anything. That set picks its pictures by subtype, so
+			 * a subtype left over from another cargo picks a picture that is not there, and
+			 * the vehicle falls back to the sprites of whatever it was substituted from --
+			 * which is how a wagon came to be drawn as an entirely different vehicle. Shown
+			 * as subtype zero it lands on the first picture it has, which is what was asked
+			 * for. See ApplyWagonCargoException(). */
+			const Engine *e = v->GetEngine();
+			if (e->has_drawn_cargoes && (!IsValidCargoType(v->cargo_type) || !e->drawn_cargoes.Test(v->cargo_type))) return 0;
+			return v->cargo_subtype;
+		}
 		case 0x73: break; // vehicle specific, see below
 		case 0x74: break; // vehicle specific, see below
 		case 0x75: break; // vehicle specific, see below
