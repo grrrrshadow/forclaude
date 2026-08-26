@@ -334,14 +334,27 @@ Má-li kabinu jen jeden konec, vede ten. Mají-li ji oba — a to je přesně to
 co z vlaku udělá připojení mašinky z druhé strany, tedy push-pull — jede se
 tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
 
-## 2.4b Spojení směr jízdy **nemění**. Nikdy.
+## 2.4b Dvě věty, které se nesmí zaměnit
 
 **Tohle je teď to hlavní pravidlo a přebíjí obě verze 2.4 i 2.5 níž.**
 
-Mašinka, která něco sebrala, **jede dál tím směrem, kterým už jela.**
-Sebrat něco tě neotočí. Přesně to odjakživa dělaly vagonky — a proto
-odjížděly předvídatelně — a vlak sebraný z jiného vlaku **není jiný
-případ a nesmí se tak chovat.**
+- **Po spojení mašinka jede dál tím směrem, kterým přijela.** Sebrat něco
+  tě neotočí. Spojení **nemění směr jízdy nikdy**.
+- **Po rozpojení mašinka směr změnit musí** — je to logické a hráč to
+  čeká. Musí odjet **pryč od vozů, které nechala stát.**
+
+**Pozor, tady se to už jednou popletlo:** věta „odjeď pryč od toho, cos
+odložil" patří **výhradně rozpojení**. **Spojení nic neodkládá.** Kdo tuhle
+větu přilepí ke spojení, vyrobí přesně to otáčení po spojení, kvůli
+kterému se vlaky rozsypaly.
+
+A druhá polovina téhož, ať se nevyrábí zákaz, kde žádný není: **mašinka
+po spojení smí projet skrz vlak i skrz vagony a tlačit je před sebou.**
+To je v pořádku a je to normální provoz.
+
+Vagonky se takhle chovaly odjakživa — a proto odjížděly předvídatelně —
+a vlak sebraný z jiného vlaku **není jiný případ a nesmí se tak chovat.**
+Tak to bylo ve `#81`.
 
 Co to nahradilo: pravidlo „spojený vlak odjede tou cestou, kterou mašinka
 přijela", které vlak na místě otočí. Bylo to jediné místo, kde spojování
@@ -350,7 +363,7 @@ severovýchodu a z jihozápadu, a nikdo o to nežádal.
 
 **Otočit vlak smí teď už jen:**
 
-- **rozpojení** — aby obě části mohly jet každá na jinou stranu,
+- **rozpojení** — mašinka musí odjet od vozů, které nechala stát,
 - **konec kolejí** a **konec hlavového nádraží**,
 - **hráč sám** tlačítkem otočení. To je něco úplně jiného, protože ho
   zmáčkl.
