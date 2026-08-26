@@ -962,6 +962,30 @@ ve 32bpp (`zin4`). Tak to má celá sada, i vagony, které fungují.
 
 ---
 
+# 13.5 Žádný GRF nerozhoduje o tom, jak se otáčí vlak
+
+Dva příznaky vozidla umožňují sadě rozhodovat o otáčení za hru:
+
+- **„má kabinu"** (`ExtraEngineFlag::HasCab`) — říká, že i vůz bez pohonu
+  smí vést vlak. Právě na tohle se ptá `ReverseTrainDirection()`, když
+  vybírá, jestli se vlak **otočí na místě**, nebo jen **začne jet na
+  druhou stranu**. Sada, která ten příznak rozdává, tím mění chování
+  každého vlaku, ve kterém takový vůz je.
+- **„staré otáčení v depu"** (`EngineMiscFlag::RailFlips`) — sada si
+  otočený vůz kreslí a měří sama, místo aby to nechala na hře.
+
+U nás se o tom, kterým koncem vlak jede, rozhoduje **měřením** a pravidly,
+která hráč vidí. Když do toho zvenčí mluví ještě sada, přestane se to dát
+číst — a hlavně přestane být reprodukovatelné, protože výsledek závisí na
+tom, které sady jsou zrovna načtené.
+
+Proto se oba příznaky u všech GRF vozidel **zahazují**
+(`IgnoreNewGRFReversingFlags()` v `newgrf.cpp`) a každý vlak se otáčí
+stejně. Není to mířené na žádnou konkrétní sadu a nic jiného to vozidlu
+nebere — grafiku, kapacitu ani cokoli dalšího si nechává.
+
+---
+
 # 14. Statistika firmy podle TTDPatch
 
 V okně firmy je pod čudlíkem ředitelství čudlík **Statistika**. Otevře okno

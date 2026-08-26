@@ -3,6 +3,25 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #88 — pád v `TrainController()`, `train_cmd.cpp:6135`
+
+Hláška: `chosen_track.Count() == 1 && !chosen_track.Any({Wormhole, Depot})`.
+Je to **můj diagnostický assert**, ne vanilkový — a udělal přesně to, kvůli
+čemu tam je: řekl nám, které volání to je.
+
+Vanilka by na tom samém spadla o řádek níž uvnitř `TrackBitsToTrack()`
+(ta hláška z buildu #78), jen bez udání místa. **Takže tohle je ten pád,
+který se hledal od #78, a teď je zaměřený:** je to větev „vagon jede za
+vozem před sebou" v `TrainController()` — `chosen_track = prev->track`
+(případně `_connecting_track`) a pak `&= bits`. Vagon vjel na políčko,
+které kolej jeho předchůdce vůbec nenabízí, takže po tom `&` nezbylo nic.
+Není to tedy rezervace ani volba cesty; **je rozbitá geometrie vlaku** —
+vůz a jeho předchůdce stojí tak, že je žádná kolej nespojuje.
+
+Okolnosti podle hráče: mašinka se otočila ve stanici (na hlavovém nádraží
+se má otáčet odrazem na konci), potom pád. **Bez mašinek CZTR problém
+mizí.** Vlak pak taky nechtěl odjet vyložit na další stanici.
+
 ## Build #85 — podrobná tabulka výbuchů při spojení mašinky s vlakem
 
 **Tohle je měření, které se v minulém kole ztratilo. Nesmí se ztratit

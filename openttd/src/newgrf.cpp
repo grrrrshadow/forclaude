@@ -1075,6 +1075,38 @@ static void ApplyWagonCargoException()
 	error.message = STR_NEWGRF_ERROR_WAGON_CARGO_EXCEPTION;
 }
 
+/**
+ * Take away every NewGRF's say in how its trains turn round.
+ *
+ * Two engine flags let a NewGRF decide that for itself, and both of them reach straight into
+ * machinery this build has rewritten:
+ *
+ * - a "has a cab" flag on a vehicle, which says an unpowered wagon may lead a train. It is
+ *   what ReverseTrainDirection() asks before it decides whether a train turns round on the
+ *   spot or simply starts driving the other way, so a set that hands it out changes what
+ *   every train carrying such a vehicle does at the end of a platform;
+ * - an "old depot-flip handling" flag, which says the set draws and measures a flipped
+ *   vehicle itself rather than letting the game do it.
+ *
+ * Which way round a train runs is decided here, by measuring the train and by rules the
+ * player can see, and a set that quietly overrules that from the outside makes those
+ * decisions unreadable -- and unreproducible, because it depends on which sets are loaded.
+ * So the flags are dropped and every train, from whatever set, turns round the same way.
+ *
+ * This is not aimed at any one NewGRF and takes nothing away that a player would notice
+ * beyond that: a vehicle keeps its graphics, its capacity and everything else it declared.
+ */
+static void IgnoreNewGRFReversingFlags()
+{
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Train) continue;
+		if (e->GetGRF() == nullptr) continue;
+
+		e->info.extra_flags.Reset(ExtraEngineFlag::HasCab);
+		e->info.misc_flags.Reset(EngineMiscFlag::RailFlips);
+	}
+}
+
 /** Check for invalid engines */
 static void FinaliseEngineArray()
 {
@@ -1877,6 +1909,9 @@ static void AfterLoadGRFs()
 
 	/* And then finish the exception off. */
 	ApplyWagonCargoException();
+
+	/* No NewGRF gets a say in how its trains turn round. */
+	IgnoreNewGRFReversingFlags();
 
 	/* Polish engines */
 	FinaliseEngineArray();
