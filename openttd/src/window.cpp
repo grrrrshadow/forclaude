@@ -2494,15 +2494,46 @@ static void EndViewportScrollIfLetGo()
 
 	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
 
+	/* A drag that has stopped moving the map is over.
+	 *
+	 * This asks the map rather than the button, which is the point of it. Every
+	 * other way of ending the drag has to believe what the game thinks the
+	 * button is doing, and what the game thinks the button is doing is the one
+	 * thing known to be wrong: it goes on reading as held when nobody is
+	 * holding it, and the drag outlives the hand. The map cannot lie in the
+	 * same way. While a drag is really under way the pointer is moving, because
+	 * that is what a drag is; when it stops, either the hand has let go or it
+	 * has paused, and in both cases nothing is being dragged at that moment.
+	 *
+	 * Ending it early therefore costs nothing that can be seen. Pressing again
+	 * starts a new one at once, and on the kind of pointer where this goes
+	 * wrong -- a button held under one finger while another drags -- the button
+	 * is still held, so the next movement simply carries on. What it buys is
+	 * that a stuck button can never hold the map for longer than this. */
+	static std::chrono::steady_clock::time_point last_movement;
+	static bool was_scrolling = false;
+
+	auto now = std::chrono::steady_clock::now();
+	/* The clock starts when the drag does, and is noticed here rather than
+	 * where the drag begins, so that no future way of starting one can forget
+	 * to start it. Left to a stale reading from some earlier drag, every new
+	 * one would end on the frame it began. */
+	if (!was_scrolling || _cursor.delta.x != 0 || _cursor.delta.y != 0) last_movement = now;
+	was_scrolling = true;
+
+	constexpr auto STILL_LONG_ENOUGH = std::chrono::milliseconds(1000);
+	bool gone_quiet = now - last_movement > STILL_LONG_ENOUGH;
+
 	/* And the left button ends it. Two drags of the map cannot both be under
 	 * way, and of the two the one just started wins. It is also the way out if
 	 * the game ever believes the right button is held that nobody is holding:
 	 * a press of the left one puts a stop to it. */
-	if (_right_button_down && !_left_button_down) return;
+	if (_right_button_down && !_left_button_down && !gone_quiet) return;
 
 	_cursor.fix_at = false;
 	_scrolling_viewport = false;
 	_last_scroll_window = nullptr;
+	was_scrolling = false;
 }
 
 /**

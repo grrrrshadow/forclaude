@@ -474,6 +474,27 @@ jedné chyby", tak se **nesmí přidat nic jiného** — a napřed se zjistí, c
 vanilla na téhle platformě doopravdy dělá, ne co dělá na první, na kterou
 padne oko.
 
+## 5.0b Tažení končí tím, že se mapa přestane hýbat
+
+Nápad hráče a je lepší než všechno, co jsem zkoušel předtím, protože se
+**neptá tlačítka**. Každý jiný způsob, jak tažení ukončit, musí věřit tomu,
+co si hra myslí o tlačítku — a to je právě ta jediná věc, o které víme, že
+je špatně: čte se jako držené, když ho nikdo nedrží, a tažení přežije ruku.
+
+Mapa takhle lhát neumí. Dokud tažení opravdu běží, ukazatel se hýbe — to
+*je* tažení. Když se zastaví, buď ruka pustila, nebo se zastavila, a v obou
+případech se v tu chvíli nic netáhne.
+
+Proto se tažení ukončí po **vteřině bez pohybu**. Nestojí to nic
+viditelného: dalším stiskem začne hned nové, a na tom druhu ovládání, kde
+to zlobí — prst drží tlačítko na obrazovce a druhý táhne mapu — je tlačítko
+pořád dole, takže další pohyb prostě pokračuje. Co se tím získá: **zaseknuté
+tlačítko nemůže mapu držet déle než tu vteřinu.**
+
+Stopka se nuluje uvnitř téže funkce, ne tam, kde tažení začíná — jinak by
+každé nové tažení skončilo na snímku, ve kterém začalo, a zapomenout na to
+by šlo znovu.
+
 ## 5.1 Zaseknutý čudlík posunu mapy
 
 **Není to zařízením, na kterém se hraje.** Řečeno třikrát. Chová se to
