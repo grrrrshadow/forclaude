@@ -1351,6 +1351,8 @@ static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
 static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
+static bool CheckReverseTrain(const Train *consist);
+static void ReverseTrainDirection(Train *consist);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -3179,6 +3181,33 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * so the route it forced is a route around nothing. Hold the ground the
 	 * joined train is standing on, and then ask for a way out of it. */
 	new_head->ReserveTrackUnderConsist();
+
+	/* And now ask which way it actually has to go, which is better information than
+	 * which way the engine came in and was never asked for until here.
+	 *
+	 * Where the joined train leaves by was settled above from the way the collecting
+	 * engine arrived, on the grounds that that way is known to be passable. That is a
+	 * reasonable guess and nothing more: the train has orders, and the next place it is
+	 * due at can perfectly well lie the other way. On the test station it lies the other
+	 * way at three platforms out of four, and those three are exactly the three that
+	 * went wrong.
+	 *
+	 * The game does normally settle this, but only in the same breath as advancing an
+	 * order -- the reverse check sits behind that test -- and a train that couples has
+	 * had its order concluded here by hand instead. So nothing asked, the train reserved
+	 * a way out in the direction the guess had picked, and set off across the throat of
+	 * the station against everything coming the other way.
+	 *
+	 * Asked here, before the way out is reserved, so that what is reserved and what the
+	 * train then does are the same thing. The pathfinder answers with the way it costs
+	 * least to reach the next order from, which takes passability into account by
+	 * itself, so nothing is lost by preferring it to the guess. */
+	if (new_head->GetMovingFront()->track.Any() && CheckReverseTrain(new_head)) {
+		new_head->wait_counter = 0;
+		new_head->cur_speed = 0;
+		new_head->subspeed = 0;
+		ReverseTrainDirection(new_head);
+	}
 
 	/* Asking is the part that was missing, and it let a train drive out of a
 	 * platform on no reservation at all.

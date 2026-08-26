@@ -168,6 +168,11 @@ Do tabulky podezřelých tedy patří i **spor mezi tím, kudy spojený vlak
 podle nás má odjet (tou cestou, kterou přijela mašinka), a tím, kudy
 opravdu potřebuje jet dál.**
 
+**A přesně to z toho vyšlo.** Dvojka je jediné nástupiště se směrem
+odjezdu doprava; 1, 3 i 4 jedou doleva. V tabulce spojení prošla dvojka a
+propadla 1, 3 i 4. **Shoda čtyři ze čtyř na jedné jediné veličině** — a ta
+veličina není číslo nástupiště, je to směr odjezdu. Viz 2.5.
+
 **Co drží kód nezávislý na nádraží, je pravidlo 0.5:** nikdy nejmenovat
 konec. Všechno se rozhoduje měřením — které konce jsou si blíž, kterým
 směrem vlak přijel, který konec má řídicí kabinu. Dokud to tak zůstane, je
@@ -323,6 +328,25 @@ s tou pravou.
 Má-li kabinu jen jeden konec, vede ten. Mají-li ji oba — a to je přesně to,
 co z vlaku udělá připojení mašinky z druhé strany, tedy push-pull — jede se
 tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
+
+## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
+
+To pravidlo výš je **odhad pro případ, kdy nic lepšího není**. Vlak ale má
+příkazy a další místo, kde má být, může klidně ležet na druhou stranu. Na
+zkušebním nádraží leží na druhou stranu **u tří nástupišť ze čtyř** — a
+právě ty tři v tabulce spojení propadly (viz 0.6b).
+
+Co se dělo: hra si tuhle otázku normálně vyřeší sama, ale **jen zároveň
+s posunem příkazu** — kontrola „nemám se otočit?" visí až za tou
+podmínkou. A vlak, který se spojil, má příkaz odbavený ručně u nás. Takže
+se nikdo nezeptal, vlak si **zamluvil cestu ven tím směrem, který vyšel
+z odhadu**, a vyjel přes celé zhlaví proti všemu, co jelo proti němu.
+
+Proto se teď hned po spojení, **ještě než se zamluví cesta ven**, zeptáme
+hledače cesty (`CheckReverseTrain`), kterým směrem se jede k dalšímu
+příkazu, a když řekne opačně, vlak se obrátí. Zamluvená cesta a to, co vlak
+opravdu udělá, jsou tím pádem jedno a to samé. Průjezdnost si hledač
+ohlídá sám, takže se oproti odhadu nic neztrácí.
 
 ---
 
