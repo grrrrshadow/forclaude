@@ -385,6 +385,12 @@ enum class WindowClass : uint16_t {
 	 */
 	Company,
 
+	/**
+	 * Company cargo statistics; %Window numbers:
+	 *   - #CompanyID = #CompanyStatisticsWidgets
+	 */
+	CompanyStatistics,
+
 
 	/**
 	 * Build object; %Window numbers:

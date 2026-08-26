@@ -122,6 +122,13 @@ struct CompanyProperties {
 	std::array<CompanyEconomyEntry, MAX_HISTORY_QUARTERS> old_economy{}; ///< Economic data of the company of the last #MAX_HISTORY_QUARTERS quarters.
 	uint8_t num_valid_stat_ent = 0; ///< Number of valid statistical entries in #old_economy.
 
+	/**
+	 * The amount of each cargo the company has delivered since it was founded.
+	 * #CompanyEconomyEntry::delivered_cargo only reaches back #MAX_HISTORY_QUARTERS quarters,
+	 * so a running total is kept alongside it. Shown by the company statistics window.
+	 */
+	CargoArray total_delivered_cargo{};
+
 	EnumIndexArray<Livery, LiveryScheme, LiveryScheme::End> livery{};
 
 	EngineRenewList engine_renew_list = nullptr; ///< Engine renewals of this company.

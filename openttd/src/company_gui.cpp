@@ -1853,6 +1853,171 @@ static void ShowCompanyInfrastructure(CompanyID company)
 	AllocateWindowDescFront<CompanyInfrastructureWindow>(_company_infrastructure_desc, company);
 }
 
+static constexpr std::initializer_list<NWidgetPart> _nested_company_statistics_widgets = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, Colours::Grey),
+		NWidget(WWT_CAPTION, Colours::Grey, WID_CS_CAPTION),
+		NWidget(WWT_SHADEBOX, Colours::Grey),
+		NWidget(WWT_DEFSIZEBOX, Colours::Grey),
+		NWidget(WWT_STICKYBOX, Colours::Grey),
+	EndContainer(),
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_PANEL, Colours::Grey, WID_CS_LIST), SetFill(1, 1), SetResize(0, 1),
+				SetMinimalTextLines(5, WidgetDimensions::unscaled.framerect.Vertical()), SetScrollbar(WID_CS_SCROLLBAR),
+		EndContainer(),
+		NWidget(NWID_VERTICAL),
+			NWidget(NWID_VSCROLLBAR, Colours::Grey, WID_CS_SCROLLBAR),
+			NWidget(WWT_RESIZEBOX, Colours::Grey),
+		EndContainer(),
+	EndContainer(),
+};
+
+/**
+ * How much of every cargo a company has carried since it was founded.
+ *
+ * The same window TTDPatch put behind the company view's "Statistics" button: a heading and
+ * then one line per cargo, the name on the left and the total on the right. Only cargoes the
+ * company has actually moved are listed, so the window says what was done rather than what
+ * could have been.
+ */
+struct CompanyStatisticsWindow : Window {
+	/** One line of the list: a cargo and how much of it went. */
+	struct StatisticsItem {
+		CargoType cargo; ///< The cargo, or #INVALID_CARGO for the heading.
+		uint32_t amount; ///< Total amount carried.
+	};
+
+	uint amount_width = 0; ///< Width of the widest amount, so the numbers line up.
+	std::vector<StatisticsItem> list{};
+
+	CompanyStatisticsWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
+	{
+		this->InitNested(window_number);
+		this->owner = this->window_number;
+	}
+
+	void OnInit() override
+	{
+		this->UpdateStatisticsList();
+	}
+
+	void UpdateStatisticsList()
+	{
+		this->list.clear();
+
+		const Company *c = Company::GetIfValid(this->window_number);
+		if (c != nullptr) {
+			/* The heading first, then the cargoes in the player's own sort order. */
+			this->list.emplace_back(INVALID_CARGO, 0);
+
+			for (const CargoSpec *cs : _sorted_cargo_specs) {
+				uint32_t amount = c->total_delivered_cargo[cs->Index()];
+				if (amount == 0) continue;
+				this->list.emplace_back(cs->Index(), amount);
+			}
+		}
+
+		this->GetScrollbar(WID_CS_SCROLLBAR)->SetCount(std::size(this->list));
+	}
+
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	{
+		switch (widget) {
+			case WID_CS_CAPTION:
+				return GetString(STR_COMPANY_STATISTICS_CAPTION, this->window_number);
+
+			default:
+				return this->Window::GetWidgetString(widget, stringid);
+		}
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_CS_LIST) return;
+
+		/* Every cargo can appear, so every cargo's name and a wide number have to fit. */
+		uint max_name_width = GetStringBoundingBox(STR_COMPANY_STATISTICS_NOTHING).width;
+		uint max_amount_width = 0;
+		for (const CargoSpec *cs : _sorted_cargo_specs) {
+			max_name_width = std::max(max_name_width, GetStringBoundingBox(GetString(STR_COMPANY_STATISTICS_CARGO_NAME, cs->name)).width);
+			max_amount_width = std::max(max_amount_width, GetStringBoundingBox(GetString(STR_COMPANY_STATISTICS_CARGO_AMOUNT, cs->Index(), 888888)).width);
+		}
+
+		this->amount_width = max_amount_width;
+
+		size.width = std::max(max_name_width + WidgetDimensions::scaled.hsep_wide + max_amount_width,
+				GetStringBoundingBox(STR_COMPANY_STATISTICS_HEADING).width) + WidgetDimensions::scaled.framerect.Horizontal();
+
+		fill.height = resize.height = GetCharacterHeight(FontSize::Normal);
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		if (widget != WID_CS_LIST) return;
+
+		bool rtl = _current_text_dir == TD_RTL;
+		int line_height = GetCharacterHeight(FontSize::Normal);
+
+		Rect ir = r.Shrink(WidgetDimensions::scaled.framerect);
+		Rect amountr = ir.WithWidth(this->amount_width, !rtl);
+		Rect namer = ir.Indent(this->amount_width + WidgetDimensions::scaled.hsep_wide, !rtl);
+
+		auto [first, last] = this->GetScrollbar(WID_CS_SCROLLBAR)->GetVisibleRangeIterators(this->list);
+		for (auto it = first; it != last; ++it) {
+			if (it->cargo == INVALID_CARGO) {
+				/* The heading is allowed to fill the window's width. */
+				DrawString(ir.left, ir.right, namer.top, GetString(STR_COMPANY_STATISTICS_HEADING), TextColour::Orange);
+			} else {
+				DrawString(namer, GetString(STR_COMPANY_STATISTICS_CARGO_NAME, CargoSpec::Get(it->cargo)->name), TextColour::White);
+				DrawString(amountr, GetString(STR_COMPANY_STATISTICS_CARGO_AMOUNT, it->cargo, it->amount), TextColour::White, AlignmentH::ForceRight);
+			}
+
+			namer.top += line_height;
+			amountr.top += line_height;
+		}
+
+		/* A company that has carried nothing gets told so, rather than an empty box. */
+		if (this->list.size() <= 1 && this->GetScrollbar(WID_CS_SCROLLBAR)->GetPosition() == 0) {
+			DrawString(ir.left, ir.right, namer.top, GetString(STR_COMPANY_STATISTICS_NOTHING), TextColour::White);
+		}
+	}
+
+	const IntervalTimer<TimerWindow> redraw_interval = {std::chrono::seconds(1), [this](auto) {
+		this->UpdateStatisticsList();
+		this->SetWidgetDirty(WID_CS_LIST);
+	}};
+
+	void OnResize() override
+	{
+		this->GetScrollbar(WID_CS_SCROLLBAR)->SetCapacityFromWidget(this, WID_CS_LIST, WidgetDimensions::scaled.framerect.top);
+	}
+
+	void OnInvalidateData([[maybe_unused]] int data = 0, [[maybe_unused]] bool gui_scope = true) override
+	{
+		if (!gui_scope) return;
+
+		this->ReInit();
+	}
+};
+
+/** Window definition for the company cargo statistics window. */
+static WindowDesc _company_statistics_desc(
+	WindowPosition::Automatic, "company_statistics", 0, 0,
+	WindowClass::CompanyStatistics, WindowClass::None,
+	{},
+	_nested_company_statistics_widgets
+);
+
+/**
+ * Open the cargo statistics window of a company.
+ * @param company Company to show the statistics of.
+ */
+static void ShowCompanyStatistics(CompanyID company)
+{
+	if (!Company::IsValidID(company)) return;
+	AllocateWindowDescFront<CompanyStatisticsWindow>(_company_statistics_desc, company);
+}
+
 static constexpr std::initializer_list<NWidgetPart> _nested_company_widgets = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, Colours::Grey),
@@ -1888,6 +2053,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_company_widgets = {
 							NWidget(WWT_TEXTBTN, Colours::Grey, WID_C_RELOCATE_HQ), SetStringTip(STR_COMPANY_VIEW_RELOCATE_HQ, STR_COMPANY_VIEW_RELOCATE_HQ_TOOLTIP),
 							NWidget(NWID_SPACER),
 						EndContainer(),
+						NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_C_STATISTICS), SetStringTip(STR_COMPANY_VIEW_STATISTICS_BUTTON, STR_COMPANY_VIEW_STATISTICS_TOOLTIP),
 					EndContainer(),
 				EndContainer(),
 
@@ -2229,6 +2395,10 @@ struct CompanyWindow : Window
 
 			case WID_C_VIEW_INFRASTRUCTURE:
 				ShowCompanyInfrastructure(this->window_number);
+				break;
+
+			case WID_C_STATISTICS:
+				ShowCompanyStatistics(this->window_number);
 				break;
 
 			case WID_C_GIVE_MONEY:

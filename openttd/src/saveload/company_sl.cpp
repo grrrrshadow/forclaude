@@ -543,6 +543,7 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDVAR(CompanyProperties, terraform_limit, VarTypes::U32, SaveLoadVersion::TerraformLimits, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(CompanyProperties, clear_limit, VarTypes::U32, SaveLoadVersion::TerraformLimits, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(CompanyProperties, tree_limit, VarTypes::U32, SaveLoadVersion::AutoreplaceWhenOldTreeLimit, SaveLoadVersion::MaxVersion),
+	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::CompanyTotalDeliveredCargo, SaveLoadVersion::MaxVersion),
 	SLEG_STRUCT("settings", SlCompanySettings),
 	SLEG_CONDSTRUCT("old_ai", SlCompanyOldAI, SaveLoadVersion::MinVersion, SaveLoadVersion::NoAI),
 	SLEG_STRUCT("cur_economy", SlCompanyEconomy),

@@ -4219,6 +4219,8 @@ STR_COMPANY_VIEW_RELOCATE_HQ                                    :{BLACK}Přesíd
 STR_COMPANY_VIEW_RELOCATE_HQ_TOOLTIP                            :{BLACK}Sídlo společnosti můžeš vystavit jinde za 1{NBSP}% její hodnoty. Podrž Shift pro zobrazení odhadu ceny
 STR_COMPANY_VIEW_INFRASTRUCTURE_BUTTON                          :{BLACK}Detaily
 STR_COMPANY_VIEW_INFRASTRUCTURE_TOOLTIP                         :{BLACK}Zobrazit detaily a souhrny o infrastruktuře
+STR_COMPANY_VIEW_STATISTICS_BUTTON                              :{BLACK}Statistika
+STR_COMPANY_VIEW_STATISTICS_TOOLTIP                             :{BLACK}Kolik čeho tahle společnost celkem přepravila
 STR_COMPANY_VIEW_GIVE_MONEY_BUTTON                              :{BLACK}Poslat peníze
 STR_COMPANY_VIEW_GIVE_MONEY_TOOLTIP                             :{BLACK}Poslat peníze této společnosti
 STR_COMPANY_VIEW_HOSTILE_TAKEOVER_BUTTON                        :{BLACK}Násilné převzetí
@@ -4253,6 +4255,13 @@ STR_COMPANY_INFRASTRUCTURE_VIEW_STATIONS                        :{WHITE}Staničn
 STR_COMPANY_INFRASTRUCTURE_VIEW_AIRPORTS                        :{WHITE}Letiště
 STR_COMPANY_INFRASTRUCTURE_VIEW_TOTAL_YEAR                      :{WHITE}{CURRENCY_LONG}/rok
 STR_COMPANY_INFRASTRUCTURE_VIEW_TOTAL_PERIOD                    :{WHITE}{CURRENCY_LONG}/období
+
+# Company statistics window
+STR_COMPANY_STATISTICS_CAPTION                                  :{WHITE}Statistika – {COMPANY}
+STR_COMPANY_STATISTICS_HEADING                                  :{GOLD}Kolik čeho společnost celkem přepravila
+STR_COMPANY_STATISTICS_CARGO_NAME                               :{WHITE}{STRING}
+STR_COMPANY_STATISTICS_CARGO_AMOUNT                             :{WHITE}{CARGO_SHORT}
+STR_COMPANY_STATISTICS_NOTHING                                  :{WHITE}Zatím nic nepřepravila
 
 # Industry directory
 STR_INDUSTRY_DIRECTORY_CAPTION                                  :{WHITE}Průmysl ({COMMA} z {COMMA})

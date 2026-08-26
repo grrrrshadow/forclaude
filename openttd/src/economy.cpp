@@ -1100,6 +1100,7 @@ static Money DeliverGoods(int num_pieces, CargoType cargo_type, StationID dest, 
 
 	/* Update company statistics */
 	company->cur_economy.delivered_cargo[cargo_type] += accepted_total;
+	company->total_delivered_cargo[cargo_type] += accepted_total;
 
 	/* Increase town's counter for town effects */
 	const CargoSpec *cs = CargoSpec::Get(cargo_type);

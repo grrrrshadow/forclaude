@@ -4136,6 +4136,8 @@ STR_COMPANY_VIEW_RELOCATE_HQ                                    :{BLACK}Relocate
 STR_COMPANY_VIEW_RELOCATE_HQ_TOOLTIP                            :{BLACK}Rebuild company headquarters elsewhere for 1% cost of company value. Also press Shift to show cost estimate only
 STR_COMPANY_VIEW_INFRASTRUCTURE_BUTTON                          :{BLACK}Details
 STR_COMPANY_VIEW_INFRASTRUCTURE_TOOLTIP                         :{BLACK}View detailed infrastructure counts
+STR_COMPANY_VIEW_STATISTICS_BUTTON                              :{BLACK}Statistics
+STR_COMPANY_VIEW_STATISTICS_TOOLTIP                             :{BLACK}Show how much of every cargo this company has transported
 STR_COMPANY_VIEW_GIVE_MONEY_BUTTON                              :{BLACK}Give money
 STR_COMPANY_VIEW_GIVE_MONEY_TOOLTIP                             :{BLACK}Give money to this company
 STR_COMPANY_VIEW_HOSTILE_TAKEOVER_BUTTON                        :{BLACK}Hostile takeover
@@ -4170,6 +4172,13 @@ STR_COMPANY_INFRASTRUCTURE_VIEW_STATIONS                        :{WHITE}Station 
 STR_COMPANY_INFRASTRUCTURE_VIEW_AIRPORTS                        :{WHITE}Airports
 STR_COMPANY_INFRASTRUCTURE_VIEW_TOTAL_YEAR                      :{WHITE}{CURRENCY_LONG}/year
 STR_COMPANY_INFRASTRUCTURE_VIEW_TOTAL_PERIOD                    :{WHITE}{CURRENCY_LONG}/period
+
+# Company statistics window
+STR_COMPANY_STATISTICS_CAPTION                                  :{WHITE}Statistics of {COMPANY}
+STR_COMPANY_STATISTICS_HEADING                                  :{GOLD}Total amount of cargo transported
+STR_COMPANY_STATISTICS_CARGO_NAME                               :{WHITE}{STRING}
+STR_COMPANY_STATISTICS_CARGO_AMOUNT                             :{WHITE}{CARGO_SHORT}
+STR_COMPANY_STATISTICS_NOTHING                                  :{WHITE}Nothing transported yet
 
 # Industry directory
 STR_INDUSTRY_DIRECTORY_CAPTION                                  :{WHITE}Industries ({COMMA} of {COMMA})

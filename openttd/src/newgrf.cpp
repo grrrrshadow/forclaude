@@ -929,6 +929,13 @@ static bool IsWagonCargoExceptionWagon(const Engine *e)
 }
 
 /**
+ * What each of the exception's wagons was drawn to carry, kept from before the cargoes are
+ * widened so that the wagon can still be built carrying something that suits it.
+ * Filled by PrepareWagonCargoException() and emptied again by ApplyWagonCargoException().
+ */
+static std::map<EngineID, CargoClasses> _wagon_cargo_exception_classes;
+
+/**
  * Widen the cargoes of the exception's wagons before the game works its refit masks out.
  *
  * This has to happen first. CalculateRefitMasks() ends by disabling any vehicle whose
@@ -940,12 +947,19 @@ static bool IsWagonCargoExceptionWagon(const Engine *e)
  */
 static void PrepareWagonCargoException()
 {
+	_wagon_cargo_exception_classes.clear();
 	if (FindWagonCargoExceptionGrf() == nullptr) return;
 
 	for (Engine *e : Engine::Iterate()) {
 		if (!IsWagonCargoExceptionWagon(e)) continue;
 
 		GRFTempEngineData &gted = _gted[e->index];
+
+		/* What the author drew the wagon for. Widening the cargoes throws this away, and it
+		 * is the only thing that says whether this is an open wagon, a van or a tanker, so
+		 * it is kept for choosing the cargo the wagon is built carrying. */
+		_wagon_cargo_exception_classes[e->index] = gted.cargo_allowed;
+
 		/* Include everything, exclude nothing, and say the wagon is refittable so that
 		 * the game does not fall back to "default cargo only". */
 		gted.ctt_include_mask = CargoTypes{_cargo_mask};
@@ -955,6 +969,36 @@ static void PrepareWagonCargoException()
 		/* The set's own refit callback would take the cargoes straight back out again. */
 		e->info.callback_mask.Reset(VehicleCallbackMask::CustomRefit);
 	}
+}
+
+/**
+ * Pick the cargo one of the exception's wagons is built carrying.
+ *
+ * Every wagon can now be refitted to everything, but it still has to be built carrying one
+ * particular cargo, and that choice is not cosmetic: the game works a wagon's capacity for
+ * every other cargo out by comparing it against the one it was built for. Taking simply the
+ * first cargo in the game would make every open wagon a passenger coach and throw all those
+ * capacities out.
+ *
+ * So the cargo is chosen from the classes the author gave the wagon -- bulk for an open
+ * wagon, piece goods for a van, liquid for a tanker -- and only if this game has no cargo of
+ * those classes at all does it fall back to the first cargo there is.
+ *
+ * @param e The wagon.
+ * @return The cargo to build it carrying, or #INVALID_CARGO if the game has no cargo at all.
+ */
+static CargoType PickWagonCargoExceptionDefaultCargo(const Engine *e)
+{
+	auto found = _wagon_cargo_exception_classes.find(e->index);
+	if (found != std::end(_wagon_cargo_exception_classes) && found->second.Any()) {
+		for (const CargoSpec *cs : CargoSpec::Iterate()) {
+			if (!e->info.refit_mask.Test(cs->Index())) continue;
+			if (cs->classes.Any(found->second)) return cs->Index();
+		}
+	}
+
+	if (e->info.refit_mask.Any()) return *e->info.refit_mask.begin();
+	return INVALID_CARGO;
 }
 
 /**
@@ -1003,15 +1047,20 @@ static void ApplyWagonCargoException()
 			e->ignore_capacity_callback = true;
 		}
 
+		/* Every cargo this game has, whoever brought it -- which is what _cargo_mask is. */
 		e->info.refit_mask = CargoTypes{_cargo_mask};
 
 		/* Something has to be the cargo it is built carrying, and what it was
 		 * built carrying may not be in this game at all. */
-		if (!IsValidCargoType(e->info.cargo_type) || !e->info.refit_mask.Test(e->info.cargo_type)) {
-			if (e->info.refit_mask.Any()) e->info.cargo_type = *e->info.refit_mask.begin();
+		if (!IsValidCargoType(e->info.cargo_type) || !e->info.refit_mask.Test(e->info.cargo_type) ||
+				_wagon_cargo_exception_classes.contains(e->index)) {
+			CargoType cargo = PickWagonCargoExceptionDefaultCargo(e);
+			if (IsValidCargoType(cargo)) e->info.cargo_type = cargo;
 		}
 		changed++;
 	}
+
+	_wagon_cargo_exception_classes.clear();
 
 	if (changed == 0) return;
 

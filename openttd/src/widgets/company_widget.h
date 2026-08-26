@@ -39,6 +39,8 @@ enum CompanyWidgets : WidgetID {
 	WID_C_SELECT_RELOCATE,            ///< Panel about 'Relocate HQ'.
 	WID_C_RELOCATE_HQ,                ///< Button to relocate the HQ.
 
+	WID_C_STATISTICS,                 ///< Button to open the cargo statistics.
+
 	WID_C_VIEW_INFRASTRUCTURE,        ///< Panel about infrastructure.
 
 	WID_C_SELECT_GIVE_MONEY,          ///< Selection widget for the give money button.
@@ -49,6 +51,13 @@ enum CompanyWidgets : WidgetID {
 
 	WID_C_SELECT_MULTIPLAYER,         ///< Multiplayer selection panel.
 	WID_C_COMPANY_JOIN,               ///< Button to join company.
+};
+
+/** Widgets of the #CompanyStatisticsWindow class. */
+enum CompanyStatisticsWidgets : WidgetID {
+	WID_CS_CAPTION, ///< Caption of the window.
+	WID_CS_LIST,    ///< The list of cargoes and their totals.
+	WID_CS_SCROLLBAR, ///< Scrollbar of the list.
 };
 
 /** Widgets of the #CompanyFinancesWindow class. */

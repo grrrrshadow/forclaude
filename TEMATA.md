@@ -911,6 +911,19 @@ nastavení jakékoli. Rozhoduje o tom `IsWagonCargoExceptionGrf()`
 v `newgrf.cpp` — jedno a to samé místo pro obě půlky, aby se nemohly
 rozejít.
 
+## 13.2c Čím je vagon postavený naložený
+
+Vagon může být po výjimce přeložen na všechno, ale postavit se musí
+s jedním konkrétním nákladem, a to není kosmetika: hra počítá kapacitu pro
+každý další náklad **poměrem proti tomu, se kterým byl vagon postaven**.
+Vzít prostě první náklad ve hře by ze všech otevřených vozů udělalo osobní
+vagony a rozhodilo všechny kapacity.
+
+Proto si `PrepareWagonCargoException()` schová třídy nákladů, které autor
+vagonu dal (sypké / kusové / kapalné), **než** je rozšíření přepíše, a
+`ApplyWagonCargoException()` z nich vybírá. Teprve když ve hře žádný náklad
+těch tříd není, sáhne se po prvním, který je.
+
 ## 13.3 Kapacita: sada odpovídá nulou
 
 41 vagonů té sady má v nastavení `cargo_capacity: 1` a k tomu obě
@@ -931,7 +944,27 @@ kapacitu uvedly (57, 60, 200 …), se nechávají být i s vanilkovým chování
 
 ---
 
-# 14. Otevřené
+# 14. Statistika firmy podle TTDPatch
+
+V okně firmy je pod čudlíkem ředitelství čudlík **Statistika**. Otevře okno
+se seznamem: nadpis „Kolik čeho společnost celkem přepravila" a pod ním
+řádek na každý náklad, který firma kdy dovezla — jméno vlevo, množství
+vpravo. Náklady, se kterými firma nikdy nic neudělala, se nevypisují.
+
+**Odkud se to číslo bere.** Hra si dosud pamatovala jen
+`CompanyEconomyEntry::delivered_cargo`, a to jen za posledních
+`MAX_HISTORY_QUARTERS` čtvrtletí — na „od založení" to nestačí. Přibyl
+proto průběžný součet `Company::total_delivered_cargo`, který se
+přičítá na tom jednom místě, kde se počítá i to čtvrtletní
+(`economy.cpp`, `DeliverGoods()`).
+
+Součet se ukládá do savegame (verze `CompanyTotalDeliveredCargo`). Starší
+uložené hry se načtou dál, jen v nich ta statistika začíná od nuly —
+zpětně se dopočítat nedá, ta data v nich nejsou.
+
+---
+
+# 15. Otevřené
 
 - Pády po spojení a rozpojení: `pool_type.hpp:174` (sáhnutí mimo seznam
   objektů) a `track_func.h:168` (žádaná jedna kolej, dostala se jiná
