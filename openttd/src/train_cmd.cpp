@@ -3083,33 +3083,27 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * backwards on the other, which is why fixing one kind of platform kept
 	 * breaking the other.
 	 *
-	 * So measure it. The joined train has to leave the platform by the way the
-	 * collecting train came in, because that is the way it got in past
-	 * everything else; therefore it leads with the end that was trailing on the
-	 * way in. Whether that end happens to be the head of the list is not asked
-	 * and does not matter.
+	 * So measure it, against the one thing the player can see coming: the
+	 * collecting engine carries on the way it was already going. Picking
+	 * something up does not turn you round. That is what collecting wagons has
+	 * always done, and it is the whole of the rule now -- a train collected off
+	 * another train is not a different case and must not behave like one.
+	 *
+	 * The rule this replaces said the joined train leaves by the way the engine
+	 * came in, which turns it round on the spot. It was the only place where
+	 * coupling changed a direction of travel, it made an engine that collected
+	 * from one side of a station behave differently from one that collected from
+	 * the other, and nothing the player did asked for it. Turning round is now
+	 * something only decoupling, the end of the track, and the end of a terminus
+	 * platform can cause -- and the player's own reverse button, which is a
+	 * different thing entirely because they pressed it.
 	 *
 	 * Compared as a direction rather than for equality: a vehicle on a curve is
 	 * up to 45 degrees off and is perfectly correct. See
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	TileIndexDiffC nose = TileIndexDiffCByDir(new_head->direction);
-	TileIndexDiffC leaving = TileIndexDiffCByDir(ReverseDir(arrived_heading));
-	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, nose.x * leaving.x + nose.y * leaving.y < 0);
-
-	/* Unless only one end of the joined train has a driving cab, in which case
-	 * that end leads and there is nothing to measure. A train nobody can see out
-	 * of runs at walking pace, and which way round a train runs has to be
-	 * something a player can say in advance rather than something that falls out
-	 * of where the wagons happened to be standing.
-	 *
-	 * When both ends have one -- which is what collecting an engine from the far
-	 * end of a train makes it, a push-pull set -- neither is worse than the
-	 * other, and the way it came in is the way that is known to be passable. */
-	bool head_leads = new_head->CanLeadTrain();
-	bool tail_leads = new_head->Last()->CanLeadTrain();
-	if (head_leads != tail_leads) {
-		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, tail_leads);
-	}
+	TileIndexDiffC going = TileIndexDiffCByDir(arrived_heading);
+	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, nose.x * going.x + nose.y * going.y < 0);
 
 	new_head->flags.Reset(VehicleRailFlag::Reversing);
 	new_head->ConsistChanged(CCF_TRACK);
@@ -3182,34 +3176,15 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * joined train is standing on, and then ask for a way out of it. */
 	new_head->ReserveTrackUnderConsist();
 
-	/* And now ask which way it actually has to go, which is better information than
-	 * which way the engine came in and was never asked for until here.
+	/* Nothing asks the pathfinder here whether the train would rather go the other
+	 * way, and that is deliberate. It was tried: the next order does lie the other way
+	 * at three of the four test platforms, so asking turned the train round at three of
+	 * them, and turning a train round the instant it has coupled is exactly what the
+	 * player cannot see coming. A train that has to go the other way reverses the way
+	 * any other train does -- at the end of the platform, on its own account, once it is
+	 * moving -- and that is a thing the player has watched trains do since the beginning.
 	 *
-	 * Where the joined train leaves by was settled above from the way the collecting
-	 * engine arrived, on the grounds that that way is known to be passable. That is a
-	 * reasonable guess and nothing more: the train has orders, and the next place it is
-	 * due at can perfectly well lie the other way. On the test station it lies the other
-	 * way at three platforms out of four, and those three are exactly the three that
-	 * went wrong.
-	 *
-	 * The game does normally settle this, but only in the same breath as advancing an
-	 * order -- the reverse check sits behind that test -- and a train that couples has
-	 * had its order concluded here by hand instead. So nothing asked, the train reserved
-	 * a way out in the direction the guess had picked, and set off across the throat of
-	 * the station against everything coming the other way.
-	 *
-	 * Asked here, before the way out is reserved, so that what is reserved and what the
-	 * train then does are the same thing. The pathfinder answers with the way it costs
-	 * least to reach the next order from, which takes passability into account by
-	 * itself, so nothing is lost by preferring it to the guess. */
-	if (new_head->GetMovingFront()->track.Any() && CheckReverseTrain(new_head)) {
-		new_head->wait_counter = 0;
-		new_head->cur_speed = 0;
-		new_head->subspeed = 0;
-		ReverseTrainDirection(new_head);
-	}
-
-	/* Asking is the part that was missing, and it let a train drive out of a
+	 * Asking is the part that was missing, and it let a train drive out of a
 	 * platform on no reservation at all.
 	 *
 	 * One place in the game reserves a way out for a train that is standing in

@@ -3,6 +3,40 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #90 — odjezdy po spojení, a čím se nádraží orientuje
+
+**Světové strany zkušebního nádraží** (do teď se psalo „vlevo/vpravo"):
+pravá strana nádraží je ve hře **severovýchod**, levá **jihozápad**. Vlaky
+čekající na spojení i vagonky na rozpojení přijíždějí ze **severozápadu**.
+Mašinka s příkazem „jet se spojit" jezdí **z obou stran**.
+
+**Co je dobře:** připojené **vagonky** odjíždějí správně — nemění směr
+jízdy a je to předvídatelné.
+
+**Co je špatně:** připojené **vlaky** odjíždějí postaru, tou stranou
+nádraží, kde se mašinka připojila, a mění směr jízdy. Všechny pak
+bouchly při rozpojení.
+
+Test připojení ze **severovýchodu** — jednotné na všech čtyřech, pozadu
+i popředu: **1 VB, 2 VB, 3 VB, 4 VB**.
+
+Test rozpojení, mašinka přijíždí z **jihozápadu**:
+
+| jak se mašinka připojila | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| nacouvala k vlaku zadkem | V V | B | B | B |
+| připojila vlak předkem | V V | V B (vyjela jinou stranou) | V B | V B |
+
+**Rozhodující pozorování hráče:** když spojené vlaky **ručně otočil** při
+odjezdu z nádraží, rozpojily se **perfektně všechny** — jen si občas
+prohodí příkazy. Takže rozpojení samo o sobě v pořádku je a chyba je
+v tom, kterým směrem spojený vlak z nádraží vyjede.
+
+**Druhá stopa:** z jihozápadu odjíždějí vlaky správně (směrem, kterým
+přijely) **kromě nástupiště 2**, kde odjíždějí postaru. Mašinky připojené
+ze severovýchodu se tedy chovají jinak než ty připojené z jihozápadu —
+a to je nesouměrnost, která nemá kde vzniknout, pokud se nejmenuje konec.
+
 ## Build #88 — pád v `TrainController()`, `train_cmd.cpp:6135`
 
 Hláška: `chosen_track.Count() == 1 && !chosen_track.Any({Wormhole, Depot})`.

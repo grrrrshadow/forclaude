@@ -77,6 +77,11 @@ a 8.
 Testuje se pořád ta samá situace. Bez tohohle se úkoly o spojování číst
 nedají.
 
+**Světové strany** (aby „vlevo/vpravo" nebylo na čem záviset): **pravá
+strana nádraží je severovýchod, levá jihozápad.** Vlaky čekající na
+spojení a vagonky na rozpojení přijíždějí ze **severozápadu**. Mašinka
+s příkazem „jet se spojit" přijíždí **z obou stran**.
+
 **Čtyři nástupiště, číslovaná shora dolů 1 až 4.** Na každém stojí řada
 vagonků. Mašinka, která je tam nechala, stála:
 
@@ -328,6 +333,38 @@ s tou pravou.
 Má-li kabinu jen jeden konec, vede ten. Mají-li ji oba — a to je přesně to,
 co z vlaku udělá připojení mašinky z druhé strany, tedy push-pull — jede se
 tudy, kudy se přijelo, protože o té cestě se ví, že je průjezdná.
+
+## 2.4b Spojení směr jízdy **nemění**. Nikdy.
+
+**Tohle je teď to hlavní pravidlo a přebíjí obě verze 2.4 i 2.5 níž.**
+
+Mašinka, která něco sebrala, **jede dál tím směrem, kterým už jela.**
+Sebrat něco tě neotočí. Přesně to odjakživa dělaly vagonky — a proto
+odjížděly předvídatelně — a vlak sebraný z jiného vlaku **není jiný
+případ a nesmí se tak chovat.**
+
+Co to nahradilo: pravidlo „spojený vlak odjede tou cestou, kterou mašinka
+přijela", které vlak na místě otočí. Bylo to jediné místo, kde spojování
+měnilo směr jízdy, dělalo to rozdíl mezi mašinkou sbírající ze
+severovýchodu a z jihozápadu, a nikdo o to nežádal.
+
+**Otočit vlak smí teď už jen:**
+
+- **rozpojení** — aby obě části mohly jet každá na jinou stranu,
+- **konec kolejí** a **konec hlavového nádraží**,
+- **hráč sám** tlačítkem otočení. To je něco úplně jiného, protože ho
+  zmáčkl.
+
+Zrušena je tím i výjimka o řídicí kabině (dřív: má-li kabinu jen jeden
+konec, vede ten). Byla to další podoba téhož — pravidlo, které jmenuje
+konec. **Cena, kterou to má:** když měření postaví dopředu konec bez
+kabiny, vlak pojede pomalu, dokud se neotočí. To je vidět a je to
+předvídatelné; tiché otočení vidět není.
+
+Zrušeno je i doptávání se hledače cesty hned po spojení (viz 2.5). Bylo
+vyzkoušené a otáčelo vlak na třech nástupištích ze čtyř. Vlak, který má
+jet opačně, se otočí **jako každý jiný vlak** — na konci nástupiště, sám
+od sebe, až se rozjede.
 
 ## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
 
