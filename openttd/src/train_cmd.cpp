@@ -4057,6 +4057,12 @@ bool IsWholeTrainInsideDepot(const Train *v)
  */
 bool _allow_reverse_on_depot_doorstep = false;
 
+/**
+ * Whether a train's status line spells out which way round it is running.
+ * Off by default; the console command "vlak123" turns it on. See train.h.
+ */
+bool _show_train_orientation = false;
+
 static bool IsAnyPartInsideDepot(const Train *v)
 {
 	for (const Train *u = v; u != nullptr; u = u->Next()) {

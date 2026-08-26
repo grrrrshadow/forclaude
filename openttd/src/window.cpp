@@ -2490,7 +2490,29 @@ static EventState HandleActiveWidget()
 static void EndViewportScrollIfLetGo()
 {
 	if (_settings_client.gui.scroll_mode != ViewportScrollMode::RMBPinned) return;
-	if (!_scrolling_viewport) return;
+
+	/* A drag this ended, under a button that is still held, starts again the moment
+	 * the pointer moves.
+	 *
+	 * Without this the release below is a trap rather than a rescue. The drag is only
+	 * ever begun by the press itself, so once this has let go of one, the button has
+	 * to be lifted and pressed again before the map will move -- and the whole reason
+	 * the drag is being let go of is that the game is not being told when the button
+	 * is lifted. A player with a finger still on the button is simply stuck with a map
+	 * that has stopped answering.
+	 *
+	 * The cost is real and worth saying out loud: a button the game wrongly believes
+	 * is held will take the map back the same way. What the release still buys is that
+	 * it lets go every time the map is left alone for a moment, so nothing is held
+	 * hostage while the player is doing something else, and a press of the left button
+	 * still ends it outright. */
+	if (!_scrolling_viewport) {
+		if (!_right_button_down || _left_button_down) return;
+		if (_cursor.delta.x == 0 && _cursor.delta.y == 0) return;
+
+		_scrolling_viewport = true;
+		_cursor.fix_at = true;
+	}
 
 	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
 

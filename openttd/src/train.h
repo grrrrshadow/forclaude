@@ -457,6 +457,16 @@ protected: // These functions should not be called outside acceleration code.
 extern bool _allow_reverse_on_depot_doorstep;
 
 /**
+ * Show a train's orientation in its status line.
+ *
+ * A testing switch, not a setting: the console command "vlak123" flips it. The two
+ * things a train is described by cannot be read off the screen at all -- which end of
+ * the list goes first, and which way the head vehicle is facing -- and nearly every
+ * fault in coupling has been one of them disagreeing with the other. Off by default.
+ */
+extern bool _show_train_orientation;
+
+/**
  * Is this train standing across a depot doorway -- some of it inside, some of
  * it out?
  *

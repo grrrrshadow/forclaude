@@ -366,6 +366,22 @@ vyzkoušené a otáčelo vlak na třech nástupištích ze čtyř. Vlak, který 
 jet opačně, se otočí **jako každý jiný vlak** — na konci nástupiště, sám
 od sebe, až se rozjede.
 
+## 2.4c Konzolový příkaz `vlak123` — vidět, kterým koncem vlak jede
+
+Obě veličiny z 0.5 nejde z obrazovky přečíst vůbec, a skoro každá chyba
+ve spojování byla tím, že si odporují. `vlak123` je proto přidá do řádku
+stavu v okně mašinky (`vlak123 on` / `vlak123 off`, samotné přepne):
+
+- **H** — jede hlavou seznamu napřed, **Z** — jede zadkem (koncem).
+  To je příznak „jede pozpátku".
+- **DP** — nos prvního vozu míří **od** vlaku, **DZ** — míří **do** vlaku.
+  Po srovnání směrů při spojení má vždycky vyjít DP; **kdykoli se objeví
+  DZ, je rozsypané srovnání směrů** a je to chyba, ne stav.
+- **R č.** — tuhle řadu si někdo zamluvil ke sběru, a to číslo je jeho.
+  Jinde se to nedá zjistit nijak.
+
+Je to zkušební přepínač, ne nastavení — stejně jako `depo123`.
+
 ## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
 
 To pravidlo výš je **odhad pro případ, kdy nic lepšího není**. Vlak ale má

@@ -3418,6 +3418,39 @@ public:
 
 		ExtendedTextColour text_colour{TextColour::FromString};
 		std::string str = GetVehicleStatusString(v, text_colour);
+
+		/* Which way round the train is running, spelled out for testing. Appended
+		 * here rather than written into each of the two dozen status strings,
+		 * because it belongs to every one of them equally.
+		 *
+		 * Two letters for the two things a train is described by, which are
+		 * independent of each other and which no part of the screen shows:
+		 * whether the head or the tail of the list goes first, and whether the
+		 * head vehicle's nose points away from the train or into it. Nearly every
+		 * fault in coupling has been those two disagreeing, and until now the only
+		 * way to see it was to watch the train move. See train.h. */
+		if (_show_train_orientation && v->type == VehicleType::Train) {
+			const Train *t = Train::From(v);
+
+			std::string mark = t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? " Z" : " H";
+
+			const Train *next = t->GetNextVehicle();
+			if (next != nullptr) {
+				TileIndexDiffC nose = TileIndexDiffCByDir(t->direction);
+				int away_x = t->x_pos - next->x_pos;
+				int away_y = t->y_pos - next->y_pos;
+				mark += (nose.x * away_x + nose.y * away_y >= 0) ? " DP" : " DZ";
+			}
+
+			/* And who has spoken for it, for a rake that is standing waiting to be
+			 * collected: a claim is the one thing about it that decides whether
+			 * anybody is coming, and it is invisible everywhere else. */
+			const Train *claimer = Train::GetIfValid(t->couple_claim);
+			if (claimer != nullptr) mark += fmt::format(" R{}", claimer->First()->unitnumber);
+
+			str += mark;
+		}
+
 		DrawString(tr.left, tr.right, CentreBounds(tr.top, tr.bottom, GetCharacterHeight(FontSize::Normal)), str, text_colour, AlignmentH::Centre);
 	}
 

@@ -358,6 +358,41 @@ static bool ConZoomToLevel(std::span<std::string_view> argv)
 }
 
 /**
+ * Turn the orientation marks in a train's status line on or off.
+ *
+ * Adds two letters to whatever the train is already saying: H or Z for whether the head
+ * or the tail of the list goes first, D P or D Z for whether the head vehicle's nose
+ * points away from the train or into it, and R with a number when something has claimed
+ * this rake for collection.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConShowTrainOrientation(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Spell out which way round a train is running in its status line.");
+		IConsolePrint(CC_HELP, "Usage: 'vlak123' to flip it, or 'vlak123 on' / 'vlak123 off'.");
+		return true;
+	}
+
+	if (argv.size() >= 2) {
+		if (argv[1] == "on" || argv[1] == "1") {
+			_show_train_orientation = true;
+		} else if (argv[1] == "off" || argv[1] == "0") {
+			_show_train_orientation = false;
+		} else {
+			return false;
+		}
+	} else {
+		_show_train_orientation = !_show_train_orientation;
+	}
+
+	SetWindowClassesDirty(WindowClass::VehicleView);
+
+	IConsolePrint(CC_DEFAULT, "Train orientation marks are now {}.", _show_train_orientation ? "shown" : "hidden");
+	return true;
+}
+
+/**
  * Turn the depot-doorway lock on the reverse button on or off.
  *
  * A train standing half in and half out of a depot has its turn-round button
@@ -3154,4 +3189,5 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
+	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 }
