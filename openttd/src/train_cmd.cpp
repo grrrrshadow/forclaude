@@ -4128,8 +4128,12 @@ static void ReverseTrainDirection(Train *consist)
 		 * vehicles still inside on the wrong side of those already out, and it
 		 * jams on the first tile. Being stopped is exactly the line between
 		 * the two, and it is the line the player sees: it is when the train
-		 * stops saying it is stopped that turning it stops being free. */
-		if (IsAnyPartInsideDepot(consist) && !(IsWholeTrainInsideDepot(consist) && consist->vehstatus.Test(VehState::Stopped))) return;
+		 * stops saying it is stopped that turning it stops being free.
+		 *
+		 * Asked through the same predicate the vehicle window greys the button
+		 * with, so a button that looks alive and a command that declines can
+		 * never be two different answers. */
+		if (IsTrainReverseBlockedByDepot(consist)) return;
 
 		if (IsWholeTrainInsideDepot(consist)) {
 			/* Everything below works on where vehicles sit along the track and

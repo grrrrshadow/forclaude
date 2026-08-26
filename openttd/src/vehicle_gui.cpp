@@ -3216,16 +3216,16 @@ public:
 		}
 
 		if (v->type == VehicleType::Train || v->type == VehicleType::Road) {
-			/* Greyed out while a train stands across a depot doorway. Inside a
-			 * depot the button flips the order of the vehicles, out on the line
-			 * it changes which end leads, and both are fine; half in and half
-			 * out is neither, and asking for it there is what freezes a train.
-			 * Until that is fixed properly the button says so by being dead,
-			 * the way every other button in the game says it. It can be turned
-			 * back on from the console to work on the freeze -- see
-			 * _allow_reverse_on_depot_doorstep. */
-			bool on_the_doorstep = !_allow_reverse_on_depot_doorstep && IsTrainAcrossDepotDoorway(v);
-			this->SetWidgetDisabledState(WID_VV_TURN_AROUND, !is_localcompany || on_the_doorstep);
+			/* Greyed out wherever the command would refuse: across a depot
+			 * doorway, and inside a depot once the train has been started and is
+			 * on its way out. In both the press does nothing at all, so a player
+			 * presses it again and again with no way of telling that the game has
+			 * declined. A dead button is how every other button in the game says
+			 * that, and this asks the same question the command asks, so the two
+			 * cannot drift apart. It can be turned back on from the console to
+			 * work on it -- see _allow_reverse_on_depot_doorstep. */
+			bool refused = !_allow_reverse_on_depot_doorstep && IsTrainReverseBlockedByDepot(v);
+			this->SetWidgetDisabledState(WID_VV_TURN_AROUND, !is_localcompany || refused);
 		}
 
 		this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);

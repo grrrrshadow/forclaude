@@ -467,33 +467,49 @@ extern bool _allow_reverse_on_depot_doorstep;
 extern bool _show_train_orientation;
 
 /**
- * Is this train standing across a depot doorway -- some of it inside, some of
- * it out?
+ * Would asking this train to turn round do nothing, because of where it is
+ * standing relative to a depot?
  *
- * The two ordinary places are both fine to turn a train round in: inside a
- * depot the whole train is on one tile and turning it round reverses the order
- * of its vehicles, and out on the line turning it round changes which end
- * leads. The doorway is neither, and asking for either there is what puts a
- * train to sleep, so the button is greyed out while a train is in it.
+ * Out on the line turning a train round is always fine: it changes which end
+ * leads and nothing moves. Inside a depot it is fine too, but only while the
+ * train is standing still -- there the whole train is on one tile with no
+ * extent, so both which end leads and the order of the vehicles can be turned
+ * at once. Neither of those holds anywhere in between:
+ *
+ * - **across the doorway**, part of the train inside and part of it out, the
+ *   two halves live under different rules and turning it tears the consist
+ *   apart;
+ * - **inside but started**, on its way out, the train is already a train lying
+ *   along the track even while every vehicle is still hidden on the depot tile,
+ *   and turning it then leaves the ones still inside on the wrong side of the
+ *   ones already out.
+ *
+ * ReverseTrainDirection() refuses in exactly these cases and returns without
+ * doing anything, which from the player's side is a button that does nothing at
+ * all -- so they press it again, and again. This is what greys it out instead,
+ * and it is the same question the command itself asks, so the two cannot drift
+ * apart. It can be turned back on from the console; see
+ * #_allow_reverse_on_depot_doorstep.
  *
  * @param v The train; may be any part, the question is about the whole consist.
- * @return Whether part of it is in a depot and part of it is not.
+ * @return Whether a request to turn it round here would be refused.
  */
-inline bool IsTrainAcrossDepotDoorway(const Vehicle *v)
+inline bool IsTrainReverseBlockedByDepot(const Vehicle *v)
 {
 	if (v->type != VehicleType::Train) return false;
 
 	bool any_in = false;
-	bool any_out = false;
+	bool all_in = true;
 	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
 		if (Train::From(u)->track == Track::Depot) {
 			any_in = true;
 		} else {
-			any_out = true;
+			all_in = false;
 		}
-		if (any_in && any_out) return true;
 	}
-	return false;
+
+	if (!any_in) return false;
+	return !(all_in && v->First()->vehstatus.Test(VehState::Stopped));
 }
 
 inline bool IsWaitingWagonChain(const Vehicle *v)

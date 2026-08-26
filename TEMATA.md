@@ -379,6 +379,27 @@ vyzkoušené a otáčelo vlak na třech nástupištích ze čtyř. Vlak, který 
 jet opačně, se otočí **jako každý jiný vlak** — na konci nástupiště, sám
 od sebe, až se rozjede.
 
+## 1.5 Čudlík otáčení kolem depa je zatmavený všude, kde by nic neudělal
+
+Otáčení hra odmítne **na dvou místech**, ne na jednom:
+
+- **napříč vraty depa** — část vlaku uvnitř, část venku,
+- **uvnitř depa, ale rozjetý** — na cestě ven. Vlak už leží podél kolejí,
+  i když jsou všechny vozy pořád schované na políčku depa.
+
+V obou případech příkaz **jen tiše nic neudělá**. Z pohledu hráče je to
+mrtvý čudlík bez hlášky, tak na něj klikne třikrát za sebou. Proto je teď
+zatmavený v obou případech, ne jen na vratech.
+
+**Ptá se to jednou funkcí (`IsTrainReverseBlockedByDepot`), kterou používá
+i samotný příkaz.** Nesmí nastat, že čudlík vypadá živě a příkaz odmítne —
+to jsou dvě různé odpovědi na jednu otázku.
+
+Přes konzoli se to dá vypnout: `depo123` (viz `_allow_reverse_on_depot_doorstep`).
+
+**Samotné zamrzání tím vyřešené není** — jen se přestalo dát vyvolat
+čudlíkem.
+
 ## 2.4c Konzolový příkaz `vlak123` — vidět, kterým koncem vlak jede
 
 Obě veličiny z 0.5 nejde z obrazovky přečíst vůbec, a skoro každá chyba
