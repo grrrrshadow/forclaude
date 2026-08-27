@@ -498,6 +498,21 @@ příkazu, a když řekne opačně, vlak se obrátí. Zamluvená cesta a to, co 
 opravdu udělá, jsou tím pádem jedno a to samé. Průjezdnost si hledač
 ohlídá sám, takže se oproti odhadu nic neztrácí.
 
+## 2.9 Odloženo: odpojit a spojit na příkazu „jeď do depa"
+
+Odloženo hráčem, dokud se nedomluví pravidlo konce. Co už je domluvené:
+příkaz do depa dostane přepínače **Odpojit** a **Jet se spojit** (vzájemně
+se vylučují), **žádné „čekat na spojení"** — vlaky se spojují na nádraží,
+kde je to vidět; v depu se spojuje jen s odstavenými vagonky. Filtry
+náklad/plnost/počet stejné jako na nádraží.
+
+Co domluvené není a na čem to stojí: **na který konec sběrné mašinky se
+odstavené vagonky v depu připojí.** První návrh (vagonky na konec u dveří,
+mašinka je vytlačí ven) neprošel zkouškou souměrnosti „když obráceně, tak
+všechno obráceně" — pro vjezd komínem napřed a pro nacouvání jsme každý
+drželi jiný obrázek toho, co vyjede ze dveří první. Dokud tohle pravidlo
+není řečené obyčejnými slovy tak, že ho oba čteme stejně, nepíše se kód.
+
 ---
 
 # 3. Rozpojování (decouple)
