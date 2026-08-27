@@ -3163,6 +3163,10 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 */
 	new_head->couple_target = VehicleID::Invalid();
 
+	/* It leaves the way it was already going, and nothing may second-guess that at the
+	 * moment its loading finishes; see the note at the order-advance reverse check. */
+	new_head->suppress_order_reverse = true;
+
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
 	 * partner and simply stands there for good -- it has no reason left to
@@ -3187,27 +3191,28 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * purpose is to finally trigger the arrival that lets the order advance.
 	 * That is the pointless lap round the station.
 	 *
-	 * So do here what arriving would have done: mark the station reached and
-	 * let the next order be picked up.
+	 * Whether it happens depends only on how far into the platform the wagons
+	 * are: a train that happened to stop exactly on the stop location does
+	 * arrive, loads, and couples from the loading code instead, which departs
+	 * normally and advances the order by itself. Same order, same wagons,
+	 * different platform -- which is why some platforms looked fine.
 	 *
-	 * The order is concluded here and not by handing the train to the station,
-	 * even when it is standing on a platform tile. Entering the station starts
-	 * a loading stop, and the order then advances when that loading finishes --
-	 * at which point the game asks the pathfinder whether the train would
-	 * rather go the other way and turns it round on the spot. That is how the
-	 * same coupling came out differently from one platform to the next: a train
-	 * that stopped short concluded its order here and drove straight out, while
-	 * one that stopped on the stop location went through loading and was turned
-	 * round. Coupling does not change which way a train is going, so it does
-	 * not take the route that can. Stopping to couple is not arriving to load;
-	 * a train that is to load here does it on an order of its own. */
+	 * So do here what arriving would have done. If the train is standing in
+	 * the station it was sent to, let it enter properly, cargo handling and
+	 * all; that is the same route the lucky platforms take. If it is short of
+	 * the platform, there is nothing to load at, so just mark the station
+	 * reached and let the next order be picked up. */
 	if (was_go_to_couple && new_head->current_order.IsType(OT_GOTO_STATION)) {
 		StationID dest = new_head->current_order.GetDestination().ToStationID();
 		if (IsConsistStandingAtStation(new_head, dest)) {
-			new_head->DeleteUnreachedImplicitOrders();
-			new_head->last_station_visited = dest;
-			UpdateVehicleTimetable(new_head, true);
-			new_head->IncrementImplicitOrderIndex();
+			if (IsRailStationTileOfStation(new_head->GetMovingFront()->tile, dest)) {
+				TrainEnterStation(new_head, dest);
+			} else {
+				new_head->DeleteUnreachedImplicitOrders();
+				new_head->last_station_visited = dest;
+				UpdateVehicleTimetable(new_head, true);
+				new_head->IncrementImplicitOrderIndex();
+			}
 		}
 	}
 
@@ -4247,6 +4252,9 @@ static void ReverseTrainDirection(Train *consist)
 		}
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
 	}
+
+	/* A reversal of any kind makes a pending "do not turn me round" ticket stale. */
+	consist->suppress_order_reverse = false;
 
 	/* Clear path reservation in front if train is not stuck. */
 	if (!consist->flags.Test(VehicleRailFlag::Stuck)) FreeTrainTrackReservation(consist);
@@ -6864,6 +6872,18 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 
 	bool valid_order = !consist->current_order.IsType(OT_NOTHING) && consist->current_order.GetType() != OT_CONDITIONAL;
 	bool order_advanced = ProcessOrders(consist);
+
+	/* A train that has just coupled leaves the way it was already going. Its order
+	 * advances only once its loading finishes, and the question below -- asked whenever
+	 * an order advances -- would turn it round on the spot right then. That is why a
+	 * train that collected wagons departed the wrong way while one that collected a
+	 * train, whose order was concluded by hand with nothing left to advance, departed
+	 * correctly: same rule, different bookkeeping route. One question is skipped and the
+	 * ticket is torn up; the ordinary reversal places all stay in charge afterwards. */
+	if (order_advanced && consist->suppress_order_reverse) {
+		consist->suppress_order_reverse = false;
+		order_advanced = false;
+	}
 
 	if (order_advanced && CheckReverseTrain(consist)) {
 		consist->wait_counter = 0;

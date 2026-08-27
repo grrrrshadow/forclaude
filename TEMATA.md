@@ -424,15 +424,11 @@ příkazu ptá „nechtěl bys k dalšímu cíli jet druhým koncem?"
 příkaz uzavřený ručně, nic se neposouvalo, otázka nepadla — odjel rovně.
 Vlak, který sebral **vagonky**, šel přes nakládku; příkaz poskočil po ní
 a otázka ho otočila na místě. Proto tatáž situace jednou fungovala a
-podruhé ne.
-
-Nejdřív to bylo řešeno jednorázovým lístkem na vlaku, který tu otázku
-jednou přeskočil. To byla záplata, ne oprava, a je pryč. **Zastavit se
-kvůli spojení není přijet nakládat.** Spojení si teď příkaz uzavře samo
-(ohlásí stanici, posune implicitní příkaz), ať vlak stojí kdekoli na
-peroně — nepředává vlak stanici k nakládce, takže žádný posun příkazu
-po nakládce nepřijde a otázka nepadne. Obě situace tím jedou stejnou
-cestou. Kdo má na tom nádraží nakládat, má na to vlastní příkaz.
+podruhé ne. Teď spojení vystaví jednorázový lístek
+(`Train::suppress_order_reverse`): první posun příkazu po spojení tu
+otázku přeskočí a lístek se roztrhá. Jakékoli skutečné otočení
+(`ReverseTrainDirection`) lístek zahazuje taky — otočený vlak už není
+před čím chránit.
 
 **Rozpojení, které mění vedoucí konec, dělá i doprovodnou práci.** Změna
 vedoucího konce není jen příznak: vanilkové couvání ke každému vozu
