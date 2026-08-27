@@ -187,6 +187,8 @@ static bool RangeHighComparator(const DeterministicSpriteGroupRange &range, uint
 	return range.high < value;
 }
 
+bool _cztr_trace = false; ///< Temporary: trace resolution for the wagon-set bench.
+
 /* virtual */ ResolverResult DeterministicSpriteGroup::Resolve(ResolverObject &object) const
 {
 	uint32_t last_value = 0;
@@ -207,6 +209,11 @@ static bool RangeHighComparator(const DeterministicSpriteGroupRange &range, uint
 			value = GetVariable(object, scope, adjust.parameter, last_value, available);
 		} else {
 			value = GetVariable(object, scope, adjust.variable, adjust.parameter, available);
+		}
+
+		if (_cztr_trace) {
+			Debug(grf, 2, "cztr trace: group {} scope {} var {:#x} param {:#x} -> {:#x} available {}",
+					(const void *)this, (int)this->var_scope, adjust.variable, adjust.parameter, value, available);
 		}
 
 		if (!available) {

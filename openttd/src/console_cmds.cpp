@@ -46,6 +46,11 @@
 #include "3rdparty/fmt/chrono.h"
 #include "company_cmd.h"
 #include "misc_cmd.h"
+#include "rail_cmd.h"
+#include "vehicle_cmd.h"
+#include "newgrf_engine.h"
+#include "tile_map.h"
+#include "core/backup_type.hpp"
 
 #if defined(WITH_ZLIB)
 #include "network/network_content.h"
@@ -355,6 +360,143 @@ static bool ConZoomToLevel(std::span<std::string_view> argv)
 	}
 
 	return false;
+}
+
+/**
+ * Testing bench: build one engine of the borrowed wagon set in a fresh depot and ask the
+ * drawing code, for every cargo in the game, whether it finds a picture or falls back to
+ * the substitute's sprites -- which is the "wrong vehicle" the player sees. Usage:
+ * "cztr_test <local engine id in hex>". Leaves the depot and the vehicle standing.
+ */
+static bool ConCztrTest(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build a wagon of the borrowed set and test-draw it carrying every cargo.");
+		IConsolePrint(CC_HELP, "Usage: 'cztr_test <local engine id in hex>', e.g. 'cztr_test b1'.");
+		return true;
+	}
+	if (argv.size() < 2) return false;
+
+	bool all = argv[1] == "all";
+	std::vector<const Engine *> engines;
+	if (all) {
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Train || !e->has_drawn_cargoes) continue;
+			if (!e->info.climates.Any()) continue; // articulated parts come along with their heads
+			engines.push_back(e);
+		}
+	} else {
+		auto local_id = ParseInteger<uint16_t>(argv[1], 16);
+		if (!local_id.has_value()) return false;
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Train || !e->has_drawn_cargoes) continue;
+			if (e->grf_prop.local_id == *local_id) { engines.push_back(e); break; }
+		}
+	}
+	if (engines.empty()) {
+		IConsolePrint(CC_ERROR, "No engine of the borrowed set matches.");
+		return true;
+	}
+
+	/* A headless game has no company yet; the commands below need one to act as. */
+	if (!Company::IsValidID(CompanyID::Begin())) {
+		Command<Commands::CompanyControl>::Do(DoCommandFlag::Execute, CompanyCtrlAction::New, CompanyID::Invalid(), CompanyRemoveReason{}, ClientID::Invalid);
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "Could not create a company to test with.");
+			return true;
+		}
+	}
+
+	AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+
+	/* Sandbox conditions: this set turns every original train off, so a game with no
+	 * engine set at all has no engine to derive a rail type from, and nothing could be
+	 * built. The bench is here to test drawing, not availability -- and not money. */
+	Company::Get(_current_company)->avail_railtypes.Set(RAILTYPE_RAIL);
+	Company::Get(_current_company)->money = INT64_MAX / 2;
+
+	/* A flat, empty spot the depot command actually accepts; the command is the judge. */
+	TileIndex depot_tile = INVALID_TILE;
+	for (const auto tile : Map::Iterate()) {
+		if (!IsTileType(tile, TileType::Clear) || GetTileSlope(tile) != SLOPE_FLAT) continue;
+		if (TileX(tile) < 2 || TileY(tile) < 2 || TileX(tile) > Map::MaxX() - 2 || TileY(tile) > Map::MaxY() - 2) continue;
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, tile, RAILTYPE_RAIL, DiagDirection::SE).Succeeded()) {
+			depot_tile = tile;
+			break;
+		}
+	}
+	if (depot_tile == INVALID_TILE) {
+		/* Say why, from one representative attempt. */
+		for (const auto tile : Map::Iterate()) {
+			if (!IsTileType(tile, TileType::Clear) || GetTileSlope(tile) != SLOPE_FLAT) continue;
+			if (TileX(tile) < 2 || TileY(tile) < 2) continue;
+			CommandCost why = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, tile, RAILTYPE_RAIL, DiagDirection::SE);
+			uint trains = 0, defaults = 0, engines_avail = 0;
+			for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+				trains++;
+				if (e->GetGRF() == nullptr) defaults++;
+				if (e->info.climates.Test(_settings_game.game_creation.landscape) &&
+						e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon &&
+						TimerGameCalendar::date >= e->intro_date + CalendarTime::DAYS_IN_YEAR) engines_avail++;
+			}
+			IConsolePrint(CC_ERROR, "Could not build the test depot anywhere; tile {:#x} says: {} (company {} railtypes {:#x} money {} date {} trains {} defaults {} engines_avail {})",
+					TileIndex(tile).base(), why.GetErrorMessage() == INVALID_STRING_ID ? "(no message)" : GetString(why.GetErrorMessage()),
+					_current_company.base(), Company::Get(_current_company)->avail_railtypes.base(), (int64_t)Company::Get(_current_company)->money,
+					TimerGameCalendar::date.base(), trains, defaults, engines_avail);
+			break;
+		}
+		return true;
+	}
+
+	for (const Engine *engine : engines) {
+		auto [build_ret, veh_id, refit_capacity, refit_mail, cargo_capacities] =
+				Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_tile, engine->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (build_ret.Failed()) {
+			IConsolePrint(CC_ERROR, "Could not build wagon {:#x}.", engine->grf_prop.local_id);
+			continue;
+		}
+
+		Train *t = Train::GetIfValid(veh_id);
+		if (t == nullptr) continue;
+
+		std::string bad;
+		for (const CargoSpec *cs : _sorted_cargo_specs) {
+			CargoType cargo = cs->Index();
+			if (!engine->info.refit_mask.Test(cargo)) continue;
+
+			CommandCost refit_ret = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, veh_id, cargo, 0, false, false, 0));
+
+			/* Ask every piece of the articulated whole; the player sees them all. */
+			std::string verdict;
+			for (const Train *u = t; u != nullptr; u = u->Next()) {
+				VehicleSpriteSeq seq;
+				seq.Clear();
+				GetCustomVehicleSprite(u, Direction::W, EngineImageType::OnMap, &seq);
+				if (seq.IsValid()) {
+					verdict += 'O';
+					continue;
+				}
+				/* The same net Train::GetImage() casts: the wagon's own purchase picture,
+				 * and a deliberately blank sprite for a set piece with no picture at all. */
+				seq.Clear();
+				GetCustomVehicleIcon(u->engine_type, Direction::W, EngineImageType::OnMap, &seq);
+				verdict += seq.IsValid() ? 'o' : (u->GetEngine()->has_drawn_cargoes ? '.' : 'X');
+			}
+
+			if (!all) {
+				IConsolePrint(CC_DEFAULT, "cargo {:2d} {}: refit {} sprites {} (subtype {})",
+						cargo, GetString(cs->name), refit_ret.Succeeded() ? "ok" : "REFUSED", verdict, t->cargo_subtype);
+			}
+			if (verdict.find('X') != std::string::npos || refit_ret.Failed()) bad += fmt::format(" {}({})", cargo, verdict);
+		}
+
+		IConsolePrint(CC_DEFAULT, "wagon {:#04x}: {}", engine->grf_prop.local_id, bad.empty() ? "all cargoes draw" : ("BAD:" + bad));
+
+		Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, veh_id, true, false, ClientID::Invalid);
+	}
+
+	IConsolePrint(CC_DEFAULT, "O = own picture, o = own purchase picture, X = the substitute's sprites (the wrong vehicle).");
+	return true;
 }
 
 /**
@@ -3190,4 +3332,5 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
+	IConsole::CmdRegister("cztr_test",               ConCztrTest);
 }

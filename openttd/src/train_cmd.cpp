@@ -601,6 +601,26 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 		GetCustomVehicleSprite(this, direction, image_type, result);
 		if (result->IsValid()) return;
 
+		/* A wagon of the borrowed set whose chains found no picture falls back to its own
+		 * purchase-list picture, not to the substitute's sprites. The set draws by the
+		 * cargo's translation slot and by the year the wagon was built, so there are
+		 * cargo-and-era combinations its author never drew, and the ordinary fallback for
+		 * those is the substitute -- an entirely different vehicle. The purchase picture is
+		 * this wagon, plain, and it demonstrably exists: it is what the buy menu shows.
+		 *
+		 * And a piece with no purchase picture either draws nothing at all. The set builds
+		 * its long wagons from invisible articulated parts, deliberately drawn as a single
+		 * transparent pixel; when their chains find no picture, the substitute would paint
+		 * a whole extra vehicle where the set wants empty air. See
+		 * ApplyWagonCargoException(). */
+		if (this->GetEngine()->has_drawn_cargoes) {
+			GetCustomVehicleIcon(this->engine_type, direction, image_type, result);
+			if (result->IsValid()) return;
+
+			result->Set(SPR_EMPTY);
+			return;
+		}
+
 		spritenum = this->GetEngine()->original_image_index;
 	}
 

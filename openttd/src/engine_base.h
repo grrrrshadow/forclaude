@@ -11,6 +11,7 @@
 #define ENGINE_BASE_H
 
 #include "engine_type.h"
+#include <bitset>
 #include "vehicle_type.h"
 #include "core/enum_type.hpp"
 #include "core/pool_type.hpp"
@@ -89,6 +90,15 @@ public:
 	 */
 	CargoTypes drawn_cargoes{};
 	bool has_drawn_cargoes = false;
+
+	/**
+	 * NOSAVE. Which cargo translation slots of this vehicle's own NewGRF lead to a real
+	 * picture somewhere in its sprite chains, found by walking those chains at load; and
+	 * the cargo of this game to impersonate when the one actually carried leads nowhere.
+	 * Only meaningful where #has_drawn_cargoes is set; see ApplyWagonCargoException().
+	 */
+	std::bitset<256> drawn_slots{};
+	CargoType disguise_cargo = INVALID_CARGO;
 
 private:
 	/** Vehicle-type specific information. */

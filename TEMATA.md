@@ -1108,6 +1108,49 @@ Proto lže i var 0x47: vagon s nenakresleným nákladem hlásí svůj **první
 nakreslený** náklad (třídy, váhu i přeložený slot toho nákladu). Simulátor
 potvrdil, že se známým slotem dojdou všechny čtyři na obrázek.
 
+## 13.2g Obrázky se přepínají i podle **roku výroby** — a záchranná síť
+
+Diagnostická mašinka u Uacs po přestavbě měla ještě třetí patro, které
+simulátor četl špatně a odhalil ho až běh ve skutečné hře: řetěz jde
+**podtyp → rok výroby → náklad**. Sloty nákladů s obrázkem se **liší éru
+od éry** (1946–68 / 1969–92 / 1993–2008 / 2009+), takže **žádný jeden
+převlečený náklad není správně vždycky** — slot dobrý v jedné éře je
+v jiné slepá ulička.
+
+Proto je oprava dvoupatrová:
+
+1. **Převlek podle slotů** (`Engine::drawn_slots`, `disguise_cargo`):
+   při načtení se projde strom skupin vagonu (`CollectDrawnCargoSlots()`
+   v `newgrf.cpp`) a posbírají se sloty, které vedou na obrázek. Náklad,
+   jehož vlastní slot obrázek má, se **nepřevléká** — ukáže se doopravdy.
+   Ostatní se hlásí jako `disguise_cargo`.
+2. **Záchranná síť v `Train::GetImage()`**: když řetězy obrázek stejně
+   nenajdou, vagon sady se nakreslí svým **obrázkem z nákupního seznamu**
+   (ten prokazatelně existuje — vidí ho menu nákupu) místo náhradních
+   spritů cizího vozidla. A článek, který nemá ani nákupní obrázek,
+   se nakreslí **prázdným spritem** — sada ho chce neviditelný.
+
+Důsledek: **diagnostická mašinka se u vagonů sady už nemůže objevit
+vůbec.** Tím pádem není co schovávat v nabídce přestavby — všechny
+náklady mají aspoň civilní obrázek vagonu. Uacs vozí stavebniny/cement
+a vypadá jako Uacs.
+
+## 13.2h Zkušební lavice: konzolový příkaz `cztr_test`
+
+`cztr_test all` (nebo `cztr_test <id šestnáctkově>`, např. `cztr_test b1`)
+postaví v čerstvé hře depo, koupí každý vagon sady, přeloží ho postupně na
+**všechny náklady hry** a u každého se zeptá vykreslování: `O` = vlastní
+obrázek, `o` = obrázek z nákupního seznamu (síť), `.` = záměrně prázdný
+článek, `X` = náhradní sprity (= diagnostická mašinka). Přiděluje si
+railtype a peníze samo (sada vypíná všechny původní vlaky, takže čistá
+hra jinak nemá ani koleje). Ověřeno: **35/35 vagonů kreslí** na hráčově
+`openttd.cfg` (uložené ve scratchpadu; hráč ho poslal, rok testu 2020,
+`never_expire_vehicles = true` — bez něj dva vagony s pozdním zavedením
+nejdou koupit, což není chyba grafiky).
+
+V resolveru je vypínatelná stopa `_cztr_trace` (zapíná ji lavice), která
+vypisuje průchod výhybkami — přesně tahle stopa našla to rokové patro.
+
 ## 13.3 Kapacita: sada odpovídá nulou
 
 41 vagonů té sady má v nastavení `cargo_capacity: 1` a k tomu obě

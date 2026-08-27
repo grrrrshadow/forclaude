@@ -15,6 +15,7 @@
 #include "fileio_func.h"
 #include "engine_func.h"
 #include "engine_base.h"
+#include "newgrf_spritegroup.h"
 #include "bridge.h"
 #include "town.h"
 #include "newgrf_engine.h"
@@ -973,6 +974,88 @@ static void PrepareWagonCargoException()
 }
 
 /**
+ * Does this sprite group, resolved with any luck at all, end in a real picture?
+ *
+ * Walked rather than resolved: resolution follows one path picked by the live values of
+ * the variables, and what is needed here is whether *any* path from this point reaches a
+ * picture. A callback-result group is a dead end -- during sprite resolution it yields no
+ * sprites and the vehicle falls back to the substitute's graphics.
+ *
+ * @param g Group to walk; may be nullptr.
+ * @param depth Recursion guard.
+ */
+static bool SpriteChainLeadsToPicture(const SpriteGroup *g, uint depth = 0)
+{
+	if (g == nullptr || depth > 32) return false;
+
+	if (const auto *rs = dynamic_cast<const ResultSpriteGroup *>(g); rs != nullptr) return rs->num_sprites > 0;
+	if (dynamic_cast<const CallbackResultSpriteGroup *>(g) != nullptr) return false;
+
+	if (const auto *real = dynamic_cast<const RealSpriteGroup *>(g); real != nullptr) {
+		for (const SpriteGroup *sub : real->loaded) if (SpriteChainLeadsToPicture(sub, depth + 1)) return true;
+		for (const SpriteGroup *sub : real->loading) if (SpriteChainLeadsToPicture(sub, depth + 1)) return true;
+		return false;
+	}
+
+	if (const auto *rnd = dynamic_cast<const RandomizedSpriteGroup *>(g); rnd != nullptr) {
+		for (const SpriteGroup *sub : rnd->groups) if (SpriteChainLeadsToPicture(sub, depth + 1)) return true;
+		return false;
+	}
+
+	if (const auto *det = dynamic_cast<const DeterministicSpriteGroup *>(g); det != nullptr) {
+		for (const auto &range : det->ranges) {
+			if (!range.result.calculated_result && SpriteChainLeadsToPicture(range.result.group, depth + 1)) return true;
+		}
+		return !det->default_result.calculated_result && SpriteChainLeadsToPicture(det->default_result.group, depth + 1);
+	}
+
+	return false;
+}
+
+/**
+ * Collect, from one wagon's sprite chains, the cargo translation slots its author drew a
+ * picture for.
+ *
+ * The set never names a picture per cargo where the game would look for one -- its Action 3
+ * lists are empty -- but inside the chains it switches on the cargo variable, slot by slot,
+ * with everything unknown falling through to a dead end. So the chains themselves are the
+ * only record of what was drawn, and this reads it: every switch on the cargo variable is
+ * found, and a range whose target still leads to a picture marks its slots as drawn.
+ *
+ * @param g Group to walk.
+ * @param[in,out] slots Marked per translation slot.
+ * @param depth Recursion guard.
+ */
+static void CollectDrawnCargoSlots(const SpriteGroup *g, std::bitset<256> &slots, uint depth = 0)
+{
+	if (g == nullptr || depth > 32) return;
+
+	if (const auto *real = dynamic_cast<const RealSpriteGroup *>(g); real != nullptr) {
+		for (const SpriteGroup *sub : real->loaded) CollectDrawnCargoSlots(sub, slots, depth + 1);
+		for (const SpriteGroup *sub : real->loading) CollectDrawnCargoSlots(sub, slots, depth + 1);
+		return;
+	}
+
+	if (const auto *rnd = dynamic_cast<const RandomizedSpriteGroup *>(g); rnd != nullptr) {
+		for (const SpriteGroup *sub : rnd->groups) CollectDrawnCargoSlots(sub, slots, depth + 1);
+		return;
+	}
+
+	const auto *det = dynamic_cast<const DeterministicSpriteGroup *>(g);
+	if (det == nullptr) return;
+
+	bool asks_cargo = !det->adjusts.empty() && det->adjusts.back().variable == 0x47;
+	for (const auto &range : det->ranges) {
+		if (range.result.calculated_result) continue;
+		if (asks_cargo && SpriteChainLeadsToPicture(range.result.group)) {
+			for (uint32_t slot = range.low; slot <= range.high && slot < 256; slot++) slots.set(slot);
+		}
+		CollectDrawnCargoSlots(range.result.group, slots, depth + 1);
+	}
+	if (!det->default_result.calculated_result) CollectDrawnCargoSlots(det->default_result.group, slots, depth + 1);
+}
+
+/**
  * Pick the cargo one of the exception's wagons is built carrying.
  *
  * Every wagon can now be refitted to everything, but it still has to be built carrying one
@@ -1066,6 +1149,34 @@ static void ApplyWagonCargoException()
 		 * this wagon carrying, which is the only way to tell those from the rest afterwards. */
 		e->drawn_cargoes = e->info.refit_mask;
 		e->has_drawn_cargoes = true;
+
+		/* What the pictures themselves say was drawn, which is the authority the refit mask
+		 * is only an approximation of: the chains switch on the cargo's translation slot,
+		 * and the slots that lead to a picture are the cargoes there are pictures for. */
+		e->drawn_slots.reset();
+		for (CargoType cargo : CargoTypes{_cargo_mask}) {
+			CollectDrawnCargoSlots(e->grf_prop.GetSpriteGroup(cargo), e->drawn_slots);
+		}
+		CollectDrawnCargoSlots(e->grf_prop.GetSpriteGroup(CargoGRFFileProps::SG_DEFAULT), e->drawn_slots);
+
+		/* The cargo to impersonate when the one actually carried has no picture: any cargo
+		 * of this game whose translation slot has one. Preferred among the classes the
+		 * author gave the wagon, so an open wagon poses as carrying something bulk rather
+		 * than as a passenger coach; failing that, any cargo with a picture at all. */
+		e->disguise_cargo = INVALID_CARGO;
+		const GRFFile *own_file = e->GetGRF();
+		auto found_state = _wagon_cargo_exception_state.find(e->index);
+		CargoClasses preferred = found_state != std::end(_wagon_cargo_exception_state) ? found_state->second.classes : CargoClasses{};
+		for (int pass = 0; pass < 2 && !IsValidCargoType(e->disguise_cargo); pass++) {
+			for (const CargoSpec *cs : CargoSpec::Iterate()) {
+				if (!_cargo_mask.Test(cs->Index())) continue;
+				if (pass == 0 && preferred.Any() && !cs->classes.Any(preferred)) continue;
+				uint8_t slot = own_file->cargo_map[cs->Index()];
+				if (!e->drawn_slots.test(slot)) continue;
+				e->disguise_cargo = cs->Index();
+				break;
+			}
+		}
 
 		/* Every cargo this game has, whoever brought it -- which is what _cargo_mask is. */
 		e->info.refit_mask = CargoTypes{_cargo_mask};

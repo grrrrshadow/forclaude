@@ -553,16 +553,18 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			CargoType cargo_type = v->cargo_type;
 
 			/* A wagon of the borrowed set carrying a cargo its author never drew answers
-			 * with the first cargo he did draw. Several of that set's wagons pick their
-			 * picture by this very variable -- a switch per cargo slot, everything else
-			 * falling through to a dead end -- so an unknown cargo is drawn as no picture
-			 * at all and the vehicle falls back to the sprites of whatever it was
-			 * substituted from. The cargo subtype variable tells the same lie for the
-			 * same reason; see ApplyWagonCargoException(). */
+			 * with a cargo he did draw. The set picks its pictures by this very variable --
+			 * a switch per cargo translation slot, everything unknown falling through to a
+			 * dead end -- so an unknown cargo is drawn as no picture at all and the vehicle
+			 * falls back to the sprites of whatever it was substituted from. Which slots do
+			 * have a picture was read off the wagon's own sprite chains at load, so a cargo
+			 * that does have one is shown as itself and only the rest are disguised. The
+			 * cargo subtype variable tells the same lie for the same reason; see
+			 * ApplyWagonCargoException(). */
 			const Engine *e = v->GetEngine();
-			if (e->has_drawn_cargoes && e->drawn_cargoes.Any() &&
-					(!IsValidCargoType(cargo_type) || !e->drawn_cargoes.Test(cargo_type))) {
-				cargo_type = *e->drawn_cargoes.begin();
+			if (e->has_drawn_cargoes && IsValidCargoType(e->disguise_cargo) &&
+					(!IsValidCargoType(cargo_type) || !e->drawn_slots.test(object->ro.grffile->cargo_map[cargo_type]))) {
+				cargo_type = e->disguise_cargo;
 			}
 
 			const CargoSpec *cs = CargoSpec::Get(cargo_type);
@@ -916,14 +918,15 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case 0x71: break; // not implemented
 		case 0x72: {
 			/* A wagon of the borrowed set carrying a cargo its author never drew it carrying
-			 * has no subtype that means anything. That set picks its pictures by subtype, so
-			 * a subtype left over from another cargo picks a picture that is not there, and
-			 * the vehicle falls back to the sprites of whatever it was substituted from --
-			 * which is how a wagon came to be drawn as an entirely different vehicle. Shown
-			 * as subtype zero it lands on the first picture it has, which is what was asked
-			 * for. See ApplyWagonCargoException(). */
+			 * has no subtype that means anything. Left as it is, it picks a picture that is
+			 * not there and the vehicle falls back to the sprites of whatever it was
+			 * substituted from. Shown as subtype zero to match the disguised cargo the
+			 * cargo-info variable answers with. See ApplyWagonCargoException(). */
 			const Engine *e = v->GetEngine();
-			if (e->has_drawn_cargoes && (!IsValidCargoType(v->cargo_type) || !e->drawn_cargoes.Test(v->cargo_type))) return 0;
+			if (e->has_drawn_cargoes &&
+					(!IsValidCargoType(v->cargo_type) || !e->drawn_slots.test(object->ro.grffile->cargo_map[v->cargo_type]))) {
+				return 0;
+			}
 			return v->cargo_subtype;
 		}
 		case 0x73: break; // vehicle specific, see below
