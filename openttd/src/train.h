@@ -147,15 +147,6 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	TileIndex rescue_home_depot = INVALID_TILE; ///< Depot a rescue engine is stationed at and returns to when it is done.
 	VehicleID rescue_target = VehicleID::Invalid(); ///< Casualty a rescue engine has been sent to fetch, so no two are sent to the same one.
 
-	/**
-	 * NOSAVE. Skip the next "would it rather go the other way?" question when the order
-	 * list moves on. Set by coupling: a train that has just coupled leaves the way it was
-	 * already going, and that question -- asked by the game whenever an order advances --
-	 * would turn it round on the spot the moment its loading finished. One-shot; consumed
-	 * by the first order advance, or cleared by any actual reversal since a train that has
-	 * turned round already has nothing left to be protected from.
-	 */
-	bool suppress_order_reverse = false;
 	RescueHold rescue_hold = RescueHold::None; ///< NOSAVE: why an engine on call has not been sent anywhere, so the window can say so.
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 

@@ -418,17 +418,33 @@ Je to zkušební přepínač, ne nastavení — stejně jako `depo123`.
 
 ## 2.6 Dvě opravy po testu #91
 
-**Nakládka nesmí vlak po spojení otočit.** Hra se při každém posunu
-příkazu ptá „nechtěl bys k dalšímu cíli jet druhým koncem?"
-(`CheckReverseTrain` v obsluze tiku). Vlak, který sebral **vlak**, měl
-příkaz uzavřený ručně, nic se neposouvalo, otázka nepadla — odjel rovně.
-Vlak, který sebral **vagonky**, šel přes nakládku; příkaz poskočil po ní
-a otázka ho otočila na místě. Proto tatáž situace jednou fungovala a
-podruhé ne. Teď spojení vystaví jednorázový lístek
-(`Train::suppress_order_reverse`): první posun příkazu po spojení tu
-otázku přeskočí a lístek se roztrhá. Jakékoli skutečné otočení
-(`ReverseTrainDirection`) lístek zahazuje taky — otočený vlak už není
-před čím chránit.
+**Nakládka nesmí vlak po spojení otočit — a řeší se to měřením koleje,
+ne stavem na vlaku.** Hra se při každém posunu příkazu ptá „nechtěl bys
+k dalšímu cíli jet druhým koncem?" (`CheckReverseTrain` v obsluze tiku).
+Odpověď hledače cesty je cena, a nekonečná pokuta za otočení pořád
+prohraje, když dopředu žádná trasa k cíli nevede — na průjezdném nádraží
+s dalším cílem za zády přesně tohle nastane a vlak s čerstvě sebranými
+vagonky se otočil na místě, místo aby je vytlačil druhou stranou ven.
+
+Dva dřívější pokusy byly špatně a jsou vrácené: jednorázový lístek na
+vlaku (příznakový stav, léčil příznak) a ruční uzavírání příkazu „jet se
+spojit" mimo nakládku (rozbilo spojování z jedné strany nádraží; spojení
+samotné bylo v #91 dobré a vrací se do té podoby).
+
+Teď platí (v `CheckReverseTrain`, jen když je otáčení zamčené na
+„nikde"): **vlak se při posunu příkazu smí otočit jedině tam, kde před
+jeho vedoucím koncem žádná sjízdná kolej nepokračuje** — konec koleje,
+hlavové nástupiště. Kde kolej dopředu vede, jede se dál tím směrem,
+kterým vlak stojí; jestli je to k cíli oklikou nebo vůbec, je věc hráče
+a jeho reversního chodu či čudlíku otočení. Žádný stav na vlaku, žádná
+výjimka pro spojení — pravidlo platí pro každý vlak stejně a naplňuje
+2.4b doslova: spojení nemění směr jízdy, vagonky se vytlačí před sebou.
+
+**Stopnutý vlak není partner.** Vlak, který hráč ručně zastavil, čeká
+s příznakem „čekat na spojení" úplně stejně jako předtím — ale stopnutí
+je gesto „nesahat": nenakládá, neodjíždí, a nesmí být ani cílem pro
+mašinku, která se jede spojit. `IsWaitingToBeCoupled` ho teď vynechá;
+porouchaného nebo havarovaného vlaku (odtah) se to netýká.
 
 **Rozpojení, které mění vedoucí konec, dělá i doprovodnou práci.** Změna
 vedoucího konce není jen příznak: vanilkové couvání ke každému vozu

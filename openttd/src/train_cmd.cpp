@@ -1397,6 +1397,7 @@ void ReverseTrainSwapVehicles(Train *v);
 static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static bool CheckReverseTrain(const Train *consist);
+static inline bool CheckCompatibleRail(const Train *v, TileIndex tile, bool check_railtype);
 static void ReverseTrainDirection(Train *consist);
 static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
 
@@ -1850,6 +1851,13 @@ bool IsWaitingToBeCoupled(const Train *v)
 
 	/* Stranded is the same thing said another way. */
 	if (head->breakdown_ctr == 1 || head->IsWrecked()) return true;
+
+	/* A train the player has stopped is the player's, not a partner. Stopping
+	 * is the one gesture that says "hands off" about everything else a train
+	 * might do -- it does not load, it does not leave -- and being collected
+	 * has to obey it the same way. Without this, an engine sent to couple took
+	 * a stopped train standing in a station for one waiting there for it. */
+	if (head->vehstatus.Test(VehState::Stopped)) return false;
 
 	/* A train that can drive counts only once it has got where it was sent and
 	 * come to a stand. The flag sits on the order long before that, so without
@@ -3163,10 +3171,6 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 */
 	new_head->couple_target = VehicleID::Invalid();
 
-	/* It leaves the way it was already going, and nothing may second-guess that at the
-	 * moment its loading finishes; see the note at the order-advance reverse check. */
-	new_head->suppress_order_reverse = true;
-
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
 	 * partner and simply stands there for good -- it has no reason left to
@@ -4252,9 +4256,6 @@ static void ReverseTrainDirection(Train *consist)
 		}
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
 	}
-
-	/* A reversal of any kind makes a pending "do not turn me round" ticket stale. */
-	consist->suppress_order_reverse = false;
 
 	/* Clear path reservation in front if train is not stuck. */
 	if (!consist->flags.Test(VehicleRailFlag::Stuck)) FreeTrainTrackReservation(consist);
@@ -5534,6 +5535,32 @@ static bool CheckReverseTrain(const Train *consist)
 	if (IsAnyPartInsideDepot(consist)) return false;
 
 	assert(moving_front->track.Any());
+
+	/* With turning round locked to "nowhere", this question is not about cost
+	 * any more. The infinite-penalty answer in YapfTrainCheckReverse() still
+	 * turns a train whenever no forward route to its destination exists -- a
+	 * through station whose next destination lies behind the train qualifies,
+	 * and that is how a train that had just collected wagons span round on the
+	 * spot instead of pushing them out the far side. Whether a route exists is
+	 * the pathfinder's business; whether the train may turn round is not.
+	 *
+	 * So it is measured instead: a train may turn round here only when it
+	 * physically cannot drive on -- no compatible track beyond its leading
+	 * end. That is the end of the track or a terminus platform, the one place
+	 * the player has built where coming back out is the only way out. Anywhere
+	 * a rail continues forward, the train carries on the way it is pointing;
+	 * if that is the long way round, the player says so with the reverse-out
+	 * flag or the turn-round button, not the pathfinder. */
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None) {
+		Trackdir td = moving_front->GetVehicleTrackdir();
+		DiagDirection exitdir = TrackdirToExitdir(td);
+		TileIndex next_tile = TileAddByDiagDir(moving_front->tile, exitdir);
+		TrackBits reachable = TrackdirBitsToTrackBits(GetTileTrackStatus(next_tile, TransportType::Rail, RoadTramType::Invalid).trackdirs & DiagdirReachesTrackdirs(exitdir));
+		if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(next_tile))) {
+			reachable.Reset(TrackCrossesTracks(TrackdirToTrack(td)));
+		}
+		if (reachable.Any() && CheckCompatibleRail(moving_front->First(), next_tile, true)) return false;
+	}
 
 	return YapfTrainCheckReverse(consist);
 }
@@ -6872,18 +6899,6 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 
 	bool valid_order = !consist->current_order.IsType(OT_NOTHING) && consist->current_order.GetType() != OT_CONDITIONAL;
 	bool order_advanced = ProcessOrders(consist);
-
-	/* A train that has just coupled leaves the way it was already going. Its order
-	 * advances only once its loading finishes, and the question below -- asked whenever
-	 * an order advances -- would turn it round on the spot right then. That is why a
-	 * train that collected wagons departed the wrong way while one that collected a
-	 * train, whose order was concluded by hand with nothing left to advance, departed
-	 * correctly: same rule, different bookkeeping route. One question is skipped and the
-	 * ticket is torn up; the ordinary reversal places all stay in charge afterwards. */
-	if (order_advanced && consist->suppress_order_reverse) {
-		consist->suppress_order_reverse = false;
-		order_advanced = false;
-	}
 
 	if (order_advanced && CheckReverseTrain(consist)) {
 		consist->wait_counter = 0;
