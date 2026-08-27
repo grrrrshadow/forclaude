@@ -426,10 +426,18 @@ prohraje, když dopředu žádná trasa k cíli nevede — na průjezdném nádr
 s dalším cílem za zády přesně tohle nastane a vlak s čerstvě sebranými
 vagonky se otočil na místě, místo aby je vytlačil druhou stranou ven.
 
-Dva dřívější pokusy byly špatně a jsou vrácené: jednorázový lístek na
-vlaku (příznakový stav, léčil příznak) a ruční uzavírání příkazu „jet se
-spojit" mimo nakládku (rozbilo spojování z jedné strany nádraží; spojení
-samotné bylo v #91 dobré a vrací se do té podoby).
+Jednorázový lístek na vlaku (příznakový stav, léčil příznak) byl špatně
+a je pryč nadobro.
+
+**Po spojení s vagonky se nenakládá ani nevykládá — odjezd.** Příkaz
+„jet se spojit" se po spojení uzavře na místě a nikdy předáním vlaku
+stanici: vstup do stanice spouští nakládku a spojení není příjezd pro
+náklad. Vlak si přijel pro vozy, má je, jede. Práce s nákladem na téhle
+stanici patří samostatnému příkazu, který napíše hráč. (Pozn.: tohle
+uzavírání na místě bylo jednou v podezření, že rozbilo spojování z jedné
+strany nádraží — tehdy ale jelo v kombinaci s plošným vypnutím otázky
+otáčení, které je teď pryč. Jestli se nespojení z jedné strany vrátí,
+je viník zaměřený právě sem.)
 
 Teď platí (v `CheckReverseTrain`, jen když je otáčení zamčené na
 „nikde"): **vlak se při posunu příkazu smí otočit jedině tam, kde před

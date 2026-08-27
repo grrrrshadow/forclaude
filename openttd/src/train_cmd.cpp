@@ -3195,28 +3195,19 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * purpose is to finally trigger the arrival that lets the order advance.
 	 * That is the pointless lap round the station.
 	 *
-	 * Whether it happens depends only on how far into the platform the wagons
-	 * are: a train that happened to stop exactly on the stop location does
-	 * arrive, loads, and couples from the loading code instead, which departs
-	 * normally and advances the order by itself. Same order, same wagons,
-	 * different platform -- which is why some platforms looked fine.
-	 *
-	 * So do here what arriving would have done. If the train is standing in
-	 * the station it was sent to, let it enter properly, cargo handling and
-	 * all; that is the same route the lucky platforms take. If it is short of
-	 * the platform, there is nothing to load at, so just mark the station
-	 * reached and let the next order be picked up. */
+	 * So do here what arriving would have done: mark the station reached and
+	 * let the next order be picked up. In place, never by handing the train
+	 * to the station -- entering starts a loading stop, and coupling is not
+	 * an arrival for cargo. A train that has just coupled does not load or
+	 * unload here at all: it has what it came for and it departs. Cargo work
+	 * at this station belongs to an order of its own, written by the player. */
 	if (was_go_to_couple && new_head->current_order.IsType(OT_GOTO_STATION)) {
 		StationID dest = new_head->current_order.GetDestination().ToStationID();
 		if (IsConsistStandingAtStation(new_head, dest)) {
-			if (IsRailStationTileOfStation(new_head->GetMovingFront()->tile, dest)) {
-				TrainEnterStation(new_head, dest);
-			} else {
-				new_head->DeleteUnreachedImplicitOrders();
-				new_head->last_station_visited = dest;
-				UpdateVehicleTimetable(new_head, true);
-				new_head->IncrementImplicitOrderIndex();
-			}
+			new_head->DeleteUnreachedImplicitOrders();
+			new_head->last_station_visited = dest;
+			UpdateVehicleTimetable(new_head, true);
+			new_head->IncrementImplicitOrderIndex();
 		}
 	}
 
