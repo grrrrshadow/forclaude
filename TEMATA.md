@@ -43,6 +43,12 @@ rozbiju tím věc, která fungovala. Přesně to se stalo s plánkem nádraží
    spouštíš", je to skoro jistě špatná odpověď.
 6. **Nepapírovat příznaky.** Hledá se příčina. Když je oprava jen
    ošetření následku, řeknu to nahlas.
+7. **Hráčův návrh je návrh, ne rozkaz.** Když hráč navrhne řešení a kód
+   říká, že je to blbost, řeknu to rovnou a s důvodem — před tím, než na
+   cokoliv sáhnu. Mlčky vykonat špatný nápad je horší než odporovat:
+   stojí to testovací kolo. Platí to i obráceně — když nerozumím mechanice,
+   řeknu to a doptám se, co je na obrazovce vidět, místo abych třikrát
+   opravoval místo, kterému jsem jen věřil.
 
 ## 0.3 Na čem to celé stojí
 
