@@ -416,6 +416,30 @@ stavu v okně mašinky (`vlak123 on` / `vlak123 off`, samotné přepne):
 
 Je to zkušební přepínač, ne nastavení — stejně jako `depo123`.
 
+## 2.6 Dvě opravy po testu #91
+
+**Nakládka nesmí vlak po spojení otočit.** Hra se při každém posunu
+příkazu ptá „nechtěl bys k dalšímu cíli jet druhým koncem?"
+(`CheckReverseTrain` v obsluze tiku). Vlak, který sebral **vlak**, měl
+příkaz uzavřený ručně, nic se neposouvalo, otázka nepadla — odjel rovně.
+Vlak, který sebral **vagonky**, šel přes nakládku; příkaz poskočil po ní
+a otázka ho otočila na místě. Proto tatáž situace jednou fungovala a
+podruhé ne. Teď spojení vystaví jednorázový lístek
+(`Train::suppress_order_reverse`): první posun příkazu po spojení tu
+otázku přeskočí a lístek se roztrhá. Jakékoli skutečné otočení
+(`ReverseTrainDirection`) lístek zahazuje taky — otočený vlak už není
+před čím chránit.
+
+**Rozpojení, které mění vedoucí konec, dělá i doprovodnou práci.** Změna
+vedoucího konce není jen příznak: vanilkové couvání ke každému vozu
+otočí bookkeeping kopec/z kopce a znovu ho ohlásí na jeho políčku, aby
+věděl, na které koleji stojí. Rozpojení jen přepínalo příznak, takže
+vlak, který dojel vedený opačným koncem (po odjezdu reversním chodem),
+měl po rozpojení rozbitou geometrii a o pár políček dál bouchl (assert
+z #88). Vlak dojetý mašinkou napřed má z přepnutí no-op — proto VV bez
+reversního chodu a VB s ním. Teď se ta práce udělá, ale **jen když se
+příznak opravdu měnil**.
+
 ## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
 
 To pravidlo výš je **odhad pro případ, kdy nic lepšího není**. Vlak ale má

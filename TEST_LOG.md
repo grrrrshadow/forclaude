@@ -3,6 +3,45 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #91 (commit 2d4b3aa) — spojení vlak+vlak poprvé čisté; zbyly dvě vady
+
+**Průlom: připojení k vlaku a odpojení je VV na všech čtyřech nástupištích,
+z obou stran nádraží, zadkem i předkem.** Pravidlo „spojení nemění směr"
+z `d0386db` drží.
+
+Severovýchodní strana:
+
+| test | zadkem | předkem |
+|---|---|---|
+| vlak: spojit + odpojit | 1234 VV | 1234 VV |
+| vlak, reversní chod | 1234 **VB** | 1234 **VB** |
+| vagonky: spojit + rozpojit | 1234 VV, ale **špatný směr odjezdu** | 1234 VV, špatný směr |
+| vagonky, reversní chod | 1234 VV (odjezd „správně", ale jen shodou) | 1234 VV |
+
+Jihozápadní strana: stejné výsledky řádek po řádku (vlak VV/VV, reversní
+chod VB, vagonky VV se špatným směrem, s reversním chodem VV).
+Vlaky a vagonky tam stojí jako na plánku, ale přijely jinak: ze
+směrování se jezdí zadkem na 3 a 4, přímo na 1 a 2.
+
+**Vada 1 — vagonky: po spojení vlak změní směr odjezdu.** Proti pravidlu
+naprosté předvídatelnosti; hráč to nemá jak ovlivnit (reversní chod dává
+stejný výsledek jako bez něj). Mezi depem a nádražím jezdí vlak správně.
+Mechanika nalezena: vlak+vlak uzavře příkaz ručně a odjede rovně; vlak+
+vagonky jde přes nakládku, příkaz poskočí až po ní, a vanilkové „nemám se
+otočit k dalšímu cíli?" při posunu příkazu ho otočí. → jednorázové
+potlačení té otázky po spojení.
+
+**Vada 2 — reversní chod + odpojení vlaku = výbuch (VB), obě strany.**
+Znaky z oken (`vlak123`, screenshoty z odpojovacího nádraží, soupravy
+přijíždějí zprava): souprava před rozpojením H DP; po rozpojení mašinka H;
+odpojený vlak jednou H DP, podruhé **Z DP**. Mechanika: rozpojení mění
+vedoucí konec jen příznakem, bez vanilkové doprovodné práce (otočit
+bookkeeping kopec/z kopce a znovu ohlásit každý vůz na jeho políčku).
+Vlak, který dojel vedený opačným koncem — po odjezdu reversním chodem —
+pak má rozbitou geometrii a bouchne; vlak dojetý mašinkou napřed má
+z přepnutí příznaku no-op, proto VV. → doplněna ta práce (obojí opraveno
+po #91, viz TEMATA 2.6).
+
 ## Build #90 — odjezdy po spojení, a čím se nádraží orientuje
 
 **Světové strany zkušebního nádraží** (do teď se psalo „vlevo/vpravo"):

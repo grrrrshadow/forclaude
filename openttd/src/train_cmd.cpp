@@ -1373,6 +1373,7 @@ static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist);
+static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -3137,6 +3138,10 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 */
 	new_head->couple_target = VehicleID::Invalid();
 
+	/* It leaves the way it was already going, and nothing may second-guess that at the
+	 * moment its loading finishes; see the note at the order-advance reverse check. */
+	new_head->suppress_order_reverse = true;
+
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
 	 * partner and simply stands there for good -- it has no reason left to
@@ -3327,7 +3332,26 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * here. For a train that arrived nose first there was never anything to
 	 * change. Coupling settles the same question the same way at its end -- see
 	 * CmdCoupleTrains(). */
-	v->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	if (was_driving_backwards) {
+		/* Changing which end leads is not only a flag. When the game starts a train
+		 * driving the other way, it also walks every vehicle: the uphill/downhill
+		 * bookkeeping turns round with the direction of travel, and each vehicle is
+		 * re-entered on its tile so it knows again which track it is standing on.
+		 * Flipping the flag without that work leaves each vehicle carrying the track it
+		 * had for the old direction, and a few tiles later a wagon steps onto a tile
+		 * that does not offer the track its neighbour claims to be on -- which is the
+		 * crash the movement code's assertion reports. This is why a train that arrived
+		 * here led by its far end -- after a reverse-out departure, typically -- blew up
+		 * on decoupling while one that arrived engine first never did: for the latter
+		 * the flag change is a no-op. */
+		v->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+		for (Train *u = v; u != nullptr; u = u->Next()) {
+			if (u->gv_flags.Any({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown})) {
+				u->gv_flags.Flip({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown});
+			}
+			UpdateStatusAfterSwap(u, false);
+		}
+	}
 	v->flags.Reset(VehicleRailFlag::Reversing);
 	v->ConsistChanged(CCF_TRACK);
 	FreeTrainTrackReservation(v);
@@ -3675,7 +3699,7 @@ static void SwapTrainFlags(GroundVehicleFlags *swap_flag1, GroundVehicleFlags *s
  * @param v swapped vehicle
  * @param reverse Should we reverse the direction of the vehicle?
  */
-static void UpdateStatusAfterSwap(Train *v, bool reverse = true)
+static void UpdateStatusAfterSwap(Train *v, bool reverse)
 {
 	/* Maybe reverse the direction. */
 	if (reverse) v->direction = ReverseDir(v->direction);
@@ -4188,6 +4212,9 @@ static void ReverseTrainDirection(Train *consist)
 		}
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
 	}
+
+	/* A reversal of any kind makes a pending "do not turn me round" ticket stale. */
+	consist->suppress_order_reverse = false;
 
 	/* Clear path reservation in front if train is not stuck. */
 	if (!consist->flags.Test(VehicleRailFlag::Stuck)) FreeTrainTrackReservation(consist);
@@ -6804,7 +6831,21 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	}
 
 	bool valid_order = !consist->current_order.IsType(OT_NOTHING) && consist->current_order.GetType() != OT_CONDITIONAL;
-	if (ProcessOrders(consist) && CheckReverseTrain(consist)) {
+	bool order_advanced = ProcessOrders(consist);
+
+	/* A train that has just coupled leaves the way it was already going. Its order
+	 * advances only once its loading finishes, and the question below -- asked whenever
+	 * an order advances -- would turn it round on the spot right then. That is why a
+	 * train that collected wagons departed the wrong way while one that collected a
+	 * train, whose order was concluded by hand with nothing left to advance, departed
+	 * correctly: same rule, different bookkeeping route. One question is skipped and the
+	 * ticket is torn up; the ordinary reversal places all stay in charge afterwards. */
+	if (order_advanced && consist->suppress_order_reverse) {
+		consist->suppress_order_reverse = false;
+		order_advanced = false;
+	}
+
+	if (order_advanced && CheckReverseTrain(consist)) {
 		consist->wait_counter = 0;
 		consist->cur_speed = 0;
 		consist->subspeed = 0;
