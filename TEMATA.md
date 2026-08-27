@@ -498,20 +498,29 @@ příkazu, a když řekne opačně, vlak se obrátí. Zamluvená cesta a to, co 
 opravdu udělá, jsou tím pádem jedno a to samé. Průjezdnost si hledač
 ohlídá sám, takže se oproti odhadu nic neztrácí.
 
-## 2.9 Odloženo: odpojit a spojit na příkazu „jeď do depa"
+## 2.9 Odpojit a spojit na příkazu „jeď do depa"
 
-Odloženo hráčem, dokud se nedomluví pravidlo konce. Co už je domluvené:
-příkaz do depa dostane přepínače **Odpojit** a **Jet se spojit** (vzájemně
-se vylučují), **žádné „čekat na spojení"** — vlaky se spojují na nádraží,
-kde je to vidět; v depu se spojuje jen s odstavenými vagonky. Filtry
-náklad/plnost/počet stejné jako na nádraží.
+Příkaz do depa má přepínače **Odpojit** a **Jet se spojit** (vzájemně se
+vylučují), **žádné „čekat na spojení"** — vlaky se spojují na nádraží, kde
+je to vidět; v depu se spojuje jen s odstavenými vagonky. Filtry
+náklad/plnost/počet stejné jako na nádraží. Berou se i řady odstavené do
+depa ručně přetažením — odstavená bezhlavá řada v kůlně nikam nejede,
+takže „stojí tam" je celý význam čekání a žádný příkaz k tomu nenosí.
 
-Co domluvené není a na čem to stojí: **na který konec sběrné mašinky se
-odstavené vagonky v depu připojí.** První návrh (vagonky na konec u dveří,
-mašinka je vytlačí ven) neprošel zkouškou souměrnosti „když obráceně, tak
-všechno obráceně" — pro vjezd komínem napřed a pro nacouvání jsme každý
-drželi jiný obrázek toho, co vyjede ze dveří první. Dokud tohle pravidlo
-není řečené obyčejnými slovy tak, že ho oba čteme stejně, nepíše se kód.
+**Pravidlo konce — kotva, na které jsme se shodli:** výsledek spojení
+v depu vypadá **přesně jako normální vlak s vagonky, který do depa vjel
+celý a hráč ho otočil.** Vagonky se připojí na ten konec mašinky, který
+kouká ke dveřím; ven vyjedou vagonky první a mašinka je tlačí; jako
+úplně poslední opustí depo ten její konec, který vjel dovnitř první
+(komínem napřed → komín ven poslední; nacouvala → zadek ven poslední).
+Uvnitř se nic samo neotáčí a nic se neměří — konec vybral hráč tím, jak
+vjel. V kódu se ten stav vyrábí týmž operátorem, kterým hra vlak v depu
+otáčí (`TurnTrainInsideDepot`), žádnou napodobeninou.
+
+Odpojení v depu: zbytek zůstane odstavený (bezhlavá řada bez příkazů;
+odpojený celý vlak zůstane zabrzděný a příkazy si nechá). Práce se dělá
+v bezpečné chvíli tiku, stejné jako odtahové úkony — příjezd si počet
+zapíše (`depot_decouple_pending`) a tik ho vykoná.
 
 ---
 

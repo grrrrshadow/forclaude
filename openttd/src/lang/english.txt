@@ -4895,6 +4895,8 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Go to couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
+STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Travel to this depot to couple with a rake of wagons stored there. The wagons couple onto the end facing the door and leave the depot first, pushed
+STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Leave part of the train behind in this depot, stored. How much is left is set in the box that appears
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Wagons: any
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Wagons: empty
 STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Wagons: full

@@ -841,6 +841,7 @@ public:
 		     SLE_VAR(Train, rescue_deadline,   VarTypes::I32),
 		     SLE_VAR(Train, couple_claim,      VarTypes::U32),
 		     SLE_VAR(Train, couple_target,     VarTypes::U32),
+		     SLE_VAR(Train, depot_decouple_pending, VarTypes::U8),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 

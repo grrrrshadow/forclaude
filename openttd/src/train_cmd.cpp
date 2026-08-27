@@ -33,6 +33,7 @@
 #include "network/network.h"
 #include "core/random_func.hpp"
 #include "company_base.h"
+#include "depot_base.h"
 #include "newgrf.h"
 #include "order_backup.h"
 #include "zoom_func.h"
@@ -1399,6 +1400,7 @@ static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist, const char *why);
+static void TurnTrainInsideDepot(Train *consist);
 static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
 
 /**
@@ -2092,17 +2094,41 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
  */
 static Train *FindOrClaimCoupleTarget(Train *v)
 {
-	StationID dest = v->current_order.GetDestination().ToStationID();
+	/* A couple order can name a station or a depot. At a station the offer is
+	 * anything waiting there to be coupled -- a rake, or a whole train. In a
+	 * depot the only thing on offer is a rake of stored wagons: trains couple
+	 * at stations, in the open, where the player can see it. A stored rake
+	 * has no "waiting" order to carry, and needs none: a headless chain shut
+	 * in a shed is not going anywhere by itself, so standing there is the
+	 * whole of what waiting means for it. */
+	bool depot_order = v->current_order.IsType(OT_GOTO_DEPOT);
+	StationID dest = StationID::Invalid();
+	TileIndex depot_tile = INVALID_TILE;
+	if (depot_order) {
+		const Depot *depot = Depot::GetIfValid(v->current_order.GetDestination().ToDepotID());
+		if (depot == nullptr) {
+			v->couple_target = VehicleID::Invalid();
+			return nullptr;
+		}
+		depot_tile = depot->xy;
+	} else {
+		dest = v->current_order.GetDestination().ToStationID();
+	}
 	Train *unclaimed = nullptr;
 
 	for (Train *rake : Train::Iterate()) {
-		/* Wagons waiting to be collected, or a whole little train waiting to be
-		 * carried along as part of a bigger one. */
-		if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
 		if (rake == v) continue;
 		if (rake->owner != v->owner) continue;
-		if (!IsWaitingToBeCoupled(rake)) continue;
-		if (rake->last_station_visited != dest) continue;
+		if (depot_order) {
+			if (!rake->IsFreeWagon()) continue;
+			if (rake->track != Track::Depot || rake->tile != depot_tile) continue;
+		} else {
+			/* Wagons waiting to be collected, or a whole little train waiting to be
+			 * carried along as part of a bigger one. */
+			if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
+			if (!IsWaitingToBeCoupled(rake)) continue;
+			if (rake->last_station_visited != dest) continue;
+		}
 
 		if (IsCoupleClaimStale(rake)) rake->couple_claim = VehicleID::Invalid();
 
@@ -2138,6 +2164,18 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 bool HasCoupleTarget(const Train *v)
 {
 	if (!v->current_order.ShouldGoToCouple()) return false;
+
+	if (v->current_order.IsType(OT_GOTO_DEPOT)) {
+		const Depot *depot = Depot::GetIfValid(v->current_order.GetDestination().ToDepotID());
+		if (depot == nullptr) return false;
+		for (const Train *rake : Train::Iterate()) {
+			if (rake->couple_claim != v->index) continue;
+			if (!rake->IsFreeWagon()) continue;
+			if (rake->track != Track::Depot || rake->tile != depot->xy) continue;
+			return true;
+		}
+		return false;
+	}
 
 	StationID dest = v->current_order.GetDestination().ToStationID();
 	for (const Train *rake : Train::Iterate()) {
@@ -3557,6 +3595,131 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 }
 
 /**
+ * Honour the decoupling a depot order asked for, now that the train stands
+ * whole inside the shed and nothing is walking along its consist.
+ *
+ * The depot version of TryDecoupleAtStation(), and much the plainer of the
+ * two: everything is hidden on the one tile, so there is no geometry, no
+ * reservation and no direction to sort out. The part put down stays stored in
+ * the depot. A rake of wagons needs no orders there -- a headless chain shut
+ * in a shed is not going anywhere, so standing there is the whole of what
+ * waiting means for it, and a "go to couple" order naming this depot is how
+ * it is fetched. A whole train put down is parked with its brake on instead:
+ * it keeps its own orders and moves again when the player says so.
+ *
+ * @param v          front of the arriving consist
+ * @param keep_count how many vehicles the departing train keeps
+ */
+static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
+{
+	if (keep_count == 0) return;
+	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return;
+
+	/* Same trap as every other consist surgery done from a vehicle tick:
+	 * commands read whichever company happens to be current. */
+	AutoRestoreBackup cur_company(_current_company, v->First()->owner);
+
+	Train *split_point = v;
+	for (uint8_t i = 0; i < keep_count; i++) {
+		split_point = split_point->GetNextVehicle();
+		if (split_point == nullptr) return; // consist has fewer than keep_count vehicles
+	}
+
+	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
+
+	if (TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true).Failed()) return;
+
+	v->ConsistChanged(CCF_ARRANGE);
+
+	Train *remainder = split_point->First();
+	remainder->couple_claim = VehicleID::Invalid();
+	remainder = MakeEngineLeadTheList(remainder);
+	if (remainder->IsFrontEngine()) {
+		/* Parked, not abandoned: it stays a train, keeps its orders, and waits
+		 * for the player to let the brake off. */
+		remainder->vehstatus.Set(VehState::Stopped);
+		remainder->ConsistChanged(CCF_ARRANGE);
+		InvalidateWindowData(WindowClass::VehicleView, remainder->index);
+	}
+
+	InvalidateWindowData(WindowClass::VehicleDepot, v->tile);
+	SetWindowDirty(WindowClass::VehicleDepot, v->tile);
+}
+
+/**
+ * Couple an engine standing in a depot to the rake of stored wagons it came
+ * for, and leave the result exactly as if the whole train had driven in and
+ * been turned round -- which is the one depot formation the player already
+ * knows by sight: the wagons come out of the door first and the engine pushes
+ * them, the end it drove in with leaving the shed last.
+ *
+ * The wagons therefore couple onto whichever end of the engine faces the
+ * door, and which end that is the player chose by how they drove in: nose
+ * first puts them on the tail, backing in puts them on the nose. Nothing is
+ * measured and nothing turns by itself; the entry made the choice.
+ *
+ * @param engine front of the collecting consist, standing whole in the depot
+ * @param rake   head of the stored wagon chain it has claimed
+ */
+static void TryCoupleAtDepot(Train *engine, Train *rake)
+{
+	AutoRestoreBackup cur_company(_current_company, engine->owner);
+
+	/* However this ends, the errand is decided here: either the wagons become
+	 * part of this train, or they cannot (the joined train would be too long,
+	 * say) and the claim is let go so neither side stands spoken-for forever. */
+	engine->couple_target = VehicleID::Invalid();
+	rake->couple_claim = VehicleID::Invalid();
+
+	Train *dst = engine->Last()->GetLastEnginePart();
+	if (TryConsistSplice(DoCommandFlag::Execute, rake, dst, true).Failed()) return;
+
+	/* Everything on one hidden tile means facing cannot be measured off the
+	 * ground the way NormaliseCoupledConsistFacing() does at a platform; it is
+	 * set instead. The rake lines up with the engine -- the "driven in whole"
+	 * formation -- and a vehicle whose recorded facing turns right round keeps
+	 * its picture by flipping, same as at a platform. */
+	for (Train *u = engine->Next(); u != nullptr; u = u->Next()) {
+		if (u->direction == engine->direction) continue;
+		if (u->direction == ReverseDir(engine->direction)) u->flags.Flip(VehicleRailFlag::Flipped);
+		u->direction = engine->direction;
+	}
+
+	engine->ConsistChanged(CCF_TRACK);
+
+	/* An engine that drove in leading with its head is now the "driven in
+	 * whole" train, and the reference picture is that train turned round. One
+	 * that backed in is already standing turned -- its trailing end is the
+	 * door end -- so for it there is nothing left to do. Either way the wagons
+	 * end up on the door side and come out first. */
+	if (!engine->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
+		if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: zmenen vedouci konec - spojeni v depu (vagonky ke dverim)", engine->unitnumber);
+		TurnTrainInsideDepot(engine);
+	}
+
+	/* An engine that arrived here on its couple order had that order concluded
+	 * by the ordinary depot entry. One that was already standing in this depot
+	 * when the order came up never enters anything, so nothing concluded it --
+	 * and left current, the order reads as still going to collect, claims the
+	 * next rake in the shed, and the engine glues up everything stored here
+	 * one chain at a time. Concluded the same way arriving would have, and
+	 * completely (see the station conclusion in CmdCoupleTrains for why the
+	 * order advance is taken here and not left to the tick handler). */
+	if (engine->current_order.IsType(OT_GOTO_DEPOT) && engine->current_order.ShouldGoToCouple() &&
+			engine->current_order.GetDestination().ToDepotID() == GetDepotIndex(engine->tile)) {
+		engine->DeleteUnreachedImplicitOrders();
+		UpdateVehicleTimetable(engine, true);
+		engine->IncrementImplicitOrderIndex();
+		engine->current_order.MakeDummy();
+		ProcessOrders(engine);
+	}
+
+	InvalidateWindowData(WindowClass::VehicleDepot, engine->tile);
+	SetWindowDirty(WindowClass::VehicleDepot, engine->tile);
+	InvalidateWindowData(WindowClass::VehicleView, engine->index);
+}
+
+/**
  * Sell a (single) train wagon/engine.
  * @param flags type of operation
  * @param t     the train wagon to sell
@@ -4199,6 +4362,33 @@ static bool WouldReverseIntoFreeWagons(const Train *consist)
 }
 
 /**
+ * Turn a whole train round while it stands entirely inside a depot.
+ *
+ * A depot is the one place where this is trivially safe: the vehicles have no
+ * extent there, all hidden on the one tile, so turning is pure bookkeeping --
+ * swap which end leads, and turn every vehicle round so that end still faces
+ * the door. This is the operation the player sees as "drive a train in and
+ * turn it", and coupling in a depot ends by producing exactly this state, so
+ * both go through this one function rather than each keeping its own copy of
+ * what turning in a depot means.
+ *
+ * @param consist %Train standing entirely inside a depot.
+ */
+static void TurnTrainInsideDepot(Train *consist)
+{
+	consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
+	for (Train *u = consist; u != nullptr; u = u->Next()) {
+		u->direction = ReverseDir(u->direction);
+	}
+	consist->flags.Flip(VehicleRailFlag::Reversed);
+	consist->flags.Reset(VehicleRailFlag::Reversing);
+	consist->ConsistChanged(CCF_TRACK);
+	for (Train *u = consist; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
+	InvalidateWindowData(WindowClass::VehicleDepot, consist->tile);
+	SetWindowDirty(WindowClass::VehicleView, consist->index);
+}
+
+/**
  * Turn a train around.
  * @param consist %Train to turn around.
  * @param why What caused this reversal, for the vlak123 console trace. Every
@@ -4256,16 +4446,7 @@ static void ReverseTrainDirection(Train *consist, const char *why)
 			 * every vehicle round so that end still faces out. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: zmenen vedouci konec - {}", consist->unitnumber, why);
-			consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
-			for (Train *u = consist; u != nullptr; u = u->Next()) {
-				u->direction = ReverseDir(u->direction);
-			}
-			consist->flags.Flip(VehicleRailFlag::Reversed);
-			consist->flags.Reset(VehicleRailFlag::Reversing);
-			consist->ConsistChanged(CCF_TRACK);
-			for (Train *u = consist; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
-			InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
-			SetWindowDirty(WindowClass::VehicleView, consist->index);
+			TurnTrainInsideDepot(consist);
 			return;
 		}
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
@@ -6858,6 +7039,28 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			 * had to stop because it also kept in the engine that had just
 			 * been given a job. So the two are told apart here instead. */
 			if (consist->rescue_target == VehicleID::Invalid()) return true;
+		}
+	}
+
+	/* Work a depot order left behind: putting wagons down in the shed, or
+	 * coupling to the stored rake this engine came for. Both are consist
+	 * surgery, so both happen here, at the same safe moment the rescue errand
+	 * uses -- nothing is walking along the consist. Placed before the stopped
+	 * check on purpose: an order to stop in the depot and decouple there does
+	 * both, in that order. */
+	if (consist->cur_speed == 0 && consist->IsFrontEngine() && IsWholeTrainInsideDepot(consist)) {
+		if (consist->depot_decouple_pending != 0) {
+			uint8_t keep = consist->depot_decouple_pending;
+			consist->depot_decouple_pending = 0;
+			TryDecoupleAtDepot(consist, keep);
+			return true;
+		}
+		if (consist->couple_target != VehicleID::Invalid()) {
+			Train *rake = Train::GetIfValid(consist->couple_target);
+			if (rake != nullptr && rake->IsFreeWagon() && rake->track == Track::Depot && rake->tile == consist->tile) {
+				TryCoupleAtDepot(consist, rake);
+				return true;
+			}
 		}
 	}
 

@@ -1254,7 +1254,14 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			break;
 
 		case OT_GOTO_DEPOT:
-			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT) return CMD_ERROR;
+			/* Decoupling and collecting work at a depot too: an engine can put
+			 * wagons down in the shed or fetch a rake stored there, with the
+			 * same filters a station order has. What a depot order never has is
+			 * "wait to couple" -- trains couple at stations, in the open, where
+			 * the player can see it; the only thing to couple to in a depot is
+			 * a rake of stored wagons. */
+			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE_COUNT && mof != MOF_GOTO_COUPLE &&
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_WAYPOINT:

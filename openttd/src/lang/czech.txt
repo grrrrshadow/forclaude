@@ -5028,6 +5028,8 @@ STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat n
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v této stanici, dokud vedle nezastaví vlak, se kterým se dá spojit, a pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Jet se spojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i reversním chodem) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
+STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
+STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
 STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Vagony: plné

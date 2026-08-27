@@ -394,6 +394,24 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				line += GetString(STR_ORDER_TURN_AROUND_DEPOT_SUFFIX);
 			}
 
+			/* A depot order that collects or puts down reads it off its own
+			 * line, same as a station order does. */
+			if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
+				line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+				if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
+					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
+				}
+				if (IsValidCargoType(order->GetCoupleCargo())) {
+					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
+				}
+				if (order->GetCoupleCount() != 0) {
+					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
+				}
+			}
+			if (!timetable && v->type == VehicleType::Train && order->GetDecoupleCount() != 0) {
+				line += GetString(STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+			}
+
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -1195,6 +1213,18 @@ public:
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
+
+				/* Putting wagons down and taking wagons on are opposites here the
+				 * same way they are at a station: one order does one or the
+				 * other. Waiting has no button at a depot at all -- trains couple
+				 * at stations, in the open; the only thing to couple to in a
+				 * shed is a stored rake. */
+				bool collecting = order->ShouldGoToCouple();
+				bool decoupling = order->GetDecoupleCount() != 0;
+				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE_DEPOT, collecting);
+				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE_DEPOT, decoupling);
+				this->SetWidgetLoweredState(WID_O_DECOUPLE_DEPOT, decoupling);
+				this->SetWidgetDisabledState(WID_O_DECOUPLE_DEPOT, collecting);
 			} else {
 				/* Nothing to put in the row -- a waypoint order, the end of the
 				 * list, a vehicle that is not a train -- but the row stays open
@@ -1222,7 +1252,7 @@ public:
 		NWidgetStacked *filter_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_COUPLE_FILTER);
 		if (filter_sel != nullptr) {
 			bool collecting = this->vehicle->type == VehicleType::Train && order != nullptr &&
-					order->IsType(OT_GOTO_STATION) && order->ShouldGoToCouple();
+					(order->IsType(OT_GOTO_STATION) || order->IsType(OT_GOTO_DEPOT)) && order->ShouldGoToCouple();
 			/* A row coming and going changes how tall the window is, and that is
 			 * a re-layout. It cannot be done here: this runs from inside a click
 			 * being handed to this very window, and moving every widget out from
@@ -1517,6 +1547,7 @@ public:
 				break;
 			}
 
+			case WID_O_DECOUPLE_DEPOT:
 			case WID_O_DECOUPLE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
@@ -1557,6 +1588,7 @@ public:
 				break;
 			}
 
+			case WID_O_GOTO_COUPLE_DEPOT:
 			case WID_O_GOTO_COUPLE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
@@ -1960,6 +1992,10 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_GOTO_COUPLE_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_DECOUPLE_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		/* The same height with nothing in it, so the window does not change size
 		 * as the player clicks from one order to another. A panel rather than a

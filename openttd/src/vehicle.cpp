@@ -1672,6 +1672,15 @@ void VehicleEnterDepot(Vehicle *v)
 			v->DeleteUnreachedImplicitOrders();
 			UpdateVehicleTimetable(v, true);
 			v->IncrementImplicitOrderIndex();
+
+			/* An order that asked for decoupling here is concluded on the spot a
+			 * few lines down, but taking the train apart is consist surgery and
+			 * may only happen at the point in the tick where nothing is walking
+			 * along the consist. Write the count down for TrainLocoHandler() to
+			 * honour there; see Train::depot_decouple_pending. */
+			if (v->type == VehicleType::Train && v->current_order.GetDecoupleCount() != 0) {
+				Train::From(v)->depot_decouple_pending = v->current_order.GetDecoupleCount();
+			}
 		}
 		if (v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::Halt)) {
 			/* Vehicles are always stopped on entering depots. Do not restart this one. */

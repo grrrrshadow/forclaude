@@ -153,6 +153,21 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
 	/**
+	 * How many vehicles this train keeps when it finishes the decoupling its
+	 * depot order asked for, carried from the moment of arrival to the moment
+	 * the work is safe to do. Zero means no decoupling is owed.
+	 *
+	 * Arriving at the ordered depot concludes the order on the spot
+	 * (VehicleEnterDepot() wipes it to a dummy), but taking a train apart is
+	 * consist surgery and may only happen at the point in the tick where
+	 * nothing is walking along the consist -- the same reason the rescue
+	 * errand is handled there. So the count is written down at arrival and
+	 * honoured from TrainLocoHandler(). Saved, so a game written between the
+	 * two moments still owes the split after loading.
+	 */
+	uint8_t depot_decouple_pending = 0;
+
+	/**
 	 * Which engine has spoken for this rake of wagons, set on the rake itself.
 	 *
 	 * An engine sent to collect wagons has nowhere to stop once it has set off
