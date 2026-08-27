@@ -3411,7 +3411,22 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * turns this round with it. */
 	remainder->vehicle_flags.Set(VehicleFlag::DrivingBackwards, was_driving_backwards);
 
+	/* MakeEngineLeadTheList reverses the list order when the engine is at the tail.
+	 * ReverseConsistOrder (called inside) flips DrivingBackwards but does not fix
+	 * per-vehicle GoingUp/GoingDown or re-register each vehicle on its tile -- the
+	 * same omission that caused the engine-part explosion before the was_driving_backwards
+	 * block above was added.  Detect the reversal by pointer identity and apply the
+	 * same bookkeeping repair to the remainder immediately after. */
+	Train *pre_reverse_remainder = remainder;
 	remainder = MakeEngineLeadTheList(remainder);
+	if (remainder != pre_reverse_remainder) {
+		for (Train *u = remainder; u != nullptr; u = u->Next()) {
+			if (u->gv_flags.Any({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown})) {
+				u->gv_flags.Flip({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown});
+			}
+			UpdateStatusAfterSwap(u, false);
+		}
+	}
 
 	/* Nobody has spoken for these wagons yet; whatever this vehicle was doing
 	 * in an earlier life is over. */
