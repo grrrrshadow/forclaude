@@ -740,6 +740,7 @@ public:
 		SLE_VAR(Vehicle, current_order.wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.go_to_couple, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.turn_around_in_depot, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.reverse_out_of_station, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.couple_load, VarTypes::U8),
 		SLE_VAR(Vehicle, current_order.couple_cargo, VarTypes::U8),
 		SLE_VAR(Vehicle, current_order.couple_count, VarTypes::U8),

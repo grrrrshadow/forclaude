@@ -1249,7 +1249,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE &&
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
@@ -1406,12 +1406,14 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 		/* Waiting to be collected is the opposite of going to collect, and
 		 * both are the opposite of leaving part of the train behind: one
-		 * order cannot both hand vehicles over and take them on. The buttons
-		 * grey each other out, but the rule belongs here as well: greying is
-		 * how it is shown, this is what makes it true. */
+		 * order cannot both hand vehicles over and take them on. A train that
+		 * is waiting does not decide how it leaves either -- whoever couples
+		 * to it brings the orders, and reversing out is one of them. The
+		 * buttons grey each other out, but the rule belongs here as well:
+		 * greying is how it is shown, this is what makes it true. */
 		case MOF_WAIT_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (data != 0 && (order->ShouldGoToCouple() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
+			if (data != 0 && (order->ShouldGoToCouple() || order->ShouldReverseOutOfStation() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
 			break;
 
 		case MOF_GOTO_COUPLE:
@@ -1422,6 +1424,12 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_TURN_AROUND_DEPOT:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (!order->IsType(OT_GOTO_DEPOT)) return CMD_ERROR;
+			break;
+
+		case MOF_REVERSE_OUT:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
 			break;
 
 		/* The three filters on what a coupling order will collect. They only
@@ -1554,6 +1562,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				order->SetTurnAroundInDepot(data != 0);
 				break;
 
+			case MOF_REVERSE_OUT:
+				order->SetReverseOutOfStation(data != 0);
+				break;
+
 			case MOF_COUPLE_LOAD:
 				order->SetCoupleLoad(static_cast<OrderCoupleLoad>(data));
 				break;
@@ -1601,6 +1613,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
 					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
+					u->current_order.SetReverseOutOfStation(order->ShouldReverseOutOfStation());
 					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
 					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
 					u->current_order.SetCoupleCount(order->GetCoupleCount());

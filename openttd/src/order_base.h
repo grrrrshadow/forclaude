@@ -110,6 +110,20 @@ private:
 	bool turn_around_in_depot = false;
 
 	/**
+	 * If true, a train leaving this station reverses out of it rather than
+	 * carrying on the way it was facing.
+	 *
+	 * A train that has just left wagons behind here, or picked some up, very
+	 * often wants to go back the way it came; left to itself it instead looks
+	 * for a way round, which may be a long way round or may not exist. Reversing
+	 * is something the game already does perfectly well at a dead end, so this
+	 * just asks for the same thing at a place the player chooses. Dedicated
+	 * field, not packed into `flags` -- same rationale as decouple_count
+	 * ("Bug D"). See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool reverse_out_of_station = false;
+
+	/**
 	 * What a "go to couple" order will accept when it gets there: how full the
 	 * wagons are, what they are carrying, and how many of them there are.
 	 *
@@ -251,6 +265,11 @@ public:
 	inline uint8_t GetCoupleCount() const { return this->couple_count; }
 	/** Set how many vehicles the rake this order will collect has to have. */
 	inline void SetCoupleCount(uint8_t count) { this->couple_count = count; }
+
+	inline bool ShouldReverseOutOfStation() const { return this->reverse_out_of_station; }
+
+	/** Set whether a train leaving this station reverses out of it. */
+	inline void SetReverseOutOfStation(bool reverse) { this->reverse_out_of_station = reverse; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?

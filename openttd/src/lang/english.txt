@@ -4913,6 +4913,9 @@ STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Turn aro
 STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Turn the train around while it is in this depot, so it leaves facing the way it came from. Without this it leaves the way it went in, so that a train sent for servicing is not silently turned round
 STR_ORDER_TURN_AROUND_DEPOT_SUFFIX                              :{SPACE}(and turn around)
 
+STR_ORDER_REVERSE_OUT                                           :{BLACK}Reverse out
+STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Reverse out of this station when leaving it, instead of carrying on the way the train is facing and looking for a way round
+STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(and reverse out)
 
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and an autonomous reversal here could drive straight into wagons a train just left behind
 

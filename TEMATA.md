@@ -462,34 +462,13 @@ ale pořád tu věc koupí, když není nic jiného na výběr. Teď je to řeč
 se nepokládá vůbec.
 
 Otočit se vlak smí na konci koleje, na konci hlavového nástupiště, při
-rozpojení (musí odjet od toho, co odložil) a na hráčův čudlík. Kratší
-trasa mezi to nepatří.
+rozpojení (musí odjet od toho, co odložil), na hráčův čudlík otáčení a na
+přepínač „reversní chod" v rozkazu — to všechno jsou místa, kde si o to
+někdo řekl. Kratší trasa mezi ně nepatří.
 
 Zavírá to obě cesty ke spojení najednou — tu, kde se mašinka spojí za
 jízdy, i tu, kde se spojí na konci nakládky — protože obě končí u téhle
 jedné otázky.
-
-## 2.7 „Reversní chod" (odjezd stejnou stranou) je pryč celý
-
-Rozkaz měl přepínač, který vlaku při odjezdu z nádraží nařídil vyjet
-stejnou stranou, kterou přijel. Vznikl z původního předpokladu, že vlak,
-který si tu nabral vagonky, se skoro vždycky chce vracet — a nastavoval
-se **hned za spojením** v `Vehicle::HandleLoading` příznakem
-`VehicleRailFlag::Reversing`.
-
-To je v přímém rozporu s 2.4b: **spojení směr jízdy nemění, mašinka jede
-dál tak, jak přijela, a vagonky tlačí před sebou.** Otáčet se smí jen
-při rozpojení, na konci koleje, na konci hlavového nástupiště a na
-hráčův vlastní čudlík otáčení — nic z toho tenhle přepínač nebyl.
-
-Navíc to byla **jiná cesta** než brána `ProcessOrders`/`CheckReverseTrain`,
-kterou hlídá jednorázový lístek z 2.6. Proto byl lístek v #92 k nepoznání
-od ničeho: otáčení nešlo tudy, kde se hlídalo.
-
-Odstraněno celé, ne jen to nastavení příznaku: pole v rozkazu, `MOF_`
-příkaz, čudlík v okně rozkazů, přípona na řádku rozkazu, texty i zápis do
-uložené pozice. Řádky „reversní chod" ze zkušební tabulky tím zanikají —
-ta možnost už ve hře není.
 
 ## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
 
