@@ -81,6 +81,16 @@ const SpriteGroup *GetWagonOverrideSpriteSet(EngineID engine, CargoType cargo, E
 void SetCustomEngineSprites(EngineID engine, CargoType cargo, const struct SpriteGroup *group);
 
 void GetCustomVehicleSprite(const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
+
+/**
+ * While not UINT16_MAX, a wagon of the borrowed set answers its own NewGRF's cargo variable
+ * with this translation slot directly, whatever it really carries. A slot rather than a
+ * cargo, because the set was drawn for cargoes this game may not have at all: no cargo of
+ * the game translates to the drawn slot, but the switches only look at the slot byte, so
+ * the slot itself can be presented. Set only around retry resolutions in Train::GetImage();
+ * see ApplyWagonCargoException().
+ */
+extern uint16_t _wagon_exception_forced_slot;
 void GetCustomVehicleIcon(EngineID engine, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
 
 void GetCustomRotorSprite(const struct Aircraft *v, EngineImageType image_type, VehicleSpriteSeq *result);

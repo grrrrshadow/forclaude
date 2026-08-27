@@ -1148,11 +1148,16 @@ Proto je oprava dvoupatrová:
    v `newgrf.cpp`) a posbírají se sloty, které vedou na obrázek. Náklad,
    jehož vlastní slot obrázek má, se **nepřevléká** — ukáže se doopravdy.
    Ostatní se hlásí jako `disguise_cargo`.
-2. **Záchranná síť v `Train::GetImage()`**: když řetězy obrázek stejně
-   nenajdou, vagon sady se nakreslí svým **obrázkem z nákupního seznamu**
-   (ten prokazatelně existuje — vidí ho menu nákupu) místo náhradních
-   spritů cizího vozidla. A článek, který nemá ani nákupní obrázek,
-   se nakreslí **prázdným spritem** — sada ho chce neviditelný.
+2. **Záchranná síť v `Train::GetImage()`, tři patra.** Nákupní obrázek
+   nestačil: má jediný pohled, takže se vagon neotáčel s kolejí (hlášeno
+   na #92, „jen jedna sprite"). A převlek za skutečný náklad hry taky ne:
+   nakreslený slot může patřit nákladu, který v téhle hře vůbec není,
+   takže **není za koho se převléct** — ale výhybky čtou jen bajt slotu,
+   takže se dá **předložit slot sám** (`_wagon_exception_forced_slot`).
+   Patra: (a) zkoušet nakreslené **sloty** jeden po druhém přes skutečný
+   resolver, první, který v éře vagonu projde, se zapamatuje
+   (`Engine::disguise_slot`) → plné otočné sprity; (b) nákupní obrázek;
+   (c) prázdný sprite pro články — sada je chce neviditelné.
 
 Důsledek: **diagnostická mašinka se u vagonů sady už nemůže objevit
 vůbec.** Tím pádem není co schovávat v nabídce přestavby — všechny

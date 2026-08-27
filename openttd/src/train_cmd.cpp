@@ -601,19 +601,44 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 		GetCustomVehicleSprite(this, direction, image_type, result);
 		if (result->IsValid()) return;
 
-		/* A wagon of the borrowed set whose chains found no picture falls back to its own
-		 * purchase-list picture, not to the substitute's sprites. The set draws by the
-		 * cargo's translation slot and by the year the wagon was built, so there are
-		 * cargo-and-era combinations its author never drew, and the ordinary fallback for
-		 * those is the substitute -- an entirely different vehicle. The purchase picture is
-		 * this wagon, plain, and it demonstrably exists: it is what the buy menu shows.
+		/* A wagon of the borrowed set whose chains found no picture is drawn as itself
+		 * carrying a cargo its author did draw, resolved through the wagon's own chains so
+		 * that the picture turns with the track like any other. The set draws by the
+		 * cargo's translation slot and by the year the wagon was built, and which slots
+		 * have a picture differs from era to era, so no one substitute cargo can be picked
+		 * at load; instead the cargoes whose slots were drawn at all are simply tried, and
+		 * the first that resolves in this wagon's era is kept as the first to try next
+		 * time.
 		 *
-		 * And a piece with no purchase picture either draws nothing at all. The set builds
-		 * its long wagons from invisible articulated parts, deliberately drawn as a single
-		 * transparent pixel; when their chains find no picture, the substitute would paint
-		 * a whole extra vehicle where the set wants empty air. See
+		 * Failing every one of those, the wagon's purchase-list picture -- guaranteed to
+		 * exist, the buy menu shows it, but drawn from a single viewpoint so it does not
+		 * turn with the track. And a piece with no purchase picture either draws nothing
+		 * at all: the set builds its long wagons from invisible articulated parts,
+		 * deliberately a single transparent pixel, and the ordinary fallback would paint a
+		 * whole extra vehicle where the set wants empty air. See
 		 * ApplyWagonCargoException(). */
 		if (this->GetEngine()->has_drawn_cargoes) {
+			Engine *e = Engine::Get(this->engine_type);
+
+			auto resolves_as = [&](uint16_t slot) {
+				if (slot == UINT16_MAX) return false;
+				AutoRestoreBackup forced(_wagon_exception_forced_slot, slot);
+				GetCustomVehicleSprite(this, direction, image_type, result);
+				return result->IsValid();
+			};
+
+			/* Slots, not cargoes: the drawn slot may belong to a cargo this game does not
+			 * have at all, so there may be no cargo to impersonate -- but the switches
+			 * only read the slot byte, and the slot itself is always there to present. */
+			if (resolves_as(e->disguise_slot)) return;
+			for (uint16_t slot = 0; slot < 256; slot++) {
+				if (slot == e->disguise_slot || !e->drawn_slots.test(slot)) continue;
+				if (resolves_as(slot)) {
+					e->disguise_slot = slot;
+					return;
+				}
+			}
+
 			GetCustomVehicleIcon(this->engine_type, direction, image_type, result);
 			if (result->IsValid()) return;
 

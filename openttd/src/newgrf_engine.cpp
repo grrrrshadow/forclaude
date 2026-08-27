@@ -562,6 +562,11 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			 * cargo subtype variable tells the same lie for the same reason; see
 			 * ApplyWagonCargoException(). */
 			const Engine *e = v->GetEngine();
+			if (e->has_drawn_cargoes && _wagon_exception_forced_slot != UINT16_MAX) {
+				/* The slot straight, with no classes and no weight: every switch the set
+				 * has on this variable masks the slot byte and nothing else. */
+				return _wagon_exception_forced_slot & 0xFF;
+			}
 			if (e->has_drawn_cargoes && IsValidCargoType(e->disguise_cargo) &&
 					(!IsValidCargoType(cargo_type) || !e->drawn_slots.test(object->ro.grffile->cargo_map[cargo_type]))) {
 				cargo_type = e->disguise_cargo;
@@ -923,6 +928,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			 * substituted from. Shown as subtype zero to match the disguised cargo the
 			 * cargo-info variable answers with. See ApplyWagonCargoException(). */
 			const Engine *e = v->GetEngine();
+			if (e->has_drawn_cargoes && _wagon_exception_forced_slot != UINT16_MAX) return 0;
 			if (e->has_drawn_cargoes &&
 					(!IsValidCargoType(v->cargo_type) || !e->drawn_slots.test(object->ro.grffile->cargo_map[v->cargo_type]))) {
 				return 0;
@@ -1136,6 +1142,8 @@ VehicleResolverObject::VehicleResolverObject(EngineID engine_type, const Vehicle
 		}
 	}
 }
+
+uint16_t _wagon_exception_forced_slot = UINT16_MAX;
 
 static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)
 {

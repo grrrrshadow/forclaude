@@ -99,6 +99,7 @@ public:
 	 */
 	std::bitset<256> drawn_slots{};
 	CargoType disguise_cargo = INVALID_CARGO;
+	uint16_t disguise_slot = UINT16_MAX; ///< NOSAVE. Translation slot that resolved last time; tried first on the next failed draw.
 
 private:
 	/** Vehicle-type specific information. */

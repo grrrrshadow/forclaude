@@ -466,21 +466,25 @@ static bool ConCztrTest(std::span<std::string_view> argv)
 
 			CommandCost refit_ret = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, veh_id, cargo, 0, false, false, 0));
 
-			/* Ask every piece of the articulated whole; the player sees them all. */
+			/* Ask exactly what the player sees, piece by piece, in two directions: a
+			 * picture that changes with the direction is the set's own, one that does not
+			 * is the flat purchase picture, an empty one is a deliberately blank piece,
+			 * and the substitute's sprites cannot come out of this path at all any more. */
 			std::string verdict;
 			for (const Train *u = t; u != nullptr; u = u->Next()) {
-				VehicleSpriteSeq seq;
-				seq.Clear();
-				GetCustomVehicleSprite(u, Direction::W, EngineImageType::OnMap, &seq);
-				if (seq.IsValid()) {
+				VehicleSpriteSeq west, north;
+				u->GetImage(Direction::W, EngineImageType::OnMap, &west);
+				u->GetImage(Direction::N, EngineImageType::OnMap, &north);
+				if (!west.IsValid()) {
+					verdict += 'X';
+				} else if (west.count == 1 && west.seq[0].sprite == SPR_EMPTY) {
+					verdict += '.';
+				} else if (west.count == north.count && std::equal(std::begin(west.seq), std::begin(west.seq) + west.count, std::begin(north.seq),
+						[](const auto &a, const auto &b) { return a.sprite == b.sprite; })) {
+					verdict += 'o';
+				} else {
 					verdict += 'O';
-					continue;
 				}
-				/* The same net Train::GetImage() casts: the wagon's own purchase picture,
-				 * and a deliberately blank sprite for a set piece with no picture at all. */
-				seq.Clear();
-				GetCustomVehicleIcon(u->engine_type, Direction::W, EngineImageType::OnMap, &seq);
-				verdict += seq.IsValid() ? 'o' : (u->GetEngine()->has_drawn_cargoes ? '.' : 'X');
 			}
 
 			if (!all) {
