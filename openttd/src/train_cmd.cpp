@@ -3204,6 +3204,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * tries to drive this train. */
 	CloseUpCoupledConsist(new_head);
 
+	if (_show_train_orientation) {
+		const Train *front = new_head->GetMovingFront();
+		IConsolePrint(CC_INFO, "Vlak {}: spojeno - couva {}, celo: {} na ({},{}), kolej {}, smer {}",
+				new_head->unitnumber, new_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+				front->IsEngine() ? "masinka" : "vagon", TileX(front->tile), TileY(front->tile),
+				front->track.base(), to_underlying(front->direction));
+	}
+
 	/* It has what it came for, so it is not coming for anything any more. The
 	 * matching half written on the collected train is rubbed out by the splice.
 	 */
@@ -6594,6 +6602,12 @@ reverse_train_direction:
 		first->wait_counter = 0;
 		first->cur_speed = 0;
 		first->subspeed = 0;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "  krok: {} na ({},{}), kolej {}, smer {}, couva {}",
+					v->IsEngine() ? "masinka" : "vagon", TileX(v->tile), TileY(v->tile),
+					v->track.base(), to_underlying(v->direction),
+					first->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne");
+		}
 		ReverseTrainDirection(first, "konec koleje (pri jizde)");
 	}
 
@@ -6841,6 +6855,12 @@ static bool TrainApproachingLineEnd(Train *moving_front, bool signal, bool rever
 	if (!signal && x + (moving_front->gcache.cached_veh_length + rounding) / 2 * (IsDiagonalDirection(vdir) ? 1 : 2) >= TILE_SIZE) {
 		/* we are too near the tile end, reverse now */
 		consist->cur_speed = 0;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "  celo: {} na ({},{}), kolej {}, smer {}, smer jizdy {}, couva {}",
+					moving_front->IsEngine() ? "masinka" : "vagon", TileX(moving_front->tile), TileY(moving_front->tile),
+					moving_front->track.base(), to_underlying(moving_front->direction), to_underlying(vdir),
+					consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne");
+		}
 		if (reverse) ReverseTrainDirection(consist, "konec koleje (dojezd)");
 		return false;
 	}
