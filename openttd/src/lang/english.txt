@@ -1838,6 +1838,8 @@ STR_CONFIG_SETTING_PERSISTENT_BUILDINGTOOLS_HELPTEXT            :Keep the buildi
 
 STR_CONFIG_SETTING_AUTO_REMOVE_SIGNALS                          :Automatically remove signals during rail construction: {STRING2}
 STR_CONFIG_SETTING_AUTO_REMOVE_SIGNALS_HELPTEXT                 :Automatically remove signals during rail construction if the signals are in the way. Note that this can potentially lead to train crashes
+STR_CONFIG_SETTING_DEMOLISH_STATION_CONFIRM                     :Ask for confirmation before demolishing a railway station: {STRING2}
+STR_CONFIG_SETTING_DEMOLISH_STATION_CONFIRM_HELPTEXT            :When the demolish tool would clear a railway station, ask for confirmation first. Removing single station tiles with the station removal tool never asks
 
 STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT                     :Fast forward speed limit: {STRING2}
 STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_HELPTEXT            :Limit on how fast the game goes when fast forward is enabled. 0 = no limit (as fast as your computer allows). Values below 100% slow the game down. The upper-limit depends on the specification of your computer and can vary depending on the game
@@ -3186,6 +3188,8 @@ STR_TERRAFORM_RESET_LANDSCAPE_TOOLTIP                           :{BLACK}Remove a
 
 STR_QUERY_RESET_LANDSCAPE_CAPTION                               :{WHITE}Reset Landscape
 STR_RESET_LANDSCAPE_CONFIRMATION_TEXT                           :{WHITE}Are you sure you want to remove all company-owned property?
+STR_QUERY_DEMOLISH_STATION_CAPTION                              :{WHITE}Demolish station
+STR_DEMOLISH_STATION_CONFIRMATION_TEXT                          :{WHITE}Are you sure you want to demolish this railway station?
 
 # Town generation window (SE)
 STR_FOUND_TOWN_CAPTION                                          :{WHITE}Town Generation

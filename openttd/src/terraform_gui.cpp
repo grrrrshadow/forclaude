@@ -38,6 +38,7 @@
 #include "landscape_cmd.h"
 #include "terraform_cmd.h"
 #include "object_cmd.h"
+#include "station_map.h"
 
 #include "widgets/terraform_widget.h"
 
@@ -118,6 +119,36 @@ static void PlaceRockyArea(TileIndex end, TileIndex start, bool remove)
 	if (success && _settings_client.sound.confirm) SndPlayTileFx(SND_1F_CONSTRUCTION_OTHER, end);
 }
 
+/** The demolish drag a confirmation window is standing in front of, kept so
+ * the answer can carry it out. Only one confirmation is ever open at a time:
+ * starting another demolish drag closes the previous query window first. */
+static TileIndex _demolish_confirm_start;
+static TileIndex _demolish_confirm_end;
+static bool _demolish_confirm_diagonal;
+
+/** Carry out (or drop) the demolish drag the player was asked about. */
+static void DemolishAreaConfirmationCallback(Window *, bool confirmed)
+{
+	if (!confirmed) return;
+	Command<Commands::ClearArea>::Post(STR_ERROR_CAN_T_CLEAR_THIS_AREA, CcPlaySound_EXPLOSION, _demolish_confirm_end, _demolish_confirm_start, _demolish_confirm_diagonal);
+}
+
+/**
+ * Would this demolish drag take down (part of) one of the player's own rail
+ * stations? Walked with the same iterator the clear command itself uses, so
+ * the answer is about the tiles that would really be cleared -- a diagonal
+ * drag's bounding box covers tiles the drag does not.
+ */
+static bool DemolishAreaTouchesOwnRailStation(TileIndex start_tile, TileIndex end_tile, bool diagonal)
+{
+	std::unique_ptr<TileIterator> iter = TileIterator::Create(end_tile, start_tile, diagonal);
+	for (; *iter != INVALID_TILE; ++(*iter)) {
+		TileIndex t = **iter;
+		if (IsRailStationTile(t) && IsTileOwner(t, _local_company)) return true;
+	}
+	return false;
+}
+
 /**
  * A central place to handle all X_AND_Y dragged GUI functions.
  * @param proc       Procedure related to the dragging
@@ -138,6 +169,23 @@ bool GUIPlaceProcDragXY(ViewportDragDropSelectionProcess proc, TileIndex start_t
 
 	switch (proc) {
 		case DDSP_DEMOLISH_AREA:
+			/* The demolish tool takes a rail station with it, and one click of
+			 * it can be a whole station gone. When the player has asked to be
+			 * asked, the tool stops for a yes first -- only when a station of
+			 * theirs is actually under it. Taking single station tiles out
+			 * with the station removal tool is a deliberate, aimed act and is
+			 * never questioned; this is about the bomb. */
+			if (_settings_client.gui.demolish_station_confirm &&
+					DemolishAreaTouchesOwnRailStation(start_tile, end_tile, _ctrl_pressed)) {
+				_demolish_confirm_start = start_tile;
+				_demolish_confirm_end = end_tile;
+				_demolish_confirm_diagonal = _ctrl_pressed;
+				ShowQuery(
+					GetEncodedString(STR_QUERY_DEMOLISH_STATION_CAPTION),
+					GetEncodedString(STR_DEMOLISH_STATION_CONFIRMATION_TEXT),
+					nullptr, DemolishAreaConfirmationCallback);
+				break;
+			}
 			Command<Commands::ClearArea>::Post(STR_ERROR_CAN_T_CLEAR_THIS_AREA, CcPlaySound_EXPLOSION, end_tile, start_tile, _ctrl_pressed);
 			break;
 		case DDSP_RAISE_AND_LEVEL_AREA:
