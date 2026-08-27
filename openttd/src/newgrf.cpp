@@ -2125,8 +2125,23 @@ static void AfterLoadGRFs()
 		if (railtypes.Any()) {
 			e->VehInfo<RailVehicleInfo>().railtypes = railtypes;
 			e->VehInfo<RailVehicleInfo>().intended_railtypes = railtypes;
+		} else if (!_gted[e->index].railtypelabels.empty()) {
+			/* The engine asks for a rail type no loaded NewGRF provides -- a vehicle set
+			 * made for a companion track set the player did not load. Vanilla disables the
+			 * engine, which from the player's side is a train set that silently refuses to
+			 * start. Here it runs on the game's ordinary rails instead: an electric engine
+			 * on the electrified ordinary rail, everything else on plain track. The train
+			 * exists and drives; the special track was the author's preference, not a
+			 * precondition. */
+			RailType fallback = INVALID_RAILTYPE;
+			if (e->VehInfo<RailVehicleInfo>().engclass >= EngineClass::Electric) fallback = GetRailTypeByLabel(RAILTYPE_LABEL_ELECTRIC);
+			if (fallback == INVALID_RAILTYPE) fallback = GetRailTypeByLabel(RAILTYPE_LABEL_RAIL);
+			if (fallback == INVALID_RAILTYPE) fallback = RAILTYPE_RAIL;
+
+			e->VehInfo<RailVehicleInfo>().railtypes = RailTypes{}.Set(fallback);
+			e->VehInfo<RailVehicleInfo>().intended_railtypes = RailTypes{}.Set(fallback);
 		} else {
-			/* Rail type is not available, so disable this engine */
+			/* No rail type was ever named at all; nothing to fall back from. */
 			e->info.climates = {};
 		}
 	}

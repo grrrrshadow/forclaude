@@ -1246,6 +1246,21 @@ nebere — grafiku, kapacitu ani cokoli dalšího si nechává.
 
 ---
 
+# 13.6 Sada vozidel bez své sady kolejí jede po obyčejných kolejích
+
+Vanilka vozidlo, jehož typ kolejí žádný nahraný GRF neposkytuje, **potichu
+vypne** — sada mašinek bez sady kolejí, pro kterou byla dělaná, se prostě
+„naschvál nespustí". U nás ne: takové vozidlo spadne na **obyčejné koleje
+hry** — elektrická mašinka na elektrifikovanou běžnou kolej, všechno
+ostatní na obyčejnou trať. Zvláštní kolej byla přání autora sady, ne
+podmínka.
+
+Platí to obecně pro všechny GRF (`newgrf.cpp`, místo kde se překládají
+`railtypelabels`). Vypnutí zůstává jen vozidlu, které žádný typ kolejí
+nikdy neuvedlo — tam není z čeho couvat.
+
+---
+
 # 14. Statistika firmy podle TTDPatch
 
 V okně firmy je pod čudlíkem ředitelství čudlík **Statistika**. Otevře okno
