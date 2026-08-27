@@ -685,6 +685,23 @@ FindDepotData YapfTrainFindNearestDepot(const Train *v, int max_penalty)
 	TileIndex last_tile = moving_back->tile;
 	Trackdir td_rev = ReverseTrackdir(moving_back->GetVehicleTrackdir());
 
+	/* This search is the one place that can turn a train round with no
+	 * pathfinder question asked anywhere: a depot order takes whichever answer
+	 * comes back cheaper from the two ends, and both callers then reverse the
+	 * train on the spot when the reverse end won ("If there is no depot in
+	 * front, reverse automatically"). With turning round locked to "nowhere"
+	 * that must not happen -- a train keeps going the way it is pointing, and
+	 * going back is the player's call -- so the search is only asked from the
+	 * end that leads. A depot that is only reachable backwards then simply is
+	 * not found, which is the honest answer: the train cannot go there without
+	 * turning, and nothing here is allowed to turn it. This is what sent a
+	 * train that had just collected its wagons back out of the side it came
+	 * in, orders to a depot behind it notwithstanding. */
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None) {
+		last_tile = INVALID_TILE;
+		td_rev = Trackdir::Invalid;
+	}
+
 	return _settings_game.pf.forbid_90_deg
 		? CYapfAnyDepotRailNo90::stFindNearestDepotTwoWay(v, origin.tile, origin.trackdir, last_tile, td_rev, max_penalty, YAPF_INFINITE_PENALTY)
 		: CYapfAnyDepotRail::stFindNearestDepotTwoWay(v, origin.tile, origin.trackdir, last_tile, td_rev, max_penalty, YAPF_INFINITE_PENALTY);

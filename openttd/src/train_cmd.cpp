@@ -24,6 +24,7 @@
 #include "viewport_func.h"
 #include "vehicle_func.h"
 #include "sound_func.h"
+#include "console_func.h"
 #include "ai/ai.hpp"
 #include "game/game.hpp"
 #include "newgrf_station.h"
@@ -1397,7 +1398,7 @@ void ReverseTrainSwapVehicles(Train *v);
 static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static bool CheckReverseTrain(const Train *consist);
-static void ReverseTrainDirection(Train *consist);
+static void ReverseTrainDirection(Train *consist, const char *why);
 static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
 
 /**
@@ -4200,9 +4201,15 @@ static bool WouldReverseIntoFreeWagons(const Train *consist)
 /**
  * Turn a train around.
  * @param consist %Train to turn around.
+ * @param why What caused this reversal, for the vlak123 console trace. Every
+ *            caller says; "which mechanism turned the train" is exactly the
+ *            question that has been mis-guessed from reading alone, so the
+ *            game answers it itself whenever the trace is on.
  */
-static void ReverseTrainDirection(Train *consist)
+static void ReverseTrainDirection(Train *consist, const char *why)
 {
+	/* The trace prints at the points of no return below, not here -- a call
+	 * that bounces off the depot guard has not turned anything. */
 	Train *moving_front = consist->GetMovingFront();
 	if (IsRailDepotTile(moving_front->tile)) {
 		/* A train on its way out of a depot is half in a world where it has no
@@ -4248,6 +4255,7 @@ static void ReverseTrainDirection(Train *consist)
 			 * between, here applied together: swap the leading end, and turn
 			 * every vehicle round so that end still faces out. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
+			if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: otocen - {}", consist->unitnumber, why);
 			consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
 			for (Train *u = consist; u != nullptr; u = u->Next()) {
 				u->direction = ReverseDir(u->direction);
@@ -4262,6 +4270,8 @@ static void ReverseTrainDirection(Train *consist)
 		}
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
 	}
+
+	if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: otocen - {}", consist->unitnumber, why);
 
 	/* Clear path reservation in front if train is not stuck. */
 	if (!consist->flags.Test(VehicleRailFlag::Stuck)) FreeTrainTrackReservation(consist);
@@ -4412,7 +4422,7 @@ CommandCost CmdReverseTrainDirection(DoCommandFlags flags, VehicleID veh_id, boo
 				v->cur_speed = 0;
 				v->SetLastSpeed();
 				HideFillingPercent(&v->fill_percent_te_id);
-				ReverseTrainDirection(v);
+				ReverseTrainDirection(v, "prikaz otoceni (cudlik hrace, nebo automatika hry)");
 			}
 
 			/* Unbunching data is no longer valid. */
@@ -6392,7 +6402,7 @@ reverse_train_direction:
 		first->wait_counter = 0;
 		first->cur_speed = 0;
 		first->subspeed = 0;
-		ReverseTrainDirection(first);
+		ReverseTrainDirection(first, "konec koleje (pri jizde)");
 	}
 
 	return false;
@@ -6639,7 +6649,7 @@ static bool TrainApproachingLineEnd(Train *moving_front, bool signal, bool rever
 	if (!signal && x + (moving_front->gcache.cached_veh_length + rounding) / 2 * (IsDiagonalDirection(vdir) ? 1 : 2) >= TILE_SIZE) {
 		/* we are too near the tile end, reverse now */
 		consist->cur_speed = 0;
-		if (reverse) ReverseTrainDirection(consist);
+		if (reverse) ReverseTrainDirection(consist, "konec koleje (dojezd)");
 		return false;
 	}
 
@@ -6841,7 +6851,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	}
 
 	if (consist->flags.Test(VehicleRailFlag::Reversing) && consist->cur_speed == 0) {
-		ReverseTrainDirection(consist);
+		ReverseTrainDirection(consist, "priznak otoceni (reversni chod, nebo otoceni za jizdy)");
 	}
 
 	/* exit if train is stopped */
@@ -6897,7 +6907,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		consist->cur_speed = 0;
 		consist->subspeed = 0;
 		consist->flags.Reset(VehicleRailFlag::LeavingStation);
-		ReverseTrainDirection(consist);
+		ReverseTrainDirection(consist, "posun prikazu (otazka otaceni)");
 		return true;
 	} else if (consist->flags.Test(VehicleRailFlag::LeavingStation)) {
 		/* Try to reserve a path when leaving the station as we
@@ -6938,7 +6948,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			/* Still stuck. */
 			/* Turning round to try the other way is no use when the other
 			 * way is blocked by the wagons this train has just left there. */
-			if (turn_around && !WouldReverseIntoFreeWagons(consist)) ReverseTrainDirection(consist);
+			if (turn_around && !WouldReverseIntoFreeWagons(consist)) ReverseTrainDirection(consist, "zaseknuty vlak");
 
 			if (consist->flags.Test(VehicleRailFlag::Stuck) && consist->wait_counter > 2 * _settings_game.pf.wait_for_pbs_path * Ticks::DAY_TICKS) {
 				/* Show message to player. */
