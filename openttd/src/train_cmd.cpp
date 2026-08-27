@@ -5507,28 +5507,9 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
  */
 static bool CheckReverseTrain(const Train *consist)
 {
-	/* This is the one question that turns a train round because a route came out
-	 * shorter that way, and it is asked every time an order advances -- which is
-	 * every departure from every station. A train that has just coupled departs
-	 * through it like any other, so this is where a coupled train was turned
-	 * round and sent back out the side it came in.
-	 *
-	 * Nothing chooses which way a train runs except the player. It turns round
-	 * where there is nowhere else to go -- the end of the track, the end of a
-	 * terminus platform -- when it puts wagons down and has to drive away from
-	 * them, and when the player presses the button. A route being shorter the
-	 * other way is not on that list, and it never was: it is not something a
-	 * player can see coming or plan a network around.
-	 *
-	 * The pathfinder was told the same thing as a price instead of as a rule --
-	 * reversing costs more than any route can add up to (see
-	 * YapfTrainCheckReverse) -- and a price still buys the thing when nothing
-	 * else is on offer. Said here, it does not.
-	 */
-	if (_settings_game.difficulty.train_flip_reverse_allowed != TrainFlipReversingAllowed::All) return false;
-
 	const Train *moving_front = consist->GetMovingFront();
-	if (moving_front->track == Track::Depot || moving_front->track == Track::Wormhole ||
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::EndOfLineOnly ||
+			moving_front->track == Track::Depot || moving_front->track == Track::Wormhole ||
 			!IsDiagonalDirection(moving_front->GetMovingDirection())) {
 		return false;
 	}

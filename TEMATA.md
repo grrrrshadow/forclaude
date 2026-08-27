@@ -444,31 +444,6 @@ z #88). Vlak dojetý mašinkou napřed má z přepnutí no-op — proto VV bez
 reversního chodu a VB s ním. Teď se ta práce udělá, ale **jen když se
 příznak opravdu měnil**.
 
-## 2.8 „Kteroukoliv stranou" je pryč — otáčení není otázka ceny
-
-Při každém posunu příkazu — tedy při každém odjezdu z každého nádraží —
-se hra ptala hledače cesty, jestli by se k dalšímu cíli nedojelo levněji
-druhým koncem, a když ano, otočila vlak na místě. Nebyla to strana, kudy
-vlak přijel; byla to **kterákoliv strana**, podle toho, co zrovna vyšlo
-levněji. Vlak po spojení odjíždí přesně touhle cestou jako každý jiný,
-takže tady se spojený vlak otáčel a vyjížděl zpátky tou stranou, kterou
-přijel.
-
-Hledači cesty už to bylo řečeno **jako cena** (`YapfTrainCheckReverse`:
-otočení stojí víc, než kolik může jakákoliv trasa dát dohromady). Cena
-ale pořád tu věc koupí, když není nic jiného na výběr. Teď je to řečeno
-**jako pravidlo** v `CheckReverseTrain`: dokud není otáčení nastavené na
-„všude" (a v tomhle buildu je zamčené na „nikde", viz 1.4), tahle otázka
-se nepokládá vůbec.
-
-Otočit se vlak smí na konci koleje, na konci hlavového nástupiště, při
-rozpojení (musí odjet od toho, co odložil), na hráčův čudlík otáčení a na
-přepínač „reversní chod" v rozkazu — to všechno jsou místa, kde si o to
-někdo řekl. Kratší trasa mezi ně nepatří.
-
-Zavírá to obě cesty ke spojení najednou — tu, kde se mašinka spojí za
-jízdy, i tu, kde se spojí na konci nakládky — protože obě končí u téhle
-jedné otázky.
 
 ## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
 
