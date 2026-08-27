@@ -1397,7 +1397,6 @@ void ReverseTrainSwapVehicles(Train *v);
 static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static bool CheckReverseTrain(const Train *consist);
-static inline bool CheckCompatibleRail(const Train *v, TileIndex tile, bool check_railtype);
 static void ReverseTrainDirection(Train *consist);
 static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
 
@@ -3208,6 +3207,22 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 			new_head->last_station_visited = dest;
 			UpdateVehicleTimetable(new_head, true);
 			new_head->IncrementImplicitOrderIndex();
+
+			/* And concluded completely, here and now. Bumping the index alone
+			 * leaves the switch to the next order for the tick handler's own
+			 * ProcessOrders() call, which reports it as an order advance -- and
+			 * on every order advance the game asks the pathfinder whether the
+			 * train would rather go the other way. For a train whose next stop
+			 * lies back the way it came, on a network with no way round, that
+			 * question turns it round on the spot despite everything settled
+			 * above: the wagons it should push out of the far side get pulled
+			 * back out of the near one instead. That one-tick gap is how the
+			 * turn kept happening no matter what the coupling itself decided.
+			 * Taking the order advance ourselves closes it: the tick handler
+			 * then sees no advance, asks nothing, and the train departs the way
+			 * the coupling pointed it. A train that really is to go back has
+			 * the player's reverse-out flag for saying so. */
+			ProcessOrders(new_head);
 		}
 	}
 
@@ -5527,32 +5542,18 @@ static bool CheckReverseTrain(const Train *consist)
 
 	assert(moving_front->track.Any());
 
-	/* With turning round locked to "nowhere", this question is not about cost
-	 * any more. The infinite-penalty answer in YapfTrainCheckReverse() still
-	 * turns a train whenever no forward route to its destination exists -- a
-	 * through station whose next destination lies behind the train qualifies,
-	 * and that is how a train that had just collected wagons span round on the
-	 * spot instead of pushing them out the far side. Whether a route exists is
-	 * the pathfinder's business; whether the train may turn round is not.
-	 *
-	 * So it is measured instead: a train may turn round here only when it
-	 * physically cannot drive on -- no compatible track beyond its leading
-	 * end. That is the end of the track or a terminus platform, the one place
-	 * the player has built where coming back out is the only way out. Anywhere
-	 * a rail continues forward, the train carries on the way it is pointing;
-	 * if that is the long way round, the player says so with the reverse-out
-	 * flag or the turn-round button, not the pathfinder. */
-	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None) {
-		Trackdir td = moving_front->GetVehicleTrackdir();
-		DiagDirection exitdir = TrackdirToExitdir(td);
-		TileIndex next_tile = TileAddByDiagDir(moving_front->tile, exitdir);
-		TrackBits reachable = TrackdirBitsToTrackBits(GetTileTrackStatus(next_tile, TransportType::Rail, RoadTramType::Invalid).trackdirs & DiagdirReachesTrackdirs(exitdir));
-		if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(next_tile))) {
-			reachable.Reset(TrackCrossesTracks(TrackdirToTrack(td)));
-		}
-		if (reachable.Any() && CheckCompatibleRail(moving_front->First(), next_tile, true)) return false;
-	}
-
+	/* With turning round locked to "nowhere", the infinite penalty in
+	 * YapfTrainCheckReverse() makes this a permission rather than a
+	 * preference: the only thing that can outweigh it is there being no
+	 * forward route at all. A train sent to couple leans on exactly that --
+	 * an engine that has to back onto its rake flips here because nothing
+	 * ahead of it leads to the rake -- so this must stay answerable with yes.
+	 * Blocking it whenever any rail continued ahead was tried, and it took
+	 * the approach reversal down with it: engines stopped being able to
+	 * reach their wagons at all. The departure side of the same question --
+	 * a freshly coupled train must not be turned round by it -- is handled
+	 * where the couple order is concluded, by concluding it completely, so
+	 * the question is never asked there. See CmdCoupleTrains(). */
 	return YapfTrainCheckReverse(consist);
 }
 

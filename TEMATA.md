@@ -418,35 +418,43 @@ Je to zkušební přepínač, ne nastavení — stejně jako `depo123`.
 
 ## 2.6 Dvě opravy po testu #91
 
-**Nakládka nesmí vlak po spojení otočit — a řeší se to měřením koleje,
-ne stavem na vlaku.** Hra se při každém posunu příkazu ptá „nechtěl bys
-k dalšímu cíli jet druhým koncem?" (`CheckReverseTrain` v obsluze tiku).
-Odpověď hledače cesty je cena, a nekonečná pokuta za otočení pořád
-prohraje, když dopředu žádná trasa k cíli nevede — na průjezdném nádraží
-s dalším cílem za zády přesně tohle nastane a vlak s čerstvě sebranými
-vagonky se otočil na místě, místo aby je vytlačil druhou stranou ven.
+**Proč se vlak s vagonky otáčel, ať se na otázku otáčení sáhlo jakkoli.**
+Hra se při každém posunu příkazu ptá „nechtěl bys k dalšímu cíli jet
+druhým koncem?" (`CheckReverseTrain` v obsluze tiku). Nekonečná pokuta
+za otočení prohraje jen tehdy, když dopředu žádná trasa k cíli nevede —
+a přesně to je případ vlaku, který sebral vagonky a jehož další cíl leží
+za zády na síti bez okruhu. Vlak, který sebral vlak, má další cíl
+dosažitelný dopředu, proto se nikdy neotočil — stejné pravidlo, jiná
+geometrie cílů. To je celý rozdíl „vlaky dobře, vagonky špatně".
 
-Jednorázový lístek na vlaku (příznakový stav, léčil příznak) byl špatně
-a je pryč nadobro.
+Uzavření příkazu „na místě" tu otázku nevypnulo: posunulo jen index, a
+samotné přepnutí na další příkaz provedl až `ProcessOrders` v obsluze
+tiku **o tik později** — ohlásil posun a otázka padla stejně. Tou
+skulinou se otočení vracelo, ať se otázka hlídala lístkem, vypínala
+plošně nebo měřila kolej: pokaždé se stihla položit jindy nebo jinudy.
+
+Oprava: **závěr spojení dokončí posun příkazu celý sám** — po posunutí
+indexu hned zavolá `ProcessOrders`. Obsluha tiku pak žádný posun nevidí,
+otázka nepadne a vlak odjede tak, jak ho spojení nasměrovalo: dál svým
+směrem, vagonky vytlačí druhou stranou ven. Vlak, který se opravdu má
+vracet, na to má hráčův reversní chod. Žádný stav na vlaku, žádná
+výjimka.
+
+**Na otázku otáčení se nesahá.** Pokus „kde vede kolej dopředu, nikdy se
+neotáčej" vzal s sebou i otočení, na kterém stojí příjezd na spojení —
+mašinka, co se potřebuje přehodit a nacouvat na vagonky, se točí právě
+skrz „dopředu to k cíli nejde". Proto spojování začalo vycházet jen
+někdy. Vráceno do podoby #91: pokuta je povolení, otočit se lze jen
+tam, kde dopředu žádná trasa není.
 
 **Po spojení s vagonky se nenakládá ani nevykládá — odjezd.** Příkaz
 „jet se spojit" se po spojení uzavře na místě a nikdy předáním vlaku
 stanici: vstup do stanice spouští nakládku a spojení není příjezd pro
-náklad. Vlak si přijel pro vozy, má je, jede. Práce s nákladem na téhle
-stanici patří samostatnému příkazu, který napíše hráč. (Pozn.: tohle
-uzavírání na místě bylo jednou v podezření, že rozbilo spojování z jedné
-strany nádraží — tehdy ale jelo v kombinaci s plošným vypnutím otázky
-otáčení, které je teď pryč. Jestli se nespojení z jedné strany vrátí,
-je viník zaměřený právě sem.)
+náklad. Práce s nákladem na téhle stanici patří samostatnému příkazu,
+který napíše hráč.
 
-Teď platí (v `CheckReverseTrain`, jen když je otáčení zamčené na
-„nikde"): **vlak se při posunu příkazu smí otočit jedině tam, kde před
-jeho vedoucím koncem žádná sjízdná kolej nepokračuje** — konec koleje,
-hlavové nástupiště. Kde kolej dopředu vede, jede se dál tím směrem,
-kterým vlak stojí; jestli je to k cíli oklikou nebo vůbec, je věc hráče
-a jeho reversního chodu či čudlíku otočení. Žádný stav na vlaku, žádná
-výjimka pro spojení — pravidlo platí pro každý vlak stejně a naplňuje
-2.4b doslova: spojení nemění směr jízdy, vagonky se vytlačí před sebou.
+Jednorázový lístek na vlaku (příznakový stav, léčil příznak) byl špatně
+a je pryč nadobro.
 
 **Stopnutý vlak není partner.** Vlak, který hráč ručně zastavil, čeká
 s příznakem „čekat na spojení" úplně stejně jako předtím — ale stopnutí
