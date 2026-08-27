@@ -4255,7 +4255,7 @@ static void ReverseTrainDirection(Train *consist, const char *why)
 			 * between, here applied together: swap the leading end, and turn
 			 * every vehicle round so that end still faces out. See
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: otocen - {}", consist->unitnumber, why);
+			if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: zmenen vedouci konec - {}", consist->unitnumber, why);
 			consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
 			for (Train *u = consist; u != nullptr; u = u->Next()) {
 				u->direction = ReverseDir(u->direction);
@@ -4271,7 +4271,7 @@ static void ReverseTrainDirection(Train *consist, const char *why)
 		InvalidateWindowData(WindowClass::VehicleDepot, moving_front->tile);
 	}
 
-	if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: otocen - {}", consist->unitnumber, why);
+	if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: zmenen vedouci konec - {}", consist->unitnumber, why);
 
 	/* Clear path reservation in front if train is not stuck. */
 	if (!consist->flags.Test(VehicleRailFlag::Stuck)) FreeTrainTrackReservation(consist);
