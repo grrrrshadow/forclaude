@@ -233,7 +233,6 @@ public:
 		SLE_VAR(Order, wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Order, go_to_couple, VarTypes::BOOL),
 		SLE_VAR(Order, turn_around_in_depot, VarTypes::BOOL),
-		SLE_VAR(Order, reverse_out_of_station, VarTypes::BOOL),
 		SLE_VAR(Order, couple_load, VarTypes::U8),
 		SLE_VAR(Order, couple_cargo, VarTypes::U8),
 		SLE_VAR(Order, couple_count, VarTypes::U8),

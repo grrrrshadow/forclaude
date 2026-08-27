@@ -440,6 +440,28 @@ z #88). Vlak dojetý mašinkou napřed má z přepnutí no-op — proto VV bez
 reversního chodu a VB s ním. Teď se ta práce udělá, ale **jen když se
 příznak opravdu měnil**.
 
+## 2.7 „Reversní chod" (odjezd stejnou stranou) je pryč celý
+
+Rozkaz měl přepínač, který vlaku při odjezdu z nádraží nařídil vyjet
+stejnou stranou, kterou přijel. Vznikl z původního předpokladu, že vlak,
+který si tu nabral vagonky, se skoro vždycky chce vracet — a nastavoval
+se **hned za spojením** v `Vehicle::HandleLoading` příznakem
+`VehicleRailFlag::Reversing`.
+
+To je v přímém rozporu s 2.4b: **spojení směr jízdy nemění, mašinka jede
+dál tak, jak přijela, a vagonky tlačí před sebou.** Otáčet se smí jen
+při rozpojení, na konci koleje, na konci hlavového nástupiště a na
+hráčův vlastní čudlík otáčení — nic z toho tenhle přepínač nebyl.
+
+Navíc to byla **jiná cesta** než brána `ProcessOrders`/`CheckReverseTrain`,
+kterou hlídá jednorázový lístek z 2.6. Proto byl lístek v #92 k nepoznání
+od ničeho: otáčení nešlo tudy, kde se hlídalo.
+
+Odstraněno celé, ne jen to nastavení příznaku: pole v rozkazu, `MOF_`
+příkaz, čudlík v okně rozkazů, přípona na řádku rozkazu, texty i zápis do
+uložené pozice. Řádky „reversní chod" ze zkušební tabulky tím zanikají —
+ta možnost už ve hře není.
+
 ## 2.5 …ale „kudy se přijelo" je jen odhad, ne odpověď
 
 To pravidlo výš je **odhad pro případ, kdy nic lepšího není**. Vlak ale má

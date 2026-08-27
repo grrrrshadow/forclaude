@@ -191,7 +191,6 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_WAIT_COUPLE,     ///< Toggle whether to wait at this station for a partner train to couple with.
 	MOF_GOTO_COUPLE,     ///< Toggle whether this order's destination is a place to travel to (reversing if needed) to couple with a partner train there.
 	MOF_TURN_AROUND_DEPOT,///< Toggle whether a train visiting this depot turns around there.
-	MOF_REVERSE_OUT,     ///< Toggle whether a train leaving this station reverses out of it.
 	MOF_COUPLE_LOAD,     ///< Passes an OrderCoupleLoad: how full the wagons to be collected have to be.
 	MOF_COUPLE_CARGO,    ///< Passes a CargoType the wagons to be collected have to carry, or INVALID_CARGO for any.
 	MOF_COUPLE_COUNT,    ///< Change how many vehicles the rake to be collected has to have (0 = any).

@@ -346,16 +346,6 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					line += GetString(STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 				}
 
-				/* Reversing out is about where the train goes next, not about
-				 * how long it stays, so it has no place in the timetable. Nor
-				 * is it shown when the order decouples here, because then it is
-				 * not carried out -- an order saved before the two were made
-				 * exclusive can still have both set, and saying so would be a
-				 * plain lie about what the train is going to do. */
-				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation() &&
-						order->GetDecoupleCount() == 0) {
-					line += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
-				}
 			}
 			break;
 		}
@@ -1172,26 +1162,13 @@ public:
 				 * collected is the opposite of going to collect, and both are
 				 * the opposite of leaving part of the train behind -- an order
 				 * cannot both hand vehicles over and take them on. Whichever
-				 * of the three is set greys the other two out.
-				 *
-				 * Reversing out is a fourth, and combines fine with coupling:
-				 * a train that has just picked wagons up very often wants to
-				 * go back the way it came. It is only decoupling and waiting
-				 * that rule it out -- a decoupling train already leaves facing
-				 * the right way, and a train waiting to be collected does not
-				 * decide how it leaves at all, since whoever couples to it
-				 * brings the orders. */
+				 * of the three is set greys the other two out. */
 				bool waiting = order->ShouldWaitForCouple();
 				bool collecting = order->ShouldGoToCouple();
 				bool decoupling = order->GetDecoupleCount() != 0;
-				bool reversing_out = order->ShouldReverseOutOfStation();
 
 				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE, waiting || decoupling);
-				this->SetWidgetDisabledState(WID_O_WAIT_COUPLE, collecting || decoupling || reversing_out);
-
-				bool can_reverse_out = !decoupling && !waiting;
-				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
-				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && reversing_out);
+				this->SetWidgetDisabledState(WID_O_WAIT_COUPLE, collecting || decoupling);
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
@@ -1213,7 +1190,7 @@ public:
 		bool decoupling = can_decouple && order->GetDecoupleCount() != 0;
 
 		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
-				order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
+				order->ShouldWaitForCouple() || order->ShouldGoToCouple());
 		this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
 
 		/* What a coupling order will accept is only worth showing on an order
@@ -1561,13 +1538,6 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				assert(order != nullptr);
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
-				break;
-			}
-
-			case WID_O_REVERSE_OUT: {
-				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, order->ShouldReverseOutOfStation() ? 0 : 1);
 				break;
 			}
 
@@ -1926,20 +1896,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 	/* Second button row. */
 	NWidget(NWID_HORIZONTAL),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(93, 12), SetFill(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_SKIP_BUTTON, STR_ORDERS_SKIP_TOOLTIP), SetResize(1, 0),
-			/* Reversing out of a station is done to a whole order the way
-			 * skipping and deleting are, so it sits with them. All four are
-			 * narrowed so the row stays the width it was. */
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_REVERSE_OUT), SetMinimalSize(93, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDER_REVERSE_OUT, STR_ORDER_REVERSE_OUT_TOOLTIP), SetResize(1, 0),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_BOTTOM_MIDDLE),
-				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(93, 12), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(124, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_DELETE_BUTTON, STR_ORDERS_DELETE_TOOLTIP), SetResize(1, 0),
-				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_STOP_SHARING), SetMinimalSize(93, 12), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_STOP_SHARING), SetMinimalSize(124, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_STOP_SHARING_BUTTON, STR_ORDERS_STOP_SHARING_TOOLTIP), SetResize(1, 0),
 			EndContainer(),
-			NWidget(NWID_BUTTON_DROPDOWN, Colours::Grey, WID_O_GOTO), SetMinimalSize(93, 12), SetFill(1, 0),
+			NWidget(NWID_BUTTON_DROPDOWN, Colours::Grey, WID_O_GOTO), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_GO_TO_BUTTON, STR_ORDERS_GO_TO_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),

@@ -2513,23 +2513,6 @@ void Vehicle::HandleLoading(bool mode)
 				if (CmdCoupleTrains(DoCommandFlag::Execute, t->index).Failed()) return;
 			}
 
-			/* Reverse out of this station rather than carrying on the way we
-			 * are facing, if the order asks for it. Setting the flag rather
-			 * than turning the train here lets the ordinary reversal path do
-			 * it on the next tick, exactly as it does for the reverse button
-			 * and for reaching a dead end -- and that path is the one that
-			 * keeps the consist self-consistent.
-			 *
-			 * This combines with coupling on purpose: a train that has just
-			 * collected wagons here very often wants to go back the way it
-			 * came. Decoupling is the exception -- there the train already
-			 * leaves the right way by itself, so the choice is not offered.
-			 * See FEATURE_DESIGN_COUPLING_TOW.md. */
-			if (this->type == VehicleType::Train && this->current_order.ShouldReverseOutOfStation() &&
-					this->current_order.GetDecoupleCount() == 0) {
-				Train::From(this)->flags.Set(VehicleRailFlag::Reversing);
-			}
-
 			this->PlayLeaveStationSound();
 
 			this->LeaveStation();

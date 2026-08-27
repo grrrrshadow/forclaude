@@ -5011,9 +5011,6 @@ STR_ORDER_WAIT_TO_UNBUNCH                                       :{SPACE}(Počkat
 STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Otočit
 STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Otočit vlak v tomto depu, takže z něj vyjede čelem tam, odkud přijel. Bez toho vyjede tak, jak vjel, aby se vlak poslaný na údržbu sám od sebe neotočil
 STR_ORDER_TURN_AROUND_DEPOT_SUFFIX                              :{SPACE}(a otočit)
-STR_ORDER_REVERSE_OUT                                           :{BLACK}Reversní chod
-STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Při odjezdu z této stanice jet reversním chodem, místo aby vlak pokračoval směrem, kterým je otočený, a hledal cestu okolo
-STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(a reversní chod)
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
 STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat si vozů
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Při odjezdu z této stanice ponechat vepředu tento počet vozidel a zbytek nechat odpojený stát. 0 znamená neodpojovat

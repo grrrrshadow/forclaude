@@ -44,7 +44,6 @@ enum OrderWidgets : WidgetID {
 	WID_O_WAIT_COUPLE,               ///< Toggle waiting at this station for a partner train to couple with.
 	WID_O_GOTO_COUPLE,               ///< Toggle travelling to this station (reversing if needed) to couple with a partner train there.
 	WID_O_TURN_AROUND_DEPOT,         ///< Toggle turning the train around while it is in this depot.
-	WID_O_REVERSE_OUT,               ///< Toggle reversing out of this station on departure.
 	WID_O_SEL_COUPLE_FILTER,         ///< #NWID_SELECTION widget for the row saying what a coupling order will accept, shown once it is going to collect something.
 	WID_O_COUPLE_LOAD,               ///< Choose how full the wagons to be collected have to be.
 	WID_O_COUPLE_CARGO,              ///< Choose which cargo the wagons to be collected have to carry.
