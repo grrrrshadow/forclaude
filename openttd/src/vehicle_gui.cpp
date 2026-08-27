@@ -3289,8 +3289,16 @@ public:
 				 * player watching an engine that says it is going somewhere and
 				 * plainly is not, with nothing to report but that. Being given
 				 * the job and getting out of the door are two different things
-				 * and they fail for different reasons. */
-				if (v->IsInDepot()) return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE);
+				 * and they fail for different reasons -- and which reason it is
+				 * is read back from the gate that held it (CheckTrainStayInDepot),
+				 * not worked out a second time here. */
+				if (v->IsInDepot()) {
+					switch (Train::From(v)->rescue_hold) {
+						case RescueHold::ExitBlocked: return GetString(STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED);
+						case RescueHold::NoPath: return GetString(STR_VEHICLE_STATUS_RESCUE_NO_PATH);
+						default: return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE);
+					}
+				}
 				return GetString(STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY);
 			}
 			if (v->IsInDepot() && !v->vehstatus.Test(VehState::Stopped)) {

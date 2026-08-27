@@ -4592,6 +4592,13 @@ static bool CheckTrainStayInDepot(Train *v)
 		if (u->track != Track::Depot || u->tile != v->tile) return false;
 	}
 
+	/* A rescue engine held in here with a call-out on it says why, the same
+	 * way every other way of standing still in this feature says why: the
+	 * place that decides is the place that says so. Two gates below can hold
+	 * it -- a full block outside the door, and no reservable route to the
+	 * casualty -- and the window used to say only "cannot leave" for both. */
+	bool on_call = v->vehicle_flags.Test(VehicleFlag::RescueEngine) && v->rescue_target != VehicleID::Invalid();
+
 	/* if the train got no power, then keep it in the depot */
 	if (v->gcache.cached_power == 0) {
 		v->vehstatus.Set(VehState::Stopped);
@@ -4616,6 +4623,7 @@ static bool CheckTrainStayInDepot(Train *v)
 		seg_state = _settings_game.pf.reserve_paths ? SigSegState::Path : UpdateSignalsOnSegment(v->tile, DiagDirection::Invalid, v->owner);
 		if (seg_state == SigSegState::Full || HasDepotReservation(v->tile)) {
 			/* Full and no PBS signal in block or depot reserved, can't exit. */
+			if (on_call) v->rescue_hold = RescueHold::ExitBlocked;
 			SetWindowClassesDirty(WindowClass::TrainList);
 			return true;
 		}
@@ -4633,10 +4641,13 @@ static bool CheckTrainStayInDepot(Train *v)
 	/* Only leave when we can reserve a path to our destination. */
 	if (seg_state == SigSegState::Path && !TryPathReserve(v) && v->force_proceed == TFP_NONE) {
 		/* No path and no force proceed. */
+		if (on_call) v->rescue_hold = RescueHold::NoPath;
 		SetWindowClassesDirty(WindowClass::TrainList);
 		MarkTrainAsStuck(v);
 		return true;
 	}
+
+	if (on_call) v->rescue_hold = RescueHold::None;
 
 	SetDepotReservation(v->tile, true);
 	if (_settings_client.gui.show_track_reservation) MarkTileDirtyByTile(v->tile);

@@ -4753,6 +4753,8 @@ STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN                            :{BLACK}Čeká n
 STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE                     :{BLACK}Čeká na poruchu, vidí poruchu ale nesmí
 STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}Jede k porouchanému vlaku
 STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Má výjezd, nemůže z depa
+STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED                          :{LTBLUE}Má výjezd, koleje před depem jsou obsazené
+STR_VEHICLE_STATUS_RESCUE_NO_PATH                               :{LTBLUE}Má výjezd, nenachází cestu k případu
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuje vlak do depa
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu
