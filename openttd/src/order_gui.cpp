@@ -1538,7 +1538,11 @@ public:
 
 			case WID_O_COND_VALUE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				uint value = order->GetConditionValue();
 				if (order->GetConditionVariable() == OrderConditionVariable::MaxSpeed) value = ConvertSpeedToDisplaySpeed(value, this->vehicle->type);
 				this->querying_decouple_count = false;
@@ -1550,7 +1554,11 @@ public:
 			case WID_O_DECOUPLE_DEPOT:
 			case WID_O_DECOUPLE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				/* One button for the whole thing: it asks how many vehicles the
 				 * train keeps here, and nought is how decoupling is switched
 				 * off again.
@@ -1583,7 +1591,11 @@ public:
 
 			case WID_O_WAIT_COUPLE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_WAIT_COUPLE, order->ShouldWaitForCouple() ? 0 : 1);
 				break;
 			}
@@ -1591,37 +1603,58 @@ public:
 			case WID_O_GOTO_COUPLE_DEPOT:
 			case WID_O_GOTO_COUPLE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
 				break;
 			}
 
 			case WID_O_REVERSE_OUT: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, order->ShouldReverseOutOfStation() ? 0 : 1);
 				break;
 			}
 
 			case WID_O_TURN_AROUND_DEPOT: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot() ? 0 : 1);
 				break;
 			}
 
-			case WID_O_COUPLE_LOAD:
-				ShowDropDownMenu(this, _order_couple_load_dropdown, to_underlying(this->vehicle->GetOrder(this->OrderGetSel())->GetCoupleLoad()), WID_O_COUPLE_LOAD, 0, 0);
+			case WID_O_COUPLE_LOAD: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				ShowDropDownMenu(this, _order_couple_load_dropdown, to_underlying(order->GetCoupleLoad()), WID_O_COUPLE_LOAD, 0, 0);
 				break;
+			}
 
-			case WID_O_COUPLE_CARGO:
-				ShowDropDownList(this, BuildCoupleCargoDropDown(),
-						this->vehicle->GetOrder(this->OrderGetSel())->GetCoupleCargo(), WID_O_COUPLE_CARGO);
+			case WID_O_COUPLE_CARGO: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				ShowDropDownList(this, BuildCoupleCargoDropDown(), order->GetCoupleCargo(), WID_O_COUPLE_CARGO);
 				break;
+			}
 
 			case WID_O_COUPLE_COUNT: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				assert(order != nullptr);
+				/* The selection can be the end-of-list row, or go stale when the
+				 * list shrinks under an open window; a click then has no order to
+				 * act on and does nothing. Asserting here brought the game down
+				 * for exactly that (crash 2026-08-28). */
+				if (order == nullptr) break;
 				this->querying_decouple_count = false;
 				this->querying_couple_count = true;
 				ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});

@@ -2456,9 +2456,21 @@ void Vehicle::LeaveStation()
 			 * here has to be read back off the order it is actually working
 			 * through, and handed to the wagons being left behind. */
 			const Order *real_order = this->GetOrder(this->cur_real_order_index);
-			TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount(),
-					real_order != nullptr ? real_order->GetLoadType() : OrderLoadType::LoadIfPossible,
-					real_order != nullptr ? real_order->GetUnloadType() : OrderUnloadType::UnloadIfPossible);
+
+			/* And only the station that order actually names. A train that
+			 * stops everywhere on the way -- non-stop off -- passes through
+			 * stations the player never asked it to put wagons down at, and
+			 * the count would leak out of the order at the first of them.
+			 * The rig caught exactly that: a depot order's decouple, meant
+			 * for the shed, fired at a station passed en route. A depot
+			 * order's count is consumed at the depot (VehicleEnterDepot),
+			 * never here. */
+			bool ordered_here = real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
+					real_order->GetDestination().ToStationID() == this->last_station_visited;
+			if (ordered_here) {
+				TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount(),
+						real_order->GetLoadType(), real_order->GetUnloadType());
+			}
 		}
 
 		Train::From(this)->flags.Set(VehicleRailFlag::LeavingStation);
@@ -2518,14 +2530,33 @@ void Vehicle::HandleLoading(bool mode)
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (this->type == VehicleType::Train && (IsWaitingToBeCoupled(Train::From(this)) || this->current_order.ShouldGoToCouple())) {
 				Train *t = Train::From(this);
-				if (GetTrainCouplePartner(t) == nullptr) return;
-				/* Commands check ownership against whichever company is current,
-				 * which during a vehicle tick is whatever ran last rather than
-				 * this train's owner -- back it up as the tick loop does
-				 * elsewhere, or the coupling fails its first check and silently
-				 * does nothing. */
-				AutoRestoreBackup cur_company(_current_company, t->owner);
-				if (CmdCoupleTrains(DoCommandFlag::Execute, t->index).Failed()) return;
+
+				/* The flag on the loading state is only as good as the order
+				 * it leaked out of. A collector that stops everywhere on the
+				 * way -- non-stop off -- enters loading at stations its order
+				 * never named, and standing there "waiting to couple" holds
+				 * it for a partner that is never coming. The coupling half of
+				 * loading applies only at the station the real order names;
+				 * everywhere else this is an ordinary stop and the train
+				 * simply moves on. (The rig caught a collector bound for a
+				 * depot rake parked for good at the first station en route.) */
+				bool couple_here = IsWaitingToBeCoupled(t);
+				if (!couple_here) {
+					const Order *real_order = this->GetOrder(this->cur_real_order_index);
+					couple_here = real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
+							real_order->GetDestination().ToStationID() == this->last_station_visited;
+				}
+
+				if (couple_here) {
+					if (GetTrainCouplePartner(t) == nullptr) return;
+					/* Commands check ownership against whichever company is current,
+					 * which during a vehicle tick is whatever ran last rather than
+					 * this train's owner -- back it up as the tick loop does
+					 * elsewhere, or the coupling fails its first check and silently
+					 * does nothing. */
+					AutoRestoreBackup cur_company(_current_company, t->owner);
+					if (CmdCoupleTrains(DoCommandFlag::Execute, t->index).Failed()) return;
+				}
 			}
 
 			/* Reverse out of this station rather than carrying on the way we

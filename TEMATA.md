@@ -532,6 +532,24 @@ odpojený celý vlak zůstane zabrzděný a příkazy si nechá). Práce se děl
 v bezpečné chvíli tiku, stejné jako odtahové úkony — příjezd si počet
 zapíše (`depot_decouple_pending`) a tik ho vykoná.
 
+**Tři úniky příznaků do zastávek cestou, chycené rigem při prvním
+depovém běhu** (vlak s vypnutým non-stop staví všude a stav nakládky
+podědí pole z pracovního příkazu):
+
+- odpojení se provádělo v první stanici cestou — teď jen ve stanici,
+  kterou příkaz jmenuje; depový počet spotřebuje jedině depo;
+- nakládková větev spojování držela sběrače „na partnera" v cizí
+  stanici — teď platí jen v cílové stanici příkazu;
+- držení „nevyjížděj bez zamluvené řady" četlo příznak z nakládky a
+  ptalo se na řadu v cizí stanici — teď platí jen na skutečném
+  cestovním příkazu (jeď do stanice / jeď do depa).
+
+A stráž „nevjížděj na políčko bezhlavé řady" má výjimku pro dlaždici
+depa — v kůlně se nic nesráží a odstavená řada nesmí zavírat dveře
+mašince, která si pro ni jede. Pád okna příkazů (assert na kliknutí bez
+vybraného příkazu, crash log 2026-08-28) nahrazen tichou pojistkou u
+všech čudlíků spojovací řady.
+
 ## 2.10 Bezhlavý zkušební rig — hra se testuje sama
 
 Konzolový příkaz `testspoj` postaví celou zkušební scénu příkazy hry:

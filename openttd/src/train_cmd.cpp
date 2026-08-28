@@ -6353,9 +6353,16 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * a depot, or a less congested line, and arrive from an
 					 * unexpected side), so a collision with wagons left
 					 * behind by an earlier, unrelated decouple order would
-					 * be baffling rather than an accepted risk. See
-					 * FEATURE_DESIGN_COUPLING_TOW.md. */
-					for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
+					 * be baffling rather than an accepted risk.
+					 *
+					 * A depot tile is the one exception: chains stored in a
+					 * shed stand on parallel tracks and nothing collides in
+					 * there, so a rake stored in a depot must not bar the
+					 * door -- an engine sent to fetch it has to be able to
+					 * drive in. Without this, the guard stopped every train
+					 * on the doorstep of any depot holding stored wagons.
+					 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+					if (!IsRailDepotTile(gp.new_tile)) for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
 						if (u->type != VehicleType::Train) continue;
 						const Train *t = Train::From(u)->First();
 						if (t == first || t->IsFrontEngine()) continue;
@@ -7115,8 +7122,15 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * only of a train standing still, so an engine already on its way is never
 	 * halted in the middle of the line by this; and the answer is remembered on
 	 * the rake, so asking again on the next tick returns the same one. See
-	 * FindOrClaimCoupleTarget(). */
-	if (consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0 &&
+	 * FindOrClaimCoupleTarget().
+	 *
+	 * And asked only while the couple order itself is current. The flag leaks
+	 * into the loading state of an ordinary stop en route -- non-stop off --
+	 * and a hold read off that state asks for a rake at whatever station the
+	 * train happens to be standing in, finds none, and parks it there for
+	 * good before the stop can even finish. */
+	if ((consist->current_order.IsType(OT_GOTO_STATION) || consist->current_order.IsType(OT_GOTO_DEPOT)) &&
+			consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0 &&
 			FindOrClaimCoupleTarget(consist) == nullptr) {
 		/* And it holds no track while it waits. Reserving first and choosing
 		 * afterwards was the whole trouble: the path was held against every

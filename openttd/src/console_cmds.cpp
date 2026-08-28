@@ -582,6 +582,17 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		return true;
 	}
 
+	/* 'couvej' turns the collector round in the shed so it approaches
+	 * backing; 'depo' moves the whole exchange into the west depot: the
+	 * deliverer stores its rake in there and the collector fetches it with a
+	 * go-to-couple depot order. */
+	bool backing = false;
+	bool depot_mode = false;
+	for (size_t i = 1; i < argv.size(); i++) {
+		if (argv[i] == "couvej") backing = true;
+		if (argv[i] == "depo") depot_mode = true;
+	}
+
 	/* A headless newgame (null video driver has no GUI) starts like a
 	 * dedicated server: spectating, no company anywhere. Make one to build
 	 * as, the same way the GUI newgame path does. */
@@ -705,14 +716,22 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	}
 
 	Order deliver;
-	deliver.MakeGoToStation(st_id);
-	deliver.SetLoadType(OrderLoadType::NoLoad);
-	deliver.SetUnloadType(OrderUnloadType::NoUnload);
-	deliver.SetDecoupleCount(1);
-	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
-	Order home_w;
-	home_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
-	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_w);
+	if (depot_mode) {
+		/* Deliver straight into the west depot and stay there, halted; the
+		 * rake is stored in the shed by the depot decouple. */
+		deliver.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		deliver.SetDecoupleCount(1);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
+	} else {
+		deliver.MakeGoToStation(st_id);
+		deliver.SetLoadType(OrderLoadType::NoLoad);
+		deliver.SetUnloadType(OrderUnloadType::NoUnload);
+		deliver.SetDecoupleCount(1);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
+		Order home_w;
+		home_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_w);
+	}
 
 	/* The collector: a light engine sent to couple, with its next stop lying
 	 * behind it -- the depot it starts from -- which is the exact shape of the
@@ -723,10 +742,15 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		return true;
 	}
 	Order collect;
-	collect.MakeGoToStation(st_id);
-	collect.SetLoadType(OrderLoadType::NoLoad);
-	collect.SetUnloadType(OrderUnloadType::NoUnload);
-	collect.SetGoToCouple(true);
+	if (depot_mode) {
+		collect.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		collect.SetGoToCouple(true);
+	} else {
+		collect.MakeGoToStation(st_id);
+		collect.SetLoadType(OrderLoadType::NoLoad);
+		collect.SetUnloadType(OrderUnloadType::NoUnload);
+		collect.SetGoToCouple(true);
+	}
 	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, collect);
 	Order home_e;
 	home_e.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
@@ -735,7 +759,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	/* 'testspoj couvej' turns the collector round in the shed first, so it
 	 * approaches the rake driving backwards -- the same way an engine that
 	 * turned on a stub arrives in the player's game. */
-	if (argv.size() >= 2 && argv[1] == "couvej") {
+	if (backing) {
 		Command<Commands::ReverseTrainDirection>::Do(DoCommandFlag::Execute, veh1, false);
 		IConsolePrint(CC_DEFAULT, "testspoj: collector will back onto the rake.");
 	}
