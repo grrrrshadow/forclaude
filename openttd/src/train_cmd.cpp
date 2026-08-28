@@ -2143,9 +2143,17 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 	}
 
 	if (unclaimed != nullptr) {
+		if (_show_train_orientation && v->couple_target != unclaimed->index) {
+			IConsolePrint(CC_INFO, "Vlak {}: zabral cil spojeni {} (drive {})", v->unitnumber,
+					unclaimed->index.base(), v->couple_target.base());
+		}
 		unclaimed->couple_claim = v->index;
 		v->couple_target = unclaimed->index;
 	} else {
+		if (_show_train_orientation && v->couple_target != VehicleID::Invalid()) {
+			IConsolePrint(CC_INFO, "Vlak {}: cil spojeni zmizel (byl {})", v->unitnumber,
+					v->couple_target.base());
+		}
 		v->couple_target = VehicleID::Invalid();
 	}
 	return unclaimed;
@@ -4869,12 +4877,24 @@ static bool CheckTrainStayInDepot(Train *v)
 	if (seg_state == SigSegState::Path && !TryPathReserve(v) && v->force_proceed == TFP_NONE) {
 		/* No path and no force proceed. */
 		if (on_call) v->rescue_hold = RescueHold::NoPath;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: vyjezd z depa odlozen - cesta se nepodarila zarezervovat", v->unitnumber);
+		}
 		SetWindowClassesDirty(WindowClass::TrainList);
 		MarkTrainAsStuck(v);
 		return true;
 	}
 
 	if (on_call) v->rescue_hold = RescueHold::None;
+
+	if (_show_train_orientation) {
+		PBSTileInfo res = FollowTrainReservation(v);
+		TileIndex mouth = TileAddByDiagDir(v->tile, GetRailDepotDirection(v->tile));
+		IConsolePrint(CC_INFO, "Vlak {}: vyjizdi z depa ({},{}) - stav segmentu {}, cesta {}, rezervace konci na ({},{}), usti rez {:#x}",
+				v->unitnumber, TileX(v->tile), TileY(v->tile), to_underlying(seg_state),
+				seg_state == SigSegState::Path ? "zarezervovana" : "bez rezervace (blokove navesti)",
+				TileX(res.tile), TileY(res.tile), GetReservedTrackbits(mouth).base());
+	}
 
 	SetDepotReservation(v->tile, true);
 	if (_settings_client.gui.show_track_reservation) MarkTileDirtyByTile(v->tile);
@@ -5529,6 +5549,24 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 	/* No possible reservation target found, we are probably lost. */
 	if (res_dest.tile == INVALID_TILE) {
+		/* Try to find any safe destination -- but never for a train still
+		 * standing in a depot. This fallback exists so a train already out on
+		 * the line has somewhere safe to stand while its route is blocked; a
+		 * train in a depot already stands in the safest place there is. Letting
+		 * it out here sent it onto whatever stub the search could call "safe",
+		 * including a curve ending against the back of a one-way signal right
+		 * outside the door: the train drove out, met the impassable signal,
+		 * reversed on the spot, re-entered the depot, and did it all again --
+		 * the depot-mouth bouncing, with its blinking reservation, that ends in
+		 * a collision when the stub crosses a junction other trains use. It
+		 * stays in the shed and asks again next tick, like any other train
+		 * whose way out is momentarily blocked. */
+		if (moving_front->track == Track::Depot) {
+			FreeTrainTrackReservation(consist);
+			if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
+			if (mark_stuck) MarkTrainAsStuck(consist);
+			return FindFirstTrack(tracks_on_tile);
+		}
 		/* Try to find any safe destination. */
 		PBSTileInfo origin = FollowTrainReservation(consist);
 		if (TryReserveSafeTrack(consist, origin.tile, origin.trackdir, false)) {
@@ -6332,11 +6370,21 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					bits.Reset(TrackCrossesTracks(FindFirstTrack(v->track)));
 				}
 
-				if (bits.None()) goto invalid_rail;
+				if (bits.None()) {
+					if (_show_train_orientation) {
+						IConsolePrint(CC_INFO, "  krok duvod: zadna navazujici kolej na ({},{})", TileX(gp.new_tile), TileY(gp.new_tile));
+					}
+					goto invalid_rail;
+				}
 
 				/* Check if the new tile constrains tracks that are compatible
 				 * with the current train, if not, bail out. */
-				if (!CheckCompatibleRail(v->First(), gp.new_tile, v->IsMovingFront())) goto invalid_rail;
+				if (!CheckCompatibleRail(v->First(), gp.new_tile, v->IsMovingFront())) {
+					if (_show_train_orientation) {
+						IConsolePrint(CC_INFO, "  krok duvod: cizi kolej na ({},{})", TileX(gp.new_tile), TileY(gp.new_tile));
+					}
+					goto invalid_rail;
+				}
 
 				TrackBits chosen_track;
 				if (v->IsMovingFront()) {
@@ -6392,6 +6440,9 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						if (u->type != VehicleType::Train) continue;
 						const Train *t = Train::From(u)->First();
 						if (t == first || t->IsFrontEngine()) continue;
+						if (_show_train_orientation) {
+							IConsolePrint(CC_INFO, "  krok duvod: volne vagony na ({},{})", TileX(gp.new_tile), TileY(gp.new_tile));
+						}
 						MarkTrainAsStuck(first);
 						/* Reuse the same halt mechanism as every other
 						 * "can't enter this tile" case in this function
@@ -6472,6 +6523,9 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 								UpdateSignalsOnSegment(v->tile, enterdir, v->owner) == SigSegState::Path) {
 							first->wait_counter = 0;
 							return false;
+						}
+						if (_show_train_orientation) {
+							IConsolePrint(CC_INFO, "  krok duvod: cervena na ({},{})", TileX(gp.new_tile), TileY(gp.new_tile));
 						}
 						goto reverse_train_direction;
 					} else {
@@ -7166,6 +7220,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * reserve it for. Not every tick -- there is nothing to release most of
 		 * the time. */
 		if ((consist->tick_counter & 0x1F) == 0) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: drzi bez cile - rezervace zahozena, na ({},{})",
+						consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
+			}
 			FreeTrainTrackReservation(consist);
 			consist->ReserveTrackUnderConsist();
 		}

@@ -35,6 +35,7 @@
 #include "timer/timer_game_tick.h"
 #include "company_func.h"
 #include "signal_func.h"
+#include "pbs.h"
 #include "vehicle_func.h"
 #include "station_cmd.h"
 #include "order_cmd.h"
@@ -821,6 +822,61 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
 			if (o.IsType(OT_GOTO_DEPOT) && o.ShouldTurnAroundInDepot()) extra += " OTOC-DEPO";
 			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);
+		}
+	}
+	return true;
+}
+
+/**
+ * Dump rail layout of a map rectangle: tracks, signals (with direction and
+ * one-way-ness), reservations. Test-rig eyes for a headless run.
+ * Usage: testmapa <x1> <y1> <x2> <y2>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestMap(std::span<std::string_view> argv)
+{
+	if (argv.size() < 5) {
+		IConsolePrint(CC_HELP, "Usage: 'testmapa <x1> <y1> <x2> <y2>'.");
+		return true;
+	}
+	auto px1 = ParseInteger(argv[1]), py1 = ParseInteger(argv[2]);
+	auto px2 = ParseInteger(argv[3]), py2 = ParseInteger(argv[4]);
+	if (!px1.has_value() || !py1.has_value() || !px2.has_value() || !py2.has_value()) return false;
+
+	IConsolePrint(CC_DEFAULT, "testmapa: otaceni u navesti (reverse_at_signals) = {}", _settings_game.pf.reverse_at_signals ? "zapnuto" : "vypnuto");
+	for (uint y = *py1; y <= (uint)*py2; y++) {
+		for (uint x = *px1; x <= (uint)*px2; x++) {
+			TileIndex tile = TileXY(x, y);
+			std::string desc;
+			TrackBits tracks{};
+			if (IsPlainRailTile(tile)) {
+				tracks = GetTrackBits(tile);
+				desc = "kolej";
+			} else if (IsRailDepotTile(tile)) {
+				desc = fmt::format("depo (vrata {})", to_underlying(GetRailDepotDirection(tile)));
+			} else if (IsRailStationTile(tile)) {
+				tracks = TrackBits{GetRailStationTrack(tile)};
+				desc = fmt::format("stanice {}", GetStationIndex(tile).base());
+			} else if (IsLevelCrossingTile(tile)) {
+				tracks = TrackBits{GetCrossingRailTrack(tile)};
+				desc = "prejezd";
+			} else {
+				continue;
+			}
+			std::string sigs;
+			if (IsPlainRailTile(tile) && HasSignals(tile)) {
+				for (Trackdir td : TRACKDIR_BIT_MASK) {
+					if (!HasTrack(tile, TrackdirToTrack(td))) continue;
+					if (!HasSignalOnTrackdir(tile, td)) continue;
+					sigs += fmt::format(" navest[td {}]: typ {} stav {}{}",
+							to_underlying(td),
+							to_underlying(GetSignalType(tile, TrackdirToTrack(td))),
+							GetSignalStateByTrackdir(tile, td) == SignalState::Green ? "zelena" : "cervena",
+							HasSignalOnTrackdir(tile, ReverseTrackdir(td)) ? "" : " (jednosmerna)");
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "({},{}): {} koleje {:#x} rez {:#x}{}",
+					x, y, desc, tracks.base(), GetReservedTrackbits(tile).base(), sigs);
 		}
 	}
 	return true;
@@ -3764,6 +3820,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
+	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);

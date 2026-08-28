@@ -571,6 +571,49 @@ směru odjezdu; hráč už nemusí testovat každou hypotézu na telefonu.
 
 ---
 
+## 2.11 Blikající rezervace u vrat depa — otrávený pahýl
+
+**Co hráč viděl.** Krátká mašinka bez vagonů vyjížděla z depa, rezervace
+pod ní blikala, a na křížení před depem se srazily dva vlaky. Ve velkém
+testu tomu odpovídala stará odchylka R3/R4: jedna sběračka ze čtyř
+poskakovala v ústí depa (třikrát „konec koleje (pri jizde)" a návrat do
+vrat) a k vagonkům pak dojela s propadlým příkazem spojení.
+
+**Příčina — jedna, obojí z ní.** Když si vlak v depu žádá o cestu ven a
+skutečná trasa k cíli je zrovna neprůjezdná (drží ji vlak před ním), hra
+má nouzovou větev „nenašel jsem cestu → zarezervuj aspoň nejbližší
+bezpečné místo". Ta větev počítá **konec koleje za bezpečné místo** —
+a záda jednosměrného návěstidla jsou z pohledu vlaku právě konec koleje.
+U depa B tak vyšel „úspěch": jednopolíčkový pahýl na oblouk křižovatky,
+který končí v zádech jednosměrky vjezdu. Vlak vyjel, o krok dál narazil
+na neprůjezdnou jednosměrku, hra ho na místě otočila (u jednosměrky se
+nečeká, jinak by stál navěky), vjel zpátky do vrat — a znovu. Každý
+cyklus = rezervace tam, rezervace pryč: to je to blikání. A protože vlak
+mezi otočkami jezdí po pahýlu, který nikam nevede, na křížení, kudy
+pahýl vede, se s ním může potkat vlak, který tudy jede doopravdy.
+
+**Oprava příčiny.** Nouzové „zarezervuj cokoli bezpečného" se nespouští
+pro vlak, který ještě stojí v depu — ten už na nejbezpečnějším místě je.
+Když cesta ven zrovna není, vlak zůstane ve vratech a ptá se každý tik
+znovu, stejně jako to celou dobu dělaly ostatní mašinky ve frontě (těm
+pahýl nevyšel jen proto, že ho vždycky držel právě ten jeden smolař).
+Vlaku na širé trati zůstává nouzová větev beze změny — tam bezpečné
+místo potřebuje; a skutečně nalezená cesta končící na kusé koleji
+nástupiště jde jinou větví a nemění se taky.
+
+**Ověřeno rigem na hráčově save91** (`teststartdepo 70 122` +
+`testklon 11 3 [reverz] za 8000`): před opravou 3 odrazy od vrat a
+jedna nesebraná souprava; po opravě žádný odraz, spojení 4/4 s reverzem
+i bez, srážek 0. Tím je uzavřená i odchylka R3/R4.
+
+**Nové oči rigu:** příkaz `testmapa <x1> <y1> <x2> <y2>` vypíše koleje,
+návěstidla (směr, jednosměrnost, barvu) a rezervace výřezu mapy; stopa
+výjezdu z depa hlásí, kde rezervace končí; „konec koleje" hlásí důvod
+(červená / žádná kolej / cizí kolej / volné vagony) a zmizení či zabrání
+cíle spojení se vypisuje.
+
+---
+
 # 3. Rozpojování (decouple)
 
 - Číslo v příkazu je **kolik vozů si vlak nechá**, ne kolik jich nechá stát.

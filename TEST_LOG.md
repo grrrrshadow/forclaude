@@ -3,6 +3,27 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #99 — blikající rezervace u vrat depa a srážka na křížení (2026-08-28)
+
+Hlášení: krátká mašinka bez vagonů vyjížděla z depa, rezervace pod ní
+blikala, na křížení před depem srážka (4 mrtví). Rig to reprodukoval na
+save91 repro-postupem odchylky R3/R4 (`teststartdepo 70 122` +
+`testklon 11 3 reverz za 8000`): sběračka bez průjezdné cesty dostala od
+nouzové větve „zarezervuj aspoň bezpečné místo" jednopolíčkový pahýl
+končící v zádech jednosměrky, vyjela na něj, hra ji otočila, vjela
+zpátky — a dokola. Blikání = rezervace pahýlu tam a pryč při každém
+odrazu.
+
+Oprava: nouzová větev se nespouští pro vlak stojící v depu (téma 2.11).
+
+| běh | před opravou | po opravě |
+|---|---|---|
+| R3-repro (reverz) | 3 odrazy od vrat, spojení 3/4 | 0 odrazů, spojení 4/4, reverz 4/4 |
+| totéž bez reverzu | — | spojení 4/4 |
+| havárie | 0 (v rigu; u hráče srážka) | 0 |
+
+Tím je uzavřená i stará odchylka R3/R4 — byla to táž příčina.
+
 ## Velký test na hráčově save91 — bezhlavě, 16 běhů (2026-08-28)
 
 Hráčův protokol odjetý rigem na jeho vlastním savu: 4 depa × 2 mašinky,
