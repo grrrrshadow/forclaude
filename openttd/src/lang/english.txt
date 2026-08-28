@@ -3758,7 +3758,7 @@ STR_NEWGRF_ERROR_OTTD_VERSION_NUMBER                            :{1:RAW_STRING} 
 STR_NEWGRF_ERROR_AFTER_TRANSLATED_FILE                          :the NewGRF file it was designed to translate
 STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED                        :Too many NewGRFs are loaded
 STR_NEWGRF_ERROR_STATIC_GRF_CAUSES_DESYNC                       :Loading {1:RAW_STRING} as static NewGRF with {2:RAW_STRING} could cause desyncs
-STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5                :This release of CZTR Wagons-Cargo is not prepared for FIRS 5. Use the older CZTR Wagons-Cargo 1.0.0
+STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5                :EVERYTHING WILL WORK with cztr vagons 1.0.0 — ALL CARGOES. Feel free to set Steeltown in FIRS parameters
 STR_NEWGRF_ERROR_UNEXPECTED_SPRITE                              :Unexpected sprite (sprite {3:NUM})
 STR_NEWGRF_ERROR_UNKNOWN_PROPERTY                               :Unknown Action 0 property {4:HEX} (sprite {3:NUM})
 STR_NEWGRF_ERROR_INVALID_ID                                     :Attempt to use invalid ID (sprite {3:NUM})
