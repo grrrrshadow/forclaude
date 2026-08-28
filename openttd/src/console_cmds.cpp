@@ -572,6 +572,7 @@ static bool ConShowTrainOrientation(std::span<std::string_view> argv)
  * @copydoc IConsoleCmdProc
  */
 static bool _testspoj_active = false;
+static uint _testmapa_area[4]; ///< Last built test scene's surroundings, for a no-argument testmapa.
 
 static bool ConTestCouple(std::span<std::string_view> argv)
 {
@@ -594,15 +595,21 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	/* 'blok' stages the occupied platform: the deliverer keeps a wagon told
 	 * to fill up on a map with no cargo, so it never pulls clear of the rake
 	 * it dropped -- the collector must then never be sent for it. */
+	/* 'vlek' plays the two-train shuttle: a light engine collects a whole
+	 * waiting train at the east station and puts it down at a second, western
+	 * station, where the dropped train's way home lies right through where
+	 * the light engine stands and the other way round. */
 	bool backing = false;
 	bool depot_mode = false;
 	bool timetabled = false;
 	bool blocked = false;
+	bool tow_mode = false;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
 		if (argv[i] == "blok") blocked = true;
+		if (argv[i] == "vlek") tow_mode = true;
 	}
 
 	/* A headless newgame (null video driver has no GUI) starts like a
@@ -668,6 +675,8 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	uint x0 = TileX(strip);
 	uint y0 = TileY(strip);
 	IConsolePrint(CC_DEFAULT, "testspoj: strip at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0);
+	_testmapa_area[0] = x0; _testmapa_area[1] = y0 > 1 ? y0 - 1 : 0;
+	_testmapa_area[2] = x0 + LEN - 1; _testmapa_area[3] = y0 + 1;
 
 	/* A depot at each end of one straight line, doors facing inwards, and a
 	 * through platform in the middle. The deliverer comes out of the east
@@ -712,6 +721,69 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	StationID st_id = GetStationIndex(st_tile);
 	DepotID dep_w = GetDepotIndex(depot_w);
 	DepotID dep_e = GetDepotIndex(depot_e);
+
+	if (tow_mode) {
+		/* The second, western station the collected train is put down at. */
+		TileIndex st2_tile = TileXY(x0 + 7, y0);
+		if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st2_tile, RAILTYPE_RAIL, Axis::X, 1, 2, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj: station 2 failed.");
+			return true;
+		}
+		UpdateSignalsInBuffer();
+		StationID st2_id = GetStationIndex(st2_tile);
+
+		/* The train to be carried: engine and two wagons, sent to the east
+		 * station to stand waiting to be collected. */
+		auto [cost_a, veh_a, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_a.Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj: vlek train failed.");
+			return true;
+		}
+		for (int i = 0; i < 2; i++) {
+			auto [costw, wid, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (costw.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, wid, Train::Get(veh_a)->Last()->index, false).Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj: vlek wagon failed.");
+				return true;
+			}
+		}
+		Order wait_at_st0;
+		wait_at_st0.MakeGoToStation(st_id);
+		wait_at_st0.SetLoadType(OrderLoadType::NoLoad);
+		wait_at_st0.SetUnloadType(OrderUnloadType::NoUnload);
+		wait_at_st0.SetWaitForCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_a, 0, wait_at_st0);
+
+		/* The light engine: collect the waiting train at the east station,
+		 * put it down at the western one keeping just itself, then home to
+		 * the east depot -- right through where the dropped train stands. */
+		auto [cost_b, veh_b, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_b.Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj: vlek engine failed.");
+			return true;
+		}
+		Order collect_b;
+		collect_b.MakeGoToStation(st_id);
+		collect_b.SetLoadType(OrderLoadType::NoLoad);
+		collect_b.SetUnloadType(OrderUnloadType::NoUnload);
+		collect_b.SetGoToCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_b, 0, collect_b);
+		Order drop_b;
+		drop_b.MakeGoToStation(st2_id);
+		drop_b.SetLoadType(OrderLoadType::NoLoad);
+		drop_b.SetUnloadType(OrderUnloadType::NoUnload);
+		drop_b.SetDecoupleCount(1);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_b, 1, drop_b);
+		Order home_b;
+		home_b.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_b, 2, home_b);
+
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_a, false);
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_b, false);
+		_testspoj_active = true;
+		IConsolePrint(CC_DEFAULT, "testspoj vlek: vezeny=vlak {}, masinka=vlak {}, stanice0={} stanice2={} ({}..{},{}).",
+				Train::Get(veh_a)->unitnumber, Train::Get(veh_b)->unitnumber, st_id, st2_id, x0 + 7, x0 + 8, y0);
+		return true;
+	}
 
 	/* The delivering train: engine and three wagons. */
 	auto [cost2, veh2, unused_a, unused_b, unused_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
@@ -814,13 +886,17 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 	for (const Train *t : Train::Iterate()) {
 		if (t->First() != t) continue;
 		if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
-		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) rychlost {} couva {} rozkaz {} vozu {} zasekly {} cil {} narok {}",
+		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) rychlost {} couva {} rozkaz {} vozu {} zasekly {} cil {} narok {} stav[{}{}{}{}]",
 				t->unitnumber, TileX(t->tile), TileY(t->tile), t->cur_speed,
 				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
 				to_underlying(t->current_order.GetType()), CountVehiclesInChain(t),
 				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
 				t->couple_target == VehicleID::Invalid() ? -1 : (int)t->couple_target.base(),
-				t->couple_claim == VehicleID::Invalid() ? -1 : (int)t->couple_claim.base());
+				t->couple_claim == VehicleID::Invalid() ? -1 : (int)t->couple_claim.base(),
+				t->vehstatus.Test(VehState::Stopped) ? 'S' : '-',
+				t->flags.Test(VehicleRailFlag::LeavingStation) ? 'L' : '-',
+				t->flags.Test(VehicleRailFlag::Reversing) ? 'R' : '-',
+				t->vehicle_flags.Test(VehicleFlag::LoadingFinished) ? 'F' : '-');
 	}
 	return true;
 }
@@ -884,8 +960,6 @@ static bool ConSaveConsoleLog(std::span<std::string_view> argv)
  * Usage: testmapa <x1> <y1> <x2> <y2>
  * @copydoc IConsoleCmdProc
  */
-static uint _testmapa_area[4]; ///< Last built test scene's surroundings, for a no-argument testmapa.
-
 static bool ConTestMap(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;

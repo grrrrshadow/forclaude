@@ -30,6 +30,7 @@
 #include "company_base.h"
 #include "core/random_func.hpp"
 #include "vehicle_cmd.h"
+#include "console_func.h"
 #include "aircraft_cmd.h"
 #include "autoreplace_cmd.h"
 #include "group_cmd.h"
@@ -662,6 +663,13 @@ CommandCost CmdStartStopVehicle(DoCommandFlags flags, VehicleID veh_id, bool eva
 	if (flags.Test(DoCommandFlag::Execute)) {
 		if (v->IsStoppedInDepot() && !flags.Test(DoCommandFlag::AutoReplace)) DeleteVehicleNews(veh_id, AdviceType::VehicleWaiting);
 
+		{
+			extern bool _show_train_orientation;
+			if (_show_train_orientation && v->type == VehicleType::Train) {
+				IConsolePrint(CC_INFO, "Vlak {}: prepnuta brzda -> {}", v->unitnumber,
+						v->vehstatus.Test(VehState::Stopped) ? "jede" : "STOP");
+			}
+		}
 		v->vehstatus.Flip(VehState::Stopped);
 		if (v->type != VehicleType::Train) v->cur_speed = 0; // trains can stop 'slowly'
 

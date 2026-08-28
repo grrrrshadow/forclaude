@@ -11,8 +11,11 @@
 #include "train.h"
 #include "roadveh.h"
 #include "depot_map.h"
+#include "console_func.h"
 
 #include "safeguards.h"
+
+extern bool _show_train_orientation;
 
 /**
  * Recalculates the cached total power of a vehicle. Should be called when the consist is changed.
@@ -60,7 +63,12 @@ void GroundVehicle<T, Type>::PowerChanged()
 	max_te /= 256;  // Tractive effort is a [0-255] coefficient.
 	if (this->gcache.cached_power != total_power || this->gcache.cached_max_te != max_te) {
 		/* Stop the vehicle if it has no power. */
-		if (total_power == 0) this->vehstatus.Set(VehState::Stopped);
+		if (total_power == 0) {
+			this->vehstatus.Set(VehState::Stopped);
+			if (_show_train_orientation && Type == VehicleType::Train) {
+				IConsolePrint(CC_INFO, "Vlak {}: bez vykonu -> STOP (na ({},{}))", this->unitnumber, TileX(this->tile), TileY(this->tile));
+			}
+		}
 
 		this->gcache.cached_power = total_power;
 		this->gcache.cached_max_te = max_te;

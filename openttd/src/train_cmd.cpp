@@ -3736,6 +3736,10 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	if (keep_count == 0) return false;
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: odpojeni zacina - stop {}", v->unitnumber, v->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
+	}
+
 	/* Taking a train apart is the same work the move command does, and parts of
 	 * that work ask the game which company is acting -- handing out a unit
 	 * number to the half that becomes a train of its own reads it straight from
@@ -3926,6 +3930,19 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 		FreeTrainTrackReservation(remainder);
 		remainder->ReserveTrackUnderConsist();
+		if (_show_train_orientation) {
+			for (Train *u = v; u != nullptr; u = u->Next()) {
+				IConsolePrint(CC_INFO, "Vlak {}: po odpojeni tahac clanek {} stop {}", v->unitnumber, u->index, u->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
+			}
+			for (Train *u = remainder; u != nullptr; u = u->Next()) {
+				IConsolePrint(CC_INFO, "Vlak {}: po odpojeni zbytek clanek {} stop {}", remainder->unitnumber, u->index, u->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
+			}
+			IConsolePrint(CC_INFO, "Vlak {}: vykon tahace {}, vykon zbytku {}", v->unitnumber, v->gcache.cached_power, remainder->gcache.cached_power);
+			IConsolePrint(CC_INFO, "Vlak {}: tahac smer {} trackdir {} na ({},{}); zbytek smer {} couva {} na ({},{})",
+					v->unitnumber, to_underlying(v->direction), to_underlying(v->GetVehicleTrackdir()), v->x_pos, v->y_pos,
+					to_underlying(remainder->direction), remainder->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+					remainder->x_pos, remainder->y_pos);
+		}
 		return true;
 	}
 
@@ -4008,6 +4025,11 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 		} else {
 			InvalidateWindowData(WindowClass::VehicleView, remainder->index);
 		}
+	}
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: odpojeni konci - stop {}, odlozeny stop {}", v->unitnumber,
+				v->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne",
+				remainder->First()->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
 	}
 	return true;
 }
@@ -6044,7 +6066,13 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 
 	/* And nothing that cannot say which way it is pointing gets a path found
 	 * for it; see the matching note in FreeTrainTrackReservation(). */
-	if (!IsValidTrackdir(consist->GetMovingFront()->GetVehicleTrackdir())) return false;
+	if (!IsValidTrackdir(consist->GetMovingFront()->GetVehicleTrackdir())) {
+		if (_show_train_orientation && (consist->wait_counter % (16 * _settings_game.pf.path_backoff_interval)) == 0) {
+			IConsolePrint(CC_INFO, "Vlak {}: cesta neni - celo neumi rict smer (kolej {:#x}, smer {})", consist->unitnumber,
+					consist->GetMovingFront()->track.base(), to_underlying(consist->GetMovingFront()->direction));
+		}
+		return false;
+	}
 
 	const Train *moving_front = consist->GetMovingFront();
 
@@ -6091,9 +6119,30 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 		const Train *head = consist->First();
 		bool is_our_errand = ahead->index == head->couple_target || ahead->index == head->rescue_target;
 
+		/* "In the way" has to mean in front. The platform search that found
+		 * this train scans the whole platform, both ways, so an engine that
+		 * has just put a train down finds that very train standing BEHIND it
+		 * and reads it as a blocker ahead -- and then stands there for the
+		 * rest of the game, asking for a path and being told its own wagons
+		 * are in the way. Measured against the direction the front is
+		 * walking: what lies behind it is not blocking anything, and the
+		 * fresh pathfind below decides from the real ground instead. */
+		{
+			TileIndexDiffC ahead_of_me = TileIndexDiffCByDiagDir(TrackdirToExitdir(moving_front->GetVehicleTrackdir()));
+			int dx = (int)TileX(other_train->tile) - (int)TileX(moving_front->tile);
+			int dy = (int)TileY(other_train->tile) - (int)TileY(moving_front->tile);
+			if (ahead_of_me.x * dx + ahead_of_me.y * dy <= 0) is_our_errand = true;
+		}
+
 		if (ahead->IsFrontEngine() && !is_our_errand) {
 			/* Genuinely blocked by a real, driving train -- nothing
 			 * useful to do but wait, exactly as before. */
+			if (_show_train_orientation && (consist->wait_counter % (16 * _settings_game.pf.path_backoff_interval)) == 0) {
+				IConsolePrint(CC_INFO, "Vlak {}: cesta neni - v ceste stoji vlak {} na ({},{}); ja na ({},{}), smer chuze {}, konec rezervace ({},{})",
+						consist->unitnumber, ahead->unitnumber, TileX(other_train->tile), TileY(other_train->tile),
+						TileX(consist->GetMovingFront()->tile), TileY(consist->GetMovingFront()->tile),
+						to_underlying(consist->GetMovingFront()->GetVehicleTrackdir()), TileX(origin.tile), TileY(origin.tile));
+			}
 			if (mark_as_stuck) MarkTrainAsStuck(consist);
 			return false;
 		}
@@ -6152,6 +6201,10 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	ChooseTrainTrack(consist, new_tile, exitdir, reachable, true, &res_made, mark_as_stuck);
 
 	if (!res_made) {
+		if (_show_train_orientation && (consist->wait_counter % (16 * _settings_game.pf.path_backoff_interval)) == 0) {
+			IConsolePrint(CC_INFO, "Vlak {}: cesta neni - hledani/rezervace selhaly (od ({},{}) smerem {} na ({},{}))",
+					consist->unitnumber, TileX(origin.tile), TileY(origin.tile), to_underlying(origin.trackdir), TileX(new_tile), TileY(new_tile));
+		}
 		/* Free the depot reservation as well. */
 		if (moving_front->track == Track::Depot) SetDepotReservation(moving_front->tile, false);
 		return false;
@@ -6621,6 +6674,14 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 		first->cur_speed = 0;
 		first->subspeed = 0;
 		return 0;
+	}
+
+	if (_show_train_orientation) {
+		const Train *tv = Train::From(v);
+		IConsolePrint(CC_ERROR, "Srazka: jedouci vlak {} clanek {} na ({},{}) rychlost {} smer {} kolej 0x{:X} narazil do vlaku {} clanku {} na ({},{}) smer {} kolej 0x{:X}",
+				first->unitnumber, moving_front->index, moving_front->x_pos, moving_front->y_pos,
+				first->cur_speed, (int)moving_front->direction, (uint)moving_front->track.base(),
+				other->unitnumber, tv->index, tv->x_pos, tv->y_pos, (int)tv->direction, (uint)tv->track.base());
 	}
 
 	/* Crash both trains. Two statements required to guarantee execution
@@ -7740,6 +7801,9 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		bool turn_around = consist->wait_counter % (_settings_game.pf.wait_for_pbs_path * Ticks::DAY_TICKS) == 0 && _settings_game.pf.reverse_at_signals;
 
 		if (!turn_around && consist->wait_counter % _settings_game.pf.path_backoff_interval != 0 && consist->force_proceed == TFP_NONE) return true;
+		if (_show_train_orientation && (consist->wait_counter % (16 * _settings_game.pf.path_backoff_interval)) == 0) {
+			IConsolePrint(CC_INFO, "Vlak {}: zasekly, znovu zada o cestu z ({},{})", consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
+		}
 		if (!TryPathReserve(consist)) {
 			/* Still stuck. */
 			/* Turning round to try the other way is no use when the other
