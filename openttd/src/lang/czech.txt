@@ -4766,6 +4766,7 @@ STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL                      :{LTBLUE}Míří
 STR_VEHICLE_STATUS_NO_ORDERS_VEL                                :{LTBLUE}{VELOCITY} - Žádné příkazy
 STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL                     :{LTBLUE}Míří do {WAYPOINT}, {VELOCITY}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL                        :{ORANGE}Míří do {DEPOT}, {VELOCITY}
+STR_VEHICLE_STATUS_RAKE_TIMETABLE_HOLD                          :{LTBLUE}Stojí podle jízdního řádu (zbývá {NUM} dní)
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Čeká na spojení
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_FULL_LOAD                 :{LTBLUE}Čeká na spojení (plně naložit)
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_NO_LOAD                   :{LTBLUE}Čeká na spojení (nenakládat)

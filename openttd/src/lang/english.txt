@@ -4657,6 +4657,7 @@ STR_VEHICLE_VIEW_AIRCRAFT_STATUS_START_STOP_TOOLTIP             :{BLACK}Current 
 
 # Messages in the start stop button in the vehicle view
 STR_VEHICLE_STATUS_LOADING_UNLOADING                            :{LTBLUE}Loading / Unloading
+STR_VEHICLE_STATUS_RAKE_TIMETABLE_HOLD                          :{LTBLUE}Standing as timetabled ({NUM} days left)
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Waiting for couple
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_FULL_LOAD                 :{LTBLUE}Waiting for couple (full load)
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_NO_LOAD                   :{LTBLUE}Waiting for couple (no loading)

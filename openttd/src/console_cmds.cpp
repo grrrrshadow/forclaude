@@ -40,6 +40,7 @@
 #include "vehicle_func.h"
 #include "station_cmd.h"
 #include "order_cmd.h"
+#include "timetable_cmd.h"
 #include "order_base.h"
 #include "depot_map.h"
 #include "station_map.h"
@@ -587,12 +588,16 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	/* 'couvej' turns the collector round in the shed so it approaches
 	 * backing; 'depo' moves the whole exchange into the west depot: the
 	 * deliverer stores its rake in there and the collector fetches it with a
-	 * go-to-couple depot order. */
+	 * go-to-couple depot order. 'rad' puts a timetabled stay on the deliver
+	 * order: the engine must drop and go at once, and the rake must stand the
+	 * stay out idle -- uncollectable -- before the collector gets it. */
 	bool backing = false;
 	bool depot_mode = false;
+	bool timetabled = false;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
+		if (argv[i] == "rad") timetabled = true;
 	}
 
 	/* A headless newgame (null video driver has no GUI) starts like a
@@ -730,6 +735,15 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		deliver.SetUnloadType(OrderUnloadType::NoUnload);
 		deliver.SetDecoupleCount(1);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
+		if (timetabled) {
+			/* Timetable data goes through its own command; an order inserted
+			 * with the fields pre-filled is refused whole. */
+			if (Command<Commands::ChangeTimetable>::Do(DoCommandFlag::Execute, veh2, 0, MTF_WAIT_TIME, 30 * Ticks::DAY_TICKS).Succeeded()) {
+				IConsolePrint(CC_DEFAULT, "testspoj: odpojovaci prikaz ma jizdni rad 30 dni.");
+			} else {
+				IConsolePrint(CC_ERROR, "testspoj: jizdni rad se nepodaril nastavit.");
+			}
+		}
 		Order home_w;
 		home_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_w);

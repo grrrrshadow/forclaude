@@ -663,6 +663,15 @@ a nula havárií.
 
 # 3. Rozpojování (decouple)
 
+- **Jízdní řád odpojovacího příkazu patří vagonkům, ne mašince.** „Počkat
+  8 dní" na příkazu s odpojením znamená: mašinka odpojí a jede hned;
+  odložená řada těch 8 dní **nečinně stojí** — nenakládá, nevykládá,
+  není cílem spojení (neubírá náklad sousednímu nástupišti) — a teprve
+  pak začne práci, kterou jí mašinka nechala. Smysl: mašinka mezitím
+  odváží jiné vagonky z vedlejšího peronu, řady se střídají. Okno řady
+  po tu dobu píše „Stojí podle jízdního řádu (zbývá N dní)". Hráč čekání
+  ukončí Přeskočit na příkazu řady, jako všechno ostatní u řad. Bez
+  jízdního řádu se nic nemění. Rig: `testspoj rad`.
 - **Odpojuje se při příjezdu, ne při odjezdu.** Mašinka nemá důvod
   prosedět nakládku, která patří vagonkům, co tu nechává — vagonky si
   naloží samy, až odjede (umí to, je to zavedená mechanika). Odpojí se

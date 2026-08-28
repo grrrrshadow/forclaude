@@ -1808,6 +1808,16 @@ void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index)
 	const Order *order = rake->GetOrder(index);
 	if (order == nullptr) return;
 
+	/* Adopting an order is the player's (or the finished load's) word that the
+	 * rake is to get on with things, so a timetabled stay it was waiting out
+	 * ends here -- and a rake that was held back from entering the station by
+	 * that stay enters it now, or the order it adopts has no loading stop to
+	 * live on. */
+	rake->wait_counter = 0;
+	if (!rake->current_order.IsType(OT_LOADING) && IsRailStationTile(rake->tile)) {
+		TrainEnterStation(rake, GetStationIndex(rake->tile));
+	}
+
 	rake->cur_real_order_index = rake->cur_implicit_order_index = index;
 	rake->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
 	rake->current_order.SetLoadType(order->GetLoadType());
@@ -1848,8 +1858,11 @@ bool IsWaitingToBeCoupled(const Train *v)
 	 * finished loading just as much as while they are still at it. Asking only
 	 * about loading made a rake disappear the moment it was done: the engine
 	 * sent to collect it then had a destination that matched nowhere, found no
-	 * route to it, reserved nothing, and drove on without one. */
-	if (head->IsFreeWagon()) return true;
+	 * route to it, reserved nothing, and drove on without one.
+	 *
+	 * Unless it is waiting out a timetabled stay: for that spell it stands
+	 * idle and is nobody's -- see Train::Tick(). */
+	if (head->IsFreeWagon()) return head->wait_counter == 0;
 
 	/* Stranded is the same thing said another way. */
 	if (head->breakdown_ctr == 1 || head->IsWrecked()) return true;
@@ -3656,11 +3669,21 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
  * the mental model that a decoupled remainder is always left in a state
  * ready to be picked up again. See FEATURE_DESIGN_COUPLING_TOW.md.
  *
+ * A timetabled stay on the decouple order belongs to the wagons, not to the
+ * engine: the point of the stay is that the rake stands out a spell at the
+ * platform -- idle, taking no cargo away from the platform next door and
+ * offering itself to nobody -- while the engine goes and works other rakes.
+ * So the stay is handed to the rake as @p hold_ticks: it stands inert for
+ * that long (see Train::Tick()) before it starts the job it was left with,
+ * and the engine is released from the timetabled wait by the caller.
+ *
  * @param v          front of the consist standing at its decouple stop
  * @param keep_count number of vehicles to keep at the front
+ * @param hold_ticks how long the put-down rake stands idle before it starts
+ *                   its job -- the decouple order's timetabled stay
  * @return whether the train was actually split
  */
-bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type)
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks)
 {
 	if (keep_count == 0) return false;
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
@@ -3919,7 +3942,16 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 					remainder->current_order.ShouldWaitForCouple() ? 1 : 0;
 		}
 
-		TrainEnterStation(remainder, station);
+		/* A timetabled stay holds the whole of the rake's life here back: it
+		 * does not enter the station -- so it loads and unloads nothing --
+		 * and it is nobody's to collect (see IsWaitingToBeCoupled()), until
+		 * the time runs out in Train::Tick() or the player skips its order. */
+		remainder->wait_counter = hold_ticks;
+		if (hold_ticks == 0) {
+			TrainEnterStation(remainder, station);
+		} else {
+			InvalidateWindowData(WindowClass::VehicleView, remainder->index);
+		}
 	}
 	return true;
 }
@@ -7474,7 +7506,13 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
 				real_order->GetDestination().ToStationID() == consist->last_station_visited &&
 				TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
-						real_order->GetLoadType(), real_order->GetUnloadType())) {
+						real_order->GetLoadType(), real_order->GetUnloadType(),
+						real_order->GetTimetabledWait())) {
+			/* The order's timetabled stay was just handed to the rake -- the
+			 * point of the stay is that the wagons stand out a spell, not
+			 * that the engine sits coupled to them watching it pass. The
+			 * engine leaves when its own cargo work here is done. */
+			consist->current_order.SetWaitTimetabled(false);
 			return true;
 		}
 	}
@@ -7804,6 +7842,22 @@ bool Train::Tick()
 
 		return TrainLocoHandler(this, true);
 	} else if (this->IsFreeWagon() && !this->vehstatus.Test(VehState::Crashed)) {
+		/* A rake put down by an order with a timetabled stay waits that stay
+		 * out first, idle: it has not entered the station, so it loads and
+		 * unloads nothing and takes no cargo from the platform next door, and
+		 * it is nobody's to collect. The stay is the timetable's, so the
+		 * player ends it early the same way they end anything of a rake's --
+		 * the Skip button on its orders. When the time runs out, the rake
+		 * starts the job it was left with, exactly as if it had just been put
+		 * down. */
+		if (this->wait_counter > 0) {
+			if (--this->wait_counter == 0 && !this->current_order.IsType(OT_LOADING) && IsRailStationTile(this->tile)) {
+				TrainEnterStation(this, GetStationIndex(this->tile));
+				InvalidateWindowData(WindowClass::VehicleView, this->index);
+			}
+			return true;
+		}
+
 		/* A rake of wagons left at a platform works through the order the engine
 		 * left it with -- fill up, or take nothing -- and only when that is done
 		 * does it become something waiting to be collected. Nobody else will

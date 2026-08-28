@@ -3333,6 +3333,14 @@ public:
 
 		if (v->type == VehicleType::Aircraft && Aircraft::From(v)->flags.Test(VehicleAirFlag::DestinationTooFar) && !v->current_order.IsType(OT_LOADING)) return GetString(STR_VEHICLE_STATUS_AIRCRAFT_TOO_FAR);
 
+		/* A rake waiting out the timetabled stay of the order that put it down
+		 * stands idle on purpose; without a word it looks abandoned. The days
+		 * are counted the way the player set them, so they can see the stay
+		 * running out. */
+		if (v->type == VehicleType::Train && Train::From(v)->IsFreeWagon() && Train::From(v)->wait_counter > 0) {
+			return GetString(STR_VEHICLE_STATUS_RAKE_TIMETABLE_HOLD, (Train::From(v)->wait_counter + Ticks::DAY_TICKS - 1) / Ticks::DAY_TICKS);
+		}
+
 		/* Vehicle is in a "normal" state, show current order. */
 		if (mouse_over_start_stop) {
 			if (v->vehstatus.Test(VehState::Stopped)) {
