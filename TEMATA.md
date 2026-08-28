@@ -1400,6 +1400,37 @@ nikdy neuvedlo — tam není z čeho couvat.
 
 ---
 
+# 13.7 FIRS se kvůli CZTR mašinkám sám vypíná — naše hra mu je zatají
+
+**Co se dělo.** FIRS od verze 4 nosí v sobě natvrdo seznam „nekompatibilních"
+GRF (ve zdrojáku `src/grf/incompatible_grfs.py`) a při startu hry se ptá, jestli
+některý z nich není nahraný. Všechny čtyři sady CZTR Engines na tom seznamu
+jsou — Steam `4D490207`, Electric `4D490208`, Diesel `4D490209`, EMU `4D490210`.
+Když FIRS některou najde, vyhodí fatální hlášku `E01: Incompatible set` a **sám
+sebe vypne** — bez FIRSu pak nejede průmysl. Důvod autorů FIRSu: CZTR mašinky si
+definují vlastní náklady. U nás ale náklady vozí Uacs vagonky, které si je berou
+od FIRSu (téma 13), takže ta pojistka jen překáží.
+
+**Jak je to vyřešené.** Ta kontrola je obyčejný dotaz GRF na hru: „je/bude
+aktivní GRF s tímhle ID?" (akce 7, podmínka `0x0A`). Odpovídá na něj jediné
+místo — `newgrf/newgrf_act7_9.cpp`, `SkipIf()`. Tam je teď výjimka
+`HideGrfFromIncompatibilityCheck()`: **když se FIRS (jakákoli verze, ID
+`F12500xx`) ptá na některé ze čtyř CZTR ID, hra odpoví „takový GRF neznám".**
+FIRS pak chybový blok sám přeskočí — úplně stejně, jako by CZTR ve hře nebylo —
+a normálně se spustí. Lež platí jen pro tazatele FIRS a jen pro ta čtyři ID;
+každý jiný dotaz kohokoli na cokoli jede beze změny. Obráceně se nelže schválně:
+kdyby se CZTR ptalo na FIRS, může to dělat proto, aby si podle toho zapnulo
+FIRSí náklady — to se rozbít nesmí.
+
+**Ověřeno v bezhlavém rigu** třemi mini-GRF: napodobenina CZTR (jen hlavička
+s ID Diesel), napodobenina FIRSu (stejný dotaz + stejná fatální chyba jako
+pravý FIRS) a kontrolní GRF s cizím ID a toutéž kontrolou. Výsledek: CZTR
+aktivní, FIRS chybu přeskočil a aktivoval se, kontrolní GRF chybu vyhodil —
+takže napodobenina je věrná a výjimka opravdu platí jen pro tu jednu dvojici.
+Generátor těch GRF není v repozitáři (je to pomůcka rigu, ne hry).
+
+---
+
 # 14. Statistika firmy podle TTDPatch
 
 V okně firmy je pod čudlíkem ředitelství čudlík **Statistika**. Otevře okno

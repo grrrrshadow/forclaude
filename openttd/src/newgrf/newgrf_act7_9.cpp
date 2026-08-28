@@ -21,6 +21,37 @@
 
 #include "../safeguards.h"
 
+/**
+ * FIRS carries a hardcoded list of "incompatible" GRFs and disables itself with a
+ * fatal E01 error when one of them is loaded; the CZTR Engines sets are on that
+ * list because they define their own cargos. In this build the CZTR cargos are
+ * handled by wagons that take their cargos from FIRS, so the combination works
+ * and the self-disable only gets in the way. When FIRS (any version) asks the
+ * game whether a CZTR Engines GRF is loaded, we answer "no such GRF" so the
+ * error block is skipped and FIRS activates normally. The lie is limited to
+ * exactly this asker/target pair; every other GRF status query is untouched.
+ * @param asker GRF ID (internal byte order) of the GRF doing the Action 7/9 check.
+ * @param target GRF ID (internal byte order) of the GRF being asked about.
+ * @return true if the target should be reported as absent to this asker.
+ */
+static bool HideGrfFromIncompatibilityCheck(GrfID asker, GrfID target)
+{
+	/* Constants below are in the byte order shown in-game / on BaNaNaS. */
+	uint32_t asker_display = std::byteswap(asker);
+	if ((asker_display & 0xFFFFFF00) != 0xF1250000) return false; // FIRS, any version byte
+
+	switch (std::byteswap(target)) {
+		case 0x4D490207: // CZTR Engines-Steam
+		case 0x4D490208: // CZTR Engines-Electric
+		case 0x4D490209: // CZTR Engines-Diesel
+		case 0x4D490210: // CZTR Engines-EMU
+			return true;
+
+		default:
+			return false;
+	}
+}
+
 /** 32 * 8 = 256 flags. Apparently TTDPatch uses this many.. */
 static std::array<uint32_t, 8> _ttdpatch_flags;
 
@@ -254,6 +285,11 @@ static void SkipIf(ByteReader &buf)
 
 		if (c != nullptr && c->flags.Test(GRFConfigFlag::Static) && !_cur_gps.grfconfig->flags.Test(GRFConfigFlag::Static) && _networking) {
 			DisableStaticNewGRFInfluencingNonStaticNewGRFs(*c);
+			c = nullptr;
+		}
+
+		if (c != nullptr && HideGrfFromIncompatibilityCheck(_cur_gps.grfconfig->ident.grfid, c->ident.grfid)) {
+			GrfMsg(2, "SkipIf: hiding GRFID 0x{:08X} from incompatibility check by 0x{:08X}", std::byteswap(c->ident.grfid), std::byteswap(_cur_gps.grfconfig->ident.grfid));
 			c = nullptr;
 		}
 
