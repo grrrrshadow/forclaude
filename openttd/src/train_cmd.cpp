@@ -3451,47 +3451,42 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * contradicts its neighbours. */
 	NormaliseCoupledConsistFacing(new_head);
 
-	/* Which end of the joined train leads is a separate question, and it is not
-	 * one to answer from the order of the list.
+	/* Which end of the joined train leads: always the end the partner was
+	 * attached to. Not measured, because there is nothing left to measure --
+	 * the rule "a train keeps its direction of travel" and the shape this
+	 * train now has pin the answer completely:
 	 *
-	 * A train is described by two things that have nothing to do with each
-	 * other: the order of its vehicles, and which end goes first when it moves.
-	 * Coupling does not change the first and reversing does not change the
-	 * second. On a platform reached by backing in, those two point at opposite
-	 * ends of the train; on one reached nose first, at the same end. So any
-	 * rule that names an end -- "the head leads" -- is right on one and
-	 * backwards on the other, which is why fixing one kind of platform kept
-	 * breaking the other.
+	 * The engine drove TO its partner, so its direction of travel at the
+	 * meeting points through the partner -- carrying on means driving through
+	 * what it came for, pushing it out ahead. And the splice above always
+	 * hangs the partner off the tail of the list, while the facing
+	 * normalisation always leaves the head's nose pointing away from the body
+	 * -- away from the partner. So "carry on the way you were going" is,
+	 * structurally, "the tail end leads": DrivingBackwards, every time.
 	 *
-	 * So measure it, against the one thing the player can see coming: the
-	 * collecting engine carries on the way it was already going. Picking
-	 * something up does not turn you round. That is what collecting wagons has
-	 * always done, and it is the whole of the rule now -- a train collected off
-	 * another train is not a different case and must not behave like one.
+	 * This replaces measuring the collector's heading at the moment of
+	 * coupling, which was the same answer taken by a longer and breakable
+	 * road: the free-wagon doorstep guard flips an arriving collector round
+	 * on the spot one step before it couples ("konec koleje (pri jizde)" at
+	 * the wagons), and a heading read after that flip points back where the
+	 * train came from. The measurement then concluded, faithfully, that
+	 * "carrying on" meant going home -- and the joined train left by the side
+	 * it arrived, wagons in tow, exactly what this rule exists to prevent.
+	 * The rig's clean scene never flips on approach, so the measurement
+	 * looked right there and wrong on every real station.
 	 *
-	 * The rule this replaces said the joined train leaves by the way the engine
-	 * came in, which turns it round on the spot. It was the only place where
-	 * coupling changed a direction of travel, it made an engine that collected
-	 * from one side of a station behave differently from one that collected from
-	 * the other, and nothing the player did asked for it. Turning round is now
-	 * something only decoupling, the end of the track, and the end of a terminus
-	 * platform can cause -- and the player's own reverse button, which is a
-	 * different thing entirely because they pressed it.
-	 *
-	 * Compared as a direction rather than for equality: a vehicle on a curve is
-	 * up to 45 degrees off and is perfectly correct. See
-	 * FEATURE_DESIGN_COUPLING_TOW.md. */
-	TileIndexDiffC nose = TileIndexDiffCByDir(new_head->direction);
-	TileIndexDiffC going = TileIndexDiffCByDir(arrived_heading);
-	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, nose.x * going.x + nose.y * going.y < 0);
+	 * A train that really is to go back has the player's reverse-out flag,
+	 * honoured at the conclusion below; and the route to wherever the next
+	 * order points is the pathfinder's job after departure, never a reason to
+	 * turn on the spot here. */
+	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, true);
 
 	/* No driving-cab override on top of that. It was tried twice and it is
 	 * wrong both times, and the headless rig caught it red-handed: the facing
 	 * normalisation above always leaves the head engine's recorded nose
 	 * pointing away from the body of the train -- away from whatever was just
 	 * collected -- so "the cab end leads" always reads as "go back the way
-	 * you came", whichever way the engine actually arrived. The measurement
-	 * is the one rule, for wagons and trains alike. */
+	 * you came", whichever way the engine actually arrived. */
 	new_head->flags.Reset(VehicleRailFlag::Reversing);
 	new_head->ConsistChanged(CCF_TRACK);
 

@@ -383,12 +383,28 @@ jsi přijel", ať mašinka přijela jakkoli. Hráč měl pravdu, že „v #90 to
 jezdí blbě, takhle jako teď" — kabina byla v #90 i v mém včerejším
 vrácení, a moje archeologie z deníku byla špatně.
 
-**Platí jediné pravidlo pro všechno, co se spojuje: změřené „neměnit
-směr jízdy".** V rigu ověřeno pro sběr vagonků nosem napřed i
-nacouváním (obojí správně vytlačí druhou stranou) a je to totéž
-pravidlo, kterým od #91 jezdí spojené vlaky — sjednoceno, žádné dva
-režimy. Příznak couvání přežívá až k měření („pred spojenim - couva
-ano" v protokolu), takže vstup měření je zdravý.
+**Platí jediné pravidlo pro všechno, co se spojuje: „neměnit směr
+jízdy".** A po hráčově hlášení z reálného nádraží padlo i **měření** toho
+pravidla — zůstala jen jeho konstanta:
+
+Měřilo se „kterým směrem mašinka přijela" v okamžiku spojení. Jenže krok
+před spojením mašinku otočí na místě **zábrana před volnými vagonky**
+(„konec koleje (pri jizde) — volne vagony": aby do stojící řady nenajela,
+hra ji zastaví otočkou). Směr přečtený po té otočce ukazuje zpátky domů,
+a „pokračuj svým směrem" pak poctivě znamenalo „vrať se, kudy jsi
+přijela" — i s vagonky. Čistá scéna rigu se u vagonků neodráží, takže
+tam měření vycházelo; na skutečném nádraží se odráží skoro vždycky
+(protokol save91 to měl ve stopách celou dobu: „pred spojenim - smer
+prijezdu 5" u sběračky, která jela na západ).
+
+Konstanta: mašinka jela **ke svému cíli**, takže pokračovat znamená
+projet skrz to, co si přijela sebrat — vytlačit to před sebou. A po
+spliceu visí sebrané vždycky na konci seznamu a nos hlavy ukazuje od
+těla. Takže „neměnit směr" je stavebně **vede konec s vagonky**
+(`DrivingBackwards = true`), pokaždé, bez měření. Trasu k dalšímu
+příkazu si pak najde pathfinder až po odjezdu — vyjede se protější
+stranou nádraží a k cíli za zády se objíždí okruhem, ne otočkou na
+peronu. Kdo se opravdu má vracet, má na to hráčův reversní chod.
 
 Zrušeno je i doptávání se hledače cesty hned po spojení (viz 2.5). Bylo
 vyzkoušené a otáčelo vlak na třech nástupištích ze čtyř. Vlak, který má
