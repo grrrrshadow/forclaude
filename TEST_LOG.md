@@ -3,6 +3,24 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #99 — odtah na výhybkách: assert a narovnání vraku (2026-08-28)
+
+Hlášení: assert `IsValidDiagDirection(exitdir)` (train_cmd.cpp:6509 buildu
+#99) při odtahu — odtahovka se na výhybkách nedostala k vraku před čumák.
+Rig scénou `testodtah` (porucha ohnutá přes výhybku) reprodukoval tutéž
+rodinu pádů a po opravách (téma 4.3: čisté konce spojení, narovnání vraku,
+kasualita nedrží trať) prošlo všechno:
+
+| běh | výsledek |
+|---|---|
+| `testodtah` (výhybka) | narovnání + spojení bez pádu, odvoz do depa, složení |
+| `testodtah rovina` (kontrola) | bez narovnání, spojení postaru, odvoz do depa |
+| save91 protokol s reverzem | spojení 4/4, reverz 4/4, 0 havárií |
+| save91 protokol bez reverzu | spojení 4/4, 0 havárií |
+
+Cestou se opravilo i to, že si porouchaný vlak nechával zarezervovanou
+cestu před sebou a odtahovka se k němu přes ni vůbec nemohla vydat.
+
 ## Build #99 — blikající rezervace u vrat depa a srážka na křížení (2026-08-28)
 
 Hlášení: krátká mašinka bez vagonů vyjížděla z depa, rezervace pod ní

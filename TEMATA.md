@@ -729,6 +729,45 @@ koncích. **Odpadlo přechodem na beta 16**, kde je skutečná jízda
 pozpátku. Zároveň tím zmizelo riziko chyby A ze starého patche — příznak,
 který měl ovlivnit jen vykreslení, tam přepisoval skutečný směr jízdy.
 
+## 4.3 Odtah na výhybkách — odtahovka si vrak narovná
+
+**Co hráč hlásil.** Assert `IsValidDiagDirection(exitdir)` (train_cmd.cpp,
+vagon hledá předchůdce a ten není na sousedním políčku): odtahovka se na
+výhybkách nemá jak dostat k vraku před čumák, spojení se přesto uzavřelo
+„na blízkost" a vznikl vlak s dírou ohnutou přes křižovatku. Hráčův návrh:
+odtahovka vyprošťuje, tak ať si vrak narovná. Návrh je správně — na
+výhybce žádné ježdění najetí neumožní.
+
+**Tři pravidla, která z toho vzešla:**
+
+1. **Spojení se uzavře jen na čistých koncích.** Čistý konec = oba konce
+   na rovných kolejích (X/Y) a po kolejích na sebe navazují (měří se
+   krátkou obchůzkou po kolejích, `AreCoupleEndsRailConnected`; peron se
+   počítá celý, protože sledovač kolejí ho přeskakuje jedním krokem).
+   Nádražní spojování se nemění — perony jsou rovné z principu. Nečisté
+   obyčejné spojení se prostě neprovede (vlak stojí dál); nečistý odtah
+   jde na narovnání.
+
+2. **Narovnání (`LayCasualtyAlongTow`), jen pro odtah.** Vrak se zvedne
+   **vcelku** a položí se na kolej před odtahovku, vůz za vozem po
+   políčkách; dotahovací krok ho pak přitáhne. Napřed se celá pokládka
+   naplánuje — cizí vlak v cestě, tunel/most nebo konec koleje ji odmítne
+   a pak se nestane vůbec nic, vrak leží dál. Opuštěná políčka se uklidí
+   jako při vyjetí vlaku (rezervace, přejezd, návěstidla). Na rovině se
+   nenarovnává — tam platí normální najetí jako dřív.
+
+3. **Kasualita nedrží trať.** Porouchaný vlak si nechával zarezervovanou
+   cestu, kterou už nikdy nepojede — a odtahovka se přes ni k němu
+   nedokázala dostat (nemohla si trasu zabrat, stála v depu do vypršení
+   lhůty). Ve chvíli, kdy vlak začne čekat na odtah, se mu cesta uvolní
+   a drží jen zem pod sebou — stejné pravidlo jako u odložených vlaků.
+
+**Rig:** `testodtah` postaví scénu (porucha ohnutá přes výhybku do jižní
+odbočky, odtahovka na zavolání v západním depu), `testodtah rovina` je
+kontrola na rovné trati (narovnání se nesmí spustit). Obě ověřeny: spojení
+bez pádu, odvoz do depa, složení vraku; regrese nádražního protokolu na
+save91 4/4 s reverzem i bez.
+
 ---
 
 # 5. Myš, kurzor, stavba

@@ -1007,6 +1007,204 @@ static bool ConTestClone(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Build the junction-rescue scene: a casualty that breaks down bent across a
+ * set of points, with both of its track pieces unconnectable from the rescue
+ * engine's approach -- the exact shape in which coupling used to assert.
+ *
+ * Layout on the flattest strip: depots at both ends of a main line, a branch
+ * curving south off the middle of it (a LOWER curve into a Y stub ending in a
+ * small platform). The casualty (engine + one wagon) sets off from the east
+ * depot for the branch station and is broken down by the tick watcher the
+ * moment its front turns onto the branch, leaving it lying across the curve.
+ * The rescue engine waits on call in the west depot; its approach enters the
+ * junction tile over the edge the curve does not touch, so no driving can
+ * bring it nose-to-end -- the straightening has to do it.
+ * Usage: 'testodtah'.
+ * @copydoc IConsoleCmdProc
+ */
+static VehicleID _testodtah_casualty = VehicleID::Invalid();
+static TileIndex _testodtah_break_tile = INVALID_TILE;
+
+static bool ConTestRescue(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina]'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testodtah: only in a running game.");
+		return true;
+	}
+	/* 'rovina' breaks the casualty down on the plain main line instead of on
+	 * the points -- the control case: no straightening may fire there. */
+	bool plain = argv.size() >= 2 && argv[1] == "rovina";
+
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testodtah: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	_settings_game.vehicle.train_rescue_towing = true;
+
+	EngineID eid_loco = EngineID::Invalid();
+	EngineID eid_wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+		} else {
+			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
+		}
+		if (eid_loco != EngineID::Invalid() && eid_wagon != EngineID::Invalid()) break;
+	}
+	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testodtah: no available engine or wagon.");
+		return true;
+	}
+
+	/* The flattest clear run, like testspoj's, plus one column somewhere in
+	 * its middle with room for the branch below. */
+	static const uint LEN = 40;
+	TileIndex strip = INVALID_TILE;
+	uint xj = 0;
+	for (uint y = 8; y < Map::SizeY() - 12 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			TileIndex t = TileXY(x, y);
+			bool ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+			int z = ok ? GetTileZ(t) : -1;
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					uint sx0 = x - LEN + 1;
+					/* A branch column: five flat clear tiles straight down,
+					 * anywhere in the middle third of the strip. */
+					for (uint bx = sx0 + 12; bx <= sx0 + 27; bx++) {
+						bool col_ok = true;
+						for (uint dy = 1; dy <= 5; dy++) {
+							TileIndex bt = TileXY(bx, y + dy);
+							if (!(IsTileType(bt, TileType::Clear) || IsTileType(bt, TileType::Trees)) || GetTileSlope(bt) != SLOPE_FLAT || GetTileZ(bt) != z0) { col_ok = false; break; }
+						}
+						if (col_ok) {
+							strip = TileXY(sx0, y);
+							xj = bx;
+							break;
+						}
+					}
+					if (strip != INVALID_TILE) break;
+					run--; // keep sliding the window
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testodtah: no flat clear area found.");
+		return true;
+	}
+	uint x0 = TileX(strip);
+	uint y0 = TileY(strip);
+	IConsolePrint(CC_DEFAULT, "testodtah: strip at ({},{})..({},{}), junction at ({},{}).", x0, y0, x0 + LEN - 1, y0, xj, y0);
+
+	TileIndex depot_w = TileXY(x0, y0);
+	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_w, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
+			Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_e, RAILTYPE_RAIL, DiagDirection::NE).Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: depot failed.");
+		return true;
+	}
+	if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: track failed.");
+		return true;
+	}
+	/* The branch: a curve off the main line toward the south, a short stub, a
+	 * platform at its end for the casualty to be heading to. The curve is the
+	 * whole point: it hangs on the two edges of the junction tile that the
+	 * rescue engine's approach cannot reach. */
+	if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(xj, y0), RAILTYPE_RAIL, Track::Lower, false).Failed() ||
+			Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(xj, y0 + 1), TileXY(xj, y0 + 2), RAILTYPE_RAIL, Track::Y, false, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: branch failed.");
+		return true;
+	}
+	if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, TileXY(xj, y0 + 3), RAILTYPE_RAIL, Axis::Y, 1, 2, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: branch station failed.");
+		return true;
+	}
+	for (uint sx : {x0 + 2, xj - 3, xj + 3, x0 + LEN - 3}) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
+			IConsolePrint(CC_ERROR, "testodtah: signal at ({},{}) failed.", sx, y0);
+			return true;
+		}
+	}
+	UpdateSignalsInBuffer();
+
+	StationID st_branch = GetStationIndex(TileXY(xj, y0 + 3));
+
+	/* The casualty: engine and one wagon, short enough that when it breaks on
+	 * the branch nothing of it still lies on the main line. */
+	auto [cost_c, veh_c, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_c.Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: casualty engine failed.");
+		return true;
+	}
+	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_w.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_w, Train::Get(veh_c)->Last()->index, false).Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: casualty wagon failed.");
+		return true;
+	}
+	Order to_branch;
+	to_branch.MakeGoToStation(st_branch);
+	to_branch.SetLoadType(OrderLoadType::NoLoad);
+	to_branch.SetUnloadType(OrderUnloadType::NoUnload);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_c, 0, to_branch);
+
+	/* The rescue engine, on call in the west depot: flag set, brake off. */
+	auto [cost_r, veh_r, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_r.Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: rescue engine failed.");
+		return true;
+	}
+	if (Command<Commands::SetRescueEngine>::Do(DoCommandFlag::Execute, veh_r, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testodtah: could not station the rescue engine.");
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+
+	/* Send the casualty off; the tick watcher breaks it down the moment its
+	 * front turns onto the branch. */
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
+	_testodtah_casualty = veh_c;
+	_testodtah_break_tile = plain ? TileXY(xj + 8, y0) : TileXY(xj, y0 + 1);
+	_testspoj_active = true;
+
+	IConsolePrint(CC_DEFAULT, "testodtah: scene ready. casualty=vlak {}, rescue=vlak {}, break at ({},{}).",
+			Train::Get(veh_c)->unitnumber, Train::Get(veh_r)->unitnumber, TileX(_testodtah_break_tile), TileY(_testodtah_break_tile));
+	return true;
+}
+
+/** Break the testodtah casualty down the moment it reaches the armed tile. */
+static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Priority::None, 1}, [](auto) {
+	if (_testodtah_break_tile == INVALID_TILE) return;
+	Train *t = Train::GetIfValid(_testodtah_casualty);
+	if (t == nullptr) {
+		_testodtah_break_tile = INVALID_TILE;
+		return;
+	}
+	if (t->tile != _testodtah_break_tile) return;
+	t->breakdown_ctr = 2;
+	_testodtah_break_tile = INVALID_TILE;
+	IConsolePrint(CC_INFO, "testodtah: vlak {} porouchan na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+});
+
 /** While the test scene runs, say where everybody stands every few seconds. */
 static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Priority::None, 1000}, [](auto) {
 	if (!_testspoj_active) return;
@@ -3821,6 +4019,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
+	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);

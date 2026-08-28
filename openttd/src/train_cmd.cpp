@@ -2407,6 +2407,211 @@ static bool AreConsistsCloseEnoughToCouple(const Train *a, const Train *b)
 }
 
 /**
+ * Are the two meeting ends of a coupling joined by actual rail, close by?
+ *
+ * Being near each other on the map is not the same as being connected: at a
+ * junction the two can stand a tile apart with nothing but an impassable
+ * crossing between them. Splicing them anyway builds a train with a hole bent
+ * round a corner in it, the close-up walk cannot drive that shut, and a wagon
+ * that later looks for the vehicle ahead of it finds it on a tile that is not
+ * even adjacent -- which is an assert and the game goes down. So walk the
+ * rails: from the end of one train, along every branch, a few tiles at most,
+ * and see whether the other train's end is standing on track we can reach.
+ *
+ * @param from the vehicle at the meeting end of one consist
+ * @param to   the vehicle at the meeting end of the other
+ * @return true if @p to stands on rail reachable from @p from within the gap
+ *         a coupling is allowed to close
+ */
+static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore);
+
+static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
+{
+	/* Depots stack their chains on one tile and couple by their own rules;
+	 * wormholes have no per-tile geometry to walk. Neither is this check's
+	 * business. */
+	if (from->track.Any({Track::Depot, Track::Wormhole}) || to->track.Any({Track::Depot, Track::Wormhole})) return true;
+	if (from->tile == to->tile) return from->track == to->track;
+
+	/* Two ends standing on the same platform are joined by the platform: a
+	 * platform is straight connected track by construction. This cannot be
+	 * left to the walk below, because the track follower crosses a whole
+	 * platform in one step and never visits the tiles in the middle. */
+	if (IsRailStationTile(from->tile) && IsRailStationTile(to->tile) &&
+			IsCompatibleTrainStationTile(to->tile, from->tile)) {
+		TileIndexDiff delta = TileOffsByAxis(GetRailStationAxis(from->tile));
+		for (TileIndex t = from->tile + delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, from->tile); t += delta) {
+			if (t == to->tile) return true;
+		}
+		for (TileIndex t = from->tile - delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, from->tile); t -= delta) {
+			if (t == to->tile) return true;
+		}
+	}
+
+	Track target = TrackBitsToTrack(to->track);
+
+	std::vector<std::pair<TileIndex, Trackdir>> queue;
+	std::vector<std::pair<TileIndex, Trackdir>> seen;
+	for (Trackdir td : TRACKDIR_BIT_MASK) {
+		if (TrackdirToTrack(td) != TrackBitsToTrack(from->track)) continue;
+		queue.emplace_back(from->tile, td);
+	}
+
+	/* The distance test in AreConsistsCloseEnoughToCouple() allows about two
+	 * tiles of gap, so anything genuinely connected is connected within a
+	 * couple of steps. */
+	static const uint MAX_STEPS = 4;
+	for (uint step = 0; step < MAX_STEPS && !queue.empty(); step++) {
+		std::vector<std::pair<TileIndex, Trackdir>> next;
+		for (const auto &[tile, td] : queue) {
+			CFollowTrackRail ft(from->First());
+			if (!ft.Follow(tile, td)) continue;
+			for (Trackdir cand : ft.new_td_bits) {
+				if (ft.new_tile == to->tile && TrackdirToTrack(cand) == target) return true;
+				/* A step onto a platform lands on its far end -- the follower
+				 * crosses the whole platform in one step -- so standing
+				 * anywhere on that platform counts as reached. */
+				if (TrackdirToTrack(cand) == target && IsRailStationTile(ft.new_tile) &&
+						IsRailStationTile(to->tile) && IsCompatibleTrainStationTile(to->tile, ft.new_tile)) {
+					return true;
+				}
+				auto key = std::pair(ft.new_tile, cand);
+				if (std::ranges::find(seen, key) != seen.end()) continue;
+				seen.push_back(key);
+				next.push_back(key);
+			}
+		}
+		queue = std::move(next);
+	}
+	return false;
+}
+
+/**
+ * Lift a casualty off wherever it is lying and lay it down along the rails at
+ * the rescue engine's coupling end, one vehicle per tile, so the two can be
+ * coupled as if the engine had driven right up to it.
+ *
+ * This exists for the case the geometry cannot solve: a casualty on a set of
+ * points has no track leading nose-to-nose to it, so no amount of driving gets
+ * the rescue engine in front of it. A rescue engine is not an ordinary train
+ * though -- it is a recovery job, and recovering a wreck includes getting it
+ * back on the rails in a line. So when the ordinary approach is impossible,
+ * the wreck is straightened: laid out along the track the engine is facing,
+ * spaced a tile apart, for the ordinary close-up walk to pull snug. Nothing
+ * here applies to ordinary couplings; those are refused instead, see
+ * CmdCoupleTrains().
+ *
+ * The laying refuses honestly rather than force anything: a stranger's train
+ * on the bed, a tunnel or bridge mouth, or track running out before the whole
+ * casualty is down each abort the attempt, and the coupling then simply does
+ * not happen this tick.
+ *
+ * @param tow      the rescue engine, front of its consist
+ * @param casualty the train to straighten, front of its consist
+ * @return true if the casualty now lies along the tow's track, ready to splice
+ */
+static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
+{
+	Train *mf = tow->GetMovingFront();
+	if (mf->track.Any({Track::Depot, Track::Wormhole})) return false;
+
+	Trackdir cur_td = TrackDirectionToTrackdir(TrackBitsToTrack(mf->track), mf->GetMovingDirection());
+	if (!IsValidTrackdir(cur_td)) return false;
+	TileIndex cur_tile = mf->tile;
+
+	/* Walk one step of the bed: follow the rails, refuse anything that cannot
+	 * carry the wreck, prefer the branch that leads on toward where the
+	 * casualty is lying (so it is dragged into line, not around the block). */
+	CFollowTrackRail ft(tow);
+	auto step = [&]() -> bool {
+		if (!ft.Follow(cur_tile, cur_td)) return false;
+		if (IsTileType(ft.new_tile, TileType::TunnelBridge)) return false;
+		for (const Vehicle *o : VehiclesOnTile(ft.new_tile)) {
+			if (o->type != VehicleType::Train) return false;
+			const Train *of = Train::From(o)->First();
+			if (of != casualty && of != tow) return false;
+		}
+		Trackdir pick = Trackdir::Invalid;
+		uint best = UINT_MAX;
+		for (Trackdir cand : ft.new_td_bits) {
+			uint d = DistanceManhattan(TileAddByDiagDir(ft.new_tile, TrackdirToExitdir(cand)), casualty->tile);
+			if (d < best) { best = d; pick = cand; }
+		}
+		if (pick == Trackdir::Invalid) return false;
+		cur_tile = ft.new_tile;
+		cur_td = pick;
+		return true;
+	};
+
+	/* Plan the whole bed before moving anything, so a failure half-way leaves
+	 * the casualty exactly where it was. One spare tile between the engine and
+	 * the first vehicle keeps the pair from being put down overlapping; the
+	 * close-up walk only knows how to pull a gap shut, not push one open. */
+	struct Berth {
+		TileIndex tile;
+		Track track;
+		DiagDirection enterdir;
+	};
+	std::vector<Berth> bed;
+	if (!step()) return false;
+	for (const Train *u = casualty; u != nullptr; u = u->Next()) {
+		if (!step()) return false;
+		bed.push_back({cur_tile, TrackdirToTrack(cur_td), ft.exitdir});
+	}
+
+	/* Remember what ground it is being lifted off, to be tidied below. */
+	std::vector<std::pair<TileIndex, TrackBits>> vacated;
+	for (const Train *u = casualty; u != nullptr; u = u->Next()) vacated.emplace_back(u->tile, u->track);
+
+	auto it = bed.begin();
+	for (Train *u = casualty; u != nullptr; u = u->Next(), ++it) {
+		GetNewVehiclePosResult gp{};
+		gp.x = TileX(it->tile) * TILE_SIZE;
+		gp.y = TileY(it->tile) * TILE_SIZE;
+		Direction dir = VehicleEnterTileCoordinates(gp, it->enterdir, it->track);
+		if (dir == Direction::Invalid) return false;
+
+		u->tile = it->tile;
+		u->track = TrackBits{it->track};
+		u->direction = dir;
+		u->x_pos = gp.x;
+		u->y_pos = gp.y;
+		u->z_pos = GetSlopePixelZ(gp.x, gp.y, true);
+		u->UpdatePosition();
+		u->UpdateViewport(true, true);
+	}
+
+	/* The ground the casualty was lifted off: give back what it was holding
+	 * there, exactly the way deleting a wreck's wagon gives its tile back --
+	 * reservation, crossing, signals. Skipped for any tile something is still
+	 * standing on (the bed can reuse part of the old ground). */
+	for (const auto &[tile, bits] : vacated) {
+		if (bits.Any({Track::Wormhole, Track::Depot})) continue;
+		bool still_used = false;
+		for (const Vehicle *o : VehiclesOnTile(tile)) {
+			if (o->type == VehicleType::Train) { still_used = true; break; }
+		}
+		if (still_used) continue;
+		Track track = TrackBitsToTrack(bits);
+		if (HasReservedTracks(tile, bits)) UnreserveRailTrack(tile, track);
+		if (IsLevelCrossingTile(tile)) UpdateLevelCrossing(tile);
+		if (IsRailStationTile(tile)) {
+			bool occupied = IsRailStationPlatformOccupied(tile, nullptr);
+			DiagDirection dir = AxisToDiagDir(GetRailStationAxis(tile));
+			SetRailStationPlatformReservation(tile, dir, occupied);
+			SetRailStationPlatformReservation(tile, ReverseDiagDir(dir), occupied);
+		}
+		SetSignalsOnBothDir(tile, track, casualty->owner);
+	}
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: narovnal vrak vlaku {} k sobe na kolej", tow->unitnumber, casualty->unitnumber);
+	}
+
+	return true;
+}
+
+/**
  * Pull a freshly coupled part up against the rest of its train, closing the gap
  * the coupling was made across.
  *
@@ -2645,6 +2850,18 @@ bool TrainAwaitsRescue(Train *v)
 
 	if (v->rescue_deadline == TimerGameEconomy::Date{}) {
 		v->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+
+		/* From this moment the train is going nowhere until it is fetched, so
+		 * the path it had reserved ahead of itself is track it will never
+		 * drive -- and track the rescue engine may well need to come in over.
+		 * Held, it kept the tow out for the whole of the wait: the approach
+		 * could not be reserved across it, the tow never left its depot, and
+		 * the deadline ran out with nobody having moved. Same rule as every
+		 * other train that stands to be collected: it keeps the ground under
+		 * itself and nothing else. */
+		FreeTrainTrackReservation(v);
+		v->ReserveTrackUnderConsist();
+
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 	}
 
@@ -3121,6 +3338,51 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * of closing up should be asked to cover. */
 	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
+	/* Near is not joined. At a junction the two ends can stand a tile apart
+	 * with no rail leading from one to the other, and a splice made there is a
+	 * train with a bent hole in it -- the close-up cannot walk it shut and the
+	 * game goes down on an assert a few steps later. So measure it: walk the
+	 * rails between the two meeting ends. An ordinary coupling that is not
+	 * joined simply does not happen -- the train stands and the player
+	 * repositions. A rescue is the one case with another answer: the casualty
+	 * cannot be repositioned by driving, because it cannot drive, and the
+	 * engine cannot get in front of a nose parked across points however it
+	 * approaches. Recovery includes getting the wreck back into a line, so the
+	 * tow straightens it -- see LayCasualtyAlongTow(). */
+	const Train *l_end = leading;
+	const Train *t_end = trailing;
+	{
+		const Train *l_last = leading->Last();
+		const Train *t_last = trailing->Last();
+		if (DistanceSquaredBetweenVehicles(leading, trailing) > DistanceSquaredBetweenVehicles(l_last, trailing) ||
+				DistanceSquaredBetweenVehicles(leading, t_last) > DistanceSquaredBetweenVehicles(l_last, t_last)) {
+			l_end = l_last;
+		}
+		if (DistanceSquaredBetweenVehicles(l_end, trailing) > DistanceSquaredBetweenVehicles(l_end, t_last)) t_end = t_last;
+	}
+	/* "Connected" alone is not "clean". A meeting on the curve of a junction
+	 * can be reachable by rail and still put the two ends onto the same curved
+	 * piece, overlapping; the joined train then has one end facing into the
+	 * junction and the other out of it, and the close-up walk drags them
+	 * apart until a follower steps somewhere its neighbour cannot be reached
+	 * from. Clean is what every platform coupling has always been: both
+	 * meeting ends standing on straight track. Platforms are straight by
+	 * construction, so nothing that worked changes. */
+	auto on_straight_rail = [](const Train *t) {
+		return t->track.Any({Track::X, Track::Y}) && !t->track.Any({Track::Depot, Track::Wormhole});
+	};
+	bool ends_rail_connected = AreCoupleEndsRailConnected(l_end, t_end);
+	bool ends_clean = ends_rail_connected &&
+			(on_straight_rail(l_end) || l_end->track == Track::Depot) &&
+			(on_straight_rail(t_end) || t_end->track == Track::Depot);
+	if (!ends_clean && _show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: konce spoje nejsou ciste - navaznost {}, konec A ({},{}) kolej {:#x}, konec B ({},{}) kolej {:#x}",
+				(collector != nullptr ? collector : leading)->unitnumber, ends_rail_connected ? "ano" : "ne",
+				TileX(l_end->tile), TileY(l_end->tile), l_end->track.base(),
+				TileX(t_end->tile), TileY(t_end->tile), t_end->track.base());
+	}
+	if (!ends_clean && tow == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+
 	if (flags.Test(DoCommandFlag::Execute)) {
 		/* Let go of the track each of them was holding, and do it now, before
 		 * anything about either train changes.
@@ -3139,6 +3401,16 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		 * FEATURE_DESIGN_COUPLING_TOW.md. */
 		FreeTrainTrackReservation(v->First());
 		FreeTrainTrackReservation(partner);
+
+		/* The ends do not meet cleanly on the rails, and this is a rescue:
+		 * straighten the casualty onto the tow's own track first, whole,
+		 * exactly as it is. If there is no room to lay it down, nothing
+		 * happens and nothing has been half-done -- the tow keeps standing
+		 * and this is asked again next tick. */
+		if (!ends_clean) {
+			Train *casualty = leading == tow ? trailing : leading;
+			if (!LayCasualtyAlongTow(tow, casualty)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+		}
 
 		/* Splicing appends the trailing list to the end of the leading one, so
 		 * the two ends that meet in the middle have to be the two ends that
@@ -6568,6 +6840,14 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 
 				/* Update XY to reflect the entrance to the new tile, and select the direction to use */
 				/* Diagnostic: see the matching note in ReserveTrackUnderConsist(). */
+				if (_show_train_orientation && chosen_track.Count() != 1) {
+					IConsolePrint(CC_ERROR, "  krok ROZBITY: {} z ({},{}) na ({},{}), enterdir {}, chosen {:#x}, smer {}, prev {} na ({},{}) kolej {:#x}",
+							v->IsEngine() ? "masinka" : "vagon", TileX(gp.old_tile), TileY(gp.old_tile), TileX(gp.new_tile), TileY(gp.new_tile),
+							to_underlying(enterdir), chosen_track.base(), to_underlying(v->direction),
+							prev == nullptr ? "nikdo" : (prev->IsEngine() ? "masinka" : "vagon"),
+							prev == nullptr ? 0 : TileX(prev->tile), prev == nullptr ? 0 : TileY(prev->tile),
+							prev == nullptr ? 0 : prev->track.base());
+				}
 				assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 				Direction chosen_dir = VehicleEnterTileCoordinates(gp, enterdir, TrackBitsToTrack(chosen_track));
 
