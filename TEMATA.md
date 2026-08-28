@@ -663,6 +663,19 @@ a nula havárií.
 
 # 3. Rozpojování (decouple)
 
+- **Vagonky nejsou k mání, dokud odkladačka stojí vedle nich.** Odpojení
+  při příjezdu znamená, že řada existuje, i když odkladačka ještě nestihla
+  odjet (červená, ucpané zhlaví). Sběračka poslaná v tu chvíli dojede
+  k obsazenému nástupišti, ke konci řady se nedostane, spojit se nesmí
+  a umí jedině to vzdát a odjet — hráč to nachytal nastraženou mašinkou
+  a poslal první vlaksav log. Pravidlo je zrcadlem „odložený počká, až
+  odloživší uhne": řada se nenabízí, dokud odkladačka nestojí aspoň dvě
+  políčka daleko (měřeně; jméno odkladačky nese couple_claim, zábor
+  sběračky se pozná podle couple_target zpátky). Sběračka mezitím drží
+  na svém čekacím místě a log říká proč: „vagonky zatim nejsou k mani -
+  nastupiste jeste obsazene masinkou, ktera je odlozila". Rig:
+  `testspoj blok` (odkladačka se z nástupiště nikdy nehne — sběračka si
+  řadu nesmí nikdy zabrat).
 - **Jízdní řád odpojovacího příkazu patří vagonkům, ne mašince.** „Počkat
   8 dní" na příkazu s odpojením znamená: mašinka odpojí a jede hned;
   odložená řada těch 8 dní **nečinně stojí** — nenakládá, nevykládá,

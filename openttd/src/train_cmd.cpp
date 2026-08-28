@@ -1829,6 +1829,36 @@ void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index)
 }
 
 /**
+ * Is this rake still standing in the shadow of the engine that put it down?
+ *
+ * A decouple leaves the dropper and the rake a coupling's width apart, and
+ * the dropper cannot always pull away at once -- a red signal is enough. A
+ * collector offered the rake in that state drives in against an occupied
+ * platform: it cannot reach either end of the rake cleanly, it must not
+ * couple, and the best it can do is give up and wander off. So the rake is
+ * simply not on offer until its dropper has pulled clear -- the same
+ * measured rule the other way round from "what was put down waits for its
+ * dropper" (see TryDecoupleAtStation()). Measured, not timed: the dropper
+ * being gone, sold, or a couple of tiles away all end it.
+ *
+ * The dropper's name is carried in couple_claim; a claim whose owner is
+ * coming for this rake (couple_target points back) is a collector's claim
+ * and none of this rule's business.
+ *
+ * @param rake head of a headless rake standing where it was put down
+ * @return whether its dropper is still standing beside it
+ */
+static bool IsRakeHeldByDropper(const Train *rake)
+{
+	if (rake->couple_claim == VehicleID::Invalid()) return false;
+	const Train *dropper = Train::GetIfValid(rake->couple_claim);
+	if (dropper == nullptr) return false;
+	const Train *head = dropper->First();
+	if (head->couple_target == rake->index) return false; // a collector's claim, not a dropper's
+	return DistanceManhattan(head->tile, rake->tile) <= 2;
+}
+
+/**
  * Is this consist standing where it is, waiting for somebody to come and
  * collect it?
  *
@@ -1861,8 +1891,11 @@ bool IsWaitingToBeCoupled(const Train *v)
 	 * route to it, reserved nothing, and drove on without one.
 	 *
 	 * Unless it is waiting out a timetabled stay: for that spell it stands
-	 * idle and is nobody's -- see Train::Tick(). */
-	if (head->IsFreeWagon()) return head->wait_counter == 0;
+	 * idle and is nobody's -- see Train::Tick(). And not while the engine
+	 * that put it down is still standing beside it -- a collector sent then
+	 * arrives at an occupied platform it can neither couple at nor pass; see
+	 * IsRakeHeldByDropper(). */
+	if (head->IsFreeWagon()) return head->wait_counter == 0 && !IsRakeHeldByDropper(head);
 
 	/* Stranded is the same thing said another way. */
 	if (head->breakdown_ctr == 1 || head->IsWrecked()) return true;
@@ -2139,7 +2172,16 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 			/* Wagons waiting to be collected, or a whole little train waiting to be
 			 * carried along as part of a bigger one. */
 			if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
-			if (!IsWaitingToBeCoupled(rake)) continue;
+			if (!IsWaitingToBeCoupled(rake)) {
+				/* Say why the collector is not being sent, when the reason is
+				 * the one the player cannot see from the rake itself: the
+				 * engine that dropped it has not pulled clear yet. */
+				if (_show_train_orientation && rake->IsFreeWagon() && rake->last_station_visited == dest &&
+						IsRakeHeldByDropper(rake) && (v->tick_counter & 0x1F) == 0) {
+					IConsolePrint(CC_INFO, "Vlak {}: vagonky zatim nejsou k mani - nastupiste jeste obsazene masinkou, ktera je odlozila", v->unitnumber);
+				}
+				continue;
+			}
 			if (rake->last_station_visited != dest) continue;
 		}
 
@@ -3941,6 +3983,14 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 			remainder->cur_real_order_index = remainder->cur_implicit_order_index =
 					remainder->current_order.ShouldWaitForCouple() ? 1 : 0;
 		}
+
+		/* Until the engine that put them down has pulled clear, the wagons
+		 * are not on offer: a collector sent now would find the platform
+		 * still occupied and no clean way onto either end of them. The
+		 * dropper's name rides in couple_claim and the hold ends by measure
+		 * -- see IsRakeHeldByDropper(); the first collector look after that
+		 * clears the stale name off. Mirror of the dropped-train wait. */
+		remainder->couple_claim = v->index;
 
 		/* A timetabled stay holds the whole of the rake's life here back: it
 		 * does not enter the station -- so it loads and unloads nothing --

@@ -591,13 +591,18 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * go-to-couple depot order. 'rad' puts a timetabled stay on the deliver
 	 * order: the engine must drop and go at once, and the rake must stand the
 	 * stay out idle -- uncollectable -- before the collector gets it. */
+	/* 'blok' stages the occupied platform: the deliverer keeps a wagon told
+	 * to fill up on a map with no cargo, so it never pulls clear of the rake
+	 * it dropped -- the collector must then never be sent for it. */
 	bool backing = false;
 	bool depot_mode = false;
 	bool timetabled = false;
+	bool blocked = false;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
+		if (argv[i] == "blok") blocked = true;
 	}
 
 	/* A headless newgame (null video driver has no GUI) starts like a
@@ -731,9 +736,16 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
 	} else {
 		deliver.MakeGoToStation(st_id);
-		deliver.SetLoadType(OrderLoadType::NoLoad);
-		deliver.SetUnloadType(OrderUnloadType::NoUnload);
-		deliver.SetDecoupleCount(1);
+		if (blocked) {
+			deliver.SetLoadType(OrderLoadType::FullLoadAny);
+			deliver.SetUnloadType(OrderUnloadType::NoUnload);
+			deliver.SetDecoupleCount(2);
+			IConsolePrint(CC_DEFAULT, "testspoj: odkladacka si necha vagon na plnou nakladku - z nastupiste neodjede.");
+		} else {
+			deliver.SetLoadType(OrderLoadType::NoLoad);
+			deliver.SetUnloadType(OrderUnloadType::NoUnload);
+			deliver.SetDecoupleCount(1);
+		}
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
 		if (timetabled) {
 			/* Timetable data goes through its own command; an order inserted
