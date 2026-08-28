@@ -797,9 +797,167 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Dump every train's order list, so a loaded save can be read like a map:
+ * which engine has which preset orders, and where.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestOrders(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t) continue;
+		if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
+		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) vozu {} {} rozkazu {}",
+				t->unitnumber, TileX(t->tile), TileY(t->tile), CountVehiclesInChain(t),
+				t->IsInDepot() ? "v depu" : (t->vehstatus.Test(VehState::Stopped) ? "stopnut" : "venku"),
+				t->GetNumOrders());
+		int n = 0;
+		for (const Order &o : t->Orders()) {
+			std::string extra;
+			if (o.ShouldGoToCouple()) extra += " SPOJIT";
+			if (o.ShouldWaitForCouple()) extra += " CEKAT";
+			if (o.GetDecoupleCount() != 0) extra += fmt::format(" ODPOJIT:{}", o.GetDecoupleCount());
+			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
+			if (o.IsType(OT_GOTO_DEPOT) && o.ShouldTurnAroundInDepot()) extra += " OTOC-DEPO";
+			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);
+		}
+	}
+	return true;
+}
+
+/**
+ * Start every train standing in the depot on the given tile.
+ * Usage: teststartdepo <x> <y>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestStartDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Usage: 'teststartdepo <x> <y>'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]);
+	auto py = ParseInteger(argv[2]);
+	if (!px.has_value() || !py.has_value()) return false;
+	TileIndex tile = TileXY(*px, *py);
+	/* A save carried over from the player's machine loads paused, and the
+	 * polite unpause can refuse; the test has to run, so the brake comes off
+	 * directly. Single player, headless -- nobody else is affected. */
+	_pause_mode = {};
+	int started = 0;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFrontEngine()) continue;
+		if (!t->IsInDepot() || t->tile != tile) continue;
+		if (!t->vehstatus.Test(VehState::Stopped)) continue;
+		/* "Release the trains" means the trains: light engines parked in the
+		 * same shed are the collectors, and which of them runs -- and how many
+		 * copies -- is the cloning step's decision, not this one's. */
+		if (CountVehiclesInChain(t) < 2) continue;
+		if (Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false).Succeeded()) started++;
+	}
+	IConsolePrint(CC_DEFAULT, "teststartdepo: started {} trains at ({},{}).", started, *px, *py);
+	return true;
+}
+
+/**
+ * Clone the train with the given unit number, several times, in its depot,
+ * and start the clones. Usage: testklon <unit> <count> [reverz]
+ * With 'reverz', every station order of each clone (and of the original)
+ * gets the reverse-out flag first.
+ * @copydoc IConsoleCmdProc
+ */
+static void DoTestClone(uint unit, uint count, bool reverz)
+{
+	_pause_mode = {};
+
+	Train *original = nullptr;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() == t && t->IsFrontEngine() && t->unitnumber == unit) {
+			original = t;
+			break;
+		}
+	}
+	if (original == nullptr || !original->IsInDepot()) {
+		IConsolePrint(CC_ERROR, "testklon: train {} not found in a depot.", unit);
+		return;
+	}
+
+	/* Fired from a timer, not from the console: whoever ran last is the
+	 * "current" company then, and the commands below check ownership. */
+	AutoRestoreBackup cur_company(_current_company, original->owner);
+
+	auto set_reverz = [](const Train *t) {
+		int n = 0;
+		for (const Order &o : t->Orders()) {
+			if (o.IsType(OT_GOTO_STATION) && !o.ShouldReverseOutOfStation() &&
+					o.GetDecoupleCount() == 0 && !o.ShouldWaitForCouple()) {
+				Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)n, MOF_REVERSE_OUT, 1);
+			}
+			n++;
+		}
+	};
+	if (reverz) set_reverz(original);
+
+	for (int i = 0; i < (int)count; i++) {
+		auto [cost, cloned] = Command<Commands::CloneVehicle>::Do(DoCommandFlag::Execute, original->tile, original->index, false);
+		if (cost.Failed()) {
+			IConsolePrint(CC_ERROR, "testklon: clone {} failed: {}", i + 1, GetString(cost.GetErrorMessage()));
+			return;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, cloned, false);
+		IConsolePrint(CC_DEFAULT, "testklon: clone vlak {} started.", Train::Get(cloned)->unitnumber);
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, original->index, false);
+	IConsolePrint(CC_DEFAULT, "testklon: original vlak {} started{}.", original->unitnumber, reverz ? " (reverz on station orders)" : "");
+	_testspoj_active = true;
+}
+
+/** A clone step ordered for later, the way a hand on a phone paces it;
+ * counted down by the heartbeat timer below. */
+static int _testklon_delay = 0;
+static uint _testklon_unit = 0;
+static uint _testklon_count = 0;
+static bool _testklon_reverz = false;
+
+static bool ConTestClone(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Usage: 'testklon <unit> <count> [reverz] [za <ticks>]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto pcount = ParseInteger(argv[2]);
+	if (!punit.has_value() || !pcount.has_value()) return false;
+	bool reverz = false;
+	int delay = 0;
+	for (size_t i = 3; i < argv.size(); i++) {
+		if (argv[i] == "reverz") reverz = true;
+		if (argv[i] == "za" && i + 1 < argv.size()) {
+			auto pdelay = ParseInteger(argv[i + 1]);
+			if (pdelay.has_value()) delay = (int)*pdelay;
+		}
+	}
+	if (delay > 0) {
+		_testklon_unit = (uint)*punit;
+		_testklon_count = (uint)*pcount;
+		_testklon_reverz = reverz;
+		_testklon_delay = delay;
+		_testspoj_active = true;
+		IConsolePrint(CC_DEFAULT, "testklon: vlak {} x{} za {} tiku.", *punit, *pcount, delay);
+		return true;
+	}
+	DoTestClone((uint)*punit, (uint)*pcount, reverz);
+	return true;
+}
+
 /** While the test scene runs, say where everybody stands every few seconds. */
 static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Priority::None, 1000}, [](auto) {
 	if (!_testspoj_active) return;
+	if (_testklon_delay > 0) {
+		_testklon_delay -= 1000;
+		if (_testklon_delay <= 0) DoTestClone(_testklon_unit, _testklon_count, _testklon_reverz);
+	}
 	std::string_view name = "teststav";
 	std::span<std::string_view> args(&name, 1);
 	ConTestCoupleState(args);
@@ -3605,5 +3763,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
+	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
+	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
+	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);
 }

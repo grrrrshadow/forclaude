@@ -3,6 +3,39 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Velký test na hráčově save91 — bezhlavě, 16 běhů (2026-08-28)
+
+Hráčův protokol odjetý rigem na jeho vlastním savu: 4 depa × 2 mašinky,
+pustit vlaky, po prodlevě naklonovat mašinku 3× a pustit všechny čtyři.
+Kolo T = normální odjezd, kolo R = totéž s reversním chodem na
+spojovacím příkazu standardního nádraží.
+
+| běh | spojení | havárie | reverz proveden |
+|---|---|---|---|
+| T1–T8 | 4/4 všude | 0 | — |
+| R1, R2 | 4/4 | 0 | 4/4 |
+| R3, R4 | 3/4 | 0 | 4/4, 3/4 |
+| R5–R8 | 4/4 | 0 | 4/4 |
+
+Cestou k té tabulce rig chytil a opravilo se:
+
+- **Vada 2 doopravdy:** sebrat vlak + reversní chod + odpojit jinde
+  končilo srážkou obou půlek — odložený vlak se rozjel za svými příkazy
+  týmž směrem a najel do zádi mašinky, která ho odložila (7 px před
+  ním). Geometrie po rozpojení je v pořádku; chybělo zrcadlo pravidla
+  2.4b: **kdo byl odložen, počká, až odloživší odjede.** Doplněno,
+  měřeně (nárok + vzdálenost), R5–R8 z 8/8 výbuchů na 0.
+- **Reversní chod na spojovacím příkazu se vůbec neprováděl** — žil
+  v závěru nakládky a spojení nakládkou už neprochází. Provádí se teď
+  při závěru spojení. Bez opravy 0 provedení, s ní 4/4.
+- Klon přes časovač velel za „nikoho" (oprava _current_company),
+  hromadné pouštění z depa bralo i mašinky (filtr na vícevozové).
+
+**Otevřené:** R3/R4 (depo B + reverz) — jeden sběrač ze čtyř dojede na
+stanici už bez spojovacího příznaku, s drženým nárokem odjede do depa
+a jedna řada zůstane stát. Deterministické, bez výbuchu; stopa
+„odjizdi z nakladky bez spojeni" je na to nachystaná.
+
 ## Build #91 (commit 2d4b3aa) — spojení vlak+vlak poprvé čisté; zbyly dvě vady
 
 **Průlom: připojení k vlaku a odpojení je VV na všech čtyřech nástupištích,

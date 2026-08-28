@@ -2576,6 +2576,14 @@ void Vehicle::HandleLoading(bool mode)
 				Train::From(this)->flags.Set(VehicleRailFlag::Reversing);
 			}
 
+			extern bool _show_train_orientation;
+			if (_show_train_orientation && this->type == VehicleType::Train &&
+					(this->current_order.ShouldGoToCouple() || Train::From(this)->couple_target != VehicleID::Invalid())) {
+				IConsolePrint(CC_WARNING, "Vlak {}: odjizdi z nakladky bez spojeni - spojit {}, cil {}",
+						this->unitnumber, this->current_order.ShouldGoToCouple() ? "ano" : "ne",
+						Train::From(this)->couple_target == VehicleID::Invalid() ? -1 : (int)Train::From(this)->couple_target.base());
+			}
+
 			this->PlayLeaveStationSound();
 
 			this->LeaveStation();

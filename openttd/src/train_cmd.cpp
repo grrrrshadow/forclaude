@@ -3265,6 +3265,15 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (was_go_to_couple && new_head->current_order.IsType(OT_GOTO_STATION)) {
 		StationID dest = new_head->current_order.GetDestination().ToStationID();
 		if (IsConsistStandingAtStation(new_head, dest)) {
+			/* The reverse-out flag on a couple order is "collect and go back
+			 * the way you came" -- the player's own call, the one sanctioned
+			 * way a coupling ends in a turn. It used to be honoured by the
+			 * loading stop's departure; couple orders conclude here instead
+			 * now, so it is honoured here, the same way: the flag is set and
+			 * the ordinary reversal path does the work next tick. Read before
+			 * the order is concluded away below. */
+			bool reverse_out = new_head->current_order.ShouldReverseOutOfStation();
+
 			new_head->DeleteUnreachedImplicitOrders();
 			new_head->last_station_visited = dest;
 			UpdateVehicleTimetable(new_head, true);
@@ -3285,6 +3294,8 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 			 * the coupling pointed it. A train that really is to go back has
 			 * the player's reverse-out flag for saying so. */
 			ProcessOrders(new_head);
+
+			if (reverse_out) new_head->flags.Set(VehicleRailFlag::Reversing);
 		}
 	}
 
@@ -3521,6 +3532,18 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * than driving off to reach somewhere it has never left -- the same lap
 	 * round the station that collecting used to make. */
 	if (remainder->IsFrontEngine()) {
+		/* The other half of "drive away from what you put down": what was put
+		 * down waits for the one that put it down to pull clear. Both halves
+		 * stand a coupling's width apart the moment they come apart, and a
+		 * dropped train that sets off after its own orders in the same breath
+		 * -- towards the same throat, as a reverse-out delivery leaves it --
+		 * runs straight into the back of the engine that dropped it. The rig
+		 * caught exactly that, four times out of four. Written down as who it
+		 * is waiting for, and let go by measure, not by timer: the moment the
+		 * dropper is a couple of tiles away (or gone), the wait ends. See
+		 * TrainLocoHandler(). */
+		remainder->couple_claim = v->index;
+
 		remainder->ConsistChanged(CCF_TRACK);
 
 		if (IsRailStationTile(remainder->tile) && remainder->GetNumOrders() != 0) {
@@ -6125,6 +6148,9 @@ static uint TrainCrashed(Train *v)
 	if (!v->IsWrecked()) {
 		victims = v->Crash();
 		TileIndex tile = v->GetMovingFront()->tile;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_ERROR, "Vlak {}: HAVAROVAL na ({},{})", v->unitnumber, TileX(tile), TileY(tile));
+		}
 		AI::NewEvent(v->owner, new ScriptEventVehicleCrashed(v->index, tile, ScriptEventVehicleCrashed::CRASH_TRAIN, victims, v->owner));
 		Game::NewEvent(new ScriptEventVehicleCrashed(v->index, tile, ScriptEventVehicleCrashed::CRASH_TRAIN, victims, v->owner));
 	}
@@ -7144,6 +7170,21 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			consist->ReserveTrackUnderConsist();
 		}
 		return true;
+	}
+
+	/* A train just put down stands until the one that put it down has pulled
+	 * clear; see the note where the claim is written, in TryDecoupleAtStation().
+	 * Measured, not timed: gone or a couple of tiles away ends the wait. Only
+	 * for a dropped train -- a waiting train's claim means a collector is
+	 * coming for it and is none of this rule's business. */
+	if (consist->IsFrontEngine() && consist->couple_claim != VehicleID::Invalid() && !IsWaitingToBeCoupled(consist)) {
+		const Train *dropper = Train::GetIfValid(consist->couple_claim);
+		if (dropper == nullptr || dropper->First() == consist ||
+				DistanceManhattan(dropper->First()->tile, consist->tile) > 2) {
+			consist->couple_claim = VehicleID::Invalid();
+		} else if (consist->cur_speed == 0) {
+			return true;
+		}
 	}
 
 	/* And the same for the train at the other end of that arrangement: one
