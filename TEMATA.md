@@ -374,11 +374,16 @@ severovýchodu a z jihozápadu, a nikdo o to nežádal.
 - **hráč sám** tlačítkem otočení. To je něco úplně jiného, protože ho
   zmáčkl.
 
-Zrušena je tím i výjimka o řídicí kabině (dřív: má-li kabinu jen jeden
-konec, vede ten). Byla to další podoba téhož — pravidlo, které jmenuje
-konec. **Cena, kterou to má:** když měření postaví dopředu konec bez
-kabiny, vlak pojede pomalu, dokud se neotočí. To je vidět a je to
-předvídatelné; tiché otočení vidět není.
+**Výjimka o řídicí kabině platí a vrací se** (má-li kabinu jen jeden
+konec, vede ten). Její smazání v #91 byla chyba s dlouhým ocasem: právě
+tohle pravidlo dělalo vagonky správně ve všech buildech do #90 — mašinka,
+jediná s kabinou, vede a jede dál po svém nose, vagonky tlačí nebo táhne.
+Smazal jsem ji jako „další pravidlo, které jmenuje konec" — špatně:
+kabina není místo v seznamu, je to vlastnost vozidla, měří se, nejmenuje.
+Od smazání jezdily vagonky špatným směrem a hledalo se to týdny všude
+jinde. Měřené „pokračuj, jak jedeš" zůstává pro případ, pro který
+vzniklo: vlak sebraný z vlaku, kde kabinu mají oba konce a žádný není
+ten samozřejmý.
 
 Zrušeno je i doptávání se hledače cesty hned po spojení (viz 2.5). Bylo
 vyzkoušené a otáčelo vlak na třech nástupištích ze čtyř. Vlak, který má
