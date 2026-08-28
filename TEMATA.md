@@ -374,16 +374,21 @@ severovýchodu a z jihozápadu, a nikdo o to nežádal.
 - **hráč sám** tlačítkem otočení. To je něco úplně jiného, protože ho
   zmáčkl.
 
-**Výjimka o řídicí kabině platí a vrací se** (má-li kabinu jen jeden
-konec, vede ten). Její smazání v #91 byla chyba s dlouhým ocasem: právě
-tohle pravidlo dělalo vagonky správně ve všech buildech do #90 — mašinka,
-jediná s kabinou, vede a jede dál po svém nose, vagonky tlačí nebo táhne.
-Smazal jsem ji jako „další pravidlo, které jmenuje konec" — špatně:
-kabina není místo v seznamu, je to vlastnost vozidla, měří se, nejmenuje.
-Od smazání jezdily vagonky špatným směrem a hledalo se to týdny všude
-jinde. Měřené „pokračuj, jak jedeš" zůstává pro případ, pro který
-vzniklo: vlak sebraný z vlaku, kde kabinu mají oba konce a žádný není
-ten samozřejmý.
+**Výjimka o řídicí kabině je smazaná nadobro, tentokrát s důkazem.**
+Dvakrát byla v kódu a dvakrát dělala totéž zlo, chycené bezhlavým rigem
+(viz 2.10) přímo při činu: narovnání natočení po spojení zapíše hlavové
+mašince nos vždycky „od těla vlaku" — tedy pryč od toho, co právě
+sebrala — takže „vede konec s kabinou" znamená vždycky „vrať se, odkud
+jsi přijel", ať mašinka přijela jakkoli. Hráč měl pravdu, že „v #90 to
+jezdí blbě, takhle jako teď" — kabina byla v #90 i v mém včerejším
+vrácení, a moje archeologie z deníku byla špatně.
+
+**Platí jediné pravidlo pro všechno, co se spojuje: změřené „neměnit
+směr jízdy".** V rigu ověřeno pro sběr vagonků nosem napřed i
+nacouváním (obojí správně vytlačí druhou stranou) a je to totéž
+pravidlo, kterým od #91 jezdí spojené vlaky — sjednoceno, žádné dva
+režimy. Příznak couvání přežívá až k měření („pred spojenim - couva
+ano" v protokolu), takže vstup měření je zdravý.
 
 Zrušeno je i doptávání se hledače cesty hned po spojení (viz 2.5). Bylo
 vyzkoušené a otáčelo vlak na třech nástupištích ze čtyř. Vlak, který má
@@ -526,6 +531,25 @@ Odpojení v depu: zbytek zůstane odstavený (bezhlavá řada bez příkazů;
 odpojený celý vlak zůstane zabrzděný a příkazy si nechá). Práce se dělá
 v bezpečné chvíli tiku, stejné jako odtahové úkony — příjezd si počet
 zapíše (`depot_decouple_pending`) a tik ho vykoná.
+
+## 2.10 Bezhlavý zkušební rig — hra se testuje sama
+
+Konzolový příkaz `testspoj` postaví celou zkušební scénu příkazy hry:
+rovný pás, depo na obou koncích, průjezdné nádraží uprostřed, path
+návěstidla, rozvozová souprava (doveze vagonky, rozpojí, zaparkuje) a
+sběrná mašinka s příkazem „jet se spojit" a dalším příkazem za zády —
+přesný tvar hráčova případu. `testspoj couvej` navíc sběrače v depu
+otočí, takže na vagonky nacouvá. Vlastní čekání sběrače na řadu celou
+scénu časuje samo, žádné řízení zvenčí.
+
+Běží to bez obrazovky: `openttd -vnull:ticks=20000 -snull -mnull -x`
+s `autoexec.scr` = `newgame` a `game_start.scr` = `vlak123 on` +
+`testspoj`. Pod nulovým videem jde výstup konzole na stdout, takže celý
+průběh — „pred spojenim", „spojeno", „vjel do stanice/depa", každá
+změna vedoucího konce s příčinou, tep `teststav` — se čte jako protokol.
+Správný odjezd končí „vjel do západního depa" (vytlačené vagonky),
+špatný „vjel do východního". Tímhle rigem byla chycena a spravena vada
+směru odjezdu; hráč už nemusí testovat každou hypotézu na telefonu.
 
 ---
 

@@ -32,7 +32,17 @@
 #include "viewport_func.h"
 #include "window_func.h"
 #include "timer/timer.h"
+#include "timer/timer_game_tick.h"
 #include "company_func.h"
+#include "signal_func.h"
+#include "vehicle_func.h"
+#include "station_cmd.h"
+#include "order_cmd.h"
+#include "order_base.h"
+#include "depot_map.h"
+#include "station_map.h"
+#include "newgrf_station.h"
+#include "train_cmd.h"
 #include "gamelog.h"
 #include "ai/ai.hpp"
 #include "ai/ai_config.hpp"
@@ -537,6 +547,239 @@ static bool ConShowTrainOrientation(std::span<std::string_view> argv)
 	IConsolePrint(CC_DEFAULT, "Train orientation marks are now {}.", _show_train_orientation ? "shown" : "hidden");
 	return true;
 }
+
+/**
+ * Build the coupling test scene, headless, so the departure direction can be
+ * watched from a console trace instead of from a phone.
+ *
+ * Lays out, on the flattest strip it can find: a depot at the west end, a
+ * plain line eastwards ending blind (the reversing stub), and a four-tile
+ * through platform in the middle. Then two trains in the depot: one engine
+ * with three wagons, ordered to the station with "decouple, keep 1" and then
+ * back to the depot to halt -- it delivers the rake and gets out of the way --
+ * and one light engine with "go to couple" at the same station and a depot
+ * order after it. The light engine's own hold keeps it in the shed until the
+ * rake is standing at the platform, so the whole scene sequences itself.
+ *
+ * What to read afterwards with vlak123 on: the "pred spojenim"/"spojeno"
+ * lines say what the coupling measured and decided, and the following
+ * arrival/line-end lines say which way the joined train really went --
+ * east to the stub is the pushed-out departure, west back into the depot is
+ * the wrong one.
+ * @copydoc IConsoleCmdProc
+ */
+static bool _testspoj_active = false;
+
+static bool ConTestCouple(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the coupling test scene. Usage: 'testspoj'.");
+		return true;
+	}
+
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testspoj: only in a running game.");
+		return true;
+	}
+
+	/* A headless newgame (null video driver has no GUI) starts like a
+	 * dedicated server: spectating, no company anywhere. Make one to build
+	 * as, the same way the GUI newgame path does. */
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testspoj: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+
+	/* Enough money that no build below can fail on cost. */
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+
+	/* Find engines first; their railtype decides what gets laid. */
+	EngineID eid_loco = EngineID::Invalid();
+	EngineID eid_wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+		} else {
+			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
+		}
+		if (eid_loco != EngineID::Invalid() && eid_wagon != EngineID::Invalid()) break;
+	}
+	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testspoj: no available engine or wagon.");
+		return true;
+	}
+
+	/* The flattest clear run of tiles along the X axis. */
+	static const uint LEN = 40;
+	TileIndex strip = INVALID_TILE;
+	for (uint y = 8; y < Map::SizeY() - 8 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			TileIndex t = TileXY(x, y);
+			bool ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+			int z = ok ? GetTileZ(t) : -1;
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					strip = TileXY(x - LEN + 1, y);
+					break;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testspoj: no flat clear strip of {} tiles found.", LEN);
+		return true;
+	}
+
+	uint x0 = TileX(strip);
+	uint y0 = TileY(strip);
+	IConsolePrint(CC_DEFAULT, "testspoj: strip at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0);
+
+	/* A depot at each end of one straight line, doors facing inwards, and a
+	 * through platform in the middle. The deliverer comes out of the east
+	 * depot, puts its wagons down at the platform and carries on west into
+	 * the west depot, so the line east of the rake is clear for the
+	 * collector, which follows from the east with its next order pointing
+	 * back east -- the exact shape of the failing case. A correct departure
+	 * pushes the rake on west into the west depot; the wrong one turns back
+	 * east into the east depot; the arrival trace names which. */
+	TileIndex depot_w = TileXY(x0, y0);
+	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_w, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
+			Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_e, RAILTYPE_RAIL, DiagDirection::NE).Failed()) {
+		IConsolePrint(CC_ERROR, "testspoj: depot failed.");
+		return true;
+	}
+	if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testspoj: track failed.");
+		return true;
+	}
+	TileIndex st_tile = TileXY(x0 + 18, y0);
+	if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st_tile, RAILTYPE_RAIL, Axis::X, 1, 4, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed()) {
+		IConsolePrint(CC_ERROR, "testspoj: station failed.");
+		return true;
+	}
+	/* Two-way path signals a little outside each depot and on both throats
+	 * of the platform, matching how the player's test station is signalled;
+	 * without any signals the whole line is one block and no depot ever lets
+	 * a train out while the rake stands anywhere on it. */
+	for (uint sx : {x0 + 2, x0 + 15, x0 + 24, x0 + LEN - 3}) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj: signal at ({},{}) failed.", sx, y0);
+			return true;
+		}
+	}
+
+	/* The command wrapper normally flushes the signal-update buffer after
+	 * each command; calling the commands directly skips the wrapper, so
+	 * flush by hand before anything ticks. */
+	UpdateSignalsInBuffer();
+
+	StationID st_id = GetStationIndex(st_tile);
+	DepotID dep_w = GetDepotIndex(depot_w);
+	DepotID dep_e = GetDepotIndex(depot_e);
+
+	/* The delivering train: engine and three wagons. */
+	auto [cost2, veh2, unused_a, unused_b, unused_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost2.Failed()) {
+		IConsolePrint(CC_ERROR, "testspoj: engine 2 failed.");
+		return true;
+	}
+	for (int i = 0; i < 3; i++) {
+		auto [costw, wid, unused_d, unused_e, unused_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+		if (costw.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, wid, Train::Get(veh2)->Last()->index, false).Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj: wagon failed.");
+			return true;
+		}
+	}
+
+	Order deliver;
+	deliver.MakeGoToStation(st_id);
+	deliver.SetLoadType(OrderLoadType::NoLoad);
+	deliver.SetUnloadType(OrderUnloadType::NoUnload);
+	deliver.SetDecoupleCount(1);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
+	Order home_w;
+	home_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_w);
+
+	/* The collector: a light engine sent to couple, with its next stop lying
+	 * behind it -- the depot it starts from -- which is the exact shape of the
+	 * player's failing case. */
+	auto [cost1, veh1, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost1.Failed()) {
+		IConsolePrint(CC_ERROR, "testspoj: engine 1 failed.");
+		return true;
+	}
+	Order collect;
+	collect.MakeGoToStation(st_id);
+	collect.SetLoadType(OrderLoadType::NoLoad);
+	collect.SetUnloadType(OrderUnloadType::NoUnload);
+	collect.SetGoToCouple(true);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, collect);
+	Order home_e;
+	home_e.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 1, home_e);
+
+	/* 'testspoj couvej' turns the collector round in the shed first, so it
+	 * approaches the rake driving backwards -- the same way an engine that
+	 * turned on a stub arrives in the player's game. */
+	if (argv.size() >= 2 && argv[1] == "couvej") {
+		Command<Commands::ReverseTrainDirection>::Do(DoCommandFlag::Execute, veh1, false);
+		IConsolePrint(CC_DEFAULT, "testspoj: collector will back onto the rake.");
+	}
+
+	/* Deliverer first, collector after; the collector's own hold keeps it in
+	 * the shed until the rake is standing at the platform. */
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh2, false);
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh1, false);
+
+	_testspoj_active = true;
+
+	IConsolePrint(CC_DEFAULT, "testspoj: scene ready. deliverer=vlak {}, collector=vlak {}, station={} at ({}..{},{}), west depot ({},{}), east depot ({},{}).",
+			Train::Get(veh2)->unitnumber, Train::Get(veh1)->unitnumber, st_id, x0 + 18, x0 + 21, y0, x0, y0, x0 + LEN - 1, y0);
+	return true;
+}
+
+/**
+ * Print where every train stands right now, for reading a headless run.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCoupleState(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t) continue;
+		if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
+		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) rychlost {} couva {} rozkaz {} vozu {} zasekly {} cil {} narok {}",
+				t->unitnumber, TileX(t->tile), TileY(t->tile), t->cur_speed,
+				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+				to_underlying(t->current_order.GetType()), CountVehiclesInChain(t),
+				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
+				t->couple_target == VehicleID::Invalid() ? -1 : (int)t->couple_target.base(),
+				t->couple_claim == VehicleID::Invalid() ? -1 : (int)t->couple_claim.base());
+	}
+	return true;
+}
+
+/** While the test scene runs, say where everybody stands every few seconds. */
+static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Priority::None, 1000}, [](auto) {
+	if (!_testspoj_active) return;
+	std::string_view name = "teststav";
+	std::span<std::string_view> args(&name, 1);
+	ConTestCoupleState(args);
+});
 
 /**
  * Turn the depot-doorway lock on the reverse button on or off.
@@ -3336,5 +3579,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
+	IConsole::CmdRegister("testspoj",                ConTestCouple);
+	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);
 }

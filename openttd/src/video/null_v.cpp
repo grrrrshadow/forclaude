@@ -19,8 +19,16 @@
 /** Factory for the null video driver. */
 static FVideoDriver_Null iFVideoDriver_Null;
 
+/**
+ * Whether the game runs under the null video driver. A headless run has no
+ * console window, so console output would otherwise vanish; IConsolePrint()
+ * mirrors it to stdout when this is set, the same way a dedicated server does.
+ */
+bool _video_null_active = false;
+
 std::optional<std::string_view> VideoDriver_Null::Start(const StringList &parm)
 {
+	_video_null_active = true;
 #ifdef _MSC_VER
 	/* Disable the MSVC assertion message box. */
 	_set_error_mode(_OUT_TO_STDERR);

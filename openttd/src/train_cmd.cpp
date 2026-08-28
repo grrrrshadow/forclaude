@@ -3205,23 +3205,13 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	TileIndexDiffC going = TileIndexDiffCByDir(arrived_heading);
 	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, nose.x * going.x + nose.y * going.y < 0);
 
-	/* Unless only one end of the joined train has a driving cab, in which case
-	 * that end leads and there is nothing to measure. This is the engine-and-
-	 * wagons case, and it is the rule that made collected wagons leave
-	 * predictably in every build up to 90: the engine, the only thing with a
-	 * cab, carries on the way its nose points and pushes or pulls whatever it
-	 * has picked up. It was deleted in the same stroke that fixed the two-cab
-	 * case (build 91), as "another rule that names an end" -- wrongly: a cab is
-	 * not a place in the list, it is a fact about the vehicle, and deleting the
-	 * rule is exactly when wagon departures went wrong. The measurement above
-	 * remains for what it was made for: a train collected off another train,
-	 * where both ends have a cab and neither is the obvious one. */
-	bool head_leads = new_head->CanLeadTrain();
-	bool tail_leads = new_head->Last()->CanLeadTrain();
-	if (head_leads != tail_leads) {
-		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, tail_leads);
-	}
-
+	/* No driving-cab override on top of that. It was tried twice and it is
+	 * wrong both times, and the headless rig caught it red-handed: the facing
+	 * normalisation above always leaves the head engine's recorded nose
+	 * pointing away from the body of the train -- away from whatever was just
+	 * collected -- so "the cab end leads" always reads as "go back the way
+	 * you came", whichever way the engine actually arrived. The measurement
+	 * is the one rule, for wagons and trains alike. */
 	new_head->flags.Reset(VehicleRailFlag::Reversing);
 	new_head->ConsistChanged(CCF_TRACK);
 
@@ -5851,6 +5841,10 @@ int Train::UpdateSpeed()
  */
 static void TrainEnterStation(Train *consist, StationID station)
 {
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: vjel do stanice {} ({},{})", consist->unitnumber, station, TileX(consist->tile), TileY(consist->tile));
+	}
+
 	consist->last_station_visited = station;
 
 	/* check if a train ever visited this station before */

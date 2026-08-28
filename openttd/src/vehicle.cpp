@@ -26,6 +26,7 @@
 #include "strings_func.h"
 #include "zoom_func.h"
 #include "vehicle_func.h"
+#include "console_func.h"
 #include "autoreplace_func.h"
 #include "autoreplace_gui.h"
 #include "station_base.h"
@@ -1579,6 +1580,11 @@ void VehicleEnterDepot(Vehicle *v)
 {
 	/* Always work with the front of the vehicle */
 	assert(v == v->First());
+
+	extern bool _show_train_orientation;
+	if (_show_train_orientation && v->type == VehicleType::Train) {
+		IConsolePrint(CC_INFO, "Vlak {}: vjel do depa ({},{})", v->unitnumber, TileX(v->tile), TileY(v->tile));
+	}
 
 	switch (v->type) {
 		case VehicleType::Train: {

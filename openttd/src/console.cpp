@@ -114,6 +114,14 @@ void IConsolePrint(ExtendedTextColour colour_code, const std::string &string)
 		return;
 	}
 
+	/* A headless run under the null video driver has no console window to
+	 * show this in, so say it on stdout like a dedicated server would. */
+	extern bool _video_null_active;
+	if (_video_null_active) {
+		fmt::print("{}{}\n", GetLogPrefix(), str);
+		fflush(stdout);
+	}
+
 	IConsoleWriteToLogFile(str);
 	IConsoleGUIPrint(colour_code, str);
 }
