@@ -3099,6 +3099,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * settled. */
 	Direction arrived_heading = (collector != nullptr ? collector : leading)->GetMovingDirection();
 
+	if (_show_train_orientation) {
+		const Train *c = collector != nullptr ? collector : leading;
+		IConsolePrint(CC_INFO, "Vlak {}: pred spojenim - smer prijezdu {}, couva {}, nos {}",
+				c->unitnumber, to_underlying(arrived_heading),
+				c->First()->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+				to_underlying(c->direction));
+	}
+
 	/* Some gap is normal -- a train cannot reserve the tile its partner stands
 	 * on, so it stops about a tile short and the two are closed up after the
 	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
