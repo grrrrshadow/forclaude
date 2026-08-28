@@ -7494,7 +7494,14 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * what it had chosen. Nothing is reserved until there is something to
 		 * reserve it for. Not every tick -- there is nothing to release most of
 		 * the time. */
-		if ((consist->tick_counter & 0x1F) == 0) {
+		/* Not for a train standing in a depot. It holds no reservation there
+		 * to let go of -- and reservations carry no owner, so the walk that
+		 * frees "its" path starts at the shed door and eats whatever exit
+		 * reservation a stablemate has just made through it. Three collectors
+		 * sharing a depot with a fourth that had no rake yet crashed exactly
+		 * this way: the empty one kept wiping the mouth clean behind each one
+		 * that reserved it, and two of them met on the doorstep. */
+		if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vlak {}: drzi bez cile - rezervace zahozena, na ({},{})",
 						consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
@@ -7533,7 +7540,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * the cargo going aboard is the train's own business and finishes on its
 	 * own. */
 	if (consist->cur_speed == 0 && !consist->current_order.IsType(OT_LOADING) && IsWaitingToBeCoupled(consist)) {
-		if ((consist->tick_counter & 0x1F) == 0) {
+		/* Same depot guard as the collector's hold above: a train wholly in a
+		 * depot holds no path of its own, and the ownerless free would eat a
+		 * stablemate's exit reservation through the shared door. */
+		if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
 			FreeTrainTrackReservation(consist);
 			consist->ReserveTrackUnderConsist();
 		}

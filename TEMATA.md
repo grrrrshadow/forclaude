@@ -628,6 +628,18 @@ výjezdu z depa hlásí, kde rezervace končí; „konec koleje" hlásí důvod
 (červená / žádná kolej / cizí kolej / volné vagony) a zmizení či zabrání
 cíle spojení se vypisuje.
 
+**Dodatek: rezervace nemají majitele — a vlak v depu žádnou nemá.**
+Hráč vyfotil sběračku, která si zarezervovala trať přes stojící
+odkladačku; rig chytil mechanismus u vrat depa: sběračka **bez cíle**,
+stojící v depu, si každých 32 tiků „uvolňovala svou cestu" — jenže vlak
+celý v depu žádnou vlastní rezervaci nemá, a to uvolňování vykráčelo
+z vrat a **mazalo čerstvé výjezdové rezervace ostatních mašinek ze
+stejného depa**. Dvě se pak potkaly na prahu. Oba čekací bloky (sběračka
+bez cíle i vlak čekající na sebrání) teď uvolňují cestu jen mimo depo —
+v depu není co pouštět. Ověřeno: sběračky puštěné hned za odkladačkami
+i s prodlevami 500/1500 tiků — dřív 2–3 srážky na běh, teď 4/4 spojení
+a nula havárií.
+
 ---
 
 # 3. Rozpojování (decouple)
