@@ -2377,6 +2377,29 @@ bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
  */
 static Train *FindCouplePartnerAlongReservation(const Train *v, bool from_rear)
 {
+	/* Physical adjacency first. The partner being looked for is a train
+	 * standing right against this end, and the reservation walk below cannot
+	 * be trusted to say so on its own: a waiting train holds reservation
+	 * under its own vehicles, that reservation sits flush against this
+	 * train's path, and the walk glides across the seam and on to wherever
+	 * the ribbon of reserved track happens to end -- far past the partner.
+	 * The walk then reports a distant empty tile, and the partner right off
+	 * this train's nose is never asked about. The rig caught the
+	 * consequence: a collecting engine, stopped a coupling's width from its
+	 * partner, found "nobody", set off again, and crept up tile by tile
+	 * until the two shared one -- concluding the coupling with the pair
+	 * parked closer than a coupling's width, which is the distance the
+	 * collision check calls a crash the moment they come apart again. */
+	const Train *end = Train::From(from_rear ? v->GetMovingBack() : v->GetMovingFront());
+	if (end->track != Track::Depot && end->track != Track::Wormhole) {
+		Trackdir end_td = end->GetVehicleTrackdir();
+		if (end_td != Trackdir::Invalid) {
+			if (from_rear) end_td = ReverseTrackdir(end_td);
+			Train *beside = FindCouplePartnerOnAdjacentTile(v, end->tile, end_td);
+			if (beside != nullptr) return beside;
+		}
+	}
+
 	Vehicle *train_on_res = nullptr;
 	PBSTileInfo res = FollowTrainReservation(v, &train_on_res, from_rear);
 
@@ -3561,6 +3584,10 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 				new_head->unitnumber, new_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
 				front->IsEngine() ? "masinka" : "vagon", TileX(front->tile), TileY(front->tile),
 				front->track.base(), to_underlying(front->direction));
+		for (const Train *u = new_head; u != nullptr; u = u->Next()) {
+			IConsolePrint(CC_INFO, "  clanek {} na ({},{}) delka {} rozestup chce {}",
+					u->index, u->x_pos, u->y_pos, u->gcache.cached_veh_length, u->CalcNextVehicleOffset());
+		}
 	}
 
 	/* It has what it came for, so it is not coming for anything any more. The
@@ -3735,10 +3762,6 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 {
 	if (keep_count == 0) return false;
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
-
-	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "Vlak {}: odpojeni zacina - stop {}", v->unitnumber, v->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
-	}
 
 	/* Taking a train apart is the same work the move command does, and parts of
 	 * that work ask the game which company is acting -- handing out a unit
@@ -3930,19 +3953,6 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 		FreeTrainTrackReservation(remainder);
 		remainder->ReserveTrackUnderConsist();
-		if (_show_train_orientation) {
-			for (Train *u = v; u != nullptr; u = u->Next()) {
-				IConsolePrint(CC_INFO, "Vlak {}: po odpojeni tahac clanek {} stop {}", v->unitnumber, u->index, u->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
-			}
-			for (Train *u = remainder; u != nullptr; u = u->Next()) {
-				IConsolePrint(CC_INFO, "Vlak {}: po odpojeni zbytek clanek {} stop {}", remainder->unitnumber, u->index, u->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
-			}
-			IConsolePrint(CC_INFO, "Vlak {}: vykon tahace {}, vykon zbytku {}", v->unitnumber, v->gcache.cached_power, remainder->gcache.cached_power);
-			IConsolePrint(CC_INFO, "Vlak {}: tahac smer {} trackdir {} na ({},{}); zbytek smer {} couva {} na ({},{})",
-					v->unitnumber, to_underlying(v->direction), to_underlying(v->GetVehicleTrackdir()), v->x_pos, v->y_pos,
-					to_underlying(remainder->direction), remainder->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
-					remainder->x_pos, remainder->y_pos);
-		}
 		return true;
 	}
 
@@ -4025,11 +4035,6 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 		} else {
 			InvalidateWindowData(WindowClass::VehicleView, remainder->index);
 		}
-	}
-	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "Vlak {}: odpojeni konci - stop {}, odlozeny stop {}", v->unitnumber,
-				v->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne",
-				remainder->First()->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne");
 	}
 	return true;
 }
@@ -6671,9 +6676,28 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 	Train *first = moving_front->First();
 	Train *other = Train::From(v)->First();
 	if (other->cur_speed == 0 && (IsValidCouplePartner(first, other) || IsValidCouplePartner(other, first))) {
+		if (_show_train_orientation && first->cur_speed != 0) {
+			IConsolePrint(CC_INFO, "Vlak {}: dobrzdil u partnera {} - clanky {} ({},{}) a {} ({},{}), vzdalenost² {}",
+					first->unitnumber, other->unitnumber, moving_front->index, moving_front->x_pos, moving_front->y_pos,
+					Train::From(v)->index, v->x_pos, v->y_pos, x_diff * x_diff + y_diff * y_diff);
+		}
 		first->cur_speed = 0;
 		first->subspeed = 0;
 		return 0;
+	}
+
+	/* The two halves of a coupling that has just come apart stand a
+	 * coupling's width apart -- and after a coupling that concluded a shade
+	 * too close, or one carried in an older save, closer than the distance
+	 * this function calls a collision. Which two they are is written down:
+	 * the half that was put down carries a claim naming the head that put
+	 * it down (see TryDecoupleAtStation()). One of them pulling clear of
+	 * the other is separation, not collision -- told apart by where it is
+	 * going. Moving away from the other is never a crash; moving at it
+	 * still is, claim or no claim. */
+	if (other->couple_claim == first->index || first->couple_claim == other->index) {
+		TileIndexDiffC away = TileIndexDiffCByDir(moving_front->GetMovingDirection());
+		if (away.x * x_diff + away.y * y_diff <= 0) return 0;
 	}
 
 	if (_show_train_orientation) {

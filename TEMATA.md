@@ -647,6 +647,30 @@ Hloubku zásobníku řídí hráčova nastavení `console_backlog_length`
 a `console_backlog_timeout`; na dlouhé záznamy je dobré si délku zvednout
 (`setting console_backlog_length 1000` v konzoli).
 
+## 2.12 Spojení se uzavírá u nosu — jinak se vlak doplíží partnerovi pod kola
+
+Sbíječka dojede k partnerovi, kolizní kontrola ji zastaví na šířku
+spřáhla — a spojení se má uzavřít hned na místě. Neuzavíralo se:
+hledání partnera šlo **po rezervaci**, a čekající **vlak** (na rozdíl od
+bezhlavé řady) má rezervaci i sám pod sebou. Ta navazuje na cestu
+sbíječky beze švu, procházka po ní partnera přejela a skončila kdesi
+daleko za stanicí — „nikdo tam není". Sbíječka se tedy každý tik znovu
+rozjela, o jednotku popolezla, znovu dostala stopku… a spojení se
+uzavřelo teprve, když oba stáli na **stejném políčku** — o 3 jednotky
+blíž, než se sluší. Ta těsnost pak přežila celé vlečení (vlak jede
+v zákrytu, rozestupy se nemění) a vybuchla až při rozpojení: obě půlky
+stály v kolizní vzdálenosti a první pohyb kterékoli z nich — **i směrem
+pryč** — kontrola prohlásila za srážku. V rigu čtyřikrát ze čtyř;
+u hráče se to jevilo jako „stojí navždy", protože tam mašinku držela
+ještě falešná překážka (téma 3) a k pohybu vůbec nedošlo.
+
+Oprava u kořene: hledání partnera se **nejdřív podívá na políčko přímo
+před vlastním koncem** (fyzická sousednost — o tu tady celou dobu jde)
+a teprve pak věří procházce po rezervaci. Spojení se tak uzavře na
+první stopce, rozestup zůstane na šířku spřáhla a rozpojení je zpátky
+symetrické se stavěným vlakem. Pro páry spojené natěsno ve starších
+hrách platí záchranná brzda z tématu 3: odjezd od sebe není srážka.
+
 **Dodatek: rezervace nemají majitele — a vlak v depu žádnou nemá.**
 Hráč vyfotil sběračku, která si zarezervovala trať přes stojící
 odkladačku; rig chytil mechanismus u vrat depa: sběračka **bez cíle**,
@@ -704,6 +728,24 @@ a nula havárií.
 - Odpojená část, která má vepředu mašinku, **je zase vlak**: příkaz jí
   poskočí a když další příkaz jmenuje stanici, ve které stojí, odbaví ho na
   místě, místo aby pro něj objížděla nádraží.
+- **Vlak stojící ZA mašinkou není překážka v cestě.** Po odpojení se
+  mašinka ptá o cestu ven a hlídka „v cestě stojí vlak" jí ukazovala na
+  vlak, který právě odložila — procházka po rezervaci prohledává celý
+  peron, takže našla i vagonky **za jejími zády**, a mašinka to vzdávala
+  navždy: stála na peronu i potom, co se trať dávno uvolnila, a jelo se
+  s ní jen semaforkem (force). Hráčovo hlášení sedělo přesně („když se
+  cesta uvolní, musím ji přinutit; ostatní vlaky tím místem jezdí").
+  Rozhoduje se skalárním součinem: kdo stojí za výjezdním koncem, není
+  překážka a jde se rovnou hledat čerstvá cesta. Rig: `testspoj vlek
+  blok` — mašinka po odpojení drží červenou od nastražené překážky,
+  periodicky se ptá znovu, a jakmile překážka uhne, **rozjede se sama**.
+- **Rozpojená dvojice, která se od sebe vzdaluje, není srážka.** Obě
+  půlky stojí po rozpojení na šířku spřáhla od sebe — a po spojení,
+  které se uzavřelo o chlup blíž (nebo ve starším savu), i uvnitř
+  vzdálenosti, kterou kolizní kontrola počítá jako náraz. Kdo ty dvě
+  jsou, je zapsáno: odložená půlka nese nárok se jménem odkladačky.
+  Odjezd od sebe (skalární součin směru jízdy a spojnice) se nechá jet;
+  jízda proti sobě bouchá dál, nárok nenárok.
 
 ---
 

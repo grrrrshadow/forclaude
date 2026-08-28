@@ -3,6 +3,41 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Build #103 — mašinka po odložení vlečeného vlaku stojí navždy (2026-08-28)
+
+Hlášení: vedoucí mašinky po odpojení, když nemají hned volnou cestu,
+zůstanou stát navždy; když se cesta uvolní, musí se donutit semaforkem
+(force). Hráč to přezkoušel nastraženou překážkou: stojí jen kvůli
+červené, blikla jim i zelená, ale nejely — ani potom, co mohly. Půlky se
+u hráče nesrážejí (nic se nerozjede). Přivlečený vlak pak odjíždí sám bez
+donucování.
+
+Rig (`testspoj vlek`) našel pod tím dvě vady najednou:
+
+1. **Falešná překážka:** hlídka „v cestě stojí vlak" ukazovala na vlak
+   odložený ZA mašinkou (prohledávání celého peronu), mašinka to vzdala
+   napořád — hráčovo „stojí navždy". Oprava: kdo stojí za výjezdním
+   koncem, není překážka (téma 3).
+2. **Spojení uzavřené moc blízko:** hledání partnera po rezervaci
+   přejelo čekající vlak (má rezervaci samo pod sebou), sbíječka se
+   doplížila až na stejné políčko a spojila se o 3 jednotky blíž, než se
+   sluší. V rigu pak po opravě č. 1 obě půlky při rozpojení „bouchly",
+   i když odjížděly od sebe. Oprava: partner se hledá nejdřív u nosu
+   (téma 2.12) + odjezd od sebe není srážka (téma 3).
+
+| běh | výsledek |
+|---|---|
+| `testspoj vlek` | dobrzdění 1×, rozestup 7, odpojení, oba odjezdy čisté, 0 havárií |
+| `testspoj vlek blok` (nastražená překážka) | mašinka drží červenou, ptá se znovu, po uhnutí překážky **odjede sama** |
+| `testspoj` zakl/couvej/rad | spojeno, 0 havárií |
+| `testspoj depo` / `blok` | vyzvednutí z depa OK / sběračka správně nevyslána |
+| `testodtah rovina`/`krizeni` | odvoz do depa, narovnání na křížení, 0 havárií |
+| save91 protokol bez reverzu | spojení 4/4, 0 havárií |
+| save91 protokol s reverzem | spojení 4/4, 0 havárií |
+
+Rig k tomu dostal příkazy `testbrzda`, `testskip`, `testotoc` (hráčovy
+čudlíky z konzole) a `testza` umí víc naplánovaných příkazů najednou.
+
 ## Build #99 — odtah na výhybkách: assert a narovnání vraku (2026-08-28)
 
 Hlášení: assert `IsValidDiagDirection(exitdir)` (train_cmd.cpp:6509 buildu

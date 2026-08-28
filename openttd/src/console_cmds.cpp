@@ -779,6 +779,35 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_a, false);
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_b, false);
+
+		/* 'vlek blok' adds the obstacle the player staged by hand: a third
+		 * engine, built with the brake on so it does not tangle with the
+		 * collection run on the single line. Released mid-scene with
+		 * 'testbrzda' while the tow is underway, it heads for the western
+		 * station (full-load there, on a map with no cargo, so it would hold
+		 * it for good) and meets the returning drop engine head to head at a
+		 * signal: the drop engine gets a red and stands. 'testskip' then
+		 * turns the obstacle round for home, the line frees, and the engine
+		 * standing at the red must take the path by itself, unforced --
+		 * the case the player staged by hand on the phone. */
+		if (blocked) {
+			auto [cost_c, veh_c, un_j, un_k, un_l] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost_c.Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj: vlek obstacle engine failed.");
+				return true;
+			}
+			Order park_c;
+			park_c.MakeGoToStation(st2_id);
+			park_c.SetLoadType(OrderLoadType::FullLoadAny);
+			park_c.SetUnloadType(OrderUnloadType::NoUnload);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_c, 0, park_c);
+			Order home_c;
+			home_c.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_c, 1, home_c);
+			IConsolePrint(CC_DEFAULT, "testspoj vlek blok: prekazka=vlak {} (vyjede na 'testbrzda {}', dal ji posle 'testskip {}').",
+					Train::Get(veh_c)->unitnumber, Train::Get(veh_c)->unitnumber, Train::Get(veh_c)->unitnumber);
+		}
+
 		_testspoj_active = true;
 		IConsolePrint(CC_DEFAULT, "testspoj vlek: vezeny=vlak {}, masinka=vlak {}, stanice0={} stanice2={} ({}..{},{}).",
 				Train::Get(veh_a)->unitnumber, Train::Get(veh_b)->unitnumber, st_id, st2_id, x0 + 7, x0 + 8, y0);
@@ -1359,13 +1388,12 @@ static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Prior
  * Granularity is the heartbeat's 1000 ticks.
  * @copydoc IConsoleCmdProc
  */
-static int _testza_delay = 0;
-static std::string _testza_cmd;
+static std::vector<std::pair<int, std::string>> _testza_queue;
 
 static bool ConTestAfter(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Run a console command later. Usage: 'testza <ticks> <command...>'.");
+		IConsolePrint(CC_HELP, "Run a console command later. Usage: 'testza <ticks> <command...>'. May be given several times; each fires once.");
 		return true;
 	}
 	auto pticks = ParseInteger(argv[1]);
@@ -1375,10 +1403,93 @@ static bool ConTestAfter(std::span<std::string_view> argv)
 		if (!cmd.empty()) cmd += ' ';
 		cmd += argv[i];
 	}
-	_testza_delay = (int)*pticks;
-	_testza_cmd = std::move(cmd);
+	IConsolePrint(CC_DEFAULT, "testza: '{}' za {} tiku.", cmd, *pticks);
+	_testza_queue.emplace_back((int)*pticks, std::move(cmd));
 	_testspoj_active = true;
-	IConsolePrint(CC_DEFAULT, "testza: '{}' za {} tiku.", _testza_cmd, _testza_delay);
+	return true;
+}
+
+/**
+ * Toggle a train's hand brake, the same as the player's start/stop button.
+ * Meant for staged scenes: a train built stopped is released mid-scene.
+ * Usage: testbrzda <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestToggleBrake(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Toggle a train's hand brake. Usage: 'testbrzda <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		/* Fired from the heartbeat timer there is no acting company set, and
+		 * the command would bounce off its ownership check, silently. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testbrzda: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Turn a train round, the same as the player's reverse button.
+ * Usage: testotoc <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestReverse(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Turn a train round. Usage: 'testotoc <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		/* Fired from the heartbeat timer there is no acting company set, and
+		 * the command would bounce off its ownership check, silently. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		Command<Commands::ReverseTrainDirection>::Do(DoCommandFlag::Execute, t->index, false);
+		IConsolePrint(CC_DEFAULT, "testotoc: vlak {} otocen.", t->unitnumber);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testotoc: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Skip a train's current order, the same as the player's skip button.
+ * Meant for staged scenes: a parked obstacle train is released by skipping
+ * the order that holds it. Usage: testskip <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSkipOrder(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Skip a train's current order. Usage: 'testskip <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		if (t->GetNumOrders() == 0) {
+			IConsolePrint(CC_ERROR, "testskip: vlak {} nema rozkazy.", t->unitnumber);
+			return true;
+		}
+		VehicleOrderID next = (VehicleOrderID)((t->cur_implicit_order_index + 1) % t->GetNumOrders());
+		/* Fired from the heartbeat timer there is no acting company set, and
+		 * the command would bounce off its ownership check, silently. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		Command<Commands::SkipToOrder>::Do(DoCommandFlag::Execute, t->index, next);
+		IConsolePrint(CC_DEFAULT, "testskip: vlak {} preskocil na rozkaz {}.", t->unitnumber, next);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testskip: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -1389,12 +1500,14 @@ static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Pr
 		_testklon_delay -= 1000;
 		if (_testklon_delay <= 0) DoTestClone(_testklon_unit, _testklon_count, _testklon_reverz);
 	}
-	if (_testza_delay > 0) {
-		_testza_delay -= 1000;
-		if (_testza_delay <= 0 && !_testza_cmd.empty()) {
-			std::string cmd = std::move(_testza_cmd);
-			_testza_cmd.clear();
+	for (auto it = _testza_queue.begin(); it != _testza_queue.end(); ) {
+		it->first -= 1000;
+		if (it->first <= 0) {
+			std::string cmd = std::move(it->second);
+			it = _testza_queue.erase(it);
 			IConsoleCmdExec(cmd);
+		} else {
+			++it;
 		}
 	}
 	std::string_view name = "teststav";
@@ -4207,6 +4320,9 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
+	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
+	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
+	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);
