@@ -2205,6 +2205,35 @@ void LoadNewGRF(SpriteID load_index, uint num_baseset)
 		if (c->status != GRFStatus::NotFound) c->status = GRFStatus::Unknown;
 	}
 
+	/* The other half of letting FIRS 5 run alongside the CZTR sets (see the
+	 * status-query exception in newgrf_act7_9.cpp): the wagons that make that
+	 * combination work are exactly one release, CZTR Wagons-Cargo 1.0.0 --
+	 * the one whose cargoes this game feeds from FIRS through the wagon-cargo
+	 * exception above. Any other release of that set is not prepared for
+	 * FIRS 5 and the exception deliberately leaves it alone, so running it
+	 * alongside FIRS 5 is refused outright, with a message saying which
+	 * release to use instead. FIRS's own authors refuse combinations they
+	 * did not prepare for; this does the same for ours. Without FIRS 5 in
+	 * the game, nothing here does anything. */
+	{
+		bool firs5 = false;
+		for (const auto &c : _grfconfig) {
+			if (c->status == GRFStatus::NotFound) continue;
+			if (std::byteswap(c->ident.grfid) == 0xF1250009) {
+				firs5 = true;
+				break;
+			}
+		}
+		if (firs5) {
+			for (const auto &c : _grfconfig) {
+				if (c->status == GRFStatus::NotFound) continue;
+				if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) continue;
+				if (IsWagonCargoExceptionGrf(*c)) continue; // 1.0.0 is the release that works
+				DisableGrf(STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5, c.get());
+			}
+		}
+	}
+
 	_cur_gps.spriteid = load_index;
 
 	/* Load newgrf sprites

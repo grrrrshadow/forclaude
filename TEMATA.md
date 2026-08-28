@@ -1511,6 +1511,19 @@ aktivní, FIRS chybu přeskočil a aktivoval se, kontrolní GRF chybu vyhodil �
 takže napodobenina je věrná a výjimka opravdu platí jen pro tu jednu dvojici.
 Generátor těch GRF není v repozitáři (je to pomůcka rigu, ne hry).
 
+**Druhá půlka: s FIRS 5 smí jen vagonky 1.0.0.** Odblokování ukázalo, že
+s FIRS 5 pak běží i CZTR Wagons-Cargo **1.1.0**, které na FIRS 5 připravené
+nejsou (výjimka na náklady — téma 13 — je jmenovitá pro 1.0.0 a verze 1.1.0
+se nesmí dotknout). Nechceme autorům zasahovat do úmyslů, tak si hra drží
+vlastní párové pravidlo (`LoadNewGRF`, hned u resetu stavů): **když je ve
+hře FIRS 5 (`F1250009`) a k tomu Wagons-Cargo (`4D490213`) v jiné verzi než
+jmenovité 1.0.0, ta verze se vypne** s fatální hláškou „Tahle verze CZTR
+Wagons-Cargo není připravená na FIRS 5. Použij starší CZTR Wagons-Cargo
+1.0.0" — ukáže se v červeném rámečku po startu i u GRF v nastavení, stejnou
+cestou jako FIRSí E01. Bez FIRS 5 se vagonek nikdo nedotkne. Rig: tři běhy
+s napodobeninami — FIRS5+1.1.0 → 1.1.0 vypnuto; FIRS5+1.0.0 → obojí jede;
+1.1.0 samotné → jede.
+
 ---
 
 # 14. Statistika firmy podle TTDPatch
