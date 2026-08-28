@@ -11,6 +11,7 @@
 #include "train.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
+#include "console_gui.h"
 #include "debug.h"
 #include "engine_func.h"
 #include "landscape.h"
@@ -823,6 +824,30 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			if (o.IsType(OT_GOTO_DEPOT) && o.ShouldTurnAroundInDepot()) extra += " OTOC-DEPO";
 			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);
 		}
+	}
+	return true;
+}
+
+/**
+ * Save the console backlog to a text file in the personal directory, so an
+ * incident can be reported whole instead of screenshotting the console a
+ * window at a time. Usage: vlaksav [<name>]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConSaveConsoleLog(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Save the console backlog to a file. Usage: 'vlaksav [<name>]' (default vlaksav.txt).");
+		return true;
+	}
+	extern std::string _personal_dir;
+	std::string name = argv.size() >= 2 ? fmt::format("{}.txt", argv[1]) : "vlaksav.txt";
+	std::string path = _personal_dir + name;
+	int lines = IConsoleSaveBacklog(path);
+	if (lines < 0) {
+		IConsolePrint(CC_ERROR, "vlaksav: nejde zapsat '{}'.", path);
+	} else {
+		IConsolePrint(CC_DEFAULT, "vlaksav: {} radku ulozeno do '{}'.", lines, path);
 	}
 	return true;
 }
@@ -4020,6 +4045,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
+	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);

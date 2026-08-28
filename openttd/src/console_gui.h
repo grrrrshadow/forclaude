@@ -14,5 +14,6 @@
 
 void IConsoleResize(Window *w);
 void IConsoleSwitch();
+int IConsoleSaveBacklog(const std::string &path);
 
 #endif /* CONSOLE_GUI_H */

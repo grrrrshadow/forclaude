@@ -7485,31 +7485,52 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * train happens to be standing in, finds none, and parks it there for
 	 * good before the stop can even finish. */
 	if ((consist->current_order.IsType(OT_GOTO_STATION) || consist->current_order.IsType(OT_GOTO_DEPOT)) &&
-			consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0 &&
-			FindOrClaimCoupleTarget(consist) == nullptr) {
-		/* And it holds no track while it waits. Reserving first and choosing
-		 * afterwards was the whole trouble: the path was held against every
-		 * other train for as long as the wait lasted, and when the choice was
-		 * finally made the train went to what it had reserved rather than to
-		 * what it had chosen. Nothing is reserved until there is something to
-		 * reserve it for. Not every tick -- there is nothing to release most of
-		 * the time. */
-		/* Not for a train standing in a depot. It holds no reservation there
-		 * to let go of -- and reservations carry no owner, so the walk that
-		 * frees "its" path starts at the shed door and eats whatever exit
-		 * reservation a stablemate has just made through it. Three collectors
-		 * sharing a depot with a fourth that had no rake yet crashed exactly
-		 * this way: the empty one kept wiping the mouth clean behind each one
-		 * that reserved it, and two of them met on the doorstep. */
-		if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
-			if (_show_train_orientation) {
-				IConsolePrint(CC_INFO, "Vlak {}: drzi bez cile - rezervace zahozena, na ({},{})",
-						consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
+			consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0) {
+		if (FindOrClaimCoupleTarget(consist) == nullptr) {
+			/* And it holds no track while it waits. Reserving first and choosing
+			 * afterwards was the whole trouble: the path was held against every
+			 * other train for as long as the wait lasted, and when the choice was
+			 * finally made the train went to what it had reserved rather than to
+			 * what it had chosen. Nothing is reserved until there is something to
+			 * reserve it for. Not every tick -- there is nothing to release most of
+			 * the time. */
+			/* Not for a train standing in a depot. It holds no reservation there
+			 * to let go of -- and reservations carry no owner, so the walk that
+			 * frees "its" path starts at the shed door and eats whatever exit
+			 * reservation a stablemate has just made through it. Three collectors
+			 * sharing a depot with a fourth that had no rake yet crashed exactly
+			 * this way: the empty one kept wiping the mouth clean behind each one
+			 * that reserved it, and two of them met on the doorstep. */
+			if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: drzi bez cile - rezervace zahozena, na ({},{})",
+							consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
+				}
+				FreeTrainTrackReservation(consist);
+				consist->ReserveTrackUnderConsist();
 			}
-			FreeTrainTrackReservation(consist);
-			consist->ReserveTrackUnderConsist();
+			return true;
 		}
-		return true;
+
+		/* It has a rake to go for -- but the wait above threw its path away,
+		 * so it is standing in the middle of the line with nothing reserved
+		 * ahead. Setting off like that is driving blind: the rake appeared
+		 * the moment its dropper put it down, the dropper is still pulling
+		 * clear on a path of its own, and a collector that just goes meets it
+		 * head on -- while its window honestly says it cannot reach the
+		 * station yet. So it leaves the wait the way a train leaves anywhere
+		 * else: with a reservation, or not at all. A train in a depot is not
+		 * this rule's business -- the depot-exit code holds it back with its
+		 * own path check. An already-standing safe reservation releases it at
+		 * once; a fresh search is only run every few ticks, because the times
+		 * it fails are exactly the times the way ahead is busy. */
+		if (!IsWholeTrainInsideDepot(consist)) {
+			PBSTileInfo res = FollowTrainReservation(consist);
+			if (!res.okay) {
+				if ((consist->tick_counter & 0x7) != 0) return true;
+				if (!TryPathReserve(consist)) return true;
+			}
+		}
 	}
 
 	/* A train just put down stands until the one that put it down has pulled

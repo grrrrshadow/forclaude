@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "core/string_consumer.hpp"
+#include "fileio_type.h"
 #include "textbuf_type.h"
 #include "window_gui.h"
 #include "autocompletion.h"
@@ -552,6 +553,26 @@ void IConsoleGUIPrint(ExtendedTextColour colour_code, const std::string &str)
 {
 	_iconsole_buffer.push_front(IConsoleLine(str, colour_code));
 	SetWindowDirty(WindowClass::Console, 0);
+}
+
+/**
+ * Write the console backlog to a file, oldest line first, so a whole incident
+ * can be reported after the fact instead of screenshotting the console a
+ * window at a time. Only what the backlog still holds can be written; its
+ * depth is the player's console_backlog_length/_timeout settings.
+ * @param path Where to write; overwritten if it exists.
+ * @return Number of lines written, or -1 when the file could not be opened.
+ */
+int IConsoleSaveBacklog(const std::string &path)
+{
+	auto file = FileHandle::Open(path, "w");
+	if (!file.has_value()) return -1;
+	int lines = 0;
+	for (auto it = _iconsole_buffer.rbegin(); it != _iconsole_buffer.rend(); ++it) {
+		fmt::print(*file, "{}\n", it->buffer);
+		lines++;
+	}
+	return lines;
 }
 
 /**

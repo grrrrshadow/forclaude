@@ -628,6 +628,25 @@ výjezdu z depa hlásí, kde rezervace končí; „konec koleje" hlásí důvod
 (červená / žádná kolej / cizí kolej / volné vagony) a zmizení či zabrání
 cíle spojení se vypisuje.
 
+**Dodatek 2: z čekání se vyjíždí jen s rezervací.** Hráčova fotka z #101:
+sběračka čekala bez cíle na širé trati (čekání jí cestu právem zahodilo),
+a v okamžiku, kdy odkladačka složila vagonky, **vyrazila bez cesty** —
+okno poctivě psalo „Nelze dosáhnout…" a přesto jela — přímo do odkladačky,
+která si svou cestu držela správně. Uvolnění z čekacího bloku teď
+vyžaduje rezervaci: stojící bezpečná rezervace pustí vlak hned, jinak se
+zkouší TryPathReserve (každý osmý tik) a do té doby vlak stojí. Vagonky
+se tak sbírají, až když odkladačka uhne — což je přesně pořadí, které na
+tom nádraží platí i pro všechno ostatní. Ověřeno maticí: sběračky hned
+za odkladačkami, za 500, za 1500 i standardní protokol s reverzem i bez
+— všude 4/4, nula havárií.
+
+**Konzole do souboru: `vlaksav [jméno]`.** Uloží celý zpětný zásobník
+konzole (od nejstaršího řádku) do `vlaksav.txt` (nebo `<jméno>.txt`)
+v osobní složce hry — hlášení nehody pak nemusí být po screenshotech.
+Hloubku zásobníku řídí hráčova nastavení `console_backlog_length`
+a `console_backlog_timeout`; na dlouhé záznamy je dobré si délku zvednout
+(`setting console_backlog_length 1000` v konzoli).
+
 **Dodatek: rezervace nemají majitele — a vlak v depu žádnou nemá.**
 Hráč vyfotil sběračku, která si zarezervovala trať přes stojící
 odkladačku; rig chytil mechanismus u vrat depa: sběračka **bez cíle**,
