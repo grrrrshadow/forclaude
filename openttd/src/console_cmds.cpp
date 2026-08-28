@@ -884,15 +884,23 @@ static bool ConSaveConsoleLog(std::span<std::string_view> argv)
  * Usage: testmapa <x1> <y1> <x2> <y2>
  * @copydoc IConsoleCmdProc
  */
+static uint _testmapa_area[4]; ///< Last built test scene's surroundings, for a no-argument testmapa.
+
 static bool ConTestMap(std::span<std::string_view> argv)
 {
+	if (argv.empty()) return true;
+	std::optional<uint64_t> px1, py1, px2, py2;
 	if (argv.size() < 5) {
-		IConsolePrint(CC_HELP, "Usage: 'testmapa <x1> <y1> <x2> <y2>'.");
-		return true;
+		if (_testmapa_area[2] == 0) {
+			IConsolePrint(CC_HELP, "Usage: 'testmapa <x1> <y1> <x2> <y2>' (bez argumentu: okoli posledni zkusebni sceny).");
+			return true;
+		}
+		px1 = _testmapa_area[0]; py1 = _testmapa_area[1]; px2 = _testmapa_area[2]; py2 = _testmapa_area[3];
+	} else {
+		px1 = ParseInteger(argv[1]); py1 = ParseInteger(argv[2]);
+		px2 = ParseInteger(argv[3]); py2 = ParseInteger(argv[4]);
+		if (!px1.has_value() || !py1.has_value() || !px2.has_value() || !py2.has_value()) return false;
 	}
-	auto px1 = ParseInteger(argv[1]), py1 = ParseInteger(argv[2]);
-	auto px2 = ParseInteger(argv[3]), py2 = ParseInteger(argv[4]);
-	if (!px1.has_value() || !py1.has_value() || !px2.has_value() || !py2.has_value()) return false;
 
 	IConsolePrint(CC_DEFAULT, "testmapa: otaceni u navesti (reverse_at_signals) = {}", _settings_game.pf.reverse_at_signals ? "zapnuto" : "vypnuto");
 	for (uint y = *py1; y <= (uint)*py2; y++) {
@@ -1076,11 +1084,12 @@ static bool ConTestClone(std::span<std::string_view> argv)
  */
 static VehicleID _testodtah_casualty = VehicleID::Invalid();
 static TileIndex _testodtah_break_tile = INVALID_TILE;
+static TileIndex _testodtah_cross_tile = INVALID_TILE;
 
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -1088,8 +1097,12 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		return true;
 	}
 	/* 'rovina' breaks the casualty down on the plain main line instead of on
-	 * the points -- the control case: no straightening may fire there. */
+	 * the points -- the control case: no straightening may fire there.
+	 * 'krizeni' breaks it right on the junction tile and lays a stranger's
+	 * reservation across it, which is the shape that made freeing the
+	 * casualty's own forward path bail out and leak. */
 	bool plain = argv.size() >= 2 && argv[1] == "rovina";
+	bool crossing = argv.size() >= 2 && argv[1] == "krizeni";
 
 	if (Company::GetIfValid(_local_company) == nullptr) {
 		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
@@ -1165,6 +1178,8 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	uint x0 = TileX(strip);
 	uint y0 = TileY(strip);
 	IConsolePrint(CC_DEFAULT, "testodtah: strip at ({},{})..({},{}), junction at ({},{}).", x0, y0, x0 + LEN - 1, y0, xj, y0);
+	_testmapa_area[0] = x0; _testmapa_area[1] = y0 > 1 ? y0 - 1 : 0;
+	_testmapa_area[2] = x0 + LEN - 1; _testmapa_area[3] = y0 + 6;
 
 	TileIndex depot_w = TileXY(x0, y0);
 	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
@@ -1234,7 +1249,8 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
 	_testodtah_casualty = veh_c;
-	_testodtah_break_tile = plain ? TileXY(xj + 8, y0) : TileXY(xj, y0 + 1);
+	_testodtah_break_tile = plain ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1));
+	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testspoj_active = true;
 
 	IConsolePrint(CC_DEFAULT, "testodtah: scene ready. casualty=vlak {}, rescue=vlak {}, break at ({},{}).",
@@ -1254,7 +1270,43 @@ static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Prior
 	t->breakdown_ctr = 2;
 	_testodtah_break_tile = INVALID_TILE;
 	IConsolePrint(CC_INFO, "testodtah: vlak {} porouchan na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+	if (_testodtah_cross_tile != INVALID_TILE) {
+		/* A stranger's reservation across the casualty's tile, staged: the
+		 * shape that made freeing the casualty's own path bail out. */
+		if (TryReserveRailTrack(_testodtah_cross_tile, Track::X)) {
+			IConsolePrint(CC_INFO, "testodtah: cizi rezervace polozena pres ({},{}).", TileX(_testodtah_cross_tile), TileY(_testodtah_cross_tile));
+		}
+		_testodtah_cross_tile = INVALID_TILE;
+	}
 });
+
+/**
+ * Run a console command after a delay, once. Usage: testza <ticks> <command...>
+ * Granularity is the heartbeat's 1000 ticks.
+ * @copydoc IConsoleCmdProc
+ */
+static int _testza_delay = 0;
+static std::string _testza_cmd;
+
+static bool ConTestAfter(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Run a console command later. Usage: 'testza <ticks> <command...>'.");
+		return true;
+	}
+	auto pticks = ParseInteger(argv[1]);
+	if (!pticks.has_value()) return false;
+	std::string cmd;
+	for (size_t i = 2; i < argv.size(); i++) {
+		if (!cmd.empty()) cmd += ' ';
+		cmd += argv[i];
+	}
+	_testza_delay = (int)*pticks;
+	_testza_cmd = std::move(cmd);
+	_testspoj_active = true;
+	IConsolePrint(CC_DEFAULT, "testza: '{}' za {} tiku.", _testza_cmd, _testza_delay);
+	return true;
+}
 
 /** While the test scene runs, say where everybody stands every few seconds. */
 static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Priority::None, 1000}, [](auto) {
@@ -1262,6 +1314,14 @@ static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Pr
 	if (_testklon_delay > 0) {
 		_testklon_delay -= 1000;
 		if (_testklon_delay <= 0) DoTestClone(_testklon_unit, _testklon_count, _testklon_reverz);
+	}
+	if (_testza_delay > 0) {
+		_testza_delay -= 1000;
+		if (_testza_delay <= 0 && !_testza_cmd.empty()) {
+			std::string cmd = std::move(_testza_cmd);
+			_testza_cmd.clear();
+			IConsoleCmdExec(cmd);
+		}
 	}
 	std::string_view name = "teststav";
 	std::span<std::string_view> args(&name, 1);
@@ -4072,6 +4132,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
+	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);

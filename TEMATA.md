@@ -842,9 +842,20 @@ výhybce žádné ježdění najetí neumožní.
 
 **Rig:** `testodtah` postaví scénu (porucha ohnutá přes výhybku do jižní
 odbočky, odtahovka na zavolání v západním depu), `testodtah rovina` je
-kontrola na rovné trati (narovnání se nesmí spustit). Obě ověřeny: spojení
+kontrola na rovné trati (narovnání se nesmí spustit), `testodtah krizeni`
+rozbije kasualitu přímo na políčku křižovatky. Obě ověřeny: spojení
 bez pádu, odvoz do depa, složení vraku; regrese nádražního protokolu na
 save91 4/4 s reverzem i bez.
+
+**Zůstatek rezervace po odtahu (hráčovo hlášení, opraveno).** Úklid
+políček opuštěných narovnáním přeskakoval **celé políčko**, když na něm
+kdokoli stál — jenže na křižovatce může odtahovka stát na rovném kusu,
+zatímco se vrak zvedá z oblouku, a rezervace oblouku pak zůstala viset
+navěky (zarezervovaný kus trati, na kterém nic není a nic ji nikdy
+nepustí). Přeskakuje se teď jen, když někdo stojí **na tomtéž kusu
+koleje**. Chyceno `testodtah krizeni` + výpisem `testmapa` po odtahu
+(`testza <tiky> <příkaz>` — odložené spuštění konzolového příkazu);
+po opravě zbývají po odtahu jen rezervace pod živými vlaky.
 
 ---
 

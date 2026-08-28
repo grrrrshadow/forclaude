@@ -2642,9 +2642,15 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 	 * standing on (the bed can reuse part of the old ground). */
 	for (const auto &[tile, bits] : vacated) {
 		if (bits.Any({Track::Wormhole, Track::Depot})) continue;
+		/* Skipped only for a train standing on the same piece of track, not
+		 * for anybody anywhere on the tile: on a junction the tow itself can
+		 * stand on the straight piece while the wreck is lifted off the
+		 * curve, and a whole-tile skip then left the curve's reservation
+		 * orphaned for good -- a reserved piece of line with nothing on it
+		 * and nothing ever coming to release it. */
 		bool still_used = false;
 		for (const Vehicle *o : VehiclesOnTile(tile)) {
-			if (o->type == VehicleType::Train) { still_used = true; break; }
+			if (o->type == VehicleType::Train && Train::From(o)->track == bits) { still_used = true; break; }
 		}
 		if (still_used) continue;
 		Track track = TrackBitsToTrack(bits);
