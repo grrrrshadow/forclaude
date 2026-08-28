@@ -3630,9 +3630,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 /**
  * Decouple a stopped train down to its front @p keep_count "real"
  * (non-articulated-part) vehicles, splitting the rest off into a new
- * standalone train left behind. Called from #Vehicle::LeaveStation when
- * the order just finished has Order::ShouldDecoupleOnDeparture() set; see
- * FEATURE_DESIGN_COUPLING_TOW.md.
+ * standalone train left behind. Called from #TrainLocoHandler the moment
+ * the train stands loading at the station its decouple order names --
+ * on arrival, not on departure. The engine has no reason to sit through
+ * a load that belongs to the wagons it is leaving: they load perfectly
+ * well on their own, and once split off, that is exactly what they do.
+ * What the kept part itself has to load or unload here, it still does,
+ * through the rest of its own stop; a light engine has nothing and goes.
+ * See FEATURE_DESIGN_COUPLING_TOW.md.
  *
  * If @p keep_count is 0 or is not achievable with the train's current
  * length (e.g. the consist has since been shortened, or it's a
@@ -3640,7 +3645,9 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
  * does nothing rather than failing loudly - the order's decouple count is
  * a per-order setting that can outlive changes to the consist it was set
  * on, similar to how e.g. full-load orders don't error on a consist that
- * can never fill up.
+ * can never fill up. Doing nothing is also what makes calling this every
+ * loading tick safe: the first call splits, every later one finds the
+ * train already at its kept length and bows out.
  *
  * Right after the split, the left-behind remainder is given a synthetic
  * "wait to couple" order at the station it's still standing on, so it
@@ -3649,13 +3656,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
  * the mental model that a decoupled remainder is always left in a state
  * ready to be picked up again. See FEATURE_DESIGN_COUPLING_TOW.md.
  *
- * @param v          front of the consist that just finished loading
+ * @param v          front of the consist standing at its decouple stop
  * @param keep_count number of vehicles to keep at the front
+ * @return whether the train was actually split
  */
-void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type)
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type)
 {
-	if (keep_count == 0) return;
-	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return;
+	if (keep_count == 0) return false;
+	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
 	/* Taking a train apart is the same work the move command does, and parts of
 	 * that work ask the game which company is acting -- handing out a unit
@@ -3669,10 +3677,10 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	Train *split_point = v;
 	for (uint8_t i = 0; i < keep_count; i++) {
 		split_point = split_point->GetNextVehicle();
-		if (split_point == nullptr) return; // consist has fewer than keep_count vehicles
+		if (split_point == nullptr) return false; // consist has fewer than keep_count vehicles
 	}
 
-	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
+	if (split_point->IsRearDualheaded()) return false; // can't split a multiheaded engine in half
 
 	/* Which end leads belongs to the whole train and has to be handed on to the
 	 * part being put down before the front engine's own copy is reset below. */
@@ -3847,7 +3855,7 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 		FreeTrainTrackReservation(remainder);
 		remainder->ReserveTrackUnderConsist();
-		return;
+		return true;
 	}
 
 	if (IsRailStationTile(remainder->tile)) {
@@ -3913,6 +3921,7 @@ void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 		TrainEnterStation(remainder, station);
 	}
+	return true;
 }
 
 /**
@@ -7449,6 +7458,27 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * uses -- nothing is walking along the consist. Placed before the stopped
 	 * check on purpose: an order to stop in the depot and decouple there does
 	 * both, in that order. */
+	/* A station decouple happens on arrival, at this same safe moment: the
+	 * train has come to a stand loading at the station its order names, and
+	 * the wagons it is leaving are split off before any of the load that is
+	 * theirs is waited for. They load on their own once put down -- that is
+	 * established machinery -- so the engine sits through none of it; what
+	 * the kept part itself is to load or unload here, it still does through
+	 * the rest of its own stop, and a light engine has nothing and goes.
+	 * Read off the real order, never the loading state, so a stop en route
+	 * (non-stop off) can never trip it; and safe to ask every loading tick,
+	 * because a train already at its kept length splits into nothing. */
+	if (consist->cur_speed == 0 && consist->IsFrontEngine() && consist->current_order.IsType(OT_LOADING) &&
+			consist->current_order.GetDecoupleCount() != 0) {
+		const Order *real_order = consist->GetOrder(consist->cur_real_order_index);
+		if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
+				real_order->GetDestination().ToStationID() == consist->last_station_visited &&
+				TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
+						real_order->GetLoadType(), real_order->GetUnloadType())) {
+			return true;
+		}
+	}
+
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && IsWholeTrainInsideDepot(consist)) {
 		if (consist->depot_decouple_pending != 0) {
 			uint8_t keep = consist->depot_decouple_pending;

@@ -84,7 +84,7 @@ bool HandleRescueEngineInDepot(Train *tow);
 void EndRescueErrand(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
 bool IsRescueTargetOnTile(const Train *v, TileIndex tile);
-void TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type);
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type);
 
 /** Variables that are cached to improve performance and such */
 struct TrainCache {

@@ -2444,34 +2444,10 @@ void Vehicle::LeaveStation()
 			TriggerStationAnimation(st, tile, StationAnimationTrigger::VehicleDeparts);
 		}
 
-		/* If this order asked to decouple down to a given number of
-		 * vehicles, do it now, right before actually leaving - see
-		 * FEATURE_DESIGN_COUPLING_TOW.md. MakeLeaveStation() above only
-		 * resets `type`/`flags`; decouple_count is its own field (not
-		 * packed into `flags`, see the "Bug D" writeup) so it's still
-		 * intact here. */
-		if (this->current_order.ShouldDecoupleOnDeparture()) {
-			/* MakeLeaveStation() above has already reset the loading fields
-			 * of current_order, so how this train was told to handle cargo
-			 * here has to be read back off the order it is actually working
-			 * through, and handed to the wagons being left behind. */
-			const Order *real_order = this->GetOrder(this->cur_real_order_index);
-
-			/* And only the station that order actually names. A train that
-			 * stops everywhere on the way -- non-stop off -- passes through
-			 * stations the player never asked it to put wagons down at, and
-			 * the count would leak out of the order at the first of them.
-			 * The rig caught exactly that: a depot order's decouple, meant
-			 * for the shed, fired at a station passed en route. A depot
-			 * order's count is consumed at the depot (VehicleEnterDepot),
-			 * never here. */
-			bool ordered_here = real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
-					real_order->GetDestination().ToStationID() == this->last_station_visited;
-			if (ordered_here) {
-				TryDecoupleAtStation(Train::From(this), this->current_order.GetDecoupleCount(),
-						real_order->GetLoadType(), real_order->GetUnloadType());
-			}
-		}
+		/* A decouple asked for by this order happened on arrival, in
+		 * TrainLocoHandler(), the moment the train stood loading here --
+		 * the engine does not sit through a load that belongs to the wagons
+		 * it is leaving. Nothing about it is left for departure. */
 
 		Train::From(this)->flags.Set(VehicleRailFlag::LeavingStation);
 	}

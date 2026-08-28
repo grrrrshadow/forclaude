@@ -663,6 +663,15 @@ a nula havárií.
 
 # 3. Rozpojování (decouple)
 
+- **Odpojuje se při příjezdu, ne při odjezdu.** Mašinka nemá důvod
+  prosedět nakládku, která patří vagonkům, co tu nechává — vagonky si
+  naloží samy, až odjede (umí to, je to zavedená mechanika). Odpojí se
+  hned, jak vlak zastaví v nakládce na stanici, kterou příkaz jmenuje
+  (čte se skutečný příkaz, takže mezizastávky při vypnutém non-stop to
+  nikdy nespustí); co má naložit/vyložit ponechaná část, to si v klidu
+  doodbaví ve zbytku své zastávky — samotná mašinka nemá nic a jede.
+  Dřív se odpojovalo při odjezdu (hák v LeaveStation — zrušen, mechanismus
+  je jen jeden, v TrainLocoHandleru u ostatní vlakové chirurgie).
 - Číslo v příkazu je **kolik vozů si vlak nechá**, ne kolik jich nechá stát.
 - Odpojená řada dostane **dva skutečné příkazy**: co jí mašinka nechala za
   práci na téhle stanici, a za tím „čekat na spojení". Hráč mezi nimi
