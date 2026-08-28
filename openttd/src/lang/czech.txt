@@ -3841,7 +3841,7 @@ STR_NEWGRF_ERROR_OTTD_VERSION_NUMBER                            :{1:STRING} pot�
 STR_NEWGRF_ERROR_AFTER_TRANSLATED_FILE                          :grafika, která se měla přeložit
 STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED                        :Je nahráno příliš mnoho grafik
 STR_NEWGRF_ERROR_STATIC_GRF_CAUSES_DESYNC                       :Nahrání {1:STRING} jako statické grafiky spolu s {STRING} může způsobit chybu synchronizace
-STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5                :Tahle verze CZTR Wagons-Cargo není připravená na FIRS 5. Použij starší CZTR Wagons-Cargo 1.0.0
+STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5                :VŠECHNO BUDE FUNGOVAT s cztr vagons 1.0.0 — VŠECHNY NÁKLADY. Klidně nastav Steeltown v parametrech FIRS
 STR_NEWGRF_ERROR_UNEXPECTED_SPRITE                              :Neočekávaný sprite (sprite {3:NUM})
 STR_NEWGRF_ERROR_UNKNOWN_PROPERTY                               :Neznámá Akce 0 vlastnost {4:HEX} (sprite {3:NUM})
 STR_NEWGRF_ERROR_INVALID_ID                                     :Pokus o použití neplatného ID (sprite {3:NUM})
