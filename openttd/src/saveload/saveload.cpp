@@ -756,6 +756,9 @@ static size_t _next_offs;
  */
 int SlIterateArray()
 {
+	if (_sl_legacy_decouple_import) {
+		Debug(sl, 0, "iterate array: at {}, next_offs {}", _sl.reader->GetSize(), _next_offs);
+	}
 	/* After reading in the whole array inside the loop
 	 * we must have read in all the data, so we must be at end of current block. */
 	if (_next_offs != 0 && _sl.reader->GetSize() != _next_offs) {
@@ -1898,8 +1901,14 @@ void SlObject(void *object, const SaveLoadTable &slt)
 		if (_sl.need_length == NeedLength::CalcLength) return;
 	}
 
+	bool trace = _sl_legacy_decouple_import && _sl.action == SaveLoadAction::Load;
 	for (auto &sld : slt) {
+		size_t before = trace ? _sl.reader->GetSize() : 0;
 		SlObjectMember(object, sld);
+		if (trace) {
+			size_t after = _sl.reader->GetSize();
+			if (after - before > 8) Debug(sl, 0, "field '{}': {} -> {} ({} bytes)", sld.name, before, after, after - before);
+		}
 	}
 }
 

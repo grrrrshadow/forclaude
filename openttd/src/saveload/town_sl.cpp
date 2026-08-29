@@ -373,6 +373,72 @@ struct HIDSChunkHandler : NewGRFMappingChunkHandler {
 	HIDSChunkHandler() : NewGRFMappingChunkHandler('HIDS', _house_mngr) {}
 };
 
+/* See the comment on _sl_legacy_decouple_import (saveload.cpp). A foreign
+ * fork's town record is not something to walk past by length and discard --
+ * unlike a vehicle, a house tile's owning town is not optional anywhere in
+ * the game, and importing an old save specifically to look at its towns
+ * would be defeated by throwing them away. So this decodes the record
+ * properly instead, adjusted for the one place it actually differs.
+ *
+ * That one place: real OpenTTD dropped a plain 4-byte "cargo produced"
+ * counter at savegame version 199 (GitHub PR 6802, extending cargo types to
+ * 64 needed more room and the field was widened and moved), and the two
+ * null placeholders either side of that version in _town_sl_compat record
+ * that exact history -- 4 bytes before it, 8 after. A fork frozen mid-2018
+ * never received that specific change; its version-200 saves still carry
+ * the old plain 4-byte counter, never the replacement. This copies the
+ * shared list verbatim except for that one entry, so a save from that fork
+ * decodes every other field exactly as it would anywhere else. */
+const SaveLoadCompat _town_sl_compat_legacy_decouple[] = {
+	SLC_VAR("xy"),
+	SLC_NULL(2, SaveLoadVersion::MinVersion, SaveLoadVersion::BiggerStationVariables),
+	SLC_NULL(4, SaveLoadVersion::BiggerStationVariables, SaveLoadVersion::MaglevMonorailPaxWagonLivery),
+	SLC_NULL(2, SaveLoadVersion::MinVersion, SaveLoadVersion::RemoveHouseCount),
+	SLC_VAR("townnamegrfid"),
+	SLC_VAR("townnametype"),
+	SLC_VAR("townnameparts"),
+	SLC_VAR("name"),
+	SLC_VAR("flags"),
+	SLC_VAR("statues"),
+	SLC_NULL(1, SaveLoadVersion::MinVersion, SaveLoadVersion::VehicleCurrencyStationChanges),
+	SLC_VAR("have_ratings"),
+	SLC_VAR("ratings"),
+	SLC_VAR("unwanted"),
+	SLC_VAR("supplied[CT_PASSENGERS].old_max"),
+	SLC_VAR("supplied[CT_MAIL].old_max"),
+	SLC_VAR("supplied[CT_PASSENGERS].new_max"),
+	SLC_VAR("supplied[CT_MAIL].new_max"),
+	SLC_VAR("supplied[CT_PASSENGERS].old_act"),
+	SLC_VAR("supplied[CT_MAIL].old_act"),
+	SLC_VAR("supplied[CT_PASSENGERS].new_act"),
+	SLC_VAR("supplied[CT_MAIL].new_act"),
+	SLC_NULL(2, SaveLoadVersion::MinVersion, SaveLoadVersion::VehicleCentreAndZPos),
+	SLC_VAR("received[TE_FOOD].old_act"),
+	SLC_VAR("received[TE_WATER].old_act"),
+	SLC_VAR("received[TE_FOOD].new_act"),
+	SLC_VAR("received[TE_WATER].new_act"),
+	SLC_VAR("goal"),
+	SLC_VAR("text"),
+	SLC_VAR("time_until_rebuild"),
+	SLC_VAR("grow_counter"),
+	SLC_VAR("growth_rate"),
+	SLC_VAR("fund_buildings_months"),
+	SLC_VAR("road_build_months"),
+	SLC_VAR("exclusivity"),
+	SLC_VAR("exclusive_counter"),
+	SLC_VAR("larger_town"),
+	SLC_VAR("layout"),
+	SLC_VAR("psa_list"),
+	/* The one entry that differs from _town_sl_compat: this fork's plain
+	 * 4-byte cargo_produced field, standing where real history has the
+	 * pre-199 4-byte null followed by the post-199 8-byte one. */
+	SLC_NULL(4, SaveLoadVersion::InfrastructureMaintenanceCosts, SaveLoadVersion::RemoveTownCargoCache),
+	SLC_NULL(30, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::RemoveTownCargoCache),
+	SLC_VAR("supplied"),
+	SLC_VAR("received"),
+	SLC_VAR("acceptance_matrix"),
+};
+
 struct CITYChunkHandler : ChunkHandler {
 	CITYChunkHandler() : ChunkHandler('CITY', ChunkType::Table) {}
 
@@ -388,7 +454,10 @@ struct CITYChunkHandler : ChunkHandler {
 
 	void Load() const override
 	{
-		const std::vector<SaveLoad> slt = SlCompatTableHeader(_town_desc, _town_sl_compat);
+		extern bool _sl_legacy_decouple_import;
+		const std::vector<SaveLoad> slt = _sl_legacy_decouple_import ?
+				SlCompatTableHeader(_town_desc, _town_sl_compat_legacy_decouple) :
+				SlCompatTableHeader(_town_desc, _town_sl_compat);
 
 		int index;
 
