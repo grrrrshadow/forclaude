@@ -1,6 +1,6 @@
 ### Decouple edition:
 
-- Karel Mácha - Feature design, rules of play and all the testing
+- Karel Mácha - Leads this edition: says how it all has to behave, and tests every build
 
 ### The OpenTTD team (in alphabetical order):
 

@@ -347,7 +347,7 @@ static const std::initializer_list<const std::string_view> _credits = {
 	"Original graphics by Simon Foster",
 	"",
 	"Decouple edition:",
-	"  Karel M\u00e1cha - Feature design, rules of play and all the testing",
+	"  Karel M\u00e1cha - Leads this edition: says how it all has to behave, and tests every build",
 	"",
 	"The OpenTTD team (in alphabetical order):",
 	"  Matthijs Kooijman (blathijs) - Pathfinder-guru, Debian port (since 0.3)",
