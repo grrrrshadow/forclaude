@@ -138,6 +138,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_load_dialog_widgets 
 			NWidget(WWT_PANEL, Colours::Grey, WID_SL_DETAILS), SetResize(1, 1), SetFill(1, 1),
 			EndContainer(),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SL_MISSING_NEWGRFS), SetStringTip(STR_NEWGRF_SETTINGS_FIND_MISSING_CONTENT_BUTTON, STR_NEWGRF_SETTINGS_FIND_MISSING_CONTENT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_SL_LEGACY_IMPORT), SetStringTip(STR_SAVELOAD_LEGACY_IMPORT_OFF, STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 					NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SL_NEWGRF_INFO), SetStringTip(STR_MAPGEN_NEWGRF_SETTINGS, STR_MAPGEN_NEWGRF_SETTINGS_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
@@ -424,6 +425,13 @@ public:
 			this->GetWidget<NWidgetStacked>(WID_SL_CONTENT_DOWNLOAD_SEL)->SetDisplayedPlane(SZSP_HORIZONTAL);
 		}
 
+		/* Always start with this off: it is a per-load choice, not something
+		 * that should ever carry over from an earlier window, an earlier
+		 * file, or a crash that skipped Close(). See the comment on
+		 * _sl_legacy_decouple_import (saveload.cpp). */
+		extern bool _sl_legacy_decouple_import;
+		_sl_legacy_decouple_import = false;
+
 		/* Select caption string of the window. */
 		StringID caption_string;
 		switch (this->abstract_filetype) {
@@ -499,11 +507,26 @@ public:
 
 	void Close([[maybe_unused]] int data = 0) override
 	{
+		/* Never let this leak into some unrelated later load -- quick-load,
+		 * continue-game, another window entirely -- that never asked for
+		 * it. See the comment on _sl_legacy_decouple_import (saveload.cpp). */
+		extern bool _sl_legacy_decouple_import;
+		_sl_legacy_decouple_import = false;
+
 		/* pause is only used in single-player, non-editor mode, non menu mode */
 		if (!_networking && _game_mode != GameMode::Editor && _game_mode != GameMode::Menu) {
 			Command<Commands::Pause>::Post(PauseMode::SaveLoad, false);
 		}
 		this->Window::Close();
+	}
+
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	{
+		if (widget == WID_SL_LEGACY_IMPORT) {
+			extern bool _sl_legacy_decouple_import;
+			return GetString(_sl_legacy_decouple_import ? STR_SAVELOAD_LEGACY_IMPORT_ON : STR_SAVELOAD_LEGACY_IMPORT_OFF);
+		}
+		return this->Window::GetWidgetString(widget, stringid);
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
@@ -746,6 +769,25 @@ public:
 					ShowMissingContentWindow(_load_check_data.grfconfig);
 				}
 				break;
+
+			case WID_SL_LEGACY_IMPORT: {
+				/* See the comment on _sl_legacy_decouple_import (saveload.cpp).
+				 * The file the player has highlighted was already checked once
+				 * under the old setting of this flag -- re-run that check now
+				 * under the new one, the same check a fresh click on the file
+				 * would trigger, so the error (or the lack of one) the details
+				 * pane and the Load button both react to reflects the choice
+				 * just made rather than the one before it. */
+				extern bool _sl_legacy_decouple_import;
+				_sl_legacy_decouple_import = !_sl_legacy_decouple_import;
+				if (this->selected != nullptr && this->selected->type.detailed == DetailedFileType::GameFile) {
+					_load_check_data.Clear();
+					SaveOrLoad(this->selected->name, SaveLoadOperation::Check, DetailedFileType::GameFile, Subdirectory::None, false);
+				}
+				this->SetWidgetDirty(WID_SL_LEGACY_IMPORT);
+				this->InvalidateData(SLIWD_SELECTION_CHANGES);
+				break;
+			}
 
 			case WID_SL_DRIVES_DIRECTORIES_LIST: { // Click the listbox
 				auto it = this->vscroll->GetScrolledItemFromWidget(this->display_list, pt.y, this, WID_SL_DRIVES_DIRECTORIES_LIST, WidgetDimensions::scaled.inset.top);
