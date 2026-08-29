@@ -404,6 +404,21 @@ public:
 	size_t GetNumCargo() const
 	{
 		if (IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo)) return 12;
+		/* See the comment on _sl_legacy_decouple_import (saveload.cpp). Real
+		 * OpenTTD widened this to 64 the moment it reached ExtendCargotypes
+		 * (199), and every station record from that version on is written
+		 * with 64 per-cargo slots. A fork that claims the same version
+		 * number without ever having taken that specific change keeps
+		 * writing only the 32 it always did -- there is nothing in the file
+		 * itself that says so, because there was never a reason to say so
+		 * until a second fork disagreed with the first about what the
+		 * number means. Reading 64 from a station that only has 32 does not
+		 * stop at a tidy boundary: it runs on into whatever the next
+		 * station's own bytes happen to be and reads them as if they were
+		 * more goods entries, which is how a plain miscount two stations
+		 * away turned into a hard crash deep inside cargo-flow bookkeeping. */
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import && IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return 32;
 		if (IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes)) return 32;
 		if (IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return NUM_CARGO;
 		/* Read from the savegame how long the list is. */
@@ -469,7 +484,12 @@ public:
 	{
 		Station *st = Station::From(bst);
 
-		size_t num_cargo = IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : NUM_CARGO;
+		/* Mirrors the same fork-specific count used in GetNumCargo() above --
+		 * fixing pointers on entries Load() never actually populated would
+		 * not match what is really in this station's record. */
+		extern bool _sl_legacy_decouple_import;
+		size_t num_cargo = (_sl_legacy_decouple_import && IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) ? 32 :
+				IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : NUM_CARGO;
 		auto end = std::next(std::begin(st->goods), std::min(num_cargo, std::size(st->goods)));
 		for (auto it = std::begin(st->goods); it != end; ++it) {
 			GoodsEntry &ge = *it;
@@ -618,8 +638,62 @@ public:
 /**
  * SaveLoad handler for a normal station (read: not a waypoint).
  */
+/* See the comment on _sl_legacy_decouple_import (saveload.cpp). This one
+ * field's on-disk width changed from 32 to 64 bits at the same real-history
+ * point (ExtendCargotypes, 199) that widened cargo types themselves -- the
+ * same point a fork stuck at its own NUM_CARGO=32 (see GetNumCargo() in
+ * SlStationGoods above) never crossed. Its version-200 stations still write
+ * the old 4-byte width; this build's normal field list, seeing 200 >= 199,
+ * reads 8. The value itself -- which cargoes a station always accepts
+ * regardless of nearby industry -- is exactly the kind of standing economic
+ * instruction a fresh station starts without, so it is not decoded at all
+ * here: skipped by its real 4-byte width, left at whatever a newly built
+ * station already has it at. */
+const SaveLoadCompat _station_normal_sl_compat_legacy_decouple[] = {
+	SLC_VAR("base"),
+	SLC_VAR("train_station.tile"),
+	SLC_VAR("train_station.w"),
+	SLC_VAR("train_station.h"),
+	SLC_VAR("bus_stops"),
+	SLC_VAR("truck_stops"),
+	SLC_NULL(4, SaveLoadVersion::MinVersion, SaveLoadVersion::MultitileDocks),
+	SLC_VAR("ship_station.tile"),
+	SLC_VAR("ship_station.w"),
+	SLC_VAR("ship_station.h"),
+	SLC_VAR("docking_station.tile"),
+	SLC_VAR("docking_station.w"),
+	SLC_VAR("docking_station.h"),
+	SLC_VAR("airport.tile"),
+	SLC_VAR("airport.w"),
+	SLC_VAR("airport.h"),
+	SLC_VAR("airport.type"),
+	SLC_VAR("airport.layout"),
+	SLC_VAR("airport.flags"),
+	SLC_VAR("airport.rotation"),
+	SLC_VAR("storage"),
+	SLC_VAR("airport.psa"),
+	SLC_VAR("indtype"),
+	SLC_VAR("time_since_load"),
+	SLC_VAR("time_since_unload"),
+	SLC_VAR("last_vehicle_type"),
+	SLC_VAR("had_vehicle_of_type"),
+	SLC_VAR("loading_vehicles"),
+	/* The one entry that differs from _station_normal_sl_compat: this
+	 * fork's plain 4-byte always_accepted, standing where real history from
+	 * ExtendCargotypes on has an 8-byte one. */
+	SLC_NULL(4, SaveLoadVersion::TownAcceptance, SaveLoadVersion::MaxVersion),
+	SLC_VAR("goods"),
+};
+
 class SlStationNormal : public DefaultSaveLoadHandler<SlStationNormal, BaseStation> {
 public:
+	SaveLoadCompatTable GetCompatDescription() const override
+	{
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) return _station_normal_sl_compat_legacy_decouple;
+		return DefaultSaveLoadHandler<SlStationNormal, BaseStation>::GetCompatDescription();
+	}
+
 	static inline const SaveLoad description[] = {
 		SLEG_STRUCT("base", SlStationBase),
 		    SLE_VAR(Station, train_station.tile,         VarTypes::U32),

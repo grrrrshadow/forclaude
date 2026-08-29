@@ -288,6 +288,22 @@ struct ORDLChunkHandler : ChunkHandler {
 
 	void Load() const override
 	{
+		/* See the comment on _sl_legacy_decouple_import (saveload.cpp). An
+		 * OrderList exists only to be a vehicle's or a shared group's list
+		 * of orders -- there is no such thing as one belonging to nothing.
+		 * VEHS and ORDR are already walked past unread in this mode, so no
+		 * OrderList created here would ever find the orders or the vehicle
+		 * it is meant to speak for; worse, FixPointers() below would then
+		 * try to resolve an old-format order reference into a pool that
+		 * was deliberately never populated, and assert. Walking past this
+		 * chunk too, the same way, leaves nothing dangling. */
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) {
+			extern void SlSkipArray();
+			SlSkipArray();
+			return;
+		}
+
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(GetOrderListDescription(), _orderlist_sl_compat);
 
 		int index;

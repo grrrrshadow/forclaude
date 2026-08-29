@@ -1395,6 +1395,19 @@ static void *IntToReference(size_t index, SLRefType rt)
 	 * invalid vehicle was 0xFFFF, now we use 0x0000 for everything invalid. */
 	if (rt != SLRefType::OldVehicle) index--;
 
+	/* See the comment on _sl_legacy_decouple_import (saveload.cpp). VEHS,
+	 * ORDR and ORDL are walked past unread in this mode, so nothing else
+	 * that names a vehicle or an order list by reference -- a station's
+	 * list of vehicles currently loading, a cargo payment's vehicle, an
+	 * order backup's clone source -- can ever find what it names either.
+	 * Every one of those is a place that already copes with "nothing here"
+	 * in the ordinary course of play (a vehicle sold mid-journey leaves
+	 * exactly this kind of gap behind it), so resolving to nothing here
+	 * is answering the question honestly, not papering over a real one. */
+	if (_sl_legacy_decouple_import && (rt == SLRefType::OrderList || rt == SLRefType::OldVehicle || rt == SLRefType::Vehicle)) {
+		return nullptr;
+	}
+
 	switch (rt) {
 		case SLRefType::OrderList:
 			if (OrderList::IsValidID(index)) return OrderList::Get(index);

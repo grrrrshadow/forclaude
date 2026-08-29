@@ -347,8 +347,33 @@ public:
 	void LoadCheck(CompanyProperties *c) const override { this->Load(c); }
 };
 
+/* See the comment on _sl_legacy_decouple_import (saveload.cpp), and on
+ * _station_normal_sl_compat_legacy_decouple (station_sl.cpp) for the exact
+ * same divergence in a different field: delivered_cargo also widened from
+ * a 32-entry array to a NUM_CARGO(64)-entry one at ExtendCargotypes (199),
+ * and a fork stuck at NUM_CARGO=32 keeps writing 32 forever after. A
+ * company's per-year delivered-cargo tally is score/graph history, nothing
+ * a map or its towns and stations are seen to have, so it is skipped by
+ * its real 32-entry width rather than decoded -- both here and in the
+ * historical entries SlCompanyOldEconomy reads through the same class. */
+const SaveLoadCompat _company_economy_compat_legacy_decouple[] = {
+	SLC_VAR("income"),
+	SLC_VAR("expenses"),
+	SLC_VAR("company_value"),
+	SLC_VAR("delivered_cargo[NUM_CARGO - 1]"),
+	SLC_NULL(32 * 4, SaveLoadVersion::CountIndividualCargoes, SaveLoadVersion::MaxVersion),
+	SLC_VAR("performance_history"),
+};
+
 class SlCompanyEconomy : public DefaultSaveLoadHandler<SlCompanyEconomy, CompanyProperties> {
 public:
+	SaveLoadCompatTable GetCompatDescription() const override
+	{
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) return _company_economy_compat_legacy_decouple;
+		return DefaultSaveLoadHandler<SlCompanyEconomy, CompanyProperties>::GetCompatDescription();
+	}
+
 	static inline const SaveLoad description[] = {
 		SLE_CONDVAR(CompanyEconomyEntry, income, VarFileType::I32 | VarMemType::I64, SaveLoadVersion::MinVersion, SaveLoadVersion::VehicleCurrencyStationChanges),
 		SLE_CONDVAR(CompanyEconomyEntry, income, VarTypes::I64, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::MaxVersion),
