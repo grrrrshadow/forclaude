@@ -1,3 +1,7 @@
+### Decouple edition:
+
+- Karel Mácha (Karn) - Feature design, rules of play and all the testing
+
 ### The OpenTTD team (in alphabetical order):
 
 - Matthijs Kooijman (blathijs) - Pathfinder-guru, Debian port (since 0.3)
