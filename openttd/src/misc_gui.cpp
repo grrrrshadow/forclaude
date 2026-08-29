@@ -356,7 +356,7 @@ static const std::initializer_list<const std::string_view> _credits = {
 	"  ai , its the same like pay team coders. Lost time and many. No donation posible.",
 	"",
 	"Design of the coupling and decoupling:",
-	"  Palo123 (Karn) - The patch for OpenTTD 1.5.3 this edition's feature takes its shape from",
+	"  Palo123 (Karn) - The old decouple 0.10.4 patch this edition's feature takes its shape from",
 	"",
 	"Blueprint patch carried in this build:",
 	"  Spaceone (age77) - Copy and paste of your own infrastructure, written for 15.3",
