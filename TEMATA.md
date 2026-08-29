@@ -49,6 +49,13 @@ rozbiju tím věc, která fungovala. Přesně to se stalo s plánkem nádraží
    stojí to testovací kolo. Platí to i obráceně — když nerozumím mechanice,
    řeknu to a doptám se, co je na obrazovce vidět, místo abych třikrát
    opravoval místo, kterému jsem jen věřil.
+8. **Před editací si přečtu celý soubor, do kterého sahám.** Vyrobeno
+   naostro: do credits jsem připsal řádek s „feature design", zatímco
+   o obrazovku níž tentýž soubor říkal, že design je Karnův — a „karn
+   s velkým K" jsem si vyložil jako novou přezdívku, místo abych si
+   všiml, že Karn v souboru dávno je. Tři kola oprav na čtyřech řádcích
+   textu. Zvlášť u souborů, kde spolu záznamy souvisí (credits, témata,
+   překlady), platí: nejdřív přečíst, pak psát.
 
 ## 0.3 Na čem to celé stojí
 
