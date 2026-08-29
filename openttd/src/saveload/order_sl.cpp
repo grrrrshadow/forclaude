@@ -202,6 +202,18 @@ struct ORDRChunkHandler : ChunkHandler {
 				++num;
 			}
 		} else {
+			/* See the comment on _sl_legacy_decouple_import (saveload.cpp):
+			 * a foreign fork's Order records carry a field this list has no
+			 * member for, so the array is walked past by each item's own
+			 * stated length instead of decoded -- no old order comes out of
+			 * this, and nothing downstream should expect one to. */
+			extern bool _sl_legacy_decouple_import;
+			if (_sl_legacy_decouple_import) {
+				extern void SlSkipArray();
+				SlSkipArray();
+				return;
+			}
+
 			const std::vector<SaveLoad> slt = SlCompatTableHeader(GetOrderDescription(), _order_sl_compat);
 
 			int index;

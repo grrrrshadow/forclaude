@@ -1159,6 +1159,19 @@ struct VEHSChunkHandler : ChunkHandler {
 	{
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(_vehicle_desc, _vehicle_sl_compat);
 
+		/* See the comment on _sl_legacy_decouple_import (saveload.cpp): a
+		 * foreign fork's vehicle records do not match this list field for
+		 * field, so decoding them is not attempted at all -- the whole
+		 * array is walked past by the length each item already states for
+		 * itself, same as an unrecognised chunk is. No Vehicle comes out of
+		 * this; nothing downstream should expect one to. */
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) {
+			extern void SlSkipArray();
+			SlSkipArray();
+			return;
+		}
+
 		int index;
 
 		_cargo_count = 0;

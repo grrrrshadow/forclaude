@@ -525,6 +525,40 @@ static bool ConCztrTest(std::span<std::string_view> argv)
  * this rake for collection.
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Toggle legacy-decouple import mode: on the next 'load', vehicle and order
+ * records belonging to a save from a foreign fork (a shape this build has no
+ * field for) are walked past instead of decoded, so the map and everything
+ * else on it can still come in. Nothing is decoded into vehicles; there are
+ * none afterwards. See the comment on _sl_legacy_decouple_import.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
+{
+	extern bool _sl_legacy_decouple_import;
+
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Import an old foreign-fork save's map and infrastructure, discarding its vehicles.");
+		IConsolePrint(CC_HELP, "Usage: 'legacyimport' to flip it, or 'legacyimport on' / 'legacyimport off', then 'load <file>'.");
+		return true;
+	}
+
+	if (argv.size() >= 2) {
+		if (argv[1] == "on" || argv[1] == "1") {
+			_sl_legacy_decouple_import = true;
+		} else if (argv[1] == "off" || argv[1] == "0") {
+			_sl_legacy_decouple_import = false;
+		} else {
+			return false;
+		}
+	} else {
+		_sl_legacy_decouple_import = !_sl_legacy_decouple_import;
+	}
+
+	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", _sl_legacy_decouple_import ? "ON - vehicles will be discarded on next load" : "off");
+	return true;
+}
+
 static bool ConShowTrainOrientation(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
@@ -4313,6 +4347,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
+	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);

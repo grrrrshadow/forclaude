@@ -74,6 +74,29 @@
 
 extern const SaveLoadVersion SAVEGAME_VERSION{to_underlying(SaveLoadVersion::MaxVersion) - 1}; ///< Current savegame version of OpenTTD.
 
+/* A save from a foreign fork can carry per-vehicle or per-order fields this
+ * build has no member for -- fields our own field list has no way to skip,
+ * because it does not know they are there. Reading such a file normally
+ * walks off the rails partway through the very first mismatched record and
+ * calls the whole save broken, even though everything before that record
+ * (the map, the industries, the stations, the towns, the companies) is
+ * perfectly ordinary and would have read just fine on its own.
+ *
+ * This asks nothing of that unknown layout. Read on, an array chunk's own
+ * items are each stapled to a length the file states for itself -- so a
+ * chunk can be walked end to end by that length alone, sight unseen, same as
+ * an already-unknown chunk from a NewGRF that isn't installed. Set this
+ * before loading and the chunks a foreign vehicle format would otherwise
+ * break on (VEHS, ORDR) are walked that way instead of decoded field by
+ * field, so nothing after them is thrown off by a shape this build was never
+ * taught -- at the cost of that fork's vehicles and their orders, which
+ * never existed as far as the rest of the load is concerned.
+ *
+ * Left off (the default, always, for an ordinary load) an old but genuinely
+ * unmodified OpenTTD save reads exactly as it always has: nothing here
+ * changes its shape or its meaning. */
+bool _sl_legacy_decouple_import = false;
+
 SavegameType _savegame_type; ///< type of savegame we are loading
 FileToSaveLoad _file_to_saveload; ///< File to save or load in the openttd loop.
 
