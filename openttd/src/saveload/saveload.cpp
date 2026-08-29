@@ -756,9 +756,6 @@ static size_t _next_offs;
  */
 int SlIterateArray()
 {
-	if (_sl_legacy_decouple_import) {
-		Debug(sl, 0, "iterate array: at {}, next_offs {}", _sl.reader->GetSize(), _next_offs);
-	}
 	/* After reading in the whole array inside the loop
 	 * we must have read in all the data, so we must be at end of current block. */
 	if (_next_offs != 0 && _sl.reader->GetSize() != _next_offs) {
@@ -804,6 +801,26 @@ void SlSkipArray()
 	while (SlIterateArray() != -1) {
 		SlSkipBytes(_next_offs - _sl.reader->GetSize());
 	}
+}
+
+/**
+ * Skip whatever is left of the array item currently being read, once its
+ * wanted fields have been read from the front of it.
+ *
+ * Each item in an array chunk states its own byte length up front,
+ * regardless of how old the file is or what shape the item's fields take --
+ * that length is what SlIterateArray() checks the read position against
+ * before moving to the next item. So a record can be read partially, taking
+ * only the fields whose shape is known and trusted, and whatever is left
+ * -- fields in a container shape this build gets wrong, or simply fields
+ * nobody asked for -- can be stepped over sight unseen by that same length,
+ * the same way SlSkipArray() steps over a whole item it does not read at
+ * all. Used for legacy-decouple-import town records: see the comment on
+ * _sl_legacy_decouple_import.
+ */
+void SlSkipRestOfArrayItem()
+{
+	SlSkipBytes(_next_offs - _sl.reader->GetSize());
 }
 
 /**
@@ -1901,14 +1918,8 @@ void SlObject(void *object, const SaveLoadTable &slt)
 		if (_sl.need_length == NeedLength::CalcLength) return;
 	}
 
-	bool trace = _sl_legacy_decouple_import && _sl.action == SaveLoadAction::Load;
 	for (auto &sld : slt) {
-		size_t before = trace ? _sl.reader->GetSize() : 0;
 		SlObjectMember(object, sld);
-		if (trace) {
-			size_t after = _sl.reader->GetSize();
-			if (after - before > 8) Debug(sl, 0, "field '{}': {} -> {} ({} bytes)", sld.name, before, after, after - before);
-		}
 	}
 }
 

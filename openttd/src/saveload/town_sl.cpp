@@ -434,9 +434,18 @@ const SaveLoadCompat _town_sl_compat_legacy_decouple[] = {
 	 * pre-199 4-byte null followed by the post-199 8-byte one. */
 	SLC_NULL(4, SaveLoadVersion::InfrastructureMaintenanceCosts, SaveLoadVersion::RemoveTownCargoCache),
 	SLC_NULL(30, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::RemoveTownCargoCache),
-	SLC_VAR("supplied"),
-	SLC_VAR("received"),
-	SLC_VAR("acceptance_matrix"),
+	/* "supplied", "received" and "acceptance_matrix" are deliberately not
+	 * listed: they are the per-cargo-type history containers, and this old
+	 * fork's own version of them does not frame the same way this build
+	 * expects -- reading a length out of it as if it were this build's own
+	 * container shape ran to over four times the record's real size, on
+	 * the very first town, and would have gone on doing so for every one
+	 * after it. What is on offer here is a town's visual likeness -- where
+	 * it stands, what it is called -- and not its trade figures, so the
+	 * gap left by these three is filled the same way founding a new town
+	 * fills them: at whatever CreateAtIndex() already put there. See
+	 * CITYChunkHandler::Load(), which skips the rest of the record by its
+	 * own stated length rather than trying to decode into this shape. */
 };
 
 struct CITYChunkHandler : ChunkHandler {
@@ -464,6 +473,16 @@ struct CITYChunkHandler : ChunkHandler {
 		while ((index = SlIterateArray()) != -1) {
 			Town *t = Town::CreateAtIndex(TownID(index));
 			SlObject(t, slt);
+
+			/* The legacy list above stops short of "supplied", "received"
+			 * and "acceptance_matrix" on purpose (see the comment there):
+			 * a new town wears this one's coat, not its trade figures, and
+			 * whatever of those this old fork actually wrote is walked
+			 * past by the record's own stated length, sight unseen. */
+			if (_sl_legacy_decouple_import) {
+				extern void SlSkipRestOfArrayItem();
+				SlSkipRestOfArrayItem();
+			}
 
 			if (IsSavegameVersionBefore(SaveLoadVersion::ScriptTownGrowth)) {
 				/* Passengers and mail were always treated as slots 0 and 2 in older saves. */
