@@ -348,7 +348,6 @@ static const std::initializer_list<const std::string_view> _credits = {
 	"",
 	"Decouple edition:",
 	"  Karel M\u00e1cha - Feature design, rules of play and all the testing",
-	"  Palo123 (Karn) - The original coupling patch the feature takes its shape from",
 	"",
 	"The OpenTTD team (in alphabetical order):",
 	"  Matthijs Kooijman (blathijs) - Pathfinder-guru, Debian port (since 0.3)",
