@@ -1104,6 +1104,37 @@ se a odtáhne ji do depa; porouchaná pak jede dál po svých. Ostatní scény
 
 ---
 
+## 4.5 Po spojení vede odtahovka, ne porouchaný vlak
+
+**Hráčovo hlášení:** odtahovka dojela správně, zepředu, spojila se —
+**a zůstala stát.** Za porouchanou stál další vlak, takže tam nemohla.
+Hráč jí v okně dal otočit a jela.
+
+Po každém spojení se nastavuje „vede zadek", a spojka věší partnera na
+konec seznamu — takže vede **to, co bylo sebráno**. Pro sběračku
+s vagonky je to správné pravidlo: pokračuje tam, kam jela, protože tam
+ty vagonky patří.
+
+**Pro odtah je to obráceně, a ze stejného důvodu čtenýho naopak.**
+Odtahovka nic nedoručuje. Jela proti provozu nahoru za vlakem, který
+zůstal stát, a celý její úkol je dostat ho z trati **pryč**. Pokračovat
+dál znamená tlačit porouchanou před sebou přesně do provozu, který se za
+poruchou nakupil — kam nemá co dělat a často se tam ani nedostane.
+
+Takže **vede odtahovka**. Spojka věší porouchanou na konec a srovnání
+natočení nechává nos hlavy mířit pryč od těla, takže „vede hlava" je
+strukturálně „zpátky tou cestou, kterou odtahovka přijela" — tou, kterou
+si zamluvila a o které jako jediné ví, že je volná. A je to i to, co
+lokomotiva s mrtvým vlakem dělá: **táhne ho**, netlačí ho před sebou
+proti provozu. Otáčet se přitom nemusí; je otočená správně už ve chvíli
+spojení.
+
+Naměřeno v `testodtah jednosmer`: dřív `spojeno - couva ano` a vlak
+odjel dál na východ, teď `spojeno - couva ne, celo: masinka` a odtáhne
+porouchanou zpátky na západ do depa, ze kterého vyjela.
+
+---
+
 # 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy

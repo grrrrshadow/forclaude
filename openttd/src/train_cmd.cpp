@@ -3748,8 +3748,26 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * A train that really is to go back has the player's reverse-out flag,
 	 * honoured at the conclusion below; and the route to wherever the next
 	 * order points is the pathfinder's job after departure, never a reason to
-	 * turn on the spot here. */
-	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, true);
+	 * turn on the spot here.
+	 *
+	 * A rescue is the one case where the answer is the other one, and for the
+	 * same reason read the other way round. A collector carries wagons onward:
+	 * where it was going is where they are wanted. A rescue engine is not
+	 * delivering anything -- it went up the line the wrong way to reach a train
+	 * that had stopped, and its whole errand is to bring that train back off
+	 * the line. Carrying on would push the casualty ahead of it into exactly
+	 * the traffic that piled up behind the breakdown, which is where it has no
+	 * business being and often cannot go at all: the player found his rescue
+	 * engine coupled up and standing still, with another train behind the
+	 * casualty, and had to turn it round by hand.
+	 *
+	 * So the tow leads. The splice hangs the casualty off the tail and the
+	 * facing normalisation leaves the head's nose pointing away from the body,
+	 * so "the head leads" is, structurally, "back the way the tow came" -- the
+	 * road it booked to get here, which is the one road it knows is clear. It
+	 * is also what an engine does with a dead train: drags it, rather than
+	 * propelling it ahead into oncoming traffic. */
+	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, tow == nullptr);
 
 	/* No driving-cab override on top of that. It was tried twice and it is
 	 * wrong both times, and the headless rig caught it red-handed: the facing
