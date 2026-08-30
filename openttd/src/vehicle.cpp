@@ -1673,7 +1673,25 @@ void VehicleEnterDepot(Vehicle *v)
 			}
 		}
 
-		if (v->current_order.GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) {
+		/* An order to come here and collect wagons is not finished by
+		 * arriving. It is finished by coupling, which happens a tick or two
+		 * from now, at the point in the tick where taking consists apart and
+		 * putting them together is safe -- TryCoupleAtDepot(), which sees the
+		 * order through itself, exactly as it already does for an engine that
+		 * was standing in the shed when the order came up.
+		 *
+		 * Finished here instead, the train steps to its next order and pulls
+		 * straight back out of the shed empty on the rare occasion the wagons
+		 * are not there yet -- and then everything downstream that is built
+		 * round those wagons arriving is quietly short of them for that lap:
+		 * a station working a cycle of its own ends up with wagons missing and
+		 * nothing to say why. So it stays on this order and waits in the shed
+		 * instead, which is also what lets it take a rake that only turns up
+		 * afterwards. */
+		bool collecting_here = v->type == VehicleType::Train && v->current_order.IsType(OT_GOTO_DEPOT) &&
+				v->current_order.ShouldGoToCouple();
+
+		if (!collecting_here && v->current_order.GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) {
 			/* Part of orders */
 			v->DeleteUnreachedImplicitOrders();
 			UpdateVehicleTimetable(v, true);
@@ -1718,7 +1736,7 @@ void VehicleEnterDepot(Vehicle *v)
 			}
 		}
 
-		v->current_order.MakeDummy();
+		if (!collecting_here) v->current_order.MakeDummy();
 	}
 }
 

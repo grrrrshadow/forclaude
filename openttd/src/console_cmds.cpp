@@ -1503,6 +1503,83 @@ static bool ConTestScrapRakesInDepot(std::span<std::string_view> argv)
 }
 
 /**
+ * Put a headless rake of wagons into the depot on a given tile, as if a train
+ * had just left them there. Usage: testvagony <x> <y> [count]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestStoreRake(std::span<std::string_view> argv)
+{
+	if (argv.empty() || argv.size() > 4) {
+		IConsolePrint(CC_HELP, "Store wagons in a depot. Usage: 'testvagony <x> <y> [count]',");
+		IConsolePrint(CC_HELP, "or 'testvagony [count]' to put them where a train is already waiting to collect some.");
+		return true;
+	}
+
+	uint count = 1;
+	TileIndex tile = INVALID_TILE;
+	if (argv.size() >= 3) {
+		auto px = ParseInteger(argv[1]);
+		auto py = ParseInteger(argv[2]);
+		if (!px.has_value() || !py.has_value()) return false;
+		tile = TileXY(*px, *py);
+		if (argv.size() == 4) {
+			auto pc = ParseInteger(argv[3]);
+			if (!pc.has_value()) return false;
+			count = *pc;
+		}
+	} else {
+		if (argv.size() == 2) {
+			auto pc = ParseInteger(argv[1]);
+			if (!pc.has_value()) return false;
+			count = *pc;
+		}
+		/* Whichever shed a train is sitting in waiting for wagons -- the
+		 * scenes lay their track down wherever the generated map has room,
+		 * so the tile is never the same twice and cannot be typed out. */
+		for (const Train *t : Train::Iterate()) {
+			if (!t->IsFrontEngine() || t->track != Track::Depot) continue;
+			if (!t->current_order.IsType(OT_GOTO_DEPOT) || !t->current_order.ShouldGoToCouple()) continue;
+			tile = t->tile;
+			break;
+		}
+		if (tile == INVALID_TILE) {
+			IConsolePrint(CC_ERROR, "testvagony: zadna mashinka v depu neceka na vagonky.");
+			return true;
+		}
+	}
+
+	EngineID eid_wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type != RailVehicleType::Wagon) continue;
+		eid_wagon = e->index;
+		break;
+	}
+	if (eid_wagon == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testvagony: zadny vagon k dispozici.");
+		return true;
+	}
+
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	VehicleID head = VehicleID::Invalid();
+	for (uint i = 0; i < count; i++) {
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, tile, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) {
+			IConsolePrint(CC_ERROR, "testvagony: vagon {} se nepodarilo postavit.", i);
+			return true;
+		}
+		if (head == VehicleID::Invalid()) {
+			head = veh;
+		} else {
+			Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh, Train::Get(head)->Last()->index, false);
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testvagony: v depu ({},{}) odlozeno {} vagonu.", TileX(tile), TileY(tile), count);
+	return true;
+}
+
+/**
  * Toggle a train's hand brake, the same as the player's start/stop button.
  * Meant for staged scenes: a train built stopped is released mid-scene.
  * Usage: testbrzda <unit number>
@@ -4417,6 +4494,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
+	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
