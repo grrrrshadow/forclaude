@@ -254,8 +254,17 @@ public:
 		if (IsTileType(tile, TileType::Railway)) {
 			bool has_signal_against = HasSignalOnTrackdir(tile, ReverseTrackdir(trackdir));
 			bool has_signal_along = HasSignalOnTrackdir(tile, trackdir);
-			if (has_signal_against && !has_signal_along && IsOnewaySignal(tile, TrackdirToTrack(trackdir))) {
-				/* one-way signal in opposite direction */
+			if (has_signal_against && !has_signal_along && IsOnewaySignal(tile, TrackdirToTrack(trackdir)) &&
+					!IsOnRescueRun(Yapf().GetVehicle()->First())) {
+				/* one-way signal in opposite direction.
+				 *
+				 * Not for a rescue engine on a call-out. A train that has
+				 * stopped where it stopped is reached from the end that
+				 * clears, and on a line worked one way that is the end it was
+				 * driving towards -- so the way there is up the line against
+				 * the signals. It pays for that by booking the whole road
+				 * before it moves and stopping nowhere along it; see
+				 * IsSafeWaitingPosition() and FEATURE_DESIGN_COUPLING_TOW.md. */
 				n.segment->end_segment_reason.Set(EndSegmentReason::DeadEnd);
 			} else {
 				if (has_signal_along) {

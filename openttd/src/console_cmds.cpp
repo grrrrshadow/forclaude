@@ -1394,6 +1394,19 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * casualty's own forward path bail out and leak. */
 	bool plain = argv.size() >= 2 && argv[1] == "rovina";
 	bool crossing = argv.size() >= 2 && argv[1] == "krizeni";
+	/* 'jednosmer' puts one-way path signals on the main line instead of
+	 * ordinary ones. The casualty runs westwards along it, so the signals face
+	 * that way and the rescue engine coming east out of its shed is going
+	 * against every one of them -- which is the player's line, where a rescue
+	 * engine has to reach a casualty head-on because the queue is behind it.
+	 * The trailing number is which way round the signals are built; both are
+	 * tried because the command cycles rather than states it. */
+	bool oneway = argv.size() >= 2 && argv[1] == "jednosmer";
+	uint8_t sig_cycle = 0;
+	if (oneway && argv.size() >= 3) {
+		auto n = ParseInteger(argv[2]);
+		if (n.has_value()) sig_cycle = (uint8_t)*n;
+	}
 
 	if (Company::GetIfValid(_local_company) == nullptr) {
 		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
@@ -1497,12 +1510,26 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		return true;
 	}
 	for (uint sx : {x0 + 2, xj - 3, xj + 3, x0 + LEN - 3}) {
-		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X,
+				oneway ? SignalType::PathOneWay : SignalType::Path, SignalVariant::Electric,
+				false, false, false, SignalType::Block, SignalType::Block, oneway ? sig_cycle : 0, 0).Failed()) {
 			IConsolePrint(CC_ERROR, "testodtah: signal at ({},{}) failed.", sx, y0);
 			return true;
 		}
 	}
 	UpdateSignalsInBuffer();
+
+	if (oneway) {
+		/* Say which way they actually came out, since the command cycles the
+		 * direction rather than being told it. */
+		for (uint sx : {x0 + 2, x0 + LEN - 3}) {
+			TileIndex t = TileXY(sx, y0);
+			IConsolePrint(CC_DEFAULT, "testodtah jednosmer: navestidlo ({},{}) - smer NE {}, smer SW {}.",
+					sx, y0,
+					HasSignalOnTrackdir(t, Trackdir::X_NE) ? "ano" : "ne",
+					HasSignalOnTrackdir(t, Trackdir::X_SW) ? "ano" : "ne");
+		}
+	}
 
 	StationID st_branch = GetStationIndex(TileXY(xj, y0 + 3));
 
@@ -1540,7 +1567,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
 	_testodtah_casualty = veh_c;
-	_testodtah_break_tile = plain ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1));
+	_testodtah_break_tile = (plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testspoj_active = true;
 

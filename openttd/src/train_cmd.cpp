@@ -5650,7 +5650,13 @@ void FreeTrainTrackReservation(const Train *consist)
 			} else if (HasPbsSignalOnTrackdir(tile, ReverseTrackdir(td))) {
 				/* Reservation passes an opposing path signal. Mark signal for update to re-establish the proper default state. */
 				AddSideToSignalBuffer(tile, TrackdirToExitdir(ReverseTrackdir(td)), consist->owner);
-			} else if (HasSignalOnTrackdir(tile, ReverseTrackdir(td)) && IsOnewaySignal(tile, TrackdirToTrack(td))) {
+			} else if (HasSignalOnTrackdir(tile, ReverseTrackdir(td)) && IsOnewaySignal(tile, TrackdirToTrack(td)) &&
+					!IsOnRescueRun(consist)) {
+				/* A rescue engine books its way past signals that face it (see
+				 * IsSafeWaitingPosition), so letting go has to be able to walk
+				 * the same way. Stopping here would leave every tile beyond the
+				 * first opposing signal booked to a train that is no longer
+				 * coming -- track held for good, by nobody. */
 				break;
 			}
 		}
@@ -5701,10 +5707,14 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 
 	TileIndex tile = origin.tile;
 	Trackdir  cur_td = origin.trackdir;
+	bool rescue_run = IsOnRescueRun(v->First());
+
 	while (ft.Follow(tile, cur_td)) {
 		if (ft.new_td_bits.Count() == 1) {
-			/* Possible signal tile. */
-			if (HasOnewaySignalBlockingTrackdir(ft.new_tile, FindFirstTrackdir(ft.new_td_bits))) break;
+			/* Possible signal tile. A signal facing a rescue engine is not a
+			 * wall to it; going the wrong way up a worked line is how it
+			 * reaches a casualty at all. See IsSafeWaitingPosition(). */
+			if (!rescue_run && HasOnewaySignalBlockingTrackdir(ft.new_tile, FindFirstTrackdir(ft.new_td_bits))) break;
 		}
 
 		if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile))) {
@@ -7127,8 +7137,19 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						}
 					}
 
+					/* A rescue engine booked the whole road to its casualty
+					 * before it set off, signals facing it and all (see
+					 * IsSafeWaitingPosition()). A signal on track that is
+					 * already its own therefore tells it nothing it does not
+					 * know: what the signal is there to protect against is
+					 * exactly what the booking has already settled. Booked
+					 * track only -- a red on track it does not hold stops it
+					 * like anybody else, so this never turns into a licence to
+					 * drive through reds in general. */
+					bool rescue_on_booked_track = IsOnRescueRun(first) && HasReservedTracks(gp.new_tile, chosen_track);
+
 					/* Check if it's a red signal and that force proceed is not clicked. */
-					if (red_signals.Any(chosen_track) && first->force_proceed == TFP_NONE) {
+					if (red_signals.Any(chosen_track) && first->force_proceed == TFP_NONE && !rescue_on_booked_track) {
 						/* In front of a red signal */
 						Trackdir i = FindFirstTrackdir(trackdirbits);
 

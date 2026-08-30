@@ -325,7 +325,13 @@ PBSTileInfo FollowTrainReservation(const Train *consist, Vehicle **train_on_res,
 	if (IsRailDepotTile(tile) && GetDepotReservationTrackBits(tile).None()) return PBSTileInfo(tile, trackdir, false);
 
 	FindTrainOnTrackInfo ftoti;
-	ftoti.res = FollowReservation(consist->owner, GetAllCompatibleRailTypes(consist->railtypes), tile, trackdir);
+	/* A rescue engine's own booking runs against the signals on the way to its
+	 * casualty (see IsSafeWaitingPosition), so following it has to be willing
+	 * to go the same way. Stopped at the first signal facing it, the engine
+	 * would read its own reservation as ending a few tiles out and set about
+	 * booking the rest all over again. */
+	ftoti.res = FollowReservation(consist->owner, GetAllCompatibleRailTypes(consist->railtypes), tile, trackdir,
+			IsOnRescueRun(consist->First()));
 	ftoti.res.okay = IsSafeWaitingPosition(consist, ftoti.res.tile, ftoti.res.trackdir, true, _settings_game.pf.forbid_90_deg);
 	if (train_on_res != nullptr) {
 		CheckTrainsOnTrack(ftoti, ftoti.res.tile);
@@ -410,6 +416,35 @@ Train *GetTrainForReservation(TileIndex tile, Track track)
 bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bool include_line_end, bool forbid_90deg)
 {
 	if (IsRailDepotTile(tile)) return true;
+
+	/* A rescue engine on a call-out has one safe place to stop and it is up
+	 * against the casualty. Nowhere along the way will do.
+	 *
+	 * It has to reach a train that has stopped where it stopped, and on a line
+	 * that is worked in one direction that means going up it the wrong way --
+	 * the queue is behind the casualty, so the only end that ever clears is
+	 * the one it was driving towards. Which in turn means the whole road has
+	 * to be its own for as long as it is on it: booked from the shed door to
+	 * the casualty's nose in one piece, or not set off for at all. Stopping
+	 * half way, at a signal, facing the traffic, is the one thing it must
+	 * never do.
+	 *
+	 * So this is not an exemption bolted on to make a rescue engine go where
+	 * an ordinary train may not. It is the other half of the same rule: it
+	 * goes against the signals, and it pays for that by having to book the
+	 * entire way before it moves at all. Refusing every intermediate stopping
+	 * place is what makes that reservation all-or-nothing. See
+	 * FEATURE_DESIGN_COUPLING_TOW.md. */
+	if (IsOnRescueRun(v->First())) {
+		CFollowTrackRail rescue_ft(v, GetAllCompatibleRailTypes(v->railtypes));
+		if (!rescue_ft.Follow(tile, trackdir)) return include_line_end;
+		rescue_ft.new_td_bits &= DiagdirReachesTrackdirs(rescue_ft.exitdir);
+		if (Rail90DegTurnDisallowed(GetTileRailType(rescue_ft.old_tile), GetTileRailType(rescue_ft.new_tile), forbid_90deg)) {
+			rescue_ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(trackdir));
+		}
+		if (rescue_ft.new_td_bits.None()) return include_line_end;
+		return IsRescueTargetOnTile(v, rescue_ft.new_tile);
+	}
 
 	/* For non-pbs signals, stop on the signal tile. */
 	if (HasBlockSignalOnTrackdir(tile, trackdir)) return true;

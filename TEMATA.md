@@ -1008,6 +1008,68 @@ po opravě zbývají po odtahu jen rezervace pod živými vlaky.
 
 ---
 
+## 4.4 Odtahovka jede proti návěstidlům — ale zaplatí za to celou cestou
+
+**Hráčovo hlášení:** odtahovka marně hledá cestu, i když porouchaná stojí
+kousek před jejím depem; když ji přinutí vyjet, jezdí okolo poruchy.
+Reprodukováno v rigu (`testodtah jednosmer`) — jednosměrná návěstidla na
+hlavní trati a odtahovka dělá tohle donekonečna:
+
+```
+Vlak 2: vyjizdi z depa (82,11) - rezervace konci na (83,11)
+Vlak 2: zmenen vedouci konec - konec koleje (pri jizde)
+Vlak 2: vjel do depa (82,11)
+```
+
+Vyjede o jedno políčko, jednosměrné návěstidlo před ní je pro hledání
+cesty **konec koleje**, otočí se, vjede zpátky a znova. Porouchané
+mezitím vyprší lhůta a odjede sama.
+
+**Proč to musí jít proti návěstidlům.** Porouchaný vlak stojí tam, kde
+stojí, a **za ním se staví fronta**. Volno bude jedině **před ním** —
+až odjedou vlaky, které jely před ním. Na trati provozované jedním
+směrem to znamená, že odtahovka k porouchanému může jen **proti provozu**,
+zepředu, čelem k němu. Jinak k němu nikdy nedojede.
+
+**Čím se to platí.** Není to výjimka nalepená na to, aby odtahovka
+projela tam, kam obyčejný vlak nesmí. Je to druhá půlka téhož pravidla:
+jede proti návěstidlům, a **za to si musí zamluvit celou cestu, než se
+vůbec pohne, a cestou nikde nezastaví.** Zastavit se v půlce, u návěsti,
+čelem proti provozu, je to jediné, co nikdy udělat nesmí.
+
+Provedeno na pěti místech, všechna říkají totéž:
+
+- `IsSafeWaitingPosition()` (pbs.cpp) — pro odtahovku na výjezdu je
+  jediné bezpečné místo k zastavení **až u porouchané**. Tím se
+  rezervace stává **všechno, nebo nic**: buď se zamluví celá cesta od
+  vrat depa k nosu porouchané, nebo odtahovka nevyjede vůbec.
+- `FollowTrainReservation()` (pbs.cpp) — sledování **vlastní** rezervace
+  musí umět jít stejnou cestou, jinak si odtahovka přečte svou rezervaci
+  jako končící u prvního návěstidla a začne zamlouvat znovu.
+- `ExtendTrainReservation()` (train_cmd.cpp) — návěstidlo proti ní není
+  zeď.
+- `FreeTrainTrackReservation()` (train_cmd.cpp) — **pouštění musí umět
+  projít tudy taky.** Jinak by za prvním protilehlým návěstidlem zůstala
+  trať zamluvená vlaku, který už nejede — držená napořád, nikým.
+- `SignalCost()` (yapf_costrail.hpp) — hledání cesty to nesmí prohlásit
+  za slepou uličku.
+
+**A ještě jedno, které se ukázalo až po prvních čtyřech:** rezervace už
+vedla až k porouchané, a odtahovka se přesto u prvního návěstidla
+otočila — tentokrát ji zastavil **běh hry**, ne hledání cesty
+(`red_signals` v `TrainController`, hláška `krok duvod: cervena na …`).
+Doplněno tam, ale úzce: odtahovka projede návěstidlo **jen po koleji,
+kterou už má zamluvenou**. Červená na koleji, kterou nedrží, ji zastaví
+jako kohokoli jiného — z tohohle se nesmí stát povolení jezdit na
+červenou.
+
+Ověřeno: `testodtah jednosmer` — odtahovka vyjede, zamluví si cestu až
+k porouchané, projede proti návěstidlům, dojede k ní **zepředu**, spojí
+se a odtáhne ji do depa; porouchaná pak jede dál po svých. Ostatní scény
+(21 celkem) beze změny.
+
+---
+
 # 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy
