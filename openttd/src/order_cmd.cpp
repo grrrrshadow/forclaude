@@ -1411,16 +1411,27 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * rather than rejected here. */
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data > UINT8_MAX) return CMD_ERROR;
-			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldGoToCouple())) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() ||
+					(order->ShouldGoToCouple() && !order->IsType(OT_GOTO_DEPOT)))) return CMD_ERROR;
 			break;
 
-		/* Waiting to be collected is the opposite of going to collect, and
-		 * both are the opposite of leaving part of the train behind: one
-		 * order cannot both hand vehicles over and take them on. A train that
-		 * is waiting does not decide how it leaves either -- whoever couples
-		 * to it brings the orders, and reversing out is one of them. The
-		 * buttons grey each other out, but the rule belongs here as well:
-		 * greying is how it is shown, this is what makes it true. */
+		/* Waiting to be collected is the opposite of going to collect, and a
+		 * train that is waiting does not decide how it leaves either --
+		 * whoever couples to it brings the orders, and reversing out is one of
+		 * them. Nor does it hand anything over on the way: waiting rules out
+		 * everything else on the order. The buttons grey each other out, but
+		 * the rule belongs here as well: greying is how it is shown, this is
+		 * what makes it true.
+		 *
+		 * Putting wagons down and taking wagons on are opposites at a station,
+		 * where they are two pieces of work at opposite ends of one stop and
+		 * one order does one of them. In a depot they are not: the train
+		 * stands whole and hidden on a single tile with the brake on, both
+		 * halves are the same piece of consist surgery done at the same safe
+		 * moment in the tick, and a shed is exactly where a train goes to
+		 * leave one rake and pick up another. So a depot order may carry both,
+		 * and does them in the order the player would: leave first, then
+		 * collect. */
 		case MOF_WAIT_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data != 0 && (order->ShouldGoToCouple() || order->ShouldReverseOutOfStation() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
@@ -1428,7 +1439,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 		case MOF_GOTO_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (data != 0 && (order->ShouldWaitForCouple() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() ||
+					(order->GetDecoupleCount() != 0 && !order->IsType(OT_GOTO_DEPOT)))) return CMD_ERROR;
 			break;
 
 		case MOF_TURN_AROUND_DEPOT:

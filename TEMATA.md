@@ -721,6 +721,30 @@ při každém obnovení seznamu, ne jen při jeho stavbě.
 
 ---
 
+## 2.14 V depu smí jeden rozkaz odpojit i připojit
+
+Na nádraží jsou to protiklady — dva kusy práce na opačných koncích jedné
+zastávky a jeden rozkaz dělá jeden z nich. **V depu ne:** vlak stojí celý
+a schovaný na jedné dlaždici s brzdou, obě půlky jsou tatáž operace na
+soupravě ve stejném bezpečném okamžiku tiku, a kůlna je přesně místo, kam
+se jezdí jednu řadu nechat a druhou si vzít. Rozkaz do depa proto smí
+nést obojí a dělá to v pořadí, v jakém by to dělal hráč: **nejdřív nechat,
+pak vzít.** Zákaz na nádraží platí dál, čekání na sebrání vylučuje pořád
+všechno.
+
+Vyžádalo si to jedno nové políčko, `Train::depot_dropped_rake`: **co vlak
+zrovna nechal, si nesmí hned vzít zpátky.** Bez toho odloží řadu a
+v příštím tiku si ji sebere, znovu a znovu, a rozkaz nikdy neskončí.
+Jméno platí jen dokud vlak stojí v té kůlně na tom rozkazu — jakmile
+vyjede, je to obyčejná odložená řada a smí pro ni být poslán jako
+kdokoli jiný. Ukládá se: čekání na vhodnou řadu může být dlouhé.
+
+Scéna v rigu: `testspoj depo oboji` — v depu leží 2 odložené vagony,
+odkladačka přiveze 3 a má je vyměnit. Ověřeno: před 4 vozy / 2 odložené,
+po výměně 3 vozy / 3 odložené, a vlak dojede domů.
+
+---
+
 # 3. Rozpojování (decouple)
 
 - **Vagonky nejsou k mání, dokud odkladačka stojí vedle nich.** Odpojení
@@ -1770,3 +1794,19 @@ zpětně se dopočítat nedá, ta data v nich nejsou.
   zamrzání.
 - Otočit směr na první dlaždici od depa zamrazí vlak.
 - Odpojení přeskočené při prvním příjezdu po načtení hry.
+
+---
+
+# 16. Nedořešeno
+
+Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich
+je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
+
+- **„Prodat vše" v depu prodá i rezervovanou řadu.** Okno depa na řadu,
+  pro kterou už jede mašinka, nepustí ani klik, ani tažení, ani prodej
+  jednotlivého vozu — ale hromadné tlačítko jde mimo okno rovnou do
+  příkazu `DepotMassSell` a rezervaci nezná. Nechané schválně jako
+  úniková cesta: kdyby se něco zaseklo, hráč má čím řadu uvolnit, a
+  mašinka to ustojí — cíl se jí zruší, počká v depu a sebere až to, co
+  přijde po ní. Kdyby se to mělo zamknout, patří to do příkazu, ne do
+  okna.

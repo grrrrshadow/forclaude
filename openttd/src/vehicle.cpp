@@ -1691,20 +1691,23 @@ void VehicleEnterDepot(Vehicle *v)
 		bool collecting_here = v->type == VehicleType::Train && v->current_order.IsType(OT_GOTO_DEPOT) &&
 				v->current_order.ShouldGoToCouple();
 
+		/* An order that asked for decoupling here is concluded either on the
+		 * spot a few lines down or, if it goes on to collect as well, by the
+		 * coupling; but taking the train apart is consist surgery and may only
+		 * happen at the point in the tick where nothing is walking along the
+		 * consist. Write the count down for TrainLocoHandler() to honour
+		 * there; see Train::depot_decouple_pending. Written whichever of those
+		 * two endings applies -- a depot order is allowed to put wagons down
+		 * and take wagons on, and it does them in that order. */
+		if (v->type == VehicleType::Train && v->current_order.GetDecoupleCount() != 0) {
+			Train::From(v)->depot_decouple_pending = v->current_order.GetDecoupleCount();
+		}
+
 		if (!collecting_here && v->current_order.GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) {
 			/* Part of orders */
 			v->DeleteUnreachedImplicitOrders();
 			UpdateVehicleTimetable(v, true);
 			v->IncrementImplicitOrderIndex();
-
-			/* An order that asked for decoupling here is concluded on the spot a
-			 * few lines down, but taking the train apart is consist surgery and
-			 * may only happen at the point in the tick where nothing is walking
-			 * along the consist. Write the count down for TrainLocoHandler() to
-			 * honour there; see Train::depot_decouple_pending. */
-			if (v->type == VehicleType::Train && v->current_order.GetDecoupleCount() != 0) {
-				Train::From(v)->depot_decouple_pending = v->current_order.GetDecoupleCount();
-			}
 		}
 		if (v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::Halt)) {
 			/* Vehicles are always stopped on entering depots. Do not restart this one. */

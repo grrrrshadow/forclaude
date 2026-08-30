@@ -1214,17 +1214,18 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
 
-				/* Putting wagons down and taking wagons on are opposites here the
-				 * same way they are at a station: one order does one or the
-				 * other. Waiting has no button at a depot at all -- trains couple
-				 * at stations, in the open; the only thing to couple to in a
-				 * shed is a stored rake. */
-				bool collecting = order->ShouldGoToCouple();
-				bool decoupling = order->GetDecoupleCount() != 0;
-				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE_DEPOT, collecting);
-				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE_DEPOT, decoupling);
-				this->SetWidgetLoweredState(WID_O_DECOUPLE_DEPOT, decoupling);
-				this->SetWidgetDisabledState(WID_O_DECOUPLE_DEPOT, collecting);
+				/* Both at once is allowed here, unlike at a station: a shed is
+				 * where a train goes to leave one rake and pick up another, and
+				 * the two halves are the same piece of work at the same moment.
+				 * They happen in the order the player would do them by hand --
+				 * leave first, then collect -- and what was just left behind is
+				 * not what gets picked up. Waiting has no button at a depot at
+				 * all: trains couple at stations, in the open; the only thing to
+				 * couple to in a shed is a stored rake. */
+				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE_DEPOT, order->ShouldGoToCouple());
+				this->SetWidgetLoweredState(WID_O_DECOUPLE_DEPOT, order->GetDecoupleCount() != 0);
+				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE_DEPOT, false);
+				this->SetWidgetDisabledState(WID_O_DECOUPLE_DEPOT, false);
 			} else {
 				/* Nothing to put in the row -- a waypoint order, the end of the
 				 * list, a vehicle that is not a train -- but the row stays open

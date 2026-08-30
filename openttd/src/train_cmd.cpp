@@ -2200,6 +2200,7 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 		if (depot_order) {
 			if (!rake->IsFreeWagon()) continue;
 			if (rake->track != Track::Depot || rake->tile != depot_tile) continue;
+			if (rake->index == v->depot_dropped_rake) continue; // this train's own leavings
 		} else {
 			/* Wagons waiting to be collected, or a whole little train waiting to be
 			 * carried along as part of a bigger one. */
@@ -4115,6 +4116,13 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
 	Train *remainder = split_point->First();
 	remainder->couple_claim = VehicleID::Invalid();
 	remainder = MakeEngineLeadTheList(remainder);
+
+	/* The same order may go on to collect a rake from this very shed, and what
+	 * it has just put down is not what it came for. Without this the train
+	 * takes its own leavings straight back on the next tick and the order
+	 * never ends. See Train::depot_dropped_rake. */
+	v->depot_dropped_rake = remainder->index;
+
 	if (remainder->IsFrontEngine()) {
 		/* Parked, not abandoned: it stays a train, keeps its orders, and waits
 		 * for the player to let the brake off. */
@@ -4150,6 +4158,7 @@ static void TryCoupleAtDepot(Train *engine, Train *rake)
 	 * part of this train, or they cannot (the joined train would be too long,
 	 * say) and the claim is let go so neither side stands spoken-for forever. */
 	engine->couple_target = VehicleID::Invalid();
+	engine->depot_dropped_rake = VehicleID::Invalid();
 	rake->couple_claim = VehicleID::Invalid();
 
 	Train *dst = engine->Last()->GetLastEnginePart();
@@ -7713,6 +7722,17 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			IConsolePrint(CC_INFO, "Vlak {}: vagonky, pro ktere jel, uz neexistuji - cil zrusen", consist->unitnumber);
 		}
 		consist->couple_target = VehicleID::Invalid();
+	}
+
+	/* What this train left in a shed is out of its own reach only while it is
+	 * still standing in that shed working the order that put it down. Once it
+	 * has driven out, those wagons are an ordinary stored rake and it may be
+	 * sent back for them like anybody else. Dropped as soon as the wagons
+	 * themselves are gone, too, for the same reason the couple target is:
+	 * vehicle numbers get handed out again. */
+	if (consist->depot_dropped_rake != VehicleID::Invalid() &&
+			(consist->track != Track::Depot || Train::GetIfValid(consist->depot_dropped_rake) == nullptr)) {
+		consist->depot_dropped_rake = VehicleID::Invalid();
 	}
 
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && IsWholeTrainInsideDepot(consist)) {

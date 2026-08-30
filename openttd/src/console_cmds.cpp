@@ -647,6 +647,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool tow_mode = false;
 	bool counted = false;
 	bool parked = false;
+	bool swap_mode = false;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
@@ -655,7 +656,13 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		if (argv[i] == "vlek") tow_mode = true;
 		if (argv[i] == "pocet") counted = true;
 		if (argv[i] == "stoji") parked = true;
+		if (argv[i] == "oboji") swap_mode = true;
 	}
+	/* 'oboji' is a depot exchange on one order: the deliverer drops the rake
+	 * it brought and takes a different one that is already stored in the same
+	 * shed. Only a depot order may do both, and the point of the test is that
+	 * what was just put down is not what gets picked up. */
+	if (swap_mode) depot_mode = true;
 
 	/* A headless newgame (null video driver has no GUI) starts like a
 	 * dedicated server: spectating, no company anywhere. Make one to build
@@ -874,7 +881,37 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	}
 
 	Order deliver;
-	if (depot_mode) {
+	if (swap_mode) {
+		/* Store a rake of two wagons in the west depot before anyone gets
+		 * there, so the exchange has something to pick up that is not the
+		 * three wagons the deliverer is about to put down. */
+		VehicleID stored = VehicleID::Invalid();
+		for (int i = 0; i < 2; i++) {
+			auto [costs, sid, unused_j, unused_k, unused_l] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (costs.Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj oboji: odlozeny vagon se nepodaril.");
+				return true;
+			}
+			if (stored == VehicleID::Invalid()) {
+				stored = sid;
+			} else if (Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, sid, Train::Get(stored)->Last()->index, false).Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj oboji: odlozene vagony se nespojily.");
+				return true;
+			}
+		}
+
+		/* One order, both halves: leave three behind, take the stored two on.
+		 * Then home to the east depot, so the run says plainly whether the
+		 * exchange finished or the train sat in the shed. */
+		deliver.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		deliver.SetDecoupleCount(1);
+		deliver.SetGoToCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
+		Order home_swap;
+		home_swap.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_swap);
+		IConsolePrint(CC_DEFAULT, "testspoj oboji: v depu ({},{}) lezi 2 odlozene vagony; odkladacka ma nechat 3 a vzit si je.", x0, y0);
+	} else if (depot_mode) {
 		/* Deliver straight into the west depot and stay there, halted; the
 		 * rake is stored in the shed by the depot decouple. */
 		deliver.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
@@ -905,6 +942,17 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		Order home_w;
 		home_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_w);
+	}
+
+	/* No separate collector in the exchange scene: the whole point is that one
+	 * train does both halves, and a second engine sent to the same shed would
+	 * simply race it for the stored rake. */
+	if (swap_mode) {
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh2, false);
+		_testspoj_active = true;
+		IConsolePrint(CC_DEFAULT, "testspoj oboji: scena hotova. odkladacka=vlak {}, zapadni depo ({},{}), vychodni depo ({},{}).",
+				Train::Get(veh2)->unitnumber, x0, y0, x0 + LEN - 1, y0);
+		return true;
 	}
 
 	/* The collector: a light engine sent to couple, with its next stop lying

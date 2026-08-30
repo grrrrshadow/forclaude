@@ -170,6 +170,23 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	uint8_t depot_decouple_pending = 0;
 
 	/**
+	 * The rake this train has just left standing in the shed it is in.
+	 *
+	 * A depot order may put wagons down and take wagons on, in that order, and
+	 * what was put down must not be what gets taken back on -- otherwise the
+	 * train drops its rake and picks the same one up again on the next tick,
+	 * over and over, and the order never ends. The name is written down at the
+	 * decoupling and holds only while this train is still standing in that
+	 * shed working that order; once it has driven out, the rake is an ordinary
+	 * stored one and this train may be sent back for it like anybody else.
+	 *
+	 * Saved, because the wait for a suitable rake to collect can be long: a
+	 * game written while the train stands in the shed between the two halves
+	 * of its order has to remember which rake is its own leavings.
+	 */
+	VehicleID depot_dropped_rake = VehicleID::Invalid();
+
+	/**
 	 * Which engine has spoken for this rake of wagons, set on the rake itself.
 	 *
 	 * An engine sent to collect wagons has nowhere to stop once it has set off
