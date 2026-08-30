@@ -1464,6 +1464,45 @@ static bool ConTestAfter(std::span<std::string_view> argv)
 }
 
 /**
+ * Sell every headless rake standing in the depot on a given tile.
+ * Stages the one way a collector can arrive at a shed it was sent to and
+ * find it empty: the wagons it claimed are gone by the time it gets there.
+ * Usage: testzrus <x> <y>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestScrapRakesInDepot(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Sell wagons stored in a depot. Usage: 'testzrus' for all of them, or 'testzrus <x> <y>' for one depot.");
+		return true;
+	}
+	TileIndex tile = INVALID_TILE;
+	if (argv.size() == 3) {
+		auto px = ParseInteger(argv[1]);
+		auto py = ParseInteger(argv[2]);
+		if (!px.has_value() || !py.has_value()) return false;
+		tile = TileXY(*px, *py);
+	} else if (argv.size() != 1) {
+		return false;
+	}
+
+	std::vector<VehicleID> doomed;
+	for (const Train *t : Train::Iterate()) {
+		if (!t->IsFreeWagon() || t->track != Track::Depot) continue;
+		if (tile != INVALID_TILE && t->tile != tile) continue;
+		doomed.push_back(t->index);
+	}
+	for (VehicleID id : doomed) {
+		const Train *t = Train::GetIfValid(id);
+		if (t == nullptr) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, id, true, false, ClientID::Invalid);
+	}
+	IConsolePrint(CC_DEFAULT, "testzrus: zruseno {} rad odlozenych vagonku.", doomed.size());
+	return true;
+}
+
+/**
  * Toggle a train's hand brake, the same as the player's start/stop button.
  * Meant for staged scenes: a train built stopped is released mid-scene.
  * Usage: testbrzda <unit number>
@@ -4377,6 +4416,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
+	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);

@@ -7665,6 +7665,20 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		}
 	}
 
+	/* A rake that is not there any more is not something to go for. Letting
+	 * the name of it stand is not harmlessly stale: vehicle numbers are handed
+	 * out again once a vehicle is gone, so the name eventually belongs to some
+	 * other vehicle entirely and this train goes on reading itself as being on
+	 * an errand for that one. The rig caught it -- wagons sold while a
+	 * collector was on its way to fetch them left it carrying their number for
+	 * the rest of the game. */
+	if (consist->couple_target != VehicleID::Invalid() && Train::GetIfValid(consist->couple_target) == nullptr) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: vagonky, pro ktere jel, uz neexistuji - cil zrusen", consist->unitnumber);
+		}
+		consist->couple_target = VehicleID::Invalid();
+	}
+
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && IsWholeTrainInsideDepot(consist)) {
 		if (consist->depot_decouple_pending != 0) {
 			uint8_t keep = consist->depot_decouple_pending;
