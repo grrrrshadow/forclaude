@@ -1897,6 +1897,10 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticky
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Ukazovat v jízdním řádu příjezdy a odjezdy: {STRING}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Zobrazit předpokládané časy příjezdu a odjezdu v jízdních řádech.
 
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :{STRING}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_AUTO                     :automaticky, po připojení ve stanici vlak odjede stejnou stranou nádraží kterou přijela lokomotiva
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_MANUAL                   :manuálně, po připojení na průjezdném nádraží lokomotiva nezmění směr jízdy
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :automatické doplňování reversního chodu u příkazu jeď se spojit.
 STR_CONFIG_SETTING_QUICKGOTO                                    :Rychlejší zadávání příkazů pro vozidla: {STRING}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Předvybere "jet do" po otevření okna jízdního řádu
 

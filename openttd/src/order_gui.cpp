@@ -1612,7 +1612,22 @@ public:
 				 * act on and does nothing. Asserting here brought the game down
 				 * for exactly that (crash 2026-08-28). */
 				if (order == nullptr) break;
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, order->ShouldGoToCouple() ? 0 : 1);
+				bool turning_on = !order->ShouldGoToCouple();
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_GOTO_COUPLE, turning_on ? 1 : 0);
+
+				/* An engine sent to a station to collect something almost always
+				 * wants to leave again by the side it came in: what it came for
+				 * is in front of it, and the way on is behind it. So the switch
+				 * is filled in with the collect order rather than left for the
+				 * player to remember -- filled in, not forced: the button is
+				 * there and can be pressed straight back out. Whoever would
+				 * rather have it the old way turns the setting off and nothing
+				 * is added at all. Not at a depot: what leads out of a shed is
+				 * settled by which way the train drove in (see 2.13). */
+				if (turning_on && widget == WID_O_GOTO_COUPLE && _settings_client.gui.couple_auto_reverse_out &&
+						!order->ShouldReverseOutOfStation()) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, 1);
+				}
 				break;
 			}
 

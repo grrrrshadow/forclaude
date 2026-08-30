@@ -745,6 +745,31 @@ po výměně 3 vozy / 3 odložené, a vlak dojede domů.
 
 ---
 
+## 2.17 Přepínač: reversní chod se u „jeď se spojit" doplní sám
+
+V nastavení hry, stránka **Příkazy**, přibyl přepínač. Zapnuto (výchozí)
+říká *„automaticky, po připojení ve stanici vlak odjede stejnou stranou
+nádraží kterou přijela lokomotiva"*, vypnuto *„manuálně, po připojení na
+průjezdném nádraží lokomotiva nezmění směr jízdy"*; nápověda dole zní
+*„automatické doplňování reversního chodu u příkazu jeď se spojit."*
+
+Funguje to jen jako **předvyplnění**: ve chvíli, kdy hráč u rozkazu na
+nádraží zmáčkne *jeď se spojit*, zamáčkne se s ním i *reversní chod*.
+Čudlík zůstává čudlíkem — kdo ho nechce, hned ho vymáčkne. Vypnutý
+přepínač nedoplňuje nic a všechno je jako dřív.
+
+**V depu se nedoplňuje nic**, a to dvakrát: podmínka je vázaná na čudlík
+u stanice, a `MOF_REVERSE_OUT` navíc přijímá jen rozkaz typu
+`OT_GOTO_STATION`. Kudy se vyjíždí z kůlny, rozhoduje to, kudy se do ní
+zajelo (téma 2.13), ne přepínač.
+
+Řádek v nastavení nenese jméno, ale rovnou **stav** — název `str` je
+holé `{STRING}` a hodnotu dodává `val_cb` (`CoupleAutoReverseValueText`).
+Co si hráč z toho řádku potřebuje přečíst, je která z těch dvou možností
+zrovna platí, ne štítek, jehož význam si pak musí pamatovat.
+
+---
+
 ## 2.15 Číslo na rozkazu do depa je „sber tolik", ne „najdi řadu o tolika"
 
 Nástupiště a depo nejsou stejné místo a **stejné číslo tam neznamená

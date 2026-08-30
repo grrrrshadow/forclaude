@@ -117,6 +117,17 @@ static std::pair<StringParameter, StringParameter> SettingsValueAbsolute(const I
 	return {sd.str_val + ((value >= 0) ? 1 : 0), abs(value)};
 }
 
+/**
+ * The couple-order reverse-out setting says what it does rather than being
+ * named: what a player needs to read off this row is which of the two ways it
+ * behaves, not a label they then have to remember the meaning of.
+ * @copydoc IntSettingDesc::GetValueParamsCallback
+ */
+static std::pair<StringParameter, StringParameter> CoupleAutoReverseValueText(const IntSettingDesc &, int32_t value)
+{
+	return {value != 0 ? STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_AUTO : STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_MANUAL, {}};
+}
+
 /** Service Interval Settings Default Value displays the correct units or as a percentage. @copydoc IntSettingDesc::GetValueParamsCallback */
 static std::pair<StringParameter, StringParameter> ServiceIntervalSettingsValueText(const IntSettingDesc &sd, int32_t value)
 {

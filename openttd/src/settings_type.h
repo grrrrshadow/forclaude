@@ -268,6 +268,7 @@ struct GUISettings {
 	TimerGameCalendar::Year coloured_news_year; ///< when does newspaper become coloured?
 	TimetableMode timetable_mode; ///< Time units for timetables: days, seconds, or ticks
 	bool quick_goto; ///< Allow quick access to 'goto button' in vehicle orders window
+	bool couple_auto_reverse_out; ///< Fill "reverse out of station" in with a "go to couple" order as it is switched on
 	bool auto_euro; ///< automatically switch to euro in 2002
 	uint8_t drag_signals_density; ///< many signals density
 	bool drag_signals_fixed_distance; ///< keep fixed distance between signals when dragging

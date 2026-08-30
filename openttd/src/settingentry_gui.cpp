@@ -749,7 +749,8 @@ SettingsContainer &GetSettingsTree()
 
 			SettingsPage *orders = vehicles->Add(new SettingsPage(STR_CONFIG_SETTING_VEHICLES_ORDERS));
 			{
-				orders->Add(new SettingEntry("gui.new_nonstop"));
+				orders->Add(new SettingEntry("gui.couple_auto_reverse_out"));
+			orders->Add(new SettingEntry("gui.new_nonstop"));
 				orders->Add(new SettingEntry("gui.quick_goto"));
 				orders->Add(new SettingEntry("gui.stop_location"));
 				orders->Add(new SettingEntry("order.improved_load"));
