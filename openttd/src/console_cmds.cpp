@@ -648,6 +648,8 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool counted = false;
 	bool parked = false;
 	bool swap_mode = false;
+	bool store_mode = false;
+	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
@@ -657,7 +659,20 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		if (argv[i] == "pocet") counted = true;
 		if (argv[i] == "stoji") parked = true;
 		if (argv[i] == "oboji") swap_mode = true;
+		if (argv[i] == "sklad") store_mode = true;
+		/* A bare number is how many the collect order asks for, so the store
+		 * scene can be pointed at any count without a word for each one. */
+		uint n = 0;
+		if (!argv[i].empty() && std::all_of(argv[i].begin(), argv[i].end(), [](char c) { return c >= '0' && c <= '9'; })) {
+			for (char c : argv[i]) n = n * 10 + (c - '0');
+			if (n != 0) want_n = n;
+		}
 	}
+	/* 'sklad' fills the west depot with wagons in more than one stored rake
+	 * before anybody gets there, so a collect order carrying a number has a
+	 * store to take that number out of -- the player's own case, where a shed
+	 * holds far more than one order wants. */
+	if (store_mode) depot_mode = true;
 	/* 'oboji' is a depot exchange on one order: the deliverer drops the rake
 	 * it brought and takes a different one that is already stored in the same
 	 * shed. Only a depot order may do both, and the point of the test is that
@@ -683,15 +698,25 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	/* Find engines first; their railtype decides what gets laid. */
 	EngineID eid_loco = EngineID::Invalid();
 	EngineID eid_wagon = EngineID::Invalid();
+	/* A second kind of wagon, for the store scene: a wagon built in a shed
+	 * joins any loose chain of its own kind already standing there
+	 * (FindGoodVehiclePos()), and no command takes a free rake apart -- so the
+	 * only way to put two separate rakes in one shed is to make them of
+	 * different stock. Which is the ordinary case in a real game anyway. */
+	EngineID eid_wagon2 = EngineID::Invalid();
 	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
 		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
-			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+			if (eid_wagon == EngineID::Invalid()) {
+				eid_wagon = e->index;
+			} else if (eid_wagon2 == EngineID::Invalid()) {
+				eid_wagon2 = e->index;
+			}
 		} else {
 			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
 		}
-		if (eid_loco != EngineID::Invalid() && eid_wagon != EngineID::Invalid()) break;
+		if (eid_loco != EngineID::Invalid() && eid_wagon2 != EngineID::Invalid()) break;
 	}
 	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
 		IConsolePrint(CC_ERROR, "testspoj: no available engine or wagon.");
@@ -880,6 +905,46 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		}
 	}
 
+	if (store_mode) {
+		/* Two separate stored rakes, five and three, so the scene covers both
+		 * halves of what a store means: taking part of one rake, and taking
+		 * across two of them.
+		 *
+		 * Two kinds of wagon, because that is the only way to get two rakes.
+		 * A wagon built in a shed joins any loose chain of its own kind that is
+		 * already standing there (FindGoodVehiclePos()), and there is no
+		 * command that takes a free rake apart afterwards -- CmdMoveRailVehicle
+		 * with no destination does not detach a wagon, it looks for a good
+		 * place to put it, and the good place is the chain it just came from.
+		 * Two earlier versions of this scene did not know that and quietly
+		 * built one rake of eight, which turned the "across two rakes" test
+		 * into another "out of one rake" test that passed for the wrong
+		 * reason. */
+		if (eid_wagon2 == EngineID::Invalid()) {
+			IConsolePrint(CC_ERROR, "testspoj sklad: k dispozici je jen jeden druh vagonu, dve oddelene rady se postavit nedaji.");
+			return true;
+		}
+		for (int i = 0; i < 8; i++) {
+			auto [costs, sid, unused_m, unused_n, unused_o] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, i < 5 ? eid_wagon : eid_wagon2, true, INVALID_CARGO, ClientID::Invalid);
+			if (costs.Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj sklad: odlozeny vagon se nepodaril.");
+				return true;
+			}
+		}
+
+		/* Report what really stands there, not what was meant to. */
+		std::string what;
+		for (const Train *rake : Train::Iterate()) {
+			if (!rake->IsFreeWagon() || rake->tile != depot_w) continue;
+			uint units = 0;
+			for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) units++;
+			if (!what.empty()) what += " + ";
+			what += fmt::format("{}", units);
+		}
+		IConsolePrint(CC_DEFAULT, "testspoj sklad: v depu ({},{}) lezi rady o {} vozech; rozkaz chce sebrat {}.",
+				x0, y0, what, want_n != 0 ? want_n : (counted ? 3 : 0));
+	}
+
 	Order deliver;
 	if (swap_mode) {
 		/* Store a rake of two wagons in the west depot before anyone gets
@@ -975,7 +1040,11 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		/* 'pocet' adds the wagon-count filter the player's own collect order
 		 * carries and the plain scene never exercised. The deliverer above
 		 * stores exactly three wagons, so this asks for what is really there. */
-		if (counted) collect.SetCoupleCount(3);
+		if (want_n != 0) {
+			collect.SetCoupleCount(want_n);
+		} else if (counted) {
+			collect.SetCoupleCount(3);
+		}
 	} else {
 		collect.MakeGoToStation(st_id);
 		collect.SetLoadType(OrderLoadType::NoLoad);
@@ -995,10 +1064,27 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testspoj: collector will back onto the rake.");
 	}
 
+	/* A second collector on the store scene, with the same order. Two engines
+	 * sent to one store is the question the reserved rows exist to answer:
+	 * each has to end up with its own share put aside for it, and neither may
+	 * be handed what the other has already spoken for. */
+	VehicleID veh3 = VehicleID::Invalid();
+	if (store_mode) {
+		auto [cost3, made3, unused_p, unused_q, unused_r] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost3.Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj sklad: druha sberacka se nepodarila.");
+			return true;
+		}
+		veh3 = made3;
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh3, 0, collect);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh3, 1, home_e);
+	}
+
 	/* Deliverer first, collector after; the collector's own hold keeps it in
 	 * the shed until the rake is standing at the platform. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh2, false);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh1, false);
+	if (veh3 != VehicleID::Invalid()) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh3, false);
 
 	_testspoj_active = true;
 

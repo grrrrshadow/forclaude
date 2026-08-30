@@ -2011,11 +2011,18 @@ void MarkCoupleClaimChanged(const Train *rake)
  * answers and is collected whole, or it does not and is left where it stands.
  * Taking a train apart is what the decoupling order is for.
  *
- * @param order the order doing the collecting
- * @param rake  the front of a headless rake waiting to be collected
+ * In a depot the count is not one of these questions at all: see
+ * AssembleDepotRake(). There the stored wagons are a store to draw from, and
+ * asking for a number means taking that many out of it. So the caller says
+ * whether the count is being asked here; the load and cargo filters are the
+ * same question either way.
+ *
+ * @param order       the order doing the collecting
+ * @param rake        the front of a headless rake waiting to be collected
+ * @param check_count whether the wagon count is one of the questions
  * @return whether the rake is what the order asked for
  */
-static bool MatchesCoupleFilter(const Order &order, const Train *rake)
+static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool check_count = true)
 {
 	switch (order.GetCoupleLoad()) {
 		case OrderCoupleLoad::Any:
@@ -2054,13 +2061,137 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake)
 		if (!carries_it) return false;
 	}
 
-	if (order.GetCoupleCount() != 0) {
+	if (check_count && order.GetCoupleCount() != 0) {
 		uint count = 0;
 		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;
 		if (count != order.GetCoupleCount()) return false;
 	}
 
 	return true;
+}
+
+/**
+ * How many vehicles a rake is, counting an engine or wagon and everything
+ * permanently attached to it as one.
+ *
+ * @param rake the front of a chain
+ * @return the number of units in it
+ */
+static uint CountUnits(const Train *rake)
+{
+	uint count = 0;
+	for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;
+	return count;
+}
+
+/**
+ * Put together, out of the wagons stored in a depot, exactly as many as the
+ * order asked for, and hand back the result as one rake.
+ *
+ * A platform and a shed are not the same kind of place, and a number written
+ * on an order does not mean the same thing at each. A rake standing at a
+ * platform is something somebody put there whole: asking for four wagons
+ * there is asking *which* rake to fetch, and one of five is not it. A shed is
+ * a store. Wagons are put into it a few at a time by whatever happened to
+ * come by, and they sit there in whatever groups they were dropped in --
+ * groups that mean nothing at all to the train coming to collect. Asking for
+ * four wagons there is asking for four wagons.
+ *
+ * So that is what it does: it counts what is in the shed, and if there are
+ * enough it takes exactly the number asked for -- across as many of the
+ * stored groups as it takes, since the groups are not the point -- and leaves
+ * the remainder standing as its own. Not enough, and it takes nothing at all
+ * and waits. Half a load is worse than none: everything downstream is built
+ * on the number arriving.
+ *
+ * The wagons it is taking are put together into one rake here and now, rather
+ * than noted down to be gathered on arrival. That is what makes a reservation
+ * visible and what makes several of them possible: the rake this train has
+ * spoken for is a rake, standing in the shed with its own row in the depot
+ * window marked reserved, and what is left over is a rake too -- which the
+ * next engine sent here draws its own from, and so on. Nothing has to hold
+ * "two out of those five" anywhere, because after this there is no such
+ * thing: there is a two and there is a three.
+ *
+ * The load and cargo filters still ask their question of a whole stored rake,
+ * as they do at a platform. They pick which of the stored groups may be drawn
+ * from; the count says how many to take.
+ *
+ * @param v          the collecting engine
+ * @param depot_tile the shed its order names
+ * @param want       how many vehicles it was told to collect
+ * @return the assembled rake, or nullptr if the shed cannot fill the order
+ */
+static Train *AssembleDepotRake(Train *v, TileIndex depot_tile, uint want)
+{
+	/* Count first, touch nothing. A shed that cannot fill the order must be
+	 * left exactly as it was -- rearranged and then not collected from would
+	 * be the worst of both. */
+	std::vector<Train *> pile;
+	uint available = 0;
+	for (Train *rake : Train::Iterate()) {
+		if (rake == v) continue;
+		if (rake->owner != v->owner) continue;
+		if (!rake->IsFreeWagon()) continue;
+		if (rake->track != Track::Depot || rake->tile != depot_tile) continue;
+		if (rake->index == v->depot_dropped_rake) continue; // this train's own leavings
+		if (IsCoupleClaimStale(rake)) {
+			rake->couple_claim = VehicleID::Invalid();
+			MarkCoupleClaimChanged(rake);
+		}
+		if (rake->couple_claim != VehicleID::Invalid()) continue; // spoken for
+		if (!MatchesCoupleFilter(v->current_order, rake, false)) continue;
+
+		pile.push_back(rake);
+		available += CountUnits(rake);
+	}
+
+	/* Not enough: nothing is taken and nothing is moved. The waiting train says
+	 * why for itself, once, from the hold in TrainLocoHandler() -- said again
+	 * from here it would be said every tick for as long as the shed stayed
+	 * short, which is exactly the console-burying repetition that hold was
+	 * rewritten to stop. */
+	if (available < want) return nullptr;
+
+	/* Same trap as every other consist surgery: commands read whichever
+	 * company happens to be current. */
+	AutoRestoreBackup cur_company(_current_company, v->owner);
+
+	Train *head = nullptr;
+	uint have = 0;
+	for (Train *rake : pile) {
+		if (have >= want) break;
+		if (head == nullptr) {
+			head = rake;
+		} else if (TryConsistSplice(DoCommandFlag::Execute, rake, head->Last(), true).Failed()) {
+			/* Too long joined, or something else the splice would not have.
+			 * Whatever is already together stays together -- it is a perfectly
+			 * ordinary stored rake -- and nothing is claimed. */
+			break;
+		}
+		have += CountUnits(rake);
+	}
+
+	if (head == nullptr || have < want) return nullptr;
+
+	if (have > want) {
+		/* Give back the surplus. Counted off the front, so the wagons that
+		 * were first into the shed are the first out of it. */
+		Train *split_point = head;
+		for (uint i = 0; i < want; i++) {
+			split_point = split_point->GetNextVehicle();
+			if (split_point == nullptr) return nullptr; // cannot happen: have > want
+		}
+		if (split_point->IsRearDualheaded()) return nullptr; // can't split a multiheaded engine in half
+		if (TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true).Failed()) return nullptr;
+		head->ConsistChanged(CCF_ARRANGE);
+		Train *left_over = split_point->First();
+		left_over->ConsistChanged(CCF_ARRANGE);
+	}
+
+	InvalidateWindowData(WindowClass::VehicleDepot, depot_tile);
+	SetWindowDirty(WindowClass::VehicleDepot, depot_tile);
+	return head;
 }
 
 /**
@@ -2192,6 +2323,24 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 	} else {
 		dest = v->current_order.GetDestination().ToStationID();
 	}
+	/* A shed with a number on the order is a store to take that many out of,
+	 * not a shelf of ready-made rakes to pick one off. Anything already spoken
+	 * for by this train is looked up the ordinary way below -- the rake was
+	 * made up when it was claimed and is not remade every tick. */
+	if (depot_order && v->current_order.GetCoupleCount() != 0 && v->couple_target == VehicleID::Invalid()) {
+		Train *made = AssembleDepotRake(v, depot_tile, v->current_order.GetCoupleCount());
+		if (made == nullptr) return nullptr;
+
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: v depu ({},{}) si odlozil {} vozu k sebrani (rada {})", v->unitnumber,
+					TileX(depot_tile), TileY(depot_tile), v->current_order.GetCoupleCount(), made->index.base());
+		}
+		made->couple_claim = v->index;
+		v->couple_target = made->index;
+		MarkCoupleClaimChanged(made);
+		return made;
+	}
+
 	Train *unclaimed = nullptr;
 
 	for (Train *rake : Train::Iterate()) {
@@ -7844,10 +7993,14 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 								consist->unitnumber, TileX(consist->tile), TileY(consist->tile),
 								TileX(depot->xy), TileY(depot->xy));
 					} else {
+						/* A number on a depot order is how many to take out of the
+						 * store, not which ready-made rake to pick -- so the reason
+						 * for waiting has to be put the same way, or it reads as a
+						 * refusal to take five when four were asked for. */
 						say = fmt::format("Vlak {}: ceka na ({},{}) - v depu ({},{}) je {}; rozkaz chce {}",
 								consist->unitnumber, TileX(consist->tile), TileY(consist->tile),
 								TileX(depot->xy), TileY(depot->xy), what,
-								wanted == 0 ? std::string("cokoli") : fmt::format("presne {} vozu", wanted));
+								wanted == 0 ? std::string("cokoli") : fmt::format("sebrat {} vozu", wanted));
 					}
 				} else {
 					say = fmt::format("Vlak {}: ceka na ({},{}) - na stanici nejsou zadne vagonky, pro ktere by mohl jet",

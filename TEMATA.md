@@ -745,6 +745,53 @@ po výměně 3 vozy / 3 odložené, a vlak dojede domů.
 
 ---
 
+## 2.15 Číslo na rozkazu do depa je „sber tolik", ne „najdi řadu o tolika"
+
+Nástupiště a depo nejsou stejné místo a **stejné číslo tam neznamená
+totéž.** Řada u nástupiště je celek, který tam někdo postavil celý:
+„čtyři vozy" tam znamená **kterou řadu** vzít, a řada o pěti to není.
+Depo je **sklad**. Vagonky do něj přijdou po pár kusech od toho, kdo
+zrovna jel kolem, a leží tam v hromádkách, které pro sbírající mašinku
+neznamenají nic. „Čtyři vozy" tam znamená **čtyři vozy**.
+
+Dřív to bylo `count != GetCoupleCount()` — přesná shoda celé řady — i
+v depu. Hráč pak měl v depu spoustu odložených vagonků a mašinka stála,
+protože žádná hromádka neměla přesně tolik, kolik chtěl rozkaz.
+
+Teď: `AssembleDepotRake()` v depu **spočítá, co tam leží**, a když je toho
+dost, vezme přesně požadovaný počet — klidně napříč několika
+hromádkami — a zbytek nechá stát jako vlastní řadu. Když toho dost není,
+**nevezme nic** a čeká. Půl nákladu je horší než žádný: všechno dál
+v cyklu na tom počtu stojí. Filtry na náklad a naloženost se pořád ptají
+celé odložené řady (vybírají, ze kterých hromádek se smí brát); počet
+říká, kolik z nich vzít.
+
+**Rezervace se udělá tak, že se ty vagonky opravdu poskládají**, hned při
+záboru, ne až při příjezdu. Tím je rezervace vidět a tím jich může být
+v jednom depu víc: zabraná řada **je** řada — stojí v depu, má v okně
+depa svůj řádek s nápisem *reservováno* — a zbytek je taky řada, ze které
+si další mašinka udělá svou. Nikde se nemusí držet „dva z těch pěti",
+protože po tom kroku nic takového neexistuje: je tam dvojka a je tam
+trojka.
+
+Scény v rigu: `testspoj depo sklad <počet>` — v depu leží řady o 5 a 3
+vozech a jedou pro ně **dvě** sběračky. Naměřeno: „sbírej 2" → obě
+sběračky odjedou se 2 (v okně depa mezitím dva samostatné zabrané řádky,
+každý na svou mašinku, a jeden volný); „sbírej 6" → první vezme 5+1
+**napříč dvěma řadami**, druhá čeká; „sbírej 20" → nikdo nevezme nic
+a nic se v depu ani nepřeskládá.
+
+**Dvě chyby, které si ta scéna sama na sobě našla.** Vagon postavený
+v depu se sám připojí k volné řadě svého druhu, která tam už stojí
+(`FindGoodVehiclePos()`), a **žádný příkaz volnou řadu nerozdělí** —
+`CmdMoveRailVehicle` bez cíle vagon neodpojí, ale hledá pro něj dobré
+místo, a to dobré místo je ta řada, ze které přišel. První dvě verze
+scény o tom nevěděly a postavily jednu řadu o osmi. Test „napříč dvěma
+řadami" pak procházel z úplně jiného důvodu, než měl. Dvě oddělené řady
+v jednom depu jdou udělat jedině **z jiného druhu vagonů**.
+
+---
+
 # 3. Rozpojování (decouple)
 
 - **Vagonky nejsou k mání, dokud odkladačka stojí vedle nich.** Odpojení
