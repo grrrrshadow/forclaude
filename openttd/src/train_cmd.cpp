@@ -7672,6 +7672,27 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			TryDecoupleAtDepot(consist, keep);
 			return true;
 		}
+		/* Speak for a rake right here if nobody has yet. Choosing one is
+		 * otherwise done further down, on the way to fetch it -- and that is
+		 * past the point where a stopped train turns back (a few lines
+		 * below), so an engine that is already standing in the very shed its
+		 * order names, with the brake on, never got as far as choosing.
+		 * Which is the ordinary way to arrive: a depot order that says
+		 * "stop" leaves the train standing exactly like that. It sat there
+		 * with the wagons beside it and did nothing, and forcing it in by
+		 * hand did not help, because being driven in was never what was
+		 * missing -- having chosen was.
+		 *
+		 * Nothing is driven anywhere by this: the two are already in the
+		 * same shed, and coupling in a shed is assembling a train standing
+		 * still, which is exactly what the depot window lets the player do
+		 * by hand while the brake is on. */
+		if (consist->couple_target == VehicleID::Invalid() && consist->current_order.IsType(OT_GOTO_DEPOT) &&
+				consist->current_order.ShouldGoToCouple() &&
+				consist->current_order.GetDestination().ToDepotID() == GetDepotIndex(consist->tile)) {
+			FindOrClaimCoupleTarget(consist);
+		}
+
 		if (consist->couple_target != VehicleID::Invalid()) {
 			Train *rake = Train::GetIfValid(consist->couple_target);
 			if (rake != nullptr && rake->IsFreeWagon() && rake->track == Track::Depot && rake->tile == consist->tile) {

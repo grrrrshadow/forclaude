@@ -646,6 +646,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool blocked = false;
 	bool tow_mode = false;
 	bool counted = false;
+	bool parked = false;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
@@ -653,6 +654,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		if (argv[i] == "blok") blocked = true;
 		if (argv[i] == "vlek") tow_mode = true;
 		if (argv[i] == "pocet") counted = true;
+		if (argv[i] == "stoji") parked = true;
 	}
 
 	/* A headless newgame (null video driver has no GUI) starts like a
@@ -908,7 +910,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	/* The collector: a light engine sent to couple, with its next stop lying
 	 * behind it -- the depot it starts from -- which is the exact shape of the
 	 * player's failing case. */
-	auto [cost1, veh1, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	auto [cost1, veh1, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, parked ? depot_w : depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
 	if (cost1.Failed()) {
 		IConsolePrint(CC_ERROR, "testspoj: engine 1 failed.");
 		return true;
@@ -917,6 +919,11 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	if (depot_mode) {
 		collect.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 		collect.SetGoToCouple(true);
+		/* 'stoji' builds the collector in the very depot its collect order
+		 * names, so it is already standing there with nothing yet to fetch --
+		 * the player's own case, where a depot order that says "stop" had
+		 * parked it in that shed. Brake it mid-scene with 'testbrzda' and it
+		 * must still take the wagons once they arrive. */
 		/* 'pocet' adds the wagon-count filter the player's own collect order
 		 * carries and the plain scene never exercised. The deliverer above
 		 * stores exactly three wagons, so this asks for what is really there. */
