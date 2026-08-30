@@ -1967,6 +1967,38 @@ static bool IsCoupleClaimStale(const Train *rake)
 }
 
 /**
+ * Is an engine on its way for this rake right now?
+ *
+ * The claim on its own is not the answer: a claim outlives the engine behind
+ * it until somebody looks, so anyone asking has to ask both halves of the
+ * question at once.
+ *
+ * @param rake the front of a headless rake
+ * @return whether the rake is spoken for
+ */
+bool IsRakeClaimedForCoupling(const Train *rake)
+{
+	return rake->couple_claim != VehicleID::Invalid() && !IsCoupleClaimStale(rake);
+}
+
+/**
+ * Note that a rake has changed hands: it has just been spoken for, or the
+ * engine that had spoken for it has stopped coming.
+ *
+ * The depot window keeps rakes that are spoken for in rows of their own, out
+ * of the player's reach, so it has to be told when that set changes -- nothing
+ * else would bring the window round, since the engine doing the claiming is
+ * usually nowhere near. A claim on a rake standing out in the open is not
+ * drawn anywhere, so only a rake in a shed is worth the call.
+ *
+ * @param rake the front of a headless rake whose claim just changed
+ */
+void MarkCoupleClaimChanged(const Train *rake)
+{
+	if (rake->track == Track::Depot) InvalidateWindowData(WindowClass::VehicleDepot, rake->tile);
+}
+
+/**
  * Does the rake @p rake answer the description the order @p order gives of
  * what it is going to collect?
  *
@@ -2185,7 +2217,10 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 			if (rake->last_station_visited != dest) continue;
 		}
 
-		if (IsCoupleClaimStale(rake)) rake->couple_claim = VehicleID::Invalid();
+		if (IsCoupleClaimStale(rake)) {
+			rake->couple_claim = VehicleID::Invalid();
+			MarkCoupleClaimChanged(rake);
+		}
 
 		if (rake->couple_claim == v->index) {
 			v->couple_target = rake->index; // already ours
@@ -2204,6 +2239,7 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 		}
 		unclaimed->couple_claim = v->index;
 		v->couple_target = unclaimed->index;
+		MarkCoupleClaimChanged(unclaimed);
 	} else {
 		if (_show_train_orientation && v->couple_target != VehicleID::Invalid()) {
 			IConsolePrint(CC_INFO, "Vlak {}: cil spojeni zmizel (byl {})", v->unitnumber,

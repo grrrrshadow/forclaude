@@ -692,6 +692,35 @@ a nula havárií.
 
 ---
 
+## 2.13 Depo: prázdný odjezd se neděje a rezervovaná řada je vidět
+
+**Sběračka nesmí vjet do depa a vyjet bez vagonků.** Příjezd do depa
+uzavíral rozkaz (`VehicleEnterDepot()` ho přepsal na dummy), takže když
+vagonky ještě nedorazily nebo je někdo mezitím sešrotoval, mašinka
+poskočila na další rozkaz a vycouvala prázdná. Všechno, co dál v cyklu
+na těch vagoncích stojí, pak jedno kolo nesedí — na nádraží prostě
+chybí a nic to neřekne. Rozkaz „jeď se spojit do depa" se proto při
+příjezdu **neuzavírá**; uzavře ho až samo spojení (`TryCoupleAtDepot()`),
+přesně jako u mašinky, která už v depu stála, když rozkaz přišel. Vedlejší
+zisk: mašinka, která přijede dřív než vagonky, na ně v depu počká
+a sebere je, jakmile dorazí.
+
+**Řádek „reservováno" v okně depa.** Bezhlavá řada, kterou si už nějaká
+mašinka zabrala (`couple_claim`), se v okně depa vyzvedne **nad ostatní
+řádky** a vpravo dostane nápis *reservováno*. Řádky se objeví jen tehdy,
+když pro vagonky opravdu někdo jede — zábor se ptá na obě půlky najednou
+(`IsRakeClaimedForCoupling()`), takže zábor po mašince, která už nejede,
+řádek neudrží. S rezervovanou řadou hráč v okně depa nic nedělá: klik,
+tažení ani prodej přes okno na ni nesáhnou. Cesta zpátky vede přes
+mašinku — sešrotovat ji nebo jí poskočit rozkaz zábor pustí (téma 2.2).
+
+Zábor bere mašinka, která může být přes půl mapy, takže se v depu v ten
+okamžik nic nemění a okno by se samo nepřekreslilo: proto
+`MarkCoupleClaimChanged()` u záboru i u jeho uvolnění a rozdělení řad
+při každém obnovení seznamu, ne jen při jeho stavbě.
+
+---
+
 # 3. Rozpojování (decouple)
 
 - **Vagonky nejsou k mání, dokud odkladačka stojí vedle nich.** Odpojení

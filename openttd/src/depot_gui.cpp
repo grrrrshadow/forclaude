@@ -266,12 +266,15 @@ struct DepotWindow : Window {
 	bool check_unitnumber_digits = true;
 	WidgetID hovered_widget = INVALID_WIDGET; ///< Index of the widget being hovered during drag/drop. \c INVALID_WIDGET if no drag is in progress.
 	VehicleList vehicle_list{};
-	VehicleList wagon_list{};
+	VehicleList wagon_list{}; ///< Engineless rakes as the depot reports them, before the spoken-for ones are lifted out.
+	VehicleList reserved_list{}; ///< Rakes an engine is already on its way to collect, drawn in rows of their own at the top.
+	VehicleList free_list{}; ///< The rest of \c wagon_list: rakes that are still the player's to move about.
 	uint unitnumber_digits = 2;
 	uint num_columns = 1; ///< Number of columns.
 	Scrollbar *hscroll = nullptr; ///< Only for trains.
 	Scrollbar *vscroll = nullptr;
 	uint count_width = 0; ///< Width of length count, including separator.
+	uint reserved_width = 0; ///< Width of the "reserved" label, including separator.
 	uint header_width = 0; ///< Width of unit number and flag, including separator.
 	Dimension flag_size{}; ///< Size of start/stop flag.
 	VehicleCellSize cell_size{}; ///< Vehicle sprite cell size.
@@ -386,6 +389,17 @@ struct DepotWindow : Window {
 			diff_y = WidgetDimensions::scaled.matrix.top + GetCharacterHeight(FontSize::Normal) + WidgetDimensions::scaled.vsep_normal;
 		}
 
+		/* Say so on rakes that are spoken for. The word goes at the right-hand
+		 * end of the row, just left of the length, on a patch of plain ground
+		 * so it stays readable however far the wagons reach under it. */
+		if (v->type == VehicleType::Train && IsRakeClaimedForCoupling(Train::From(v))) {
+			Rect label = text.Indent(this->count_width, !rtl).WithWidth(this->reserved_width, !rtl)
+					.WithHeight(GetCharacterHeight(FontSize::Small), true);
+			GfxFillRect(label, GetColourGradient(this->GetWidget<NWidgetCore>(WID_D_MATRIX)->colour, Shade::Normal));
+			DrawString(label.left, label.right - WidgetDimensions::scaled.hsep_normal, label.top,
+					STR_DEPOT_RESERVED_FOR_COUPLING, TextColour::FromString, AlignmentH::ForceRight, false, FontSize::Small);
+		}
+
 		text = text.WithWidth(this->header_width - WidgetDimensions::scaled.hsep_normal, rtl).WithHeight(GetCharacterHeight(FontSize::Normal)).Indent(diff_x, rtl);
 		if (free_wagon) {
 			DrawString(text, STR_DEPOT_NO_ENGINE);
@@ -435,22 +449,35 @@ struct DepotWindow : Window {
 		uint16_t rows_in_display = wid->current_y / wid->resize_y;
 
 		uint num = this->vscroll->GetPosition() * this->num_columns;
-		uint maxval = static_cast<uint>(std::min<size_t>(this->vehicle_list.size(), num + (rows_in_display * this->num_columns)));
+		uint last = num + (rows_in_display * this->num_columns);
+
+		/* Rakes an engine is already on its way for come first, so that what is
+		 * spoken for is the first thing the player sees and never has to be
+		 * hunted for among the rest. There are none of these unless this is a
+		 * train depot, where there is only ever one column. */
+		uint maxval = static_cast<uint>(std::min<size_t>(this->reserved_list.size(), last));
+		for (; num < maxval; num++, ir = ir.Translate(0, this->resize.step_height)) {
+			this->DrawVehicleInDepot(this->reserved_list[num], ir);
+		}
+
+		uint offset = static_cast<uint>(this->reserved_list.size());
+		maxval = static_cast<uint>(std::min<size_t>(offset + this->vehicle_list.size(), last));
 		for (; num < maxval; ir = ir.Translate(0, this->resize.step_height)) { // Draw the rows
 			Rect cell = ir; /* Keep track of horizontal cells */
 			for (uint i = 0; i < this->num_columns && num < maxval; i++, num++) {
 				/* Draw all vehicles in the current row */
-				const Vehicle *v = this->vehicle_list[num];
+				const Vehicle *v = this->vehicle_list[num - offset];
 				this->DrawVehicleInDepot(v, cell);
 				cell = cell.Translate(rtl ? -(int)this->resize.step_width : (int)this->resize.step_width, 0);
 			}
 		}
 
-		maxval = static_cast<uint>(std::min<size_t>(this->vehicle_list.size() + this->wagon_list.size(), (this->vscroll->GetPosition() * this->num_columns) + (rows_in_display * this->num_columns)));
+		offset += static_cast<uint>(this->vehicle_list.size());
+		maxval = static_cast<uint>(std::min<size_t>(offset + this->free_list.size(), last));
 
 		/* Draw the train wagons without an engine in front. */
 		for (; num < maxval; num++, ir = ir.Translate(0, this->resize.step_height)) {
-			const Vehicle *v = this->wagon_list[num - this->vehicle_list.size()];
+			const Vehicle *v = this->free_list[num - offset];
 			this->DrawVehicleInDepot(v, ir);
 		}
 	}
@@ -506,7 +533,7 @@ struct DepotWindow : Window {
 		int32_t row = this->vscroll->GetScrolledRowFromWidget(y, this, WID_D_MATRIX);
 		uint pos = (row * this->num_columns) + xt;
 
-		if (row == INT32_MAX || this->vehicle_list.size() + this->wagon_list.size() <= pos) {
+		if (row == INT32_MAX || this->reserved_list.size() + this->vehicle_list.size() + this->free_list.size() <= pos) {
 			/* Clicking on 'line' / 'block' without a vehicle */
 			if (this->type == VehicleType::Train) {
 				/* End the dragging */
@@ -516,6 +543,15 @@ struct DepotWindow : Window {
 			}
 		}
 
+		/* Wagons another engine is already on its way to collect. Until that
+		 * engine has them or has stopped coming they are not the player's to
+		 * move, to sell or to put in any other order, so there is nothing here
+		 * to click on at all. The way to get them back is on the engine's side:
+		 * scrap it, or move its orders past the collecting one, and the claim
+		 * falls away by itself. */
+		if (this->reserved_list.size() > pos) return {.action = DepotGUIAction::Error};
+		pos -= (uint)this->reserved_list.size();
+
 		const Vehicle *vehicle;
 		bool is_wagon = false;
 		if (this->vehicle_list.size() > pos) {
@@ -524,7 +560,7 @@ struct DepotWindow : Window {
 			if (this->type == VehicleType::Train) x += this->hscroll->GetPosition();
 		} else {
 			pos -= (uint)this->vehicle_list.size();
-			vehicle = this->wagon_list[pos];
+			vehicle = this->free_list[pos];
 			/* free wagons don't have an initial loco. */
 			x -= ScaleSpriteTrad(VEHICLEINFO_FULL_VEHICLE_WIDTH);
 			is_wagon = true;
@@ -699,8 +735,10 @@ struct DepotWindow : Window {
 
 				if (this->type == VehicleType::Train) {
 					this->count_width = GetStringBoundingBox(GetString(STR_JUST_DECIMAL, GetParamMaxValue(1000, 0, FontSize::Small), 1), FontSize::Small).width + WidgetDimensions::scaled.hsep_normal;
+					this->reserved_width = GetStringBoundingBox(STR_DEPOT_RESERVED_FOR_COUPLING, FontSize::Small).width + 2 * WidgetDimensions::scaled.hsep_normal;
 				} else {
 					this->count_width = 0;
+					this->reserved_width = 0;
 				}
 
 				Dimension unumber = GetStringBoundingBox(GetString(STR_JUST_COMMA, GetParamMaxDigits(this->unitnumber_digits)));
@@ -752,6 +790,21 @@ struct DepotWindow : Window {
 
 			this->check_unitnumber_digits = true;
 		}
+
+		/* Split the engineless rakes into the ones an engine is already coming
+		 * for and the ones that are still the player's. Done on every refresh
+		 * rather than only when the list is rebuilt: a claim is taken by an
+		 * engine that may be half the map away, so nothing about this depot
+		 * changes at the moment it happens. */
+		this->reserved_list.clear();
+		this->free_list.clear();
+		for (const Vehicle *v : this->wagon_list) {
+			if (v->type == VehicleType::Train && IsRakeClaimedForCoupling(Train::From(v))) {
+				this->reserved_list.push_back(v);
+			} else {
+				this->free_list.push_back(v);
+			}
+		}
 	}
 
 	void OnPaint() override
@@ -779,7 +832,7 @@ struct DepotWindow : Window {
 				max_width = std::max(max_width, width);
 			}
 			/* Always have 1 empty row, so people can change the setting of the train */
-			this->vscroll->SetCount(this->vehicle_list.size() + this->wagon_list.size() + 1);
+			this->vscroll->SetCount(this->reserved_list.size() + this->vehicle_list.size() + this->free_list.size() + 1);
 			/* Always make it longer than the longest train, so you can attach vehicles at the end, and also see the next vertical tile separator line */
 			this->hscroll->SetCount(max_width + ScaleSpriteTrad(2 * VEHICLEINFO_FULL_VEHICLE_WIDTH + 1));
 		} else {
@@ -1052,7 +1105,16 @@ struct DepotWindow : Window {
 		}
 
 		DepotActionResult result = this->GetVehicleFromDepotWndPt(pt.x, pt.y);
-		if (result.action != DepotGUIAction::DragVehicle) return;
+		if (result.action != DepotGUIAction::DragVehicle) {
+			/* Nothing can be dropped here -- a row of wagons that is spoken
+			 * for, or the header cell of a row -- so there is no destination
+			 * to mark either. */
+			if (this->vehicle_over != VehicleID::Invalid()) {
+				this->vehicle_over = VehicleID::Invalid();
+				this->SetWidgetDirty(widget);
+			}
+			return;
+		}
 
 		VehicleID new_vehicle_over = VehicleID::Invalid();
 		if (result.vehicle != nullptr) {

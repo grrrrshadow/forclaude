@@ -4441,6 +4441,7 @@ STR_DEPOT_RENAME_TOOLTIP                                        :{BLACK}Change n
 STR_DEPOT_RENAME_DEPOT_CAPTION                                  :Rename depot
 
 STR_DEPOT_NO_ENGINE                                             :{BLACK}-
+STR_DEPOT_RESERVED_FOR_COUPLING                                 :{ORANGE}reserved
 STR_DEPOT_VEHICLE_TOOLTIP                                       :{BLACK}{ENGINE}{RAW_STRING}
 STR_DEPOT_VEHICLE_TOOLTIP_CHAIN                                 :{BLACK}{NUM} vehicle{P "" s}{RAW_STRING}
 STR_DEPOT_VEHICLE_TOOLTIP_CARGO                                 :{}{CARGO_LONG} ({CARGO_SHORT})

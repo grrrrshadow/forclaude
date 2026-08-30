@@ -1099,7 +1099,10 @@ CommandCost CmdSkipToOrder(DoCommandFlags flags, VehicleID veh_id, VehicleOrderI
 			Train *t = Train::From(v);
 			if (t->couple_target != VehicleID::Invalid()) {
 				Train *claimed = Train::GetIfValid(t->couple_target);
-				if (claimed != nullptr && claimed->couple_claim == t->index) claimed->couple_claim = VehicleID::Invalid();
+				if (claimed != nullptr && claimed->couple_claim == t->index) {
+					claimed->couple_claim = VehicleID::Invalid();
+					MarkCoupleClaimChanged(claimed);
+				}
 				t->couple_target = VehicleID::Invalid();
 			}
 			t->current_order.SetGoToCouple(false);
