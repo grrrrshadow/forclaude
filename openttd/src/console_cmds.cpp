@@ -1745,6 +1745,17 @@ static bool ConTestStoreRake(std::span<std::string_view> argv)
 			break;
 		}
 		if (tile == INVALID_TILE) {
+			/* Or, failing that, whichever shed holds a rake somebody has
+			 * spoken for -- which is where buying wagons is the interesting
+			 * thing to do: they must not join the reserved row. */
+			for (const Train *rake : Train::Iterate()) {
+				if (!rake->IsFreeWagon() || rake->track != Track::Depot) continue;
+				if (!IsRakeClaimedForCoupling(rake)) continue;
+				tile = rake->tile;
+				break;
+			}
+		}
+		if (tile == INVALID_TILE) {
 			IConsolePrint(CC_ERROR, "testvagony: zadna mashinka v depu neceka na vagonky.");
 			return true;
 		}

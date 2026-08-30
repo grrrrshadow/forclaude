@@ -873,6 +873,10 @@ void NormalizeTrainVehInDepot(const Train *u)
 {
 	assert(u->IsEngine());
 	for (VehicleID vehicle : GetFreeWagonsInDepot(u->tile)) {
+		/* The other way round from FindGoodVehiclePos(), and the same rule: a
+		 * newly built engine gathers the loose wagons standing in the shed, and
+		 * the ones another engine is already coming for are not loose. */
+		if (IsRakeClaimedForCoupling(Train::Get(vehicle))) continue;
 		if (Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, vehicle, u->index, true).Failed()) {
 			break;
 		}
@@ -1007,6 +1011,13 @@ static Train *FindGoodVehiclePos(const Train *src)
 
 	for (VehicleID vehicle : GetFreeWagonsInDepot(src->tile)) {
 		Train *dst = Train::Get(vehicle);
+
+		/* Not onto a rake an engine is already on its way for. A wagon built
+		 * in a shed looks for a chain of its own kind to join, and a reserved
+		 * rake is exactly that -- so a player buying wagons while a collector
+		 * was on the way had them jump into the reserved row, and the engine
+		 * arrived and took the lot. What is spoken for is closed. */
+		if (IsRakeClaimedForCoupling(dst)) continue;
 
 		/* check so all vehicles in the line have the same engine. */
 		Train *t = dst;
@@ -1436,6 +1447,18 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 
 		/* Do not allow appending to crashed vehicles, too */
 		if (dst->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
+	}
+
+	/* Neither end of this may be a rake an engine is already on its way for.
+	 * The depot window offers nothing to do with such a row, but the window is
+	 * not the only way in: a wagon built in the shed looks for a chain to join
+	 * and a newly built engine gathers the loose wagons, and both of those come
+	 * through here. The two callers filter it themselves so their own loops
+	 * carry on past it rather than stopping; this is the backstop that makes
+	 * "closed" true whatever asks. Coupling itself does not come this way --
+	 * TryCoupleAtDepot() and AssembleDepotRake() splice directly. */
+	if (IsRakeClaimedForCoupling(src->First()) || (dst != nullptr && IsRakeClaimedForCoupling(dst->First()))) {
+		return CommandCost(STR_ERROR_WAGONS_ARE_RESERVED_FOR_COUPLING);
 	}
 
 	/* if an articulated part is being handled, deal with its parent vehicle */

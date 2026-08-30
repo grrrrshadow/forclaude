@@ -4445,7 +4445,7 @@ STR_DEPOT_RENAME_TOOLTIP                                        :{BLACK}Change n
 STR_DEPOT_RENAME_DEPOT_CAPTION                                  :Rename depot
 
 STR_DEPOT_NO_ENGINE                                             :{BLACK}-
-STR_DEPOT_RESERVED_FOR_COUPLING                                 :{ORANGE}reserved
+STR_DEPOT_RESERVED_FOR_COUPLING                                 :{BLACK}reserved {COMMA}
 STR_DEPOT_VEHICLE_TOOLTIP                                       :{BLACK}{ENGINE}{RAW_STRING}
 STR_DEPOT_VEHICLE_TOOLTIP_CHAIN                                 :{BLACK}{NUM} vehicle{P "" s}{RAW_STRING}
 STR_DEPOT_VEHICLE_TOOLTIP_CARGO                                 :{}{CARGO_LONG} ({CARGO_SHORT})
@@ -5443,6 +5443,7 @@ STR_ERROR_CAN_T_REVERSE_DIRECTION_RAIL_VEHICLE_MULTIPLE_UNITS   :consists of mul
 STR_ERROR_INCOMPATIBLE_RAIL_TYPES                               :incompatible rail types
 
 STR_ERROR_CAN_T_MOVE_VEHICLE                                    :Can't move vehicle...
+STR_ERROR_WAGONS_ARE_RESERVED_FOR_COUPLING                      :{WHITE}These wagons are reserved for an engine that is on its way for them
 STR_ERROR_REAR_ENGINE_FOLLOW_FRONT                              :the rear engine will always follow its front counterpart
 STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Can't couple train...
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... no stopped train immediately ahead to couple with

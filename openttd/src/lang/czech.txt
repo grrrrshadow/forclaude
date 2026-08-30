@@ -4528,7 +4528,7 @@ STR_DEPOT_RENAME_TOOLTIP                                        :{BLACK}Změnit 
 STR_DEPOT_RENAME_DEPOT_CAPTION                                  :Přejmenovat depo
 
 STR_DEPOT_NO_ENGINE                                             :{BLACK}-
-STR_DEPOT_RESERVED_FOR_COUPLING                                 :{ORANGE}reservováno
+STR_DEPOT_RESERVED_FOR_COUPLING                                 :{BLACK}reservováno {COMMA}
 STR_DEPOT_VEHICLE_TOOLTIP                                       :{BLACK}{ENGINE}{STRING}
 STR_DEPOT_VEHICLE_TOOLTIP_CHAIN                                 :{BLACK}{NUM} vozid{P lo la el}{STRING}
 STR_DEPOT_VEHICLE_TOOLTIP_CARGO                                 :{}{CARGO_LONG} ({CARGO_SHORT})
@@ -5522,6 +5522,7 @@ STR_ERROR_CAN_T_REVERSE_DIRECTION_RAIL_VEHICLE_MULTIPLE_UNITS   :{WHITE}... se s
 STR_ERROR_INCOMPATIBLE_RAIL_TYPES                               :Neslučitelné druhy kolejí
 
 STR_ERROR_CAN_T_MOVE_VEHICLE                                    :{WHITE}Nelze přesunout vozidlo...
+STR_ERROR_WAGONS_ARE_RESERVED_FOR_COUPLING                      :{WHITE}Tyto vagonky jsou rezervované pro mašinku, která pro ně jede
 STR_ERROR_REAR_ENGINE_FOLLOW_FRONT                              :{WHITE}Zadní stroj vždy doprovází svůj protějšek vepředu
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :nelze najít cestu do místního depa...
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :nelze najít místní garáž

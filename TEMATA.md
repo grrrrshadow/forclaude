@@ -719,6 +719,34 @@ okamžik nic nemění a okno by se samo nepřekreslilo: proto
 `MarkCoupleClaimChanged()` u záboru i u jeho uvolnění a rozdělení řad
 při každém obnovení seznamu, ne jen při jeho stavbě.
 
+**Ten řádek musí být opravdu uzavřený, ne jen neklikací.** Hráčovo
+hlášení: mašinka jede pro dva vagonky, hráč mezitím vagonky kupuje —
+a nově koupené naskáčou na rezervovaný řádek a mašinka odveze všechny.
+Okno depa na rezervovanou řadu nepustí klik ani tažení, jenže okno není
+jediná cesta dovnitř:
+
+- vagon postavený v depu si hledá řadu **svého druhu**, ke které se
+  připojí (`FindGoodVehiclePos()`) — a rezervovaná řada je přesně taková;
+- nově postavená **lokomotiva** si naopak posbírá volné vagony, které
+  v depu stojí (`NormalizeTrainVehInDepot()`) — a co je zabrané, volné
+  není.
+
+Obojí teď zabranou řadu přeskočí, a jako záchytka to navíc odmítá i sám
+příkaz `CmdMoveRailVehicle` na obou koncích. Samotné spojení tudy nechodí
+(`TryCoupleAtDepot()` i `AssembleDepotRake()` spojují přímo), takže
+zámek nic nerozbíjí.
+
+Naměřeno na scéně `koupitpri` (dvě sběračky si zaberou po 2, pak hráč
+koupí 3 vagony). **Bez pojistky** hned po nákupu: řada o **5 vozech
+a bez nároku** — koupené vagony pohltily rezervovanou řadu i s rezervací.
+**S pojistkou:** rezervované řádky zůstávají 2 a 2, koupené si udělají
+vlastní řadu o 3, a každá sběračka odveze přesně své dva.
+
+**Nápis na řádku** je černý, normální velikosti a nese **číslo
+lokomotivy**, která si řadu zabrala — v jednom depu může být zabraných
+řádků víc a „reservováno" samo o sobě neřekne čí. Malé oranžové písmo
+bylo na telefonu špatně vidět.
+
 ---
 
 ## 2.14 V depu smí jeden rozkaz odpojit i připojit

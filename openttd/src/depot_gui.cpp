@@ -393,11 +393,18 @@ struct DepotWindow : Window {
 		 * end of the row, just left of the length, on a patch of plain ground
 		 * so it stays readable however far the wagons reach under it. */
 		if (v->type == VehicleType::Train && IsRakeClaimedForCoupling(Train::From(v))) {
+			/* Which engine has it, because a shed can hold a reserved row for
+			 * each of several engines and "reserved" on its own does not say
+			 * whose. Ordinary black at the ordinary size: it has to be read at
+			 * a glance on a small screen, which is the one thing the small
+			 * orange version was not. */
+			const Train *claimer = Train::GetIfValid(Train::From(v)->couple_claim);
 			Rect label = text.Indent(this->count_width, !rtl).WithWidth(this->reserved_width, !rtl)
-					.WithHeight(GetCharacterHeight(FontSize::Small), true);
+					.WithHeight(GetCharacterHeight(FontSize::Normal), true);
 			GfxFillRect(label, GetColourGradient(this->GetWidget<NWidgetCore>(WID_D_MATRIX)->colour, Shade::Normal));
 			DrawString(label.left, label.right - WidgetDimensions::scaled.hsep_normal, label.top,
-					STR_DEPOT_RESERVED_FOR_COUPLING, TextColour::FromString, AlignmentH::ForceRight, false, FontSize::Small);
+					GetString(STR_DEPOT_RESERVED_FOR_COUPLING, claimer == nullptr ? 0 : claimer->unitnumber),
+					TextColour::FromString, AlignmentH::ForceRight);
 		}
 
 		text = text.WithWidth(this->header_width - WidgetDimensions::scaled.hsep_normal, rtl).WithHeight(GetCharacterHeight(FontSize::Normal)).Indent(diff_x, rtl);
@@ -735,7 +742,7 @@ struct DepotWindow : Window {
 
 				if (this->type == VehicleType::Train) {
 					this->count_width = GetStringBoundingBox(GetString(STR_JUST_DECIMAL, GetParamMaxValue(1000, 0, FontSize::Small), 1), FontSize::Small).width + WidgetDimensions::scaled.hsep_normal;
-					this->reserved_width = GetStringBoundingBox(STR_DEPOT_RESERVED_FOR_COUPLING, FontSize::Small).width + 2 * WidgetDimensions::scaled.hsep_normal;
+					this->reserved_width = GetStringBoundingBox(GetString(STR_DEPOT_RESERVED_FOR_COUPLING, GetParamMaxDigits(this->unitnumber_digits))).width + 2 * WidgetDimensions::scaled.hsep_normal;
 				} else {
 					this->count_width = 0;
 					this->reserved_width = 0;
