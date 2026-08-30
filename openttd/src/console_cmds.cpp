@@ -1094,6 +1094,47 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 }
 
 /**
+ * Change the cargo filter on a collecting order while the train is already
+ * working it. Stages the one thing a player does when a train stands waiting
+ * for wagons it will never match: put the filter right and expect it to take.
+ * Usage: testfiltr [cargo index] -- no argument clears the filter.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCoupleFilter(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Change the cargo filter on a collect order. Usage: 'testfiltr' to clear it, or 'testfiltr <cargo>'.");
+		return true;
+	}
+
+	uint32_t cargo = (uint32_t)INVALID_CARGO;
+	if (argv.size() >= 2) {
+		auto n = ParseInteger(argv[1]);
+		if (!n.has_value()) return false;
+		cargo = (uint32_t)*n;
+	}
+
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFrontEngine()) continue;
+		for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
+			const Order *o = t->GetOrder(i);
+			if (o == nullptr || !o->ShouldGoToCouple()) continue;
+			/* Commands read whichever company happens to be current, and a
+			 * console command is nobody's. Without this the order change was
+			 * refused on ownership and quietly did nothing, which for a while
+			 * looked exactly like the bug being tested for. */
+			AutoRestoreBackup cur_company(_current_company, t->owner);
+			CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, i, MOF_COUPLE_CARGO, cargo);
+			IConsolePrint(r.Failed() ? CC_ERROR : CC_DEFAULT, "testfiltr: vlak {} rozkaz {} - filtr nakladu na {} {}.",
+					t->unitnumber, i, (int)(int32_t)cargo, r.Failed() ? "SELHAL" : "nastaven");
+			return true;
+		}
+	}
+	IConsolePrint(CC_ERROR, "testfiltr: zadny vlak nema rozkaz jet se spojit.");
+	return true;
+}
+
+/**
  * Print where every train stands right now, for reading a headless run.
  * @copydoc IConsoleCmdProc
  */
@@ -4646,6 +4687,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
+	IConsole::CmdRegister("testfiltr",               ConTestCoupleFilter);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);

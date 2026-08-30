@@ -781,6 +781,40 @@ každý na svou mašinku, a jeden volný); „sbírej 6" → první vezme 5+1
 **napříč dvěma řadami**, druhá čeká; „sbírej 20" → nikdo nevezme nic
 a nic se v depu ani nepřeskládá.
 
+## 2.16 Změna filtru se musí projevit hned
+
+**Hráčovo hlášení:** filtr nastavený špatně (vagonky na zrní, v depu jsou
+uhelné) mašinku zastaví — a **když ho hráč opraví na uhlí, už to
+nezabere.**
+
+Příčina: `v->current_order` je **kopie** rozkazu pořízená ve chvíli, kdy
+se rozkaz stal aktuálním. Úprava rozkazu v seznamu tu kopii nemění.
+`CmdModifyOrder` už kopii dorovnával — ale **jen u rozkazu na nádraží**;
+u rozkazu do depa přenášel jedinou věc, otáčení v depu. Filtry a
+„připojit" tam nebyly vůbec. Mašinka tedy do konce hry četla filtr, se
+kterým do depa dorazila.
+
+Zvenku to nejde poznat: vlak čekající na špatnou věc a vlak čekající na
+správnou věc, která tam není, vypadají úplně stejně.
+
+**Opraveno** — rozkaz do depa dorovnává totéž co rozkaz na nádraží. A ke
+všemu: **když se změní popis toho, co se má sebrat, pustí se už zabraná
+řada a volba se udělá znovu.** Filtr říká, co sebrat; když se změní,
+musí se odpověď spočítat nanovo, jinak vlak dál veze to, co mu hráč
+právě zakázal.
+
+Scény: `filtrspatny` (špatný filtr, nikdy neopraven → 0 spojení, čeká) a
+`filtropraveny` (špatný filtr, po chvíli opraven → sebere hned).
+
+**Řádek rozkazu čte v pořadí, v jakém se to opravdu dělá.** Bylo
+„(jet se spojit) … (a nechat si 1)", je „(nechat si 1) (a připojit)".
+Napřed nechat, pak vzít — jak by to dělal hráč rukou. Slovo *připojit*
+místo *jet se spojit*, protože v depu se nikam nejede.
+
+---
+
+## 2.15b Poznámka k rigu
+
 **Dvě chyby, které si ta scéna sama na sobě našla.** Vagon postavený
 v depu se sám připojí k volné řadě svého druhu, která tam už stojí
 (`FindGoodVehiclePos()`), a **žádný příkaz volnou řadu nerozdělí** —

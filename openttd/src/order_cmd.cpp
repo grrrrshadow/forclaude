@@ -1629,8 +1629,30 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * its way still takes effect on this trip rather than the next
 			 * one. See FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (sel_ord == u->cur_real_order_index && u->type == VehicleType::Train) {
+				/* Whether the description of what to collect has changed. Asked
+				 * before anything is copied over, because the copy is what the
+				 * question is about. */
+				bool wanted_changed = u->current_order.ShouldGoToCouple() != order->ShouldGoToCouple() ||
+						u->current_order.GetCoupleLoad() != order->GetCoupleLoad() ||
+						u->current_order.GetCoupleCargo() != order->GetCoupleCargo() ||
+						u->current_order.GetCoupleCount() != order->GetCoupleCount();
+
 				if (u->current_order.IsType(OT_GOTO_DEPOT) && order->IsType(OT_GOTO_DEPOT)) {
 					u->current_order.SetTurnAroundInDepot(order->ShouldTurnAroundInDepot());
+					/* And the collecting half of a depot order, for the same
+					 * reason as the station one below -- which it did not have,
+					 * and the hole showed: a train standing in a shed waiting
+					 * for wagons its filter does not match went on waiting for
+					 * ever after the filter was put right, because the filter it
+					 * was reading was the copy taken when the order came up.
+					 * Nothing said so, because from outside a train waiting for
+					 * the wrong thing and a train waiting for the right thing
+					 * that is not there look identical. */
+					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
+					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
+					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
+					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
+					u->current_order.SetCoupleCount(order->GetCoupleCount());
 				} else if ((u->current_order.IsType(OT_GOTO_STATION) || u->current_order.IsType(OT_LOADING)) && order->IsType(OT_GOTO_STATION)) {
 					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
 					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
@@ -1639,6 +1661,21 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
 					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
 					u->current_order.SetCoupleCount(order->GetCoupleCount());
+				}
+
+				/* A rake already spoken for was chosen against the old
+				 * description, so it is let go and the choice made again. The
+				 * filter says what to fetch; change it and the answer has to be
+				 * worked out afresh, or the train goes on fetching what the
+				 * player has just told it not to. */
+				Train *t = Train::From(u);
+				if (wanted_changed && t->couple_target != VehicleID::Invalid()) {
+					Train *claimed = Train::GetIfValid(t->couple_target);
+					if (claimed != nullptr && claimed->couple_claim == t->index) {
+						claimed->couple_claim = VehicleID::Invalid();
+						MarkCoupleClaimChanged(claimed);
+					}
+					t->couple_target = VehicleID::Invalid();
 				}
 			}
 

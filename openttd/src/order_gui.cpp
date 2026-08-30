@@ -395,9 +395,15 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			}
 
 			/* A depot order that collects or puts down reads it off its own
-			 * line, same as a station order does. */
+			 * line, same as a station order does -- but in the order the work
+			 * is really done in, which is the order the player would do it in
+			 * by hand: leave first, then take on. */
+			if (!timetable && v->type == VehicleType::Train && order->GetDecoupleCount() != 0) {
+				line += GetString(STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+			}
 			if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
-				line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+				bool after_decouple = !timetable && order->GetDecoupleCount() != 0;
+				line += GetString(after_decouple ? STR_ORDER_DEPOT_COUPLE_SUFFIX_AND : STR_ORDER_DEPOT_COUPLE_SUFFIX);
 				if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
 					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
 				}
@@ -407,9 +413,6 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				if (order->GetCoupleCount() != 0) {
 					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
 				}
-			}
-			if (!timetable && v->type == VehicleType::Train && order->GetDecoupleCount() != 0) {
-				line += GetString(STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 			}
 
 			break;
