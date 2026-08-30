@@ -749,6 +749,16 @@ public:
 					this->Close();
 					LoadTownData();
 				} else if (!_load_check_data.HasNewGrfs() || _load_check_data.grf_compatibility != GRFListCompatibility::NotFound || _settings_client.gui.UserIsAllowedToChangeNewGRFs()) {
+					/* Hand the choice to the load itself, and only here, where
+					 * a load is really about to be asked for -- the branches
+					 * above load something else entirely, and falling through
+					 * all of them loads nothing at all, in which case a choice
+					 * written down would still be sitting there waiting to be
+					 * spent on whatever got loaded next. */
+					{
+						extern bool _sl_legacy_decouple_import;
+						_file_to_saveload.legacy_decouple_import = _sl_legacy_decouple_import;
+					}
 					_switch_mode = (_game_mode == GameMode::Editor) ? SwitchMode::LoadScenario : SwitchMode::LoadGame;
 					ClearErrorMessages();
 					this->Close();

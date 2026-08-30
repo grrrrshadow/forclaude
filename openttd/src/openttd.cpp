@@ -943,7 +943,21 @@ bool SafeLoad(const std::string &filename, SaveLoadOperation fop, DetailedFileTy
 
 	_game_mode = newgm;
 
-	SaveLoadResult result = (lf == nullptr) ? SaveOrLoad(filename, fop, dft, subdir) : LoadWithFilter(std::move(lf));
+	/* A legacy import is asked for one file and answered once. Taken off the
+	 * request here rather than left standing, because this very function
+	 * falls back to loading the intro game when a load fails -- an ordinary
+	 * modern save that must be read whole, vehicles and all, and would come
+	 * up empty if the request were still in force when it got here. See the
+	 * comment on _sl_legacy_decouple_import (saveload.cpp). */
+	bool legacy_import = _file_to_saveload.legacy_decouple_import;
+	_file_to_saveload.legacy_decouple_import = false;
+
+	SaveLoadResult result;
+	{
+		extern bool _sl_legacy_decouple_import;
+		AutoRestoreBackup legacy_import_backup(_sl_legacy_decouple_import, legacy_import);
+		result = (lf == nullptr) ? SaveOrLoad(filename, fop, dft, subdir) : LoadWithFilter(std::move(lf));
+	}
 	if (result == SaveLoadResult::Ok) return true;
 
 	if (_network_dedicated && ogm == GameMode::Menu) {

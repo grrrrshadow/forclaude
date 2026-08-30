@@ -535,27 +535,34 @@ static bool ConCztrTest(std::span<std::string_view> argv)
  */
 static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
 {
-	extern bool _sl_legacy_decouple_import;
-
 	if (argv.empty()) {
 		IConsolePrint(CC_HELP, "Import an old foreign-fork save's map and infrastructure, discarding its vehicles.");
 		IConsolePrint(CC_HELP, "Usage: 'legacyimport' to flip it, or 'legacyimport on' / 'legacyimport off', then 'load <file>'.");
 		return true;
 	}
 
+	/* This marks the request, not the reading -- the same thing the file
+	 * window's checkbox marks when Load is pressed, and spent the same way,
+	 * on the one load that follows. Emphatically not the live flag itself
+	 * (_sl_legacy_decouple_import): left standing, that outlives the load it
+	 * was meant for and is still in force when a failed load falls back to
+	 * reading the intro game, which then comes up with no vehicles in it.
+	 * Measured, not guessed -- the rig caught exactly that. */
+	bool &want = _file_to_saveload.legacy_decouple_import;
+
 	if (argv.size() >= 2) {
 		if (argv[1] == "on" || argv[1] == "1") {
-			_sl_legacy_decouple_import = true;
+			want = true;
 		} else if (argv[1] == "off" || argv[1] == "0") {
-			_sl_legacy_decouple_import = false;
+			want = false;
 		} else {
 			return false;
 		}
 	} else {
-		_sl_legacy_decouple_import = !_sl_legacy_decouple_import;
+		want = !want;
 	}
 
-	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", _sl_legacy_decouple_import ? "ON - vehicles will be discarded on next load" : "off");
+	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", want ? "ON - vehicles will be discarded on next load" : "off");
 	return true;
 }
 

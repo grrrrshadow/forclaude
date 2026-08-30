@@ -436,6 +436,18 @@ struct FileToSaveLoad {
 	FiosType ftype;                  ///< File type.
 	std::string name;                ///< Name of the file.
 	EncodedString title;             ///< Internal name of the game.
+	/**
+	 * Whether this particular load was asked for as a legacy import; see the
+	 * comment on _sl_legacy_decouple_import (saveload.cpp).
+	 *
+	 * The answer belongs here, with the rest of "what was asked for", because
+	 * of when it is needed. Pressing Load in the file window does not load
+	 * anything: it writes down what to load and closes, and the reading
+	 * happens later, from the main loop (SwitchToMode()). A choice left
+	 * anywhere else is a choice made in a window that is gone by the time
+	 * anyone asks.
+	 */
+	bool legacy_decouple_import = false;
 
 	void SetMode(const FiosType &ft, SaveLoadOperation fop = SaveLoadOperation::Load);
 	void Set(const FiosItem &item);
