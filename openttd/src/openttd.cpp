@@ -841,6 +841,26 @@ static void OnStartScenario()
  * Triggers everything that should be triggered when starting a game.
  * @param dedicated_server Whether this is a dedicated server or not.
  */
+/**
+ * Write a heading into the console saying a game just began, and how.
+ *
+ * The console log is read back after the fact -- saved whole with the
+ * 'vlaksav' command and gone through line by line to work out what a train
+ * did. Without this, one game's lines run straight into the next one's with
+ * nothing between them: the reader cannot tell where the game he is looking
+ * at started, which trains are the same trains, or whether the number he is
+ * chasing belongs to this game at all. So every start says so, loudly enough
+ * to find by eye when scrolling.
+ *
+ * @param what what kind of start this is, already in words.
+ */
+static void LogGameStart(std::string_view what)
+{
+	IConsolePrint(CC_WHITE, "==========================================================");
+	IConsolePrint(CC_WHITE, "=== {} ===", what);
+	IConsolePrint(CC_WHITE, "==========================================================");
+}
+
 static void OnStartGame(bool dedicated_server)
 {
 	/* Update the local company for a loaded game. It is either the first available company
@@ -855,6 +875,10 @@ static void OnStartGame(bool dedicated_server)
 
 static void MakeNewGameDone()
 {
+	/* Before anything else this start does, and on every path out of here --
+	 * a headless server takes an early one a few lines down. */
+	LogGameStart("NOVA HRA");
+
 	SettingsDisableElrail(_settings_game.vehicle.disable_elrails);
 
 	/* In a dedicated server, the server does not play */
@@ -1114,6 +1138,7 @@ void SwitchToMode(SwitchMode new_mode)
 			if (!SafeLoad(_file_to_saveload.name, _file_to_saveload.file_op, _file_to_saveload.ftype.detailed, GameMode::Normal, Subdirectory::None)) {
 				ShowErrorMessage(GetSaveLoadErrorType(), GetSaveLoadErrorMessage(), WarningLevel::Critical);
 			} else {
+				LogGameStart(fmt::format("NACTENA HRA: {}", _file_to_saveload.name));
 				if (_file_to_saveload.ftype.abstract == AbstractFileType::Scenario) {
 					OnStartScenario();
 				}
@@ -1148,6 +1173,7 @@ void SwitchToMode(SwitchMode new_mode)
 
 		case SwitchMode::LoadScenario: { // Load scenario from scenario editor
 			if (SafeLoad(_file_to_saveload.name, _file_to_saveload.file_op, _file_to_saveload.ftype.detailed, GameMode::Editor, Subdirectory::None)) {
+				LogGameStart(fmt::format("NACTEN SCENAR: {}", _file_to_saveload.name));
 				SetLocalCompany(OWNER_NONE);
 				GenerateSavegameId();
 				_settings_newgame.game_creation.starting_year = TimerGameCalendar::year;

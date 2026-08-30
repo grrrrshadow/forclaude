@@ -645,12 +645,14 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool timetabled = false;
 	bool blocked = false;
 	bool tow_mode = false;
+	bool counted = false;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
 		if (argv[i] == "blok") blocked = true;
 		if (argv[i] == "vlek") tow_mode = true;
+		if (argv[i] == "pocet") counted = true;
 	}
 
 	/* A headless newgame (null video driver has no GUI) starts like a
@@ -915,6 +917,10 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	if (depot_mode) {
 		collect.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 		collect.SetGoToCouple(true);
+		/* 'pocet' adds the wagon-count filter the player's own collect order
+		 * carries and the plain scene never exercised. The deliverer above
+		 * stores exactly three wagons, so this asks for what is really there. */
+		if (counted) collect.SetCoupleCount(3);
 	} else {
 		collect.MakeGoToStation(st_id);
 		collect.SetLoadType(OrderLoadType::NoLoad);

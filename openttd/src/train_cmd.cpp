@@ -4132,14 +4132,21 @@ static void TryCoupleAtDepot(Train *engine, Train *rake)
 
 	engine->ConsistChanged(CCF_TRACK);
 
-	/* An engine that drove in leading with its head is now the "driven in
-	 * whole" train, and the reference picture is that train turned round. One
-	 * that backed in is already standing turned -- its trailing end is the
-	 * door end -- so for it there is nothing left to do. Either way the wagons
-	 * end up on the door side and come out first. */
-	if (!engine->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
-		if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: zmenen vedouci konec - spojeni v depu (vagonky ke dverim)", engine->unitnumber);
-		TurnTrainInsideDepot(engine);
+	/* Which end leads is not touched here, and that is the whole rule: the
+	 * wagons go on the engine's back, and the train leaves the way it came
+	 * in. Drove in nose first, it pulls out nose first with the engine at
+	 * the head; backed in, it backs out with the wagons at the head and the
+	 * engine last. Exactly a train standing in a shed with the turn-round
+	 * button pressed -- which is the thing every player already knows, so it
+	 * is the thing this should feel like.
+	 *
+	 * It used to force the train round so the wagons always stood at the
+	 * door and always came out first. That is a decision about which way a
+	 * train faces, and nothing here has any business making it: the driver
+	 * decided that when he chose which way to drive in. */
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: spojeno v depu - vagonky na zada, vede {}", engine->unitnumber,
+				engine->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "zadek (couva, vagonky prvni)" : "masinka (jede predkem)");
 	}
 
 	/* An engine that arrived here on its couple order had that order concluded
@@ -7710,11 +7717,69 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			 * sharing a depot with a fourth that had no rake yet crashed exactly
 			 * this way: the empty one kept wiping the mouth clean behind each one
 			 * that reserved it, and two of them met on the doorstep. */
-			if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
-				if (_show_train_orientation) {
-					IConsolePrint(CC_INFO, "Vlak {}: drzi bez cile - rezervace zahozena, na ({},{})",
+			/* Said seldom, and said once. A train with nothing to fetch waits
+			 * for as long as that stays true, which is often the rest of the
+			 * game; at the rate the track was being let go, that filled the
+			 * console with the same line over and over and buried everything
+			 * worth reading between the repeats. And the repeated line said
+			 * only that there was a reason, never what it was -- while "the
+			 * rake is not in that shed" is exactly the thing a player cannot
+			 * check from outside, because an empty shed and a shed holding
+			 * the wrong wagons look identical from the track. So: one line,
+			 * rarely, carrying the whole reason. */
+			if (_show_train_orientation) {
+				std::string say;
+				const Depot *depot = consist->current_order.IsType(OT_GOTO_DEPOT) ?
+						Depot::GetIfValid(consist->current_order.GetDestination().ToDepotID()) : nullptr;
+				if (consist->current_order.IsType(OT_GOTO_DEPOT) && depot == nullptr) {
+					say = fmt::format("Vlak {}: ceka na ({},{}) - rozkaz jet se spojit ukazuje na depo, ktere neexistuje",
+							consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
+				} else if (depot != nullptr) {
+					std::string what;
+					for (const Train *rake : Train::Iterate()) {
+						if (rake == consist || rake->owner != consist->owner) continue;
+						if (rake->track != Track::Depot || rake->tile != depot->xy) continue;
+						if (!rake->IsFreeWagon()) continue;
+						uint units = 0;
+						for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) units++;
+						if (!what.empty()) what += ", ";
+						what += fmt::format("rada o {} vozech{}", units,
+								rake->couple_claim == VehicleID::Invalid() ? "" :
+								(rake->couple_claim == consist->index ? " (moje)" : " (uz zabrana jinym vlakem)"));
+					}
+					uint wanted = consist->current_order.GetCoupleCount();
+					if (what.empty()) {
+						say = fmt::format("Vlak {}: ceka na ({},{}) - v depu ({},{}) nejsou zadne odlozene vagonky",
+								consist->unitnumber, TileX(consist->tile), TileY(consist->tile),
+								TileX(depot->xy), TileY(depot->xy));
+					} else {
+						say = fmt::format("Vlak {}: ceka na ({},{}) - v depu ({},{}) je {}; rozkaz chce {}",
+								consist->unitnumber, TileX(consist->tile), TileY(consist->tile),
+								TileX(depot->xy), TileY(depot->xy), what,
+								wanted == 0 ? std::string("cokoli") : fmt::format("presne {} vozu", wanted));
+					}
+				} else {
+					say = fmt::format("Vlak {}: ceka na ({},{}) - na stanici nejsou zadne vagonky, pro ktere by mohl jet",
 							consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
 				}
+
+				/* Only when it is news. A train with nothing to fetch waits
+				 * for as long as that stays true, which is regularly the rest
+				 * of the game -- printed on a timer, the same sentence buries
+				 * everything else in the log. Printed on change, it says the
+				 * reason once, and says it again the moment the reason is a
+				 * different one. (Only the console is written here, never any
+				 * game state, so remembering this outside the savegame is
+				 * safe -- reload and the reason simply gets said once more.) */
+				static std::map<VehicleID, std::string> last_said;
+				std::string &prev = last_said[consist->index];
+				if (prev != say) {
+					prev = say;
+					IConsolePrint(CC_WARNING, "{}", say);
+				}
+			}
+
+			if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
 				FreeTrainTrackReservation(consist);
 				consist->ReserveTrackUnderConsist();
 			}
