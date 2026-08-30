@@ -2032,6 +2032,30 @@ běží nepodmíněně na konci `AfterLoadGame()`. Nula tedy znamená: **hra
 spadla ještě před ním**, uvnitř načítání, ne až v prvním tiku hry. To
 zároveň vylučovalo seznam nakládajících vozidel, který se čte až za běhu.
 
+## 17.3 Čudlík přenosu: celý mačkací, nad stahováním obsahu
+
+Byl to úzký zaškrtávací řádek pod tlačítkem „hledat chybějící obsah
+on-line" a nesl jednu zkratkovitou větu. Teď:
+
+- **stojí nad** stahováním obsahu — patří k save, který je zrovna
+  vybraný, ne k nastavení hry, a je to jediná věc v tom okně, kterou
+  hráč musí najít, aniž by mu někdo řekl, že tam je;
+- je **celý mačkací a tak vysoký, jak je potřeba** — text si kreslí sám
+  (`DrawWidget`) a láme se přes tolik řádků, kolik zabere. Jednořádkový
+  popisek by musel být krátký, a tím i zašifrovaný;
+- **zapnuto** = zamáčknuté tlačítko a oranžový text. Obě znění jsou
+  **stejně dlouhá schválně**: čudlík, který by při zmáčknutí změnil
+  výšku, by odsunul všechno pod sebou zpod prstu, který ho zmáčkl;
+- **zatmavený, když to není starý save.** Nabízet přenos na cokoli
+  jiného znamená nabízet vyhození vozidel ze save, který by se načetl
+  úplně v pohodě. Kterou hrou byl soubor psaný, je jen v jeho vlastním
+  gamelogu (`Gamelog::Info()` → poslední zápis o revizi); nic jiného
+  v souboru to neříká. Naměřeno: `testold.sav` psán verzí `0x19000000`,
+  naše `0x20006d64` → jde zmáčknout; naše vlastní savy `0x20006d64` →
+  zatmavený.
+
+---
+
 ## 17.2 Skutečná příčina: rozdělaná platba bez vozidla
 
 Build #113 už nesl stopu z tématu 17.1 a crash log poprvé řekl kde:

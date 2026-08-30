@@ -3559,8 +3559,8 @@ STR_SAVELOAD_LOAD_BUTTON                                        :{BLACK}Nahrát
 STR_SAVELOAD_LOAD_TOOLTIP                                       :{BLACK}Rozehrát vybranou hru
 STR_SAVELOAD_LOAD_HEIGHTMAP_TOOLTIP                             :{BLACK}Načíst označenou výškovou mapu
 STR_SAVELOAD_LOAD_TOWN_DATA_TOOLTIP                             :{BLACK}Načíst data vybraného města
-STR_SAVELOAD_LEGACY_IMPORT_OFF                                  :{BLACK}[ ] Import staré hry: jen vzhled hrací plochy, bez vozidel
-STR_SAVELOAD_LEGACY_IMPORT_ON                                   :{BLACK}[X] Import staré hry: jen vzhled hrací plochy, bez vozidel
+STR_SAVELOAD_LEGACY_IMPORT_OFF                                  :{BLACK}přenést svět ze starého save decouple 0.10.4, importuje se jen vzhled hrací plochy - mapa a infrastruktura bez dopravních prostředků
+STR_SAVELOAD_LEGACY_IMPORT_ON                                   :{ORANGE}přenést svět ze starého save decouple 0.10.4, importuje se jen vzhled hrací plochy - mapa a infrastruktura bez dopravních prostředků
 STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP                              :{BLACK}Pro starou hru, kterou tahle verze jinak neotevře: převezme se jen vzhled hrací plochy přesně tak, jak stojí - terén, města, stanice - bez vozidel a bez ekonomiky, jako by bylo právě nově postavené. Zapni tohle a zkus Načíst znovu.
 STR_SAVELOAD_DETAIL_CAPTION                                     :{BLACK}Vlastnosti hry
 STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Uloženo: {STRING}

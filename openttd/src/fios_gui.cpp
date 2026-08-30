@@ -30,6 +30,8 @@
 #include "stringfilter_type.h"
 #include "misc_cmd.h"
 #include "gamelog_internal.h"
+#include "rev.h"
+#include "zoom_func.h"
 
 #include "widgets/fios_widget.h"
 
@@ -137,8 +139,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_load_dialog_widgets 
 		NWidget(NWID_VERTICAL),
 			NWidget(WWT_PANEL, Colours::Grey, WID_SL_DETAILS), SetResize(1, 1), SetFill(1, 1),
 			EndContainer(),
+			/* Above the online-content button, because it belongs to the save
+			 * that is selected right now rather than to the game's own set-up,
+			 * and because it is the one thing in this window a player has to
+			 * find without being told it is there. It carries its whole
+			 * explanation on its face, over as many lines as that takes, which
+			 * is why it draws its own text (see DrawWidget) instead of taking a
+			 * one-line label. */
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_SL_LEGACY_IMPORT), SetStringTip(STR_EMPTY, STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SL_MISSING_NEWGRFS), SetStringTip(STR_NEWGRF_SETTINGS_FIND_MISSING_CONTENT_BUTTON, STR_NEWGRF_SETTINGS_FIND_MISSING_CONTENT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_SL_LEGACY_IMPORT), SetStringTip(STR_SAVELOAD_LEGACY_IMPORT_OFF, STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 					NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_SL_NEWGRF_INFO), SetStringTip(STR_MAPGEN_NEWGRF_SETTINGS, STR_MAPGEN_NEWGRF_SETTINGS_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
@@ -520,18 +529,28 @@ public:
 		this->Window::Close();
 	}
 
-	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	/**
+	 * What the import button says right now.
+	 * @return the whole sentence, in the wording for on or for off.
+	 */
+	static StringID LegacyImportString()
 	{
-		if (widget == WID_SL_LEGACY_IMPORT) {
-			extern bool _sl_legacy_decouple_import;
-			return GetString(_sl_legacy_decouple_import ? STR_SAVELOAD_LEGACY_IMPORT_ON : STR_SAVELOAD_LEGACY_IMPORT_OFF);
-		}
-		return this->Window::GetWidgetString(widget, stringid);
+		extern bool _sl_legacy_decouple_import;
+		return _sl_legacy_decouple_import ? STR_SAVELOAD_LEGACY_IMPORT_ON : STR_SAVELOAD_LEGACY_IMPORT_OFF;
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		switch (widget) {
+			case WID_SL_LEGACY_IMPORT:
+				/* The whole button is the sentence, wrapped over as many lines
+				 * as it needs. A one-line label would have to be short enough
+				 * to be cryptic, and this is the one control here whose meaning
+				 * cannot be guessed from a few words. */
+				DrawStringMultiLine(r.Shrink(WidgetDimensions::scaled.framerect), LegacyImportString(),
+						TextColour::FromString, AlignmentH::Centre);
+				break;
+
 			case WID_SL_SORT_BYNAME:
 			case WID_SL_SORT_BYDATE:
 				if ((_savegame_sorter == SavegameSorter::Name) == (widget == WID_SL_SORT_BYNAME)) {
@@ -693,6 +712,21 @@ public:
 				fill.height = resize.height = GetCharacterHeight(FontSize::Normal);
 				size.height = resize.height * 10 + padding.height;
 				break;
+
+			case WID_SL_LEGACY_IMPORT: {
+				/* Tall enough for the whole sentence at the width the details
+				 * panel is happy with. Measured at a fixed width rather than at
+				 * whatever this widget ends up being: the widget stretches, and
+				 * a height worked out from a wider box would come up short the
+				 * moment the window was made narrow again. Wider than measured
+				 * simply leaves a little room over. */
+				uint width = ScaleGUITrad(260);
+				Dimension d = GetStringMultiLineBoundingBox(LegacyImportString(), {width, 0});
+				d.width = width + padding.width;
+				d.height += padding.height;
+				size = maxdim(size, d);
+				break;
+			}
 			case WID_SL_SORT_BYNAME:
 			case WID_SL_SORT_BYDATE: {
 				Dimension d = GetStringBoundingBox(this->GetWidget<NWidgetCore>(widget)->GetString());
@@ -794,6 +828,11 @@ public:
 					_load_check_data.Clear();
 					SaveOrLoad(this->selected->name, SaveLoadOperation::Check, DetailedFileType::GameFile, Subdirectory::None, false);
 				}
+				/* On shows as pressed in, and the sentence goes orange. Both
+				 * wordings are the same length on purpose: a button that changed
+				 * height when it was clicked would move everything under it out
+				 * from under the finger that clicked it. */
+				this->SetWidgetLoweredState(WID_SL_LEGACY_IMPORT, _sl_legacy_decouple_import);
 				this->SetWidgetDirty(WID_SL_LEGACY_IMPORT);
 				this->InvalidateData(SLIWD_SELECTION_CHANGES);
 				break;
@@ -1012,6 +1051,18 @@ public:
 						this->SetWidgetDisabledState(WID_SL_NEWGRF_INFO, !_load_check_data.HasNewGrfs());
 						this->SetWidgetDisabledState(WID_SL_MISSING_NEWGRFS,
 								!_load_check_data.HasNewGrfs() || _load_check_data.grf_compatibility == GRFListCompatibility::AllGood);
+
+						/* The import is for a save written by an older game than
+						 * this one. Offered on anything else it is an offer to
+						 * throw the vehicles out of a save that would have loaded
+						 * perfectly well. Which game wrote it is only in the
+						 * file's own gamelog; nothing else in it says so. */
+						uint32_t saved_by = 0;
+						uint8_t ever_modified = 0;
+						bool removed_newgrfs = false;
+						_load_check_data.gamelog.Info(&saved_by, &ever_modified, &removed_newgrfs);
+						this->SetWidgetDisabledState(WID_SL_LEGACY_IMPORT,
+								this->selected == nullptr || saved_by == 0 || saved_by >= _openttd_newgrf_version);
 						break;
 					}
 

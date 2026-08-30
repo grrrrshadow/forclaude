@@ -3476,8 +3476,8 @@ STR_SAVELOAD_LOAD_BUTTON                                        :{BLACK}Load
 STR_SAVELOAD_LOAD_TOOLTIP                                       :{BLACK}Load the selected game
 STR_SAVELOAD_LOAD_HEIGHTMAP_TOOLTIP                             :{BLACK}Load the selected heightmap
 STR_SAVELOAD_LOAD_TOWN_DATA_TOOLTIP                             :{BLACK}Load the selected town data
-STR_SAVELOAD_LEGACY_IMPORT_OFF                                  :{BLACK}[ ] Import old save: playing field's look only, no vehicles
-STR_SAVELOAD_LEGACY_IMPORT_ON                                   :{BLACK}[X] Import old save: playing field's look only, no vehicles
+STR_SAVELOAD_LEGACY_IMPORT_OFF                                  :{BLACK}Bring the world across from an old decouple 0.10.4 save. Only the look of the playing field is imported - the map and the infrastructure, without vehicles
+STR_SAVELOAD_LEGACY_IMPORT_ON                                   :{ORANGE}Bring the world across from an old decouple 0.10.4 save. Only the look of the playing field is imported - the map and the infrastructure, without vehicles
 STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP                              :{BLACK}For a save this build cannot otherwise open: bring in only the look of the playing field, exactly as it stands - terrain, towns, stations - with no vehicles and no economy, as if everything had just been newly built. Turn this on, then try Load again.
 STR_SAVELOAD_DETAIL_CAPTION                                     :{BLACK}Game Details
 STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Saved: {RAW_STRING}
