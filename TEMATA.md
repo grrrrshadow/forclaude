@@ -1960,12 +1960,51 @@ doložený z kódu, ne z běhu.
 
 **A pád to nebyl.** Build #112 s tou opravou spadl na stejném save znovu,
 stejně (`crash20260830150239`). Ta díra v seznamu je skutečná chyba
-a opravená zůstává, ale příčina pádu leží jinde — a **v obou crash
+a opravená zůstává, ale příčina pádu ležela jinde — a **v obou crash
 lozích má firma všechny počty infrastruktury na nule.** Ty se
 přepočítávají z mapy v `AfterLoadCompanyStats()` (company_sl.cpp), který
 běží nepodmíněně na konci `AfterLoadGame()`. Nula tedy znamená: **hra
 spadla ještě před ním**, uvnitř načítání, ne až v prvním tiku hry. To
-zároveň vylučuje seznam nakládajících vozidel, který se čte až za běhu.
+zároveň vylučovalo seznam nakládajících vozidel, který se čte až za běhu.
+
+## 17.2 Skutečná příčina: rozdělaná platba bez vozidla
+
+Build #113 už nesl stopu z tématu 17.1 a crash log poprvé řekl kde:
+
+```
+"stage": "afterload: ClearOldOrders"
+```
+
+`ClearOldOrders()` sama je dva řádky a spadnout nemůže. Hned za ní je
+ale v `AfterLoadGame()` tohle, **nepodmíněně, bez ohledu na verzi save**:
+
+```cpp
+/* Fix the cache for cargo payments. */
+for (CargoPayment *cp : CargoPayment::Iterate()) {
+    cp->front->cargo_payment = cp;
+    cp->current_station = cp->front->last_station_visited;
+}
+```
+
+`CargoPayment::front` je odkaz na vozidlo
+(`SLE_REF(CargoPayment, front, SLRefType::Vehicle)`). Rozdělaná platba
+vznikne, když vozidlo začne vykládat, a zavře se, až doloží; **v rozehrané
+hře jich je otevřených plno.** Přenos vozidla přeskakuje, takže každé
+`front` vyjde na nic — a tenhle řádek do toho nic okamžitě zapisuje.
+Sáhnutí na nulovou adresu uprostřed načítání.
+
+To vysvětluje i to, proč testovací save bez GRF jde načíst: **na klidné
+zkušební mapě nikdo nic nevykládal**, takže tam žádná rozdělaná platba
+není (naměřeno: 0). Rozdíl nikdy nebyly GRF.
+
+**Oprava:** úklid po přenosu se rozdělil na dvě půlky, protože jsou
+potřeba ve dvou různých okamžicích. Co je viset zůstalé **jméno**
+(seznamy nakládajících vozidel, rozdělané platby) musí ven **dřív, než
+se rozběhne jediný řádek obyčejného dodělávání po načtení** — hned na
+začátku `AfterLoadGame()`. Co je stav mapy (rezervace, obsazená stání na
+letištích, závory) může počkat, až se mapa dopřevede do dnešní podoby,
+a zůstává na konci. Můj původní úklid dělal obojí najednou a byl až na
+konci — tedy **o dva tisíce řádků později, než ta smyčka**.
 
 ## 17.1 Crash log se u nás píše vždycky, a říká, kde byl kód
 

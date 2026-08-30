@@ -577,30 +577,51 @@ static void StartScripts()
  * good, and the player finds out weeks later that a junction nothing is
  * standing on will not let anything through.
  *
- * So the leftovers go out here, all of them, at the one moment when it is
- * certain that no vehicle exists to miss them.
+ * The work is in two halves because they are wanted at two different moments.
+ * Anything that is a dangling *name* has to go before a single line of the
+ * ordinary post-load fixing runs, because that fixing walks straight into
+ * them; anything that is map state can wait until the map has finished being
+ * converted into its modern shape.
  */
-static void AfterLoadLegacyDecoupleImport()
+static void AfterLoadLegacyDecoupleImportReferences()
 {
 	size_t cleared_loading = 0;
-	size_t cleared_reservations = 0;
 	const size_t cleared_payments = CargoPayment::GetNumItems();
 
+	/* Vehicles standing at the platforms loading. */
 	for (Station *st : Station::Iterate()) {
-		/* Vehicles standing at the platforms loading. */
 		cleared_loading += st->loading_vehicles.size();
 		st->loading_vehicles.clear();
-		/* Airport stands and taxiways held by aircraft that were not imported;
-		 * left set, an airport quietly refuses to handle any plane built later. */
-		st->airport.blocks = {};
 	}
 
 	/* A payment is opened when a vehicle starts unloading and closed when it
 	 * finishes. Every one of these belongs to a vehicle that is not here. The
 	 * pool is emptied rather than the items deleted one by one, because the
 	 * destructor reaches back through the vehicle to pay the company -- and
-	 * only the pool clean-up tells it not to. */
+	 * only the pool clean-up tells it not to.
+	 *
+	 * This is the one that has to happen early, and the reason the whole
+	 * function was split. A few dozen lines into AfterLoadGame() there is an
+	 * unconditional "fix the cache for cargo payments" loop that does
+	 * cp->front->cargo_payment = cp for every payment in the pool -- and
+	 * cp->front is the vehicle, which under an import is nothing at all. That
+	 * loop was the player's crash, found by the whereabouts marker the report
+	 * now carries: "afterload: ClearOldOrders", which is the marker set
+	 * immediately before it. */
 	_cargo_payment_pool.CleanPool();
+
+	IConsolePrint(CC_INFO, "Prenos stare hry: zahozeno {} nakladajicich vozidel na nadrazich, {} rozdelanych plateb.",
+			cleared_loading, cleared_payments);
+}
+
+/** @copydoc AfterLoadLegacyDecoupleImportReferences */
+static void AfterLoadLegacyDecoupleImportMap()
+{
+	size_t cleared_reservations = 0;
+
+	/* Airport stands and taxiways held by aircraft that were not imported;
+	 * left set, an airport quietly refuses to handle any plane built later. */
+	for (Station *st : Station::Iterate()) st->airport.blocks = {};
 
 	/* Track reserved for trains that were not imported. The same sweep the
 	 * ordinary loader does for a savegame written before path reservations
@@ -652,8 +673,7 @@ static void AfterLoadLegacyDecoupleImport()
 	/* Said out loud: this is the one place where an import throws something
 	 * away that the file really did contain, and how much there was of it is
 	 * the difference between a quiet test save and somebody's running game. */
-	IConsolePrint(CC_INFO, "Prenos stare hry: zahozeno {} nakladajicich vozidel na nadrazich, {} rezervaci koleji, {} rozdelanych plateb.",
-			cleared_loading, cleared_reservations, cleared_payments);
+	IConsolePrint(CC_INFO, "Prenos stare hry: zruseno {} rezervaci koleji.", cleared_reservations);
 }
 
 /**
@@ -665,6 +685,16 @@ bool AfterLoadGame()
 {
 	CrashLog::SetStage("afterload: SetSignalHandlers");
 	SetSignalHandlers();
+
+	/* First of all, before a single line of the ordinary post-load fixing
+	 * below: an import has left names of vehicles behind that resolve to
+	 * nothing, and that fixing walks straight into them without ever
+	 * expecting a hole. */
+	{
+		CrashLog::SetStage("afterload: legacy import references");
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImportReferences();
+	}
 
 	extern TileIndex _cur_tileloop_tile; // From landscape.cpp.
 	/* The LFSR used in RunTileLoop iteration cannot have a zeroed state, make it non-zeroed. */
@@ -3700,7 +3730,7 @@ bool AfterLoadGame()
 
 	{
 		extern bool _sl_legacy_decouple_import;
-		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImport();
+		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImportMap();
 	}
 
 	_gamelog.PrintDebug(1);
