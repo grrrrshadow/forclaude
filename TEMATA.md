@@ -1797,6 +1797,60 @@ zpětně se dopočítat nedá, ta data v nich nejsou.
 
 ---
 
+# 17. Přenos staré hry: co po vozidlech zůstane, když se vozidla nenačtou
+
+**Pád po prvním opravdovém přenosu (build #111, `EXCEPTION_ACCESS_VIOLATION`,
+`crash20260830115026`).** Hráčův testovací save se načetl, jeho skutečná
+rozehraná hra spadla pár vteřin po načtení. Rozdíl **nebyly GRF** — v crash
+logu je všech 62 „activated", mapa i datum se načetly (tik 19034) — rozdíl
+byl, že v rozehrané hře **stála vozidla na nádražích a nakládala**.
+
+Řetěz je v kódu jistý, ne odhadnutý:
+
+1. Nádraží si drží `Station::loading_vehicles` — seznam vozidel, která
+   u něj právě nakládají. Ukládá se jako `SLE_CONDREFLIST(..., Vehicle)`.
+2. Přenos vozidla **přeskakuje**, takže `IntToReference()` na každý odkaz
+   na vozidlo odpoví `nullptr`. Načítací smyčka
+   (`SlStorageHelper::SlSaveLoad`) ale seznam **nezkracuje** — vytvoří
+   tolik položek, kolik jich v souboru bylo, a pak do každé zapíše to
+   `nullptr`. Ze seznamu vozidel je seznam děr, ne prázdný seznam.
+3. `CallVehicleTicks()` volá `LoadUnloadStation()` na **každé** nádraží
+   **každý tik** a hned na prvním řádku dělá `v->vehstatus` — bez
+   kontroly na `nullptr`, protože ji tam nikdy nikdo nepotřeboval.
+
+To je sáhnutí na nulovou adresu v prvním tiku po načtení. Přesně to,
+co se stalo.
+
+**Můj vlastní komentář u té opravy tvrdil, že to je v pořádku** — že
+všechna místa, která jmenují vozidlo, si s „nic tu není" poradí, protože
+prodané vozidlo za sebou nechává stejnou díru. **Pro jedno políčko to
+platí, pro seznam ne.** Napsal jsem to jako hotový závěr, aniž bych to
+u seznamu ověřil. Komentář je opravený a říká to.
+
+**Oprava:** `AfterLoadLegacyDecoupleImport()` (afterload.cpp) uklidí po
+konci načítání všechno, co po vozidlech na mapě zbylo, v jediném
+okamžiku, kdy je jisté, že žádné vozidlo neexistuje:
+
+- `loading_vehicles` na všech nádražích,
+- `airport.blocks` — obsazená stání a pojezdovky; ponechané by letiště
+  tiše odmítalo i letadla postavená později,
+- rozdělané platby (`_cargo_payment_pool`; přes `CleanPool()`, protože
+  destruktor sahá zpátky přes vozidlo na firmu),
+- **všechny rezervace kolejí** (koleje, depa, přejezdy, nádraží, tunely
+  a mosty) a přepočet závor na přejezdech.
+
+Ty rezervace jsou to tiché a horší: kolej držená pro vlak, který se
+nikdy nenačetl, je držená napořád. **I v tom „funkčním" testovacím save
+jich zůstávalo pět.** Přenos to teď hlásí do konzole číslem, protože
+právě tohle číslo je rozdíl mezi klidným testem a rozehranou hrou.
+
+**Nereprodukováno u nás.** Ani jeden ze dvou savů, které máme, nemá na
+nádraží nic nakládajícího (naměřeno: 0), a náš vlastní save se přes
+přenos načíst nedá — přeskakování počítá s tvarem cizí větve. Řetěz je
+doložený z kódu, ne z běhu.
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich

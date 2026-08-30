@@ -45,6 +45,7 @@
 #include "../game/game.hpp"
 #include "../town.h"
 #include "../economy_base.h"
+#include "../console_func.h"
 #include "../animated_tile_map.h"
 #include "../animated_tile_func.h"
 #include "../subsidy_base.h"
@@ -551,6 +552,107 @@ static void StartScripts()
 	Game::StartNew();
 
 	ShowScriptDebugWindowIfScriptError();
+}
+
+/**
+ * Clear away everything the map still says about vehicles, after a legacy
+ * import has read the map and left the vehicles behind.
+ *
+ * See the comment on _sl_legacy_decouple_import (saveload.cpp). The import
+ * reads the land, the track and the buildings out of a foreign fork's
+ * savegame and skips its vehicles, because those are the one part that
+ * cannot be trusted to mean the same thing. What it cannot skip is the rest
+ * of the game writing about them: a station keeps a list of the vehicles
+ * standing at its platforms loading, a payment is open for every vehicle
+ * part-way through delivering a load, and every metre of track a train was
+ * standing on or driving towards is marked as reserved for it.
+ *
+ * All of that named vehicles that this game does not have, and resolving
+ * those names to "nothing" is not enough on its own. A list of nothings is
+ * still a list, and the loading code walks it every single tick without ever
+ * expecting to find a hole in it -- which is a crash on the first tick after
+ * the game appears, not a wrong number somewhere. Reservations are quieter
+ * and worse: track held for a train that was never imported is held for
+ * good, and the player finds out weeks later that a junction nothing is
+ * standing on will not let anything through.
+ *
+ * So the leftovers go out here, all of them, at the one moment when it is
+ * certain that no vehicle exists to miss them.
+ */
+static void AfterLoadLegacyDecoupleImport()
+{
+	size_t cleared_loading = 0;
+	size_t cleared_reservations = 0;
+	const size_t cleared_payments = CargoPayment::GetNumItems();
+
+	for (Station *st : Station::Iterate()) {
+		/* Vehicles standing at the platforms loading. */
+		cleared_loading += st->loading_vehicles.size();
+		st->loading_vehicles.clear();
+		/* Airport stands and taxiways held by aircraft that were not imported;
+		 * left set, an airport quietly refuses to handle any plane built later. */
+		st->airport.blocks = {};
+	}
+
+	/* A payment is opened when a vehicle starts unloading and closed when it
+	 * finishes. Every one of these belongs to a vehicle that is not here. The
+	 * pool is emptied rather than the items deleted one by one, because the
+	 * destructor reaches back through the vehicle to pay the company -- and
+	 * only the pool clean-up tells it not to. */
+	_cargo_payment_pool.CleanPool();
+
+	/* Track reserved for trains that were not imported. The same sweep the
+	 * ordinary loader does for a savegame written before path reservations
+	 * existed, for the same reason: nothing on this map is entitled to hold
+	 * any track, so none of it is held. */
+	for (auto t : Map::Iterate()) {
+		switch (GetTileType(t)) {
+			case TileType::Railway:
+				if (IsRailDepot(t)) {
+					if (HasDepotReservation(t)) cleared_reservations++;
+					SetDepotReservation(t, false);
+				} else {
+					if (GetRailReservationTrackBits(t) != TrackBits{}) cleared_reservations++;
+					SetTrackReservation(t, {});
+				}
+				break;
+
+			case TileType::Road:
+				if (IsLevelCrossing(t)) {
+					if (HasCrossingReservation(t)) cleared_reservations++;
+					SetCrossingReservation(t, false);
+				}
+				break;
+
+			case TileType::Station:
+				if (HasStationRail(t)) {
+					if (HasStationReservation(t)) cleared_reservations++;
+					SetRailStationReservation(t, false);
+				}
+				break;
+
+			case TileType::TunnelBridge:
+				if (GetTunnelBridgeTransportType(t) == TransportType::Rail) {
+					if (HasTunnelBridgeReservation(t)) cleared_reservations++;
+					SetTunnelBridgeReservation(t, false);
+				}
+				break;
+
+			default: break;
+		}
+	}
+
+	/* A crossing whose barriers came down for a train that is not here would
+	 * stay down; recomputed from what is actually on the map, which is
+	 * nothing. */
+	for (const auto tile : Map::Iterate()) {
+		if (IsLevelCrossingTile(tile)) UpdateLevelCrossing(tile, false);
+	}
+	/* Said out loud: this is the one place where an import throws something
+	 * away that the file really did contain, and how much there was of it is
+	 * the difference between a quiet test save and somebody's running game. */
+	IConsolePrint(CC_INFO, "Prenos stare hry: zahozeno {} nakladajicich vozidel na nadrazich, {} rezervaci koleji, {} rozdelanych plateb.",
+			cleared_loading, cleared_reservations, cleared_payments);
 }
 
 /**
@@ -3438,6 +3540,11 @@ bool AfterLoadGame()
 	AfterLoadLabelMaps();
 	AfterLoadCompanyStats();
 	AfterLoadStoryBook();
+
+	{
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImport();
+	}
 
 	_gamelog.PrintDebug(1);
 

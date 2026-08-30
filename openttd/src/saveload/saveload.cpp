@@ -1400,10 +1400,17 @@ static void *IntToReference(size_t index, SLRefType rt)
 	 * that names a vehicle or an order list by reference -- a station's
 	 * list of vehicles currently loading, a cargo payment's vehicle, an
 	 * order backup's clone source -- can ever find what it names either.
-	 * Every one of those is a place that already copes with "nothing here"
-	 * in the ordinary course of play (a vehicle sold mid-journey leaves
-	 * exactly this kind of gap behind it), so resolving to nothing here
-	 * is answering the question honestly, not papering over a real one. */
+	 * Answering "nothing" is the only honest answer available here.
+	 *
+	 * It is not, on its own, a safe one, and it was once written down here
+	 * as if it were. A field that holds one vehicle copes with nothing --
+	 * that is the same gap a vehicle sold mid-journey leaves behind. A
+	 * *list* of vehicles does not: it keeps its length, the holes stay in
+	 * it, and the loading machinery walks that list every tick without ever
+	 * expecting one. That is a crash on the first tick after the game
+	 * appears, and it is what took down the player's first real import.
+	 * The leftovers are therefore cleared out wholesale once the load is
+	 * finished, in AfterLoadLegacyDecoupleImport() (afterload.cpp). */
 	if (_sl_legacy_decouple_import && (rt == SLRefType::OrderList || rt == SLRefType::OldVehicle || rt == SLRefType::Vehicle)) {
 		return nullptr;
 	}
