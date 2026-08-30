@@ -1811,6 +1811,35 @@ bool IsOnRescueRun(const Train *v)
 }
 
 /**
+ * Is this engine still on its way to a casualty, as opposed to bringing one
+ * home?
+ *
+ * The two halves of a rescue are not the same journey and must not be given
+ * the same rules. Going out, the engine has to reach a train that has stopped
+ * where it stopped, which on a line worked one way means going up it against
+ * the signals -- and it pays for that by booking the whole road before it
+ * moves and stopping nowhere along it (see IsSafeWaitingPosition()).
+ *
+ * Coming back it is an ordinary train with a long load, going to a depot the
+ * ordinary way, and it must queue at signals like anything else. Left under
+ * the outward rules it could stop nowhere on the way home either: the only
+ * place it counted as safe was up against the casualty, which it already had,
+ * so on any line busy enough that the road home was not clear end to end it
+ * booked nothing and stood at the first signal for good. Which is what the
+ * player saw.
+ *
+ * @param v the engine, front of its consist
+ * @return whether the casualty is still out there rather than in hand
+ */
+bool IsFetchingCasualty(const Train *v)
+{
+	if (!IsOnRescueRun(v)) return false;
+	const Train *casualty = Train::GetIfValid(v->rescue_target);
+	/* In hand means part of this very consist. */
+	return casualty == nullptr || casualty->First() != v;
+}
+
+/**
  * Move a rake of wagons on to one of the orders it is carrying.
  *
  * A rake left at a platform carries two: the job the engine left it doing
@@ -5692,7 +5721,7 @@ void FreeTrainTrackReservation(const Train *consist)
 				/* Reservation passes an opposing path signal. Mark signal for update to re-establish the proper default state. */
 				AddSideToSignalBuffer(tile, TrackdirToExitdir(ReverseTrackdir(td)), consist->owner);
 			} else if (HasSignalOnTrackdir(tile, ReverseTrackdir(td)) && IsOnewaySignal(tile, TrackdirToTrack(td)) &&
-					!IsOnRescueRun(consist)) {
+					!IsFetchingCasualty(consist)) {
 				/* A rescue engine books its way past signals that face it (see
 				 * IsSafeWaitingPosition), so letting go has to be able to walk
 				 * the same way. Stopping here would leave every tile beyond the
@@ -5748,7 +5777,7 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 
 	TileIndex tile = origin.tile;
 	Trackdir  cur_td = origin.trackdir;
-	bool rescue_run = IsOnRescueRun(v->First());
+	bool rescue_run = IsFetchingCasualty(v->First());
 
 	while (ft.Follow(tile, cur_td)) {
 		if (ft.new_td_bits.Count() == 1) {
@@ -7187,7 +7216,7 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * track only -- a red on track it does not hold stops it
 					 * like anybody else, so this never turns into a licence to
 					 * drive through reds in general. */
-					bool rescue_on_booked_track = IsOnRescueRun(first) && HasReservedTracks(gp.new_tile, chosen_track);
+					bool rescue_on_booked_track = IsFetchingCasualty(first) && HasReservedTracks(gp.new_tile, chosen_track);
 
 					/* Check if it's a red signal and that force proceed is not clicked. */
 					if (red_signals.Any(chosen_track) && first->force_proceed == TFP_NONE && !rescue_on_booked_track) {

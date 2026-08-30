@@ -331,7 +331,7 @@ PBSTileInfo FollowTrainReservation(const Train *consist, Vehicle **train_on_res,
 	 * would read its own reservation as ending a few tiles out and set about
 	 * booking the rest all over again. */
 	ftoti.res = FollowReservation(consist->owner, GetAllCompatibleRailTypes(consist->railtypes), tile, trackdir,
-			IsOnRescueRun(consist->First()));
+			IsFetchingCasualty(consist->First()));
 	ftoti.res.okay = IsSafeWaitingPosition(consist, ftoti.res.tile, ftoti.res.trackdir, true, _settings_game.pf.forbid_90_deg);
 	if (train_on_res != nullptr) {
 		CheckTrainsOnTrack(ftoti, ftoti.res.tile);
@@ -435,7 +435,7 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * entire way before it moves at all. Refusing every intermediate stopping
 	 * place is what makes that reservation all-or-nothing. See
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
-	if (IsOnRescueRun(v->First())) {
+	if (IsFetchingCasualty(v->First())) {
 		CFollowTrackRail rescue_ft(v, GetAllCompatibleRailTypes(v->railtypes));
 		if (!rescue_ft.Follow(tile, trackdir)) return include_line_end;
 		rescue_ft.new_td_bits &= DiagdirReachesTrackdirs(rescue_ft.exitdir);

@@ -1186,6 +1186,30 @@ Naměřeno v `testodtah jednosmer`: dřív `spojeno - couva ano` a vlak
 odjel dál na východ, teď `spojeno - couva ne, celo: masinka` a odtáhne
 porouchanou zpátky na západ do depa, ze kterého vyjela.
 
+## 4.6 Cesta tam a cesta zpátky nejsou tatáž jízda
+
+**Hráčovo hlášení:** odtahovka si přestala rezervovat trať až k porouchané,
+vyjede a někde zůstane stát na semaforku.
+
+Moje chyba z tématu 4.4. Pravidlo „jediné bezpečné místo k zastavení je
+až u porouchané" jsem přivázal na `IsOnRescueRun()`, jenže to platí
+**i po spojení** — dokud se výjezd neuzavře v depu. Cesta domů tím spadla
+pod stejný zákaz: jediné, co se počítalo za bezpečné, byla porouchaná,
+kterou už měla za sebou. Na trati, kde cesta domů není volná celá naráz,
+si tedy nezamluvila **nic** a zůstala stát u prvního návěstidla natrvalo.
+
+Cesta tam a cesta zpátky nejsou tatáž jízda a nesmí dostat stejná
+pravidla. Tam jede proti návěstidlům a platí za to celou cestou. Zpátky
+je to obyčejný vlak s dlouhým nákladem, který jede do depa obyčejnou
+cestou a u návěstidel čeká jako každý jiný. Rozlišuje to
+`IsFetchingCasualty()` — je to výjezd **a** porouchaná ještě není součástí
+téhle soupravy — a všech pět míst z tématu 4.4 plus výjimka z červené
+v `TrainController` se ptají jeho, ne `IsOnRescueRun()`.
+
+Scéna `testodtah daleko`: porouchaná až na druhém konci pásu, odtahovka
+si zamluví 35 políček přes všechna čtyři protilehlá návěstidla, spojí se
+a dotáhne ji domů.
+
 ---
 
 # 5. Myš, kurzor, stavba

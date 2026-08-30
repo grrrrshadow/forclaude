@@ -1442,7 +1442,11 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * engine has to reach a casualty head-on because the queue is behind it.
 	 * The trailing number is which way round the signals are built; both are
 	 * tried because the command cycles rather than states it. */
-	bool oneway = argv.size() >= 2 && argv[1] == "jednosmer";
+	bool oneway = argv.size() >= 2 && (argv[1] == "jednosmer" || argv[1] == "daleko");
+	/* 'daleko' is 'jednosmer' with the casualty at the far end of the strip, so
+	 * the rescue engine has to book the whole length of the line past every
+	 * signal on it rather than the two nearest ones. */
+	bool faraway = argv.size() >= 2 && argv[1] == "daleko";
 	uint8_t sig_cycle = 0;
 	if (oneway && argv.size() >= 3) {
 		auto n = ParseInteger(argv[2]);
@@ -1608,7 +1612,8 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
 	_testodtah_casualty = veh_c;
-	_testodtah_break_tile = (plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1));
+	_testodtah_break_tile = faraway ? TileXY(x0 + LEN - 6, y0) :
+			((plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testspoj_active = true;
 

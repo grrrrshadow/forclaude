@@ -255,7 +255,7 @@ public:
 			bool has_signal_against = HasSignalOnTrackdir(tile, ReverseTrackdir(trackdir));
 			bool has_signal_along = HasSignalOnTrackdir(tile, trackdir);
 			if (has_signal_against && !has_signal_along && IsOnewaySignal(tile, TrackdirToTrack(trackdir)) &&
-					!IsOnRescueRun(Yapf().GetVehicle()->First())) {
+					!IsFetchingCasualty(Yapf().GetVehicle()->First())) {
 				/* one-way signal in opposite direction.
 				 *
 				 * Not for a rescue engine on a call-out. A train that has
