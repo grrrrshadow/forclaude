@@ -31,6 +31,8 @@
 #include "safeguards.h"
 
 /* static */ std::string CrashLog::message{};
+/* static */ std::string_view CrashLog::stage{};
+/* static */ std::string CrashLog::note{};
 
 /** The version of the schema of the JSON information. */
 constexpr uint8_t CRASHLOG_SURVEY_VERSION = 1;
@@ -100,6 +102,14 @@ void CrashLog::FillCrashLog()
 		this->survey["crash"]["reason"] = CrashLog::message;
 		CrashLog::message.clear();
 	}
+
+	/* Whereabouts, and anything the handler wanted to say. Written whichever
+	 * of the two branches above ran: on a machine that cannot produce a
+	 * stacktrace, "EXCEPTION_ACCESS_VIOLATION" on its own says what happened
+	 * and nothing whatever about where, and this is the only thing in the
+	 * report that narrows it down. */
+	if (!CrashLog::stage.empty()) this->survey["crash"]["stage"] = CrashLog::stage;
+	if (!CrashLog::note.empty()) this->survey["crash"]["note"] = CrashLog::note;
 
 	if (!this->TryExecute("stacktrace", [this]() { this->SurveyStacktrace(this->survey["stacktrace"]); return true; })) {
 		this->survey["stacktrace"] = "crashed while gathering information";

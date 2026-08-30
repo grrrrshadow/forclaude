@@ -21,6 +21,27 @@ private:
 	static std::string message;
 
 	/**
+	 * Whereabouts of the code when it crashed, in words.
+	 *
+	 * A hardware fault on a machine with no debugging library gives an empty
+	 * stacktrace and nothing else -- the crash reason is then only
+	 * "EXCEPTION_ACCESS_VIOLATION", which says what happened and nothing at all
+	 * about where. This is the substitute: a coarse marker the loading path
+	 * moves along as it goes, so a crash report from such a machine at least
+	 * names the neighbourhood. Cheap enough to set often; it is a pointer
+	 * assignment to a literal, not a formatted string.
+	 */
+	static std::string_view stage;
+
+	/**
+	 * Anything the crash handler wants to say about this crash that is not the
+	 * fault itself -- currently, that a NewGRF the savegame asked for was
+	 * missing or had to be replaced by another version, which vanilla treats
+	 * as reason enough to write no crash report at all.
+	 */
+	static std::string note;
+
+	/**
 	 * Convert system crash reason to JSON.
 	 *
 	 * @param survey The JSON object.
@@ -85,6 +106,13 @@ public:
 
 	static void SetErrorMessage(const std::string &message);
 	static void AfterCrashLogCleanup();
+
+	/**
+	 * Say where the code is now, for a crash report that will have no
+	 * stacktrace. Pass a string literal: it is stored by reference, not copied.
+	 */
+	static void SetStage(std::string_view where) { CrashLog::stage = where; }
+	static void SetNote(const std::string &what) { CrashLog::note = what; }
 };
 
 #endif /* CRASHLOG_H */

@@ -40,6 +40,7 @@
 #include "../linkgraph/linkgraphjob.h"
 #include "../statusbar_gui.h"
 #include "../fileio_func.h"
+#include "../crashlog.h"
 #include "../gamelog.h"
 #include "../string_func.h"
 #include "../fios.h"
@@ -2398,8 +2399,15 @@ static void SlLoadChunks()
 	uint32_t id;
 	const ChunkHandler *ch;
 
+	/* Static, and written into rather than replaced, because CrashLog holds a
+	 * view of it and a crash may read that view at any moment. */
+	static char stage[32];
+
 	for (id = SlReadUint32(); id != 0; id = SlReadUint32()) {
 		Debug(sl, 2, "Loading chunk {:c}{:c}{:c}{:c}", id >> 24, id >> 16, id >> 8, id);
+
+		auto written = fmt::format_to_n(stage, lengthof(stage) - 1, "loading chunk {:c}{:c}{:c}{:c}", id >> 24, id >> 16, id >> 8, id);
+		CrashLog::SetStage({stage, written.size});
 
 		ch = SlFindChunkHandler(id);
 		if (ch == nullptr) SlErrorCorrupt("Unknown chunk type");

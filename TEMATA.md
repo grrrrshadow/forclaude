@@ -1896,6 +1896,44 @@ nádraží nic nakládajícího (naměřeno: 0), a náš vlastní save se přes
 přenos načíst nedá — přeskakování počítá s tvarem cizí větve. Řetěz je
 doložený z kódu, ne z běhu.
 
+**A pád to nebyl.** Build #112 s tou opravou spadl na stejném save znovu,
+stejně (`crash20260830150239`). Ta díra v seznamu je skutečná chyba
+a opravená zůstává, ale příčina pádu leží jinde — a **v obou crash
+lozích má firma všechny počty infrastruktury na nule.** Ty se
+přepočítávají z mapy v `AfterLoadCompanyStats()` (company_sl.cpp), který
+běží nepodmíněně na konci `AfterLoadGame()`. Nula tedy znamená: **hra
+spadla ještě před ním**, uvnitř načítání, ne až v prvním tiku hry. To
+zároveň vylučuje seznam nakládajících vozidel, který se čte až za běhu.
+
+## 17.1 Crash log se u nás píše vždycky, a říká, kde byl kód
+
+Dvě věci, které stály za tím, že hráč z prvních pádů neměl vůbec nic:
+
+**Vanilka crash log schválně nenapíše, když v save chyběl nebo se
+nahradil nějaký GRF.** `HandleSavegameLoadCrash()` (afterload.cpp) při
+pádu během načítání nastaví `_saveload_crash_with_missing_newgrfs`, když
+je kterýkoli GRF `Compatible` nebo `NotFound` — a `ExceptionHandler`
+(crashlog_win.cpp) pak jen ukáže okno s hláškou a hru ukončí, **bez
+souboru**. Pro nás je to obráceně: celý smysl přenosu staré hry je
+načíst cizí save s tím, co je po ruce, takže právě ten případ potřebuje
+hlášení nejvíc. U nás se hlášení napíše jako každé jiné a informace
+o GRF jde **do něj**, ne místo něj (`crash.note`).
+
+**Zbytek už funguje a nemusel se měnit:** `MakeCrashLog()` zapíše na disk
+crash log, minidump, záchranný save i screenshot a **teprve potom** se
+skočí do `ShowCrashlogWindow()`. Okno jen ukazuje cestu k souboru, který
+tam v tu chvíli dávno je; OK hru jen ukončí.
+
+**A protože na Windows 7 bez `dbghelp.dll` je `stacktrace` prázdný
+(téma 15) a `reason` je jen „EXCEPTION_ACCESS_VIOLATION" — což říká *co*
+a vůbec nic o *kde* — přibyla do hlášení stopa `crash.stage`.** Je to
+jméno posledního místa, kterým načítání prošlo: `loading chunk XXXX` při
+čtení souboru, `afterload: before <VerzeSaveGamu>` v každém z 131
+verzních bloků `AfterLoadGame()`, `afterload: <JménoFunkce>` u každého
+z 30 pojmenovaných volání, a `game running`, jakmile načítání skončí —
+jinak by stopa ukazovala na načítání do konce hry. Ověřeno vynuceným
+pádem: `"stage": "afterload: StartScripts"`.
+
 ---
 
 # 16. Nedořešeno

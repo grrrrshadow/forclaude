@@ -325,13 +325,21 @@ static LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS *ep)
 		ImmediateExitProcess(3);
 	}
 
+	/* Vanilla writes no crash report at all in this case: a savegame loaded
+	 * with a NewGRF missing, or with another version of it standing in, is
+	 * held to explain any crash by itself, so there is nothing worth
+	 * collecting. For this build that is exactly backwards. The whole point of
+	 * a legacy import is loading somebody else's savegame with whatever
+	 * NewGRFs are to hand, so the case vanilla writes off is the case that
+	 * needs a report the most -- and the player is left staring at a message
+	 * box with no file anywhere, which is what happened. So the report is
+	 * written like any other, and the NewGRF situation goes into it as a note
+	 * rather than instead of it. */
 	if (SaveloadCrashWithMissingNewGRFs()) {
-		static const wchar_t _saveload_crash[] =
-			L"A serious fault condition occurred in the game. The game will shut down.\n"
-			L"As you loaded an savegame for which you do not have the required NewGRFs\n"
-			L"no crash information will be generated.\n";
-		MessageBox(nullptr, _saveload_crash, L"Fatal Application Failure", MB_ICONERROR);
-		ImmediateExitProcess(3);
+		CrashLog::SetNote("A NewGRF the savegame asked for was missing, or another version of it was "
+				"loaded in its place. That can be the whole explanation on its own -- OpenTTD cannot "
+				"tell whether a replacement NewGRF is newer or older than the one the savegame was "
+				"made with. Read the rest of this report with that in mind.");
 	}
 
 	CrashLogWindows *log = new CrashLogWindows(ep);
