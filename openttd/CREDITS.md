@@ -85,12 +85,6 @@ which stays theirs and is named here.
   Original at https://github.com/age77/openttd-15.3-blueprint
 - Icons8 (https://icons8.com) - The hammer-and-wrench artwork the rescue-engine
   button is drawn from.
-- erikjanp - The old (overgrown) tracks patch: rail that grows over when
-  nothing runs on it and is worn clean again by the trains that do. Written
-  for OpenTTD 12.0 and ported here to 16.0-beta2; the sprites it draws come
-  from its own oldtracks.grf. Off by default, and only on the game's own
-  rails -- a rail type whose graphics come from a NewGRF is left alone,
-  because its own artwork is not ours to paint over.
 - Palo123, also known as Karn - The old decouple 0.10.4 patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's
