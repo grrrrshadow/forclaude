@@ -3282,7 +3282,16 @@ public:
 			if (IsOnRescueRun(Train::From(v))) {
 				const Train *casualty = Train::GetIfValid(Train::From(v)->rescue_target);
 				bool in_tow = casualty != nullptr && casualty->First() == v;
-				if (in_tow) return GetString(STR_VEHICLE_STATUS_RESCUE_TOWING);
+				if (in_tow) {
+					/* Towing and standing still with nowhere to take it are not
+					 * the same thing, and the difference is the whole of what
+					 * the player can see: an engine that has coupled up and then
+					 * cannot find a depot to reach looks exactly like one that is
+					 * about to set off. Read back from the code that asks, so the
+					 * window cannot say one thing while the game does another. */
+					if (Train::From(v)->rescue_hold == RescueHold::NoDepot) return GetString(STR_VEHICLE_STATUS_RESCUE_NO_DEPOT);
+					return GetString(STR_VEHICLE_STATUS_RESCUE_TOWING);
+				}
 
 				/* On its way is not the same as still standing in the shed with
 				 * the job in its hand. Saying "on the way" for both leaves the

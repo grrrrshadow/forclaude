@@ -60,6 +60,7 @@
 #include "company_cmd.h"
 #include "misc_cmd.h"
 #include "rail_cmd.h"
+#include "landscape_cmd.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
 #include "tile_map.h"
@@ -1417,6 +1418,55 @@ static bool ConTestClone(std::span<std::string_view> argv)
 static VehicleID _testodtah_casualty = VehicleID::Invalid();
 static TileIndex _testodtah_break_tile = INVALID_TILE;
 static TileIndex _testodtah_cross_tile = INVALID_TILE;
+static TileIndex _testodtah_depot_w = INVALID_TILE;
+
+/**
+ * Take the rescue engine's home depot away and give it back again.
+ *
+ * The scene it serves is the one the player found and the rig had no way of
+ * building: an engine that reaches its casualty, couples up, and then has
+ * nowhere it can reach to put it down. Taking the shed away while the engine is
+ * out is the only honest way to arrange that on a rig -- and giving it back
+ * afterwards is the half that matters, because the point being tested is not
+ * that the engine stops, it is that it starts again by itself once there is
+ * somewhere to go. Usage: 'testdepo pryc' / 'testdepo zpet'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRescueDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Take the testodtah home depot away or give it back. Usage: 'testdepo pryc|zpet'.");
+		return true;
+	}
+	if (_testodtah_depot_w == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testdepo: zadna scena testodtah nestoji.");
+		return true;
+	}
+
+	/* Building and demolishing are the player's own actions, so they are done
+	 * as the player. Without this they are attempted as whatever company ran
+	 * last, which on a headless rig is nobody. */
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	if (argv[1] == "pryc") {
+		CommandCost r = Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, _testodtah_depot_w);
+		IConsolePrint(r.Failed() ? CC_ERROR : CC_DEFAULT, "testdepo: depo ({},{}) zbourano - {}.",
+				TileX(_testodtah_depot_w), TileY(_testodtah_depot_w), r.Failed() ? "nepovedlo se" : "ok");
+	} else {
+		CommandCost r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, _testodtah_depot_w, RAILTYPE_RAIL, DiagDirection::SW);
+		IConsolePrint(r.Failed() ? CC_ERROR : CC_DEFAULT, "testdepo: depo ({},{}) postaveno zpet - {}.",
+				TileX(_testodtah_depot_w), TileY(_testodtah_depot_w), r.Failed() ? "nepovedlo se" : "ok");
+	}
+
+	/* Taking a depot off the map or putting one back leaves work in the signal
+	 * buffer, and the flush that normally follows a command belongs to the path
+	 * the player's clicks take, not to the one used here. This runs from the
+	 * heartbeat, in the middle of the tick, so the buffer left standing is the
+	 * next moving train's problem: it walks into the assertion that the buffer
+	 * is empty. Emptied here instead. */
+	UpdateSignalsInBuffer();
+	return true;
+}
 
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
@@ -1615,6 +1665,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	_testodtah_break_tile = faraway ? TileXY(x0 + LEN - 6, y0) :
 			((plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
+	_testodtah_depot_w = depot_w;
 	_testspoj_active = true;
 
 	IConsolePrint(CC_DEFAULT, "testodtah: scene ready. casualty=vlak {}, rescue=vlak {}, break at ({},{}).",
@@ -4708,6 +4759,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
+	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);

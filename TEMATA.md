@@ -1210,6 +1210,57 @@ Scéna `testodtah daleko`: porouchaná až na druhém konci pásu, odtahovka
 si zamluví 35 políček přes všechna čtyři protilehlá návěstidla, spojí se
 a dotáhne ji domů.
 
+## 4.7 Spojit se s poruchou není totéž co ji odvézt
+
+**Hráčovo hlášení:** už jela pěkně, ale neodtáhla tu poruchu, zůstala tam
+stát.
+
+Rozkaz „jeď do nejbližšího depa" dostane odtahovka ve chvíli spojení a
+jeho **výsledek se zahazoval**. Přitom v té chvíli může klidně selhat:
+odtahovka stojí na úseku, ze kterého se právě teď do žádného depa dostat
+nedá — cestu domů drží fronta, která se za poruchou nakupila, nebo je
+zpátky jen skrz jednosměrné návěstidlo, které už porušit nesmí, protože
+zpátky je z ní obyčejný vlak (téma 4.6).
+
+Zeptat se jednou a nechat to být znamená, že tam stojí **navždy**. Vlastní
+rozkazy odtahovka mít nesmí, takže ji nic jiného nikdy nerozjede, a
+porouchaná už na nikoho nečeká — je připojená — takže nikdo další pro ni
+nepřijede. Z hlediska hry se ta porucha z mapy nikdy neztratí.
+
+Opraveno tak, že se odtahovka ptá dál: `TrainLocoHandler()` se zeptá
+znovu vždycky po 64 ticích, dokud rozkaz neprojde. Ne každý tik — jedno
+odmítnutí stojí celý běh hledače cest a to, na co se čeká (uvolnění
+trati), trvá o hodně déle než jeden tik.
+
+A okno odtahovky to mezitím řekne: `RescueHold::NoDepot`, „Připojeno, ale
+žádné depo v dosahu". Zvenčí totiž vypadá vlak, který se spojil a nemá
+kam, úplně stejně jako vlak, který se právě chystá vyjet — a „ono to tam
+jen stojí" je jinak všechno, co se o tom dá říct.
+
+### Rig na to neuměl přijít, protože měřil jen půlku
+
+Všechny čtyři odtahové scény končily měření **u spojení** a to
+prohlásily za úspěch. Odtahovka, která se spojila a pak do konce hry
+stála na trati, jim vycházela zeleně. Přesně tu chybu pak našel hráč.
+
+Napraveno dvakrát:
+
+* `HandleRescueEngineInDepot()` říká nahlas „odtah dokončen — porucha
+  složena v depu na (x,y)" a všechny odtahové scény čekají na **tuhle**
+  větu, ne na „spojeno".
+* Nová scéna `odtahbezdepa` tu poruchu staví schválně: `testdepo pryc`
+  zbourá domovské depo ve chvíli, kdy je odtahovka venku, `testdepo zpet`
+  ho o 8000 tiků později postaví zpátky. Odtahovka se spojí, nemá kam,
+  řekne to — a jakmile je depo zpátky, **sama** se rozjede a poruchu
+  doveze. Testuje se tím to podstatné: ne že se zastaví, ale že se zase
+  rozjede.
+
+Poznámka k rigu: `Command<>::Do` **nepromazává** frontu návěstidel — to
+dělá až cesta, kterou jdou hráčovy kliky. Bourání a stavění z heartbeatu
+(`testza`) tedy nechalo frontu stát a první pohnuvší se vlak spadl na
+`assert(_globset.IsEmpty())`. `testdepo` si po sobě volá
+`UpdateSignalsInBuffer()` samo.
+
 ---
 
 # 5. Myš, kurzor, stavba

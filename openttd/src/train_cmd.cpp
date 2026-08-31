@@ -3284,6 +3284,11 @@ void EndRescueErrand(Train *tow)
 
 	tow->rescue_target = VehicleID::Invalid();
 	tow->couple_target = VehicleID::Invalid();
+
+	/* And whatever was holding the errand up is no longer holding anything, so
+	 * it stops being said. Left set, an engine back on call in its shed would
+	 * go on telling the player it has a casualty it cannot put down. */
+	tow->rescue_hold = RescueHold::None;
 }
 
 /**
@@ -3580,6 +3585,17 @@ bool HandleRescueEngineInDepot(Train *tow)
 			casualty->ConsistChanged(CCF_ARRANGE);
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		}
+	}
+
+	/* Said out loud because the errand only counts as done here, and the
+	 * headless rig had no way of telling. Every rescue scene in the battery
+	 * ended its measurement at the coupling and called that a pass, so a tow
+	 * that coupled up and then stood on the open line for the rest of the game
+	 * read as green -- which is exactly the fault the player then found. The
+	 * scenes now wait for this line instead. */
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - porucha slozena v depu na ({},{})",
+				tow->unitnumber, TileX(tow->tile), TileY(tow->tile));
 	}
 
 	/* Home if this is not home, otherwise straight back on call. Named
@@ -3989,8 +4005,19 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * HandleRescueEngineInDepot()'s business. */
 	if (tow != nullptr) {
 		AutoRestoreBackup cur_company(_current_company, new_head->owner);
-		Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, new_head->index,
+		CommandCost sent = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, new_head->index,
 				DepotCommandFlags{DepotCommandFlag::DontCancel}, VehicleListIdentifier{});
+		/* This can fail -- no depot within reach at this instant -- and its
+		 * result used to be thrown away. A rescue engine that has just coupled
+		 * to a casualty and been given nowhere to take it is a train standing
+		 * on the open line with a dead train hanging off it and nothing to do
+		 * about either, for good: the casualty is no longer waiting for
+		 * anybody, so nobody else comes either. Asked again from
+		 * TrainLocoHandler() until it takes. */
+		new_head->rescue_hold = sent.Succeeded() ? RescueHold::None : RescueHold::NoDepot;
+		if (sent.Failed() && _show_train_orientation) {
+			IConsolePrint(CC_WARNING, "Vlak {}: odtah spojen, ale nemam kam s nim - depo zatim mimo dosah", new_head->unitnumber);
+		}
 	}
 
 	return ret;
@@ -7990,6 +8017,44 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			 * engine leaves when its own cargo work here is done. */
 			consist->current_order.SetWaitTimetabled(false);
 			return true;
+		}
+	}
+
+	/* A rescue engine with the casualty already hanging off it and no depot to
+	 * take it to is asked again, and goes on being asked until it takes.
+	 *
+	 * The order is given the moment the coupling happens, and at that moment it
+	 * can perfectly well fail: the pathfinder is standing on a stretch of line
+	 * from which, right then, no depot can be reached -- the road home is held
+	 * by the traffic that piled up behind the breakdown, or the only way back is
+	 * through a one-way signal it is no longer allowed to defy now that it is an
+	 * ordinary train again. Asked once and refused, the engine would stand there
+	 * for good: it has no orders of its own (a rescue engine cannot have any),
+	 * so nothing else would ever move it, and the casualty, now coupled up, is
+	 * no longer waiting for anybody, so no second engine would be sent either.
+	 * The player watched exactly that: it drove out nicely, coupled up, and then
+	 * simply stood there with the breakdown on the line behind it.
+	 *
+	 * Asked every 64th tick rather than every tick because a refusal costs a
+	 * full pathfinder run, and the thing being waited for -- a road clearing --
+	 * takes far longer than a tick anyway. */
+	if (IsOnRescueRun(consist) && !IsFetchingCasualty(consist) &&
+			!consist->current_order.IsType(OT_GOTO_DEPOT) && (consist->tick_counter & 0x3F) == 0) {
+		AutoRestoreBackup cur_company(_current_company, consist->owner);
+		bool took = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, consist->index,
+				DepotCommandFlags{DepotCommandFlag::DontCancel}, VehicleListIdentifier{}).Succeeded();
+
+		/* And the window says so meanwhile, because from the outside an engine
+		 * that has coupled up and cannot go anywhere looks exactly like one
+		 * that is about to set off, and "it just stands there" is otherwise all
+		 * the player can tell anyone about it. */
+		consist->rescue_hold = took ? RescueHold::None : RescueHold::NoDepot;
+		InvalidateWindowData(WindowClass::VehicleView, consist->index);
+
+		if (_show_train_orientation) {
+			SayOnChange(consist, took
+					? fmt::format("Vlak {}: odtah - depo je uz v dosahu, jedeme", consist->unitnumber)
+					: fmt::format("Vlak {}: odtah stoji s poruchou - zadne depo v dosahu, zkousim dal", consist->unitnumber));
 		}
 	}
 

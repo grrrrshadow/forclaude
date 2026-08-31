@@ -4684,6 +4684,7 @@ STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Called 
 STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED                          :{LTBLUE}Called out, the track outside the depot is occupied
 STR_VEHICLE_STATUS_RESCUE_NO_PATH                               :{LTBLUE}Called out, cannot find a route to the casualty
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Towing a train to a depot
+STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Coupled up, but no depot within reach
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}No power
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Waiting for free path
