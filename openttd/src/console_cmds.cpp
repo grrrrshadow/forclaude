@@ -61,6 +61,10 @@
 #include "misc_cmd.h"
 #include "rail_cmd.h"
 #include "landscape_cmd.h"
+#include "industrytype.h"
+#include "industry_cmd.h"
+#include "terraform_cmd.h"
+#include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
 #include "tile_map.h"
@@ -1096,6 +1100,294 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 
 	IConsolePrint(CC_DEFAULT, "testspoj: scene ready. deliverer=vlak {}, collector=vlak {}, station={} at ({}..{},{}), west depot ({},{}), east depot ({},{}).",
 			Train::Get(veh2)->unitnumber, Train::Get(veh1)->unitnumber, st_id, x0 + 18, x0 + 21, y0, x0, y0, x0 + LEN - 1, y0);
+	return true;
+}
+
+/**
+ * Build the loaded-platform scene: the testspoj strip plus an industry beside
+ * the platform, so the station has real cargo waiting and a "full load" order
+ * stages reservations and unloads on the train standing there.
+ *
+ * Every other scene runs on an empty map, so every coupling and decoupling
+ * they exercise happens on trains whose cargo lists are clean -- and consist
+ * surgery on a train standing in a loading stop with cargo work in flight
+ * (reserved cargo pulled from the station, unloads staged) was never
+ * exercised at all. The player hit it first: full load plus decouple on one
+ * order put the game down on the cargo-bookkeeping assert in
+ * CheckCargoCapacity() the moment the split ran.
+ *
+ * Plain: one train, engine and two wagons, one order "full load and decouple
+ * everything" at the platform. Built with the brake on -- release it with
+ * 'testbrzda 1' once the industry has had time to pile cargo at the station,
+ * or the arrival finds an empty platform and reserves nothing.
+ *
+ * 'cekat': the coupling-side twin. A waiter loads at the platform on a full
+ * load order -- reservations in flight for as long as cargo trickles in --
+ * and a light engine is sent to couple onto it mid-load. Release the engine
+ * with 'testbrzda 2'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCargoScene(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the loaded-platform scene (industry + full load + decouple). Usage: 'testnaklad [cekat]'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testnaklad: only in a running game.");
+		return true;
+	}
+	bool wait_mode = argv.size() >= 2 && argv[1] == "cekat";
+
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testnaklad: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+
+	/* An engine, and a wagon whose cargo some fundable industry produces --
+	 * the pair is what makes the platform a loaded one. On the default set
+	 * this finds the coal wagon and the coal mine. */
+	EngineID eid_loco = EngineID::Invalid();
+	EngineID eid_wagon = EngineID::Invalid();
+	IndustryType ind_type = NUM_INDUSTRYTYPES;
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type != RailVehicleType::Wagon) {
+			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
+			continue;
+		}
+		if (eid_wagon != EngineID::Invalid()) continue;
+		CargoType c = e->GetDefaultCargoType();
+		if (!IsValidCargoType(c)) continue;
+		for (IndustryType it = 0; it < NUM_INDUSTRYTYPES && eid_wagon == EngineID::Invalid(); it++) {
+			const IndustrySpec *is = GetIndustrySpec(it);
+			if (is == nullptr || !is->enabled) continue;
+			/* Only an industry that can stand on an ordinary field next to the
+			 * strip. The first pairing this loop ever found was the passenger
+			 * wagon and the oil rig -- the one industry that only builds on
+			 * water -- and the scene then had nowhere to put it. */
+			if (is->behaviour.Any({IndustryBehaviour::BuiltOnWater, IndustryBehaviour::Town1200More,
+					IndustryBehaviour::OnlyInTown, IndustryBehaviour::OnlyNearTown, IndustryBehaviour::Before1950, IndustryBehaviour::After1960})) {
+				continue;
+			}
+			for (CargoType pc : is->produced_cargo) {
+				if (pc == c) {
+					eid_wagon = e->index;
+					ind_type = it;
+					break;
+				}
+			}
+		}
+	}
+	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testnaklad: no engine, or no wagon whose cargo an industry produces.");
+		return true;
+	}
+
+	/* The flattest clear run of tiles along the X axis; the industry needs
+	 * room beside it, so ask for clear rows next to the strip too. */
+	static const uint LEN = 40;
+	TileIndex strip = INVALID_TILE;
+	for (uint y = 8; y < Map::SizeY() - 12 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			TileIndex t = TileXY(x, y);
+			bool ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+			int z = ok ? GetTileZ(t) : -1;
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					strip = TileXY(x - LEN + 1, y);
+					break;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testnaklad: no flat clear strip of {} tiles found.", LEN);
+		return true;
+	}
+	uint x0 = TileX(strip);
+	uint y0 = TileY(strip);
+	_testmapa_area[0] = x0; _testmapa_area[1] = y0 > 1 ? y0 - 1 : 0;
+	_testmapa_area[2] = x0 + LEN - 1; _testmapa_area[3] = y0 + 6;
+
+	TileIndex depot_w = TileXY(x0, y0);
+	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_w, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
+			Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_e, RAILTYPE_RAIL, DiagDirection::NE).Failed()) {
+		IConsolePrint(CC_ERROR, "testnaklad: depot failed.");
+		return true;
+	}
+	if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testnaklad: track failed.");
+		return true;
+	}
+	TileIndex st_tile = TileXY(x0 + 18, y0);
+	if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st_tile, RAILTYPE_RAIL, Axis::X, 1, 4, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed()) {
+		IConsolePrint(CC_ERROR, "testnaklad: station failed.");
+		return true;
+	}
+	for (uint sx : {x0 + 2, x0 + 15, x0 + 24, x0 + LEN - 3}) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
+			IConsolePrint(CC_ERROR, "testnaklad: signal at ({},{}) failed.", sx, y0);
+			return true;
+		}
+	}
+	UpdateSignalsInBuffer();
+
+	StationID st_id = GetStationIndex(st_tile);
+	DepotID dep_w = GetDepotIndex(depot_w);
+	DepotID dep_e = GetDepotIndex(depot_e);
+
+	/* The industry, beside the platform so the station's catchment covers it.
+	 * Funded as the game's own deity would fund one -- that path may place it
+	 * anywhere the layout fits, so several spots are offered until one takes. */
+	bool ind_built = false;
+	{
+		/* Whatever the ground beside the strip looks like, the industry needs
+		 * a flat patch; the strip finder only ever guaranteed the strip row. */
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 28, y0 + 8), TileXY(x0 + 10, y0 + 2), false, LevelMode::Level);
+
+		AutoRestoreBackup deity(_current_company, OWNER_DEITY);
+		/* Under the platform first: the station's catchment reaches only a few
+		 * tiles, and an industry funded off to one side of it feeds nothing --
+		 * the scene then measures an empty platform and proves nothing. */
+		for (uint dy = 2; dy <= 8 && !ind_built; dy++) {
+			for (uint dx = 6; dx <= 22 && !ind_built; dx++) {
+				uint ix = x0 + 10 + dx, iy = y0 + dy;
+				if (ix >= Map::SizeX() - 2 || iy >= Map::SizeY() - 2) continue;
+				for (uint layout = 0; layout < (uint)GetIndustrySpec(ind_type)->layouts.size() && !ind_built; layout++) {
+					if (Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, TileXY(ix, iy), ind_type, layout, true, InteractiveRandom()).Succeeded()) {
+						ind_built = true;
+						IConsolePrint(CC_DEFAULT, "testnaklad: prumysl '{}' zalozen u ({},{}).", GetIndustrySpec(ind_type)->name, ix, iy);
+					}
+				}
+			}
+		}
+	}
+	if (!ind_built) {
+		IConsolePrint(CC_ERROR, "testnaklad: industry would not build anywhere beside the platform.");
+		return true;
+	}
+
+	/* The loaded train: engine and two wagons of the industry's cargo. */
+	auto build_train = [&](TileIndex depot) -> VehicleID {
+		auto [cost, veh, unused_a, unused_b, unused_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) return VehicleID::Invalid();
+		for (int i = 0; i < 2; i++) {
+			auto [costw, wid, unused_d, unused_e, unused_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (costw.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, wid, Train::Get(veh)->Last()->index, false).Failed()) return VehicleID::Invalid();
+		}
+		return veh;
+	};
+
+	VehicleID veh1 = build_train(depot_e);
+	if (veh1 == VehicleID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testnaklad: train failed.");
+		return true;
+	}
+
+	if (wait_mode) {
+		/* The waiter: full load at the platform, waiting to be coupled while
+		 * its load is still coming in. Started at once. */
+		Order load_wait;
+		load_wait.MakeGoToStation(st_id);
+		load_wait.SetLoadType(OrderLoadType::FullLoadAny);
+		load_wait.SetWaitForCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, load_wait);
+		Order home_w;
+		home_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 1, home_w);
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh1, false);
+
+		/* The collector: a light engine sent to couple onto the loading
+		 * waiter. Built braked; released mid-load by the script. */
+		auto [cost2, veh2, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost2.Failed()) {
+			IConsolePrint(CC_ERROR, "testnaklad: collector failed.");
+			return true;
+		}
+		Order collect;
+		collect.MakeGoToStation(st_id);
+		collect.SetLoadType(OrderLoadType::NoLoad);
+		collect.SetUnloadType(OrderUnloadType::NoUnload);
+		collect.SetGoToCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, collect);
+		Order home_e;
+		home_e.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, home_e);
+		IConsolePrint(CC_DEFAULT, "testnaklad cekat: vlak {} naklada a ceka na spojeni, vlak {} pustis brzdou, az bude nakladka v behu.",
+				Train::Get(veh1)->unitnumber, Train::Get(veh2)->unitnumber);
+	} else {
+		/* Two passes on purpose. An industry only hands its production to a
+		 * station once some train has tried to load that cargo there -- until
+		 * then the platform stays empty however long the mine has stood
+		 * beside it, and a decouple at an empty platform has no cargo work in
+		 * flight to trip over. So the first visit is an ordinary stop that
+		 * opens the tap, and the second is the player's crashing combination,
+		 * letter for letter: full load and put every wagon down, arriving at
+		 * a platform the mine has meanwhile piled cargo on. */
+		Order prime;
+		prime.MakeGoToStation(st_id);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, prime);
+		Order via_w;
+		via_w.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 1, via_w);
+		Order deliver;
+		deliver.MakeGoToStation(st_id);
+		deliver.SetLoadType(OrderLoadType::FullLoadAny);
+		/* Transfer, so the second arrival has cargo work in flight the moment
+		 * loading begins: the wagons come back carrying what the first pass
+		 * loaded, and a transfer is staged on arrival whether or not the
+		 * station accepts the cargo. A reservation would do the same job, but
+		 * it only gets staged once the loading loop has had a tick, and a
+		 * light test train can be standing still before that -- the player's
+		 * heavier train brakes into the platform for several ticks and meets
+		 * the staged work either way. */
+		deliver.SetUnloadType(OrderUnloadType::Transfer);
+		deliver.SetDecouple(true);
+		deliver.SetDecoupleCount(0);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 2, deliver);
+		Order home_e;
+		home_e.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 3, home_e);
+		IConsolePrint(CC_DEFAULT, "testnaklad: vlak {} stoji na brzde; pust ho 'testbrzda {}' - prvni zastavka otevre stanici {} naklad, druha je ta padava.",
+				Train::Get(veh1)->unitnumber, Train::Get(veh1)->unitnumber, st_id);
+	}
+
+	_testspoj_active = true;
+	return true;
+}
+
+/**
+ * Print what cargo lies waiting at every station -- the rig's eyes for the
+ * loaded-platform scene, where "no crash" only means something if the
+ * platform really had cargo on it.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestStationCargo(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	for (const Station *st : Station::Iterate()) {
+		for (const CargoSpec *cs : CargoSpec::Iterate()) {
+			CargoType c = cs->Index();
+			if (!st->goods[c].HasData()) continue;
+			uint waiting = st->goods[c].GetData().cargo.TotalCount();
+			if (waiting == 0) continue;
+			IConsolePrint(CC_DEFAULT, "stanice {}: naklad {} ceka {} jednotek", st->index, c, waiting);
+		}
+	}
 	return true;
 }
 
@@ -5072,6 +5364,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
+	IConsole::CmdRegister("testnaklad",              ConTestCargoScene);
+	IConsole::CmdRegister("teststanice",             ConTestStationCargo);
 	IConsole::CmdRegister("testfiltr",               ConTestCoupleFilter);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);

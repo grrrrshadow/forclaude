@@ -2655,6 +2655,53 @@ vlak měl patnáct skutečných (tři cykly připojit/odpojit s obměnami), ne
 
 ---
 
+## 2.25 Stříhat vlak uprostřed nakládky — pád na „plně naložit a odpojit"
+
+„Plně naložit cokoliv" + „odpojit vše" na jednom rozkazu položilo hru
+assertem v účetnictví nákladu (`CheckCargoCapacity`), jakmile na
+nástupišti opravdu leželo zboží. Bez plného naložení nepadala — a hned se
+nabízelo hledat vinu v FIRS nebo CZTR, protože s čistou hrou to napoprvé
+nepadalo taky. Není to grf: spadlo to i na hře bez jediného grf, jakmile
+byly splněny skutečné podmínky. Grf jen dodaly kulisy — průmysl u peronu
+a vagony, do kterých jeho zboží patří.
+
+**Příčina.** Vlak stojící v nakládce není v klidu: zboží, které má
+nabrat, je **rezervované** ze stanice do jeho vozů, a zboží, které
+přivezl, je **rozfázované** k vyložení či překladu. Chirurgie na soupravě
+(naše spojování i odpojování jede přes tutéž přesouvací mašinerii jako
+depo) byla ve vanille možná jen v depu, kde žádný vlak nenakládá — a její
+assert vlak s rozdělanou prací po právu odmítá. My ji pouštíme na peron
+doprostřed nakládky. Proč to nepadalo dřív: prázdné vozy bez plného
+naložení nemají nic rozdělaného (0 = 0 v klidu). A proč nepadla ani první
+čistá hra: stanice dostává zboží z průmyslu **až když ji nějaký vlak
+zkusil naložit** — u čerstvé trati je peron prázdný, rozdělané není nic.
+Lehký zkušební vlak navíc zastaví dřív, než nakládka udělá první krok;
+těžký hráčův dojíždí do zastávky několik tiků a rozdělanou práci potká
+vždycky. (Jízdní řád s tím nebojuje — jen prodlužuje stání, a tím okno,
+kdy je co potkat.)
+
+**Oprava.** Před střihem se rozdělaná nakládka poctivě uklidí — stejně,
+jako to dělá obyčejný odjezd: rezervace se vrátí stanici, přivezené
+zůstane ve vozech, platba se uzavře (`SettleLoadingBeforeSplice`, volané
+před splice ve spojení i odpojení). A hned po střihu se té půlce, která
+v zastávce zůstává, zastávka znovu rozjede (`PrepareUnload` nad tím, čím
+vlak nyní je) — jinak by nakládala u stanice, která o ní neví, a stála
+tam navěky. Odložená řada dostává zastávku poctivým příjezdem, jak už to
+bylo. Nic se neztrácí: tatáž práce se rozfázuje znovu, tentokrát nad
+správnou soupravou.
+
+**Rig k tomu dostal oči a kulisy:** scéna `testnaklad` (důl vedle peronu;
+první zastávka otevře stanici zboží, druhá je ta padavá kombinace;
+`cekat` = spojení do nakládajícího čekajícího vlaku), sonda `teststanice`
+(co u které stanice leží) a výpis „odpojeni u nakladky - naklad X
+jednotek, v klidu Y" — bez něj „nespadlo to" nic neznamená, protože
+nevíš, jestli rozdělaná práce vůbec vznikla. Hráčův save bez grf, kde
+Y < X doložené (90 vs 15), je v baterii jako scéna `nakladsav`. Pozor:
+save uložený v pauze na headless rigu tiše „proběhne" bez jediného tiku —
+skript musí začít `unpause`.
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich

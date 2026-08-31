@@ -45,6 +45,7 @@
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_economy.h"
 #include "timetable.h"
+#include "economy_func.h"
 
 #include "table/strings.h"
 #include "table/train_sprites.h"
@@ -3625,6 +3626,38 @@ bool HandleRescueEngineInDepot(Train *tow)
 }
 
 /**
+ * Put a loading train's cargo work to rest before its consist is taken apart
+ * or spliced into another.
+ *
+ * A train standing in a loading stop is not a settled thing: cargo it is to
+ * pick up has been reserved off the station into its wagons, and cargo it
+ * arrived carrying is staged for unloading or transfer. The consist surgery
+ * both coupling and decoupling run through was written for depots, where no
+ * train is ever loading, and its cargo bookkeeping refuses a vehicle with
+ * work in flight -- the assert put the game down the first time a player
+ * combined "full load" with "decouple everything" at a platform with cargo
+ * actually on it.
+ *
+ * So the work is put to rest the same way an ordinary departure puts it to
+ * rest: reservations go back to the station, everything staged is kept on
+ * board, the payment is closed out. Nothing is lost -- whichever part of the
+ * train goes on standing here starts its stop afresh (see the PrepareUnload()
+ * calls at the callers) and stages the very same work again over the consist
+ * it then actually is.
+ *
+ * @param head front engine of a train about to be spliced or split
+ */
+static void SettleLoadingBeforeSplice(Train *head)
+{
+	if (!head->current_order.IsType(OT_LOADING)) return;
+	if (!Station::IsValidID(head->last_station_visited)) return;
+	Station *st = Station::Get(head->last_station_visited);
+	st->loading_vehicles.remove(head);
+	head->CancelReservation(StationID::Invalid(), st);
+	delete head->cargo_payment;
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -3770,6 +3803,16 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		 * FEATURE_DESIGN_COUPLING_TOW.md. */
 		FreeTrainTrackReservation(v->First());
 		FreeTrainTrackReservation(partner);
+
+		/* And what each of them was loading is put to rest the same way --
+		 * before anything about either train changes, while each head is
+		 * still the head its loading state is written on. A waiter is
+		 * standing in a loading stop by definition, and a collector that
+		 * stops everywhere on the way couples out of one too; splicing
+		 * either with reservations or staged unloads in flight is what the
+		 * cargo bookkeeping's assert refuses. */
+		SettleLoadingBeforeSplice(v->First());
+		SettleLoadingBeforeSplice(partner);
 
 		/* The ends do not meet cleanly on the rails, and this is a rescue:
 		 * straighten the casualty onto the tow's own track first, whole,
@@ -4005,6 +4048,19 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		}
 	}
 
+	/* A merged train that is still working a loading stop -- a collector that
+	 * coupled in the middle of its own stop, or a waiter that was coupled onto
+	 * before it finished -- had that stop put to rest for the splice above.
+	 * Left like that it is a train loading at a station the station does not
+	 * know about: nothing feeds it, its load never finishes, and it stands at
+	 * the platform for good. So the stop is started afresh over the train as
+	 * it now is. An in-place arrival above already did this through the
+	 * ordinary arrival path, which is what the payment check recognises. */
+	if (new_head->current_order.IsType(OT_LOADING) && new_head->cargo_payment == nullptr &&
+			Station::IsValidID(new_head->last_station_visited)) {
+		PrepareUnload(new_head);
+	}
+
 	/* Both paths were thrown away before the splice, so the route this train was
 	 * following is gone and will be planned again from here. That is wanted for
 	 * its own sake as well: the old route was worked out while the wagons now
@@ -4116,6 +4172,22 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 {
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
+	if (_show_train_orientation) {
+		/* How much of the train's cargo is settled and how much is mid-action
+		 * (reserved off the station, staged for unloading). Anything not
+		 * settled here is exactly what the splice's cargo bookkeeping cannot
+		 * survive -- printed so a run shows whether that state was even
+		 * reached. */
+		uint total = 0, settled = 0;
+		for (const Train *u = v; u != nullptr; u = u->Next()) {
+			total += u->cargo.TotalCount();
+			settled += u->cargo.ActionCount(VehicleCargoList::MoveToAction::Keep);
+		}
+		if (total != 0 || settled != 0) {
+			IConsolePrint(CC_INFO, "Vlak {}: odpojeni u nakladky - naklad {} jednotek, v klidu {}", v->unitnumber, total, settled);
+		}
+	}
+
 	/* Taking a train apart is the same work the move command does, and parts of
 	 * that work ask the game which company is acting -- handing out a unit
 	 * number to the half that becomes a train of its own reads it straight from
@@ -4136,6 +4208,15 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 	/* Nothing behind what is kept, so there is nothing to leave here. */
 	if (split_point == nullptr) return false;
+
+	/* The split is now certain, so the loading stop it happens in the middle
+	 * of is put to rest first -- asked any earlier, this would cancel the
+	 * loading of a train that is not being taken apart at all, since this
+	 * function is asked every loading tick and bows out above when there is
+	 * nothing to leave. Both halves get their stop back afresh right after:
+	 * the engine below, over what it still is; the put-down rake through the
+	 * ordinary arrival TrainEnterStation() gives it. */
+	SettleLoadingBeforeSplice(v);
 
 	/* Which end leads belongs to the whole train and has to be handed on to the
 	 * part being put down before the front engine's own copy is reset below. */
@@ -4202,6 +4283,17 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	v->ConsistChanged(CCF_TRACK);
 	FreeTrainTrackReservation(v);
 	v->ReserveTrackUnderConsist();
+
+	/* The kept engine goes on standing in its loading stop, so the stop is
+	 * started afresh over what the train is now -- the settle before the
+	 * split took the whole old consist's cargo work out of flight, and this
+	 * stages exactly the kept part's own share of it again. What it has to
+	 * load or unload here it still does; a light engine has nothing and its
+	 * load finishes at once. */
+	if (v->current_order.IsType(OT_LOADING) && v->cargo_payment == nullptr &&
+			Station::IsValidID(v->last_station_visited)) {
+		PrepareUnload(v);
+	}
 
 	Train *remainder = split_point->First();
 
