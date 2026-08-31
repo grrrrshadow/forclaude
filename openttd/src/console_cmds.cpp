@@ -1162,6 +1162,38 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 				t->flags.Test(VehicleRailFlag::Reversing) ? 'R' : '-',
 				t->vehicle_flags.Test(VehicleFlag::LoadingFinished) ? 'F' : '-');
 	}
+
+	/* The rescue side of the same picture, on the same command. Working it out
+	 * meant reading three different outputs and joining them up by hand: who is
+	 * on call, who is going for whom, what is holding whoever is not moving,
+	 * and which broken trains are still waiting rather than about to give up.
+	 * All of it is known; none of it was said. */
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFrontEngine()) continue;
+
+		if (t->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
+			static const char * const drzi[] = {"nic - jede nebo vyjizdi", "ma zatazenou brzdu", "ma vlastni rozkazy",
+					"nikdo necaka", "porucha se nepocita", "uz pro ni jede jina", "vyjezd z depa je blokovany",
+					"nenajde cestu k poruse", "nema kam s poruchou"};
+			const Train *cil = Train::GetIfValid(t->rescue_target);
+			IConsolePrint(CC_DEFAULT, "odtahovka {}: {} cil {} {} - drzi ji: {}",
+					t->unitnumber,
+					t->IsInDepot() ? "v depu" : fmt::format("na ({},{})", TileX(t->tile), TileY(t->tile)),
+					cil == nullptr ? "zadny" : fmt::format("vlak {}", cil->unitnumber),
+					cil == nullptr ? "" : (IsFetchingCasualty(t) ? "(jede pro ni)" : "(ma ji spojenou)"),
+					drzi[to_underlying(t->rescue_hold)]);
+			continue;
+		}
+
+		if (t->breakdown_ctr == 1 || t->IsWrecked()) {
+			const Train *kdo = Train::GetIfValid(t->couple_claim);
+			IConsolePrint(CC_DEFAULT, "porucha {}: na ({},{}) {} - {}, jede pro ni {}",
+					t->unitnumber, TileX(t->tile), TileY(t->tile),
+					t->IsWrecked() ? "vrak" : "porouchany",
+					IsWaitingToBeRescued(t) ? "ceka na odtah" : "uz na odtah neceka (vyprsela lhuta)",
+					kdo == nullptr ? "nikdo" : fmt::format("odtahovka {}", kdo->unitnumber));
+		}
+	}
 	return true;
 }
 

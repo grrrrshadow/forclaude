@@ -59,6 +59,19 @@ private:
 
 	std::vector<std::pair<TileIndex, Trackdir>> signals_set_to_red; ///< List of signals turned red during a path reservation.
 
+	/**
+	 * Tiles booked so far on this attempt, for a rescue engine on its way out.
+	 *
+	 * Which way round it planned is the one thing the log never said, and it is
+	 * the first thing anybody asks: the short way straight ahead, or the long
+	 * way about? A whole afternoon went on telling those two apart by dumping
+	 * reservations by hand and reasoning from the map. It is written down here
+	 * as the booking is laid, and read back whether it succeeds or fails --
+	 * on failure it is exactly "it got this far, and stopped here".
+	 */
+	std::vector<TileIndex> rescue_booked;
+	bool rescue_watching = false; ///< Whether this attempt is a rescue engine's, so the tiles are worth keeping.
+
 	bool FindSafePositionProc(TileIndex tile, Trackdir td)
 	{
 		if (IsSafeWaitingPosition(Yapf().GetVehicle(), tile, td, true, !TrackFollower::Allow90degTurns())) {
@@ -116,6 +129,7 @@ private:
 				this->res_fail_td = td;
 				return false;
 			}
+			if (this->rescue_watching) this->rescue_booked.push_back(tile);
 
 			/* Green path signal opposing the path? Turn to red. */
 			if (HasPbsSignalOnTrackdir(tile, rev_td) && GetSignalStateByTrackdir(tile, rev_td) == SignalState::Green) {
@@ -209,6 +223,23 @@ public:
 		 * taken, or a tile on the way is held by somebody, or the search never
 		 * got there at all. Telling them apart by hand took a whole afternoon
 		 * and a rig; the game knows all three at the moment it gives up. */
+		{
+			const Train *v = Yapf().GetVehicle();
+			this->rescue_watching = _show_train_orientation && v != nullptr && IsFetchingCasualty(v->First());
+			this->rescue_booked.clear();
+		}
+
+		auto kudy = [&]() {
+			if (this->rescue_booked.empty()) return std::string{"nezamluvila nic"};
+			std::string out = fmt::format("zamluveno {} policek: ", this->rescue_booked.size());
+			for (size_t i = 0; i < this->rescue_booked.size(); i++) {
+				if (i != 0) out += " ";
+				if (i == 8 && this->rescue_booked.size() > 12) { out += "... "; i = this->rescue_booked.size() - 4; }
+				out += fmt::format("({},{})", TileX(this->rescue_booked[i]), TileY(this->rescue_booked[i]));
+			}
+			return out;
+		};
+
 		auto say = [&](std::string what) {
 			if (!_show_train_orientation) return;
 			const Train *v = Yapf().GetVehicle();
@@ -231,9 +262,10 @@ public:
 				 * one line that answers "why will it not go": on the player's
 				 * own railway it was a train parked on the only road. */
 				const Train *drzi = GetTrainForReservation(this->res_fail_tile, TrackdirToTrack(this->res_fail_td));
-				say(fmt::format("nejde zamluvit ({},{}) - drzi {}",
+				say(fmt::format("nejde zamluvit ({},{}) - drzi {}; {}",
 						TileX(this->res_fail_tile), TileY(this->res_fail_tile),
-						drzi != nullptr ? fmt::format("vlak {}", drzi->unitnumber) : "nikdo (jina prekazka)"));
+						drzi != nullptr ? fmt::format("vlak {}", drzi->unitnumber) : "nikdo (jina prekazka)",
+						kudy()));
 
 				/* Reservation failed, undo. */
 				Node *fail_node = this->res_dest_node;
@@ -254,6 +286,8 @@ public:
 		}
 
 		if (target != nullptr) target->okay = true;
+
+		say(fmt::format("cesta k poruse zamluvena, {}", kudy()));
 
 		if (Yapf().CanUseGlobalCache(*this->res_dest_node)) {
 			YapfNotifyTrackLayoutChange(INVALID_TILE, Track::Invalid);
