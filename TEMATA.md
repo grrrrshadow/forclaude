@@ -1155,6 +1155,23 @@ k porouchané, projede proti návěstidlům, dojede k ní **zepředu**, spojí
 se a odtáhne ji do depa; porouchaná pak jede dál po svých. Ostatní scény
 (21 celkem) beze změny.
 
+### „Všechno, nebo nic" je rozhodnuté a nepředělává se
+
+Navrhl jsem otevřít otázku, jestli by odtahovka na vytížené hlavní trati
+neměla smět zastavit i na holé trati proti provozu — celá cesta naráz se
+tam totiž zamluvit skoro nedá. **Hráč to zamítl a rozhodnutí je staré:
+celá trať až k poruše je jenom její.** Odtahovka počká v depu, dokud
+odjedou vlaky, které jely před poruchou; pak je před poruchou volno, celá
+cesta se zamluví a odtahovka vyjede. Znovu se to nezvedá.
+
+Čekání v depu tomu odpovídá a je nekonečné jen zdánlivě: `CheckTrainStay-
+InDepot()` zkusí zamluvit cestu znovu každých 37 tiků, pořád dokola, a
+okno odtahovky mezitím říká „Má výjezd, nenachází cestu k případu"
+(`RescueHold::NoPath`). Strop je jediný, a je to strop porouchaného vlaku,
+ne odtahovky: `RESCUE_DEADLINE_DAYS` (čtvrt roku). Když se do té doby
+trať neuvolní, porouchaný to vzdá a spraví se po vanilkovém, odtahovka
+zruší výjezd a vrátí se do pohotovosti. Zaseknout se tím nedá nic.
+
 ---
 
 ## 4.5 Po spojení vede odtahovka, ne porouchaný vlak
