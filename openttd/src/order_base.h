@@ -56,13 +56,39 @@ private:
 	uint16_t max_speed = UINT16_MAX; ///< How fast the vehicle may go on the way to the destination.
 
 	/**
-	 * Number of vehicles to keep at the front of the consist when leaving
-	 * this order's station; 0 (the default, unaffected by any pre-existing
-	 * order/savegame) means "don't decouple". Deliberately its own field,
-	 * not packed into `flags` alongside unrelated per-order-type data --
-	 * see FEATURE_DESIGN_COUPLING_TOW.md, "Bug D" for why that aliasing
-	 * bit-packing approach caused real bugs in the patch this feature is
-	 * inspired by.
+	 * Whether this order leaves part of the train behind, and how much of it
+	 * stays on: the engine, plus #decouple_keep_wagons wagons.
+	 *
+	 * The engine is not counted. A player asking for "keep two" means two
+	 * wagons and takes the engine for granted -- it is the thing doing the
+	 * leaving, so counting it as one of the things left with is a way of
+	 * thinking nobody has. Counting it also made zero mean two different
+	 * things at once ("keep nothing" and "do not decouple"), so the useful
+	 * case of dropping the whole rake could not be asked for at all; and on a
+	 * train whose first two units were a single engine and a double-headed
+	 * one, "keep two" fell inside the double engine and the order silently did
+	 * nothing.
+	 *
+	 * So the two questions are two fields. Whether to decouple at all is the
+	 * button; how many wagons stay is a number that may be zero, and zero is
+	 * the default: leave the lot, engine goes on alone.
+	 *
+	 * Deliberately their own fields, not packed into `flags` alongside
+	 * unrelated per-order-type data -- see FEATURE_DESIGN_COUPLING_TOW.md,
+	 * "Bug D" for why that aliasing bit-packing approach caused real bugs in
+	 * the patch this feature is inspired by.
+	 */
+	bool decouple = false;
+	uint8_t decouple_keep_wagons = 0;
+
+	/**
+	 * The old "how many vehicles from the front stay on, zero means do not
+	 * decouple" field, kept only so that orders written before the two
+	 * questions were separated still mean what they meant.
+	 *
+	 * Saves are matched by field name, so an old save brings this and neither
+	 * of the two above; migration turns it into them once, on load, and writes
+	 * zero here from then on. See AfterLoadDecoupleCounts().
 	 */
 	uint8_t decouple_count = 0;
 
@@ -216,21 +242,43 @@ public:
 	void SetRefit(CargoType cargo);
 
 	/**
-	 * Should the consist decouple down to #GetDecoupleCount vehicles when
-	 * leaving this order's station?
-	 * @pre IsType(OT_GOTO_STATION)
+	 * Does this order leave part of the train behind?
+	 * @pre IsType(OT_GOTO_STATION) || IsType(OT_GOTO_DEPOT)
 	 */
-	inline bool ShouldDecoupleOnDeparture() const { return this->decouple_count > 0; }
+	inline bool ShouldDecoupleOnDeparture() const { return this->decouple; }
+
+	/** Set whether this order leaves part of the train behind. */
+	inline void SetDecouple(bool decouple) { this->decouple = decouple; }
 
 	/**
-	 * How many vehicles (counted from the front) to keep when decoupling
-	 * on departure; only meaningful if #ShouldDecoupleOnDeparture.
-	 * @pre IsType(OT_GOTO_STATION)
+	 * How many wagons stay on with the engine when this order decouples.
+	 * The engine itself is never counted and never left behind, so zero is a
+	 * real answer: the engine goes on alone. Only meaningful if
+	 * #ShouldDecoupleOnDeparture.
 	 */
-	inline uint8_t GetDecoupleCount() const { return this->decouple_count; }
+	inline uint8_t GetDecoupleCount() const { return this->decouple_keep_wagons; }
 
-	/** Set how many vehicles to keep when decoupling on departure; 0 disables decoupling for this order. */
-	inline void SetDecoupleCount(uint8_t count) { this->decouple_count = count; }
+	/** Set how many wagons stay on with the engine; zero keeps none of them. */
+	inline void SetDecoupleCount(uint8_t count) { this->decouple_keep_wagons = count; }
+
+	/**
+	 * Convert an order written under the old single count into the switch and
+	 * the wagon count that replaced it, once, on load.
+	 *
+	 * The old count was the engine plus the wagons, so one off it is the
+	 * wagons; and any count at all meant decoupling was on. Emptying the old
+	 * field is what keeps "has the old field" a reliable mark of an old save.
+	 *
+	 * @return whether there was anything to convert.
+	 */
+	bool MigrateLegacyDecoupleCount()
+	{
+		if (this->decouple_count == 0) return false;
+		this->decouple = true;
+		this->decouple_keep_wagons = this->decouple_count - 1;
+		this->decouple_count = 0;
+		return true;
+	}
 
 	/** Should we delay leaving this station until a partner train arrives to couple with? @pre IsType(OT_GOTO_STATION) */
 	inline bool ShouldWaitForCouple() const { return this->wait_for_couple; }

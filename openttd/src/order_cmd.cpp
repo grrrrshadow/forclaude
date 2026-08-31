@@ -1252,7 +1252,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
@@ -1263,7 +1263,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * "wait to couple" -- trains couple at stations, in the open, where
 			 * the player can see it; the only thing to couple to in a depot is
 			 * a rake of stored wagons. */
-			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE_COUNT && mof != MOF_GOTO_COUPLE &&
+			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_GOTO_COUPLE &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
@@ -1403,6 +1403,15 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (data >= v->GetNumOrders()) return CMD_ERROR;
 			break;
 
+		case MOF_DECOUPLE:
+			/* What may not be combined with leaving wagons here is asked of the
+			 * switch, which is the thing that says whether the order decouples
+			 * at all. The number beside it is just a number. */
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() ||
+					(order->ShouldGoToCouple() && !order->IsType(OT_GOTO_DEPOT)))) return CMD_ERROR;
+			break;
+
 		case MOF_DECOUPLE_COUNT:
 			/* Not validated against the vehicle's current length: the
 			 * order can be edited ahead of the consist changing, and an
@@ -1411,8 +1420,6 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * rather than rejected here. */
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data > UINT8_MAX) return CMD_ERROR;
-			if (data != 0 && (order->ShouldWaitForCouple() ||
-					(order->ShouldGoToCouple() && !order->IsType(OT_GOTO_DEPOT)))) return CMD_ERROR;
 			break;
 
 		/* Waiting to be collected is the opposite of going to collect, and a
@@ -1434,13 +1441,13 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		 * collect. */
 		case MOF_WAIT_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (data != 0 && (order->ShouldGoToCouple() || order->ShouldReverseOutOfStation() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
+			if (data != 0 && (order->ShouldGoToCouple() || order->ShouldReverseOutOfStation() || order->ShouldDecoupleOnDeparture())) return CMD_ERROR;
 			break;
 
 		case MOF_GOTO_COUPLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data != 0 && (order->ShouldWaitForCouple() ||
-					(order->GetDecoupleCount() != 0 && !order->IsType(OT_GOTO_DEPOT)))) return CMD_ERROR;
+					(order->ShouldDecoupleOnDeparture() && !order->IsType(OT_GOTO_DEPOT)))) return CMD_ERROR;
 			break;
 
 		case MOF_TURN_AROUND_DEPOT:
@@ -1451,7 +1458,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_REVERSE_OUT:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
-			if (data != 0 && (order->ShouldWaitForCouple() || order->GetDecoupleCount() != 0)) return CMD_ERROR;
+			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture())) return CMD_ERROR;
 			break;
 
 		/* The three filters on what a coupling order will collect. They only
@@ -1568,6 +1575,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				order->SetConditionSkipToOrder(data);
 				break;
 
+			case MOF_DECOUPLE:
+				order->SetDecouple(data != 0);
+				break;
+
 			case MOF_DECOUPLE_COUNT:
 				order->SetDecoupleCount(static_cast<uint8_t>(data));
 				break;
@@ -1648,12 +1659,14 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					 * Nothing said so, because from outside a train waiting for
 					 * the wrong thing and a train waiting for the right thing
 					 * that is not there look identical. */
+					u->current_order.SetDecouple(order->ShouldDecoupleOnDeparture());
 					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
 					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
 					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
 					u->current_order.SetCoupleCount(order->GetCoupleCount());
 				} else if ((u->current_order.IsType(OT_GOTO_STATION) || u->current_order.IsType(OT_LOADING)) && order->IsType(OT_GOTO_STATION)) {
+					u->current_order.SetDecouple(order->ShouldDecoupleOnDeparture());
 					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
 					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());

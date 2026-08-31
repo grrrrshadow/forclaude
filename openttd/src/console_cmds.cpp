@@ -849,7 +849,8 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		drop_b.MakeGoToStation(st2_id);
 		drop_b.SetLoadType(OrderLoadType::NoLoad);
 		drop_b.SetUnloadType(OrderUnloadType::NoUnload);
-		drop_b.SetDecoupleCount(1);
+		drop_b.SetDecouple(true);
+		drop_b.SetDecoupleCount(0);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_b, 1, drop_b);
 		Order home_b;
 		home_b.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
@@ -970,7 +971,8 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		 * Then home to the east depot, so the run says plainly whether the
 		 * exchange finished or the train sat in the shed. */
 		deliver.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
-		deliver.SetDecoupleCount(1);
+		deliver.SetDecouple(true);
+		deliver.SetDecoupleCount(0);
 		deliver.SetGoToCouple(true);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
 		Order home_swap;
@@ -981,19 +983,22 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		/* Deliver straight into the west depot and stay there, halted; the
 		 * rake is stored in the shed by the depot decouple. */
 		deliver.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
-		deliver.SetDecoupleCount(1);
+		deliver.SetDecouple(true);
+		deliver.SetDecoupleCount(0);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
 	} else {
 		deliver.MakeGoToStation(st_id);
 		if (blocked) {
 			deliver.SetLoadType(OrderLoadType::FullLoadAny);
 			deliver.SetUnloadType(OrderUnloadType::NoUnload);
-			deliver.SetDecoupleCount(2);
+			deliver.SetDecouple(true);
+			deliver.SetDecoupleCount(1);
 			IConsolePrint(CC_DEFAULT, "testspoj: odkladacka si necha vagon na plnou nakladku - z nastupiste neodjede.");
 		} else {
 			deliver.SetLoadType(OrderLoadType::NoLoad);
 			deliver.SetUnloadType(OrderUnloadType::NoUnload);
-			deliver.SetDecoupleCount(1);
+			deliver.SetDecouple(true);
+			deliver.SetDecoupleCount(0);
 		}
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, deliver);
 		if (timetabled) {

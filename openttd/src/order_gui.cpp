@@ -349,8 +349,8 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * line with everything else the order is going to do. A button
 				 * speaks for the one order selected, so a train that decouples
 				 * at several stations learned nothing from it about any. */
-				if (!timetable && v->type == VehicleType::Train && order->GetDecoupleCount() != 0) {
-					line += GetString(STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+				if (!timetable && v->type == VehicleType::Train && order->ShouldDecoupleOnDeparture()) {
+					line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DECOUPLE_SUFFIX_ALL : STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 				}
 
 				/* Reversing out is about where the train goes next, not about
@@ -360,7 +360,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * exclusive can still have both set, and saying so would be a
 				 * plain lie about what the train is going to do. */
 				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation() &&
-						order->GetDecoupleCount() == 0) {
+						!order->ShouldDecoupleOnDeparture()) {
 					line += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
 				}
 			}
@@ -405,11 +405,11 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			 * line, same as a station order does -- but in the order the work
 			 * is really done in, which is the order the player would do it in
 			 * by hand: leave first, then take on. */
-			if (!timetable && v->type == VehicleType::Train && order->GetDecoupleCount() != 0) {
-				line += GetString(STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+			if (!timetable && v->type == VehicleType::Train && order->ShouldDecoupleOnDeparture()) {
+				line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL : STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 			}
 			if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
-				bool after_decouple = !timetable && order->GetDecoupleCount() != 0;
+				bool after_decouple = !timetable && order->ShouldDecoupleOnDeparture();
 				line += GetString(after_decouple ? STR_ORDER_DEPOT_COUPLE_SUFFIX_AND : STR_ORDER_DEPOT_COUPLE_SUFFIX);
 				if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
 					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
@@ -1224,7 +1224,7 @@ public:
 				 * brings the orders. */
 				bool waiting = order->ShouldWaitForCouple();
 				bool collecting = order->ShouldGoToCouple();
-				bool decoupling = order->GetDecoupleCount() != 0;
+				bool decoupling = order->ShouldDecoupleOnDeparture();
 				bool reversing_out = order->ShouldReverseOutOfStation();
 
 				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE, waiting || decoupling);
@@ -1246,7 +1246,7 @@ public:
 				 * all: trains couple at stations, in the open; the only thing to
 				 * couple to in a shed is a stored rake. */
 				this->SetWidgetLoweredState(WID_O_GOTO_COUPLE_DEPOT, order->ShouldGoToCouple());
-				this->SetWidgetLoweredState(WID_O_DECOUPLE_DEPOT, order->GetDecoupleCount() != 0);
+				this->SetWidgetLoweredState(WID_O_DECOUPLE_DEPOT, order->ShouldDecoupleOnDeparture());
 				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE_DEPOT, false);
 				this->SetWidgetDisabledState(WID_O_DECOUPLE_DEPOT, false);
 			} else {
@@ -1264,7 +1264,7 @@ public:
 		/* The decoupling row carries the switch itself, so it is there for any
 		 * station order; what changes is whether the rest of it can be used. */
 		bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
-		bool decoupling = can_decouple && order->GetDecoupleCount() != 0;
+		bool decoupling = can_decouple && order->ShouldDecoupleOnDeparture();
 
 		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
 				order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
@@ -1584,33 +1584,29 @@ public:
 				 * act on and does nothing. Asserting here brought the game down
 				 * for exactly that (crash 2026-08-28). */
 				if (order == nullptr) break;
-				/* One button for the whole thing: it asks how many vehicles the
-				 * train keeps here, and nought is how decoupling is switched
-				 * off again.
+				/* The button is the switch, and nothing else. It used to be the
+				 * switch and the number both, with nought standing for "off" --
+				 * which cost the one answer a player most often wants, "leave
+				 * the whole lot here", because that is nought wagons and nought
+				 * already meant something else.
 				 *
-				 * Pressed while it is already on, it simply switches decoupling
-				 * off. There is nothing left to ask at that point, and a number
-				 * box standing in the way of turning something off is a box that
-				 * only ever gets a nought typed into it. */
-				if (order->GetDecoupleCount() != 0) {
-					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 0);
+				 * Pressed while it is on, it simply switches off. */
+				if (order->ShouldDecoupleOnDeparture()) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE, 0);
 					break;
 				}
-				/* Switch it on at one first, and only then ask. One -- the
-				 * engine keeps itself and puts everything behind it down -- is
-				 * what is wanted nearly every time, and a number box is not
-				 * something to have to work through to get it.
-				 *
-				 * It has to be this way round: a query box calls back only when
-				 * the text is changed, so a box that opens already saying the
-				 * right answer does nothing at all when it is accepted. Setting
-				 * it first means accepting the box leaves it at one, and typing
-				 * something else changes it. */
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 1);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE, 1);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 0);
 
+				/* And then ask how many wagons stay on, with nought already
+				 * filled in, because nought is both the commonest answer and
+				 * the default. Accepting the box unchanged leaves it there --
+				 * a query box calls back only when the text is edited -- which
+				 * is why the count is set before the box opens rather than by
+				 * it. */
 				this->querying_decouple_count = true;
 				this->querying_couple_count = false;
-				ShowQueryString(GetString(STR_JUST_INT, 1), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				ShowQueryString(GetString(STR_JUST_INT, 0), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				break;
 			}
 

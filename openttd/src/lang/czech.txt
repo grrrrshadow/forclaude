@@ -5030,9 +5030,9 @@ STR_ORDER_REVERSE_OUT                                           :{BLACK}Reversn�
 STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Při odjezdu z této stanice jet reversním chodem, místo aby vlak pokračoval směrem, kterým je otočený, a hledal cestu okolo
 STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(a reversní chod)
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
-STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat si vozů
-STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Při odjezdu z této stanice ponechat vepředu tento počet vozidel a zbytek nechat odpojený stát. 0 znamená neodpojovat
-STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Zadej počet vozidel, která zůstanou (0 = neodpojovat)
+STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat si vagonů
+STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Kolik vagonů zůstane s mašinkou; zbytek se tu nechá stát. Mašinka se nepočítá, takže 0 znamená odpojit všechny vagonky
+STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Kolik vagonů zůstane s mašinkou (0 = odpojit všechny)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v této stanici, dokud vedle nezastaví vlak, se kterým se dá spojit, a pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit
@@ -5061,7 +5061,9 @@ STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká 
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
+STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(a odpojit vše)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(nechat si {NUM})
+STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL                             :{SPACE}(odpojit vše)
 STR_ORDER_DEPOT_COUPLE_SUFFIX                                   :{SPACE}(připojit)
 STR_ORDER_DEPOT_COUPLE_SUFFIX_AND                               :{SPACE}(a připojit)
 

@@ -187,7 +187,8 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_COND_COMPARATOR, ///< A comparator changes.
 	MOF_COND_VALUE,      ///< The value to set the condition to.
 	MOF_COND_DESTINATION,///< Change the destination of a conditional order.
-	MOF_DECOUPLE_COUNT,  ///< Change how many vehicles to keep when decoupling on departure (0 = don't decouple).
+	MOF_DECOUPLE,        ///< Toggle whether this order leaves part of the train behind.
+	MOF_DECOUPLE_COUNT,  ///< Change how many wagons stay on with the engine when decoupling; the engine is never counted, so zero keeps none of them.
 	MOF_WAIT_COUPLE,     ///< Toggle whether to wait at this station for a partner train to couple with.
 	MOF_GOTO_COUPLE,     ///< Toggle whether this order's destination is a place to travel to (reversing if needed) to couple with a partner train there.
 	MOF_TURN_AROUND_DEPOT,///< Toggle whether a train visiting this depot turns around there.

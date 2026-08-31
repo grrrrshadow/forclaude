@@ -1699,8 +1699,8 @@ void VehicleEnterDepot(Vehicle *v)
 		 * there; see Train::depot_decouple_pending. Written whichever of those
 		 * two endings applies -- a depot order is allowed to put wagons down
 		 * and take wagons on, and it does them in that order. */
-		if (v->type == VehicleType::Train && v->current_order.GetDecoupleCount() != 0) {
-			Train::From(v)->depot_decouple_pending = v->current_order.GetDecoupleCount();
+		if (v->type == VehicleType::Train && v->current_order.ShouldDecoupleOnDeparture()) {
+			Train::From(v)->depot_decouple_pending = v->current_order.GetDecoupleCount() + 1;
 		}
 
 		if (!collecting_here && v->current_order.GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) {
@@ -2569,7 +2569,7 @@ void Vehicle::HandleLoading(bool mode)
 			 * leaves the right way by itself, so the choice is not offered.
 			 * See FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (this->type == VehicleType::Train && this->current_order.ShouldReverseOutOfStation() &&
-					this->current_order.GetDecoupleCount() == 0) {
+					!this->current_order.ShouldDecoupleOnDeparture()) {
 				Train::From(this)->flags.Set(VehicleRailFlag::Reversing);
 			}
 

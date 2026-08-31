@@ -238,9 +238,14 @@ public:
 		SLE_VAR(Order, travel_time, VarTypes::U16),
 		SLE_VAR(Order, max_speed,   VarTypes::U16),
 		/* This is a CH_TABLE chunk: fields are matched by name, so saves
-		 * from before this field existed simply don't have it and the
-		 * in-class default (0 = "don't decouple") applies on load. See
-		 * FEATURE_DESIGN_COUPLING_TOW.md. */
+		 * from before a field existed simply don't have it and the in-class
+		 * default applies on load. Which is what lets the old, single
+		 * decouple_count be carried alongside the two fields that replaced it
+		 * and told apart from them without a version number: an old save has
+		 * only the old field, and a new one always writes it as zero. See
+		 * AfterLoadDecoupleCounts() and FEATURE_DESIGN_COUPLING_TOW.md. */
+		SLE_VAR(Order, decouple, VarTypes::BOOL),
+		SLE_VAR(Order, decouple_keep_wagons, VarTypes::U8),
 		SLE_VAR(Order, decouple_count, VarTypes::U8),
 		SLE_VAR(Order, wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Order, go_to_couple, VarTypes::BOOL),

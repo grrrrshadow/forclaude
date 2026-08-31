@@ -614,6 +614,46 @@ static void AfterLoadLegacyDecoupleImportReferences()
 			cleared_loading, cleared_payments);
 }
 
+/**
+ * Turn the old single "keep this many vehicles" decoupling count into the two
+ * questions it was really answering.
+ *
+ * It used to mean "keep this many vehicles counted from the front, and zero
+ * means do not decouple at all". It now means "the engine stays, and this many
+ * wagons stay with it", with a separate switch for whether to decouple -- so
+ * zero has become a real answer rather than an off switch. An order saved
+ * under the old meaning would therefore keep one wagon too many, silently, and
+ * a player who had set up a working railway would find it quietly rearranged
+ * on the next load.
+ *
+ * Which is exactly what the old count did contain: the engine plus the wagons.
+ * One off the count and the switch turned on, and the order does what it did.
+ *
+ * Told apart from a new save without a version number: the fields are matched
+ * by name, so an old save has only the old field, and a new save always writes
+ * it as zero. Emptying it here is what keeps that true after the first load.
+ */
+static void AfterLoadDecoupleCounts()
+{
+	size_t migrated = 0;
+	for (OrderList *ol : OrderList::Iterate()) {
+		for (Order &o : ol->GetOrders()) {
+			if (o.MigrateLegacyDecoupleCount()) migrated++;
+		}
+	}
+	/* The copy a vehicle is working on right now is its own and is not in any
+	 * list, so it has to be converted too -- otherwise a train already standing
+	 * at the station it decouples at goes on reading the old meaning until its
+	 * order comes round again. */
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (v->current_order.MigrateLegacyDecoupleCount()) migrated++;
+	}
+
+	if (migrated != 0) {
+		IConsolePrint(CC_INFO, "Prevedeno {} rozkazu odpojeni na novy zapis (masinka se nepocita).", migrated);
+	}
+}
+
 /** @copydoc AfterLoadLegacyDecoupleImportReferences */
 static void AfterLoadLegacyDecoupleImportMap()
 {
@@ -3732,6 +3772,9 @@ bool AfterLoadGame()
 		extern bool _sl_legacy_decouple_import;
 		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImportMap();
 	}
+
+	CrashLog::SetStage("afterload: AfterLoadDecoupleCounts");
+	AfterLoadDecoupleCounts();
 
 	_gamelog.PrintDebug(1);
 

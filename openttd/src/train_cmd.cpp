@@ -4074,7 +4074,6 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
  */
 bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks)
 {
-	if (keep_count == 0) return false;
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
 	/* Taking a train apart is the same work the move command does, and parts of
@@ -4086,13 +4085,17 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * called through, and the same answer: say who is acting before acting. */
 	AutoRestoreBackup cur_company(_current_company, v->First()->owner);
 
-	Train *split_point = v;
-	for (uint8_t i = 0; i < keep_count; i++) {
-		split_point = split_point->GetNextVehicle();
-		if (split_point == nullptr) return false; // consist has fewer than keep_count vehicles
+	/* The engine stays and is not counted; keep_count is wagons. Stepping by
+	 * whole units rather than by vehicles is what makes that true of a
+	 * double-headed engine too -- GetNextUnit() steps over its rear half and
+	 * over articulated parts, so the split can never land inside one. */
+	Train *split_point = v->GetNextUnit();
+	for (uint8_t i = 0; i < keep_count && split_point != nullptr; i++) {
+		split_point = split_point->GetNextUnit();
 	}
 
-	if (split_point->IsRearDualheaded()) return false; // can't split a multiheaded engine in half
+	/* Nothing behind what is kept, so there is nothing to leave here. */
+	if (split_point == nullptr) return false;
 
 	/* Which end leads belongs to the whole train and has to be handed on to the
 	 * part being put down before the front engine's own copy is reset below. */
@@ -4381,20 +4384,21 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
 		}
 	};
 
-	if (keep_count == 0) return;
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return nic("havarovany vlak");
 
 	/* Same trap as every other consist surgery done from a vehicle tick:
 	 * commands read whichever company happens to be current. */
 	AutoRestoreBackup cur_company(_current_company, v->First()->owner);
 
-	Train *split_point = v;
-	for (uint8_t i = 0; i < keep_count; i++) {
-		split_point = split_point->GetNextVehicle();
-		if (split_point == nullptr) return nic("vlak je kratsi nez kolik si ma nechat"); // consist has fewer than keep_count vehicles
+	/* See the matching walk in TryDecoupleAtStation(): the engine is kept and
+	 * never counted, and stepping by units keeps the split out of the middle of
+	 * a double-headed engine. */
+	Train *split_point = v->GetNextUnit();
+	for (uint8_t i = 0; i < keep_count && split_point != nullptr; i++) {
+		split_point = split_point->GetNextUnit();
 	}
 
-	if (split_point->IsRearDualheaded()) return nic("delilo by to dvojitou masinku napul"); // can't split a multiheaded engine in half
+	if (split_point == nullptr) return nic("za tim, co si necha, uz nic neni");
 
 	if (TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true).Failed()) return nic("rozpojeni samo selhalo");
 
@@ -8043,7 +8047,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * (non-stop off) can never trip it; and safe to ask every loading tick,
 	 * because a train already at its kept length splits into nothing. */
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && consist->current_order.IsType(OT_LOADING) &&
-			consist->current_order.GetDecoupleCount() != 0) {
+			consist->current_order.ShouldDecoupleOnDeparture()) {
 		const Order *real_order = consist->GetOrder(consist->cur_real_order_index);
 		if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
 				real_order->GetDestination().ToStationID() == consist->last_station_visited &&
@@ -8124,7 +8128,9 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && IsWholeTrainInsideDepot(consist)) {
 		if (consist->depot_decouple_pending != 0) {
-			uint8_t keep = consist->depot_decouple_pending;
+			/* Held as wagons-to-keep plus one, because zero wagons is a real
+			 * answer now and zero is also how this field says "nothing to do". */
+			uint8_t keep = consist->depot_decouple_pending - 1;
 			consist->depot_decouple_pending = 0;
 			TryDecoupleAtDepot(consist, keep);
 			return true;

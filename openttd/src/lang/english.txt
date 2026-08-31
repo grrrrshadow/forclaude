@@ -4895,9 +4895,11 @@ STR_ORDER_CONDITIONAL_VALUE_TOOLTIP                             :{BLACK}The valu
 STR_ORDER_CONDITIONAL_VALUE_CAPT                                :{WHITE}Enter value to compare against
 
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Decouple: {NUM}
-STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Keep this many
-STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}When leaving this station, keep this many vehicles at the front and leave the rest behind, decoupled. 0 means don't decouple
-STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Enter number of vehicles to keep (0 = don't decouple)
+STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Keep this many wagons
+STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}How many wagons stay on with the engine; the rest is left standing here. The engine is never counted, so 0 means drop every wagon
+STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(and drop them all)
+STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL                             :{SPACE}(drop them all)
+STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}How many wagons stay on with the engine (0 = drop them all)
 
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Wait to couple
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at this station until a stopped train arrives immediately next to us to couple with, then continue as one consist

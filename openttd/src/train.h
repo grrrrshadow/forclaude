@@ -157,9 +157,13 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
 	/**
-	 * How many vehicles this train keeps when it finishes the decoupling its
+	 * How many wagons this train keeps when it finishes the decoupling its
 	 * depot order asked for, carried from the moment of arrival to the moment
-	 * the work is safe to do. Zero means no decoupling is owed.
+	 * the work is safe to do -- **plus one**. Zero means no decoupling is owed.
+	 *
+	 * The plus one is because keeping no wagons at all is a perfectly ordinary
+	 * order (the engine drops the lot and goes on alone), so a plain count
+	 * could not tell "keep none" apart from "nothing to do".
 	 *
 	 * Arriving at the ordered depot concludes the order on the spot
 	 * (VehicleEnterDepot() wipes it to a dummy), but taking a train apart is
