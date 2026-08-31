@@ -6285,7 +6285,12 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 					TileX(consist->dest_tile), TileY(consist->dest_tile),
 					path_found ? "cil nalezen" : "CIL NENALEZEN",
 					res_dest.tile == INVALID_TILE ? "nikde" :
-							fmt::format("({},{}) {}", TileX(res_dest.tile), TileY(res_dest.tile), res_dest.okay ? "ok" : "nezamluveno")));
+							fmt::format("({},{}) {}, bezpecne {}, volno {}",
+									TileX(res_dest.tile), TileY(res_dest.tile), res_dest.okay ? "ok" : "nezamluveno",
+									res_dest.trackdir == Trackdir::Invalid ? "?" :
+											(IsSafeWaitingPosition(consist, res_dest.tile, res_dest.trackdir, true, _settings_game.pf.forbid_90_deg) ? "ano" : "NE"),
+									res_dest.trackdir == Trackdir::Invalid ? "?" :
+											(IsWaitingPositionFree(consist, res_dest.tile, res_dest.trackdir, _settings_game.pf.forbid_90_deg) ? "ano" : "NE"))));
 		}
 
 		consist->HandlePathfindingResult(path_found);

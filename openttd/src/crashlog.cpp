@@ -72,7 +72,7 @@ static void SurveyRecentNews(nlohmann::json &json)
 /**
  * Create a timestamped filename.
  * @param ext           The extension for the filename.
- * @param with_dir      Whether to prepend the filename with the personal directory.
+ * @param with_dir      Whether to prepend the filename with the directory it goes in.
  * @return The filename
  */
 std::string CrashLog::CreateFileName(std::string_view ext, bool with_dir) const
@@ -82,7 +82,13 @@ std::string CrashLog::CreateFileName(std::string_view ext, bool with_dir) const
 	if (crashname.empty()) {
 		crashname = fmt::format("crash{:%Y%m%d%H%M%S}", fmt::gmtime(time(nullptr)));
 	}
-	return fmt::format("{}{}{}", with_dir ? _personal_dir : std::string{}, crashname, ext);
+	/* Beside the saved games rather than in the personal directory above them.
+	 * A crash report is only any use if it reaches somebody, and what the
+	 * player is already holding when he goes looking is the save -- reporting a
+	 * crash is the save plus this file, so the two belong in one folder. On a
+	 * phone, hunting a loose file out of the folder above is a separate errand,
+	 * and one that gets skipped. */
+	return fmt::format("{}{}{}", with_dir ? FioFindDirectory(Subdirectory::Save) : std::string{}, crashname, ext);
 }
 
 /**

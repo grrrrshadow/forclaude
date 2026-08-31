@@ -1195,9 +1195,15 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 }
 
 /**
- * Save the console backlog to a text file in the personal directory, so an
+ * Save the console backlog to a text file beside the saved games, so an
  * incident can be reported whole instead of screenshotting the console a
  * window at a time. Usage: vlaksav [<name>]
+ *
+ * Beside the saves and not in the personal directory above them, because that
+ * is the one folder the player already has open when something goes wrong: he
+ * is reaching for the save anyway, and a report is a save plus this. Hunting a
+ * loose file out of the folder above, on a phone, is a separate errand nobody
+ * should have to run twice.
  * @copydoc IConsoleCmdProc
  */
 static bool ConSaveConsoleLog(std::span<std::string_view> argv)
@@ -1206,9 +1212,8 @@ static bool ConSaveConsoleLog(std::span<std::string_view> argv)
 		IConsolePrint(CC_HELP, "Save the console backlog to a file. Usage: 'vlaksav [<name>]' (default vlaksav.txt).");
 		return true;
 	}
-	extern std::string _personal_dir;
 	std::string name = argv.size() >= 2 ? fmt::format("{}.txt", argv[1]) : "vlaksav.txt";
-	std::string path = _personal_dir + name;
+	std::string path = FioFindDirectory(Subdirectory::Save) + name;
 	int lines = IConsoleSaveBacklog(path);
 	if (lines < 0) {
 		IConsolePrint(CC_ERROR, "vlaksav: nejde zapsat '{}'.", path);
@@ -1429,6 +1434,37 @@ static uint _testokruh_detour_row = 0;
 static bool _testokruh_detour_seen = false;
 
 /**
+ * Let a train's brake off, or put it on, by unit number.
+ *
+ * Added to be able to replay a player's own saved game rather than a scene
+ * built from scratch: what a save cannot carry is the click that starts the
+ * train, and on a rescue engine that click is the whole errand -- brake off is
+ * what puts one on call. Usage: 'testbrzda <cislo vlaku>'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBrake(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Toggle a train's brake by unit number. Usage: 'testbrzda <unit>'.");
+		return true;
+	}
+	auto want = ParseInteger(argv[1]);
+	if (!want.has_value()) return false;
+
+	for (Train *t : Train::Iterate()) {
+		if (!t->IsFrontEngine() || t->unitnumber != (UnitID)*want) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
+		IConsolePrint(r.Failed() ? CC_ERROR : CC_DEFAULT, "testbrzda: vlak {} - {}.", *want,
+				r.Failed() ? "nepovedlo se" : (t->vehstatus.Test(VehState::Stopped) ? "brzda zatazena" : "brzda pustena"));
+		_testspoj_active = true;
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testbrzda: vlak {} neexistuje.", *want);
+	return true;
+}
+
+/**
  * Print every reserved tile in the current test scene's rectangle.
  *
  * A rescue engine that will not leave its shed says only "no route", and from
@@ -1440,12 +1476,21 @@ static bool _testokruh_detour_seen = false;
 static bool ConTestReservations(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "List reserved tiles in the test scene. Usage: 'testrez'.");
+		IConsolePrint(CC_HELP, "List reserved tiles. Usage: 'testrez' (test scene) or 'testrez <x0> <y0> <x1> <y1>'.");
 		return true;
 	}
+	/* A scene built here leaves its rectangle behind; a player's own saved game
+	 * does not, so the corners can be given instead. */
+	uint x0 = _testmapa_area[0], y0 = _testmapa_area[1], x1 = _testmapa_area[2], y1 = _testmapa_area[3];
+	if (argv.size() >= 5) {
+		auto a0 = ParseInteger(argv[1]), b0 = ParseInteger(argv[2]), a1 = ParseInteger(argv[3]), b1 = ParseInteger(argv[4]);
+		if (!a0 || !b0 || !a1 || !b1) return false;
+		x0 = *a0; y0 = *b0; x1 = *a1; y1 = *b1;
+	}
+
 	uint n = 0;
-	for (uint y = _testmapa_area[1]; y <= _testmapa_area[3]; y++) {
-		for (uint x = _testmapa_area[0]; x <= _testmapa_area[2]; x++) {
+	for (uint y = y0; y <= y1 && y < Map::SizeY(); y++) {
+		for (uint x = x0; x <= x1 && x < Map::SizeX(); x++) {
 			TileIndex t = TileXY(x, y);
 			if (!IsTileType(t, TileType::Railway) && !IsRailStationTile(t)) continue;
 			TrackBits res = GetReservedTrackbits(t);
@@ -5034,6 +5079,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);
+	IConsole::CmdRegister("testbrzda",               ConTestBrake);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
