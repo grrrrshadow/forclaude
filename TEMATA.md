@@ -1528,6 +1528,30 @@ průchod (`ExtendTrainReservation`), ne hledač cest. Proto všechny odtahové
 scény v rigu procházejí, aniž by kterákoli z výjimek v hledači cest byla
 jedinkrát spuštěna. Jsou to nedokázané řádky.
 
+## 4.10 Jakákoli dvojí cesta zúžení hledání zkazí
+
+**Hráčova diagnóza, a je správná.** Potvrzeno dvěma scénami v rigu, které se
+liší jedinou věcí — jestli je z čeho vybírat:
+
+```
+testodtah daleko (jedna cesta, proti jednosměrným): spojeno=1 odtazeno=1 cil nenalezen=0
+testokruh        (okruh, dvě cesty na výběr):       spojeno=0 odtazeno=0 cil nenalezen=354
+```
+
+**Proč.** To zúžení je pravidlo z tématu 4.4: pro odtahovku na výjezdu není
+bezpečné místo k zastavení **nikde** kromě u porouchané. Na jednom koridoru
+to nic nestojí, protože zamlouvání tam dělá krátký chůzový průchod
+(`ExtendTrainReservation`) a hledače cest se nikdo neptá. Jakmile je na
+cestě odbočka, ptát se ho musí — a celý PBS hledač je postavený na tom, že
+bezpečné místo k zastavení najde do dvou návěstidel. Se zúžením žádné do
+konce cesty není, takže s ním hledač neumí pracovat a vrátí „cíl nenalezen".
+
+**Není to o jednosměrných návěstidlech.** Proti nim to na jednom koridoru
+projde (scéna `daleko`). Rozhoduje ta odbočka, ne návěstidlo.
+
+**Nedořešeno.** Opravit to znamená sáhnout na to zúžení, ne přidat další
+výjimku vedle. Rozhodnutí, kterým směrem, ještě nepadlo.
+
 ---
 
 # 5. Myš, kurzor, stavba
