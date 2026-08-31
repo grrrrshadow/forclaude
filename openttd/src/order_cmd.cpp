@@ -170,7 +170,28 @@ bool Order::Equals(const Order &other) const
 				this->GetDepotActionType().Reset(OrderDepotActionFlag::NearestDepot) == other.GetDepotActionType().Reset(OrderDepotActionFlag::NearestDepot);
 	}
 
-	return this->type == other.type && this->flags == other.flags && this->dest == other.dest;
+	/* The dedicated fields are part of what an order asks for, so orders that
+	 * differ only in them are different orders. They live outside `flags` (see
+	 * their declarations), and left out of this comparison, two neighbouring
+	 * orders to the same destination differing only in one of them read as
+	 * "unchanged" to ProcessOrders -- which then keeps the stale current_order
+	 * and the second order's work never reaches the train. Couple here, then
+	 * decouple here, written on one platform, was the visible case: the
+	 * decouple ran once through the loading state of a plain arrival and never
+	 * through the follow-up order.
+	 *
+	 * The two coupling fields are deliberately not compared. On current_order
+	 * they are execution state, not a request: concluding a coupling clears
+	 * them in place (see CmdCoupleTrains), and a collector that finds nothing
+	 * to collect turns its "go" into a "wait" the same way. Compared here,
+	 * the very next ProcessOrders tick would find current_order differing
+	 * from the order list, copy the list entry back in, and resurrect the
+	 * coupling that has just been concluded. */
+	return this->type == other.type && this->flags == other.flags && this->dest == other.dest &&
+			this->decouple == other.decouple &&
+			this->decouple_keep_wagons == other.decouple_keep_wagons &&
+			this->reverse_out_of_station == other.reverse_out_of_station &&
+			this->turn_around_in_depot == other.turn_around_in_depot;
 }
 
 /**

@@ -1217,7 +1217,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			std::string extra;
 			if (o.ShouldGoToCouple()) extra += " SPOJIT";
 			if (o.ShouldWaitForCouple()) extra += " CEKAT";
-			if (o.GetDecoupleCount() != 0) extra += fmt::format(" ODPOJIT:{}", o.GetDecoupleCount());
+			if (o.ShouldDecoupleOnDeparture()) extra += o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount());
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
 			if (o.IsType(OT_GOTO_DEPOT) && o.ShouldTurnAroundInDepot()) extra += " OTOC-DEPO";
 			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);

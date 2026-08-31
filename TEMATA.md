@@ -2602,6 +2602,59 @@ pádem: `"stage": "afterload: StartScripts"`.
 
 ---
 
+## 2.24 Dva rozkazy na jednom nástupišti — připojit a hned odpojit
+
+Dvojice rozkazů na totéž nádraží — „připojit (reversní chod)" a hned za
+ním „odpojit vše" — dělala jen první půlku: vlak se spojil, odjel s vozy,
+a neodpojil je ani při žádné další jízdě přes to nádraží. Vložený
+waypoint mezi ty dva rozkazy to „léčil". Změřeno na rigu se hráčovým
+savem, obojí do puntíku zopakováno.
+
+Kořeny byly dva, jeden nad druhým:
+
+**1) Zámek „tady už jsem byl".** Hra si u vlaku vede poslední navštívenou
+stanici a `Order::ShouldStopAtStation()` říká: zastav jen tam, kde jsi
+naposledy nebyl. Závěr spojení tu stanici právem zapíše jako navštívenou
+(rozkaz spojení se tím uzavírá) — jenže tím je následující rozkaz na
+totéž nádraží zamčený navěky: vlak tudy projíždí a nezastaví, dokud
+poslední navštívenou nepřepíše něco jiného. Přesně tohle dělal ten
+waypoint — jeho průjezd ji přepisuje, proto s ním to fungovalo.
+Vanilla tuhle dvojici u obyčejné nakládky řeší tak, že druhý rozkaz při
+odjezdu prostě spolkne (`Vehicle::HandleLoading`) — což je v pořádku u
+rozkazu, který nechce nic navíc, ale rozkaz s prací (odpojit) se spolknout
+nesmí. Oprava: když po uzavření spojení míří další rozkaz na nádraží, kde
+vlak právě stojí, vlak pro něj **přijede na místě** — zavolá se poctivé
+`TrainEnterStation` (začne nakládka), brána odpojení vystřelí jako při
+každém příjezdu a odjezd jde běžnou mašinerií i s rezervací cesty.
+Funguje na začátku, uprostřed i na konci seznamu, protože se rozhoduje
+podle aktuálního rozkazu, ne podle místa v seznamu.
+
+**2) `Order::Equals` naše pole neviděl.** I s příjezdem na místě se
+odpojení nekonalo — nakládka běžela, ale aktuální rozkaz příznak odpojení
+neměl. `ProcessOrders` má zkratku „pokud je nový rozkaz stejný jako
+aktuální, nech ho být" — a `Order::Equals` porovnával jen typ, vlajky a
+cíl. Naše vyhrazená pole (odpojit, počet, reversní chod, otočka v depu)
+nezná, takže rozkaz „odpojit tady" vypadal stejně jako dosluhující
+„připojit tady" (s už smazaným připojením) a do vlaku se nikdy nenahrál.
+Oprava: `Equals` ta čtyři pole porovnává. **Schválně ne pole spojování**
+(`go_to_couple`, `wait_for_couple`) — ta se na aktuálním rozkazu mažou za
+běhu jako „hotovo" (závěr spojení, přechod jeď→čekej), a kdyby je
+`Equals` viděl, další tik by je překopíroval ze seznamu zpátky a vzkřísil
+uzavřené spojení.
+
+Vedle toho `testrozkazy` konečně ukazuje i odpojení (`ODPOJIT:vse` /
+`ODPOJIT:nechat N`) — do té doby byl rozkaz „odpojit vše" v dumpu
+neviditelný, protože se testoval jen počet, a ten je u „vše" nula. A brána
+odpojení hlásí, když stojí u nakládky s příznakem a neodpojí — tiché
+neodpojení už nemá jak zůstat bez stopy v logu.
+
+K otázce „viselých" rozkazů: žádné skryté nejsou. Hra má jeden seznam a
+`testrozkazy` tiskne přesně to, co ukazuje okno rozkazů — v tom savu jich
+vlak měl patnáct skutečných (tři cykly připojit/odpojit s obměnami), ne
+šest; save je prostě z jiné chvíle úprav než obrazovka.
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich

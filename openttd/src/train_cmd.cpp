@@ -3962,6 +3962,46 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 			ProcessOrders(new_head);
 
 			if (reverse_out) new_head->flags.Set(VehicleRailFlag::Reversing);
+
+			/* The order taken up just now may name the very station the train
+			 * is standing in -- couple here, then do something else here: drop
+			 * the collected wagons again, load, wait for another partner. That
+			 * order can only ever be worked by arriving, and this train cannot
+			 * arrive any more: the conclusion above wrote the station into
+			 * last_station_visited, and "stop only when we've not just been
+			 * there" (Order::ShouldStopAtStation) reads that as done with this
+			 * place -- not only now, but on every later lap too, until some
+			 * other station or waypoint overwrites it. The player watched the
+			 * result: couple and decouple written on the same platform, the
+			 * coupling worked, and the decouple never ran again for the rest
+			 * of the game -- unless a waypoint sat between the two orders,
+			 * whose passing rewrites last_station_visited and unlocks the stop.
+			 *
+			 * An ordinary departure would have swallowed the follow-up order
+			 * whole (Vehicle::HandleLoading advances past a next order naming
+			 * the station just left), but swallowing is for orders that ask
+			 * nothing beyond the visit itself; this one carries work.
+			 *
+			 * So the train arrives for it without moving: it is standing at
+			 * that station, which is all arriving means. The honest arrival
+			 * routine makes the order current the way any stop would --
+			 * loading begins, a decouple fires off the loading state as
+			 * always, and the eventual departure leaves through
+			 * Vehicle::LeaveStation() with a path reserved like everybody
+			 * else's. A via order is left alone -- passing through is not a
+			 * stop -- and so is a train whose moving front has ended up off
+			 * the platform, which cannot begin loading. */
+			if (new_head->current_order.IsType(OT_GOTO_STATION) &&
+					new_head->current_order.GetDestination().ToStationID() == dest &&
+					!new_head->current_order.GetNonStopType().Test(OrderNonStopFlag::GoVia) &&
+					IsRailStationTileOfStation(new_head->GetMovingFront()->tile, dest)) {
+				TrainEnterStation(new_head, dest);
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: prijezd na miste pro dalsi rozkaz - typ {}, odpojit {}, rychlost {}",
+							new_head->unitnumber, to_underlying(new_head->current_order.GetType()),
+							new_head->current_order.ShouldDecoupleOnDeparture() ? "ano" : "ne", new_head->cur_speed);
+				}
+			}
 		}
 	}
 
@@ -8066,9 +8106,9 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && consist->current_order.IsType(OT_LOADING) &&
 			consist->current_order.ShouldDecoupleOnDeparture()) {
 		const Order *real_order = consist->GetOrder(consist->cur_real_order_index);
-		if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
-				real_order->GetDestination().ToStationID() == consist->last_station_visited &&
-				TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
+		bool order_names_here = real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
+				real_order->GetDestination().ToStationID() == consist->last_station_visited;
+		if (order_names_here && TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
 						real_order->GetLoadType(), real_order->GetUnloadType(),
 						real_order->GetTimetabledWait())) {
 			/* The order's timetabled stay was just handed to the rake -- the
@@ -8077,6 +8117,15 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			 * engine leaves when its own cargo work here is done. */
 			consist->current_order.SetWaitTimetabled(false);
 			return true;
+		}
+		if (_show_train_orientation) {
+			/* A decouple that silently does not happen leaves nothing in the log
+			 * to say it was even considered; both refusals are named so the
+			 * console can tell them apart. */
+			SayOnChange(consist, order_names_here
+					? fmt::format("Vlak {}: odpojeni na stanici neprovedeno - neni co odpojit (nebo deleni nejde)", consist->unitnumber)
+					: fmt::format("Vlak {}: brana odpojeni - stoji u nakladky s priznakem, ale skutecny rozkaz {} sem nemiri (naposledy stanice {})",
+							consist->unitnumber, consist->cur_real_order_index, consist->last_station_visited));
 		}
 	}
 
