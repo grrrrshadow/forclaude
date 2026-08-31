@@ -320,9 +320,16 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 
 					/* And what it is going to accept, for each filter that has
 					 * been set. Read off the line, a whole list of orders says
-					 * at a glance which engine is going for which wagons. */
+					 * at a glance which engine is going for which wagons.
+					 *
+					 * Named short here, unlike on the buttons: "full" and
+					 * "empty" can only be wagons and "coal" can only be a
+					 * cargo, so the words "wagons" and "cargo" cost a third of
+					 * the room and say nothing the reader did not already
+					 * know. An order line is short and shares it with the
+					 * station name. */
 					if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
-						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
+						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
 					}
 					if (IsValidCargoType(order->GetCoupleCargo())) {
 						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
@@ -405,7 +412,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				bool after_decouple = !timetable && order->GetDecoupleCount() != 0;
 				line += GetString(after_decouple ? STR_ORDER_DEPOT_COUPLE_SUFFIX_AND : STR_ORDER_DEPOT_COUPLE_SUFFIX);
 				if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
-					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
+					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
 				}
 				if (IsValidCargoType(order->GetCoupleCargo())) {
 					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
@@ -645,6 +652,19 @@ private:
 	/** The filter row has appeared or gone, so the window has to be laid out again at a moment when nothing is being delivered to it. */
 	bool couple_filter_resized = false;
 	VehicleOrderID order_over = INVALID_VEH_ORDER_ID; ///< Order over which another order is dragged, \c INVALID_VEH_ORDER_ID if none.
+	/**
+	 * Has the pointer actually been dragged since the selected order was picked
+	 * up? Only then does letting go move it.
+	 *
+	 * Selecting an order arms drag-and-drop, and the drop is delivered wherever
+	 * the button comes up -- which is not where it went down if the hand moved a
+	 * few pixels in between. On a touch screen it always does. So an order that
+	 * was merely being selected, on a row boundary, was picked up and put down
+	 * one row along, and the player was left with a reordered list he never
+	 * asked for while trying to click the order below. Grabbing and dragging is
+	 * the gesture that moves an order; a tap is not.
+	 */
+	bool order_dragged = false;
 	OrderPlaceObjectState goto_type = OPOS_NONE;
 	const Vehicle *vehicle = nullptr; ///< Vehicle owning the orders being displayed and manipulated.
 	Scrollbar *vscroll = nullptr;
@@ -1436,6 +1456,7 @@ public:
 
 					if (this->vehicle->owner == _local_company) {
 						/* Activate drag and drop */
+						this->order_dragged = false;
 						SetObjectToPlaceWnd(SPR_CURSOR_MOUSE, PAL_NONE, HT_DRAG, this);
 					}
 				}
@@ -1776,6 +1797,9 @@ public:
 	{
 		switch (widget) {
 			case WID_O_ORDER_LIST: {
+				/* Only a real drag moves an order. See order_dragged. */
+				if (!this->order_dragged) break;
+
 				VehicleOrderID from_order = this->OrderGetSel();
 				VehicleOrderID to_order = this->GetOrderFromPt(pt.y);
 
@@ -1797,6 +1821,7 @@ public:
 		}
 
 		ResetObjectToPlace();
+		this->order_dragged = false;
 
 		if (this->order_over != INVALID_VEH_ORDER_ID) {
 			/* End of drag-and-drop, hide dragged order destination highlight. */
@@ -1908,6 +1933,10 @@ public:
 	void OnMouseDrag(Point pt, WidgetID widget) override
 	{
 		if (this->selected_order != -1 && widget == WID_O_ORDER_LIST) {
+			/* The hand is on the order and moving: this is a drag, and letting
+			 * go of it now is meant to put the order down somewhere. */
+			this->order_dragged = true;
+
 			/* An order is dragged.. */
 			VehicleOrderID from_order = this->OrderGetSel();
 			VehicleOrderID to_order = this->GetOrderFromPt(pt.y);

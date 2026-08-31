@@ -3592,8 +3592,14 @@ bool HandleRescueEngineInDepot(Train *tow)
 	 * ended its measurement at the coupling and called that a pass, so a tow
 	 * that coupled up and then stood on the open line for the rest of the game
 	 * read as green -- which is exactly the fault the player then found. The
-	 * scenes now wait for this line instead. */
-	if (_show_train_orientation) {
+	 * scenes now wait for this line instead.
+	 *
+	 * Only when something really was put down. An errand can end here having
+	 * fetched nothing -- the casualty gave up waiting and sorted itself out
+	 * while the engine was still on its way -- and saying "done" for that is
+	 * the same false green all over again, one measurement further along: the
+	 * loop scene reported a delivery for an engine that never left its shed. */
+	if (in_tow && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - porucha slozena v depu na ({},{})",
 				tow->unitnumber, TileX(tow->tile), TileY(tow->tile));
 	}
@@ -6286,6 +6292,14 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		 * stays in the shed and asks again next tick, like any other train
 		 * whose way out is momentarily blocked. */
 		if (moving_front->track == Track::Depot) {
+			/* Which of the three ways a reservation can come to nothing this
+			 * was. "No route" covers all three and tells them apart for nobody;
+			 * a rescue engine that will not leave its shed has been three
+			 * different faults so far and each time the first job was working
+			 * out which. */
+			if (_show_train_orientation) {
+				SayOnChange(consist, fmt::format("Vlak {}: rezervace - hledani nenaslo zadny cil (jsem v depu, zustavam)", consist->unitnumber));
+			}
 			FreeTrainTrackReservation(consist);
 			if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 			if (mark_stuck) MarkTrainAsStuck(consist);

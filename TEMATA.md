@@ -877,6 +877,38 @@ scény o tom nevěděly a postavily jednu řadu o osmi. Test „napříč dvěma
 řadami" pak procházel z úplně jiného důvodu, než měl. Dvě oddělené řady
 v jednom depu jdou udělat jedině **z jiného druhu vagonů**.
 
+## 2.18 Příkaz se jmenuje „připojit" a na řádku se nepíše, co každý ví
+
+Dvě věci od hráče, obě o místě na řádku rozkazu.
+
+**Jedno jméno pro obojí.** „Jeď se spojit" bylo dlouhé a v depu se týž
+rozkaz jmenoval jinak než na nádraží. Všude je teď **„připojit"** —
+čudlík, přípona na řádku i text v nastavení hry. K tomu sedí protějšek
+„odpojit", který se tak jmenoval odjakživa.
+
+**Na řádku se nepíše „vagony" ani „náklad".** Plné a prázdné můžou být
+jedině vagony a uhlí může být jedině náklad; ta dvě slova zabírala třetinu
+místa a neřekla čtenáři nic, co by nevěděl. Na řádku je tedy
+`(plné) (uhlí) (3 vozů)`. Na čudlících popisky zůstaly — tam místo je a
+sloupec potřebuje záhlaví.
+
+## 2.19 Rozkaz se posouvá jedině tažením, ne klepnutím
+
+**Hráčovo hlášení:** když kliknu na rozkaz, je bílý a jde posunout; chci
+ho posouvat jen tažením, ne tím, že je vybraný — netrefím se na jiný
+rozkaz, kliknu mezi řádky a on se posune.
+
+Vybrání rozkazu **natáhne** táhni-a-pusť (`SetObjectToPlaceWnd(..., HT_DRAG)`)
+a puštění tlačítka se doručí jako položení tam, kde tlačítko nahoře je —
+což není tam, kde šlo dolů, pohnula-li se ruka mezitím o pár bodů. Na
+dotykové obrazovce se pohne vždycky. Rozkaz, který měl být jen vybraný, se
+tak na hranici řádků zvedl a položil o řádek vedle.
+
+Rozlišuje se to tím, co gesto opravdu bylo: `OnMouseDrag()` běží jen když
+je ruka na rozkazu a **hýbe se**, takže si tam příznak `order_dragged`
+zapíše, a `OnDragDrop()` bez něj nepřesouvá nic. Tažení funguje beze
+změny, klepnutí vybírá a nic víc.
+
 ---
 
 # 3. Rozpojování (decouple)
@@ -1277,6 +1309,56 @@ dělá až cesta, kterou jdou hráčovy kliky. Bourání a stavění z heartbeat
 (`testza`) tedy nechalo frontu stát a první pohnuvší se vlak spadl na
 `assert(_globset.IsEmpty())`. `testdepo` si po sobě volá
 `UpdateSignalsInBuffer()` samo.
+
+## 4.8 Odtahovka na rozcestí — rig konečně staví hráčovu trať
+
+**Hráčův popis jeho tratě:** z depa vede cesta doprava na okruh a tudy
+odtahovka přijede **za** vlak, který stojí za poruchou — ten je k ní
+otočený zadkem a za ním trať zamluvená není, jsou to PBS návěstidla.
+Nebo může doleva, proti jednosměrným návěstidlům; tam jsou ty výhybky,
+jedna vpravo, jedna vlevo.
+
+To je tvar, který žádná dosavadní scéna neuměla: **odtahovka má na
+vybranou.** Nová scéna `testokruh` ho staví — hlavní trať, z ní okruh
+dolů a zpátky, jednosměrná návěstidla jen na krátké cestě, porouchaná
+až za místem, kde se okruh vrací. Obě cesty k ní vedou, takže se neměří
+nic než **kterou si vybere**.
+
+### Co se tím našlo
+
+**1. Pokuta za jízdu zezadu do PBS návěstidla platila i pro odtahovku.**
+`rail_pbs_signal_back_penalty` je 15 políček za každé takové návěstidlo.
+Krátká cesta proti třem z nich byla tím dražší než objížďka kolem, takže
+hledání cest posílalo odtahovku dokola — hráčovo první hlášení znělo
+přesně takhle: „když ji přinutím vyjet, jezdí okolo poruchy". Zrušil jsem
+větu z tématu 4.4 jen napůl: zákaz (`DeadEnd`) jsem sundal, pokutu nechal
+stát. Je to jedno pravidlo, ne dvě — jízda proti provozu je způsob, jak se
+k stojícímu vlaku dostat, a platí se za ni zamluvením celé cesty předem.
+Účtovat ji podruhé znamená jen koupit špatnou cestu. Zpátky je odtahovka
+obyčejný vlak a platí jako každý.
+
+**2. Nedořešeno: odtahovka nevyjede, jakmile je na cestě jakékoli
+rozcestí.** Scéna to ukazuje na dvou nezávislých věcech — okruh
+(`testokruh`) i nástupiště na cestě (`testokruh rovne`) — a bez obojího
+(`testokruh rovne bezstanice`) jede. Hlášení je pořád stejné: „cesta není
+— hledání/rezervace selhaly", donekonečna, z depa. Zamluvené přitom není
+nic než dvě políčka, na kterých porouchaná stojí (`testrez`).
+
+Kde to je: `ExtendTrainReservation()` projde **jen jeden běh koleje bez
+odbočky**. Na rovné trati dojde od vrat depa až k porouchané a celá
+rezervace se povede, aniž by se kdo ptal hledače cest — a to je jediný
+důvod, proč všech pět dosavadních odtahových scén procházelo. Jakmile je
+na cestě rozcestí (nebo nástupiště), předá se to hledači cest — a ten
+vrátí `res_dest.tile == INVALID_TILE`, tedy **cíl nenašel**. Odtahovka
+tedy zřejmě hledačem cest nikdy úspěšně neprojela; fungovalo jen to, co
+šlo obejít.
+
+Příští krok je zjistit, proč `FindPath()` nedojde na políčko porouchané,
+když je cíl `v->dest_tile` a rozkaz `OT_DUMMY`.
+
+Pomůcky k tomu, obojí zůstává v rigu: `testrez` vypíše, kdo ve scéně co
+drží, a `ChooseTrainTrack()` teď při vzdání v depu řekne, **kterým** ze
+tří konců to bylo.
 
 ---
 

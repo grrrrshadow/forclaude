@@ -319,7 +319,27 @@ public:
 					n.segment->last_signal_td = trackdir;
 				}
 
-				if (has_signal_against && IsPbsSignal(GetSignalType(tile, TrackdirToTrack(trackdir)))) {
+				/* Coming at a path signal from behind is worth fifteen tiles of
+				 * detour to an ordinary train, and rightly so. To a rescue
+				 * engine on its way out it is the plan, and the fine is the
+				 * whole difference between the two ways round.
+				 *
+				 * Lifting the veto above and leaving this standing is what the
+				 * player's layout ran into: a loop, with the casualty a short
+				 * way off to one side against four one-way signals, and the
+				 * long way round the other. Sixty tiles of penalty on the short
+				 * way made the long way cheaper, so the engine set off round
+				 * the loop -- "it drives around the breakdown" -- and got as far
+				 * as the back of the queue that had piled up behind it, which is
+				 * the one place it can never do any good.
+				 *
+				 * It is one rule, not two: going up the line against the flow is
+				 * how a stopped train is reached, and it is paid for by booking
+				 * the whole road first and stopping nowhere along it. Charging
+				 * for it twice only buys the wrong route. On the way home the
+				 * engine is an ordinary train again and pays like one. */
+				if (has_signal_against && IsPbsSignal(GetSignalType(tile, TrackdirToTrack(trackdir))) &&
+						!IsFetchingCasualty(Yapf().GetVehicle()->First())) {
 					cost += n.num_signals_passed < Yapf().PfGetSettings().rail_look_ahead_max_signals ? Yapf().PfGetSettings().rail_pbs_signal_back_penalty : 0;
 				}
 			}

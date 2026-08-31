@@ -1419,6 +1419,41 @@ static VehicleID _testodtah_casualty = VehicleID::Invalid();
 static TileIndex _testodtah_break_tile = INVALID_TILE;
 static TileIndex _testodtah_cross_tile = INVALID_TILE;
 static TileIndex _testodtah_depot_w = INVALID_TILE;
+static VehicleID _testokruh_rescue = VehicleID::Invalid();
+static uint _testokruh_detour_row = 0;
+static bool _testokruh_detour_seen = false;
+
+/**
+ * Print every reserved tile in the current test scene's rectangle.
+ *
+ * A rescue engine that will not leave its shed says only "no route", and from
+ * the outside that is indistinguishable from a dozen different causes. Track
+ * held by somebody else is the one that can be looked at, so it is looked at:
+ * this walks the scene and says who is holding what. Usage: 'testrez'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestReservations(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "List reserved tiles in the test scene. Usage: 'testrez'.");
+		return true;
+	}
+	uint n = 0;
+	for (uint y = _testmapa_area[1]; y <= _testmapa_area[3]; y++) {
+		for (uint x = _testmapa_area[0]; x <= _testmapa_area[2]; x++) {
+			TileIndex t = TileXY(x, y);
+			if (!IsTileType(t, TileType::Railway) && !IsRailStationTile(t)) continue;
+			TrackBits res = GetReservedTrackbits(t);
+			if (res.None()) continue;
+			const Train *who = GetTrainForReservation(t, FindFirstTrack(res));
+			IConsolePrint(CC_DEFAULT, "testrez: ({},{}) drzi {:#x} - vlak {}.", x, y, res.base(),
+					who != nullptr ? fmt::format("{}", who->unitnumber) : "nikdo");
+			n++;
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testrez: celkem {} zamluvenych policek.", n);
+	return true;
+}
 
 /**
  * Take the rescue engine's home depot away and give it back again.
@@ -1673,8 +1708,240 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Build the loop scene: two ways round to the same casualty.
+ *
+ * The player's railway, and the shape none of the straight-strip scenes could
+ * put a question to. The rescue engine's shed opens onto a line that goes both
+ * ways: the short way to the casualty is straight ahead against one-way
+ * signals, and the long way round is a loop that rejoins the line beyond them.
+ * Both reach the casualty, so the only thing being measured is **which one it
+ * picks** -- and the wrong answer is not a failure the engine reports, it is an
+ * engine that quietly drives round the houses and fetches up behind the queue
+ * that piled in behind the breakdown, which is the one place it can do no good.
+ *
+ * Usage: 'testokruh'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRescueLoop(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the loop-rescue test scene: short way against one-way signals vs long way round. Usage: 'testokruh'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testokruh: only in a running game.");
+		return true;
+	}
+
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testokruh: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	_settings_game.vehicle.train_rescue_towing = true;
+
+	EngineID eid_loco = EngineID::Invalid();
+	EngineID eid_wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+		} else {
+			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
+		}
+		if (eid_loco != EngineID::Invalid() && eid_wagon != EngineID::Invalid()) break;
+	}
+	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testokruh: no available engine or wagon.");
+		return true;
+	}
+
+	/* A flat clear rectangle: the main line along the top and three rows below
+	 * it for the loop to hang in. */
+	static const uint LEN = 34;
+	static const uint DEEP = 3;
+	uint x0 = 0, y0 = 0;
+	bool found = false;
+	for (uint y = 8; y + DEEP < Map::SizeY() - 8 && !found; y++) {
+		for (uint x = 2; x + LEN < Map::SizeX() - 2 && !found; x++) {
+			bool ok = true;
+			int z0 = GetTileZ(TileXY(x, y));
+			for (uint dx = 0; dx < LEN && ok; dx++) {
+				for (uint dy = 0; dy <= DEEP && ok; dy++) {
+					TileIndex t = TileXY(x + dx, y + dy);
+					ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) &&
+							GetTileSlope(t) == SLOPE_FLAT && GetTileZ(t) == z0;
+				}
+			}
+			if (ok) { x0 = x; y0 = y; found = true; }
+		}
+	}
+	if (!found) {
+		IConsolePrint(CC_ERROR, "testokruh: no flat clear area found.");
+		return true;
+	}
+	uint y1 = y0 + DEEP;
+	uint xa = x0 + 8;  // where the loop leaves the main line
+	uint xb = x0 + 20; // where it rejoins it
+	IConsolePrint(CC_DEFAULT, "testokruh: main line ({},{})..({},{}), loop ({},{})..({},{}).",
+			x0, y0, x0 + LEN - 1, y0, xa, y1, xb, y1);
+	_testmapa_area[0] = x0; _testmapa_area[1] = y0 > 1 ? y0 - 1 : 0;
+	_testmapa_area[2] = x0 + LEN - 1; _testmapa_area[3] = y1 + 1;
+
+	TileIndex depot_w = TileXY(x0, y0);
+	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_w, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
+			Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_e, RAILTYPE_RAIL, DiagDirection::NE).Failed()) {
+		IConsolePrint(CC_ERROR, "testokruh: depot failed.");
+		return true;
+	}
+
+	/* 'bezstanice' leaves the platform out and sends the casualty to the west
+	 * depot instead. The platform sits on the road the rescue engine has to
+	 * take, which no earlier scene did, so it has to be possible to take it
+	 * away again and see whether it is what the engine is stumbling over. */
+	bool no_station = false;
+	for (size_t i = 1; i < argv.size(); i++) if (argv[i] == "bezstanice") no_station = true;
+
+	/* Main line, with the casualty's destination platform near the west end so
+	 * it drives the whole way down and breaks in the far east. */
+	bool line_ok;
+	if (no_station) {
+		line_ok = Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 1, y0), TileXY(x0 + LEN - 2, y0), RAILTYPE_RAIL, Track::X, false, true).Succeeded();
+	} else {
+		line_ok = Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 1, y0), TileXY(x0 + 3, y0), RAILTYPE_RAIL, Track::X, false, true).Succeeded() &&
+				Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, TileXY(x0 + 4, y0), RAILTYPE_RAIL, Axis::X, 1, 2, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Succeeded() &&
+				Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 6, y0), TileXY(x0 + LEN - 2, y0), RAILTYPE_RAIL, Track::X, false, true).Succeeded();
+	}
+	if (!line_ok) {
+		IConsolePrint(CC_ERROR, "testokruh: main line failed.");
+		return true;
+	}
+
+	/* 'rovne' builds the same scene without the loop -- the control case, to
+	 * tell a fault that belongs to the loop apart from one that belongs to
+	 * everything else the scene is the first to put in a rescue engine's way. */
+	bool no_loop = argv.size() >= 2 && argv[1] == "rovne";
+
+	/* The loop. The two curves on the main line are the points the player
+	 * describes -- one turning off to the right, one back in from the left. */
+	struct { TileIndex tile; Track track; } curves[] = {
+		{ TileXY(xa, y0), Track::Right }, // west end of the loop: line from the west, down to the south
+		{ TileXY(xa, y1), Track::Left },  // from the north, away to the east
+		{ TileXY(xb, y1), Track::Upper }, // from the west, back up to the north
+		{ TileXY(xb, y0), Track::Lower }, // from the south, onward to the east
+	};
+	if (!no_loop) {
+		for (const auto &c : curves) {
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, c.tile, RAILTYPE_RAIL, c.track, false).Failed()) {
+				IConsolePrint(CC_ERROR, "testokruh: curve at ({},{}) failed.", TileX(c.tile), TileY(c.tile));
+				return true;
+			}
+		}
+		if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(xa, y0 + 1), TileXY(xa, y1 - 1), RAILTYPE_RAIL, Track::Y, false, true).Failed() ||
+				Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(xb, y0 + 1), TileXY(xb, y1 - 1), RAILTYPE_RAIL, Track::Y, false, true).Failed() ||
+				Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(xa + 1, y1), TileXY(xb - 1, y1), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
+			IConsolePrint(CC_ERROR, "testokruh: loop failed.");
+			return true;
+		}
+	}
+
+	/* One-way signals on the short way only, facing the way the traffic runs
+	 * (westwards, the way the casualty was going), so a rescue engine driving
+	 * east out of its shed is against every one of them. The long way round
+	 * carries none, and is the cheap way for anything that pays the ordinary
+	 * price for coming at a path signal from behind. */
+	for (uint sx : {xa + 3, xa + 6, xa + 9}) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X,
+				SignalType::PathOneWay, SignalVariant::Electric,
+				false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
+			IConsolePrint(CC_ERROR, "testokruh: signal at ({},{}) failed.", sx, y0);
+			return true;
+		}
+	}
+	UpdateSignalsInBuffer();
+	for (uint sx : {xa + 3, xa + 9}) {
+		TileIndex t = TileXY(sx, y0);
+		IConsolePrint(CC_DEFAULT, "testokruh: navestidlo ({},{}) - smer NE {}, smer SW {}.", sx, y0,
+				HasSignalOnTrackdir(t, Trackdir::X_NE) ? "ano" : "ne",
+				HasSignalOnTrackdir(t, Trackdir::X_SW) ? "ano" : "ne");
+	}
+
+	/* Say what actually got built at the four corners. A loop with one corner
+	 * laid the wrong way round is not a loop at all -- it is a dead-end siding,
+	 * the engine has no choice to make, and the scene silently measures nothing
+	 * while looking like a pass. */
+	if (no_loop) {
+		IConsolePrint(CC_DEFAULT, "testokruh rovne: okruh se nestavi, jen prima trat.");
+	} else {
+		for (const auto &c : curves) {
+			IConsolePrint(CC_DEFAULT, "testokruh: roh ({},{}) koleje {:#x}.", TileX(c.tile), TileY(c.tile), GetTrackBits(c.tile).base());
+		}
+	}
+
+	StationID st_west = no_station ? StationID::Invalid() : GetStationIndex(TileXY(x0 + 4, y0));
+
+	auto [cost_c, veh_c, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_c.Failed() || cost_w.Failed() ||
+			Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_w, Train::Get(veh_c)->Last()->index, false).Failed()) {
+		IConsolePrint(CC_ERROR, "testokruh: casualty failed.");
+		return true;
+	}
+	Order to_west;
+	if (no_station) {
+		to_west.MakeGoToDepot(GetDepotIndex(depot_w), OrderDepotTypeFlags{}, OrderNonStopFlags{});
+	} else {
+		to_west.MakeGoToStation(st_west);
+		to_west.SetLoadType(OrderLoadType::NoLoad);
+		to_west.SetUnloadType(OrderUnloadType::NoUnload);
+	}
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_c, 0, to_west);
+
+	auto [cost_r, veh_r, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_r.Failed() || Command<Commands::SetRescueEngine>::Do(DoCommandFlag::Execute, veh_r, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testokruh: rescue engine failed.");
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
+
+	_testodtah_casualty = veh_c;
+	/* East of where the loop rejoins, so both ways round really do reach it. */
+	_testodtah_break_tile = TileXY(x0 + LEN - 6, y0);
+	_testodtah_cross_tile = INVALID_TILE;
+	_testodtah_depot_w = depot_w;
+	_testokruh_rescue = veh_r;
+	_testokruh_detour_row = y1;
+	_testokruh_detour_seen = false;
+	_testspoj_active = true;
+
+	IConsolePrint(CC_DEFAULT, "testokruh: scene ready. casualty=vlak {}, rescue=vlak {}, break at ({},{}).",
+			Train::Get(veh_c)->unitnumber, Train::Get(veh_r)->unitnumber, TileX(_testodtah_break_tile), TileY(_testodtah_break_tile));
+	return true;
+}
+
 /** Break the testodtah casualty down the moment it reaches the armed tile. */
 static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Priority::None, 1}, [](auto) {
+	/* Which way round the loop the rescue engine went. Said once, the first
+	 * time it sets a wheel on the far side of the loop: from there on it is
+	 * driving away from the casualty the long way, and no later measurement --
+	 * not even a successful tow -- tells that apart from having gone straight. */
+	if (_testokruh_detour_row != 0 && !_testokruh_detour_seen) {
+		const Train *r = Train::GetIfValid(_testokruh_rescue);
+		if (r != nullptr && TileY(r->tile) == _testokruh_detour_row) {
+			_testokruh_detour_seen = true;
+			IConsolePrint(CC_WARNING, "testokruh: odtahovka jede objizdkou okolo, ne proti navestidlum.");
+		}
+	}
+
 	if (_testodtah_break_tile == INVALID_TILE) return;
 	Train *t = Train::GetIfValid(_testodtah_casualty);
 	if (t == nullptr) {
@@ -4760,6 +5027,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
+	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
+	IConsole::CmdRegister("testrez",                 ConTestReservations);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);

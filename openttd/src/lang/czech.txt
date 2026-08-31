@@ -1897,7 +1897,7 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticky
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Ukazovat v jízdním řádu příjezdy a odjezdy: {STRING}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Zobrazit předpokládané časy příjezdu a odjezdu v jízdních řádech.
 
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :automatické doplňování reversního chodu u příkazu jeď se spojit: {STRING}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :automatické doplňování reversního chodu u příkazu připojit: {STRING}
 STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_AUTO                     :automatické
 STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_MANUAL                   :manuální
 STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :implicitní - "automatické doplňování".{}{}automatické - po připojení vlak odjede z nádraží stejnou stranou kudy se přijela připojit lokomotiva.{}{}manuální - po připojení na průjezdném nádraží lokomotiva nezmění směr jízdy
@@ -5037,13 +5037,16 @@ STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Při odj
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Zadej počet vozidel, která zůstanou (0 = neodpojovat)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v této stanici, dokud vedle nezastaví vlak, se kterým se dá spojit, a pak pokračovat jako jedna souprava
-STR_ORDER_GOTO_COUPLE                                           :{BLACK}Jet se spojit
+STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i reversním chodem) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
 STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Vagony: plné
+STR_ORDER_COUPLE_LOAD_SHORT_ANY                                 :jakékoliv
+STR_ORDER_COUPLE_LOAD_SHORT_EMPTY                               :prázdné
+STR_ORDER_COUPLE_LOAD_SHORT_FULL                                :plné
 STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Odvézt jen takto naložené vagony. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
 STR_ORDER_COUPLE_CARGO_ANY                                      :{BLACK}Náklad: jakýkoliv
 STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Náklad: {STRING}
@@ -5054,10 +5057,10 @@ STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Odvézt 
 STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má řada mít (0 = libovolně)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
-STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}(náklad {STRING})
+STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} vozů)
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu
-STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(jet se spojit)
+STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(nechat si {NUM})
