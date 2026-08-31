@@ -4371,8 +4371,18 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
  */
 static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
 {
+	/* Every way of doing nothing here says so. The player watched a train
+	 * stand in a shed with its wagons still on it under an order that plainly
+	 * said to put them down, and there was nothing to go on: four separate
+	 * exits, all silent, and no way to tell from outside which one it took. */
+	auto nic = [&](const char *proc) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_WARNING, "Vlak {}: v depu neodpojuji ({}), nechat si {}", v->unitnumber, proc, keep_count);
+		}
+	};
+
 	if (keep_count == 0) return;
-	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return;
+	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return nic("havarovany vlak");
 
 	/* Same trap as every other consist surgery done from a vehicle tick:
 	 * commands read whichever company happens to be current. */
@@ -4381,12 +4391,12 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
 	Train *split_point = v;
 	for (uint8_t i = 0; i < keep_count; i++) {
 		split_point = split_point->GetNextVehicle();
-		if (split_point == nullptr) return; // consist has fewer than keep_count vehicles
+		if (split_point == nullptr) return nic("vlak je kratsi nez kolik si ma nechat"); // consist has fewer than keep_count vehicles
 	}
 
-	if (split_point->IsRearDualheaded()) return; // can't split a multiheaded engine in half
+	if (split_point->IsRearDualheaded()) return nic("delilo by to dvojitou masinku napul"); // can't split a multiheaded engine in half
 
-	if (TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true).Failed()) return;
+	if (TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true).Failed()) return nic("rozpojeni samo selhalo");
 
 	v->ConsistChanged(CCF_ARRANGE);
 

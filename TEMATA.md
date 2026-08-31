@@ -892,6 +892,51 @@ místa a neřekla čtenáři nic, co by nevěděl. Na řádku je tedy
 `(plné) (uhlí) (3 vozů)`. Na čudlících popisky zůstaly — tam místo je a
 sloupec potřebuje záhlaví.
 
+## 2.20 Přepínač reversního chodu: „(invalid parameter)" a proč tam byl
+
+**Hráčovo hlášení, podruhé:** v nastavení hry je na tom řádku pořád
+napsáno „invalid parameter".
+
+Příčina, a je moje: řádek nastavení se kreslí jako
+`GetString(nadpis, STR_CONFIG_SETTING_VALUE, param1, param2)`, tedy nadpis
+dostane hodnotu k doplnění. To funguje u posuvníků a rozbalovacích
+seznamů. **U zaškrtávacího nastavení to nepoužívá v celé hře nikdo** —
+prošel jsem všechny `SDT_BOOL` a `SDTC_BOOL` ve vanilce a `val_cb` nemá
+ani jedno. Stav u nich ukazuje ten přepínač vlevo, a nadpis je prostý
+popisek. Já si k tomu vymyslel vlastní `val_cb` a nadpis s `{STRING}`,
+a to se nemělo čím doplnit.
+
+Opraveno tak, jak to má celá hra: `val_cb` pryč, nadpis bez `{STRING}`,
+stav říká přepínač zapnuto/vypnuto a co která poloha znamená, stojí
+v nápovědě pod tím.
+
+**Poučení:** když se nějaká kombinace nastavení nikde ve vanilce
+nevyskytuje, není to díra na trhu, je to varování.
+
+## 2.21 Co se doplní samo, musí se samo i odebrat
+
+Přepínač z tématu 2.17 doplňoval reversní chod ve chvíli, kdy hráč zmáčkl
+„připojit". Odebrání „připojit" už ale reversní chod nechávalo zamáčknutý,
+takže hráči zůstal rozkaz, který vlak na nádraží pro nic za nic otáčí —
+a on to nikdy nezadal. Teď se drží obojího směru: zapnutí doplní, vypnutí
+odebere. Pořád jen předvyplnění, ne přinucení — čudlík zůstává a hráč si
+ho může přemáčknout.
+
+## 2.22 V depu jde vagon připojit i na tu druhou stranu mašinky
+
+Příkaz staví vlečený vůz **za** ten, který dostane, takže puštění na vůz
+znamená „před tenhle" a zadává se jménem vozu předchozího. Jenže před
+hlavou vlaku žádný předchozí není a vanilka to tam vzdá: puštění vagonu na
+mašinku **neudělá vůbec nic, potichu**. Jediná cesta na tenhle konec je
+trefit se do prázdna za posledním vozem, což je u krátkého vlaku v depu
+proužek. Z hráčovy strany má tedy mašinka jednu stranu, která vagony bere,
+a druhou, která je bez vysvětlení odmítá.
+
+Hráč si v depu přerovnává vlastní vlak a smí na obou koncích, takže
+puštění na hlavu vlaku připojí **za ni**, místo aby neudělalo nic. Nic se
+tím neztrácí — „před hlavu" neexistuje a je to jediný případ, který se
+mění.
+
 ## 2.19 Rozkaz se posouvá jedině tažením, ne klepnutím
 
 **Hráčovo hlášení:** když kliknu na rozkaz, je bílý a jde posunout; chci

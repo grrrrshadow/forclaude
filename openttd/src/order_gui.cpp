@@ -1645,9 +1645,17 @@ public:
 				 * rather have it the old way turns the setting off and nothing
 				 * is added at all. Not at a depot: what leads out of a shed is
 				 * settled by which way the train drove in (see 2.13). */
-				if (turning_on && widget == WID_O_GOTO_COUPLE && _settings_client.gui.couple_auto_reverse_out &&
-						!order->ShouldReverseOutOfStation()) {
-					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, 1);
+				if (widget == WID_O_GOTO_COUPLE && _settings_client.gui.couple_auto_reverse_out &&
+						order->ShouldReverseOutOfStation() != turning_on) {
+					/* And taken back off again with it. What was filled in
+					 * because the order collects has no business outliving the
+					 * collecting: the player takes the couple order off, and is
+					 * left with an order that quietly turns the train round at
+					 * a station for no reason he ever asked for. Whatever is
+					 * put in by itself has to come out by itself. Still only
+					 * filling in, not forcing -- the button stays there and can
+					 * be pressed either way afterwards. */
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, turning_on ? 1 : 0);
 				}
 				break;
 			}

@@ -143,8 +143,23 @@ static void TrainDepotMoveVehicle(const Vehicle *wagon, VehicleID sel, const Veh
 	if (wagon == nullptr) {
 		if (head != nullptr) wagon = head->Last();
 	} else {
-		wagon = wagon->Previous();
-		if (wagon == nullptr) return;
+		/* The command puts what is being dragged *behind* the vehicle it is
+		 * given, so dropping onto a vehicle means "in front of this one" and is
+		 * asked for by naming the one before it.
+		 *
+		 * Which leaves the head of a train with nothing before it, and vanilla
+		 * simply gives up there: dropping a wagon onto the engine does nothing
+		 * at all, silently, and the only way onto that end of the train is to
+		 * find the empty space past its tail. On a short train in a shed that is
+		 * a sliver of a row, so from the player's side the engine has one side
+		 * that takes wagons and one that refuses them for no stated reason.
+		 *
+		 * A player rearranging his own train in a shed may work at either end,
+		 * so a drop onto the head attaches behind it rather than doing nothing.
+		 * Nothing is lost: there is no "in front of the head" to be had, and
+		 * that is the only case this changes. */
+		const Vehicle *before = wagon->Previous();
+		if (before != nullptr) wagon = before;
 	}
 
 	if (wagon == v) return;
