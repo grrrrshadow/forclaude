@@ -16,6 +16,9 @@
 #include "yapf_destrail.hpp"
 #include "../../viewport_func.h"
 #include "../../newgrf_station.h"
+#include "../../console_func.h"
+
+extern bool _show_train_orientation;
 
 #include "../../safeguards.h"
 
@@ -199,13 +202,39 @@ public:
 			target->okay = false;
 		}
 
+		/* Everything a rescue engine's booking can fail on, said by name.
+		 *
+		 * "No route" was the only thing it ever reported, and behind that one
+		 * sentence sit three different answers: the place it wants to stop is
+		 * taken, or a tile on the way is held by somebody, or the search never
+		 * got there at all. Telling them apart by hand took a whole afternoon
+		 * and a rig; the game knows all three at the moment it gives up. */
+		auto say = [&](std::string what) {
+			if (!_show_train_orientation) return;
+			const Train *v = Yapf().GetVehicle();
+			if (v == nullptr || !IsFetchingCasualty(v->First())) return;
+			IConsolePrint(CC_WARNING, "Vlak {}: odtah - {}", v->First()->unitnumber, what);
+		};
+
 		/* Don't bother if the target is reserved. */
-		if (!IsWaitingPositionFree(Yapf().GetVehicle(), this->res_dest_tile, this->res_dest_td)) return false;
+		if (!IsWaitingPositionFree(Yapf().GetVehicle(), this->res_dest_tile, this->res_dest_td)) {
+			say(fmt::format("misto k zastaveni ({},{}) uz nekdo drzi",
+					TileX(this->res_dest_tile), TileY(this->res_dest_tile)));
+			return false;
+		}
 
 		this->signals_set_to_red.clear();
 		for (Node *node = this->res_dest_node; node->parent != nullptr; node = node->parent) {
 			node->IterateTiles(Yapf().GetVehicle(), Yapf(), *this, &CYapfReserveTrack<Types>::ReserveSingleTrack);
 			if (this->res_fail_tile != INVALID_TILE) {
+				/* Which tile stopped it, and who is standing on it. This is the
+				 * one line that answers "why will it not go": on the player's
+				 * own railway it was a train parked on the only road. */
+				const Train *drzi = GetTrainForReservation(this->res_fail_tile, TrackdirToTrack(this->res_fail_td));
+				say(fmt::format("nejde zamluvit ({},{}) - drzi {}",
+						TileX(this->res_fail_tile), TileY(this->res_fail_tile),
+						drzi != nullptr ? fmt::format("vlak {}", drzi->unitnumber) : "nikdo (jina prekazka)"));
+
 				/* Reservation failed, undo. */
 				Node *fail_node = this->res_dest_node;
 				TileIndex stop_tile = this->res_fail_tile;

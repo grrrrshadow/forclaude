@@ -12,6 +12,10 @@
 
 #include "../pbs.h"
 #include "../roadveh.h"
+#include "../train.h"
+#include "../console_func.h"
+
+extern bool _show_train_orientation;
 #include "../station_base.h"
 #include "../train.h"
 #include "../tunnelbridge.h"
@@ -125,6 +129,36 @@ struct CFollowTrackT {
 	 * @param old_td The track direction on the previous tile.
 	 * @return \c true iff there are one or more tracks to follow on the next tile (\c new_tile).
 	 */
+	/**
+	 * Say why a step was refused, when the train asking is a rescue engine on
+	 * its way out.
+	 *
+	 * Everything the search does that ends in "no route" ends here, in one of
+	 * five refusals -- and none of them is the end-of-segment reason the cost
+	 * function reports, which is why watching only that said nothing at all.
+	 * Wrong owner, wrong rail type, too sharp a turn, no way onto the tile, or
+	 * the tile is already booked by somebody: those five, by name, with the
+	 * tile they happened on.
+	 *
+	 * Off unless the orientation marks are on, and capped, because this is per
+	 * step of a search that visits thousands.
+	 */
+	inline void SayRefusal()
+	{
+		if constexpr (Ttr_type_ != TransportType::Rail) return;
+		if (!_show_train_orientation || this->veh == nullptr) return;
+		if (!IsFetchingCasualty(Train::From(this->veh)->First())) return;
+
+		static int said = 0;
+		if (said >= 60) return;
+		said++;
+
+		static const char * const duvod[] = {"zadny", "cizi majitel", "jina kolej", "moc ostra zatacka", "na policko se neda vjet", "policko uz nekdo drzi"};
+		IConsolePrint(CC_WARNING, "  odtah hleda: z ({},{}) smer {} na ({},{}) NELZE - {}",
+				TileX(this->old_tile), TileY(this->old_tile), to_underlying(this->old_td),
+				TileX(this->new_tile), TileY(this->new_tile), duvod[to_underlying(this->err)]);
+	}
+
 	inline bool Follow(TileIndex old_tile, Trackdir old_td)
 	{
 		this->old_tile = old_tile;
@@ -140,9 +174,16 @@ struct CFollowTrackT {
 
 		this->exitdir = TrackdirToExitdir(this->old_td);
 		if (this->ForcedReverse()) return true;
-		if (!this->CanExitOldTile()) return false;
+		if (!this->CanExitOldTile()) {
+			this->new_tile = this->old_tile;
+			this->SayRefusal();
+			return false;
+		}
 		this->FollowTileExit();
-		if (!this->QueryNewTileTrackStatus()) return TryReverse();
+		if (!this->QueryNewTileTrackStatus()) {
+			this->SayRefusal();
+			return TryReverse();
+		}
 		this->new_td_bits &= DiagdirReachesTrackdirs(this->exitdir);
 		if (this->new_td_bits.None() || !this->CanEnterNewTile()) {
 			/* In case we can't enter the next tile, but are
@@ -163,12 +204,14 @@ struct CFollowTrackT {
 			 * Only set a reason if CanEnterNewTile was not called */
 			if (this->new_td_bits.None()) this->err = ErrorCode::NoWay;
 
+			this->SayRefusal();
 			return false;
 		}
 		if ((!IsRailTT() && !Allow90degTurns()) || (IsRailTT() && Rail90DegTurnDisallowed(GetTileRailType(this->old_tile), GetTileRailType(this->new_tile), !Allow90degTurns()))) {
 			this->new_td_bits.Reset(TrackdirCrossesTrackdirs(this->old_td));
 			if (this->new_td_bits.None()) {
 				this->err = ErrorCode::SharpTurn;
+				this->SayRefusal();
 				return false;
 			}
 		}
@@ -186,6 +229,7 @@ struct CFollowTrackT {
 				if (HasStationReservation(tile)) {
 					this->new_td_bits.Reset();
 					this->err = ErrorCode::Reserved;
+					this->SayRefusal();
 					return false;
 				}
 			}
@@ -200,6 +244,7 @@ struct CFollowTrackT {
 		}
 		if (this->new_td_bits.None()) {
 			this->err = ErrorCode::Reserved;
+			this->SayRefusal();
 			return false;
 		}
 		return true;
