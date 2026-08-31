@@ -49,6 +49,8 @@
 #include "table/strings.h"
 #include "table/train_sprites.h"
 
+#include "crashlog.h"
+
 #include "safeguards.h"
 
 static Track ChooseTrainTrack(Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool force_res, bool *got_reservation, bool mark_stuck);
@@ -7294,6 +7296,13 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						goto reverse_train_direction;
 					} else {
 						/* Diagnostic: see the matching note in ReserveTrackUnderConsist(). */
+						if (chosen_track.Count() != 1 || chosen_track.Any({Track::Wormhole, Track::Depot})) {
+							std::string what = fmt::format("krok ROZBITY pred rezervaci: {} na ({},{}), enterdir {}, chosen {:#x}",
+									v->IsEngine() ? "masinka" : "vagon", TileX(gp.new_tile), TileY(gp.new_tile),
+									to_underlying(enterdir), chosen_track.base());
+							IConsolePrint(CC_ERROR, "  {}", what);
+							CrashLog::SetNote(what);
+						}
 						assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 						TryReserveRailTrack(gp.new_tile, TrackBitsToTrack(chosen_track), false);
 					}
@@ -7331,14 +7340,25 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				}
 
 				/* Update XY to reflect the entrance to the new tile, and select the direction to use */
-				/* Diagnostic: see the matching note in ReserveTrackUnderConsist(). */
-				if (_show_train_orientation && chosen_track.Count() != 1) {
-					IConsolePrint(CC_ERROR, "  krok ROZBITY: {} z ({},{}) na ({},{}), enterdir {}, chosen {:#x}, smer {}, prev {} na ({},{}) kolej {:#x}",
+				/* Diagnostic: see the matching note in ReserveTrackUnderConsist().
+				 *
+				 * Said out loud whatever the console is set to, and written into
+				 * the crash report as well, because the assert on the next line
+				 * is where this ends and a report that only says which line it
+				 * was tells nobody anything: the whole question is which vehicle,
+				 * coming from where, picked what. Two of these have now been
+				 * reported from a machine that cannot produce a stack trace, and
+				 * both times the answer was in a console the player had no reason
+				 * to have switched on. */
+				if (chosen_track.Count() != 1 || chosen_track.Any({Track::Wormhole, Track::Depot})) {
+					std::string what = fmt::format("krok ROZBITY: {} z ({},{}) na ({},{}), enterdir {}, chosen {:#x}, smer {}, prev {} na ({},{}) kolej {:#x}",
 							v->IsEngine() ? "masinka" : "vagon", TileX(gp.old_tile), TileY(gp.old_tile), TileX(gp.new_tile), TileY(gp.new_tile),
 							to_underlying(enterdir), chosen_track.base(), to_underlying(v->direction),
 							prev == nullptr ? "nikdo" : (prev->IsEngine() ? "masinka" : "vagon"),
 							prev == nullptr ? 0 : TileX(prev->tile), prev == nullptr ? 0 : TileY(prev->tile),
 							prev == nullptr ? 0 : prev->track.base());
+					IConsolePrint(CC_ERROR, "  {}", what);
+					CrashLog::SetNote(what);
 				}
 				assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 				Direction chosen_dir = VehicleEnterTileCoordinates(gp, enterdir, TrackBitsToTrack(chosen_track));

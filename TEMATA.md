@@ -2039,6 +2039,27 @@ zpětně se dopočítat nedá, ta data v nich nejsou.
     **Takže druhý kandidát jsou obě místa v `TrainController()`, která
     předávají `chosen_track`** — a ta sedí na situaci líp než mazání
     havarovaných vozů. Kdyby se hledalo znovu, začít tady.
+
+  - **Znovu, build #115 (`crash20260831000622`), a stopa už řekla kde:**
+    `Assertion failed at line 7320 of train_cmd.cpp: chosen_track.Count()
+    == 1 && !chosen_track.Any({Wormhole, Depot})`, `"stage": "game
+    running"`. To je **druhý** z těch dvou assertů — ten za celým
+    if/else, tedy platí i pro **vagonovou** větev (`prev != nullptr`,
+    „vagon jede za předchozím"). Hráčův popis: „něco v depu". Malá mapa,
+    3 vlaky, poruchy zapnuté.
+
+    Ověřeno a **vyloučeno**: podezření, že `AssembleDepotRake()` po
+    slepení odložených řad neobnoví cache soupravy, neplatí —
+    `TryConsistSplice()` si volá `NormaliseTrainHead()` sám, a ten dělá
+    `ConsistChanged(CCF_ARRANGE)`.
+
+    **Co k tomu přibylo:** hned před oběma asserty stál výpis
+    `krok ROZBITY: …`, který říká přesně to, co je potřeba — které
+    vozidlo, odkud kam, `enterdir`, vybrané bity a kolej předchozího —
+    ale psal se **jen se zapnutým `vlak123`**. Teď se píše vždycky a jde
+    navíc do crash reportu jako `crash.note`. Dvakrát už to spadlo na
+    stroji, který neumí výpis zásobníku, a pokaždé byla odpověď
+    v konzoli, kterou hráč neměl důvod mít zapnutou.
 - Po načtení savu odjely ze stanice mašinky, které čekaly na spojení —
   poskočil jim příkaz.
 - Peron 1 a 2 při spojení mašinka+mašinka: výbuchy, po načtení savu
