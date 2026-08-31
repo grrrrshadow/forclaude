@@ -1353,8 +1353,36 @@ vrátí `res_dest.tile == INVALID_TILE`, tedy **cíl nenašel**. Odtahovka
 tedy zřejmě hledačem cest nikdy úspěšně neprojela; fungovalo jen to, co
 šlo obejít.
 
-Příští krok je zjistit, proč `FindPath()` nedojde na políčko porouchané,
-když je cíl `v->dest_tile` a rozkaz `OT_DUMMY`.
+### Změřeno, ne odhadnuto: hledání cíl nenajde
+
+Doplněná hláška v `ChooseTrainTrack()` to říká rovnou:
+
+```
+Vlak 2: hledani z (18,44) na cil (42,44) - CIL NENALEZEN, konec nikde
+```
+
+Takže to není rezervace, která by selhala na obsazené trati — **hledání
+cest se na políčko porouchané vůbec nedostane.** Tím padá celá řada
+vysvětlení, která začínala u toho, kdo co drží.
+
+### Co se ukázalo jako slepá ulička
+
+Napadlo mě, že vinu má **sdílená paměť úseků** v YAPFu: odpovědi
+„jednosměrné návěstidlo je slepá ulička" a „za jízdu zezadu do návěstidla
+se platí" se ukládají do mezipaměti, která je společná pro všechny vlaky a
+maže se jen při změně kolejí — o to, *kdo* se ptá, se nestará. Na trati,
+kterou už projely obyčejné vlaky, by tedy odtahovka dostala jejich
+odpověď.
+
+Úvaha platí a je to skutečná chyba: kdo udělá uloženou odpověď závislou na
+tazateli, nesmí do té mezipaměti. Proto tam `IsFetchingCasualty()` teď
+`DisableCache(true)` volá, stejnou cestou, jakou to už dělá případ složitých
+směrových bodů. **Ale tuhle chybu to neopravilo** — scéna padá dál. Zapsáno
+jako oprava jiné, latentní chyby, ne jako řešení téhle.
+
+Příští krok je dostat hlášku dovnitř `ChooseRailTrack()` a zjistit, kam až
+nejlepší uzel došel — jestli se hledání zastaví u prvního návěstidla,
+u nástupiště, nebo někde jinde.
 
 Pomůcky k tomu, obojí zůstává v rigu: `testrez` vypíše, kdo ve scéně co
 drží, a `ChooseTrainTrack()` teď při vzdání v depu řekne, **kterým** ze

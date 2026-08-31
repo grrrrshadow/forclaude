@@ -83,6 +83,13 @@ public:
 		return *static_cast<Tpf *>(this);
 	}
 
+	void SetDestination(const Train *v, bool override_rail_type = false)
+	{
+		/* See the matching call in CYapfDestinationTileOrStationRailT. */
+		if (IsFetchingCasualty(v->First())) Yapf().DisableCache(true);
+		this->CYapfDestinationRailBase::SetDestination(v, override_rail_type);
+	}
+
 	/** @copydoc CYapfBaseT::PfDetectDestinationFunc */
 	inline bool PfDetectDestination(Node &n)
 	{
@@ -127,6 +134,27 @@ protected:
 public:
 	void SetDestination(const Train *v)
 	{
+		/* A rescue engine on its way out reads two things off the track
+		 * differently from everybody else: a one-way signal facing it is not a
+		 * dead end, and coming at a path signal from behind costs it nothing
+		 * (see SignalCost). Both of those answers are stored in the **shared**
+		 * segment cache, which is keyed by track and thrown away only when the
+		 * layout changes -- it has no idea which train asked.
+		 *
+		 * So on a line ordinary trains have already used, the segments are long
+		 * since filed as "dead end at that signal", and the rescue engine is
+		 * handed that answer and never plans a route up the line at all. It is
+		 * not the reservation failing; the road is never even offered. On a rig
+		 * with two trains and a clean map the segments are usually computed by
+		 * the tow itself and everything looks fine, which is why this only ever
+		 * showed up in a real game.
+		 *
+		 * Whoever makes a cached answer depend on who is asking has to keep out
+		 * of the cache. Same reasoning as BlockedByFreeWagons being left out of
+		 * ESRF_CACHED_MASK, and the same remedy the complex-waypoint case below
+		 * already uses. */
+		if (IsFetchingCasualty(v->First())) Yapf().DisableCache(true);
+
 		this->any_depot = false;
 		this->couple_at_dest_station = false;
 		switch (v->current_order.GetType()) {

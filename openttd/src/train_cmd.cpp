@@ -6259,6 +6259,21 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 		Track next_track = DoTrainPathfind(consist, new_tile, dest_enterdir, tracks, path_found, do_track_reservation, &res_dest, &final_dest);
 		if (new_tile == tile) best_track = next_track;
+
+		/* What the search actually came back with. "No route" is three
+		 * different answers wearing one coat: the destination was never
+		 * reached, or it was and the road to it could not be booked. Without
+		 * telling them apart, a rescue engine that will not leave its shed is
+		 * a guessing game -- and it has been guessed wrong twice already. */
+		if (_show_train_orientation && IsOnRescueRun(consist->First())) {
+			SayOnChange(consist, fmt::format("Vlak {}: hledani z ({},{}) na cil ({},{}) - {}, konec {}",
+					consist->unitnumber, TileX(new_tile), TileY(new_tile),
+					TileX(consist->dest_tile), TileY(consist->dest_tile),
+					path_found ? "cil nalezen" : "CIL NENALEZEN",
+					res_dest.tile == INVALID_TILE ? "nikde" :
+							fmt::format("({},{}) {}", TileX(res_dest.tile), TileY(res_dest.tile), res_dest.okay ? "ok" : "nezamluveno")));
+		}
+
 		consist->HandlePathfindingResult(path_found);
 	}
 
