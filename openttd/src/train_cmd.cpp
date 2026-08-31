@@ -1811,6 +1811,29 @@ bool IsOnRescueRun(const Train *v)
 }
 
 /**
+ * Say something about a train in the console, but only when it is news.
+ *
+ * A train that cannot do what it is trying to do goes on not being able to do
+ * it, often for the rest of the game, and a reason printed every attempt
+ * buries everything else in the log -- which is the one thing the log is for.
+ * Printed on change, the reason is said once and said again the moment it is a
+ * different reason. Only the console is written, never any game state, so
+ * remembering this outside the savegame is safe: reload and it gets said once
+ * more.
+ *
+ * @param v    the train it is about
+ * @param what the whole line, already put together
+ */
+static void SayOnChange(const Train *v, std::string what)
+{
+	static std::map<VehicleID, std::string> last_said;
+	std::string &prev = last_said[v->index];
+	if (prev == what) return;
+	prev = std::move(what);
+	IConsolePrint(CC_INFO, "{}", prev);
+}
+
+/**
  * Is this engine still on its way to a casualty, as opposed to bringing one
  * home?
  *
@@ -5540,7 +5563,7 @@ static bool CheckTrainStayInDepot(Train *v)
 		/* No path and no force proceed. */
 		if (on_call) v->rescue_hold = RescueHold::NoPath;
 		if (_show_train_orientation) {
-			IConsolePrint(CC_INFO, "Vlak {}: vyjezd z depa odlozen - cesta se nepodarila zarezervovat", v->unitnumber);
+			SayOnChange(v, fmt::format("Vlak {}: vyjezd z depa odlozen - cesta se nepodarila zarezervovat", v->unitnumber));
 		}
 		SetWindowClassesDirty(WindowClass::TrainList);
 		MarkTrainAsStuck(v);
@@ -6487,9 +6510,9 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	ChooseTrainTrack(consist, new_tile, exitdir, reachable, true, &res_made, mark_as_stuck);
 
 	if (!res_made) {
-		if (_show_train_orientation && (consist->wait_counter % (16 * _settings_game.pf.path_backoff_interval)) == 0) {
-			IConsolePrint(CC_INFO, "Vlak {}: cesta neni - hledani/rezervace selhaly (od ({},{}) smerem {} na ({},{}))",
-					consist->unitnumber, TileX(origin.tile), TileY(origin.tile), to_underlying(origin.trackdir), TileX(new_tile), TileY(new_tile));
+		if (_show_train_orientation) {
+			SayOnChange(consist, fmt::format("Vlak {}: cesta neni - hledani/rezervace selhaly (od ({},{}) smerem {} na ({},{}))",
+					consist->unitnumber, TileX(origin.tile), TileY(origin.tile), to_underlying(origin.trackdir), TileX(new_tile), TileY(new_tile)));
 		}
 		/* Free the depot reservation as well. */
 		if (moving_front->track == Track::Depot) SetDepotReservation(moving_front->tile, false);

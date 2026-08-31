@@ -1820,10 +1820,10 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticks
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Show arrival and departure in timetables: {STRING2}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Display anticipated arrival and departure times in timetables
 
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :{STRING}
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_AUTO                     :automatic: after coupling at a station the train leaves by the side of the station the engine arrived from
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_MANUAL                   :manual: after coupling at a through station the engine does not change its direction of travel
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :Filling in "reverse out" by itself on a "go to couple" order
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Filling in "reverse out" by itself on a "go to couple" order: {STRING}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_AUTO                     :automatic
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_MANUAL                   :manual
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :Default - "automatic".{}{}automatic - after coupling, the train leaves the station by the same side the engine came in to couple.{}{}manual - after coupling at a through station the engine does not change its direction of travel
 STR_CONFIG_SETTING_QUICKGOTO                                    :Quick creation of vehicle orders: {STRING2}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Pre-select the 'goto cursor' when opening the orders window
 
