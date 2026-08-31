@@ -18,6 +18,9 @@
 #include "../pathfinder_type.h"
 #include "yapf_type.hpp"
 #include "yapf_costbase.hpp"
+#include "../../console_func.h"
+
+extern bool _show_train_orientation;
 
 template <class Types>
 class CYapfCostRailT : public CYapfCostBase {
@@ -219,55 +222,6 @@ public:
 			for (const Vehicle *u : VehiclesOnTile(tile)) {
 				if (u->type != VehicleType::Train) continue;
 				if (!Train::From(u)->First()->IsFrontEngine()) return true;
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * Is @p tile held by a train that stands between a rescue engine on its way
-	 * out and the casualty it was sent for?
-	 *
-	 * To an ordinary train a stranger on the line is not an obstruction, it is
-	 * a wait: the road ahead clears by itself and the signalling sorts out the
-	 * queueing, so the pathfinder is right to plan straight through it. A
-	 * rescue engine on its way out cannot wait, because it may not stop
-	 * anywhere short of the casualty -- it books the whole road or it does not
-	 * set off. So for it a train in the way is not a delay, it is a wall, and
-	 * the only useful answer is the way round.
-	 *
-	 * Left as an ordinary cost, that answer is never found: the search returns
-	 * the short way, the booking of it fails on the train standing there, and
-	 * nothing ever reconsiders the route -- the engine sits in its shed
-	 * reporting "no route" with a perfectly good way round untried. That is the
-	 * player's own railway: a loop, a train stopped on the near side, and the
-	 * casualty reachable the other way about. Which is also the whole point of
-	 * fetching a casualty head-on: what is in front of it is what clears.
-	 *
-	 * The casualty itself is exempt -- it is the destination, and a destination
-	 * that reads as a wall is a destination nothing can ever reach. So is this
-	 * engine's own consist. Same shape and same reasoning as
-	 * IsBlockedByFreeWagons(), including being kept out of the cached segment
-	 * reasons: it depends on where vehicles happen to be standing right now,
-	 * and the segment cache is only invalidated by track layout changes.
-	 */
-	inline bool IsBlockedForRescueRun(TileIndex tile, Trackdir trackdir, int skipped)
-	{
-		const Train *tow = Yapf().GetVehicle();
-		if (tow == nullptr) return false;
-		tow = tow->First();
-		if (!IsFetchingCasualty(tow)) return false;
-
-		TileIndexDiff diff = TileOffsByDiagDir(TrackdirToExitdir(ReverseTrackdir(trackdir)));
-		for (; skipped >= 0; skipped--, tile += diff) {
-			if (GetReservedTrackbits(tile).None()) continue;
-
-			for (const Vehicle *u : VehiclesOnTile(tile)) {
-				if (u->type != VehicleType::Train) continue;
-				const Train *head = Train::From(u)->First();
-				if (head == tow) continue;
-				if (head->index == tow->rescue_target) continue;
-				return true;
 			}
 		}
 		return false;
@@ -502,6 +456,18 @@ public:
 					segment_cost = segment.cost;
 					/* We know also the reason why the segment ends. */
 					end_segment_reason = segment.end_segment_reason;
+
+			/* Where a rescue engine's road runs out, said out loud. Two separate
+			 * one-way dead ends had to be found by hand already; the third is
+			 * not going to be found by reading. Capped, and only while the
+			 * orientation marks are on. */
+			if (_show_train_orientation && IsFetchingCasualty(Yapf().GetVehicle()->First())) {
+				static int said = 0;
+				if (end_segment_reason.Any(EndSegmentReason::DeadEnd) && said < 40) {
+					said++;
+					IConsolePrint(CC_WARNING, "  hledani: slepa ulice na ({},{}) smer {}", TileX(cur.tile), TileY(cur.tile), to_underlying(cur.td));
+				}
+			}
 					/* We will need also some information about the last signal (if it was red). */
 					if (segment.last_signal_tile != INVALID_TILE) {
 						assert(HasSignalOnTrackdir(segment.last_signal_tile, segment.last_signal_td));
@@ -548,8 +514,7 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 			 * keep reporting a dead end long after the wagons were collected.
 			 * BlockedByFreeWagons is deliberately absent from ESRF_CACHED_MASK
 			 * for that reason. See IsBlockedByFreeWagons(). */
-			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td, follower->tiles_skipped) ||
-					Yapf().IsBlockedForRescueRun(cur.tile, cur.td, follower->tiles_skipped)) {
+			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td, follower->tiles_skipped)) {
 				end_segment_reason.Set(EndSegmentReason::BlockedByFreeWagons);
 			}
 
@@ -677,11 +642,29 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 				if (HasSignalOnTrackdir(next.tile, next.td) && IsPbsSignal(GetSignalType(next.tile, TrackdirToTrack(next.td)))) {
 					/* Possible safe tile. */
 					end_segment_reason.Set(EndSegmentReason::SafeTile);
-				} else if (HasSignalOnTrackdir(next.tile, ReverseTrackdir(next.td)) && GetSignalType(next.tile, TrackdirToTrack(next.td)) == SignalType::PathOneWay) {
+				} else if (HasSignalOnTrackdir(next.tile, ReverseTrackdir(next.td)) && GetSignalType(next.tile, TrackdirToTrack(next.td)) == SignalType::PathOneWay &&
+						!IsFetchingCasualty(Yapf().GetVehicle()->First())) {
 					/* Possible safe tile, but not so good as it's the back of a signal... */
 					end_segment_reason.Set({EndSegmentReason::SafeTile, EndSegmentReason::DeadEnd});
 					extra_cost += Yapf().PfGetSettings().rail_lastred_exit_penalty;
 				}
+				/* The second of the two places a one-way signal ends the road,
+				 * and the one that was missed: the other is in SignalCost() and
+				 * asks about the tile being stood on, this one asks about the
+				 * tile ahead. Exempting only the first left a rescue engine
+				 * still walled in on any line worked one way -- it would look
+				 * for a way round, find every branch of it dead-ended a tile
+				 * early, and report no route at all with the road in front of
+				 * it empty. The player found it on his own railway and said
+				 * plainly what it was: there are one-way signals there, so the
+				 * exception has to cover them.
+				 *
+				 * The penalty goes with the veto, for the same reason it does
+				 * in SignalCost(): going up the line against the flow is how a
+				 * stopped train is reached, it is paid for by booking the whole
+				 * road first, and charging for it twice only buys a worse
+				 * route. Coming home the engine is an ordinary train again and
+				 * pays like one. */
 			}
 
 			/* Check the next tile for the rail type. */

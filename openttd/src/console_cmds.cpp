@@ -1434,37 +1434,6 @@ static uint _testokruh_detour_row = 0;
 static bool _testokruh_detour_seen = false;
 
 /**
- * Let a train's brake off, or put it on, by unit number.
- *
- * Added to be able to replay a player's own saved game rather than a scene
- * built from scratch: what a save cannot carry is the click that starts the
- * train, and on a rescue engine that click is the whole errand -- brake off is
- * what puts one on call. Usage: 'testbrzda <cislo vlaku>'.
- * @copydoc IConsoleCmdProc
- */
-static bool ConTestBrake(std::span<std::string_view> argv)
-{
-	if (argv.size() < 2) {
-		IConsolePrint(CC_HELP, "Toggle a train's brake by unit number. Usage: 'testbrzda <unit>'.");
-		return true;
-	}
-	auto want = ParseInteger(argv[1]);
-	if (!want.has_value()) return false;
-
-	for (Train *t : Train::Iterate()) {
-		if (!t->IsFrontEngine() || t->unitnumber != (UnitID)*want) continue;
-		AutoRestoreBackup cur_company(_current_company, t->owner);
-		CommandCost r = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
-		IConsolePrint(r.Failed() ? CC_ERROR : CC_DEFAULT, "testbrzda: vlak {} - {}.", *want,
-				r.Failed() ? "nepovedlo se" : (t->vehstatus.Test(VehState::Stopped) ? "brzda zatazena" : "brzda pustena"));
-		_testspoj_active = true;
-		return true;
-	}
-	IConsolePrint(CC_ERROR, "testbrzda: vlak {} neexistuje.", *want);
-	return true;
-}
-
-/**
  * Print every reserved tile in the current test scene's rectangle.
  *
  * A rescue engine that will not leave its shed says only "no route", and from
@@ -5079,7 +5048,6 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);
-	IConsole::CmdRegister("testbrzda",               ConTestBrake);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);

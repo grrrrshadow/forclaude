@@ -5607,8 +5607,20 @@ static bool CheckTrainStayInDepot(Train *v)
 		return true;
 	}
 
-	/* Only leave when we can reserve a path to our destination. */
-	if (seg_state == SigSegState::Path && !TryPathReserve(v) && v->force_proceed == TFP_NONE) {
+	/* Only leave when we can reserve a path to our destination.
+	 *
+	 * For a rescue engine on its way out, whatever the signalling says. An
+	 * ordinary train may leave a shed into a block that is merely free, with
+	 * nothing booked, because block signalling will stop it further along and
+	 * standing at a signal is a thing it is allowed to do. The one train that
+	 * is not allowed to do that is this one: it may not stop anywhere short of
+	 * the casualty, so leaving on anything less than the whole road booked is
+	 * leaving to stand on the open line -- which is exactly where the player
+	 * found it, out of the shed, holding one tile of main line, asking every
+	 * few ticks for a road that a parked train was sitting on.
+	 *
+	 * The whole road or the shed. Those are the only two places it belongs. */
+	if ((seg_state == SigSegState::Path || IsFetchingCasualty(v)) && !TryPathReserve(v) && v->force_proceed == TFP_NONE) {
 		/* No path and no force proceed. */
 		if (on_call) v->rescue_hold = RescueHold::NoPath;
 		if (_show_train_orientation) {
