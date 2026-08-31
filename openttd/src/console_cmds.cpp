@@ -1180,7 +1180,7 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 					t->unitnumber,
 					t->IsInDepot() ? "v depu" : fmt::format("na ({},{})", TileX(t->tile), TileY(t->tile)),
 					cil == nullptr ? "zadny" : fmt::format("vlak {}", cil->unitnumber),
-					cil == nullptr ? "" : (IsFetchingCasualty(t) ? "(jede pro ni)" : "(ma ji spojenou)"),
+					cil == nullptr ? "" : (IsFetchingCasualty(t) ? "(jede pro ni)" : "(uz ji veze)"),
 					drzi[to_underlying(t->rescue_hold)]);
 			continue;
 		}
