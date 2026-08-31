@@ -225,6 +225,55 @@ public:
 	}
 
 	/**
+	 * Is @p tile held by a train that stands between a rescue engine on its way
+	 * out and the casualty it was sent for?
+	 *
+	 * To an ordinary train a stranger on the line is not an obstruction, it is
+	 * a wait: the road ahead clears by itself and the signalling sorts out the
+	 * queueing, so the pathfinder is right to plan straight through it. A
+	 * rescue engine on its way out cannot wait, because it may not stop
+	 * anywhere short of the casualty -- it books the whole road or it does not
+	 * set off. So for it a train in the way is not a delay, it is a wall, and
+	 * the only useful answer is the way round.
+	 *
+	 * Left as an ordinary cost, that answer is never found: the search returns
+	 * the short way, the booking of it fails on the train standing there, and
+	 * nothing ever reconsiders the route -- the engine sits in its shed
+	 * reporting "no route" with a perfectly good way round untried. That is the
+	 * player's own railway: a loop, a train stopped on the near side, and the
+	 * casualty reachable the other way about. Which is also the whole point of
+	 * fetching a casualty head-on: what is in front of it is what clears.
+	 *
+	 * The casualty itself is exempt -- it is the destination, and a destination
+	 * that reads as a wall is a destination nothing can ever reach. So is this
+	 * engine's own consist. Same shape and same reasoning as
+	 * IsBlockedByFreeWagons(), including being kept out of the cached segment
+	 * reasons: it depends on where vehicles happen to be standing right now,
+	 * and the segment cache is only invalidated by track layout changes.
+	 */
+	inline bool IsBlockedForRescueRun(TileIndex tile, Trackdir trackdir, int skipped)
+	{
+		const Train *tow = Yapf().GetVehicle();
+		if (tow == nullptr) return false;
+		tow = tow->First();
+		if (!IsFetchingCasualty(tow)) return false;
+
+		TileIndexDiff diff = TileOffsByDiagDir(TrackdirToExitdir(ReverseTrackdir(trackdir)));
+		for (; skipped >= 0; skipped--, tile += diff) {
+			if (GetReservedTrackbits(tile).None()) continue;
+
+			for (const Vehicle *u : VehiclesOnTile(tile)) {
+				if (u->type != VehicleType::Train) continue;
+				const Train *head = Train::From(u)->First();
+				if (head == tow) continue;
+				if (head->index == tow->rescue_target) continue;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Calculate the cost for reserved tiles, including skipped ones.
 	 * @param n The current node.
 	 * @param tile The start tile to look at.
@@ -499,7 +548,8 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 			 * keep reporting a dead end long after the wagons were collected.
 			 * BlockedByFreeWagons is deliberately absent from ESRF_CACHED_MASK
 			 * for that reason. See IsBlockedByFreeWagons(). */
-			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td, follower->tiles_skipped)) {
+			if (Yapf().IsBlockedByFreeWagons(cur.tile, cur.td, follower->tiles_skipped) ||
+					Yapf().IsBlockedForRescueRun(cur.tile, cur.td, follower->tiles_skipped)) {
 				end_segment_reason.Set(EndSegmentReason::BlockedByFreeWagons);
 			}
 
