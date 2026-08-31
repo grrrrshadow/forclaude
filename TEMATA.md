@@ -877,6 +877,50 @@ scény o tom nevěděly a postavily jednu řadu o osmi. Test „napříč dvěma
 řadami" pak procházel z úplně jiného důvodu, než měl. Dvě oddělené řady
 v jednom depu jdou udělat jedině **z jiného druhu vagonů**.
 
+## 2.23 Mašinka se nepočítá — a nula je platná odpověď
+
+**Hráčovo hlášení a rozhodnutí:** v depu neodpojil vagonky, rozkaz byl
+„zastavit" a „nechat si 2". Diagnostika řekla proč:
+
+```
+Vlak 2: v depu neodpojuji (delilo by to dvojitou masinku napul), nechat si 2
+```
+
+Souprava byla `[mašinka][dvojitá mašinka]`, tedy 0,5 + 1,0 = 1,5 — sedí to
+na délku v okně depa. „Nechat si 2" počítalo **vozy od hlavy soupravy**,
+takže druhý krok padl doprostřed dvojité mašinky a hra to odmítla. Potichu.
+
+Hráčovo rozhodnutí: **mašinka se nepočítá vůbec.** Počítají se jen vagony,
+nula je přednastavená a znamená „odpojit všechny vagonky", a zapíná se to
+čudlíkem.
+
+Tím se z jednoho pole staly dvě otázky, protože nula do té doby znamenala
+dvě věci zároveň („nenechat si nic" a „neodpojovat"), a ta užitečnější
+z nich se nedala zadat vůbec:
+
+- `Order::decouple` — zapnuto/vypnuto, to je ten čudlík,
+- `Order::decouple_keep_wagons` — kolik vagonů zůstane s mašinkou.
+
+Počítá se `GetNextUnit()`, ne `GetNextVehicle()` — ten krok přeskočí zadní
+půlku dvojité mašinky i článkované části, takže dělení **nikdy nemůže
+padnout dovnitř mašinky**. Původní chyba tím zmizí sama, ne že by se
+ošetřila.
+
+### Staré rozkazy se převedou, ne zlomí
+
+Starý počet obsahoval mašinku i vagony, takže o jedna míň jsou vagony,
+a jakýkoli počet znamenal „odpojovat zapnuto". Dělá to
+`AfterLoadDecoupleCounts()` jednou, při načtení.
+
+Rozeznat starý save od nového bez čísla verze jde proto, že se pole
+v savu **párují jménem**: starý save má jen `decouple_count`, nový píše
+vždycky nulu. Vyprázdnění toho pole při převodu je to, co tuhle značku
+drží pravdivou i po prvním uložení.
+
+Ověřeno na skutečném starém savu (`save91.sav`): *„Prevedeno 12 rozkazu
+odpojeni na novy zapis"*, a obě scény z něj se chovají stejně jako předtím.
+Celá baterie (26 scén) beze změny.
+
 ## 2.18 Příkaz se jmenuje „připojit" a na řádku se nepíše, co každý ví
 
 Dvě věci od hráče, obě o místě na řádku rozkazu.
