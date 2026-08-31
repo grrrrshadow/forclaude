@@ -191,8 +191,16 @@ public:
 	{
 		assert(node->parent != nullptr);
 
-		/* We will never pass more than two signals, no need to check for a safe tile. */
-		if (node->parent->num_signals_passed >= 2) return;
+		/* We will never pass more than two signals, no need to check for a safe tile.
+		 *
+		 * True of an ordinary train, which will come to a stand at a signal long
+		 * before it gets further. The opposite of true for a rescue engine on
+		 * its way out: the one place it is allowed to stop is against the
+		 * casualty, at the far end of the journey, so giving up the search after
+		 * two signals leaves the booking aimed at a tile it can never have --
+		 * and it reports no route with the road in front of it empty. It has to
+		 * look the whole way, because the whole way is the rule. */
+		if (node->parent->num_signals_passed >= 2 && !IsFetchingCasualty(Yapf().GetVehicle()->First())) return;
 
 		if (!node->IterateTiles(Yapf().GetVehicle(), Yapf(), *this, &CYapfReserveTrack<Types>::FindSafePositionProc)) {
 			this->res_dest_node = node;
@@ -563,6 +571,21 @@ public:
 			if (reserve_track && path_found) {
 				if (dest != nullptr) *dest = Yapf().GetBestNode()->GetLastTile();
 				this->TryReservePath(target, node->GetLastTile());
+			}
+		}
+
+		/* How far the search actually got, when it did not get there. "No route"
+		 * says nothing about whether it stopped one tile short or never left the
+		 * yard, and that number is the whole difference between a road that is
+		 * blocked and a road that is not being looked at. */
+		if (_show_train_orientation && !path_found) {
+			const Train *me = Yapf().GetVehicle();
+			if (me != nullptr && IsFetchingCasualty(me->First())) {
+				Node *best = Yapf().GetBestNode();
+				IConsolePrint(CC_WARNING, "  odtah hledal: dosel nejdal na {}, prosel {} uzlu",
+						best == nullptr ? std::string{"nikam"} :
+								fmt::format("({},{}) smer {}", TileX(best->GetLastTile()), TileY(best->GetLastTile()), to_underlying(best->GetLastTrackdir())),
+						Yapf().num_steps);
 			}
 		}
 

@@ -222,6 +222,22 @@ struct CFollowTrackT {
 	{
 		if (!DoTrackMasking()) return true;
 
+		/* A rescue engine on its way out is sent to a train that is standing
+		 * still, and a train standing still holds the tiles it stands on.
+		 * Masking those away makes the destination unreachable by definition --
+		 * the search cannot step onto the one tile it was sent to, so it reports
+		 * no route at all. Which is what happens the moment a junction puts the
+		 * pathfinder in charge; on a single corridor the choice-free walk does
+		 * the booking and this never bites, which is exactly why one road works
+		 * and two do not.
+		 *
+		 * Only the casualty's own tiles, and only on the way out. Everybody
+		 * else's reservation is still a wall, and once the casualty is in hand
+		 * this train reads reservations like any other. */
+		if constexpr (Ttr_type_ == TransportType::Rail) {
+			if (this->veh != nullptr && IsRescueTargetOnTile(Train::From(this->veh), this->new_tile)) return true;
+		}
+
 		if (this->is_station) {
 			/* Check skipped station tiles as well. */
 			TileIndexDiff diff = TileOffsByDiagDir(this->exitdir);

@@ -518,7 +518,27 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 				end_segment_reason.Set(EndSegmentReason::BlockedByFreeWagons);
 			}
 
-			/* Tests for 'potential target' reasons to close the segment. */
+			/* Tests for 'potential target' reasons to close the segment.
+			 *
+			 * A rescue engine's destination is one of them, and it is the only
+			 * destination in the game that is not a place: it is wherever a
+			 * particular train happens to have stopped, on plain track that ends
+			 * no segment by itself. Every other target -- a depot, a station, a
+			 * waypoint -- closes the segment where it stands, which is what puts
+			 * it on a node boundary; and the destination test only ever looks at
+			 * a node's last tile. So a casualty standing mid-segment is invisible
+			 * to the search, which sails straight past it to the end of the line
+			 * and reports no route.
+			 *
+			 * Measured, not guessed: eleven nodes for a twenty-nine tile run, the
+			 * best of them five tiles beyond the casualty, nothing refused and no
+			 * dead end anywhere. It also explains why one road works and two do
+			 * not -- on a road with no choices the booking never goes through the
+			 * pathfinder at all. */
+			if (IsRescueTargetOnTile(v, cur.tile)) {
+				end_segment_reason.Set(EndSegmentReason::SafeTile);
+			}
+
 			if (cur.tile == prev.tile) {
 				/* Penalty for reversing in a depot. */
 				assert(IsRailDepot(cur.tile));

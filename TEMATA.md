@@ -1552,6 +1552,42 @@ projde (scéna `daleko`). Rozhoduje ta odbočka, ne návěstidlo.
 **Nedořešeno.** Opravit to znamená sáhnout na to zúžení, ne přidat další
 výjimku vedle. Rozhodnutí, kterým směrem, ještě nepadlo.
 
+### 4.10b Příčina: cíl uprostřed úseku hledání nevidí
+
+Změřeno, ne odhadnuto. Doplněná hláška říká, kam až se hledání dostalo:
+
+```
+odtah hledal: dosel nejdal na (49,21) smer 8, prosel 11 uzlu
+```
+
+Porucha stojí na `(44,21)`. Hledání dojede na `(49,21)` — **pět políček za
+ni** — a projde přitom jen **jedenáct uzlů** na devětadvacet políček.
+Jedenáct uzlů na takovou trať znamená, že uzel je **celý úsek**, ne
+políčko. A test cíle (`PfDetectDestination`) se ptá jen na **poslední
+políčko uzlu**.
+
+Cíl odtahovky je jediný cíl ve hře, který **není místo**: je to tam, kde
+zrovna zastavil nějaký vlak, na holé koleji. Depo, nádraží i směrový bod
+úsek samy uzavřou, a tím se vždycky ocitnou na hranici uzlu. Porucha
+uprostřed úseku ne — takže ji hledání **nevidí a projede kolem** až na
+konec trati, a ohlásí „cesta není".
+
+Odtud i to, proč jedna cesta projde a dvě ne: na koridoru bez odbočky se
+hledače cest nikdo neptá, zamlouvání dělá krátký chůzový průchod.
+
+**Oprava:** políčko s poruchou úsek uzavře, stejně jako to dělá depo nebo
+nádraží — jeden řádek v `PfCalcCost`. Tím se ocitne na hranici uzlu a test
+cíle na ni sáhne.
+
+**Co to nebylo** (obojí vyzkoušeno samostatně a vráceno): dvě návěstidla
+jako strop pro hledání bezpečného místa, a škrtání políček, která drží
+porouchaná, v `MaskReservedTracks()`.
+
+Scéna `testokruh` je v baterii a prochází: zamluví 22 políček až
+k poruše, spojí se, odtáhne. Na hráčových savech je `CIL NENALEZEN`
+nulový; na `odtah1.sav` zbývá jediné odmítnutí — stojící vlak na
+`(12,74)`, a to je správně.
+
 ---
 
 # 5. Myš, kurzor, stavba
