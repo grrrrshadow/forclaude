@@ -261,7 +261,13 @@ public:
 				/* Which tile stopped it, and who is standing on it. This is the
 				 * one line that answers "why will it not go": on the player's
 				 * own railway it was a train parked on the only road. */
-				const Train *drzi = GetTrainForReservation(this->res_fail_tile, TrackdirToTrack(this->res_fail_td));
+				/* Ask about the track that is actually booked, not the one this
+				 * train wanted. Asking with the wanted track named a tile that a
+				 * train was plainly standing on as held by nobody, which reads
+				 * as a reservation with no owner -- a fault of ours -- when it
+				 * was only the question being wrong. */
+				TrackBits held = GetReservedTrackbits(this->res_fail_tile);
+				const Train *drzi = held.None() ? nullptr : GetTrainForReservation(this->res_fail_tile, FindFirstTrack(held));
 				say(fmt::format("nejde zamluvit ({},{}) - drzi {}; {}",
 						TileX(this->res_fail_tile), TileY(this->res_fail_tile),
 						drzi != nullptr ? fmt::format("vlak {}", drzi->unitnumber) : "nikdo (jina prekazka)",

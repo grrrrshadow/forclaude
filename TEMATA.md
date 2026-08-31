@@ -1477,6 +1477,57 @@ Pomůcky k tomu, obojí zůstává v rigu: `testrez` vypíše, kdo ve scéně co
 drží, a `ChooseTrainTrack()` teď při vzdání v depu řekne, **kterým** ze
 tří konců to bylo.
 
+## 4.9 Odtahovka na hráčově vlastní trati — co se změřilo a co ne
+
+**První kolo, kdy jsem si mohl pustit hráčův save** (`odtah.sav` bez poruchy,
+`odtah1.sav` s poruchou připravenou). Tím padla spousta dohadů, včetně mých.
+
+### Co ta trať je
+
+Hlavní trať `y=74`: depo `(7,74)`, stanice 0 s porouchaným vlakem na
+`(22..24,74)`. Jednosměrná návěstidla na ní jsou na trackdiru 8, tedy
+**po směru** odtahovky jedoucí na východ — proti ní nejsou.
+
+Z depa vede i **jižní smyčka**: `(10,75)` → klikatě na jihovýchod →
+`(13,77..80)` → na východ po `y=84` přes stanici 1 `(24..26,84)` → na
+sever po `x=30` → **zpátky na hlavní trať u `x≈29-30`, tedy za poruchou.**
+Odtud se k poruše jede **na západ, proti jednosměrným** — a to je ta
+hráčova věta „musí přijet zepředu". Já ji zpočátku odepsal jako bloudění;
+byl to omyl, ta cesta je ta správná.
+
+### Co odtahovku zastavuje
+
+Ne návěstidla. Hledač cest cíl **najde**, vybere si `(21,74)` těsně před
+poruchou, a to místo je bezpečné i volné. Neodmítne ani jeden krok.
+Zamluvení padne na jediném políčku, `(12,74)`, u depa.
+
+Zamluvit stihne `(10,74)` a `(11,74)` — tedy **rovně na východ**, tou
+krátkou cestou. Jižní smyčku nezkusí: hledač vrací jednu nejlevnější cestu
+a nejlevnější je ta krátká, byť neprůjezdná.
+
+### Opraveno
+
+**Odtahovka nesmí vyjet z depa, dokud nemá zamluvenou celou cestu.**
+Vyjížděla na míň: obyčejný vlak smí z depa do bloku, který je *jen volný*,
+protože blokové návěstidlo ho zastaví dál a stát u návěstidla smí. Tenhle
+vlak stát nesmí nikde před poruchou. Výhybka na dveřích depa vyžadovala
+zamluvenou cestu jen u cestového návěstění; u blokového vyjela ven a stála
+na hlavní trati. Teď platí: celá cesta, nebo depo.
+
+### Nedořešeno — a poctivě
+
+Kdo `(12,74)` drží. `testrez` v témže běhu říká **vlak 2**, hláška
+u zamluvení říká **„drží nikdo (jiná překážka)"**. Ptal jsem se na kolej,
+kterou odtahovka chtěla, místo na tu doopravdy zamluvenou; oprava toho
+dotazu ale **výsledek nezměnila**. Takže dokud se to nevysvětlí, platí:
+**věř tomu políčku, ne tomu jménu** — a moje tvrzení „blokuje to vlak 2"
+je slabší, než jsem ho podal.
+
+A druhá věc: na trati bez odbočky dělá zamluvení na výjezdu krátký chůzový
+průchod (`ExtendTrainReservation`), ne hledač cest. Proto všechny odtahové
+scény v rigu procházejí, aniž by kterákoli z výjimek v hledači cest byla
+jedinkrát spuštěna. Jsou to nedokázané řádky.
+
 ---
 
 # 5. Myš, kurzor, stavba
