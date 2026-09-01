@@ -66,6 +66,7 @@
 #include "terraform_cmd.h"
 #include "waypoint_cmd.h"
 #include "waypoint_base.h"
+#include "vehicle_gui.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -2541,6 +2542,29 @@ static bool ConTestStoreRake(std::span<std::string_view> argv)
  * Usage: testbrzda <unit number>
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Open a train's vehicle window, the same as the player clicking on it.
+ * Usage: testokno <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestOpenWindow(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Open a train's window. Usage: 'testokno <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		ShowVehicleViewWindow(t);
+		IConsolePrint(CC_DEFAULT, "testokno: okno vlaku {} otevreno.", t->unitnumber);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testokno: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestToggleBrake(std::span<std::string_view> argv)
 {
 	if (argv.size() != 2) {
@@ -5456,6 +5480,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
+	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);

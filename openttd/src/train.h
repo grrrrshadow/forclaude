@@ -509,6 +509,8 @@ extern bool _allow_reverse_on_depot_doorstep;
  */
 extern bool _show_train_orientation;
 
+bool IsHoldingShortOfStationWaypoint(const Train *v);
+
 /**
  * Would asking this train to turn round do nothing, because of where it is
  * standing relative to a depot?

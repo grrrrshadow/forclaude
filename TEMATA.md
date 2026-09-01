@@ -2952,6 +2952,46 @@ Vedlejší nálezy z téhož měření:
   úspěchu jedna taková hláška bývá a nic neznamená — už to dvakrát
   svedlo ke zbytečnému pátrání.
 
+## 2.32 Nádražní směrování není cíl cesty — nejdřív vagonky, pak rezervace
+
+Hráč: mašinka dojede na klasické směrování, další rozkaz je nádražní
+směrování + spojit; na chvilku si zarezervuje koleje správným směrem k
+nádražnímu směrování, rezervace hned zmizí, a k vagonkům pak nevyjede.
+Trojice pádů „Unknown exception code" přišla v tomhle stavu při kliknutí
+na mašinku (viz níže — samostatná věc).
+
+Příčina rezervace: po splnění klasického směrování se aktuálním rozkazem
+stane nádražní směrování a všechny cesty k rezervaci (po otočení na konci
+koleje, předvídavé prodloužení, vjezd do bloku) k němu poctivě hledají
+cestu — držení (§2.26) nastupuje až v klidu a rezervaci teprve pak ruší.
+Pořadí bylo obráceně: rezervovat a pak čekat. Hráčovo pravidlo: **nejdřív
+hledat vagonky, rezervovat až když jsou.**
+
+Oprava — jeden predikát `IsHoldingShortOfStationWaypoint()` (aktuální
+rozkaz je nádražní směrování a za řetězem nádražních směrování stojí
+rozkaz spojit; dokud je ten rozkaz aktuální, žádný záběr ještě není —
+záběr ho uzavře v témže tiku) a čtyři místa, která se ho ptají:
+
+1. `TryPathReserve` — nic nehledá, drží jen zem pod sebou, hlásí „bez
+   cesty": volající mašinku zastaví obvyklou cestou (značka zaseknutí).
+2. `CheckNextTrainTile` — předvídavé prodlužování rezervace nedělá nic.
+3. Výhled pathfinderu na další rozkaz (`VehicleOrderSaver::SwitchToNextOrder`)
+   se u nádražního směrování s rozkazem spojit za ním zastaví: rezervace
+   končí *před* ním, ne skrz něj do nástupišť.
+4. Držení samo maže značku zaseknutí (jinak okno říká „nemůže najít
+   cestu" a časem by ji otočilo) a okno vozidla říká „čeká na vagonky".
+
+Mašinka tak zastaví tam, kde jí skončila poslední rezervace — na konci
+slepé koleje za klasickým směrováním, u návěsti — a stojí bez jediného
+zabraného políčka, dokud hledání skrz směrování nenajde řadu. Pak platí
+§2.26 beze změny: záběr, uzavření směrování, jízda pro vagonky s vlastní
+rezervací. Změřeno na hráčově savu (rezervace k (100,45) zmizela z logu,
+`zasekly ne`), claune2 cykly i baterie beze změn.
+
+Poznámka k místu čekání: jako všude u PBS musí být kde stát — slepá
+kolej za směrováním nebo návěst. Na průběžné koleji bez návěsti není
+čím zastavit a vlak dojede až na nejbližší bezpečné místo.
+
 ---
 
 # 16. Nedořešeno

@@ -3408,6 +3408,10 @@ public:
 
 			case OT_GOTO_WAYPOINT:
 				assert(v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship);
+				/* Standing short of a station waypoint for wagons to collect
+				 * behind it; "heading for" would say the opposite of what it
+				 * does. */
+				if (v->type == VehicleType::Train && IsHoldingShortOfStationWaypoint(Train::From(v))) return GetString(STR_VEHICLE_STATUS_WAITING_FOR_WAGONS);
 				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_WAYPOINT_VEL : STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL,
 					v->current_order.GetDestination(),PackVelocity(v->GetDisplaySpeed(), v->type));
 

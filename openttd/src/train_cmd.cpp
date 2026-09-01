@@ -2634,13 +2634,12 @@ bool HasCoupleTarget(const Train *v)
  * @param v the train, front of its consist
  * @return the station couple order behind the station waypoint(s), or nullptr
  */
-static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
+static const Order *CoupleOrderBehindStationWaypointsFrom(const Train *v, VehicleOrderID idx)
 {
 	if (v->orders == nullptr || v->GetNumOrders() == 0) return nullptr;
-	if (!v->current_order.IsType(OT_GOTO_WAYPOINT)) return nullptr;
 
-	VehicleOrderID idx = v->cur_real_order_index;
 	const Order *order = v->GetOrder(idx);
+	if (order == nullptr || !order->IsType(OT_GOTO_WAYPOINT)) return nullptr;
 	for (uint left = v->GetNumOrders(); order != nullptr && left > 0; left--) {
 		if (order->IsType(OT_IMPLICIT)) {
 			/* Not a real order; step over it. */
@@ -2654,6 +2653,38 @@ static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
 		order = v->GetOrder(idx);
 	}
 	return nullptr;
+}
+
+/** The current-order form of #CoupleOrderBehindStationWaypointsFrom. */
+static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
+{
+	if (!v->current_order.IsType(OT_GOTO_WAYPOINT)) return nullptr;
+	return CoupleOrderBehindStationWaypointsFrom(v, v->cur_real_order_index);
+}
+
+/**
+ * Whether this train is standing (or is about to stand) short of a station
+ * waypoint, waiting for wagons to collect behind it.
+ *
+ * A station waypoint with a couple order behind it is not a place to drive
+ * to: the wagons are searched for through it, and the run in is planned
+ * only once a rake has been claimed -- at which point the waypoint order is
+ * concluded on the spot and the couple order takes over (see the hold in
+ * TrainLocoHandler()). So for as long as that waypoint order is the current
+ * one, nothing has been claimed yet, and the train has no destination to
+ * find a path to. Every place that asks for a path checks this first; the
+ * train comes to a stand wherever its last reservation ends -- the waypoint
+ * it just passed, a dead end, a signal -- and waits there, holding nothing.
+ * Reserving toward the waypoint first and throwing the reservation away
+ * once standing was the earlier order of events, and the road it briefly
+ * held ran into the very platforms the wagons stand on.
+ *
+ * @param v the train, front of its consist
+ * @return true when the train is on such a hold
+ */
+bool IsHoldingShortOfStationWaypoint(const Train *v)
+{
+	return CoupleOrderBehindStationWaypoints(v) != nullptr;
 }
 
 /**
@@ -5796,6 +5827,10 @@ static void CheckNextTrainTile(Train *consist)
 	/* Exit if we are inside a depot. */
 	if (moving_front->track == Track::Depot) return;
 
+	/* Nothing to look ahead to for a collector waiting short of a station
+	 * waypoint; see IsHoldingShortOfStationWaypoint(). */
+	if (IsHoldingShortOfStationWaypoint(consist)) return;
+
 	switch (consist->current_order.GetType()) {
 		/* Exit if we reached our destination depot. */
 		case OT_GOTO_DEPOT:
@@ -6397,8 +6432,14 @@ public:
 					/* Skip service in depot orders when the train doesn't need service. */
 					if (order->GetDepotOrderType().Test(OrderDepotTypeFlag::Service) && !this->v->NeedsServicing()) break;
 					[[fallthrough]];
-				case OT_GOTO_STATION:
 				case OT_GOTO_WAYPOINT:
+					/* A station waypoint with a couple order behind it is where
+					 * the train will stand and wait for wagons, not a place its
+					 * path continues to; the reservation ends short of it. See
+					 * IsHoldingShortOfStationWaypoint(). */
+					if (CoupleOrderBehindStationWaypointsFrom(this->v, this->index) != nullptr) return false;
+					[[fallthrough]];
+				case OT_GOTO_STATION:
 					this->v->current_order = *order;
 					return UpdateOrderDest(this->v, order, 0, true);
 				case OT_CONDITIONAL: {
@@ -6754,6 +6795,16 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	if (IsWaitingToBeCoupled(consist)) {
 		consist->ReserveTrackUnderConsist();
 		return true;
+	}
+
+	/* And a collector short of a station waypoint has nowhere to go yet: the
+	 * wagons it is for have not been found. No path is looked for and none is
+	 * booked; it keeps the ground under itself and stands where it is. See
+	 * IsHoldingShortOfStationWaypoint(). Reported as "no path" so the callers
+	 * bring it to a stand the ordinary way; the hold clears the stuck mark. */
+	if (IsHoldingShortOfStationWaypoint(consist)) {
+		consist->ReserveTrackUnderConsist();
+		return false;
 	}
 
 	/* And nothing that cannot say which way it is pointing gets a path found
@@ -8512,6 +8563,15 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	if (consist->current_order.IsType(OT_GOTO_WAYPOINT) && consist->IsFrontEngine() && consist->cur_speed == 0) {
 		const Order *couple_order = CoupleOrderBehindStationWaypoints(consist);
 		if (couple_order != nullptr) {
+			/* It came to a stand because no path was given to it (see
+			 * TryPathReserve()), which marks a train stuck. It is not stuck,
+			 * it is waiting; the mark would show "cannot find a route" in its
+			 * window and, given time, turn it round. */
+			if (consist->flags.Test(VehicleRailFlag::Stuck)) {
+				consist->flags.Reset(VehicleRailFlag::Stuck);
+				consist->wait_counter = 0;
+				SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+			}
 			const Waypoint *through = Waypoint::GetIfValid(consist->current_order.GetDestination().ToStationID());
 			if (FindOrClaimCoupleTarget(consist, *couple_order, through) == nullptr) {
 				if (_show_train_orientation) {

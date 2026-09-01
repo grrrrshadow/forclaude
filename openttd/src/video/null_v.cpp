@@ -42,6 +42,20 @@ std::optional<std::string_view> VideoDriver_Null::Start(const StringList &parm)
 	_screen.width  = _screen.pitch = _cur_resolution.width;
 	_screen.height = _cur_resolution.height;
 	_screen.dst_ptr = nullptr;
+
+	/* Test rig: "blit=<name>" runs a real blitter into a memory buffer, so a
+	 * headless run draws its windows for real -- sprites, strings, viewports.
+	 * Some faults only ever show up in the drawing. */
+	auto blit = GetDriverParam(parm, "blit");
+	if (blit.has_value()) {
+		if (BlitterFactory::SelectBlitter(*blit) == nullptr) return "unknown blitter";
+		static std::vector<uint8_t> buffer;
+		buffer.assign((size_t)_screen.pitch * _screen.height * (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() / 8), 0);
+		_screen.dst_ptr = buffer.data();
+		BlitterFactory::GetCurrentBlitter()->PostResize();
+		ScreenSizeChanged();
+		return std::nullopt;
+	}
 	ScreenSizeChanged();
 
 	/* Do not render, nor blit */
