@@ -2750,6 +2750,55 @@ plnící se řadu, sběračku pustí brzy a chce vidět všechny tři kroky —
 
 ---
 
+## 2.27 Dvě chyby, které hráč našel hned na hráčově trati
+
+Hráč nahlásil dvě věci na svém vlastním save (Test1.sav, skutečná mašinka
+CZTR, dvě nakládací nástupiště plus stavěná řada) hned po nasazení 2.26:
+
+**1) Mašinka po odpojení zůstala stát u nakládky.** Krok zpátky přesně k
+chybě, kterou jsme kdysi řešili — hráč to poznal na první pohled. Příčina:
+oprava z 2.25 po střihu poctivě „znovu rozjela" nakládku i mašince, která
+zůstává sama (`PrepareUnload(v)` bez podmínky). To smaže příznak „naloženo
+hotovo" (`LoadingFinished`) — a holá mašinka bez vozů ho už nikdy znovu
+nedostane, protože nemá co plnit (0 = 0 se „úplně naložit" nikdy nesplní).
+Vagony si naopak svoje naložení/vyložení mají dodělat samy, to zůstává.
+Oprava: rozlišit, jestli část vlaku, co po střihu zůstává, vůbec něco veze
+(`cargo_cap != 0` u některého vozu). Jen tehdy se jí nakládka rozjíždí
+znovu; holé mašince se rovnou nastaví „hotovo" a jede dál obyčejnou cestou
+— vagonky se plní samy, to je návrh, na kterém jsme se shodli dávno a nemá
+se znovu rozjíždět oklikou.
+
+**2) Nádražní směrování #5 poslalo sběračku na směrování #6.** Hledání
+z 2.26 bylo omezené jen na *stanici*, ne na *skupinu peronů za tím
+konkrétním směrováním* — a jedna stanice u hráče má dvě takové skupiny
+(dvě nakládací nástupiště pod jedním číslem stanice, každé se svým
+směrováním). Oprava: `CollectPlatformTilesBehindWaypoint` — omezený
+průchod po kolejích od dlaždic směrování ven, sbírá nástupištní dlaždice
+cílové stanice, které potká, a **zastaví se na dlaždici jiného
+směrování** (to už patří jinému číslu). `FindOrClaimCoupleTarget` pak
+řadu bere v potaz, jen leží-li na některé z takhle nalezených dlaždic.
+Odpovídá tomu, jak to hráč popsal: směrování je „číslo peronu", ne jen
+značka na trati.
+
+Obojí opraveno a přeměřeno na rigu (baterie 31 scén zelená; scéna
+`testnaklad` navíc ukázala, že holá mašinka po odpojení skutečně z
+nástupiště odjede a dojede až do depa, ne že tam zůstane stát). **Co
+tahle session neměřila:** skutečnou diskriminaci dvou skupin peronů pod
+jednou stanicí — na to by byla potřeba nová scéna se dvěma rovnoběžnými
+nástupišti a dvěma směrováními, a to se do noci nestihlo. Logika je
+prověřená čtením (BFS se zastaví na cizím směrování), ne rigem. Hráčovo
+vlastní save je přesně ten případ — první věc, kterou má zítra zkusit.
+
+Vedlejší postřeh z ladění na hráčově save: hráčův save byl uložený
+zapauzovaný (běžná věc, hra se ukládá v pauze) a navíc v „chybovém"
+pozastavení kvůli chybějícím grf (CZTR, FIRS) — obyčejné `unpause` v
+konzoli takovou pauzu nesundá („Game is in error state and cannot be
+unpaused via console"). Přibyl rigový příkaz `testpauza` (smaže úplně
+všechny pauzy), jinak zkušební běh tiše stojí na místě a tváří se, že
+proběhl.
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich

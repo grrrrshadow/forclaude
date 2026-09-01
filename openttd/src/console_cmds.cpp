@@ -1422,6 +1422,23 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 }
 
 /**
+ * Clear every pause the game holds, including the error pause a save with
+ * missing NewGRFs starts under -- which the ordinary 'unpause' refuses to
+ * touch. Rig-only by nature: the headless runner has no dialog to click
+ * away, and a player's save is the one thing worth running exactly as it
+ * came, missing sets and all.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestUnpause(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	extern PauseModes _pause_mode;
+	_pause_mode = {};
+	IConsolePrint(CC_DEFAULT, "testpauza: vsechny pauzy smazany.");
+	return true;
+}
+
+/**
  * Print what cargo lies waiting at every station -- the rig's eyes for the
  * loaded-platform scene, where "no crash" only means something if the
  * platform really had cargo on it.
@@ -5417,6 +5434,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
 	IConsole::CmdRegister("testnaklad",              ConTestCargoScene);
 	IConsole::CmdRegister("teststanice",             ConTestStationCargo);
+	IConsole::CmdRegister("testpauza",               ConTestUnpause);
 	IConsole::CmdRegister("testfiltr",               ConTestCoupleFilter);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);

@@ -2365,6 +2365,63 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 }
 
 /**
+ * Collect the platform tiles of station @p dest that lie along the rails
+ * around station waypoint @p wp.
+ *
+ * A station waypoint names the group of platforms its couple order is for --
+ * "the number of the platform", in the player's words -- and one station can
+ * carry several such groups, each behind its own waypoint. The claim search
+ * scoped only by station could not tell them apart and sent a collector to
+ * whichever group's rake it found first; the wagons behind the other number
+ * were somebody else's plan. So the rails themselves are asked: a bounded
+ * walk out of the waypoint's tiles, along everything connected, collecting
+ * the platform tiles of the destination station it runs into. Another
+ * waypoint's tile ends a branch -- that ground belongs to another number.
+ *
+ * @param v    the collector (for rail compatibility of the walk)
+ * @param wp   the station waypoint the search looks through
+ * @param dest the couple order's station
+ * @param out  the platform tiles of @p dest found around the waypoint
+ */
+static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *wp, StationID dest, std::set<TileIndex> &out)
+{
+	std::vector<std::pair<TileIndex, Trackdir>> open;
+	std::set<uint64_t> seen;
+	for (TileIndex t : wp->train_station) {
+		if (!IsRailWaypointTile(t) || GetStationIndex(t) != wp->index) continue;
+		if (GetRailStationAxis(t) == Axis::X) {
+			open.emplace_back(t, Trackdir::X_NE);
+			open.emplace_back(t, Trackdir::X_SW);
+		} else {
+			open.emplace_back(t, Trackdir::Y_NW);
+			open.emplace_back(t, Trackdir::Y_SE);
+		}
+	}
+
+	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
+	uint budget = 128;
+	while (!open.empty()) {
+		auto [tile, td] = open.back();
+		open.pop_back();
+		if (!seen.insert(tile.base() * 16 + to_underlying(td)).second) continue;
+		if (budget == 0) break;
+		budget--;
+
+		if (IsRailStationTile(tile)) {
+			if (GetStationIndex(tile) == dest) out.insert(tile);
+		} else if (IsRailWaypointTile(tile) && GetStationIndex(tile) != wp->index) {
+			continue;
+		}
+
+		if (!ft.Follow(tile, td)) continue;
+		TrackdirBits bits = ft.new_td_bits;
+		while (bits.Any()) {
+			open.emplace_back(ft.new_tile, RemoveFirstTrackdir(bits));
+		}
+	}
+}
+
+/**
  * Find the rake a train under a "go to couple" order is going to fetch,
  * speaking for it if nobody has yet.
  *
@@ -2378,13 +2435,15 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
  * engine has it or has given up.
  *
  * @param v     the train, front of its consist
- * @param order the "go to couple" order being worked -- usually the current
- *              order, but a train holding short of a station waypoint asks
- *              with the couple order that lies behind it (see the
- *              #WPF_STATION_SEARCH hold in TrainLocoHandler())
+ * @param order   the "go to couple" order being worked -- usually the current
+ *                order, but a train holding short of a station waypoint asks
+ *                with the couple order that lies behind it (see the
+ *                #WPF_STATION_SEARCH hold in TrainLocoHandler())
+ * @param through the station waypoint the search looks through, if any; only
+ *                rakes on platforms along its rails are on offer
  * @return the rake it is to fetch, or nullptr if there is nothing for it
  */
-static Train *FindOrClaimCoupleTarget(Train *v, const Order &order)
+static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoint *through = nullptr)
 {
 	/* A couple order can name a station or a depot. At a station the offer is
 	 * anything waiting there to be coupled -- a rake, or a whole train. In a
@@ -2424,6 +2483,9 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order)
 		return made;
 	}
 
+	std::set<TileIndex> behind;
+	if (through != nullptr && !depot_order) CollectPlatformTilesBehindWaypoint(v, through, dest, behind);
+
 	Train *unclaimed = nullptr;
 
 	for (Train *rake : Train::Iterate()) {
@@ -2448,6 +2510,16 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order)
 				continue;
 			}
 			if (rake->last_station_visited != dest) continue;
+			if (through != nullptr) {
+				bool on_reachable = false;
+				for (const Train *u = rake; u != nullptr; u = u->Next()) {
+					if (behind.count(u->tile) != 0) {
+						on_reachable = true;
+						break;
+					}
+				}
+				if (!on_reachable) continue;
+			}
 		}
 
 		if (IsCoupleClaimStale(rake)) {
@@ -4328,15 +4400,35 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	FreeTrainTrackReservation(v);
 	v->ReserveTrackUnderConsist();
 
-	/* The kept engine goes on standing in its loading stop, so the stop is
-	 * started afresh over what the train is now -- the settle before the
-	 * split took the whole old consist's cargo work out of flight, and this
-	 * stages exactly the kept part's own share of it again. What it has to
-	 * load or unload here it still does; a light engine has nothing and its
-	 * load finishes at once. */
+	/* The kept part goes on standing in its loading stop only for its own
+	 * cargo work -- the settle before the split took the whole old consist's
+	 * work out of flight, and this stages exactly the kept share of it again.
+	 *
+	 * A kept part that cannot carry anything has no share, and for it the
+	 * stop is over: the engine drops its wagons and goes, and the wagons work
+	 * their load and unload orders by themselves -- that is the design, and
+	 * it was the behaviour once already. Re-arming the stop for the engine
+	 * too is what quietly took it back: restarting the load wiped the
+	 * "finished loading" mark, and a full-load order over a train with no
+	 * capacity at all can never earn it again -- nothing can ever be full --
+	 * so the light engine stood at the platform for good (or, told to load
+	 * whatever was there, until the wagons beside it happened to finish).
+	 * The finished mark is set outright instead: the ordinary departure
+	 * machinery then takes it out the ordinary way. */
 	if (v->current_order.IsType(OT_LOADING) && v->cargo_payment == nullptr &&
 			Station::IsValidID(v->last_station_visited)) {
-		PrepareUnload(v);
+		bool can_carry = false;
+		for (const Train *u = v; u != nullptr; u = u->Next()) {
+			if (u->cargo_cap != 0) {
+				can_carry = true;
+				break;
+			}
+		}
+		if (can_carry) {
+			PrepareUnload(v);
+		} else {
+			v->vehicle_flags.Set(VehicleFlag::LoadingFinished);
+		}
 	}
 
 	Train *remainder = split_point->First();
@@ -8394,7 +8486,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	if (consist->current_order.IsType(OT_GOTO_WAYPOINT) && consist->IsFrontEngine() && consist->cur_speed == 0) {
 		const Order *couple_order = CoupleOrderBehindStationWaypoints(consist);
 		if (couple_order != nullptr) {
-			if (FindOrClaimCoupleTarget(consist, *couple_order) == nullptr) {
+			const Waypoint *through = Waypoint::GetIfValid(consist->current_order.GetDestination().ToStationID());
+			if (FindOrClaimCoupleTarget(consist, *couple_order, through) == nullptr) {
 				if (_show_train_orientation) {
 					SayOnChange(consist, fmt::format("Vlak {}: ceka pred nadraznim smerovanim na ({},{}) - na stanici nejsou zadne vagonky, pro ktere by mohl jet",
 							consist->unitnumber, TileX(consist->tile), TileY(consist->tile)));
