@@ -276,7 +276,7 @@ CommandCost CmdBuildRailWaypoint(DoCommandFlags flags, TileIndex start_tile, Axi
 
 	/* Check if there is an already existing, deleted, waypoint close to us that we can reuse. */
 	TileIndex center_tile = start_tile + (count / 2) * offset;
-	if (wp == nullptr && reuse) wp = FindDeletedWaypointCloseTo(center_tile, STR_SV_STNAME_WAYPOINT, _current_company, false, station_search);
+	if (wp == nullptr && reuse) wp = FindDeletedWaypointCloseTo(center_tile, station_search ? STR_SV_STNAME_STATION_WAYPOINT : STR_SV_STNAME_WAYPOINT, _current_company, false, station_search);
 
 	if (wp != nullptr) {
 		/* Reuse an existing waypoint. */
@@ -318,7 +318,10 @@ CommandCost CmdBuildRailWaypoint(DoCommandFlags flags, TileIndex start_tile, Axi
 		wp->delete_ctr = 0;
 		wp->facilities.Set(StationFacility::Train);
 		wp->build_date = TimerGameCalendar::date;
-		wp->string_id = STR_SV_STNAME_WAYPOINT;
+		/* Its own name, so a platform waypoint reads as what it is from the
+		 * map sign on -- and gets its own numbering per town with it, since
+		 * waypoints count their serial per name. */
+		wp->string_id = station_search ? STR_SV_STNAME_STATION_WAYPOINT : STR_SV_STNAME_WAYPOINT;
 		wp->train_station = new_location;
 		/* A no-op on an existing waypoint -- the join guard above refused any
 		 * whose kind differs -- and the making of a fresh or reused one. */

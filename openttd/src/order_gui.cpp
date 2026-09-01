@@ -1121,6 +1121,17 @@ public:
 					this->SetWidgetLoweredState(WID_O_FULL_LOAD, order->GetLoadType() == OrderLoadType::FullLoadAny);
 					this->SetWidgetLoweredState(WID_O_UNLOAD, order->GetUnloadType() == OrderUnloadType::Unload);
 
+					/* A couple order is not a cargo stop: the engine couples and
+					 * goes, and what state the wagons have to be in is the couple
+					 * filter's question, not the load buttons'. The command has
+					 * already written "no load, no unload" onto the order; the
+					 * greyed buttons say that nothing here is the player's to
+					 * set. */
+					if (order->ShouldGoToCouple()) {
+						this->DisableWidget(WID_O_FULL_LOAD);
+						this->DisableWidget(WID_O_UNLOAD);
+					}
+
 					/* Can only do refitting when stopping at the destination and loading cargo.
 					 * Also enable the button if a refit is already set to allow clearing it. */
 					this->SetWidgetDisabledState(WID_O_REFIT_DROPDOWN,

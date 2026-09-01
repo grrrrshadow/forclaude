@@ -74,13 +74,21 @@ public:
 	WaypointWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		this->wp = Waypoint::Get(window_number);
-		if (wp->string_id == STR_SV_STNAME_WAYPOINT) {
+		if (wp->string_id == STR_SV_STNAME_WAYPOINT || wp->string_id == STR_SV_STNAME_STATION_WAYPOINT) {
 			this->vt = HasBit(this->wp->waypoint_flags, WPF_ROAD) ? VehicleType::Road : VehicleType::Train;
 		} else {
 			this->vt = VehicleType::Ship;
 		}
 
 		this->CreateNestedTree();
+
+		/* A platform station waypoint's window says so in a bar of its own,
+		 * right under the caption -- the viewport looks exactly like an
+		 * ordinary waypoint's and the player has both kinds standing in one
+		 * station throat; the kind has to be readable at a glance, not
+		 * deduced from the name. Ordinary waypoints collapse the bar away. */
+		this->GetWidget<NWidgetStacked>(WID_W_STWP_SEL)->SetDisplayedPlane(
+				HasBit(this->wp->waypoint_flags, WPF_STATION_SEARCH) ? 0 : SZSP_HORIZONTAL);
 		if (this->vt == VehicleType::Train) {
 			this->GetWidget<NWidgetCore>(WID_W_SHOW_VEHICLES)->SetStringTip(STR_TRAIN, STR_STATION_VIEW_SCHEDULED_TRAINS_TOOLTIP);
 		}
@@ -204,6 +212,14 @@ static constexpr std::initializer_list<NWidgetPart> _nested_waypoint_view_widget
 		NWidget(WWT_SHADEBOX, Colours::Grey),
 		NWidget(WWT_DEFSIZEBOX, Colours::Grey),
 		NWidget(WWT_STICKYBOX, Colours::Grey),
+	EndContainer(),
+	/* One more bar under the caption, carried only by a platform station
+	 * waypoint, naming the kind outright -- the two kinds of waypoint look
+	 * identical from the viewport and stand in the same station throats. */
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_W_STWP_SEL),
+		NWidget(WWT_PANEL, Colours::Grey),
+			NWidget(WWT_LABEL, Colours::Grey, WID_W_STWP_LABEL), SetStringTip(STR_WAYPOINT_VIEW_STATION_WAYPOINT_LABEL), SetFill(1, 0), SetResize(1, 0), SetPadding(1, 2, 1, 2),
+		EndContainer(),
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey),
 		NWidget(WWT_INSET, Colours::Grey), SetPadding(2, 2, 2, 2),

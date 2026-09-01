@@ -2799,6 +2799,55 @@ proběhl.
 
 ---
 
+## 2.28 Hráčův save doběhl celý cyklus — tři opravy a jedno okno
+
+Hráč dodal save bez grf (claune.sav: tři slepé perony pod jednou stanicí,
+vjezd i výjezd jižním zhlavím s jednosměrnými, slepá odstavná štreka
+s klasickým směrováním jako čekací místo, nádražní směrování nástupišť
+na přístupech k peronům) a hlásil: zasekává se na směrování, musí ručně
+přeskakovat příkazy, při připojování se nakládá. Vše zreprodukováno na
+rigu do puntíku a opraveno; po opravách save běží celé cykly dokola —
+každé „spojeno" na téže dlaždici jako „zabral".
+
+**1) Rozsah hledání neviděl vagonky uprostřed peronu.** Průchod
+kolejemi od směrování (2.27) sbíral jen dlaždice, na které skutečně
+šlápl — jenže sledovač kolejí přeskočí peron jedním krokem a hlásí až
+vzdálený konec. Vagonky stojí uprostřed → „na stanici ceka rad: 2, za
+timhle smerovanim z nich: 0" (ta čísla přibyla do hlášky čekání přesně
+kvůli tomuhle — bez nich jsou „nejsou vagonky" a „vagonky jsou, ale
+nevidím je" k nerozeznání). Oprava: dlaždice peronu se sbírá celý peron
+po jeho ose, ne jen ta jedna.
+
+**2) Po zabrání řady jela mašinka po staré rezervaci na cizí peron.**
+Cestu si zamluvila ještě za jízdy k čekacímu místu — s rozkazem
+směrování jako cílem, a nejbližší bezpečné zastavení za směrováním je
+právě některý peron, zabraná řada nezabraná. Vlak, který opouští
+čekání, se znovu neptá, když rezervaci má („leaves the wait with a
+reservation, or not at all") — a tak dojel na cizí peron, chytil se tam
+do nakládky u cizích vagonů a stál navěky. Oprava: v okamžiku zabrání
+řady se stará cesta zahodí (FreeTrainTrackReservation + držení jen pod
+sebou) a jízda pro vagonky si zamluví svou. Hráčův save měl tu vadnou
+rezervaci dokonce uloženou v sobě — na peronu, kam vlak nikdy neměl jet.
+
+**3) Příkaz připojit už nenabízí nakládku.** Mašinka připojí a jede;
+plné/prázdné je otázka filtru připojení, ne nakládacích čudlíků. Zapnutí
+připojit na staničním rozkazu samo zapíše nenakládat/nevykládat (a
+vypnutí to zase vrátí — co se doplní samo, samo se i odebere, §2.21),
+okno rozkazů roletky nakládky u připojení zatmaví. Filtr plné/prázdné/
+jakékoliv zůstává beze změny.
+
+**A okno:** nádražní směrování nástupišť má v okně směrování navíc lištu
+s nápisem „Nádražní směrování nástupišť" (u obyčejného směrování se
+lišta složí), nové se jmenuje od začátku „Nástupiště {TOWN} č. N" (svoje
+číslování zadarmo — směrování počítají pořadí podle jména), a text u
+ikonky výstavby je hráčův: „Nádražní směrování nástupišť. Slouží
+k přesnému navedení mašinek na připojení k vagonům." Jméno je nový
+SV-string na konci připíchnutého bloku (0x6028), takže se žádné ID
+neposunulo; okno směrování pozná druh vlaku i podle nového jména
+(waypoint_gui řádek ~77 — jinak by nové směrování četlo jako bóji).
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich

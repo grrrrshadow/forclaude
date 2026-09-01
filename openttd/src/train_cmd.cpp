@@ -2408,7 +2408,20 @@ static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *w
 		budget--;
 
 		if (IsRailStationTile(tile)) {
-			if (GetStationIndex(tile) == dest) out.insert(tile);
+			if (GetStationIndex(tile) == dest) {
+				/* The whole platform, not the one tile the walk happens to
+				 * touch: the track follower crosses a platform in a single
+				 * step, reporting only its far end, and the wagons stand in
+				 * the middle. Collected tile by tile along the platform's own
+				 * axis instead, or a rake parked mid-platform is never "in
+				 * reach" of anything. */
+				Axis axis = GetRailStationAxis(tile);
+				for (DiagDirection dir : {AxisToDiagDir(axis), ReverseDiagDir(AxisToDiagDir(axis))}) {
+					for (TileIndex pt = tile; IsRailStationTile(pt) && GetStationIndex(pt) == dest && GetRailStationAxis(pt) == axis; pt = TileAddByDiagDir(pt, dir)) {
+						out.insert(pt);
+					}
+				}
+			}
 		} else if (IsRailWaypointTile(tile) && GetStationIndex(tile) != wp->index) {
 			continue;
 		}
@@ -2539,8 +2552,8 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 
 	if (unclaimed != nullptr) {
 		if (_show_train_orientation && v->couple_target != unclaimed->index) {
-			IConsolePrint(CC_INFO, "Vlak {}: zabral cil spojeni {} (drive {})", v->unitnumber,
-					unclaimed->index.base(), v->couple_target.base());
+			IConsolePrint(CC_INFO, "Vlak {}: zabral cil spojeni {} na ({},{}) (drive {})", v->unitnumber,
+					unclaimed->index.base(), TileX(unclaimed->tile), TileY(unclaimed->tile), v->couple_target.base());
 		}
 		unclaimed->couple_claim = v->index;
 		v->couple_target = unclaimed->index;
@@ -8489,8 +8502,29 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			const Waypoint *through = Waypoint::GetIfValid(consist->current_order.GetDestination().ToStationID());
 			if (FindOrClaimCoupleTarget(consist, *couple_order, through) == nullptr) {
 				if (_show_train_orientation) {
-					SayOnChange(consist, fmt::format("Vlak {}: ceka pred nadraznim smerovanim na ({},{}) - na stanici nejsou zadne vagonky, pro ktere by mohl jet",
-							consist->unitnumber, TileX(consist->tile), TileY(consist->tile)));
+					/* Not just "nothing" -- how many rakes stand waiting at the
+					 * station at all, and how many of them the waypoint's own
+					 * rails reach. A collector waiting for ever with full rakes
+					 * in plain sight is one of two different failures, and from
+					 * the outside they look identical. */
+					uint waiting = 0, in_reach = 0;
+					std::set<TileIndex> behind;
+					StationID dest = couple_order->GetDestination().ToStationID();
+					if (through != nullptr) CollectPlatformTilesBehindWaypoint(consist, through, dest, behind);
+					for (const Train *rake : Train::Iterate()) {
+						if (rake == consist || rake->owner != consist->owner) continue;
+						if (!rake->IsFreeWagon() && !rake->IsFrontEngine()) continue;
+						if (!IsWaitingToBeCoupled(rake) || rake->last_station_visited != dest) continue;
+						waiting++;
+						for (const Train *u = rake; u != nullptr; u = u->Next()) {
+							if (behind.count(u->tile) != 0) {
+								in_reach++;
+								break;
+							}
+						}
+					}
+					SayOnChange(consist, fmt::format("Vlak {}: ceka pred nadraznim smerovanim na ({},{}) - na stanici ceka rad: {}, za timhle smerovanim z nich: {}",
+							consist->unitnumber, TileX(consist->tile), TileY(consist->tile), waiting, in_reach));
 				}
 				/* It holds no track while it waits -- same reasoning, and the
 				 * same depot guard, as the collecting hold below. */
@@ -8509,6 +8543,20 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			UpdateVehicleTimetable(consist, true);
 			consist->IncrementImplicitOrderIndex();
 			ProcessOrders(consist);
+
+			/* And whatever path was standing goes with it. It was booked for
+			 * the waypoint leg, while the train was still rolling toward its
+			 * waiting spot -- and past a waypoint whose tiles guard the
+			 * platforms, the nearest safe end for such a path is whichever
+			 * platform lay easiest, claimed rake or no. A train leaving a wait
+			 * follows a standing reservation without asking again, so the
+			 * leftover took the collector onto the wrong platform and parked
+			 * it against somebody else's wagons for good. The collecting run
+			 * books its own road to the rake it now has. */
+			if (!IsWholeTrainInsideDepot(consist)) {
+				FreeTrainTrackReservation(consist);
+				consist->ReserveTrackUnderConsist();
+			}
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vlak {}: vagonky pripraveny - nadrazni smerovani ma splneno, jede se pro ne", consist->unitnumber);
 			}

@@ -18,6 +18,8 @@ enum WaypointWidgets : WidgetID {
 	WID_W_RENAME,        ///< Rename this waypoint.
 	WID_W_SHOW_VEHICLES, ///< Show the vehicles visiting this waypoint.
 	WID_W_CATCHMENT,     ///< Coverage button.
+	WID_W_STWP_SEL,      ///< Selection for the platform-waypoint label bar.
+	WID_W_STWP_LABEL,    ///< "Platform station waypoint" label bar.
 };
 
 #endif /* WIDGETS_WAYPOINT_WIDGET_H */

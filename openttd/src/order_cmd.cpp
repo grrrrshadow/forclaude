@@ -1610,6 +1610,23 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_GOTO_COUPLE:
 				order->SetGoToCouple(data != 0);
+				/* A collecting run is not a cargo stop: the wagons come loaded
+				 * or empty per the couple filter, and the engine couples and
+				 * goes -- it neither loads nor unloads anything here. The
+				 * vanilla load buttons are therefore filled in as "no load, no
+				 * unload" the moment the order becomes a couple order (and the
+				 * window greys them out), and put back to their defaults the
+				 * moment it stops being one -- what fills itself in has to
+				 * take itself back out. */
+				if (order->IsType(OT_GOTO_STATION)) {
+					if (data != 0) {
+						order->SetLoadType(OrderLoadType::NoLoad);
+						order->SetUnloadType(OrderUnloadType::NoUnload);
+					} else {
+						order->SetLoadType(OrderLoadType::LoadIfPossible);
+						order->SetUnloadType(OrderUnloadType::UnloadIfPossible);
+					}
+				}
 				break;
 
 			case MOF_TURN_AROUND_DEPOT:
@@ -1692,6 +1709,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
 					u->current_order.SetReverseOutOfStation(order->ShouldReverseOutOfStation());
+					/* The couple toggle rewrites the order's load and unload;
+					 * the live copy has to follow or the trip already under way
+					 * still loads. */
+					u->current_order.SetUnloadType(order->GetUnloadType());
 					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
 					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
 					u->current_order.SetCoupleCount(order->GetCoupleCount());

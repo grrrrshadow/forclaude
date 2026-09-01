@@ -652,6 +652,32 @@ static void AfterLoadDecoupleCounts()
 	if (migrated != 0) {
 		IConsolePrint(CC_INFO, "Prevedeno {} rozkazu odpojeni na novy zapis (masinka se nepocita).", migrated);
 	}
+
+	/* A couple order is not a cargo stop -- the engine couples and goes, and
+	 * whether the wagons come loaded is the couple filter's question. New
+	 * orders get "no load, no unload" written in the moment the couple switch
+	 * goes on; orders written before that rule carry whatever the player's
+	 * buttons happened to say, most often "full load" -- which over an engine
+	 * with nothing to fill never finishes, and is the load nobody asked for at
+	 * the platform. Brought in line here, once, the same way the decouple
+	 * counts are. The live copy too, loading state included: a collector
+	 * captured mid-stop reads its types off that copy. */
+	size_t couple_orders = 0;
+	auto settle_couple_cargo = [&couple_orders](Order &o) {
+		if (!o.ShouldGoToCouple()) return;
+		if (!o.IsType(OT_GOTO_STATION) && !o.IsType(OT_LOADING)) return;
+		if (o.GetLoadType() == OrderLoadType::NoLoad && o.GetUnloadType() == OrderUnloadType::NoUnload) return;
+		o.SetLoadType(OrderLoadType::NoLoad);
+		o.SetUnloadType(OrderUnloadType::NoUnload);
+		couple_orders++;
+	};
+	for (OrderList *ol : OrderList::Iterate()) {
+		for (Order &o : ol->GetOrders()) settle_couple_cargo(o);
+	}
+	for (Vehicle *v : Vehicle::Iterate()) settle_couple_cargo(v->current_order);
+	if (couple_orders != 0) {
+		IConsolePrint(CC_INFO, "Prevedeno {} rozkazu pripojeni na nenakladat/nevykladat (pripojit a jet).", couple_orders);
+	}
 }
 
 /** @copydoc AfterLoadLegacyDecoupleImportReferences */

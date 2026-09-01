@@ -2933,7 +2933,7 @@ STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_TRACK                   :{BLACK}Položit
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_AUTORAIL                         :{BLACK}Pokládat koleje v libovolném směru. Ctrl přepíná režim stavba/odstraňování. Podrž Shift pro zobrazení odhadu ceny
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_TRAIN_DEPOT_FOR_BUILDING         :{BLACK}Postavit železniční depo (pro nákup a servis vlaků). Podrž Shift pro zobrazení odhadu ceny
 STR_RAIL_TOOLBAR_TOOLTIP_CONVERT_RAIL_TO_WAYPOINT               :{BLACK}Postavit na trati směrování. Podrž Shift pro zobrazení odhadu ceny
-STR_RAIL_TOOLBAR_TOOLTIP_BUILD_STATION_WAYPOINT                 :{BLACK}Postavit na trati nádražní směrování nástupišť. Vlak jedoucí skrz něj na příkaz připojit počká, kde stojí, dokud nebudou vagonky na nádraží hotové, a pak jede pro ty, které byly hotové první
+STR_RAIL_TOOLBAR_TOOLTIP_BUILD_STATION_WAYPOINT                 :{BLACK}Nádražní směrování nástupišť. Slouží k přesnému navedení mašinek na připojení k vagonům
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_STATION                 :{BLACK}Postavit nádraží. Pomocí Ctrl ho připojíš k jinému. Podrž Shift pro zobrazení odhadu ceny
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_SIGNALS                 :{BLACK}Umístit návěstidla. Pomocí Ctrl vybereš mezi mechanickými a světelnými{}Tažením umístíš návěstidla na rovném úseku tratě a s přidržením Ctrl až do dalšího křížení{}Kliknutím na tlačítko s Ctrl otevřeš okno s výběrem návěstidel{}Podrž Shift pro zobrazení odhadu ceny
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_BRIDGE                  :{BLACK}Postavit železniční most. Podrž Shift pro zobrazení odhadu ceny
@@ -4148,6 +4148,7 @@ STR_STATION_VIEW_CLOSE_AIRPORT_TOOLTIP                          :{BLACK}Zabráni
 
 # Waypoint/buoy view window
 STR_WAYPOINT_VIEW_CAPTION                                       :{WHITE}{WAYPOINT}
+STR_WAYPOINT_VIEW_STATION_WAYPOINT_LABEL                        :{BLACK}Nádražní směrování nástupišť
 STR_WAYPOINT_VIEW_CENTER_TOOLTIP                                :{BLACK}Zaměřit hlavní pohled na umístění bodu na trase. Při stisknutí Ctrl+Klik otevřete nové okno na umístění bodu na trase
 STR_WAYPOINT_VIEW_EDIT_TOOLTIP                                  :{BLACK}Přejmenovat směřování nebo přesunout značku
 STR_BUOY_VIEW_CENTER_TOOLTIP                                    :{BLACK}Vycentrovat pohled na bójku. Ctrl+Klik otevře nové okno náhledu
@@ -6049,6 +6050,7 @@ STR_SV_STNAME_LOWER                                             :Dolní {STRING}
 STR_SV_STNAME_HELIPORT                                          :Heliport {STRING}
 STR_SV_STNAME_FOREST                                            :{STRING} les
 STR_SV_STNAME_FALLBACK                                          :{STRING} Stanice č. {NUM}
+STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING2}
 
 ############ end of savegame specific region!
 
@@ -6341,6 +6343,8 @@ STR_FORMAT_BUOY_NAME_SERIAL                                     :Bójka {TOWN} �
 ###length 2
 STR_FORMAT_WAYPOINT_NAME                                        :Směrování {TOWN}
 STR_FORMAT_WAYPOINT_NAME_SERIAL                                 :Směrování {TOWN} č. {COMMA}
+STR_FORMAT_STATION_WAYPOINT_NAME                                :Nástupiště {TOWN}
+STR_FORMAT_STATION_WAYPOINT_NAME_SERIAL                         :Nástupiště {TOWN} č. {COMMA}
 
 ###length 6
 STR_FORMAT_DEPOT_NAME_TRAIN                                     :Železniční depo {TOWN}
