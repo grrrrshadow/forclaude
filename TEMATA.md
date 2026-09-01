@@ -2992,6 +2992,20 @@ Poznámka k místu čekání: jako všude u PBS musí být kde stát — slepá
 kolej za směrováním nebo návěst. Na průběžné koleji bez návěsti není
 čím zastavit a vlak dojede až na nejbližší bezpečné místo.
 
+**Pád při kliknutí na čekající mašinku — příčina zatím neznámá, ale
+poznatelná.** Kód pádu 3765269347 = 0xE06D7363 je *nechycená C++ výjimka*
+(MSVC), ne přístup do paměti; „Unknown exception code" ji jen neumělo
+pojmenovat. Headless rig ji nereprodukuje ani se skutečným blitterem,
+česky a ve škále 175 (rig má teď `testokno <vlak>` = klik, a
+`-vnull:blit=32bpp-anim` kreslí do paměti opravdovým blitterem; GUI
+sestavení v `build_gui`). Hráčovy .dmp jsou pod Wine (Winlator) prázdné
+a stack v logu taky. Proto crash log na Windows nově čte C++ výjimku v
+okamžiku vyhození (vektorový handler, první šance, stack ještě stojí):
+typ vyhozeného objektu a u `std::exception` i text `what()` — v JSON
+`reason` pak stojí např. `Uncaught C++ exception .?AVout_of_range@std@@:
+...`. Další takový pád tím řekne, co a proč; do té doby se nic
+neošetřuje naslepo.
+
 ---
 
 # 16. Nedořešeno

@@ -39,6 +39,96 @@
 /** Exception code used for custom abort. */
 static constexpr DWORD CUSTOM_ABORT_EXCEPTION = 0xE1212012;
 
+/** The exception code MSVC raises for every C++ throw. */
+static constexpr DWORD MSVC_CPP_EXCEPTION = 0xE06D7363;
+
+/**
+ * The C++ exception last seen in flight, decoded at first chance -- its type
+ * and, for a std::exception, its message. See RememberCppException().
+ */
+static std::string _last_cpp_exception;
+
+#if defined(_MSC_VER) && defined(_M_AMD64)
+/* MSVC's C++ exception record on x64: ExceptionInformation[1] is the thrown
+ * object, [2] the ThrowInfo, [3] the module base every RVA below is off. */
+struct MsvcPMD { int32_t mdisp, pdisp, vdisp; };
+struct MsvcCatchableType { uint32_t properties; int32_t type; MsvcPMD this_displacement; int32_t size_or_offset; int32_t copy_function; };
+struct MsvcCatchableTypeArray { int32_t count; int32_t types[1]; };
+struct MsvcThrowInfo { uint32_t attributes; int32_t unwind; int32_t forward_compat; int32_t catchable_types; };
+struct MsvcTypeDescriptor { const void *vftable; void *spare; char name[1]; };
+
+/**
+ * Copy a C string into a fixed buffer. No library call, so it may run
+ * inside the __try below, and none of the banned string functions either.
+ */
+static void CopyCString(char *dst, size_t len, const char *src)
+{
+	size_t i = 0;
+	for (; i + 1 < len && src[i] != '\0'; i++) dst[i] = src[i];
+	dst[i] = '\0';
+}
+
+static bool CStringEquals(const char *a, const char *b)
+{
+	for (; *a != '\0' && *a == *b; a++, b++) {}
+	return *a == *b;
+}
+
+/**
+ * Read the thrown object's type name and, if it is a std::exception, its
+ * what() text. Every pointer here comes out of a record we did not write,
+ * so the reads are guarded; a function with __try may hold nothing that
+ * needs unwinding, hence the plain buffers.
+ * @return whether anything was decoded
+ */
+static bool DecodeCppException(const EXCEPTION_RECORD *er, char *type_out, size_t type_len, char *what_out, size_t what_len)
+{
+	type_out[0] = '\0';
+	what_out[0] = '\0';
+	if (er->NumberParameters < 4 || er->ExceptionInformation[0] != 0x19930520) return false;
+	const char *base = reinterpret_cast<const char *>(er->ExceptionInformation[3]);
+	const char *object = reinterpret_cast<const char *>(er->ExceptionInformation[1]);
+	const MsvcThrowInfo *ti = reinterpret_cast<const MsvcThrowInfo *>(er->ExceptionInformation[2]);
+	if (base == nullptr || object == nullptr || ti == nullptr) return false;
+
+	__try {
+		const MsvcCatchableTypeArray *arr = reinterpret_cast<const MsvcCatchableTypeArray *>(base + ti->catchable_types);
+		for (int32_t i = 0; i < arr->count && i < 16; i++) {
+			const MsvcCatchableType *ct = reinterpret_cast<const MsvcCatchableType *>(base + arr->types[i]);
+			const MsvcTypeDescriptor *td = reinterpret_cast<const MsvcTypeDescriptor *>(base + ct->type);
+			if (i == 0) CopyCString(type_out, type_len, td->name);
+			if (CStringEquals(td->name, ".?AVexception@std@@")) {
+				/* std::exception: a vtable pointer, then { const char *what; bool free; }. */
+				const char *what = *reinterpret_cast<const char *const *>(object + ct->this_displacement.mdisp + sizeof(void *));
+				if (what != nullptr) CopyCString(what_out, what_len, what);
+			}
+		}
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		CopyCString(what_out, what_len, "(exception record could not be read)");
+	}
+	return true;
+}
+
+/**
+ * Called at first chance for every C++ throw, before anything unwinds:
+ * remember what was thrown, so that if nobody catches it the report can
+ * name it. "Unknown exception code" was all the report said for a whole
+ * family of crashes -- an uncaught std::exception is code 0xE06D7363, and
+ * the code alone says nothing about which one or from where.
+ */
+static void RememberCppException(const EXCEPTION_RECORD *er)
+{
+	char type[256];
+	char what[512];
+	if (!DecodeCppException(er, type, sizeof(type), what, sizeof(what))) return;
+	_last_cpp_exception = type;
+	if (what[0] != '\0') {
+		_last_cpp_exception += ": ";
+		_last_cpp_exception += what;
+	}
+}
+#endif /* _MSC_VER && _M_AMD64 */
+
 /** A map between exception code and its name. */
 static const std::map<DWORD, std::string> exception_code_to_name{
 	{EXCEPTION_ACCESS_VIOLATION, "EXCEPTION_ACCESS_VIOLATION"},
@@ -90,6 +180,9 @@ class CrashLogWindows : public CrashLog {
 		survey["id"] = ep->ExceptionRecord->ExceptionCode;
 		if (exception_code_to_name.count(ep->ExceptionRecord->ExceptionCode) > 0) {
 			survey["reason"] = exception_code_to_name.at(ep->ExceptionRecord->ExceptionCode);
+		} else if (ep->ExceptionRecord->ExceptionCode == MSVC_CPP_EXCEPTION) {
+			/* An uncaught C++ exception; say which, if it was seen thrown. */
+			survey["reason"] = _last_cpp_exception.empty() ? std::string("Uncaught C++ exception") : fmt::format("Uncaught C++ exception {}", _last_cpp_exception);
 		} else {
 			survey["reason"] = "Unknown exception code";
 		}
@@ -386,6 +479,11 @@ static LONG WINAPI VectoredExceptionHandler(EXCEPTION_POINTERS *ep)
 	if (ep->ExceptionRecord->ExceptionCode == CUSTOM_ABORT_EXCEPTION) {
 		return ExceptionHandler(ep);
 	}
+#if defined(_MSC_VER) && defined(_M_AMD64)
+	/* A C++ throw passes through here first, with its stack still standing;
+	 * it is not ours to handle, but it is the one moment it can be read. */
+	if (ep->ExceptionRecord->ExceptionCode == MSVC_CPP_EXCEPTION) RememberCppException(ep->ExceptionRecord);
+#endif
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }
