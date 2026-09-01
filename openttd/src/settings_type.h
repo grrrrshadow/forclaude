@@ -617,6 +617,7 @@ struct VehicleSettings {
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration
 	bool wagon_speed_limits; ///< enable wagon speed limits
+	bool no_engine_cargo; ///< engines may not carry cargo -- wagons haul, engines pull
 	bool disable_elrails; ///< when true, the elrails are disabled
 	UnitID max_trains; ///< max trains in game per company
 	UnitID max_roadveh; ///< max trucks in game per company

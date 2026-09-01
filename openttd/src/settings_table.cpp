@@ -189,6 +189,29 @@ static void UpdateConsists(int32_t)
 }
 
 /**
+ * The engine-cargo ban was flipped: recompute the capacity of every vehicle
+ * belonging to an engine unit, here and directly, never through
+ * ConsistChanged() -- most of its callers may not change capacities and
+ * would report the difference as a broken NewGRF instead of applying it.
+ * Turning the ban on takes the capacity and tips out whatever cargo sat in
+ * it; turning it off gives the set's declared capacity back (the cargo that
+ * was tipped out is gone -- fuel spent). Wagons are never touched: the ban
+ * is about engines pretending to haul, see Train::ConsistChanged().
+ */
+static void EngineCargoBanChanged(int32_t)
+{
+	for (Train *u : Train::Iterate()) {
+		if (RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type == RailVehicleType::Wagon) continue;
+		uint16_t new_cap = _settings_game.vehicle.no_engine_cargo ? 0 : Engine::Get(u->engine_type)->DetermineCapacity(u);
+		if (u->cargo_cap > new_cap) u->cargo.Truncate(new_cap);
+		u->refit_cap = std::min(new_cap, u->refit_cap);
+		u->cargo_cap = new_cap;
+	}
+	InvalidateWindowClassesData(WindowClass::BuildVehicle, 0);
+	SetWindowClassesDirty(WindowClass::VehicleDetails);
+}
+
+/**
  * Check and update if needed all vehicle service intervals.
  * @param new_value Contains 0 if service intervals are in time (days or real-world minutes), otherwise intervals use percents.
  */

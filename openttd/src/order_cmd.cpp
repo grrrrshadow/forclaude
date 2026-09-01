@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "debug.h"
 #include "command_func.h"
+#include "console_func.h"
 #include "company_func.h"
 #include "news_func.h"
 #include "strings_func.h"
@@ -2410,10 +2411,32 @@ bool ProcessOrders(Vehicle *v)
 	bool may_reverse = v->current_order.IsType(OT_NOTHING);
 	Vehicle *moving_front = v->GetMovingFront();
 
-	/* Check if we've reached a 'via' destination. */
+	/* Check if we've reached a 'via' destination. The moving front is what
+	 * normally crosses it first, but it is not the only end that counts: a
+	 * train that ran its nose into a dead end turns its leading end around
+	 * on the spot, in the same movement step that put the nose on the last
+	 * tile -- when the destination waypoint IS that last tile, the end now
+	 * standing on it is the trailing one, and the leading end will never
+	 * touch it, because there is no more track to carry it there. The next
+	 * path request then asks for a waypoint lying behind the train's back
+	 * in a stub it cannot re-enter, and is refused for good. A waypoint any
+	 * end of the train is standing on has been reached, whichever way the
+	 * train is facing. */
+	auto stands_on_via_dest = [&v, &moving_front]() {
+		auto on_dest = [&v](TileIndex t) {
+			return IsTileType(t, TileType::Station) && v->current_order.GetDestination() == GetStationIndex(t);
+		};
+		if (on_dest(moving_front->tile)) return true;
+		return v->type == VehicleType::Train && (on_dest(v->tile) || on_dest(v->Last()->tile));
+	};
 	if (((v->current_order.IsType(OT_GOTO_STATION) && v->current_order.GetNonStopType().Test(OrderNonStopFlag::GoVia)) || v->current_order.IsType(OT_GOTO_WAYPOINT)) &&
-			IsTileType(moving_front->tile, TileType::Station) &&
-			v->current_order.GetDestination() == GetStationIndex(moving_front->tile)) {
+			stands_on_via_dest()) {
+		if (_show_train_orientation && v->type == VehicleType::Train) {
+			IConsolePrint(CC_INFO, "Vlak {}: prujezdni cil splnen - rozkaz c.{} (cil {}), stojim na ({},{})",
+					Train::From(v)->unitnumber, v->cur_real_order_index,
+					v->current_order.GetDestination().ToStationID().base(),
+					TileX(moving_front->tile), TileY(moving_front->tile));
+		}
 		v->DeleteUnreachedImplicitOrders();
 		/* We set the last visited station here because we do not want
 		 * the train to stop at this 'via' station if the next order

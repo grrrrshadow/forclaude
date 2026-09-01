@@ -65,6 +65,7 @@
 #include "industry_cmd.h"
 #include "terraform_cmd.h"
 #include "waypoint_cmd.h"
+#include "waypoint_base.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -1510,13 +1511,16 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 	for (const Train *t : Train::Iterate()) {
 		if (t->First() != t) continue;
 		if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
-		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) rychlost {} couva {} rozkaz {} vozu {} zasekly {} cil {} narok {} stav[{}{}{}{}]",
+		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) rychlost {} couva {} rozkaz {} [c.{} kam ({},{})] vozu {} zasekly {} cil {} narok {} zpozdeni {} stav[{}{}{}{}]",
 				t->unitnumber, TileX(t->tile), TileY(t->tile), t->cur_speed,
 				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
-				to_underlying(t->current_order.GetType()), CountVehiclesInChain(t),
+				to_underlying(t->current_order.GetType()),
+				t->cur_real_order_index, TileX(t->dest_tile), TileY(t->dest_tile),
+				CountVehiclesInChain(t),
 				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
 				t->couple_target == VehicleID::Invalid() ? -1 : (int)t->couple_target.base(),
 				t->couple_claim == VehicleID::Invalid() ? -1 : (int)t->couple_claim.base(),
+				t->lateness_counter,
 				t->vehstatus.Test(VehState::Stopped) ? 'S' : '-',
 				t->flags.Test(VehicleRailFlag::LeavingStation) ? 'L' : '-',
 				t->flags.Test(VehicleRailFlag::Reversing) ? 'R' : '-',
@@ -1648,6 +1652,11 @@ static bool ConTestMap(std::span<std::string_view> argv)
 				desc = "kolej";
 			} else if (IsRailDepotTile(tile)) {
 				desc = fmt::format("depo (vrata {})", to_underlying(GetRailDepotDirection(tile)));
+			} else if (IsRailWaypointTile(tile)) {
+				tracks = TrackBits{GetRailStationTrack(tile)};
+				const Waypoint *wp = Waypoint::GetByTile(tile);
+				desc = fmt::format("smerovani {}{}", wp->index.base(),
+						HasBit(wp->waypoint_flags, WPF_STATION_SEARCH) ? " (nadrazni)" : "");
 			} else if (IsRailStationTile(tile)) {
 				tracks = TrackBits{GetRailStationTrack(tile)};
 				desc = fmt::format("stanice {}", GetStationIndex(tile).base());

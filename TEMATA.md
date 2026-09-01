@@ -2851,11 +2851,14 @@ neposunulo; okno směrování pozná druh vlaku i podle nového jména
 ## 2.29 Mašinky nic nevozí — plošně, basta
 
 Hráčův save s grf: mašinka u rozkazu odpojit „zůstala dlouho stát, pak
-spadla hra" — a tentýž save bez grf byl v pořádku. Rozdíl: parní mašinky
-CZTR mají deklarovanou kapacitu (tendr s uhlím), vanilla mašinka žádnou.
-Oprava z 2.28 se po střihu ptala „umí zbylý kus něco vézt?" — u mašinky
-s tendrem odpověď zněla ano, nakládka se jí znovu rozjela s „plně
-naložit"… a tendr se uhlím na nádraží s cizím nákladem nenaplní nikdy.
+spadla hra" — a tentýž save bez grf byl v pořádku. Rozdíl: některé grf
+mašinky mají deklarovanou nákladovou kapacitu, vanilla mašinka žádnou.
+(Oprava dřívějšího znění: uhlí nevozí žádná mašinka — tendr je palivo a
+sada mu kapacitu nedává; jestli něco, vozí některé mašinky poštu. Na
+mechanice chyby to nic nemění: kapacita > 0 na mašince stačí.) Oprava
+z 2.28 se po střihu ptala „umí zbylý kus něco vézt?" — u takové mašinky
+odpověď zněla ano, nakládka se jí znovu rozjela s „plně naložit"… a
+mašinčina kapacita se na nádraží s cizím nákladem nenaplní nikdy.
 Otázka byla položená špatně.
 
 Hráčovo rozhodnutí: **seber jim to globálně — mašinky nic nevozej.**
@@ -2884,12 +2887,92 @@ nedoložený**: stav, ve kterém k němu došlo (věčné stání v nakládce),
 tímhle mizí, ale příčina pádu změřená není. Kdyby se ukázal znovu, je
 potřeba crash sav (leží vedle crash logu).
 
+## 2.30 Zákaz nákladu u lokomotivy je volba, implicitně vypnutá
+
+Plošný zákaz z 2.29 se hráčovým rozhodnutím stal volitelným — nastavení
+„Zákaz nákladu u lokomotivy" (`vehicle.no_engine_cargo`), implicitně
+vypnuto; třeba se kapacita mašinek v budoucnu hodí. Všechna tři místa
+z 2.29 jsou teď za touhle podmínkou.
+
+Řemeslo kolem, aby se příště nehledalo:
+
+- **Callback musí znát i pre-amble.** Vygenerovaná tabulka
+  (`generated/table/settings.h`) volá `post_cb` jménem — a prototypy si
+  bere z `[pre-amble]` bloku v `game_settings.ini`, ne ze
+  `settings_table.cpp`. Definice callbacku v settings_table.cpp
+  nestačí: bez řádku v pre-amble spadne překlad tabulky na „not
+  declared in this scope", i když soused `UpdateConsists` o pár řádků
+  výš funguje (ten v pre-amble je).
+- **Callback přepočítává přímo, ne přes `ConsistChanged`.**
+  `EngineCargoBanChanged` projde mašinky, spočítá kapacitu z enginu,
+  případný přebytečný náklad vysype a překreslí okna. Volat místo toho
+  ConsistChanged by tahalo grf callbacky do momentu přepnutí volby.
+- Titulek boolu: `: {STRING2}` v angličtině, `: {STRING}` v češtině
+  (§2.20 platí i tady).
+
+## 2.31 Osm dní z odpojení si mašinka odvezla s sebou
+
+Hráčův save: rozkaz odpojit má v jízdním řádu 8 dní čekání — myšleno
+pro vagonky po odpojení, a vagonky to plní. Jenže mašinka pak o několik
+rozkazů dál, u dalšího odpojování, stála dalších 8 dní navíc; když hráč
+těch 8 dní z prvního odpojení smazal, čekání u dalšího zmizelo s nimi.
+
+Změřeno na rigu (teststav dostal sloupec `zpozdeni` =
+`lateness_counter`): brána odpojení předá pobyt vagonkům a mašinku
+pustí hned — jenže odjezdové účtování (`UpdateVehicleTimetable`,
+timetable_cmd.cpp) čte plánovaných 8 dní ze skutečného rozkazu a zapíše
+mašince `lateness_counter ≈ −592` (74 tiků × 8 dní; naměřeno −590).
+A „předčasný" vlak si u příští nakládky svůj náskok odstojí:
+`HandleLoading` počítá `wait_time = plán − lateness` — takže z −590
+je 590 tiků stání někde úplně jinde. Pobyt se odsloužil dvakrát:
+jednou vagonky (správně), jednou mašinkou (nesmysl).
+
+Oprava tam, kde se účtuje: když skutečný rozkaz je odpojit s plánovaným
+pobytem a běžící kopie má pobyt bránou sundaný (přesně tohle po předání
+vagonkům nastává, nic jiného ten stav nevyrábí), bere se odjezd mašinky
+jako včasný — `timetabled = 0`, lateness se nemění. Pobyt vagonků se
+nemění vůbec. Ověřeno: `zpozdeni` drží 0 přes celé cykly, čekání u
+dalšího odpojování zmizelo, baterie beze změn.
+
+Vedlejší nálezy z téhož měření:
+
+- **Směrování na konci slepé koleje se umělo nesplnit.** Průjezdní cíl
+  se uzavíral podle políčka pohyblivého čela — jenže vlak, co vjede
+  nosem na poslední políčko slepé koleje, si v témže kroku otočí
+  vedoucí konec („dojezd"), a na směrování od té chvíle stojí ten
+  druhý konec. Rozkaz se neuzavřel nikdy a vlak žádal cestu na
+  směrování, které měl za zády — „cesta neni" navěky. Oprava
+  (`ProcessOrders`): u vlaku se průjezdní cíl počítá za splněný, když
+  na jeho políčku stojí kterýkoli konec soupravy. Držení před
+  směrováním to nerozbíjí — držený vlak stojí před ním, žádným koncem
+  na něm.
+- **„Neni co odpojit" po úspěšném odpojení je normální.** Brána se ptá
+  každý tik nakládky; tik po povedeném střihu už vlak stojí na držené
+  délce, střih vyjde naprázdno a vypíše se odmítnutí. V logu tedy po
+  úspěchu jedna taková hláška bývá a nic neznamená — už to dvakrát
+  svedlo ke zbytečnému pátrání.
+
 ---
 
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich
 je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
+
+- **Couvání do obsazeného nástupiště přes servisní hrdlo umí uvíznout.**
+  Nádražní směrování před rozkazem *odpojit* (ne připojit — tam drží
+  průhled) se plní fyzickým dojezdem: vlak si na políčko směrování
+  zarezervuje, ale bezpečný konec cesty leží až za ním, v nástupišti za
+  jednosměrkou — a když na tom nástupišti ještě stojí dříve odložená
+  řada (se záběrem pod sebou), rezervace se o ni rozbije a vlak stojí
+  na výtažné koleji se „cesta neni" napořád. Změřeno headless na
+  claune/claune2 (výtažná (103,46) → směrování 3 (100,45), řada na
+  (100,42)); **stejně se zasekne i kód buildu #124 beze změn z 2.31 —
+  není to regres**, hráčova hra to při svém časování netrefí. Kdyby se
+  to mělo řešit: buď průhled i pro odpojit (směrování jen jmenuje
+  skupinu nástupišť a rozkaz stanice si cestu najde sám), nebo učit
+  rezervaci couvat do poloprázdného nástupiště. Rozhodnutí patří
+  hráči.
 
 - **„Prodat vše" v depu prodá i rezervovanou řadu.** Okno depa na řadu,
   pro kterou už jede mašinka, nepustí ani klik, ani tažení, ani prodej

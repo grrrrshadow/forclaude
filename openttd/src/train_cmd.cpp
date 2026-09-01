@@ -212,7 +212,10 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 		 * station never had. Asked of the unit's head, not the part: sets
 		 * regularly register tenders and other articulated pieces of an
 		 * engine as wagon-typed, and those are still the engine. */
-		if (RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type != RailVehicleType::Wagon) new_cap = 0;
+		if (_settings_game.vehicle.no_engine_cargo &&
+				RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type != RailVehicleType::Wagon) {
+			new_cap = 0;
+		}
 		if (allowed_changes.Test(ConsistChangeFlag::Capacity)) {
 			/* Update vehicle capacity. */
 			if (u->cargo_cap > new_cap) u->cargo.Truncate(new_cap);
@@ -6582,7 +6585,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		 * reached, or it was and the road to it could not be booked. Without
 		 * telling them apart, a rescue engine that will not leave its shed is
 		 * a guessing game -- and it has been guessed wrong twice already. */
-		if (_show_train_orientation && IsOnRescueRun(consist->First())) {
+		if (_show_train_orientation) {
 			SayOnChange(consist, fmt::format("Vlak {}: hledani z ({},{}) na cil ({},{}) - {}, konec {}",
 					consist->unitnumber, TileX(new_tile), TileY(new_tile),
 					TileX(consist->dest_tile), TileY(consist->dest_tile),

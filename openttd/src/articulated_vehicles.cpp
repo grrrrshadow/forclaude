@@ -130,10 +130,14 @@ CargoArray GetCapacityOfArticulatedParts(EngineID engine)
 	CargoArray capacity{};
 	const Engine *e = Engine::Get(engine);
 
-	/* An engine carries nothing -- wagons haul, engines pull (see the
-	 * capacity override in Train::ConsistChanged). The shop window must not
-	 * promise what the rails will take away the moment it is built. */
-	if (e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return capacity;
+	/* With the engine-cargo ban on, an engine carries nothing -- wagons haul,
+	 * engines pull (see the capacity override in Train::ConsistChanged). The
+	 * shop window must not promise what the rails will take away the moment
+	 * it is built. */
+	if (_settings_game.vehicle.no_engine_cargo &&
+			e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) {
+		return capacity;
+	}
 
 	if (auto [cargo, cap] = GetVehicleDefaultCapacity(engine); IsValidCargoType(cargo)) {
 		capacity[cargo] = cap;

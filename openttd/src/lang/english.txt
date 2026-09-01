@@ -1940,6 +1940,8 @@ STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :When enabled, t
 
 STR_CONFIG_SETTING_WAGONSPEEDLIMITS                             :Enable wagon speed limits: {STRING2}
 STR_CONFIG_SETTING_WAGONSPEEDLIMITS_HELPTEXT                    :When enabled, also use speed limits of wagons for deciding the maximum speed of a train
+STR_CONFIG_SETTING_NO_ENGINE_CARGO                              :Ban cargo on locomotives: {STRING2}
+STR_CONFIG_SETTING_NO_ENGINE_CARGO_HELPTEXT                     :When enabled, locomotives carry no cargo at all, whatever their set declares -- wagons haul, engines pull. A tender's coal or an engine's mail hold reads as fuel, not freight. Existing engines lose their capacity (and tip out their cargo) when this is switched on or a save is loaded with it on
 
 STR_CONFIG_SETTING_AIRCRAFT_RANGE                               :Enable aircraft maximum range: {STRING2}
 STR_CONFIG_SETTING_AIRCRAFT_RANGE_HELPTEXT                      :When enabled, NewGRFs will be able to limit maximum range of aircraft

@@ -548,6 +548,20 @@ void UpdateVehicleTimetable(Vehicle *v, bool travelling)
 	TimerGameTick::Ticks timetabled = travelling ? real_current_order->GetTimetabledTravel() :
 			real_current_order->GetTimetabledWait();
 
+	/* A station decouple hands the order's timetabled stay to the rake it put
+	 * down: the wagons stand it out where they were left, and the engine goes
+	 * as soon as its own cargo work is done -- the decouple gate clears the
+	 * timetabled-wait flag on the running copy of the order to let it (see
+	 * train_cmd.cpp). Booking that departure against the full stay would mark
+	 * the engine a whole stay early, and the earliness does not evaporate: the
+	 * next loading stop makes an early train stand it out, so the engine would
+	 * serve the same stay a second time, somewhere else entirely. The stay is
+	 * the wagons' alone; for the engine this departure is simply on time. */
+	if (!travelling && v->current_order.IsType(OT_LOADING) && !v->current_order.IsWaitTimetabled() &&
+			real_current_order->ShouldDecoupleOnDeparture()) {
+		timetabled = 0;
+	}
+
 	/* Vehicles will wait at stations if they arrive early even if they are not
 	 * timetabled to wait there, so make sure the lateness counter is updated
 	 * when this happens. */
