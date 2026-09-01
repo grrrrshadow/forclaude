@@ -3015,6 +3015,29 @@ neviděl, protože okno směrování nikdy neotevřel — teď umí `testokno sm
 hláška crash logu je ta nejlevnější diagnostika, kterou jsme dlouho
 neměli.
 
+## 2.33 Odtah poruchy trčící z depa — zatím nereprodukováno
+
+Hráč: vlak se porouchal, když z půlky vězel v depu; odtahovka se
+připojila na výhybkách zepředu, ale odtáhla jen kus, zbytek zůstal trčet
+z depa, vlak se „rozpadl" a hra spadla — bez crash logu (FatalError jde
+přes abort → náš handler; pod Wine se report zjevně nenapsal).
+
+Co rig umí a co změřil (`testodtah depo` / `depozpet`, `testzbourat depo`):
+
+- Porucha mašinka + 5 vozů, jen mašinka venku, zbytek v depu, výhybka
+  hned za vraty: odtahovka připojí zepředu, čtyři vozy z depa vyjedou za
+  ní, odtah do vzdáleného depa i do depa na odbočce (s otočkou na
+  slepé koleji) — čistě.
+- Jediné dostupné depo je to, ze kterého porucha trčí: hledání depa ho
+  nenabídne, dokud v něm vagony stojí („nemam kam s nim"); odtahovka
+  dojede na konec, otočí se s celým vlakem venku a zaveze poruchu
+  zpátky — čistě.
+
+Věc, která se u nás nikdy nestala a u hráče podle popisu asi ano: otočka
+odtahovky ve chvíli, kdy část poruchy ještě stojí v depu (couvání vozů
+zpět vraty). Bez hráčova savu s tou tratí se to netrefí; scény
+zůstávají v rigu pro další pokus.
+
 ---
 
 # 16. Nedořešeno

@@ -1928,7 +1928,7 @@ static bool ConTestRescueDepot(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -1954,6 +1954,15 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * the rescue engine has to book the whole length of the line past every
 	 * signal on it rather than the two nearest ones. */
 	bool faraway = argv.size() >= 2 && argv[1] == "daleko";
+	/* 'depo' breaks the casualty down the moment its engine has cleared the
+	 * shed door with the wagon still inside: half a train out on the line,
+	 * half of it in the depot. The player's own case, which took the game
+	 * down without a report. */
+	bool half_in_depot = argv.size() >= 2 && (argv[1] == "depo" || argv[1] == "depozpet");
+	/* 'depozpet' is 'depo' without the shed on the stub: pull the west depot
+	 * down once the tow is out (testzbourat depo) and the only depot left to
+	 * bring the casualty to is the one it is half inside of, behind the tow. */
+	bool stub_shed = argv.size() >= 2 && argv[1] == "depo";
 	uint8_t sig_cycle = 0;
 	if (oneway && argv.size() >= 3) {
 		auto n = ParseInteger(argv[2]);
@@ -2097,6 +2106,43 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "testodtah: casualty wagon failed.");
 		return true;
 	}
+	if (half_in_depot) {
+		/* A long casualty, so that most of it is still in the shed when the
+		 * engine has cleared the door; and points right outside that door,
+		 * so the wagons come out of the depot onto a junction tile the way
+		 * the player's did. */
+		for (int i = 0; i < 4; i++) {
+			auto [cost_x, veh_x, un_x1, un_x2, un_x3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost_x.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_x, Train::Get(veh_c)->Last()->index, false).Failed()) {
+				IConsolePrint(CC_ERROR, "testodtah: extra casualty wagon failed.");
+				return true;
+			}
+		}
+		TileIndex pts = TileXY(x0 + LEN - 4, y0);
+		CommandCost pts_res = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, pts, RAILTYPE_RAIL, Track::Lower, false);
+		if (pts_res.Failed()) {
+			IConsolePrint(CC_ERROR, "testodtah: points by the depot failed at ({},{}): {}", TileX(pts), TileY(pts), GetString(pts_res.GetErrorMessage()));
+			return true;
+		}
+		/* The stub off the points is nice to have, not needed: a corner piece
+		 * alone already makes the tile a junction. The ground beside the strip
+		 * was never checked to be flat, so this may not build. */
+		for (uint dy = 1; dy <= 2; dy++) {
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 4, y0 + dy), RAILTYPE_RAIL, Track::Y, false).Failed()) {
+				IConsolePrint(CC_WARNING, "testodtah: stub off the points not built at ({},{}); points alone.", x0 + LEN - 4, y0 + dy);
+				break;
+			}
+		}
+		/* And a shed at the end of that stub: the nearest depot to the coupling
+		 * point, and one the tow can only reach by turning round -- with half
+		 * the casualty still inside the depot it broke down leaving. */
+		if (stub_shed && Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 4, y0 + 3), RAILTYPE_RAIL, DiagDirection::NW).Failed()) {
+			IConsolePrint(CC_WARNING, "testodtah: shed on the stub not built at ({},{}).", x0 + LEN - 4, y0 + 3);
+		}
+		/* Track built by hand leaves its signal work queued; flushed here, as
+		 * the scene did for the rest of its rails above. */
+		UpdateSignalsInBuffer();
+	}
 	Order to_branch;
 	to_branch.MakeGoToStation(st_branch);
 	to_branch.SetLoadType(OrderLoadType::NoLoad);
@@ -2119,7 +2165,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
 	_testodtah_casualty = veh_c;
-	_testodtah_break_tile = faraway ? TileXY(x0 + LEN - 6, y0) :
+	_testodtah_break_tile = half_in_depot ? TileXY(x0 + LEN - 2, y0) : faraway ? TileXY(x0 + LEN - 6, y0) :
 			((plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testodtah_depot_w = depot_w;
@@ -2543,6 +2589,30 @@ static bool ConTestStoreRake(std::span<std::string_view> argv)
  * Usage: testbrzda <unit number>
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Pull down the west depot of the rescue scene, once the rescue engine is
+ * out of it: leaves the tow with only the depot the casualty is half inside
+ * of to bring it to. Usage: testzbourat depo
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDemolishDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2 || argv[1] != "depo") {
+		IConsolePrint(CC_HELP, "Demolish the rescue scene's west depot. Usage: 'testzbourat depo'.");
+		return true;
+	}
+	if (_testodtah_depot_w == INVALID_TILE || !IsRailDepotTile(_testodtah_depot_w)) {
+		IConsolePrint(CC_ERROR, "testzbourat: zadne zapadni depo sceny.");
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, GetTileOwner(_testodtah_depot_w));
+	CommandCost res = Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, _testodtah_depot_w);
+	UpdateSignalsInBuffer();
+	IConsolePrint(res.Failed() ? CC_ERROR : CC_DEFAULT, "testzbourat: zapadni depo ({},{}) {}.", TileX(_testodtah_depot_w), TileY(_testodtah_depot_w),
+			res.Failed() ? GetString(res.GetErrorMessage()) : std::string("zbourano"));
+	return true;
+}
+
 /**
  * Open a train's vehicle window, the same as the player clicking on it.
  * Usage: testokno <unit number>
@@ -5498,6 +5568,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
+	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
