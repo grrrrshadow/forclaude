@@ -17,6 +17,23 @@
  */
 enum WaypointFlags : uint8_t {
 	WPF_ROAD                    = 0, ///< This is a road waypoint
+
+	/**
+	 * This is a "station waypoint": the wagon-collecting hold looks straight
+	 * through an order naming it. A collector whose current order is a run to
+	 * this waypoint, with a "go to couple" station order following, behaves as
+	 * if the couple order were already current -- it stands where it is until
+	 * a rake at that station is ready, claims it, and only then sets off.
+	 *
+	 * Its own kind on purpose, not a change to ordinary waypoints: the
+	 * look-through has to have a boundary the player draws. Extended to every
+	 * waypoint, a collector would hold at the first waypoint of its journey --
+	 * a station away, a town away -- instead of coming up close the way it
+	 * does today. An ordinary waypoint is somewhere to drive to; this one
+	 * names the group of platforms the search is for, placed right where the
+	 * road into them forks. See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	WPF_STATION_SEARCH          = 1,
 };
 
 /** Representation of a waypoint. */

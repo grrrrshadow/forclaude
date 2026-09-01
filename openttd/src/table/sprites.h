@@ -57,7 +57,7 @@ static const SpriteID SPR_LARGE_SMALL_WINDOW = 682;
 /** @{
  * Extra graphic spritenumbers */
 static const SpriteID SPR_OPENTTD_BASE   = 4896;
-static const uint16_t OPENTTD_SPRITE_COUNT = 209;
+static const uint16_t OPENTTD_SPRITE_COUNT = 210;
 /** @} */
 
 /** @{
@@ -202,6 +202,7 @@ static const SpriteID SPR_BLUEPRINT_TOOLBAR          = SPR_OPENTTD_BASE + 207;
 
 /* Rescue engine button (hammer and wrench, artwork from icons8.com -- see CREDITS.md). */
 static const SpriteID SPR_IMG_RESCUE_ENGINE          = SPR_OPENTTD_BASE + 208;
+static const SpriteID SPR_IMG_WAYPOINT_STATION       = SPR_OPENTTD_BASE + 209; ///< Station-waypoint build button (see #WPF_STATION_SEARCH).
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

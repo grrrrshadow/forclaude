@@ -175,8 +175,9 @@ void CcRailDepot(Commands, const CommandCost &result, TileIndex tile, RailType, 
 /**
  * Place a rail waypoint.
  * @param tile Position to start dragging a waypoint.
+ * @param station_search whether a station waypoint is being built (see #WPF_STATION_SEARCH)
  */
-static void PlaceRail_Waypoint(TileIndex tile)
+static void PlaceRail_Waypoint(TileIndex tile, bool station_search)
 {
 	if (_remove_button_clicked) {
 		VpStartPlaceSizing(tile, VPM_X_AND_Y, DDSP_REMOVE_STATION);
@@ -191,7 +192,7 @@ static void PlaceRail_Waypoint(TileIndex tile)
 	} else {
 		/* Tile where we can't build rail waypoints. This is always going to fail,
 		 * but provides the user with a proper error message. */
-		Command<Commands::BuildRailWaypoint>::Post(STR_ERROR_CAN_T_BUILD_RAIL_WAYPOINT , tile, Axis::X, 1, 1, STAT_CLASS_WAYP, 0, StationID::Invalid(), false);
+		Command<Commands::BuildRailWaypoint>::Post(STR_ERROR_CAN_T_BUILD_RAIL_WAYPOINT , tile, Axis::X, 1, 1, STAT_CLASS_WAYP, 0, StationID::Invalid(), false, station_search);
 	}
 }
 
@@ -475,7 +476,7 @@ struct BuildRailToolbarWindow : Window {
 	void Close([[maybe_unused]] int data = 0) override
 	{
 		if (this->IsWidgetLowered(WID_RAT_BUILD_STATION)) SetViewportCatchmentStation(nullptr, true);
-		if (this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT)) SetViewportCatchmentWaypoint(nullptr, true);
+		if (this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT) || this->IsWidgetLowered(WID_RAT_BUILD_STATION_WAYPOINT)) SetViewportCatchmentWaypoint(nullptr, true);
 		if (_settings_client.gui.link_terraform_toolbar) CloseWindowById(WindowClass::ScenarioGenerateLandscape, 0, false);
 		CloseWindowById(WindowClass::JoinStation, 0);
 		this->Window::Close();
@@ -484,7 +485,7 @@ struct BuildRailToolbarWindow : Window {
 	/** List of widgets to be disabled if infrastructure limit prevents building. */
 	static inline const std::initializer_list<WidgetID> can_build_widgets = {
 		WID_RAT_BUILD_NS, WID_RAT_BUILD_X, WID_RAT_BUILD_EW, WID_RAT_BUILD_Y, WID_RAT_AUTORAIL,
-		WID_RAT_BUILD_DEPOT, WID_RAT_BUILD_WAYPOINT, WID_RAT_BUILD_STATION, WID_RAT_BUILD_SIGNALS,
+		WID_RAT_BUILD_DEPOT, WID_RAT_BUILD_WAYPOINT, WID_RAT_BUILD_STATION_WAYPOINT, WID_RAT_BUILD_STATION, WID_RAT_BUILD_SIGNALS,
 		WID_RAT_BUILD_BRIDGE, WID_RAT_BUILD_TUNNEL, WID_RAT_CONVERT_RAIL,
 	};
 
@@ -568,6 +569,7 @@ struct BuildRailToolbarWindow : Window {
 			case WID_RAT_BUILD_Y:
 			case WID_RAT_AUTORAIL:
 			case WID_RAT_BUILD_WAYPOINT:
+			case WID_RAT_BUILD_STATION_WAYPOINT:
 			case WID_RAT_BUILD_STATION:
 			case WID_RAT_BUILD_SIGNALS:
 				/* Removal button is enabled only if the rail/signal/waypoint/station
@@ -613,6 +615,7 @@ struct BuildRailToolbarWindow : Window {
 			case WID_RAT_DEMOLISH: return ANIMCURSOR_DEMOLISH;
 			case WID_RAT_BUILD_DEPOT: return GetRailTypeInfo(_cur_railtype)->cursor.depot;
 			case WID_RAT_BUILD_WAYPOINT: return SPR_CURSOR_WAYPOINT;
+			case WID_RAT_BUILD_STATION_WAYPOINT: return SPR_CURSOR_WAYPOINT;
 			case WID_RAT_BUILD_STATION: return SPR_CURSOR_RAIL_STATION;
 			case WID_RAT_BUILD_SIGNALS: return ANIMCURSOR_BUILDSIGNALS;
 			case WID_RAT_BUILD_BRIDGE: return SPR_CURSOR_BRIDGE;
@@ -638,6 +641,7 @@ struct BuildRailToolbarWindow : Window {
 			case WID_RAT_DEMOLISH: return HT_RECT | HT_DIAGONAL;
 			case WID_RAT_BUILD_DEPOT: return HT_RECT;
 			case WID_RAT_BUILD_WAYPOINT: return HT_RECT;
+			case WID_RAT_BUILD_STATION_WAYPOINT: return HT_RECT;
 			case WID_RAT_BUILD_STATION: return HT_RECT;
 			case WID_RAT_BUILD_SIGNALS: return HT_RECT;
 			case WID_RAT_BUILD_BRIDGE: return HT_RECT;
@@ -671,6 +675,7 @@ struct BuildRailToolbarWindow : Window {
 				break;
 
 			case WID_RAT_BUILD_WAYPOINT:
+			case WID_RAT_BUILD_STATION_WAYPOINT:
 				if (started) {
 					ShowBuildWaypointPicker(this);
 				}
@@ -733,7 +738,11 @@ struct BuildRailToolbarWindow : Window {
 				break;
 
 			case WID_RAT_BUILD_WAYPOINT:
-				PlaceRail_Waypoint(tile);
+				PlaceRail_Waypoint(tile, false);
+				break;
+
+			case WID_RAT_BUILD_STATION_WAYPOINT:
+				PlaceRail_Waypoint(tile, true);
 				break;
 
 			case WID_RAT_BUILD_STATION:
@@ -818,12 +827,13 @@ struct BuildRailToolbarWindow : Window {
 							TileArea ta(start_tile, end_tile);
 							Axis axis = select_method == VPM_X_LIMITED ? Axis::X : Axis::Y;
 							bool adjacent = _ctrl_pressed;
+							bool station_search = this->IsWidgetLowered(WID_RAT_BUILD_STATION_WAYPOINT);
 
 							auto proc = [=](bool test, StationID to_join) -> bool {
 								if (test) {
-									return Command<Commands::BuildRailWaypoint>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildRailWaypoint>()), ta.tile, axis, ta.w, ta.h, _waypoint_gui.sel_class, _waypoint_gui.sel_type, StationID::Invalid(), adjacent).Succeeded();
+									return Command<Commands::BuildRailWaypoint>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildRailWaypoint>()), ta.tile, axis, ta.w, ta.h, _waypoint_gui.sel_class, _waypoint_gui.sel_type, StationID::Invalid(), adjacent, station_search).Succeeded();
 								} else {
-									return Command<Commands::BuildRailWaypoint>::Post(STR_ERROR_CAN_T_BUILD_RAIL_WAYPOINT , CcPlaySound_CONSTRUCTION_RAIL, ta.tile, axis, ta.w, ta.h, _waypoint_gui.sel_class, _waypoint_gui.sel_type, to_join, adjacent);
+									return Command<Commands::BuildRailWaypoint>::Post(STR_ERROR_CAN_T_BUILD_RAIL_WAYPOINT , CcPlaySound_CONSTRUCTION_RAIL, ta.tile, axis, ta.w, ta.h, _waypoint_gui.sel_class, _waypoint_gui.sel_type, to_join, adjacent, station_search);
 								}
 							};
 
@@ -838,7 +848,7 @@ struct BuildRailToolbarWindow : Window {
 	void OnPlaceObjectAbort() override
 	{
 		if (this->IsWidgetLowered(WID_RAT_BUILD_STATION)) SetViewportCatchmentStation(nullptr, true);
-		if (this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT)) SetViewportCatchmentWaypoint(nullptr, true);
+		if (this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT) || this->IsWidgetLowered(WID_RAT_BUILD_STATION_WAYPOINT)) SetViewportCatchmentWaypoint(nullptr, true);
 
 		this->RaiseButtons();
 		this->DisableWidget(WID_RAT_REMOVE);
@@ -861,13 +871,13 @@ struct BuildRailToolbarWindow : Window {
 	EventState OnCTRLStateChange() override
 	{
 		/* do not toggle Remove button by Ctrl when placing station */
-		if (!this->IsWidgetLowered(WID_RAT_BUILD_STATION) && !this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT) && RailToolbar_CtrlChanged(this)) return EventState::Handled;
+		if (!this->IsWidgetLowered(WID_RAT_BUILD_STATION) && !this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT) && !this->IsWidgetLowered(WID_RAT_BUILD_STATION_WAYPOINT) && RailToolbar_CtrlChanged(this)) return EventState::Handled;
 		return EventState::NotHandled;
 	}
 
 	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
 	{
-		if (this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT)) CheckRedrawRailWaypointCoverage(this);
+		if (this->IsWidgetLowered(WID_RAT_BUILD_WAYPOINT) || this->IsWidgetLowered(WID_RAT_BUILD_STATION_WAYPOINT)) CheckRedrawRailWaypointCoverage(this);
 	}
 
 	/**
@@ -956,6 +966,8 @@ static constexpr std::initializer_list<NWidgetPart> _nested_build_rail_widgets =
 						SetFill(0, 1), SetToolbarMinimalSize(1), SetSpriteTip(SPR_IMG_DEPOT_RAIL, STR_RAIL_TOOLBAR_TOOLTIP_BUILD_TRAIN_DEPOT_FOR_BUILDING),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_RAT_BUILD_WAYPOINT),
 						SetFill(0, 1), SetToolbarMinimalSize(1), SetSpriteTip(SPR_IMG_WAYPOINT, STR_RAIL_TOOLBAR_TOOLTIP_CONVERT_RAIL_TO_WAYPOINT),
+		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_RAT_BUILD_STATION_WAYPOINT),
+						SetFill(0, 1), SetToolbarMinimalSize(1), SetSpriteTip(SPR_IMG_WAYPOINT_STATION, STR_RAIL_TOOLBAR_TOOLTIP_BUILD_STATION_WAYPOINT),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_RAT_BUILD_STATION),
 						SetFill(0, 1), SetToolbarMinimalSize(2), SetSpriteTip(SPR_IMG_RAIL_STATION, STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_STATION),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_RAT_BUILD_SIGNALS),

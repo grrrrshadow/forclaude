@@ -22,6 +22,7 @@ enum RailToolbarWidgets : WidgetID {
 	WID_RAT_DEMOLISH,       ///< Destroy something with dynamite!
 	WID_RAT_BUILD_DEPOT,    ///< Build a depot.
 	WID_RAT_BUILD_WAYPOINT, ///< Build a waypoint.
+	WID_RAT_BUILD_STATION_WAYPOINT, ///< Build a station waypoint (see #WPF_STATION_SEARCH).
 	WID_RAT_BUILD_STATION,  ///< Build a station.
 	WID_RAT_BUILD_SIGNALS,  ///< Build signals.
 	WID_RAT_BUILD_BRIDGE,   ///< Build a bridge.

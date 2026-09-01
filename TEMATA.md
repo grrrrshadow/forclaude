@@ -2702,6 +2702,54 @@ skript musí začít `unpause`.
 
 ---
 
+## 2.26 Nádražní směrování nástupišť — hledač skrz něj vidí
+
+Hráčova sestava: dvě nástupiště, kde se řady plní na plno, třetí, kde se
+z odložených vozů staví delší řada, a před nakládacími perony směrování
+jako „číslo peronu". Sběračka má dojet ke směrování a odtamtud si vzít
+tu řadu, která se naplní dřív — kterou to bude, předem nikdo neví.
+
+**Past, kterou to odhalilo:** výsady „jet se připojit" — čekat, až bude
+co sebrat, a smět dojet až na tělo vagonků — platí jen, když je rozkaz
+připojit *aktuální*. Dokud je aktuální rozkaz směrování, hledání neběží;
+a k směrování před obsazenými perony vlak ani nedojede, protože za ním
+není kde zastavit — koleje končí v peronech, kde se teprve nakládá.
+Kruh: aby hledal, musel by projet směrování; aby projel, musel by už mít
+co hledat.
+
+**Řešení není prodloužit pravidlo na každé směrování** — sběračka by pak
+čekala hned u prvního směrování své cesty, klidně o město vedle. Hranici
+kreslí hráč: nový druh, **nádražní směrování nástupišť** (`WPF_STATION_SEARCH`
+na `Waypoint::waypoint_flags`, ukládá se zadarmo). Klasické směrování se
+nemění ani o chlup — je to pořád místo, kam se jede. To nádražní je pro
+hledač průhledné: sběračka, jejíž aktuální rozkaz je jízda na něj (klidně
+i přes několik takových za sebou) a za nimi stojí rozkaz připojit, se
+drží tam, kde zrovna je, a hledá už teď — rozkazem připojit, který teprve
+přijde (`CoupleOrderBehindStationWaypoints`,
+`FindOrClaimCoupleTarget` bere rozkaz parametrem). Jakmile se některá
+řada naplní a je k mání, zabere si ji — „která dřív, ta vyhrává" tím
+rozhodne samo zabírání — a směrovací rozkaz se **uzavře na místě**, ne
+příjezdem: příjezd je právě to, co nejde. Zbytek je obyčejná jízda pro
+vagonky se všemi jejími právy; kolem dlaždic směrování stejně vede,
+tam ho hráč postavil. Obyčejný rozkaz vklíněný do řetězu průhlednost
+ruší — hráč řekl „nejdřív dojeď sem".
+
+Ve výstavbě je to druhý čudl vedle směrování (ikonka: směrovací brána
+s červenou stříškou, pipeline §10.2; grf třídy směrování se nabízejí
+stejné), staví se příkazem s příznakem navíc a **dva druhy se nikdy
+nespojí do jednoho** — ani přístavbou, ani „postav vedle". Kopírka
+(blueprint) druh zachovává, dokud zdrojové směrování ještě existuje.
+
+Pozor na dvě věci z měření: řada vedená mašinkou s CEKAT je k mání
+okamžitě (i uprostřed plnění — `IsWaitingToBeCoupled` řádek ~1996),
+kdežto *odložená* řada s plným naložením čeká až od naplnění — scéna,
+která má prověřit fázi čekání, musí řadu odložit, ne přivézt. Scéna
+`testnaklad smerovani` (v baterii `nakladsmer`) dělá přesně to: odloží
+plnící se řadu, sběračku pustí brzy a chce vidět všechny tři kroky —
+„ceka pred nadraznim smerovanim", „vagonky pripraveny", „spojeno".
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich

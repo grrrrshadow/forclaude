@@ -75,15 +75,17 @@ void Waypoint::MoveSign(TileIndex new_xy)
  * @param str  the string to get the 'type' of
  * @param cid previous owner of the waypoint
  * @param is_road whether to find a road waypoint
+ * @param station_search whether to find a station waypoint (see #WPF_STATION_SEARCH)
  * @return the deleted nearby waypoint
  */
-static Waypoint *FindDeletedWaypointCloseTo(TileIndex tile, StringID str, CompanyID cid, bool is_road)
+static Waypoint *FindDeletedWaypointCloseTo(TileIndex tile, StringID str, CompanyID cid, bool is_road, bool station_search)
 {
 	Waypoint *best = nullptr;
 	uint thres = 8;
 
 	for (Waypoint *wp : Waypoint::Iterate()) {
-		if (!wp->IsInUse() && wp->string_id == str && wp->owner == cid && HasBit(wp->waypoint_flags, WPF_ROAD) == is_road) {
+		if (!wp->IsInUse() && wp->string_id == str && wp->owner == cid && HasBit(wp->waypoint_flags, WPF_ROAD) == is_road &&
+				HasBit(wp->waypoint_flags, WPF_STATION_SEARCH) == station_search) {
 			uint cur_dist = DistanceManhattan(tile, wp->xy);
 
 			if (cur_dist < thres) {
@@ -215,7 +217,7 @@ StationGfx RailStationTileLayout<StationType::RailWaypoint>::Iterator::operator*
  * @param adjacent allow waypoints directly adjacent to other waypoints.
  * @return the cost of this operation or an error
  */
-CommandCost CmdBuildRailWaypoint(DoCommandFlags flags, TileIndex start_tile, Axis axis, uint8_t width, uint8_t height, StationClassID spec_class, uint16_t spec_index, StationID station_to_join, bool adjacent)
+CommandCost CmdBuildRailWaypoint(DoCommandFlags flags, TileIndex start_tile, Axis axis, uint8_t width, uint8_t height, StationClassID spec_class, uint16_t spec_index, StationID station_to_join, bool adjacent, bool station_search)
 {
 	if (!IsValidAxis(axis)) return CMD_ERROR;
 	/* Check if the given station class is valid */
@@ -274,11 +276,15 @@ CommandCost CmdBuildRailWaypoint(DoCommandFlags flags, TileIndex start_tile, Axi
 
 	/* Check if there is an already existing, deleted, waypoint close to us that we can reuse. */
 	TileIndex center_tile = start_tile + (count / 2) * offset;
-	if (wp == nullptr && reuse) wp = FindDeletedWaypointCloseTo(center_tile, STR_SV_STNAME_WAYPOINT, _current_company, false);
+	if (wp == nullptr && reuse) wp = FindDeletedWaypointCloseTo(center_tile, STR_SV_STNAME_WAYPOINT, _current_company, false, station_search);
 
 	if (wp != nullptr) {
 		/* Reuse an existing waypoint. */
 		if (wp->owner != _current_company) return CommandCost(STR_ERROR_TOO_CLOSE_TO_ANOTHER_WAYPOINT);
+
+		/* An ordinary waypoint and a station waypoint are different tools and
+		 * a single waypoint cannot be both, so the two never join. */
+		if (wp->IsInUse() && HasBit(wp->waypoint_flags, WPF_STATION_SEARCH) != station_search) return CommandCost(STR_ERROR_TOO_CLOSE_TO_ANOTHER_WAYPOINT);
 
 		/* Check if we want to expand an already existing waypoint. */
 		if (wp->train_station.tile != INVALID_TILE) {
@@ -314,6 +320,9 @@ CommandCost CmdBuildRailWaypoint(DoCommandFlags flags, TileIndex start_tile, Axi
 		wp->build_date = TimerGameCalendar::date;
 		wp->string_id = STR_SV_STNAME_WAYPOINT;
 		wp->train_station = new_location;
+		/* A no-op on an existing waypoint -- the join guard above refused any
+		 * whose kind differs -- and the making of a fresh or reused one. */
+		AssignBit(wp->waypoint_flags, WPF_STATION_SEARCH, station_search);
 
 		if (wp->town == nullptr) MakeDefaultName(wp);
 
@@ -413,7 +422,7 @@ CommandCost CmdBuildRoadWaypoint(DoCommandFlags flags, TileIndex start_tile, Axi
 
 	/* Check if there is an already existing, deleted, waypoint close to us that we can reuse. */
 	TileIndex center_tile = start_tile + (count / 2) * TileOffsByAxis(OtherAxis(axis));
-	if (wp == nullptr && reuse) wp = FindDeletedWaypointCloseTo(center_tile, STR_SV_STNAME_WAYPOINT, _current_company, true);
+	if (wp == nullptr && reuse) wp = FindDeletedWaypointCloseTo(center_tile, STR_SV_STNAME_WAYPOINT, _current_company, true, false);
 
 	if (wp != nullptr) {
 		/* Reuse an existing waypoint. */
@@ -512,7 +521,7 @@ CommandCost CmdBuildBuoy(DoCommandFlags flags, TileIndex tile)
 	if (!IsTileFlat(tile)) return CommandCost(STR_ERROR_SITE_UNSUITABLE);
 
 	/* Check if there is an already existing, deleted, waypoint close to us that we can reuse. */
-	Waypoint *wp = FindDeletedWaypointCloseTo(tile, STR_SV_STNAME_BUOY, OWNER_NONE, false);
+	Waypoint *wp = FindDeletedWaypointCloseTo(tile, STR_SV_STNAME_BUOY, OWNER_NONE, false, false);
 	if (wp == nullptr && !Waypoint::CanAllocateItem()) return CommandCost(STR_ERROR_TOO_MANY_STATIONS_LOADING);
 
 	CommandCost cost(ExpensesType::Construction, _price[Price::BuildWaypointBuoy]);

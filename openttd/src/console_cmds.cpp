@@ -64,6 +64,7 @@
 #include "industrytype.h"
 #include "industry_cmd.h"
 #include "terraform_cmd.h"
+#include "waypoint_cmd.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -1138,6 +1139,7 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 		return true;
 	}
 	bool wait_mode = argv.size() >= 2 && argv[1] == "cekat";
+	bool waypoint_mode = argv.size() >= 2 && argv[1] == "smerovani";
 
 	if (Company::GetIfValid(_local_company) == nullptr) {
 		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
@@ -1298,7 +1300,56 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 		return true;
 	}
 
-	if (wait_mode) {
+	if (waypoint_mode) {
+		/* The player's platform-number arrangement: a rake filling up at the
+		 * platform, a station waypoint on the throat in front of it, and a
+		 * collector whose orders lead through that waypoint to the couple
+		 * order. The collector must stand short of the waypoint -- the track
+		 * beyond ends in the occupied platform -- until the rake is full,
+		 * then claim it, conclude the waypoint on the spot and drive in. */
+		TileIndex wp_tile = TileXY(x0 + 23, y0);
+		if (Command<Commands::BuildRailWaypoint>::Do(DoCommandFlag::Execute, wp_tile, Axis::X, 1, 1, STAT_CLASS_WAYP, 0, StationID::Invalid(), false, true).Failed()) {
+			IConsolePrint(CC_ERROR, "testnaklad smerovani: waypoint failed.");
+			return true;
+		}
+		UpdateSignalsInBuffer();
+		StationID wp_id = GetStationIndex(wp_tile);
+
+		/* The rake is dropped, not driven: a rake put down with a fill-up job
+		 * is nobody's until the job is done (see TryDecoupleAtStation), which
+		 * is exactly the spell the collector has to spend standing short of
+		 * the waypoint. */
+		Order drop;
+		drop.MakeGoToStation(st_id);
+		drop.SetLoadType(OrderLoadType::FullLoadAny);
+		drop.SetDecouple(true);
+		drop.SetDecoupleCount(0);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, drop);
+		Order dropper_home;
+		dropper_home.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 1, dropper_home);
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh1, false);
+
+		auto [cost2, veh2, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost2.Failed()) {
+			IConsolePrint(CC_ERROR, "testnaklad smerovani: collector failed.");
+			return true;
+		}
+		Order via;
+		via.MakeGoToWaypoint(wp_id);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 0, via);
+		Order collect;
+		collect.MakeGoToStation(st_id);
+		collect.SetLoadType(OrderLoadType::NoLoad);
+		collect.SetUnloadType(OrderUnloadType::NoUnload);
+		collect.SetGoToCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 1, collect);
+		Order home_e;
+		home_e.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh2, 2, home_e);
+		IConsolePrint(CC_DEFAULT, "testnaklad smerovani: rada (vlak {}) se plni u stanice {}, nadrazni smerovani {} na ({},{}); sberacku (vlak {}) pust brzdou.",
+				Train::Get(veh1)->unitnumber, st_id, wp_id, x0 + 23, y0, Train::Get(veh2)->unitnumber);
+	} else if (wait_mode) {
 		/* The waiter: full load at the platform, waiting to be coupled while
 		 * its load is still coming in. Started at once. */
 		Order load_wait;

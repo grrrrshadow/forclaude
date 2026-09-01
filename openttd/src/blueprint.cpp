@@ -37,6 +37,7 @@
 #include "water_cmd.h"
 #include "water_map.h"
 #include "waypoint_cmd.h"
+#include "waypoint_base.h"
 
 #include "safeguards.h"
 
@@ -1093,17 +1094,22 @@ CommandCost CmdPasteBlueprint(DoCommandFlags flags, TileIndex origin, const Blue
 			uint slices = rect.axis == Axis::X ? rect.w : rect.h;
 			uint8_t slice_w = rect.axis == Axis::X ? 1 : static_cast<uint8_t>(rect.w);
 			uint8_t slice_h = rect.axis == Axis::X ? static_cast<uint8_t>(rect.h) : 1;
+			/* A copied station waypoint pastes as one: the kind is part of what
+			 * the waypoint is. Read off the source waypoint while it still
+			 * exists; a blueprint outliving its source pastes the ordinary kind. */
+			const Waypoint *src_wp = Waypoint::GetIfValid(rect.station);
+			bool station_search = src_wp != nullptr && HasBit(src_wp->waypoint_flags, WPF_STATION_SEARCH);
 			for (uint i = 0; i < slices; i++) {
 				TileIndexDiffC slice = {static_cast<int16_t>(rect.offset.x + (rect.axis == Axis::X ? i : 0)),
 						static_cast<int16_t>(rect.offset.y + (rect.axis == Axis::X ? 0 : i))};
 				if (!tile_valid(slice)) continue;
 				StationID join = join_target(rect.station);
 				bool built = PasteBuild<Commands::BuildRailWaypoint>(state, flags, target_tile(slice), rect.axis, slice_w, slice_h,
-						STAT_CLASS_WAYP, 0, join, true);
+						STAT_CLASS_WAYP, 0, join, true, station_search);
 				if (!built && join != NEW_STATION) {
 					/* Joining may be impossible (e.g. station spread); build separately. */
 					built = PasteBuild<Commands::BuildRailWaypoint>(state, flags, target_tile(slice), rect.axis, slice_w, slice_h,
-							STAT_CLASS_WAYP, 0, NEW_STATION, true);
+							STAT_CLASS_WAYP, 0, NEW_STATION, true, station_search);
 				}
 				if (built) register_new_station(rect.station, slice);
 			}

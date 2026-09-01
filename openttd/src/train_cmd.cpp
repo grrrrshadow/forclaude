@@ -46,6 +46,7 @@
 #include "timer/timer_game_economy.h"
 #include "timetable.h"
 #include "economy_func.h"
+#include "waypoint_base.h"
 
 #include "table/strings.h"
 #include "table/train_sprites.h"
@@ -2200,7 +2201,7 @@ static uint CountUnits(const Train *rake)
  * @param want       how many vehicles it was told to collect
  * @return the assembled rake, or nullptr if the shed cannot fill the order
  */
-static Train *AssembleDepotRake(Train *v, TileIndex depot_tile, uint want)
+static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_tile, uint want)
 {
 	/* Count first, touch nothing. A shed that cannot fill the order must be
 	 * left exactly as it was -- rearranged and then not collected from would
@@ -2218,7 +2219,7 @@ static Train *AssembleDepotRake(Train *v, TileIndex depot_tile, uint want)
 			MarkCoupleClaimChanged(rake);
 		}
 		if (rake->couple_claim != VehicleID::Invalid()) continue; // spoken for
-		if (!MatchesCoupleFilter(v->current_order, rake, false)) continue;
+		if (!MatchesCoupleFilter(order, rake, false)) continue;
 
 		pile.push_back(rake);
 		available += CountUnits(rake);
@@ -2376,10 +2377,14 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
  * want a rake speaks for it, and it is offered to nobody else until that
  * engine has it or has given up.
  *
- * @param v the train, front of its consist, on a "go to couple" order
+ * @param v     the train, front of its consist
+ * @param order the "go to couple" order being worked -- usually the current
+ *              order, but a train holding short of a station waypoint asks
+ *              with the couple order that lies behind it (see the
+ *              #WPF_STATION_SEARCH hold in TrainLocoHandler())
  * @return the rake it is to fetch, or nullptr if there is nothing for it
  */
-static Train *FindOrClaimCoupleTarget(Train *v)
+static Train *FindOrClaimCoupleTarget(Train *v, const Order &order)
 {
 	/* A couple order can name a station or a depot. At a station the offer is
 	 * anything waiting there to be coupled -- a rake, or a whole train. In a
@@ -2388,30 +2393,30 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 	 * has no "waiting" order to carry, and needs none: a headless chain shut
 	 * in a shed is not going anywhere by itself, so standing there is the
 	 * whole of what waiting means for it. */
-	bool depot_order = v->current_order.IsType(OT_GOTO_DEPOT);
+	bool depot_order = order.IsType(OT_GOTO_DEPOT);
 	StationID dest = StationID::Invalid();
 	TileIndex depot_tile = INVALID_TILE;
 	if (depot_order) {
-		const Depot *depot = Depot::GetIfValid(v->current_order.GetDestination().ToDepotID());
+		const Depot *depot = Depot::GetIfValid(order.GetDestination().ToDepotID());
 		if (depot == nullptr) {
 			v->couple_target = VehicleID::Invalid();
 			return nullptr;
 		}
 		depot_tile = depot->xy;
 	} else {
-		dest = v->current_order.GetDestination().ToStationID();
+		dest = order.GetDestination().ToStationID();
 	}
 	/* A shed with a number on the order is a store to take that many out of,
 	 * not a shelf of ready-made rakes to pick one off. Anything already spoken
 	 * for by this train is looked up the ordinary way below -- the rake was
 	 * made up when it was claimed and is not remade every tick. */
-	if (depot_order && v->current_order.GetCoupleCount() != 0 && v->couple_target == VehicleID::Invalid()) {
-		Train *made = AssembleDepotRake(v, depot_tile, v->current_order.GetCoupleCount());
+	if (depot_order && order.GetCoupleCount() != 0 && v->couple_target == VehicleID::Invalid()) {
+		Train *made = AssembleDepotRake(v, order, depot_tile, order.GetCoupleCount());
 		if (made == nullptr) return nullptr;
 
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "Vlak {}: v depu ({},{}) si odlozil {} vozu k sebrani (rada {})", v->unitnumber,
-					TileX(depot_tile), TileY(depot_tile), v->current_order.GetCoupleCount(), made->index.base());
+					TileX(depot_tile), TileY(depot_tile), order.GetCoupleCount(), made->index.base());
 		}
 		made->couple_claim = v->index;
 		v->couple_target = made->index;
@@ -2455,7 +2460,7 @@ static Train *FindOrClaimCoupleTarget(Train *v)
 			return rake;
 		}
 		if (rake->couple_claim != VehicleID::Invalid()) continue; // somebody else's
-		if (!MatchesCoupleFilter(v->current_order, rake)) continue;
+		if (!MatchesCoupleFilter(order, rake)) continue;
 
 		if (unclaimed == nullptr) unclaimed = rake;
 	}
@@ -2513,6 +2518,45 @@ bool HasCoupleTarget(const Train *v)
 		return true;
 	}
 	return false;
+}
+
+/**
+ * The "go to couple" order this train's current run leads to, when everything
+ * between here and it is station waypoints.
+ *
+ * A station waypoint (see #WPF_STATION_SEARCH) is transparent to the
+ * wagon-collecting hold: a collector bound for one, with a couple order
+ * behind it, is already on its collecting errand and must not set off into
+ * the throat the waypoint guards until it has something to collect. This
+ * walks the order list from the current order across consecutive station
+ * waypoint orders and hands back the couple order they lead to -- or nothing,
+ * when the current order is not a station waypoint run, when an ordinary
+ * order interrupts the chain (the player said "drive here first"), or when
+ * no couple order follows.
+ *
+ * @param v the train, front of its consist
+ * @return the station couple order behind the station waypoint(s), or nullptr
+ */
+static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
+{
+	if (v->orders == nullptr || v->GetNumOrders() == 0) return nullptr;
+	if (!v->current_order.IsType(OT_GOTO_WAYPOINT)) return nullptr;
+
+	VehicleOrderID idx = v->cur_real_order_index;
+	const Order *order = v->GetOrder(idx);
+	for (uint left = v->GetNumOrders(); order != nullptr && left > 0; left--) {
+		if (order->IsType(OT_IMPLICIT)) {
+			/* Not a real order; step over it. */
+		} else if (order->IsType(OT_GOTO_WAYPOINT)) {
+			const Waypoint *wp = Waypoint::GetIfValid(order->GetDestination().ToStationID());
+			if (wp == nullptr || !HasBit(wp->waypoint_flags, WPF_STATION_SEARCH)) return nullptr;
+		} else {
+			return order->IsType(OT_GOTO_STATION) && order->ShouldGoToCouple() ? order : nullptr;
+		}
+		idx = (idx + 1) % v->GetNumOrders();
+		order = v->GetOrder(idx);
+	}
+	return nullptr;
 }
 
 /**
@@ -8311,7 +8355,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (consist->couple_target == VehicleID::Invalid() && consist->current_order.IsType(OT_GOTO_DEPOT) &&
 				consist->current_order.ShouldGoToCouple() &&
 				consist->current_order.GetDestination().ToDepotID() == GetDepotIndex(consist->tile)) {
-			FindOrClaimCoupleTarget(consist);
+			FindOrClaimCoupleTarget(consist, consist->current_order);
 		}
 
 		if (consist->couple_target != VehicleID::Invalid()) {
@@ -8330,6 +8374,55 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	/* exit if train is stopped */
 	if (consist->vehstatus.Test(VehState::Stopped) && consist->cur_speed == 0) return true;
 
+	/* A collector standing short of a station waypoint is already on its
+	 * collecting errand -- the waypoint only names the group of platforms the
+	 * couple order behind it is for, placed where the road into them forks.
+	 * Driving in is not possible yet and must not be: the tracks past the
+	 * waypoint end in the platforms the wagons are still loading on, so
+	 * there is nowhere to stand and nothing to choose. So it is held right
+	 * here, and the search runs through the waypoint to the couple order:
+	 * the moment a rake at that station is ready, it is claimed -- which of
+	 * the platforms finished first is decided by that, not by anybody in
+	 * advance -- and the waypoint order is concluded on the spot so the
+	 * ordinary collecting run takes over, with all its rights of pulling up
+	 * against the claimed wagons. The route in passes the waypoint's tiles
+	 * either way; that is where the player put it.
+	 *
+	 * An ordinary waypoint is deliberately none of this: it stays a place to
+	 * drive to, so the player controls where the waiting happens by which
+	 * kind they build. See #WPF_STATION_SEARCH. */
+	if (consist->current_order.IsType(OT_GOTO_WAYPOINT) && consist->IsFrontEngine() && consist->cur_speed == 0) {
+		const Order *couple_order = CoupleOrderBehindStationWaypoints(consist);
+		if (couple_order != nullptr) {
+			if (FindOrClaimCoupleTarget(consist, *couple_order) == nullptr) {
+				if (_show_train_orientation) {
+					SayOnChange(consist, fmt::format("Vlak {}: ceka pred nadraznim smerovanim na ({},{}) - na stanici nejsou zadne vagonky, pro ktere by mohl jet",
+							consist->unitnumber, TileX(consist->tile), TileY(consist->tile)));
+				}
+				/* It holds no track while it waits -- same reasoning, and the
+				 * same depot guard, as the collecting hold below. */
+				if ((consist->tick_counter & 0x1F) == 0 && !IsWholeTrainInsideDepot(consist)) {
+					FreeTrainTrackReservation(consist);
+					consist->ReserveTrackUnderConsist();
+				}
+				return true;
+			}
+
+			/* It has its rake, so the waypoint has done all a station waypoint
+			 * does. Concluded here, standing short of it, never by arriving:
+			 * arriving is the thing that cannot happen. One order per tick;
+			 * a second station waypoint in the chain concludes on the next. */
+			consist->DeleteUnreachedImplicitOrders();
+			UpdateVehicleTimetable(consist, true);
+			consist->IncrementImplicitOrderIndex();
+			ProcessOrders(consist);
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: vagonky pripraveny - nadrazni smerovani ma splneno, jede se pro ne", consist->unitnumber);
+			}
+			return true;
+		}
+	}
+
 	/* A train told to go and collect wagons does not set off until it has a
 	 * rake to collect, and once it has one, that rake is nobody else's. Asked
 	 * only of a train standing still, so an engine already on its way is never
@@ -8344,7 +8437,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * good before the stop can even finish. */
 	if ((consist->current_order.IsType(OT_GOTO_STATION) || consist->current_order.IsType(OT_GOTO_DEPOT)) &&
 			consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0) {
-		if (FindOrClaimCoupleTarget(consist) == nullptr) {
+		if (FindOrClaimCoupleTarget(consist, consist->current_order) == nullptr) {
 			/* And it holds no track while it waits. Reserving first and choosing
 			 * afterwards was the whole trouble: the path was held against every
 			 * other train for as long as the wait lasted, and when the choice was
