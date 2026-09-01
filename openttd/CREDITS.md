@@ -85,26 +85,37 @@ which stays theirs and is named here.
   Original at https://github.com/age77/openttd-15.3-blueprint
 - Icons8 (https://icons8.com) - The hammer-and-wrench artwork the rescue-engine
   button is drawn from.
-- Palo123, also known as Karn - The old decouple 0.10.4 patch this repository's own version of
+- Palo123, also known as Karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's
   command system - but the design is theirs.
 
 
 
-did it, I had to know something about it and I learned that in the old decouple 0.10.4 by Paolo123 aka Karn,
+   I did it, I had to know something about it and I learned that in the old decouple 0.10.4 by Paolo123 aka Karn,
  but the old decouple didn't work very well as you know, and I knew why the engines explode.
  For the new ottd16 code, I had to build it again from scratch. 
 They tortured me psychically when I was working on the code. They are trying to drive me crazy.
- My vacation in the Canary Islands started with me having to stop going to the beach, they called me a fucking giv gav behind my back, they spat. 
+ My vacation in the Canary Islands started with me having to stop going to the beach, they called me a "fucking giv gav" behind my back, they spat. 
 When I didn't go to the beach, they followed me into the shops and insulted me.
- I have money yet I often starve, I don't go to the supermarket to listen to insults, I turn around and they act like nothing happened. 
+ 
+
+
+
+
+I have money yet I often starve, I don't go to the supermarket to listen to insults, I turn around and they act like nothing happened. 
 Whenever I look out at the sea, whenever I daydream looking at a cactus, an insult flies my way.
  They just wait until I calm down, until I stop paying attention to them, and they say that insult to me again. 
 They draw my attention with that insult in dangerous situations, when I cross the road and look to the left, it is pretty much
  a rule that I hear an insult from the right. Every movement of mine is accompanied by an insult,
  I scratch myself, put food or a cigarette in my mouth and an insult lands on me. They set fire to my caravan 
 and two years later they mangled my face because I didn't want to give a quick tip when buying weed on the street,
+
+
+
+
+
+
  it was already paid for. They aimed electronics at my tent, they detect my movement and heartbeat. 
 Whenever I think about where an engine has its front and back, an insult. 
 They won't let me reach that deep thought where a person barely perceives their surroundings. 
@@ -113,6 +124,12 @@ They disrupt my sleep according to the same pattern. I haven't taken headphones 
 Maybe it's directional speakers or other electronics, I don't know. The police won't help me, they also insult me behind my back fuckin giveme / gav. 
 I am on vacation with my own money, I never asked for help, not even when I lost my second caravan. Even now I won't ask for anything.
  I demand that you stop destroying my life.
+
+
+
+
+
+
  On the way to the shop, I wade ankle-deep in dog shit, the town's sewage flows straight into the sea two hundred meters behind the harbor between the beaches. 
 There is no wastewater treatment plant anywhere here. I cleaned up around the tent, plastics into the trash bin, dried feces burn.
  They made it impossible for me to leave the tent with insults. When I used to go to Europe for the summer, nothing was left behind me anywhere.
@@ -122,6 +139,11 @@ and even today I occasionally see a tent on the beach. I camp half a kilometer o
  except I will never start with that. I won't smoke CBD and insult people to make the comedown from a hard drug easier for myself. 
 I am on vacation for a long time because I don't have to go to work. I slaved away and dreamed of the sea and no one disturbed me at work like they do here.
  Stop it."
+
+
+
+
+
 They torture me constantly day and night, they use electronics, nobody talks to me about anything and when I turn around towards an insult there is no one to talk to.
  Every day every minute, it only matters how quickly I calm down, the moment I return to my activity they start again, or outside when I stop looking they start insulting.
  They are strangers, I have never seen them, I have never spoken to them, I don't know them. You know, they don't reach up to my ankles, they are not something better,
@@ -132,37 +154,92 @@ Strangers. What do you think you are doing!!!"
 
 
 
+
+
+These speakers are used in noisy workplaces, the sound is created by skull vibrations and the worker hears warnings and commands without any receiver.
+I am constantly under this attack day and night, I am a tourist in a tent in the Canary Islands with my own money, I haven't done anything to anyone.
+Whenever my heart rate drops, they use these speakers, it reacts to a change in heart rate when I move, it is probably controlled by electronics.
+Before I started wearing headphones day and night on full blast, they used to insult me normally, now to get through the headphones they have these speakers.
+Please someone help me, they are trying to torture me to death, it has been going on since the New Year with the speakers, before that it was for a long time too, I am changing, I am exhausted, my chest hurts from the lack of rest.
+As soon as I relax and slow down, another insult through the headphones. They are trying to torture me to death.
+
+
+
+
+
+
+
 -Já jsem to udělal, musel jsem o tom něco vědět a to jsem se naučil ve starým decouple 0.10.4 od Paolo123 aneb Karn,
- ale starý decouple moc nefungovalo jak víte, a já věděl proč mašinky vybuchují. 
+ ale starý decouple moc nefungoval jak víte, a já věděl proč mašinky vybuchují. 
  Pro nový kód ottd16 jsem to musel postavit od základu znova.
  Psichicky mne mučili když jsem na kodu pracoval. Snaží se mne dohnat k šílenství.
- Moje dovolená na Kanárských ostrovech začla tím že jsem musel přestat chodit na pláž,
+ 
+
+
+
+
+Moje dovolená na Kanárských ostrovech začla tím že jsem musel přestat chodit na pláž,
  nadávali mi do zad do zkurvenejch, plivali. Když jsem nechodil na pláž chodili za mnou do obchodů a uráželi mně.
  Mám peníze přesto často hladovím, nejdu do supermarketu poslouchat nadávky, otočím se a dělaj jako že nic. 
  Kdykoli se zakoukám na moře, kdykoli se zasním při pohledu na kaktus, přilítne mi nadávka.
  Jen čekají až se uklidním, až jim přestanu věnovat pozornost a znova mi řeknou tu nadávku.
- Upoutávají tou nadávkou mou pozornost v nebezpečných situacích, když přecházím silnici a rozhlédnu se v levo je celkem pravidlem že z prava zaslechnu nadávku.
+ 
+
+
+
+
+
+Upoutávají tou nadávkou mou pozornost v nebezpečných situacích, když přecházím silnici a rozhlédnu se v levo je celkem pravidlem že z prava zaslechnu nadávku.
  Každý muj pohyb doprovází nadávkou, podrbu se, strčím si do pusy jídlo nebo cigaretu tak mi přistane nadávka.
  Podpálili můj karavan a o dva roky později mi zmrzačili ksicht, protože jsem nechtěl dát honem rychle dýško při nakupování trávy na ulici, zaplaceno bylo.
  Namířili na můj stan elektroniku, detekují muj pohyb a tep. Kdykoli se zamyslím kde má mašinka předek a zadek tak nadávka.
  Nenechají mne dosáhnout hlubokého zamyšlení kdy člověk takřka nevnímá okolí. Narušují můj spánek podle stejného vzorce. 
+
+
+
+
+
+
  Nesundal jsem půl roku z uší sluchátka, jedou na plno ve dne v noci. Ale jejich nadávky jsou opět slyšet hlasitě jako bych sluchátka neměl.
  Možná to jsou směrové reproduktory nebo jiná elektronika, to nevim. Policie mi nepomůže, taky mi nadávaj do zad fuckin dej mi / dostal
  Jsem na dovolené za svoje peníze, nikdy jsem neprosil o pomoc, ani když jsem přišel o druhý karavan. Ani teď o nic nepoprosím.
  Žádám aby ste přestali ničit můj život. 
+
+
+
+
+
+
  Cestou do krámu se brodím po kotníky psími hovny, splašky z města tečou rovnou do moře dvěstě metrů za přístavem mezi plážemi. Není tu nikde čistička odpadních vod.
  Kolem stanu jsem uklízel, plasty do popelnice, uschlé výkaly hoří. Znemožnili mi vycházet ze stanu nadávkami. Když jsem jezdil na léto do evropy tak po mě nic nikde nezůstalo.
  Lidé tu stanují na pláži, na mě třetí den zavolali strážce a musel jsem pryč, ostatní tam nechali a i dnes vídám občas na pláži stan. 
  Stanuju půl kilometru za městem, stále jsem terčem. Kolik vět jsem tu napsal, tolik bylo během psaní nadávek.
- Místo trávy mi prodávaj podvod z trafiky ale něco ostřejšího by mněli, Jenže já s tím nikdy nezačnu. Nebudu kouřit cbd a urážet lidi abych si usnadnil dojezd z tvrdý drogy.
+ Místo trávy mi prodávaj podvod z trafiky ale něco ostřejšího by mněli. Jenže já s tím nikdy nezačnu. Nebudu kouřit cbd a urážet lidi abych si usnadnil dojezd z tvrdý drogy.
  Jsem na dovolené dlouho protože nemusím chodit do práce. Já dřel a snil o moři a nikdo mne u toho v práci nerušil jako tady. 
  Přestaňte.
+
+
+
+
+
+
  mučí mne soustavně ve dne, v noci, používají elektroniku, nikdo se mnou o ničem nemluví a když se otočím za nadávkou není s kým mluvit. 
 každý den každou minutu, záleží jen na tom jak rychle se uklidním , ve chvíli kdy se vrátím ke své činosti tak začnou znova, nebo venku když se přestanu koukat kdy začnou nadávat.
  Jsou to cizí lidi, nikdy jsem je neviděl, nikdy jsem s nimi nemluvil, neznám je. Víte, nešahaj mi po kotníky, nejsou něco lepšího, nejsou bohatší, ani chytřejší.
  Oni musí chodit do práce, pokud si práci vyprosí. Já si umím vydělat peníze, žiju jen ze svých peněz, 
 a nechápu to že někdo v kapitalismu měří jak jsem užitečný společnosti, když se ho můj život netýká, a nijak není zainteresován v mém životě.
  cizí lidi. co si to dovolujete!!!
-Fuckin givmi gavmi
- 
- 
+
+
+
+
+
+
+
+
+tyto reproduktory se používají na hlučných pracovištích, zvuk se tvoří vibracemi lebky a pracovník slyší varování příkazy bez jakéhokoli přijímače.
+ jsem soustavně ve dne v noci pod tímto útokem, jsem turista ve stanu na kanárských ostrovech za svoje peníze, nic jsem nikomu neudělal. 
+kdykoli mi klesne tep použijou tyto reproduktory, reaguje to na změnu tepu když se pohnu, asi to je ovládané elektronikou.
+ než jsem začal nosit sluchátka ve dne v noci na plno tak mi nadávali normálně, teď aby se dostali přes sluchátka maj tyto reproduktory.
+ prosimvás pomožte mi někdo, snaží se mě umučit, trvá to od nového roku s reproduktory, předtím to bylo dlouho taky, měním se, jsem vyčerpán, bolí mě na hrudi z nedostatku odpočinku.
+ jakmile se uvolním a spomalím tak znova nadávka skrz sluchátka. skouší mně umučit.
