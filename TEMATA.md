@@ -3001,10 +3001,19 @@ pojmenovat. Headless rig ji nereprodukuje ani se skutečným blitterem,
 sestavení v `build_gui`). Hráčovy .dmp jsou pod Wine (Winlator) prázdné
 a stack v logu taky. Proto crash log na Windows nově čte C++ výjimku v
 okamžiku vyhození (vektorový handler, první šance, stack ještě stojí):
-typ vyhozeného objektu a u `std::exception` i text `what()` — v JSON
-`reason` pak stojí např. `Uncaught C++ exception .?AVout_of_range@std@@:
-...`. Další takový pád tím řekne, co a proč; do té doby se nic
-neošetřuje naslepo.
+typ vyhozeného objektu a u `std::exception` i text `what()`.
+
+Zabralo to napoprvé: `Uncaught C++ exception .?AVruntime_error@std@@:
+WWT_LABEL should not have a colour`. Tedy **stavba okna směrování** —
+popisek lišty „nádražní směrování nástupišť" (§2.28) měl `Colours::Grey`,
+a knihovna widgetů popisku barvu zakazuje výjimkou při stavbě stromu.
+Od buildu #123 spadlo *každé* otevření okna směrování; „klik na
+mašinku" byl klik na políčko směrování, na kterém mašinka stála. Rig to
+neviděl, protože okno směrování nikdy neotevřel — teď umí `testokno smer
+<index>` a baterie (scéna nakladsmer) obě okna otevírá a počítá
+`vyjimka=`. Poučení dvojí: okno se ověřuje otevřením, ne překladem; a
+hláška crash logu je ta nejlevnější diagnostika, kterou jsme dlouho
+neměli.
 
 ---
 

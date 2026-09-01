@@ -218,7 +218,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_waypoint_view_widget
 	 * identical from the viewport and stand in the same station throats. */
 	NWidget(NWID_SELECTION, Colours::Invalid, WID_W_STWP_SEL),
 		NWidget(WWT_PANEL, Colours::Grey),
-			NWidget(WWT_LABEL, Colours::Grey, WID_W_STWP_LABEL), SetStringTip(STR_WAYPOINT_VIEW_STATION_WAYPOINT_LABEL), SetFill(1, 0), SetResize(1, 0), SetPadding(1, 2, 1, 2),
+			NWidget(WWT_LABEL, Colours::Invalid, WID_W_STWP_LABEL), SetStringTip(STR_WAYPOINT_VIEW_STATION_WAYPOINT_LABEL), SetFill(1, 0), SetResize(1, 0), SetPadding(1, 2, 1, 2),
 		EndContainer(),
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey),

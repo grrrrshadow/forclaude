@@ -66,6 +66,7 @@
 #include "terraform_cmd.h"
 #include "waypoint_cmd.h"
 #include "waypoint_base.h"
+#include "waypoint_func.h"
 #include "vehicle_gui.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
@@ -2549,8 +2550,24 @@ static bool ConTestStoreRake(std::span<std::string_view> argv)
  */
 static bool ConTestOpenWindow(std::span<std::string_view> argv)
 {
-	if (argv.size() != 2) {
-		IConsolePrint(CC_HELP, "Open a train's window. Usage: 'testokno <unit number>'.");
+	if (argv.size() != 2 && !(argv.size() == 3 && argv[1] == "smer")) {
+		IConsolePrint(CC_HELP, "Open a train's window, or a waypoint's. Usage: 'testokno <unit number>' or 'testokno smer <waypoint index>'.");
+		return true;
+	}
+	if (argv.size() == 3) {
+		/* A window is built when it opens, and a mistake in its widget tree
+		 * is an exception at that moment -- a waypoint window built with a
+		 * coloured label crashed the player's game on every click for two
+		 * builds, and the rig never opened one. */
+		auto pidx = ParseInteger(argv[2]);
+		if (!pidx.has_value()) return false;
+		const Waypoint *wp = Waypoint::GetIfValid(static_cast<StationID>(*pidx));
+		if (wp == nullptr) {
+			IConsolePrint(CC_ERROR, "testokno: smerovani {} neexistuje.", argv[2]);
+			return true;
+		}
+		ShowWaypointWindow(wp);
+		IConsolePrint(CC_DEFAULT, "testokno: okno smerovani {} otevreno.", wp->index.base());
 		return true;
 	}
 	auto punit = ParseInteger(argv[1]);
