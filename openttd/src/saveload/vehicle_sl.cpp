@@ -443,6 +443,21 @@ void AfterLoadVehiclesPhase2(bool part_of_load)
 				Train *t = Train::From(v);
 				if (t->IsFrontEngine() || t->IsFreeWagon()) {
 					t->gcache.last_speed = t->cur_speed; // update displayed train speed
+
+					/* Engines carry nothing (see the capacity override in
+					 * ConsistChanged) -- but a save written before that rule
+					 * still has capacity and possibly cargo sitting on its
+					 * engines. Taken away here, before ConsistChanged below
+					 * verifies capacities against the rule, or every such
+					 * engine would raise a broken-NewGRF warning on load. */
+					for (Train *u = t; u != nullptr; u = u->Next()) {
+						if (RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type == RailVehicleType::Wagon) continue;
+						if (u->cargo_cap == 0 && u->cargo.TotalCount() == 0) continue;
+						u->cargo.Truncate(0);
+						u->cargo_cap = 0;
+						u->refit_cap = 0;
+					}
+
 					t->ConsistChanged(CCF_SAVELOAD);
 				}
 				break;

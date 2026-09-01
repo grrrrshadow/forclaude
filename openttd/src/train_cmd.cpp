@@ -204,6 +204,15 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 		}
 
 		uint16_t new_cap = e_u->DetermineCapacity(u);
+		/* An engine carries nothing. Whatever its set declares -- a steam
+		 * engine's tender full of coal is fuel, not freight -- wagons haul and
+		 * engines pull, globally and for good. Decided when a tender's
+		 * declared capacity left a light engine standing at a platform on a
+		 * full-load order, waiting to fill its own firebox with a cargo the
+		 * station never had. Asked of the unit's head, not the part: sets
+		 * regularly register tenders and other articulated pieces of an
+		 * engine as wagon-typed, and those are still the engine. */
+		if (RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type != RailVehicleType::Wagon) new_cap = 0;
 		if (allowed_changes.Test(ConsistChangeFlag::Capacity)) {
 			/* Update vehicle capacity. */
 			if (u->cargo_cap > new_cap) u->cargo.Truncate(new_cap);
@@ -4417,17 +4426,18 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * cargo work -- the settle before the split took the whole old consist's
 	 * work out of flight, and this stages exactly the kept share of it again.
 	 *
-	 * A kept part that cannot carry anything has no share, and for it the
-	 * stop is over: the engine drops its wagons and goes, and the wagons work
-	 * their load and unload orders by themselves -- that is the design, and
-	 * it was the behaviour once already. Re-arming the stop for the engine
-	 * too is what quietly took it back: restarting the load wiped the
-	 * "finished loading" mark, and a full-load order over a train with no
-	 * capacity at all can never earn it again -- nothing can ever be full --
-	 * so the light engine stood at the platform for good (or, told to load
-	 * whatever was there, until the wagons beside it happened to finish).
-	 * The finished mark is set outright instead: the ordinary departure
-	 * machinery then takes it out the ordinary way. */
+	 * "Its own cargo work" means the wagons that stayed on. An engine that
+	 * kept none goes, whatever a NewGRF says about its capacity -- a steam
+	 * engine's tender reads as cargo room under some sets, and asking "can
+	 * anything aboard carry?" instead of "did any wagons stay?" left exactly
+	 * such an engine standing at the platform, waiting to fill its own
+	 * firebox with a cargo the station never had. The vanilla engine has no
+	 * capacity, so the same save without the set behaved -- which is how the
+	 * player caught the question being the wrong one. And a kept part whose
+	 * wagons cannot hold anything (a brake van, say) has no cargo work
+	 * either. The stop is re-armed only when wagons stayed and something
+	 * aboard can actually be filled or emptied; everything else gets the
+	 * finished mark outright and leaves through the ordinary departure. */
 	if (v->current_order.IsType(OT_LOADING) && v->cargo_payment == nullptr &&
 			Station::IsValidID(v->last_station_visited)) {
 		bool can_carry = false;
@@ -4437,7 +4447,7 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 				break;
 			}
 		}
-		if (can_carry) {
+		if (v->GetNextUnit() != nullptr && can_carry) {
 			PrepareUnload(v);
 		} else {
 			v->vehicle_flags.Set(VehicleFlag::LoadingFinished);

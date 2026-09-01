@@ -2848,6 +2848,44 @@ neposunulo; okno směrování pozná druh vlaku i podle nového jména
 
 ---
 
+## 2.29 Mašinky nic nevozí — plošně, basta
+
+Hráčův save s grf: mašinka u rozkazu odpojit „zůstala dlouho stát, pak
+spadla hra" — a tentýž save bez grf byl v pořádku. Rozdíl: parní mašinky
+CZTR mají deklarovanou kapacitu (tendr s uhlím), vanilla mašinka žádnou.
+Oprava z 2.28 se po střihu ptala „umí zbylý kus něco vézt?" — u mašinky
+s tendrem odpověď zněla ano, nakládka se jí znovu rozjela s „plně
+naložit"… a tendr se uhlím na nádraží s cizím nákladem nenaplní nikdy.
+Otázka byla položená špatně.
+
+Hráčovo rozhodnutí: **seber jim to globálně — mašinky nic nevozej.**
+Uhlí v tendru je palivo, ne náklad; vozí vagony, mašinka táhne. Tři kusy:
+
+1. **Hrdlo v `Train::ConsistChanged`** — kudy jde každá stavba,
+   přestavba i grf callback: článek, jehož hlava jednotky není vagon,
+   dostane kapacitu 0. Ptát se na hlavu jednotky, ne na článek — sady
+   běžně registrují tendry a kloubové kusy mašinky jako „vagonového"
+   typu, a pořád je to mašinka.
+2. **Úklid při načtení** (`AfterLoadVehiclesPhase2`, před ověřovacím
+   `ConsistChanged(CCF_SAVELOAD)`) — starým savům se mašinkám kapacita
+   sebere a náklad vysype; bez toho by každá taková mašinka při načtení
+   vyhodila hlášku „broken NewGRF", protože CCF_SAVELOAD kapacitu
+   neopravuje, jen kontroluje.
+3. **Výloha** (`GetCapacityOfArticulatedParts`) — nákupní okno u mašinek
+   kapacitu už neslibuje.
+
+Vedle toho zůstává z téže noci pravidlo po střihu: nakládka se znovu
+rozjede, jen když zůstaly vagony A něco z nich umí vézt (brzdový vůz s
+plným naložením by jinak stál stejně); jinak rovnou „naloženo hotovo" a
+jede.
+
+**Pád samotný („Unknown exception code", bez stacku — Win7) zůstává
+nedoložený**: stav, ve kterém k němu došlo (věčné stání v nakládce),
+tímhle mizí, ale příčina pádu změřená není. Kdyby se ukázal znovu, je
+potřeba crash sav (leží vedle crash logu).
+
+---
+
 # 16. Nedořešeno
 
 Ne chyby — místa, kde je rozhodnuto jen napůl a ví se o tom. Každé z nich
