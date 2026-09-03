@@ -3096,6 +3096,20 @@ Návrhové otázky hráče, zatím nedotčené v kódu:
 - Odtah dvouvlaku: odtahovka veze cokoli, co visí na porouchaném čele;
   pohlcený vlak zůstane spojený, dokud čelo neodpojí podle svých rozkazů.
 
+## 2.36 Rig: scény ze savu běžely na prázdné mapě
+
+Baterie píše před scénou do `autoexec.scr` příkaz `newgame` — a ten se
+provede i nad savem načteným přes `-g`, takže scény `nakladsav`,
+`save91`, `save91rev` (a nová `emu`) běžely týdny na čerstvé mapě a
+jejich „spojeno=0" jsem bral jako normál. Odhaleno až tím, že scéna
+`emu` hlásila 0, ač ruční běh téhož savu dával 4. Oprava v `run_scene`:
+scéna s `-g` dostane prázdný autoexec. Zároveň scény ze savu potřebují
+`testpauza` (pauznutý save jinak stojí na nule tiků). Po opravě:
+`nakladsav` skutečně dělí vlak u nakládky s nákladem v pohybu (bez
+assertu — to bylo její poslání), `emu` 4 spojení. Poučení: každá nová
+scéna se nejdřív pustí ručně a porovná s baterií, čísla „0" nejsou
+zelená.
+
 ---
 
 # 16. Nedořešeno
