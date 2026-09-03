@@ -3038,6 +3038,15 @@ odtahovky ve chvíli, kdy část poruchy ještě stojí v depu (couvání vozů
 zpět vraty). Bez hráčova savu s tou tratí se to netrefí; scény
 zůstávají v rigu pro další pokus.
 
+## 2.34 Rozkaz připojit: výchozí „nenakládat" zůstává, výběry jsou zpátky živé
+
+Hráč začíná ladit osobáky, a tam se po připojení nakládá (jednotka
+složená ze dvou půlek naloží a jede). Takže z §2.28: zapnutí přepínače
+připojit dál zapíše „nevykládat a nenakládat" (výchozí stav, ať mašinka
+připojí a jede), ale dva výběry nakládání/vykládání v okně rozkazů už
+nejsou šedé — příkaz je nikdy nezakazoval, jen okno. Filtr připojení
+beze změny.
+
 ---
 
 # 16. Nedořešeno
