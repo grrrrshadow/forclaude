@@ -3221,6 +3221,101 @@ static int64_t DistanceSquaredBetweenVehicles(const Train *a, const Train *b)
  */
 static void NormaliseCoupledConsistFacing(Train *consist);
 
+/**
+ * Make the rear head of a dual-headed engine its front head, and the other
+ * way round.
+ *
+ * The two heads of such an engine are the same vehicle twice over -- same
+ * type, same cargo, same value -- and differ only in which of them is written
+ * down as "the engine" (the front, which the train is asked about) and which
+ * as the part that merely rides along at the back, one sprite further on.
+ * The game's own bookkeeping insists the front comes first in the list; so
+ * when a list is turned round, the roles turn round with it.
+ *
+ * @param front the head currently written as the engine
+ * @param rear  its other half, currently the rear part
+ */
+/**
+ * Hand everything that makes a vehicle "the train" from one vehicle to
+ * another: orders, number, name, timetable, the current order, and the
+ * coupling and rescue state this build keeps on a head.
+ *
+ * Only ever between the two heads of one dual-headed engine (see
+ * SwapDualHeadRoles()): the one that carried the train's identity gives it to
+ * the one that is going to be first in the list. A train travelling as
+ * another one's wagons keeps its own identity dormant on its engine
+ * (keep_absorbed_identity in TryConsistSplice()); that engine can be a dual
+ * head too, so the hand-over is done wherever the front head has anything to
+ * hand over, not only for the head of the list.
+ *
+ * @param from the head carrying the identity
+ * @param to   the head that is to carry it
+ */
+static void TransferTrainIdentity(Train *from, Train *to)
+{
+	if (from->orders != nullptr) {
+		to->orders = from->orders;
+		to->AddToShared(from);
+		DeleteVehicleOrders(from);
+	}
+	to->CopyConsistPropertiesFrom(from);
+	from->name.clear();
+
+	/* The number moves; nothing is released, so nothing can be handed out
+	 * to somebody else in between. */
+	to->unitnumber = from->unitnumber;
+	from->unitnumber = 0;
+
+	to->current_order = from->current_order;
+	from->current_order.Free();
+	to->dest_tile = from->dest_tile;
+	to->last_station_visited = from->last_station_visited;
+	to->last_loading_station = from->last_loading_station;
+	to->last_loading_tick = from->last_loading_tick;
+	to->profit_this_year = from->profit_this_year;
+	to->profit_last_year = from->profit_last_year;
+	from->profit_this_year = 0;
+	from->profit_last_year = 0;
+
+	for (VehicleFlag f : {VehicleFlag::DrivingBackwards, VehicleFlag::RescueEngine, VehicleFlag::LoadingFinished,
+			VehicleFlag::StopLoading, VehicleFlag::PathfinderLost}) {
+		to->vehicle_flags.Set(f, from->vehicle_flags.Test(f));
+		from->vehicle_flags.Reset(f);
+	}
+	for (VehicleRailFlag f : {VehicleRailFlag::Stuck, VehicleRailFlag::Reversing, VehicleRailFlag::LeavingStation}) {
+		to->flags.Set(f, from->flags.Test(f));
+		from->flags.Reset(f);
+	}
+
+	to->couple_target = from->couple_target;
+	to->couple_claim = from->couple_claim;
+	to->rescue_target = from->rescue_target;
+	to->rescue_deadline = from->rescue_deadline;
+	to->rescue_hold = from->rescue_hold;
+	from->couple_target = VehicleID::Invalid();
+	from->couple_claim = VehicleID::Invalid();
+	from->rescue_target = VehicleID::Invalid();
+	from->rescue_deadline = {};
+	from->rescue_hold = RescueHold::None;
+
+	to->wait_counter = from->wait_counter;
+	to->force_proceed = from->force_proceed;
+	from->wait_counter = 0;
+	from->force_proceed = TFP_NONE;
+}
+
+static void SwapDualHeadRoles(Train *front, Train *rear)
+{
+	assert(front->IsMultiheaded() && front->IsEngine());
+	assert(rear->IsRearDualheaded() && front->other_multiheaded_part == rear && rear->other_multiheaded_part == front);
+	front->ClearEngine();
+	rear->SetEngine();
+	std::swap(front->spritenum, rear->spritenum);
+	/* Whatever the front head was to the game -- the train itself, or a
+	 * train riding along dormant -- the new front head is now. */
+	TransferTrainIdentity(front, rear);
+}
+
 static Train *ReverseConsistOrder(Train *head)
 {
 	std::vector<Train *> units;
@@ -3234,6 +3329,26 @@ static Train *ReverseConsistOrder(Train *head)
 	Train *new_head = units.back();
 	for (size_t i = units.size() - 1; i > 0; i--) {
 		InsertInConsist(units[i]->GetLastEnginePart(), units[i - 1]);
+	}
+
+	/* A dual-headed engine lies in the list front head first, rear head last,
+	 * and everything that tidies a train after a change relies on that: the
+	 * rear is moved to sit behind its front wherever it is found. Turned
+	 * round, the rear now comes first -- and the tidying moves it out from
+	 * under the very pointer that names the new head, which is how a joined
+	 * pair of multiple units came down on an assert. So the two heads swap
+	 * roles along with their places: whichever is first is the front. */
+	for (Train *u : units) {
+		if (!u->IsMultiheaded() || !u->IsEngine()) continue;
+		Train *rear = u->other_multiheaded_part;
+		if (rear == nullptr || rear->First() != u->First()) continue;
+		/* Is the rear now ahead of its front in the list? */
+		bool rear_first = false;
+		for (Train *w = new_head; w != nullptr; w = w->Next()) {
+			if (w == rear) { rear_first = true; break; }
+			if (w == u) break;
+		}
+		if (rear_first) SwapDualHeadRoles(u, rear);
 	}
 
 	/* Nothing has moved: the vehicles are on the tiles they were on and the
@@ -4378,6 +4493,43 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 		split_point = split_point->GetNextUnit();
 	}
 
+	/* Two trains running as one come apart where the second one begins: at
+	 * its engine, which rides along as a wagon of the first (its identity
+	 * dormant on it, see keep_absorbed_identity in TryConsistSplice()). Counted
+	 * by wagons the split would land inside the first train's own multiple
+	 * unit -- a car between its two heads -- and the game rightly refuses to
+	 * cut there, so "decouple all" on a joined pair did nothing at all. The
+	 * count still says how many of the first train's own wagons stay; it can
+	 * never reach into the second train. */
+	Train *absorbed = nullptr;
+	for (Train *u = v->Next(); u != nullptr; u = u->Next()) {
+		if (u->IsArticulatedPart()) continue;
+		if (!u->IsEngine() && !u->IsRearDualheaded()) continue;
+		if (u == v->other_multiheaded_part) continue;
+		absorbed = u;
+		break;
+	}
+	auto at_or_after = [](const Train *from, const Train *what) {
+		for (const Train *u = from; u != nullptr; u = u->Next()) {
+			if (u == what) return true;
+		}
+		return false;
+	};
+	if (absorbed != nullptr && (split_point == nullptr || at_or_after(absorbed, split_point))) split_point = absorbed;
+	/* The head's own rear head can never be left behind: a cut that would
+	 * strand it is moved to the second train, or is no cut at all. */
+	if (split_point != nullptr && v->other_multiheaded_part != nullptr && at_or_after(split_point, v->other_multiheaded_part)) {
+		split_point = absorbed;
+	}
+	if (split_point != nullptr && split_point->IsRearDualheaded()) {
+		/* The second train lies the other way round in the list, rear head
+		 * first: it was turned round to meet the first one end to end. A
+		 * chain has to start with an engine, so its two heads swap roles
+		 * first -- the one that will lead the put-down train becomes its
+		 * front, and takes the dormant identity with it. */
+		SwapDualHeadRoles(split_point->other_multiheaded_part, split_point);
+	}
+
 	/* Nothing behind what is kept, so there is nothing to leave here. */
 	if (split_point == nullptr) return false;
 
@@ -4411,7 +4563,13 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	FreeTrainTrackReservation(v);
 
-	TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
+	CommandCost cut = TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true);
+	if (cut.Failed()) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_ERROR, "Vlak {}: deleni odmitnuto u clanku {}: {}", v->unitnumber, split_point->index.base(), GetString(cut.GetErrorMessage()));
+		}
+		return false;
+	}
 
 	/* The engine keeps the front of the list and the wagons it is leaving are
 	 * everything behind it, so whichever way the train came in, the way out is
@@ -7765,6 +7923,15 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							{{{Track::Right, {},           Track::Lower, Track::Y    }}}
 						}}};
 						DiagDirection exitdir = DiagdirBetweenTiles(gp.new_tile, prev->tile);
+						if (!IsValidDiagDirection(exitdir) && _show_train_orientation) {
+							/* The vehicle ahead is not on a neighbouring tile at all:
+							 * the consist has come apart on the map. Named before the
+							 * assert below, which says nothing about who or where. */
+							IConsolePrint(CC_ERROR, "Vlak {}: krok ROZBITY - clanek {} ({}) vjizdi na ({},{}) z ({},{}), ale clanek pred nim {} stoji na ({},{}) kolej {:#x}",
+									first->unitnumber, v->index.base(), v->IsEngine() ? "masinka" : "vagon",
+									TileX(gp.new_tile), TileY(gp.new_tile), TileX(gp.old_tile), TileY(gp.old_tile),
+									prev->index.base(), TileX(prev->tile), TileY(prev->tile), prev->track.base());
+						}
 						assert(IsValidDiagDirection(exitdir));
 						chosen_track = _connecting_track[enterdir][exitdir];
 					}
@@ -8427,8 +8594,12 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			/* A decouple that silently does not happen leaves nothing in the log
 			 * to say it was even considered; both refusals are named so the
 			 * console can tell them apart. */
+			std::string chain;
+			for (const Train *u = consist; u != nullptr; u = u->Next()) {
+				chain += fmt::format(" {}{}", u->index.base(), u->IsEngine() ? "M" : (u->IsRearDualheaded() ? "z" : (u->IsWagon() ? "v" : "?")));
+			}
 			SayOnChange(consist, order_names_here
-					? fmt::format("Vlak {}: odpojeni na stanici neprovedeno - neni co odpojit (nebo deleni nejde)", consist->unitnumber)
+					? fmt::format("Vlak {}: odpojeni na stanici neprovedeno - neni co odpojit (nebo deleni nejde); seznam:{}", consist->unitnumber, chain)
 					: fmt::format("Vlak {}: brana odpojeni - stoji u nakladky s priznakem, ale skutecny rozkaz {} sem nemiri (naposledy stanice {})",
 							consist->unitnumber, consist->cur_real_order_index, consist->last_station_visited));
 		}

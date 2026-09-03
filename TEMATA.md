@@ -3047,6 +3047,55 @@ připojí a jede), ale dva výběry nakládání/vykládání v okně rozkazů u
 nejsou šedé — příkaz je nikdy nezakazoval, jen okno. Filtr připojení
 beze změny.
 
+## 2.35 Dvouhlavé jednotky (EMU): spojení, rozpojení a identita
+
+Hráčův save: dvě depa, osm jednotek (přední hlava + vůz + zadní hlava),
+čtyři čekají na spojení, čtyři jedou spojit (dvě z nich reverzně), pak
+odpojit vše a do depa. Spojení padalo na `chain->Previous() == nullptr`
+(u hráče z fóra `First() == this` — stejná rodina).
+
+Příčina: spojování umí soupravu **otočit v seznamu** (konec napřed), aby
+se konce potkaly. Vanilla ale u dvouhlavé jednotky trvá na tom, že
+přední hlava je v seznamu před zadní, a `NormaliseDualHeads` po každé
+změně zadní hlavu přestěhuje za přední — po otočení tedy vytrhne
+vozidlo, na které ukazuje čelo. Tři kusy opravy:
+
+1. **Prohození rolí hlav při otočení seznamu** (`SwapDualHeadRoles` v
+   `ReverseConsistOrder`): hlava, která je po otočení první, se stane
+   přední (bit motoru, sprite), druhá zadní. Jednotka je symetrická,
+   role je jen zápis.
+2. **Přenos identity s rolí** (`TransferTrainIdentity`): rozkazy (i
+   sdílené), číslo, jméno, jízdní řád, aktuální rozkaz, stav spojování a
+   odtahu — z hlavy, která ji nesla, na tu, která bude první. Bez toho
+   spojené jednotky dostaly nová čísla a žádné rozkazy a bloudily (z
+   toho byla srážka i vjezd do depa naslepo). Platí i pro pohlcený vlak
+   uvnitř soupravy — jeho spící identita jede na jeho přední hlavě.
+3. **Hranice dělení u spojeného dvouvlaku** (`TryDecoupleAtStation`):
+   „odpojit" na vlaku, který veze druhý vlak, dělí na začátku druhého
+   vlaku — u jeho první hlavy, ať přední nebo zadní (leží-li obráceně,
+   role se před dělením prohodí, aby oddělený vlak začínal mašinkou).
+   Vlastní zadní hlava čelního vlaku se nikdy nenechá stát; počet vozů k
+   ponechání se počítá jen po vlastních vozech.
+
+Změřeno na savu: 4 spojení, 4 rozpojení ve stanici, všech osm jednotek
+dojede do dep s vlastními čísly a rozkazy; žádný assert, žádná srážka;
+baterie a claune2 beze změn. Save je scéna `emu` v baterii.
+
+Rig: `testvozy <vlak>` vypíše seznam vozidel s rolemi; před assertem
+„roztržený vlak" (IsValidDiagDirection) se vypíše kdo a kde; odmítnuté
+dělení říká proč; hláška „neni co odpojit" po úspěšném dělení je pořád
+jen opakovaný dotaz brány (§2.31).
+
+Návrhové otázky hráče, zatím nedotčené v kódu:
+- Okno a rozkazy po rozpojení: každá půlka má své (spící identita se
+  probudí při položení) — platí už teď.
+- Odpojení na kratším nádraží než vlak: navrhuji **žádné pravidlo
+  navíc** — dělí se na místě, kde souprava stojí, i s převisem; porucha
+  + odtah do depa by přinesly dva jízdní řády v jednom odtahu a nemají
+  smysl s vypnutými poruchami. Rozhodnutí je hráčovo.
+- Odtah dvouvlaku: odtahovka veze cokoli, co visí na porouchaném čele;
+  pohlcený vlak zůstane spojený, dokud čelo neodpojí podle svých rozkazů.
+
 ---
 
 # 16. Nedořešeno

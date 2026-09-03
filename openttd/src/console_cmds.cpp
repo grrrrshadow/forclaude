@@ -2652,6 +2652,39 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * List every vehicle of a train with what it is, for reading a consist
+ * headless. Usage: testvozy <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestListUnits(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "List a train's vehicles. Usage: 'testvozy <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		IConsolePrint(CC_DEFAULT, "vlak {}: {} couva {}", t->unitnumber, t->IsFrontEngine() ? "masinka v cele" : "bez cela",
+				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne");
+		uint i = 0;
+		for (const Train *u = t; u != nullptr; u = u->Next(), i++) {
+			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) smer {}", i, u->index.base(), u->engine_type.base(),
+					u->IsEngine() ? "masinka" : (u->IsWagon() ? "vagon" : "cast"),
+					u->IsMultiheaded() ? (u->IsRearDualheaded() ? " (zadni hlava)" : " (predni hlava)") : "",
+					u->IsArticulatedPart() ? " (kloub)" : "",
+					u->IsFrontEngine() ? " CELO" : "",
+					u->IsFreeWagon() ? " VOLNY" : "",
+					TileX(u->tile), TileY(u->tile), to_underlying(u->direction));
+		}
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testvozy: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestToggleBrake(std::span<std::string_view> argv)
 {
 	if (argv.size() != 2) {
@@ -5568,6 +5601,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
+	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
