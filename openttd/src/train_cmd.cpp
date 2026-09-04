@@ -2842,6 +2842,33 @@ bool IsCoupleTargetOnTile(const Train *v, TileIndex tile)
 	return false;
 }
 
+/**
+ * May a rescue engine's road booking step onto this tile because its casualty
+ * stands there?
+ *
+ * Only when nothing else does. Two wrecks can lie on one tile -- a train sent
+ * through a red into another leaves both there -- and a road booked "through
+ * the casualty's own tiles" then runs through the other wreck as well. The
+ * tow drove into it: the exception that lets it reach what it came for was
+ * read as leave to drive at whatever else lay in the way.
+ *
+ * @param v    the tow asking, any part of it
+ * @param tile the tile the booking wants to step onto
+ * @return whether the casualty is there and nobody else is
+ */
+bool IsRescueRoadFreeOnTile(const Train *v, TileIndex tile)
+{
+	if (!IsRescueTargetOnTile(v, tile)) return false;
+	const Train *tow = v->First();
+	const Train *casualty = Train::Get(tow->rescue_target)->First();
+	for (const Vehicle *u : VehiclesOnTile(tile)) {
+		if (u->type != VehicleType::Train) continue;
+		const Train *other = Train::From(u)->First();
+		if (other != casualty && other != tow) return false;
+	}
+	return true;
+}
+
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
 {
 	if (!IsRailStationTile(tile)) return false;
@@ -7154,7 +7181,14 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		/* Use tracks_on_tile, not best_track and not the (by now
 		 * overwritten) `tracks`: best_track can still be Track::Invalid
 		 * here, and `tracks` may describe a different tile entirely --
-		 * both fail our caller's "did we get a usable track" assert. */
+		 * both fail our caller's "did we get a usable track" assert.
+		 *
+		 * A train the player has sent through the signal ahead drives the
+		 * road the search found, booked or not -- that is what the button
+		 * means, and vanilla's placeholder was that road's first step. Only
+		 * when the search was made from this very tile; otherwise the first
+		 * track here, as before. */
+		if (consist->force_proceed != TFP_NONE && best_track != Track::Invalid && tracks_on_tile.Test(best_track)) return best_track;
 		return FindFirstTrack(tracks_on_tile);
 	}
 
@@ -8096,7 +8130,13 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * -- straight into an occupied platform, in the case that
 					 * showed this up. Being stuck means staying put, so stay
 					 * put and let the retry in TrainLocoHandler sort it out. */
-					if (!was_stuck && first->flags.Test(VehicleRailFlag::Stuck)) {
+					/* Not for a train the player has sent through the signal
+					 * ahead: being stuck is exactly what the button overrides,
+					 * and it drives on at vanilla's well-understood risk of
+					 * running into whatever holds the road. Held here, the
+					 * button did nothing at all -- the train sat in front of the
+					 * red revving and never moved. */
+					if (!was_stuck && first->flags.Test(VehicleRailFlag::Stuck) && first->force_proceed == TFP_NONE) {
 						first->cur_speed = 0;
 						first->subspeed = 0;
 						first->wait_counter = 0;
@@ -8123,6 +8163,28 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * drive in. Without this, the guard stopped every train
 					 * on the doorstep of any depot holding stored wagons.
 					 * See FEATURE_DESIGN_COUPLING_TOW.md. */
+					/* And a rescue engine on its way out never drives at a train
+					 * that is not what it came for. Its road may end against
+					 * the casualty, and the casualty's tile can hold another
+					 * wreck as well -- one train sent through a red into
+					 * another leaves both lying there. Reaching the casualty
+					 * means touching it, which the collision check lets pass;
+					 * touching the other one first is a crash, and the tow
+					 * became the third wreck on the pile. */
+					if (!IsRailDepotTile(gp.new_tile) && IsFetchingCasualty(first)) {
+						const Train *casualty = Train::GetIfValid(first->rescue_target);
+						for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
+							if (u->type != VehicleType::Train) continue;
+							const Train *t = Train::From(u)->First();
+							if (t == first || (casualty != nullptr && t == casualty->First())) continue;
+							if (_show_train_orientation) {
+								IConsolePrint(CC_INFO, "  krok duvod: odtah - na ({},{}) u poruchy stoji jeste vlak {}", TileX(gp.new_tile), TileY(gp.new_tile), t->unitnumber);
+							}
+							MarkTrainAsStuck(first);
+							goto invalid_rail;
+						}
+					}
+
 					if (!IsRailDepotTile(gp.new_tile)) for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
 						if (u->type != VehicleType::Train) continue;
 						const Train *t = Train::From(u)->First();

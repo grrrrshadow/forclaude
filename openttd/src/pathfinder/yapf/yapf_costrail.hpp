@@ -535,7 +535,7 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 			 * dead end anywhere. It also explains why one road works and two do
 			 * not -- on a road with no choices the booking never goes through the
 			 * pathfinder at all. */
-			if (IsRescueTargetOnTile(v, cur.tile)) {
+			if (IsRescueRoadFreeOnTile(v, cur.tile)) {
 				end_segment_reason.Set(EndSegmentReason::SafeTile);
 			}
 

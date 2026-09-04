@@ -233,9 +233,11 @@ struct CFollowTrackT {
 		 *
 		 * Only the casualty's own tiles, and only on the way out. Everybody
 		 * else's reservation is still a wall, and once the casualty is in hand
-		 * this train reads reservations like any other. */
+		 * this train reads reservations like any other. And only a tile the
+		 * casualty has to itself: another train lying on the same tile is
+		 * the wall it always was (see IsRescueRoadFreeOnTile()). */
 		if constexpr (Ttr_type_ == TransportType::Rail) {
-			if (this->veh != nullptr && IsRescueTargetOnTile(Train::From(this->veh), this->new_tile)) return true;
+			if (this->veh != nullptr && IsRescueRoadFreeOnTile(Train::From(this->veh), this->new_tile)) return true;
 		}
 
 		if (this->is_station) {

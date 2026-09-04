@@ -1757,6 +1757,46 @@ dveře zavírají všem případům stejně.
 
 ---
 
+## 4.14 „Ignorovat návěst" nejelo — a odtahovka najížděla do druhého vraku
+
+**Hráčovo hlášení (save vlak31):** vlak 31 stojí před červenou u vjezdu do
+depa, kde vlak 32 vjíždí napůl dovnitř; hráč mu dá „ignorovat návěst", aby
+vyrobil vrak ve vratech, a vlak se nehne. Změřeno: `force_proceed` je
+v savu nastavený, vlak přesto stojí na místě a jen roztáčí a zastavuje
+rychlost.
+
+**Příčina 1:** pojistka v `TrainController` z 2.x („hledání selhalo → vlak
+je zaseklý → stůj, ať nejede po náhradní koleji") platila i pro vlak, který
+hráč tlačítkem výslovně posílá dál. Tlačítko tím nedělalo nic. Pojistka se
+u `force_proceed` vynechá a `ChooseTrainTrack` vrátí posílanému vlaku první
+krok nalezené (nezamluvené) cesty, jak to dělá vanilla — jede na vanilla
+riziko, že narazí do toho, co trať drží. Vlak 31 teď nabourá do vlaku 32.
+
+**Příčina 2 (našla se hned za tím):** odtahovka 30 vyjela pro vrak 31 a
+narazila do vraku 32, který leží na témž políčku (98,73). Výjimka „políčko
+poruchy smí zábor projít" nerozlišovala, že na políčku leží ještě někdo
+jiný. Nový predikát `IsRescueRoadFreeOnTile`: políčko poruchy je průchodné
+jen tehdy, když na něm nestojí žádný jiný vlak — pro zábor (`follow_track`),
+konec úseku (`yapf_costrail`), bezpečnou a volnou čekací pozici (`pbs`), a
+jako poslední pojistka i v řadiči: odtahovka na cestě ven nikdy nevjede na
+políčko, kde vedle poruchy stojí cizí vlak („krok duvod: odtah - u poruchy
+stoji jeste vlak"). Odtahovka pak k takovému vraku cestu nezamluví, po
+osmi pokusech ho odloží (4.13) a zůstane doma; vraky se po lhůtě uklidí
+samy.
+
+**Rig:** `testprojet <vlak>` (tlačítko ignorovat návěst; pozor, přepíná —
+v savu s už zapnutým tlačítkem ho vypne). Scéna `vlak31` (vlak31.sav):
+čeká se `havaroval=2`, `srazka=1`, žádný další vrak.
+
+**Nedotčeno / k rozhodnutí:** vrak s hlavou uvnitř depa (32) není případ
+pro odtah vůbec (`IsWaitingToBeRescued` ho vyřadí jako „v depu"). Hráčova
+myšlenka: takový vlak by se měl depem *protlačit* — odtahovka se připojí
+k ocasu a tlačí ho dovnitř, místo aby ho tahala ven pozadu (tahání ven
+z depa přes vozy, co už jsou uvnitř, je nejspíš ten pád, co hráč viděl
+dřív). Není uděláno; čeká na rozhodnutí.
+
+---
+
 # 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy

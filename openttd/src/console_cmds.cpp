@@ -2873,6 +2873,31 @@ static bool ConTestToggleBrake(std::span<std::string_view> argv)
 }
 
 /**
+ * Send a train past the signal in front of it, the same as the player's
+ * "ignore signal" button. Usage: testprojet <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestForceProceed(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Make a train pass the signal ahead. Usage: 'testprojet <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost res = Command<Commands::ForceTrainProceed>::Do(DoCommandFlag::Execute, t->index);
+		IConsolePrint(res.Failed() ? CC_ERROR : CC_DEFAULT, "testprojet: vlak {} - {} (force_proceed {})", t->unitnumber,
+				res.Failed() ? GetString(res.GetErrorMessage()) : std::string("projizdi navest"), to_underlying(t->force_proceed));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testprojet: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * Turn a train round, the same as the player's reverse button.
  * Usage: testotoc <unit number>
  * @copydoc IConsoleCmdProc
@@ -5825,6 +5850,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);
 	IConsole::CmdRegister("testsleduj",              ConTestFollow);
 	IConsole::CmdRegister("testpostav",              ConTestBuildEngine);
+	IConsole::CmdRegister("testprojet",              ConTestForceProceed);
 	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);

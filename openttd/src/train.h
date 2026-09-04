@@ -89,6 +89,7 @@ bool HandleRescueEngineInDepot(Train *tow);
 void EndRescueErrand(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
 bool IsRescueTargetOnTile(const Train *v, TileIndex tile);
+bool IsRescueRoadFreeOnTile(const Train *v, TileIndex tile);
 bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
 bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks);
 
