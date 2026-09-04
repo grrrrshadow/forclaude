@@ -2887,7 +2887,12 @@ static bool ConTestBreakdown(std::span<std::string_view> argv)
 	if (!punit.has_value()) return false;
 	for (Train *t : Train::Iterate()) {
 		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
-		t->breakdown_ctr = 2;
+		/* Straight to "broken down", past the game's own gate that lets no
+		 * train break down with a part in a shed: the rig stages exactly the
+		 * case the game no longer produces on its own (a wreck there still
+		 * can), to keep the push-in measured. */
+		t->breakdown_ctr = 1;
+		t->breakdown_delay = 255;
 		IConsolePrint(CC_DEFAULT, "testporucha: vlak {} se porouchal na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
 		return true;
 	}

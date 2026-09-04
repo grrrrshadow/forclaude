@@ -75,6 +75,7 @@ void NormalizeTrainVehInDepot(const Train *u);
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
 bool IsWholeTrainInsideDepot(const Train *v);
+bool IsAnyPartInsideDepot(const Train *v);
 bool HasCoupleTarget(const Train *v);
 bool IsWaitingToBeCoupled(const Train *v);
 bool IsRakeClaimedForCoupling(const Train *rake);

@@ -1841,9 +1841,38 @@ je jediný způsob, jak se k ní srovnat. Ostatní vlaky nastavení dodržují.
 Použito ve všech místech, která zákaz čtou: výběr hledače, čekací pozice,
 zábor, řadič.
 
-**Nedotčeno / hranice:** porucha, jejíž venkovní konec stojí ještě na
-políčku depa (vlak porouchaný hned při výjezdu), nemá vedle sebe políčko, kde
-by odtahovka zastavila — nechá se lhůtě a vanillové opravě. Hráčova poznámka
+**Druhé kolo (save porucha, pád „Disconnecting train" na #132):** porucha
+ve vratech ležela ohnutá přes výhybku, odtahovka 3 vjela na políčko jejího
+ocasu po jiném kusu koleje (pravidlo „na konci poruchy kterákoli kolej"),
+spojení bylo odmítnuto (konce na sebe nenavazují, a poruchu v depu nejde
+položit podél odtahovky) — a odtahovka se pak po vozech poruchy **plazila**
+krok za tik až k hlavě u vrat, tam se spojila a hra spadla. Tři věci:
+
+1. **Odmítnuté spojení s partnerem na dotek = stát.** Výjimka ze srážky
+   nechá oba překrýt místo nabourání, ale vlak jel po odmítnutí dál a
+   posouval se skrz partnera po krůčcích (`AreConsistsTouching`, blok
+   spojování v `TrainLocoHandler`). Teď stojí a ptá se znovu; důvod je
+   v konzoli. Plazení bylo obecná chyba, ne jen odtahu.
+2. Porucha s částí v depu: na její koncové políčko jen po její vlastní
+   koleji (žádná výjimka „kterákoli kolej"), a `LayCasualtyAlongTow` se
+   u ní nezkouší — protlačit jde jen za čistý venkovní konec.
+3. **Hráčovo pravidlo: vlak s částí v depu se neporouchá** (`CheckVehicleBreakdown`
+   a `HandleBreakdown` v `vehicle.cpp`, `IsAnyPartInsideDepot` — totéž, co
+   šedí čudlík otočení ve vratech). Porucha, která má přijít, počká, až je
+   vlak celý venku. Protlačení tím zůstává jen pro vraky ve vratech
+   (a pro rig: `testporucha` poruchu nastaví napřímo, aby scéna `protlacit`
+   dál měřila mechaniku).
+
+**Změřeno na porucha.sav:** žádný pád; odtahovka k ohnuté poruše cestu
+nenajde a zůstane doma; vlak 1 (s puštěnou návěstí ze savu) do poruchy
+nabourá — hráčova věc.
+
+**Nedotčeno / hranice:** vrak ve vratech, jehož venkovní konec neleží rovně
+(ohnutý přes výhybku), odtahovka nesebere — nemá kde čistě zastavit ani jak
+ho narovnat; zůstane do lhůty a uklidí se sám. Porucha, jejíž venkovní
+konec stojí ještě na políčku depa, už nevzniká (bod 3). Hráčova myšlenka
+„porucha kouří a plazí se dvacítkou na místo, kde jde sebrat" není
+uděláno: u poruch ji bod 3 dělá skoro zbytečnou, u vraků nejde. Hráčova poznámka
 k obměně vozidel: nová vozidla hra rodí ve výchozí orientaci; až se bude
 dělat, orientace řady/vlaku se musí přenést.
 

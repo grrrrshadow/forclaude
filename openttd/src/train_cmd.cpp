@@ -1429,7 +1429,6 @@ static StationID StationUnderChain(const Train *chain);
 static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
-static bool IsAnyPartInsideDepot(const Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist, const char *why);
@@ -2890,7 +2889,11 @@ TrackBits RescueRoadTracksOnTile(const Train *v, TileIndex tile)
 		if (t == front_end || t == rear_end) at_end = true;
 		if (t->track != Track::Depot && t->track != Track::Wormhole) along |= t->track;
 	}
-	if (at_end && along.Any()) return TRACK_BIT_ALL;
+	/* Not for a casualty with a part in a shed: that one is pushed in from
+	 * its outside end along its own track and cannot be laid anywhere, so a
+	 * tow coming in on another piece of the same tile only overlaps it --
+	 * and then crept the length of it. */
+	if (at_end && along.Any() && !IsAnyPartInsideDepot(casualty)) return TRACK_BIT_ALL;
 	return along;
 }
 
@@ -3058,6 +3061,27 @@ static bool AreConsistsCloseEnoughToCouple(const Train *a, const Train *b)
 			int y_diff = u->y_pos - w->y_pos;
 			int reach = 2 * TILE_SIZE;
 			if (x_diff * x_diff + y_diff * y_diff <= reach * reach) return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Are the two consists within a collision's reach of each other -- so close
+ * that driving on would put one over the other?
+ *
+ * @param a One consist.
+ * @param b The other consist.
+ * @return true if any two of their vehicles are that close.
+ */
+static bool AreConsistsTouching(const Train *a, const Train *b)
+{
+	for (const Train *u = a; u != nullptr; u = u->Next()) {
+		for (const Train *w = b; w != nullptr; w = w->Next()) {
+			if (abs(u->z_pos - w->z_pos) > 8) continue;
+			int x_diff = u->x_pos - w->x_pos;
+			int y_diff = u->y_pos - w->y_pos;
+			if (x_diff * x_diff + y_diff * y_diff <= 8 * 8) return true;
 		}
 	}
 	return false;
@@ -4426,6 +4450,9 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		 * and this is asked again next tick. */
 		if (!ends_clean) {
 			Train *casualty = leading == tow ? trailing : leading;
+			/* One with a part in a shed cannot be laid anywhere: it is pushed
+			 * in as it lies, and the tow has to meet its outside end cleanly. */
+			if (IsAnyPartInsideDepot(casualty)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 			if (!LayCasualtyAlongTow(tow, casualty)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 		}
 
@@ -6023,7 +6050,7 @@ bool _allow_reverse_on_depot_doorstep = false;
  */
 bool _show_train_orientation = false;
 
-static bool IsAnyPartInsideDepot(const Train *v)
+bool IsAnyPartInsideDepot(const Train *v)
 {
 	for (const Train *u = v; u != nullptr; u = u->Next()) {
 		if (u->track == Track::Depot) return true;
@@ -9036,6 +9063,19 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * unconditionally would leave a train that cannot couple for some
 		 * other reason frozen here for good, doing nothing else ever again. */
 		if (CmdCoupleTrains(DoCommandFlag::Execute, consist->index).Succeeded()) return true;
+
+		/* Refused with the partner right against it: stay put. The collision
+		 * check lets these two overlap rather than crash, and a train that
+		 * went on driving after a refusal inched through its partner a step
+		 * a tick -- a tow crept the length of a casualty this way and the
+		 * game came down when it coupled at the far end. It stands here and
+		 * asks again; the reason is on the console. */
+		const Train *partner = GetTrainCouplePartner(consist);
+		if (partner != nullptr && AreConsistsTouching(consist, partner)) {
+			consist->cur_speed = 0;
+			consist->subspeed = 0;
+			return true;
+		}
 	}
 
 	/* Everything a rescue engine does while standing in a depot happens here,

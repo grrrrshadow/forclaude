@@ -10,3 +10,6 @@ přes `-g` a scény jsou v baterii.
   kam napůl vjíždí vlak 32; odtahovka 30 v depu (112,75). TEMATA 4.14.
   Scéna `protlacit`: `testporucha 32` — porucha ve vratech, odtahovka 30 ji
   protlačí dovnitř (TEMATA 4.15).
+- `porucha.sav` — vlak 2 porouchaný ve vratech depa (97,46), ohnutý přes
+  výhybku; odtahovky 3 a 4 zabrzděné. Pád „Disconnecting train" na #132
+  (TEMATA 4.15, druhé kolo). Scéna `poruchavrata`.

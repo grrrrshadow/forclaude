@@ -1327,6 +1327,13 @@ void CheckVehicleBreakdown(Vehicle *v)
 	/* With Reduced breakdowns, vehicles (un)loading at stations don't lose reliability. */
 	if (_settings_game.difficulty.vehicle_breakdowns == VehicleBreakdowns::Reduced && v->current_order.IsType(OT_LOADING)) return;
 
+	/* A train with a part inside a shed -- on its way in or out -- does not
+	 * break down: the player's rule, the same one that greys the reverse
+	 * button in that doorway. A breakdown there has no end to be fetched by
+	 * and no road to be fetched along; the tow's job starts once the train
+	 * is wholly on the line. */
+	if (v->type == VehicleType::Train && IsAnyPartInsideDepot(Train::From(v))) return;
+
 	/* Decrease reliability. */
 	int rel, rel_old;
 	v->reliability = rel = std::max((rel_old = v->reliability) - v->reliability_spd_dec, 0);
@@ -1384,6 +1391,9 @@ bool Vehicle::HandleBreakdown()
 			return false;
 
 		case 2:
+			/* Due, but not in a shed doorway: it waits until the train is
+			 * wholly on the line (see CheckVehicleBreakdown()). */
+			if (this->type == VehicleType::Train && IsAnyPartInsideDepot(Train::From(this))) return false;
 			this->breakdown_ctr = 1;
 
 			if (this->breakdowns_since_last_service != 255) {
