@@ -2750,6 +2750,44 @@ static bool ConTestRakeWait(std::span<std::string_view> argv)
 }
 
 /**
+ * Build a lone engine in a depot on the map, for staging a scene on a
+ * player's save; optionally station it there as a rescue engine, on call.
+ * Usage: testpostav <x> <y> <engine type> [odtahovka]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBuildEngine(std::span<std::string_view> argv)
+{
+	if (argv.size() != 4 && argv.size() != 5) {
+		IConsolePrint(CC_HELP, "Build an engine in a depot. Usage: 'testpostav <x> <y> <engine type> [odtahovka]'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]);
+	auto py = ParseInteger(argv[2]);
+	auto pe = ParseInteger(argv[3]);
+	if (!px.has_value() || !py.has_value() || !pe.has_value()) return false;
+	TileIndex depot = TileXY((uint)*px, (uint)*py);
+	if (!IsRailDepotTile(depot)) {
+		IConsolePrint(CC_ERROR, "testpostav: na ({},{}) neni depo.", *px, *py);
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, GetTileOwner(depot));
+	auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, (EngineID)*pe, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost.Failed()) {
+		IConsolePrint(CC_ERROR, "testpostav: stavba selhala - {}", GetString(cost.GetErrorMessage()));
+		return true;
+	}
+	Train *t = Train::Get(veh);
+	std::string extra;
+	if (argv.size() == 5 && argv[4] == "odtahovka") {
+		CommandCost res = Command<Commands::SetRescueEngine>::Do(DoCommandFlag::Execute, t->index, true);
+		if (res.Succeeded()) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
+		extra = res.Failed() ? fmt::format(" - odtahovka NE: {}", GetString(res.GetErrorMessage())) : " - odtahovka v pohotovosti";
+	}
+	IConsolePrint(CC_DEFAULT, "testpostav: vlak {} (vozidlo {}) postaven v depu ({},{}){}", t->unitnumber, t->index.base(), *px, *py, extra);
+	return true;
+}
+
+/**
  * Station an engine as a rescue engine, first taking its orders away -- the
  * player's two clicks in one, for a save whose spare engine has orders.
  * Usage: testodtahovka <unit number>
@@ -5786,6 +5824,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);
 	IConsole::CmdRegister("testsleduj",              ConTestFollow);
+	IConsole::CmdRegister("testpostav",              ConTestBuildEngine);
 	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
