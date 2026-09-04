@@ -1826,7 +1826,11 @@ bool IsWaitingToBeRescued(const Train *v)
 	}
 	if (!v->IsFrontEngine()) return false;
 	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
-	if (v->IsInDepot()) return false;
+	/* Wholly inside a shed there is nothing to fetch. Half inside -- broken
+	 * down while entering, its tail still out on the line -- it is a case:
+	 * the tow couples to the tail and pushes it the rest of the way in.
+	 * See CmdCoupleTrains(). */
+	if (IsWholeTrainInsideDepot(v)) return false;
 	if (v->breakdown_ctr != 1 && !v->IsWrecked()) return false;
 	if (v->rescue_deadline == TimerGameEconomy::Date{}) return false;
 	return TimerGameEconomy::date < v->rescue_deadline;
@@ -2843,30 +2847,77 @@ bool IsCoupleTargetOnTile(const Train *v, TileIndex tile)
 }
 
 /**
- * May a rescue engine's road booking step onto this tile because its casualty
- * stands there?
+ * On which tracks of this tile may a rescue engine's road step onto it,
+ * because its casualty stands there?
  *
- * Only when nothing else does. Two wrecks can lie on one tile -- a train sent
- * through a red into another leaves both there -- and a road booked "through
- * the casualty's own tiles" then runs through the other wreck as well. The
- * tow drove into it: the exception that lets it reach what it came for was
- * read as leave to drive at whatever else lay in the way.
+ * The casualty's own footprint and nothing else. Two things went wrong with
+ * "any tile the casualty is on": two wrecks can lie on one tile -- a train
+ * sent through a red into another leaves both there -- and the road ran
+ * through the second one; and at a junction the road came in from the side,
+ * across the middle of the casualty, and the tow crept over its wagons with
+ * the collision check waving it through as "what it came for". A tow reaches
+ * a casualty along the track the casualty stands on, at one of its ends.
  *
  * @param v    the tow asking, any part of it
- * @param tile the tile the booking wants to step onto
- * @return whether the casualty is there and nobody else is
+ * @param tile the tile the road wants to step onto
+ * @return the tracks under the casualty there, or none if it is not there or
+ *         somebody else is
+ */
+TrackBits RescueRoadTracksOnTile(const Train *v, TileIndex tile)
+{
+	const Train *tow = v->First();
+	if (!IsOnRescueRun(tow)) return TrackBits{};
+	const Train *casualty = Train::GetIfValid(tow->rescue_target);
+	if (casualty == nullptr || casualty->First() == tow) return TrackBits{};
+	casualty = casualty->First();
+
+	/* At either end of the casualty any track will do: that is where the
+	 * tow meets it, and a casualty lying across the points of a junction --
+	 * its nose on a curve -- is reached along the straight and laid along
+	 * the tow's own track afterwards (LayCasualtyAlongTow()). In the middle
+	 * of it only its own track: coming in from the side there is crossing
+	 * it, not reaching it. */
+	const Train *front_end = casualty;
+	const Train *rear_end = casualty->Last();
+	TrackBits along{};
+	bool at_end = false;
+	for (const Vehicle *u : VehiclesOnTile(tile)) {
+		if (u->type != VehicleType::Train) continue;
+		const Train *t = Train::From(u);
+		const Train *other = t->First();
+		if (other == tow) continue;
+		if (other != casualty) return TrackBits{};
+		if (t == front_end || t == rear_end) at_end = true;
+		if (t->track != Track::Depot && t->track != Track::Wormhole) along |= t->track;
+	}
+	if (at_end && along.Any()) return TRACK_BIT_ALL;
+	return along;
+}
+
+/**
+ * May a rescue engine's road booking step onto this tile at all because its
+ * casualty stands there (and nobody else does)? See RescueRoadTracksOnTile().
  */
 bool IsRescueRoadFreeOnTile(const Train *v, TileIndex tile)
 {
-	if (!IsRescueTargetOnTile(v, tile)) return false;
-	const Train *tow = v->First();
-	const Train *casualty = Train::Get(tow->rescue_target)->First();
-	for (const Vehicle *u : VehiclesOnTile(tile)) {
-		if (u->type != VehicleType::Train) continue;
-		const Train *other = Train::From(u)->First();
-		if (other != casualty && other != tow) return false;
-	}
-	return true;
+	return RescueRoadTracksOnTile(v, tile).Any();
+}
+
+/**
+ * Does the ban on 90-degree turns apply to this train right now?
+ *
+ * Not to a rescue engine on a call: the player's rule. The last stretch to a
+ * casualty is regularly across the points of a junction, exactly where a
+ * sharp turn is the only way to line up with it, and the way home with the
+ * casualty in tow crosses the same points the other way. Every other train
+ * keeps the setting.
+ *
+ * @param v the train, any part of it
+ * @return whether 90-degree turns are forbidden for it
+ */
+bool Forbid90DegFor(const Train *v)
+{
+	return _settings_game.pf.forbid_90_deg && !IsOnRescueRun(v->First());
 }
 
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
@@ -3910,7 +3961,13 @@ static void TryDispatchRescueEngine(Train *tow)
 	 * says which engine is coming and the engine says what it is going for. */
 	tow->couple_target = nearest->index;
 	nearest->couple_claim = tow->index;
-	tow->SetDestTile(nearest->tile);
+	/* Where to go for it: a case half inside a shed is reached at the end
+	 * that stands outside, the shed itself being no place for a road. */
+	TileIndex target_tile = nearest->tile;
+	for (const Train *u = nearest; u != nullptr; u = u->Next()) {
+		if (u->track != Track::Depot) { target_tile = u->tile; break; }
+	}
+	tow->SetDestTile(target_tile);
 	StationID rake_station = nearest->IsFreeWagon() ? StationUnderChain(nearest) : StationID::Invalid();
 	if (rake_station != StationID::Invalid()) {
 		/* Wagons standing at a platform: the tow goes for them the way any
@@ -4101,6 +4158,11 @@ bool HandleRescueEngineInDepot(Train *tow)
 			casualty->breakdown_ctr = 0;
 			casualty->breakdown_delay = 0;
 			casualty->rescue_deadline = TimerGameEconomy::Date{};
+			/* Put right means serviced: reliability back up, the next
+			 * breakdown as far off as after any depot visit. It came in as
+			 * part of the tow, so the shed serviced the tow and not it -- and
+			 * it broke down again on the doorstep on the way out. */
+			VehicleServiceInDepot(casualty);
 			/* Collected and put right, so it is no longer waiting for anybody. */
 			casualty->current_order.SetWaitForCouple(false);
 			casualty->vehstatus.Reset(VehState::Stopped);
@@ -4114,6 +4176,10 @@ bool HandleRescueEngineInDepot(Train *tow)
 			casualty->current_order.Free();
 			casualty->SetDestTile(INVALID_TILE);
 			casualty->force_proceed = TFP_NONE;
+			/* It leaves the shed the way a train leaves a shed: its head
+			 * first, the way it was going when it broke down. Which end led
+			 * while it was being pushed or towed was the tow's business. */
+			casualty->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
 			casualty->ConsistChanged(CCF_ARRANGE);
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		}
@@ -4448,7 +4514,14 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * road it booked to get here, which is the one road it knows is clear. It
 	 * is also what an engine does with a dead train: drags it, rather than
 	 * propelling it ahead into oncoming traffic. */
-	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, tow == nullptr);
+	/* And the one case where the tow does not lead: a casualty that broke
+	 * down half inside a shed. Its head is in, its tail is what the tow
+	 * coupled to, and dragging it back out over the vehicles already inside
+	 * is not a movement the game knows. The player's rule: push it the rest
+	 * of the way in -- the tail end leads, the casualty's own head at the
+	 * front, into the shed it was entering; the shed takes them both apart. */
+	bool push_in = tow != nullptr && IsAnyPartInsideDepot(new_head);
+	new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, tow == nullptr || push_in);
 
 	/* No driving-cab override on top of that. It was tried twice and it is
 	 * wrong both times, and the headless rig caught it red-handed: the facing
@@ -4654,7 +4727,20 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * depot -- a casualty is fetched to get it off the line, and the nearest
 	 * way off the line is the best one. What happens to it there is
 	 * HandleRescueEngineInDepot()'s business. */
-	if (tow != nullptr) {
+	if (tow != nullptr && push_in) {
+		/* The shed it is already half inside. Nothing to search for: the
+		 * order names it, and the moving front is on its tile. */
+		TileIndex shed = INVALID_TILE;
+		for (const Train *u = new_head; u != nullptr; u = u->Next()) {
+			if (u->track == Track::Depot) { shed = u->tile; break; }
+		}
+		new_head->current_order.MakeGoToDepot(GetDepotIndex(shed), OrderDepotTypeFlags{}, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		new_head->SetDestTile(shed);
+		new_head->rescue_hold = RescueHold::None;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: odtah - porucha trci z depa ({},{}), tlacim ji dovnitr", new_head->unitnumber, TileX(shed), TileY(shed));
+		}
+	} else if (tow != nullptr) {
 		AutoRestoreBackup cur_company(_current_company, new_head->owner);
 		CommandCost sent = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, new_head->index,
 				DepotCommandFlags{DepotCommandFlag::DontCancel}, VehicleListIdentifier{});
@@ -5488,6 +5574,9 @@ void Train::UpdateDeltaXY()
 static void MarkTrainAsStuck(Train *consist)
 {
 	if (!consist->flags.Test(VehicleRailFlag::Stuck)) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: oznacen za zaseknuty na ({},{})", consist->unitnumber, TileX(consist->tile), TileY(consist->tile));
+		}
 		/* It is the first time the problem occurred, set the "train stuck" flag. */
 		consist->flags.Set(VehicleRailFlag::Stuck);
 
@@ -6369,7 +6458,7 @@ static void CheckNextTrainTile(Train *consist)
 			if (HasPbsSignalOnTrackdir(ft.new_tile, FindFirstTrackdir(ft.new_td_bits))) {
 				/* If the next tile is a PBS signal, try to make a reservation. */
 				TrackBits tracks = TrackdirBitsToTrackBits(ft.new_td_bits);
-				if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile))) {
+				if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), Forbid90DegFor(consist))) {
 					tracks.Reset(TrackCrossesTracks(TrackdirToTrack(ft.old_td)));
 				}
 				ChooseTrainTrack(consist, ft.new_tile, ft.exitdir, tracks, false, nullptr, false);
@@ -6720,7 +6809,7 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 			if (!rescue_run && HasOnewaySignalBlockingTrackdir(ft.new_tile, FindFirstTrackdir(ft.new_td_bits))) break;
 		}
 
-		if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile))) {
+		if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), Forbid90DegFor(v))) {
 			ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(ft.old_td));
 			if (ft.new_td_bits.None()) break;
 		}
@@ -6750,8 +6839,8 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 		cur_td = FindFirstTrackdir(ft.new_td_bits);
 
 		Trackdir rev_td = ReverseTrackdir(cur_td);
-		if (IsSafeWaitingPosition(v, tile, cur_td, true, _settings_game.pf.forbid_90_deg)) {
-			bool wp_free = IsWaitingPositionFree(v, tile, cur_td, _settings_game.pf.forbid_90_deg);
+		if (IsSafeWaitingPosition(v, tile, cur_td, true, Forbid90DegFor(v))) {
+			bool wp_free = IsWaitingPositionFree(v, tile, cur_td, Forbid90DegFor(v));
 			if (!(wp_free && TryReserveRailTrack(tile, TrackdirToTrack(cur_td)))) break;
 			/* Green path signal opposing the path? Turn to red. */
 			if (HasPbsSignalOnTrackdir(tile, rev_td) && GetSignalStateByTrackdir(tile, rev_td) == SignalState::Green) {
@@ -6786,7 +6875,7 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 	while (tile != stopped || cur_td != stopped_td) {
 		if (!ft.Follow(tile, cur_td)) break;
 
-		if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile))) {
+		if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), Forbid90DegFor(v))) {
 			ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(ft.old_td));
 			assert(ft.new_td_bits.Any());
 		}
@@ -7162,9 +7251,9 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 							fmt::format("({},{}) {}, bezpecne {}, volno {}",
 									TileX(res_dest.tile), TileY(res_dest.tile), res_dest.okay ? "ok" : "nezamluveno",
 									res_dest.trackdir == Trackdir::Invalid ? "?" :
-											(IsSafeWaitingPosition(consist, res_dest.tile, res_dest.trackdir, true, _settings_game.pf.forbid_90_deg) ? "ano" : "NE"),
+											(IsSafeWaitingPosition(consist, res_dest.tile, res_dest.trackdir, true, Forbid90DegFor(consist)) ? "ano" : "NE"),
 									res_dest.trackdir == Trackdir::Invalid ? "?" :
-											(IsWaitingPositionFree(consist, res_dest.tile, res_dest.trackdir, _settings_game.pf.forbid_90_deg) ? "ano" : "NE"))));
+											(IsWaitingPositionFree(consist, res_dest.tile, res_dest.trackdir, Forbid90DegFor(consist)) ? "ano" : "NE"))));
 		}
 
 		consist->HandlePathfindingResult(path_found);
@@ -7240,12 +7329,12 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	if (got_reservation != nullptr) *got_reservation = true;
 
 	/* Reservation target found and free, check if it is safe. */
-	while (!IsSafeWaitingPosition(consist, res_dest.tile, res_dest.trackdir, true, _settings_game.pf.forbid_90_deg)) {
+	while (!IsSafeWaitingPosition(consist, res_dest.tile, res_dest.trackdir, true, Forbid90DegFor(consist))) {
 		/* Extend reservation until we have found a safe position. */
 		DiagDirection exitdir = TrackdirToExitdir(res_dest.trackdir);
 		TileIndex next_tile = TileAddByDiagDir(res_dest.tile, exitdir);
 		TrackBits reachable = TrackdirBitsToTrackBits(GetTileTrackStatus(next_tile, TransportType::Rail, RoadTramType::Invalid).trackdirs) & DiagdirReachesTracks(exitdir);
-		if (Rail90DegTurnDisallowed(GetTileRailType(res_dest.tile), GetTileRailType(next_tile))) {
+		if (Rail90DegTurnDisallowed(GetTileRailType(res_dest.tile), GetTileRailType(next_tile), Forbid90DegFor(consist))) {
 			reachable.Reset(TrackCrossesTracks(TrackdirToTrack(res_dest.trackdir)));
 		}
 
@@ -7353,6 +7442,21 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 
 	const Train *moving_front = consist->GetMovingFront();
 
+	/* Its front inside a shed with the rest still outside is a train on its
+	 * way in, not out -- a casualty pushed the rest of the way in by the tow
+	 * that coupled to its tail (see CmdCoupleTrains()). It has nothing to
+	 * book: the shed is where it is going and it is already there. Read as a
+	 * train leaving, the shed's own reservation looked like somebody else's
+	 * and the push stood stuck at the door. */
+	if (moving_front->track == Track::Depot && !IsWholeTrainInsideDepot(consist)) {
+		if (consist->flags.Test(VehicleRailFlag::Stuck)) {
+			consist->flags.Reset(VehicleRailFlag::Stuck);
+			consist->wait_counter = 0;
+			SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+		}
+		return true;
+	}
+
 	/* We have to handle depots specially as the track follower won't look
 	 * at the depot tile itself but starts from the next tile. If we are still
 	 * inside the depot, a depot reservation can never be ours. */
@@ -7374,7 +7478,12 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	 * block signals or when changing tracks and/or signals.
 	 * Exit here as doing any further reservations will probably just
 	 * make matters worse. */
-	if (other_train != nullptr && other_train->index != consist->index) {
+	/* Its own vehicles are never in its way. The walk out of a depot starts
+	 * on the tile beyond the door, and a train being pushed into a shed tail
+	 * first -- a casualty that broke down half inside, see CmdCoupleTrains()
+	 * -- has its own wagons standing there: read as "a real train ahead",
+	 * they held the push stuck at the door for good. */
+	if (other_train != nullptr && Train::From(other_train)->First() != consist) {
 		/* Blocked by the very train we were sent to fetch is not being blocked
 		 * at all -- it is arriving. A casualty has an engine at its head, so
 		 * "blocked by a real train, nothing to do but wait" is exactly what
@@ -7414,11 +7523,11 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 		if (ahead->IsFrontEngine() && !is_our_errand) {
 			/* Genuinely blocked by a real, driving train -- nothing
 			 * useful to do but wait, exactly as before. */
-			if (_show_train_orientation && (consist->wait_counter % (16 * _settings_game.pf.path_backoff_interval)) == 0) {
-				IConsolePrint(CC_INFO, "Vlak {}: cesta neni - v ceste stoji vlak {} na ({},{}); ja na ({},{}), smer chuze {}, konec rezervace ({},{})",
-						consist->unitnumber, ahead->unitnumber, TileX(other_train->tile), TileY(other_train->tile),
+			if (_show_train_orientation) {
+				SayOnChange(consist, fmt::format("Vlak {}: cesta neni - v ceste stoji vlak {} (vozidlo {}) na ({},{}); ja na ({},{}), smer chuze {}, konec rezervace ({},{})",
+						consist->unitnumber, ahead->unitnumber, other_train->index.base(), TileX(other_train->tile), TileY(other_train->tile),
 						TileX(consist->GetMovingFront()->tile), TileY(consist->GetMovingFront()->tile),
-						to_underlying(consist->GetMovingFront()->GetVehicleTrackdir()), TileX(origin.tile), TileY(origin.tile));
+						to_underlying(consist->GetMovingFront()->GetVehicleTrackdir()), TileX(origin.tile), TileY(origin.tile)));
 			}
 			if (mark_as_stuck) MarkTrainAsStuck(consist);
 			return false;
@@ -7439,7 +7548,7 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 		DiagDirection exitdir = TrackdirToExitdir(moving_front->GetVehicleTrackdir());
 		TileIndex new_tile = TileAddByDiagDir(moving_front->tile, exitdir);
 		TrackBits reachable = TrackdirBitsToTrackBits(GetTileTrackStatus(new_tile, TransportType::Rail, RoadTramType::Invalid).trackdirs & DiagdirReachesTrackdirs(exitdir));
-		if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(new_tile))) {
+		if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(new_tile), Forbid90DegFor(consist))) {
 			reachable.Reset(TrackCrossesTracks(TrackdirToTrack(moving_front->GetVehicleTrackdir())));
 		}
 
@@ -7472,7 +7581,7 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	TileIndex new_tile = TileAddByDiagDir(origin.tile, exitdir);
 	TrackBits reachable = TrackdirBitsToTrackBits(GetTileTrackStatus(new_tile, TransportType::Rail, RoadTramType::Invalid).trackdirs & DiagdirReachesTrackdirs(exitdir));
 
-	if (Rail90DegTurnDisallowed(GetTileRailType(origin.tile), GetTileRailType(new_tile))) reachable.Reset(TrackCrossesTracks(TrackdirToTrack(origin.trackdir)));
+	if (Rail90DegTurnDisallowed(GetTileRailType(origin.tile), GetTileRailType(new_tile), Forbid90DegFor(consist))) reachable.Reset(TrackCrossesTracks(TrackdirToTrack(origin.trackdir)));
 
 	bool res_made = false;
 	ChooseTrainTrack(consist, new_tile, exitdir, reachable, true, &res_made, mark_as_stuck);
@@ -8085,7 +8194,7 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				TrackBits red_signals = TrackdirBitsToTrackBits(ts.signals & reachable_trackdirs);
 
 				TrackBits bits = TrackdirBitsToTrackBits(trackdirbits);
-				if (Rail90DegTurnDisallowed(GetTileRailType(gp.old_tile), GetTileRailType(gp.new_tile)) && prev == nullptr) {
+				if (Rail90DegTurnDisallowed(GetTileRailType(gp.old_tile), GetTileRailType(gp.new_tile), Forbid90DegFor(first)) && prev == nullptr) {
 					/* We allow wagons to make 90 deg turns, because forbid_90_deg
 					 * can be switched on halfway a turn */
 					bits.Reset(TrackCrossesTracks(FindFirstTrack(v->track)));
@@ -8171,18 +8280,13 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * means touching it, which the collision check lets pass;
 					 * touching the other one first is a crash, and the tow
 					 * became the third wreck on the pile. */
-					if (!IsRailDepotTile(gp.new_tile) && IsFetchingCasualty(first)) {
-						const Train *casualty = Train::GetIfValid(first->rescue_target);
-						for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
-							if (u->type != VehicleType::Train) continue;
-							const Train *t = Train::From(u)->First();
-							if (t == first || (casualty != nullptr && t == casualty->First())) continue;
-							if (_show_train_orientation) {
-								IConsolePrint(CC_INFO, "  krok duvod: odtah - na ({},{}) u poruchy stoji jeste vlak {}", TileX(gp.new_tile), TileY(gp.new_tile), t->unitnumber);
-							}
-							MarkTrainAsStuck(first);
-							goto invalid_rail;
+					if (!IsRailDepotTile(gp.new_tile) && IsFetchingCasualty(first) && IsRescueTargetOnTile(first, gp.new_tile) &&
+							!RescueRoadTracksOnTile(first, gp.new_tile).Any(chosen_track)) {
+						if (_show_train_orientation) {
+							IConsolePrint(CC_INFO, "  krok duvod: odtah - na ({},{}) k poruse jen po jeji koleji, a bez cizich vlaku", TileX(gp.new_tile), TileY(gp.new_tile));
 						}
+						MarkTrainAsStuck(first);
+						goto invalid_rail;
 					}
 
 					if (!IsRailDepotTile(gp.new_tile)) for (const Vehicle *u : VehiclesOnTile(gp.new_tile)) {
@@ -8870,7 +8974,7 @@ static bool TrainCheckIfLineEnds(Train *moving_front, bool reverse)
 
 	/* mask unreachable track bits if we are forbidden to do 90deg turns */
 	TrackBits bits = TrackdirBitsToTrackBits(trackdirbits);
-	if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(tile))) {
+	if (Rail90DegTurnDisallowed(GetTileRailType(moving_front->tile), GetTileRailType(tile), Forbid90DegFor(moving_front))) {
 		bits.Reset(TrackCrossesTracks(FindFirstTrack(moving_front->track)));
 	}
 

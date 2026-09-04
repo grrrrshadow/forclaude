@@ -8,3 +8,5 @@ přes `-g` a scény jsou v baterii.
   nedosažitelnou poruchou) a Nedořešeno (porucha ve vratech depa odtahovky).
 - `vlak31.sav` — vlak 31 s „ignorovat návěst" před vjezdem do depa (97,73),
   kam napůl vjíždí vlak 32; odtahovka 30 v depu (112,75). TEMATA 4.14.
+  Scéna `protlacit`: `testporucha 32` — porucha ve vratech, odtahovka 30 ji
+  protlačí dovnitř (TEMATA 4.15).

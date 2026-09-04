@@ -535,8 +535,22 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 			 * dead end anywhere. It also explains why one road works and two do
 			 * not -- on a road with no choices the booking never goes through the
 			 * pathfinder at all. */
-			if (IsRescueRoadFreeOnTile(v, cur.tile)) {
-				end_segment_reason.Set(EndSegmentReason::SafeTile);
+			if (IsRescueTargetOnTile(v, cur.tile)) {
+				if (RescueRoadTracksOnTile(v, cur.tile).Test(TrackdirToTrack(cur.td))) {
+					end_segment_reason.Set(EndSegmentReason::SafeTile);
+				} else {
+					/* The casualty's tile, but not along its own track -- in
+					 * from the side at a junction, or with another train lying
+					 * on it. No road that way; the reason is the uncached one
+					 * for the same reason as the free wagons above: it depends
+					 * on where trains stand right now. */
+					end_segment_reason.Set(EndSegmentReason::BlockedByFreeWagons);
+					if (_show_train_orientation) {
+						IConsolePrint(CC_INFO, "  odtah hleda: policko poruchy ({},{}) smer {} kolej c.{} neni po jeji koleji ({:#x})",
+								TileX(cur.tile), TileY(cur.tile), to_underlying(cur.td), to_underlying(TrackdirToTrack(cur.td)),
+								RescueRoadTracksOnTile(v, cur.tile).base());
+					}
+				}
 			}
 
 			if (cur.tile == prev.tile) {

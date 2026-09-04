@@ -2873,6 +2873,29 @@ static bool ConTestToggleBrake(std::span<std::string_view> argv)
 }
 
 /**
+ * Break a train down where it stands, as the game's own breakdown would.
+ * Usage: testporucha <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBreakdown(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Break a train down where it stands. Usage: 'testporucha <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		t->breakdown_ctr = 2;
+		IConsolePrint(CC_DEFAULT, "testporucha: vlak {} se porouchal na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testporucha: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * Send a train past the signal in front of it, the same as the player's
  * "ignore signal" button. Usage: testprojet <unit number>
  * @copydoc IConsoleCmdProc
@@ -5851,6 +5874,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testsleduj",              ConTestFollow);
 	IConsole::CmdRegister("testpostav",              ConTestBuildEngine);
 	IConsole::CmdRegister("testprojet",              ConTestForceProceed);
+	IConsole::CmdRegister("testporucha",             ConTestBreakdown);
 	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);

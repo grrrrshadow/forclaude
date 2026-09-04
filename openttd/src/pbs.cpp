@@ -332,7 +332,7 @@ PBSTileInfo FollowTrainReservation(const Train *consist, Vehicle **train_on_res,
 	 * booking the rest all over again. */
 	ftoti.res = FollowReservation(consist->owner, GetAllCompatibleRailTypes(consist->railtypes), tile, trackdir,
 			IsFetchingCasualty(consist->First()));
-	ftoti.res.okay = IsSafeWaitingPosition(consist, ftoti.res.tile, ftoti.res.trackdir, true, _settings_game.pf.forbid_90_deg);
+	ftoti.res.okay = IsSafeWaitingPosition(consist, ftoti.res.tile, ftoti.res.trackdir, true, Forbid90DegFor(consist));
 	if (train_on_res != nullptr) {
 		CheckTrainsOnTrack(ftoti, ftoti.res.tile);
 		if (ftoti.best != nullptr) *train_on_res = ftoti.best->First();
@@ -443,7 +443,7 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 			rescue_ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(trackdir));
 		}
 		if (rescue_ft.new_td_bits.None()) return include_line_end;
-		return IsRescueRoadFreeOnTile(v, rescue_ft.new_tile);
+		return RescueRoadTracksOnTile(v, rescue_ft.new_tile).Any(TrackdirBitsToTrackBits(rescue_ft.new_td_bits));
 	}
 
 	/* For non-pbs signals, stop on the signal tile. */
@@ -473,7 +473,7 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * because what is in its way is what it was sent for. See
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
-			IsCoupleTargetOnTile(v, ft.new_tile) || IsRescueRoadFreeOnTile(v, ft.new_tile))) {
+			IsCoupleTargetOnTile(v, ft.new_tile) || RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)))) {
 		return true;
 	}
 
@@ -534,5 +534,5 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * their own. Pulling up against them is exactly right, and coupling takes
 	 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	return ((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
-			IsCoupleTargetOnTile(v, ft.new_tile) || IsRescueRoadFreeOnTile(v, ft.new_tile));
+			IsCoupleTargetOnTile(v, ft.new_tile) || RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)));
 }

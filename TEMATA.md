@@ -1797,6 +1797,58 @@ dřív). Není uděláno; čeká na rozhodnutí.
 
 ---
 
+## 4.15 Porucha napůl v depu se protlačí dovnitř
+
+**Hráčovo rozhodnutí:** vlak, který se porouchá při vjezdu do depa (hlava
+uvnitř, ocas venku), se depem protlačí: odtahovka se připojí k ocasu a tlačí
+ho dovnitř, v depu se rozpojí, odtahovka se narovná a jede domů, porouchaný
+vlak pokračuje ve svých rozkazech hlavou napřed, jak do depa vjížděl.
+
+**Co to obnášelo (save vlak31, vlak 32 porouchaný ve vratech (97,73)):**
+
+1. Případem je i vlak s částí v depu (`IsWaitingToBeRescued`: vyřazuje se
+   jen vlak celý uvnitř). Cíl výjezdu odtahovky je konec stojící venku.
+2. Cesta odtahovky kopíruje stopu poruchy (`RescueRoadTracksOnTile`): na
+   políčko poruchy smí jen když tam nestojí nikdo jiný, a doprostřed soupravy
+   jen po koleji, na které porucha stojí — dřív přijela z boku přes výhybku
+   doprostřed soupravy a plazila se po vozech (srážka se nepočítá — „to, pro
+   co jela"). Na políčku s **koncem** poruchy je dovolena kterákoli kolej:
+   tam se odtahovka s poruchou potkává, a porucha ležící šikmo přes výhybku se
+   dosáhne po rovné koleji a pak narovná (`LayCasualtyAlongTow`, scéna
+   `odtahkrizeni` — první verze pravidla ji rozbila). Platí pro zábor
+   (`follow_track`), hledání (`yapf_costrail`: jinak slepá ulička,
+   necachovaná), čekací pozice (`pbs`) i řadič.
+3. Po spojení u poruchy s částí v depu vede ocas (`DrivingBackwards`), tj.
+   hlava poruchy uvnitř depa; rozkaz je „do tohoto depa". Vjezd do depa už
+   uměl vyhodnotit poslední vůz podle pořadí jízdy.
+4. `TryPathReserve` bral zábor depa (udělal si ho porouchaný vlak při vjezdu)
+   za cizí a soupravu zasekl; a rezervační procházka z depa narazila na vlastní
+   vozy a četla je jako cizí vlak v cestě. Vlak s čelem v depu a zbytkem venku
+   je vlak vjíždějící: nemá co zamlouvat, jede.
+5. Odložený vlak se v depu ošetří (`VehicleServiceInDepot`) — do depa vjel
+   jako součást odtahovky, ošetřila se odtahovka a on hned za vraty stál
+   znovu porouchaný. A odjíždí hlavou napřed (`DrivingBackwards` smazáno).
+
+**Změřeno:** spojení u ocasu → „tlacim ji dovnitr" → „vjel do depa" →
+„porucha slozena" → odtahovka narovnaná, domů → vlak 32 vyjel po svých
+rozkazech. Scéna `protlacit` (vlak31.sav + `testporucha 32`).
+
+**Odtahovka smí zatáčet o 90°** (hráčovo pravidlo z téhož dne): po celou
+dobu odtahu — cestou k poruše i s poruchou zpátky — na ni neplatí zákaz
+ostrých zatáček (`Forbid90DegFor`: nastavení `forbid_90_deg` mínus vlak na
+odtahu). Poslední úsek k poruše vede pravidelně přes výhybky a ostrá zatáčka
+je jediný způsob, jak se k ní srovnat. Ostatní vlaky nastavení dodržují.
+Použito ve všech místech, která zákaz čtou: výběr hledače, čekací pozice,
+zábor, řadič.
+
+**Nedotčeno / hranice:** porucha, jejíž venkovní konec stojí ještě na
+políčku depa (vlak porouchaný hned při výjezdu), nemá vedle sebe políčko, kde
+by odtahovka zastavila — nechá se lhůtě a vanillové opravě. Hráčova poznámka
+k obměně vozidel: nová vozidla hra rodí ve výchozí orientaci; až se bude
+dělat, orientace řady/vlaku se musí přenést.
+
+---
+
 # 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy

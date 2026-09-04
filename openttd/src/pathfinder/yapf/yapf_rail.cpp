@@ -688,7 +688,7 @@ struct CYapfAnySafeTileRailNo90 : CYapfRailBase<CYapfRail_TypesT<CYapfAnySafeTil
 
 Track YapfTrainChooseTrack(const Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool &path_found, bool reserve_track, PBSTileInfo *target, TileIndex *dest)
 {
-	Trackdir td_ret = _settings_game.pf.forbid_90_deg
+	Trackdir td_ret = Forbid90DegFor(v)
 		? CYapfRailNo90::stChooseRailTrack(v, tile, enterdir, tracks, path_found, reserve_track, target, dest)
 		: CYapfRail::stChooseRailTrack(v, tile, enterdir, tracks, path_found, reserve_track, target, dest);
 
@@ -762,7 +762,7 @@ bool YapfTrainCheckReverse(const Train *v)
 	/* slightly hackish: If the pathfinders finds a path, the cost of the first node is tested to distinguish between forward- and reverse-path. */
 	if (reverse_penalty == 0) reverse_penalty = 1;
 
-	bool reverse = _settings_game.pf.forbid_90_deg
+	bool reverse = Forbid90DegFor(v)
 		? CYapfRailNo90::stCheckReverseTrain(v, tile, td, tile_rev, td_rev, reverse_penalty)
 		: CYapfRail::stCheckReverseTrain(v, tile, td, tile_rev, td_rev, reverse_penalty);
 
@@ -794,14 +794,14 @@ FindDepotData YapfTrainFindNearestDepot(const Train *v, int max_penalty)
 		td_rev = Trackdir::Invalid;
 	}
 
-	return _settings_game.pf.forbid_90_deg
+	return Forbid90DegFor(v)
 		? CYapfAnyDepotRailNo90::stFindNearestDepotTwoWay(v, origin.tile, origin.trackdir, last_tile, td_rev, max_penalty, YAPF_INFINITE_PENALTY)
 		: CYapfAnyDepotRail::stFindNearestDepotTwoWay(v, origin.tile, origin.trackdir, last_tile, td_rev, max_penalty, YAPF_INFINITE_PENALTY);
 }
 
 bool YapfTrainFindNearestSafeTile(const Train *v, TileIndex tile, Trackdir td, bool override_railtype)
 {
-	return _settings_game.pf.forbid_90_deg
+	return Forbid90DegFor(v)
 		? CYapfAnySafeTileRailNo90::stFindNearestSafeTile(v, tile, td, override_railtype)
 		: CYapfAnySafeTileRail::stFindNearestSafeTile(v, tile, td, override_railtype);
 }
