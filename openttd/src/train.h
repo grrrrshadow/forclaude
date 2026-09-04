@@ -32,6 +32,8 @@ enum class VehicleRailFlag : uint8_t {
 	Reversed = 7, ///< Used for vehicle var 0xFE bit 8 (toggled each time the train is reversed, accurate for first vehicle only).
 	Stuck = 8, ///< Train can't get a path reservation.
 	LeavingStation = 9, ///< Train is just leaving a station.
+	FlippedBeforeTow = 10, ///< Was Flipped when a rescue engine coupled to its train; restored when the train is put down. See RestoreCasualtyOrientation().
+	BackwardsBeforeTow = 11, ///< (head only) Its train was driving backwards when a rescue engine coupled to it; restored when it is put down.
 };
 /** Bitset of the %VehicleRailFlag elements. */
 using VehicleRailFlags = EnumBitSet<VehicleRailFlag, uint16_t>;
@@ -76,6 +78,7 @@ Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
 bool IsWholeTrainInsideDepot(const Train *v);
 bool IsAnyPartInsideDepot(const Train *v);
+bool IsDepotDoorBookedByAnother(const Train *v);
 bool HasCoupleTarget(const Train *v);
 bool IsWaitingToBeCoupled(const Train *v);
 bool IsRakeClaimedForCoupling(const Train *rake);

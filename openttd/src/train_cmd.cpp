@@ -4068,6 +4068,62 @@ static void StraightenTowInDepot(Train *tow)
 	}
 }
 
+/**
+ * Put a train that has just been taken off a rescue engine in a depot back
+ * the way round it was when the engine coupled to it.
+ *
+ * The player's rule: a casualty carries on with its orders the way it was
+ * going -- forwards or backwards, and led by the engine that led it. Being
+ * towed rewrote all of that (see CmdCoupleTrains(), where the old state is
+ * written down), and the shed is where it is put right again: inside a shed
+ * nothing moves, so this is bookkeeping only, the same as
+ * StraightenTowInDepot() does for the tow itself.
+ *
+ * Three things are restored. The list is turned round if the engine that
+ * headed the train is now at its tail -- a train picked up by its rear engine
+ * comes apart led by that one, and would set off as a different train. Every
+ * vehicle's Flipped flag goes back to what it was; being coupled nose to nose
+ * with the tow had flipped the lot, which is what drew them facing the back
+ * wall. And whether the train was driving backwards is read back onto its
+ * head, with each vehicle's facing set the way a train in a shed has it for
+ * that: nose to the door when the head leads out, nose to the wall when the
+ * tail does.
+ *
+ * @param casualty head of the chain that was put down, an engine
+ * @param called the vehicle the call was written on -- the head it had when
+ *               it was picked up
+ * @return its head afterwards, which is a different vehicle if the list was
+ *         turned round
+ */
+static Train *RestoreCasualtyOrientation(Train *casualty, Train *called)
+{
+	if (!casualty->IsInDepot()) return casualty;
+
+	/* The head it had is the head it keeps. */
+	if (called != nullptr && called != casualty && called->IsEngine() && called->First() == casualty && called == casualty->Last()) {
+		casualty = ReverseConsistOrder(casualty);
+		NormaliseSubtypes(casualty);
+	}
+
+	bool backwards = called != nullptr && called->flags.Test(VehicleRailFlag::BackwardsBeforeTow);
+	Direction out = DiagDirToDir(GetRailDepotDirection(casualty->tile));
+	uint flipped = 0;
+	for (Train *u = casualty; u != nullptr; u = u->Next()) {
+		u->flags.Set(VehicleRailFlag::Flipped, u->flags.Test(VehicleRailFlag::FlippedBeforeTow));
+		u->flags.Reset({VehicleRailFlag::FlippedBeforeTow, VehicleRailFlag::BackwardsBeforeTow});
+		if (u->flags.Test(VehicleRailFlag::Flipped)) flipped++;
+		u->direction = backwards ? ReverseDir(out) : out;
+	}
+	casualty->vehicle_flags.Set(VehicleFlag::DrivingBackwards, backwards);
+	casualty->ConsistChanged(CCF_ARRANGE);
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: postaven v depu ({},{}) jak byl - couva {}, v cele {}, otocenych vozidel {}",
+				casualty->unitnumber, TileX(casualty->tile), TileY(casualty->tile), backwards ? "ano" : "ne", casualty->index.base(), flipped);
+	}
+	return casualty;
+}
+
 bool HandleRescueEngineInDepot(Train *tow)
 {
 	if (!tow->IsFrontEngine()) return false;
@@ -4156,6 +4212,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 			 * now, a rake in a shed for the next engine to collect, and the
 			 * call is answered. */
 			wagons = true;
+			if (casualty->IsFrontEngine()) casualty = RestoreCasualtyOrientation(casualty, called);
 			casualty->rescue_deadline = TimerGameEconomy::Date{};
 			casualty->couple_claim = VehicleID::Invalid();
 			if (called != nullptr) called->rescue_deadline = TimerGameEconomy::Date{};
@@ -4175,6 +4232,13 @@ bool HandleRescueEngineInDepot(Train *tow)
 			delete casualty;
 			casualty = nullptr;
 		} else {
+			/* First the way round it was going when it broke down -- the same
+			 * end leading, the same engine at its head. Which end led while it
+			 * was being pushed or towed was the tow's business and is undone
+			 * here; everything below is written on the head that comes out of
+			 * it. */
+			casualty = RestoreCasualtyOrientation(casualty, called);
+
 			/* Whatever was wrong with it is put right, as a depot puts anything
 			 * right, and it carries on from the order it had got to. It has had
 			 * its own orders the whole way -- being towed does not take a train's
@@ -4200,11 +4264,6 @@ bool HandleRescueEngineInDepot(Train *tow)
 			casualty->current_order.Free();
 			casualty->SetDestTile(INVALID_TILE);
 			casualty->force_proceed = TFP_NONE;
-			/* It leaves the shed the way a train leaves a shed: its head
-			 * first, the way it was going when it broke down. Which end led
-			 * while it was being pushed or towed was the tow's business. */
-			casualty->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
-			casualty->ConsistChanged(CCF_ARRANGE);
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		}
 	}
@@ -4415,6 +4474,23 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (!ends_clean && tow == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
+		/* A casualty is taken in tow exactly as it stood and is put down in
+		 * the shed the same way, so that it carries on with its orders the way
+		 * round it was going. Being towed rewrites all of that -- the list is
+		 * turned round to hang it off the tow, every vehicle's facing is
+		 * lined up with the tow's, which end leads becomes the tow's business
+		 * -- so what it was is written down here, before any of that, and
+		 * read back in RestoreCasualtyOrientation(). Left unrecorded, the
+		 * player found his repaired train standing in the shed drawn nose to
+		 * the back wall, running backwards ever after. */
+		if (tow != nullptr) {
+			Train *casualty = (tow == v->First()) ? partner : v->First();
+			casualty->flags.Set(VehicleRailFlag::BackwardsBeforeTow, casualty->vehicle_flags.Test(VehicleFlag::DrivingBackwards));
+			for (Train *u = casualty; u != nullptr; u = u->Next()) {
+				u->flags.Set(VehicleRailFlag::FlippedBeforeTow, u->flags.Test(VehicleRailFlag::Flipped));
+			}
+		}
+
 		/* Let go of the track each of them was holding, and do it now, before
 		 * anything about either train changes.
 		 *
@@ -6059,6 +6135,53 @@ bool IsAnyPartInsideDepot(const Train *v)
 }
 
 /**
+ * Is the road outside the door of the depot this train stands in booked by
+ * some other train on its way in?
+ *
+ * A reservation has no owner written on it. A train that has just parked in
+ * a shed and wants to give back "whatever it still held" can only walk out of
+ * the door and free what it finds contiguous there -- and what it finds may
+ * be the road another train has this moment booked to the same door. That is
+ * the player's own save: a train comes off a breakdown in the doorway and
+ * drives in, another one has been waiting at the platform for that door and
+ * books up to it the instant the doorway clears, the parking train frees that
+ * booking on arrival, and the two of them meet on the mouth tile at speed.
+ *
+ * The one thing that tells the two apart: a booking through this door leads
+ * into this shed and nowhere else, so its holder's reservation ends at the
+ * shed or on its doorstep. Nothing of the parked train's own can end there --
+ * it consumed its road tile by tile on the way in.
+ *
+ * @param v a train standing wholly inside a depot
+ * @return true if some other train's reservation ends at that depot or on the
+ *         tile in front of its door
+ */
+bool IsDepotDoorBookedByAnother(const Train *v)
+{
+	const Train *head = v->First();
+	if (!IsRailDepotTile(head->tile)) return false;
+	TileIndex depot = head->tile;
+	DiagDirection dir = GetRailDepotDirection(depot);
+	TileIndex mouth = TileAddByDiagDir(depot, dir);
+	if (!IsValidTile(mouth) || !HasReservedTracks(mouth, DiagdirReachesTracks(dir))) return false;
+
+	for (const Train *t : Train::Iterate()) {
+		if (!t->IsFrontEngine() || t == head) continue;
+		if (t->vehstatus.Test(VehState::Crashed)) continue;
+		if (t->GetMovingFront()->track == Track::Depot) continue;
+		if (!IsValidTrackdir(t->GetMovingFront()->GetVehicleTrackdir())) continue;
+		PBSTileInfo res = FollowTrainReservation(t);
+		if (res.tile == depot || res.tile == mouth) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: v depu ({},{}) - cestu pred vraty drzi vlak {}, nechavam ji", head->unitnumber, TileX(depot), TileY(depot), t->unitnumber);
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Would turning this train round drive it into a headless consist standing
  * right behind it?
  *
@@ -6750,6 +6873,24 @@ void FreeTrainTrackReservation(const Train *consist)
 		assert(bits.None());
 
 		if (!IsValidTrackdir(td)) break;
+
+		/* Ground another train is standing on is that train's, whatever is
+		 * booked on it and however it joins on to this one's road. Vanilla
+		 * never gets here: a road ends at a signal, and a signal with a
+		 * stranger's booking beyond it shows red, which stops the walk. A
+		 * rescue engine's road ends nose to nose with the casualty instead, on
+		 * a line it booked against the signals -- so from its front the walk
+		 * ran straight on through the casualty's footprint, on past the
+		 * opposing signals, and took the ground from under a train waiting
+		 * behind the casualty. The next train out of the shed booked a road
+		 * over that train and hit it (saves/porucha_za_vlakem.sav). */
+		bool someone_else_here = false;
+		for (const Vehicle *u : VehiclesOnTile(tile)) {
+			if (u->type != VehicleType::Train || Train::From(u)->First() == consist) continue;
+			someone_else_here = true;
+			break;
+		}
+		if (someone_else_here) break;
 
 		if (IsTileType(tile, TileType::Railway)) {
 			if (HasSignalOnTrackdir(tile, td) && !IsPbsSignal(GetSignalType(tile, TrackdirToTrack(td)))) {

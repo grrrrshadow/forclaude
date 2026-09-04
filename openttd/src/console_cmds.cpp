@@ -3010,6 +3010,16 @@ static const IntervalTimer<TimerGameTick> _testsleduj_timer({TimerGameTick::Prio
 				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
 				res.tile == INVALID_TILE ? 0 : TileX(res.tile), res.tile == INVALID_TILE ? 0 : TileY(res.tile), res.okay ? "bezpecny" : "NEbezpecny",
 				IsWaitingToBeCoupled(t) ? "ano" : "ne", t->couple_target.base(), t->couple_claim.base(), to_underlying(t->rescue_hold));
+		/* Where each vehicle stands and what is booked under it: a collision
+		 * is always two trains with a road booked over the same ground. */
+		std::string under;
+		uint flipped = 0;
+		for (const Train *u = t; u != nullptr; u = u->Next()) {
+			TrackBits res = IsTileType(u->tile, TileType::Railway) || IsRailStationTile(u->tile) || IsRailDepotTile(u->tile) ? GetReservedTrackbits(u->tile) : TrackBits{};
+			if (u->flags.Test(VehicleRailFlag::Flipped)) flipped++;
+			fmt::format_to(std::back_inserter(under), " ({},{}) k{:#x}/r{:#x}/s{}", TileX(u->tile), TileY(u->tile), u->track.base(), res.base(), to_underlying(u->direction));
+		}
+		IConsolePrint(CC_DEFAULT, "  porucha {}/{} otocenych {} vozy:{}", t->breakdown_ctr, t->breakdown_delay, flipped, under);
 		return;
 	}
 });

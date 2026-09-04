@@ -3092,8 +3092,14 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 			 * holds no path. Whatever it still had reserved when it arrived
 			 * has to go back, or it is left behind as track marked taken with
 			 * nothing standing on it and nothing coming to release it -- which
-			 * is what other trains then follow into the depot. */
-			FreeTrainTrackReservation(consist);
+			 * is what other trains then follow into the depot.
+			 *
+			 * Unless what lies outside the door is somebody else's: a
+			 * reservation carries no owner, and the walk out of the door
+			 * cannot tell a stale leftover from the road a train has this
+			 * moment booked to the same door. Freeing that one put two trains
+			 * on the mouth tile at speed. See IsDepotDoorBookedByAnother(). */
+			if (!IsDepotDoorBookedByAnother(consist)) FreeTrainTrackReservation(consist);
 
 			VehicleEnterDepot(consist);
 		}

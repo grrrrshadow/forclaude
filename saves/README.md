@@ -16,3 +16,7 @@ přes `-g` a scény jsou v baterii.
 - `porucha_nastupiste.sav` — vlak 2 porouchaný na nástupišti (98,54–56),
   ocas na návěstidle (98,53); odtahovka 3 v depu (100,48) „nenajde cestu".
   Scéna `poruchanastup` (TEMATA 4.16).
+- `porucha_za_vlakem.sav` — vlak 2 porouchaný na nástupišti (98,54–56),
+  za ním stojí mašinka 5 na (98,50); odtahovka 4 v depu (97,46) musí jet
+  předem, kolem přes jednosměrku (98,57). TEMATA 4.17 (zeď), 4.18 (srážky
+  bez odtahovky), 4.19 (orientace po složení). Scéna `poruchazavlakem`.

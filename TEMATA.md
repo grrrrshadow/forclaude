@@ -1827,7 +1827,8 @@ vlak pokračuje ve svých rozkazech hlavou napřed, jak do depa vjížděl.
    je vlak vjíždějící: nemá co zamlouvat, jede.
 5. Odložený vlak se v depu ošetří (`VehicleServiceInDepot`) — do depa vjel
    jako součást odtahovky, ošetřila se odtahovka a on hned za vraty stál
-   znovu porouchaný. A odjíždí hlavou napřed (`DrivingBackwards` smazáno).
+   znovu porouchaný. A odjíždí tak, jak jel před poruchou — viz 4.19
+   (dřív se tu `DrivingBackwards` jen mazalo a vozy zůstaly otočené).
 
 **Změřeno:** spojení u ocasu → „tlacim ji dovnitr" → „vjel do depa" →
 „porucha slozena" → odtahovka narovnaná, domů → vlak 32 vyjel po svých
@@ -1896,6 +1897,144 @@ kterém porucha stojí (`yapf_destrail`: stejný spoj nástupiště, kolej
 nástupiště, porucha na cílovém políčku). Zábor pak končí před ocasem poruchy
 jako jinde. Změřeno: zamluveno 8 políček → spojení u ocasu → odvoz do depa
 (97,46) → „porucha slozena". Scéna `poruchanastup`.
+
+---
+
+## 4.17 Stojící cizí vlak je pro odtahovku zeď — a tohle se už NIKDY neodstraňuje
+
+**Hráčovo hlášení (save porucha_za_vlakem, hráčův „porucha2"):** porucha 2
+stojí na nástupišti (98,54–56), za ní stojí mašinka 5 na (98,50) se záborem
+až na (98,52). Odtahovka 4 z depa (97,46) musí jet **předem**: kolem, skrz
+jednosměrky od (98,57), a zamluvit si celou cestu předem. „To už jezdila
+předem. Proč to vždycky dáš pryč, někam si to napiš."
+
+**Co se stalo:** pravidlo zdi bylo v commitu 2fc7a01 („A train in the way is
+a wall to a rescue engine, not a wait", `IsBlockedForRescueRun` v
+`yapf_costrail`) a commit 7441308 („The whole road or the shed") ho smazal
+spolu s jinou změnou, aniž o tom jeho zpráva mluví. Změřeno před opravou:
+hledání zvolilo severní trasu, zábor selhal na (98,52) („misto k zastaveni
+uz nekdo drzi"), jižní trasa se nikdy nezkusila — odtahovka seděla v depu
+s „cesta neni".
+
+**Proč zeď:** obyčejnému vlaku je cizí vlak na trati čekání, ne překážka —
+trať se sama uvolní a návěsti to vyřeší, hledač skrz něj právem plánuje.
+Odtahovka na cestě k poruše čekat nesmí: buď má celou cestu, nebo zůstane
+v depu (4.4, 7441308). Pro ni je stojící vlak zeď a jediná užitečná odpověď
+je cesta jinudy. Jako obyčejná cena to nikdy nevyjde — hledání vrátí krátkou
+cestu, zábor se rozbije a nic to nepřehodnotí.
+
+**Pravidlo (`IsBlockedForRescueRun`, `yapf_costrail.hpp`):** pro odtahovku
+na cestě k poruše (`IsFetchingCasualty`) je políčko, na kterém stojí vlak
+jiný než porucha a než ona sama, slepá ulička stejného druhu jako řada bez
+mašinky (`BlockedByFreeWagons`, necachovaná — závisí na tom, kde kdo právě
+stojí). Porucha je výjimka, protože je cílem; její vlastní políčko soudí
+`RescueRoadTracksOnTile` (4.15). V konzoli: „odtah hleda: na (x,y) stoji
+vlak N - zed, hleda se jinudy".
+
+**Změřeno po opravě:** zamluveno 26 políček (98,48)…(98,58)(98,57)(98,47)
+(98,46), spojení u hlavy na (98,56), odvoz, „porucha slozena". Scéna
+`poruchazavlakem`.
+
+**Pro příště:** tohle pravidlo patří k rozhodnutí o odtahu (0.3, 4.4) a
+neodstraňuje se. Když se sahá na hledání odtahovky, spustit scény
+`poruchazavlakem`, `poruchanastup`, `ekaodtah` a `odtahkrizeni` — každá
+hlídá jinou půlku téhož pravidla.
+
+---
+
+## 4.18 Dvě srážky bez odtahovky: kdo komu smí sahat na rezervaci
+
+Obojí našel rig na hráčových savech při měření 4.17 a 4.19; obojí je
+vanilkový mechanismus, který naše pravidla dostala do stavu, ve kterém
+vanilka nikdy není: **rezervace nemá vlastníka**, a procházka „po své
+cestě" nepozná, kde vlastní končí a cizí začíná.
+
+**1. Dojezd do depa uvolnil cizí cestu k vratům (save porucha, bez
+odtahovek).** Porucha 2 ve vratech (97,46) se z poruchy dostala sama a
+vjela dovnitř; vlak 1 čekal na nástupišti na tytéž vrata (jede si pro
+řadu odloženou v depu) a v okamžiku, kdy se vrata uvolnila, si zamluvil
+cestu až k nim. Dojezd do depa volá `FreeTrainTrackReservation` (commit
+2ca28f1: „vlak v depu nemá co držet") — a ta z depa vyšla ven ústím a
+uvolnila čerstvou cestu vlaku 1. Vlak 2 pak z depa vyjel (ústí bylo
+„volné"), vlak 1 už jel po své (zmizelé) cestě: srážka na (99,46).
+Ve #128 se to netrefilo časováním, mechanismus tam byl.
+
+Oprava (`IsDepotDoorBookedByAnother`, `rail_cmd.cpp` u vjezdu do depa):
+vlak, který dojel celý do depa, cestu za vraty uvolní jen tehdy, když ji
+nedrží nikdo jiný — a „drží" se pozná podle jediného, co jde poznat:
+zábor skrz vrata vede jen do tohohle depa, takže rezervace jeho držitele
+končí na depu nebo na políčku před vraty. Vlastní zbytek tam skončit
+nemůže (svou cestu vlak dovnitř projel a políčko po políčku pustil).
+Změřeno: „cestu pred vraty drzi vlak 1, nechavam ji" → vlak 1 vjel první,
+spojil se s řadou, vlak 2 vyjel až po něm; žádná srážka. Proč tam to
+uvolnění vůbec je (2ca28f1: vlak, který couval do depa, nechával za
+sebou kus záboru) zůstává — jen je teď ohlídané.
+
+**2. Odtahovka při spojení uvolnila zem pod vlakem stojícím za poruchou
+(save porucha_za_vlakem).** Po zdi (4.17) odtahovka přijela od (98,57)
+k hlavě poruchy na (98,56). Spojení nejdřív pouští rezervace obou
+(`FreeTrainTrackReservation`) — a procházka odtahovky od jejího čela
+pokračovala **skrz stopu poruchy** (98,55)…(98,53), kolem protisměrných
+jednosměrek (ty vanilková procházka schválně přechází), až na
+(98,52)…(98,50): zábor a **zem pod mašinkou 5**. Ta pak stála bez záboru
+pod sebou; opravená porucha 2 vyjela z depa, zamluvila si cestu přes
+(98,50) a do stojící mašinky narazila. Vanilka se sem nedostane: vlaku
+končí cesta na návěstidle a návěstidlo s cizím záborem za sebou svítí
+červeně, což procházku zastaví. Odtahovka končí čelem na dotek poruchy na
+trati zamluvené proti návěstím — žádné červené nemá.
+
+Oprava (`FreeTrainTrackReservation`): procházka se zastaví na políčku, na
+kterém stojí jiný vlak než ten, jehož cestu pouští. Zem pod cizím vlakem
+je jeho, ať je na ní zabráno cokoli. Změřeno: mašinka 5 drží zábor, vlak
+2 po složení vyjede a čeká za ní (zácpa je hra); scéna `poruchazavlakem`
+havaroval=0.
+
+---
+
+## 4.19 Porucha se v depu postaví tak, jak jela — ne čelem do zdi
+
+**Hráčovo hlášení (save porucha):** odtahovka poruchu odloží v depu
+„směrem do zdi depa", odtahovka si nepamatuje poslední orientaci vlaku
+(dopředu/dozadu, zda hlavou), a porucha musí po odpojení pokračovat v
+jízdním řádu natočená, jak byla.
+
+**Co se dělo (změřeno na scéně `protlacit`, vlak 32, 12 vozidel):** při
+spojení odtahovka přijede k venkovnímu konci poruchy čelem; srovnání
+směrů spojené soupravy (`NormaliseCoupledConsistFacing`) otočí všechna
+vozidla poruchy (`Flipped`), aby souprava souhlasila sama se sebou. Při
+složení v depu se seznam otočil zpátky (`MakeEngineLeadTheList`),
+`DrivingBackwards` se smazalo — ale `Flipped` zůstalo: **8 z 12 vozidel
+otočených**, kreslených čelem k zadní zdi depa, a vlak pak jezdil
+„pozpátku" napořád. (Kdy vlak z depa nevyjede vůbec, se v rigu netrefilo;
+u hráče je porucha ve vratech hned u výhybky, kde na sebe navazuje 4.18.)
+
+**Pravidlo:** porucha se bere do vleku přesně tak, jak stála, a v depu se
+postaví přesně tak zpátky. Při spojení (`CmdCoupleTrains`, jen s
+odtahovkou) se před jakoukoli změnou zapíše na každé vozidlo `Flipped`
+(`FlippedBeforeTow`) a na hlavu `DrivingBackwards` (`BackwardsBeforeTow`;
+oba bity v `Train::flags`, ukládají se se savem). Při složení
+(`RestoreCasualtyOrientation`, volá se z `HandleRescueEngineInDepot`
+před ošetřením a před vyčištěním rozkazu, aby se všechno psalo na
+výslednou hlavu) se obnoví tři věci:
+
+1. **Hlava.** Mašinka, na které bylo zavoláno (`called` = hlava při
+   sebrání), vede seznam: vlak sebraný za zadní mašinku (EMU, dvě
+   mašinky) se rozpojí veden tou zadní a odjel by jako jiný vlak.
+   `ReverseConsistOrder` + `NormaliseSubtypes`.
+2. **`Flipped`** každého vozidla zpátky, jak bylo.
+3. **`DrivingBackwards`** zpátky, jak bylo; směr vozidel podle toho, jak
+   ho má vlak v depu: k vratům, když ven vede hlava, do depa, když ocas
+   (tak to zapisuje vjezd do depa v `rail_cmd.cpp`).
+
+Konzole: „postaven v depu (x,y) jak byl - couva …, v cele …, otocenych
+vozidel N". Změřeno: `protlacit` 0 otočených, vlak 32 vyjel po svých
+rozkazech; `poruchazavlakem` porucha 2 postavena, vyjela; baterie beze
+změny. Odtahovka sama se dál rovná do normálu (`StraightenTowInDepot`) —
+to je jiné pravidlo pro jiný vlak.
+
+**Hráčova poznámka, ať se neztratí:** totéž se objeví u obměny vozidel
+za nová — hra nová vozidla rodí ve výchozí orientaci; až se bude dělat,
+orientace vlaku se musí přenést stejně jako tady.
 
 ---
 
