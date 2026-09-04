@@ -1959,6 +1959,10 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * half of it in the depot. The player's own case, which took the game
 	 * down without a report. */
 	bool half_in_depot = argv.size() >= 2 && (argv[1] == "depo" || argv[1] == "depozpet");
+	/* 'vagony': no breakdown at all. The casualty engine leaves its wagon at
+	 * the branch platform (decouple all) and goes home; the wagon then stands
+	 * there until 'testodvoz' calls the tow for it. */
+	bool wagons_variant = argv.size() >= 2 && argv[1] == "vagony";
 	/* 'depozpet' is 'depo' without the shed on the stub: pull the west depot
 	 * down once the tow is out (testzbourat depo) and the only depot left to
 	 * bring the casualty to is the one it is half inside of, behind the tow. */
@@ -2147,7 +2151,16 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	to_branch.MakeGoToStation(st_branch);
 	to_branch.SetLoadType(OrderLoadType::NoLoad);
 	to_branch.SetUnloadType(OrderUnloadType::NoUnload);
+	if (wagons_variant) {
+		to_branch.SetDecouple(true);
+		to_branch.SetDecoupleCount(0);
+	}
 	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_c, 0, to_branch);
+	/* No order after the decouple on purpose: the platform is a dead end, and
+	 * an engine sent anywhere from there would have to reverse through the
+	 * very wagons it just left -- the player's mistake, not the rig's. It
+	 * stays parked at the buffer; the tow takes the wagons from the other
+	 * end. */
 
 	/* The rescue engine, on call in the west depot: flag set, brake off. */
 	auto [cost_r, veh_r, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
@@ -2165,7 +2178,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
 	_testodtah_casualty = veh_c;
-	_testodtah_break_tile = half_in_depot ? TileXY(x0 + LEN - 2, y0) : faraway ? TileXY(x0 + LEN - 6, y0) :
+	_testodtah_break_tile = wagons_variant ? INVALID_TILE : half_in_depot ? TileXY(x0 + LEN - 2, y0) : faraway ? TileXY(x0 + LEN - 6, y0) :
 			((plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testodtah_depot_w = depot_w;
@@ -2682,6 +2695,38 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testvozy: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Call a tow for a rake of waiting wagons, the same as the player pressing the
+ * button in its window. Usage: testodvoz <unit number> | vse
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRequestTow(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Call a tow for waiting wagons. Usage: 'testodvoz <unit number>' or 'testodvoz vse'.");
+		return true;
+	}
+	bool all = argv[1] == "vse";
+	uint unit = 0;
+	if (!all) {
+		auto punit = ParseInteger(argv[1]);
+		if (!punit.has_value()) return false;
+		unit = *punit;
+	}
+	uint done = 0;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || !IsWaitingWagonChain(t)) continue;
+		if (!all && t->unitnumber != (UnitID)unit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost res = Command<Commands::RequestWagonTow>::Do(DoCommandFlag::Execute, t->index, true);
+		IConsolePrint(res.Failed() ? CC_ERROR : CC_DEFAULT, "testodvoz: rada {} na ({},{}) - {}", t->unitnumber, TileX(t->tile), TileY(t->tile),
+				res.Failed() ? GetString(res.GetErrorMessage()) : std::string("odtah zavolan"));
+		done++;
+	}
+	if (done == 0) IConsolePrint(CC_ERROR, "testodvoz: zadna cekajici rada.");
 	return true;
 }
 
@@ -5601,6 +5646,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
+	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);

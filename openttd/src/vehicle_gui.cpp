@@ -3132,6 +3132,9 @@ public:
 		this->GetWidget<NWidgetCore>(WID_VV_SHOW_ORDERS)->SetToolTip(STR_VEHICLE_VIEW_TRAIN_ORDERS_TOOLTIP + to_underlying(v->type));
 		this->GetWidget<NWidgetCore>(WID_VV_SHOW_DETAILS)->SetToolTip(STR_VEHICLE_VIEW_TRAIN_SHOW_DETAILS_TOOLTIP + to_underlying(v->type));
 		this->GetWidget<NWidgetCore>(WID_VV_CLONE)->SetToolTip(STR_VEHICLE_VIEW_CLONE_TRAIN_INFO + to_underlying(v->type));
+		/* The same button, with the tow's icon, does the other half of the job
+		 * on a rake of waiting wagons: it calls the tow for them. */
+		if (IsWaitingWagonChain(v)) this->GetWidget<NWidgetCore>(WID_VV_RESCUE_ENGINE)->SetToolTip(STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP);
 
 		this->UpdatePlanes();
 		this->UpdateButtons();
@@ -3188,6 +3191,8 @@ public:
 			this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, !is_localcompany);
 			this->SetWidgetDisabledState(WID_VV_SHOW_DETAILS, true);
 			this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);
+			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany);
+			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, IsWagonTowRequested(Train::From(v)));
 			return;
 		}
 
@@ -3395,6 +3400,15 @@ public:
 
 			case OT_LOADING:
 				if (v->type == VehicleType::Train && (v->current_order.ShouldWaitForCouple() || v->current_order.ShouldGoToCouple())) {
+					/* Wagons that have called for a tow say whether one is coming
+					 * -- the one thing about the call that is otherwise invisible. */
+					if (IsWaitingWagonChain(v) && IsWagonTowRequested(Train::From(v))) {
+						const Train *tow = Train::GetIfValid(Train::From(v)->couple_claim);
+						if (tow != nullptr && tow->First()->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
+							return GetString(STR_VEHICLE_STATUS_TOW_WAGONS_COMING, tow->First()->unitnumber);
+						}
+						return GetString(STR_VEHICLE_STATUS_TOW_WAGONS_NONE);
+					}
 					/* Wagons standing here on their own are working through the
 					 * cargo handling the engine that left them here was working
 					 * through, which is the one thing about them the player
@@ -3571,8 +3585,12 @@ public:
 				assert(v->type == VehicleType::Train);
 				Command<Commands::ForceTrainProceed>::Post(STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL, v->tile, v->index);
 				break;
-			case WID_VV_RESCUE_ENGINE: // station here as a rescue engine, or stand down
+			case WID_VV_RESCUE_ENGINE: // station here as a rescue engine, or stand down; on wagons: call a tow for them
 				assert(v->type == VehicleType::Train);
+				if (IsWaitingWagonChain(v)) {
+					Command<Commands::RequestWagonTow>::Post(STR_ERROR_CAN_T_REQUEST_TOW, v->tile, v->index, !IsWagonTowRequested(Train::From(v)));
+					break;
+				}
 				Command<Commands::SetRescueEngine>::Post(STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE, v->tile, v->index,
 						!v->vehicle_flags.Test(VehicleFlag::RescueEngine));
 				break;
@@ -3655,7 +3673,10 @@ public:
 		bool wagons = IsWaitingWagonChain(v);
 
 		int depot_clone = SZSP_NONE;
-		if (!wagons) {
+		if (wagons) {
+			/* The tow button: these wagons can ask to be taken away. */
+			depot_clone = SEL_DC_RESCUE - SEL_DC_BASEPLANE;
+		} else {
 			if (ShowsRescueEngineButton(v)) {
 				depot_clone = SEL_DC_RESCUE - SEL_DC_BASEPLANE;
 			} else if (v->IsStoppedInDepot()) {

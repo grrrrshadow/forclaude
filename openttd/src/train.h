@@ -83,6 +83,7 @@ void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index);
 bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);
 bool IsFetchingCasualty(const Train *v);
+bool IsRescueTargetAttached(const Train *v);
 bool HandleRescueEngineInDepot(Train *tow);
 void EndRescueErrand(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
@@ -562,6 +563,17 @@ inline bool IsWaitingWagonChain(const Vehicle *v)
 	if (v->type != VehicleType::Train) return false;
 	const Train *head = Train::From(v)->First();
 	return head->IsFreeWagon() && !head->IsInDepot();
+}
+
+/**
+ * Has the player asked for these waiting wagons to be towed to a depot?
+ * The call is written as a rescue deadline on the rake, the same way a
+ * breakdown is written on an engine (see CmdRequestWagonTow()).
+ */
+inline bool IsWagonTowRequested(const Train *v)
+{
+	const Train *head = v->First();
+	return head->IsFreeWagon() && head->rescue_deadline != TimerGameEconomy::Date{};
 }
 
 #endif /* TRAIN_H */

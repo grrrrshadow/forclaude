@@ -1805,6 +1805,15 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
  */
 bool IsWaitingToBeRescued(const Train *v)
 {
+	/* Wagons the player has asked to have taken away: a rake standing out on
+	 * the line with a call written on it (see CmdRequestWagonTow()). The tow
+	 * fetches it like any other case -- it already waits to be coupled -- and
+	 * puts it down in the depot as a stored rake. */
+	if (v->IsFreeWagon()) {
+		if (v->IsInDepot()) return false;
+		if (v->rescue_deadline == TimerGameEconomy::Date{}) return false;
+		return TimerGameEconomy::date < v->rescue_deadline;
+	}
 	if (!v->IsFrontEngine()) return false;
 	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
 	if (v->IsInDepot()) return false;
@@ -1870,10 +1879,27 @@ static void SayOnChange(const Train *v, std::string what)
  * @param v the engine, front of its consist
  * @return whether the casualty is still out there rather than in hand
  */
+/**
+ * Is the rescue engine's case coupled up behind it?
+ * @param v the tow, front of its consist
+ * @return whether its rescue target is now part of this consist
+ */
+bool IsRescueTargetAttached(const Train *v)
+{
+	if (!IsOnRescueRun(v)) return false;
+	const Train *casualty = Train::GetIfValid(v->rescue_target);
+	return casualty != nullptr && casualty->First() == v;
+}
+
 bool IsFetchingCasualty(const Train *v)
 {
 	if (!IsOnRescueRun(v)) return false;
 	const Train *casualty = Train::GetIfValid(v->rescue_target);
+	/* Wagons called for are fetched the way any collector fetches a rake --
+	 * an ordinary run on an ordinary reservation, stopping at signals like
+	 * everybody else. The rescue road rules are for a train that stopped on
+	 * the open line with the traffic piling up behind it. */
+	if (casualty != nullptr && casualty->First()->IsFreeWagon()) return false;
 	/* In hand means part of this very consist. */
 	return casualty == nullptr || casualty->First() != v;
 }
@@ -3595,6 +3621,53 @@ void EndRescueErrand(Train *tow)
  * @param rescue whether it is to be a rescue engine
  * @return the cost of this operation or an error
  */
+/**
+ * Ask for a rake of wagons standing out on the line to be taken to a depot by
+ * a rescue engine, or take the call back.
+ *
+ * The player's way of cleaning up: a rake left by a decouple that went wrong
+ * -- with engines riding inside it as wagons, even -- is a rake all the same,
+ * and it stands there until somebody comes for it. This writes a call on it,
+ * the same rescue deadline a breakdown writes on an engine, and from then on
+ * the rescue engine on call sees it as a case: it fetches it with the
+ * ordinary coupling (the rake already waits to be coupled) and puts it down
+ * in the depot as a stored rake. See HandleRescueEngineInDepot().
+ *
+ * @param flags   type of operation
+ * @param veh_id  head of the rake
+ * @param request true to call a tow, false to take the call back
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool request)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr || v->First() != v || !v->IsFreeWagon()) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (v->IsInDepot()) return CMD_ERROR;
+
+	if (!request) {
+		/* Once an engine is on its way the call stands, as with a breakdown:
+		 * a tow that has been sent is not called back from here. */
+		const Train *tow = Train::GetIfValid(v->couple_claim);
+		if (tow != nullptr && tow->First()->vehicle_flags.Test(VehicleFlag::RescueEngine) &&
+				tow->First()->rescue_target == v->index) {
+			return CommandCost(STR_ERROR_TOW_ALREADY_COMING);
+		}
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		v->rescue_deadline = request ? TimerGameEconomy::date + RESCUE_DEADLINE_DAYS : TimerGameEconomy::Date{};
+		/* Whatever it was doing, from now on it is a rake waiting to be
+		 * fetched -- which is what lets the tow couple to it at all. */
+		if (request) v->current_order.SetWaitForCouple(true);
+		InvalidateWindowData(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}
+
 CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue)
 {
 	Train *v = Train::GetIfValid(veh_id);
@@ -3756,7 +3829,21 @@ static void TryDispatchRescueEngine(Train *tow)
 	tow->couple_target = nearest->index;
 	nearest->couple_claim = tow->index;
 	tow->SetDestTile(nearest->tile);
-	tow->current_order.MakeDummy();
+	if (nearest->IsFreeWagon() && IsRailStationTile(nearest->tile)) {
+		/* Wagons standing at a platform: the tow goes for them the way any
+		 * collector goes for a rake, on a station order to couple. That is
+		 * the one search that knows how to find a partner on a platform --
+		 * a platform is one step to the path search, and a bare tile as the
+		 * destination is walked straight over. Not an order in the list, the
+		 * tow has none; the running order only, as a depot run is. */
+		tow->current_order.MakeGoToStation(GetStationIndex(nearest->tile));
+		tow->current_order.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
+		tow->current_order.SetLoadType(OrderLoadType::NoLoad);
+		tow->current_order.SetUnloadType(OrderUnloadType::NoUnload);
+		tow->current_order.SetGoToCouple(true);
+	} else {
+		tow->current_order.MakeDummy();
+	}
 	InvalidateWindowData(WindowClass::VehicleView, tow->index);
 	SetWindowDirty(WindowClass::VehicleDepot, tow->tile);
 }
@@ -3786,6 +3873,37 @@ static void TryDispatchRescueEngine(Train *tow)
  * @return whether the errand was dealt with here; false means the engine has
  *         somewhere to go and must be left alone to go there
  */
+/**
+ * Put a rescue engine standing in a depot back the way it was built: list
+ * head leading, nose the way the depot faces, nothing flipped.
+ *
+ * A tow comes back from every job the way the job left it -- turned round on
+ * a dead end, led by its tail, its nose written the other way after a
+ * coupling -- and the next call would start from that. The player's rule:
+ * after every tow, once the case is put down, it is straightened out before
+ * it waits for the next one. Inside a depot nothing moves, so this is
+ * bookkeeping only, and the way out of the shed is the way the shed faces.
+ *
+ * @param tow the rescue engine, standing in a depot
+ */
+static void StraightenTowInDepot(Train *tow)
+{
+	if (!tow->IsInDepot()) return;
+	Direction dir = DiagDirToDir(GetRailDepotDirection(tow->tile));
+	bool changed = tow->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
+	tow->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	for (Train *u = tow; u != nullptr; u = u->Next()) {
+		if (u->direction != dir || u->flags.Test(VehicleRailFlag::Flipped)) changed = true;
+		u->direction = dir;
+		u->flags.Reset(VehicleRailFlag::Flipped);
+	}
+	if (!changed) return;
+	tow->ConsistChanged(CCF_ARRANGE);
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: odtahovka narovnana v depu ({},{}) - smer i hlava do normalu", tow->unitnumber, TileX(tow->tile), TileY(tow->tile));
+	}
+}
+
 bool HandleRescueEngineInDepot(Train *tow)
 {
 	if (!tow->IsFrontEngine()) return false;
@@ -3798,6 +3916,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 		if (tow->tile == tow->rescue_home_depot) {
 			tow->current_order.MakeDummy();
 			tow->vehstatus.Reset(VehState::Stopped);
+			StraightenTowInDepot(tow);
 			InvalidateWindowData(WindowClass::VehicleView, tow->index);
 		}
 		return true;
@@ -3819,6 +3938,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 
 	/* Nothing was ever picked up -- the casualty was sold, or sorted itself out
 	 * before this engine got there. Nothing to put down. */
+	bool wagons = false;
 	if (in_tow) {
 		bool wrecked = casualty->IsWrecked();
 
@@ -3845,7 +3965,17 @@ bool HandleRescueEngineInDepot(Train *tow)
 		 * vehicle that is not the head of anything, does lasting damage. */
 		if (casualty->First() != casualty) return true;
 
-		if (wrecked) {
+		if (casualty->IsFreeWagon()) {
+			/* Wagons fetched on the player's call: they are simply stored here
+			 * now, a rake in a shed for the next engine to collect, and the
+			 * call is answered. */
+			wagons = true;
+			casualty->rescue_deadline = TimerGameEconomy::Date{};
+			casualty->couple_claim = VehicleID::Invalid();
+			casualty->current_order.Free();
+			casualty->SetDestTile(INVALID_TILE);
+			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
+		} else if (wrecked) {
 			/* A wreck brought into a depot is scrapped there. */
 			delete casualty;
 			casualty = nullptr;
@@ -3888,8 +4018,8 @@ bool HandleRescueEngineInDepot(Train *tow)
 	 * the same false green all over again, one measurement further along: the
 	 * loop scene reported a delivery for an engine that never left its shed. */
 	if (in_tow && _show_train_orientation) {
-		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - porucha slozena v depu na ({},{})",
-				tow->unitnumber, TileX(tow->tile), TileY(tow->tile));
+		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - {} v depu na ({},{})",
+				tow->unitnumber, wagons ? "vagonky odlozeny" : "porucha slozena", TileX(tow->tile), TileY(tow->tile));
 	}
 
 	/* Home if this is not home, otherwise straight back on call. Named
@@ -3897,14 +4027,22 @@ bool HandleRescueEngineInDepot(Train *tow)
 	 * particular depot, that is where the player put it, and the nearest one is
 	 * the one it is standing in. */
 	if (tow->tile != tow->rescue_home_depot && IsRailDepotTile(tow->rescue_home_depot)) {
+		/* Without the halt: a halted depot order pulls the brake on arrival,
+		 * and the brake is the player's -- pulled, the engine reads as parked
+		 * and takes no more calls. In the shed the on-call block holds it by
+		 * itself. */
 		tow->current_order.MakeGoToDepot(GetDepotIndex(tow->rescue_home_depot), OrderDepotTypeFlags{},
-				OrderNonStopFlags{}, OrderDepotActionFlags{OrderDepotActionFlag::Halt});
+				OrderNonStopFlags{}, OrderDepotActionFlags{});
 		tow->SetDestTile(tow->rescue_home_depot);
 		tow->vehstatus.Reset(VehState::Stopped);
 	} else {
 		tow->current_order.MakeDummy();
 		tow->vehstatus.Reset(VehState::Stopped);
 	}
+
+	/* The job is put down; the engine is straightened out before it waits
+	 * for the next, whichever shed it is standing in. */
+	StraightenTowInDepot(tow);
 
 	InvalidateWindowData(WindowClass::VehicleView, tow->index);
 	SetWindowDirty(WindowClass::VehicleDepot, tow->tile);
@@ -8545,6 +8683,12 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (consist->rescue_target != VehicleID::Invalid()) {
 			if (HandleRescueEngineInDepot(consist)) return true;
 		} else {
+			/* Home again after a job put down elsewhere: the go-home order
+			 * has done its work, back on call (and straightened out). Left as
+			 * a halted depot order, the engine would stand here braked and
+			 * read as parked for good. */
+			if (consist->tile == consist->rescue_home_depot) StraightenTowInDepot(consist);
+
 			TryDispatchRescueEngine(consist);
 
 			/* Nothing to go to, so it does not go. Being on call is standing
@@ -8555,7 +8699,12 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			 * it in was this block claiming the tick whatever happened, which
 			 * had to stop because it also kept in the engine that had just
 			 * been given a job. So the two are told apart here instead. */
-			if (consist->rescue_target == VehicleID::Invalid()) return true;
+			/* ... unless home is elsewhere and the order to get there is waiting
+			 * for the depot-leaving code below, which this must not stand in
+			 * front of. A job put down in the nearest depot used to be put down
+			 * at home every time, so a tow standing in somebody else's shed with
+			 * a way home in hand never came up. */
+			if (consist->rescue_target == VehicleID::Invalid() && !consist->current_order.IsType(OT_GOTO_DEPOT)) return true;
 		}
 	}
 
@@ -8623,7 +8772,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * Asked every 64th tick rather than every tick because a refusal costs a
 	 * full pathfinder run, and the thing being waited for -- a road clearing --
 	 * takes far longer than a tick anyway. */
-	if (IsOnRescueRun(consist) && !IsFetchingCasualty(consist) &&
+	if (IsOnRescueRun(consist) && IsRescueTargetAttached(consist) &&
 			!consist->current_order.IsType(OT_GOTO_DEPOT) && (consist->tick_counter & 0x3F) == 0) {
 		AutoRestoreBackup cur_company(_current_company, consist->owner);
 		bool took = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, consist->index,

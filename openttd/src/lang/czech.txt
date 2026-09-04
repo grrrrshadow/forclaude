@@ -4724,6 +4724,7 @@ STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Donuť v
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reversní chod
 STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Spojit tento vlak se stojícím vlakem hned před ním
 STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Určit tento vlak jako odtahovku v tomto depu. Čeká tady, vyjíždí pro porouchané a havarované vlaky a potom se sem vrací
+STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP                             :{BLACK}Zavolat odtahovku, ať tyto vagony odtáhne do depa. Druhým kliknutím se volání zruší
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Otoč vozidlo
 STR_VEHICLE_VIEW_ORDER_LOCATION_TOOLTIP                         :{BLACK}Vycentrovat hlavní zobrazení na cíl objednávky. Ctrl+Klik pro otevření nového zobrazení na umístění cíle pokynu.
 
@@ -4779,6 +4780,8 @@ STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL                     :{LTBLUE}Míří
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL                        :{ORANGE}Míří do {DEPOT}, {VELOCITY}
 STR_VEHICLE_STATUS_RAKE_TIMETABLE_HOLD                          :{LTBLUE}Stojí podle jízdního řádu (zbývá {NUM} dní)
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE                           :{LTBLUE}Čeká na spojení
+STR_VEHICLE_STATUS_TOW_WAGONS_NONE                              :{LTBLUE}Čeká na odtah – žádná odtahovka v dosahu
+STR_VEHICLE_STATUS_TOW_WAGONS_COMING                            :{LTBLUE}Jede pro ně odtahovka č. {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_FULL_LOAD                 :{LTBLUE}Čeká na spojení (plně naložit)
 STR_VEHICLE_STATUS_WAITING_FOR_COUPLE_NO_LOAD                   :{LTBLUE}Čeká na spojení (nenakládat)
 STR_VEHICLE_VIEW_WAGONS_CAPTION                                 :{WHITE}Vagony čekají na odvoz
@@ -5749,6 +5752,8 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... mašinka by skončila za vagonky, což zatím není podporováno
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je moc daleko na spojení
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto vlaku nelze udělat odtahovku...
+STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Pro tyto vagony nelze zavolat odtah...
+STR_ERROR_TOW_ALREADY_COMING                                    :{WHITE}... už pro ně jede odtahovka
 STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... musí stát v depu
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... odtahovka čeká na zavolání a nemůže mít vlastní příkazy
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... odtahovka jezdí pro vlaky a musí být sama

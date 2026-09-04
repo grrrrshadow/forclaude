@@ -1592,6 +1592,60 @@ nulový; na `odtah1.sav` zbývá jediné odmítnutí — stojící vlak na
 
 # 5. Myš, kurzor, stavba
 
+## 4.11 Odtahovka uklízí i řady vagonků — na zavolání z okna
+
+**Hráčův návrh.** Řada vagonků (i ta, co vznikla špatným rozpojením a má
+v sobě mašinky jako vagony — hra to unese, tak ať se to dá uklidit)
+dostane v okně tlačítko s ikonou odtahovky: *odtáhnout do depa*. Okno
+řady pak říká „čeká na odtah – žádná odtahovka v dosahu" nebo „jede pro
+ně odtahovka č. N". Odtahovka řadu v depu odloží (odložená řada
+k sebrání, žádné „opravit a poslat dál") a jde zpátky na příjem. A **po
+každém odtahu** — vrak, porucha i vagonky — se po odpojení v depu
+narovná: hlava seznamu vede, nos po směru depa, nic převrácené, než
+začne čekat na další.
+
+**Jak to sedí do návrhu z §4.** Odtah je obyčejné spojení s partnerem,
+který má „čekat na spojení" — řada ho má. Chybělo jen:
+
+1. **Zavolání** — příkaz `RequestWagonTow` zapíše na řadu lhůtu odtahu,
+   tutéž, jakou porucha dostává na mašinku; `IsWaitingToBeRescued` ji
+   u volné řady mimo depo bere jako případ. Odvolat jde jen do chvíle,
+   než je odtahovka vyslaná (jako u poruchy: vyslanou nejde odvolat).
+2. **Pro vagony jede odtahovka jako obyčejný sběrač.** Hráčovo zadání:
+   bez záboru celé trati, bez protisměru, prostě jede pro vagonky.
+   `IsFetchingCasualty` u řady odpovídá *ne* — odtahová pravidla cesty
+   (§4.4) platí jen pro poruchy a vraky. Řada na **nástupišti** dostane
+   od vyslání dočasný rozkaz „do stanice, spojit" (jen běžící rozkaz, ne
+   seznam — jako rozkaz do depa): holé políčko jako cíl hledání mine,
+   protože nástupiště je pro hledání jeden krok (§2.27), a rozkaz spojit
+   je to jediné, co partnera na nástupišti umí najít. Řada na širé trati
+   má cíl políčko jako porucha.
+3. **Položení v depu** — u řady se jen smaže lhůta a záběr; zůstane
+   stát jako odložená řada. Hláška „odtah dokoncen - vagonky odlozeny".
+4. **Narovnání** (`StraightenTowInDepot`) po položení a po návratu domů.
+5. **Návrat domů byl rozbitý a nikdo to neviděl:** blok pohotovosti
+   v `TrainLocoHandler` bral odtahovce tik i s rozkazem „domů", takže
+   z cizího depa nikdy nevyjela; a rozkaz domů měl příznak *zastavit*,
+   takže by doma stála zabrzděná = pro hru zaparkovaná. Nikdy to
+   nevadilo, protože nejbližší depo bylo ve všech scénách zároveň
+   domovské. Teď: rozkaz domů bez zastavení (v depu ji drží pohotovostní
+   blok sám) a blok tik nebere, dokud má cestu domů.
+
+Okno: u čekající řady se v místě tlačítka „depo/klon" ukáže tlačítko
+odtahovky (`SEL_DC_RESCUE`), zamáčknuté, když je zavoláno; stav v okně
+podle záběru (`couple_claim` je odtahovka → „jede pro ně č. N").
+
+**Rig:** `testodvoz <vlak>|vse` = klik na tlačítko; scéna `testodtah
+vagony` (mašinka odloží vagon na slepém nástupišti odbočky a zůstane
+u zarážedla — rozkaz do depa by ji hnal skrz vlastní vagon, což je
+hráčova chyba, ne rigu); baterie `odtahvagony` chce „odtah dokoncen"
+a otevře headless okno řady. Změřeno: zavolání → obyčejná jízda (i s
+otočkou ve východním depu, protože odbočka je z hlavní trati dosažitelná
+jen z té strany) → spojení → odvoz → „vagonky odlozeny" → „narovnana"
+→ návrat do domovského depa, pohotovost bez brzdy.
+
+---
+
 ## 5.0 Co je „naše" nastavení posunu mapy
 
 V nabídce je **pět** voleb. První je naše a je přednastavená. Je to
