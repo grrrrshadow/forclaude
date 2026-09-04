@@ -1878,6 +1878,27 @@ dělat, orientace řady/vlaku se musí přenést.
 
 ---
 
+## 4.16 Porucha na nástupišti: cíl uprostřed nástupiště se přejde jedním krokem
+
+**Hráčovo hlášení (save porucha_nastupiste):** odtahovka má zamluvit celou
+cestu proti jednosměrkám, ale „nenajde cestu". Diagnostika: hledání došlo
+na (98,53) — ocas poruchy na návěstidle před nástupištěm — a dál nic; 49
+uzlů, žádné odmítnutí.
+
+**Příčina:** porucha stojí na nástupišti (98,54–56) a cílové políčko
+odtahovky je její hlava uprostřed nástupiště. Nástupiště je pro hledání
+jeden krok, uzel končí na jeho vzdáleném konci a test cíle políčko uprostřed
+nikdy nevidí (totéž, kvůli čemu vagony na nástupišti dostávají nádražní
+rozkaz spojit, 4.11 bod 2). Porucha nádražní rozkaz nemá — má políčko.
+
+**Oprava:** pro odtahovku na cestě k poruše je cílem celé nástupiště, na
+kterém porucha stojí (`yapf_destrail`: stejný spoj nástupiště, kolej
+nástupiště, porucha na cílovém políčku). Zábor pak končí před ocasem poruchy
+jako jinde. Změřeno: zamluveno 8 políček → spojení u ocasu → odvoz do depa
+(97,46) → „porucha slozena". Scéna `poruchanastup`.
+
+---
+
 # 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy

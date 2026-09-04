@@ -150,7 +150,7 @@ struct CFollowTrackT {
 		if (!IsFetchingCasualty(Train::From(this->veh)->First())) return;
 
 		static int said = 0;
-		if (said >= 60) return;
+		if (said >= 600) return;
 		said++;
 
 		static const char * const duvod[] = {"zadny", "cizi majitel", "jina kolej", "moc ostra zatacka", "na policko se neda vjet", "policko uz nekdo drzi"};

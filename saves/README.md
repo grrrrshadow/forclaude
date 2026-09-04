@@ -13,3 +13,6 @@ přes `-g` a scény jsou v baterii.
 - `porucha.sav` — vlak 2 porouchaný ve vratech depa (97,46), ohnutý přes
   výhybku; odtahovky 3 a 4 zabrzděné. Pád „Disconnecting train" na #132
   (TEMATA 4.15, druhé kolo). Scéna `poruchavrata`.
+- `porucha_nastupiste.sav` — vlak 2 porouchaný na nástupišti (98,54–56),
+  ocas na návěstidle (98,53); odtahovka 3 v depu (100,48) „nenajde cestu".
+  Scéna `poruchanastup` (TEMATA 4.16).

@@ -227,6 +227,20 @@ public:
 			return IsRailDepotTile(tile);
 		}
 
+		/* A rescue engine's destination is wherever its casualty stopped, and
+		 * that can be a platform. A platform is one step to the search, which
+		 * reports the far end of it and never the tile in the middle the
+		 * casualty stands on, so the destination was walked straight over
+		 * and reported unreachable. The platform the casualty stands on is
+		 * the destination, whichever of its tiles the step lands on. */
+		if (IsRailStationTile(tile) && IsRailStationTile(this->dest_tile) && IsCompatibleTrainStationTile(tile, this->dest_tile)) {
+			const Train *v = Yapf().GetVehicle();
+			if (v != nullptr && IsFetchingCasualty(v->First()) && IsRescueTargetOnTile(v, this->dest_tile) &&
+					GetRailStationTrack(tile) == TrackdirToTrack(td)) {
+				return true;
+			}
+		}
+
 		return (tile == this->dest_tile) && this->dest_trackdirs.Test(td);
 	}
 
