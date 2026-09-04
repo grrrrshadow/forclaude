@@ -1658,8 +1658,8 @@ static bool ConTestMap(std::span<std::string_view> argv)
 			} else if (IsRailWaypointTile(tile)) {
 				tracks = TrackBits{GetRailStationTrack(tile)};
 				const Waypoint *wp = Waypoint::GetByTile(tile);
-				desc = fmt::format("smerovani {}{}", wp->index.base(),
-						HasBit(wp->waypoint_flags, WPF_STATION_SEARCH) ? " (nadrazni)" : "");
+				desc = fmt::format("smerovani {}{} '{}'", wp->index.base(),
+						HasBit(wp->waypoint_flags, WPF_STATION_SEARCH) ? " (nadrazni)" : "", GetString(STR_WAYPOINT_NAME, wp->index));
 			} else if (IsRailStationTile(tile)) {
 				tracks = TrackBits{GetRailStationTrack(tile)};
 				desc = fmt::format("stanice {}", GetStationIndex(tile).base());

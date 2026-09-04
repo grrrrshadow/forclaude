@@ -1798,8 +1798,18 @@ static void FormatString(StringBuilder &builder, std::string_view str_arg, Strin
 						GetStringWithArgs(builder, STR_JUST_RAW_STRING, tmp_params);
 					} else {
 						auto tmp_params = MakeParameters(wp->town->index, wp->town_cn + 1);
-						StringID string_id = ((wp->string_id == STR_SV_STNAME_BUOY) ? STR_FORMAT_BUOY_NAME : STR_FORMAT_WAYPOINT_NAME);
-						if (wp->town_cn != 0) string_id++;
+						/* A platform station waypoint has a name format of its
+						 * own -- "Platform" rather than "Waypoint", the word the
+						 * player uses for the numbered group of platforms it
+						 * stands for -- and the format was never picked here, so
+						 * every one of them was named as a plain waypoint. And it
+						 * always carries its number, the first one included: the
+						 * number is the name of the platform group, so a bare
+						 * town name would be a group with no number. */
+						bool platform = wp->string_id == STR_SV_STNAME_STATION_WAYPOINT;
+						StringID string_id = (wp->string_id == STR_SV_STNAME_BUOY) ? STR_FORMAT_BUOY_NAME :
+								platform ? STR_FORMAT_STATION_WAYPOINT_NAME : STR_FORMAT_WAYPOINT_NAME;
+						if (wp->town_cn != 0 || platform) string_id++;
 						GetStringWithArgs(builder, string_id, tmp_params);
 					}
 					break;

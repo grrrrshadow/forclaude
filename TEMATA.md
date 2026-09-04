@@ -1883,6 +1883,14 @@ sama píše, že zamykání ukazatele nemusí všude fungovat.
   takže přidání dalšího ostatní zúží a nic z řady nevypadne.
 - Okno bezhlavé řady vagonků má vlastní titulek a odemčené příkazy;
   podrobnosti a přejmenování zamčené.
+- **Nádražní směrování se jmenuje „Nástupiště <město> č. N", vždy
+  s číslem.** Hráčovo slovo pro skupinu nástupišť za směrováním je číslo
+  nástupiště, ne směrování; formát `STR_FORMAT_STATION_WAYPOINT_NAME`
+  existoval, ale `{WAYPOINT}` ve `strings.cpp` ho nikdy nevybral (znal
+  jen bójku a obyčejné směrování), a první směrování ve městě bylo bez
+  čísla. Rig: `testmapa` tiskne jméno směrování.
+- **Zákaz nákladu u lokomotivy** chyběl ve stromu nastavení (přesně
+  podle bodu výše: byl jen přes vyhledávání); doplněn do „Fyzika".
 
 ---
 
