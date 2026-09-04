@@ -84,10 +84,12 @@ bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);
 bool IsFetchingCasualty(const Train *v);
 bool IsRescueTargetAttached(const Train *v);
+void LeaveHeadlessChainWaiting(Train *chain);
 bool HandleRescueEngineInDepot(Train *tow);
 void EndRescueErrand(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
 bool IsRescueTargetOnTile(const Train *v, TileIndex tile);
+bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
 bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks);
 
 /** Variables that are cached to improve performance and such */

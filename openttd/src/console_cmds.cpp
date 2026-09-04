@@ -42,6 +42,7 @@
 #include "order_cmd.h"
 #include "timetable_cmd.h"
 #include "order_base.h"
+#include "order_func.h"
 #include "depot_map.h"
 #include "station_map.h"
 #include "newgrf_station.h"
@@ -2672,16 +2673,32 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
  */
 static bool ConTestListUnits(std::span<std::string_view> argv)
 {
-	if (argv.size() != 2) {
-		IConsolePrint(CC_HELP, "List a train's vehicles. Usage: 'testvozy <unit number>'.");
+	if (argv.size() != 2 && argv.size() != 3) {
+		IConsolePrint(CC_HELP, "List a train's vehicles. Usage: 'testvozy <unit number>' or 'testvozy <x> <y>' (a rake without a number, by the tile of its first vehicle).");
 		return true;
 	}
-	auto punit = ParseInteger(argv[1]);
+	bool all_rakes = argv[1] == "vse";
+	auto punit = all_rakes ? std::optional<uint32_t>(0) : ParseInteger(argv[1]);
 	if (!punit.has_value()) return false;
+	std::optional<uint64_t> py;
+	if (argv.size() == 3) {
+		py = ParseInteger(argv[2]);
+		if (!py.has_value()) return false;
+	}
+	bool found = false;
 	for (const Train *t : Train::Iterate()) {
-		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
-		IConsolePrint(CC_DEFAULT, "vlak {}: {} couva {}", t->unitnumber, t->IsFrontEngine() ? "masinka v cele" : "bez cela",
-				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne");
+		if (t->First() != t) continue;
+		if (all_rakes) {
+			if (!t->IsFreeWagon()) continue;
+		} else if (py.has_value() ? t->tile != TileXY((uint)*punit, (uint)*py) : t->unitnumber != (UnitID)*punit) {
+			continue;
+		}
+		found = true;
+		IConsolePrint(CC_DEFAULT, "vlak {}: {} couva {} rozkaz {} ceka-na-spojeni {} lhuta-odtahu {}", t->unitnumber, t->IsFrontEngine() ? "masinka v cele" : "bez cela",
+				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+				to_underlying(t->current_order.GetType()),
+				t->current_order.ShouldWaitForCouple() ? "ano" : "ne",
+				t->rescue_deadline == TimerGameEconomy::Date{} ? "zadna" : "ano");
 		uint i = 0;
 		for (const Train *u = t; u != nullptr; u = u->Next(), i++) {
 			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) smer {}", i, u->index.base(), u->engine_type.base(),
@@ -2692,9 +2709,70 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 					u->IsFreeWagon() ? " VOLNY" : "",
 					TileX(u->tile), TileY(u->tile), to_underlying(u->direction));
 		}
+		if (!all_rakes) return true;
+	}
+	if (!found) IConsolePrint(CC_ERROR, "testvozy: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Make a headless chain standing out on the line wait to be collected, the
+ * way a coupling that leaves the engine inside now does on its own. For
+ * replaying a save made before that: the chains in it stand with no order.
+ * Usage: testrada <x> <y> | vse
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRakeWait(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2 && argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Make a headless chain wait to be collected. Usage: 'testrada <x> <y>' or 'testrada vse'.");
 		return true;
 	}
-	IConsolePrint(CC_ERROR, "testvozy: vlak {} nenalezen.", argv[1]);
+	bool all = argv[1] == "vse";
+	TileIndex at = INVALID_TILE;
+	if (!all) {
+		if (argv.size() != 3) return false;
+		auto px = ParseInteger(argv[1]);
+		auto py = ParseInteger(argv[2]);
+		if (!px.has_value() || !py.has_value()) return false;
+		at = TileXY((uint)*px, (uint)*py);
+	}
+	uint done = 0;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFreeWagon() || t->IsInDepot()) continue;
+		if (!all && t->tile != at) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		LeaveHeadlessChainWaiting(t);
+		done++;
+	}
+	if (done == 0) IConsolePrint(CC_ERROR, "testrada: zadna rada venku.");
+	return true;
+}
+
+/**
+ * Station an engine as a rescue engine, first taking its orders away -- the
+ * player's two clicks in one, for a save whose spare engine has orders.
+ * Usage: testodtahovka <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestMakeRescueEngine(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Station a train as a rescue engine. Usage: 'testodtahovka <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		DeleteVehicleOrders(t);
+		CommandCost res = Command<Commands::SetRescueEngine>::Do(DoCommandFlag::Execute, t->index, true);
+		IConsolePrint(res.Failed() ? CC_ERROR : CC_DEFAULT, "testodtahovka: vlak {} - {}", t->unitnumber,
+				res.Failed() ? GetString(res.GetErrorMessage()) : std::string("odtahovka v pohotovosti"));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testodtahovka: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -2805,6 +2883,59 @@ static bool ConTestSkipOrder(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testskip: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/** A train being followed closely: unit number and how often it is reported. */
+static UnitID _testsleduj_unit = 0;
+static uint _testsleduj_every = 50;
+static uint _testsleduj_ticks = 0;
+
+/** Every few ticks, say where the followed train is and what it is doing. */
+static const IntervalTimer<TimerGameTick> _testsleduj_timer({TimerGameTick::Priority::None, 10}, [](auto) {
+	if (_testsleduj_unit == 0) return;
+	_testsleduj_ticks += 10;
+	if (_testsleduj_ticks < _testsleduj_every) return;
+	_testsleduj_ticks = 0;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != _testsleduj_unit) continue;
+		const Train *front = t->GetMovingFront();
+		IConsolePrint(CC_DEFAULT, "sleduj {}: ({},{}) px ({},{}) smer {} kolej {:#x} rychlost {} rozkaz {} cil ({},{}) zasekly {} couva {} rez-pod {:#x}",
+				t->unitnumber, TileX(front->tile), TileY(front->tile), front->x_pos, front->y_pos, to_underlying(front->direction),
+				front->track.base(), t->cur_speed, to_underlying(t->current_order.GetType()),
+				TileX(t->dest_tile), TileY(t->dest_tile),
+				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
+				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+				IsTileType(front->tile, TileType::Railway) || IsRailStationTile(front->tile) ? GetReservedTrackbits(front->tile) : TrackBits{});
+		PBSTileInfo res = FollowTrainReservation(t);
+		IConsolePrint(CC_DEFAULT, "  max-rychlost {} brzdi-do-stanice {} wait {} force {} stuck {} rez-konec ({},{}) {} ceka-na-spojeni {} partner-cil {} narok {} odtah-drzi {}",
+				t->GetCurrentMaxSpeed(), t->vehstatus.Test(VehState::TrainSlowing) ? "ano" : "ne", t->wait_counter, to_underlying(t->force_proceed),
+				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
+				res.tile == INVALID_TILE ? 0 : TileX(res.tile), res.tile == INVALID_TILE ? 0 : TileY(res.tile), res.okay ? "bezpecny" : "NEbezpecny",
+				IsWaitingToBeCoupled(t) ? "ano" : "ne", t->couple_target.base(), t->couple_claim.base(), to_underlying(t->rescue_hold));
+		return;
+	}
+});
+
+/**
+ * Follow one train closely: report it every few ticks.
+ * Usage: testsleduj <unit number> [ticks]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestFollow(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Report a train every few ticks. Usage: 'testsleduj <unit number> [ticks]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	_testsleduj_unit = (UnitID)*punit;
+	if (argv.size() >= 3) {
+		auto pev = ParseInteger(argv[2]);
+		if (!pev.has_value()) return false;
+		_testsleduj_every = (uint)*pev;
+	}
 	return true;
 }
 
@@ -5647,6 +5778,9 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
+	IConsole::CmdRegister("testrada",                ConTestRakeWait);
+	IConsole::CmdRegister("testsleduj",              ConTestFollow);
+	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);

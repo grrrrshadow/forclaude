@@ -1590,8 +1590,6 @@ nulový; na `odtah1.sav` zbývá jediné odmítnutí — stojící vlak na
 
 ---
 
-# 5. Myš, kurzor, stavba
-
 ## 4.11 Odtahovka uklízí i řady vagonků — na zavolání z okna
 
 **Hráčův návrh.** Řada vagonků (i ta, co vznikla špatným rozpojením a má
@@ -1645,6 +1643,84 @@ jen z té strany) → spojení → odvoz → „vagonky odlozeny" → „narovna
 → návrat do domovského depa, pohotovost bez brzdy.
 
 ---
+
+## 4.12 Spojení, po kterém není mašinka v čele — řada čeká, sběračka i odtahovka ji odvezou
+
+**Hráčovo hlášení (save umak/umins):** čtyři vlaky čekají na spojení, pro
+každý přijede mašinka s vagonem za sebou, nosem napřed. Výsledek: řada
+s vagonem v čele a mašinkami uvnitř, bez rozkazu, nikomu k ničemu.
+Hráč to tak chce nechat — je to hráčova chyba a hra to unese — jen řada
+má zase čekat na spojení a jít odvézt obyčejnou mašinkou i odtahovkou.
+
+**Změřeno na #128 i #129:** obě sestavení dávají tutéž řadu bez rozkazu
+(scéna `mess`: vlaky 17–20 ven, 24 + tři klony). Rozdíl mezi buildy tam
+není; spojení se v commitu odtahu vagonků nezměnilo. Co hráč viděl na
+#128 čekat, byla jiná řada (odložená rozkazem).
+
+**Příčina:** sběračka, která přijede nosem napřed s vagonem za sebou,
+se v seznamu otočí (aby se konce potkaly) — v čele je pak její vagon,
+spojený vlak není vlak, ale volná řada, a `CmdCoupleTrains` na ni dál
+sahal jako na vlak: zavřel jí rozkaz spojení a hotovo. Nikdo jí nedal
+„čekej".
+
+**Oprava (jedna věta v kódu, žádná automatika, žádné nastavení):** když
+po spojení nevede mašinka, řada dostane totéž, co řada odložená
+rozkazem — nádražní rozkaz „čekat na spojení" (nenakládat), dvojici
+rozkazů k přeskočení a vjezd do stanice (`LeaveHeadlessChainWaiting`,
+společné jádro s odpojením: `LeaveRakeWaitingAtStation`). Stanice se
+bere z kteréhokoli vozu řady (`StationUnderChain`): řada dlouhá přesně
+jako nástupiště přečnívá hlavou o pár pixelů na vjezdové políčko, a hlava
+sama by stanici neviděla. Totéž hledání používá výjezd odtahovky.
+
+**Co se při tom ještě našlo a spravilo:**
+
+1. **Mašinka uvnitř řady se ve stejném tiku ještě jednou obsloužila jako
+   sběračka** (`Train::Tick` volá `TrainLocoHandler` dvakrát) a zabrala
+   vlastní řadu; řada pak četla, že u ní stojí odkladatelka, napořád.
+   Druhé volání se vynechá, když první skončilo tím, že vlak už není
+   čelem ničeho.
+2. **Sběračka s rozkazem spojit se zastavila na cizím nástupišti téže
+   stanice.** Cesta k řadě vedla skrz prázdné nástupiště vedle; vjezd do
+   stanice, zpomalení před stanicí (`GetCurrentMaxSpeed`) i „cíl rozkazu
+   dosažen, hledej další" (`ChooseTrainTrack`) braly každé nástupiště
+   cílové stanice za příjezd. Rozkaz spojit má jedno nástupiště: to, kde
+   stojí partner (`IsCouplePartnerOnPlatform`); ostatní jsou pro něj trať.
+   Předtím to „fungovalo" jen náhodou: sběračka na špatném nástupišti
+   přeskočila na další rozkaz, odjela do depa na druhém konci a při
+   návratu partnera trefila.
+3. **Rezervace končící na partnerovi.** `FollowTrainReservation` nepozná
+   šev mezi vlastní rezervací a rezervací řady, sklouzne přes ni až na
+   její druhý konec a odpoví „nebezpečné místo"; sběračka pak stála se
+   správnou cestou pod sebou a čekala na jinou. Konec na políčku
+   vlastního cíle spojení je konec před ním (`IsCoupleTargetOnTile`,
+   i pro bezpečnou/volnou čekací pozici v `pbs.cpp` — řada přečnívající
+   na vjezdové políčko je jinak k dosažení jen z druhé strany).
+4. **Odložení v depu řezalo na hlavě řady, ne za odtahovkou.** Řada
+   sebraná za zadek leží v seznamu obráceně, hlava poslední; řez „na
+   hlavě" odložil jeden vůz a zbytek jel s odtahovkou na další výjezd —
+   při dalším spojení se pak k slovu dostala mašinka uvnitř a odtahovka
+   přišla o číslo. Řeže se za vlastní jednotkou odtahovky
+   (`GetNextUnit`).
+5. **Řada s mašinkou na konci se po otočení čte jako vlak** a odložení ji
+   bralo za spravenou poruchu: pustilo ji s jejími starými rozkazy hned
+   z depa. Volání odtahu na vagonky (cíl byl vagon) se odloží vždy; má-li
+   pak mašinku v čele, je to zaparkovaný vlak s brzdou jako u odpojení
+   v depu — jede, až hráč pustí brzdu.
+
+**Rig:** `testrada <x> <y>|vse` (dá starým řadám ze savu čekání),
+`testodtahovka <vlak>` (smaže rozkazy a udělá odtahovku),
+`testsleduj <vlak> [tiků]` (hlášení každých pár tiků: pozice, rychlost,
+max. rychlost, konec rezervace a proč stojí — bez toho by se bod 3
+nenašel). Scény `mess` (umak.sav), `messodvoz` (umins.sav, mašinka 28
+řadu odveze do depa 6), `messodtah` (umins.sav, odtahovka 28 na zavolání
+odveze všechny čtyři, dvě odloží jako řady, dvě zaparkuje jako vlaky,
+vrátí se domů).
+
+**Nedotčeno:** rozpojení („odpojit 0" zůstává), pravidlo odtahu poruch.
+
+---
+
+# 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy
 

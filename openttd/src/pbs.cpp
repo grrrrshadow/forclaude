@@ -472,7 +472,10 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * at the last signal before the station for a path that will never come,
 	 * because what is in its way is what it was sent for. See
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
-	if (((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) || IsRescueTargetOnTile(v, ft.new_tile))) return true;
+	if (((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
+			IsCoupleTargetOnTile(v, ft.new_tile) || IsRescueTargetOnTile(v, ft.new_tile))) {
+		return true;
+	}
 
 	if (ft.new_td_bits.Count() == 1) {
 		Trackdir td = FindFirstTrackdir(ft.new_td_bits);
@@ -530,5 +533,6 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * clear, since the wagons it is going to collect are not going to move on
 	 * their own. Pulling up against them is exactly right, and coupling takes
 	 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
-	return ((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) || IsRescueTargetOnTile(v, ft.new_tile));
+	return ((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
+			IsCoupleTargetOnTile(v, ft.new_tile) || IsRescueTargetOnTile(v, ft.new_tile));
 }

@@ -465,7 +465,12 @@ int Train::GetCurrentMaxSpeed() const
 
 	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && IsRailStationTile(moving_front->tile)) {
 		StationID sid = GetStationIndex(moving_front->tile);
-		if (this->current_order.ShouldStopAtStation(this, sid)) {
+		/* A train sent to couple stops on its partner's platform and nowhere
+		 * else at that station; the other platforms are line to it (see the
+		 * arrival check in VehicleEnterTile_Station()). */
+		bool stops_here = this->current_order.ShouldStopAtStation(this, sid) &&
+				(!this->current_order.ShouldGoToCouple() || IsCouplePartnerOnPlatform(this, moving_front->tile));
+		if (stops_here) {
 			int station_ahead;
 			int station_length;
 			int stop_at = GetTrainStopLocation(sid, moving_front->tile, moving_front, &station_ahead, &station_length);
@@ -1420,6 +1425,7 @@ static void NormaliseTrainHead(Train *head)
 
 static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain, bool keep_absorbed_identity = false);
 static void TrainEnterStation(Train *consist, StationID station);
+static StationID StationUnderChain(const Train *chain);
 static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
@@ -2803,6 +2809,35 @@ bool IsRescueTargetOnTile(const Train *v, TileIndex tile)
 	return false;
 }
 
+/**
+ * Is the rake this collector has spoken for standing on this tile?
+ *
+ * The platform rule (IsCouplePartnerOnPlatform()) lets a collector pull up
+ * against wagons on a platform. A rake that fills its platform exactly has
+ * its outer end a step past the platform's end, on the entry tile -- and a
+ * collector coming from that side meets it there, on plain track, where the
+ * platform rule has nothing to say. Same reasoning as for a casualty: the
+ * thing in the way is the thing that was sent for, so stopping short of it
+ * is the end of the journey.
+ *
+ * @param v    the train asking, any part of it
+ * @param tile the tile being considered as somewhere to stop
+ * @return whether its couple target stands on that tile
+ */
+bool IsCoupleTargetOnTile(const Train *v, TileIndex tile)
+{
+	const Train *head = v->First();
+	if (!head->current_order.ShouldGoToCouple()) return false;
+
+	const Train *target = Train::GetIfValid(head->couple_target);
+	if (target == nullptr || target->First() == head) return false;
+
+	for (const Train *u = target->First(); u != nullptr; u = u->Next()) {
+		if (u->tile == tile) return true;
+	}
+	return false;
+}
+
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
 {
 	if (!IsRailStationTile(tile)) return false;
@@ -3829,14 +3864,15 @@ static void TryDispatchRescueEngine(Train *tow)
 	tow->couple_target = nearest->index;
 	nearest->couple_claim = tow->index;
 	tow->SetDestTile(nearest->tile);
-	if (nearest->IsFreeWagon() && IsRailStationTile(nearest->tile)) {
+	StationID rake_station = nearest->IsFreeWagon() ? StationUnderChain(nearest) : StationID::Invalid();
+	if (rake_station != StationID::Invalid()) {
 		/* Wagons standing at a platform: the tow goes for them the way any
 		 * collector goes for a rake, on a station order to couple. That is
 		 * the one search that knows how to find a partner on a platform --
 		 * a platform is one step to the path search, and a bare tile as the
 		 * destination is walked straight over. Not an order in the list, the
 		 * tow has none; the running order only, as a depot run is. */
-		tow->current_order.MakeGoToStation(GetStationIndex(nearest->tile));
+		tow->current_order.MakeGoToStation(rake_station);
 		tow->current_order.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
 		tow->current_order.SetLoadType(OrderLoadType::NoLoad);
 		tow->current_order.SetUnloadType(OrderUnloadType::NoUnload);
@@ -3928,6 +3964,8 @@ bool HandleRescueEngineInDepot(Train *tow)
 
 	Train *casualty = Train::GetIfValid(tow->rescue_target);
 	bool in_tow = casualty != nullptr && casualty != tow && casualty->First() == tow;
+	/* The vehicle the call was written on, kept past the errand's end below. */
+	Train *called = casualty;
 
 	/* Still to be fetched, so the job is not over and there is nothing here to
 	 * put down. Say so rather than doing anything: the caller has to let the
@@ -3943,8 +3981,18 @@ bool HandleRescueEngineInDepot(Train *tow)
 		bool wrecked = casualty->IsWrecked();
 
 		/* Split it back off. It is standing in a depot, which is where taking
-		 * trains apart is an ordinary thing to do. */
-		TryConsistSplice(DoCommandFlag::Execute, casualty, nullptr, true);
+		 * trains apart is an ordinary thing to do.
+		 *
+		 * Cut behind the tow's own engine, not at the casualty's head. Picked
+		 * up off the end that faced the tow, the casualty lies the other way
+		 * round in the joined list, its head last -- and a cut at the head put
+		 * down that one vehicle and kept the rest on the tow, which then went
+		 * out on its next call dragging them along. A tow is an engine on its
+		 * own, so everything behind its own unit is what it fetched. */
+		Train *fetched = tow->GetNextUnit();
+		if (fetched == nullptr) return true;
+		TryConsistSplice(DoCommandFlag::Execute, fetched, nullptr, true);
+		casualty = fetched;
 
 		/* And put it back the right way round in the list, for the same reason
 		 * it has to be done when a train is decoupled at a platform: it was
@@ -3965,15 +4013,34 @@ bool HandleRescueEngineInDepot(Train *tow)
 		 * vehicle that is not the head of anything, does lasting damage. */
 		if (casualty->First() != casualty) return true;
 
-		if (casualty->IsFreeWagon()) {
+		/* The call was written on the vehicle that headed the rake when it was
+		 * made -- a wagon, for a rake; a casualty is called by its engine. That
+		 * vehicle need not head the chain now: a rake with engines riding
+		 * inside it (a coupling that went wrong, left as it was by the
+		 * player's choice) comes to lie engine first once it is turned round,
+		 * and reads as a train. It is still what the player called a tow for:
+		 * wagons to be put away, not a casualty to be repaired and sent on
+		 * its way. */
+		bool called_for_wagons = called != nullptr && !called->IsEngine();
+
+		if (casualty->IsFreeWagon() || called_for_wagons) {
 			/* Wagons fetched on the player's call: they are simply stored here
 			 * now, a rake in a shed for the next engine to collect, and the
 			 * call is answered. */
 			wagons = true;
 			casualty->rescue_deadline = TimerGameEconomy::Date{};
 			casualty->couple_claim = VehicleID::Invalid();
+			if (called != nullptr) called->rescue_deadline = TimerGameEconomy::Date{};
 			casualty->current_order.Free();
 			casualty->SetDestTile(INVALID_TILE);
+			if (casualty->IsFrontEngine()) {
+				/* An engine at its head makes it a train again. Parked, as a
+				 * whole train put down in a shed is (see TryDecoupleAtDepot()):
+				 * it keeps whatever orders it had and moves when the player
+				 * lets the brake off, not the moment it is put down. */
+				casualty->vehstatus.Set(VehState::Stopped);
+				casualty->ConsistChanged(CCF_ARRANGE);
+			}
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		} else if (wrecked) {
 			/* A wreck brought into a depot is scrapped there. */
@@ -4366,6 +4433,16 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 */
 	new_head->couple_target = VehicleID::Invalid();
 
+	/* No engine at the head: the collector came in nose first with wagons
+	 * behind it, and its engine now rides inside the chain. Not a train any
+	 * more but a rake, and it is left as one -- waiting to be collected, so
+	 * an engine sent to couple here, or the tow the player calls from its
+	 * window, can take it away. Nothing below is about a rake. */
+	if (!new_head->IsFrontEngine()) {
+		LeaveHeadlessChainWaiting(new_head);
+		return CommandCost();
+	}
+
 	/* The coupling this order asked for has happened, so the order is done.
 	 * Left set, the merged train goes on reading itself as still waiting for a
 	 * partner and simply stands there for good -- it has no reason left to
@@ -4548,6 +4625,143 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	}
 
 	return ret;
+}
+
+/**
+ * The station a chain is standing at, if any.
+ *
+ * Asked of the whole chain rather than of its head: a chain that fills a
+ * platform exactly has its head a step past the end of it, on the signal
+ * tile, and is standing at the station in every sense that matters. The
+ * station of the first vehicle found on a platform tile.
+ *
+ * @param chain head of the chain
+ * @return the station under it, or StationID::Invalid() if it is not at one
+ */
+static StationID StationUnderChain(const Train *chain)
+{
+	for (const Train *u = chain; u != nullptr; u = u->Next()) {
+		if (IsRailStationTile(u->tile)) return GetStationIndex(u->tile);
+	}
+	return StationID::Invalid();
+}
+
+/**
+ * Give a headless rake standing at a station the order that makes it a rake
+ * waiting to be collected there: the station, what the wagons do with cargo
+ * meanwhile, and the wait itself -- plus the written pair of orders the
+ * player can skip through. The caller settles who holds it and enters it
+ * into the station.
+ *
+ * @param rake        head of the rake
+ * @param station     the station it is standing at
+ * @param load_type   how the wagons load while they stand here
+ * @param unload_type how they unload
+ */
+static void LeaveRakeWaitingAtStation(Train *rake, StationID station, OrderLoadType load_type, OrderUnloadType unload_type)
+{
+	rake->current_order.MakeGoToStation(station);
+	/* The wagons keep being handled the way the train was told to handle
+	 * them here. They are the same wagons at the same platform a moment
+	 * later, so an order not to load that applied to them while they were
+	 * coupled has to go on applying once they are not -- otherwise the
+	 * engine departs under orders not to load and the wagons it left
+	 * behind start filling up on their own.
+	 *
+	 * And that order is theirs to finish before they are anybody's to
+	 * collect. Wagons told to fill up are doing a job here, not waiting;
+	 * only once the job is done do they become something an engine can be
+	 * sent for. Saying both at once -- filling up and waiting -- was wrong
+	 * and is what let a half-loaded rake be carried off. See Train::Tick(),
+	 * which is where the one turns into the other. */
+	rake->current_order.SetLoadType(load_type);
+	rake->current_order.SetUnloadType(unload_type);
+
+	/* Told to fill up, the rake has a job to finish here and is not waiting
+	 * for anybody until it is done. Told anything else, there is nothing to
+	 * finish, so it is waiting from the moment it is put down. */
+	rake->current_order.SetWaitForCouple(!rake->current_order.IsFullLoadOrder());
+
+	/* And the rake gets a real pair of orders: what the engine left it doing
+	 * here, and then waiting to be collected. Two orders, so the player can
+	 * open the ordinary orders window and press the ordinary Skip button to
+	 * go from the first to the second -- which is how you say "never mind
+	 * the load, take them away" when the industry that was filling them has
+	 * closed. No special button anywhere, and the same shape the reference
+	 * has.
+	 *
+	 * Nothing works through this list on its own: only the head of a train
+	 * is ever asked what to do next, and a rake has no engine at its head.
+	 * It is there to be read, skipped, and edited. Train::Tick() moves it on
+	 * from the first to the second when the loading really does finish. */
+	/* An order list is a pooled object, and the pool insists on being asked
+	 * whether it has room before anything is taken from it -- CanAllocateItem()
+	 * is not advice, it is the permission the allocation itself checks for,
+	 * and taking without asking is what brought the game down the moment an
+	 * engine put its wagons down. Every other place that gives a vehicle its
+	 * first order asks first (see CmdInsertOrder); this one has to as well,
+	 * and if the answer is no the rake simply goes without a written list.
+	 * It is still standing there waiting to be collected either way -- that
+	 * lives on the order it is working from, not on the list. */
+	if (rake->orders == nullptr && OrderList::CanAllocateItem()) {
+		Order job = rake->current_order;
+		job.SetWaitForCouple(false);
+
+		Order waiting{};
+		waiting.MakeGoToStation(station);
+		waiting.SetLoadType(OrderLoadType::NoLoad);
+		waiting.SetUnloadType(OrderUnloadType::NoUnload);
+		waiting.SetWaitForCouple(true);
+
+		InsertOrder(rake, std::move(job), 0);
+		InsertOrder(rake, std::move(waiting), 1);
+		rake->cur_real_order_index = rake->cur_implicit_order_index =
+				rake->current_order.ShouldWaitForCouple() ? 1 : 0;
+	}
+}
+
+/**
+ * A coupling has produced a chain with no engine at its head -- an engine
+ * that came in nose first with wagons behind it, so that the joined list
+ * reads wagon, engine, partner. That is a rake with an engine riding inside
+ * it, and the player's answer is to leave it exactly that: a rake, waiting
+ * to be collected like any other, with the tow button in its window. What
+ * it lacked was the waiting itself -- it stood there with no order at all,
+ * so neither a collecting engine nor the tow could see it.
+ *
+ * At a station it waits the way a put-down rake waits; anywhere else the
+ * wait alone is written on it, which is all a tow needs.
+ *
+ * @param chain head of the headless chain
+ */
+void LeaveHeadlessChainWaiting(Train *chain)
+{
+	assert(chain->First() == chain && !chain->IsFrontEngine());
+
+	chain->couple_claim = VehicleID::Invalid();
+	chain->couple_target = VehicleID::Invalid();
+	chain->flags.Reset(VehicleRailFlag::LeavingStation);
+	chain->wait_counter = 0;
+
+	StationID at = StationUnderChain(chain);
+	if (at != StationID::Invalid()) {
+		LeaveRakeWaitingAtStation(chain, at, OrderLoadType::NoLoad, OrderUnloadType::NoUnload);
+		TrainEnterStation(chain, at);
+	} else {
+		chain->current_order.Free();
+		chain->current_order.SetWaitForCouple(true);
+		chain->SetDestTile(INVALID_TILE);
+	}
+	/* It keeps the ground under itself and nothing else, like every rake. */
+	FreeTrainTrackReservation(chain);
+	chain->ReserveTrackUnderConsist();
+	InvalidateWindowData(WindowClass::VehicleView, chain->index);
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Rada na ({},{}): bez cela (masinka uvnitr) - ceka na spojeni {}",
+				TileX(chain->tile), TileY(chain->tile),
+				at == StationID::Invalid() ? std::string("na siré trati") : fmt::format("u stanice {}", at));
+	}
 }
 
 /**
@@ -4896,64 +5110,7 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 	if (IsRailStationTile(remainder->tile)) {
 		StationID station = GetStationIndex(remainder->tile);
-		remainder->current_order.MakeGoToStation(station);
-		/* The wagons keep being handled the way the train was told to handle
-		 * them here. They are the same wagons at the same platform a moment
-		 * later, so an order not to load that applied to them while they were
-		 * coupled has to go on applying once they are not -- otherwise the
-		 * engine departs under orders not to load and the wagons it left
-		 * behind start filling up on their own.
-		 *
-		 * And that order is theirs to finish before they are anybody's to
-		 * collect. Wagons told to fill up are doing a job here, not waiting;
-		 * only once the job is done do they become something an engine can be
-		 * sent for. Saying both at once -- filling up and waiting -- was wrong
-		 * and is what let a half-loaded rake be carried off. See Train::Tick(),
-		 * which is where the one turns into the other. */
-		remainder->current_order.SetLoadType(load_type);
-		remainder->current_order.SetUnloadType(unload_type);
-
-		/* Told to fill up, the rake has a job to finish here and is not waiting
-		 * for anybody until it is done. Told anything else, there is nothing to
-		 * finish, so it is waiting from the moment it is put down. */
-		remainder->current_order.SetWaitForCouple(!remainder->current_order.IsFullLoadOrder());
-
-		/* And the rake gets a real pair of orders: what the engine left it doing
-		 * here, and then waiting to be collected. Two orders, so the player can
-		 * open the ordinary orders window and press the ordinary Skip button to
-		 * go from the first to the second -- which is how you say "never mind
-		 * the load, take them away" when the industry that was filling them has
-		 * closed. No special button anywhere, and the same shape the reference
-		 * has.
-		 *
-		 * Nothing works through this list on its own: only the head of a train
-		 * is ever asked what to do next, and a rake has no engine at its head.
-		 * It is there to be read, skipped, and edited. Train::Tick() moves it on
-		 * from the first to the second when the loading really does finish. */
-		/* An order list is a pooled object, and the pool insists on being asked
-		 * whether it has room before anything is taken from it -- CanAllocateItem()
-		 * is not advice, it is the permission the allocation itself checks for,
-		 * and taking without asking is what brought the game down the moment an
-		 * engine put its wagons down. Every other place that gives a vehicle its
-		 * first order asks first (see CmdInsertOrder); this one has to as well,
-		 * and if the answer is no the rake simply goes without a written list.
-		 * It is still standing there waiting to be collected either way -- that
-		 * lives on the order it is working from, not on the list. */
-		if (remainder->orders == nullptr && OrderList::CanAllocateItem()) {
-			Order job = remainder->current_order;
-			job.SetWaitForCouple(false);
-
-			Order waiting{};
-			waiting.MakeGoToStation(station);
-			waiting.SetLoadType(OrderLoadType::NoLoad);
-			waiting.SetUnloadType(OrderUnloadType::NoUnload);
-			waiting.SetWaitForCouple(true);
-
-			InsertOrder(remainder, std::move(job), 0);
-			InsertOrder(remainder, std::move(waiting), 1);
-			remainder->cur_real_order_index = remainder->cur_implicit_order_index =
-					remainder->current_order.ShouldWaitForCouple() ? 1 : 0;
-		}
+		LeaveRakeWaitingAtStation(remainder, station, load_type, unload_type);
 
 		/* Until the engine that put them down has pulled clear, the wagons
 		 * are not on offer: a collector sent now would find the platform
@@ -6888,7 +7045,14 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		orders.SwitchToNextOrder(false);
 	} else if (consist->current_order.IsType(OT_LOADING) || (!consist->current_order.IsType(OT_GOTO_DEPOT) && (
 			consist->current_order.IsType(OT_GOTO_STATION) ?
-			IsRailStationTile(moving_front->tile) && consist->current_order.GetDestination() == GetStationIndex(moving_front->tile) :
+			IsRailStationTile(moving_front->tile) && consist->current_order.GetDestination() == GetStationIndex(moving_front->tile) &&
+			/* A couple order is reached on the platform its partner stands
+			 * on and nowhere else. The road to that platform can run through
+			 * another platform of the same station, and looking ahead from
+			 * there as if the order were done sent the collector off after its
+			 * next order -- to a depot at the other end of the line -- with the
+			 * rake one platform over. */
+			(!consist->current_order.ShouldGoToCouple() || IsCouplePartnerOnPlatform(consist, moving_front->tile)) :
 			moving_front->tile == consist->dest_tile))) {
 		orders.SwitchToNextOrder(true);
 	}
@@ -9073,7 +9237,13 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * it fails are exactly the times the way ahead is busy. */
 		if (!IsWholeTrainInsideDepot(consist)) {
 			PBSTileInfo res = FollowTrainReservation(consist);
-			if (!res.okay) {
+			/* The walk cannot tell this train's reservation from the rake's
+			 * own, which lies flush against its end, and glides on across the
+			 * seam to the rake's far end -- no place to wait, so the answer
+			 * came back "not safe" for a path that in fact ends right in front
+			 * of what it was booked for, and the train stood on it for good.
+			 * Ending on the rake is ending in front of it. */
+			if (!res.okay && !IsCoupleTargetOnTile(consist, res.tile)) {
 				if ((consist->tick_counter & 0x7) != 0) return true;
 				if (!TryPathReserve(consist)) return true;
 			}
@@ -9321,6 +9491,15 @@ bool Train::Tick()
 		this->current_order_time++;
 
 		if (!TrainLocoHandler(this, false)) return false;
+
+		/* The first call can end in a coupling that puts this engine inside
+		 * another chain -- nose first onto a waiting train with wagons behind
+		 * it, so that a wagon heads the joined list and this engine rides
+		 * along dormant. It is the head of nothing now, and the second call
+		 * must not act for it: it would go on working the couple order it
+		 * still carries and claim, as a collector, the very rake it is now
+		 * part of -- which then reads as held by its dropper for good. */
+		if (this->First() != this) return true;
 
 		return TrainLocoHandler(this, true);
 	} else if (this->IsFreeWagon() && !this->vehstatus.Test(VehState::Crashed)) {

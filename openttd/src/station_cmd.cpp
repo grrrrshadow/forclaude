@@ -3878,6 +3878,19 @@ static VehicleEnterTileStates VehicleEnterTile_Station(Vehicle *v, TileIndex til
 		Vehicle *consist = v->First();
 		if (!consist->current_order.ShouldStopAtStation(consist, station_id)) return {};
 
+		/* Sent here to couple, the train has one platform to arrive at: the
+		 * one its partner is standing on. Its route there can run through
+		 * another platform of the same station -- round the back, when the
+		 * rake fills its platform up to the entry tile -- and arriving on
+		 * that one would start a loading stop at the wrong platform, with the
+		 * partner one platform over, for good. Every other platform of the
+		 * station is a piece of line to it. */
+		if (consist->current_order.IsType(OT_GOTO_STATION) && consist->current_order.ShouldGoToCouple() &&
+				consist->current_order.GetDestination().ToStationID() == station_id &&
+				!IsCouplePartnerOnPlatform(Train::From(consist), tile)) {
+			return {};
+		}
+
 		int station_ahead;
 		int station_length;
 		int stop = GetTrainStopLocation(station_id, tile, Train::From(v), &station_ahead, &station_length);
