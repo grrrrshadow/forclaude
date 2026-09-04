@@ -157,6 +157,8 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	VehicleID rescue_target = VehicleID::Invalid(); ///< Casualty a rescue engine has been sent to fetch, so no two are sent to the same one.
 
 	RescueHold rescue_hold = RescueHold::None; ///< NOSAVE: why an engine on call has not been sent anywhere, so the window can say so.
+	VehicleID rescue_skip = VehicleID::Invalid(); ///< NOSAVE: a case this engine gave up on for now because no road to it could be booked; others come first.
+	uint8_t rescue_nopath_tries = 0; ///< NOSAVE: how many times in a row the road to the current case could not be booked.
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
 	/**

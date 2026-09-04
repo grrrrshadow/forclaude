@@ -2783,21 +2783,27 @@ static bool ConTestMakeRescueEngine(std::span<std::string_view> argv)
  */
 static bool ConTestRequestTow(std::span<std::string_view> argv)
 {
-	if (argv.size() != 2) {
-		IConsolePrint(CC_HELP, "Call a tow for waiting wagons. Usage: 'testodvoz <unit number>' or 'testodvoz vse'.");
+	if (argv.size() != 2 && argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Call a tow for waiting wagons. Usage: 'testodvoz <unit number>', 'testodvoz <x> <y>' or 'testodvoz vse'.");
 		return true;
 	}
 	bool all = argv[1] == "vse";
 	uint unit = 0;
+	TileIndex at = INVALID_TILE;
 	if (!all) {
 		auto punit = ParseInteger(argv[1]);
 		if (!punit.has_value()) return false;
 		unit = *punit;
+		if (argv.size() == 3) {
+			auto py = ParseInteger(argv[2]);
+			if (!py.has_value()) return false;
+			at = TileXY(unit, (uint)*py);
+		}
 	}
 	uint done = 0;
 	for (Train *t : Train::Iterate()) {
 		if (t->First() != t || !IsWaitingWagonChain(t)) continue;
-		if (!all && t->unitnumber != (UnitID)unit) continue;
+		if (!all && (at != INVALID_TILE ? t->tile != at : t->unitnumber != (UnitID)unit)) continue;
 		AutoRestoreBackup cur_company(_current_company, t->owner);
 		CommandCost res = Command<Commands::RequestWagonTow>::Do(DoCommandFlag::Execute, t->index, true);
 		IConsolePrint(res.Failed() ? CC_ERROR : CC_DEFAULT, "testodvoz: rada {} na ({},{}) - {}", t->unitnumber, TileX(t->tile), TileY(t->tile),

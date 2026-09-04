@@ -1817,8 +1817,12 @@ bool IsWaitingToBeRescued(const Train *v)
 	 * puts it down in the depot as a stored rake. */
 	if (v->IsFreeWagon()) {
 		if (v->IsInDepot()) return false;
-		if (v->rescue_deadline == TimerGameEconomy::Date{}) return false;
-		return TimerGameEconomy::date < v->rescue_deadline;
+		/* The call stands until it is answered or taken back. A breakdown's
+		 * deadline is there because vanilla mends a breakdown by itself in
+		 * the end; nothing mends a rake of wagons, and a call the player
+		 * made that quietly lapsed while the tow was held up looked to the
+		 * player like a tow that had gone to sleep. */
+		return v->rescue_deadline != TimerGameEconomy::Date{};
 	}
 	if (!v->IsFrontEngine()) return false;
 	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
@@ -3821,6 +3825,7 @@ static void TryDispatchRescueEngine(Train *tow)
 
 	Train *nearest = nullptr;
 	uint nearest_distance = UINT_MAX;
+	Train *skipped = nullptr;
 	bool saw_trouble = false;
 	bool saw_casualty = false;
 	for (Train *casualty : Train::Iterate()) {
@@ -3844,6 +3849,12 @@ static void TryDispatchRescueEngine(Train *tow)
 		}
 		if (taken) continue;
 
+		/* The one it gave up on for want of a road: only if nobody else. */
+		if (casualty->index == tow->rescue_skip) {
+			skipped = casualty;
+			continue;
+		}
+
 		uint distance = DistanceManhattan(tow->tile, casualty->tile);
 		if (distance < nearest_distance) {
 			nearest = casualty;
@@ -3851,12 +3862,21 @@ static void TryDispatchRescueEngine(Train *tow)
 		}
 	}
 
+	if (nearest == nullptr) nearest = skipped;
 	if (nearest == nullptr) {
 		if (saw_casualty) return hold(RescueHold::AllTaken);
 		return hold(saw_trouble ? RescueHold::NotEligible : RescueHold::NobodyWaiting);
 	}
 
 	tow->rescue_hold = RescueHold::None;
+	tow->rescue_nopath_tries = 0;
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: odtah - vyjizdim pro {} ({}) na ({},{}) (tik {})", tow->unitnumber, nearest->index.base(),
+				nearest->IsFreeWagon() ? "vagonky" : "poruchu", TileX(nearest->tile), TileY(nearest->tile), TimerGameTick::counter);
+	}
+	/* Going for somebody else clears the way for another try at the one
+	 * given up on; going for that one is the try. */
+	tow->rescue_skip = VehicleID::Invalid();
 
 	tow->rescue_target = nearest->index;
 	/* Spoken for, in the same words every other coupling uses: the casualty
@@ -6404,7 +6424,27 @@ static bool CheckTrainStayInDepot(Train *v)
 	 * The whole road or the shed. Those are the only two places it belongs. */
 	if ((seg_state == SigSegState::Path || IsFetchingCasualty(v)) && !TryPathReserve(v) && v->force_proceed == TFP_NONE) {
 		/* No path and no force proceed. */
-		if (on_call) v->rescue_hold = RescueHold::NoPath;
+		if (on_call) {
+			v->rescue_hold = RescueHold::NoPath;
+			/* A case whose road cannot be booked is not the only case there
+			 * is. Held to it, the engine sat in its shed for as long as that
+			 * road stayed shut -- with wagons the player had called it for
+			 * standing opposite the door, told there was no tow within reach.
+			 * After a few refusals it lets this one go and the next look
+			 * puts the others first; this one is tried again when it is
+			 * alone, or once another case has been seen to. */
+			if (++v->rescue_nopath_tries >= 8) {
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: odtah - k pripadu {} se ted nejde dostat, zkusim jine (tik {})", v->unitnumber, v->rescue_target.base(), TimerGameTick::counter);
+				}
+				v->rescue_skip = v->rescue_target;
+				v->rescue_nopath_tries = 0;
+				EndRescueErrand(v);
+				v->current_order.MakeDummy();
+				v->SetDestTile(INVALID_TILE);
+				InvalidateWindowData(WindowClass::VehicleView, v->index);
+			}
+		}
 		if (_show_train_orientation) {
 			SayOnChange(v, fmt::format("Vlak {}: vyjezd z depa odlozen - cesta se nepodarila zarezervovat", v->unitnumber));
 		}

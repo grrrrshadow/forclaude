@@ -1720,6 +1720,43 @@ vrátí se domů).
 
 ---
 
+## 4.13 Odtahovka držená nedosažitelným případem nevyjede pro nic jiného
+
+**Hráčovo hlášení (save eka):** odtahovka odtáhne první řadu naproti depu,
+druhou po zavolání ne — okno říká, že cestu nenajde — dokud ji hráč
+nesesadí a znovu neurčí odtahovkou; pak jede.
+
+**Změřeno:** po prvním odtahu si odtahovka vybere nejbližší případ, porouchaný
+vlak, ke kterému nejde zamluvit cestu (na trati stojí jiný vlak), a sedí v depu
+s „nenajde cestu k poruse" — až do vypršení lhůty té poruchy, což je i s
+odstupy pokusů tisíce tiků. Zavolaná řada se zatím dočkala jen „žádná
+odtahovka v dosahu": odtahovka má cíl, tak ji výběr přeskočí. Sesazení a
+nové určení cíl smaže a nový výběr padne na řadu (je blíž). A druhá věc:
+volání na vagonky mělo lhůtu jako porucha; když odtahovka nemohla ven
+dost dlouho, volání potichu vypršelo a řada už se nenabízela.
+
+**Oprava:**
+
+1. Po osmi marných pokusech zamluvit cestu k případu (`CheckTrainStayInDepot`,
+   `RescueHold::NoPath`) odtahovka případ pustí a zapíše si ho jako
+   odložený (`rescue_skip`, neukládá se). Výběr (`TryDispatchRescueEngine`)
+   bere odložený případ jen tehdy, když jiný není; vyjede-li pro jiný, odložení
+   se smaže a odložený přijde na řadu znovu. Sám o sobě se odložený zkouší
+   pořád dokola (to je totéž, co dřív), jen se mezitím obslouží ostatní.
+2. Volání odtahu na vagonky nevyprší; trvá, dokud odtahovka nepřijede nebo
+   hráč volání nevezme zpět. Lhůta u poruchy existuje proto, že se porucha
+   nakonec spraví sama; vagonky se samy nespraví.
+
+**Rig:** scéna `ekaodtah` (eka.sav): první řada hned, druhá zavolaná ve chvíli,
+kdy odtahovka sedí na nedosažitelné poruše — odtahovka poruchu pustí a řadu
+odveze (`odtazeno=2`). Diagnostika „odtah - vyjizdim pro … (tik)" a „k pripadu
+… se ted nejde dostat, zkusim jine".
+
+**Nedotčeno:** blokovaný výjezd z depa (`ExitBlocked`) se nestřídá — zavřené
+dveře zavírají všem případům stejně.
+
+---
+
 # 5. Myš, kurzor, stavba
 
 ## 5.0 Co je „naše" nastavení posunu mapy
@@ -3270,3 +3307,11 @@ je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
   mašinka to ustojí — cíl se jí zruší, počká v depu a sebere až to, co
   přijde po ní. Kdyby se to mělo zamknout, patří to do příkazu, ne do
   okna.
+
+- **Porucha na políčku depa odtahovky nikdy neskončí (save eka).** V rigu
+  se vlak 20 porouchá cestou do depa na políčku (125,78), kde stojí
+  odtahovka; lhůta odtahu mu vyprší („uz na odtah neceka"), ale porouchaný
+  zůstane do konce měření (přes 15 000 tiků) a odtahovce zavírá dveře
+  (`vyjezd z depa je blokovany`) — napůl v depu, napůl venku, plazí se
+  rychlostí 2–16. Je to ten případ „porucha z půlky v depu", na který se
+  čekalo se savem; teď save je. Nezkoumáno dál, zapsáno, ať se neztratí.
