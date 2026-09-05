@@ -1408,6 +1408,9 @@ STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Select the phys
 
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING                          :Trains wait to be towed away: {STRING2}
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING_HELPTEXT                 :A train that has broken down or crashed stays where it is and waits for a rescue engine to fetch it, instead of repairing itself or falling apart where it stands. Turned off, breakdowns and crashes behave as they do in the unmodified game
+STR_CONFIG_SETTING_RESCUE_WAIT_DAYS                             :Breakdown length: {STRING2}
+STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_HELPTEXT                    :How long a broken-down or crashed train waits for a rescue engine before it mends itself. A longer breakdown extends the reach of the rescue engine
+STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} day{P 0 "" s}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Trains slow down before a level crossing: {STRING2}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :A train eases off where the line is dangerous, and runs normally under a road bridge. The driver looks ahead, and a car caught on the crossing comes off more lightly
 

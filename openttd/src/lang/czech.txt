@@ -1488,6 +1488,9 @@ STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Zvolit fyzikál
 
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING                          :Vlaky čekají na odtah: {STRING}
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING_HELPTEXT                 :Porouchaný nebo havarovaný vlak zůstane stát a čeká, až pro něj přijede odtahovka, místo aby se sám spravil nebo se na místě rozpadl. Vypnuto se porucha i havárie chovají jako v neupravené hře
+STR_CONFIG_SETTING_RESCUE_WAIT_DAYS                             :Délka poruch: {STRING}
+STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_HELPTEXT                    :Jak dlouho porouchaný nebo havarovaný vlak čeká na odtahovku, než se spraví sám. Delší porucha zvětšuje dosah odtahovky
+STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} {P 0 den dny dní}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Vlak spomalí před silničním přejezdem: {STRING}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :Vlak na nebezpečném úseku spomalí, pod silničním nadjezdem jede normálně. Strojvedoucí předvídá, auta uvízlá na přejezdu spůsobí menší škody.
 

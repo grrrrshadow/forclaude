@@ -1365,9 +1365,10 @@ cesta se zamluví a odtahovka vyjede. Znovu se to nezvedá.
 InDepot()` zkusí zamluvit cestu znovu každých 37 tiků, pořád dokola, a
 okno odtahovky mezitím říká „Má výjezd, nenachází cestu k případu"
 (`RescueHold::NoPath`). Strop je jediný, a je to strop porouchaného vlaku,
-ne odtahovky: `RESCUE_DEADLINE_DAYS` (čtvrt roku). Když se do té doby
-trať neuvolní, porouchaný to vzdá a spraví se po vanilkovém, odtahovka
-zruší výjezd a vrátí se do pohotovosti. Zaseknout se tím nedá nic.
+ne odtahovky: délka poruchy (`vehicle.rescue_wait_days`, dřív pevně čtvrt
+roku, teď hráčovo nastavení, viz 7.3). Když se do té doby trať neuvolní,
+porouchaný to vzdá a spraví se po vanilkovém, odtahovka zruší výjezd a
+vrátí se do pohotovosti. Zaseknout se tím nedá nic.
 
 ---
 
@@ -2359,6 +2360,23 @@ Vypnuto: nakládají všichni najednou a dělí se.
 U stanice se ukládá **výjimka**, ne stav — díky tomu znamená totéž, ať je
 celohra na kterékoliv straně, a starý sav se načte jako „žádné výjimky".
 Když je celohra vypnutá, čudlík je zašedlý; není z čeho vyjímat.
+
+## 7.3 Délka poruch = dosah odtahovky
+
+**Ve vanile** porucha trvá `breakdown_delay` = 128–255 kroků, u vlaků se
+odečítá každý 4. tik → 512–1020 tiků ≈ **7–14 dní**. U nás s odtahem
+zapnutým porouchaný (i havarovaný) vlak čeká na odtahovku a spraví se sám
+teprve, když čekání vyprší (`TrainAwaitsRescue`) — to čekání je délka poruchy
+a zároveň dosah odtahovky: čím dál má odtahovka z depa, tím déle musí porucha
+vydržet. Dřív pevně čtvrt roku (`RESCUE_DEADLINE_DAYS`).
+
+**Hráčovo rozhodnutí:** nastavení hry, ve stromu Nehody hned pod „Poruchy
+vozidel", **„Délka poruch"** ve dnech, nápověda „Delší porucha zvětšuje dosah
+odtahovky". Hráčům implicitně **14 dní** („zkusíme"), rozsah 7–365; pro ladění
+necháváme dlouhou — rig si v každé scéně nastaví 90 (`battery.sh`,
+`setting vehicle.rescue_wait_days 90`), protože scény byly psané proti čtvrt
+roku. `vehicle.rescue_wait_days`, `RescueDeadlineDays()` v `train_cmd.cpp`.
+Starý save pole nemá → 14.
 
 ---
 

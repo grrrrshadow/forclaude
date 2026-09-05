@@ -613,6 +613,7 @@ struct VehicleSettings {
 	AccelerationModel train_acceleration_model; ///< realistic acceleration for trains
 	bool train_slow_for_level_crossing; ///< trains ease off before a level crossing
 	bool train_rescue_towing; ///< broken-down and crashed trains wait to be towed away instead of sorting themselves out
+	uint16_t rescue_wait_days; ///< how many days a broken-down or crashed train waits to be fetched before it mends itself the vanilla way
 	AccelerationModel roadveh_acceleration_model; ///< realistic acceleration for road vehicles
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration

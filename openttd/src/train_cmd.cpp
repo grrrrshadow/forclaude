@@ -3790,13 +3790,21 @@ static void NormaliseCoupledConsistFacing(Train *consist)
 
 /**
  * How long a casualty waits to be fetched before sorting itself out the vanilla
- * way: three months of game time, counted from the trouble rather than from a
- * rescue engine setting off. One length for both kinds of casualty -- a
- * breakdown and a crash wait exactly as long -- because from the player's side
- * they are the same wait, and two different lengths would only be something to
- * guess at.
+ * way, counted from the trouble rather than from a rescue engine setting off.
+ * One length for both kinds of casualty -- a breakdown and a crash wait exactly
+ * as long -- because from the player's side they are the same wait, and two
+ * different lengths would only be something to guess at.
+ *
+ * The length is the player's, in the game settings under the breakdown
+ * frequency: it is what a breakdown lasts in this game, and it is the reach of
+ * a rescue engine -- the further the shed, the longer the casualty has to
+ * hold out. The player's default is a fortnight; the rig runs it at a quarter
+ * of a year to have time to watch.
  */
-static constexpr int RESCUE_DEADLINE_DAYS = EconomyTime::DAYS_IN_ECONOMY_YEAR / 4;
+static inline int RescueDeadlineDays()
+{
+	return _settings_game.vehicle.rescue_wait_days;
+}
 
 /**
  * Should this broken-down train stay broken down and wait to be fetched?
@@ -3827,7 +3835,7 @@ bool TrainAwaitsRescue(Train *v)
 	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return false;
 
 	if (v->rescue_deadline == TimerGameEconomy::Date{}) {
-		v->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+		v->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
 
 		/* From this moment the train is going nowhere until it is fetched, so
 		 * the path it had reserved ahead of itself is track it will never
@@ -3976,7 +3984,7 @@ CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool requ
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		v->rescue_deadline = request ? TimerGameEconomy::date + RESCUE_DEADLINE_DAYS : TimerGameEconomy::Date{};
+		v->rescue_deadline = request ? TimerGameEconomy::date + RescueDeadlineDays() : TimerGameEconomy::Date{};
 		/* Whatever it was doing, from now on it is a rake waiting to be
 		 * fetched -- which is what lets the tow couple to it at all. */
 		if (request) v->current_order.SetWaitForCouple(true);
@@ -8381,7 +8389,7 @@ uint Train::Crash(bool flooded)
 		 * broken-down train starts its wait the moment it breaks down and this is
 		 * the same moment for a wreck. */
 		if (!this->vehicle_flags.Test(VehicleFlag::RescueEngine) && this->rescue_deadline == TimerGameEconomy::Date{}) {
-			this->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+			this->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
 			this->current_order.SetWaitForCouple(true);
 			this->current_order.SetGoToCouple(false);
 		}
@@ -10163,7 +10171,7 @@ bool Train::Tick()
 			 * its clock is a wreck that stands on the line for ever. Only the
 			 * first one ever cleared itself away; the rest simply stayed. */
 			if (this->rescue_deadline == TimerGameEconomy::Date{}) {
-				this->rescue_deadline = TimerGameEconomy::date + RESCUE_DEADLINE_DAYS;
+				this->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
 			}
 
 			if (TimerGameEconomy::date >= this->rescue_deadline) {
