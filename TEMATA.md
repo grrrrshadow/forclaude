@@ -3794,6 +3794,12 @@ je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
   přijde po ní. Kdyby se to mělo zamknout, patří to do příkazu, ne do
   okna.
 
+- **Scéna `okruh` jednou ze 17 běhů vyšla 0/0.** Scény na nové hře běží na
+  náhodné mapě (`newgame` bez semínka), takže terén se mezi běhy liší a
+  běh se nedá zopakovat; log toho jednoho běhu byl přepsaný dalším. Čtyři
+  opakování hned poté prošly. Nezkoumáno dál (hráč: neladit, testuje sám).
+  Kdyby se to vracelo: dát baterii pevné semínko a druhé, jiné, na hledání.
+
 - **Porucha na políčku depa odtahovky nikdy neskončí (save eka).** V rigu
   se vlak 20 porouchá cestou do depa na políčku (125,78), kde stojí
   odtahovka; lhůta odtahu mu vyprší („uz na odtah neceka"), ale porouchaný
