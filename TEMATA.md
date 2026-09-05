@@ -2181,6 +2181,13 @@ sama píše, že zamykání ukazatele nemusí všude fungovat.
   vanilkový rozsah. V rigu se pak hlásí 1 (starší OpenGFX než beta 16 —
   pravé hlášení). Hlášení o chybějících překladech necháváme, překlady až
   ve finále (hráčovo rozhodnutí).
+  **Jak to spolu žije (hráčova otázka):** vlastní OpenGFX nemáme a nepotřebujeme.
+  Hra při načtení grafiky vezme dva „extra" soubory: náš `openttd.grf`
+  (v gitu, `media/baseset/`, balí se s hrou — proto v CI buildu ikonky
+  jsou) a extra grf základní sady (OpenGFX ze serveru). Sada přebije jen
+  ty sprity, které sama má; našich 18 nezná, ty zůstanou z našeho souboru.
+  Stažené OpenGFX je obyčejné, o nás neví, a nic mu nechybí — chybělo jen
+  počítadlo, které tenhle rozdíl neznalo.
 - **Titulek úvodního okna a podtitul loga:** `STR_INTRO_CAPTION` je
   „OpenTTD decouple by Karel Mácha" (hráčův text); pod oranžové logo na
   úvodní obrazovce se kreslí oranžově velkým písmem `STR_INTRO_SUBTITLE`
