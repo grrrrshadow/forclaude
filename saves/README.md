@@ -23,3 +23,6 @@ přes `-g` a scény jsou v baterii.
 - `emu.sav`, `emu_reverz.sav` — dvě depa, osm dvouhlavých jednotek, čtyři
   čekají na spojení, čtyři jedou spojit (v `emu_reverz` reverzně), pak
   odpojit a do depa. TEMATA 2.35. Scény `emu`, `emujz`.
+- `loko_obou_stran.sav` — vlaky 20+ mašinka–vůz–mašinka z obyčejných
+  lokomotiv; plán „odpojit připojený vlak" (TEMATA §3, plán). Scéna:
+  20–23 pustit, 24 naklonovat 3×.

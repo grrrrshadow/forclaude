@@ -1062,6 +1062,60 @@ změny, klepnutí vybírá a nic víc.
   Odjezd od sebe (skalární součin směru jízdy a spojnice) se nechá jet;
   jízda proti sobě bouchá dál, nárok nenárok.
 
+- **PLÁN (neuděláno): „odpojit připojený vlak" jako druhá volba příkazu
+  odpojit.** Hráčův save `loko_obou_stran.sav`: vlaky 20+ jsou
+  mašinka–vůz–mašinka z obyčejných lokomotiv (ne dvouhlavá jednotka).
+  Pro ně dnešní pravidlo „druhý vlak se odpojí u své první mašinky" (2.35
+  bod 3) sedí špatně: první mašinka za čelem je **vlastní zadní
+  lokomotiva** a hra nemá jak vědět, že patří k prvnímu vlaku. „Nechat si
+  0" by tedy uřízlo i ji — čelo odjede samo a zbytek s mašinkou v čele je
+  nový vlak bez příkazů (má mašinku, tak se čte jako vlak, 4.12 se ho
+  netýká).
+
+  Hráčovo rozhodnutí o rozhraní: čudlík odpojit nabídne dvě volby —
+  **„nechat si N vozů"** (dnešní, s číslem, 0 = všechny vozy dolů; zůstává
+  kvůli vagonkům) a **„odpojit vlak"** = odpojit přesně to, co vlak
+  připojil (naše „zvláštní nula", stejná věc, jakou EMU dělá samo).
+  Příkaz připojit se nemění (výběr nákladu zůstává, připojuje se vždy celá
+  řada), jen si má pamatovat, co potom odpojí. U dvouhlavých jednotek je
+  logika z 2.35 nadřazená a volba hráče nemá vliv.
+
+  Návrh provedení:
+  1. **Paměť spoje = značka na prvním vozidle připojené části**
+     (`VehicleRailFlag`, ukládá se se savem), zapíše se v `CmdCoupleTrains`
+     po splice na první vozidlo přivěšené části (ať leží jakkoli, po
+     otočení seznamu je to prostě první článek partnera v spojeném
+     seznamu). Spící identita na mašince (keep_absorbed_identity) zůstává
+     tím, co se probudí — značka říká jen *kde* řez vede, a funguje i pro
+     řadu bez mašinky. Víc spojení = víc značek; „odpojit vlak" řeže u
+     první značky za čelem, tedy nechá jen to, s čím vlak vyjel z depa.
+     Značka mizí řezem. Starý save bez značek: „odpojit vlak" padne na
+     dnešní hledání spící identity (mašinka s identitou za čelem), a když
+     ani ta není, řekne v konzoli, že neví, co bylo připojeno, a neudělá nic.
+  2. **Příkaz:** místo dvou otázek tři odpovědi — neodpojovat / odpojit
+     připojený vlak / nechat si N vozů. Nejmenší zásah: k `decouple` a
+     `decouple_keep_wagons` přibude bool `decouple_coupled` (vlastní pole,
+     ne hodnota 255 v počtu — 0.3 „dvě otázky, dvě pole"). Řádek příkazu:
+     „(a odpojí připojený vlak)" / „(a nechá si N)" / „(a nechá je
+     všechny stát)".
+  3. **Čudlík:** z přepínače se stane rozbalovací tlačítko jako „Bez
+     zastávky"/„Plně naložit" — položky „Neodpojovat", „Odpojit připojený
+     vlak", „Nechat si … vozů" (ta otevře dnešní číselník s nulou
+     předvyplněnou). Nápis tlačítka říká, co je zvolené. Jedno místo, jeden
+     zvyk, žádný nový stav okna. Alternativa (klik = zapnout a hned
+     nabídnout dvě položky, druhý klik = vypnout) je o krok kratší, ale
+     přepnout mezi režimy pak znamená vypnout a zapnout.
+  4. **Vlastní zadní lokomotiva při „nechat si N":** se značkou už jde
+     poznat, co je vlastní — a hráčovo přání pro tenhle save je nechat
+     „nechat si 0" jak je (lokomotivy zůstanou v řadě). Otevřené: má
+     „nechat si 0" u mašinka–vůz–mašinka nechat vlastní zadní lokomotivu
+     na vlaku (jako EMU nechává zadní hlavu), nebo ji pustit s řadou?
+     Hráč říká pustit. Zapsáno, rozhodnutí je jeho.
+
+  Změřeno zatím jen složení savu; scéna (20–23 pustit, 24 naklonovat 3×)
+  za 15 000 tiků ke spojení nedošla — 22 a 23 stojí „zaseklé" na jedné
+  koleji za sebou. Nezkoumáno, patří k tomuhle savu, až se bude dělat.
+
 ---
 
 # 4. Odtah
