@@ -80,6 +80,17 @@ private:
 	 */
 	bool decouple = false;
 	uint8_t decouple_keep_wagons = 0;
+	/**
+	 * The other answer to "what stays on": not a number of wagons but "what
+	 * this train came with" -- the decoupling drops exactly what it coupled
+	 * on the way, at the coupling that joined it (see FindCoupledBoundary()).
+	 * The player's word for it is "decouple the whole train"; a count of zero
+	 * stays what it was, every wagon down, which is the right thing for a
+	 * rake but cuts a locomotive-both-ends train behind its front engine.
+	 * Only meaningful if #decouple; when nothing is remembered it falls back
+	 * to that zero.
+	 */
+	bool decouple_whole_train = false;
 
 	/**
 	 * The old "how many vehicles from the front stay on, zero means do not
@@ -260,6 +271,12 @@ public:
 
 	/** Set how many wagons stay on with the engine; zero keeps none of them. */
 	inline void SetDecoupleCount(uint8_t count) { this->decouple_keep_wagons = count; }
+
+	/** Does this order drop exactly what the train coupled, rather than keep a number of wagons? Only meaningful if #ShouldDecoupleOnDeparture. */
+	inline bool ShouldDecoupleWholeTrain() const { return this->decouple_whole_train; }
+
+	/** Set whether the decoupling drops exactly what the train coupled. */
+	inline void SetDecoupleWholeTrain(bool whole) { this->decouple_whole_train = whole; }
 
 	/**
 	 * Convert an order written under the old single count into the switch and

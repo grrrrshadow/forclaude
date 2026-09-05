@@ -5041,6 +5041,9 @@ STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit:
 STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat si vagonů
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Kolik vagonů zůstane s mašinkou; zbytek se tu nechá stát. Mašinka se nepočítá, takže 0 znamená odpojit všechny vagonky
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Kolik vagonů zůstane s mašinkou (0 = odpojit všechny)
+STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Odpojit celý vlak
+STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(a odpojit celý vlak)
+STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(odpojit celý vlak)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v této stanici, dokud vedle nezastaví vlak, se kterým se dá spojit, a pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit

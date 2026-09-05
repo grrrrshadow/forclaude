@@ -350,7 +350,11 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * speaks for the one order selected, so a train that decouples
 				 * at several stations learned nothing from it about any. */
 				if (!timetable && v->type == VehicleType::Train && order->ShouldDecoupleOnDeparture()) {
-					line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DECOUPLE_SUFFIX_ALL : STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+					if (order->ShouldDecoupleWholeTrain()) {
+						line += GetString(STR_ORDER_DECOUPLE_SUFFIX_WHOLE);
+					} else {
+						line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DECOUPLE_SUFFIX_ALL : STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+					}
 				}
 
 				/* Reversing out is about where the train goes next, not about
@@ -406,7 +410,11 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			 * is really done in, which is the order the player would do it in
 			 * by hand: leave first, then take on. */
 			if (!timetable && v->type == VehicleType::Train && order->ShouldDecoupleOnDeparture()) {
-				line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL : STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+				if (order->ShouldDecoupleWholeTrain()) {
+					line += GetString(STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE);
+				} else {
+					line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL : STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+				}
 			}
 			if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
 				bool after_decouple = !timetable && order->ShouldDecoupleOnDeparture();
@@ -1605,6 +1613,7 @@ public:
 				}
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE, 1);
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 0);
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_WHOLE, 0);
 
 				/* And then ask how many wagons stay on, with nought already
 				 * filled in, because nought is both the commonest answer and
@@ -1612,9 +1621,13 @@ public:
 				 * a query box calls back only when the text is edited -- which
 				 * is why the count is set before the box opens rather than by
 				 * it. */
+				/* The other answer to the same question sits in the same box, a
+				 * button across its whole width: not a number of wagons but
+				 * "what I came with" -- drop exactly what this train coupled.
+				 * The player's design; see FindCoupledBoundary(). */
 				this->querying_decouple_count = true;
 				this->querying_couple_count = false;
-				ShowQueryString(GetString(STR_JUST_INT, 0), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				ShowQueryString(GetString(STR_JUST_INT, 0), STR_ORDER_DECOUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {}, STR_ORDER_DECOUPLE_WHOLE_BUTTON);
 				break;
 			}
 
@@ -1719,6 +1732,14 @@ public:
 		}
 	}
 
+	void OnQueryTextExtra() override
+	{
+		/* The count box's button: drop the whole coupled train. */
+		if (!this->querying_decouple_count) return;
+		this->querying_decouple_count = false;
+		Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_WHOLE, 1);
+	}
+
 	void OnQueryTextFinished(std::optional<std::string> str) override
 	{
 		if (!str.has_value() || str->empty()) return;
@@ -1729,6 +1750,7 @@ public:
 
 		if (this->querying_decouple_count) {
 			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_DECOUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
+			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_DECOUPLE_WHOLE, 0);
 			return;
 		}
 

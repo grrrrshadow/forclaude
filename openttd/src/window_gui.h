@@ -791,6 +791,14 @@ public:
 	virtual void OnQueryTextFinished([[maybe_unused]] std::optional<std::string> str) {}
 
 	/**
+	 * The query string window's extra button was pressed: the question was
+	 * answered the other way, not with text. Only sent when the window was
+	 * opened with an extra button (see ShowQueryString()); OnQueryTextFinished
+	 * is not sent as well.
+	 */
+	virtual void OnQueryTextExtra() {}
+
+	/**
 	 * Some data on this window has become invalid.
 	 * @param data information about the changed data.
 	 * @param gui_scope Whether the call is done from GUI scope. You may not do everything when not in GUI scope. See #InvalidateWindowData() for details.

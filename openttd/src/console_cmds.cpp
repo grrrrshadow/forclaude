@@ -1584,7 +1584,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			std::string extra;
 			if (o.ShouldGoToCouple()) extra += " SPOJIT";
 			if (o.ShouldWaitForCouple()) extra += " CEKAT";
-			if (o.ShouldDecoupleOnDeparture()) extra += o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount());
+			if (o.ShouldDecoupleOnDeparture()) extra += o.ShouldDecoupleWholeTrain() ? " ODPOJIT:cely vlak" : (o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount()));
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
 			if (o.IsType(OT_GOTO_DEPOT) && o.ShouldTurnAroundInDepot()) extra += " OTOC-DEPO";
 			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);
@@ -2875,6 +2875,31 @@ static bool ConTestToggleBrake(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testbrzda: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Switch a train's decouple order to "drop the whole coupled train", the way
+ * the button in the count box does. Usage: testcelyvlak <unit number> <order>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDecoupleWhole(std::span<std::string_view> argv)
+{
+	if (argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Make a decouple order drop the whole coupled train. Usage: 'testcelyvlak <unit number> <order index>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_DECOUPLE_WHOLE, 1);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testcelyvlak: vlak {} rozkaz {} -> odpojit cely vlak {}", *punit, *porder, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testcelyvlak: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -5889,6 +5914,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
+	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);

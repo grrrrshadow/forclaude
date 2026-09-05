@@ -1710,7 +1710,8 @@ void VehicleEnterDepot(Vehicle *v)
 		 * two endings applies -- a depot order is allowed to put wagons down
 		 * and take wagons on, and it does them in that order. */
 		if (v->type == VehicleType::Train && v->current_order.ShouldDecoupleOnDeparture()) {
-			Train::From(v)->depot_decouple_pending = v->current_order.GetDecoupleCount() + 1;
+			Train::From(v)->depot_decouple_pending = v->current_order.ShouldDecoupleWholeTrain() ?
+					Train::DEPOT_DECOUPLE_WHOLE : std::min<uint>(v->current_order.GetDecoupleCount() + 1, Train::DEPOT_DECOUPLE_WHOLE - 1);
 		}
 
 		if (!collecting_here && v->current_order.GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) {

@@ -371,6 +371,12 @@ static CommandCost BuildReplacementVehicle(Vehicle *old_veh, Vehicle **new_vehic
 		assert(cost.Succeeded()); // This should be ensured by GetNewCargoTypeForReplace()
 	}
 
+	/* Where a coupling joined the old vehicle's part to the train, the new
+	 * one stands in the same join; see FindCoupledBoundary(). */
+	if (new_veh->type == VehicleType::Train && Train::From(old_veh)->flags.Test(VehicleRailFlag::CoupledHere)) {
+		Train::From(new_veh)->flags.Set(VehicleRailFlag::CoupledHere);
+	}
+
 	/* Try to reverse the vehicle, but do not care if it fails as the new type might not be reversible */
 	if (new_veh->type == VehicleType::Train && Train::From(old_veh)->flags.Test(VehicleRailFlag::Flipped)) {
 		/* Only copy the reverse state if neither old or new vehicle implements reverse-on-build probability callback. */

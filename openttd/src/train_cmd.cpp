@@ -1518,6 +1518,15 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 	/* Check if all vehicles in the destination train are stopped inside a depot. */
 	if (dst_head != nullptr && !dst_head->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
 
+	/* A train the player takes apart by hand has no "what I came with" any
+	 * more; see FindCoupledBoundary(). Not when the game itself is rebuilding
+	 * it vehicle by vehicle for a replacement -- that train is meant to come
+	 * out exactly as it went in, marks included. */
+	if (flags.Test(DoCommandFlag::Execute) && !flags.Test(DoCommandFlag::AutoReplace)) {
+		for (Train *u = src_head; u != nullptr; u = u->Next()) u->flags.Reset(VehicleRailFlag::CoupledHere);
+		for (Train *u = dst_head; u != nullptr; u = u->Next()) u->flags.Reset(VehicleRailFlag::CoupledHere);
+	}
+
 	return TryConsistSplice(flags, src, dst, move_chain);
 }
 
@@ -3434,6 +3443,12 @@ static void TransferTrainIdentity(Train *from, Train *to)
 	to->unitnumber = from->unitnumber;
 	from->unitnumber = 0;
 
+	/* And whether the train is parked. Every vehicle is built parked and only
+	 * a head ever has the brake let off, so an engine that has never led
+	 * still carries the brake it was built with -- made the head, it stood
+	 * still at the platform with its orders in hand. */
+	to->vehstatus.Set(VehState::Stopped, from->vehstatus.Test(VehState::Stopped));
+
 	to->current_order = from->current_order;
 	from->current_order.Free();
 	to->dest_tile = from->dest_tile;
@@ -3499,6 +3514,21 @@ static Train *ReverseConsistOrder(Train *head)
 	if (units.size() < 2) return head;
 
 	bool driving_backwards = head->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
+
+	/* A coupling mark says "the join is just in front of me" (see
+	 * FindCoupledBoundary()). Turned round, the same join is just in front of
+	 * the unit that used to stand before this one -- so the mark walks one
+	 * unit towards the old head. Nothing can be joined in front of a head. */
+	{
+		std::vector<bool> marked(units.size());
+		for (size_t i = 0; i < units.size(); i++) {
+			marked[i] = units[i]->flags.Test(VehicleRailFlag::CoupledHere);
+			units[i]->flags.Reset(VehicleRailFlag::CoupledHere);
+		}
+		for (size_t i = 1; i < units.size(); i++) {
+			if (marked[i]) units[i - 1]->flags.Set(VehicleRailFlag::CoupledHere);
+		}
+	}
 
 	for (Train *u : units) RemoveFromConsist(u);
 
@@ -4575,6 +4605,12 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	ret = TryConsistSplice(flags, src, dst, true, true);
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
 
+	/* Remember where the two met. A "decouple the whole train" order later
+	 * cuts exactly here, whatever lies on either side; see
+	 * FindCoupledBoundary(). A rescue engine does not: what it picked up is
+	 * put down by its own rule (HandleRescueEngineInDepot()). */
+	if (tow == nullptr && dst->Next() != nullptr) dst->Next()->flags.Set(VehicleRailFlag::CoupledHere);
+
 	/* The vehicles of the two halves point every which way relative to each
 	 * other; line them up along the list so nothing reads a nose that
 	 * contradicts its neighbours. */
@@ -5010,6 +5046,68 @@ void LeaveHeadlessChainWaiting(Train *chain)
 }
 
 /**
+ * Where does what this train coupled on the way begin?
+ *
+ * The player's second answer to "what stays on" is not a number of wagons but
+ * "what I came with": the train drops exactly what it coupled, at the coupling
+ * that joined it. Counting wagons cannot say that -- a locomotive at both ends
+ * of a train reads as an engine like any other, and the count's rule "the
+ * second train begins at its engine" cuts such a train behind its own front
+ * engine. So the coupling writes the join down, as a mark on the first
+ * vehicle of the part it hung on (VehicleRailFlag::CoupledHere), and this
+ * reads it back: the first marked unit behind the head. A train that coupled
+ * several times has several marks, and the first one is where everything it
+ * coupled begins, so "the whole train" is the train as it left its shed.
+ *
+ * The mark rides with the vehicle through save and load, walks with the join
+ * when the list is turned round (ReverseConsistOrder()), is copied when the
+ * vehicle is replaced (autoreplace), and is wiped when the player rebuilds the
+ * train by hand in a depot (CmdMoveRailVehicle()) -- a rebuilt train has no
+ * "what I came with" any more.
+ *
+ * @param v head of the train
+ * @return the first unit behind the head that a coupling put there, or
+ *         nullptr if nothing is remembered
+ */
+/**
+ * See that a chain about to be cut off comes out led by the engine that is
+ * the train: the one carrying a dormant identity (orders, number, name --
+ * see keep_absorbed_identity in TryConsistSplice()).
+ *
+ * A train picked up off its far end lies the other way round in the joined
+ * list, its head engine last. Cut off whole, the chain starts with its rear
+ * locomotive, and the splice makes that one the front engine and hands it a
+ * fresh number, while the real identity sleeps on the engine at the tail: the
+ * player's train comes back as a nameless one with no orders. The same rule as
+ * for the two heads of a multiple unit (SwapDualHeadRoles()): the identity goes
+ * with whichever engine leads. Done before the cut, so the splice finds a head
+ * that already has a number and hands out none.
+ *
+ * @param split_point the first vehicle of the chain about to be cut off
+ */
+static void LetIdentityLeadDroppedChain(Train *split_point)
+{
+	if (!split_point->IsEngine() || split_point->IsArticulatedPart() || split_point->unitnumber != 0) return;
+	for (Train *u = split_point->Next(); u != nullptr; u = u->Next()) {
+		if (u->IsEngine() && !u->IsRearDualheaded() && !u->IsArticulatedPart() && u->unitnumber != 0) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "  identita vlaku {} prechazi z clanku {} na vedouci masinku {}", u->unitnumber, u->index.base(), split_point->index.base());
+			}
+			TransferTrainIdentity(u, split_point);
+			return;
+		}
+	}
+}
+
+Train *FindCoupledBoundary(Train *v)
+{
+	for (Train *u = v->GetNextUnit(); u != nullptr; u = u->GetNextUnit()) {
+		if (u->flags.Test(VehicleRailFlag::CoupledHere)) return u;
+	}
+	return nullptr;
+}
+
+/**
  * Decouple a stopped train down to its front @p keep_count "real"
  * (non-articulated-part) vehicles, splitting the rest off into a new
  * standalone train left behind. Called from #TrainLocoHandler the moment
@@ -5048,13 +5146,28 @@ void LeaveHeadlessChainWaiting(Train *chain)
  *
  * @param v          front of the consist standing at its decouple stop
  * @param keep_count number of vehicles to keep at the front
+ * @param whole_train drop exactly what the train coupled instead (see
+ *                   FindCoupledBoundary()); falls back to keeping nothing
+ *                   when no coupling is remembered
  * @param hold_ticks how long the put-down rake stands idle before it starts
  *                   its job -- the decouple order's timetabled stay
  * @return whether the train was actually split
  */
-bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks)
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks)
 {
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
+
+	/* "The whole train" is a place in the list, not a count. Where that place
+	 * is not written down there is nothing to keep but the engine, which is
+	 * what a count of nought says -- and what the player asked for, once told
+	 * the memory is gone. */
+	Train *boundary = whole_train ? FindCoupledBoundary(v) : nullptr;
+	if (whole_train && boundary == nullptr) {
+		keep_count = 0;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_WARNING, "Vlak {}: odpojit cely vlak - nevim, co bylo pripojeno, odpojuji vse za masinkou", v->unitnumber);
+		}
+	}
 
 	if (_show_train_orientation) {
 		/* How much of the train's cargo is settled and how much is mid-action
@@ -5089,6 +5202,7 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 	for (uint8_t i = 0; i < keep_count && split_point != nullptr; i++) {
 		split_point = split_point->GetNextUnit();
 	}
+	if (boundary != nullptr) split_point = boundary;
 
 	/* Two trains running as one come apart where the second one begins: at
 	 * its engine, which rides along as a wagon of the first (its identity
@@ -5112,11 +5226,14 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 		}
 		return false;
 	};
-	if (absorbed != nullptr && (split_point == nullptr || at_or_after(absorbed, split_point))) split_point = absorbed;
+	/* A remembered coupling is the one place the count's guesswork must not
+	 * move: the engine it would stop at may be the train's own rear
+	 * locomotive. */
+	if (boundary == nullptr && absorbed != nullptr && (split_point == nullptr || at_or_after(absorbed, split_point))) split_point = absorbed;
 	/* The head's own rear head can never be left behind: a cut that would
 	 * strand it is moved to the second train, or is no cut at all. */
 	if (split_point != nullptr && v->other_multiheaded_part != nullptr && at_or_after(split_point, v->other_multiheaded_part)) {
-		split_point = absorbed;
+		split_point = boundary != nullptr ? boundary : absorbed;
 	}
 	if (split_point != nullptr && split_point->IsRearDualheaded()) {
 		/* The second train lies the other way round in the list, rear head
@@ -5129,6 +5246,8 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 
 	/* Nothing behind what is kept, so there is nothing to leave here. */
 	if (split_point == nullptr) return false;
+
+	LetIdentityLeadDroppedChain(split_point);
 
 	/* The split is now certain, so the loading stop it happens in the middle
 	 * of is put to rest first -- asked any earlier, this would cancel the
@@ -5166,6 +5285,20 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
 			IConsolePrint(CC_ERROR, "Vlak {}: deleni odmitnuto u clanku {}: {}", v->unitnumber, split_point->index.base(), GetString(cut.GetErrorMessage()));
 		}
 		return false;
+	}
+	/* The cut is that join undone; nothing is joined in front of a head. */
+	split_point->flags.Reset(VehicleRailFlag::CoupledHere);
+	if (whole_train) {
+		/* Once. This is asked every loading tick, and a count keeps asking
+		 * harmlessly -- at its kept length the train splits into nothing. A
+		 * cut at the join has no such rest: the join is gone, and asked again
+		 * the order would read "nothing remembered", fall back to nought and
+		 * take the train's own wagons off it. So the stop's copy of the order
+		 * stops asking; the real order is untouched. */
+		v->current_order.SetDecouple(false);
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: odpojen cely pripojeny vlak - rez u clanku {}", v->unitnumber, split_point->index.base());
+		}
 	}
 
 	/* The engine keeps the front of the list and the wagons it is leaving are
@@ -5394,8 +5527,10 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type,
  *
  * @param v          front of the arriving consist
  * @param keep_count how many vehicles the departing train keeps
+ * @param whole_train drop exactly what the train coupled instead; see
+ *                    TryDecoupleAtStation()
  */
-static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
+static void TryDecoupleAtDepot(Train *v, uint8_t keep_count, bool whole_train)
 {
 	/* Every way of doing nothing here says so. The player watched a train
 	 * stand in a shed with its wagons still on it under an order that plainly
@@ -5416,14 +5551,24 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count)
 	/* See the matching walk in TryDecoupleAtStation(): the engine is kept and
 	 * never counted, and stepping by units keeps the split out of the middle of
 	 * a double-headed engine. */
+	Train *boundary = whole_train ? FindCoupledBoundary(v) : nullptr;
+	if (whole_train && boundary == nullptr) {
+		keep_count = 0;
+		if (_show_train_orientation) {
+			IConsolePrint(CC_WARNING, "Vlak {}: odpojit cely vlak - nevim, co bylo pripojeno, odpojuji vse za masinkou", v->unitnumber);
+		}
+	}
 	Train *split_point = v->GetNextUnit();
 	for (uint8_t i = 0; i < keep_count && split_point != nullptr; i++) {
 		split_point = split_point->GetNextUnit();
 	}
+	if (boundary != nullptr) split_point = boundary;
 
 	if (split_point == nullptr) return nic("za tim, co si necha, uz nic neni");
 
+	LetIdentityLeadDroppedChain(split_point);
 	if (TryConsistSplice(DoCommandFlag::Execute, split_point, nullptr, true).Failed()) return nic("rozpojeni samo selhalo");
+	split_point->flags.Reset(VehicleRailFlag::CoupledHere);
 
 	v->ConsistChanged(CCF_ARRANGE);
 
@@ -5477,6 +5622,9 @@ static void TryCoupleAtDepot(Train *engine, Train *rake)
 
 	Train *dst = engine->Last()->GetLastEnginePart();
 	if (TryConsistSplice(DoCommandFlag::Execute, rake, dst, true).Failed()) return;
+
+	/* Where the two met; see FindCoupledBoundary(). */
+	if (dst->Next() != nullptr) dst->Next()->flags.Set(VehicleRailFlag::CoupledHere);
 
 	/* Everything on one hidden tile means facing cannot be measured off the
 	 * ground the way NormaliseCoupledConsistFacing() does at a platform; it is
@@ -9290,6 +9438,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		bool order_names_here = real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
 				real_order->GetDestination().ToStationID() == consist->last_station_visited;
 		if (order_names_here && TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
+						consist->current_order.ShouldDecoupleWholeTrain(),
 						real_order->GetLoadType(), real_order->GetUnloadType(),
 						real_order->GetTimetabledWait())) {
 			/* The order's timetabled stay was just handed to the rake -- the
@@ -9381,9 +9530,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (consist->depot_decouple_pending != 0) {
 			/* Held as wagons-to-keep plus one, because zero wagons is a real
 			 * answer now and zero is also how this field says "nothing to do". */
-			uint8_t keep = consist->depot_decouple_pending - 1;
+			bool whole = consist->depot_decouple_pending == Train::DEPOT_DECOUPLE_WHOLE;
+			uint8_t keep = whole ? 0 : consist->depot_decouple_pending - 1;
 			consist->depot_decouple_pending = 0;
-			TryDecoupleAtDepot(consist, keep);
+			TryDecoupleAtDepot(consist, keep, whole);
 			return true;
 		}
 		/* Speak for a rake right here if nobody has yet. Choosing one is

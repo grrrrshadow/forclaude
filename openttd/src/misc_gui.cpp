@@ -1010,11 +1010,12 @@ struct QueryStringWindow : public Window
 {
 	QueryString editbox; ///< Editbox.
 	QueryStringFlags flags{}; ///< Flags controlling behaviour of the window.
+	StringID extra_button = INVALID_STRING_ID; ///< Label of the extra button, or INVALID_STRING_ID for none.
 
 	WidgetID last_user_action = INVALID_WIDGET; ///< Last started user action.
 
-	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags) :
-			Window(desc), editbox(max_bytes, max_chars)
+	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button) :
+			Window(desc), editbox(max_bytes, max_chars), extra_button(extra_button)
 	{
 		this->editbox.text.Assign(str);
 
@@ -1030,6 +1031,7 @@ struct QueryStringWindow : public Window
 		this->CreateNestedTree();
 		this->GetWidget<NWidgetStacked>(WID_QS_DEFAULT_SEL)->SetDisplayedPlane((this->flags.Test(QueryStringFlag::EnableDefault)) ? 0 : SZSP_NONE);
 		this->GetWidget<NWidgetStacked>(WID_QS_MOVE_SEL)->SetDisplayedPlane((this->flags.Test(QueryStringFlag::EnableMove)) ? 0 : SZSP_NONE);
+		this->GetWidget<NWidgetStacked>(WID_QS_EXTRA_SEL)->SetDisplayedPlane(this->extra_button != INVALID_STRING_ID ? 0 : SZSP_NONE);
 		this->FinishInitNested(QueryStringWindowNumber::Default);
 
 		this->parent = parent;
@@ -1040,6 +1042,7 @@ struct QueryStringWindow : public Window
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		if (widget == WID_QS_CAPTION) return GetString(this->editbox.caption);
+		if (widget == WID_QS_EXTRA) return GetString(this->extra_button);
 
 		return this->Window::GetWidgetString(widget, stringid);
 	}
@@ -1066,6 +1069,15 @@ struct QueryStringWindow : public Window
 				[[fallthrough]];
 
 			case WID_QS_CANCEL:
+				this->Close();
+				break;
+
+			case WID_QS_EXTRA:
+				/* The other answer. Whatever is in the box is not it, so the
+				 * parent hears only this and not a text as well. */
+				assert(this->parent != nullptr);
+				this->editbox.handled = true;
+				this->parent->OnQueryTextExtra();
 				this->Close();
 				break;
 
@@ -1144,6 +1156,9 @@ static constexpr std::initializer_list<NWidgetPart> _nested_query_string_widgets
 	NWidget(WWT_PANEL, Colours::Grey),
 		NWidget(WWT_EDITBOX, Colours::Grey, WID_QS_TEXT), SetMinimalSize(256, 0), SetFill(1, 0), SetPadding(2, 2, 2, 2),
 	EndContainer(),
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_QS_EXTRA_SEL),
+		NWidget(WWT_TEXTBTN, Colours::Grey, WID_QS_EXTRA), SetMinimalSize(256, 12), SetFill(1, 0),
+	EndContainer(),
 	NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 		NWidget(NWID_SELECTION, Colours::Invalid, WID_QS_DEFAULT_SEL),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_QS_DEFAULT), SetMinimalSize(65, 12), SetFill(1, 1), SetStringTip(STR_BUTTON_DEFAULT),
@@ -1172,13 +1187,17 @@ static WindowDesc _query_string_desc(
  * @param parent pointer to a Window that will handle the events (ok/cancel) of this window.
  * @param afilter filters out unwanted character input
  * @param flags various flags, @see QueryStringFlags
+ * @param extra_button label of a full-width button offering the other answer
+ *        to the question -- one that is not a text -- or INVALID_STRING_ID for
+ *        none. Pressing it sends the parent Window::OnQueryTextExtra() instead
+ *        of a text.
  */
-void ShowQueryString(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags)
+void ShowQueryString(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button)
 {
 	assert(parent != nullptr);
 
 	CloseWindowByClass(WindowClass::QueryString);
-	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags);
+	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, extra_button);
 }
 
 /**

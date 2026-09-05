@@ -196,6 +196,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_COUPLE_LOAD,     ///< Passes an OrderCoupleLoad: how full the wagons to be collected have to be.
 	MOF_COUPLE_CARGO,    ///< Passes a CargoType the wagons to be collected have to carry, or INVALID_CARGO for any.
 	MOF_COUPLE_COUNT,    ///< Change how many vehicles the rake to be collected has to have (0 = any).
+	MOF_DECOUPLE_WHOLE,  ///< Toggle whether the decoupling drops exactly what the train coupled, instead of keeping a number of wagons.
 	MOF_END
 };
 

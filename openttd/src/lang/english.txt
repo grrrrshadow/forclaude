@@ -4908,6 +4908,9 @@ STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}How many
 STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(and drop them all)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL                             :{SPACE}(drop them all)
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}How many wagons stay on with the engine (0 = drop them all)
+STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Decouple the whole coupled train
+STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(and drop the coupled train)
+STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(drop the coupled train)
 
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Wait to couple
 STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at this station until a stopped train arrives immediately next to us to couple with, then continue as one consist

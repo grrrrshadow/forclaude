@@ -34,6 +34,7 @@ enum class VehicleRailFlag : uint8_t {
 	LeavingStation = 9, ///< Train is just leaving a station.
 	FlippedBeforeTow = 10, ///< Was Flipped when a rescue engine coupled to its train; restored when the train is put down. See RestoreCasualtyOrientation().
 	BackwardsBeforeTow = 11, ///< (head only) Its train was driving backwards when a rescue engine coupled to it; restored when it is put down.
+	CoupledHere = 12, ///< The coupling that joined this vehicle's part to the train happened just in front of it; a "decouple the whole train" order cuts here. See FindCoupledBoundary().
 };
 /** Bitset of the %VehicleRailFlag elements. */
 using VehicleRailFlags = EnumBitSet<VehicleRailFlag, uint16_t>;
@@ -97,7 +98,8 @@ bool IsRescueRoadFreeOnTile(const Train *v, TileIndex tile);
 bool Forbid90DegFor(const Train *v);
 TrackBits RescueRoadTracksOnTile(const Train *v, TileIndex tile);
 bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
-bool TryDecoupleAtStation(Train *v, uint8_t keep_count, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks);
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks);
+Train *FindCoupledBoundary(Train *v);
 
 /** Variables that are cached to improve performance and such */
 struct TrainCache {
@@ -186,6 +188,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	 * two moments still owes the split after loading.
 	 */
 	uint8_t depot_decouple_pending = 0;
+	static constexpr uint8_t DEPOT_DECOUPLE_WHOLE = 0xFF; ///< #depot_decouple_pending value for "drop the whole coupled train" rather than a count.
 
 	/**
 	 * The rake this train has just left standing in the shed it is in.

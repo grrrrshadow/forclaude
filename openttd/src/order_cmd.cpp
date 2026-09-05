@@ -191,6 +191,7 @@ bool Order::Equals(const Order &other) const
 	return this->type == other.type && this->flags == other.flags && this->dest == other.dest &&
 			this->decouple == other.decouple &&
 			this->decouple_keep_wagons == other.decouple_keep_wagons &&
+			this->decouple_whole_train == other.decouple_whole_train &&
 			this->reverse_out_of_station == other.reverse_out_of_station &&
 			this->turn_around_in_depot == other.turn_around_in_depot;
 }
@@ -1274,7 +1275,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	assert(order != nullptr);
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
-			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
+			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
@@ -1285,7 +1286,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * "wait to couple" -- trains couple at stations, in the open, where
 			 * the player can see it; the only thing to couple to in a depot is
 			 * a rake of stored wagons. */
-			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_GOTO_COUPLE &&
+			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_GOTO_COUPLE &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
 			break;
 
@@ -1442,6 +1443,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * rather than rejected here. */
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data > UINT8_MAX) return CMD_ERROR;
+			break;
+
+		case MOF_DECOUPLE_WHOLE:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
 			break;
 
 		/* Waiting to be collected is the opposite of going to collect, and a
@@ -1603,6 +1608,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_DECOUPLE_COUNT:
 				order->SetDecoupleCount(static_cast<uint8_t>(data));
+				break;
+
+			case MOF_DECOUPLE_WHOLE:
+				order->SetDecoupleWholeTrain(data != 0);
 				break;
 
 			case MOF_WAIT_COUPLE:
