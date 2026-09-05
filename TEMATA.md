@@ -3535,7 +3535,24 @@ vozidlo, na které ukazuje čelo. Tři kusy opravy:
 
 Změřeno na savu: 4 spojení, 4 rozpojení ve stanici, všech osm jednotek
 dojede do dep s vlastními čísly a rozkazy; žádný assert, žádná srážka;
-baterie a claune2 beze změn. Save je scéna `emu` v baterii.
+baterie a claune2 beze změn. Save je scéna `emu` v baterii (`saves/emu.sav`; `emu_reverz.sav` = scéna `emujz`, jednotky jedoucí reverzně).
+
+**Oprava bodu 1 (hráčovo hlášení: po spojení EMU s EMU mají obě hlavy
+čumák k vozu mezi sebou):** prohození rolí smí prohodit jen zápis (bit
+motoru, identita), **ne sprity**. Sprite patří vozidlu — nic se na zemi
+nepohnulo, nic nesmí vypadat jinak. Srovnání směrů po spojení
+(`NormaliseCoupledConsistFacing`) je samo obrázek zachovávající (směr
+obráceně + `Flipped`), ale s prohozenými sadami spritů se obrázek otočil
+podruhé: hlava s přední sadou kreslená přes `Flipped` má čumák dovnitř,
+hlava se zadní sadou taky. Změřeno na emu.sav (`testvozy` teď vypisuje
+`otoceny`, `sprite` a `nos` = směr čumáku po započtení `Flipped` i sady):
+sběračka jedoucí dopředu (vlaky 7, 8) měla po spojení i po rozpojení obě
+hlavy `nos` dovnitř; po opravě všechny hlavy `nos` ven — během spojení,
+po rozpojení i v depu shodně s jednotkami, které se nikdy neotáčely.
+`Flipped` na celé jednotce zůstává (je to jen zápis, jak se seznam
+otočil), a „přední hlava" po otočení může nést zadní sadu spritů — na
+obrázku to není vidět a nic jiného sadu nečte (staré savy si ji
+přepočítávají jen při načtení).
 
 Rig: `testvozy <vlak>` vypíše seznam vozidel s rolemi; před assertem
 „roztržený vlak" (IsValidDiagDirection) se vypíše kdo a kde; odmítnuté

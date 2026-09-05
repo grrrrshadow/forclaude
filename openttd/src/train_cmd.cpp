@@ -3395,9 +3395,10 @@ static void NormaliseCoupledConsistFacing(Train *consist);
  * The two heads of such an engine are the same vehicle twice over -- same
  * type, same cargo, same value -- and differ only in which of them is written
  * down as "the engine" (the front, which the train is asked about) and which
- * as the part that merely rides along at the back, one sprite further on.
- * The game's own bookkeeping insists the front comes first in the list; so
- * when a list is turned round, the roles turn round with it.
+ * as the part that merely rides along at the back. The game's own
+ * bookkeeping insists the front comes first in the list; so when a list is
+ * turned round, the roles turn round with it -- the roles, and nothing that
+ * is drawn.
  *
  * @param front the head currently written as the engine
  * @param rear  its other half, currently the rear part
@@ -3477,7 +3478,15 @@ static void SwapDualHeadRoles(Train *front, Train *rear)
 	assert(rear->IsRearDualheaded() && front->other_multiheaded_part == rear && rear->other_multiheaded_part == front);
 	front->ClearEngine();
 	rear->SetEngine();
-	std::swap(front->spritenum, rear->spritenum);
+	/* Not the sprites. Each head keeps the picture it was built with: the
+	 * role is a place in the list and nothing on the ground has moved, so
+	 * nothing on the ground may look different. Swapping the sprite sets
+	 * along with the roles turned both heads' noses round -- and the facing
+	 * normalisation after a coupling, which is picture-preserving by itself
+	 * (direction reversed, Flipped toggled), then turned them round again
+	 * the other way: a unit that arrived nose first at its partner came out
+	 * of the coupling with both cabs facing the coach between them, and
+	 * stayed so after the decoupling. Measured on the player's EMU save. */
 	/* Whatever the front head was to the game -- the train itself, or a
 	 * train riding along dormant -- the new front head is now. */
 	TransferTrainIdentity(front, rear);

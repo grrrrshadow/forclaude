@@ -2701,13 +2701,19 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 				t->rescue_deadline == TimerGameEconomy::Date{} ? "zadna" : "ano");
 		uint i = 0;
 		for (const Train *u = t; u != nullptr; u = u->Next(), i++) {
-			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) smer {}", i, u->index.base(), u->engine_type.base(),
+			/* Which way the picture's nose points: the direction, turned by
+			 * Flipped, turned again by a reversed sprite set (the rear head of
+			 * a dual-headed engine, or a NewGRF's reversed sprite). */
+			Direction nose = u->flags.Test(VehicleRailFlag::Flipped) ? ReverseDir(u->direction) : u->direction;
+			if (u->spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED || (!IsCustomVehicleSpriteNum(u->spritenum) && u->spritenum == RailVehInfo(u->engine_type)->image_index + 1)) nose = ReverseDir(nose);
+			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) smer {} otoceny {} sprite {} nos {}", i, u->index.base(), u->engine_type.base(),
 					u->IsEngine() ? "masinka" : (u->IsWagon() ? "vagon" : "cast"),
 					u->IsMultiheaded() ? (u->IsRearDualheaded() ? " (zadni hlava)" : " (predni hlava)") : "",
 					u->IsArticulatedPart() ? " (kloub)" : "",
 					u->IsFrontEngine() ? " CELO" : "",
 					u->IsFreeWagon() ? " VOLNY" : "",
-					TileX(u->tile), TileY(u->tile), to_underlying(u->direction));
+					TileX(u->tile), TileY(u->tile), to_underlying(u->direction),
+					u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne", u->spritenum, to_underlying(nose));
 		}
 		if (!all_rakes) return true;
 	}
