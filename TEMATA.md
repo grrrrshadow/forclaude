@@ -1315,6 +1315,18 @@ až odjedou vlaky, které jely před ním. Na trati provozované jedním
 směrem to znamená, že odtahovka k porouchanému může jen **proti provozu**,
 zepředu, čelem k němu. Jinak k němu nikdy nedojede.
 
+**„Zepředu" tu ale není pravidlo, je to důsledek jednosměrné trati. Hráčovo
+pravidlo zní: odtahovka jezdí odtahovat zepředu i zezadu** — kudy dokáže
+z depa zamluvit celou cestu, tudy jede, klidně proti jednosměrkám a s 90°
+zatáčkami (4.15). Ze kterého konce k poruše přijede, rozhoduje jen cesta,
+ne přednost; kód konec nepreferuje (cíl je porucha, hledač k ní dojde po
+její vlastní koleji z obou stran a zastaví před prvním vozem, který potká —
+`protlacit` a `odtahperon` spojily u ocasu, `poruchazavlakem` u hlavy).
+Smysl celé rezervace je jediný: aby za poruchu nic nevjelo, dokud tam
+odtahovka jede. Zezadu nedojede jen tam, kde za poruchou fyzicky něco
+stojí — fronta vlaků nebo odložená řada vagonků — a to není pravidlo, to
+je kolej.
+
 **Čím se to platí.** Není to výjimka nalepená na to, aby odtahovka
 projela tam, kam obyčejný vlak nesmí. Je to druhá půlka téhož pravidla:
 jede proti návěstidlům, a **za to si musí zamluvit celou cestu, než se
