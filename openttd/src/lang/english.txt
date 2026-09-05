@@ -2275,7 +2275,8 @@ STR_VIDEO_DRIVER_ERROR_NO_HARDWARE_ACCELERATION                 :no compatible G
 STR_VIDEO_DRIVER_ERROR_HARDWARE_ACCELERATION_CRASH              :GPU driver crashed the game. Hardware acceleration disabled
 
 # Intro window
-STR_INTRO_CAPTION                                               :{WHITE}OpenTTD
+STR_INTRO_CAPTION                                               :{WHITE}OpenTTD decouple by Karel Mácha
+STR_INTRO_SUBTITLE                                              :decouple by Karel Mácha
 STR_INTRO_VERSION                                               :OpenTTD {REV}
 
 STR_INTRO_NEW_GAME                                              :{BLACK}New Game

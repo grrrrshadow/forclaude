@@ -213,9 +213,14 @@ static void LoadSpriteTables()
 
 	LoadNewGRF(SPR_NEWGRFS_BASE, 2);
 
-	uint total_extra_graphics = SPR_NEWGRFS_BASE - SPR_OPENTTD_BASE;
+	/* Only the extra sprites the game has upstream are a base set's to
+	 * supply. This build's own extra sprites -- its icons for coupling,
+	 * blueprints, the rescue engine -- live in its own openttd.grf and no
+	 * base set can know them, so counting them here reported every base set
+	 * short of exactly that many sprites on the title screen. */
+	uint total_extra_graphics = OPENTTD_VANILLA_SPRITE_COUNT;
 	Debug(sprite, 4, "Checking sprites from fallback grf");
-	_missing_extra_graphics = GetSpriteCountForFile(default_filename, SPR_OPENTTD_BASE, SPR_NEWGRFS_BASE);
+	_missing_extra_graphics = GetSpriteCountForFile(default_filename, SPR_OPENTTD_BASE, SPR_OPENTTD_BASE + OPENTTD_VANILLA_SPRITE_COUNT);
 	Debug(sprite, 1, "{} extra sprites, {} from baseset, {} from fallback", total_extra_graphics, total_extra_graphics - _missing_extra_graphics, _missing_extra_graphics);
 
 	/* The original baseset extra graphics intentionally make use of the fallback graphics.

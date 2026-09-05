@@ -266,10 +266,16 @@ struct MainWindow : Window
 			}
 			int off_x = (this->width - name_width) / 2;
 
+			uint name_height = 0;
 			for (const SpriteID &sprite : title_sprites) {
 				DrawSprite(sprite, PAL_NONE, off_x, ScaleGUITrad(50));
 				off_x += GetSpriteSize(sprite).width + letter_spacing;
+				name_height = std::max(name_height, GetSpriteSize(sprite).height);
 			}
+
+			/* Whose build this is, in the logo's own colour right under it. */
+			int subtitle_y = ScaleGUITrad(50) + name_height + ScaleGUITrad(4);
+			DrawString(0, this->width - 1, subtitle_y, STR_INTRO_SUBTITLE, TextColour::Orange, {AlignmentH::Centre, AlignmentV::Top}, false, FontSize::Large);
 
 			int text_y = this->height - GetCharacterHeight(FontSize::Normal) * 2;
 			DrawString(0, this->width - 1, text_y, STR_INTRO_VERSION, TextColour::White, {AlignmentH::Centre, AlignmentV::Middle});

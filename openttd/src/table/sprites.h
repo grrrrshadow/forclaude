@@ -57,6 +57,9 @@ static const SpriteID SPR_LARGE_SMALL_WINDOW = 682;
 /** @{
  * Extra graphic spritenumbers */
 static const SpriteID SPR_OPENTTD_BASE   = 4896;
+/** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
+static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
+/** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
 static const uint16_t OPENTTD_SPRITE_COUNT = 210;
 /** @} */
 

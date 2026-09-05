@@ -2172,6 +2172,21 @@ sama píše, že zamykání ukazatele nemusí všude fungovat.
   čísla. Rig: `testmapa` tiskne jméno směrování.
 - **Zákaz nákladu u lokomotivy** chyběl ve stromu nastavení (přesně
   podle bodu výše: byl jen přes vyhledávání); doplněn do „Fyzika".
+- **Úvodní obrazovka: „V základní sadě grafiky chybí 18 spritů" byly naše
+  vlastní.** Počítadlo (`gfxinit.cpp`, `_missing_extra_graphics`) bere za
+  chybějící každý sprite z rozsahu extra grafiky, který nedodala základní
+  sada, ale záložní `openttd.grf` — a náš rozsah je 210, vanilkový 192
+  (`OPENTTD_VANILLA_SPRITE_COUNT`): 16 blueprint + odtahovka + nádražní
+  směrování = přesně 18, které OpenGFX znát nemůže. Počítá se jen
+  vanilkový rozsah. V rigu se pak hlásí 1 (starší OpenGFX než beta 16 —
+  pravé hlášení). Hlášení o chybějících překladech necháváme, překlady až
+  ve finále (hráčovo rozhodnutí).
+- **Titulek úvodního okna a podtitul loga:** `STR_INTRO_CAPTION` je
+  „OpenTTD decouple by Karel Mácha" (hráčův text); pod oranžové logo na
+  úvodní obrazovce se kreslí oranžově velkým písmem `STR_INTRO_SUBTITLE`
+  „decouple by Karel Mácha" (`main_gui.cpp`, `OnPaint` v menu). Bílý
+  dlouhý řádek u spodního okraje je `STR_INTRO_VERSION` — kreslí se na
+  každé obrazovce v menu, ne jen na telefonu.
 
 ---
 
