@@ -1133,14 +1133,32 @@ změny, klepnutí vybírá a nic víc.
      3×; pak „odpojit celý vlak" i „nechat si 0" na téže dvojici. Plus
      `emu`, `emujz` beze změny.
 
-  **Změřeno na savu (dnešní kód, po kouskách 20–23 → klon 24 3×):** ke
-  spojení nedošlo ani za 26 000 tiků. Čeká jen vlak 20 (na nástupišti
-  (107,73), nárok má vlak 23); 21 dojel na směrování (111,82), otočil se
-  na konci koleje a **drží tam** („na stanici nejsou zadne vagonky, pro
-  ktere by mohl jet" — 2.32); 22 chce na totéž směrování a stojí za ním
-  na (113,73); 23 s nárokem na vlak 20 stojí za 22 na (121,73). Zácpa
-  z příkazů (21 a 22 jsou sběračky bez řady, ne čekající), nebo držení
-  na směrování na jedné koleji — nerozhodnuto, patří k tomuhle savu.
+  **Změřeno na savu (dnešní kód, hráčův postup):** čekající jsou 17–20
+  (CEKAT na nástupišti 1), sběračky 21–24 (směrování 4 → SPOJIT REVERZ na
+  1 → ODPOJIT:vse na stanici 3 → depo). Puštěno 17–20, po 8 000 ticích
+  klon 21 3× (33–35). Všechny tři sběračky spojily, na stanici 3 odpojily
+  „nechat si 0" a odjely do depa **samy, jen lokomotiva** — jak hráč říká.
+  Zbytek ale dopadl dvakrát různě podle toho, jak čekající ležel
+  v seznamu:
+  - 33 a 34: seznam [105,106,107 | 57,58,59] (čekající hlavou napřed) →
+    dolů šlo [vůz 106, zadní lok 107, 57,58,59] → **bezhlavá řada o pěti**
+    s lokomotivami uprostřed, identity 17 a 18 spí na 57/60 uvnitř
+    (testvozy je „nenajde"). To je to, co hráč viděl a chce.
+  - 35: seznam [111,112,113 | 65,64,63] (čekající obráceně, hlava 63
+    poslední) → dolů šlo [112,113,65,64,63], na konci mašinka se spící
+    identitou → seznam se otočil, **vlak 19 se probudil a odjel** po svých
+    rozkazech — i s vozem 112 a zadní lokomotivou 113 sběračky 35.
+  Pravidlo, které to dělá: odložený zbytek se probudí jako vlak jen když
+  mašinka s identitou stojí na jeho konci (`MakeEngineLeadTheList`); uprostřed
+  zůstane řadou. „Nechat si 0" tedy u mašinka–vůz–mašinka dává výsledek
+  závislý na orientaci partnera — a přesně to „odpojit celý vlak" se značkou
+  srovná: řez na spřáhle 113|65, sběračka si nechá svoje tři, čekající se
+  probudí se svými třemi, ať ležel jakkoli. „Nechat si 0" zůstává jak je
+  (hráčovo rozhodnutí), jen se o té dvojakosti ví.
+
+  Identita při otočení sběračky (bod 3) se tu neprojevila: všechny tři
+  sběračky přijely reverzně (couva ano) a jejich seznam se neotáčel. Ověřit
+  na sběračce jedoucí dopředu.
 
 ---
 
