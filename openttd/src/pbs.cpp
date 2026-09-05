@@ -436,6 +436,8 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * place is what makes that reservation all-or-nothing. See
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (IsFetchingCasualty(v->First())) {
+		/* Never on the casualty itself. */
+		if (IsRescueTargetOnTile(v, tile)) return false;
 		CFollowTrackRail rescue_ft(v, GetAllCompatibleRailTypes(v->railtypes));
 		if (!rescue_ft.Follow(tile, trackdir)) return include_line_end;
 		rescue_ft.new_td_bits &= DiagdirReachesTrackdirs(rescue_ft.exitdir);
@@ -443,7 +445,15 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 			rescue_ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(trackdir));
 		}
 		if (rescue_ft.new_td_bits.None()) return include_line_end;
-		return RescueRoadTracksOnTile(v, rescue_ft.new_tile).Any(TrackdirBitsToTrackBits(rescue_ft.new_td_bits));
+		/* The tile right in front, not the far end of a platform the follower
+		 * crossed in one step: the casualty may stand on the platform's first
+		 * tile, and the engine stops on the tile before that. */
+		TileIndex next = rescue_ft.new_tile - TileOffsByDiagDir(rescue_ft.exitdir) * rescue_ft.tiles_skipped;
+		if (RescueRoadTracksOnTile(v, next).Any(TrackdirBitsToTrackBits(rescue_ft.new_td_bits))) return true;
+		/* Or a free stretch of the casualty's own platform with the casualty
+		 * at the end of it: the booking runs along the platform and stops
+		 * against the casualty (ReserveRailStationPlatform()). */
+		return IsCasualtyAheadOnPlatform(v, tile, trackdir);
 	}
 
 	/* For non-pbs signals, stop on the signal tile. */
@@ -505,8 +515,10 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	Track     track = TrackdirToTrack(trackdir);
 	TrackBits reserved = GetReservedTrackbits(tile);
 
-	/* Tile reserved? Can never be a free waiting position. */
-	if (TrackOverlapsTracks(reserved, track)) return false;
+	/* Tile reserved? Can never be a free waiting position. Unless the
+	 * booking is the casualty's own platform booking and the tile is a free
+	 * tile of that platform: that is where a rescue engine pulls up. */
+	if (TrackOverlapsTracks(reserved, track) && !IsCasualtyPlatformTileFree(v, tile)) return false;
 
 	/* Not reserved and depot or not a pbs signal -> free. */
 	if (IsRailDepotTile(tile)) return true;
@@ -534,5 +546,6 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * their own. Pulling up against them is exactly right, and coupling takes
 	 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	return ((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
-			IsCoupleTargetOnTile(v, ft.new_tile) || RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)));
+			IsCoupleTargetOnTile(v, ft.new_tile) || RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)) ||
+			IsCasualtyAheadOnPlatform(v, tile, trackdir));
 }

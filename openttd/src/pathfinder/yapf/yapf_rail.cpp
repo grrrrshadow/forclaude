@@ -92,12 +92,18 @@ private:
 	{
 		TileIndex     start = tile;
 		TileIndexDiff diff = TileOffsByDiagDir(dir);
+		const Train  *v = Yapf().GetVehicle();
 
 		do {
-			if (HasStationReservation(tile)) return false;
+			/* The casualty's own platform booking is not in a rescue engine's
+			 * way on the free tiles of that platform; see IsOnCasualtyPlatform(). */
+			if (HasStationReservation(tile) && !(v != nullptr && IsCasualtyPlatformTileFree(v, tile))) return false;
 			SetRailStationReservation(tile, true);
 			MarkTileDirtyByTile(tile);
+			if (this->rescue_watching) this->rescue_booked.push_back(tile);
 			tile = TileAdd(tile, diff);
+			/* And it ends against the casualty, not at the platform's end. */
+			if (v != nullptr && IsRescueTargetOnTile(v, tile)) break;
 		} while (IsCompatibleTrainStationTile(tile, start) && tile != this->origin_tile);
 
 		auto *st = Station::GetByTile(start);

@@ -238,6 +238,12 @@ struct CFollowTrackT {
 		 * the wall it always was (see RescueRoadTracksOnTile()). */
 		if constexpr (Ttr_type_ == TransportType::Rail) {
 			if (this->veh != nullptr) {
+				/* A platform the casualty stands on is booked whole, by the
+				 * casualty. To the engine sent for it that is not a stranger's
+				 * booking: it steps onto the platform, and the booking of its
+				 * own road stops against the casualty (see
+				 * ReserveRailStationPlatform()). */
+				if (this->is_station && IsOnCasualtyPlatform(Train::From(this->veh), this->new_tile)) return true;
 				TrackBits along = RescueRoadTracksOnTile(Train::From(this->veh), this->new_tile);
 				if (along.Any()) {
 					/* Along the casualty's own track only: never in from the
@@ -469,6 +475,12 @@ protected:
 			/* entered railway station
 			 * get platform length */
 			uint length = BaseStation::GetByTile(this->new_tile)->GetPlatformLength(this->new_tile, TrackdirToExitdir(this->old_td));
+			/* For a rescue engine the casualty's platform ends where the
+			 * casualty begins; see PlatformLengthBeforeCasualty(). */
+			if (this->veh != nullptr) {
+				uint before = PlatformLengthBeforeCasualty(Train::From(this->veh), this->new_tile, this->exitdir);
+				if (before != 0) length = before;
+			}
 			/* how big step we must do to get to the last platform tile? */
 			this->tiles_skipped = length - 1;
 			/* move to the platform end */

@@ -2515,6 +2515,14 @@ bool ProcessOrders(Vehicle *v)
  */
 bool Order::ShouldStopAtStation(const Vehicle *v, StationID station) const
 {
+	/* A rescue engine on a call stops nowhere but at its casualty: it booked
+	 * the whole road for exactly that (see IsSafeWaitingPosition()). Stopping
+	 * at a platform on the way also wrote the visit down as an implicit order,
+	 * and an engine with orders is not on call any more -- the player found
+	 * his rescue engine standing in its shed saying it had orders of its own.
+	 * Same on the way home with the casualty in tow. */
+	if (v->type == VehicleType::Train && IsOnRescueRun(Train::From(v)->First())) return false;
+
 	bool is_dest_station = this->IsType(OT_GOTO_STATION) && this->dest == station;
 
 	return (!this->IsType(OT_GOTO_DEPOT) || this->GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) &&

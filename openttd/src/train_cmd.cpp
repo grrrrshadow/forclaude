@@ -2811,6 +2811,131 @@ static Train *FindCouplePartnerOnAdjacentTile(const Train *v, TileIndex tile, Tr
  * @param tile the tile being considered as somewhere to stop
  * @return whether that tile is where the casualty is
  */
+/**
+ * Do these two station tiles belong to one and the same platform?
+ *
+ * "Compatible station tile" (IsCompatibleTrainStationTile()) says only that
+ * two tiles are the same station, the same axis and the same rail -- which is
+ * true of the next platform over as well. It is meant to be asked while
+ * walking along a platform, where the tiles are on one line by construction.
+ * Asked of two arbitrary tiles it answered yes for a parallel platform, and a
+ * rescue engine took the platform beside its casualty for the casualty's own:
+ * it pulled up alongside it, on another track, and coupled across the gap.
+ *
+ * @param tile  a rail station tile
+ * @param other another rail station tile
+ * @return whether walking along the platform from @p other reaches @p tile
+ */
+bool IsOnSameRailPlatform(TileIndex tile, TileIndex other)
+{
+	if (!IsRailStationTile(tile) || !IsRailStationTile(other)) return false;
+	if (tile == other) return true;
+	TileIndexDiff delta = TileOffsByAxis(GetRailStationAxis(other));
+	for (TileIndex t = other + delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, other); t += delta) {
+		if (t == tile) return true;
+	}
+	for (TileIndex t = other - delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, other); t -= delta) {
+		if (t == tile) return true;
+	}
+	return false;
+}
+
+/**
+ * Is this station tile on the platform the casualty of a rescue engine on
+ * its way out is standing on?
+ *
+ * A platform is booked as a whole, and a casualty standing on part of one
+ * holds the booking on all of it. To the engine sent for it that booking is
+ * not a stranger's: the free tiles of that platform are the only place it
+ * can pull up against the casualty at all. The tiles the casualty itself
+ * stands on are another matter, see IsCasualtyPlatformTileFree().
+ *
+ * @param v    the engine asking, any part of it
+ * @param tile a tile being considered
+ * @return whether v is fetching a casualty that stands on that platform
+ */
+bool IsOnCasualtyPlatform(const Train *v, TileIndex tile)
+{
+	const Train *tow = v->First();
+	if (!IsFetchingCasualty(tow) || !IsRailStationTile(tile)) return false;
+	const Train *casualty = Train::GetIfValid(tow->rescue_target);
+	if (casualty == nullptr || casualty->First() == tow) return false;
+	for (const Train *u = casualty->First(); u != nullptr; u = u->Next()) {
+		if (IsOnSameRailPlatform(tile, u->tile)) return true;
+	}
+	return false;
+}
+
+/**
+ * A tile of the casualty's platform (IsOnCasualtyPlatform()) with nothing
+ * standing on it: booked by the casualty's platform booking, and yet free
+ * for the engine sent for it to stop on.
+ */
+bool IsCasualtyPlatformTileFree(const Train *v, TileIndex tile)
+{
+	if (!IsOnCasualtyPlatform(v, tile)) return false;
+	for (const Vehicle *u : VehiclesOnTile(tile)) {
+		if (u->type == VehicleType::Train && Train::From(u)->First() != v->First()) return false;
+	}
+	return true;
+}
+
+/**
+ * Standing on @p tile facing @p trackdir, is the first train ahead on this
+ * platform the casualty this engine was sent for?
+ *
+ * The follower crosses a platform in one step, so "is the casualty on the
+ * next tile" cannot be asked of a platform tile with free tiles between it
+ * and the casualty. This walks those tiles one by one. Another train met
+ * first is the answer no: the engine could never reach the casualty past it.
+ */
+bool IsCasualtyAheadOnPlatform(const Train *v, TileIndex tile, Trackdir trackdir)
+{
+	if (!IsOnCasualtyPlatform(v, tile)) return false;
+	const Train *tow = v->First();
+	TileIndexDiff diff = TileOffsByDiagDir(TrackdirToExitdir(trackdir));
+	for (TileIndex t = tile + diff; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, tile); t += diff) {
+		for (const Vehicle *u : VehiclesOnTile(t)) {
+			if (u->type != VehicleType::Train) continue;
+			const Train *head = Train::From(u)->First();
+			if (head == tow) continue;
+			return head->index == tow->rescue_target;
+		}
+	}
+	return false;
+}
+
+/**
+ * How many tiles of a platform lie between its entry tile and the casualty
+ * standing further along it -- the part of the platform a rescue engine on
+ * its way out may use.
+ *
+ * The track follower crosses a platform in one step, to its far end. For an
+ * engine sent to a casualty standing on that platform the platform ends
+ * where the casualty begins: the step must land on the tile before it, so
+ * that the search finds its destination there, the safe-position walk sees
+ * that tile, and the booking stops against the casualty instead of running
+ * on past it to wherever the platform leads.
+ *
+ * @param v     the engine, any part of it
+ * @param entry the first platform tile the step lands on
+ * @param dir   direction of travel along the platform
+ * @return the number of free platform tiles before the casualty, or 0 when
+ *         the platform is not the casualty's, or the casualty stands on the
+ *         entry tile itself
+ */
+uint PlatformLengthBeforeCasualty(const Train *v, TileIndex entry, DiagDirection dir)
+{
+	if (!IsOnCasualtyPlatform(v, entry)) return 0;
+	TileIndexDiff diff = TileOffsByDiagDir(dir);
+	uint length = 0;
+	for (TileIndex t = entry; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, entry); t += diff) {
+		if (IsRescueTargetOnTile(v, t)) return length;
+		length++;
+	}
+	return 0;
+}
+
 bool IsRescueTargetOnTile(const Train *v, TileIndex tile)
 {
 	const Train *tow = v->First();
@@ -3244,6 +3369,18 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 	};
 	std::vector<Berth> bed;
 	if (!step()) return false;
+	/* The first step off the engine's nose has to land on the casualty: that
+	 * is what "lying across the points in front of me" means. A casualty that
+	 * is merely near -- on the platform next door, a track's width away -- is
+	 * not on this line at all, and laying it along this line would drag it
+	 * across the gap. */
+	TileIndex first_ahead = cur_tile - TileOffsByDiagDir(ft.exitdir) * ft.tiles_skipped;
+	if (!IsRescueTargetOnTile(tow, first_ahead)) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: porucha nelezi na me koleji - prvni policko pred nosem ({},{}) je bez ni, nenarovnavam", tow->unitnumber, TileX(first_ahead), TileY(first_ahead));
+		}
+		return false;
+	}
 	for (const Train *u = casualty; u != nullptr; u = u->Next()) {
 		if (!step()) return false;
 		bed.push_back({cur_tile, TrackdirToTrack(cur_td), ft.exitdir});
@@ -3962,7 +4099,19 @@ static void TryDispatchRescueEngine(Train *tow)
 	/* Brake off is what puts one on call; a rescue engine standing with its
 	 * brake on is parked, not waiting. */
 	if (tow->vehstatus.Test(VehState::Stopped)) return hold(RescueHold::Braked);
-	if (tow->GetNumOrders() != 0) return hold(RescueHold::HasOrders);
+	/* Orders it was given, not visits the game wrote down for it: a rescue
+	 * engine used to be stopped by every platform on its road and came home
+	 * with a list of implicit orders, and that list kept it in the shed for
+	 * good. It stops nowhere on the way now (Order::ShouldStopAtStation), and
+	 * a list holding nothing but such visits is thrown away here. */
+	if (tow->GetNumManualOrders() != 0) return hold(RescueHold::HasOrders);
+	if (tow->GetNumOrders() != 0) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: odtah - mazu {} zapsanych prujezdu, nejsou to rozkazy", tow->unitnumber, tow->GetNumOrders());
+		}
+		DeleteVehicleOrders(tow);
+		InvalidateWindowData(WindowClass::VehicleOrders, tow->index);
+	}
 
 	Train *nearest = nullptr;
 	uint nearest_distance = UINT_MAX;

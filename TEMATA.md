@@ -1972,7 +1972,8 @@ rozkaz spojit, 4.11 bod 2). Porucha nádražní rozkaz nemá — má políčko.
 kterém porucha stojí (`yapf_destrail`: stejný spoj nástupiště, kolej
 nástupiště, porucha na cílovém políčku). Zábor pak končí před ocasem poruchy
 jako jinde. Změřeno: zamluveno 8 políček → spojení u ocasu → odvoz do depa
-(97,46) → „porucha slozena". Scéna `poruchanastup`.
+(97,46) → „porucha slozena". Scéna `poruchanastup`. Doplněno v 4.20: jen
+totéž nástupiště, ne sousední, a nástupiště pro odtahovku končí u poruchy.
 
 ---
 
@@ -2111,6 +2112,67 @@ to je jiné pravidlo pro jiný vlak.
 **Hráčova poznámka, ať se neztratí:** totéž se objeví u obměny vozidel
 za nová — hra nová vozidla rodí ve výchozí orientaci; až se bude dělat,
 orientace vlaku se musí přenést stejně jako tady.
+
+---
+
+## 4.20 Odtahovka nikde nezastavuje a nástupiště poruchy je její
+
+**Hráčovo hlášení (save odtah_peron):** odtahovka cestou k poruše projede
+nádražím, každý průjezd se jí zapíše šedým písmem do příkazů, a pak stojí v
+depu s „má své příkazy". Po smazání příkazů vyjela, ale poruchu nesebrala:
+„šla po ní přes peron nádraží" — jela po sousedním nástupišti a spojila se
+přes mezeru („krok ROZBITY" v rigu, souprava roztržená mezi dvě koleje).
+
+**Hráčovo pravidlo, které tím platí i tady:** odtahovka může k poruše
+zepředu i zezadu, kudy najde cestu, celou si ji zamluví (i skrz jednosměrky).
+Pro vagonky jezdí normálně; k poruše musí rezervovat. Jede vyprošťovat vlak.
+A do jejích příkazů se nic nezapisuje, dokud svítí kladívko; hráčův ruční
+příkaz kladívko zhasne (to už platilo, `CmdInsertOrder`).
+
+**Tři příčiny, tři opravy:**
+
+1. **Zastavování cestou.** `Order::ShouldStopAtStation` u vlaku na odtahu
+   (tam i zpět) vrací ne: odtahovka si celou cestu zamluvila právě proto, aby
+   nikde nestála, a zastávka na nástupišti cestou ještě zapisovala implicitní
+   příkaz. Podmínka „má své příkazy" (`RescueHold::HasOrders`) počítá jen
+   ruční příkazy (`GetNumManualOrders`); seznam, ve kterém nejsou nic než
+   zapsané průjezdy z dřívějška, si odtahovka smaže sama ve chvíli, kdy v
+   depu hledá práci (konzole: „mazu N zapsanych prujezdu") — tím vyjede i na
+   rozehraném savu, kde ty šedé příkazy už má.
+2. **Sousední nástupiště.** Cíl „celé nástupiště poruchy" (4.16) používal
+   `IsCompatibleTrainStationTile` — to říká jen „stejná stanice, stejná osa",
+   a to platí i pro vedlejší nástupiště. Nový `IsOnSameRailPlatform` chodí
+   po nástupišti od políčka poruchy; cílem je jen to, kam se tak dojde.
+   A `LayCasualtyAlongTow` (narovnání poruchy podél odtahovky) teď chce, aby
+   první políčko před nosem odtahovky poruchu neslo — porucha o kolej vedle
+   není na její koleji a nenarovnává se.
+3. **Nástupiště je pro hledač jeden krok** (4.16) a porucha stojící uprostřed
+   nástupiště s volnými políčky před sebou to rozbíjela třikrát: bezpečné
+   místo k zastavení se hledalo jen na políčkách, která hledač navštíví
+   (před nástupištěm a na jeho konci), rezervace nástupiště pod poruchou je
+   jeden bit na celý peron („misto k zastaveni uz nekdo drzi" i na volném
+   políčku), a rezervace se táhla přes poruchu až za nástupiště.
+   Oprava: **pro odtahovku na cestě k poruše končí nástupiště poruchy tam,
+   kde porucha začíná** (`PlatformLengthBeforeCasualty` v
+   `follow_track.hpp`): krok hledače dopadne na políčko před poruchou, tam
+   je cíl (`IsOnSameRailPlatform`), tam je bezpečné místo (`pbs.cpp`: bere se
+   políčko hned před nosem, ne konec přeskočeného nástupiště, a nikdy políčko
+   pod poruchou) a rezervace nástupiště se zastaví o poruchu
+   (`ReserveRailStationPlatform`). Rezervace peronu pod poruchou není pro
+   odtahovku cizí: volné políčko nástupiště poruchy je volné
+   (`IsCasualtyPlatformTileFree` v `IsWaitingPositionFree`, v maskování
+   `follow_track` a v zamlouvání).
+
+**Změřeno (scéna `odtahperon`, odtahovka 36 z depa (97,73), porucha 37 na
+(108–111,72) se sousedním nástupištěm y=73):** dřív cesta po y=73 do stanice
+(zapsaný průjezd), zastavení vedle poruchy, spojení přes mezeru, roztržená
+souprava. Teď 11 políček (98,73)…(105,73)(105,72)(106,72)(107,72), konec před
+ocasem poruchy, spojení na (108,72), odvoz do depa, „postaven jak byl",
+nic za poruchou nezamluveno, žádný zápis průjezdu. Baterie 47 scén čistá.
+
+**Pro příště:** kdo sahá na `IsSafeWaitingPosition`, `MaskReservedTracks`
+nebo `ReserveRailStationPlatform`, pouští `odtahperon`, `poruchanastup`,
+`poruchazavlakem` a `odtahkrizeni` — každá drží jinou půlku téhož pravidla.
 
 ---
 

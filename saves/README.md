@@ -28,3 +28,6 @@ přes `-g` a scény jsou v baterii.
   pak depo). „Odpojit celý vlak" (TEMATA §3). Scény `lokonula` (nechat si
   0) a `lokocely` (celý vlak): 17–20 pustit, po 8 000 ticích 21 naklonovat
   3×.
+- `odtah_peron.sav` — porucha 37 uprostřed nástupiště (108–111,72), vedle
+  souběžné nástupiště téže stanice; odtahovka (v rigu vlak 36 přes
+  `testodtahovka`) z depa (97,73). TEMATA 4.20. Scéna `odtahperon`.

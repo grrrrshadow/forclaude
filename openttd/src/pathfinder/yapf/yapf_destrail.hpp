@@ -232,8 +232,11 @@ public:
 		 * reports the far end of it and never the tile in the middle the
 		 * casualty stands on, so the destination was walked straight over
 		 * and reported unreachable. The platform the casualty stands on is
-		 * the destination, whichever of its tiles the step lands on. */
-		if (IsRailStationTile(tile) && IsRailStationTile(this->dest_tile) && IsCompatibleTrainStationTile(tile, this->dest_tile)) {
+		 * the destination, whichever of its tiles the step lands on. That
+		 * platform and no other: "compatible" is also true of the platform
+		 * next door, and the engine once pulled up on it, alongside the
+		 * casualty on another track (IsOnSameRailPlatform()). */
+		if (IsOnSameRailPlatform(tile, this->dest_tile)) {
 			const Train *v = Yapf().GetVehicle();
 			if (v != nullptr && IsFetchingCasualty(v->First()) && IsRescueTargetOnTile(v, this->dest_tile) &&
 					GetRailStationTrack(tile) == TrackdirToTrack(td)) {
