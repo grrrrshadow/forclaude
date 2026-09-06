@@ -3827,9 +3827,11 @@ nástupiště + 1 políčko?
    nástupiště × 16; scény: založení z prázdna, dva cykly růstu, „nevejde
    se" → hotová → odvoz cizí sběračkou → nové založení; s směrováním i bez.
 
+**Rozhodnuto hráčem:** (b) obojí naráz — konečný počet vagonků **a** ochrana
+proti stavění přes délku peronu („to by bylo nejlepší").
+
 **K rozhodnutí hráče:** (a) plná řada → stavitelka čeká, dokud ji někdo
-neodveze (navrhuju), nebo jede dál? (b) N volitelné vedle délky nástupiště
-(navrhuju), nebo jen jedno z nich? (c) rozestavěná řada neviditelná pro
+neodveze (navrhuju), nebo jede dál? (c) rozestavěná řada neviditelná pro
 ostatní připojit (navrhuju, bez toho to nefunguje)? (d) tolerance 0 nebo 1?
 
 ---
