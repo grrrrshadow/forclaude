@@ -2566,6 +2566,28 @@ static bool ConTestAfter(std::span<std::string_view> argv)
 }
 
 /**
+ * List the rail engines and whether the first company may build them.
+ * Stages the question "what is still on offer in a late game": model age
+ * against the three life phases that decide when a model goes out of
+ * production, and whether it has been marked as never going.
+ * Usage: testmodely
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestListEngineModels(std::span<std::string_view>)
+{
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon) continue;
+		if (!e->info.climates.Test(_settings_game.game_creation.landscape)) continue;
+		IConsolePrint(CC_DEFAULT, "model {:2}: {:<24} k dispozici {} stari {} mesicu, faze {}+{}+{}={} mesicu{}",
+				e->index.base(), GetString(e->info.string_id), e->company_avail.Test(CompanyID::Begin()) ? "ano" : "ne ", e->age,
+				e->duration_phase_1, e->duration_phase_2, e->duration_phase_3,
+				e->duration_phase_1 + e->duration_phase_2 + e->duration_phase_3,
+				e->info.base_life == 0xFF ? " (vyrabi se navzdy)" : "");
+	}
+	return true;
+}
+
+/**
  * Run a console command after a delay measured in ticks, once.
  * Usage: testzatik <ticks> <command...>
  *
@@ -6153,6 +6175,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testzatik",               ConTestAfterTicks);
+	IConsole::CmdRegister("testmodely",              ConTestListEngineModels);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);

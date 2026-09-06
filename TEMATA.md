@@ -4194,6 +4194,36 @@ každém průjezdu oběma cestami.
 
 ---
 
+## 2.40 Floss '47' a SH '40' se vyrábějí navždy
+
+**Hráč:** rozpojování je posun a posunuje se jednoduchou mašinkou; ve
+vanilkovém mírném podnebí ale po roce zhruba 2010 zbývají jen dvojité
+jednotky (T.I.M., AsiaStar, Millennium Z1) a monorail/maglev, takže bez
+„nikdy nezestárnou" by hráči museli s rozpojováním přestat, a obměna by
+jim obyčejnou mašinku vyměnila za dvojitou EMU. Hráčovo rozhodnutí: Floss
+'47' (naftová) a SH '40' (elektrická) mají být k dispozici napořád.
+
+**Jak to hra dělá:** každý model má v `table/engines.h` „život modelu"
+(`base_life`, v letech); k němu si hra při startu přihodí tři náhodné
+fáze (celkem asi 3–17 let navíc) a po nich model stáhne z nabídky.
+Hodnota 0xFF znamená nekonečný život — stejnou značku dostávají všechny
+vagony (`Engine::Engine()`), takže je to cesta, kterou hra sama používá.
+Stáří modelu se přičítá jen v měsíční smyčce, tedy jen za skutečně
+odehrané měsíce; skok data v cheatu ho nehne, proto po přeskočení let
+nezmizí ani parní. Vypnutí „nikdy nezestárnou" zabere při první změně
+měsíce.
+
+**Změna:** řádky 15 (Floss '47') a 24 (SH '40') mají `base_life` 0xFF,
+s poznámkou v tabulce proč.
+
+**Změřeno (rig, `testmodely`):** nová hra v roce 2046 s vypnutým „nikdy
+nezestárnou", po první změně měsíce: Floss '47' a SH '40' „k dispozici
+ano (vyrabi se navzdy)", všechny ostatní klasické mašinky včetně SH '30'
+a SH '125' „ne"; zbývají dvojité AsiaStar, Millennium Z1 (monorail) a
+maglevy. Vozidlové NewGRF sady tohle přebíjejí svými daty.
+
+---
+
 ## 2.36 Rig: scény ze savu běžely na prázdné mapě
 
 Baterie píše před scénou do `autoexec.scr` příkaz `newgame` — a ten se

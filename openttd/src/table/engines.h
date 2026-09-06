@@ -99,7 +99,15 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	/*      base_intro     base_life
 	 *      |    decay_speed         cargo_type
 	 *      |    |    lifelength     |         climates
-	 *      |    |    |    |         |         | */
+	 *      |    |    |    |         |         |
+	 * A base_life of 0xFF means the model never goes out of production (the
+	 * same mark every wagon gets, see Engine::Engine()). Two temperate
+	 * single-unit engines carry it, Floss '47' and SH '40': coupling and
+	 * decoupling are shunting work, done with a single engine, and the
+	 * stock game leaves the temperate climate with nothing but double-headed
+	 * multiple units once these two have gone. A game that is meant to go on
+	 * being played that way past 2050 needs one plain diesel and one plain
+	 * electric engine on the list for good. */
 	MT(  1827,  20,  15,  30, CT_NONE        , LandscapeTypes({T      })), //   0 Kirby Paul Tank (Steam)
 	MT( 12784,  20,  22,  30, CT_NONE        , LandscapeTypes({  A,S  })), //   1 MJS 250 (Diesel)
 	MT(  9497,  20,  20,  50, CT_NONE        , LandscapeTypes({      Y})), //   2 Ploddyphut Choo-Choo
@@ -115,7 +123,7 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MM( 23376,  20,  15,  35, CT_PASSENGERS  , LandscapeTypes({T      })), //  12 'Dash' (Diesel)
 	MT( 14976,  20,  18,  28, CT_NONE        , LandscapeTypes({T      })), //  13 SH/Hendry '25' (Diesel)
 	MT( 14245,  20,  20,  30, CT_NONE        , LandscapeTypes({T      })), //  14 UU '37' (Diesel)
-	MT( 15341,  20,  22,  33, CT_NONE        , LandscapeTypes({T      })), //  15 Floss '47' (Diesel)
+	MT( 15341,  20,  22,0xFF, CT_NONE        , LandscapeTypes({T      })), //  15 Floss '47' (Diesel) -- built for ever, see below
 	MT( 14976,  20,  20,  25, CT_NONE        , LandscapeTypes({  A,S  })), //  16 CS 4000 (Diesel)
 	MT( 16437,  20,  20,  30, CT_NONE        , LandscapeTypes({  A,S  })), //  17 CS 2400 (Diesel)
 	MT( 18993,  20,  22,  30, CT_NONE        , LandscapeTypes({  A,S  })), //  18 Centennial (Diesel)
@@ -124,7 +132,7 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MT( 16071,  20,  22,  30, CT_NONE        , LandscapeTypes({  A,S  })), //  21 MJS 1000 (Diesel)
 	MT( 20820,  20,  20,  25, CT_MAIL        , LandscapeTypes({T      })), //  22 SH '125' (Diesel)
 	MT( 16437,  20,  23,  30, CT_NONE        , LandscapeTypes({T      })), //  23 SH '30' (Electric)
-	MT( 19359,  20,  23,  80, CT_NONE        , LandscapeTypes({T      })), //  24 SH '40' (Electric)
+	MT( 19359,  20,  23,0xFF, CT_NONE        , LandscapeTypes({T      })), //  24 SH '40' (Electric) -- built for ever, see below
 	MM( 23376,  20,  25,  30, CT_NONE        , LandscapeTypes({T      })), //  25 'T.I.M.' (Electric)
 	MM( 26298,  20,  25,  50, CT_NONE        , LandscapeTypes({T      })), //  26 'AsiaStar' (Electric)
 	MW(  1827,  20,  20,  50, CT_PASSENGERS  , LandscapeTypes({T,A,S,Y})), //  27 Passenger Carriage
