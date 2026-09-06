@@ -1011,11 +1011,15 @@ struct QueryStringWindow : public Window
 	QueryString editbox; ///< Editbox.
 	QueryStringFlags flags{}; ///< Flags controlling behaviour of the window.
 	StringID extra_button = INVALID_STRING_ID; ///< Label of the extra button, or INVALID_STRING_ID for none.
+	StringID top_button = INVALID_STRING_ID; ///< Label of the toggle above the text, or INVALID_STRING_ID for none.
+	bool toggles = false; ///< The top and extra buttons are two exclusive toggles confirmed by OK, not an answer of their own.
+	uint8_t choice = 0; ///< Which toggle is down: 0 neither, 1 top, 2 bottom.
 
 	WidgetID last_user_action = INVALID_WIDGET; ///< Last started user action.
 
-	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button, StringID tooltip) :
-			Window(desc), editbox(max_bytes, max_chars), extra_button(extra_button)
+	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button, StringID tooltip,
+			StringID top_button = INVALID_STRING_ID, bool toggles = false, uint8_t choice = 0) :
+			Window(desc), editbox(max_bytes, max_chars), extra_button(extra_button), top_button(top_button), toggles(toggles), choice(choice)
 	{
 		this->editbox.text.Assign(str);
 
@@ -1032,30 +1036,52 @@ struct QueryStringWindow : public Window
 		this->GetWidget<NWidgetStacked>(WID_QS_DEFAULT_SEL)->SetDisplayedPlane((this->flags.Test(QueryStringFlag::EnableDefault)) ? 0 : SZSP_NONE);
 		this->GetWidget<NWidgetStacked>(WID_QS_MOVE_SEL)->SetDisplayedPlane((this->flags.Test(QueryStringFlag::EnableMove)) ? 0 : SZSP_NONE);
 		this->GetWidget<NWidgetStacked>(WID_QS_EXTRA_SEL)->SetDisplayedPlane(this->extra_button != INVALID_STRING_ID ? 0 : SZSP_NONE);
-		/* A window asking two things at once explains both on the extra button
-		 * and on OK, which confirms both; the caption itself cannot carry a
-		 * tooltip. */
+		this->GetWidget<NWidgetStacked>(WID_QS_TOP_SEL)->SetDisplayedPlane(this->top_button != INVALID_STRING_ID ? 0 : SZSP_NONE);
+		/* A window asking more than one thing explains all of them on its
+		 * buttons and on OK, which confirms them together; the caption itself
+		 * cannot carry a tooltip. */
 		if (tooltip != INVALID_STRING_ID) {
 			this->GetWidget<NWidgetCore>(WID_QS_EXTRA)->SetToolTip(tooltip);
+			this->GetWidget<NWidgetCore>(WID_QS_TOP)->SetToolTip(tooltip);
 			this->GetWidget<NWidgetCore>(WID_QS_OK)->SetToolTip(tooltip);
 		}
 		this->FinishInitNested(QueryStringWindowNumber::Default);
+		this->ShowChoice();
 
 		this->parent = parent;
 
 		this->SetFocusedWidget(WID_QS_TEXT);
 	}
 
+	/** Press down whichever toggle is chosen and lift the other. */
+	void ShowChoice()
+	{
+		if (!this->toggles) return;
+		this->SetWidgetLoweredState(WID_QS_TOP, this->choice == 1);
+		this->SetWidgetLoweredState(WID_QS_EXTRA, this->choice == 2);
+		this->SetWidgetDirty(WID_QS_TOP);
+		this->SetWidgetDirty(WID_QS_EXTRA);
+	}
+
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		if (widget == WID_QS_CAPTION) return GetString(this->editbox.caption);
 		if (widget == WID_QS_EXTRA) return GetString(this->extra_button);
+		if (widget == WID_QS_TOP) return GetString(this->top_button);
 
 		return this->Window::GetWidgetString(widget, stringid);
 	}
 
 	void OnOk()
 	{
+		/* With toggles, OK confirms the text and the choice together, and the
+		 * choice can have changed with the text left alone. */
+		if (this->toggles) {
+			assert(this->parent != nullptr);
+			this->parent->OnQueryTextChoice(this->editbox.text.GetText(), this->choice);
+			this->editbox.handled = true;
+			return;
+		}
 		if (!this->editbox.orig.has_value() || this->editbox.text.GetText() != this->editbox.orig) {
 			assert(this->parent != nullptr);
 
@@ -1080,12 +1106,24 @@ struct QueryStringWindow : public Window
 				break;
 
 			case WID_QS_EXTRA:
+				/* One of two exclusive toggles: down, and the other up; down
+				 * again lifts it. OK says what was chosen. */
+				if (this->toggles) {
+					this->choice = this->choice == 2 ? 0 : 2;
+					this->ShowChoice();
+					break;
+				}
 				/* The other answer. Whatever is in the box is not it, so the
 				 * parent hears only this and not a text as well. */
 				assert(this->parent != nullptr);
 				this->editbox.handled = true;
 				this->parent->OnQueryTextExtra(this->editbox.text.GetText());
 				this->Close();
+				break;
+
+			case WID_QS_TOP:
+				this->choice = this->choice == 1 ? 0 : 1;
+				this->ShowChoice();
 				break;
 
 			case WID_QS_MOVE:
@@ -1160,6 +1198,9 @@ static constexpr std::initializer_list<NWidgetPart> _nested_query_string_widgets
 		NWidget(WWT_CLOSEBOX, Colours::Grey),
 		NWidget(WWT_CAPTION, Colours::Grey, WID_QS_CAPTION), SetTextStyle(TextColour::White),
 	EndContainer(),
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_QS_TOP_SEL),
+		NWidget(WWT_TEXTBTN, Colours::Grey, WID_QS_TOP), SetMinimalSize(256, 12), SetFill(1, 0),
+	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey),
 		NWidget(WWT_EDITBOX, Colours::Grey, WID_QS_TEXT), SetMinimalSize(256, 0), SetFill(1, 0), SetPadding(2, 2, 2, 2),
 	EndContainer(),
@@ -1207,6 +1248,24 @@ void ShowQueryString(std::string_view str, StringID caption, uint maxsize, Windo
 
 	CloseWindowByClass(WindowClass::QueryString);
 	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, extra_button, tooltip);
+}
+
+/**
+ * Show a query string window with two exclusive toggles besides the text: one
+ * above the box, one below. Either may be down or neither; pressing one lifts
+ * the other. OK hands the text and the choice to Window::OnQueryTextChoice().
+ * @param top_button label of the toggle above the text
+ * @param bottom_button label of the toggle below the text
+ * @param choice which toggle starts down: 0 neither, 1 top, 2 bottom
+ * @param tooltip tooltip for both toggles and for OK, or INVALID_STRING_ID
+ * @see ShowQueryString for the other parameters
+ */
+void ShowQueryStringWithChoice(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID top_button, StringID bottom_button, uint8_t choice, StringID tooltip)
+{
+	assert(parent != nullptr);
+
+	CloseWindowByClass(WindowClass::QueryString);
+	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, bottom_button, tooltip, top_button, true, choice);
 }
 
 /**

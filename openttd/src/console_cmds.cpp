@@ -1677,6 +1677,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			if (o.ShouldGoToCouple()) extra += " SPOJIT";
 			if (o.ShouldFoundRake()) extra += o.GetCoupleCount() != 0 ? fmt::format(" ZALOZIT:do {}", o.GetCoupleCount()) : " ZALOZIT";
 			if (o.ShouldHonk()) extra += " HOUKAT";
+			if (o.IsCoupleCountMinimum()) extra += " MIN";
 			if (o.ShouldWaitForCouple()) extra += " CEKAT";
 			if (o.ShouldDecoupleOnDeparture()) extra += o.ShouldDecoupleWholeTrain() ? " ODPOJIT:cely vlak" : (o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount()));
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
@@ -3023,6 +3024,36 @@ static bool ConTestFoundRake(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testzalozit: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Make a couple order's count a minimum, the way the toggle does.
+ * Usage: testminimalne <unit number> <order> [<count>] [0]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCoupleMin(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Make a couple order collect any rake of at least so many vehicles. Usage: 'testminimalne <unit number> <order index> [<count>] [0 to switch it off]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	uint32_t on = argv.size() >= 5 && ParseInteger(argv[4]).value_or(1) == 0 ? 0 : 1;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		if (argv.size() >= 4) {
+			auto pcount = ParseInteger(argv[3]);
+			if (pcount.has_value()) Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_COUNT, *pcount);
+		}
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_MIN, on);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testminimalne: vlak {} rozkaz {} -> minimalne {} {}", *punit, *porder, on != 0 ? "ano" : "ne", r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testminimalne: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -6083,6 +6114,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
 	IConsole::CmdRegister("mousedebug",              ConMouseDebug);
+	IConsole::CmdRegister("testminimalne",           ConTestCoupleMin);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);

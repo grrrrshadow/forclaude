@@ -168,6 +168,14 @@ private:
 	bool honk = false;
 
 	/**
+	 * The couple count is a minimum: the order collects the rake once it has
+	 * grown to at least that many vehicles, rather than one of exactly that
+	 * size. Never together with founding, which reads the same number as the
+	 * rake's final size; the command keeps the two apart.
+	 */
+	bool couple_min = false;
+
+	/**
 	 * What a "go to couple" order will accept when it gets there: how full the
 	 * wagons are, what they are carrying, and how many of them there are.
 	 *
@@ -327,6 +335,12 @@ public:
 
 	/** Set whether this couple order founds and grows a rake. */
 	inline void SetFoundRake(bool found) { this->couple_found_rake = found; }
+
+	/** Is the couple count a minimum -- any rake of at least that many vehicles will do -- rather than an exact size? */
+	inline bool IsCoupleCountMinimum() const { return this->couple_min; }
+
+	/** Set whether the couple count is a minimum. */
+	inline void SetCoupleCountMinimum(bool minimum) { this->couple_min = minimum; }
 
 	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
 	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }

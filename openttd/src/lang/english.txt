@@ -4943,8 +4943,10 @@ STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} v
 STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND                            :{SPACE}(found a rake)
 STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT                      :{SPACE}(found a rake of up to {NUM})
 STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}Found a rake here if there is none, and grow it up to (0 - any) vehicles
-STR_ORDER_COUPLE_FOUND_OFF_BUTTON                               :{BLACK}Do not found a rake, only couple to one by its number of vehicles
-STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP                            :{BLACK}Two things in one window. Without founding, the number says which rake to collect: only a rake of exactly that many vehicles, 0 for any rake. With founding, the engine puts its own wagons down as a new rake when the station has none, adds them to the rake when there is one, and stops adding once the rake has this many vehicles, 0 for as many as fit on the platform. OK confirms both
+STR_ORDER_COUPLE_MIN_BUTTON                                     :{BLACK}At least: couple to a rake once it has (0 - any) vehicles or more
+STR_ORDER_COUPLE_COUNT_MIN                                      :{BLACK}Vehicles: at least {NUM}
+STR_ORDER_COUPLE_FILTER_SUFFIX_MIN                              :{SPACE}(at least {NUM} vehicles)
+STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP                            :{BLACK}One number, three readings. Neither toggle down: collect only a rake of exactly this many vehicles, 0 for any rake. "At least" down: collect a rake once it has this many vehicles or more, so a rake still being built is left to grow. "Found a rake" down: the engine puts its own wagons down as a new rake when the station has none, adds them to the rake when there is one, and stops adding once the rake has this many vehicles, 0 for as many as fit on the platform. Only one toggle can be down; OK confirms the number and the toggle together
 STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Founding a rake: up to {NUM}
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Founding a rake: platform length
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting for wagons to collect

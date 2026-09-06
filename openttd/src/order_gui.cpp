@@ -350,7 +350,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					if (order->ShouldFoundRake()) {
 						second += order->GetCoupleCount() != 0 ? GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT, order->GetCoupleCount()) : GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND);
 					} else if (order->GetCoupleCount() != 0) {
-						second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
+						second += GetString(order->IsCoupleCountMinimum() ? STR_ORDER_COUPLE_FILTER_SUFFIX_MIN : STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
 					}
 				}
 
@@ -1493,6 +1493,7 @@ public:
 					return GetString(STR_ORDER_COUPLE_COUNT_FOUND, order->GetCoupleCount());
 				}
 				if (order->GetCoupleCount() == 0) return GetString(STR_ORDER_COUPLE_COUNT_ANY);
+				if (order->IsCoupleCountMinimum()) return GetString(STR_ORDER_COUPLE_COUNT_MIN, order->GetCoupleCount());
 				return GetString(STR_ORDER_COUPLE_COUNT_BUTTON, order->GetCoupleCount());
 			}
 
@@ -1803,9 +1804,16 @@ public:
 				/* With the other answer across the box: found a rake here, of
 				 * at most the number entered -- or stop founding one. Depot
 				 * orders collect from a store and found nothing. */
-				ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {},
-						!order->IsType(OT_GOTO_STATION) ? INVALID_STRING_ID : (order->ShouldFoundRake() ? STR_ORDER_COUPLE_FOUND_OFF_BUTTON : STR_ORDER_COUPLE_FOUND_BUTTON),
-						!order->IsType(OT_GOTO_STATION) ? INVALID_STRING_ID : STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP);
+				if (order->IsType(OT_GOTO_STATION)) {
+					/* Two readings of the number, as two exclusive toggles: "at
+					 * least" above the box, founding below it; neither down is
+					 * the exact count. OK confirms number and toggle together. */
+					ShowQueryStringWithChoice(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {},
+							STR_ORDER_COUPLE_MIN_BUTTON, STR_ORDER_COUPLE_FOUND_BUTTON,
+							order->IsCoupleCountMinimum() ? 1 : (order->ShouldFoundRake() ? 2 : 0), STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP);
+				} else {
+					ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				}
 				break;
 			}
 
@@ -1824,18 +1832,26 @@ public:
 			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_DECOUPLE_WHOLE, 1);
 			return;
 		}
-		/* The couple count box's button: found a rake here (or stop doing so).
-		 * The number in the box goes with it -- as the rake's final size. */
-		if (this->querying_couple_count) {
-			this->querying_couple_count = false;
-			const Order *order = this->vehicle->GetOrder(sel);
-			if (order == nullptr) return;
-			auto value = ParseInteger(text, 10, true);
-			if (value.has_value()) {
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
-			}
-			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_FOUND, order->ShouldFoundRake() ? 0 : 1);
+	}
+
+	void OnQueryTextChoice(std::string_view text, uint8_t choice) override
+	{
+		/* The couple count box with its two toggles: the number, and which
+		 * reading of it -- exact (neither), at least (top), founding (bottom).
+		 * The one switched off goes first, so the command's own exclusion
+		 * never lifts the one just chosen. */
+		if (!this->querying_couple_count) return;
+		this->querying_couple_count = false;
+		VehicleOrderID sel = this->OrderGetSel();
+		if (this->vehicle->GetOrder(sel) == nullptr) return;
+		auto value = ParseInteger(text, 10, true);
+		if (value.has_value()) {
+			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
 		}
+		if (choice != 1) Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_MIN, 0);
+		if (choice != 2) Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_FOUND, 0);
+		if (choice == 1) Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_MIN, 1);
+		if (choice == 2) Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_FOUND, 1);
 	}
 
 	void OnQueryTextFinished(std::optional<std::string> str) override

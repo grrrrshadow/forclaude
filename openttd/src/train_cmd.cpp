@@ -2238,7 +2238,9 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 	if (check_count && order.GetCoupleCount() != 0 && !order.ShouldFoundRake()) {
 		uint count = 0;
 		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;
-		if (count != order.GetCoupleCount()) return false;
+		/* "At least": a rake still being grown is left alone until it has
+		 * reached the number, then taken whole, however much bigger it got. */
+		if (order.IsCoupleCountMinimum() ? count < order.GetCoupleCount() : count != order.GetCoupleCount()) return false;
 	}
 
 	return true;

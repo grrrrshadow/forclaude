@@ -799,6 +799,13 @@ public:
 	virtual void OnQueryTextExtra([[maybe_unused]] std::string_view text) {}
 
 	/**
+	 * The query window with two exclusive toggles has been confirmed with OK.
+	 * @param text the text entered
+	 * @param choice 0 for neither toggle, 1 for the top one, 2 for the bottom one
+	 */
+	virtual void OnQueryTextChoice([[maybe_unused]] std::string_view text, [[maybe_unused]] uint8_t choice) {}
+
+	/**
 	 * Some data on this window has become invalid.
 	 * @param data information about the changed data.
 	 * @param gui_scope Whether the call is done from GUI scope. You may not do everything when not in GUI scope. See #InvalidateWindowData() for details.

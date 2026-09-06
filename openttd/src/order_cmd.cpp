@@ -1276,7 +1276,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
-					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND) return CMD_ERROR;
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1454,6 +1454,13 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
 			break;
 
+		case MOF_COUPLE_MIN:
+			/* A number on a depot order is how many to take out of the store
+			 * (see the count filter); "at least" is a question about a rake
+			 * standing whole at a platform. */
+			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			break;
+
 		/* Waiting to be collected is the opposite of going to collect, and a
 		 * train that is waiting does not decide how it leaves either --
 		 * whoever couples to it brings the orders, and reversing out is one of
@@ -1625,7 +1632,16 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				break;
 
 			case MOF_COUPLE_FOUND:
+				/* One number, two readings, never both: the rake's final size
+				 * when founding, the least a rake must have when collecting.
+				 * Switching one on switches the other off. */
 				order->SetFoundRake(data != 0);
+				if (data != 0) order->SetCoupleCountMinimum(false);
+				break;
+
+			case MOF_COUPLE_MIN:
+				order->SetCoupleCountMinimum(data != 0);
+				if (data != 0) order->SetFoundRake(false);
 				break;
 
 			case MOF_WAIT_COUPLE:

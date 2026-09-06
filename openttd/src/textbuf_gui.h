@@ -29,6 +29,7 @@ using QueryStringFlags = EnumBitSet<QueryStringFlag, uint8_t>;
 typedef void QueryCallbackProc(Window*, bool);
 
 void ShowQueryString(std::string_view str, StringID caption, uint max_len, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button = INVALID_STRING_ID, StringID tooltip = INVALID_STRING_ID);
+void ShowQueryStringWithChoice(std::string_view str, StringID caption, uint max_len, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID top_button, StringID bottom_button, uint8_t choice, StringID tooltip);
 void UpdateQueryStringDefault(std::string_view str);
 void ShowQuery(EncodedString &&caption, EncodedString &&message, Window *w, QueryCallbackProc *callback, bool focus = false);
 

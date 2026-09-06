@@ -40,6 +40,8 @@ enum QueryStringWidgets : WidgetID {
 	WID_QS_MOVE_SEL, ///< Container for move button, which can be hidden.
 	WID_QS_EXTRA,   ///< Optional full-width button offering the other answer to the question (see ShowQueryString()).
 	WID_QS_EXTRA_SEL, ///< Container for the extra button, which can be hidden.
+	WID_QS_TOP,     ///< Optional full-width toggle above the text, the first of two exclusive choices (see ShowQueryStringWithChoice()).
+	WID_QS_TOP_SEL, ///< Container for the top toggle, which can be hidden.
 };
 
 /** Widgets of the #QueryWindow class. */

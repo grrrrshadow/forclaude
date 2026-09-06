@@ -3962,6 +3962,22 @@ potvrzuje obojí — je na čudlíku i na OK (`ShowQueryString` dostal
 parametr `tooltip`); titulek okna nápovědu nést neumí. Čudlík si šířku
 vezme z textu, okno se roztáhne.
 
+**„Minimálně" (hráč, totéž okno):** nad řádkem s číslem je druhý velký
+čudlík „Minimálně: připojit řadu, jakmile má (0 - libovolně) a více vozů".
+Číslo pak čte jako **spodní mez**: řada o tolika nebo více vozech se
+odveze, menší se nechá dorůst (`Order::couple_min`, `MOF_COUPLE_MIN`,
+`MatchesCoupleFilter`: `count < N` místo `count != N`; jen nádražní
+připojit, depový počet zůstává „vzít tolik"). Oba čudlíky jsou přepínače
+zamáčknuté podle stavu příkazu, **navzájem výlučné**: stisk jednoho
+pustí druhý, žádný zamáčknutý = přesný počet z titulku; příkaz to hlídá
+sám (zapnutí jednoho vypne druhý). OK potvrzuje číslo i čudlík najednou
+(`ShowQueryStringWithChoice`, `Window::OnQueryTextChoice`; okno dotazu
+dostalo horní čudlík `WID_QS_TOP`). Nápověda „jedno číslo, tři významy"
+je na obou čudlících i na OK. Na čudlíku počtu „Vozů: aspoň N", na
+řádku příkazu „(aspoň N vozů)". Rig: `testminimalne <vlak> <rozkaz>
+[N] [0]`, `testrozkazy` píše „MIN". Změřeno: scéna `zaloz` se sběračkou
+„aspoň 4" — u řady o 2 čeká, po dorůstu na 4 zabere a odveze.
+
 **Okno rozkazů:** to, co příkaz dostal navíc — (připojit …), (založit
 řadu …), (čekat na spojení), (odpojit …), (couvat ven), (otočit v depu),
 depové (odpojit/připojit …) — se píše **pod příkaz na druhý řádek**
