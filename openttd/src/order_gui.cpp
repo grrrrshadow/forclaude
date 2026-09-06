@@ -268,6 +268,11 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 	DrawString(left, rtl ? right - 2 * sprite_size.width - 3 : middle, y, GetString(STR_ORDER_INDEX, order_index + 1), colour, AlignmentH::ForceRight);
 
 	std::string line;
+	/* What this feature adds to an order -- coupling, its filters, waiting,
+	 * decoupling, reversing out, the depot's coupling and putting down -- goes
+	 * on a second line under the order, in the list; the timetable keeps it
+	 * on the one line it has. See OrderHasSecondLine(). */
+	std::string second;
 
 	switch (order->GetType()) {
 		case OT_DUMMY:
@@ -316,7 +321,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * actually being a separate OrderType. See
 				 * FEATURE_DESIGN_COUPLING_TOW.md. */
 				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
-					line += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+					second += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
 
 					/* And what it is going to accept, for each filter that has
 					 * been set. Read off the line, a whole list of orders says
@@ -329,15 +334,15 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					 * know. An order line is short and shares it with the
 					 * station name. */
 					if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
-						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
+						second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
 					}
 					if (IsValidCargoType(order->GetCoupleCargo())) {
-						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
+						second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
 					}
 					if (order->ShouldFoundRake()) {
-						line += order->GetCoupleCount() != 0 ? GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT, order->GetCoupleCount()) : GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND);
+						second += order->GetCoupleCount() != 0 ? GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT, order->GetCoupleCount()) : GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND);
 					} else if (order->GetCoupleCount() != 0) {
-						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
+						second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
 					}
 				}
 
@@ -345,7 +350,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * only place it could be read was a button that speaks for one
 				 * order at a time. Everything an order is going to do belongs
 				 * on its own line, where a whole list can be read at once. */
-				if (v->type == VehicleType::Train && order->ShouldWaitForCouple()) line += GetString(STR_ORDER_WAIT_COUPLE_SUFFIX);
+				if (v->type == VehicleType::Train && order->ShouldWaitForCouple()) second += GetString(STR_ORDER_WAIT_COUPLE_SUFFIX);
 
 				/* How many vehicles stay with the train belongs on the order
 				 * line with everything else the order is going to do. A button
@@ -353,9 +358,9 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * at several stations learned nothing from it about any. */
 				if (!timetable && v->type == VehicleType::Train && order->ShouldDecoupleOnDeparture()) {
 					if (order->ShouldDecoupleWholeTrain()) {
-						line += GetString(STR_ORDER_DECOUPLE_SUFFIX_WHOLE);
+						second += GetString(STR_ORDER_DECOUPLE_SUFFIX_WHOLE);
 					} else {
-						line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DECOUPLE_SUFFIX_ALL : STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+						second += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DECOUPLE_SUFFIX_ALL : STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 					}
 				}
 
@@ -367,7 +372,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * plain lie about what the train is going to do. */
 				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation() &&
 						!order->ShouldDecoupleOnDeparture()) {
-					line += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
+					second += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
 				}
 			}
 			break;
@@ -404,7 +409,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			 * of it, not how long it stays, so it has no place in the
 			 * timetable. See FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (!timetable && v->type == VehicleType::Train && order->ShouldTurnAroundInDepot()) {
-				line += GetString(STR_ORDER_TURN_AROUND_DEPOT_SUFFIX);
+				second += GetString(STR_ORDER_TURN_AROUND_DEPOT_SUFFIX);
 			}
 
 			/* A depot order that collects or puts down reads it off its own
@@ -413,22 +418,22 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			 * by hand: leave first, then take on. */
 			if (!timetable && v->type == VehicleType::Train && order->ShouldDecoupleOnDeparture()) {
 				if (order->ShouldDecoupleWholeTrain()) {
-					line += GetString(STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE);
+					second += GetString(STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE);
 				} else {
-					line += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL : STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
+					second += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL : STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 				}
 			}
 			if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
 				bool after_decouple = !timetable && order->ShouldDecoupleOnDeparture();
-				line += GetString(after_decouple ? STR_ORDER_DEPOT_COUPLE_SUFFIX_AND : STR_ORDER_DEPOT_COUPLE_SUFFIX);
+				second += GetString(after_decouple ? STR_ORDER_DEPOT_COUPLE_SUFFIX_AND : STR_ORDER_DEPOT_COUPLE_SUFFIX);
 				if (order->GetCoupleLoad() != OrderCoupleLoad::Any) {
-					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
+					second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_PART, STR_ORDER_COUPLE_LOAD_SHORT_ANY + to_underlying(order->GetCoupleLoad()));
 				}
 				if (IsValidCargoType(order->GetCoupleCargo())) {
-					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
+					second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
 				}
 				if (order->GetCoupleCount() != 0) {
-					line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
+					second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
 				}
 			}
 
@@ -470,7 +475,29 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 		}
 	}
 
-	DrawString(rtl ? left : middle, rtl ? middle : right, y, line, colour);
+	if (timetable || second.empty()) {
+		DrawString(rtl ? left : middle, rtl ? middle : right, y, line + second, colour);
+	} else {
+		DrawString(rtl ? left : middle, rtl ? middle : right, y, line, colour);
+		DrawString(rtl ? left : middle, rtl ? middle : right, y + GetCharacterHeight(FontSize::Normal), second, colour);
+	}
+}
+
+/**
+ * Whether the order list shows this order on two lines: the second carries
+ * what this feature adds (see the matching parts in DrawOrderString()).
+ */
+bool OrderHasSecondLine(const Vehicle *v, const Order *order)
+{
+	if (v->type != VehicleType::Train) return false;
+	if (order->IsType(OT_GOTO_STATION)) {
+		return order->ShouldGoToCouple() || order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture() ||
+				order->ShouldReverseOutOfStation();
+	}
+	if (order->IsType(OT_GOTO_DEPOT)) {
+		return order->ShouldTurnAroundInDepot() || order->ShouldDecoupleOnDeparture() || order->ShouldGoToCouple();
+	}
+	return false;
 }
 
 /**
@@ -611,6 +638,11 @@ enum OrderHotKeys : int32_t {
  * For vehicles of other companies, both button rows are not displayed.
  */
 struct OrdersWindow : public Window {
+	/* Rows are two lines high while any order of this vehicle has a second
+	 * line to show (OrderHasSecondLine()); the scrollbar only knows uniform
+	 * rows, so all rows grow together. */
+	bool two_line_orders = false;
+
 private:
 	/** Under what reason are we using the PlaceObject functionality? */
 	enum OrderPlaceObjectState : uint8_t {
@@ -942,8 +974,8 @@ public:
 	{
 		switch (widget) {
 			case WID_O_ORDER_LIST:
-				fill.height = resize.height = GetCharacterHeight(FontSize::Normal);
-				size.height = 6 * resize.height + padding.height;
+				fill.height = resize.height = GetCharacterHeight(FontSize::Normal) * (this->two_line_orders ? 2 : 1);
+				size.height = 6 * GetCharacterHeight(FontSize::Normal) + padding.height;
 				break;
 
 			case WID_O_COND_VARIABLE: {
@@ -1042,6 +1074,19 @@ public:
 		}
 
 		this->vscroll->SetCount(this->vehicle->GetNumOrders() + 1);
+		if (gui_scope) {
+			bool two = false;
+			for (const Order &o : this->vehicle->Orders()) {
+				if (OrderHasSecondLine(this->vehicle, &o)) {
+					two = true;
+					break;
+				}
+			}
+			if (two != this->two_line_orders) {
+				this->two_line_orders = two;
+				this->ReInit();
+			}
+		}
 		if (gui_scope) this->UpdateButtonState();
 
 		/* Scroll to the new order. */

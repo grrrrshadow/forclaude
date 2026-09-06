@@ -2244,17 +2244,6 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 	return true;
 }
 
-/**
- * How long, in pixels, is what this train would leave standing under a
- * "decouple all" order: everything behind its leading unit.
- */
-static uint WagonsLengthBehindEngine(const Train *v)
-{
-	uint length = 0;
-	for (const Train *u = v->GetNextUnit(); u != nullptr; u = u->Next()) length += u->gcache.cached_veh_length;
-	return length;
-}
-
 /** How many units this train would leave standing under a "decouple all" order. */
 static uint WagonUnitsBehindEngine(const Train *v)
 {
@@ -2264,14 +2253,54 @@ static uint WagonUnitsBehindEngine(const Train *v)
 }
 
 /**
- * How much rake a platform can hold, in pixels: its length plus the one tile
- * of tolerance the player allows for the signal and waypoint tile in front
- * of it. Ground that is not a platform holds anything.
+ * How long a platform is, in pixels. Ground that is not a platform holds
+ * anything.
  */
-static uint PlatformRakeCapacity(TileIndex tile)
+static uint PlatformLengthPx(TileIndex tile)
 {
 	if (!IsRailStationTile(tile)) return UINT_MAX;
-	return (BaseStation::GetByTile(tile)->GetPlatformLength(tile) + 1) * TILE_SIZE;
+	return BaseStation::GetByTile(tile)->GetPlatformLength(tile) * TILE_SIZE;
+}
+
+/**
+ * How much of a rake's platform is free beside it, in pixels: the longer of
+ * the two stretches between the rake and the platform's ends. A rake put
+ * down at the far end leaves all of it at the near end, which is where the
+ * feeder comes in. A rake standing on no platform has room without end.
+ *
+ * @param rake the rake, any vehicle of it
+ */
+static uint FreeRoomBesideRake(const Train *rake)
+{
+	const Train *on_platform = nullptr;
+	for (const Train *u = rake->First(); u != nullptr; u = u->Next()) {
+		if (IsRailStationTile(u->tile)) {
+			on_platform = u;
+			break;
+		}
+	}
+	if (on_platform == nullptr) return UINT_MAX;
+
+	TileIndex tile = on_platform->tile;
+	Axis axis = GetRailStationAxis(tile);
+	TileIndexDiff delta = TileOffsByAxis(axis);
+	TileIndex low = tile;
+	TileIndex high = tile;
+	while (IsCompatibleTrainStationTile(low - delta, tile)) low -= delta;
+	while (IsCompatibleTrainStationTile(high + delta, tile)) high += delta;
+	int platform_min = (axis == Axis::X ? TileX(low) : TileY(low)) * TILE_SIZE;
+	int platform_max = (axis == Axis::X ? TileX(high) : TileY(high)) * TILE_SIZE + TILE_SIZE;
+
+	int rake_min = INT_MAX;
+	int rake_max = INT_MIN;
+	for (const Train *u = rake->First(); u != nullptr; u = u->Next()) {
+		int pos = axis == Axis::X ? u->x_pos : u->y_pos;
+		int half = (u->gcache.cached_veh_length + 1) / 2;
+		rake_min = std::min(rake_min, pos - half);
+		rake_max = std::max(rake_max, pos + half);
+	}
+	int room = std::max(rake_min - platform_min, platform_max - rake_max);
+	return room > 0 ? (uint)room : 0;
 }
 
 /**
@@ -2279,9 +2308,13 @@ static uint PlatformRakeCapacity(TileIndex tile)
  * to it?
  *
  * Two bounds, both the player's: the number on the founding order, when there
- * is one, is the rake's final size; and no rake is built past the platform it
- * stands on (plus one tile). A rake that has no room is finished -- the
- * feeder waits for a collector to take it away and then founds the next.
+ * is one, is the rake's final size; and the feeder, wagons and engine, has to
+ * fit on the platform in front of the rake, with one tile to spare. So no
+ * rake is ever built past its platform, and a feeder never sets off for a
+ * rake it cannot pull up to: it would stand in the platform's mouth, on the
+ * station waypoint, exactly where the collector has to come in. A rake that
+ * has no room is finished -- the feeder waits for a collector to take it
+ * away and then founds the next.
  *
  * @param rake   the rake standing at the station
  * @param feeder the train that would couple to it and put its wagons down
@@ -2290,21 +2323,20 @@ static uint PlatformRakeCapacity(TileIndex tile)
 static bool RakeHasRoomFor(const Train *rake, const Train *feeder, const Order &order)
 {
 	uint units = 0;
-	uint length = 0;
 	for (const Train *u = rake; u != nullptr; u = u->Next()) {
-		length += u->gcache.cached_veh_length;
 		if (!u->IsArticulatedPart() && !u->IsRearDualheaded()) units++;
 	}
 	if (order.GetCoupleCount() != 0 && units + WagonUnitsBehindEngine(feeder) > order.GetCoupleCount()) return false;
-	return length + WagonsLengthBehindEngine(feeder) <= PlatformRakeCapacity(rake->tile);
+	return FreeRoomBesideRake(rake) >= feeder->gcache.cached_total_length + TILE_SIZE;
 }
 
 static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *wp, StationID dest, std::set<TileIndex> &out);
 
 /**
- * Would this train's wagons fit on the longest platform they could be put
- * down on at @p dest -- behind @p through when the couple order sits behind
- * a station waypoint, anywhere at the station otherwise?
+ * Would this train, wagons and engine, fit with a tile to spare on the
+ * longest platform it could put its wagons down on at @p dest -- behind
+ * @p through when the couple order sits behind a station waypoint, anywhere
+ * at the station otherwise?
  */
 static bool FeederWagonsFitAt(const Train *v, StationID dest, const Waypoint *through)
 {
@@ -2312,15 +2344,15 @@ static bool FeederWagonsFitAt(const Train *v, StationID dest, const Waypoint *th
 	if (through != nullptr) {
 		std::set<TileIndex> behind;
 		CollectPlatformTilesBehindWaypoint(v, through, dest, behind);
-		for (TileIndex t : behind) longest = std::max(longest, PlatformRakeCapacity(t));
+		for (TileIndex t : behind) longest = std::max(longest, PlatformLengthPx(t));
 	} else {
 		const Station *st = Station::GetIfValid(dest);
 		if (st == nullptr) return false;
 		for (TileIndex t : st->train_station) {
-			if (IsRailStationTile(t) && GetStationIndex(t) == dest) longest = std::max(longest, PlatformRakeCapacity(t));
+			if (IsRailStationTile(t) && GetStationIndex(t) == dest) longest = std::max(longest, PlatformLengthPx(t));
 		}
 	}
-	return WagonsLengthBehindEngine(v) <= longest;
+	return v->gcache.cached_total_length + TILE_SIZE <= longest;
 }
 
 /**
@@ -2862,7 +2894,7 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
 		return false;
 	}
 	if (!FeederWagonsFitAt(v, dest, through)) {
-		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - moje vozy ({} px) se na zadne nastupiste stanice {} nevejdou, cekam", v->unitnumber, WagonsLengthBehindEngine(v), dest.base()));
+		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - cely vlak ({} px + policko) se na zadne nastupiste stanice {} nevejde, cekam", v->unitnumber, v->gcache.cached_total_length, dest.base()));
 		return false;
 	}
 
@@ -10175,8 +10207,13 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 					TryPathReserve(consist, true, false);
 					return true;
 				}
-				if (couple_order->ShouldFoundRake()) FoundingCoupleOrderHold(consist, *couple_order, through, saw_full_rake);
-				if (_show_train_orientation) {
+				/* A founding run says its own reason (the rake is full, or its
+				 * wagons would not fit); the generic count below would then
+				 * take turns with it, and two "said once" lines that alternate
+				 * are said every tick -- seventy thousand of them in one run. */
+				if (couple_order->ShouldFoundRake()) {
+					FoundingCoupleOrderHold(consist, *couple_order, through, saw_full_rake);
+				} else if (_show_train_orientation) {
 					/* Not just "nothing" -- how many rakes stand waiting at the
 					 * station at all, and how many of them the waypoint's own
 					 * rails reach. A collector waiting for ever with full rakes

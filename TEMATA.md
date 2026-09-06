@@ -3833,11 +3833,19 @@ ne přesný počet — filtr přesného počtu se u zakládacího příkazu nepo
 Partner se hledá jako dnes, před výjezdem. Tři odpovědi:
 - řada s místem → zabrat, přijet, připojit; „odpojit vše" za tím odloží
   vozy i řadu jako jednu (řada roste);
-- řada, do které se vozy stavitelky nevejdou — má N vozů, nebo délka řady
-  + vozy > délka nástupiště + 1 políčko (`PlatformRakeCapacity`,
-  `RakeHasRoomFor`) → řada je **plná**, stavitelka **čeká** (v depu, u
-  nádraží, před směrováním), „zaklada radu - rada … je hotova (plna),
-  cekam, az ji nekdo odveze";
+- řada, do které se stavitelka nevejde — má N vozů, nebo na nástupišti
+  vedle řady není volno aspoň na **celou stavitelku (mašinka + vozy) plus
+  jedno políčko** (`FreeRoomBesideRake`, `RakeHasRoomFor`) → řada je
+  **plná**, stavitelka **čeká** (v depu, u nádraží, před směrováním),
+  „zaklada radu - rada … je hotova (plna), cekam, az ji nekdo odveze".
+  Původní míra „délka řady + vozy ≤ nástupiště + 1 políčko" byla špatně
+  obráceně: pouštěla řadu čouhat a stavitelku k řadě, ke které se už
+  nevešla — na savu new1 pak stála na křižovatce pod „peron3", kam má
+  přijíždět sběračka, a hlásila „prijel masinkou napred" (hráč: bez
+  zadaného počtu tam jela, i když byl peron plný; s počtem to sedělo).
+  S touhle mírou řada nikdy nepřečnívá a stavitelka se k ní vždycky vejde
+  celá; totéž měřítko platí i pro založení na prázdném nástupišti
+  (`FeederWagonsFitAt`: nástupiště ≥ stavitelka + políčko);
 - žádná řada → připojit se **uzavře jako splněné** (jako by se spojilo,
   `ConcludeCoupleOrderInPlace`; před směrováním se uzavře i směrování) a
   odpojit za ním jede založit. Vlastní vozy se přitom musí na nástupiště
@@ -3892,14 +3900,34 @@ na pevném semínku (`newgame 1`), aby souřadnice držely.
 
 Mimochodem nalezeno a opraveno: depo zamluvené nikým, **4.21**.
 
-**Změřeno (scéna `zaloz`, pevné semínko):** založení 2 vozů na (67,44),
-růst 2→4→6 směrem k (65,44), čtvrtá jízda „rada je hotova (plna), cekam",
-sběračka po `testbrzda 3` řadu zabere, spojí („couva ano"), odveze do depa
-V se 6 vozy; stavitelka po zabrání řady sběračkou „neni k cemu se
-pripojit" a založí novou na druhém nástupišti (67,45); pak čeká, protože
-v depu Z už vozy nejsou. Baterie 48 scén: beze změny proti předchozímu
+**Změřeno (scéna `zaloz`, pevné semínko, nástupiště 4 políčka):** založení
+2 vozů na vzdáleném konci, růst na 4 (s mírou „stavitelka + políčko":
+mašinka + 2 vozy = 24 px + 16, za 4 vozy zbývá 32 → plná), třetí jízda
+„rada je hotova (plna), cekam"; sběračka po `testbrzda 3` řadu zabere,
+spojí („couva ano"), odveze do depa V; stavitelka po zabrání řady
+sběračkou „neni k cemu se pripojit" a založí novou, doroste na 4. Na
+hráčově savu (nástupiště 10 políček, stavitelka mašinka + 3 vozy = 32 px):
+3→6→9→12→15 vozů, pak „plna" a stání na klasickém směrování „2"
+(108,92–93), na peronové se nejede (scéna `zalozsmer`, běh 62 000 tiků). Baterie 48 scén: beze změny proti předchozímu
 běhu (jen počty vjezdů do depa na náhodných mapách), `zaloz` spojeno=7
 (4× v depu, 2× u řady, 1× sběračka), havaroval=0.
+
+**Okno rozkazů:** to, co příkaz dostal navíc — (připojit …), (založit
+řadu …), (čekat na spojení), (odpojit …), (couvat ven), (otočit v depu),
+depové (odpojit/připojit …) — se píše **pod příkaz na druhý řádek**
+(`OrderHasSecondLine`, `DrawOrderString`); vanilkové přípony (plná
+nakládka, vyložit, místo zastavení, přestavba) zůstávají na prvním.
+Seznam má jednotné řádky (posuvník jiné neumí), tak jsou u vlaku, který
+má aspoň jeden takový příkaz, všechny řádky dvouřádkové; jízdní řád
+zůstává jednořádkový. Zatím jen zalomení, hráč to chce v tuhle chvíli
+takhle.
+
+**Hráčova otázka — zakázat založení bez maxima (červená chyba „zadej max
+počet vagonků v řadě")?** Šlo by snadno: v `OnQueryTextExtra` u tlačítka
+„Založit řadu" s nulou v okně vrátit `ShowErrorMessage` a příznak
+nezapnout; nula by tím přestala znamenat „podle nástupiště". Nedělám to:
+s novou mírou (stavitelka + políčko) nula funguje správně a je to
+jednodušší zadání pro hráče; kdyby přesto chtěl, je to jedno místo.
 
 **K odsouhlasení / otevřené:**
 - (a) výjimka 2 — depo otočí zakládací stavitelku samo;
