@@ -3761,6 +3761,79 @@ Návrhové otázky hráče, zatím nedotčené v kódu:
 - Odtah dvouvlaku: odtahovka veze cokoli, co visí na porouchaném čele;
   pohlcený vlak zůstane spojený, dokud čelo neodpojí podle svých rozkazů.
 
+## 2.37 PLÁN (probíráme, nestaví se): „Založit řadu" u příkazu připojit
+
+**Hráčův návrh:** jako u odpojit („Odpojit celý vlak") dostane okno počtu u
+připojit („Zadej, kolik vozů má řada mít") řádek s tlačítkem **„Založit
+řadu"**. Význam: mašinka jede připojit; když za nádražním směrováním (nebo na
+obyčejném nádraží) **žádné vagonky k připojení nejsou, příkaz připojit se
+přeskočí** a platí další příkaz, což je vždy odpojit na tom nástupišti —
+mašinka tam odloží své vozy a řadu tím založí. Při dalších jízdách řadu
+najde, připojí, odpojí vše → řada roste. Celé to musí běžet samo: hráč dá
+založit řadu, připojit libovolně, pod tím odpojit, a mašinka navozí řadu na
+délku nástupiště; pak řada zůstane čekat sama.
+
+**Meze délky (hráč):** řada nesmí být delší než nástupiště, ať nečouhá —
+tolerance 1 políčko přes nástupiště pro systém; když se vagonky nevejdou,
+mašinka **nevyjede připojovat vůbec**. Nebo ručně: „založit řadu max N
+vagonků", tím by připojování k řadě skončilo. Otázka hráče: ručně, nebo délka
+nástupiště + 1 políčko?
+
+**Co z toho plyne (můj rozbor, k probrání):**
+
+1. **Řada ve stavbě nesmí být na nabídku.** Dnes je odložená řada k mání
+   každé sběračce hned, jak odkládačka odjede dvě políčka (§3). Rozestavěnou
+   řadu by si odvezl první dálkový vlak s „připojit", který jede kolem, a
+   celý cyklus by se rozpadl. Řada založená tímhle příkazem tedy potřebuje
+   stav **„rozestavěná"** (uložený se savem): připojit se k ní smí jen
+   příkaz se zapnutým „založit řadu" (ten ji staví); ostatním připojit je
+   neviditelná. **Hotová** (viz 3) se stane obyčejnou čekající řadou jako
+   dnes.
+2. **Kdo ji dostaví, ten ji dostaví celou** — hotovou řadu si smí vzít
+   kterákoli sběračka podle svých filtrů; to je dnešní chování a nemění se.
+3. **Kdy je hotová.** Dvě míry, obě naráz: **délka nástupiště** (fyzika,
+   vždy) a **volitelné N** z okna počtu (0 = jen nástupiště). Systémová
+   verze: řada je hotová ve chvíli, kdy se do ní další vozy stavitelky
+   nevejdou (délka řady + délka jejích vozů > délka nástupiště + tolerance)
+   — nebo když má aspoň N vozů. Zjišťuje se **před výjezdem** při hledání
+   partnera (0.3/2.2: nejdřív partner, pak trať): nevejde se → nevyjíždí
+   připojovat, řadu prohlásí za hotovou (od té chvíle na nabídku), a **čeká
+   před směrováním, dokud hotovou řadu někdo neodveze**; pak zakládá novou.
+   Alternativa „přeskočit a jet dál s vozy" by znamenala, že mašinka s vozy
+   objíždí a nikde ho neodloží — nedává smysl; ale rozhodne hráč.
+4. **Přeskočení připojit.** Dnes sběračka bez partnera **drží** před
+   nádražním směrováním (2.32, „čeká na vagonky") nebo čeká na nádraží.
+   S „založit řadu" se místo držení příkaz připojit uzavře jako splněný
+   (řada není → jedeme založit) a další příkaz odpojit jede po svém — na
+   nástupiště za směrováním se dojede obyčejnou cestou, protože z hrdla
+   směrování jinam nevede. Bez směrování totéž na kterémkoli nástupišti.
+   Vlastní vozy stavitelky se musí na nástupiště vejít (stejná míra).
+5. **Růst řady.** Stavitelka připojí celou rozestavěnou řadu (jako dnes),
+   „odpojit vše" pak odloží její vozy i řadu jako jednu (mašinka je na
+   konci seznamu, řez za ní — funguje ať přijela předkem nebo reverzně).
+   Odložené řadě zůstává stav „rozestavěná" a její míry; na zbytku
+   (nakládka, jízdní řád odpojení, držení odkládačkou) se nic nemění.
+6. **Tolerance 1 políčko:** vůz trčící za nástupiště leží na hrdle — na
+   výhybce nebo návěstidle. Stavitelka se k řadě připojuje z toho konce, ze
+   kterého přijede, takže trčící konec jí nevadí, ale vadí všemu, co tudy
+   jezdí kolem. Navrhuju toleranci 0 a raději delší nástupiště; hráčova
+   volba.
+7. **Okno:** tlačítko „Založit řadu" v okně počtu u připojit **nezahazuje
+   číslo v okně** — číslo je to volitelné N (0 = libovolně); tlačítko
+   zapne stavbu. Řádek příkazu: „(připojit) (založit řadu)" / „(založit
+   řadu do N)". Pole na příkazu: `found_rake` (vlastní pole, 0.3), na řadě
+   příznak rozestavěnosti + cíl N.
+8. **Měření:** délka v pixelech (`cached_veh_length`) proti délce
+   nástupiště × 16; scény: založení z prázdna, dva cykly růstu, „nevejde
+   se" → hotová → odvoz cizí sběračkou → nové založení; s směrováním i bez.
+
+**K rozhodnutí hráče:** (a) plná řada → stavitelka čeká, dokud ji někdo
+neodveze (navrhuju), nebo jede dál? (b) N volitelné vedle délky nástupiště
+(navrhuju), nebo jen jedno z nich? (c) rozestavěná řada neviditelná pro
+ostatní připojit (navrhuju, bez toho to nefunguje)? (d) tolerance 0 nebo 1?
+
+---
+
 ## 2.36 Rig: scény ze savu běžely na prázdné mapě
 
 Baterie píše před scénou do `autoexec.scr` příkaz `newgame` — a ten se
