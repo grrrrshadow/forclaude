@@ -36,3 +36,8 @@ přes `-g` a scény jsou v baterii.
   dlouhou řadu; klasické směrování „2" na slepé koleji, vlak 1 vozí vozy z
   depa (106,92). TEMATA 2.38 (založit za směrováním), 4.22 (puštěné držení
   bez záboru). Scéna `zalozsmer`. Otevřené: odtahovka na vagonky (§16).
+- `obmena.sav` — čtyři vlaky čekají na nástupišti (151,166–169), dva
+  couvají; mašinky mají nastavenou náhradu, depa (139,167) a (164,167),
+  směrování „0" na slepé koleji (147,160). TEMATA 4.23 (směr přes obměnu:
+  `testskip 1`, `testskip 2`) a §16 (crash obměny nad odtahovkou
+  s poruchou: `testpostav 139 167 8 odtahovka`, `testporucha 1`).

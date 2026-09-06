@@ -2249,6 +2249,36 @@ takže to je jen šum, ale stojí za pohled, proč tam zábor nebyl.
 
 ---
 
+## 4.23 Obměna vozidel drží směr vlaku — jako složení z odtahovky
+
+**Hráč (save `obmena.sav`):** čtyři vlaky čekají na nástupišti, dva z nich
+couvají (mašinka vzadu, „couva ano"). Po přeskočení rozkazu jedou do depa,
+tam jim hra vymění mašinku (obměna podle seznamu náhrad) a vyjedou
+„normálně popředu" — mašinkou napřed. Sami se otočit neumějí a k řadě by
+pak přijížděly špatným koncem. Hráčovo pravidlo: totéž jako u odtahovky
+(4.19): zapamatovat, jak byl vlak nasměrován, a po obměně ho vrátit tak,
+jak byl.
+
+**Příčina:** obměna staví novou mašinku jako každé vozidlo v depu — čelem
+ke vratům — a `CopyHeadSpecificThings` z hlavy přenáší rozkazy, skupinu,
+statistiky, ne příznak `DrivingBackwards`. Vozy si `Flipped` už přenášely
+(vanilkový kód přes `ReverseTrainDirection` na jednom vozidle).
+
+**Oprava (`autoreplace_cmd.cpp`):**
+1. každé nové vozidlo dostane `direction` starého — v depu míří vozidla
+   couvajícího vlaku k zadní zdi a právě to čtení, obrácené příznakem
+   couvání, je vede ven z vrat; jedno nové vozidlo čelem ke vratům by byl
+   vlak se zlomem, který nevyjede;
+2. nová hlava dostane `DrivingBackwards` staré.
+
+**Změřeno na savu (rig: `testskip 1`, `testskip 2`, poruchy vypnuté):** oba
+vlaky po obměně v depu „couva ano", vozidla směr 5 (k zadní zdi), po
+`testbrzda` vyjedou vagony napřed, dojedou na směrování „0" na slepé
+koleji, tam se otočí a do stanice vjedou. Baterie beze změn (`okruh` zase
+jednou 0/0, §16).
+
+---
+
 ## 5.0 Co je „naše" nastavení posunu mapy
 
 V nabídce je **pět** voleb. První je naše a je přednastavená. Je to
@@ -4162,6 +4192,22 @@ je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
   oblouku (4.3), ne v 4.22 — to jen změnilo časování, kterým se tam hra
   dostane. Nezkoumáno dál dnes; scéna zůstává v baterii červená
   schválně, ať se na to nezapomene.
+
+- **Obměna nad spojeným vlakem odtahovka + porucha padá (assert
+  `ret.Succeeded()`, `autoreplace_cmd.cpp` řádek 696, hráčův crash z 6. 9.
+  po složení poruchy v depu).** Hráč to chce nechat a uložit příště; rig
+  to už umí: save `obmena.sav`, `testpostav 139 167 8 odtahovka`,
+  `testporucha 1` — odtahovka poruchu zabere, spojí („couva ne"), vjede
+  s ní do depa (139,167) a hra spadne dřív, než se porucha složí. Co je
+  vidět: obměna se spouští při vjezdu do depa nad **celým spojeným
+  vlakem** (odtahovka v čele, mašinka poruchy uprostřed jako vagon) a
+  její zkušební průchod (bez Execute) neumí staré vozy poskládat zpátky
+  (`CmdMoveVehicle` odmítne). Nápad na opravu, až se k tomu půjde: vlak
+  s připojenou poruchou (`IsRescueTargetAttached`) obměně vůbec nedávat,
+  poruchu obměnit až po složení jako vlastní vlak (zařadit do
+  `_vehicles_to_autoreplace`); a zjistit, proč přesun uprostřed řetězu
+  s mašinkou selhává — totéž hrozí každému spojenému vlaku s mašinkou
+  uvnitř (loko_obou_stran), když má náhradu nastavenou.
 
 - **Odtahovka pro vagonky si zamlouvá cestu až k nim a sráží se (save
   new1).** Hráč: zavolat odtahovku na plné vagonky chvíli po startu savu,

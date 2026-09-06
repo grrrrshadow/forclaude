@@ -377,6 +377,13 @@ static CommandCost BuildReplacementVehicle(Vehicle *old_veh, Vehicle **new_vehic
 		Train::From(new_veh)->flags.Set(VehicleRailFlag::CoupledHere);
 	}
 
+	/* And it faces the way the old one faced. A vehicle built in a shed faces
+	 * the door; the vehicles of a train that drove in backwards face the back
+	 * wall, and it is that facing, read against the train's backwards flag,
+	 * that takes it out of the door again. One new vehicle facing the door in
+	 * such a train is a train with a kink in it that cannot leave. */
+	if (new_veh->type == VehicleType::Train) new_veh->direction = old_veh->direction;
+
 	/* Try to reverse the vehicle, but do not care if it fails as the new type might not be reversible */
 	if (new_veh->type == VehicleType::Train && Train::From(old_veh)->flags.Test(VehicleRailFlag::Flipped)) {
 		/* Only copy the reverse state if neither old or new vehicle implements reverse-on-build probability callback. */
@@ -444,6 +451,16 @@ static CommandCost CopyHeadSpecificThings(Vehicle *old_head, Vehicle *new_head, 
 	if (cost.Succeeded() && old_head != new_head && flags.Test(DoCommandFlag::Execute)) {
 		/* Copy other things which cannot be copied by a command and which shall not stay reset from the build vehicle command */
 		new_head->CopyVehicleConfigAndStatistics(old_head);
+
+		/* Which end leads. A train that drove into the shed backwards -- an
+		 * engine that came to collect its wagons from the other end and has
+		 * been pushing them since -- drives out backwards, new engine or
+		 * old: the way it is facing is its own business and the shed is not
+		 * to turn it. Left off the new head, every replaced train came out
+		 * engine first, and one that collects wagons by its wagon end then
+		 * arrived at the rake engine first. The player's rule for the tow
+		 * (RestoreCasualtyOrientation()) applied to the replacement. */
+		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, old_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards));
 		GroupStatistics::AddProfitLastYear(new_head);
 
 		/* Switch vehicle windows/news to the new vehicle, so they are not closed/deleted when the old vehicle is sold */
