@@ -2357,6 +2357,46 @@ sama píše, že zamykání ukazatele nemusí všude fungovat.
 
 ---
 
+## 5.4 Debug myši: posledních 5 vteřin, Ctrl + pravé tlačítko
+
+**Proč:** o zaseknutém pravém tlačítku se roky jen dohadujeme. Hráč
+nevěří, že se paměť „pravé je dole" po puštění opravdu nuluje — a má
+pravdu v tom, že to nikdo nikdy neviděl na jedné časové ose. Tak se
+napřed zapisuje, pak se opravuje.
+
+**Co to je (`mouse_debug.cpp`):** každá událost myši se zapíše s časem
+(ms od první) a s celým stavem, jak ho drží hra: L/R (paměť tlačítek),
+Rclk (čekající pravý klik), pozice a delta ukazatele, pin (přišpendlený
+ukazatel), drag (tažení mapy), mode (volba posunu, 0 = naše). Drží se
+**posledních 5 vteřin** (a nejvýš 20 000 řádků). Zapisuje se:
+
+- Windows ovladač (`win32_v.cpp`): zprávy WM_LBUTTONDOWN/UP,
+  WM_RBUTTONDOWN/UP (u puštění i to, co v tu chvíli říká systém),
+  WM_CAPTURECHANGED, WM_MOUSELEAVE, každý WM_MOUSEMOVE včetně toho, zda
+  byl ukazatel vrácen (SetCursorPos); **dotaz na systém**
+  (GetAsyncKeyState) — při každé změně odpovědi a každých 250 ms, dokud
+  si hra pamatuje nějaké tlačítko dole, včetně toho, zda systém pravé
+  „viděl dole" (stráž z 5.1) a zda se tím paměť vynulovala;
+- SDL ovladač totéž (SDL_GetMouseState, SDL_WarpMouseInWindow);
+- `window.cpp`: začátek tažení stiskem, obnovení tažení pohybem podle
+  paměti (5.0b — přesně to místo, které umí „aretovat"), konec tažení
+  s důvodem (350 ms bez pohybu / stisk levého / pravé puštěno / tlačítko
+  už není dole / žádné okno).
+
+**Uložení:** Ctrl + pravé tlačítko (klik se spolkne, tažení nezačne) →
+soubor `mouseRRRRMMDDhhmmss.log` vedle savů a crash reportů
+(`FioFindDirectory(Save)`), na obrazovce „Debug myši uložen: …". V konzoli
+`mousedebug`.
+
+**Jak číst:** jestli je paměť R=1 dlouho po posledním WM_RBUTTONUP, a co
+v těch chvílích říkal systém — to je celá otázka. Když systém říká R=0
+a paměť drží R=1 s „videl-R-dole=0", je to případ stráže z 5.1 (systém
+tlačítko nikdy neviděl) a nulovat nemá co; když systém říká R=1, lže
+systém (Wine/Winlator) a musí to řešit náš režim sám (návrh A v hovoru:
+tažení začíná jen stiskem a končí i bez tlačítka).
+
+---
+
 # 6. Okna a rozhraní
 
 - **Okno se nesmí přeskládat, když se právě doručuje klik.** `ReInit()`

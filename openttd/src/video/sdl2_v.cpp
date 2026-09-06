@@ -26,6 +26,8 @@
 #	include <emscripten/html5.h>
 #endif
 
+#include "../mouse_debug.h"
+
 #include "../safeguards.h"
 
 void VideoDriver_SDL_Base::MakeDirty(int left, int top, int width, int height)
@@ -434,7 +436,9 @@ bool VideoDriver_SDL_Base::PollEvent()
 				}
 			}
 
-			if (_cursor.UpdateCursorPosition(x, y)) {
+			bool warp = _cursor.UpdateCursorPosition(x, y);
+			MouseDebugLog(fmt::format("udalost SDL_MOUSEMOTION ({},{}){}", x, y, warp ? " -> ukazatel vracen (SDL_WarpMouseInWindow)" : ""));
+			if (warp) {
 				SDL_WarpMouseInWindow(this->sdl_window, _cursor.pos.x, _cursor.pos.y);
 			}
 			HandleMouseEvents();
@@ -469,11 +473,13 @@ bool VideoDriver_SDL_Base::PollEvent()
 			switch (ev.button.button) {
 				case SDL_BUTTON_LEFT:
 					_left_button_down = true;
+					MouseDebugLog("udalost SDL_MOUSEBUTTONDOWN leve");
 					break;
 
 				case SDL_BUTTON_RIGHT:
 					_right_button_down = true;
 					_right_button_clicked = true;
+					MouseDebugLog("udalost SDL_MOUSEBUTTONDOWN prave");
 					break;
 
 				default: break;
@@ -489,8 +495,10 @@ bool VideoDriver_SDL_Base::PollEvent()
 			} else if (ev.button.button == SDL_BUTTON_LEFT) {
 				_left_button_down = false;
 				_left_button_clicked = false;
+				MouseDebugLog("udalost SDL_MOUSEBUTTONUP leve");
 			} else if (ev.button.button == SDL_BUTTON_RIGHT) {
 				_right_button_down = false;
+				MouseDebugLog("udalost SDL_MOUSEBUTTONUP prave");
 			}
 			HandleMouseEvents();
 			break;
@@ -694,6 +702,18 @@ void VideoDriver_SDL_Base::InputLoop()
 		bool left_held = (buttons & SDL_BUTTON_LMASK) != 0;
 		bool right_held = (buttons & SDL_BUTTON_RMASK) != 0;
 
+		{
+			static bool last_left = false, last_right = false;
+			static auto last_sample = std::chrono::steady_clock::now();
+			auto now = std::chrono::steady_clock::now();
+			bool changed = left_held != last_left || right_held != last_right;
+			bool periodic = (_left_button_down || _right_button_down) && now - last_sample > std::chrono::milliseconds(250);
+			if (changed || periodic) {
+				MouseDebugLog(fmt::format("dotaz na system (SDL_GetMouseState): L={} R={} videl-R-dole={}{}", left_held, right_held, seen_right_down, changed ? " (zmena)" : ""));
+				last_left = left_held; last_right = right_held; last_sample = now;
+			}
+		}
+
 		if (!_left_button_down) seen_left_down = false;
 		if (left_held) seen_left_down = true;
 		if (_left_button_down && seen_left_down && !left_held) {
@@ -708,6 +728,7 @@ void VideoDriver_SDL_Base::InputLoop()
 			_right_button_down = false;
 			_right_button_clicked = false;
 			seen_right_down = false;
+			MouseDebugLog("dotaz na system: prave pusteno podle systemu - pamet vynulovana");
 		}
 	}
 

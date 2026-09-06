@@ -81,6 +81,8 @@
 
 #include "table/strings.h"
 
+#include "mouse_debug.h"
+
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -3021,6 +3023,22 @@ static bool ConTestFoundRake(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testzalozit: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Save the mouse record the way Ctrl and the right button do. Usage: mousedebug
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConMouseDebug(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return false;
+	std::string saved = MouseDebugSave();
+	if (saved.empty()) {
+		IConsolePrint(CC_ERROR, "mousedebug: debug mysi se nepodarilo ulozit.");
+	} else {
+		IConsolePrint(CC_DEFAULT, "mousedebug: ulozeno do {}", saved);
+	}
 	return true;
 }
 
@@ -6064,6 +6082,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
+	IConsole::CmdRegister("mousedebug",              ConMouseDebug);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);

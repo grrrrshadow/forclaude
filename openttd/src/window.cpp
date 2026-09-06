@@ -42,6 +42,8 @@
 
 #include "table/strings.h"
 
+#include "mouse_debug.h"
+
 #include "safeguards.h"
 
 static Point _drag_delta; ///< delta between mouse cursor and upper left corner of dragged window
@@ -2512,6 +2514,7 @@ static void EndViewportScrollIfLetGo()
 
 		_scrolling_viewport = true;
 		_cursor.fix_at = true;
+		MouseDebugLog("tazeni: znovu rozjeto pohybem, protoze si hra pamatuje prave dole");
 	}
 
 	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
@@ -2557,6 +2560,7 @@ static void EndViewportScrollIfLetGo()
 	 * a press of the left one puts a stop to it. */
 	if (_right_button_down && !_left_button_down && !gone_quiet) return;
 
+	MouseDebugLog(fmt::format("tazeni: konec - {}", gone_quiet ? "350 ms bez pohybu" : (_left_button_down ? "stisk leveho" : "prave pusteno")));
 	_cursor.fix_at = false;
 	_scrolling_viewport = false;
 	_last_scroll_window = nullptr;
@@ -2579,6 +2583,7 @@ static EventState HandleViewportScroll()
 	if (_last_scroll_window == nullptr) _last_scroll_window = FindWindowFromPt(_cursor.pos.x, _cursor.pos.y);
 
 	if (_last_scroll_window == nullptr || !((_settings_client.gui.scroll_mode != ViewportScrollMode::MapLMB && _right_button_down) || scrollwheel_scrolling || (_settings_client.gui.scroll_mode == ViewportScrollMode::MapLMB && _left_button_down))) {
+		MouseDebugLog(_last_scroll_window == nullptr ? "tazeni: konec - zadne okno pod ukazatelem" : "tazeni: konec - tlacitko uz neni dole");
 		_cursor.fix_at = false;
 		_scrolling_viewport = false;
 		_last_scroll_window = nullptr;
@@ -3072,6 +3077,7 @@ static void MouseLoop(MouseClick click, int mousewheel)
 					_cursor.fix_at = (_settings_client.gui.scroll_mode == ViewportScrollMode::RMBPinned ||
 							_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed ||
 							_settings_client.gui.scroll_mode == ViewportScrollMode::MapRMBFixed);
+					MouseDebugLog("tazeni: zacatek stiskem praveho");
 					DispatchRightClickEvent(w, x - w->left, y - w->top);
 					return;
 				}
@@ -3133,6 +3139,17 @@ void HandleMouseEvents()
 		double_click_time = std::chrono::steady_clock::now();
 		double_click_pos = _cursor.pos;
 		_left_button_clicked = true;
+	} else if (_right_button_clicked && _ctrl_pressed) {
+		/* Ctrl and the right button save the last few seconds of the mouse
+		 * beside the saved games, where the crash reports go. The click is
+		 * taken, so it neither starts a drag nor reaches a window. */
+		_right_button_clicked = false;
+		std::string saved = MouseDebugSave();
+		if (saved.empty()) {
+			ShowErrorMessage(GetEncodedString(STR_MOUSE_DEBUG_FAILED), {}, WarningLevel::Error);
+		} else {
+			ShowErrorMessage(GetEncodedString(STR_MOUSE_DEBUG_SAVED, saved), {}, WarningLevel::Info);
+		}
 	} else if (_right_button_clicked) {
 		_right_button_clicked = false;
 		click = MouseClick::Right;

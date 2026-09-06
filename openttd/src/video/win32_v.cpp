@@ -40,6 +40,8 @@
 #include "opengl.h"
 #endif /* WITH_OPENGL */
 
+#include "../mouse_debug.h"
+
 #include "../safeguards.h"
 
 /* Missing define in MinGW headers. */
@@ -587,12 +589,14 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_LBUTTONDOWN:
 			SetCapture(hwnd);
 			_left_button_down = true;
+			MouseDebugLog("zprava WM_LBUTTONDOWN");
 			HandleMouseEvents();
 			return 0;
 
 		case WM_LBUTTONUP:
 			_left_button_down = false;
 			_left_button_clicked = false;
+			MouseDebugLog(fmt::format("zprava WM_LBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
 			/* Capture is a single thing, not one per button: releasing it while
 			 * the other button is still held throws away the grab that button
 			 * is relying on, and the message saying it was let go then goes to
@@ -613,11 +617,13 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			SetCapture(hwnd);
 			_right_button_down = true;
 			_right_button_clicked = true;
+			MouseDebugLog("zprava WM_RBUTTONDOWN");
 			HandleMouseEvents();
 			return 0;
 
 		case WM_RBUTTONUP:
 			_right_button_down = false;
+			MouseDebugLog(fmt::format("zprava WM_RBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
 			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
 			return 0;
@@ -630,9 +636,11 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			_right_button_down = (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
 			if (!_left_button_down) _left_button_clicked = false;
 			if (!_right_button_down) _right_button_clicked = false;
+			MouseDebugLog("zprava WM_CAPTURECHANGED - tlacitka prectena ze systemu");
 			return 0;
 
 		case WM_MOUSELEAVE:
+			MouseDebugLog("zprava WM_MOUSELEAVE");
 			UndrawMouseCursor();
 			_cursor.in_window = false;
 
@@ -666,7 +674,9 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				}
 			}
 
-			if (_cursor.UpdateCursorPosition(x, y)) {
+			bool warp = _cursor.UpdateCursorPosition(x, y);
+			MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}){}", x, y, warp ? " -> ukazatel vracen (SetCursorPos)" : ""));
+			if (warp) {
 				POINT pt;
 				pt.x = _cursor.pos.x;
 				pt.y = _cursor.pos.y;
@@ -1087,6 +1097,21 @@ void VideoDriver_Win32Base::InputLoop()
 	bool left_held = this->has_focus && GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) < 0;
 	bool right_held = this->has_focus && GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) < 0;
 
+	/* What the system answers each frame, on the record: written whenever the
+	 * answer changes, and every quarter second for as long as either button is
+	 * remembered down, so a poll that has gone quiet can be seen to have. */
+	{
+		static bool last_left = false, last_right = false, last_focus = false;
+		static auto last_sample = std::chrono::steady_clock::now();
+		auto now = std::chrono::steady_clock::now();
+		bool changed = left_held != last_left || right_held != last_right || this->has_focus != last_focus;
+		bool periodic = (_left_button_down || _right_button_down) && now - last_sample > std::chrono::milliseconds(250);
+		if (changed || periodic) {
+			MouseDebugLog(fmt::format("dotaz na system (GetAsyncKeyState): L={} R={} focus={} videl-R-dole={}{}", left_held, right_held, this->has_focus, seen_right_down, changed ? " (zmena)" : ""));
+			last_left = left_held; last_right = right_held; last_focus = this->has_focus; last_sample = now;
+		}
+	}
+
 	if (!_left_button_down) seen_left_down = false;
 	if (left_held) seen_left_down = true;
 	if (_left_button_down && seen_left_down && !left_held) {
@@ -1101,6 +1126,7 @@ void VideoDriver_Win32Base::InputLoop()
 		_right_button_down = false;
 		_right_button_clicked = false;
 		seen_right_down = false;
+		MouseDebugLog("dotaz na system: prave pusteno podle systemu - pamet vynulovana");
 	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();

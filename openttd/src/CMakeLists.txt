@@ -274,6 +274,8 @@ add_files(
     misc_gui.cpp
     mixer.cpp
     mixer.h
+    mouse_debug.cpp
+    mouse_debug.h
     music.cpp
     music_gui.cpp
     newgrf.cpp
