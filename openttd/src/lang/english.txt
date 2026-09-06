@@ -4940,7 +4940,14 @@ STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRI
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} vehicles)
+STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND                            :{SPACE}(found a rake)
+STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT                      :{SPACE}(found a rake of up to {NUM})
+STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}Found a rake here
+STR_ORDER_COUPLE_FOUND_OFF_BUTTON                               :{BLACK}Stop founding a rake
+STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Founding a rake: up to {NUM}
+STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Founding a rake: platform length
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting for wagons to collect
+STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Founding a rake: has to arrive wagons first
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})
@@ -5467,6 +5474,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Can't co
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... no stopped train immediately ahead to couple with
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... the engine would end up behind the wagons, which is not supported yet
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... it is too far away to couple to
+STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST                 :{WHITE}... to found a rake it has to arrive wagons first, the engine would end up inside the rake
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Can't station this train as a rescue engine...
 STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Can't call a tow for these wagons...
 STR_ERROR_TOW_ALREADY_COMING                                    :{WHITE}... a rescue engine is already on its way for them

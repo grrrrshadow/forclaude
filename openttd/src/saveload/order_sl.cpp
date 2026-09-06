@@ -255,6 +255,7 @@ public:
 		SLE_VAR(Order, couple_load, VarTypes::U8),
 		SLE_VAR(Order, couple_cargo, VarTypes::U8),
 		SLE_VAR(Order, couple_count, VarTypes::U8),
+		SLE_VAR(Order, couple_found_rake, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

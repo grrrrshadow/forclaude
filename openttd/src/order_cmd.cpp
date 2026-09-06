@@ -1276,7 +1276,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
-					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1287,7 +1287,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * the player can see it; the only thing to couple to in a depot is
 			 * a rake of stored wagons. */
 			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_GOTO_COUPLE &&
-					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT) return CMD_ERROR;
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -1447,6 +1447,11 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 		case MOF_DECOUPLE_WHOLE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
+			break;
+
+		case MOF_COUPLE_FOUND:
+			/* Rakes are founded on platforms, in the open; a shed is a store. */
+			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
 			break;
 
 		/* Waiting to be collected is the opposite of going to collect, and a
@@ -1612,6 +1617,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_DECOUPLE_WHOLE:
 				order->SetDecoupleWholeTrain(data != 0);
+				break;
+
+			case MOF_COUPLE_FOUND:
+				order->SetFoundRake(data != 0);
 				break;
 
 			case MOF_WAIT_COUPLE:

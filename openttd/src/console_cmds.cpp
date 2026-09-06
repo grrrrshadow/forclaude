@@ -659,6 +659,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool parked = false;
 	bool swap_mode = false;
 	bool store_mode = false;
+	bool found_mode = false;
 	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
@@ -670,6 +671,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		if (argv[i] == "stoji") parked = true;
 		if (argv[i] == "oboji") swap_mode = true;
 		if (argv[i] == "sklad") store_mode = true;
+		if (argv[i] == "zaloz") found_mode = true;
 		/* A bare number is how many the collect order asks for, so the store
 		 * scene can be pointed at any count without a word for each one. */
 		uint n = 0;
@@ -808,6 +810,32 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	StationID st_id = GetStationIndex(st_tile);
 	DepotID dep_w = GetDepotIndex(depot_w);
 	DepotID dep_e = GetDepotIndex(depot_e);
+
+	if (found_mode) {
+		/* A second platform beside the first, on the row below, with a switch
+		 * before the station and a merge after it. A rake being founded stands
+		 * on its platform for weeks, and on one track that rake is a wall: the
+		 * feeder could never get back past it to the shed for the next pair,
+		 * nor the collector reach it. A station that grows rakes has a
+		 * through platform next to them, in any real layout too. */
+		TileIndex row2_a = TileXY(x0 + 16, y0 + 1);
+		TileIndex row2_b = TileXY(x0 + 23, y0 + 1);
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, row2_b, row2_a, false, LevelMode::Level);
+		/* Each half of an S-curve sits in one column: the piece on the main
+		 * row leaves by its south-east edge straight into the tile below it. */
+		bool ok = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 16, y0), RAILTYPE_RAIL, Track::Right, false).Succeeded() &&
+				Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 16, y0 + 1), RAILTYPE_RAIL, Track::Left, false).Succeeded() &&
+				Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 17, y0 + 1), RAILTYPE_RAIL, Track::X, false).Succeeded() &&
+				Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, TileXY(x0 + 18, y0 + 1), RAILTYPE_RAIL, Axis::X, 1, 4, STAT_CLASS_DFLT, 0, st_id, false).Succeeded() &&
+				Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 22, y0 + 1), RAILTYPE_RAIL, Track::X, false).Succeeded() &&
+				Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 23, y0 + 1), RAILTYPE_RAIL, Track::Upper, false).Succeeded() &&
+				Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 23, y0), RAILTYPE_RAIL, Track::Lower, false).Succeeded();
+		if (!ok) {
+			IConsolePrint(CC_ERROR, "testspoj zaloz: druhe nastupiste se nepodarilo postavit.");
+			return true;
+		}
+		UpdateSignalsInBuffer();
+	}
 
 	if (tow_mode) {
 		/* The second, western station the collected train is put down at. */
@@ -1097,6 +1125,68 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 
 	/* Deliverer first, collector after; the collector's own hold keeps it in
 	 * the shed until the rake is standing at the platform. */
+	/* 'zaloz [N]': the feeder founds and grows a rake at the platform. Eight
+	 * wagons are stored in the west depot; the feeder fetches two at a time
+	 * (depot couple order, count 2), then "couple, founding a rake of up to N"
+	 * at the platform, then "decouple all" there, and round again. A second
+	 * engine, built stopped in the east depot, is the collector that takes
+	 * the finished rake away when the scene releases it (testbrzda). */
+	if (found_mode) {
+		for (int i = 0; i < 8; i++) {
+			auto [costs, sid, unused_m, unused_n, unused_o] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (costs.Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj zaloz: odlozeny vagon se nepodaril.");
+				return true;
+			}
+		}
+		DeleteVehicleOrders(Train::Get(veh1));
+		/* Shed, platform, shed: the feeder leaves the west shed pushing its
+		 * pair (a founding run puts the wagons at the door, see
+		 * TryCoupleAtDepot()), adds them to the rake by their end, and drives
+		 * back nose first for the next pair. The depot order is non-stop so
+		 * the first run in from the east shed does not make a stop of the
+		 * station on the way. */
+		Order fetch;
+		fetch.MakeGoToDepot(DestinationID(dep_w), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlag::NonStop, OrderDepotActionFlags{});
+		fetch.SetGoToCouple(true);
+		fetch.SetCoupleCount(2);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, fetch);
+		Order found;
+		found.MakeGoToStation(st_id);
+		found.SetLoadType(OrderLoadType::NoLoad);
+		found.SetUnloadType(OrderUnloadType::NoUnload);
+		found.SetGoToCouple(true);
+		found.SetFoundRake(true);
+		found.SetCoupleCount(want_n);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 1, found);
+		Order grow;
+		grow.MakeGoToStation(st_id);
+		grow.SetLoadType(OrderLoadType::NoLoad);
+		grow.SetUnloadType(OrderUnloadType::NoUnload);
+		grow.SetDecouple(true);
+		grow.SetDecoupleCount(0);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 2, grow);
+
+		auto [cost4, veh4, unused_s, unused_t, unused_u] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost4.Failed()) {
+			IConsolePrint(CC_ERROR, "testspoj zaloz: sberacka hotove rady se nepodarila.");
+			return true;
+		}
+		Order take;
+		take.MakeGoToStation(st_id);
+		take.SetLoadType(OrderLoadType::NoLoad);
+		take.SetUnloadType(OrderUnloadType::NoUnload);
+		take.SetGoToCouple(true);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh4, 0, take);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh4, 1, home_e);
+
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh1, false);
+		_testspoj_active = true;
+		IConsolePrint(CC_DEFAULT, "testspoj zaloz: zakladac=vlak {} (zaklada radu do {}), sberacka hotove rady=vlak {} (zabrzdena), v depu ({},{}) lezi 8 vozu, nastupiste {} ({}..{},{}).",
+				Train::Get(veh1)->unitnumber, want_n, Train::Get(veh4)->unitnumber, x0, y0, st_id, x0 + 18, x0 + 21, y0);
+		return true;
+	}
+
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh2, false);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh1, false);
 	if (veh3 != VehicleID::Invalid()) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh3, false);
@@ -1583,6 +1673,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 		for (const Order &o : t->Orders()) {
 			std::string extra;
 			if (o.ShouldGoToCouple()) extra += " SPOJIT";
+			if (o.ShouldFoundRake()) extra += o.GetCoupleCount() != 0 ? fmt::format(" ZALOZIT:do {}", o.GetCoupleCount()) : " ZALOZIT";
 			if (o.ShouldWaitForCouple()) extra += " CEKAT";
 			if (o.ShouldDecoupleOnDeparture()) extra += o.ShouldDecoupleWholeTrain() ? " ODPOJIT:cely vlak" : (o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount()));
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
@@ -2900,6 +2991,35 @@ static bool ConTestDecoupleWhole(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testcelyvlak: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Switch a train's couple order to "found a rake here", the way the button in
+ * the count box does. Usage: testzalozit <unit number> <order> [<max>]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestFoundRake(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Make a couple order found a rake. Usage: 'testzalozit <unit number> <order index> [<max vehicles>]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		if (argv.size() >= 4) {
+			auto pmax = ParseInteger(argv[3]);
+			if (pmax.has_value()) Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_COUNT, *pmax);
+		}
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_FOUND, 1);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testzalozit: vlak {} rozkaz {} -> zalozit radu {}", *punit, *porder, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testzalozit: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -5915,6 +6035,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
+	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);

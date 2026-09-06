@@ -796,7 +796,7 @@ public:
 	 * opened with an extra button (see ShowQueryString()); OnQueryTextFinished
 	 * is not sent as well.
 	 */
-	virtual void OnQueryTextExtra() {}
+	virtual void OnQueryTextExtra([[maybe_unused]] std::string_view text) {}
 
 	/**
 	 * Some data on this window has become invalid.

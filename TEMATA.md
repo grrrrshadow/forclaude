@@ -2191,6 +2191,32 @@ nebo `ReserveRailStationPlatform`, pouští `odtahperon`, `poruchanastup`,
 
 # 5. Myš, kurzor, stavba
 
+## 4.21 Depo zamluvené nikým — procházka pouštění záboru končila u vrat
+
+**Nalezeno rigem u zakládání řady (2.37), platí pro každou hru.** Vanilkový
+výhled: vlak jedoucí na nástupiště, za kterým není návěstidlo, si musí
+zamluvit dál — k cíli dalšího rozkazu nebo k nejbližšímu bezpečnému místu,
+a tím bývá depo (vlak 2 vyjel z depa Z se záborem až do depa V,
+„rezervace konci na (85,44)"). Zábor do depa nastaví depu jeho jediný bit
+záboru. Když pak vlak zábor pouští — po odpojení, po otočení, po zásahu
+hráče — procházka `FreeTrainTrackReservation` šla po záboru až k depu a
+tam se zastavila **podle pravidla 4.18/2**: na políčku stojí cizí vlaky
+(odstavené v depu). Bit záboru depa zůstal nastaven navždy. Depo je od té
+chvíle „obsazené" (`IsWaitingPositionFree`: zábor na políčku = není
+volno), nikdo si do něj nezamluví cestu — stavitelka po odložení stála na
+konci nástupiště do konce hry: „hledani … cil nalezen, konec (85,54)
+nezamluveno, bezpecne ano, volno NE", „cesta neni".
+
+**Oprava:** depo je z pravidla 4.18/2 vyjmuto. Vlaky odstavené v depu na
+žádné koleji nestojí a bit záboru depa není jejich — je toho, kdo si
+zamluvil vrata, a to je právě vlak, jehož zábor se pouští. Pravidlo samo
+(zem pod cizím vlakem na trati je jeho) zůstává beze změny.
+
+**Změřeno:** scéna `zaloz` — stavitelka po odložení odjede, baterie beze
+změny (`poruchazavlakem` havaroval=0, ta pravidlo 4.18/2 hlídá).
+
+---
+
 ## 5.0 Co je „naše" nastavení posunu mapy
 
 V nabídce je **pět** voleb. První je naše a je přednastavená. Je to
@@ -3761,78 +3787,97 @@ Návrhové otázky hráče, zatím nedotčené v kódu:
 - Odtah dvouvlaku: odtahovka veze cokoli, co visí na porouchaném čele;
   pohlcený vlak zůstane spojený, dokud čelo neodpojí podle svých rozkazů.
 
-## 2.37 PLÁN (probíráme, nestaví se): „Založit řadu" u příkazu připojit
+## 2.37 „Založit řadu" u příkazu připojit — postaveno; dvě věci k odsouhlasení
 
-**Hráčův návrh:** jako u odpojit („Odpojit celý vlak") dostane okno počtu u
-připojit („Zadej, kolik vozů má řada mít") řádek s tlačítkem **„Založit
-řadu"**. Význam: mašinka jede připojit; když za nádražním směrováním (nebo na
-obyčejném nádraží) **žádné vagonky k připojení nejsou, příkaz připojit se
-přeskočí** a platí další příkaz, což je vždy odpojit na tom nástupišti —
-mašinka tam odloží své vozy a řadu tím založí. Při dalších jízdách řadu
-najde, připojí, odpojí vše → řada roste. Celé to musí běžet samo: hráč dá
-založit řadu, připojit libovolně, pod tím odpojit, a mašinka navozí řadu na
-délku nástupiště; pak řada zůstane čekat sama.
+**Co to je.** V okně počtu u nádražního připojit („Zadej, kolik vozů má
+řada mít") je řádek s tlačítkem **„Založit řadu"** / „Nezakládat řadu";
+na příkazu je vlastní pole `couple_found_rake` (save, CH_TABLE, 0.3),
+řádek příkazu říká „(založit řadu)" nebo „(založit řadu do N)". Číslo
+v okně je u zakládání **maximum délky řady** (0 = jen délka nástupiště),
+ne přesný počet — filtr přesného počtu se u zakládacího příkazu nepoužije
+(`MatchesCoupleFilter`).
 
-**Meze délky (hráč):** řada nesmí být delší než nástupiště, ať nečouhá —
-tolerance 1 políčko přes nástupiště pro systém; když se vagonky nevejdou,
-mašinka **nevyjede připojovat vůbec**. Nebo ručně: „založit řadu max N
-vagonků", tím by připojování k řadě skončilo. Otázka hráče: ručně, nebo délka
-nástupiště + 1 políčko?
+**Jak to jede (`FoundingCoupleOrderHold`, `FindOrClaimCoupleTarget`).**
+Partner se hledá jako dnes, před výjezdem. Tři odpovědi:
+- řada s místem → zabrat, přijet, připojit; „odpojit vše" za tím odloží
+  vozy i řadu jako jednu (řada roste);
+- řada, do které se vozy stavitelky nevejdou — má N vozů, nebo délka řady
+  + vozy > délka nástupiště + 1 políčko (`PlatformRakeCapacity`,
+  `RakeHasRoomFor`) → řada je **plná**, stavitelka **čeká** (v depu, u
+  nádraží, před směrováním), „zaklada radu - rada … je hotova (plna),
+  cekam, az ji nekdo odveze";
+- žádná řada → připojit se **uzavře jako splněné** (jako by se spojilo,
+  `ConcludeCoupleOrderInPlace`; před směrováním se uzavře i směrování) a
+  odpojit za ním jede založit. Vlastní vozy se přitom musí na nástupiště
+  vejít (`FeederWagonsFitAt`), jinak stavitelka čeká.
 
-**Co z toho plyne (můj rozbor, k probrání):**
+**Rozhodnuto hráčem (oproti plánu výše, body 1–3):** **žádný stav
+„rozestavěná"** — řada je od začátku na nabídku všem sběračkám, odveze si
+ji kterákoli podle svých filtrů, a stavitelka pak zakládá další; plná řada
+→ stavitelka čeká, dokud ji někdo neodveze; N je strop; tolerance 1
+políčko (za nástupištěm se počítá s návěstidlem a směrováním).
 
-1. **Řada ve stavbě nesmí být na nabídku.** Dnes je odložená řada k mání
-   každé sběračce hned, jak odkládačka odjede dvě políčka (§3). Rozestavěnou
-   řadu by si odvezl první dálkový vlak s „připojit", který jede kolem, a
-   celý cyklus by se rozpadl. Řada založená tímhle příkazem tedy potřebuje
-   stav **„rozestavěná"** (uložený se savem): připojit se k ní smí jen
-   příkaz se zapnutým „založit řadu" (ten ji staví); ostatním připojit je
-   neviditelná. **Hotová** (viz 3) se stane obyčejnou čekající řadou jako
-   dnes.
-2. **Kdo ji dostaví, ten ji dostaví celou** — hotovou řadu si smí vzít
-   kterákoli sběračka podle svých filtrů; to je dnešní chování a nemění se.
-3. **Kdy je hotová.** Dvě míry, obě naráz: **délka nástupiště** (fyzika,
-   vždy) a **volitelné N** z okna počtu (0 = jen nástupiště). Systémová
-   verze: řada je hotová ve chvíli, kdy se do ní další vozy stavitelky
-   nevejdou (délka řady + délka jejích vozů > délka nástupiště + tolerance)
-   — nebo když má aspoň N vozů. Zjišťuje se **před výjezdem** při hledání
-   partnera (0.3/2.2: nejdřív partner, pak trať): nevejde se → nevyjíždí
-   připojovat, řadu prohlásí za hotovou (od té chvíle na nabídku), a **čeká
-   před směrováním, dokud hotovou řadu někdo neodveze**; pak zakládá novou.
-   Alternativa „přeskočit a jet dál s vozy" by znamenala, že mašinka s vozy
-   objíždí a nikde ho neodloží — nedává smysl; ale rozhodne hráč.
-4. **Přeskočení připojit.** Dnes sběračka bez partnera **drží** před
-   nádražním směrováním (2.32, „čeká na vagonky") nebo čeká na nádraží.
-   S „založit řadu" se místo držení příkaz připojit uzavře jako splněný
-   (řada není → jedeme založit) a další příkaz odpojit jede po svém — na
-   nástupiště za směrováním se dojede obyčejnou cestou, protože z hrdla
-   směrování jinam nevede. Bez směrování totéž na kterémkoli nástupišti.
-   Vlastní vozy stavitelky se musí na nástupiště vejít (stejná míra).
-5. **Růst řady.** Stavitelka připojí celou rozestavěnou řadu (jako dnes),
-   „odpojit vše" pak odloží její vozy i řadu jako jednu (mašinka je na
-   konci seznamu, řez za ní — funguje ať přijela předkem nebo reverzně).
-   Odložené řadě zůstává stav „rozestavěná" a její míry; na zbytku
-   (nakládka, jízdní řád odpojení, držení odkládačkou) se nic nemění.
-6. **Tolerance 1 políčko:** vůz trčící za nástupiště leží na hrdle — na
-   výhybce nebo návěstidle. Stavitelka se k řadě připojuje z toho konce, ze
-   kterého přijede, takže trčící konec jí nevadí, ale vadí všemu, co tudy
-   jezdí kolem. Navrhuju toleranci 0 a raději delší nástupiště; hráčova
-   volba.
-7. **Okno:** tlačítko „Založit řadu" v okně počtu u připojit **nezahazuje
-   číslo v okně** — číslo je to volitelné N (0 = libovolně); tlačítko
-   zapne stavbu. Řádek příkazu: „(připojit) (založit řadu)" / „(založit
-   řadu do N)". Pole na příkazu: `found_rake` (vlastní pole, 0.3), na řadě
-   příznak rozestavěnosti + cíl N.
-8. **Měření:** délka v pixelech (`cached_veh_length`) proti délce
-   nástupiště × 16; scény: založení z prázdna, dva cykly růstu, „nevejde
-   se" → hotová → odvoz cizí sběračkou → nové založení; s směrováním i bez.
+**Co ukázal rig a co z toho vzešlo.** Scéna `testspoj zaloz [N]`: depo Z se
+8 vozy, stavitelka (vlak 2: depo Z připojit 2 → nádraží připojit založit
+do N → nádraží odpojit 0), nádraží se **dvěma nástupišti** (druhé v řadě
+pod prvním, výhybka před a za — rig si ho postaví, včetně srovnání terénu),
+sběračka (vlak 3) na brzdě v depu V, pustí se `testbrzda 3`. Ruční ladění
+na pevném semínku (`newgame 1`), aby souřadnice držely.
 
-**Rozhodnuto hráčem:** (b) obojí naráz — konečný počet vagonků **a** ochrana
-proti stavění přes délku peronu („to by bylo nejlepší").
+1. **Vozy napřed, nebo nic.** Stavitelka může řadu zvětšit jen vozovým
+   koncem — mašinka musí zůstat venku, aby mohla odjet. Přijede-li
+   mašinkou napřed, spojení podle 4.12 zavře mašinku dovnitř řady: rig
+   viděl vlak 2 zmizet („testvozy: vlak 2 nenalezen", řada bez čela
+   s mašinkou uvnitř) a sběračka ho pak odvezla jako vagon. Odmítnutí
+   v `CmdCoupleTrains` (`FoundingEndIsEngine` — měří se vzdálenost konců,
+   ne příznak, protože doorstep guard umí přijíždějící vlak krok před
+   spojením otočit): stavitelka stojí u řady, okno říká **„Zakládá řadu:
+   musí přijet vagony napřed"** (`IsFoundingHeldEngineFirst`), chybová
+   hláška `STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST`.
+2. **Depo pustí stavitelku vozy ke vratům** (`TryCoupleAtDepot`): má-li
+   vlak za depovým připojit jako další skutečný rozkaz zakládací připojit,
+   vyjede couvaje, vozy první, ať vjel jakkoli. Proč zrovna takhle: depo
+   drží směr vjezdu (2.22, „rozhodl řidič vjezdem"), pahýl ho obrací —
+   s jedním depem a jedním pahýlem se parita **každou jízdu překlopí**
+   (poprvé dobře, podruhé mašinkou napřed), s depem-obratištěm to nejde
+   nikdy, se dvěma depy by vozy musely být v obou. Rig prošel všechny
+   varianty. Posunovačka to dělá stejně: vytlačí vozy z depa na řadu a
+   odjede předkem, do depa zase předkem, kolo se opakuje. Při otočení se
+   musí otočit i `direction` všech vozidel — v depu míří ven z vrat a
+   jen s příznakem couvání vlak „jel" do zadní zdi: krok ven, konec
+   koleje, otočka, krok ven, donekonečna (tak dopadl i dřívější náhodný
+   případ „vede zadek" z odražení na slepé koleji). **Je to výjimka
+   z 2.22 — k odsouhlasení hráčem.**
+3. **Zakládací odpojit staví na vzdálený konec nástupiště**
+   (`IsFoundingDropOrder` v `GetTrainStopLocation`, stejně jako připojit):
+   řada roste od vzdáleného konce k příjezdové straně. Odložená na blízkém
+   konci seděla první dvojice v hrdle a každá další se připojovala zvenku.
+4. **Odložená řada se hlásí podle kteréhokoli svého vozu na nástupišti**
+   (`TryDecoupleAtStation`, dřív jen podle políčka hlavy; `TrainEnterStation`
+   bere pro nádražní spouště první políčko nástupiště). Řada, jejíž krajní
+   vůz stál půl políčka za hrdlem, nebyla zaregistrovaná nikde: sběračka
+   „na stanici nejsou zadne vagonky", stavitelka založila druhou vedle.
 
-**K rozhodnutí hráče:** (a) plná řada → stavitelka čeká, dokud ji někdo
-neodveze (navrhuju), nebo jede dál? (c) rozestavěná řada neviditelná pro
-ostatní připojit (navrhuju, bez toho to nefunguje)? (d) tolerance 0 nebo 1?
+Mimochodem nalezeno a opraveno: depo zamluvené nikým, **4.21**.
+
+**Změřeno (scéna `zaloz`, pevné semínko):** založení 2 vozů na (67,44),
+růst 2→4→6 směrem k (65,44), čtvrtá jízda „rada je hotova (plna), cekam",
+sběračka po `testbrzda 3` řadu zabere, spojí („couva ano"), odveze do depa
+V se 6 vozy; stavitelka po zabrání řady sběračkou „neni k cemu se
+pripojit" a založí novou na druhém nástupišti (67,45); pak čeká, protože
+v depu Z už vozy nejsou. Baterie 48 scén: beze změny proti předchozímu
+běhu (jen počty vjezdů do depa na náhodných mapách), `zaloz` spojeno=7
+(4× v depu, 2× u řady, 1× sběračka), havaroval=0.
+
+**K odsouhlasení / otevřené:**
+- (a) výjimka 2 — depo otočí zakládací stavitelku samo;
+- (b) když sběračka řadu **zabere**, ale ještě neodvezla, stavitelka řadu
+  už nevidí a zakládá novou: se dvěma nástupišti na tom volném, s jedním
+  jede na obsazené a čeká na návěsti, dokud řada neodjede (peron
+  obsazený). Nechávám tak, dokud hráč neřekne jinak.
+- (c) v `testvozy 3` po odvozu mají všechna vozidla sběračky „otoceny
+  ano" (příznak `Flipped`, jednotně celý vlak) — ověřit na obrazovce,
+  hlavně směr mašinky; rig obraz neumí.
 
 ---
 

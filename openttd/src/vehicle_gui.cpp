@@ -3372,6 +3372,10 @@ public:
 					 * is already on the way for. Standing still with no reason
 					 * given looks like a fault, so give the reason. */
 					if (!HasCoupleTarget(Train::From(v))) return GetString(STR_VEHICLE_STATUS_WAITING_FOR_WAGONS);
+					/* A feeder that came to grow a rake but pulled up to it engine
+					 * first stands there refused (see CmdCoupleTrains()); with no
+					 * word it looks like a train that has simply stopped. */
+					if (IsFoundingHeldEngineFirst(Train::From(v))) return GetString(STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST);
 					return GetString(STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL, v->current_order.GetDestination(), PackVelocity(v->GetDisplaySpeed(), v->type));
 				}
 				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_STATION_VEL : STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL,

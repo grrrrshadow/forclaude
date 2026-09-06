@@ -334,7 +334,9 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					if (IsValidCargoType(order->GetCoupleCargo())) {
 						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO, CargoSpec::Get(order->GetCoupleCargo())->name);
 					}
-					if (order->GetCoupleCount() != 0) {
+					if (order->ShouldFoundRake()) {
+						line += order->GetCoupleCount() != 0 ? GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT, order->GetCoupleCount()) : GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND);
+					} else if (order->GetCoupleCount() != 0) {
 						line += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
 					}
 				}
@@ -1421,6 +1423,10 @@ public:
 			case WID_O_COUPLE_COUNT: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) return {};
+				if (order->ShouldFoundRake()) {
+					if (order->GetCoupleCount() == 0) return GetString(STR_ORDER_COUPLE_COUNT_FOUND_ANY);
+					return GetString(STR_ORDER_COUPLE_COUNT_FOUND, order->GetCoupleCount());
+				}
 				if (order->GetCoupleCount() == 0) return GetString(STR_ORDER_COUPLE_COUNT_ANY);
 				return GetString(STR_ORDER_COUPLE_COUNT_BUTTON, order->GetCoupleCount());
 			}
@@ -1722,7 +1728,11 @@ public:
 				if (order == nullptr) break;
 				this->querying_decouple_count = false;
 				this->querying_couple_count = true;
-				ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
+				/* With the other answer across the box: found a rake here, of
+				 * at most the number entered -- or stop founding one. Depot
+				 * orders collect from a store and found nothing. */
+				ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {},
+						!order->IsType(OT_GOTO_STATION) ? INVALID_STRING_ID : (order->ShouldFoundRake() ? STR_ORDER_COUPLE_FOUND_OFF_BUTTON : STR_ORDER_COUPLE_FOUND_BUTTON));
 				break;
 			}
 
@@ -1732,12 +1742,27 @@ public:
 		}
 	}
 
-	void OnQueryTextExtra() override
+	void OnQueryTextExtra(std::string_view text) override
 	{
-		/* The count box's button: drop the whole coupled train. */
-		if (!this->querying_decouple_count) return;
-		this->querying_decouple_count = false;
-		Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_WHOLE, 1);
+		VehicleOrderID sel = this->OrderGetSel();
+		/* The decouple count box's button: drop the whole coupled train. */
+		if (this->querying_decouple_count) {
+			this->querying_decouple_count = false;
+			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_DECOUPLE_WHOLE, 1);
+			return;
+		}
+		/* The couple count box's button: found a rake here (or stop doing so).
+		 * The number in the box goes with it -- as the rake's final size. */
+		if (this->querying_couple_count) {
+			this->querying_couple_count = false;
+			const Order *order = this->vehicle->GetOrder(sel);
+			if (order == nullptr) return;
+			auto value = ParseInteger(text, 10, true);
+			if (value.has_value()) {
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_COUNT, Clamp(*value, 0, UINT8_MAX));
+			}
+			Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, sel, MOF_COUPLE_FOUND, order->ShouldFoundRake() ? 0 : 1);
+		}
 	}
 
 	void OnQueryTextFinished(std::optional<std::string> str) override

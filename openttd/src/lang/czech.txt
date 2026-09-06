@@ -5071,7 +5071,14 @@ STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRI
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} vozů)
+STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND                            :{SPACE}(založit řadu)
+STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT                      :{SPACE}(založit řadu do {NUM} vozů)
+STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}Založit řadu
+STR_ORDER_COUPLE_FOUND_OFF_BUTTON                               :{BLACK}Nezakládat řadu
+STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Založit řadu: do {NUM}
+STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Založit řadu: podle nástupiště
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu
+STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Zakládá řadu: musí přijet vagony napřed
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
@@ -5758,6 +5765,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN                                    :{WHITE}Nelze sp
 STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned před ním nestojí žádný vlak ke spojení
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... mašinka by skončila za vagonky, což zatím není podporováno
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je moc daleko na spojení
+STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST                 :{WHITE}... k zakládané řadě musí přijet vagony napřed, mašinka by skončila uvnitř řady
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto vlaku nelze udělat odtahovku...
 STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Pro tyto vagony nelze zavolat odtah...
 STR_ERROR_TOW_ALREADY_COMING                                    :{WHITE}... už pro ně jede odtahovka

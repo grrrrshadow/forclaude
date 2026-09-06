@@ -1077,7 +1077,7 @@ struct QueryStringWindow : public Window
 				 * parent hears only this and not a text as well. */
 				assert(this->parent != nullptr);
 				this->editbox.handled = true;
-				this->parent->OnQueryTextExtra();
+				this->parent->OnQueryTextExtra(this->editbox.text.GetText());
 				this->Close();
 				break;
 

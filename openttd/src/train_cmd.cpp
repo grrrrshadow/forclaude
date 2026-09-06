@@ -278,6 +278,30 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 }
 
 /**
+ * Whether the current order of @p consist is the drop that founds a rake: a
+ * decouple order at a station that directly follows (implicit stops aside) a
+ * founding couple order for the same station.
+ *
+ * @param consist the train, front of its consist
+ * @return true when its current decouple order is a founding drop
+ */
+static bool IsFoundingDropOrder(const Train *consist)
+{
+	if (consist->orders == nullptr || consist->GetNumOrders() == 0) return false;
+	if (!consist->current_order.IsType(OT_GOTO_STATION)) return false;
+	VehicleOrderID idx = consist->cur_real_order_index;
+	for (uint left = consist->GetNumOrders(); left > 0; left--) {
+		idx = (idx == 0 ? consist->GetNumOrders() : idx) - 1;
+		const Order *prev = consist->GetOrder(idx);
+		if (prev == nullptr) return false;
+		if (prev->IsType(OT_IMPLICIT)) continue;
+		return prev->IsType(OT_GOTO_STATION) && prev->ShouldGoToCouple() && prev->ShouldFoundRake() &&
+				prev->GetDestination() == consist->current_order.GetDestination();
+	}
+	return false;
+}
+
+/**
  * Get the stop location of (the center) of the front vehicle of a train at
  * a platform of a station.
  * @param station_id     the ID of the station where we're stopping
@@ -312,6 +336,13 @@ int GetTrainStopLocation(StationID station_id, TileIndex tile, const Train *movi
 		 * themselves are what stops it before the far end. See
 		 * FEATURE_DESIGN_COUPLING_TOW.md. */
 		if (consist->current_order.ShouldGoToCouple()) osl = OrderStopLocation::FarEnd;
+
+		/* The drop that founds a rake goes to the far end as well. The rake
+		 * grows from there back toward the side the feeder comes in from,
+		 * pushing each pair onto it; put down at the near end instead, the
+		 * first pair sat in the platform's mouth and every pair after it was
+		 * joined on from outside the platform. */
+		if (consist->current_order.ShouldDecoupleOnDeparture() && IsFoundingDropOrder(consist)) osl = OrderStopLocation::FarEnd;
 	}
 
 	/* The stop location of the FRONT! of the train */
@@ -1430,6 +1461,7 @@ static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
 static bool IsConsistStandingAtStation(const Train *consist, StationID station);
+static void ConcludeCoupleOrderInPlace(Train *new_head);
 static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist, const char *why);
 static void TurnTrainInsideDepot(Train *consist);
@@ -2200,13 +2232,95 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 		if (!carries_it) return false;
 	}
 
-	if (check_count && order.GetCoupleCount() != 0) {
+	/* On a founding order the number is the rake's final size, not which rake
+	 * to take -- a rake being built is by nature not yet that size. Whether
+	 * there is room left in it is asked separately (RakeHasRoomFor()). */
+	if (check_count && order.GetCoupleCount() != 0 && !order.ShouldFoundRake()) {
 		uint count = 0;
 		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;
 		if (count != order.GetCoupleCount()) return false;
 	}
 
 	return true;
+}
+
+/**
+ * How long, in pixels, is what this train would leave standing under a
+ * "decouple all" order: everything behind its leading unit.
+ */
+static uint WagonsLengthBehindEngine(const Train *v)
+{
+	uint length = 0;
+	for (const Train *u = v->GetNextUnit(); u != nullptr; u = u->Next()) length += u->gcache.cached_veh_length;
+	return length;
+}
+
+/** How many units this train would leave standing under a "decouple all" order. */
+static uint WagonUnitsBehindEngine(const Train *v)
+{
+	uint units = 0;
+	for (const Train *u = v->GetNextUnit(); u != nullptr; u = u->GetNextUnit()) units++;
+	return units;
+}
+
+/**
+ * How much rake a platform can hold, in pixels: its length plus the one tile
+ * of tolerance the player allows for the signal and waypoint tile in front
+ * of it. Ground that is not a platform holds anything.
+ */
+static uint PlatformRakeCapacity(TileIndex tile)
+{
+	if (!IsRailStationTile(tile)) return UINT_MAX;
+	return (BaseStation::GetByTile(tile)->GetPlatformLength(tile) + 1) * TILE_SIZE;
+}
+
+/**
+ * Would this rake still be within its bounds with @p feeder's wagons added
+ * to it?
+ *
+ * Two bounds, both the player's: the number on the founding order, when there
+ * is one, is the rake's final size; and no rake is built past the platform it
+ * stands on (plus one tile). A rake that has no room is finished -- the
+ * feeder waits for a collector to take it away and then founds the next.
+ *
+ * @param rake   the rake standing at the station
+ * @param feeder the train that would couple to it and put its wagons down
+ * @param order  the founding couple order
+ */
+static bool RakeHasRoomFor(const Train *rake, const Train *feeder, const Order &order)
+{
+	uint units = 0;
+	uint length = 0;
+	for (const Train *u = rake; u != nullptr; u = u->Next()) {
+		length += u->gcache.cached_veh_length;
+		if (!u->IsArticulatedPart() && !u->IsRearDualheaded()) units++;
+	}
+	if (order.GetCoupleCount() != 0 && units + WagonUnitsBehindEngine(feeder) > order.GetCoupleCount()) return false;
+	return length + WagonsLengthBehindEngine(feeder) <= PlatformRakeCapacity(rake->tile);
+}
+
+static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *wp, StationID dest, std::set<TileIndex> &out);
+
+/**
+ * Would this train's wagons fit on the longest platform they could be put
+ * down on at @p dest -- behind @p through when the couple order sits behind
+ * a station waypoint, anywhere at the station otherwise?
+ */
+static bool FeederWagonsFitAt(const Train *v, StationID dest, const Waypoint *through)
+{
+	uint longest = 0;
+	if (through != nullptr) {
+		std::set<TileIndex> behind;
+		CollectPlatformTilesBehindWaypoint(v, through, dest, behind);
+		for (TileIndex t : behind) longest = std::max(longest, PlatformRakeCapacity(t));
+	} else {
+		const Station *st = Station::GetIfValid(dest);
+		if (st == nullptr) return false;
+		for (TileIndex t : st->train_station) {
+			if (IsRailStationTile(t) && GetStationIndex(t) == dest) longest = std::max(longest, PlatformRakeCapacity(t));
+		}
+	}
+	return WagonsLengthBehindEngine(v) <= longest;
 }
 
 /**
@@ -2516,7 +2630,7 @@ static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *w
  *                rakes on platforms along its rails are on offer
  * @return the rake it is to fetch, or nullptr if there is nothing for it
  */
-static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoint *through = nullptr)
+static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoint *through = nullptr, bool *saw_full_rake = nullptr)
 {
 	/* A couple order can name a station or a depot. At a station the offer is
 	 * anything waiting there to be coupled -- a rake, or a whole train. In a
@@ -2606,6 +2720,12 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 		}
 		if (rake->couple_claim != VehicleID::Invalid()) continue; // somebody else's
 		if (!MatchesCoupleFilter(order, rake)) continue;
+		/* A founding order grows a rake only while there is room in it for
+		 * what this train brings; a finished rake is left for a collector. */
+		if (order.ShouldFoundRake() && !depot_order && !RakeHasRoomFor(rake, v, order)) {
+			if (saw_full_rake != nullptr) *saw_full_rake = true;
+			continue;
+		}
 
 		if (unclaimed == nullptr) unclaimed = rake;
 	}
@@ -2708,6 +2828,63 @@ static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
 {
 	if (!v->current_order.IsType(OT_GOTO_WAYPOINT)) return nullptr;
 	return CoupleOrderBehindStationWaypointsFrom(v, v->cur_real_order_index);
+}
+
+/**
+ * What a founding couple order does when there is nothing for it to couple to
+ * -- or nothing it may couple to.
+ *
+ * The player's design: the order founds a rake where there is none. Finding no
+ * rake at the station, it is concluded like a coupling would conclude it, and
+ * the decouple order behind it takes over: the train goes to the platform and
+ * puts its wagons down as the start of a rake. Finding a rake with room, it
+ * couples to it (the ordinary claim) and the decouple order grows the rake.
+ * Finding only a rake with no room -- its number reached, or its platform
+ * full -- the train waits where it stands until a collector has taken the rake
+ * away, and then founds the next. And a train whose own wagons would not fit
+ * the platform waits too, rather than found a rake that already overhangs.
+ *
+ * @param v the train, standing still, its couple order current or behind the
+ *          station waypoint it stands short of
+ * @param order the founding couple order
+ * @param through the station waypoint the order sits behind, or nullptr
+ * @param saw_full_rake whether the claim search met a rake it may not grow
+ * @return true if the order was concluded and the train has moved on to the
+ *         next; false if it is to wait
+ */
+static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint *through, bool saw_full_rake)
+{
+	if (!order.ShouldFoundRake() || !order.IsType(OT_GOTO_STATION)) return false;
+	StationID dest = order.GetDestination().ToStationID();
+
+	if (saw_full_rake) {
+		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), cekam, az ji nekdo odveze", v->unitnumber, dest.base()));
+		return false;
+	}
+	if (!FeederWagonsFitAt(v, dest, through)) {
+		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - moje vozy ({} px) se na zadne nastupiste stanice {} nevejdou, cekam", v->unitnumber, WagonsLengthBehindEngine(v), dest.base()));
+		return false;
+	}
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: zaklada radu - na stanici {} neni k cemu se pripojit, pripojit se preskakuje, jede odpojit", v->unitnumber, dest.base());
+	}
+	if (v->current_order.IsType(OT_GOTO_STATION) && v->current_order.ShouldGoToCouple() && IsConsistStandingAtStation(v, dest)) {
+		/* Already at the platform: concluded like a coupling would be, and the
+		 * decouple order behind it arrives in place. */
+		ConcludeCoupleOrderInPlace(v);
+	} else {
+		v->current_order.SetGoToCouple(false);
+		v->DeleteUnreachedImplicitOrders();
+		UpdateVehicleTimetable(v, true);
+		v->IncrementImplicitOrderIndex();
+		ProcessOrders(v);
+	}
+	if (!IsWholeTrainInsideDepot(v)) {
+		FreeTrainTrackReservation(v);
+		v->ReserveTrackUnderConsist();
+	}
+	return true;
 }
 
 /**
@@ -4542,6 +4719,171 @@ static void SettleLoadingBeforeSplice(Train *head)
 }
 
 /**
+ * Conclude a couple order on the train standing where it is, the way arriving
+ * would have -- see the notes inside for why nothing else can. Used when the
+ * coupling has happened, and by a founding order that found nothing to couple
+ * to and lets its decouple order take over (FoundingCoupleOrderHold()).
+ *
+ * @param new_head the train, standing at the station its couple order names
+ */
+static void ConcludeCoupleOrderInPlace(Train *new_head)
+{
+	/* The coupling this order asked for has happened, so the order is done.
+	 * Left set, the merged train goes on reading itself as still waiting for a
+	 * partner and simply stands there for good -- it has no reason left to
+	 * move and never advances to whatever the engine was supposed to do next.
+	 * Clearing it on the current order only, not in the order list, so a train
+	 * looping back round to this order couples again as intended. */
+	bool was_go_to_couple = new_head->current_order.ShouldGoToCouple();
+	new_head->current_order.SetGoToCouple(false);
+	new_head->current_order.SetWaitForCouple(false);
+
+	/* A train that came here under a "go to couple" order has now done what
+	 * that order asked, so the order is finished and the next one is due.
+	 *
+	 * Nothing else will conclude that for it. A train only moves on from a
+	 * station order by arriving: the platform's own tile handler notices the
+	 * front reach the stop location, the train loads, and departing advances
+	 * the order. But a train sent to collect wagons stops when it touches
+	 * them, which is short of the stop location while they are standing in
+	 * the rest of the platform, so that handler never fires. The order stays
+	 * current, the train still reads it as "get to this station", and off it
+	 * goes -- round the loop and back to the same platform, whose only
+	 * purpose is to finally trigger the arrival that lets the order advance.
+	 * That is the pointless lap round the station.
+	 *
+	 * So do here what arriving would have done: mark the station reached and
+	 * let the next order be picked up. In place, never by handing the train
+	 * to the station -- entering starts a loading stop, and coupling is not
+	 * an arrival for cargo. A train that has just coupled does not load or
+	 * unload here at all: it has what it came for and it departs. Cargo work
+	 * at this station belongs to an order of its own, written by the player. */
+	if (was_go_to_couple && new_head->current_order.IsType(OT_GOTO_STATION)) {
+		StationID dest = new_head->current_order.GetDestination().ToStationID();
+		if (IsConsistStandingAtStation(new_head, dest)) {
+			/* The reverse-out flag on a couple order is "collect and go back
+			 * the way you came" -- the player's own call, the one sanctioned
+			 * way a coupling ends in a turn. It used to be honoured by the
+			 * loading stop's departure; couple orders conclude here instead
+			 * now, so it is honoured here, the same way: the flag is set and
+			 * the ordinary reversal path does the work next tick. Read before
+			 * the order is concluded away below. */
+			bool reverse_out = new_head->current_order.ShouldReverseOutOfStation();
+
+			new_head->DeleteUnreachedImplicitOrders();
+			new_head->last_station_visited = dest;
+			UpdateVehicleTimetable(new_head, true);
+			new_head->IncrementImplicitOrderIndex();
+
+			/* And concluded completely, here and now. Bumping the index alone
+			 * leaves the switch to the next order for the tick handler's own
+			 * ProcessOrders() call, which reports it as an order advance -- and
+			 * on every order advance the game asks the pathfinder whether the
+			 * train would rather go the other way. For a train whose next stop
+			 * lies back the way it came, on a network with no way round, that
+			 * question turns it round on the spot despite everything settled
+			 * above: the wagons it should push out of the far side get pulled
+			 * back out of the near one instead. That one-tick gap is how the
+			 * turn kept happening no matter what the coupling itself decided.
+			 * Taking the order advance ourselves closes it: the tick handler
+			 * then sees no advance, asks nothing, and the train departs the way
+			 * the coupling pointed it. A train that really is to go back has
+			 * the player's reverse-out flag for saying so. */
+			ProcessOrders(new_head);
+
+			if (reverse_out) new_head->flags.Set(VehicleRailFlag::Reversing);
+
+			/* The order taken up just now may name the very station the train
+			 * is standing in -- couple here, then do something else here: drop
+			 * the collected wagons again, load, wait for another partner. That
+			 * order can only ever be worked by arriving, and this train cannot
+			 * arrive any more: the conclusion above wrote the station into
+			 * last_station_visited, and "stop only when we've not just been
+			 * there" (Order::ShouldStopAtStation) reads that as done with this
+			 * place -- not only now, but on every later lap too, until some
+			 * other station or waypoint overwrites it. The player watched the
+			 * result: couple and decouple written on the same platform, the
+			 * coupling worked, and the decouple never ran again for the rest
+			 * of the game -- unless a waypoint sat between the two orders,
+			 * whose passing rewrites last_station_visited and unlocks the stop.
+			 *
+			 * An ordinary departure would have swallowed the follow-up order
+			 * whole (Vehicle::HandleLoading advances past a next order naming
+			 * the station just left), but swallowing is for orders that ask
+			 * nothing beyond the visit itself; this one carries work.
+			 *
+			 * So the train arrives for it without moving: it is standing at
+			 * that station, which is all arriving means. The honest arrival
+			 * routine makes the order current the way any stop would --
+			 * loading begins, a decouple fires off the loading state as
+			 * always, and the eventual departure leaves through
+			 * Vehicle::LeaveStation() with a path reserved like everybody
+			 * else's. A via order is left alone -- passing through is not a
+			 * stop -- and so is a train whose moving front has ended up off
+			 * the platform, which cannot begin loading. */
+			if (new_head->current_order.IsType(OT_GOTO_STATION) &&
+					new_head->current_order.GetDestination().ToStationID() == dest &&
+					!new_head->current_order.GetNonStopType().Test(OrderNonStopFlag::GoVia) &&
+					IsRailStationTileOfStation(new_head->GetMovingFront()->tile, dest)) {
+				TrainEnterStation(new_head, dest);
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: prijezd na miste pro dalsi rozkaz - typ {}, odpojit {}, rychlost {}",
+							new_head->unitnumber, to_underlying(new_head->current_order.GetType()),
+							new_head->current_order.ShouldDecoupleOnDeparture() ? "ano" : "ne", new_head->cur_speed);
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Whether the end of @p feeder that meets @p partner is an engine.
+ *
+ * Measured, not read off a flag: the doorstep guard can flip an arriving
+ * train's driving direction one step before it couples, so the way it says
+ * it is going is not to be trusted here, but where its two ends stand is.
+ *
+ * @param feeder  the train arriving to couple, front of its consist
+ * @param partner the train it has pulled up against, front of its consist
+ * @return true if the vehicle of @p feeder nearest to @p partner is an engine
+ */
+static bool FoundingEndIsEngine(const Train *feeder, const Train *partner)
+{
+	const Train *f_first = feeder->First();
+	const Train *f_last = f_first->Last();
+	const Train *p_first = partner->First();
+	const Train *p_last = p_first->Last();
+	int64_t first_near = std::min(DistanceSquaredBetweenVehicles(f_first, p_first), DistanceSquaredBetweenVehicles(f_first, p_last));
+	int64_t last_near = std::min(DistanceSquaredBetweenVehicles(f_last, p_first), DistanceSquaredBetweenVehicles(f_last, p_last));
+	const Train *meeting = first_near <= last_near ? f_first : f_last;
+	return meeting->IsEngine();
+}
+
+/** Whether any vehicle of @p v is a wagon. */
+static bool HasAnyWagon(const Train *v)
+{
+	for (const Train *u = v->First(); u != nullptr; u = u->Next()) {
+		if (u->IsWagon()) return true;
+	}
+	return false;
+}
+
+/**
+ * Whether @p v is a feeder standing against the rake it came to grow, held
+ * because it arrived engine first (see the refusal in CmdCoupleTrains()).
+ *
+ * @param v the train, front of its consist
+ * @return true when that hold is what is keeping it standing
+ */
+bool IsFoundingHeldEngineFirst(const Train *v)
+{
+	if (v->cur_speed != 0 || !v->current_order.IsType(OT_GOTO_STATION) || !v->current_order.ShouldFoundRake()) return false;
+	if (!HasAnyWagon(v)) return false;
+	const Train *partner = GetTrainCouplePartner(v);
+	return partner != nullptr && FoundingEndIsEngine(v, partner);
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -4603,6 +4945,24 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (v->First()->current_order.ShouldGoToCouple()) collector = v->First();
 	else if (partner->current_order.ShouldGoToCouple()) collector = partner;
 	if (collector != nullptr && collector->IsFrontEngine() && leading != collector) std::swap(leading, trailing);
+
+	/* A feeder founding a rake adds its wagons to the rake and drives off
+	 * without them, so its engine has to stay on the outside: the wagons
+	 * meet the rake, the engine is at the far end. Arriving engine first,
+	 * the coupling below would put the engine inside the joined chain and
+	 * hand the whole thing over as a headless rake -- the feeder, orders and
+	 * number and all, swallowed by the rake it came to grow, and carried off
+	 * by the next collector as wagons (the rig saw exactly that). So it does
+	 * not couple that way round: it stands against the rake, the window says
+	 * why (IsFoundingHeldEngineFirst()), and the player turns it round --
+	 * a stub or a terminus on the way in, so it comes pushing. */
+	if (collector != nullptr && collector->current_order.ShouldFoundRake() && HasAnyWagon(collector)) {
+		const Train *other = collector == v->First() ? partner : v->First();
+		if (FoundingEndIsEngine(collector, other)) {
+			SayOnChange(collector, fmt::format("Vlak {}: zaklada radu - prijel masinkou napred, vozy by zustaly za ni; k rade se prijizdi vozy napred, stojim", collector->unitnumber));
+			return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST);
+		}
+	}
 
 	/* How the collecting train came in. Read now, before any relinking below
 	 * moves a head about, because the way out of the platform is measured
@@ -4868,112 +5228,7 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		return CommandCost();
 	}
 
-	/* The coupling this order asked for has happened, so the order is done.
-	 * Left set, the merged train goes on reading itself as still waiting for a
-	 * partner and simply stands there for good -- it has no reason left to
-	 * move and never advances to whatever the engine was supposed to do next.
-	 * Clearing it on the current order only, not in the order list, so a train
-	 * looping back round to this order couples again as intended. */
-	bool was_go_to_couple = new_head->current_order.ShouldGoToCouple();
-	new_head->current_order.SetGoToCouple(false);
-	new_head->current_order.SetWaitForCouple(false);
-
-	/* A train that came here under a "go to couple" order has now done what
-	 * that order asked, so the order is finished and the next one is due.
-	 *
-	 * Nothing else will conclude that for it. A train only moves on from a
-	 * station order by arriving: the platform's own tile handler notices the
-	 * front reach the stop location, the train loads, and departing advances
-	 * the order. But a train sent to collect wagons stops when it touches
-	 * them, which is short of the stop location while they are standing in
-	 * the rest of the platform, so that handler never fires. The order stays
-	 * current, the train still reads it as "get to this station", and off it
-	 * goes -- round the loop and back to the same platform, whose only
-	 * purpose is to finally trigger the arrival that lets the order advance.
-	 * That is the pointless lap round the station.
-	 *
-	 * So do here what arriving would have done: mark the station reached and
-	 * let the next order be picked up. In place, never by handing the train
-	 * to the station -- entering starts a loading stop, and coupling is not
-	 * an arrival for cargo. A train that has just coupled does not load or
-	 * unload here at all: it has what it came for and it departs. Cargo work
-	 * at this station belongs to an order of its own, written by the player. */
-	if (was_go_to_couple && new_head->current_order.IsType(OT_GOTO_STATION)) {
-		StationID dest = new_head->current_order.GetDestination().ToStationID();
-		if (IsConsistStandingAtStation(new_head, dest)) {
-			/* The reverse-out flag on a couple order is "collect and go back
-			 * the way you came" -- the player's own call, the one sanctioned
-			 * way a coupling ends in a turn. It used to be honoured by the
-			 * loading stop's departure; couple orders conclude here instead
-			 * now, so it is honoured here, the same way: the flag is set and
-			 * the ordinary reversal path does the work next tick. Read before
-			 * the order is concluded away below. */
-			bool reverse_out = new_head->current_order.ShouldReverseOutOfStation();
-
-			new_head->DeleteUnreachedImplicitOrders();
-			new_head->last_station_visited = dest;
-			UpdateVehicleTimetable(new_head, true);
-			new_head->IncrementImplicitOrderIndex();
-
-			/* And concluded completely, here and now. Bumping the index alone
-			 * leaves the switch to the next order for the tick handler's own
-			 * ProcessOrders() call, which reports it as an order advance -- and
-			 * on every order advance the game asks the pathfinder whether the
-			 * train would rather go the other way. For a train whose next stop
-			 * lies back the way it came, on a network with no way round, that
-			 * question turns it round on the spot despite everything settled
-			 * above: the wagons it should push out of the far side get pulled
-			 * back out of the near one instead. That one-tick gap is how the
-			 * turn kept happening no matter what the coupling itself decided.
-			 * Taking the order advance ourselves closes it: the tick handler
-			 * then sees no advance, asks nothing, and the train departs the way
-			 * the coupling pointed it. A train that really is to go back has
-			 * the player's reverse-out flag for saying so. */
-			ProcessOrders(new_head);
-
-			if (reverse_out) new_head->flags.Set(VehicleRailFlag::Reversing);
-
-			/* The order taken up just now may name the very station the train
-			 * is standing in -- couple here, then do something else here: drop
-			 * the collected wagons again, load, wait for another partner. That
-			 * order can only ever be worked by arriving, and this train cannot
-			 * arrive any more: the conclusion above wrote the station into
-			 * last_station_visited, and "stop only when we've not just been
-			 * there" (Order::ShouldStopAtStation) reads that as done with this
-			 * place -- not only now, but on every later lap too, until some
-			 * other station or waypoint overwrites it. The player watched the
-			 * result: couple and decouple written on the same platform, the
-			 * coupling worked, and the decouple never ran again for the rest
-			 * of the game -- unless a waypoint sat between the two orders,
-			 * whose passing rewrites last_station_visited and unlocks the stop.
-			 *
-			 * An ordinary departure would have swallowed the follow-up order
-			 * whole (Vehicle::HandleLoading advances past a next order naming
-			 * the station just left), but swallowing is for orders that ask
-			 * nothing beyond the visit itself; this one carries work.
-			 *
-			 * So the train arrives for it without moving: it is standing at
-			 * that station, which is all arriving means. The honest arrival
-			 * routine makes the order current the way any stop would --
-			 * loading begins, a decouple fires off the loading state as
-			 * always, and the eventual departure leaves through
-			 * Vehicle::LeaveStation() with a path reserved like everybody
-			 * else's. A via order is left alone -- passing through is not a
-			 * stop -- and so is a train whose moving front has ended up off
-			 * the platform, which cannot begin loading. */
-			if (new_head->current_order.IsType(OT_GOTO_STATION) &&
-					new_head->current_order.GetDestination().ToStationID() == dest &&
-					!new_head->current_order.GetNonStopType().Test(OrderNonStopFlag::GoVia) &&
-					IsRailStationTileOfStation(new_head->GetMovingFront()->tile, dest)) {
-				TrainEnterStation(new_head, dest);
-				if (_show_train_orientation) {
-					IConsolePrint(CC_INFO, "Vlak {}: prijezd na miste pro dalsi rozkaz - typ {}, odpojit {}, rychlost {}",
-							new_head->unitnumber, to_underlying(new_head->current_order.GetType()),
-							new_head->current_order.ShouldDecoupleOnDeparture() ? "ano" : "ne", new_head->cur_speed);
-				}
-			}
-		}
-	}
+	ConcludeCoupleOrderInPlace(new_head);
 
 	/* A merged train that is still working a loading stop -- a collector that
 	 * coupled in the middle of its own stop, or a waiter that was coupled onto
@@ -5643,8 +5898,22 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 		return true;
 	}
 
-	if (IsRailStationTile(remainder->tile)) {
-		StationID station = GetStationIndex(remainder->tile);
+	/* Any part of the rake on a platform makes it a rake left at that station.
+	 * Asking only its head tile missed a rake whose end wagon stood a few
+	 * pixels past the platform's mouth: a feeder pushing its pair onto a rake
+	 * that had been put down at the near end joined on from outside the
+	 * platform, and the grown rake -- half on the platform, all of it
+	 * headless -- was registered nowhere. No collector saw it, no feeder saw
+	 * it, and the next founding run started a second rake beside it. */
+	TileIndex on_platform = INVALID_TILE;
+	for (const Train *u = remainder; u != nullptr; u = u->Next()) {
+		if (IsRailStationTile(u->tile)) {
+			on_platform = u->tile;
+			break;
+		}
+	}
+	if (on_platform != INVALID_TILE) {
+		StationID station = GetStationIndex(on_platform);
 		LeaveRakeWaitingAtStation(remainder, station, load_type, unload_type);
 
 		/* Until the engine that put them down has pulled clear, the wagons
@@ -5761,7 +6030,9 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count, bool whole_train)
  * The wagons therefore couple onto whichever end of the engine faces the
  * door, and which end that is the player chose by how they drove in: nose
  * first puts them on the tail, backing in puts them on the nose. Nothing is
- * measured and nothing turns by itself; the entry made the choice.
+ * measured and nothing turns by itself; the entry made the choice. The one
+ * exception is a train whose next order founds a rake: that leaves wagons
+ * first whichever way it came in, see below.
  *
  * @param engine front of the collecting consist, standing whole in the depot
  * @param rake   head of the stored wagon chain it has claimed
@@ -5808,6 +6079,41 @@ static void TryCoupleAtDepot(Train *engine, Train *rake)
 	 * door and always came out first. That is a decision about which way a
 	 * train faces, and nothing here has any business making it: the driver
 	 * decided that when he chose which way to drive in. */
+	/* The one order that does decide the facing: a founding run. The order
+	 * after this one says "add these wagons to the rake at the station", and a
+	 * feeder can only do that by its wagon end -- engine first, the coupling
+	 * at the platform is refused (CmdCoupleTrains()), because the engine would
+	 * end up inside the rake it came to grow. A shunter does this by pushing
+	 * the wagons out of the yard onto the rake and driving off the way it
+	 * came, nose first; back at the yard it goes in nose first again and the
+	 * next round is the same. No stub, no run-round -- and with a shed that
+	 * keeps the way a train drove in, no other arrangement of orders gives a
+	 * cycle that does not turn the train the wrong way round every other
+	 * trip (the rig proved every one of them). So the wagons lead out. */
+	if (engine->orders != nullptr && engine->GetNumOrders() > 0) {
+		VehicleOrderID idx = engine->cur_real_order_index;
+		for (uint left = engine->GetNumOrders(); left > 0; left--) {
+			idx = (idx + 1) % engine->GetNumOrders();
+			const Order *next = engine->GetOrder(idx);
+			if (next == nullptr || next->IsType(OT_IMPLICIT)) continue;
+			if (next->IsType(OT_GOTO_STATION) && next->ShouldGoToCouple() && next->ShouldFoundRake() &&
+					!engine->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
+				/* Turned round whole, the way a train that backed in stands:
+				 * inside a shed every vehicle's recorded facing points out of
+				 * the door (the entry turned it), and the way a train moves is
+				 * that facing, reversed when it drives backwards. The flag alone
+				 * would have it moving into the back wall -- it stepped out,
+				 * read the wall as the end of the line, turned, and stepped out
+				 * again, for good. */
+				engine->vehicle_flags.Set(VehicleFlag::DrivingBackwards);
+				for (Train *u = engine; u != nullptr; u = u->Next()) {
+					u->direction = ReverseDir(u->direction);
+				}
+			}
+			break;
+		}
+	}
+
 	if (_show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: spojeno v depu - vagonky na zada, vede {}", engine->unitnumber,
 				engine->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "zadek (couva, vagonky prvni)" : "masinka (jede predkem)");
@@ -7198,11 +7504,22 @@ void FreeTrainTrackReservation(const Train *consist)
 		 * opposing signals, and took the ground from under a train waiting
 		 * behind the casualty. The next train out of the shed booked a road
 		 * over that train and hit it (saves/porucha_za_vlakem.sav). */
+		/* A shed is the one exception: the trains parked inside it stand on
+		 * no road and own no booking, and the shed's single booking bit is
+		 * this train's, laid when its road ran on into the shed (a station
+		 * stop with no signal beyond books through to the next order). Ending
+		 * the walk here left that bit set for good, and a shed booked by
+		 * nobody is a shed no train can ever enter again: the feeder that had
+		 * just put its wagons down on the platform stood there for the rest
+		 * of the game, "waiting for a free path" to a shed with only parked
+		 * trains inside. */
 		bool someone_else_here = false;
-		for (const Vehicle *u : VehiclesOnTile(tile)) {
-			if (u->type != VehicleType::Train || Train::From(u)->First() == consist) continue;
-			someone_else_here = true;
-			break;
+		if (!IsRailDepotTile(tile)) {
+			for (const Vehicle *u : VehiclesOnTile(tile)) {
+				if (u->type != VehicleType::Train || Train::From(u)->First() == consist) continue;
+				someone_else_here = true;
+				break;
+			}
 		}
 		if (someone_else_here) break;
 
@@ -8212,7 +8529,19 @@ static void TrainEnterStation(Train *consist, StationID station)
 
 	consist->BeginLoading();
 
+	/* The platform the triggers fire on: the leading end's tile, unless that
+	 * end stands a few pixels past the platform's mouth (a rake grown by a
+	 * feeder pushing on from outside), in which case the first part that is
+	 * on the platform names it. */
 	TileIndex tile = consist->GetMovingFront()->tile;
+	if (!IsRailStationTileOfStation(tile, station)) {
+		for (const Train *u = consist; u != nullptr; u = u->Next()) {
+			if (IsRailStationTileOfStation(u->tile, station)) {
+				tile = u->tile;
+				break;
+			}
+		}
+	}
 	TriggerStationRandomisation(st, tile, StationRandomTrigger::VehicleArrives);
 	TriggerStationAnimation(st, tile, StationAnimationTrigger::VehicleArrives);
 }
@@ -9760,7 +10089,27 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 				SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
 			}
 			const Waypoint *through = Waypoint::GetIfValid(consist->current_order.GetDestination().ToStationID());
-			if (FindOrClaimCoupleTarget(consist, *couple_order, through) == nullptr) {
+			bool saw_full_rake = false;
+			if (FindOrClaimCoupleTarget(consist, *couple_order, through, &saw_full_rake) == nullptr) {
+				/* A founding order with nothing to couple to does not wait: the
+				 * waypoint is concluded the same way a claim concludes it, and
+				 * the couple order behind it is concluded next tick, standing
+				 * here (see the hold below); the decouple order then drives in. */
+				if (couple_order->ShouldFoundRake() && !saw_full_rake && FeederWagonsFitAt(consist, couple_order->GetDestination().ToStationID(), through)) {
+					if (_show_train_orientation) {
+						IConsolePrint(CC_INFO, "Vlak {}: zaklada radu - za smerovanim zadna rada, smerovani ma splneno", consist->unitnumber);
+					}
+					consist->DeleteUnreachedImplicitOrders();
+					UpdateVehicleTimetable(consist, true);
+					consist->IncrementImplicitOrderIndex();
+					ProcessOrders(consist);
+					if (!IsWholeTrainInsideDepot(consist)) {
+						FreeTrainTrackReservation(consist);
+						consist->ReserveTrackUnderConsist();
+					}
+					return true;
+				}
+				if (couple_order->ShouldFoundRake()) FoundingCoupleOrderHold(consist, *couple_order, through, saw_full_rake);
 				if (_show_train_orientation) {
 					/* Not just "nothing" -- how many rakes stand waiting at the
 					 * station at all, and how many of them the waypoint's own
@@ -9838,7 +10187,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * good before the stop can even finish. */
 	if ((consist->current_order.IsType(OT_GOTO_STATION) || consist->current_order.IsType(OT_GOTO_DEPOT)) &&
 			consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0) {
-		if (FindOrClaimCoupleTarget(consist, consist->current_order) == nullptr) {
+		bool saw_full_rake = false;
+		if (FindOrClaimCoupleTarget(consist, consist->current_order, nullptr, &saw_full_rake) == nullptr) {
+			/* A founding order founds instead of waiting; see FoundingCoupleOrderHold(). */
+			if (consist->current_order.ShouldFoundRake() && FoundingCoupleOrderHold(consist, consist->current_order, nullptr, saw_full_rake)) return true;
 			/* And it holds no track while it waits. Reserving first and choosing
 			 * afterwards was the whole trouble: the path was held against every
 			 * other train for as long as the wait lasted, and when the choice was

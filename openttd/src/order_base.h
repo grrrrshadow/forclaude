@@ -177,6 +177,15 @@ private:
 	OrderCoupleLoad couple_load = OrderCoupleLoad::Any;
 	CargoType couple_cargo = INVALID_CARGO; ///< Cargo the wagons have to carry; INVALID_CARGO for any.
 	uint8_t couple_count = 0;               ///< How many vehicles the rake has to have; 0 for any.
+	/**
+	 * The couple order founds a rake where there is none: finding nothing to
+	 * couple to, it is concluded and the decouple order behind it puts the
+	 * train's wagons down as the start of one; finding a rake, it couples and
+	 * the decouple order grows it. #couple_count is then the rake's final
+	 * size (0 = whatever the platform holds), and no rake is ever built past
+	 * the platform. The player's design; see FoundingCoupleOrderHold().
+	 */
+	bool couple_found_rake = false;
 
 public:
 	Order() {}
@@ -305,6 +314,12 @@ public:
 
 	/** Is this order's destination a place to travel to (reversing along the way if needed) in order to couple with a partner train there? @pre IsType(OT_GOTO_STATION) */
 	inline bool ShouldGoToCouple() const { return this->go_to_couple; }
+
+	/** Does this couple order found a rake where there is none, and grow it where there is? */
+	inline bool ShouldFoundRake() const { return this->couple_found_rake; }
+
+	/** Set whether this couple order founds and grows a rake. */
+	inline void SetFoundRake(bool found) { this->couple_found_rake = found; }
 
 	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
 	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }
