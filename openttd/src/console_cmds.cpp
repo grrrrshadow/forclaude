@@ -1674,6 +1674,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			std::string extra;
 			if (o.ShouldGoToCouple()) extra += " SPOJIT";
 			if (o.ShouldFoundRake()) extra += o.GetCoupleCount() != 0 ? fmt::format(" ZALOZIT:do {}", o.GetCoupleCount()) : " ZALOZIT";
+			if (o.ShouldHonk()) extra += " HOUKAT";
 			if (o.ShouldWaitForCouple()) extra += " CEKAT";
 			if (o.ShouldDecoupleOnDeparture()) extra += o.ShouldDecoupleWholeTrain() ? " ODPOJIT:cely vlak" : (o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount()));
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
@@ -3020,6 +3021,32 @@ static bool ConTestFoundRake(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testzalozit: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Switch the horn on a train's waypoint order, the way the button does.
+ * Usage: testhoukat <unit number> <order> [0]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestHonk(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Make a waypoint order sound the horn. Usage: 'testhoukat <unit number> <order index> [0 to switch it off]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	uint32_t on = argv.size() >= 4 && ParseInteger(argv[3]).value_or(1) == 0 ? 0 : 1;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_HONK, on);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testhoukat: vlak {} rozkaz {} -> houkat {} {}", *punit, *porder, on != 0 ? "ano" : "ne", r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testhoukat: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -6036,6 +6063,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
+	IConsole::CmdRegister("testhoukat",              ConTestHonk);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);

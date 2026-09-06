@@ -161,6 +161,13 @@ private:
 	bool reverse_out_of_station = false;
 
 	/**
+	 * A train passing this station waypoint sounds its horn there. The
+	 * player's touch of life on a waypoint that otherwise only names a group
+	 * of platforms; off by default, so nothing honks that was not asked to.
+	 */
+	bool honk = false;
+
+	/**
 	 * What a "go to couple" order will accept when it gets there: how full the
 	 * wagons are, what they are carrying, and how many of them there are.
 	 *
@@ -347,6 +354,11 @@ public:
 	inline void SetCoupleCount(uint8_t count) { this->couple_count = count; }
 
 	inline bool ShouldReverseOutOfStation() const { return this->reverse_out_of_station; }
+
+	/** Does a train sound its horn as it passes this waypoint? */
+	inline bool ShouldHonk() const { return this->honk; }
+	/** Set whether a train sounds its horn as it passes this waypoint. */
+	inline void SetHonk(bool honk) { this->honk = honk; }
 
 	/** Set whether a train leaving this station reverses out of it. */
 	inline void SetReverseOutOfStation(bool reverse) { this->reverse_out_of_station = reverse; }

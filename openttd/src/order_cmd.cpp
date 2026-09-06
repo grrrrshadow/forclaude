@@ -1291,7 +1291,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			break;
 
 		case OT_GOTO_WAYPOINT:
-			if (mof != MOF_NON_STOP) return CMD_ERROR;
+			if (mof != MOF_NON_STOP && mof != MOF_HONK) return CMD_ERROR;
 			break;
 
 		case OT_CONDITIONAL:
@@ -1493,6 +1493,11 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture())) return CMD_ERROR;
 			break;
 
+		case MOF_HONK:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (!order->IsType(OT_GOTO_WAYPOINT)) return CMD_ERROR;
+			break;
+
 		/* The three filters on what a coupling order will collect. They only
 		 * mean anything to an order that is going to collect something, and
 		 * each is free to be set or left alone independently of the others. */
@@ -1654,6 +1659,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_REVERSE_OUT:
 				order->SetReverseOutOfStation(data != 0);
+				break;
+
+			case MOF_HONK:
+				order->SetHonk(data != 0);
 				break;
 
 			case MOF_COUPLE_LOAD:
@@ -2450,10 +2459,16 @@ bool ProcessOrders(Vehicle *v)
 	if (((v->current_order.IsType(OT_GOTO_STATION) && v->current_order.GetNonStopType().Test(OrderNonStopFlag::GoVia)) || v->current_order.IsType(OT_GOTO_WAYPOINT)) &&
 			stands_on_via_dest()) {
 		if (_show_train_orientation && v->type == VehicleType::Train) {
-			IConsolePrint(CC_INFO, "Vlak {}: prujezdni cil splnen - rozkaz c.{} (cil {}), stojim na ({},{})",
+			IConsolePrint(CC_INFO, "Vlak {}: prujezdni cil splnen - rozkaz c.{} (cil {}), stojim na ({},{}){}",
 					Train::From(v)->unitnumber, v->cur_real_order_index,
 					v->current_order.GetDestination().ToStationID().base(),
-					TileX(moving_front->tile), TileY(moving_front->tile));
+					TileX(moving_front->tile), TileY(moving_front->tile),
+					v->current_order.ShouldHonk() ? " - HOUKAM" : "");
+		}
+		/* The horn, if the waypoint asks for it: the same sound the train
+		 * gives when it pulls out of a station. */
+		if (v->type == VehicleType::Train && v->current_order.IsType(OT_GOTO_WAYPOINT) && v->current_order.ShouldHonk()) {
+			v->PlayLeaveStationSound(true);
 		}
 		v->DeleteUnreachedImplicitOrders();
 		/* We set the last visited station here because we do not want

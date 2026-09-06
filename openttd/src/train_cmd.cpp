@@ -2309,10 +2309,11 @@ static uint FreeRoomBesideRake(const Train *rake)
  *
  * Two bounds, both the player's: the number on the founding order, when there
  * is one, is the rake's final size; and the feeder, wagons and engine, has to
- * fit on the platform in front of the rake, with one tile to spare. So no
- * rake is ever built past its platform, and a feeder never sets off for a
- * rake it cannot pull up to: it would stand in the platform's mouth, on the
- * station waypoint, exactly where the collector has to come in. A rake that
+ * fit on the platform in front of the rake -- overhanging it by one tile at
+ * most, the player's allowance for the signal tile in the mouth. So a feeder
+ * never sets off for a rake it cannot pull up to: it would stand further out
+ * than that, on the station waypoint, exactly where the collector has to come
+ * in. A rake that
  * has no room is finished -- the feeder waits for a collector to take it
  * away and then founds the next.
  *
@@ -2327,14 +2328,15 @@ static bool RakeHasRoomFor(const Train *rake, const Train *feeder, const Order &
 		if (!u->IsArticulatedPart() && !u->IsRearDualheaded()) units++;
 	}
 	if (order.GetCoupleCount() != 0 && units + WagonUnitsBehindEngine(feeder) > order.GetCoupleCount()) return false;
-	return FreeRoomBesideRake(rake) >= feeder->gcache.cached_total_length + TILE_SIZE;
+	uint room = FreeRoomBesideRake(rake);
+	return room == UINT_MAX || room + TILE_SIZE >= feeder->gcache.cached_total_length;
 }
 
 static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *wp, StationID dest, std::set<TileIndex> &out);
 
 /**
- * Would this train, wagons and engine, fit with a tile to spare on the
- * longest platform it could put its wagons down on at @p dest -- behind
+ * Would this train, wagons and engine, fit -- overhanging by a tile at most --
+ * on the longest platform it could put its wagons down on at @p dest -- behind
  * @p through when the couple order sits behind a station waypoint, anywhere
  * at the station otherwise?
  */
@@ -2352,7 +2354,7 @@ static bool FeederWagonsFitAt(const Train *v, StationID dest, const Waypoint *th
 			if (IsRailStationTile(t) && GetStationIndex(t) == dest) longest = std::max(longest, PlatformLengthPx(t));
 		}
 	}
-	return v->gcache.cached_total_length + TILE_SIZE <= longest;
+	return longest == UINT_MAX || longest + TILE_SIZE >= v->gcache.cached_total_length;
 }
 
 /**
@@ -2894,7 +2896,7 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
 		return false;
 	}
 	if (!FeederWagonsFitAt(v, dest, through)) {
-		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - cely vlak ({} px + policko) se na zadne nastupiste stanice {} nevejde, cekam", v->unitnumber, v->gcache.cached_total_length, dest.base()));
+		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - cely vlak ({} px) se ani s polickem navic na zadne nastupiste stanice {} nevejde, cekam", v->unitnumber, v->gcache.cached_total_length, dest.base()));
 		return false;
 	}
 
@@ -9071,6 +9073,18 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				enterdir = DiagdirBetweenTiles(gp.old_tile, gp.new_tile);
 				assert(IsValidDiagDirection(enterdir));
 
+				/* A station waypoint concluded short of itself (the hold before
+				 * it found the rake) still gets its horn -- as the train passes
+				 * it, not as the order was concluded a stub away. */
+				if (v->IsMovingFront() && first->honk_waypoint != StationID::Invalid() &&
+						IsRailWaypointTile(gp.new_tile) && GetStationIndex(gp.new_tile) == first->honk_waypoint) {
+					first->honk_waypoint = StationID::Invalid();
+					first->PlayLeaveStationSound(true);
+					if (_show_train_orientation) {
+						IConsolePrint(CC_INFO, "Vlak {}: houka na smerovani ({},{})", first->unitnumber, TileX(gp.new_tile), TileY(gp.new_tile));
+					}
+				}
+
 				/* Get the status of the tracks in the new tile and mask
 				 * away the bits that aren't reachable. */
 				TrackStatus ts = GetTileTrackStatus(gp.new_tile, TransportType::Rail, RoadTramType::Invalid, ReverseDiagDir(enterdir));
@@ -10251,6 +10265,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			 * does. Concluded here, standing short of it, never by arriving:
 			 * arriving is the thing that cannot happen. One order per tick;
 			 * a second station waypoint in the chain concludes on the next. */
+			/* The waypoint is concluded here, standing short of it; the horn
+			 * it asks for is kept for the moment the train passes its tile
+			 * (see TrainController()). */
+			if (consist->current_order.ShouldHonk()) consist->honk_waypoint = consist->current_order.GetDestination().ToStationID();
 			consist->DeleteUnreachedImplicitOrders();
 			UpdateVehicleTimetable(consist, true);
 			consist->IncrementImplicitOrderIndex();

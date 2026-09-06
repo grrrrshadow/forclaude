@@ -243,6 +243,14 @@ static StringID GetOrderGoToString(const Order &order)
  * @param middle X position between order index and order text
  * @param right Right border for text drawing
  */
+/** Is this a waypoint order whose waypoint is a station waypoint (see #WPF_STATION_SEARCH)? */
+static bool IsStationWaypointOrder(const Order *order)
+{
+	if (!order->IsType(OT_GOTO_WAYPOINT)) return false;
+	const Waypoint *wp = Waypoint::GetIfValid(order->GetDestination().ToStationID());
+	return wp != nullptr && HasBit(wp->waypoint_flags, WPF_STATION_SEARCH);
+}
+
 void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_index, int y, bool selected, bool timetable, int left, int middle, int right)
 {
 	bool rtl = _current_text_dir == TD_RTL;
@@ -441,6 +449,11 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 
 		case OT_GOTO_WAYPOINT:
 			line = GetString(order->GetNonStopType().Test(OrderNonStopFlag::NonStop) ? STR_ORDER_GO_NON_STOP_TO_WAYPOINT : STR_ORDER_GO_TO_WAYPOINT, order->GetDestination());
+			/* A station waypoint says whether the train honks there, either
+			 * way: the player wants the line under it never empty. */
+			if (v->type == VehicleType::Train && IsStationWaypointOrder(order)) {
+				second += GetString(order->ShouldHonk() ? STR_ORDER_HONK_SUFFIX : STR_ORDER_NO_HONK_SUFFIX);
+			}
 			break;
 
 		case OT_CONDITIONAL:
@@ -490,6 +503,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 bool OrderHasSecondLine(const Vehicle *v, const Order *order)
 {
 	if (v->type != VehicleType::Train) return false;
+	if (order->IsType(OT_GOTO_WAYPOINT)) return IsStationWaypointOrder(order);
 	if (order->IsType(OT_GOTO_STATION)) {
 		return order->ShouldGoToCouple() || order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture() ||
 				order->ShouldReverseOutOfStation();
@@ -683,7 +697,8 @@ private:
 		/* WID_O_SEL_DECOUPLE */
 		DP_COUPLE_ROW_STATION = 0, ///< Display the decouple/couple buttons for a train's station order.
 		DP_COUPLE_ROW_DEPOT   = 1, ///< Display the turn-around button for a train's depot order.
-		DP_COUPLE_ROW_EMPTY   = 2, ///< Hold the row's height open when it has no buttons to show.
+		DP_COUPLE_ROW_WAYPOINT = 2, ///< Display the horn button for a train's station waypoint order.
+		DP_COUPLE_ROW_EMPTY   = 3, ///< Hold the row's height open when it has no buttons to show.
 	};
 
 	int selected_order = -1;
@@ -1312,6 +1327,11 @@ public:
 				this->SetWidgetLoweredState(WID_O_DECOUPLE_DEPOT, order->ShouldDecoupleOnDeparture());
 				this->SetWidgetDisabledState(WID_O_GOTO_COUPLE_DEPOT, false);
 				this->SetWidgetDisabledState(WID_O_DECOUPLE_DEPOT, false);
+			} else if (is_train && IsStationWaypointOrder(order)) {
+				/* A station waypoint's row was empty; the player asked for the
+				 * horn to live there. Pressed, the train honks as it passes. */
+				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_WAYPOINT);
+				this->SetWidgetLoweredState(WID_O_HONK, order->ShouldHonk());
 			} else {
 				/* Nothing to put in the row -- a waypoint order, the end of the
 				 * list, a vehicle that is not a train -- but the row stays open
@@ -1736,6 +1756,13 @@ public:
 				 * for exactly that (crash 2026-08-28). */
 				if (order == nullptr) break;
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, order->ShouldReverseOutOfStation() ? 0 : 1);
+				break;
+			}
+
+			case WID_O_HONK: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_HONK, order->ShouldHonk() ? 0 : 1);
 				break;
 			}
 
@@ -2173,6 +2200,10 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_DECOUPLE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_HONK), SetMinimalSize(372, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_HONK, STR_ORDER_HONK_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),

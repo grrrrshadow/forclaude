@@ -47,6 +47,7 @@ enum OrderWidgets : WidgetID {
 	WID_O_GOTO_COUPLE_DEPOT,         ///< Toggle travelling to this depot to couple with a rake of wagons stored there.
 	WID_O_DECOUPLE_DEPOT,            ///< Toggle decoupling wagons in this depot.
 	WID_O_REVERSE_OUT,               ///< Toggle reversing out of this station on departure.
+	WID_O_HONK,                      ///< Toggle sounding the horn when passing this station waypoint.
 	WID_O_SEL_COUPLE_FILTER,         ///< #NWID_SELECTION widget for the row saying what a coupling order will accept, shown once it is going to collect something.
 	WID_O_COUPLE_LOAD,               ///< Choose how full the wagons to be collected have to be.
 	WID_O_COUPLE_CARGO,              ///< Choose which cargo the wagons to be collected have to carry.

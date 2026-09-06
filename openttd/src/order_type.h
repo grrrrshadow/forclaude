@@ -198,6 +198,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_COUPLE_COUNT,    ///< Change how many vehicles the rake to be collected has to have (0 = any).
 	MOF_DECOUPLE_WHOLE,  ///< Toggle whether the decoupling drops exactly what the train coupled, instead of keeping a number of wagons.
 	MOF_COUPLE_FOUND,    ///< Toggle whether the couple order founds a rake where there is none and grows it where there is.
+	MOF_HONK,            ///< Toggle whether a train sounds its horn as it passes this station waypoint.
 	MOF_END
 };
 

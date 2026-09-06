@@ -3834,18 +3834,19 @@ Partner se hledá jako dnes, před výjezdem. Tři odpovědi:
 - řada s místem → zabrat, přijet, připojit; „odpojit vše" za tím odloží
   vozy i řadu jako jednu (řada roste);
 - řada, do které se stavitelka nevejde — má N vozů, nebo na nástupišti
-  vedle řady není volno aspoň na **celou stavitelku (mašinka + vozy) plus
-  jedno políčko** (`FreeRoomBesideRake`, `RakeHasRoomFor`) → řada je
-  **plná**, stavitelka **čeká** (v depu, u nádraží, před směrováním),
-  „zaklada radu - rada … je hotova (plna), cekam, az ji nekdo odveze".
-  Původní míra „délka řady + vozy ≤ nástupiště + 1 políčko" byla špatně
-  obráceně: pouštěla řadu čouhat a stavitelku k řadě, ke které se už
-  nevešla — na savu new1 pak stála na křižovatce pod „peron3", kam má
-  přijíždět sběračka, a hlásila „prijel masinkou napred" (hráč: bez
+  vedle řady není volno na **celou stavitelku (mašinka + vozy), přičemž
+  o jedno políčko smí přečnívat** (volno + políčko ≥ délka stavitelky;
+  `FreeRoomBesideRake`, `RakeHasRoomFor`) → řada je **plná**, stavitelka
+  **čeká** (v depu, u nádraží, před směrováním), „zaklada radu - rada … je
+  hotova (plna), cekam, az ji nekdo odveze". Původní míra „délka řady +
+  vozy ≤ nástupiště + políčko" pouštěla stavitelku k řadě, ke které se
+  nevešla ani zdaleka — na savu new1 pak stála na křižovatce pod „peron3",
+  kam má přijíždět sběračka, a hlásila „prijel masinkou napred" (hráč: bez
   zadaného počtu tam jela, i když byl peron plný; s počtem to sedělo).
-  S touhle mírou řada nikdy nepřečnívá a stavitelka se k ní vždycky vejde
-  celá; totéž měřítko platí i pro založení na prázdném nástupišti
-  (`FeederWagonsFitAt`: nástupiště ≥ stavitelka + políčko);
+  Mezikrok „stavitelka + políčko se musí vejít celá" měl rezervu obráceně
+  (hráč: 2,5 políčka volno, vlak 2 políčka, a nejel). Totéž měřítko platí
+  i pro založení na prázdném nástupišti (`FeederWagonsFitAt`: nástupiště +
+  políčko ≥ stavitelka);
 - žádná řada → připojit se **uzavře jako splněné** (jako by se spojilo,
   `ConcludeCoupleOrderInPlace`; před směrováním se uzavře i směrování) a
   odpojit za ním jede založit. Vlastní vozy se přitom musí na nástupiště
@@ -3900,15 +3901,15 @@ na pevném semínku (`newgame 1`), aby souřadnice držely.
 
 Mimochodem nalezeno a opraveno: depo zamluvené nikým, **4.21**.
 
-**Změřeno (scéna `zaloz`, pevné semínko, nástupiště 4 políčka):** založení
-2 vozů na vzdáleném konci, růst na 4 (s mírou „stavitelka + políčko":
-mašinka + 2 vozy = 24 px + 16, za 4 vozy zbývá 32 → plná), třetí jízda
-„rada je hotova (plna), cekam"; sběračka po `testbrzda 3` řadu zabere,
-spojí („couva ano"), odveze do depa V; stavitelka po zabrání řady
-sběračkou „neni k cemu se pripojit" a založí novou, doroste na 4. Na
-hráčově savu (nástupiště 10 políček, stavitelka mašinka + 3 vozy = 32 px):
-3→6→9→12→15 vozů, pak „plna" a stání na klasickém směrování „2"
-(108,92–93), na peronové se nejede (scéna `zalozsmer`, běh 62 000 tiků). Baterie 48 scén: beze změny proti předchozímu
+**Změřeno (scéna `zaloz`, pevné semínko, nástupiště 4 políčka = 64 px,
+stavitelka mašinka + 2 vozy = 24 px):** založení 2 vozů na vzdáleném konci,
+růst 2→4→6 (za 6 vozy zbývá 16 + políčko 16 ≥ 24), pak „rada je hotova
+(plna), cekam"; sběračka po `testbrzda 3` řadu zabere, spojí („couva
+ano"), odveze do depa V; stavitelka po zabrání řady sběračkou „neni k
+cemu se pripojit" a založí novou. Na hráčově savu (nástupiště 10 políček,
+stavitelka mašinka + 3 vozy = 32 px): roste až do 18 vozů (zbývá 16 +
+16 ≥ 32), pak „plna" a stání na klasickém směrování „2" (108,92–93), na
+peronové se nejede (scéna `zalozsmer`). Baterie 48 scén: beze změny proti předchozímu
 běhu (jen počty vjezdů do depa na náhodných mapách), `zaloz` spojeno=7
 (4× v depu, 2× u řady, 1× sběračka), havaroval=0.
 
@@ -3995,6 +3996,36 @@ po každém kole, 0 havárií); baterie po změně beze změn až na
 `poruchavrata` (jiné časování odhalilo starou chybu dotažení, §16); výpis „krok BEZ ZABORU" (vjezd na políčko bez
 záboru mimo depo) zůstává zapnutý pod `vlak123`, protože je to první
 příznak každé takové srážky.
+
+---
+
+## 2.39 „Zahoukat" u nádražního směrování
+
+**Hráč:** řádek příkazu u nádražního směrování je prázdný a v okně rozkazů
+je u směrování volné místo na čudlík — tak tam patří **„Zahoukat"**. Čudlík
+je přepínač (zamáčknutý = houká), implicitně nehouká; pod příkazem se
+vždy píše, co platí: „(zahoukat)" nebo „(nehoukat)", aby řádek nebyl
+prázdný.
+
+**Postaveno:** pole `honk` na příkazu (save, CH_TABLE), `MOF_HONK` (jen
+vlak, jen směrování), čudlík `WID_O_HONK` v řadě spojovacích čudlíků
+(plán `DP_COUPLE_ROW_WAYPOINT`, jen u nádražního směrování — u obyčejného
+zůstává řádek prázdný a příkaz jednořádkový), řetězce
+`STR_ORDER_HONK*`. Zvuk je ten, který vlak dává při odjezdu ze stanice
+(`PlayLeaveStationSound(true)`), tedy houkačka mašinky.
+
+**Kdy houká:** ve chvíli, kdy směrováním skutečně projíždí. Dvě cesty:
+1. průjezdní cíl splněný projetím (`ProcessOrders`, „prujezdni cil splnen
+   … - HOUKAM") — i zakládací jízda s příznakem `FoundingViaWaypoint`;
+2. směrování uzavřené **před ním** záborem řady (2.26, „vagonky
+   pripraveny") — tam se houkačka jen zapamatuje (`Train::honk_waypoint`,
+   NOSAVE) a spustí se v `TrainController` při vjezdu čela na políčko
+   toho směrování („houka na smerovani (x,y)"). Po načtení hry se ten
+   jeden zapamatovaný zvuk ztratí; víc to nestojí.
+
+**Rig:** `testhoukat <vlak> <rozkaz> [0]`, `testrozkazy` píše „HOUKAT".
+Změřeno na savu new1: vlak 2 s houkáním na „peron3" i „load" houká při
+každém průjezdu oběma cestami.
 
 ---
 

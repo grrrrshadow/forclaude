@@ -4958,6 +4958,10 @@ STR_ORDER_DEPOT_COUPLE_SUFFIX_AND                               :{SPACE}(and cou
 STR_ORDER_TURN_AROUND_DEPOT                                     :{BLACK}Turn around
 STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP                             :{BLACK}Turn the train around while it is in this depot, so it leaves facing the way it came from. Without this it leaves the way it went in, so that a train sent for servicing is not silently turned round
 STR_ORDER_TURN_AROUND_DEPOT_SUFFIX                              :{SPACE}(and turn around)
+STR_ORDER_HONK                                                  :{BLACK}Sound the horn
+STR_ORDER_HONK_TOOLTIP                                          :{BLACK}Sound the train's horn as it passes this station waypoint
+STR_ORDER_HONK_SUFFIX                                           :{SPACE}(sound the horn)
+STR_ORDER_NO_HONK_SUFFIX                                        :{SPACE}(no horn)
 
 STR_ORDER_REVERSE_OUT                                           :{BLACK}Reverse out
 STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Reverse out of this station when leaving it, instead of carrying on the way the train is facing and looking for a way round
