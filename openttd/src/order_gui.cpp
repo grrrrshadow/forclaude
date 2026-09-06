@@ -2202,16 +2202,17 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_HONK), SetMinimalSize(372, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDER_HONK, STR_ORDER_HONK_TOOLTIP), SetResize(1, 0),
-		EndContainer(),
-		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_TURN_AROUND_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_TURN_AROUND_DEPOT, STR_ORDER_TURN_AROUND_DEPOT_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_GOTO_COUPLE_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_GOTO_COUPLE, STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_DECOUPLE_DEPOT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_DECOUPLE_BUTTON, STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+		/* Plane order is the enum order: station, depot, station waypoint, empty. */
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_HONK), SetMinimalSize(372, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_HONK, STR_ORDER_HONK_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		/* The same height with nothing in it, so the window does not change size
 		 * as the player clicks from one order to another. A panel rather than a
