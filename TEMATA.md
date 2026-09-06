@@ -2217,6 +2217,38 @@ změny (`poruchazavlakem` havaroval=0, ta pravidlo 4.18/2 hlídá).
 
 ---
 
+## 4.22 Puštěné držení musí mít zábor, nebo zůstat zaseknuté
+
+**Save new1 (2.38), první běh:** stavitelka dojela na slepou kolej „2",
+otočila se na konci („dojezd"), vanilka ji správně označila zaseknutou —
+vlak po otočce v bloku s cestovými návěstmi stojí, dokud si nezamluví
+cestu. Držení před nádražním směrováním jí ale značku smazalo („není
+zaseknutá, čeká", 2.32) a při puštění nic nezamluvilo. Nezaseknutý vlak
+bez cesty se rozjede: vanilka mezi návěstmi jezdí bez záboru (nastavení
+`reserve_paths` vypnuté, křižovatka bez návěsti se nezamlouvá) a zastaví
+až u cestové návěsti. Stavitelka tak vjela na křižovatku (108,91), kterou
+měl zabranou vlak 1 (kolej LEFT proti jejímu Y — zábor by se nikdy
+nepovedl), a srazily se; po srážce ještě assert v `FollowTrainReservation`
+(neplatný trackdir vraku), sekundární.
+
+**Pravidlo:** vlak, který stál bez záboru (držení 2.26/2.32, uzavření
+zakládacího připojit), se po puštění buď rozjede po zamluvené cestě, nebo
+zůstane zaseknutý a ptá se znovu — `TryPathReserve(v, true, false)`
+hned při puštění, `first_tile_okay` ne (vlastní políčko není bezpečné
+místo, jinak „cesta je" bez jediného políčka před vlakem a jede se
+nezabraně dál). Platí na třech místech, viz 2.38.
+
+**Diagnostika:** „krok BEZ ZABORU: vlak N vjizdi na (x,y) kolej …,
+zabrano …, zasekly pred/po" v `TrainController` — každý vjezd na políčko
+mimo depo, na kterém vlak nemá zábor. Mezi blokovými návěstmi je to
+normální; v bloku s cestovými návěstmi je to první příznak srážky.
+Ve stejném běhu ukázal i vlak 1 vyjíždějící z nakládacího peronu
+(vjezd na návěstidlo (106,88) bez záboru, hned zaseknutý) — tam ho
+zastavila stráž v `TrainController` (placeholder, „zasekly po ano"),
+takže to je jen šum, ale stojí za pohled, proč tam zábor nebyl.
+
+---
+
 ## 5.0 Co je „naše" nastavení posunu mapy
 
 V nabídce je **pět** voleb. První je naše a je přednastavená. Je to
@@ -3881,6 +3913,63 @@ běhu (jen počty vjezdů do depa na náhodných mapách), `zaloz` spojeno=7
 
 ---
 
+## 2.38 Založit řadu za nádražním směrováním — jede se skrz něj, hledá se jen za ním
+
+**Hráčův save `new1.sav`:** stavitelka (vlak 2) má rozkazy směrování „2"
+(slepá kolej) → nádražní směrování „load" → připojit → „2" → nádražní
+směrování „peron3" → připojit *založit* → odpojit vše. Nádraží má za
+„load" dva nakládací perony, za „peron3" třetí, kde má vznikat dlouhá
+řada. Stavitelka stojí na klasickém směrování (na konci slepé koleje) a
+hledá skrz „peron3"; za ním nic není → má jet založit. Místo toho začala
+řadu na nakládacím peronu.
+
+**Příčina:** držení před nádražním směrováním při „za směrováním žádná
+řada" uzavřelo směrování a rozkaz připojit se stal aktuálním — a jeho
+hledání už nemělo čím být omezené: prohledalo celé nádraží a zabralo
+řadu 29 na (104,89), nakládací peron. Cesta k odpojení by pak vedla
+kamkoli, kde je volno.
+
+**Oprava:** hledač hledá ze směrování peronu, ale mašinka stojí na
+klasickém směrování — a k peronu vede cesta jen skrz to nádražní
+směrování. Tak se jede skrz něj:
+
+1. Držení při „žádná řada" **směrování neuzavírá**, nastaví příznak
+   `FoundingViaWaypoint` a vlak jede na směrování jako na obyčejný
+   průjezdní cíl (`IsHoldingShortOfStationWaypoint` s příznakem
+   neplatí).
+2. Po projetí směrování je aktuální rozkaz připojit; jeho hledání se
+   znovu **omezí na perony za směrováním, přes které se přijelo**
+   (`StationWaypointBeforeCurrentOrder`), i za jízdy (příznak pouští
+   držení do bloku ještě v pohybu, aby odpověď padla dřív, než se ptá na
+   další cestu). Nic → připojit se uzavře (zábor za jízdy zůstává, končí u
+   návěsti před perony) a odpojit dojede jen tam, kam odtud koleje vedou.
+   Řada → zabere se a připojí jako dřív.
+3. Plná řada → čeká na klasickém směrování jako dřív (v savu ji nikdo
+   neodveze, tak stojí).
+
+**Změřeno na savu:** stavitelka počká na slepé koleji, až vlak 1 projede
+křižovatku, projede „peron3", „neni k cemu se pripojit", odloží 3 vozy na
+(108,77) (vzdálený konec), objede pro další nakládací řadu, znovu skrz
+„peron3", řadu zabere, připojí, odpojí vše — řada 6 vozů na (108,76…78).
+
+**A srážka, která z toho vypadla (4.22):** první pokus skončil srážkou na
+křižovatce (108,91) — stavitelka po otočce na slepé koleji vyjela bez
+záboru, protože držení jí smazalo značku zaseknutí a nic nezamluvilo.
+Odtud pravidlo: **po každém puštění držení buď zábor cesty, nebo
+zaseknutí** (`TryPathReserve(v, true, false)` na všech třech místech:
+založení skrz směrování, „vagonky pripraveny", uzavření zakládacího
+připojit). Vlak v bloku s cestovými návěstmi nesmí ujet ani políčko bez
+záboru — vanilka to nedovolí nikde, a držení je jediné místo, kde u nás
+vlak stojí nezabraný.
+
+**Rig:** save `saves/new1.sav`, scéna `zalozsmer` (12 000 tiků; řada roste
+po každém kole, 0 havárií); baterie po změně beze změn až na
+`poruchavrata` (jiné časování odhalilo starou chybu dotažení, §16); výpis „krok BEZ ZABORU" (vjezd na políčko bez
+záboru mimo depo) zůstává zapnutý pod `vlak123`, protože je to první
+příznak každé takové srážky.
+
+---
+
 ## 2.36 Rig: scény ze savu běžely na prázdné mapě
 
 Baterie píše před scénou do `autoexec.scr` příkaz `newgame` — a ten se
@@ -3931,6 +4020,32 @@ je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
   běh se nedá zopakovat; log toho jednoho běhu byl přepsaný dalším. Čtyři
   opakování hned poté prošly. Nezkoumáno dál (hráč: neladit, testuje sám).
   Kdyby se to vracelo: dát baterii pevné semínko a druhé, jiné, na hledání.
+
+- **Scéna `poruchavrata` teď končí assertem — roztržený odtah na oblouku
+  (save porucha).** Po 4.22 si sběračka (vlak 1) zamluví cestu hned při
+  puštění držení, drží tím cestu před vraty depa (97,46), odtahovka se
+  k poruše 21 ve vratech nedostane („nejde se dostat, zkusim jine") a
+  porucha se opraví sama — to je v pořádku, jen jiné časování než
+  dřív (spojeno 14→8, odtazeno 1→0). Jenže pak se vlak 2 porouchá znovu
+  na (98,60), na oblouku (LOWER) na konci přímé (98,57–59) s jednosměrkami;
+  odtahovka přijede po X z (97,60), „konce spoje nejsou ciste", vrak
+  narovná, spojí, vede — a dotažení (`CloseUpCoupledConsist`) mezeru
+  nezavře: článek 8 zůstane 10 px a poslední článek 9 celých 16 px za
+  předchozím. Odtahovka pak vrak táhne přes výhybku (94,54)/(95,52) a
+  poslední vůz jede jinou kolejí než ten před ním: „krok ROZBITY", assert
+  `IsValidDiagDirection(exitdir)` v `TrainController`. Deterministické
+  (3 běhy stejně), takže je co měřit. Chyba je v narovnání/dotažení na
+  oblouku (4.3), ne v 4.22 — to jen změnilo časování, kterým se tam hra
+  dostane. Nezkoumáno dál dnes; scéna zůstává v baterii červená
+  schválně, ať se na to nezapomene.
+
+- **Odtahovka pro vagonky si zamlouvá cestu až k nim a sráží se (save
+  new1).** Hráč: zavolat odtahovku na plné vagonky chvíli po startu savu,
+  srazí se; pro vagonky má jet jako obyčejný sběrač (4.11 bod 2 to tak
+  říká), celou cestu zamlouvat jen k poruše, a při výjezdu z depa dávat
+  pozor na ostatní mašinky. Hráč chce nejdřív sám vypozorovat, při jakém
+  manévru obyčejná mašinka trať nezamlouvá; zatím se to nezkoumá. Až se
+  na to půjde: výpis „krok BEZ ZABORU" (4.22) a save new1.
 
 - **Porucha na políčku depa odtahovky nikdy neskončí (save eka).** V rigu
   se vlak 20 porouchá cestou do depa na políčku (125,78), kde stojí

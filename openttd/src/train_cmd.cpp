@@ -2880,9 +2880,16 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
 		v->IncrementImplicitOrderIndex();
 		ProcessOrders(v);
 	}
-	if (!IsWholeTrainInsideDepot(v)) {
+	/* A train standing still lets go of whatever road it held for the couple
+	 * order and keeps only its own ground; one still rolling over the station
+	 * waypoint keeps the road it is on -- it ends at the signal before the
+	 * platforms, where the decouple order plans its way in. */
+	if (v->cur_speed == 0 && !IsWholeTrainInsideDepot(v)) {
 		FreeTrainTrackReservation(v);
 		v->ReserveTrackUnderConsist();
+		/* Booked road or stuck, never an unbooked start (see the founding
+		 * release at the station waypoint hold). */
+		TryPathReserve(v, true, false);
 	}
 	return true;
 }
@@ -2909,7 +2916,37 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
  */
 bool IsHoldingShortOfStationWaypoint(const Train *v)
 {
+	/* A founding run that found nothing behind the waypoint drives to it as
+	 * a plain via; the flag is set by the waypoint hold and taken off once
+	 * the couple order behind the waypoint is current. */
+	if (v->flags.Test(VehicleRailFlag::FoundingViaWaypoint)) return false;
 	return CoupleOrderBehindStationWaypoints(v) != nullptr;
+}
+
+/**
+ * The station waypoint the current order was reached through: the nearest
+ * real order before it, when that is a station waypoint. A couple order
+ * behind such a waypoint is for the platforms behind it and no others, so
+ * a search made while the couple order itself is current has to be scoped
+ * the same way the hold before the waypoint scoped it.
+ *
+ * @param v the train, front of its consist
+ * @return the station waypoint, or nullptr
+ */
+static const Waypoint *StationWaypointBeforeCurrentOrder(const Train *v)
+{
+	if (v->orders == nullptr || v->GetNumOrders() == 0) return nullptr;
+	VehicleOrderID idx = v->cur_real_order_index;
+	for (uint left = v->GetNumOrders(); left > 0; left--) {
+		idx = (idx == 0 ? v->GetNumOrders() : idx) - 1;
+		const Order *prev = v->GetOrder(idx);
+		if (prev == nullptr) return nullptr;
+		if (prev->IsType(OT_IMPLICIT)) continue;
+		if (!prev->IsType(OT_GOTO_WAYPOINT)) return nullptr;
+		const Waypoint *wp = Waypoint::GetIfValid(prev->GetDestination().ToStationID());
+		return (wp != nullptr && HasBit(wp->waypoint_flags, WPF_STATION_SEARCH)) ? wp : nullptr;
+	}
+	return nullptr;
 }
 
 /**
@@ -8110,7 +8147,13 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		}
 		/* Try to find any safe destination. */
 		PBSTileInfo origin = FollowTrainReservation(consist);
-		if (TryReserveSafeTrack(consist, origin.tile, origin.trackdir, false)) {
+		bool safe_found = TryReserveSafeTrack(consist, origin.tile, origin.trackdir, false);
+		if (_show_train_orientation) {
+			SayOnChange(consist, fmt::format("Vlak {}: bez cile - hledam jakekoli bezpecne misto od ({},{}) td {}: {} (na ({},{}) zabrano {:#x})",
+					consist->unitnumber, TileX(origin.tile), TileY(origin.tile), to_underlying(origin.trackdir),
+					safe_found ? "nalezeno" : "NIC", TileX(tile), TileY(tile), GetReservedTrackbits(tile).base()));
+		}
+		if (safe_found) {
 			TrackBits res = GetReservedTrackbits(tile) & DiagdirReachesTracks(enterdir);
 			best_track = FindFirstTrack(res);
 			TryReserveRailTrack(moving_front->tile, TrackdirToTrack(moving_front->GetVehicleTrackdir()));
@@ -9034,6 +9077,15 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					bool was_stuck = first->flags.Test(VehicleRailFlag::Stuck);
 					chosen_track = ChooseTrainTrack(first, gp.new_tile, enterdir, bits, false, nullptr, true);
 					assert(chosen_track.Any(bits | GetReservedTrackbits(gp.new_tile)));
+					/* A tile entered with nothing booked on it. Ordinary between
+					 * block signals, and a shed is booked by its own bit; in a
+					 * path-signal block it is the first step toward a collision,
+					 * which is what this line exists to catch (save new1). */
+					if (_show_train_orientation && !IsRailDepotTile(gp.new_tile) && !HasReservedTracks(gp.new_tile, chosen_track)) {
+						IConsolePrint(CC_INFO, "  krok BEZ ZABORU: vlak {} vjizdi na ({},{}) kolej {:#x}, zabrano {:#x}, zasekly pred {} po {}, force {}",
+								first->unitnumber, TileX(gp.new_tile), TileY(gp.new_tile), chosen_track.base(), GetReservedTrackbits(gp.new_tile).base(),
+								was_stuck ? "ano" : "ne", first->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne", to_underlying(first->force_proceed));
+					}
 
 					/* When ChooseTrainTrack() cannot find or reserve a path it
 					 * marks the train stuck and hands back a track only so that
@@ -10076,7 +10128,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * An ordinary waypoint is deliberately none of this: it stays a place to
 	 * drive to, so the player controls where the waiting happens by which
 	 * kind they build. See #WPF_STATION_SEARCH. */
-	if (consist->current_order.IsType(OT_GOTO_WAYPOINT) && consist->IsFrontEngine() && consist->cur_speed == 0) {
+	if (consist->current_order.IsType(OT_GOTO_WAYPOINT) && consist->IsFrontEngine() && consist->cur_speed == 0 &&
+			!consist->flags.Test(VehicleRailFlag::FoundingViaWaypoint)) {
 		const Order *couple_order = CoupleOrderBehindStationWaypoints(consist);
 		if (couple_order != nullptr) {
 			/* It came to a stand because no path was given to it (see
@@ -10091,22 +10144,35 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			const Waypoint *through = Waypoint::GetIfValid(consist->current_order.GetDestination().ToStationID());
 			bool saw_full_rake = false;
 			if (FindOrClaimCoupleTarget(consist, *couple_order, through, &saw_full_rake) == nullptr) {
-				/* A founding order with nothing to couple to does not wait: the
-				 * waypoint is concluded the same way a claim concludes it, and
-				 * the couple order behind it is concluded next tick, standing
-				 * here (see the hold below); the decouple order then drives in. */
+				/* A founding order with nothing to couple to does not wait: it
+				 * goes and founds. But not by concluding the waypoint here --
+				 * that made the couple order current with the train still
+				 * standing at the plain waypoint before, and its search, no
+				 * longer scoped by anything, took the first rake at the
+				 * station: one on the loading platforms behind the other
+				 * station waypoint, where the feeder then started building.
+				 * The station waypoint names the platforms the rake is to be
+				 * founded on, and the road into them runs through it and
+				 * nowhere else. So the train drives to it as a plain via
+				 * (the hold is lifted by the flag, see
+				 * IsHoldingShortOfStationWaypoint()), and the couple order
+				 * comes up when the waypoint is passed, searched through the
+				 * waypoint again (see the hold below); the decouple order then
+				 * drives in from there, and from there only its platforms are
+				 * to be reached. */
 				if (couple_order->ShouldFoundRake() && !saw_full_rake && FeederWagonsFitAt(consist, couple_order->GetDestination().ToStationID(), through)) {
 					if (_show_train_orientation) {
-						IConsolePrint(CC_INFO, "Vlak {}: zaklada radu - za smerovanim zadna rada, smerovani ma splneno", consist->unitnumber);
+						IConsolePrint(CC_INFO, "Vlak {}: zaklada radu - za smerovanim zadna rada, jede se na smerovani a zalozit za nim", consist->unitnumber);
 					}
-					consist->DeleteUnreachedImplicitOrders();
-					UpdateVehicleTimetable(consist, true);
-					consist->IncrementImplicitOrderIndex();
-					ProcessOrders(consist);
-					if (!IsWholeTrainInsideDepot(consist)) {
-						FreeTrainTrackReservation(consist);
-						consist->ReserveTrackUnderConsist();
-					}
+					consist->flags.Set(VehicleRailFlag::FoundingViaWaypoint);
+					/* Standing here it holds nothing, and it stands in a path
+					 * signal block: it may not roll a single tile without a
+					 * booked road, the way vanilla never lets it (a train that
+					 * turned on a stub is stuck until it has one). Lifting the
+					 * hold with the stuck mark rubbed off let it drive, unbooked,
+					 * straight into a junction another train had booked. So
+					 * either it has its road now, or it is stuck and asks again. */
+					TryPathReserve(consist, true, false);
 					return true;
 				}
 				if (couple_order->ShouldFoundRake()) FoundingCoupleOrderHold(consist, *couple_order, through, saw_full_rake);
@@ -10165,6 +10231,13 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			if (!IsWholeTrainInsideDepot(consist)) {
 				FreeTrainTrackReservation(consist);
 				consist->ReserveTrackUnderConsist();
+				/* And the road to the rake is booked before a wheel turns, or
+				 * the train is stuck until it can be: it stands in a path
+				 * signal block with nothing booked, and a train let go from
+				 * such a stand drives unbooked as far as the next signal --
+				 * through whatever junction lies on the way and whoever holds
+				 * it (the founding release found that out, see below). */
+				TryPathReserve(consist, true, false);
 			}
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vlak {}: vagonky pripraveny - nadrazni smerovani ma splneno, jede se pro ne", consist->unitnumber);
@@ -10186,11 +10259,23 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * train happens to be standing in, finds none, and parks it there for
 	 * good before the stop can even finish. */
 	if ((consist->current_order.IsType(OT_GOTO_STATION) || consist->current_order.IsType(OT_GOTO_DEPOT)) &&
-			consist->current_order.ShouldGoToCouple() && consist->cur_speed == 0) {
+			consist->current_order.ShouldGoToCouple() &&
+			(consist->cur_speed == 0 || consist->flags.Test(VehicleRailFlag::FoundingViaWaypoint))) {
+		/* The via drive to the station waypoint is over; the couple order is
+		 * current -- the train still rolling over the waypoint, which is why
+		 * the founding flag lets it in here in motion: the answer must be
+		 * given before the next road is asked for, or that road is planned
+		 * for a couple order with nothing to couple to. Searched through
+		 * that waypoint, as the hold before it searched: the platforms
+		 * behind it are the order's, the rest of the station is not (a
+		 * founding run that came this way took a rake on the loading
+		 * platforms behind the other waypoint otherwise). */
+		consist->flags.Reset(VehicleRailFlag::FoundingViaWaypoint);
+		const Waypoint *through = consist->current_order.IsType(OT_GOTO_STATION) ? StationWaypointBeforeCurrentOrder(consist) : nullptr;
 		bool saw_full_rake = false;
-		if (FindOrClaimCoupleTarget(consist, consist->current_order, nullptr, &saw_full_rake) == nullptr) {
+		if (FindOrClaimCoupleTarget(consist, consist->current_order, through, &saw_full_rake) == nullptr) {
 			/* A founding order founds instead of waiting; see FoundingCoupleOrderHold(). */
-			if (consist->current_order.ShouldFoundRake() && FoundingCoupleOrderHold(consist, consist->current_order, nullptr, saw_full_rake)) return true;
+			if (consist->current_order.ShouldFoundRake() && FoundingCoupleOrderHold(consist, consist->current_order, through, saw_full_rake)) return true;
 			/* And it holds no track while it waits. Reserving first and choosing
 			 * afterwards was the whole trouble: the path was held against every
 			 * other train for as long as the wait lasted, and when the choice was

@@ -31,3 +31,8 @@ přes `-g` a scény jsou v baterii.
 - `odtah_peron.sav` — porucha 37 uprostřed nástupiště (108–111,72), vedle
   souběžné nástupiště téže stanice; odtahovka (v rigu vlak 36 přes
   `testodtahovka`) z depa (97,73). TEMATA 4.20. Scéna `odtahperon`.
+- `new1.sav` — nádraží se dvěma nakládacími perony za nádražním
+  směrováním „load" a třetím za „peron3", kde stavitelka (vlak 2) zakládá
+  dlouhou řadu; klasické směrování „2" na slepé koleji, vlak 1 vozí vozy z
+  depa (106,92). TEMATA 2.38 (založit za směrováním), 4.22 (puštěné držení
+  bez záboru). Scéna `zalozsmer`. Otevřené: odtahovka na vagonky (§16).
