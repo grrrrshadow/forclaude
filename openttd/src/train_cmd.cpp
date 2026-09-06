@@ -1688,7 +1688,21 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 				 * Throwing them away is what made this impossible before. A
 				 * number thrown away is a number handed out again to something
 				 * else, so the train could not even come back as itself. See
-				 * FEATURE_DESIGN_COUPLING_TOW.md. */
+				 * FEATURE_DESIGN_COUPLING_TOW.md.
+				 *
+				 * One thing it does not keep: the brake off. Every vehicle is
+				 * built braked and only ever the head of a train has the brake
+				 * let off -- the rest of the game is written on that, and one
+				 * place in particular takes it on trust: autoreplace, which
+				 * takes a train apart in the depot vehicle by vehicle and puts
+				 * it back, and can only put back an engine that reads as
+				 * parked. An engine that was running when it was picked up
+				 * came in with its brake still off, and the first depot with a
+				 * replacement rule on the list took the game down putting it
+				 * back. Braked while carried; whoever makes it a train again
+				 * says whether it runs (see TryDecoupleAtStation() and
+				 * HandleRescueEngineInDepot()). */
+				src->vehstatus.Set(VehState::Stopped);
 			} else {
 				/* Remove stuff not valid anymore for non-front engines. */
 				DeleteVehicleOrders(src);
@@ -1943,6 +1957,28 @@ bool IsRescueTargetAttached(const Train *v)
 	if (!IsOnRescueRun(v)) return false;
 	const Train *casualty = Train::GetIfValid(v->rescue_target);
 	return casualty != nullptr && casualty->First() == v;
+}
+
+/**
+ * Is some other train riding inside this one?
+ *
+ * Two trains coupled up to run as one, or a rescue engine with its casualty
+ * in tow: the engine of the carried train keeps its number and its orders
+ * (see TryConsistSplice()) and is the only kind of engine that has a number
+ * while not being a head. Anything that rebuilds a train vehicle by vehicle
+ * -- autoreplace -- must keep away from such a train: what it would replace
+ * and sell is somebody else's train, and that train's identity goes with it.
+ *
+ * @param v the train, its head
+ * @return whether a vehicle behind the head is the engine of another train
+ */
+bool CarriesAnotherTrain(const Train *v)
+{
+	if (IsRescueTargetAttached(v)) return true;
+	for (const Train *u = v->Next(); u != nullptr; u = u->Next()) {
+		if (u->IsEngine() && u->unitnumber != 0) return true;
+	}
+	return false;
 }
 
 bool IsFetchingCasualty(const Train *v)
@@ -4711,6 +4747,13 @@ bool HandleRescueEngineInDepot(Train *tow)
 			casualty->SetDestTile(INVALID_TILE);
 			casualty->force_proceed = TFP_NONE;
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
+
+			/* It has arrived at a depot, the same as if it had driven in, and
+			 * a train that drives in is offered for replacement. It could not
+			 * be offered while it was part of the tow -- autoreplace keeps
+			 * away from a train carrying another, see CarriesAnotherTrain() --
+			 * so it is offered now, on its own. */
+			QueueVehicleForAutoreplace(casualty);
 		}
 	}
 
@@ -5939,6 +5982,11 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 		 * dropper is a couple of tiles away (or gone), the wait ends. See
 		 * TrainLocoHandler(). */
 		remainder->couple_claim = v->index;
+
+		/* It was running when it was collected -- a braked train is never
+		 * offered for coupling, see IsWaitingToBeCoupled() -- and it was
+		 * braked for the ride (TryConsistSplice()). Put down, it runs again. */
+		remainder->vehstatus.Reset(VehState::Stopped);
 
 		remainder->ConsistChanged(CCF_TRACK);
 

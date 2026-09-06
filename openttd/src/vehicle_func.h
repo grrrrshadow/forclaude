@@ -215,6 +215,7 @@ void RunVehicleCalendarDayProc();
 UnitID GetFreeUnitNumber(VehicleType type);
 
 void VehicleEnterDepot(Vehicle *v);
+void QueueVehicleForAutoreplace(Vehicle *v);
 
 bool CanBuildVehicleInfrastructure(VehicleType type, RoadTramType subtype = RoadTramType::Invalid);
 

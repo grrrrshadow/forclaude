@@ -933,6 +933,18 @@ static void VehicleEnteredDepotThisTick(Vehicle *v)
 }
 
 /**
+ * Offer a vehicle for autoreplace at the end of this tick as if it had just
+ * driven into the depot it is standing in. For a train that got there
+ * carried by another one and has just been put down; see
+ * HandleRescueEngineInDepot().
+ * @param v the vehicle, standing in a depot
+ */
+void QueueVehicleForAutoreplace(Vehicle *v)
+{
+	VehicleEnteredDepotThisTick(v);
+}
+
+/**
  * Age all vehicles, spreading out the action using the current TimerGameCalendar::date_fract.
  */
 void RunVehicleCalendarDayProc()

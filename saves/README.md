@@ -41,3 +41,10 @@ přes `-g` a scény jsou v baterii.
   směrování „0" na slepé koleji (147,160). TEMATA 4.23 (směr přes obměnu:
   `testskip 1`, `testskip 2`) a §16 (crash obměny nad odtahovkou
   s poruchou: `testpostav 139 167 8 odtahovka`, `testporucha 1`).
+- `obmenaporucha.sav` — totéž nádraží; vlak 2 porouchaný na nástupišti
+  (151,167), odtahovka 5 zabrzděná v depu (164,167), seznam náhrad
+  nastavený. Po načtení lhůta poruchy vyprší a vlak 2 se opraví sám; na
+  (149,170) se porouchá znovu a `testza 10 testbrzda 5` pro něj odtahovku
+  pošle. TEMATA 4.24 (obměna nad vlakem, který veze jiný vlak; otočka po
+  spojení `testzatik 2450 testotoc 5`) a §16 (hráčův `krok ROZBITY`
+  nereprodukován). Scéna `odtahotoc`.

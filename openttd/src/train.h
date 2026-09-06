@@ -91,6 +91,7 @@ bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);
 bool IsFetchingCasualty(const Train *v);
 bool IsRescueTargetAttached(const Train *v);
+bool CarriesAnotherTrain(const Train *v);
 void LeaveHeadlessChainWaiting(Train *chain);
 bool HandleRescueEngineInDepot(Train *tow);
 void EndRescueErrand(Train *tow);

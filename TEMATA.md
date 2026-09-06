@@ -2279,6 +2279,76 @@ jednou 0/0, §16).
 
 ---
 
+## 4.24 Obměna vozidel nad vlakem, který veze jiný vlak — pád v depu
+
+**Hráč (save `obmenaporucha.sav`, crash z 6. 9.):** odtahovka 5 přiveze
+poruchu (vlak 2) do depa a hra spadne; podle hráče se porucha „rozsype",
+když odtahovka cestou dá reverzní chod na semaforu, a proto pak v depu
+krachne rozpojení. Hráčův crash je `krok ROZBITY` při vjezdu do depa
+(139,167) — vůz vjíždí za vozem, který už je schovaný v depu (mezera
+v soupravě přes 11 px). Dřívější hlášení k `obmena.sav` (§16) bylo
+totéž téma: pád obměny nad odtahovkou s poruchou.
+
+**Změřeno na savu (rig):** odtahovka pro poruchu vyjede, spojí a bez
+otočky ji složí v depu (164,166) v pořádku. S otočkou za jízdy po spojení
+(`testzatik 2450 testotoc 5`, nový rigový příkaz s rozlišením 10 tiků —
+`testza` pálí jen po vteřinách) vjede do depa vagony napřed a hra spadne
+na assertu `ret.Succeeded()` v `autoreplace_cmd.cpp` — **ne** na `krok
+ROZBITY`; souprava se v rigu při otočce neroztrhne (rozestupy 8 px před
+i po). Ten samý assert dává i recept na `obmena.sav` (`testpostav 139 167
+8 odtahovka`, `testporucha 1`). Kdy padne a kdy ne, rozhoduje jen to,
+ve které ze dvou půlek tiku vlak vjede: obměna se spouští na konci tiku
+nad vším, co do depa vjelo, a složení poruchy je v obsluze vlaku o půl
+tiku později — jednou stihne být před obměnou, jednou ne.
+
+**Příčina (dvě vrstvy):**
+1. Obměna vlak v depu rozebere vozidlo po vozidle a poskládá zpátky (i ve
+   zkušebním průchodu bez Execute), a vracení mašinky poruchy odmítne
+   `CmdMoveRailVehicle` s „vlaky lze upravovat jen zastavené v depu":
+   mašinka poruchy, po rozebrání hlava svého řetězu, **není zabrzděná**.
+   Vanilla staví každé vozidlo zabrzděné a brzdu pouští jen hlavě
+   (v kódu to tak stojí — u `TransferTrainIdentity`), takže mašinka
+   uprostřed vlaku je ve vanille vždycky zabrzděná a tenhle assert je tam
+   správně. Naše připojení (spojení dvou vlaků i odtah) vezme jedoucí
+   mašinku a nechá jí brzdu puštěnou — pravidlo porušené na místě
+   připojení.
+2. I kdyby vracení prošlo, obměna by odtahovce **vyměnila a prodala
+   mašinku poruchy** (a při „zachovat délku" i její vozy): cíl odtahu by
+   ukazoval na prodané vozidlo, složení by nemělo co složit a odtahovka
+   by vozila cizí vagony dál. Totéž hrozí každému spojenému vlaku
+   s mašinkou uvnitř (loko_obou_stran), když má nastavenou náhradu.
+
+**Oprava:**
+1. `TryConsistSplice`, větev `keep_absorbed_identity`: pohlcená mašinka
+   dostane brzdu (`Stopped`) — vezená mašinka žádnou vlastní jízdu nemá.
+   Kdo ji zase udělá vlakem, o brzdě rozhodne sám: složení poruchy už to
+   dělalo (opravená jede, vagonky stojí), odpojení v depu už parkovalo,
+   odpojení na stanici teď brzdu výslovně pustí (zabrzděný vlak se nikdy
+   nenabízí k připojení — `IsWaitingToBeCoupled` — takže při připojení
+   vždycky jel). Vedlejší efekt k dobru: hráč, který v depu rozebere
+   spojený vlak tažením, už neuvidí vnitřní mašinku rozjet se sama.
+2. `CmdAutoreplaceVehicle`: vlak, který veze jiný vlak
+   (`CarriesAnotherTrain`: připojená porucha, nebo mašinka s číslem
+   uprostřed řetězu), se neobměňuje — tiše, bez zprávy. Každý z obou se
+   obmění, až stojí v depu sám za sebe.
+3. Složená opravená porucha se do obměny zařadí hned při složení
+   (`QueueVehicleForAutoreplace` → `VehicleEnteredDepotThisTick`), jako
+   by do depa vjela sama.
+
+**Změřeno po opravě:** otočka po spojení (2450) i bez ní: spojeno,
+složeno, odtahovka domů; vlak 2 vyjede jako vlak 2 s **novou mašinkou**
+(id 8 typ 0 → id 24 typ 8 podle seznamu náhrad), „couva ano" zůstalo
+(4.23). Recept na `obmena.sav` také bez pádu. Scéna `odtahotoc` v baterii.
+
+**Nereprodukováno:** hráčův `krok ROZBITY` (roztržená souprava při
+otočce na semaforu) — v rigu drží rozestupy 8 px při otočce za jízdy,
+na konci koleje i při couvání do depa. Tik hráčova crashe (26235) je jen
+~340 tiků za tikem savu, takže save není stav těsně před pádem. Zapsáno
+v §16; kdyby se to vrátilo, pomůže save z okamžiku, kdy je souprava
+vidět roztržená (před vjezdem do depa).
+
+---
+
 ## 5.0 Co je „naše" nastavení posunu mapy
 
 V nabídce je **pět** voleb. První je naše a je přednastavená. Je to
@@ -4193,21 +4263,15 @@ je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
   dostane. Nezkoumáno dál dnes; scéna zůstává v baterii červená
   schválně, ať se na to nezapomene.
 
-- **Obměna nad spojeným vlakem odtahovka + porucha padá (assert
-  `ret.Succeeded()`, `autoreplace_cmd.cpp` řádek 696, hráčův crash z 6. 9.
-  po složení poruchy v depu).** Hráč to chce nechat a uložit příště; rig
-  to už umí: save `obmena.sav`, `testpostav 139 167 8 odtahovka`,
-  `testporucha 1` — odtahovka poruchu zabere, spojí („couva ne"), vjede
-  s ní do depa (139,167) a hra spadne dřív, než se porucha složí. Co je
-  vidět: obměna se spouští při vjezdu do depa nad **celým spojeným
-  vlakem** (odtahovka v čele, mašinka poruchy uprostřed jako vagon) a
-  její zkušební průchod (bez Execute) neumí staré vozy poskládat zpátky
-  (`CmdMoveVehicle` odmítne). Nápad na opravu, až se k tomu půjde: vlak
-  s připojenou poruchou (`IsRescueTargetAttached`) obměně vůbec nedávat,
-  poruchu obměnit až po složení jako vlastní vlak (zařadit do
-  `_vehicles_to_autoreplace`); a zjistit, proč přesun uprostřed řetězu
-  s mašinkou selhává — totéž hrozí každému spojenému vlaku s mašinkou
-  uvnitř (loko_obou_stran), když má náhradu nastavenou.
+- **Roztržená souprava odtahovky s poruchou po reverzním chodu na
+  semaforu (save `obmenaporucha.sav`, crash `krok ROZBITY` ve vratech
+  depa (139,167)).** Hráč vidí, že se porucha za odtahovkou při otočce
+  rozsype; v rigu se to na tom savu neroztrhne (otočka za jízdy po
+  spojení, otočka na konci koleje, couvání do depa — rozestupy 8 px), pád
+  na tom savu je jiný a opravený (4.24). Tik crashe je ~340 tiků za tikem
+  savu, takže save ten stav nezachycuje. Čeká se na save z okamžiku, kdy
+  je souprava vidět roztržená, ještě před depem. Příbuzné: `poruchavrata`
+  výše — tam se roztrhne narovnaný vrak na oblouku.
 
 - **Odtahovka pro vagonky si zamlouvá cestu až k nim a sráží se (save
   new1).** Hráč: zavolat odtahovku na plné vagonky chvíli po startu savu,

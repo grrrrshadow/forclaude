@@ -31,6 +31,9 @@
 
 #include "table/strings.h"
 
+#include "console_func.h"
+#include "crashlog.h"
+
 #include "safeguards.h"
 
 extern void ChangeVehicleViewports(VehicleID from_index, VehicleID to_index);
@@ -710,6 +713,17 @@ static CommandCost ReplaceChain(Vehicle **chain, DoCommandFlags flags, bool wago
 
 				for (auto it = std::rbegin(replacements); it != std::rend(replacements); ++it) {
 					[[maybe_unused]] CommandCost ret = CmdMoveVehicle(it->old_veh, old_head, {DoCommandFlag::Execute, DoCommandFlag::AutoReplace}, false);
+					if (ret.Failed()) {
+						/* Said before the assert below, which names a line and
+						 * nothing else: a report from a machine that cannot give
+						 * a stack trace is only worth something if the vehicle
+						 * and the refusal are in it. */
+						std::string what = fmt::format("obmena: vraceni vozu {} za {} selhalo: {} (vuz je hlava {}, zabrzden {})",
+								it->old_veh->index, old_head->index, GetString(ret.GetErrorMessage()),
+								it->old_veh->First()->index, it->old_veh->First()->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
+						IConsolePrint(CC_ERROR, "{}", what);
+						CrashLog::SetNote(what);
+					}
 					assert(ret.Succeeded());
 				}
 			}
@@ -786,6 +800,18 @@ CommandCost CmdAutoreplaceVehicle(DoCommandFlags flags, VehicleID veh_id)
 		if (!v->IsPrimaryVehicle()) return CMD_ERROR;
 	}
 	if (!v->IsChainInDepot()) return CMD_ERROR;
+
+	/* Not a train that is carrying another one. Two trains coupled up to run
+	 * as one, or a rescue engine with its casualty behind it, are one chain
+	 * here but two trains to the player, and the carried one keeps its
+	 * number and orders on its own engine, in the middle of the chain. This
+	 * rebuilds a chain vehicle by vehicle and sells what it replaced -- done
+	 * to such a chain it sells the carried train's engine, and its identity
+	 * with it, and a tow comes home unable to put down what it fetched. Each
+	 * of the two is replaced when it stands in a depot as itself: the tow
+	 * after it has put the casualty down, the casualty on being put down
+	 * (see HandleRescueEngineInDepot()), a coupled pair once decoupled. */
+	if (v->type == VehicleType::Train && !free_wagon && CarriesAnotherTrain(Train::From(v))) return CommandCost();
 
 	const Company *c = Company::Get(_current_company);
 	bool wagon_removal = c->settings.renew_keep_length;

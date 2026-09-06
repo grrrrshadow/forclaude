@@ -2566,6 +2566,50 @@ static bool ConTestAfter(std::span<std::string_view> argv)
 }
 
 /**
+ * Run a console command after a delay measured in ticks, once.
+ * Usage: testzatik <ticks> <command...>
+ *
+ * The heartbeat clock of testza is whole seconds, which is too coarse to
+ * catch a train on its way home with a load: the whole run home can take
+ * less than a second. This one fires on a ten-tick clock instead.
+ * @copydoc IConsoleCmdProc
+ */
+static std::vector<std::pair<int, std::string>> _testzatik_queue;
+
+static bool ConTestAfterTicks(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Run a console command later, timed in ticks. Usage: 'testzatik <ticks> <command...>'.");
+		return true;
+	}
+	auto pticks = ParseInteger(argv[1]);
+	if (!pticks.has_value()) return false;
+	std::string cmd;
+	for (size_t i = 2; i < argv.size(); i++) {
+		if (!cmd.empty()) cmd += ' ';
+		cmd += argv[i];
+	}
+	IConsolePrint(CC_DEFAULT, "testzatik: '{}' za {} tiku.", cmd, *pticks);
+	_testzatik_queue.emplace_back((int)*pticks, std::move(cmd));
+	return true;
+}
+
+/** Fire the tick-timed delayed commands (testzatik). */
+static const IntervalTimer<TimerGameTick> _testzatik_timer({TimerGameTick::Priority::None, 10}, [](auto) {
+	for (auto it = _testzatik_queue.begin(); it != _testzatik_queue.end(); ) {
+		it->first -= 10;
+		if (it->first <= 0) {
+			std::string cmd = std::move(it->second);
+			it = _testzatik_queue.erase(it);
+			IConsolePrint(CC_DEFAULT, "testzatik: (tik {}) {}", TimerGameTick::counter, cmd);
+			IConsoleCmdExec(cmd);
+		} else {
+			++it;
+		}
+	}
+});
+
+/**
  * Sell every headless rake standing in the depot on a given tile.
  * Stages the one way a collector can arrive at a shed it was sent to and
  * find it empty: the wagons it claimed are gone by the time it gets there.
@@ -6108,6 +6152,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testrez",                 ConTestReservations);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
+	IConsole::CmdRegister("testzatik",               ConTestAfterTicks);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
