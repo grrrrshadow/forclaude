@@ -1014,7 +1014,7 @@ struct QueryStringWindow : public Window
 
 	WidgetID last_user_action = INVALID_WIDGET; ///< Last started user action.
 
-	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button) :
+	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button, StringID tooltip) :
 			Window(desc), editbox(max_bytes, max_chars), extra_button(extra_button)
 	{
 		this->editbox.text.Assign(str);
@@ -1032,6 +1032,13 @@ struct QueryStringWindow : public Window
 		this->GetWidget<NWidgetStacked>(WID_QS_DEFAULT_SEL)->SetDisplayedPlane((this->flags.Test(QueryStringFlag::EnableDefault)) ? 0 : SZSP_NONE);
 		this->GetWidget<NWidgetStacked>(WID_QS_MOVE_SEL)->SetDisplayedPlane((this->flags.Test(QueryStringFlag::EnableMove)) ? 0 : SZSP_NONE);
 		this->GetWidget<NWidgetStacked>(WID_QS_EXTRA_SEL)->SetDisplayedPlane(this->extra_button != INVALID_STRING_ID ? 0 : SZSP_NONE);
+		/* A window asking two things at once explains both on the extra button
+		 * and on OK, which confirms both; the caption itself cannot carry a
+		 * tooltip. */
+		if (tooltip != INVALID_STRING_ID) {
+			this->GetWidget<NWidgetCore>(WID_QS_EXTRA)->SetToolTip(tooltip);
+			this->GetWidget<NWidgetCore>(WID_QS_OK)->SetToolTip(tooltip);
+		}
 		this->FinishInitNested(QueryStringWindowNumber::Default);
 
 		this->parent = parent;
@@ -1191,13 +1198,15 @@ static WindowDesc _query_string_desc(
  *        to the question -- one that is not a text -- or INVALID_STRING_ID for
  *        none. Pressing it sends the parent Window::OnQueryTextExtra() instead
  *        of a text.
+ * @param tooltip tooltip for the extra button and for OK, explaining both
+ *        answers, or INVALID_STRING_ID for none
  */
-void ShowQueryString(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button)
+void ShowQueryString(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button, StringID tooltip)
 {
 	assert(parent != nullptr);
 
 	CloseWindowByClass(WindowClass::QueryString);
-	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, extra_button);
+	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, extra_button, tooltip);
 }
 
 /**

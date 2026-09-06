@@ -1804,7 +1804,8 @@ public:
 				 * at most the number entered -- or stop founding one. Depot
 				 * orders collect from a store and found nothing. */
 				ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {},
-						!order->IsType(OT_GOTO_STATION) ? INVALID_STRING_ID : (order->ShouldFoundRake() ? STR_ORDER_COUPLE_FOUND_OFF_BUTTON : STR_ORDER_COUPLE_FOUND_BUTTON));
+						!order->IsType(OT_GOTO_STATION) ? INVALID_STRING_ID : (order->ShouldFoundRake() ? STR_ORDER_COUPLE_FOUND_OFF_BUTTON : STR_ORDER_COUPLE_FOUND_BUTTON),
+						!order->IsType(OT_GOTO_STATION) ? INVALID_STRING_ID : STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP);
 				break;
 			}
 

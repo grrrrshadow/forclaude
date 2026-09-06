@@ -5072,15 +5072,16 @@ STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Odvézt 
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vozů: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vozů: libovolně
 STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Odvézt jen řadu, která má přesně tolik vozů. Bere se celá řada; nechat část stát umí příkaz odpojit. Nula znamená libovolný počet
-STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má řada mít (0 = libovolně)
+STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má mít připojovaná řada (0 - libovolně)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_CARGO                            :{SPACE}({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT                            :{SPACE}({NUM} vozů)
 STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND                            :{SPACE}(založit řadu)
 STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT                      :{SPACE}(založit řadu do {NUM} vozů)
-STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}Založit řadu
-STR_ORDER_COUPLE_FOUND_OFF_BUTTON                               :{BLACK}Nezakládat řadu
+STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}V případě potřeby založit řadu a připojovat do (0 - libovolně) vozů v řadě
+STR_ORDER_COUPLE_FOUND_OFF_BUTTON                               :{BLACK}Řadu nezakládat, jen připojovat podle počtu vozů
+STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP                            :{BLACK}Dvě věci v jednom okně. Bez zakládání číslo říká, kterou řadu sebrat: jen řadu přesně o tolika vozech, 0 = kteroukoli. Se zakládáním mašinka své vozy odloží jako novou řadu, když na nádraží žádná není, připojí je k řadě, když tam je, a přestane přidávat, jakmile má řada tolik vozů, 0 = kolik se vejde na nástupiště. OK potvrzuje obojí
 STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Založit řadu: do {NUM}
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Založit řadu: podle nástupiště
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu

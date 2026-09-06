@@ -3953,6 +3953,15 @@ peronové se nejede (scéna `zalozsmer`). Baterie 48 scén: beze změny proti p�
 běhu (jen počty vjezdů do depa na náhodných mapách), `zaloz` spojeno=7
 (4× v depu, 2× u řady, 1× sběračka), havaroval=0.
 
+**Okno počtu u připojit (hráčův text):** nahoře „Zadej, kolik vozů má mít
+připojovaná řada (0 - libovolně)", dole čudlík „V případě potřeby založit
+řadu a připojovat do (0 - libovolně) vozů v řadě" (zapnuto: „Řadu
+nezakládat, jen připojovat podle počtu vozů"). Nápověda popisující obě
+funkce — číslo jako filtr řady, číslo jako strop zakládané řady, OK
+potvrzuje obojí — je na čudlíku i na OK (`ShowQueryString` dostal
+parametr `tooltip`); titulek okna nápovědu nést neumí. Čudlík si šířku
+vezme z textu, okno se roztáhne.
+
 **Okno rozkazů:** to, co příkaz dostal navíc — (připojit …), (založit
 řadu …), (čekat na spojení), (odpojit …), (couvat ven), (otočit v depu),
 depové (odpojit/připojit …) — se píše **pod příkaz na druhý řádek**
