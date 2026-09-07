@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chůvička Finder</string>
+
+    <string name="section_connection">Připojení k RTL-SDR</string>
+    <string name="label_host">Adresa (rtl_tcp)</string>
+    <string name="label_port">Port</string>
+    <string name="btn_connect">Připojit</string>
+    <string name="btn_disconnect">Odpojit</string>
+    <string name="status_disconnected">Nepřipojeno</string>
+    <string name="status_connecting">Připojuji se…</string>
+    <string name="status_connected">Připojeno (tuner: %1$s)</string>
+    <string name="status_error">Chyba: %1$s</string>
+
+    <string name="section_frequency">Frekvence chůvičky</string>
+    <string name="label_preset">Předvolba pásma</string>
+    <string name="label_frequency_mhz">Frekvence (MHz)</string>
+    <string name="range_warning">Zadaná frekvence je mimo běžný rozsah RTL-SDR dongle (24–1700 MHz). Pro DECT (1,9 GHz) nebo 2,4 GHz pásmo je potřeba jiný hardware (např. HackRF, Airspy).</string>
+
+    <string name="section_receiver">Nastavení příjmu</string>
+    <string name="label_sample_rate">Vzorkovací frekvence</string>
+    <string name="label_gain_mode">Zesílení</string>
+    <string name="gain_auto">Automatické (AGC)</string>
+    <string name="gain_manual">Ruční</string>
+
+    <string name="section_meter">Síla signálu</string>
+    <string name="btn_start">Spustit hledání</string>
+    <string name="btn_stop">Zastavit</string>
+    <string name="btn_calibrate">Kalibrovat ticho (chůvičku vypni/odnes pryč)</string>
+    <string name="calibrating">Kalibruji šumové pozadí… (%1$ds)</string>
+    <string name="label_relative_db">%1$.1f dB nad šumem</string>
+    <string name="label_audio_feedback">Zvuková nápověda (pípání jako Geiger)</string>
+
+    <string name="section_sweep">Najít přesnou frekvenci</string>
+    <string name="btn_sweep">Prohledat okolí ±%1$d kHz</string>
+    <string name="sweep_progress">Prohledávám… %1$d / %2$d</string>
+    <string name="sweep_result">Nejsilnější signál nalezen na %1$.3f MHz</string>
+
+    <string name="hint_help_title">Jak appku použít</string>
+    <string name="hint_help_body">1) V telefonu spusť aplikaci „RTL2832U Driver“ s USB OTG kabelem a RTL-SDR dongle, zapni v ní rtl_tcp server.\n2) Tady se k ní připoj (výchozí 127.0.0.1:1234).\n3) Vyber pásmo své chůvičky (nebo zadej frekvenci ručně) a spusť hledání.\n4) Nejdřív klikni na Kalibrovat ticho s vypnutou/odnesenou chůvičkou, pak ji zapni a sleduj metr / pípání — čím blíž budeš, tím silnější signál.</string>
+</resources>

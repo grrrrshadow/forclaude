@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#101418</color>
+    <color name="surface">#1B2127</color>
+    <color name="primary">#4FC3F7</color>
+    <color name="onPrimary">#00131A</color>
+    <color name="textPrimary">#ECEFF1</color>
+    <color name="textSecondary">#9AA5AD</color>
+    <color name="meterLow">#2ECC71</color>
+    <color name="meterMid">#F1C40F</color>
+    <color name="meterHigh">#E74C3C</color>
+    <color name="warning">#FFB74D</color>
+    <color name="launcherBg">#101418</color>
+</resources>
