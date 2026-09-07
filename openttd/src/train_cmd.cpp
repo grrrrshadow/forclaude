@@ -3620,6 +3620,15 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 	if (!IsValidTrackdir(cur_td)) return false;
 	TileIndex cur_tile = mf->tile;
 
+	/* The tiles ahead of the engine's nose, one after another, as far as the
+	 * bed needs to reach. */
+	struct Berth {
+		TileIndex tile;
+		Track track;
+		DiagDirection enterdir;
+	};
+	std::vector<Berth> ahead;
+
 	/* Walk one step of the bed: follow the rails, refuse anything that cannot
 	 * carry the wreck, prefer the branch that leads on toward where the
 	 * casualty is lying (so it is dragged into line, not around the block). */
@@ -3627,11 +3636,6 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 	auto step = [&]() -> bool {
 		if (!ft.Follow(cur_tile, cur_td)) return false;
 		if (IsTileType(ft.new_tile, TileType::TunnelBridge)) return false;
-		for (const Vehicle *o : VehiclesOnTile(ft.new_tile)) {
-			if (o->type != VehicleType::Train) return false;
-			const Train *of = Train::From(o)->First();
-			if (of != casualty && of != tow) return false;
-		}
 		Trackdir pick = Trackdir::Invalid;
 		uint best = UINT_MAX;
 		for (Trackdir cand : ft.new_td_bits) {
@@ -3639,6 +3643,26 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 			if (d < best) { best = d; pick = cand; }
 		}
 		if (pick == Trackdir::Invalid) return false;
+		/* The track follower crosses a platform in one step and lands on its
+		 * far end. The bed is one vehicle per tile, so every tile of the
+		 * platform is a berth too -- taken in order from the near end. Left
+		 * to the follower, the first berth lay a whole platform further from
+		 * the engine than meant, and the close-up walk that pulls the bed
+		 * snug ran out of steps before it got there: the casualty was coupled
+		 * up with tile-wide holes in it and came apart in the first depot
+		 * doorway (save obmenaporucha, TEMATA 4.25). */
+		TileIndexDiff diff = TileOffsByDiagDir(ft.exitdir);
+		for (uint i = ft.tiles_skipped; i > 0; i--) {
+			ahead.push_back({ft.new_tile - diff * (int)i, TrackdirToTrack(pick), ft.exitdir});
+		}
+		ahead.push_back({ft.new_tile, TrackdirToTrack(pick), ft.exitdir});
+		for (auto it = ahead.end() - (ft.tiles_skipped + 1); it != ahead.end(); ++it) {
+			for (const Vehicle *o : VehiclesOnTile(it->tile)) {
+				if (o->type != VehicleType::Train) return false;
+				const Train *of = Train::From(o)->First();
+				if (of != casualty && of != tow) return false;
+			}
+		}
 		cur_tile = ft.new_tile;
 		cur_td = pick;
 		return true;
@@ -3648,29 +3672,24 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 	 * the casualty exactly where it was. One spare tile between the engine and
 	 * the first vehicle keeps the pair from being put down overlapping; the
 	 * close-up walk only knows how to pull a gap shut, not push one open. */
-	struct Berth {
-		TileIndex tile;
-		Track track;
-		DiagDirection enterdir;
-	};
-	std::vector<Berth> bed;
-	if (!step()) return false;
-	/* The first step off the engine's nose has to land on the casualty: that
-	 * is what "lying across the points in front of me" means. A casualty that
+	uint wanted = 1;
+	for (const Train *u = casualty; u != nullptr; u = u->Next()) wanted++;
+	while (ahead.size() < wanted) {
+		if (!step()) return false;
+	}
+	/* The first tile off the engine's nose has to hold the casualty: that is
+	 * what "lying across the points in front of me" means. A casualty that
 	 * is merely near -- on the platform next door, a track's width away -- is
 	 * not on this line at all, and laying it along this line would drag it
 	 * across the gap. */
-	TileIndex first_ahead = cur_tile - TileOffsByDiagDir(ft.exitdir) * ft.tiles_skipped;
+	TileIndex first_ahead = ahead.front().tile;
 	if (!IsRescueTargetOnTile(tow, first_ahead)) {
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "Vlak {}: porucha nelezi na me koleji - prvni policko pred nosem ({},{}) je bez ni, nenarovnavam", tow->unitnumber, TileX(first_ahead), TileY(first_ahead));
 		}
 		return false;
 	}
-	for (const Train *u = casualty; u != nullptr; u = u->Next()) {
-		if (!step()) return false;
-		bed.push_back({cur_tile, TrackdirToTrack(cur_td), ft.exitdir});
-	}
+	std::vector<Berth> bed(ahead.begin() + 1, ahead.begin() + wanted);
 
 	/* Remember what ground it is being lifted off, to be tidied below. */
 	std::vector<std::pair<TileIndex, TrackBits>> vacated;
@@ -3752,9 +3771,16 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
  */
 static void CloseUpCoupledConsist(Train *consist)
 {
-	/* Bounded well above the tile-and-a-bit any real gap can be, purely so a
-	 * consist that somehow refuses to close cannot spin here forever. */
-	for (uint step = 0; step < 4 * TILE_SIZE; step++) {
+	/* Bounded so a consist that somehow refuses to close cannot spin here for
+	 * ever, but generously: the tile-and-a-bit of an ordinary coupling, plus a
+	 * tile for every vehicle of a casualty laid out one per tile
+	 * (LayCasualtyAlongTow()), each of which has to be pulled its own tile's
+	 * worth. A bound of four tiles flat ran out on a five-vehicle casualty
+	 * laid beyond a platform, and the holes it left were a crash in the next
+	 * depot doorway. */
+	uint max_steps = 4 * TILE_SIZE + CountVehiclesInChain(consist) * TILE_SIZE;
+	uint step = 0;
+	for (; step < max_steps; step++) {
 		/* Find the first place the train is further apart than it should be.
 		 * Walking in movement order rather than chain order matters: the two
 		 * run opposite ways round for a train that is driving backwards, and
@@ -3777,7 +3803,29 @@ static void CloseUpCoupledConsist(Train *consist)
 		}
 		if (behind_gap == nullptr) break;
 
-		if (!TrainController(behind_gap, nullptr)) break;
+		if (!TrainController(behind_gap, nullptr)) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_ERROR, "Vlak {}: dotazeni odmitnuto u clanku {} na ({},{}) po {} krocich", consist->unitnumber,
+						behind_gap->index.base(), TileX(behind_gap->tile), TileY(behind_gap->tile), step);
+			}
+			break;
+		}
+	}
+
+	/* A hole left here is a crash later -- a follower that enters a tile after
+	 * the vehicle ahead has gone into a depot has no track to follow -- so a
+	 * consist that did not close says so, whatever the console is set to. */
+	for (const Train *u = consist->GetMovingFront(); u != nullptr; u = u->GetMovingNext()) {
+		const Train *next = u->GetMovingNext();
+		if (next == nullptr) break;
+		int x_diff = u->x_pos - next->x_pos;
+		int y_diff = u->y_pos - next->y_pos;
+		int want = u->CalcNextVehicleOffset();
+		if (x_diff * x_diff + y_diff * y_diff > want * want) {
+			IConsolePrint(CC_ERROR, "Vlak {}: souprava nedotazena - mezi clanky {} a {} zbyva {} px (chce {}), kroku {} z {}",
+					consist->unitnumber, u->index.base(), next->index.base(), (int)std::sqrt(x_diff * x_diff + y_diff * y_diff), want, step, max_steps);
+			break;
+		}
 	}
 
 	consist->ConsistChanged(CCF_TRACK);

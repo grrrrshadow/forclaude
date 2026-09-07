@@ -45,6 +45,9 @@ přes `-g` a scény jsou v baterii.
   (151,167), odtahovka 5 zabrzděná v depu (164,167), seznam náhrad
   nastavený. Po načtení lhůta poruchy vyprší a vlak 2 se opraví sám; na
   (149,170) se porouchá znovu a `testza 10 testbrzda 5` pro něj odtahovku
-  pošle. TEMATA 4.24 (obměna nad vlakem, který veze jiný vlak; otočka po
-  spojení `testzatik 2450 testotoc 5`) a §16 (hráčův `krok ROZBITY`
-  nereprodukován). Scéna `odtahotoc`.
+  pošle pro tu druhou. Odtahovka puštěná hned (`testzatik 10 testbrzda 5`)
+  jede pro poruchu na výhybce, narovná ji přes nástupiště a tlačí do depa
+  (139,167). TEMATA 4.24 (obměna nad vlakem, který veze jiný vlak; otočka
+  po spojení `testzatik 2450 testotoc 5`) a 4.25 (roztržená porucha:
+  lože přes nástupiště, krátké dotažení). Scény `odtahotoc`,
+  `odtahvyhybka`.

@@ -2340,12 +2340,59 @@ složeno, odtahovka domů; vlak 2 vyjede jako vlak 2 s **novou mašinkou**
 (id 8 typ 0 → id 24 typ 8 podle seznamu náhrad), „couva ano" zůstalo
 (4.23). Recept na `obmena.sav` také bez pádu. Scéna `odtahotoc` v baterii.
 
-**Nereprodukováno:** hráčův `krok ROZBITY` (roztržená souprava při
-otočce na semaforu) — v rigu drží rozestupy 8 px při otočce za jízdy,
-na konci koleje i při couvání do depa. Tik hráčova crashe (26235) je jen
-~340 tiků za tikem savu, takže save není stav těsně před pádem. Zapsáno
-v §16; kdyby se to vrátilo, pomůže save z okamžiku, kdy je souprava
-vidět roztržená (před vjezdem do depa).
+**Hráčův `krok ROZBITY`** (roztržená souprava, otočka u návěsti) se
+tady nereprodukoval jen kvůli časování rigu — odtahovka jela pro jinou
+poruchu. Reprodukován a opravený v 4.25.
+
+---
+
+## 4.25 Roztržená porucha za odtahovkou — lože přes nástupiště a krátké dotažení
+
+**Hráč (save `obmenaporucha.sav`, build #146):** odtahovka 5 puštěná hned
+po načtení dojede k poruše 2, vagonky poruchy mají po připojení „vadu
+grafiky" (jsou od sebe dál, než mají být) a při vjezdu do depa hra spadne
+(`krok ROZBITY` ve vratech (139,167) — vůz vjíždí za vozem, který už je
+schovaný v depu). To je hráčův crash z 6. 9.; v 4.24 se nereprodukoval
+proto, že rig pouštěl odtahovku až po první vteřině, a lhůta téhle
+poruchy vyprší 10 dní po načtení (~740 tiků) — porucha se opravila sama a
+odtahovka jela pro jinou. Rigový `teststav` teď u poruchy píše „lhuta do
+… dnes …", ať se to příště pozná hned.
+
+**Změřeno (rig, `testzatik 10 testbrzda 5`):** porucha stojí koncem
+(vůz 12) na výhybce (153,167), kolej RIGHT; odtahovka přijede po X,
+„konce spoje nejsou ciste", poruchu narovná („narovnal vrak k sobe na
+kolej") a spojí. Rozestupy po spojení: 8, 8, 10, 16, 16 px. Odtahovka
+vede zpátky na východ, tam je červená (154,167), po čase se otočí
+(vanilkové „otočit u návěsti") a tlačí poruchu vagony napřed do depa
+(139,167) — a ve vratech spadne: vůz s mezerou 16 px vjíždí na políčko
+depa, až když vůz před ním je schovaný.
+
+**Příčina:** dvě věci v narovnání (4.3), obě jen sčítají mezery:
+1. `LayCasualtyAlongTow` kladlo lože po krocích sledovače kolejí, a ten
+   nástupiště přejde jedním krokem na vzdálený konec. Tady je nástupiště
+   (151–152,167) hned za nosem, takže první vůz ležel o celé nástupiště
+   dál, než bylo míněno (na (150,167) místo (152,167)) — mezera k
+   odtahovce 57 px místo ~16.
+2. `CloseUpCoupledConsist` mělo strop 64 kroků („dost nad políčko a kus,
+   co reálná mezera může být") — na pět vozů po políčku to nestačí ani
+   bez bodu 1 (~40 kroků) a s ním vůbec: po 63 krocích zůstaly mezery, a
+   nikdo to neřekl.
+
+**Oprava:**
+1. Lože se klade políčko po políčku i přes nástupiště: přeskočená
+   políčka nástupiště jsou taky místa, v pořadí od bližšího konce; první
+   políčko před nosem se dál kontroluje, že na něm porucha leží.
+2. Strop dotažení: 4 políčka + políčko na každý vůz soupravy.
+3. Když po dotažení mezera zůstane, řekne to hra na konzoli vždy
+   („souprava nedotazena - mezi clanky … zbyva … px"), i s vypnutým
+   `vlak123` — mezera je pád o pár políček dál a mlčení stálo dva dny.
+
+**Změřeno po opravě:** rozestupy 8 px, odtahovka poruchu dotlačí do
+depa (139,167), složí ji „jak byl - couva ano", vrátí se domů. Scéna
+`odtahvyhybka`. Scéna `poruchavrata`, od 4.22 červená schválně (narovnaný
+vrak na oblouku s mezerami 10/16 px — tatáž příčina, jen bez nástupiště:
+strop dotažení), je teď zelená: spojeno 14, odtaženo 1, bez assertu.
+Zbytek baterie beze změn. Žádná scéna nehlásí „souprava nedotazena".
 
 ---
 
@@ -4274,34 +4321,6 @@ je vědomé, ne přehlédnuté; čekají na rozhodnutí, ne na opravu.
   běh se nedá zopakovat; log toho jednoho běhu byl přepsaný dalším. Čtyři
   opakování hned poté prošly. Nezkoumáno dál (hráč: neladit, testuje sám).
   Kdyby se to vracelo: dát baterii pevné semínko a druhé, jiné, na hledání.
-
-- **Scéna `poruchavrata` teď končí assertem — roztržený odtah na oblouku
-  (save porucha).** Po 4.22 si sběračka (vlak 1) zamluví cestu hned při
-  puštění držení, drží tím cestu před vraty depa (97,46), odtahovka se
-  k poruše 21 ve vratech nedostane („nejde se dostat, zkusim jine") a
-  porucha se opraví sama — to je v pořádku, jen jiné časování než
-  dřív (spojeno 14→8, odtazeno 1→0). Jenže pak se vlak 2 porouchá znovu
-  na (98,60), na oblouku (LOWER) na konci přímé (98,57–59) s jednosměrkami;
-  odtahovka přijede po X z (97,60), „konce spoje nejsou ciste", vrak
-  narovná, spojí, vede — a dotažení (`CloseUpCoupledConsist`) mezeru
-  nezavře: článek 8 zůstane 10 px a poslední článek 9 celých 16 px za
-  předchozím. Odtahovka pak vrak táhne přes výhybku (94,54)/(95,52) a
-  poslední vůz jede jinou kolejí než ten před ním: „krok ROZBITY", assert
-  `IsValidDiagDirection(exitdir)` v `TrainController`. Deterministické
-  (3 běhy stejně), takže je co měřit. Chyba je v narovnání/dotažení na
-  oblouku (4.3), ne v 4.22 — to jen změnilo časování, kterým se tam hra
-  dostane. Nezkoumáno dál dnes; scéna zůstává v baterii červená
-  schválně, ať se na to nezapomene.
-
-- **Roztržená souprava odtahovky s poruchou po reverzním chodu na
-  semaforu (save `obmenaporucha.sav`, crash `krok ROZBITY` ve vratech
-  depa (139,167)).** Hráč vidí, že se porucha za odtahovkou při otočce
-  rozsype; v rigu se to na tom savu neroztrhne (otočka za jízdy po
-  spojení, otočka na konci koleje, couvání do depa — rozestupy 8 px), pád
-  na tom savu je jiný a opravený (4.24). Tik crashe je ~340 tiků za tikem
-  savu, takže save ten stav nezachycuje. Čeká se na save z okamžiku, kdy
-  je souprava vidět roztržená, ještě před depem. Příbuzné: `poruchavrata`
-  výše — tam se roztrhne narovnaný vrak na oblouku.
 
 - **Odtahovka pro vagonky si zamlouvá cestu až k nim a sráží se (save
   new1).** Hráč: zavolat odtahovku na plné vagonky chvíli po startu savu,
