@@ -1752,7 +1752,7 @@ static bool ConTestMap(std::span<std::string_view> argv)
 				tracks = GetTrackBits(tile);
 				desc = "kolej";
 			} else if (IsRailDepotTile(tile)) {
-				desc = fmt::format("depo (vrata {})", to_underlying(GetRailDepotDirection(tile)));
+				desc = fmt::format("depo {} (vrata {})", GetDepotIndex(tile).base(), to_underlying(GetRailDepotDirection(tile)));
 			} else if (IsRailWaypointTile(tile)) {
 				tracks = TrackBits{GetRailStationTrack(tile)};
 				const Waypoint *wp = Waypoint::GetByTile(tile);
@@ -1868,8 +1868,17 @@ static void DoTestClone(uint unit, uint count, bool reverz)
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, cloned, false);
 		IConsolePrint(CC_DEFAULT, "testklon: clone vlak {} started.", Train::Get(cloned)->unitnumber);
 	}
-	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, original->index, false);
-	IConsolePrint(CC_DEFAULT, "testklon: original vlak {} started{}.", original->unitnumber, reverz ? " (reverz on station orders)" : "");
+	/* The start command is a toggle. A scene that lets the original off the
+	 * brake with testbrzda in the same breath used to have it toggled straight
+	 * back to a stop here, so every "clone it three times" scene ran three
+	 * collectors and left the original standing in its shed -- and its count
+	 * of couplings was one short for as long as those scenes have existed. */
+	if (original->vehstatus.Test(VehState::Stopped)) {
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, original->index, false);
+		IConsolePrint(CC_DEFAULT, "testklon: original vlak {} started{}.", original->unitnumber, reverz ? " (reverz on station orders)" : "");
+	} else {
+		IConsolePrint(CC_DEFAULT, "testklon: original vlak {} already running, left alone.", original->unitnumber);
+	}
 	_testspoj_active = true;
 }
 

@@ -51,3 +51,15 @@ přes `-g` a scény jsou v baterii.
   po spojení `testzatik 2450 testotoc 5`) a 4.25 (roztržená porucha:
   lože přes nástupiště, krátké dotažení). Scény `odtahotoc`,
   `odtahvyhybka`.
+- `rig.sav` — hráčův zkušební polygon (9. 9.): nádraží 1 uprostřed
+  (96–98,17–22) s výjezdy na obě strany, nádraží 2 na západě a 3 na
+  východě, dvoukolejný koridor po y=17/18. Depa: 0 (86,17) vlaky 1–8,
+  3 (111,18) 9–16, 1 (111,17) 17–24, 2 (86,18) 25–32, 5 (87,16) 33–40
+  (dvojité jednotky), 4 (110,16) 57–64 (dvojité), 6 (88,16) 41–48 a
+  7 (109,16) 49–56 (mašinka–vůz–mašinka, zatím se neměří), 8 = C (111,19)
+  65–76: trojice bez čudlíku / reversní chod / automaticky, dvojité
+  jednotky 65–73 a samotné mašinky 74–76, rozkaz nádraží 1 → zpět do
+  depa C — dopředu vede jen dlouhý okruh přes nádraží 2, zpátky rovnou.
+  TEMATA 2.41 (automatika). Scény `rigC2h`, `rigC1m`, `rigD0`…`rigD5`.
+  Šest vlaků puštěných naráz se zamkne v křižovatce u dep C (PBS bez
+  otáčení u návěstí) — pouštět s rozestupem.
