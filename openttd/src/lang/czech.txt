@@ -1910,8 +1910,8 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticky
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Ukazovat v jízdním řádu příjezdy a odjezdy: {STRING}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Zobrazit předpokládané časy příjezdu a odjezdu v jízdních řádech.
 
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :automatické doplňování reversního chodu u příkazu připojit
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :implicitní - "automatické doplňování".{}{}automatické - po připojení vlak odjede z nádraží stejnou stranou kudy se přijela připojit lokomotiva.{}{}manuální - po připojení na průjezdném nádraží lokomotiva nezmění směr jízdy
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Předvyplnit „Reversní chod" u příkazu připojit: {STRING}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :Zapnuto: když u rozkazu zmáčkneš „Jet se spojit", hra za tebe zmáčkne i „Reversní chod" — po připojení se vlak vrátí, kudy přijel; zrušením „Jet se spojit" zase zmizí. Vypnuto: nic se nepředvyplní, čudlík je na tobě. „Automaticky" tahle volba nikdy nepředvyplní — ten si zmáčkni sám
 STR_CONFIG_SETTING_QUICKGOTO                                    :Rychlejší zadávání příkazů pro vozidla: {STRING}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Předvybere "jet do" po otevření okna jízdního řádu
 
