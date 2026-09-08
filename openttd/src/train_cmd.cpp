@@ -4933,6 +4933,7 @@ static void ConcludeCoupleOrderInPlace(Train *new_head)
 			 * the ordinary reversal path does the work next tick. Read before
 			 * the order is concluded away below. */
 			bool reverse_out = new_head->current_order.ShouldReverseOutOfStation();
+			bool automatic = new_head->current_order.ShouldDepartAutomatically();
 
 			new_head->DeleteUnreachedImplicitOrders();
 			new_head->last_station_visited = dest;
@@ -4956,6 +4957,39 @@ static void ConcludeCoupleOrderInPlace(Train *new_head)
 			ProcessOrders(new_head);
 
 			if (reverse_out) new_head->flags.Set(VehicleRailFlag::Reversing);
+
+			/* The automatic departure, honoured here for the same reason
+			 * reversing out is: the order advance was just taken above, so
+			 * the tick handler will see none and ask nothing (that is the
+			 * point of taking it, see the note above), and the two halves of
+			 * "engine first, then the shortest way" have to be settled on the
+			 * spot. Engine first: what is about to lead out was picked by the
+			 * coupling -- the end the partner was attached to -- and if that
+			 * end cannot lead, the train came in pushing and turns, exactly
+			 * as reversing out turns it. Then the shorter way, but only for a
+			 * train that can lead from both ends, asked of the pathfinder
+			 * under the same permission an ordinary departure gives it and
+			 * spent at once. A train with one engine has its answer already:
+			 * the shorter way is engine first. */
+			if (automatic && !reverse_out) {
+				bool turn = false;
+				const char *why;
+				if (!new_head->GetMovingFront()->CanLeadTrain()) {
+					turn = true;
+					why = "cele neumi vest, masinka napred";
+				} else if (new_head->Last()->CanLeadTrain()) {
+					new_head->flags.Set(VehicleRailFlag::AutomaticDeparture);
+					turn = CheckReverseTrain(new_head);
+					new_head->flags.Reset(VehicleRailFlag::AutomaticDeparture);
+					why = turn ? "oba konce vedou, kratsi je zpatky" : "oba konce vedou, kratsi je dopredu";
+				} else {
+					why = "masinka uz je v cele";
+				}
+				if (turn) new_head->flags.Set(VehicleRailFlag::Reversing);
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: automaticky po spojeni - {} -> {}", new_head->unitnumber, why, turn ? "otacim" : "jedu dal");
+				}
+			}
 
 			/* The order taken up just now may name the very station the train
 			 * is standing in -- couple here, then do something else here: drop

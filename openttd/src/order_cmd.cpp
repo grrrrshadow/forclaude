@@ -1505,11 +1505,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_AUTO_DEPARTURE:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
-			/* Same company as reversing out, and not on a couple order either:
-			 * a coupling settles which end leads by its own rule and asks the
-			 * pathfinder nothing on purpose (see CmdCoupleTrains()), so here
-			 * the flag would do nothing and the button would be a lie. */
-			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture() || order->ShouldGoToCouple())) return CMD_ERROR;
+			/* Same company as reversing out. On a couple order it is honoured
+			 * where reversing out is, at the conclusion of the coupling -- see
+			 * ConcludeCoupleOrderInPlace(). */
+			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture())) return CMD_ERROR;
 			break;
 
 		case MOF_HONK:

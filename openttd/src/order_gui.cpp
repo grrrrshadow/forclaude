@@ -1317,9 +1317,8 @@ public:
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && reversing_out);
 
 				/* Automatic departure is the third answer to the same question
-				 * and lives next to reversing out; not offered on a couple
-				 * order, where the coupling itself settles the way out. */
-				bool can_auto = can_reverse_out && !collecting;
+				 * and lives next to reversing out, on a couple order too. */
+				bool can_auto = can_reverse_out;
 				bool automatic = order->ShouldDepartAutomatically();
 				this->SetWidgetDisabledState(WID_O_AUTO_DEPARTURE, !can_auto);
 				this->SetWidgetLoweredState(WID_O_AUTO_DEPARTURE, can_auto && automatic);
