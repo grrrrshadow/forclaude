@@ -1827,7 +1827,7 @@ static bool ConTestStartDepot(std::span<std::string_view> argv)
  * gets the reverse-out flag first.
  * @copydoc IConsoleCmdProc
  */
-static void DoTestClone(uint unit, uint count, bool reverz)
+static void DoTestClone(uint unit, uint count, bool reverz, bool stoj = false)
 {
 	_pause_mode = {};
 
@@ -1865,8 +1865,15 @@ static void DoTestClone(uint unit, uint count, bool reverz)
 			IConsolePrint(CC_ERROR, "testklon: clone {} failed: {}", i + 1, GetString(cost.GetErrorMessage()));
 			return;
 		}
-		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, cloned, false);
-		IConsolePrint(CC_DEFAULT, "testklon: clone vlak {} started.", Train::Get(cloned)->unitnumber);
+		/* "stoj": the clones are built and left standing in the shed, for a
+		 * scene that lets them out one at a time with testbrzda later on
+		 * instead of all at once. */
+		if (!stoj) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, cloned, false);
+		IConsolePrint(CC_DEFAULT, "testklon: clone vlak {} {}.", Train::Get(cloned)->unitnumber, stoj ? "built, standing" : "started");
+	}
+	if (stoj) {
+		_testspoj_active = true;
+		return;
 	}
 	/* The start command is a toggle. A scene that lets the original off the
 	 * brake with testbrzda in the same breath used to have it toggled straight
@@ -1892,16 +1899,18 @@ static bool _testklon_reverz = false;
 static bool ConTestClone(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Usage: 'testklon <unit> <count> [reverz] [za <ticks>]'.");
+		IConsolePrint(CC_HELP, "Usage: 'testklon <unit> <count> [reverz] [stoj] [za <ticks>]'. 'stoj' builds the clones stopped in the shed, for a later testbrzda.");
 		return true;
 	}
 	auto punit = ParseInteger(argv[1]);
 	auto pcount = ParseInteger(argv[2]);
 	if (!punit.has_value() || !pcount.has_value()) return false;
 	bool reverz = false;
+	bool stoj = false;
 	int delay = 0;
 	for (size_t i = 3; i < argv.size(); i++) {
 		if (argv[i] == "reverz") reverz = true;
+		if (argv[i] == "stoj") stoj = true;
 		if (argv[i] == "za" && i + 1 < argv.size()) {
 			auto pdelay = ParseInteger(argv[i + 1]);
 			if (pdelay.has_value()) delay = (int)*pdelay;
@@ -1916,7 +1925,7 @@ static bool ConTestClone(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testklon: vlak {} x{} za {} tiku.", *punit, *pcount, delay);
 		return true;
 	}
-	DoTestClone((uint)*punit, (uint)*pcount, reverz);
+	DoTestClone((uint)*punit, (uint)*pcount, reverz, stoj);
 	return true;
 }
 
