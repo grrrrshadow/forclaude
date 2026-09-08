@@ -9452,6 +9452,28 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							 * However, just choose the track into the wormhole. */
 							assert(IsTunnel(prev->tile));
 							chosen_track = bits;
+						} else if (prev->track == Track::Depot) {
+							/* The vehicle ahead has already gone in through the door
+							 * and is hidden inside: "the same track as prev" is
+							 * the depot's marker, which is not a track on this
+							 * tile at all, and masking it against the tile leaves
+							 * nothing -- the assert below, and the game down with
+							 * it. The same case as the tunnel above: the vehicle
+							 * ahead has left this tile's world early, and the
+							 * follower simply takes the one track that leads in
+							 * after it. Inside, vehicles have no extent, so the
+							 * gap that put it here closes by itself.
+							 *
+							 * Ordinarily the follower is on the tile before the
+							 * vehicle ahead is hidden, because vehicles ride
+							 * closer together than the door is deep. This is
+							 * reached only by a train with a hole in it -- one
+							 * torn by a coupling that did not close up, or by
+							 * the rig on purpose (testmezera). The hole is
+							 * still a fault and is still named where it is made
+							 * (CloseUpCoupledConsist()); this stops it being a
+							 * crash in the first depot doorway after. */
+							chosen_track = bits;
 						} else {
 							chosen_track = prev->track;
 						}

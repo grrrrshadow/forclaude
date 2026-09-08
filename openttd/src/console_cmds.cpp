@@ -3249,6 +3249,8 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
  * Usage: testotoc <unit number>
  * @copydoc IConsoleCmdProc
  */
+bool TrainController(Train *v, Vehicle *nomove, bool reverse = true); // From train_cmd.cpp
+
 static bool ConTestReverse(std::span<std::string_view> argv)
 {
 	if (argv.size() != 2) {
@@ -3267,6 +3269,55 @@ static bool ConTestReverse(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testotoc: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Tear a train open: move its leading vehicle on by a few pixels while
+ * everything behind it stands still, so the consist runs with a hole in it.
+ *
+ * Stages the one thing the game has crashed on four times over and the rig
+ * could not make on purpose once the couplings that used to make it were
+ * mended: a follower that steps onto a tile after the vehicle ahead of it has
+ * already left that tile's world -- gone into a depot, mostly. The hole is
+ * made the way the game itself moves vehicles, one step of TrainController()
+ * at a time with the rest of the train held, so the train stays on its rails
+ * and only the spacing is wrong. Usage: testmezera <unit number> <pixels>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestTearConsist(std::span<std::string_view> argv)
+{
+	if (argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Open a gap behind a train's leading vehicle. Usage: 'testmezera <unit number> <pixels>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto ppx = ParseInteger(argv[2]);
+	if (!punit.has_value() || !ppx.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		Train *front = t->GetMovingFront();
+		Train *held = front->GetMovingNext();
+		if (held == nullptr) {
+			IConsolePrint(CC_ERROR, "testmezera: vlak {} ma jediny clanek, neni co roztrhnout.", t->unitnumber);
+			return true;
+		}
+		if (front->track == Track::Depot) {
+			IConsolePrint(CC_ERROR, "testmezera: vlak {} stoji v depu, tam clanky nemaji rozmer.", t->unitnumber);
+			return true;
+		}
+		/* The step needs an acting company, like every move a train makes. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		uint done = 0;
+		for (; done < (uint)*ppx; done++) {
+			if (!TrainController(front, held, false)) break;
+		}
+		int dx = front->x_pos - held->x_pos, dy = front->y_pos - held->y_pos;
+		IConsolePrint(CC_DEFAULT, "testmezera: vlak {} roztrzen o {} px za clankem {} - rozestup k clanku {} je ted {} px (chce {})",
+				t->unitnumber, done, front->index.base(), held->index.base(), (int)std::sqrt(dx * dx + dy * dy), front->CalcNextVehicleOffset());
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testmezera: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -6223,6 +6274,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
+	IConsole::CmdRegister("testmezera",              ConTestTearConsist);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);
