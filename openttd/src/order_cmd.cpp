@@ -193,6 +193,7 @@ bool Order::Equals(const Order &other) const
 			this->decouple_keep_wagons == other.decouple_keep_wagons &&
 			this->decouple_whole_train == other.decouple_whole_train &&
 			this->reverse_out_of_station == other.reverse_out_of_station &&
+			this->automatic_departure == other.automatic_departure &&
 			this->turn_around_in_depot == other.turn_around_in_depot;
 }
 
@@ -1276,7 +1277,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 	switch (order->GetType()) {
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
-					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN) return CMD_ERROR;
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
+					mof != MOF_AUTO_DEPARTURE) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1500,6 +1502,16 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture())) return CMD_ERROR;
 			break;
 
+		case MOF_AUTO_DEPARTURE:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			/* Same company as reversing out, and not on a couple order either:
+			 * a coupling settles which end leads by its own rule and asks the
+			 * pathfinder nothing on purpose (see CmdCoupleTrains()), so here
+			 * the flag would do nothing and the button would be a lie. */
+			if (data != 0 && (order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture() || order->ShouldGoToCouple())) return CMD_ERROR;
+			break;
+
 		case MOF_HONK:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (!order->IsType(OT_GOTO_WAYPOINT)) return CMD_ERROR;
@@ -1675,6 +1687,13 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_REVERSE_OUT:
 				order->SetReverseOutOfStation(data != 0);
+				/* One answer to "which way out" at a time. */
+				if (data != 0) order->SetAutomaticDeparture(false);
+				break;
+
+			case MOF_AUTO_DEPARTURE:
+				order->SetAutomaticDeparture(data != 0);
+				if (data != 0) order->SetReverseOutOfStation(false);
 				break;
 
 			case MOF_HONK:
@@ -1753,6 +1772,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					u->current_order.SetWaitForCouple(order->ShouldWaitForCouple());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
 					u->current_order.SetReverseOutOfStation(order->ShouldReverseOutOfStation());
+					u->current_order.SetAutomaticDeparture(order->ShouldDepartAutomatically());
 					/* The couple toggle rewrites the order's load and unload;
 					 * the live copy has to follow or the trip already under way
 					 * still loads. */

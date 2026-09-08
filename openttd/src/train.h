@@ -35,6 +35,7 @@ enum class VehicleRailFlag : uint8_t {
 	FlippedBeforeTow = 10, ///< Was Flipped when a rescue engine coupled to its train; restored when the train is put down. See RestoreCasualtyOrientation().
 	BackwardsBeforeTow = 11, ///< (head only) Its train was driving backwards when a rescue engine coupled to it; restored when it is put down.
 	CoupledHere = 12, ///< The coupling that joined this vehicle's part to the train happened just in front of it; a "decouple the whole train" order cuts here. See FindCoupledBoundary().
+	AutomaticDeparture = 14, ///< (head only) Leaving a station on an order that asked for the shortest way: the next order advance may turn the train round for a shorter route if it can lead from both ends. Set on departure, cleared when that question has been asked. See YapfTrainCheckReverse().
 	FoundingViaWaypoint = 13, ///< (head only) A founding run found no rake behind the station waypoint it is bound for: the waypoint is driven to as a plain via, the couple order behind it is concluded there. See IsHoldingShortOfStationWaypoint().
 };
 /** Bitset of the %VehicleRailFlag elements. */

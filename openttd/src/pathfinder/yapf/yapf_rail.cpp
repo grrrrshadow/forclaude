@@ -732,7 +732,16 @@ bool YapfTrainCheckReverse(const Train *v)
 	 * of the track, or a terminus platform -- and coming back out of one is the
 	 * one time turning round is right, because the player built it and sent the
 	 * train into it. */
-	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None) {
+	/* With one exception, and it is the player's, not the game's: a train
+	 * leaving a station on an order that asked for the shortest way
+	 * (VehicleRailFlag::AutomaticDeparture), if it can lead from both ends.
+	 * For such a train swapping which end leads is not a turn -- nothing
+	 * moves, the other cab or engine takes over at full speed -- and the
+	 * player has said on the order that it may choose. A train with one
+	 * engine is held to the rule even so: for it "the shortest way" is
+	 * always engine first, and engine first was seen to on departure. */
+	bool may_choose = v->flags.Test(VehicleRailFlag::AutomaticDeparture) && v->Last()->CanLeadTrain();
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None && !may_choose) {
 		reverse_penalty += 1000 * YAPF_INFINITE_PENALTY;
 	}
 

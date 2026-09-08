@@ -1679,6 +1679,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			if (o.ShouldGoToCouple()) extra += " SPOJIT";
 			if (o.ShouldFoundRake()) extra += o.GetCoupleCount() != 0 ? fmt::format(" ZALOZIT:do {}", o.GetCoupleCount()) : " ZALOZIT";
 			if (o.ShouldHonk()) extra += " HOUKAT";
+			if (o.ShouldDepartAutomatically()) extra += " AUTO";
 			if (o.IsCoupleCountMinimum()) extra += " MIN";
 			if (o.ShouldWaitForCouple()) extra += " CEKAT";
 			if (o.ShouldDecoupleOnDeparture()) extra += o.ShouldDecoupleWholeTrain() ? " ODPOJIT:cely vlak" : (o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount()));
@@ -3188,6 +3189,66 @@ static bool ConTestHonk(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testhoukat: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Modify one field of an order, by the ModifyOrderFlags number, for the
+ * scenes that need a switch no other rig command has. The numbers are those
+ * of ModifyOrderFlags in order_type.h; the help lists the ones this build has.
+ * Usage: testmof <unit number> <order index> <mof> <value>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestModifyOrder(std::span<std::string_view> argv)
+{
+	if (argv.size() != 5) {
+		IConsolePrint(CC_HELP, "Modify an order field. Usage: 'testmof <unit number> <order index> <mof> <value>'.");
+		IConsolePrint(CC_HELP, "mof: {}=decouple {}=decouple-count {}=decouple-whole {}=wait-couple {}=goto-couple {}=turn-in-depot {}=reverse-out {}=couple-load {}=couple-cargo {}=couple-count {}=couple-found {}=honk {}=couple-min {}=auto-departure",
+				to_underlying(MOF_DECOUPLE), to_underlying(MOF_DECOUPLE_COUNT), to_underlying(MOF_DECOUPLE_WHOLE), to_underlying(MOF_WAIT_COUPLE), to_underlying(MOF_GOTO_COUPLE),
+				to_underlying(MOF_TURN_AROUND_DEPOT), to_underlying(MOF_REVERSE_OUT), to_underlying(MOF_COUPLE_LOAD), to_underlying(MOF_COUPLE_CARGO), to_underlying(MOF_COUPLE_COUNT),
+				to_underlying(MOF_COUPLE_FOUND), to_underlying(MOF_HONK), to_underlying(MOF_COUPLE_MIN), to_underlying(MOF_AUTO_DEPARTURE));
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	auto pmof = ParseInteger(argv[3]);
+	auto pval = ParseInteger(argv[4]);
+	if (!punit.has_value() || !porder.has_value() || !pmof.has_value() || !pval.has_value()) return false;
+	if (*pmof >= to_underlying(MOF_END)) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, (ModifyOrderFlags)*pmof, (uint16_t)*pval);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testmof: vlak {} rozkaz {} mof {} = {} -> {}", *punit, *porder, *pmof, *pval, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testmof: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Make a station order leave engine first and then the shortest way.
+ * Usage: testauto <unit number> <order index> [0 to switch it off]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestAutoDeparture(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Make a station order depart automatically. Usage: 'testauto <unit number> <order index> [0 to switch it off]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	uint32_t on = argv.size() >= 4 && ParseInteger(argv[3]).value_or(1) == 0 ? 0 : 1;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_AUTO_DEPARTURE, on);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testauto: vlak {} rozkaz {} -> automaticky {} {}", *punit, *porder, on != 0 ? "ano" : "ne", r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testauto: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -6259,6 +6320,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
+	IConsole::CmdRegister("testauto",                ConTestAutoDeparture);
+	IConsole::CmdRegister("testmof",                 ConTestModifyOrder);
 	IConsole::CmdRegister("mousedebug",              ConMouseDebug);
 	IConsole::CmdRegister("testminimalne",           ConTestCoupleMin);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);

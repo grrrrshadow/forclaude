@@ -8617,7 +8617,13 @@ static bool CheckReverseTrain(const Train *consist)
 	 * a freshly coupled train must not be turned round by it -- is handled
 	 * where the couple order is concluded, by concluding it completely, so
 	 * the question is never asked there. See CmdCoupleTrains(). */
-	return YapfTrainCheckReverse(consist);
+	bool reverse = YapfTrainCheckReverse(consist);
+	if (_show_train_orientation && consist->flags.Test(VehicleRailFlag::AutomaticDeparture)) {
+		IConsolePrint(CC_INFO, "Vlak {}: automaticky - oba konce vedou {}, pathfinder: {}", consist->unitnumber,
+				consist->Last()->CanLeadTrain() ? "ano, smi si vybrat" : "ne, masinka napred plati",
+				reverse ? "kratsi je zpatky, otacim" : "dopredu");
+	}
+	return reverse;
 }
 
 /**
@@ -10638,7 +10644,12 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	bool valid_order = !consist->current_order.IsType(OT_NOTHING) && consist->current_order.GetType() != OT_CONDITIONAL;
 	bool order_advanced = ProcessOrders(consist);
 
-	if (order_advanced && CheckReverseTrain(consist)) {
+	bool turn_on_advance = order_advanced && CheckReverseTrain(consist);
+	/* The permission an automatic departure gave (see Vehicle::LeaveStation())
+	 * is for this one question; asked, it is spent, whichever way it went. */
+	if (order_advanced) consist->flags.Reset(VehicleRailFlag::AutomaticDeparture);
+
+	if (turn_on_advance) {
 		consist->wait_counter = 0;
 		consist->cur_speed = 0;
 		consist->subspeed = 0;

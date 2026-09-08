@@ -2596,6 +2596,26 @@ void Vehicle::HandleLoading(bool mode)
 				Train::From(this)->flags.Set(VehicleRailFlag::Reversing);
 			}
 
+			/* Engine first, then the shortest way. The first half is settled
+			 * here: if what is about to lead out cannot lead -- the train
+			 * came in pushing -- it is turned round the same way reversing out
+			 * is, by the flag, so the ordinary reversal path does the work
+			 * next tick. The second half is a question for the pathfinder at
+			 * the order advance that follows; the flag on the train is the
+			 * permission to answer it with "the other way", which is only ever
+			 * taken up by a train that can lead from both ends. */
+			if (this->type == VehicleType::Train && this->current_order.ShouldDepartAutomatically() &&
+					!this->current_order.ShouldDecoupleOnDeparture()) {
+				Train *t = Train::From(this);
+				t->flags.Set(VehicleRailFlag::AutomaticDeparture);
+				if (!t->GetMovingFront()->CanLeadTrain()) t->flags.Set(VehicleRailFlag::Reversing);
+				extern bool _show_train_orientation;
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: odjezd automaticky - masinka {} v cele, oba konce vedou {}", t->unitnumber,
+							t->GetMovingFront()->CanLeadTrain() ? "uz je" : "nebyla, otacim", t->Last()->CanLeadTrain() ? "ano" : "ne");
+				}
+			}
+
 			extern bool _show_train_orientation;
 			if (_show_train_orientation && this->type == VehicleType::Train &&
 					(this->current_order.ShouldGoToCouple() || Train::From(this)->couple_target != VehicleID::Invalid())) {

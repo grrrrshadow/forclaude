@@ -258,6 +258,7 @@ public:
 		SLE_VAR(Order, couple_found_rake, VarTypes::BOOL),
 		SLE_VAR(Order, honk, VarTypes::BOOL),
 		SLE_VAR(Order, couple_min, VarTypes::BOOL),
+		SLE_VAR(Order, automatic_departure, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

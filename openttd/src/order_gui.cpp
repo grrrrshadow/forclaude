@@ -382,6 +382,10 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 						!order->ShouldDecoupleOnDeparture()) {
 					second += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
 				}
+				if (!timetable && v->type == VehicleType::Train && order->ShouldDepartAutomatically() &&
+						!order->ShouldDecoupleOnDeparture()) {
+					second += GetString(STR_ORDER_AUTO_DEPARTURE_SUFFIX);
+				}
 			}
 			break;
 		}
@@ -506,7 +510,7 @@ bool OrderHasSecondLine(const Vehicle *v, const Order *order)
 	if (order->IsType(OT_GOTO_WAYPOINT)) return IsStationWaypointOrder(order);
 	if (order->IsType(OT_GOTO_STATION)) {
 		return order->ShouldGoToCouple() || order->ShouldWaitForCouple() || order->ShouldDecoupleOnDeparture() ||
-				order->ShouldReverseOutOfStation();
+				order->ShouldReverseOutOfStation() || order->ShouldDepartAutomatically();
 	}
 	if (order->IsType(OT_GOTO_DEPOT)) {
 		return order->ShouldTurnAroundInDepot() || order->ShouldDecoupleOnDeparture() || order->ShouldGoToCouple();
@@ -1311,6 +1315,14 @@ public:
 				bool can_reverse_out = !decoupling && !waiting;
 				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, !can_reverse_out);
 				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, can_reverse_out && reversing_out);
+
+				/* Automatic departure is the third answer to the same question
+				 * and lives next to reversing out; not offered on a couple
+				 * order, where the coupling itself settles the way out. */
+				bool can_auto = can_reverse_out && !collecting;
+				bool automatic = order->ShouldDepartAutomatically();
+				this->SetWidgetDisabledState(WID_O_AUTO_DEPARTURE, !can_auto);
+				this->SetWidgetLoweredState(WID_O_AUTO_DEPARTURE, can_auto && automatic);
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
@@ -1760,6 +1772,13 @@ public:
 				break;
 			}
 
+			case WID_O_AUTO_DEPARTURE: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_AUTO_DEPARTURE, order->ShouldDepartAutomatically() ? 0 : 1);
+				break;
+			}
+
 			case WID_O_HONK: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
@@ -2187,20 +2206,24 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 	/* Second button row. */
 	NWidget(NWID_HORIZONTAL),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(93, 12), SetFill(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(74, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_SKIP_BUTTON, STR_ORDERS_SKIP_TOOLTIP), SetResize(1, 0),
 			/* Reversing out of a station is done to a whole order the way
-			 * skipping and deleting are, so it sits with them. All four are
-			 * narrowed so the row stays the width it was. */
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_REVERSE_OUT), SetMinimalSize(93, 12), SetFill(1, 0),
+			 * skipping and deleting are, so it sits with them, and the
+			 * automatic departure next to it as the other answer to the same
+			 * question. All five are narrowed so the row stays the width it
+			 * was. */
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_REVERSE_OUT), SetMinimalSize(74, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_REVERSE_OUT, STR_ORDER_REVERSE_OUT_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_AUTO_DEPARTURE), SetMinimalSize(74, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_AUTO_DEPARTURE, STR_ORDER_AUTO_DEPARTURE_TOOLTIP), SetResize(1, 0),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_BOTTOM_MIDDLE),
-				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(93, 12), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(74, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_DELETE_BUTTON, STR_ORDERS_DELETE_TOOLTIP), SetResize(1, 0),
-				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_STOP_SHARING), SetMinimalSize(93, 12), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_STOP_SHARING), SetMinimalSize(74, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDERS_STOP_SHARING_BUTTON, STR_ORDERS_STOP_SHARING_TOOLTIP), SetResize(1, 0),
 			EndContainer(),
-			NWidget(NWID_BUTTON_DROPDOWN, Colours::Grey, WID_O_GOTO), SetMinimalSize(93, 12), SetFill(1, 0),
+			NWidget(NWID_BUTTON_DROPDOWN, Colours::Grey, WID_O_GOTO), SetMinimalSize(74, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_GO_TO_BUTTON, STR_ORDERS_GO_TO_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),

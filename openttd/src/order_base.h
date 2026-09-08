@@ -161,6 +161,24 @@ private:
 	bool reverse_out_of_station = false;
 
 	/**
+	 * If true, a train leaving this station goes engine first and then takes
+	 * the shortest way to wherever it is going next.
+	 *
+	 * The third answer to "which way out": neither "carry on as you are
+	 * moving" nor "go back the way you came", but "the engine leads, and
+	 * from there whichever way is shorter". For a train that can lead from
+	 * both ends -- a cab or an engine at the back -- the first half is true
+	 * whichever end goes first, so it comes down to the shorter way alone,
+	 * and the train is let off the rule that it never turns round on the
+	 * line: swapping which end leads is not a turn for such a train. For a
+	 * train with one engine the shorter way is always engine first, so this
+	 * amounts to reversing out only when it came in pushing. Never together
+	 * with reversing out; the command keeps the two apart. The player's
+	 * consent to the choice is this flag: without it nothing turns by itself.
+	 */
+	bool automatic_departure = false;
+
+	/**
 	 * A train passing this station waypoint sounds its horn there. The
 	 * player's touch of life on a waypoint that otherwise only names a group
 	 * of platforms; off by default, so nothing honks that was not asked to.
@@ -376,6 +394,11 @@ public:
 
 	/** Set whether a train leaving this station reverses out of it. */
 	inline void SetReverseOutOfStation(bool reverse) { this->reverse_out_of_station = reverse; }
+
+	/** Does a train leaving this station go engine first and then the shortest way? */
+	inline bool ShouldDepartAutomatically() const { return this->automatic_departure; }
+	/** Set whether a train leaving this station goes engine first and then the shortest way. */
+	inline void SetAutomaticDeparture(bool automatic) { this->automatic_departure = automatic; }
 
 	/**
 	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?
