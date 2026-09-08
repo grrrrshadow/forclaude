@@ -3901,12 +3901,22 @@ static void NormaliseCoupledConsistFacing(Train *consist);
  */
 static void TransferTrainIdentity(Train *from, Train *to)
 {
+	/* Where the train is in its orders goes with the orders. Copied first:
+	 * letting go of the list resets the giver's place in it to the start
+	 * (DeleteVehicleOrders()), and copying after that handed the taker a
+	 * train at its first order. Measured on the polygon: a unit collected
+	 * nose to nose, put down at a station not on its list, went back to
+	 * the station it had been waiting at and waited again, instead of
+	 * going on to its next stop -- its wait order had come round a second
+	 * time. */
+	to->CopyConsistPropertiesFrom(from);
+	to->current_order = from->current_order;
+	from->current_order.Free();
 	if (from->orders != nullptr) {
 		to->orders = from->orders;
 		to->AddToShared(from);
 		DeleteVehicleOrders(from);
 	}
-	to->CopyConsistPropertiesFrom(from);
 	from->name.clear();
 
 	/* The number moves; nothing is released, so nothing can be handed out
@@ -3920,8 +3930,6 @@ static void TransferTrainIdentity(Train *from, Train *to)
 	 * still at the platform with its orders in hand. */
 	to->vehstatus.Set(VehState::Stopped, from->vehstatus.Test(VehState::Stopped));
 
-	to->current_order = from->current_order;
-	from->current_order.Free();
 	to->dest_tile = from->dest_tile;
 	to->last_station_visited = from->last_station_visited;
 	to->last_loading_station = from->last_loading_station;
@@ -3956,6 +3964,11 @@ static void TransferTrainIdentity(Train *from, Train *to)
 	to->force_proceed = from->force_proceed;
 	from->wait_counter = 0;
 	from->force_proceed = TFP_NONE;
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "  identita vlaku {}: z clanku {} na clanek {}, rozkazu {}, c.{}/{}", to->unitnumber,
+				from->index.base(), to->index.base(), to->GetNumOrders(), to->cur_real_order_index, to->cur_implicit_order_index);
+	}
 }
 
 static void SwapDualHeadRoles(Train *front, Train *rear)
@@ -6072,6 +6085,12 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 
 		remainder->ConsistChanged(CCF_TRACK);
 
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: odlozen - hlava clanek {} na ({},{}) {}, rozkazu {}, c.{}/{}", remainder->unitnumber,
+					remainder->index.base(), TileX(remainder->tile), TileY(remainder->tile),
+					IsRailStationTile(remainder->tile) ? "nastupiste" : "mimo nastupiste",
+					remainder->GetNumOrders(), remainder->cur_real_order_index, remainder->cur_implicit_order_index);
+		}
 		if (IsRailStationTile(remainder->tile) && remainder->GetNumOrders() != 0) {
 			StationID station = GetStationIndex(remainder->tile);
 			remainder->last_station_visited = station;
@@ -8087,6 +8106,27 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	assert(tracks == (tracks & TRACK_BIT_ALL));
 
 	if (got_reservation != nullptr) *got_reservation = false;
+
+	/* A collector chooses what it is fetching before its road is planned.
+	 * The road to a couple order ends on the platform holding the partner
+	 * (the destination test narrows the station to that platform), and with
+	 * no partner chosen yet every waiting train there passes for one -- so
+	 * the search settled for the nearest of them, while the choice, made a
+	 * tick later where the train's errand is looked after, took the first
+	 * by index. Measured on the polygon: coming from the far side those are
+	 * different trains on different platforms every time, the exemptions
+	 * then honour only the chosen one, and the train ran into the other at
+	 * line speed. From the near side the two happened to coincide, which
+	 * is why it worked there. Choosing first makes the road lead to the
+	 * choice. Nothing is held here: a train with nothing to fetch drives on
+	 * as before, and standing still over it is the hold's business. A
+	 * founding run on its way to a station waypoint chooses after the
+	 * waypoint (see the flag), as before. */
+	if (consist->IsFrontEngine() && consist->couple_target == VehicleID::Invalid() &&
+			consist->current_order.IsType(OT_GOTO_STATION) && consist->current_order.ShouldGoToCouple() &&
+			!consist->flags.Test(VehicleRailFlag::FoundingViaWaypoint)) {
+		FindOrClaimCoupleTarget(consist, consist->current_order, StationWaypointBeforeCurrentOrder(consist));
+	}
 
 	/* ExtendTrainReservation() below OVERWRITES `tracks` with the track
 	 * bits of whatever choice tile it stopped at, which is a *different*

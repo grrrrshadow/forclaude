@@ -27,7 +27,10 @@ dual-headed units (57–60 / 33–36; collectors 61 / 37). Writes
 parallel. `matrix_baseline_ce1effd.out` is the result on the tree before
 the crossed-coupling fix: same side 4/4 everywhere, crossed waiting trains
 and crossed units 1 coupling + 3 collisions in every scene, crossed rakes
-4/4.
+4/4. `matrix_after_fix.out` is the same matrix after the fix (partner
+chosen before the road is planned; order progress kept when a unit's
+identity moves to its other head): 4/4 in every scene, no collision, and
+the units put down crossed go on to their next stop and home.
 
 Scenes are to be re-run once the engine–wagons–engine depots (A/B) are
 worked on again.
