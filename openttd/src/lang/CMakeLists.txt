@@ -50,7 +50,6 @@ set(LANG_SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/norwegian_bokmal.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/norwegian_nynorsk.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/persian.txt
-        ${CMAKE_CURRENT_SOURCE_DIR}/polish.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/portuguese.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/romanian.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/russian.txt

@@ -737,11 +737,18 @@ STR_GRAPH_INDUSTRY_RANGE_PRODUCED                               :Vyprodukováno
 STR_GRAPH_INDUSTRY_RANGE_TRANSPORTED                            :Přepraveno
 STR_GRAPH_INDUSTRY_RANGE_DELIVERED                              :Doručeno
 STR_GRAPH_INDUSTRY_RANGE_WAITING                                :Čeká
+STR_GRAPH_INDUSTRY_RANGE_PRODUCED_TOOLTIP                       :Zapnout či vypnout graf nákladu vyprodukovaného tímto podnikem
+STR_GRAPH_INDUSTRY_RANGE_TRANSPORTED_TOOLTIP                    :Zapnout či vypnout graf nákladu odvezeného z tohoto podniku
+STR_GRAPH_INDUSTRY_RANGE_DELIVERED_TOOLTIP                      :Zapnout či vypnout graf nákladu doručeného do tohoto podniku
+STR_GRAPH_INDUSTRY_RANGE_WAITING_TOOLTIP                        :Zapnout či vypnout graf nákladu čekajícího u tohoto podniku
 
 STR_GRAPH_TOWN_CARGO_CAPTION                                    :{WHITE}{TOWN} - historie nákladu
 STR_GRAPH_TOWN_RANGE_PRODUCED                                   :Vyprodukováno
 STR_GRAPH_TOWN_RANGE_TRANSPORTED                                :Přepraveno
 STR_GRAPH_TOWN_RANGE_DELIVERED                                  :Doručeno
+STR_GRAPH_TOWN_RANGE_PRODUCED_TOOLTIP                           :Zapnout či vypnout graf nákladu vyprodukovaného tímto městem
+STR_GRAPH_TOWN_RANGE_TRANSPORTED_TOOLTIP                        :Zapnout či vypnout graf nákladu odvezeného z tohoto města
+STR_GRAPH_TOWN_RANGE_DELIVERED_TOOLTIP                          :Zapnout či vypnout graf nákladu doručeného do tohoto města
 
 STR_GRAPH_PERFORMANCE_DETAIL_TOOLTIP                            :{BLACK}Zobrazit podrobné hodnocení výkonu
 
@@ -1661,6 +1668,9 @@ STR_CONFIG_SETTING_TOWN_CARGO_SCALE_HELPTEXT                    :Násobit produk
 STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE                         :Násobek produkce nákladu průmyslem: {STRING}
 STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_HELPTEXT                :Násobit produkci nákladu průmyslem tímto procentem.
 STR_CONFIG_SETTING_CARGO_SCALE_VALUE                            :{NUM} %
+STR_CONFIG_SETTING_CARGO_AGING_RATE                             :Rychlost stárnutí nákladu: {STRING}
+STR_CONFIG_SETTING_CARGO_AGING_RATE_HELPTEXT                    :Jak rychle naložený náklad ztrácí cenu, jak plyne čas
+STR_CONFIG_SETTING_CARGO_AGING_RATE_VALUE                       :{NUM} %
 
 ###setting-zero-is-special
 STR_CONFIG_SETTING_CARGO_AGING_RATE_ZERO                        :Žádná degradace
@@ -3184,7 +3194,7 @@ STR_BLUEPRINT_HEIGHT_NEGATIVE                                   :{YELLOW}-{NUM}
 STR_BLUEPRINT_EXPORT                                            :{BLACK}Uložit
 STR_BLUEPRINT_IMPORT                                            :{BLACK}Načíst
 STR_BLUEPRINT_EXPORT_IMPORT                                     :{BLACK}Ulož/Nač
-STR_BLUEPRINT_INFO_VERSION                                      :{WHITE}Blueprint (autor Spaceone), verze {RAW_STRING}
+STR_BLUEPRINT_INFO_VERSION                                      :{WHITE}Blueprint (autor Spaceone), verze {STRING}
 STR_BLUEPRINT_EXPORT_MENU_SLOT                                  :Uložit aktivní přihrádku...
 STR_BLUEPRINT_EXPORT_MENU_ALL                                   :Uložit všechny přihrádky do souboru...
 STR_BLUEPRINT_IMPORT_MENU_SLOT                                  :Načíst do aktivní přihrádky...
@@ -5041,11 +5051,13 @@ STR_ORDER_HONK                                                  :{BLACK}Zahoukat
 STR_ORDER_HONK_TOOLTIP                                          :{BLACK}Vlak při průjezdu tímto nádražním směrováním zahouká
 STR_ORDER_HONK_SUFFIX                                           :{SPACE}(zahoukat)
 STR_ORDER_NO_HONK_SUFFIX                                        :{SPACE}(nehoukat)
-STR_MOUSE_DEBUG_SAVED                                           :{WHITE}Debug myši uložen: {RAW_STRING}
+STR_MOUSE_DEBUG_SAVED                                           :{WHITE}Debug myši uložen: {STRING}
 STR_MOUSE_DEBUG_FAILED                                          :{WHITE}Debug myši se nepodařilo uložit
 STR_ORDER_REVERSE_OUT                                           :{BLACK}Reversní chod
 STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Při odjezdu z této stanice jet reversním chodem, místo aby vlak pokračoval směrem, kterým je otočený, a hledal cestu okolo
 STR_ORDER_REVERSE_OUT_SUFFIX                                    :{SPACE}(a reversní chod)
+
+STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Zamčeno: hraješ s rozpojováním, a samovolné otočení by tu mohlo vjet přímo do vozů, které vlak právě odstavil
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
 STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat si vagonů
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Kolik vagonů zůstane s mašinkou; zbytek se tu nechá stát. Mašinka se nepočítá, takže 0 znamená odpojit všechny vagonky
@@ -5071,7 +5083,7 @@ STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Náklad:
 STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Odvézt jen vagony s tímto nákladem. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vozů: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vozů: libovolně
-STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Odvézt jen řadu, která má přesně tolik vozů. Bere se celá řada; nechat část stát umí příkaz odpojit. Nula znamená libovolný počet
+STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Jedno číslo, tři významy. Bez zamáčknutého čudlíku to je připojit přesně takový počet vozů, 0 = kteroukoli řadu. Čudlíky to číslo mění na hranici: „Minimálně" připojí řadu, jakmile má tolik vozů a víc, takže rozestavěná řada se nechá dorůst. „Založit řadu" je naopak maximum: připojuje nejvýš do tolika vozů, 0 = kolik se vejde na nástupiště — a když není co připojit, mašinka si řadu sama založí ze svých vozů. Bere se vždy celá řada; nechat část stát umí příkaz odpojit. Je vhodné použít směrování nástupišť
 STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má mít připojovaná řada (0 - libovolně)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
@@ -5083,7 +5095,7 @@ STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}V příp
 STR_ORDER_COUPLE_MIN_BUTTON                                     :{BLACK}Minimálně: připojit řadu, jakmile má (0 - libovolně) a více vozů
 STR_ORDER_COUPLE_COUNT_MIN                                      :{BLACK}Vozů: aspoň {NUM}
 STR_ORDER_COUPLE_FILTER_SUFFIX_MIN                              :{SPACE}(aspoň {NUM} vozů)
-STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP                            :{BLACK}Jedno číslo, tři významy. Žádný čudlík zamáčknutý: odvézt jen řadu přesně o tolika vozech, 0 = kteroukoli. „Minimálně": odvézt řadu, jakmile má tolik vozů nebo víc, takže rozestavěná řada se nechá dorůst. „Založit řadu": mašinka své vozy odloží jako novou řadu, když na nádraží žádná není, připojí je k řadě, když tam je, a přestane přidávat, jakmile má řada tolik vozů, 0 = kolik se vejde na nástupiště. Zamáčknutý může být jen jeden; OK potvrzuje číslo i čudlík najednou
+STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP                            :{BLACK}Jedno číslo, tři významy. Bez zamáčknutého čudlíku to je připojit přesně takový počet vozů, 0 = kteroukoli řadu. Čudlíky to číslo mění na hranici: „Minimálně" připojí řadu, jakmile má tolik vozů a víc, takže rozestavěná řada se nechá dorůst. „Založit řadu" je naopak maximum: připojuje nejvýš do tolika vozů, 0 = kolik se vejde na nástupiště — a když není co připojit, mašinka si řadu sama založí ze svých vozů. Zamáčknutý může být jen jeden; OK potvrzuje číslo i čudlík najednou. Je vhodné použít směrování nástupišť
 STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Založit řadu: do {NUM}
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Založit řadu: podle nástupiště
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu
@@ -5645,6 +5657,10 @@ STR_ERROR_BRIDGE_TOO_LOW_FOR_BUOY                               :{WHITE}Most s v
 STR_ERROR_BRIDGE_TOO_LOW_FOR_RAIL_WAYPOINT                      :{WHITE}Most je o {HEIGHT} moc nízko pro směřování
 STR_ERROR_BRIDGE_TOO_LOW_FOR_ROAD_WAYPOINT                      :{WHITE}Most je o {HEIGHT} moc nízko pro směřování
 STR_ERROR_BRIDGE_TOO_LOW_FOR_LOCK                               :{WHITE}Most je o {HEIGHT} moc nízko pro zdymadlo
+STR_ERROR_BRIDGE_TOO_LOW_FOR_TRAIN_DEPOT                        :{WHITE}Most je o {HEIGHT} moc nízko pro železniční depo
+STR_ERROR_BRIDGE_TOO_LOW_FOR_ROADVEH_DEPOT                      :{WHITE}Most je o {HEIGHT} moc nízko pro garáž
+STR_ERROR_BRIDGE_TOO_LOW_FOR_SHIP_DEPOT                         :{WHITE}Most je o {HEIGHT} moc nízko pro loděnici
+STR_ERROR_BRIDGE_TOO_LOW_FOR_OBJECT                             :{WHITE}Most je o {HEIGHT} moc nízko pro objekt
 
 # Tunnel related errors
 STR_ERROR_CAN_T_BUILD_TUNNEL_HERE                               :{WHITE}Zde nelze postavit tunel...
@@ -6081,7 +6097,7 @@ STR_SV_STNAME_LOWER                                             :Dolní {STRING}
 STR_SV_STNAME_HELIPORT                                          :Heliport {STRING}
 STR_SV_STNAME_FOREST                                            :{STRING} les
 STR_SV_STNAME_FALLBACK                                          :{STRING} Stanice č. {NUM}
-STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING2}
+STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING}
 
 ############ end of savegame specific region!
 
