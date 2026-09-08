@@ -8811,6 +8811,20 @@ void Train::ReserveTrackUnderConsist() const
  * @return Number of people killed.
  */
 /**
+ * How long one puff of wreck smoke lasts, and how often a wreck lying on the
+ * line makes a new one. The life is longer than the gap, so the plume is
+ * unbroken while the wreck is there and gone shortly after it is cleared.
+ *
+ * A puff is created with its counter at zero, and zero does not mean "no
+ * time": the first decrement takes a 16-bit counter below zero and wraps it,
+ * so an unset puff hangs over the ground for 65535 ticks -- the best part of
+ * three years, which is what the player saw. The breakdown smoke in
+ * TrainAwaitsRescue() sets it for the same reason.
+ */
+static const uint16_t WRECK_SMOKE_LIFE = 0x140;
+static const uint WRECK_SMOKE_PERIOD = 0xFF;
+
+/**
  * Make the mess a crash leaves on the ground.
  *
  * Vanilla spends a wreck's whole life doing this: it shakes for a while, puffs
@@ -8822,10 +8836,27 @@ void Train::ReserveTrackUnderConsist() const
  *
  * A bang at each end, and smoke over the ground around it: one plume for each
  * vehicle, so a long train makes a long mess, thrown up to three tiles clear of
- * the train itself.
+ * the train itself. This is the moment of the bang only; what goes on smoking
+ * afterwards is the wreck itself, see HandleCrashedTrain().
  *
  * @param v The train that has just crashed, its head.
  */
+/**
+ * Put a puff of smoke over each vehicle of a wreck: one plume per vehicle, so
+ * a long train makes a long mess.
+ *
+ * @param v The wreck, its head.
+ */
+static void SmokeOverWreck(Train *v)
+{
+	for (Train *u = v; u != nullptr; u = u->Next()) {
+		if (u->vehstatus.Test(VehState::Hidden)) continue;
+
+		EffectVehicle *smoke = CreateEffectVehicleRel(u, 4, 4, 5, EV_BREAKDOWN_SMOKE);
+		if (smoke != nullptr) smoke->animation_state = WRECK_SMOKE_LIFE;
+	}
+}
+
 static void ScatterWreckage(Train *v)
 {
 	if (!v->vehstatus.Test(VehState::Hidden)) CreateEffectVehicleRel(v, 4, 4, 8, EV_EXPLOSION_LARGE);
@@ -8842,11 +8873,12 @@ static void ScatterWreckage(Train *v)
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
 
 		int scatter = static_cast<int>(TILE_SIZE) * (IsRailStationTile(u->tile) ? 1 : 3);
-		CreateEffectVehicleRel(u,
+		EffectVehicle *smoke = CreateEffectVehicleRel(u,
 				static_cast<int8_t>(RandomRange(2 * scatter + 1) - scatter),
 				static_cast<int8_t>(RandomRange(2 * scatter + 1) - scatter),
 				static_cast<int8_t>(RandomRange(8) + 5),
 				EV_BREAKDOWN_SMOKE);
+		if (smoke != nullptr) smoke->animation_state = WRECK_SMOKE_LIFE;
 	}
 }
 
@@ -10777,6 +10809,22 @@ bool Train::Tick()
 				delete this;
 				return false;
 			}
+
+			/* Still lying there, so still smoking. The plumes the crash itself
+			 * threw (ScatterWreckage()) are the bang and nothing more; without
+			 * this the wreck goes quiet within days and then stands out on the
+			 * line as a silent grey train for the rest of a wait that is a
+			 * fortnight by default. Kept up the same way a breakdown keeps
+			 * smoking while it waits (TrainAwaitsRescue()), so the two read as
+			 * one thing, and the last puff dies shortly after the wreck is
+			 * cleared -- towed away, or given up on just above.
+			 *
+			 * Here rather than in HandleCrashedTrain(), which is where a
+			 * crash's own animation lives: that runs off VehState::Crashed,
+			 * and a wreck of ours does not carry it. A wreck here is an
+			 * ordinary train wearing a flag, which is what makes it towable at
+			 * all (see Train::Crash()), so it never reaches that code. */
+			if (!(this->tick_counter & WRECK_SMOKE_PERIOD)) SmokeOverWreck(this);
 		}
 
 		if (!this->vehstatus.Test(VehState::Stopped) || this->cur_speed > 0) this->running_ticks++;

@@ -54,6 +54,7 @@
 #include "newgrf_profiling.h"
 #include "console_func.h"
 #include "engine_base.h"
+#include "effectvehicle_base.h"
 #include "road.h"
 #include "rail.h"
 #include "game/game.hpp"
@@ -2585,6 +2586,30 @@ static bool ConTestListEngineModels(std::span<std::string_view>)
 				e->duration_phase_1 + e->duration_phase_2 + e->duration_phase_3,
 				e->info.base_life == 0xFF ? " (vyrabi se navzdy)" : "");
 	}
+	return true;
+}
+
+/**
+ * Count the effect vehicles alive, by kind.
+ * Smoke and explosions are effect vehicles that each count their own life
+ * down; a kind whose count never falls is a kind that never expires. That is
+ * exactly the fault the crash smoke had (TEMATA 4.26), and it is invisible
+ * from a headless run without this.
+ * Usage: testefekty
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCountEffects(std::span<std::string_view>)
+{
+	static const char *names[] = {"jiskry", "kour-parni", "kour-diesel", "kour-elektro", "vysyp",
+			"vybuch-velky", "kour-poruchy", "vybuch-maly", "buldozer", "bublina",
+			"kour-poruchy-letadlo", "kour-dulni"};
+	std::map<uint, uint> counts;
+	for (const EffectVehicle *e : EffectVehicle::Iterate()) counts[e->subtype]++;
+	std::string out;
+	for (const auto &[type, count] : counts) {
+		fmt::format_to(std::back_inserter(out), " {}={}", type < lengthof(names) ? names[type] : "?", count);
+	}
+	IConsolePrint(CC_DEFAULT, "testefekty: celkem {}{}", EffectVehicle::GetNumItems(), out.empty() ? " (zadne)" : out);
 	return true;
 }
 
@@ -6176,6 +6201,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testzatik",               ConTestAfterTicks);
+	IConsole::CmdRegister("testefekty",              ConTestCountEffects);
 	IConsole::CmdRegister("testmodely",              ConTestListEngineModels);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
