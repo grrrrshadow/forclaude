@@ -34,8 +34,12 @@ def scene(fam, wside, cside, n):
     for i, u in enumerate(units[wside]):
         lines.append(f"testzatik {10 + i * ws} testbrzda {u}")
     lines.append(f"testzatik 20 testklon {c} 3 stoj")
-    for i, u in enumerate([c, 77, 78, 79]):
-        lines.append(f"testzatik {t0 + i * d} testbrzda {u}")
+    # The clones are let out by the order they were made in, not by unit
+    # number: the game hands out the lowest free one, so the numbers move
+    # whenever the save does.
+    lines.append(f"testzatik {t0} testbrzda {c}")
+    for i in (1, 2, 3):
+        lines.append(f"testzatik {t0 + i * d} testpustklon {i}")
     name = f"{fam}_{wside}{cside}_{n}"
     body = "\n".join(lines)
     return f'run_scene {name} "{body}" {TICKS} -g $S/rig.sav\n'

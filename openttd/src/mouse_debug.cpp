@@ -55,8 +55,10 @@ void MouseDebugLog(std::string_view what)
 		_mouse_debug.pop_front();
 	}
 	/* And never more than this many, whatever the clock says: a drag at a
-	 * high frame rate writes a line a frame. */
-	while (_mouse_debug.size() >= 20000) _mouse_debug.pop_front();
+	 * high frame rate writes a line a frame. Raised along with the stretch of
+	 * time above, so that the count is the safety catch it was meant to be and
+	 * not what decides how far back the record goes. */
+	while (_mouse_debug.size() >= 60000) _mouse_debug.pop_front();
 
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - _mouse_debug_start).count();
 	_mouse_debug.push_back({now, fmt::format("{:>9} ms  L={} R={} Rclk={} pos=({},{}) delta=({},{}) pin={} drag={} mode={}  {}",

@@ -1827,9 +1827,17 @@ static bool ConTestStartDepot(std::span<std::string_view> argv)
  * gets the reverse-out flag first.
  * @copydoc IConsoleCmdProc
  */
+/** The clones the last testklon made, in the order it made them. A scene lets
+ * them out by that order rather than by unit number: the game hands out the
+ * lowest free number, so which numbers the clones get depends on which trains
+ * the save happens to be missing, and a scene written to numbers goes quiet
+ * the day the save changes. */
+static std::vector<VehicleID> _testklon_made;
+
 static void DoTestClone(uint unit, uint count, bool reverz, bool stoj = false)
 {
 	_pause_mode = {};
+	_testklon_made.clear();
 
 	Train *original = nullptr;
 	for (Train *t : Train::Iterate()) {
@@ -1866,9 +1874,10 @@ static void DoTestClone(uint unit, uint count, bool reverz, bool stoj = false)
 			return;
 		}
 		/* "stoj": the clones are built and left standing in the shed, for a
-		 * scene that lets them out one at a time with testbrzda later on
+		 * scene that lets them out one at a time with testpustklon later on
 		 * instead of all at once. */
 		if (!stoj) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, cloned, false);
+		_testklon_made.push_back(cloned);
 		IConsolePrint(CC_DEFAULT, "testklon: clone vlak {} {}.", Train::Get(cloned)->unitnumber, stoj ? "built, standing" : "started");
 	}
 	if (stoj) {
@@ -1926,6 +1935,35 @@ static bool ConTestClone(std::span<std::string_view> argv)
 		return true;
 	}
 	DoTestClone((uint)*punit, (uint)*pcount, reverz, stoj);
+	return true;
+}
+
+/**
+ * Let one of the clones the last testklon made off its brake, by the order it
+ * was made in. Usage: testpustklon <n> (1 = the first clone)
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestReleaseClone(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Let a clone made by the last 'testklon ... stoj' go. Usage: 'testpustklon <n>' (1 = first).");
+		return true;
+	}
+	auto pn = ParseInteger(argv[1]);
+	if (!pn.has_value()) return false;
+	uint n = (uint)*pn;
+	if (n < 1 || n > _testklon_made.size()) {
+		IConsolePrint(CC_ERROR, "testpustklon: klon c.{} neexistuje (testklon jich udelal {}).", n, _testklon_made.size());
+		return true;
+	}
+	Train *t = Train::GetIfValid(_testklon_made[n - 1]);
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testpustklon: klon c.{} uz neexistuje.", n);
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
+	IConsolePrint(CC_DEFAULT, "testpustklon: klon c.{} je vlak {}, puzen.", n, t->unitnumber);
 	return true;
 }
 
@@ -6433,5 +6471,6 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmezera",              ConTestTearConsist);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
+	IConsole::CmdRegister("testpustklon",            ConTestReleaseClone);
 	IConsole::CmdRegister("cztr_test",               ConCztrTest);
 }
