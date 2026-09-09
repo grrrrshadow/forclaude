@@ -22,15 +22,18 @@ three clones (`testklon ... stoj`, released one by one with `testbrzda`)
 from the left or from the right; four spacing variants per combination.
 Families: `mx` waiting trains (17–20 from the right, 25–28 from the left;
 collectors 5 / 14), `mw` rakes dropped by deliverers (9–12 / 1–4), `me`
-dual-headed units (57–60 / 33–36; collectors 61 / 37). Writes
+dual-headed units (57–60 / 33–36; collectors 61 / 37), `ms` those same
+units collected by a plain engine (5 / 14), `mv` dropped rakes collected
+by a dual-headed unit (37 / 61). Writes
 `mx_ttdhome.sh`, `mx_h2.sh`, `mx_h3.sh` into `RIG_DIR`; run them in
 parallel. `matrix_baseline_ce1effd.out` is the result on the tree before
 the crossed-coupling fix: same side 4/4 everywhere, crossed waiting trains
 and crossed units 1 coupling + 3 collisions in every scene, crossed rakes
-4/4. `matrix_after_fix.out` is the same matrix after the fix (partner
+4/4. `matrix_after_fix.out` is the same matrix after the fixes (partner
 chosen before the road is planned; order progress kept when a unit's
-identity moves to its other head): 4/4 in every scene, no collision, and
-the units put down crossed go on to their next stop and home.
+identity moves to its other head; the dual-head list normalisation left
+to sheds): all 80 scenes 4/4, no collision and no assert, and the units
+put down crossed go on to their next stop and home.
 
 Scenes are to be re-run once the engine–wagons–engine depots (A/B) are
 worked on again.

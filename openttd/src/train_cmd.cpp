@@ -1394,6 +1394,10 @@ static CommandCost ValidateTrains(Train *original_dst, Train *dst, Train *origin
  */
 static void ArrangeTrains(Train **dst_head, Train *dst, Train **src_head, Train *src, bool move_chain)
 {
+	/* Read before anything is relinked; see the note on the dual heads below. */
+	const bool in_depot = (src != nullptr && src->track == Track::Depot) ||
+			(dst != nullptr && dst->track == Track::Depot);
+
 	/* First determine the front of the two resulting trains */
 	if (*src_head == *dst_head) {
 		/* If we aren't moving part(s) to a new train, we are just moving the
@@ -1424,8 +1428,24 @@ static void ArrangeTrains(Train **dst_head, Train *dst, Train **src_head, Train 
 
 	/* Now normalise the dual heads, that is move the dual heads around in such
 	 * a way that the head and rear of a dual head are in the same train */
-	NormaliseDualHeads(*src_head);
-	NormaliseDualHeads(*dst_head);
+	/* In a shed only. Moving a vehicle about in the list costs nothing there:
+	 * a train in a shed has no position, and the whole of it is laid out
+	 * again when it comes out. Out on the track the list has to run the way
+	 * the vehicles physically lie, and this walk moves the rear head of a
+	 * dual-headed engine to the back of whatever now stands behind it without
+	 * moving it an inch on the ground.
+	 *
+	 * A multiple unit that coupled a rake of wagons came out of it with its
+	 * rear head written last and standing in the middle, so the close-up
+	 * (CloseUpCoupledConsist()) drove a wagon away from the train instead of
+	 * up to it, and the game came down on the step assert. On the ground the
+	 * ground decides where each vehicle is in the list; a rear head that ends
+	 * up in the middle of a coupled train stays there, exactly as a whole
+	 * engine riding inside a rake does. */
+	if (in_depot) {
+		NormaliseDualHeads(*src_head);
+		NormaliseDualHeads(*dst_head);
+	}
 }
 
 /**
