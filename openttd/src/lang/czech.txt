@@ -4315,6 +4315,7 @@ STR_INDUSTRY_VIEW_LOCATION_TOOLTIP                              :{BLACK}Vystřed
 STR_INDUSTRY_VIEW_CARGO_GRAPH                                   :{BLACK}graf nákladu
 STR_INDUSTRY_VIEW_CARGO_GRAPH_TOOLTIP                           :{BLACK}Zobraz graf historie nákladu průmyslu
 STR_INDUSTRY_VIEW_PRODUCTION_LEVEL                              :{BLACK}Produkce: {YELLOW}{COMMA}%
+STR_INDUSTRY_VIEW_HEALTH                                        :{BLACK}Stav budovy: {YELLOW}{NUM}%
 STR_INDUSTRY_VIEW_INDUSTRY_ANNOUNCED_CLOSURE                    :{YELLOW}Průmyslový podnik oznámil blížící se uzavření!
 
 STR_INDUSTRY_VIEW_REQUIRES_N_CARGO                              :{BLACK}Vyžaduje: {YELLOW}{STRING}

@@ -872,6 +872,49 @@ public:
 	}
 
 	/**
+	 * Draw the line that says how much of the building is still standing.
+	 *
+	 * A bar and a percentage, the way every game that lets you knock a
+	 * building down shows it. Drawn only for the player who asked for it (see
+	 * #_show_industry_health): it is a thing the window says, not a thing the
+	 * industry does, so nobody else's game changes in the slightest and a
+	 * network game does not care that this player is looking at it.
+	 *
+	 * @param ir the panel's inner rectangle, at the line to draw on
+	 * @return the height taken, to be added to the running top
+	 */
+	int DrawHealth(const Rect &ir) const
+	{
+		const Industry *i = Industry::Get(this->window_number);
+		uint percent = GetIndustryHealthPercent(i);
+
+		int height = GetCharacterHeight(FontSize::Normal);
+		Rect line = ir.WithHeight(height);
+		std::string text = GetString(STR_INDUSTRY_VIEW_HEALTH, percent);
+		int text_width = GetStringBoundingBox(text).width;
+		DrawString(line, text);
+
+		/* The bar sits after the words, on the same line, and takes whatever
+		 * width is left over -- so it is never wider than the panel and never
+		 * pushes the panel wider than it was. */
+		int bar_left = line.left + text_width + WidgetDimensions::scaled.hsep_wide;
+		if (bar_left < line.right) {
+			Rect bar = line.Shrink(RectPadding{}).WithHeight(height);
+			bar.left = bar_left;
+			bar = bar.Shrink(0, (height - GetCharacterHeight(FontSize::Small)) / 2);
+			GfxFillRect(bar, PC_BLACK);
+			Rect inner = bar.Shrink(WidgetDimensions::scaled.bevel);
+			GfxFillRect(inner, PC_GREY);
+			if (percent > 0) {
+				Rect filled = inner.WithWidth(std::max(1, inner.Width() * (int)percent / 100), _current_text_dir == TD_RTL);
+				GfxFillRect(filled, percent > 50 ? PC_GREEN : (percent > 20 ? PC_ORANGE : PC_RED));
+			}
+		}
+
+		return height;
+	}
+
+	/**
 	 * Draw the text in the #WID_IV_INFO panel.
 	 * @param r Rectangle of the panel.
 	 * @return Expected position of the bottom edge of the panel.
@@ -983,6 +1026,15 @@ public:
 		if (!i->text.empty()) {
 			ir.top += WidgetDimensions::scaled.vsep_wide;
 			ir.top = DrawStringMultiLine(ir, i->text.GetDecodedString(), TextColour::Black);
+		}
+
+		/* How much of the building is left, for the player who asked to see
+		 * it. Last, under everything the industry itself has to say, and it
+		 * pays for its own room: the panel measures what this returns and
+		 * grows by itself (see OnPaint()). */
+		if (_show_industry_health) {
+			ir.top += WidgetDimensions::scaled.vsep_wide;
+			ir.top += this->DrawHealth(ir);
 		}
 
 		/* Return required bottom position, the last pixel row plus some padding. */

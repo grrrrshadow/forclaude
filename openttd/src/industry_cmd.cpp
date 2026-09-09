@@ -57,6 +57,22 @@
 
 #include "safeguards.h"
 
+/** Whether this player's industry windows show how much of the building is left. */
+bool _show_industry_health = false;
+
+/**
+ * How much of an industry's building is still standing, as a percentage.
+ * @param i the industry
+ * @return how much of it is left, 0 to 100
+ */
+uint GetIndustryHealthPercent([[maybe_unused]] const Industry *i)
+{
+	/* Nothing wears a building down yet, so every one of them is whole. When
+	 * something does, this is where it is read from, and the window needs no
+	 * changing. */
+	return 100;
+}
+
 IndustryPool _industry_pool("Industry");
 INSTANTIATE_POOL_METHODS(Industry)
 

@@ -330,4 +330,24 @@ enum IndustryDirectoryInvalidateWindowData : uint8_t {
 
 void TrimIndustryAcceptedProduced(Industry *ind);
 
+/**
+ * Whether this player's industry windows show how much of the building is
+ * left. A thing the window says, not a thing the industry does: it is not in
+ * the savegame and it is not sent anywhere, so in a network game the player
+ * who asked for it is the only one whose game looks any different.
+ */
+extern bool _show_industry_health;
+
+/**
+ * How much of an industry's building is still standing, as a percentage.
+ *
+ * The one place the number comes from, so that whatever damages a building
+ * later has one place to change and every window follows. Nothing wears an
+ * industry down yet, so it answers whole.
+ *
+ * @param i the industry
+ * @return how much of it is left, 0 to 100
+ */
+uint GetIndustryHealthPercent(const Industry *i);
+
 #endif /* INDUSTRY_H */

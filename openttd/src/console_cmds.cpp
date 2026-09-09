@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "train.h"
+#include "industry.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
 #include "console_gui.h"
@@ -602,6 +603,46 @@ static bool ConShowTrainOrientation(std::span<std::string_view> argv)
 	SetWindowClassesDirty(WindowClass::VehicleView);
 
 	IConsolePrint(CC_DEFAULT, "Train orientation marks are now {}.", _show_train_orientation ? "shown" : "hidden");
+	return true;
+}
+
+/**
+ * Show, or stop showing, how much of an industry's building is left in its
+ * window. Typed as "miluju karla": the console takes the first word as the
+ * command and the rest as its arguments, so the second word is asked for
+ * here rather than being part of the name.
+ *
+ * Nothing but this player's windows changes. The switch is not in the
+ * savegame and is not sent to anybody, so in a network game the others go on
+ * seeing exactly what they saw.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConIndustryHealth(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	if (argv.size() < 2 || argv[1] != "karla") {
+		IConsolePrint(CC_HELP, "Show how much of an industry's building is left, in its own window.");
+		IConsolePrint(CC_HELP, "Usage: 'miluju karla' to flip it, or 'miluju karla on' / 'miluju karla off'.");
+		return true;
+	}
+
+	if (argv.size() >= 3) {
+		if (argv[2] == "on" || argv[2] == "1") {
+			_show_industry_health = true;
+		} else if (argv[2] == "off" || argv[2] == "0") {
+			_show_industry_health = false;
+		} else {
+			return false;
+		}
+	} else {
+		_show_industry_health = !_show_industry_health;
+	}
+
+	/* The windows that are already open pick it up on their next painting:
+	 * the panel measures what it drew and grows or shrinks by itself. */
+	SetWindowClassesDirty(WindowClass::IndustryView);
+
+	IConsolePrint(CC_DEFAULT, "Stav budovy prumyslu je ted {}.", _show_industry_health ? "videt" : "schovany");
 	return true;
 }
 
@@ -2879,7 +2920,7 @@ static bool ConTestDemolishDepot(std::span<std::string_view> argv)
 static bool ConTestOpenWindow(std::span<std::string_view> argv)
 {
 	if (argv.size() != 2 && !(argv.size() == 3 && argv[1] == "smer")) {
-		IConsolePrint(CC_HELP, "Open a train's window, or a waypoint's. Usage: 'testokno <unit number>' or 'testokno smer <waypoint index>'.");
+		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl' or 'testokno smer <waypoint index>'.");
 		return true;
 	}
 	if (argv.size() == 3) {
@@ -2896,6 +2937,18 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 		}
 		ShowWaypointWindow(wp);
 		IConsolePrint(CC_DEFAULT, "testokno: okno smerovani {} otevreno.", wp->index.base());
+		return true;
+	}
+	if (argv[1] == "prumysl") {
+		extern void ShowIndustryViewWindow(IndustryID industry);
+		/* Whatever the first industry on the map is: enough to have the
+		 * window built and painted, which is where a mistake in it shows. */
+		for (const Industry *i : Industry::Iterate()) {
+			ShowIndustryViewWindow(i->index);
+			IConsolePrint(CC_DEFAULT, "testokno: okno prumyslu {} na ({},{}) otevreno.", i->index.base(), TileX(i->location.tile), TileY(i->location.tile));
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testokno: na mape neni zadny prumysl.");
 		return true;
 	}
 	auto punit = ParseInteger(argv[1]);
@@ -6425,6 +6478,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
+	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);
