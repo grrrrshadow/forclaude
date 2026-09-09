@@ -1579,7 +1579,39 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 		for (Train *u = dst_head; u != nullptr; u = u->Next()) u->flags.Reset(VehicleRailFlag::CoupledHere);
 	}
 
-	return TryConsistSplice(flags, src, dst, move_chain);
+	/* A plain drag hangs on what the player saw. A train turned round in the
+	 * shed -- the turn-round button, which end leads -- is drawn the other
+	 * way round in the list, every vehicle of it nose the other way. A
+	 * vehicle taken out of it used to come out straight: the turn-round
+	 * belongs to the train and means nothing for a vehicle that has left it,
+	 * so the engine the player had just turned to hang on the far end of a
+	 * train chimney out arrived chimney in. The player's rule: nothing turns
+	 * by itself. Without Ctrl the look is kept, written as a flip of the
+	 * vehicle -- the same thing Ctrl+click on it does; with Ctrl (the chain
+	 * drag) it comes out straight, as it always has. Not within one train,
+	 * which is drawn the same way round before and after; not for a unit that
+	 * cannot be flipped (a multiple unit, an articulated engine), which comes
+	 * out as before. The train it left keeps being drawn as it was: the
+	 * turn-round moves to its new head when the old one is what was taken. */
+	bool keep_look = !move_chain && !flags.Test(DoCommandFlag::AutoReplace) && dst_head != src_head &&
+			src_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards) &&
+			!src->IsMultiheaded() && !EngInfo(src->engine_type)->callback_mask.Test(VehicleCallbackMask::ArticEngine);
+	Train *rest = (keep_look && src == src_head) ? src->GetNextUnit() : nullptr;
+
+	ret = TryConsistSplice(flags, src, dst, move_chain);
+	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute) || !keep_look) return ret;
+
+	src->flags.Flip(VehicleRailFlag::Flipped);
+	src->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	if (rest != nullptr && rest->IsFrontEngine()) rest->vehicle_flags.Set(VehicleFlag::DrivingBackwards);
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: clanek {} vzat z otoceneho vlaku - vzhled zachovan preklopenim (otoceny {})",
+				src->First()->unitnumber, src->index.base(), src->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne");
+	}
+	src->First()->ConsistChanged(CCF_ARRANGE);
+	if (rest != nullptr) rest->ConsistChanged(CCF_ARRANGE);
+	SetWindowDirty(WindowClass::VehicleDepot, src->tile);
+	return ret;
 }
 
 /**

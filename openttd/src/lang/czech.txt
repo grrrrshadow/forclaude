@@ -4550,7 +4550,7 @@ STR_DEPOT_VEHICLE_TOOLTIP_CHAIN                                 :{BLACK}{NUM} vo
 STR_DEPOT_VEHICLE_TOOLTIP_CARGO                                 :{}{CARGO_LONG} ({CARGO_SHORT})
 
 ###length VEHICLE_TYPES
-STR_DEPOT_TRAIN_LIST_TOOLTIP                                    :{BLACK}Vlaky - přetáhněte vozidlo levým tlačítkem myši pro přidání/odebrání z vlaku, klikněte pravým tlačítkem pro zobrazení informací. Při stisknutí Ctrl+Kliku aplikujte tuto funkci na následující řetězec
+STR_DEPOT_TRAIN_LIST_TOOLTIP                                    :{BLACK}Vlaky - přetáhněte vozidlo levým tlačítkem myši pro přidání/odebrání z vlaku, klikněte pravým tlačítkem pro zobrazení informací. Vozidlo si nechá směr, jak je vidět; s Ctrl se táhne i zbytek řetězce a narovná se
 STR_DEPOT_ROAD_VEHICLE_LIST_TOOLTIP                             :{BLACK}Vozidla - klikni pravým na vozidlo pro informace
 STR_DEPOT_SHIP_LIST_TOOLTIP                                     :{BLACK}Lodě - klepni pravým naloď pro informace
 STR_DEPOT_AIRCRAFT_LIST_TOOLTIP                                 :{BLACK}Letadlo - klepni pravým na letadlo pro informace

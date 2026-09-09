@@ -3404,10 +3404,11 @@ static bool ConTestFlipInDepot(std::span<std::string_view> argv)
  */
 static bool ConTestMoveInDepot(std::span<std::string_view> argv)
 {
-	if (argv.size() != 3) {
-		IConsolePrint(CC_HELP, "Hang a train on the tail of another in a depot. Usage: 'testpresun <unit number> <unit number of the train to join>'.");
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Hang a train on the tail of another in a depot. Usage: 'testpresun <unit number> <unit number of the train to join> [ctrl]' ('ctrl' drags the whole chain, as Ctrl does).");
 		return true;
 	}
+	bool ctrl = argv.size() > 3 && argv[3] == "ctrl";
 	auto psrc = ParseInteger(argv[1]);
 	auto pdst = ParseInteger(argv[2]);
 	if (!psrc.has_value() || !pdst.has_value()) return false;
@@ -3418,8 +3419,8 @@ static bool ConTestMoveInDepot(std::span<std::string_view> argv)
 		return true;
 	}
 	AutoRestoreBackup cur_company(_current_company, src->owner);
-	CommandCost ret = Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, src->index, dst->Last()->index, true);
-	IConsolePrint(CC_DEFAULT, "testpresun: vlak {} za vlak {}: {}", *psrc, *pdst, ret.Failed() ? GetString(ret.GetErrorMessage()) : "presunut");
+	CommandCost ret = Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, src->index, dst->Last()->index, ctrl);
+	IConsolePrint(CC_DEFAULT, "testpresun: vlak {} za vlak {}{}: {}", *psrc, *pdst, ctrl ? " (ctrl)" : "", ret.Failed() ? GetString(ret.GetErrorMessage()) : "presunut");
 	return true;
 }
 
