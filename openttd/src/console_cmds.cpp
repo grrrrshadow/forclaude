@@ -11,6 +11,7 @@
 #include "train.h"
 #include "industry.h"
 #include "town.h"
+#include "spritecache.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
 #include "console_gui.h"
@@ -58,6 +59,7 @@
 #include "console_func.h"
 #include "engine_base.h"
 #include "effectvehicle_base.h"
+#include "effectvehicle_func.h"
 #include "road.h"
 #include "rail.h"
 #include "game/game.hpp"
@@ -785,6 +787,51 @@ static bool ConTestAimCrosshair(std::span<std::string_view> argv)
 }
 
 /**
+ * Print the size of the button sprites, so a new icon can be drawn to match.
+ * Usage: testikony
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestIconSizes(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	struct { const char *name; SpriteID sprite; } icons[] = {
+		{"prikazy (SHOW_ORDERS)", SPR_SHOW_ORDERS},
+		{"detaily", SPR_SHOW_VEHICLE_DETAILS},
+		{"prestavba", SPR_REFIT_VEHICLE},
+		{"otoceni", SPR_FORCE_VEHICLE_TURN},
+		{"ignoruj navest", SPR_IGNORE_SIGNALS},
+		{"do depa (vlak)", SPR_SEND_TRAIN_TODEPOT},
+		{"do hangaru", SPR_SEND_AIRCRAFT_TODEPOT},
+		{"klonovat", SPR_CLONE_AIRCRAFT},
+		{"odtahovka", SPR_IMG_RESCUE_ENGINE},
+		{"zamerovac", SPR_IMG_CROSSHAIR},
+		{"kurzor zamerovace", SPR_CURSOR_CROSSHAIR},
+	};
+	/* The size the game reports counts from the drawing's own zero, so a
+	 * sprite carrying a hook point -- a cursor, which is hung on the mouse by
+	 * its middle -- comes back that much smaller. Print the hook point too,
+	 * or a 32 pixel cursor hung by its middle reads as a 16 pixel one. */
+	for (const auto &icon : icons) {
+		Point offset;
+		Dimension d = GetSpriteSize(icon.sprite, &offset);
+		IConsolePrint(CC_DEFAULT, "testikony: {} (sprite {}) = {} x {}, kresba {} x {}, zaves {},{}", icon.name, icon.sprite,
+				d.width, d.height, d.width - offset.x, d.height - offset.y, offset.x, offset.y);
+	}
+	/* Which file each one came from, not just how big it is: a base set's
+	 * extra grf lands in the same block as this build's own icons, and one
+	 * that reaches past the sprites the game upstream has takes them over
+	 * without a word. */
+	for (SpriteID id = SPR_OPENTTD_BASE + 188; id <= SPR_OPENTTD_BASE + 213; id++) {
+		Dimension d = GetSpriteSize(id);
+		SpriteFile *f = GetOriginFile(id);
+		IConsolePrint(CC_DEFAULT, "testikony: sprite {} (base+{}) = {} x {} z {} #{}{}", id, id - SPR_OPENTTD_BASE, d.width, d.height,
+				f == nullptr ? std::string("?") : f->GetSimplifiedFilename(), GetSpriteLocalID(id),
+				SpriteExists(id) ? "" : " (NEEXISTUJE)");
+	}
+	return true;
+}
+
+/**
  * Say where the towns are, so a raid can be aimed at one. Usage: testmesta
  * @copydoc IConsoleCmdProc
  */
@@ -811,6 +858,29 @@ static bool ConTestIndustryHealth(std::span<std::string_view> argv)
 		count++;
 	}
 	IConsolePrint(CC_DEFAULT, "teststavby: prumyslu celkem {}", count);
+	return true;
+}
+
+/**
+ * Count the puffs of smoke still hanging over the map, and say how much
+ * life the longest-lived one has left. Usage: testdym
+ *
+ * The smoke of a raid is meant to last three weeks from the moment it is
+ * dropped; the only way to know that it does is to count it going away.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSmoke(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	uint count = 0;
+	uint16_t longest = 0;
+	for (const EffectVehicle *e : EffectVehicle::Iterate()) {
+		if (e->subtype != EV_BREAKDOWN_SMOKE) continue;
+		count++;
+		longest = std::max<uint16_t>(longest, e->animation_state);
+	}
+	IConsolePrint(CC_DEFAULT, "testdym: oblacku {}, nejdele jeste {} tiku ({} dnu), tik {}", count, longest,
+			longest / Ticks::DAY_TICKS, TimerGameTick::counter);
 	return true;
 }
 
@@ -3127,11 +3197,11 @@ static bool ConTestDemolishDepot(std::span<std::string_view> argv)
  */
 static bool ConTestOpenWindow(std::span<std::string_view> argv)
 {
-	if (argv.size() != 2 && !(argv.size() == 3 && argv[1] == "smer")) {
-		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl' or 'testokno smer <waypoint index>'.");
+	if (argv.size() != 2 && !(argv.size() == 3 && (argv[1] == "smer" || argv[1] == "letadlo" || argv[1] == "rozkazy"))) {
+		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|<unit number>]' or 'testokno smer <waypoint index>'.");
 		return true;
 	}
-	if (argv.size() == 3) {
+	if (argv.size() == 3 && argv[1] == "smer") {
 		/* A window is built when it opens, and a mistake in its widget tree
 		 * is an exception at that moment -- a waypoint window built with a
 		 * coloured label crashed the player's game on every click for two
@@ -3152,13 +3222,27 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 		 * is built when it opens and drawn when it is painted, and a mistake
 		 * in either is a crash at that moment. */
 		extern void ShowOrdersWindow(const Vehicle *v);
+		/* Which kind of vehicle, not just which one: the orders window is built
+		 * from one widget tree for ground vehicles and another for ships and
+		 * aircraft, and a mistake in the code that fills it in shows only in
+		 * the tree that is missing the widget being asked for. The rig opened
+		 * a train's every time and saw nothing. */
+		VehicleType want = VehicleType::Invalid;
+		if (argv[1] == "letadlo") want = VehicleType::Aircraft;
+		std::optional<uint32_t> punit2;
+		if (argv.size() > 2) {
+			if (argv[2] == "letadlo") {
+				want = VehicleType::Aircraft;
+			} else if (argv[2] == "lod") {
+				want = VehicleType::Ship;
+			} else {
+				punit2 = ParseInteger(argv[2]);
+			}
+		}
 		for (const Vehicle *v : Vehicle::Iterate()) {
 			if (v->First() != v || !v->IsPrimaryVehicle()) continue;
-			if (argv[1] == "letadlo" && v->type != VehicleType::Aircraft) continue;
-			if (argv.size() > 2) {
-				auto punit2 = ParseInteger(argv[2]);
-				if (punit2.has_value() && v->unitnumber != (UnitID)*punit2) continue;
-			}
+			if (want != VehicleType::Invalid && v->type != want) continue;
+			if (punit2.has_value() && v->unitnumber != (UnitID)*punit2) continue;
 			ShowVehicleViewWindow(v);
 			if (argv[1] == "rozkazy") ShowOrdersWindow(v);
 			IConsolePrint(CC_DEFAULT, "testokno: okno vozidla {} ({}) otevreno.", v->unitnumber, argv[1]);
@@ -6712,6 +6796,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);
 	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);
 	IConsole::CmdRegister("testmesta",               ConTestTowns);
+	IConsole::CmdRegister("testikony",               ConTestIconSizes);
+	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);

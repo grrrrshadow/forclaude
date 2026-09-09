@@ -1356,13 +1356,21 @@ public:
 		}
 
 		/* The decoupling row carries the switch itself, so it is there for any
-		 * station order; what changes is whether the rest of it can be used. */
-		bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
-		bool decoupling = can_decouple && order->ShouldDecoupleOnDeparture();
+		 * station order; what changes is whether the rest of it can be used.
+		 *
+		 * Only in the window that has the row at all. Ships and aircraft are
+		 * built from the other widget tree, which has no coupling row in it and
+		 * therefore no button to reach for: asking for one there hands back
+		 * nothing, and the game reads through that nothing. Same guard as the
+		 * row above -- both are the same row. */
+		if (decouple_sel != nullptr) {
+			bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
+			bool decoupling = can_decouple && order->ShouldDecoupleOnDeparture();
 
-		this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
-				order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
-		this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
+			this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
+					order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
+			this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
+		}
 
 		/* What a coupling order will accept is only worth showing on an order
 		 * that is going to collect something. An order that is not carries no
