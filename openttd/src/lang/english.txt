@@ -5709,6 +5709,10 @@ STR_ERROR_TRAIN_START_NO_POWER                                  :train has no po
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :Can't make road vehicle turn around...
 
 STR_ERROR_AIRCRAFT_IS_IN_FLIGHT                                 :aircraft is in flight
+STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND                        :{WHITE}... aircraft must be on the ground
+STR_ERROR_AIRCRAFT_MUST_BE_EMPTY                                :{WHITE}... aircraft must be empty
+STR_VEHICLE_VIEW_AIRCRAFT_RAID_TOOLTIP                          :{BLACK}Point the crosshair at a spot on the map
+STR_ERROR_CAN_T_RAID_HERE                                       :{WHITE}Can't drop anything here...
 
 # Order related errors
 STR_ERROR_NO_MORE_SPACE_FOR_ORDERS                              :no more space for orders

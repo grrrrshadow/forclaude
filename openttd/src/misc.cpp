@@ -34,6 +34,8 @@
 #include "newgrf_profiling.h"
 #include "3rdparty/monocypher/monocypher.h"
 
+#include "industry.h"
+
 #include "safeguards.h"
 
 extern TileIndex _cur_tileloop_tile;
@@ -101,6 +103,14 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 
 	_pause_mode = {};
 	_game_speed = 100;
+
+	/* And the crosshair is put away with the game it was asked for. The
+	 * switch lives in this player's own head rather than in the savegame, so
+	 * nothing would otherwise take it back: it survived into whatever game
+	 * was loaded next, however old, and only quitting cleared it. The
+	 * player's rule is that an errand not finished does not follow them into
+	 * the next game. */
+	_show_industry_health = false;
 	TimerGameTick::counter = 0;
 	TimerGameEconomy::days_since_last_month = 0;
 	_cur_tileloop_tile = TileIndex{1};

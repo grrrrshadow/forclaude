@@ -5807,6 +5807,10 @@ STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...
 
 STR_ERROR_AIRCRAFT_IS_IN_FLIGHT                                 :{WHITE}Letadlo letí
+STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND                        :{WHITE}... letadlo musí být na zemi
+STR_ERROR_AIRCRAFT_MUST_BE_EMPTY                                :{WHITE}... letadlo musí být prázdné
+STR_VEHICLE_VIEW_AIRCRAFT_RAID_TOOLTIP                          :{BLACK}Zaměř místo na mapě
+STR_ERROR_CAN_T_RAID_HERE                                       :{WHITE}Sem to nejde shodit...
 
 # Order related errors
 STR_ERROR_NO_MORE_SPACE_FOR_ORDERS                              :{WHITE}Nedostatek prostoru na příkazy

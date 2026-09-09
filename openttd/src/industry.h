@@ -112,6 +112,7 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 	ProducedCargoes produced{}; ///< produced cargo slots
 	AcceptedCargoes accepted{}; ///< accepted cargo slots
 	uint8_t prod_level = 0; ///< general production level
+	uint8_t health = 100; ///< how much of the building is still standing, 0 to 100 (see GetIndustryHealthPercent())
 	uint16_t counter = 0; ///< used for animation and/or production (if available cargo)
 
 	IndustryType type = 0; ///< type of industry.
@@ -349,5 +350,15 @@ extern bool _show_industry_health;
  * @return how much of it is left, 0 to 100
  */
 uint GetIndustryHealthPercent(const Industry *i);
+
+/**
+ * Take a slice off an industry's building, and pull it down if that was the
+ * last of it.
+ *
+ * @param i    the industry
+ * @param hurt how much to take off, in percent
+ * @return whether the industry was pulled down (and so no longer exists)
+ */
+bool DamageIndustry(Industry *i, uint hurt);
 
 #endif /* INDUSTRY_H */

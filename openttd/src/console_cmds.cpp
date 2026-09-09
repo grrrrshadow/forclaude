@@ -607,6 +607,141 @@ static bool ConShowTrainOrientation(std::span<std::string_view> argv)
 }
 
 /**
+ * Say why a command refused, without falling over when it did not say.
+ *
+ * A command may fail with no message at all (the build of an airport on a
+ * hillside does), and asking the string table for "no string" takes the game
+ * down -- which is a poor way for a test command to report a refusal.
+ *
+ * @param cost what the command answered
+ * @return the reason, in words
+ */
+static std::string RefusalReason(const CommandCost &cost)
+{
+	StringID err = cost.GetErrorMessage();
+	if (err == INVALID_STRING_ID) return "bez duvodu";
+	return GetString(err);
+}
+
+/**
+ * Put an airport down and buy an aircraft in it, so a raid can be flown
+ * headless. Usage: testletadlo <x> <y>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBuildAircraft(std::span<std::string_view> argv)
+{
+	if (argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Build an airport and an aircraft in it. Usage: 'testletadlo <x> <y>'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]);
+	auto py = ParseInteger(argv[2]);
+	if (!px.has_value() || !py.has_value()) return false;
+
+	TileIndex tile = TileXY((uint)*px, (uint)*py);
+
+	/* A headless game has no company yet, and a command with nobody to act as
+	 * refuses without a word. */
+	if (!Company::IsValidID(CompanyID::Begin())) {
+		Command<Commands::CompanyControl>::Do(DoCommandFlag::Execute, CompanyCtrlAction::New, CompanyID::Invalid(), CompanyRemoveReason{}, ClientID::Invalid);
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "testletadlo: nejde zalozit firma.");
+			return true;
+		}
+	}
+	AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+
+	/* An airport wants flat ground; the rig levels what it was pointed at
+	 * rather than making the player hunt for a spot. */
+	Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY((uint)*px + 5, (uint)*py + 5), tile, false, LevelMode::Level);
+
+	CommandCost port = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, tile, 0, 0, StationID::Invalid(), true);
+	if (port.Failed()) {
+		IConsolePrint(CC_ERROR, "testletadlo: letiste na ({},{}) nejde postavit - {}", *px, *py, RefusalReason(port));
+		return true;
+	}
+
+	/* The first aircraft the year offers; the rig does not care which. The
+	 * hangar is where one is bought, not the airport's own tile. */
+	TileIndex hangar = tile;
+	for (TileIndex t : TileArea(tile, 6, 6)) {
+		if (IsTileType(t, TileType::Station) && IsHangar(t)) { hangar = t; break; }
+	}
+
+	std::string why = "zadny typ letadla";
+	uint tried = 0;
+	for (const Engine *e : Engine::IterateType(VehicleType::Aircraft)) {
+		tried++;
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, hangar, e->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) {
+			why = RefusalReason(cost);
+			continue;
+		}
+		IConsolePrint(CC_DEFAULT, "testletadlo: letiste na ({},{}), hangar ({},{}), letadlo {} koupeno.", *px, *py,
+				TileX(hangar), TileY(hangar), Vehicle::Get(veh)->unitnumber);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testletadlo: letiste stoji, ale zadne z {} letadel nejde koupit - {}", tried, why);
+	return true;
+}
+
+/**
+ * Fly a raid at a spot, the way the crosshair button does. Usage:
+ * testnalet <x> <y> [unit number of the aircraft]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestAirRaid(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Fly an air raid at a spot. Usage: 'testnalet <x> <y> [unit number]'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]);
+	auto py = ParseInteger(argv[2]);
+	if (!px.has_value() || !py.has_value()) return false;
+	std::optional<uint> unit;
+	if (argv.size() > 3) {
+		unit = ParseInteger(argv[3]);
+		if (!unit.has_value()) return false;
+	}
+
+	Vehicle *plane = nullptr;
+	uint planes = 0;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (v->type != VehicleType::Aircraft || v->First() != v) continue;
+		planes++;
+		if (unit.has_value() ? v->unitnumber == (UnitID)*unit : plane == nullptr) plane = v;
+	}
+	if (plane == nullptr) {
+		IConsolePrint(CC_ERROR, "testnalet: zadne letadlo (na mape jich je {}).", planes);
+		return true;
+	}
+
+	TileIndex tile = TileXY(*px, *py);
+	AutoRestoreBackup cur_company(_current_company, plane->owner);
+	CommandCost ret = Command<Commands::AirRaid>::Do(DoCommandFlag::Execute, tile, plane->index);
+	IConsolePrint(CC_DEFAULT, "testnalet: letadlo {} na ({},{}): {}", plane->unitnumber, *px, *py,
+			ret.Failed() ? RefusalReason(ret) : "nalet proveden");
+	return true;
+}
+
+/**
+ * Say how much of each industry building is left. Usage: teststavby
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestIndustryHealth(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	uint count = 0;
+	for (const Industry *i : Industry::Iterate()) {
+		IConsolePrint(CC_DEFAULT, "prumysl {}: ({},{}) stav {} %", i->index.base(), TileX(i->location.tile), TileY(i->location.tile), GetIndustryHealthPercent(i));
+		count++;
+	}
+	IConsolePrint(CC_DEFAULT, "teststavby: prumyslu celkem {}", count);
+	return true;
+}
+
+/**
  * Show, or stop showing, how much of an industry's building is left in its
  * window. Typed as "miluju karla": the console takes the first word as the
  * command and the rest as its arguments, so the second word is asked for
@@ -6479,6 +6614,9 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
+	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
+	IConsole::CmdRegister("testnalet",               ConTestAirRaid);
+	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);

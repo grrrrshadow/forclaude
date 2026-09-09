@@ -170,6 +170,10 @@ static const SaveLoad _industry_desc[] = {
 	SLEG_CONDARR("accepts_cargo", SlIndustryAccepted::old_cargo, VarTypes::U8, INDUSTRY_ORIGINAL_NUM_INPUTS, SaveLoadVersion::StoreIndustryCargo, SaveLoadVersion::ExtendIndustryCargoSlots),
 	SLEG_CONDARR("accepts_cargo", SlIndustryAccepted::old_cargo, VarTypes::U8, INDUSTRY_NUM_INPUTS, SaveLoadVersion::ExtendIndustryCargoSlots, SaveLoadVersion::IndustryCargoReorganise),
 	    SLE_VAR(Industry, prod_level,                 VarTypes::U8),
+	/* How much of the building is left. Saved by name in a table chunk, so a
+	 * game saved before anything could knock a building down loads with every
+	 * industry whole. */
+	    SLE_VAR(Industry, health,                     VarTypes::U8),
 	SLEG_CONDARR("this_month_production", SlIndustryProduced::old_this_month_production, VarTypes::U16, INDUSTRY_ORIGINAL_NUM_OUTPUTS, SaveLoadVersion::MinVersion, SaveLoadVersion::ExtendIndustryCargoSlots),
 	SLEG_CONDARR("this_month_production", SlIndustryProduced::old_this_month_production, VarTypes::U16, INDUSTRY_NUM_OUTPUTS, SaveLoadVersion::ExtendIndustryCargoSlots, SaveLoadVersion::IndustryCargoReorganise),
 	SLEG_CONDARR("this_month_transported", SlIndustryProduced::old_this_month_transported, VarTypes::U16, INDUSTRY_ORIGINAL_NUM_OUTPUTS, SaveLoadVersion::MinVersion, SaveLoadVersion::ExtendIndustryCargoSlots),

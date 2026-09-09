@@ -30,6 +30,8 @@ enum VehicleViewWidgets : WidgetID {
 	WID_VV_FORCE_PROCEED_SEL,  ///< Container for 'force proceed' button, which can be hidden.
 	WID_VV_RESCUE_ENGINE,      ///< Station this train in its depot as a rescue engine; shares a row with 'clone', which it replaces.
 	WID_VV_SELECT_TURN,        ///< Container for the 'turn around' button, which can be hidden.
+	WID_VV_RAID,               ///< Point this aircraft's crosshair at a spot on the map.
+	WID_VV_SELECT_RAID,        ///< Container for the crosshair button, which is only in the window when the player has asked for it.
 	WID_VV_HONK_HORN,          ///< Honk the vehicles horn (not drawn on UI, only used for hotkey).
 };
 

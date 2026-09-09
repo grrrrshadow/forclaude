@@ -32,6 +32,8 @@
 #include "vehicle_func.h"
 #include "sound_func.h"
 #include "animated_tile_func.h"
+#include "aircraft.h"
+#include "airport.h"
 #include "effectvehicle_func.h"
 #include "effectvehicle_base.h"
 #include "ai/ai.hpp"
@@ -42,6 +44,7 @@
 #include "game/game.hpp"
 #include "error.h"
 #include "string_func.h"
+#include "console_func.h"
 #include "industry_cmd.h"
 #include "landscape_cmd.h"
 #include "terraform_cmd.h"
@@ -58,6 +61,8 @@
 #include "safeguards.h"
 
 /** Whether this player's industry windows show how much of the building is left. */
+extern bool _show_train_orientation;
+
 bool _show_industry_health = false;
 
 /**
@@ -65,12 +70,125 @@ bool _show_industry_health = false;
  * @param i the industry
  * @return how much of it is left, 0 to 100
  */
-uint GetIndustryHealthPercent([[maybe_unused]] const Industry *i)
+uint GetIndustryHealthPercent(const Industry *i)
 {
-	/* Nothing wears a building down yet, so every one of them is whole. When
-	 * something does, this is where it is read from, and the window needs no
-	 * changing. */
-	return 100;
+	return i->health;
+}
+
+/**
+ * Take a slice off an industry's building, and pull it down if that was the
+ * last of it.
+ *
+ * Pulling it down is the ordinary closure the game already does when an
+ * industry's day is over: the industry is deleted, which clears its tiles and
+ * closes whatever was looking at it. Nothing is left standing for a building
+ * with nothing left of it.
+ *
+ * @param i    the industry
+ * @param hurt how much to take off, in percent
+ * @return whether the industry was pulled down (and so no longer exists)
+ */
+bool DamageIndustry(Industry *i, uint hurt)
+{
+	if (i->health > hurt) {
+		i->health -= hurt;
+		SetWindowDirty(WindowClass::IndustryView, i->index);
+		return false;
+	}
+
+	i->health = 0;
+	delete i;
+	return true;
+}
+
+/** How far from the spot the smoke is scattered, in tiles each way. */
+static const uint RAID_REACH = 1;
+/** How much of a building one raid takes off, in percent: four of them pull it down. */
+static const uint RAID_HURT = 30;
+/** How long the smoke of a raid hangs about: three weeks, in ticks. */
+static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
+
+/**
+ * Scatter the smoke of an air raid over a spot, and take it out of whatever
+ * industry stands under it.
+ *
+ * The player asked for this: an aircraft with nothing aboard, standing on the
+ * ground, is given a crosshair, and where it is pointed the smoke of a crash
+ * comes down. A building caught under it loses a slice of what it is made of
+ * (#DamageIndustry), and four raids pull it down.
+ *
+ * A command rather than something the window does itself, because it changes
+ * the world: the smoke, the damage and the pulling down all have to happen on
+ * every machine in a network game and in the same order, which is what going
+ * through a command is for.
+ *
+ * @param flags  type of operation
+ * @param tile   where the crosshair was put down
+ * @param veh_id the aircraft doing it
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
+{
+	Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (v == nullptr || v->type != VehicleType::Aircraft || v->First() != v) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (tile >= Map::Size()) return CMD_ERROR;
+
+	/* The player's rule: an empty aircraft, and one that is on the ground.
+	 * Empty is asked of the whole aircraft, its mail compartment included --
+	 * a plane with something aboard is carrying it somewhere. */
+	const Aircraft *a = Aircraft::From(v);
+	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND);
+	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+		if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
+	}
+
+	if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();
+
+	/* The smoke first, so it is there whatever happens to the buildings under
+	 * it, and one puff per tile so the spot is covered rather than dotted. */
+	/* One tile to start with, then grown by the reach in every direction: a
+	 * TileArea made from a single tile is empty until it is told it is one
+	 * tile wide, and grown from empty it comes out lopsided. */
+	TileArea area(tile, 1, 1);
+	area.Expand(RAID_REACH);
+	uint puffs = 0;
+	for (TileIndex t : area) {
+		EffectVehicle *smoke = CreateEffectVehicleAbove(TileX(t) * TILE_SIZE + TILE_SIZE / 2,
+				TileY(t) * TILE_SIZE + TILE_SIZE / 2, 0, EV_BREAKDOWN_SMOKE);
+		if (smoke == nullptr) continue;
+		smoke->animation_state = RAID_SMOKE_LIFE;
+		puffs++;
+	}
+
+	/* And what it came down on. Each industry is hurt once however many of its
+	 * tiles are under the smoke, so a big works is not pulled down faster than
+	 * a small one for being big. Collected first and hurt afterwards, because
+	 * hurting one can delete it and walking the map over a deleted industry is
+	 * how this would go wrong. */
+	std::set<IndustryID> caught;
+	for (TileIndex t : area) {
+		if (IsTileType(t, TileType::Industry)) caught.insert(GetIndustryIndex(t));
+	}
+	for (IndustryID id : caught) {
+		Industry *i = Industry::GetIfValid(id);
+		if (i == nullptr) continue;
+		uint before = i->health;
+		bool gone = DamageIndustry(i, RAID_HURT);
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "nalet: prumysl {} na ({},{}) {} -> {}", id.base(), TileX(i->location.tile), TileY(i->location.tile),
+					before, gone ? "zbouran" : fmt::format("{}", (uint)i->health));
+		}
+	}
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "nalet: na ({},{}) {} obláčků, zasazeno prumyslu {}", TileX(tile), TileY(tile), puffs, (uint)caught.size());
+	}
+
+	return CommandCost();
 }
 
 IndustryPool _industry_pool("Industry");

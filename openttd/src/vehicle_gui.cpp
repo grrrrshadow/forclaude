@@ -20,6 +20,9 @@
 #include "roadveh.h"
 #include "train.h"
 #include "aircraft.h"
+#include "airport.h"
+#include "industry.h"
+#include "industry_cmd.h"
 #include "depot_map.h"
 #include "group_gui.h"
 #include "strings_func.h"
@@ -2908,6 +2911,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND), SetMinimalSize(18, 18),
 												SetSpriteTip(SPR_FORCE_VEHICLE_TURN, STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP),
 			EndContainer(),
+			/* The crosshair, on a row of its own so the buttons that were
+			 * there before stay where they were: a row appears under them
+			 * rather than one of them being taken away. Only in the window
+			 * when the player has asked for it -- see _show_industry_health
+			 * and ShowsRaidButton(). */
+			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_RAID),
+				NWidget(WWT_IMGBTN, Colours::Grey, WID_VV_RAID), SetMinimalSize(18, 18),
+											SetSpriteTip(SPR_IMG_CROSSHAIR, STR_VEHICLE_VIEW_AIRCRAFT_RAID_TOOLTIP),
+			EndContainer(),
 			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SHOW_ORDERS), SetMinimalSize(18, 18), SetSpriteTip(SPR_SHOW_ORDERS),
 			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SHOW_DETAILS), SetMinimalSize(18, 18), SetSpriteTip(SPR_SHOW_VEHICLE_DETAILS),
 			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(18, 0), SetResize(0, 1), EndContainer(),
@@ -3038,6 +3050,32 @@ static bool IsVehicleRefittable(const Vehicle *v)
  * @param v The vehicle the window is showing.
  * @return Whether the button belongs in the window.
  */
+/**
+ * Does this vehicle's window carry the crosshair button?
+ *
+ * Only when the player has asked to see it (the console switch), only their
+ * own aircraft, and only one standing on the ground with nothing aboard --
+ * the player's rule. A plane in the air is flying somewhere, and one with
+ * cargo in it is carrying it.
+ *
+ * @param v the vehicle the window is for
+ * @return whether the button belongs in it
+ */
+static bool ShowsRaidButton(const Vehicle *v)
+{
+	if (!_show_industry_health) return false;
+	if (v->type != VehicleType::Aircraft || v->owner != _local_company) return false;
+	if (!Aircraft::From(v)->IsNormalAircraft()) return false;
+
+	const Aircraft *a = Aircraft::From(v);
+	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return false;
+
+	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+		if (u->cargo.TotalCount() != 0) return false;
+	}
+	return true;
+}
+
 static bool ShowsRescueEngineButton(const Vehicle *v)
 {
 	if (v->type != VehicleType::Train) return false;
@@ -3589,6 +3627,20 @@ public:
 				assert(v->type == VehicleType::Train);
 				Command<Commands::ForceTrainProceed>::Post(STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL, v->tile, v->index);
 				break;
+			case WID_VV_RAID: // point the crosshair at a spot on the map
+				/* Pressed again, or with the crosshair already out, puts it
+				 * away. One press, one raid: the mode ends itself when the
+				 * spot is picked (see OnPlaceObject), so nothing is left
+				 * armed behind the player's back. */
+				if (this->IsWidgetLowered(WID_VV_RAID)) {
+					ResetObjectToPlace();
+				} else {
+					SetObjectToPlaceWnd(SPR_CURSOR_CROSSHAIR, PAL_NONE, HT_RECT, this);
+					this->SetWidgetLoweredState(WID_VV_RAID, true);
+					this->SetWidgetDirty(WID_VV_RAID);
+				}
+				break;
+
 			case WID_VV_RESCUE_ENGINE: // station here as a rescue engine, or stand down; on wagons: call a tow for them
 				assert(v->type == VehicleType::Train);
 				if (IsWaitingWagonChain(v)) {
@@ -3620,6 +3672,23 @@ public:
 		if (!str.has_value()) return;
 
 		Command<Commands::RenameVehicle>::Post(STR_ERROR_CAN_T_RENAME_TRAIN + to_underlying(Vehicle::Get(this->window_number)->type), static_cast<VehicleID>(this->window_number), *str);
+	}
+
+	/** The crosshair has been put down somewhere: that is the raid. */
+	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
+	{
+		Command<Commands::AirRaid>::Post(STR_ERROR_CAN_T_RAID_HERE, tile, static_cast<VehicleID>(this->window_number));
+		/* One press, one raid. The player asked that nothing stay armed: the
+		 * mode ends here whether the raid came off or not, and the button
+		 * comes back up with it (see OnPlaceObjectAbort). */
+		ResetObjectToPlace();
+	}
+
+	/** The crosshair has been put away, however that happened. */
+	void OnPlaceObjectAbort() override
+	{
+		this->SetWidgetLoweredState(WID_VV_RAID, false);
+		this->SetWidgetDirty(WID_VV_RAID);
 	}
 
 	void OnMouseOver([[maybe_unused]] Point pt, WidgetID widget) override
@@ -3694,6 +3763,7 @@ public:
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(!wagons && v->type == VehicleType::Train ? 0 : SZSP_NONE);
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN)->SetDisplayedPlane(wagons ? SZSP_NONE : 0);
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_TURN)->SetDisplayedPlane(!wagons && v->IsGroundVehicle() ? 0 : SZSP_NONE);
+		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_RAID)->SetDisplayedPlane(ShowsRaidButton(v) ? 0 : SZSP_NONE);
 		return changed;
 	}
 
