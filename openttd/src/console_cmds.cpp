@@ -3351,6 +3351,78 @@ static bool ConTestReverse(std::span<std::string_view> argv)
 	return true;
 }
 
+/** Find the head of a train by its unit number, or nullptr. */
+static Train *FindTrainByUnit(uint unit)
+{
+	for (Train *t : Train::Iterate()) {
+		if (t->First() == t && t->unitnumber == (UnitID)unit) return t;
+	}
+	return nullptr;
+}
+
+/**
+ * Flip a single vehicle standing in a depot, the way Ctrl+click in the depot
+ * window does. Usage: testpreklop <unit number> [vehicle position, 0 = head]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestFlipInDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Flip one vehicle of a train standing in a depot. Usage: 'testpreklop <unit number> [position]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	uint pos = 0;
+	if (argv.size() > 2) {
+		auto ppos = ParseInteger(argv[2]);
+		if (!ppos.has_value()) return false;
+		pos = (uint)*ppos;
+	}
+	Train *t = FindTrainByUnit((uint)*punit);
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testpreklop: vlak {} nenalezen.", argv[1]);
+		return true;
+	}
+	Train *u = t;
+	for (uint i = 0; i < pos && u != nullptr; i++) u = u->GetNextVehicle();
+	if (u == nullptr) {
+		IConsolePrint(CC_ERROR, "testpreklop: vlak {} nema clanek c.{}.", argv[1], pos);
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+	CommandCost ret = Command<Commands::ReverseTrainDirection>::Do(DoCommandFlag::Execute, u->index, true);
+	IConsolePrint(CC_DEFAULT, "testpreklop: vlak {} clanek {}: {} (otoceny {})", t->unitnumber, u->index.base(),
+			ret.Failed() ? GetString(ret.GetErrorMessage()) : "preklopen", u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne");
+	return true;
+}
+
+/**
+ * Move a whole train behind the last vehicle of another one, both standing in
+ * the same depot -- the drag in the depot window. Usage: testpresun <src> <dst>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestMoveInDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Hang a train on the tail of another in a depot. Usage: 'testpresun <unit number> <unit number of the train to join>'.");
+		return true;
+	}
+	auto psrc = ParseInteger(argv[1]);
+	auto pdst = ParseInteger(argv[2]);
+	if (!psrc.has_value() || !pdst.has_value()) return false;
+	Train *src = FindTrainByUnit((uint)*psrc);
+	Train *dst = FindTrainByUnit((uint)*pdst);
+	if (src == nullptr || dst == nullptr) {
+		IConsolePrint(CC_ERROR, "testpresun: vlak nenalezen.");
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, src->owner);
+	CommandCost ret = Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, src->index, dst->Last()->index, true);
+	IConsolePrint(CC_DEFAULT, "testpresun: vlak {} za vlak {}: {}", *psrc, *pdst, ret.Failed() ? GetString(ret.GetErrorMessage()) : "presunut");
+	return true;
+}
+
 /**
  * Tear a train open: move its leading vehicle on by a few pixels while
  * everything behind it stands still, so the consist runs with a hole in it.
@@ -6355,6 +6427,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
+	IConsole::CmdRegister("testpreklop",             ConTestFlipInDepot);
+	IConsole::CmdRegister("testpresun",              ConTestMoveInDepot);
 	IConsole::CmdRegister("testmezera",              ConTestTearConsist);
 	IConsole::CmdRegister("teststartdepo",           ConTestStartDepot);
 	IConsole::CmdRegister("testklon",                ConTestClone);
