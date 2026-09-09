@@ -874,6 +874,11 @@ static void MaybeCrashAirplane(Aircraft *v);
  * @param v the aircraft
  * @return whether the errand took the tick (the caller then does nothing else)
  */
+/** How far out the run in starts, in tiles. */
+static const uint RAID_DIVE_TILES = 8;
+/** How fast the aircraft sinks and climbs on the run in, in pixels a step. */
+static const int RAID_DIVE_RATE = 2;
+
 static bool AircraftRaidController(Aircraft *v)
 {
 	if (v->raid_target == INVALID_TILE || v->state != FLYING) return false;
@@ -885,8 +890,9 @@ static bool AircraftRaidController(Aircraft *v)
 	 * width of a tile is as exact as this needs to be. */
 	if (abs(v->x_pos - tx) + abs(v->y_pos - ty) <= (int)TILE_SIZE / 2) {
 		TileIndex target = v->raid_target;
+		Direction facing = v->direction;
 		v->raid_target = INVALID_TILE;
-		DropRaidSmoke(target);
+		DropRaidSmoke(target, facing);
 
 		/* And home to the shed, which is where the player sent it from and
 		 * where an aircraft with nothing else to do belongs. An aircraft with
@@ -904,10 +910,27 @@ static bool AircraftRaidController(Aircraft *v)
 	Direction newdir = GetDirectionTowards(v, tx, ty);
 	if (newdir != v->direction) v->direction = newdir;
 
+	/* Come down on the run in, the way an aircraft comes down to land, and
+	 * climb back afterwards -- which the ordinary flying code does by itself
+	 * once the errand is over. Height is closed gradually rather than set, so
+	 * the aircraft sinks instead of dropping. */
+	int flight_level = GetAircraftFlightLevel(v);
+	int want = flight_level;
+	uint away = (abs(v->x_pos - tx) + abs(v->y_pos - ty)) / TILE_SIZE;
+	if (away <= RAID_DIVE_TILES) {
+		int ground = GetSlopePixelZ(v->x_pos, v->y_pos, true);
+		int low = ground + AIRCRAFT_MIN_FLYING_ALTITUDE / 2;
+		/* All the way down at the target, the whole way up at the far end of
+		 * the run in. */
+		want = low + (flight_level - low) * (int)away / (int)RAID_DIVE_TILES;
+	}
+
 	while (count-- > 0) {
 		GetNewVehiclePosResult gp = GetNewVehiclePos(v);
 		v->tile = gp.new_tile;
-		SetAircraftPosition(v, gp.x, gp.y, GetAircraftFlightLevel(v));
+		int z = v->z_pos;
+		if (z != want) z += Clamp(want - z, -RAID_DIVE_RATE, RAID_DIVE_RATE);
+		SetAircraftPosition(v, gp.x, gp.y, z);
 	}
 	return true;
 }

@@ -3793,13 +3793,37 @@ public:
 		return changed;
 	}
 
+	/** Set when a row has come or gone and the window has yet to be rebuilt. */
+	bool rows_changed = false;
+
 	/** Selects appropriate plane for current state of the shown vehicle. */
 	void UpdatePlanes()
 	{
 		/* A row appearing or disappearing changes the window's size, which only
 		 * a re-layout works out; selecting a plane on its own would leave the
-		 * old size behind. */
-		if (this->UpdateRowPlanes(Vehicle::Get(this->window_number))) this->ReInit();
+		 * old size behind.
+		 *
+		 * But not here. This runs from inside a click being handed to this
+		 * very window, and a re-layout throws away every widget in it -- the
+		 * one the click is still being delivered to included, which the code
+		 * that delivered it goes on to use. That is a read of freed memory
+		 * and it is what took the game down twice on the player's machine:
+		 * once on a click meant for the crosshair that landed on the button
+		 * beside it, once on the orders button after the errand was over and
+		 * the crosshair row was on its way out. Same shape as the couple
+		 * filter row in the orders window (see OrdersWindow::OnMouseLoop):
+		 * note it here and rebuild between frames. */
+		if (this->UpdateRowPlanes(Vehicle::Get(this->window_number))) this->rows_changed = true;
+	}
+
+	void OnMouseLoop() override
+	{
+		/* Between frames, with no click on its way in and nothing being drawn:
+		 * the one safe moment to move every widget in the window. */
+		if (this->rows_changed) {
+			this->rows_changed = false;
+			this->ReInit();
+		}
 	}
 
 	/**

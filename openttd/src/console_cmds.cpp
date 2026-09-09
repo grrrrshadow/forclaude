@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "train.h"
 #include "industry.h"
+#include "town.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
 #include "console_gui.h"
@@ -780,6 +781,20 @@ static bool ConTestAimCrosshair(std::span<std::string_view> argv)
 	Point pt = {0, 0};
 	w->OnPlaceObject(pt, TileXY((uint)*px, (uint)*py));
 	IConsolePrint(CC_DEFAULT, "testzamerit: polozeno na ({},{})", *px, *py);
+	return true;
+}
+
+/**
+ * Say where the towns are, so a raid can be aimed at one. Usage: testmesta
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestTowns(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	for (const Town *t : Town::Iterate()) {
+		IConsolePrint(CC_DEFAULT, "mesto {}: ({},{}) obyvatel {} domu {}", t->index.base(), TileX(t->xy), TileY(t->xy),
+				t->cache.population, t->cache.num_houses);
+	}
 	return true;
 }
 
@@ -6696,6 +6711,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testnalet",               ConTestAirRaid);
 	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);
 	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);
+	IConsole::CmdRegister("testmesta",               ConTestTowns);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);

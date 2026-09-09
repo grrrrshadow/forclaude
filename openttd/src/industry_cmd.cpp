@@ -102,8 +102,12 @@ bool DamageIndustry(Industry *i, uint hurt)
 	return true;
 }
 
-/** How far from the spot the smoke is scattered, in tiles each way. */
-static const uint RAID_REACH = 1;
+/** Half the length of a raid's carpet, along the line of flight, in tiles. */
+static const int RAID_LENGTH = 3;
+/** Half the width of a raid's carpet, across the line of flight, in tiles. */
+static const int RAID_WIDTH = 1;
+/** Where the carpet stops being solid: past this, only every other tile smokes. */
+static const int RAID_SOLID = 1;
 /** How much of a building one raid takes off, in percent: four of them pull it down. */
 static const uint RAID_HURT = 30;
 /** How long the smoke of a raid hangs about: three weeks, in ticks. */
@@ -112,42 +116,80 @@ static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
 static const int RAID_HEALTH_SHOWN_DAYS = 14;
 
 /**
- * Scatter the smoke of an air raid over a spot, and take it out of whatever
- * industry stands under it.
+ * The tiles a raid covers: a carpet laid along the line of flight.
  *
- * The player asked for this: an aircraft with nothing aboard, standing on the
- * ground, is given a crosshair, and where it is pointed the smoke of a crash
- * comes down. A building caught under it loses a slice of what it is made of
- * (#DamageIndustry), and four raids pull it down.
+ * Seven tiles long and three wide, lying the way the aircraft was heading.
+ * The middle three by three is solid smoke; the two tiles at each end are
+ * thinner, every other tile of them, so the carpet fades out rather than
+ * ending square.
  *
- * A command rather than something the window does itself, because it changes
- * the world: the smoke, the damage and the pulling down all have to happen on
- * every machine in a network game and in the same order, which is what going
- * through a command is for.
- *
- * @param flags  type of operation
  * @param tile   where the crosshair was put down
- * @param veh_id the aircraft doing it
- * @return the cost of this operation or an error
+ * @param facing which way the aircraft was heading
+ * @return the tiles that smoke, the middle of the carpet first
  */
+static std::vector<TileIndex> RaidCarpet(TileIndex tile, Direction facing)
+{
+	/* The nearest of the four diagonal directions gives the axis to lay the
+	 * carpet along; a carpet at 45 degrees is not a carpet the player can
+	 * aim. */
+	DiagDirection along = DirToDiagDir(facing);
+	int step_x = (along == DiagDirection::SW) ? 1 : (along == DiagDirection::NE ? -1 : 0);
+	int step_y = (along == DiagDirection::SE) ? 1 : (along == DiagDirection::NW ? -1 : 0);
+	/* Across is the other axis. */
+	int cross_x = (step_x == 0) ? 1 : 0;
+	int cross_y = (step_y == 0) ? 1 : 0;
+
+	int x = TileX(tile);
+	int y = TileY(tile);
+
+	std::vector<TileIndex> tiles;
+	for (int along_i = -RAID_LENGTH; along_i <= RAID_LENGTH; along_i++) {
+		for (int cross_i = -RAID_WIDTH; cross_i <= RAID_WIDTH; cross_i++) {
+			/* Thin at the ends: every other tile, so half of them. */
+			if (abs(along_i) > RAID_SOLID && ((along_i + cross_i) & 1) != 0) continue;
+
+			int tx = x + along_i * step_x + cross_i * cross_x;
+			int ty = y + along_i * step_y + cross_i * cross_y;
+			if (tx < 0 || ty < 0 || tx >= (int)Map::SizeX() || ty >= (int)Map::SizeY()) continue;
+			tiles.push_back(TileXY(tx, ty));
+		}
+	}
+	return tiles;
+}
+
 /**
- * Drop the smoke of a raid over a spot and take it out of whatever industry
- * stands under it.
+ * How many houses one raid on a town knocks down.
+ *
+ * The player's numbers: mostly one, sometimes two, rarely three. Nothing is
+ * levelled wholesale -- a raid dents a town, it does not erase it.
+ *
+ * @return the number of houses to pull down
+ */
+static uint RaidHousesToLevel()
+{
+	uint roll = RandomRange(10);
+	if (roll < 6) return 1;
+	if (roll < 9) return 2;
+	return 3;
+}
+
+/**
+ * Drop the smoke of a raid over a spot and take it out of what stands under
+ * it: industry buildings lose a slice of what they are made of, towns lose
+ * houses and the people in them.
  *
  * Called when the aircraft gets there, not when the player points at the
  * spot: the errand is a flight, and this is its end.
  *
- * @param tile where the smoke comes down
+ * @param tile   where the smoke comes down
+ * @param facing which way the aircraft was heading, so the carpet lies along it
  */
-void DropRaidSmoke(TileIndex tile)
+void DropRaidSmoke(TileIndex tile, Direction facing)
 {
-	/* One tile to start with, then grown by the reach in every direction: a
-	 * TileArea made from a single tile is empty until it is told it is one
-	 * tile wide, and grown from empty it comes out lopsided. */
-	TileArea area(tile, 1, 1);
-	area.Expand(RAID_REACH);
+	std::vector<TileIndex> carpet = RaidCarpet(tile, facing);
+
 	uint puffs = 0;
-	for (TileIndex t : area) {
+	for (TileIndex t : carpet) {
 		EffectVehicle *smoke = CreateEffectVehicleAbove(TileX(t) * TILE_SIZE + TILE_SIZE / 2,
 				TileY(t) * TILE_SIZE + TILE_SIZE / 2, 0, EV_BREAKDOWN_SMOKE);
 		if (smoke == nullptr) continue;
@@ -155,15 +197,18 @@ void DropRaidSmoke(TileIndex tile)
 		puffs++;
 	}
 
-	/* And what it came down on. Each industry is hurt once however many of its
-	 * tiles are under the smoke, so a big works is not pulled down faster than
-	 * a small one for being big. Collected first and hurt afterwards, because
-	 * hurting one can delete it and walking the map over a deleted industry is
-	 * how this would go wrong. */
+	/* What the smoke came down on. Each industry is hurt once however many of
+	 * its tiles are under the carpet, so a big works is not pulled down faster
+	 * than a small one for being big. Collected first and hurt afterwards,
+	 * because hurting one can delete it and walking the map over a deleted
+	 * industry is how this would go wrong. */
 	std::set<IndustryID> caught;
-	for (TileIndex t : area) {
+	std::vector<TileIndex> houses;
+	for (TileIndex t : carpet) {
 		if (IsTileType(t, TileType::Industry)) caught.insert(GetIndustryIndex(t));
+		if (IsTileType(t, TileType::House)) houses.push_back(t);
 	}
+
 	for (IndustryID id : caught) {
 		Industry *i = Industry::GetIfValid(id);
 		if (i == nullptr) continue;
@@ -172,6 +217,27 @@ void DropRaidSmoke(TileIndex tile)
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "nalet: prumysl {} na ({},{}) {} -> {}", id.base(), TileX(tile), TileY(tile),
 					before, gone ? "zbouran" : fmt::format("{}", (uint)i->health));
+		}
+	}
+
+	/* And the town. A house that comes down takes its people with it (that is
+	 * what clearing one does), and what is left is bare broken ground until
+	 * the town builds there again. */
+	uint levelled = 0;
+	if (!houses.empty()) {
+		uint wanted = RaidHousesToLevel();
+		while (levelled < wanted && !houses.empty()) {
+			size_t pick = RandomRange((uint)houses.size());
+			TileIndex t = houses[pick];
+			houses.erase(houses.begin() + pick);
+			if (!IsTileType(t, TileType::House)) continue; // a neighbour took it down with it
+
+			Town *town = Town::GetByTile(t);
+			ClearTownHouse(town, t);
+			/* Rubble, not a lawn. */
+			if (IsTileType(t, TileType::Clear)) MakeClear(t, ClearGround::Rough, 3);
+			MarkTileDirtyByTile(t);
+			levelled++;
 		}
 	}
 
@@ -184,7 +250,8 @@ void DropRaidSmoke(TileIndex tile)
 	SetWindowClassesDirty(WindowClass::IndustryView);
 
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "nalet: na ({},{}) {} oblacku, zasazeno prumyslu {}", TileX(tile), TileY(tile), puffs, (uint)caught.size());
+		IConsolePrint(CC_INFO, "nalet: na ({},{}) smer {} - {} oblacku, prumyslu {}, domu srovnano {}",
+				TileX(tile), TileY(tile), to_underlying(facing), puffs, (uint)caught.size(), levelled);
 	}
 }
 
