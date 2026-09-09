@@ -49,6 +49,8 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_group_livery.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rescue.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_stwp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair_cursor.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_rocks.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_snowy_rocks_1.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_snowy_rocks_2.png

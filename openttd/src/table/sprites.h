@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 210;
+static const uint16_t OPENTTD_SPRITE_COUNT = 212;
 /** @} */
 
 /** @{
@@ -206,6 +206,12 @@ static const SpriteID SPR_BLUEPRINT_TOOLBAR          = SPR_OPENTTD_BASE + 207;
 /* Rescue engine button (hammer and wrench, artwork from icons8.com -- see CREDITS.md). */
 static const SpriteID SPR_IMG_RESCUE_ENGINE          = SPR_OPENTTD_BASE + 208;
 static const SpriteID SPR_IMG_WAYPOINT_STATION       = SPR_OPENTTD_BASE + 209; ///< Station-waypoint build button (see #WPF_STATION_SEARCH).
+
+/* Crosshair, artwork from icons8.com -- see CREDITS.md. The button icon is
+ * grey like every other button; the cursor is red and carries its hotspot in
+ * the middle, written as the offset on its line in openttdgui.nfo. */
+static const SpriteID SPR_IMG_CROSSHAIR              = SPR_OPENTTD_BASE + 210;
+static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
