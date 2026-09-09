@@ -898,16 +898,21 @@ static bool ConTestSmoke(std::span<std::string_view> argv)
 static bool ConIndustryHealth(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
-	if (argv.size() < 2 || argv[1] != "karla") {
+	/* "mm" is the same switch with less typing, for as long as this is being
+	 * tried out; it goes away with the testing. Under that name there is no
+	 * second word to step over. */
+	const size_t first = (argv[0] == "mm") ? 1 : 2;
+	if (first == 2 && (argv.size() < 2 || argv[1] != "karla")) {
 		IConsolePrint(CC_HELP, "Show how much of an industry's building is left, in its own window.");
 		IConsolePrint(CC_HELP, "Usage: 'miluju karla' to flip it, or 'miluju karla on' / 'miluju karla off'.");
+		IConsolePrint(CC_HELP, "'mm' is the short way of typing the same thing, while this is being tested.");
 		return true;
 	}
 
-	if (argv.size() >= 3) {
-		if (argv[2] == "on" || argv[2] == "1") {
+	if (argv.size() > first) {
+		if (argv[first] == "on" || argv[first] == "1") {
 			_show_industry_health = true;
-		} else if (argv[2] == "off" || argv[2] == "0") {
+		} else if (argv[first] == "off" || argv[first] == "0") {
 			_show_industry_health = false;
 		} else {
 			return false;
@@ -916,9 +921,16 @@ static bool ConIndustryHealth(std::span<std::string_view> argv)
 		_show_industry_health = !_show_industry_health;
 	}
 
-	/* The windows that are already open pick it up on their next painting:
-	 * the panel measures what it drew and grows or shrinks by itself. */
+	/* The industry windows that are already open pick it up on their next
+	 * painting: the panel measures what it drew and grows or shrinks by
+	 * itself. */
 	SetWindowClassesDirty(WindowClass::IndustryView);
+	/* The vehicle windows cannot. Whether the crosshair is in one is decided
+	 * when the window works out its rows, and that only runs when something
+	 * tells the window its contents have changed -- painting it again is not
+	 * enough. Without this the crosshair turned up only after the player shut
+	 * the window and opened it again. */
+	InvalidateWindowClassesData(WindowClass::VehicleView);
 
 	IConsolePrint(CC_DEFAULT, "Stav budovy prumyslu je ted {}.", _show_industry_health ? "videt" : "schovany");
 	return true;
@@ -3245,7 +3257,16 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 			if (punit2.has_value() && v->unitnumber != (UnitID)*punit2) continue;
 			ShowVehicleViewWindow(v);
 			if (argv[1] == "rozkazy") ShowOrdersWindow(v);
-			IConsolePrint(CC_DEFAULT, "testokno: okno vozidla {} ({}) otevreno.", v->unitnumber, argv[1]);
+			/* Whether the crosshair row is in the window right now, not
+			 * whether it would be there if the window were opened again: the
+			 * switch has to reach windows that are already open. */
+			std::string_view crosshair = "?";
+			if (Window *w = FindWindowById(WindowClass::VehicleView, v->index); w != nullptr) {
+				if (NWidgetStacked *sel = w->GetWidget<NWidgetStacked>(WID_VV_SELECT_RAID); sel != nullptr) {
+					crosshair = sel->shown_plane == SZSP_NONE ? "ne" : "ano";
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "testokno: okno vozidla {} ({}) otevreno, zamerovac v okne: {}.", v->unitnumber, argv[1], crosshair);
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "testokno: zadne takove vozidlo.");
@@ -6791,6 +6812,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
+	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testnalet",               ConTestAirRaid);
 	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);
