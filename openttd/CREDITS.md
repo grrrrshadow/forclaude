@@ -84,8 +84,8 @@ which stays theirs and is named here.
   and ported here to 16.0-beta2; GPL v2, the same licence as OpenTTD itself.
   Original at https://github.com/age77/openttd-15.3-blueprint
 - Icons8 (https://icons8.com) - The hammer-and-wrench artwork the rescue-engine
-  button is drawn from, and the "accuracy" crosshair the crosshair button and
-  the red crosshair mouse cursor are drawn from.
+  button is drawn from, and the crosshair the crosshair button and the red
+  crosshair mouse cursor are drawn from.
 - Palo123, also known as Karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's

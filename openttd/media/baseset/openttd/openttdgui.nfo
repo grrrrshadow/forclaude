@@ -215,5 +215,5 @@
    -1 sprites/openttdgui_blueprint.png 8bpp 362    2  20  20   0   0 normal
    -1 sprites/openttdgui_rescue.png 8bpp   2    2  16  16   0   0 normal
    -1 sprites/openttdgui_stwp.png 8bpp   2    2  20  20   0   0 normal
-   -1 sprites/openttdgui_crosshair.png 8bpp   2    2  20  20   0   0 normal
+   -1 sprites/openttdgui_crosshair.png 8bpp   2    2  16  16   0   0 normal
    -1 sprites/openttdgui_crosshair_cursor.png 8bpp   2    2  32  32 -16 -16 normal
