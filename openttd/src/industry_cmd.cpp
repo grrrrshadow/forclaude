@@ -64,6 +64,7 @@
 extern bool _show_train_orientation;
 
 bool _show_industry_health = false;
+TimerGameEconomy::Date _industry_health_until{};
 
 /**
  * How much of an industry's building is still standing, as a percentage.
@@ -107,6 +108,8 @@ static const uint RAID_REACH = 1;
 static const uint RAID_HURT = 30;
 /** How long the smoke of a raid hangs about: three weeks, in ticks. */
 static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
+/** How long what is left of the buildings stays readable after a raid. */
+static const int RAID_HEALTH_SHOWN_DAYS = 14;
 
 /**
  * Scatter the smoke of an air raid over a spot, and take it out of whatever
@@ -127,29 +130,17 @@ static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
  * @param veh_id the aircraft doing it
  * @return the cost of this operation or an error
  */
-CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
+/**
+ * Drop the smoke of a raid over a spot and take it out of whatever industry
+ * stands under it.
+ *
+ * Called when the aircraft gets there, not when the player points at the
+ * spot: the errand is a flight, and this is its end.
+ *
+ * @param tile where the smoke comes down
+ */
+void DropRaidSmoke(TileIndex tile)
 {
-	Vehicle *v = Vehicle::GetIfValid(veh_id);
-	if (v == nullptr || v->type != VehicleType::Aircraft || v->First() != v) return CMD_ERROR;
-
-	CommandCost ret = CheckOwnership(v->owner);
-	if (ret.Failed()) return ret;
-
-	if (tile >= Map::Size()) return CMD_ERROR;
-
-	/* The player's rule: an empty aircraft, and one that is on the ground.
-	 * Empty is asked of the whole aircraft, its mail compartment included --
-	 * a plane with something aboard is carrying it somewhere. */
-	const Aircraft *a = Aircraft::From(v);
-	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND);
-	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
-		if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
-	}
-
-	if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();
-
-	/* The smoke first, so it is there whatever happens to the buildings under
-	 * it, and one puff per tile so the spot is covered rather than dotted. */
 	/* One tile to start with, then grown by the reach in every direction: a
 	 * TileArea made from a single tile is empty until it is told it is one
 	 * tile wide, and grown from empty it comes out lopsided. */
@@ -179,15 +170,77 @@ CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 		uint before = i->health;
 		bool gone = DamageIndustry(i, RAID_HURT);
 		if (_show_train_orientation) {
-			IConsolePrint(CC_INFO, "nalet: prumysl {} na ({},{}) {} -> {}", id.base(), TileX(i->location.tile), TileY(i->location.tile),
+			IConsolePrint(CC_INFO, "nalet: prumysl {} na ({},{}) {} -> {}", id.base(), TileX(tile), TileY(tile),
 					before, gone ? "zbouran" : fmt::format("{}", (uint)i->health));
 		}
 	}
 
+	/* The errand is over, so the crosshair is put away and the player has to
+	 * ask for it again. What is left of the buildings stays readable for a
+	 * fortnight, so the raid can be judged after it. */
+	_show_industry_health = false;
+	_industry_health_until = TimerGameEconomy::date + RAID_HEALTH_SHOWN_DAYS;
+	InvalidateWindowClassesData(WindowClass::IndustryView);
+	SetWindowClassesDirty(WindowClass::IndustryView);
+
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "nalet: na ({},{}) {} obláčků, zasazeno prumyslu {}", TileX(tile), TileY(tile), puffs, (uint)caught.size());
+		IConsolePrint(CC_INFO, "nalet: na ({},{}) {} oblacku, zasazeno prumyslu {}", TileX(tile), TileY(tile), puffs, (uint)caught.size());
+	}
+}
+
+/**
+ * Send an aircraft to drop smoke on a spot.
+ *
+ * The player points the crosshair; this hands the aircraft the errand and it
+ * flies there itself (see AircraftRaidController()). One aircraft at a time,
+ * and only one that is empty and standing on the ground -- the player's rule.
+ *
+ * A command rather than something the window does itself, because it changes
+ * the world: in a network game the flight, the smoke and the damage have to
+ * happen on every machine alike.
+ *
+ * @param flags  type of operation
+ * @param tile   where the crosshair was put down
+ * @param veh_id the aircraft to send
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
+{
+	Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (v == nullptr || v->type != VehicleType::Aircraft || v->First() != v) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (tile >= Map::Size()) return CMD_ERROR;
+
+	Aircraft *a = Aircraft::From(v);
+	if (!a->IsNormalAircraft()) return CMD_ERROR;
+
+	/* The player's rule: an empty aircraft, and one that is on the ground.
+	 * Empty is asked of the whole aircraft, its mail compartment included --
+	 * a plane with something aboard is carrying it somewhere. */
+	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND);
+	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+		if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
 	}
 
+	/* One at a time. */
+	for (const Aircraft *other : Aircraft::Iterate()) {
+		if (other != a && other->raid_target != INVALID_TILE) return CommandCost(STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT);
+	}
+
+	if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();
+
+	a->raid_target = tile;
+	/* Standing still with the brake on would keep it in the shed for ever. */
+	if (a->vehstatus.Test(VehState::Stopped)) a->vehstatus.Reset(VehState::Stopped);
+	SetWindowDirty(WindowClass::VehicleView, a->index);
+	SetWindowClassesDirty(WindowClass::VehicleView);
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "nalet: letadlo {} posláno na ({},{})", a->unitnumber, TileX(tile), TileY(tile));
+	}
 	return CommandCost();
 }
 

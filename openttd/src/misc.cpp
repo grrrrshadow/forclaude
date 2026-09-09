@@ -111,6 +111,7 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 	 * player's rule is that an errand not finished does not follow them into
 	 * the next game. */
 	_show_industry_health = false;
+	_industry_health_until = {};
 	TimerGameTick::counter = 0;
 	TimerGameEconomy::days_since_last_month = 0;
 	_cur_tileloop_tile = TileIndex{1};

@@ -340,6 +340,22 @@ void TrimIndustryAcceptedProduced(Industry *ind);
 extern bool _show_industry_health;
 
 /**
+ * Until when what is left of the buildings stays readable after a raid, even
+ * though the crosshair has been put away. Not in the savegame, like the
+ * switch itself.
+ */
+extern TimerGameEconomy::Date _industry_health_until;
+
+/** Whether the industry windows should carry the condition line right now. */
+inline bool ShowIndustryHealth()
+{
+	return _show_industry_health || TimerGameEconomy::date <= _industry_health_until;
+}
+
+/** Drop the smoke of a raid on a spot; see DropRaidSmoke() in industry_cmd.cpp. */
+void DropRaidSmoke(TileIndex tile);
+
+/**
  * How much of an industry's building is still standing, as a percentage.
  *
  * The one place the number comes from, so that whatever damages a building

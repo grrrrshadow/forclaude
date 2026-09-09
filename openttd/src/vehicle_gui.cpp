@@ -3065,6 +3065,11 @@ static bool ShowsRaidButton(const Vehicle *v)
 {
 	if (!_show_industry_health) return false;
 	if (v->type != VehicleType::Aircraft || v->owner != _local_company) return false;
+	/* One aircraft at a time: while one is out on an errand, no other window
+	 * offers the crosshair, and the one that is out does not offer it twice. */
+	for (const Aircraft *other : Aircraft::Iterate()) {
+		if (other->raid_target != INVALID_TILE) return false;
+	}
 	if (!Aircraft::From(v)->IsNormalAircraft()) return false;
 
 	const Aircraft *a = Aircraft::From(v);
@@ -3368,6 +3373,13 @@ public:
 			}
 		}
 
+		/* An aircraft on its errand says so, whatever else it is doing: the
+		 * player let it go and wants to see that it went. */
+		if (v->type == VehicleType::Aircraft && Aircraft::From(v)->raid_target != INVALID_TILE) {
+			const Aircraft *a = Aircraft::From(v);
+			return GetString(a->state == FLYING ? STR_VEHICLE_STATUS_RAID_FLYING : STR_VEHICLE_STATUS_RAID_TAKEOFF);
+		}
+
 		if (v->vehstatus.Test(VehState::Stopped) && (!mouse_over_start_stop || v->IsStoppedInDepot())) {
 			if (v->type != VehicleType::Train) return GetString(STR_VEHICLE_STATUS_STOPPED);
 			if (v->cur_speed != 0) return GetString(STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL, PackVelocity(v->GetDisplaySpeed(), v->type));
@@ -3584,6 +3596,13 @@ public:
 				break;
 
 			case WID_VV_GOTO_DEPOT: // goto hangar
+				/* Sending it to the shed calls the errand off; the player has
+				 * to ask for the crosshair again. */
+				if (v->type == VehicleType::Aircraft && Aircraft::From(v)->raid_target != INVALID_TILE) {
+					Aircraft::From(const_cast<Vehicle *>(v))->raid_target = INVALID_TILE;
+					_show_industry_health = false;
+					SetWindowClassesDirty(WindowClass::VehicleView);
+				}
 				Command<Commands::SendVehicleToDepot>::Post(GetCmdSendToDepotMsg(v), v->index, _ctrl_pressed ? DepotCommandFlag::Service : DepotCommandFlags{}, {});
 				break;
 			case WID_VV_REFIT: // refit
@@ -3635,7 +3654,7 @@ public:
 				if (this->IsWidgetLowered(WID_VV_RAID)) {
 					ResetObjectToPlace();
 				} else {
-					SetObjectToPlaceWnd(SPR_CURSOR_CROSSHAIR, PAL_NONE, HT_RECT, this);
+					SetObjectToPlaceWnd(SPR_CURSOR_CROSSHAIR, PAL_NONE, HT_POINT, this);
 					this->SetWidgetLoweredState(WID_VV_RAID, true);
 					this->SetWidgetDirty(WID_VV_RAID);
 				}
@@ -3758,6 +3777,13 @@ public:
 				depot_clone = SEL_DC_GOTO_DEPOT - SEL_DC_BASEPLANE;
 			}
 		}
+
+		/* While the crosshair is out, or while the aircraft is away on the
+		 * errand, the orders button is dark: the errand is not an order and
+		 * the two must not be mixed up half way through. */
+		bool aiming = v->type == VehicleType::Aircraft &&
+				(Aircraft::From(v)->raid_target != INVALID_TILE || this->IsWidgetLowered(WID_VV_RAID));
+		this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, aiming);
 
 		bool changed = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE)->SetDisplayedPlane(depot_clone);
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(!wagons && v->type == VehicleType::Train ? 0 : SZSP_NONE);

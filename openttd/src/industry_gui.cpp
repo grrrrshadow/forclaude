@@ -899,15 +899,25 @@ public:
 		 * pushes the panel wider than it was. */
 		int bar_left = line.left + text_width + WidgetDimensions::scaled.hsep_wide;
 		if (bar_left < line.right) {
-			Rect bar = line.Shrink(RectPadding{}).WithHeight(height);
-			bar.left = bar_left;
-			bar = bar.Shrink(0, (height - GetCharacterHeight(FontSize::Small)) / 2);
-			GfxFillRect(bar, PC_BLACK);
-			Rect inner = bar.Shrink(WidgetDimensions::scaled.bevel);
-			GfxFillRect(inner, PC_GREY);
-			if (percent > 0) {
-				Rect filled = inner.WithWidth(std::max(1, inner.Width() * (int)percent / 100), _current_text_dir == TD_RTL);
-				GfxFillRect(filled, percent > 50 ? PC_GREEN : (percent > 20 ? PC_ORANGE : PC_RED));
+			/* The bar is worked out in whole pixels and never allowed to come
+			 * out inside out: a rectangle whose sides have crossed is drawn as
+			 * a run of negative length, which is a write past the end of the
+			 * screen rather than a small mistake. Fonts differ, and at large
+			 * interface scales the small font can be taller than the normal
+			 * one, so this cannot be assumed away. */
+			int inset = std::max(0, (height - GetCharacterHeight(FontSize::Small)) / 2);
+			Rect bar{bar_left, line.top + inset, line.right, line.bottom - inset};
+			if (bar.right > bar.left && bar.bottom > bar.top) {
+				GfxFillRect(bar, PC_BLACK);
+				Rect inner{bar.left + 1, bar.top + 1, bar.right - 1, bar.bottom - 1};
+				if (inner.right > inner.left && inner.bottom > inner.top) {
+					GfxFillRect(inner, PC_GREY);
+					if (percent > 0) {
+						int width = std::max(1, inner.Width() * (int)std::min<uint>(percent, 100) / 100);
+						Rect filled = inner.WithWidth(width, _current_text_dir == TD_RTL);
+						GfxFillRect(filled, percent > 50 ? PC_GREEN : (percent > 20 ? PC_ORANGE : PC_RED));
+					}
+				}
 			}
 		}
 
@@ -1032,7 +1042,7 @@ public:
 		 * it. Last, under everything the industry itself has to say, and it
 		 * pays for its own room: the panel measures what this returns and
 		 * grows by itself (see OnPaint()). */
-		if (_show_industry_health) {
+		if (ShowIndustryHealth()) {
 			ir.top += WidgetDimensions::scaled.vsep_wide;
 			ir.top += this->DrawHealth(ir);
 		}

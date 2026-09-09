@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "aircraft.h"
+#include "industry.h"
 #include "landscape.h"
 #include "news_func.h"
 #include "newgrf_engine.h"
@@ -860,8 +861,63 @@ static void MaybeCrashAirplane(Aircraft *v);
  * @param v The vehicle that is moved. Must be the first vehicle of the chain
  * @return  Whether the position requested by the State Machine has been reached
  */
+/**
+ * Fly an aircraft that has been given a spot to drop its smoke on.
+ *
+ * Steered by hand rather than through the airport's own movement table,
+ * because the target is a place on the map and not a part of any airport:
+ * turn towards it, move, and when it is underneath, let the smoke go. The
+ * errand ends there and the aircraft is an ordinary one again, which sends
+ * it back to its airport the way the game sends any aircraft with nothing
+ * left to do.
+ *
+ * @param v the aircraft
+ * @return whether the errand took the tick (the caller then does nothing else)
+ */
+static bool AircraftRaidController(Aircraft *v)
+{
+	if (v->raid_target == INVALID_TILE || v->state != FLYING) return false;
+
+	int tx = TileX(v->raid_target) * TILE_SIZE + TILE_SIZE / 2;
+	int ty = TileY(v->raid_target) * TILE_SIZE + TILE_SIZE / 2;
+
+	/* Overhead, near enough: the smoke covers three tiles each way, so the
+	 * width of a tile is as exact as this needs to be. */
+	if (abs(v->x_pos - tx) + abs(v->y_pos - ty) <= (int)TILE_SIZE / 2) {
+		TileIndex target = v->raid_target;
+		v->raid_target = INVALID_TILE;
+		DropRaidSmoke(target);
+
+		/* And home to the shed, which is where the player sent it from and
+		 * where an aircraft with nothing else to do belongs. An aircraft with
+		 * no orders would otherwise circle its airport for good. */
+		Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, v->index, DepotCommandFlags{}, VehicleListIdentifier{});
+
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+		SetWindowClassesDirty(WindowClass::VehicleView);
+		return false;
+	}
+
+	int count = UpdateAircraftSpeed(v);
+	if (count == 0) return true;
+
+	Direction newdir = GetDirectionTowards(v, tx, ty);
+	if (newdir != v->direction) v->direction = newdir;
+
+	while (count-- > 0) {
+		GetNewVehiclePosResult gp = GetNewVehiclePos(v);
+		v->tile = gp.new_tile;
+		SetAircraftPosition(v, gp.x, gp.y, GetAircraftFlightLevel(v));
+	}
+	return true;
+}
+
 static bool AircraftController(Aircraft *v)
 {
+	/* An aircraft on an errand of its own flies itself; the airport's
+	 * movement table has nothing to say about a spot in the open country. */
+	if (AircraftRaidController(v)) return false;
+
 	/* nullptr if station is invalid */
 	const Station *st = Station::GetIfValid(v->targetairport);
 	/* INVALID_TILE if there is no station */
@@ -1534,6 +1590,18 @@ static void AircraftEventHandler_InHangar(Aircraft *v, const AirportFTAClass *ap
 		return;
 	}
 
+	/* An errand gets the aircraft out of the shed even with nothing on its
+	 * order list: what it is going to do is the target it was given, not an
+	 * order, and a plane bought for this has no orders at all. */
+	if (v->raid_target != INVALID_TILE && !v->vehstatus.Test(VehState::Stopped)) {
+		if (AirportHasBlock(v, &apc->layout[v->pos], apc)) return;
+		v->state = (v->subtype == AIR_HELICOPTER) ? HELITAKEOFF : TAKEOFF;
+		const Station *st = Station::GetByTile(v->tile);
+		AircraftLeaveHangar(v, st->airport.GetHangarExitDirection(v->tile));
+		AirportMove(v, apc);
+		return;
+	}
+
 	/* Check if we should wait here for unbunching. */
 	if (v->IsWaitingForUnbunching()) return;
 
@@ -1586,6 +1654,14 @@ static void AircraftEventHandler_AtTerminal(Aircraft *v, const AirportFTAClass *
 				SetWindowDirty(WindowClass::VehicleDetails, v->index);
 			}
 		}
+		return;
+	}
+
+	/* An errand takes off from a terminal too, orders or no orders. */
+	if (v->raid_target != INVALID_TILE && !v->vehstatus.Test(VehState::Stopped)) {
+		if (AirportHasBlock(v, &apc->layout[v->pos], apc)) return;
+		v->state = (v->subtype == AIR_HELICOPTER) ? HELITAKEOFF : TAKEOFF;
+		AirportMove(v, apc);
 		return;
 	}
 

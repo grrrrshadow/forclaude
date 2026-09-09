@@ -115,6 +115,15 @@ struct Aircraft final : public SpecializedVehicle<Aircraft, VehicleType::Aircraf
 	ClosestDepot FindClosestDepot() override;
 
 	/**
+	 * Where this aircraft was sent to drop its smoke, or INVALID_TILE.
+	 *
+	 * Not in the savegame: an errand the player has not finished does not
+	 * follow them into the next game, which is the rule the crosshair itself
+	 * follows (see #_show_industry_health).
+	 */
+	TileIndex raid_target = INVALID_TILE;
+
+	/**
 	 * Check if the aircraft type is a normal flying device; eg
 	 * not a rotor or a shadow
 	 * @return Returns true if the aircraft is a helicopter/airplane and

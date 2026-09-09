@@ -46,6 +46,7 @@
 #include "order_func.h"
 #include "depot_map.h"
 #include "station_map.h"
+#include "tilehighlight_func.h"
 #include "newgrf_station.h"
 #include "train_cmd.h"
 #include "gamelog.h"
@@ -677,8 +678,17 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 			why = RefusalReason(cost);
 			continue;
 		}
-		IConsolePrint(CC_DEFAULT, "testletadlo: letiste na ({},{}), hangar ({},{}), letadlo {} koupeno.", *px, *py,
-				TileX(hangar), TileY(hangar), Vehicle::Get(veh)->unitnumber);
+		/* And an order, so the orders window has a line to draw: an empty
+		 * list exercises nothing. */
+		Station *st = Station::GetByTile(tile);
+		if (st != nullptr) {
+			Order o{};
+			o.MakeGoToStation(st->index);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, o);
+		}
+
+		IConsolePrint(CC_DEFAULT, "testletadlo: letiste na ({},{}), hangar ({},{}), letadlo {} koupeno, rozkazu {}.", *px, *py,
+				TileX(hangar), TileY(hangar), Vehicle::Get(veh)->unitnumber, Vehicle::Get(veh)->GetNumOrders());
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testletadlo: letiste stoji, ale zadne z {} letadel nejde koupit - {}", tried, why);
@@ -722,6 +732,54 @@ static bool ConTestAirRaid(std::span<std::string_view> argv)
 	CommandCost ret = Command<Commands::AirRaid>::Do(DoCommandFlag::Execute, tile, plane->index);
 	IConsolePrint(CC_DEFAULT, "testnalet: letadlo {} na ({},{}): {}", plane->unitnumber, *px, *py,
 			ret.Failed() ? RefusalReason(ret) : "nalet proveden");
+	return true;
+}
+
+/**
+ * Walk the crosshair the way a click does: open the aircraft's window, take
+ * the crosshair, put it down on a spot, and let it go again.
+ * Usage: testzamerit <x> <y> [unit number]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestAimCrosshair(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Aim and drop the crosshair, as the button does. Usage: 'testzamerit <x> <y> [unit number]'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]);
+	auto py = ParseInteger(argv[2]);
+	if (!px.has_value() || !py.has_value()) return false;
+
+	const Vehicle *plane = nullptr;
+	for (const Vehicle *v : Vehicle::Iterate()) {
+		if (v->type != VehicleType::Aircraft || v->First() != v || !v->IsPrimaryVehicle()) continue;
+		if (argv.size() > 3) {
+			auto punit = ParseInteger(argv[3]);
+			if (punit.has_value() && v->unitnumber != (UnitID)*punit) continue;
+		}
+		plane = v;
+		break;
+	}
+	if (plane == nullptr) {
+		IConsolePrint(CC_ERROR, "testzamerit: zadne letadlo.");
+		return true;
+	}
+
+	ShowVehicleViewWindow(plane);
+	Window *w = FindWindowById(WindowClass::VehicleView, plane->index);
+	if (w == nullptr) {
+		IConsolePrint(CC_ERROR, "testzamerit: okno letadla se neotevrelo.");
+		return true;
+	}
+
+	extern void SetObjectToPlaceWnd(CursorID icon, PaletteID pal, HighLightStyle mode, Window *w);
+	SetObjectToPlaceWnd(SPR_CURSOR_CROSSHAIR, PAL_NONE, HT_RECT, w);
+	IConsolePrint(CC_DEFAULT, "testzamerit: zamereno");
+
+	Point pt = {0, 0};
+	w->OnPlaceObject(pt, TileXY((uint)*px, (uint)*py));
+	IConsolePrint(CC_DEFAULT, "testzamerit: polozeno na ({},{})", *px, *py);
 	return true;
 }
 
@@ -3072,6 +3130,26 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 		}
 		ShowWaypointWindow(wp);
 		IConsolePrint(CC_DEFAULT, "testokno: okno smerovani {} otevreno.", wp->index.base());
+		return true;
+	}
+	if (argv[1] == "letadlo" || argv[1] == "rozkazy") {
+		/* Any vehicle, not just a train, and its orders window too: a window
+		 * is built when it opens and drawn when it is painted, and a mistake
+		 * in either is a crash at that moment. */
+		extern void ShowOrdersWindow(const Vehicle *v);
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (v->First() != v || !v->IsPrimaryVehicle()) continue;
+			if (argv[1] == "letadlo" && v->type != VehicleType::Aircraft) continue;
+			if (argv.size() > 2) {
+				auto punit2 = ParseInteger(argv[2]);
+				if (punit2.has_value() && v->unitnumber != (UnitID)*punit2) continue;
+			}
+			ShowVehicleViewWindow(v);
+			if (argv[1] == "rozkazy") ShowOrdersWindow(v);
+			IConsolePrint(CC_DEFAULT, "testokno: okno vozidla {} ({}) otevreno.", v->unitnumber, argv[1]);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testokno: zadne takove vozidlo.");
 		return true;
 	}
 	if (argv[1] == "prumysl") {
@@ -6616,6 +6694,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testnalet",               ConTestAirRaid);
+	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);
 	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
