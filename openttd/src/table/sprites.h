@@ -59,8 +59,9 @@ static const SpriteID SPR_LARGE_SMALL_WINDOW = 682;
 static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
-/** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 212;
+/** All extra sprites, this build's own (blueprint, rescue engine, station waypoint,
+ * crosshair, shuttles) included. */
+static const uint16_t OPENTTD_SPRITE_COUNT = 228;
 /** @} */
 
 /** @{
@@ -212,6 +213,24 @@ static const SpriteID SPR_IMG_WAYPOINT_STATION       = SPR_OPENTTD_BASE + 209; /
  * the middle, written as the offset on its line in openttdgui.nfo. */
 static const SpriteID SPR_IMG_CROSSHAIR              = SPR_OPENTTD_BASE + 210;
 static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
+
+/** @{
+ * The shuttle, in two liveries of eight headings each, in the order every
+ * vehicle sprite set is written in: N, NE, E, SE, S, SW, W, NW. North points up
+ * the screen and east points right, so a heading indexes straight in:
+ * SPR_SHUTTLE_RED + to_underlying(direction).
+ *
+ * Red is the airport livery, wheels down; grey is the airborne one, wheels up.
+ * Drawn at four times the zoom the base set uses and scaled down by
+ * openttd_shuttle.py, which keeps their offsets measured from the origin all
+ * sixteen share rather than from each crop, so a turning craft does not step
+ * sideways.
+ *
+ * Only the pictures. Nothing draws them yet. */
+static const SpriteID SPR_SHUTTLE_RED                = SPR_OPENTTD_BASE + 212;
+static const SpriteID SPR_SHUTTLE_GREY               = SPR_OPENTTD_BASE + 220;
+static const uint16_t SHUTTLE_SPRITE_COUNT           = 8;
+/** @} */
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
