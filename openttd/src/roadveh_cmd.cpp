@@ -595,9 +595,13 @@ static void RoadVehCrash(RoadVehicle *v, Train *hit_by)
 
 	EncodedString headline;
 	if (billed) {
+		/* The sum is written in the money the reader's game is played in, not
+		 * in the dollars it was thought up in: everybody sees their own
+		 * currency everywhere else, and a line that does not is a line
+		 * nobody can put beside their bank balance. */
 		headline = (victims == 1)
-			? GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES, static_cast<CompanyID>(payer))
-			: GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES, victims, static_cast<CompanyID>(payer));
+			? GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES, static_cast<CompanyID>(payer), CROSSING_DAMAGES)
+			: GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES, victims, static_cast<CompanyID>(payer), CROSSING_DAMAGES);
 	} else {
 		headline = (victims == 1)
 			? GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER)

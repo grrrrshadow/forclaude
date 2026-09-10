@@ -965,15 +965,15 @@ STR_NEWS_FIRST_AIRCRAFT_ARRIVAL                                 :{BIG_FONT}{BLAC
 STR_NEWS_TRAIN_CRASH                                            :{BIG_FONT}{BLACK}Železniční neštěstí!{}Při srážce {COMMA} {P člověk lidé lidí} přiš{P el li lo} o život v plamenech
 STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER                              :{BIG_FONT}{BLACK}Dopravní nehoda!{}Řidič zahynul v plamenech při srážce s vlakem
 STR_NEWS_ROAD_VEHICLE_CRASH                                     :{BIG_FONT}{BLACK}Dopravní nehoda!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech při srážce s vlakem
-STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES                      :{BIG_FONT}{BLACK}Dopravní nehoda!{}Řidič zahynul v plamenech při srážce s vlakem{}{COMPANY} uhradí škody ve výši 500 000 usd
-STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES                             :{BIG_FONT}{BLACK}Dopravní nehoda!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech při srážce s vlakem{}{COMPANY} uhradí škody ve výši 500 000 usd
+STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES                      :{BIG_FONT}{BLACK}Dopravní nehoda!{}Řidič zahynul v plamenech při srážce s vlakem{}{COMPANY} uhradí škody ve výši {CURRENCY_LONG}
+STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES                             :{BIG_FONT}{BLACK}Dopravní nehoda!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech při srážce s vlakem{}{COMPANY} uhradí škody ve výši {CURRENCY_LONG}
 STR_NEWS_AIRCRAFT_CRASH                                         :{BIG_FONT}{BLACK}Pád letadla!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech v {STATION}
 STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLACK}Letecká havárie!{}Kvůli vyčerpání paliva {COMMA} {P člověk lidé lidí} zemřel{P "" i o} v ohnivém pekle!
 
-STR_NEWS_RAID_INDUSTRY_WORKERS                                  :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřelo {COMMA} dělníků
-STR_NEWS_RAID_INDUSTRY_CLERKS                                   :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřelo {COMMA} úředníků
-STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřelo {COMMA} akcionářů na prohlídce
-STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřeli tam všichni
+STR_NEWS_RAID_INDUSTRY_WORKERS                                  :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřelo {COMMA} dělníků
+STR_NEWS_RAID_INDUSTRY_CLERKS                                   :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřelo {COMMA} úředníků
+STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřelo {COMMA} akcionářů na prohlídce
+STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřeli tam všichni
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {TOWN}, zemřelo {COMMA} obyvatel, zbořeno {COMMA} domů
 
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin se zřítil do {STATION}!

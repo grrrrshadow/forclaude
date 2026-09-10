@@ -878,8 +878,8 @@ STR_NEWS_FIRST_AIRCRAFT_ARRIVAL                                 :{BIG_FONT}{BLAC
 STR_NEWS_TRAIN_CRASH                                            :{BIG_FONT}{BLACK}Train Crash!{}{COMMA} die in fireball after collision
 STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER                              :{BIG_FONT}{BLACK}Road Vehicle Crash!{}Driver dies in fireball after collision with train
 STR_NEWS_ROAD_VEHICLE_CRASH                                     :{BIG_FONT}{BLACK}Road Vehicle Crash!{}{COMMA} die in fireball after collision with train
-STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES                      :{BIG_FONT}{BLACK}Road Vehicle Crash!{}Driver dies in fireball after collision with train{}{COMPANY} pays 500,000 USD in damages
-STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES                             :{BIG_FONT}{BLACK}Road Vehicle Crash!{}{COMMA} die in fireball after collision with train{}{COMPANY} pays 500,000 USD in damages
+STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES                      :{BIG_FONT}{BLACK}Road Vehicle Crash!{}Driver dies in fireball after collision with train{}{COMPANY} pays {CURRENCY_LONG} in damages
+STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES                             :{BIG_FONT}{BLACK}Road Vehicle Crash!{}{COMMA} die in fireball after collision with train{}{COMPANY} pays {CURRENCY_LONG} in damages
 STR_NEWS_AIRCRAFT_CRASH                                         :{BIG_FONT}{BLACK}Plane Crash!{}{COMMA} die in fireball at {STATION}
 STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLACK}Plane Crash!{}Aircraft ran out of fuel, {COMMA} die in fireball
 
