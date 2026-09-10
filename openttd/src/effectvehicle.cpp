@@ -16,6 +16,9 @@
 #include "animated_tile_func.h"
 #include "effectvehicle_func.h"
 #include "industry.h"
+#include "timer/timer_game_tick.h"
+#include "console_func.h"
+#include "train.h"
 #include "effectvehicle_base.h"
 
 #include "safeguards.h"
@@ -600,18 +603,29 @@ static Direction RaidRocketHeading(int from_x, int from_y, int to_x, int to_y)
 }
 
 /**
- * How far a raid rocket travels each tick, in pixels.
+ * How fast a raid rocket flies, in the game's own speed unit.
  *
- * A tile is sixteen across, so this is about a tile every three ticks --
- * quick enough to read as a rocket rather than a very determined aeroplane,
- * slow enough to watch it go.
+ * That unit is what an aircraft's window shows before the game converts it
+ * for the reader: one unit is one mile an hour, so a speed in km/h divided
+ * by 1.609344 gives it. A vehicle then covers speed/256 pixels in a tick,
+ * carrying the remainder in `progress` from one tick to the next -- the same
+ * arithmetic UpdateAircraftSpeed() does, so a rocket that says 420 moves
+ * like anything else that says 420.
+ *
+ * 420 km/h: 420 / 1.609344 = 261.
  */
-static const int RAID_ROCKET_SPEED = 6;
+static const uint16_t RAID_ROCKET_SPEED = 261;
 /** How near the spot counts as arrived, in pixels. */
 static const int RAID_ROCKET_ARRIVED = 8;
-/** How many ticks a rocket may live. Nothing should need it; a rocket that
- * somehow cannot arrive is better gone than circling for the rest of the game. */
-static const uint16_t RAID_ROCKET_FUSE = 600;
+/**
+ * How many ticks a rocket may live.
+ *
+ * Long enough for the whole of a ship's reach at the speed above -- fifty
+ * tiles is eight hundred pixels and it makes about one a tick -- and then
+ * some. Nothing should ever need it; a rocket that somehow cannot arrive is
+ * better gone than flying for the rest of the game.
+ */
+static const uint16_t RAID_ROCKET_FUSE = 2000;
 
 /** Set up a raid rocket. @copydoc EffectInitProc */
 static void RaidRocketInit(EffectVehicle *v)
@@ -644,17 +658,26 @@ static bool RaidRocketTick(EffectVehicle *v)
 		 * fifteen new effect vehicles, and doing that with this one's slot
 		 * already given back hands one of them the slot the tick loop is
 		 * standing on. */
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "raketa: dopadla na ({},{}), tik {}", v->x_pos, v->y_pos, TimerGameTick::counter);
+		}
 		DropRaidSmoke(v->dest_tile, v->direction, v->owner);
 		delete v;
 		return false;
 	}
 
-	/* Point it where it is going and move it there. Whole pixels: an effect
-	 * has no sub-pixel position to carry a remainder in. */
+	/* Point it where it is going and move it there. Whole pixels this tick,
+	 * with the fraction kept in progress for the next one, so any speed can
+	 * be asked for and a slow one does not round down to standing still. */
 	v->direction = RaidRocketHeading(v->x_pos, v->y_pos, tx, ty);
-	int len = std::max(1, abs(dx) + abs(dy));
-	v->x_pos += (dx * RAID_ROCKET_SPEED + len / 2) / len;
-	v->y_pos += (dy * RAID_ROCKET_SPEED + len / 2) / len;
+	uint spd = RAID_ROCKET_SPEED + v->progress;
+	v->progress = (uint8_t)spd;
+	int pixels = spd >> 8;
+	if (pixels > 0) {
+		int len = std::max(1, abs(dx) + abs(dy));
+		v->x_pos += (dx * pixels + (dx < 0 ? -len / 2 : len / 2)) / len;
+		v->y_pos += (dy * pixels + (dy < 0 ? -len / 2 : len / 2)) / len;
+	}
 
 	v->UpdateSpriteSeq();
 	v->UpdatePositionAndViewport();
@@ -732,6 +755,9 @@ bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who)
 			TileY(target) * TILE_SIZE + TILE_SIZE / 2);
 	v->UpdateSpriteSeq();
 	v->UpdatePositionAndViewport();
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "raketa: vypustena na ({},{}), tik {}", x, y, TimerGameTick::counter);
+	}
 	return true;
 }
 
