@@ -15,6 +15,7 @@
 #include "sound_func.h"
 #include "animated_tile_func.h"
 #include "effectvehicle_func.h"
+#include "industry.h"
 #include "effectvehicle_base.h"
 
 #include "safeguards.h"
@@ -567,6 +568,99 @@ struct EffectProcs {
 		: init_proc(init_proc), tick_proc(tick_proc), transparency(transparency) {}
 };
 
+/**
+ * Which way a rocket is pointing, straight from where it is to where it is
+ * going.
+ *
+ * Not GetDirectionTowards(), which turns a vehicle a step at a time towards
+ * where it wants to be: that is right for something with a turning circle
+ * and wrong for a rocket, and it reads the vehicle's current heading, which
+ * a thing that has only just been made does not have yet.
+ *
+ * The same nine-way table the game turns vehicles by, so a rocket points the
+ * way everything else does.
+ */
+static Direction RaidRocketHeading(int from_x, int from_y, int to_x, int to_y)
+{
+	static const Direction table[] = {
+		Direction::N,  Direction::NW, Direction::W,
+		Direction::NE, Direction::SE, Direction::SW,
+		Direction::E,  Direction::SE, Direction::S,
+	};
+	int i = 0;
+	if (to_y >= from_y) {
+		if (to_y != from_y) i += 3;
+		i += 3;
+	}
+	if (to_x >= from_x) {
+		if (to_x != from_x) i++;
+		i++;
+	}
+	return table[i];
+}
+
+/**
+ * How far a raid rocket travels each tick, in pixels.
+ *
+ * A tile is sixteen across, so this is about a tile every three ticks --
+ * quick enough to read as a rocket rather than a very determined aeroplane,
+ * slow enough to watch it go.
+ */
+static const int RAID_ROCKET_SPEED = 6;
+/** How near the spot counts as arrived, in pixels. */
+static const int RAID_ROCKET_ARRIVED = 8;
+/** How many ticks a rocket may live. Nothing should need it; a rocket that
+ * somehow cannot arrive is better gone than circling for the rest of the game. */
+static const uint16_t RAID_ROCKET_FUSE = 600;
+
+/** Set up a raid rocket. @copydoc EffectInitProc */
+static void RaidRocketInit(EffectVehicle *v)
+{
+	v->animation_state = RAID_ROCKET_FUSE;
+	v->UpdateSpriteSeq();
+}
+
+/**
+ * Fly a raid rocket, and let it off when it gets there.
+ *
+ * Straight at the spot, in a line, the way a rocket goes. The smoke it
+ * leaves behind is the raid itself, dropped when it arrives -- so the ship
+ * fires and the damage happens where the rocket lands, not where the ship
+ * is standing.
+ * @copydoc EffectTickProc
+ */
+static bool RaidRocketTick(EffectVehicle *v)
+{
+	int tx = TileX(v->dest_tile) * TILE_SIZE + TILE_SIZE / 2;
+	int ty = TileY(v->dest_tile) * TILE_SIZE + TILE_SIZE / 2;
+	int dx = tx - v->x_pos;
+	int dy = ty - v->y_pos;
+
+	bool spent = v->animation_state == 0 || --v->animation_state == 0;
+	if (spent || (abs(dx) + abs(dy)) <= RAID_ROCKET_ARRIVED) {
+		/* Here. The carpet lies the way the rocket flew, the same as the one
+		 * an aircraft drops on its run. */
+		/* The smoke first, the rocket second. Dropping a carpet makes
+		 * fifteen new effect vehicles, and doing that with this one's slot
+		 * already given back hands one of them the slot the tick loop is
+		 * standing on. */
+		DropRaidSmoke(v->dest_tile, v->direction, v->owner);
+		delete v;
+		return false;
+	}
+
+	/* Point it where it is going and move it there. Whole pixels: an effect
+	 * has no sub-pixel position to carry a remainder in. */
+	v->direction = RaidRocketHeading(v->x_pos, v->y_pos, tx, ty);
+	int len = std::max(1, abs(dx) + abs(dy));
+	v->x_pos += (dx * RAID_ROCKET_SPEED + len / 2) / len;
+	v->y_pos += (dy * RAID_ROCKET_SPEED + len / 2) / len;
+
+	v->UpdateSpriteSeq();
+	v->UpdatePositionAndViewport();
+	return true;
+}
+
 /** Per-EffectVehicleType handling. */
 static const std::array<EffectProcs, EV_END> _effect_procs = {{
 	{ ChimneySmokeInit,   ChimneySmokeTick,   TransparencyOption::Industries }, // EV_CHIMNEY_SMOKE
@@ -581,6 +675,7 @@ static const std::array<EffectProcs, EV_END> _effect_procs = {{
 	{ BubbleInit,         BubbleTick,         TransparencyOption::Industries }, // EV_BUBBLE
 	{ SmokeInit,          SmokeTick,          TransparencyOption::Invalid    }, // EV_BREAKDOWN_SMOKE_AIRCRAFT
 	{ SmokeInit,          SmokeTick,          TransparencyOption::Industries }, // EV_COPPER_MINE_SMOKE
+	{ RaidRocketInit,     RaidRocketTick,     TransparencyOption::Invalid    }, // EV_RAID_ROCKET
 }};
 
 /**
@@ -609,6 +704,35 @@ EffectVehicle *CreateEffectVehicle(int x, int y, int z, EffectVehicleType type)
 	v->UpdatePositionAndViewport();
 
 	return v;
+}
+
+
+/**
+ * Fire a raid rocket at a spot.
+ *
+ * The livery is drawn at the moment of firing and is nothing but looks: red
+ * or grey, as the artwork has it, one or the other each time.
+ *
+ * @param x      where it starts, in pixels
+ * @param y      where it starts, in pixels
+ * @param z      how high it starts
+ * @param target the tile it is aimed at
+ * @param who    whose raid this is, for the papers
+ * @return whether one could be made at all
+ */
+bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who)
+{
+	EffectVehicle *v = CreateEffectVehicle(x, y, z, EV_RAID_ROCKET);
+	if (v == nullptr) return false;
+
+	v->dest_tile = target;
+	v->owner = who;
+	v->animation_substate = GB(Random(), 0, 1);
+	v->direction = RaidRocketHeading(x, y, TileX(target) * TILE_SIZE + TILE_SIZE / 2,
+			TileY(target) * TILE_SIZE + TILE_SIZE / 2);
+	v->UpdateSpriteSeq();
+	v->UpdatePositionAndViewport();
+	return true;
 }
 
 /**
@@ -643,6 +767,19 @@ EffectVehicle *CreateEffectVehicleRel(const Vehicle *v, int x, int y, int z, Eff
 bool EffectVehicle::Tick()
 {
 	return _effect_procs[this->subtype].tick_proc(this);
+}
+
+/**
+ * Put the right picture on a raid rocket.
+ *
+ * Eight headings and two liveries; the livery was picked when it was fired
+ * and the heading changes as it flies.
+ */
+void EffectVehicle::UpdateSpriteSeq()
+{
+	if (this->subtype != EV_RAID_ROCKET) return;
+	SpriteID base = this->animation_substate == 0 ? SPR_RAID_ROCKET_GREY : SPR_RAID_ROCKET_RED;
+	this->sprite_cache.sprite_seq.Set(base + to_underlying(this->direction));
 }
 
 void EffectVehicle::UpdateDeltaXY()

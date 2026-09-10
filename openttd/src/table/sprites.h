@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 212;
+static const uint16_t OPENTTD_SPRITE_COUNT = 228;
 /** @} */
 
 /** @{
@@ -212,6 +212,15 @@ static const SpriteID SPR_IMG_WAYPOINT_STATION       = SPR_OPENTTD_BASE + 209; /
  * the middle, written as the offset on its line in openttdgui.nfo. */
 static const SpriteID SPR_IMG_CROSSHAIR              = SPR_OPENTTD_BASE + 210;
 static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
+/**
+ * The rocket a ship shoots: eight headings each, in two liveries.
+ *
+ * Drawn from the same artwork as this build's aircraft, taken into the base
+ * set because an effect draws from the base set and cannot reach a vehicle
+ * GRF's sprites. Which livery a rocket wears is decided when it is fired.
+ */
+static const SpriteID SPR_RAID_ROCKET_GREY           = SPR_OPENTTD_BASE + 212;
+static const SpriteID SPR_RAID_ROCKET_RED            = SPR_OPENTTD_BASE + 220;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

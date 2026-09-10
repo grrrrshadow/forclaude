@@ -30,6 +30,7 @@ struct EffectVehicle final : public SpecializedVehicle<EffectVehicle, VehicleTyp
 	~EffectVehicle() override = default;
 
 	void UpdateDeltaXY() override;
+	void UpdateSpriteSeq();
 	bool Tick() override;
 	TransparencyOption GetTransparencyOption() const;
 };

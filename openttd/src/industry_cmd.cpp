@@ -355,6 +355,12 @@ bool IsAnyoneRaiding(const Vehicle *except)
 	for (const Ship *s : Ship::Iterate()) {
 		if (s != except && s->raid_target != INVALID_TILE) return true;
 	}
+	/* A rocket already in the air counts too. The ship that fired it has let
+	 * its errand go and would otherwise be offered the crosshair again while
+	 * its own rocket is still on its way. */
+	for (const EffectVehicle *e : EffectVehicle::Iterate()) {
+		if (e->subtype == EV_RAID_ROCKET) return true;
+	}
 	return false;
 }
 

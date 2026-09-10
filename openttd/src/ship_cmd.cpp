@@ -36,6 +36,7 @@
 #include "industry_map.h"
 #include "ship_cmd.h"
 #include "console_func.h"
+#include "effectvehicle_func.h"
 #include "train.h"
 
 #include "table/strings.h"
@@ -728,7 +729,14 @@ static void ShipRaidController(Ship *v)
 		v->raid_target = INVALID_TILE;
 		v->raid_sail_to = INVALID_TILE;
 		v->raid_return_to = INVALID_TILE;
-		DropRaidSmoke(target, facing, v->owner);
+		/* The rocket carries the raid the rest of the way: it is what the
+		 * player sees leave the ship, and the smoke falls where it lands, not
+		 * where the ship is standing. If one cannot be made -- nothing left
+		 * to make vehicles out of -- the raid still happens, because the
+		 * errand has been spent either way. */
+		if (!FireRaidRocket(v->x_pos, v->y_pos, v->z_pos + 4, target, v->owner)) {
+			DropRaidSmoke(target, facing, v->owner);
+		}
 		/* And on with what it was doing, from where it left off. */
 		v->SetDestTile(back);
 		SetWindowDirty(WindowClass::VehicleView, v->index);

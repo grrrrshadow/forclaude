@@ -1181,7 +1181,7 @@ static bool ConTestIconSizes(std::span<std::string_view> argv)
 	 * extra grf lands in the same block as this build's own icons, and one
 	 * that reaches past the sprites the game upstream has takes them over
 	 * without a word. */
-	for (SpriteID id = SPR_OPENTTD_BASE + 188; id <= SPR_OPENTTD_BASE + 213; id++) {
+	for (SpriteID id = SPR_OPENTTD_BASE + 205; id <= SPR_OPENTTD_BASE + 229; id++) {
 		Dimension d = GetSpriteSize(id);
 		SpriteFile *f = GetOriginFile(id);
 		IConsolePrint(CC_DEFAULT, "testikony: sprite {} (base+{}) = {} x {} z {} #{}{}", id, id - SPR_OPENTTD_BASE, d.width, d.height,
@@ -1258,8 +1258,17 @@ static bool ConTestSmoke(std::span<std::string_view> argv)
 		count++;
 		longest = std::max<uint16_t>(longest, e->animation_state);
 	}
-	IConsolePrint(CC_DEFAULT, "testdym: oblacku {}, nejdele jeste {} tiku ({} dnu), tik {}", count, longest,
-			longest / Ticks::DAY_TICKS, TimerGameTick::counter);
+	uint rockets = 0;
+	for (const EffectVehicle *e : EffectVehicle::Iterate()) {
+		if (e->subtype != EV_RAID_ROCKET) continue;
+		rockets++;
+		IConsolePrint(CC_DEFAULT, "testdym: raketa na ({},{}) vyska {} smer {} barva {} zapalnice {} cil ({},{})",
+				TileX(TileVirtXY(e->x_pos, e->y_pos)), TileY(TileVirtXY(e->x_pos, e->y_pos)), e->z_pos,
+				to_underlying(e->direction), e->animation_substate == 0 ? "cervena" : "seda", e->animation_state,
+				TileX(e->dest_tile), TileY(e->dest_tile));
+	}
+	IConsolePrint(CC_DEFAULT, "testdym: oblacku {}, raket {}, nejdele jeste {} tiku ({} dnu), tik {}", count, rockets,
+			longest, longest / Ticks::DAY_TICKS, TimerGameTick::counter);
 	return true;
 }
 

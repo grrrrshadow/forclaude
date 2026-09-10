@@ -26,10 +26,14 @@ enum EffectVehicleType : uint8_t {
 	EV_BUBBLE                   =  9, ///< Bubble of bubble generator (industry).
 	EV_BREAKDOWN_SMOKE_AIRCRAFT = 10, ///< Smoke of broken aircraft.
 	EV_COPPER_MINE_SMOKE        = 11, ///< Smoke at copper mine.
+	EV_RAID_ROCKET              = 12, ///< The rocket a ship shoots on a raid.
 	EV_END
 };
 
 EffectVehicle *CreateEffectVehicle(int x, int y, int z, EffectVehicleType type);
+
+/** Fire a raid rocket from a spot at a tile; see FireRaidRocket() in effectvehicle.cpp. */
+bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who);
 EffectVehicle *CreateEffectVehicleAbove(int x, int y, int z, EffectVehicleType type);
 EffectVehicle *CreateEffectVehicleRel(const Vehicle *v, int x, int y, int z, EffectVehicleType type);
 

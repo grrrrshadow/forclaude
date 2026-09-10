@@ -51,6 +51,22 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_stwp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair_cursor.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_0.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_1.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_2.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_3.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_4.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_5.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_6.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_7.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_0.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_1.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_2.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_3.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_4.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_5.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_6.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_7.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_rocks.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_snowy_rocks_1.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_snowy_rocks_2.png
