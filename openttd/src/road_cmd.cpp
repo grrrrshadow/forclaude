@@ -719,9 +719,16 @@ CommandCost CmdBuildRoad(DoCommandFlags flags, TileIndex tile, RoadBits pieces, 
 				return CommandCost(STR_ERROR_LAND_SLOPED_IN_WRONG_DIRECTION);
 			}
 
-			if (!_settings_game.construction.crossing_with_competitor && company != OWNER_TOWN && company != OWNER_DEITY) {
-				CommandCost ret = CheckTileOwnership(tile);
-				if (ret.Failed()) return ret;
+			/* A road across somebody else's rails is theirs to allow, and the
+			 * answer is no. Rails across somebody else's road stay allowed:
+			 * the player's rule, and it only runs the one way. A town lays
+			 * its roads as it always did.
+			 *
+			 * The message says what to do about it rather than only that it
+			 * cannot be done -- ask the owner to lay the crossing, or go over
+			 * the top. */
+			if (company != OWNER_TOWN && company != OWNER_DEITY && !IsTileOwner(tile, company)) {
+				return CommandCost(STR_ERROR_CROSSING_PRIVATE_LAND);
 			}
 
 			if (GetRailTileType(tile) != RailTileType::Normal) goto do_clear;

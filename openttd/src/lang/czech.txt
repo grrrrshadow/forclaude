@@ -965,6 +965,8 @@ STR_NEWS_FIRST_AIRCRAFT_ARRIVAL                                 :{BIG_FONT}{BLAC
 STR_NEWS_TRAIN_CRASH                                            :{BIG_FONT}{BLACK}Železniční neštěstí!{}Při srážce {COMMA} {P člověk lidé lidí} přiš{P el li lo} o život v plamenech
 STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER                              :{BIG_FONT}{BLACK}Dopravní nehoda!{}Řidič zahynul v plamenech při srážce s vlakem
 STR_NEWS_ROAD_VEHICLE_CRASH                                     :{BIG_FONT}{BLACK}Dopravní nehoda!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech při srážce s vlakem
+STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES                      :{BIG_FONT}{BLACK}Dopravní nehoda!{}Řidič zahynul v plamenech při srážce s vlakem{}{COMPANY} uhradí škody ve výši 500 000 usd
+STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES                             :{BIG_FONT}{BLACK}Dopravní nehoda!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech při srážce s vlakem{}{COMPANY} uhradí škody ve výši 500 000 usd
 STR_NEWS_AIRCRAFT_CRASH                                         :{BIG_FONT}{BLACK}Pád letadla!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech v {STATION}
 STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLACK}Letecká havárie!{}Kvůli vyčerpání paliva {COMMA} {P člověk lidé lidí} zemřel{P "" i o} v ohnivém pekle!
 
@@ -5610,6 +5612,7 @@ STR_ERROR_MUST_REMOVE_RAILROAD_TRACK                            :Je nutné nejpr
 STR_ERROR_CROSSING_ON_ONEWAY_ROAD                               :{WHITE}Silnice je jednosměrná nebo zablokovaná
 STR_ERROR_CROSSING_DISALLOWED_RAIL                              :{WHITE}Tento typ kolejí nedovoluje výstavbu železničních přejezdů
 STR_ERROR_CROSSING_DISALLOWED_ROAD                              :{WHITE}Tento typ silnice nedovoluje výstavbu železničních přejezdů.
+STR_ERROR_CROSSING_PRIVATE_LAND                                 :{WHITE}Soukromý pozemek, požádejte vlastníka o vybudování přejezdu nebo si postavte nadjezd
 STR_ERROR_CAN_T_BUILD_SIGNALS_HERE                              :{WHITE}Zde nelze postavit semafory...
 STR_ERROR_CAN_T_BUILD_RAILROAD_TRACK                            :Zde nelze postavit koleje…
 STR_ERROR_CAN_T_REMOVE_RAILROAD_TRACK                           :{WHITE}Odsud nelze odstranit koleje...

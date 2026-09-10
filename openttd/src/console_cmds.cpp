@@ -9,6 +9,9 @@
 
 #include "stdafx.h"
 #include "train.h"
+#include "depot_base.h"
+#include "road_cmd.h"
+#include "roadveh.h"
 #include "industry.h"
 #include "town.h"
 #include "spritecache.h"
@@ -634,6 +637,177 @@ static std::string RefusalReason(const CommandCost &cost)
  * headless. Usage: testletadlo <x> <y>
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Build a level crossing scene, or work it. Usage:
+ *   testprejezd <x> <y>  -- a rail line, a road across it, a train and a lorry
+ *   testprejezd stoj     -- stop the lorry, but only once it is on the crossing
+ *   testprejezd vlak     -- let the train go
+ *
+ * A train hitting a road vehicle is the one thing on a crossing the game
+ * does not do by itself: the barriers see to that, and only a vehicle
+ * standing on the rails when they come down gets caught. Staged by hand,
+ * because that is the only way it happens.
+ * @copydoc IConsoleCmdProc
+ */
+/** The train of the level crossing scene, so "testprejezd vlak" starts that one. */
+static VehicleID _testprejezd_train = VehicleID::Invalid();
+/** The lorry of the level crossing scene, same reason. */
+static VehicleID _testprejezd_lorry = VehicleID::Invalid();
+
+static bool ConTestLevelCrossing(std::span<std::string_view> argv)
+{
+	if (argv.size() == 2 && argv[1] == "stav") {
+		/* What the crossing cost: the train's breakdown and the company's
+		 * purse, which is the whole point of the scene. */
+		const Company *c = Company::GetIfValid(CompanyID::Begin());
+		const Train *t = Train::GetIfValid(_testprejezd_train);
+		IConsolePrint(CC_DEFAULT, "testprejezd: penize {}, vlak {} porucha {}/{} rychlost {}, auticek na mape {}",
+				c == nullptr ? Money(0) : c->money, t == nullptr ? 0 : (uint)t->unitnumber, t == nullptr ? 0 : (uint)t->breakdown_ctr,
+				t == nullptr ? 0 : (uint)t->breakdown_delay, t == nullptr ? 0 : (uint)t->cur_speed, RoadVehicle::GetNumItems());
+		return true;
+	}
+
+	if (argv.size() == 2 && (argv[1] == "stoj" || argv[1] == "vlak")) {
+		/* Starting and stopping is somebody's, and the console is nobody:
+		 * without this the command is refused for want of an owner and the
+		 * vehicle drives cheerfully on. */
+		AutoRestoreBackup stop_company(_current_company, CompanyID::Begin());
+		if (argv[1] == "vlak") {
+			/* The scene's own train, not whichever train the save happens to
+			 * list first: rig.sav is full of them. */
+			Train *t = Train::GetIfValid(_testprejezd_train);
+			if (t == nullptr) {
+				IConsolePrint(CC_ERROR, "testprejezd: scena jeste nestoji.");
+				return true;
+			}
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
+			IConsolePrint(CC_DEFAULT, "testprejezd: vlak {} vyjel z ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+			return true;
+		}
+		RoadVehicle *only = RoadVehicle::GetIfValid(_testprejezd_lorry);
+		for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+			if (rv->First() != rv) continue;
+			if (only != nullptr && rv != only) continue;
+			if (rv->vehstatus.Test(VehState::Stopped)) {
+				TileIndex at = TileVirtXY(rv->x_pos, rv->y_pos);
+				IConsolePrint(CC_DEFAULT, "testprejezd: auticko {} uz stoji na ({},{}), prejezd: {}.", rv->unitnumber,
+						TileX(at), TileY(at), IsLevelCrossingTile(at) ? "ano" : "ne");
+				return true;
+			}
+			TileIndex on = TileVirtXY(rv->x_pos, rv->y_pos);
+			if (!IsLevelCrossingTile(on)) {
+				IConsolePrint(CC_DEFAULT, "testprejezd: auticko {} je na ({},{}), jeste ne na prejezdu.",
+						rv->unitnumber, TileX(on), TileY(on));
+				return true;
+			}
+			CommandCost stop = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, rv->index, false);
+			IConsolePrint(stop.Succeeded() ? CC_DEFAULT : CC_ERROR, "testprejezd: auticko {} na prejezdu ({},{}) - {}", rv->unitnumber,
+					TileX(on), TileY(on), stop.Succeeded() ? "zastaveno" : RefusalReason(stop));
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testprejezd: zadne auticko.");
+		return true;
+	}
+
+	if (argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Build a level crossing scene. Usage: 'testprejezd <x> <y>', then 'testprejezd stoj' and 'testprejezd vlak'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]);
+	auto py = ParseInteger(argv[2]);
+	if (!px.has_value() || !py.has_value()) return false;
+	uint x0 = (uint)*px, y0 = (uint)*py;
+
+	if (!Company::IsValidID(CompanyID::Begin())) {
+		IConsolePrint(CC_ERROR, "testprejezd: hra nema firmu, pust to ze savu.");
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+
+	/* Flat ground first: a crossing wants the rails and the road on one level. */
+	Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 16, y0 + 3), TileXY(x0, y0 - 3), false, LevelMode::Level);
+
+	TileIndex depot = TileXY(x0, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW).Failed()) {
+		IConsolePrint(CC_ERROR, "testprejezd: depo na ({},{}) nejde postavit.", x0, y0);
+		return true;
+	}
+	CommandCost line = Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 15, y0), TileXY(x0 + 1, y0),
+			RAILTYPE_RAIL, Track::X, false, true);
+	if (line.Failed()) {
+		IConsolePrint(CC_ERROR, "testprejezd: trat nejde postavit - {}", RefusalReason(line));
+		return true;
+	}
+
+	/* The road crosses it in the middle, with a depot at one end so a lorry
+	 * can be bought and driven onto it. */
+	uint cx = x0 + 8;
+	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(cx, y0 + 2), TileXY(cx, y0),
+			ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
+	if (road.Failed()) {
+		IConsolePrint(CC_ERROR, "testprejezd: silnice nejde postavit - {}", RefusalReason(road));
+		return true;
+	}
+	/* One shed each side of the rails, so the lorry has a reason to keep
+	 * crossing them: a road vehicle with nowhere to go stays in its shed. */
+	/* The near shed sits right against the rails, so the lorry's first step
+	 * out of it is onto the crossing and the rig can stop it there. */
+	TileIndex road_depot = TileXY(cx, y0 - 1);
+	TileIndex road_depot_far = TileXY(cx, y0 + 3);
+	CommandCost rd = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, road_depot, ROADTYPE_ROAD, DiagDirection::SE);
+	CommandCost rd2 = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, road_depot_far, ROADTYPE_ROAD, DiagDirection::NW);
+	if (rd.Failed() || rd2.Failed()) {
+		IConsolePrint(CC_ERROR, "testprejezd: silnicni depo nejde postavit - {} / {}", RefusalReason(rd), RefusalReason(rd2));
+		return true;
+	}
+
+	/* One of each, the first the year offers. */
+	VehicleID train = VehicleID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) continue;
+		train = veh;
+		break;
+	}
+	VehicleID lorry = VehicleID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) continue;
+		lorry = veh;
+		break;
+	}
+	if (train == VehicleID::Invalid() || lorry == VehicleID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testprejezd: vlak {} auticko {} - nejde koupit.",
+				train == VehicleID::Invalid() ? "ne" : "ano", lorry == VehicleID::Invalid() ? "ne" : "ano");
+		return true;
+	}
+
+	_testprejezd_train = train;
+	_testprejezd_lorry = lorry;
+
+	/* Back and forth between the two sheds, over the rails every time. */
+	Depot *near_depot = Depot::GetByTile(road_depot);
+	Depot *far_depot = Depot::GetByTile(road_depot_far);
+	if (near_depot != nullptr && far_depot != nullptr) {
+		Order there{};
+		there.MakeGoToDepot(DestinationID(far_depot->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, lorry, 0, there);
+		Order back{};
+		back.MakeGoToDepot(DestinationID(near_depot->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, lorry, 1, back);
+	}
+
+	/* The lorry drives out at once and wanders the road; the train waits for
+	 * "testprejezd vlak", once the lorry has been stopped on the rails. */
+	CommandCost go = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, lorry, false);
+	if (go.Failed()) IConsolePrint(CC_ERROR, "testprejezd: auticko nechce vyjet - {}", RefusalReason(go));
+
+	IConsolePrint(CC_DEFAULT, "testprejezd: prejezd na ({},{}) {}, vlak {} v depe ({},{}), auticko {} vyjelo z ({},{}).",
+			cx, y0, IsLevelCrossingTile(TileXY(cx, y0)) ? "stoji" : "CHYBI", Vehicle::Get(train)->unitnumber, x0, y0,
+			Vehicle::Get(lorry)->unitnumber, TileX(road_depot), TileY(road_depot));
+	return true;
+}
+
 static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 {
 	if (argv.size() != 3) {
@@ -6835,6 +7009,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
+	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);
 	IConsole::CmdRegister("testnalet",               ConTestAirRaid);
 	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);
 	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);

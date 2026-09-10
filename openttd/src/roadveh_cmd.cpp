@@ -31,6 +31,8 @@
 #include "core/random_func.hpp"
 #include "company_base.h"
 #include "core/backup_type.hpp"
+#include "train.h"
+#include "company_func.h"
 #include "newgrf.h"
 #include "zoom_func.h"
 #include "framerate_type.h"
@@ -555,19 +557,70 @@ uint RoadVehicle::Crash(bool flooded)
 	return victims;
 }
 
-static void RoadVehCrash(RoadVehicle *v)
+/**
+ * What a train that hits a road vehicle on a crossing costs its company.
+ *
+ * The player's number is half a million dollars, and the game keeps money in
+ * pounds: a dollar is half of one, so this is what half a million of them
+ * comes to. It does not follow inflation -- a fixed sum was asked for and a
+ * fixed sum is what the papers say.
+ */
+static const Money CROSSING_DAMAGES = 250000;
+/** How long a train is out of action after hitting one. */
+static const uint8_t CROSSING_BREAKDOWN_DELAY = 0xC0;
+
+/**
+ * A train hit a road vehicle on a level crossing.
+ *
+ * Vanilla stops at the wreck and the news. The player wants the railway to
+ * feel it too: the train that did it breaks down where it stands, and its
+ * company pays for the damage. A crossing is not a free place to run people
+ * over.
+ *
+ * @param v      the road vehicle that was hit
+ * @param hit_by the train that hit it, or nullptr if it is already gone
+ */
+static void RoadVehCrash(RoadVehicle *v, Train *hit_by)
 {
 	uint victims = v->Crash();
 
 	AI::NewEvent(v->owner, new ScriptEventVehicleCrashed(v->index, v->tile, ScriptEventVehicleCrashed::CRASH_RV_LEVEL_CROSSING, victims, v->owner));
 	Game::NewEvent(new ScriptEventVehicleCrashed(v->index, v->tile, ScriptEventVehicleCrashed::CRASH_RV_LEVEL_CROSSING, victims, v->owner));
 
-	EncodedString headline = (victims == 1)
-		? GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER)
-		: GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH, victims);
+	/* Who pays: the company whose train it was. The papers name the company,
+	 * not the person -- a crossing is the company's business, unlike a raid,
+	 * which somebody orders. */
+	Owner payer = hit_by != nullptr ? hit_by->owner : v->owner;
+	bool billed = Company::IsValidID(payer);
+
+	EncodedString headline;
+	if (billed) {
+		headline = (victims == 1)
+			? GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER_DAMAGES, static_cast<CompanyID>(payer))
+			: GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DAMAGES, victims, static_cast<CompanyID>(payer));
+	} else {
+		headline = (victims == 1)
+			? GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH_DRIVER)
+			: GetEncodedString(STR_NEWS_ROAD_VEHICLE_CRASH, victims);
+	}
 	NewsType newstype = v->owner == _local_company ? NewsType::Accident : NewsType::AccidentOther;
 
 	AddTileNewsItem(std::move(headline), newstype, v->tile);
+
+	if (billed) {
+		/* The tick this runs in belongs to the road vehicle, so the bill is
+		 * addressed to the railway rather than to whoever is being ticked. */
+		SubtractMoneyFromCompany(static_cast<CompanyID>(payer), CommandCost(ExpensesType::Other, CROSSING_DAMAGES));
+	}
+
+	/* And the train stops where it is. Due next tick rather than broken this
+	 * one, which is the game's own way of breaking a vehicle down -- it does
+	 * the smoke, the sound and the message. */
+	if (hit_by != nullptr && hit_by->breakdown_ctr == 0) {
+		hit_by->breakdown_ctr = 2;
+		hit_by->breakdown_delay = CROSSING_BREAKDOWN_DELAY;
+		hit_by->breakdown_chance = 0;
+	}
 
 	ModifyStationRatingAround(v->tile, v->owner, -160, 22);
 	if (_settings_client.sound.disaster) SndPlayVehicleFx(SND_12_EXPLOSION, v);
@@ -582,10 +635,15 @@ static bool RoadVehCheckTrainCrash(RoadVehicle *v)
 
 		if (!IsLevelCrossingTile(tile)) continue;
 
-		if (HasVehicleNearTileXY(v->x_pos, v->y_pos, 4, [&u](const Vehicle *t) {
-				return t->type == VehicleType::Train && abs(t->z_pos - u->z_pos) <= 6;
+		/* Which train, not just whether there is one: it is the one that pays
+		 * and the one that breaks down. */
+		VehicleID culprit = VehicleID::Invalid();
+		if (HasVehicleNearTileXY(v->x_pos, v->y_pos, 4, [&u, &culprit](const Vehicle *t) {
+				if (t->type != VehicleType::Train || abs(t->z_pos - u->z_pos) > 6) return false;
+				culprit = t->First()->index;
+				return true;
 			})) {
-			RoadVehCrash(v);
+			RoadVehCrash(v, culprit == VehicleID::Invalid() ? nullptr : Train::From(Vehicle::Get(culprit)));
 			return true;
 		}
 	}
