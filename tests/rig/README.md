@@ -16,6 +16,22 @@ Working directory layout, pointed to by `RIG_DIR`:
 `spojeno` (couplings), `odtazeno` (tows completed), `havaroval`, `srazka`,
 `assert`, `vyjimka`, `depa` (arrivals in a depot).
 
+The first six do not move between runs of the same build. **`depa` does** --
+by one, on the long tow scenes -- so a plain diff of two runs reports
+differences that are the rig's own timing and not the change under test. Set
+`BATTERY_STABLE` to a path and the six load-bearing counters are written
+there as well; diff those:
+
+    RIG_DIR=... BATTERY_STABLE=run1.stable ./battery.sh > run1.out
+    RIG_DIR=... BATTERY_STABLE=run2.stable ./battery.sh > run2.out
+    diff run1.stable run2.stable
+
+Two things that look like fixes for the wobble and are not, both tried:
+turning random breakdowns off steadies it but guts three scenes built on a
+breakdown happening (`odtahotoc` drops to nothing at all), and turning
+automatic servicing off changes nothing -- the wobble is in the tow scenes
+themselves.
+
 `matrix_gen.py [mx] [mw] [me]` — the coupling matrix on `rig.sav`: four
 waiters released slowly from one side of station 1, then a collector and
 three clones (`testklon ... stoj`, released one by one with `testbrzda`)
