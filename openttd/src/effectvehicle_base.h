@@ -25,6 +25,18 @@ struct EffectVehicle final : public SpecializedVehicle<EffectVehicle, VehicleTyp
 	uint16_t animation_state = 0; ///< State primarily used to change the graphics/behaviour.
 	uint8_t animation_substate = 0; ///< Sub state to time the change of the graphics/behaviour.
 
+	/**
+	 * NOSAVE: how far past its pixel a raid rocket has got, in 256ths.
+	 *
+	 * A position in whole pixels cannot hold a straight line: a rocket that
+	 * should go two thirds along and one third up moves one whole pixel along
+	 * and none up, every tick, until the two are equal and it turns. Keeping
+	 * the fraction is what makes the line straight, and a straight line is
+	 * what lets one sprite be right for the whole flight.
+	 */
+	uint8_t x_frac = 0;
+	uint8_t y_frac = 0; ///< NOSAVE: the same, up and down the map. @see x_frac
+
 	EffectVehicle(VehicleID index) : SpecializedVehicleBase(index) {}
 	/** We want to 'destruct' the right class. */
 	~EffectVehicle() override = default;

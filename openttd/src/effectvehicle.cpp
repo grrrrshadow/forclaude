@@ -572,34 +572,40 @@ struct EffectProcs {
 };
 
 /**
- * Which way a rocket is pointing, straight from where it is to where it is
- * going.
+ * Which of the eight headings a rocket flying this way is nearest to.
  *
  * Not GetDirectionTowards(), which turns a vehicle a step at a time towards
  * where it wants to be: that is right for something with a turning circle
  * and wrong for a rocket, and it reads the vehicle's current heading, which
  * a thing that has only just been made does not have yet.
  *
- * The same nine-way table the game turns vehicles by, so a rocket points the
- * way everything else does.
+ * Nor the game's nine-way table, which asks only whether each of the two
+ * distances is negative, zero or positive. That answers "up and to the
+ * left" for a rocket going two parts left to one part up, and a sprite
+ * pointing up-left over something flying almost flat left is what the
+ * player sees as flying wrong.
+ *
+ * So the vector is turned through forty-five degrees, which puts the game's
+ * eight headings on the two axes and the two diagonals of the turned frame,
+ * and the octant is picked by ratio: five twelfths stands in for the
+ * tangent of twenty-two and a half degrees, near enough that the boundary
+ * is a fifth of a degree out.
  */
 static Direction RaidRocketHeading(int from_x, int from_y, int to_x, int to_y)
 {
-	static const Direction table[] = {
-		Direction::N,  Direction::NW, Direction::W,
-		Direction::NE, Direction::SE, Direction::SW,
-		Direction::E,  Direction::SE, Direction::S,
-	};
-	int i = 0;
-	if (to_y >= from_y) {
-		if (to_y != from_y) i += 3;
-		i += 3;
-	}
-	if (to_x >= from_x) {
-		if (to_x != from_x) i++;
-		i++;
-	}
-	return table[i];
+	const int dx = to_x - from_x;
+	const int dy = to_y - from_y;
+	/* Turned through forty-five degrees: N and S lie along u, E and W along
+	 * w, and the four in between on the diagonals. */
+	const int u = dx + dy;
+	const int w = dy - dx;
+	const int au = abs(u);
+	const int aw = abs(w);
+
+	if (aw * 12 < au * 5) return u < 0 ? Direction::N : Direction::S;
+	if (au * 12 < aw * 5) return w > 0 ? Direction::E : Direction::W;
+	if (w > 0) return u < 0 ? Direction::NE : Direction::SE;
+	return u < 0 ? Direction::NW : Direction::SW;
 }
 
 /**
@@ -608,9 +614,12 @@ static Direction RaidRocketHeading(int from_x, int from_y, int to_x, int to_y)
  * That unit is what an aircraft's window shows before the game converts it
  * for the reader: one unit is one mile an hour, so a speed in km/h divided
  * by 1.609344 gives it. A vehicle then covers speed/256 pixels in a tick,
- * carrying the remainder in `progress` from one tick to the next -- the same
- * arithmetic UpdateAircraftSpeed() does, so a rocket that says 420 moves
- * like anything else that says 420.
+ * the same arithmetic UpdateAircraftSpeed() does, so a rocket that says 420
+ * moves like anything else that says 420.
+ *
+ * The rocket measures that along the line it is flying rather than along
+ * the axes, so unlike the game's own aircraft it goes the same speed in
+ * every direction instead of covering half as much again on the diagonal.
  *
  * 420 km/h: 420 / 1.609344 = 261.
  */
@@ -631,6 +640,8 @@ static const uint16_t RAID_ROCKET_FUSE = 2000;
 static void RaidRocketInit(EffectVehicle *v)
 {
 	v->animation_state = RAID_ROCKET_FUSE;
+	v->x_frac = 0;
+	v->y_frac = 0;
 	v->UpdateSpriteSeq();
 }
 
@@ -666,18 +677,22 @@ static bool RaidRocketTick(EffectVehicle *v)
 		return false;
 	}
 
-	/* Point it where it is going and move it there. Whole pixels this tick,
-	 * with the fraction kept in progress for the next one, so any speed can
-	 * be asked for and a slow one does not round down to standing still. */
+	/* Point it where it is going and move it there, along the line and not
+	 * along whichever axis has the most of it left. The step is worked out
+	 * in 256ths of a pixel and what does not make a whole pixel this tick is
+	 * kept for the next, so the two distances keep their proportion the
+	 * whole way down and the flight is a straight line at any speed. */
 	v->direction = RaidRocketHeading(v->x_pos, v->y_pos, tx, ty);
-	uint spd = RAID_ROCKET_SPEED + v->progress;
-	v->progress = (uint8_t)spd;
-	int pixels = spd >> 8;
-	if (pixels > 0) {
-		int len = std::max(1, abs(dx) + abs(dy));
-		v->x_pos += (dx * pixels + (dx < 0 ? -len / 2 : len / 2)) / len;
-		v->y_pos += (dy * pixels + (dy < 0 ? -len / 2 : len / 2)) / len;
-	}
+	const int len = std::max<int>(1, IntSqrt(dx * dx + dy * dy));
+	const int step_x = v->x_frac + dx * RAID_ROCKET_SPEED / len;
+	const int step_y = v->y_frac + dy * RAID_ROCKET_SPEED / len;
+	/* Shifting a negative rounds it down and the mask leaves what is left
+	 * over, so a rocket going backwards up an axis keeps its fraction the
+	 * same way one going forwards does. */
+	v->x_pos += step_x >> 8;
+	v->y_pos += step_y >> 8;
+	v->x_frac = (uint8_t)(step_x & 0xFF);
+	v->y_frac = (uint8_t)(step_y & 0xFF);
 
 	v->UpdateSpriteSeq();
 	v->UpdatePositionAndViewport();

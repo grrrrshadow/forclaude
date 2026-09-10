@@ -1262,9 +1262,9 @@ static bool ConTestSmoke(std::span<std::string_view> argv)
 	for (const EffectVehicle *e : EffectVehicle::Iterate()) {
 		if (e->subtype != EV_RAID_ROCKET) continue;
 		rockets++;
-		IConsolePrint(CC_DEFAULT, "testdym: raketa na ({},{}) vyska {} smer {} barva {} zapalnice {} cil ({},{})",
-				TileX(TileVirtXY(e->x_pos, e->y_pos)), TileY(TileVirtXY(e->x_pos, e->y_pos)), e->z_pos,
-				to_underlying(e->direction), e->animation_substate == 0 ? "cervena" : "seda", e->animation_state,
+		IConsolePrint(CC_DEFAULT, "testdym: raketa na ({},{}) pix ({},{}) vyska {} smer {} barva {} zapalnice {} cil ({},{})",
+				TileX(TileVirtXY(e->x_pos, e->y_pos)), TileY(TileVirtXY(e->x_pos, e->y_pos)), e->x_pos, e->y_pos, e->z_pos,
+				to_underlying(e->direction), e->animation_substate == 0 ? "seda" : "zluta", e->animation_state,
 				TileX(e->dest_tile), TileY(e->dest_tile));
 	}
 	IConsolePrint(CC_DEFAULT, "testdym: oblacku {}, raket {}, nejdele jeste {} tiku ({} dnu), tik {}", count, rockets,
