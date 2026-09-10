@@ -17,8 +17,14 @@ run_scene() { # name scr-content ticks extra-args
   local odt=$(grep -c 'odtah dokoncen' $S/reg_$name.log)
   local exc=$(grep -ci 'terminate\|exception' $S/reg_$name.log)
   local dep=$(grep -c 'vjel do depa' $S/reg_$name.log)
+  # Two lines, one file each. The six counters above are the load-bearing
+  # ones and do not move between runs of the same build; the depot-arrival
+  # tally does, by one, on the long tow scenes -- it is worth reading and
+  # not worth diffing, so it is kept out of the file meant for diffing.
   echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc depa=$dep"
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc" >> ${BATTERY_STABLE:-/dev/null}
 }
+: > ${BATTERY_STABLE:-/dev/null}
 printf 'newgame\n' > $H/.openttd/scripts/autoexec.scr
 run_scene zakl "vlak123 on
 testspoj" 8000
