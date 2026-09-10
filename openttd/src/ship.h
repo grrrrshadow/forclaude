@@ -27,6 +27,24 @@ struct ShipPathElement {
 using ShipPathCache = std::vector<ShipPathElement>;
 
 /**
+ * How near the target a ship shoots from, in tiles.
+ *
+ * A ship does not sail up to the target and shoot at point blank. It shoots
+ * the moment the target comes this near, whether it was already this near
+ * when the crosshair went down or came this near on the way.
+ */
+static const uint RAID_SHIP_FIRING_RANGE = 30;
+/**
+ * How far the rocket will reach at the outside, in tiles.
+ *
+ * Between the firing range and this one is where a ship shoots that cannot
+ * get any nearer -- a headland in the way, a bay that does not open the
+ * right way. Past it there is no shot at all, and the crosshair is refused
+ * when there is no water within this of the target the ship can reach.
+ */
+static const uint RAID_SHIP_REACH = 50;
+
+/**
  * All ships have this type.
  */
 struct Ship final : public SpecializedVehicle<Ship, VehicleType::Ship> {

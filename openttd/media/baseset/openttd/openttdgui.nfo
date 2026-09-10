@@ -217,20 +217,20 @@
    -1 sprites/openttdgui_stwp.png 8bpp   2    2  20  20   0   0 normal
    -1 sprites/openttdgui_crosshair.png 8bpp   2    2  16  16   0   0 normal
    -1 sprites/openttdgui_crosshair_cursor.png 8bpp   2    2  32  32 -16 -16 normal
-   -1 sprites/openttdgui_rocket_0_0.png 8bpp   2    2  16  26  -8 -12 normal
-   -1 sprites/openttdgui_rocket_0_1.png 8bpp   2    2  40  20 -22  -9 normal
-   -1 sprites/openttdgui_rocket_0_2.png 8bpp   2    2  49   8 -25  -4 normal
-   -1 sprites/openttdgui_rocket_0_3.png 8bpp   2    2  40  20 -22 -11 normal
-   -1 sprites/openttdgui_rocket_0_4.png 8bpp   2    2  16  26  -8 -14 normal
-   -1 sprites/openttdgui_rocket_0_5.png 8bpp   2    2  40  20 -18 -11 normal
-   -1 sprites/openttdgui_rocket_0_6.png 8bpp   2    2  49   8 -24  -4 normal
-   -1 sprites/openttdgui_rocket_0_7.png 8bpp   2    2  40  20 -18  -9 normal
-   -1 sprites/openttdgui_rocket_1_0.png 8bpp   2    2  16  26  -8 -12 normal
-   -1 sprites/openttdgui_rocket_1_1.png 8bpp   2    2  40  20 -22  -9 normal
-   -1 sprites/openttdgui_rocket_1_2.png 8bpp   2    2  49   8 -25  -4 normal
-   -1 sprites/openttdgui_rocket_1_3.png 8bpp   2    2  40  20 -22 -11 normal
-   -1 sprites/openttdgui_rocket_1_4.png 8bpp   2    2  16  26  -8 -14 normal
-   -1 sprites/openttdgui_rocket_1_5.png 8bpp   2    2  40  20 -18 -11 normal
-   -1 sprites/openttdgui_rocket_1_6.png 8bpp   2    2  49   8 -24  -4 normal
-   -1 sprites/openttdgui_rocket_1_7.png 8bpp   2    2  40  20 -18  -9 normal
+   -1 sprites/openttdgui_rocket_0_0.png 8bpp   2    2   7  13  -3  -6 normal
+   -1 sprites/openttdgui_rocket_0_1.png 8bpp   2    2  19  10 -10  -4 normal
+   -1 sprites/openttdgui_rocket_0_2.png 8bpp   2    2  25   5 -12  -2 normal
+   -1 sprites/openttdgui_rocket_0_3.png 8bpp   2    2  19  10 -10  -5 normal
+   -1 sprites/openttdgui_rocket_0_4.png 8bpp   2    2   7  13  -3  -6 normal
+   -1 sprites/openttdgui_rocket_0_5.png 8bpp   2    2  19  10  -8  -5 normal
+   -1 sprites/openttdgui_rocket_0_6.png 8bpp   2    2  25   5 -12  -2 normal
+   -1 sprites/openttdgui_rocket_0_7.png 8bpp   2    2  19  10  -8  -4 normal
+   -1 sprites/openttdgui_rocket_1_0.png 8bpp   2    2   7  13  -3  -6 normal
+   -1 sprites/openttdgui_rocket_1_1.png 8bpp   2    2  19  10 -10  -4 normal
+   -1 sprites/openttdgui_rocket_1_2.png 8bpp   2    2  25   5 -12  -2 normal
+   -1 sprites/openttdgui_rocket_1_3.png 8bpp   2    2  19  10 -10  -5 normal
+   -1 sprites/openttdgui_rocket_1_4.png 8bpp   2    2   7  13  -3  -6 normal
+   -1 sprites/openttdgui_rocket_1_5.png 8bpp   2    2  19  10  -8  -5 normal
+   -1 sprites/openttdgui_rocket_1_6.png 8bpp   2    2  25   5 -12  -2 normal
+   -1 sprites/openttdgui_rocket_1_7.png 8bpp   2    2  19  10  -8  -4 normal
 

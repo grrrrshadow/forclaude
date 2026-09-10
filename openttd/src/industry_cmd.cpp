@@ -115,8 +115,6 @@ static const uint RAID_HURT = 30;
 static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
 /** How long what is left of the buildings stays readable after a raid. */
 static const int RAID_HEALTH_SHOWN_DAYS = 14;
-/** How far a ship's rocket carries, in tiles: past this there is nothing to sail for. */
-static const uint RAID_SHIP_RANGE = 50;
 
 /**
  * The tiles a raid covers: a carpet laid along the line of flight.
@@ -407,7 +405,7 @@ CommandCost CmdRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 		 * there is no errand to give -- better said now than after a ship has
 		 * spent a season finding out. */
 		extern TileIndex FindRaidWaterForShip(const Ship *v, TileIndex target, uint range);
-		TileIndex sail_to = FindRaidWaterForShip(s, tile, RAID_SHIP_RANGE);
+		TileIndex sail_to = FindRaidWaterForShip(s, tile, RAID_SHIP_REACH);
 		if (sail_to == INVALID_TILE) return CommandCost(STR_ERROR_RAID_OUT_OF_REACH);
 
 		if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();

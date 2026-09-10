@@ -697,19 +697,73 @@ static const uint RAID_SHIP_PATIENCE = 2000;
 static const uint RAID_SHIP_ARRIVED = 3;
 
 /**
- * Steer a ship that has been given a raid, and let the rocket go when it is
- * in place.
+ * Put a ship's raid away and send it back to what it was doing.
  *
- * A ship cannot go where the crosshair went, so it makes for the nearest
- * water there is to the spot and shoots from there. While it is on its way
- * its orders are left where they are and only its destination is overruled;
- * when it is done, the destination it had before is put back and it carries
- * on from where it was.
+ * Whether it shot or gave up, the ending is the same: the errand's fields go
+ * back to nothing and the destination the orders had picked is put back, so
+ * the ship carries on from where it left off.
  *
- * Giving up is part of the job. An island in the way, a lake with no way
- * out, a shed on the wrong sea -- the pathfinder will not say so, it will
- * simply never arrive. So the ship is given a while to come closer than it
- * has come before, and if it cannot, the errand is called off.
+ * @param v the ship
+ */
+static void ShipRaidDone(Ship *v)
+{
+	v->raid_target = INVALID_TILE;
+	v->raid_sail_to = INVALID_TILE;
+	v->SetDestTile(v->raid_return_to);
+	v->raid_return_to = INVALID_TILE;
+	SetWindowDirty(WindowClass::VehicleView, v->index);
+	SetWindowClassesDirty(WindowClass::VehicleView);
+	InvalidateWindowClassesData(WindowClass::VehicleView);
+}
+
+/**
+ * Let the rocket go and put the errand away.
+ *
+ * The rocket goes off along the line from here to the spot, so the smoke
+ * lies the way it flew, the same as a bombing run.
+ *
+ * @param v the ship
+ */
+static void ShipRaidFire(Ship *v)
+{
+	TileIndex target = v->raid_target;
+	Direction facing = GetDirectionTowards(v, TileX(target) * TILE_SIZE + TILE_SIZE / 2,
+			TileY(target) * TILE_SIZE + TILE_SIZE / 2);
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "nalet: lod {} strili z {} policek", v->unitnumber,
+				DistanceManhattan(v->tile, target));
+	}
+	ShipRaidDone(v);
+	/* The rocket carries the raid the rest of the way: it is what the player
+	 * sees leave the ship, and the smoke falls where it lands, not where the
+	 * ship is standing. If one cannot be made -- nothing left to make
+	 * vehicles out of -- the raid still happens, because the errand has been
+	 * spent either way. */
+	if (!FireRaidRocket(v->x_pos, v->y_pos, v->z_pos + 4, target, v->owner)) {
+		DropRaidSmoke(target, facing, v->owner);
+	}
+}
+
+/**
+ * Steer a ship that has been given a raid, and let the rocket go when the
+ * target is near enough.
+ *
+ * The rocket reaches fifty tiles and is fired at thirty, so a ship shoots
+ * long before it is on top of the target: if the target was already within
+ * thirty when the crosshair went down it shoots at once, and if it was not,
+ * it shoots the moment the sailing brings it that near. While it is on its
+ * way its orders are left where they are and only its destination is
+ * overruled; when it is done, the destination it had before is put back.
+ *
+ * Between thirty and fifty is for a ship that cannot get any nearer. A
+ * headland, a bay that opens the wrong way -- the pathfinder will not say
+ * so, it will simply stop making headway. So a ship that has arrived at the
+ * water it was steering for, or has stopped coming any closer, shoots from
+ * where it is if the target is within reach, and gives up if it is not.
+ *
+ * Nothing is fired from inside a shed. The errand is what gets the ship out
+ * of one, and a rocket coming through a closed door is not what the player
+ * asked for.
  *
  * @param v the ship
  */
@@ -717,50 +771,37 @@ static void ShipRaidController(Ship *v)
 {
 	if (v->raid_target == INVALID_TILE) return;
 
-	uint dist = DistanceManhattan(v->tile, v->raid_sail_to);
+	const uint to_target = DistanceManhattan(v->tile, v->raid_target);
+	const uint to_water = DistanceManhattan(v->tile, v->raid_sail_to);
 
-	if (dist <= RAID_SHIP_ARRIVED) {
-		/* In place: the rocket goes off along the line from here to the spot,
-		 * so the smoke lies the way it flew, the same as a bombing run. */
-		TileIndex target = v->raid_target;
-		Direction facing = GetDirectionTowards(v, TileX(target) * TILE_SIZE + TILE_SIZE / 2,
-				TileY(target) * TILE_SIZE + TILE_SIZE / 2);
-		TileIndex back = v->raid_return_to;
-		v->raid_target = INVALID_TILE;
-		v->raid_sail_to = INVALID_TILE;
-		v->raid_return_to = INVALID_TILE;
-		/* The rocket carries the raid the rest of the way: it is what the
-		 * player sees leave the ship, and the smoke falls where it lands, not
-		 * where the ship is standing. If one cannot be made -- nothing left
-		 * to make vehicles out of -- the raid still happens, because the
-		 * errand has been spent either way. */
-		if (!FireRaidRocket(v->x_pos, v->y_pos, v->z_pos + 4, target, v->owner)) {
-			DropRaidSmoke(target, facing, v->owner);
+	if (!v->IsInDepot()) {
+		/* Near enough to shoot. */
+		if (to_target <= RAID_SHIP_FIRING_RANGE) return ShipRaidFire(v);
+
+		/* As near as it is ever going to get: standing on the water it was
+		 * steering for, and the target still inside the rocket's reach. */
+		if (to_water <= RAID_SHIP_ARRIVED) {
+			if (to_target <= RAID_SHIP_REACH) return ShipRaidFire(v);
+			/* The nearest water to the target was further off than the rocket
+			 * goes. Nothing to be done from here. */
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "nalet: lod {} to vzdala, cil je {} policek daleko", v->unitnumber, to_target);
+			}
+			return ShipRaidDone(v);
 		}
-		/* And on with what it was doing, from where it left off. */
-		v->SetDestTile(back);
-		SetWindowDirty(WindowClass::VehicleView, v->index);
-		SetWindowClassesDirty(WindowClass::VehicleView);
-		InvalidateWindowClassesData(WindowClass::VehicleView);
-		return;
 	}
 
-	if (dist < v->raid_closest) {
-		v->raid_closest = dist;
+	if (to_water < v->raid_closest) {
+		v->raid_closest = to_water;
 		v->raid_stale = 0;
 	} else if (++v->raid_stale > RAID_SHIP_PATIENCE) {
-		/* It is not getting there. Back to work. */
+		/* It is not getting there. Within reach it shoots from where it is
+		 * stuck; beyond it, the errand is called off. */
+		if (!v->IsInDepot() && to_target <= RAID_SHIP_REACH) return ShipRaidFire(v);
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "nalet: lod {} to vzdala, nejbliz byla {} policek", v->unitnumber, v->raid_closest);
 		}
-		v->raid_target = INVALID_TILE;
-		v->raid_sail_to = INVALID_TILE;
-		v->SetDestTile(v->raid_return_to);
-		v->raid_return_to = INVALID_TILE;
-		SetWindowDirty(WindowClass::VehicleView, v->index);
-		SetWindowClassesDirty(WindowClass::VehicleView);
-		InvalidateWindowClassesData(WindowClass::VehicleView);
-		return;
+		return ShipRaidDone(v);
 	}
 
 	/* Orders have had their say and set a destination; the errand overrules

@@ -50,10 +50,10 @@ HEADINGS = 8
 SOURCE = "rocket_render_{livery}_{heading}.png"
 OUTPUT = "openttdgui_rocket_{set}_{heading}.png"
 
-#: How much bigger the renders are than the game draws them. Four puts the
-#: rocket at about fifty pixels long seen side on, which is a rocket beside
-#: a ship rather than beside the ship's dock.
-SCALE = 4
+#: How much bigger the renders are than the game draws them. Eight puts the
+#: rocket at twenty-five pixels long seen side on -- under half a map tile,
+#: which is a rocket beside a ship and not another ship.
+SCALE = 8
 
 #: A pixel less than this opaque has no colour to be, and the game would
 #: draw it solid, so it becomes nothing.
