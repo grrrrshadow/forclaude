@@ -1,0 +1,4 @@
+# Python leaves these behind wherever one of the sprite scripts in
+# media/baseset is imported rather than run. Not ours to keep.
+__pycache__/
+*.pyc
