@@ -43,7 +43,12 @@ protected:
 public:
 	void SetDestination(const Ship *v)
 	{
-		if (v->current_order.IsType(OT_GOTO_STATION)) {
+		/* A ship on a raid steers by the tile its errand set, not by the
+		 * station in its orders. Its orders are left where they are, so
+		 * without this the pathfinder reads the station out of them and
+		 * sails the route as if nothing had been asked of it -- which is
+		 * exactly what a ship running between harbours did. */
+		if (v->raid_target == INVALID_TILE && v->current_order.IsType(OT_GOTO_STATION)) {
 			this->dest_station = v->current_order.GetDestination().ToStationID();
 			this->dest_tile = CalcClosestStationTile(this->dest_station, v->tile, StationType::Dock);
 			this->dest_trackdirs = INVALID_TRACKDIR_BIT;

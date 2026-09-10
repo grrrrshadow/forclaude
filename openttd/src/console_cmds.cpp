@@ -866,6 +866,10 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 		if (st != nullptr) {
 			Order o{};
 			o.MakeGoToStation(st->index);
+			/* A fresh order stops at the near end of the platform, which only a
+			 * train may do; anything else is refused without a word. The orders
+			 * window sets this for the player and the rig has to as well. */
+			o.SetStopLocation(OrderStopLocation::FarEnd);
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, o);
 		}
 
@@ -894,6 +898,82 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 static bool ConTestBuildShip(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
+	if (argv.size() == 2 && argv[1] == "trasa") {
+		/* Two harbours and a ship running between them: a ship out on a route
+		 * is a different thing from one idle in a shed, and the player's raid
+		 * went wrong on the first and right on the second. */
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "testlod: hra nema firmu, pust to ze savu.");
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+
+		Ship *sh = nullptr;
+		for (Ship *candidate : Ship::Iterate()) {
+			if (candidate->First() != candidate) continue;
+			sh = candidate;
+			break;
+		}
+		if (sh == nullptr) {
+			IConsolePrint(CC_ERROR, "testlod: nejdriv 'testlod', pak 'testlod trasa'.");
+			return true;
+		}
+
+		/* Where a harbour will stand, asked of the command rather than guessed
+		 * at: the nearest one to the ship, and the furthest from that. */
+		std::vector<TileIndex> sites;
+		for (TileIndex t : Map::Iterate()) {
+			if (Command<Commands::BuildDock>::Do(DoCommandFlags{}, t, StationID::Invalid(), false).Failed()) continue;
+			sites.push_back(t);
+		}
+		if (sites.size() < 2) {
+			IConsolePrint(CC_ERROR, "testlod: na mape nejsou dve mista na pristav ({}).", sites.size());
+			return true;
+		}
+		TileIndex first = *std::min_element(sites.begin(), sites.end(),
+				[&](TileIndex a, TileIndex b) { return DistanceManhattan(a, sh->tile) < DistanceManhattan(b, sh->tile); });
+		TileIndex second = *std::max_element(sites.begin(), sites.end(),
+				[&](TileIndex a, TileIndex b) { return DistanceManhattan(a, first) < DistanceManhattan(b, first); });
+
+		CommandCost d1 = Command<Commands::BuildDock>::Do(DoCommandFlag::Execute, first, StationID::Invalid(), false);
+		CommandCost d2 = Command<Commands::BuildDock>::Do(DoCommandFlag::Execute, second, StationID::Invalid(), false);
+		if (d1.Failed() || d2.Failed()) {
+			IConsolePrint(CC_ERROR, "testlod: pristav nejde postavit - {} / {}", RefusalReason(d1), RefusalReason(d2));
+			return true;
+		}
+
+		/* Out with the shed order, in with the two harbours. */
+		while (sh->GetNumOrders() > 0) {
+			if (Command<Commands::DeleteOrder>::Do(DoCommandFlag::Execute, sh->index, 0).Failed()) break;
+		}
+		uint added = 0;
+		for (TileIndex t : {first, second}) {
+			Station *st = IsTileType(t, TileType::Station) ? Station::GetByTile(t) : nullptr;
+			if (st == nullptr) {
+				IConsolePrint(CC_ERROR, "testlod: na ({},{}) neni stanice", TileX(t), TileY(t));
+				continue;
+			}
+			Order o{};
+			o.MakeGoToStation(st->index);
+			/* A fresh order stops at the near end of the platform, which only a
+			 * train may do; anything else is refused without a word. The orders
+			 * window sets this for the player and the rig has to as well. */
+			o.SetStopLocation(OrderStopLocation::FarEnd);
+			CommandCost ins = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, sh->index, added, o);
+			if (ins.Succeeded()) {
+				added++;
+			} else {
+				IConsolePrint(CC_ERROR, "testlod: rozkaz na stanici {} nejde vlozit - {}", st->index.base(), RefusalReason(ins));
+			}
+		}
+		if (sh->vehstatus.Test(VehState::Stopped)) {
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, sh->index, false);
+		}
+		IConsolePrint(CC_DEFAULT, "testlod: pristavy na ({},{}) a ({},{}), lod {} ma {} rozkazu a jede.",
+				TileX(first), TileY(first), TileX(second), TileY(second), sh->unitnumber, added);
+		return true;
+	}
+
 	if (argv.size() == 2 && argv[1] == "stav") {
 		for (const Ship *sh : Ship::Iterate()) {
 			IConsolePrint(CC_DEFAULT, "testlod: lod {} na ({},{}) rychlost {} v depu {} cil ({},{}) nalet ({},{}) plout ({},{}) nejbliz {} stale {}",

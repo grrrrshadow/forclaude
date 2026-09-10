@@ -190,7 +190,12 @@ public:
 		YapfShipRegions pf(node_limit);
 		pf.SetDestination(start_water_region_patch);
 
-		if (v->current_order.IsType(OT_GOTO_STATION)) {
+		/* A ship on a raid steers by the tile its errand set, not by the
+		 * station in its orders -- the same rule as in the tile-level search
+		 * next door. Both have to agree, or the coarse one routes towards a
+		 * harbour and the fine one towards the errand, and the ship sails in
+		 * circles between them. */
+		if (v->raid_target == INVALID_TILE && v->current_order.IsType(OT_GOTO_STATION)) {
 			StationID station_id = v->current_order.GetDestination().ToStationID();
 			const BaseStation *station = BaseStation::Get(station_id);
 			for (const auto &tile : station->GetTileArea(StationType::Dock)) {

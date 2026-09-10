@@ -4797,7 +4797,7 @@ STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Čekám na volnou cestu
 STR_VEHICLE_STATUS_RAID_TAKEOFF                                 :{LTBLUE}Startuju bombardovat
 STR_VEHICLE_STATUS_RAID_FLYING                                  :{LTBLUE}Letím bombardovat
-STR_VEHICLE_STATUS_RAID_SAILING                                 :{LTBLUE}Plujem bombardovat
+STR_VEHICLE_STATUS_RAID_SAILING                                 :{LTBLUE}Pluju bombardovat
 STR_VEHICLE_STATUS_AIRCRAFT_TOO_FAR                             :{ORANGE}Příliš daleko k příští destinaci
 
 STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL                      :{LTBLUE}Míří do {STATION}, {VELOCITY}

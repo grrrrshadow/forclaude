@@ -842,7 +842,12 @@ static void ShipController(Ship *v)
 								VehicleEnterDepot(v);
 								return;
 							}
-						} else if (v->current_order.IsType(OT_GOTO_STATION) && IsDockingTile(gp.new_tile)) {
+						} else if (v->raid_target == INVALID_TILE && v->current_order.IsType(OT_GOTO_STATION) && IsDockingTile(gp.new_tile)) {
+							/* Not while it is out on a raid. Its orders still
+							 * name a harbour and its way past one would
+							 * otherwise be an arrival: it would tie up, load,
+							 * and take the next order, in the middle of the
+							 * errand. */
 							/* Process station in the orderlist. */
 							Station *st = Station::Get(v->current_order.GetDestination().ToStationID());
 							if (st->docking_station.Contains(gp.new_tile) && IsShipDestinationTile(gp.new_tile, st->index)) {
