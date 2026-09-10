@@ -901,6 +901,7 @@ static bool AircraftRaidController(Aircraft *v)
 
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 		SetWindowClassesDirty(WindowClass::VehicleView);
+		InvalidateWindowClassesData(WindowClass::VehicleView);
 		return false;
 	}
 

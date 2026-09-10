@@ -3614,6 +3614,7 @@ public:
 					Aircraft::From(const_cast<Vehicle *>(v))->raid_target = INVALID_TILE;
 					_show_industry_health = false;
 					SetWindowClassesDirty(WindowClass::VehicleView);
+					InvalidateWindowClassesData(WindowClass::VehicleView);
 				}
 				if (v->type == VehicleType::Ship && Ship::From(v)->raid_target != INVALID_TILE) {
 					Ship *s = Ship::From(const_cast<Vehicle *>(v));
@@ -3622,6 +3623,7 @@ public:
 					s->raid_return_to = INVALID_TILE;
 					_show_industry_health = false;
 					SetWindowClassesDirty(WindowClass::VehicleView);
+					InvalidateWindowClassesData(WindowClass::VehicleView);
 				}
 				Command<Commands::SendVehicleToDepot>::Post(GetCmdSendToDepotMsg(v), v->index, _ctrl_pressed ? DepotCommandFlag::Service : DepotCommandFlags{}, {});
 				break;

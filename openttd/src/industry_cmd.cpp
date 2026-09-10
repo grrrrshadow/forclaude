@@ -326,6 +326,10 @@ void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 	_industry_health_until = TimerGameEconomy::date + RAID_HEALTH_SHOWN_DAYS;
 	InvalidateWindowClassesData(WindowClass::IndustryView);
 	SetWindowClassesDirty(WindowClass::IndustryView);
+	/* And the crosshair row goes out of the vehicle windows with it, rather
+	 * than sitting there until something else happens to rebuild them. */
+	InvalidateWindowClassesData(WindowClass::VehicleView);
+	SetWindowClassesDirty(WindowClass::VehicleView);
 
 	if (_show_train_orientation) {
 		IConsolePrint(CC_INFO, "nalet: na ({},{}) smer {} - {} oblacku, prumyslu {}, domu srovnano {}",
@@ -411,6 +415,12 @@ CommandCost CmdRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 		s->SetDestTile(sail_to);
 		SetWindowDirty(WindowClass::VehicleView, s->index);
 		SetWindowClassesDirty(WindowClass::VehicleView);
+		/* Marking the windows for repainting is not enough: whether the
+		 * crosshair row is in a window at all is worked out when the window
+		 * counts its rows, and that only runs when something tells it its
+		 * contents changed. Without this the crosshair stayed on offer for
+		 * the whole flight and the raid could be given twice. */
+		InvalidateWindowClassesData(WindowClass::VehicleView);
 
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "nalet: lod {} poslana na ({},{}), plout na ({},{})", s->unitnumber,
@@ -437,6 +447,12 @@ CommandCost CmdRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 	if (a->vehstatus.Test(VehState::Stopped)) a->vehstatus.Reset(VehState::Stopped);
 	SetWindowDirty(WindowClass::VehicleView, a->index);
 	SetWindowClassesDirty(WindowClass::VehicleView);
+	/* Marking the windows for repainting is not enough: whether the
+	 * crosshair row is in a window at all is worked out when the window
+	 * counts its rows, and that only runs when something tells it its
+	 * contents changed. Without this the crosshair stayed on offer for
+	 * the whole flight and the raid could be given twice. */
+	InvalidateWindowClassesData(WindowClass::VehicleView);
 
 	if (_show_train_orientation) {
 		IConsolePrint(CC_INFO, "nalet: letadlo {} posláno na ({},{})", a->unitnumber, TileX(tile), TileY(tile));

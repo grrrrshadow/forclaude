@@ -733,6 +733,7 @@ static void ShipRaidController(Ship *v)
 		v->SetDestTile(back);
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 		SetWindowClassesDirty(WindowClass::VehicleView);
+		InvalidateWindowClassesData(WindowClass::VehicleView);
 		return;
 	}
 
@@ -750,6 +751,7 @@ static void ShipRaidController(Ship *v)
 		v->raid_return_to = INVALID_TILE;
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 		SetWindowClassesDirty(WindowClass::VehicleView);
+		InvalidateWindowClassesData(WindowClass::VehicleView);
 		return;
 	}
 
