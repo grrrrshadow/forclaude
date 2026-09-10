@@ -60,6 +60,8 @@
 #include "engine_base.h"
 #include "effectvehicle_base.h"
 #include "effectvehicle_func.h"
+#include "news_gui.h"
+#include "news_type.h"
 #include "road.h"
 #include "rail.h"
 #include "game/game.hpp"
@@ -858,6 +860,25 @@ static bool ConTestIndustryHealth(std::span<std::string_view> argv)
 		count++;
 	}
 	IConsolePrint(CC_DEFAULT, "teststavby: prumyslu celkem {}", count);
+	return true;
+}
+
+/**
+ * Print what is in the papers, newest first. Usage: testnoviny
+ *
+ * A news line is written when something happens and read much later; the
+ * only way to see what it says without a build in hand is to print it.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestNews(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	uint count = 0;
+	for (const NewsItem &ni : GetNews()) {
+		IConsolePrint(CC_DEFAULT, "testnoviny: {}", ni.headline.GetDecodedString());
+		count++;
+	}
+	if (count == 0) IConsolePrint(CC_DEFAULT, "testnoviny: noviny jsou prazdne.");
 	return true;
 }
 
@@ -6820,6 +6841,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmesta",               ConTestTowns);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
+	IConsole::CmdRegister("testnoviny",              ConTestNews);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);
 	IConsole::CmdRegister("testspoj",                ConTestCouple);

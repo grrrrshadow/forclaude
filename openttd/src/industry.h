@@ -353,7 +353,7 @@ inline bool ShowIndustryHealth()
 }
 
 /** Drop the smoke of a raid on a spot; see DropRaidSmoke() in industry_cmd.cpp. */
-void DropRaidSmoke(TileIndex tile, Direction facing);
+void DropRaidSmoke(TileIndex tile, Direction facing, Owner who);
 
 /**
  * How much of an industry's building is still standing, as a percentage.

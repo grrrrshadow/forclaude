@@ -174,6 +174,56 @@ static uint RaidHousesToLevel()
 }
 
 /**
+ * How many are said to have died in a raid on a building.
+ *
+ * A made-up number, as the player asked -- nothing in the game counts the
+ * people inside a factory. Only its size follows from who is being counted:
+ * a shop floor holds a lot of workers, an office fewer clerks, and a
+ * boardroom on a visit is a handful.
+ *
+ * @param raid which raid on this building this is, counting from one
+ * @return the number for the news
+ */
+static uint RaidVictims(uint raid)
+{
+	switch (raid) {
+		case 1: return 10 + RandomRange(90);   // the shop floor
+		case 2: return 5 + RandomRange(45);    // the offices
+		default: return 1 + RandomRange(9);    // shareholders on a visit
+	}
+}
+
+/**
+ * Put the raid on a building in the papers.
+ *
+ * The line names the player who ordered it -- the manager's name, which is
+ * what a company has of a person -- and which of them died, which follows
+ * from how many raids the building has taken. The last one, the one that
+ * pulls it down, says nobody got out.
+ *
+ * The building's name is written into the message here and now rather than
+ * being looked up when the paper is read, because the raid that earns the
+ * last message is also the one that deletes the building: by the time the
+ * news is on screen there would be nothing left to ask.
+ *
+ * @param who   the company whose aircraft dropped it
+ * @param name  the building's name, as it reads now
+ * @param tile  where the news points
+ * @param raid  which raid on this building this is, counting from one
+ * @param gone  whether this raid pulled it down
+ */
+static void RaidIndustryNews(Owner who, const std::string &name, TileIndex tile, uint raid, bool gone)
+{
+	if (!Company::IsValidID(who)) return;
+
+	EncodedString headline = gone
+			? GetEncodedString(STR_NEWS_RAID_INDUSTRY_EVERYBODY, static_cast<CompanyID>(who), name)
+			: GetEncodedString(STR_NEWS_RAID_INDUSTRY_WORKERS + std::min(raid, 3u) - 1,
+					static_cast<CompanyID>(who), name, RaidVictims(raid));
+	AddTileNewsItem(std::move(headline), NewsType::Accident, tile);
+}
+
+/**
  * Drop the smoke of a raid over a spot and take it out of what stands under
  * it: industry buildings lose a slice of what they are made of, towns lose
  * houses and the people in them.
@@ -183,8 +233,9 @@ static uint RaidHousesToLevel()
  *
  * @param tile   where the smoke comes down
  * @param facing which way the aircraft was heading, so the carpet lies along it
+ * @param who    the company whose aircraft dropped it, for the papers
  */
-void DropRaidSmoke(TileIndex tile, Direction facing)
+void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 {
 	std::vector<TileIndex> carpet = RaidCarpet(tile, facing);
 
@@ -213,10 +264,18 @@ void DropRaidSmoke(TileIndex tile, Direction facing)
 		Industry *i = Industry::GetIfValid(id);
 		if (i == nullptr) continue;
 		uint before = i->health;
+		/* Which raid on this building this is, read off what is left of it:
+		 * every raid takes the same slice, so what is missing says how many
+		 * have been through. Read before the hit, and kept, because the hit
+		 * can delete the building underneath us. */
+		uint raid = (100 - before) / RAID_HURT + 1;
+		std::string name = i->GetCachedName();
+		TileIndex where = i->location.tile;
 		bool gone = DamageIndustry(i, RAID_HURT);
+		RaidIndustryNews(who, name, where, raid, gone);
 		if (_show_train_orientation) {
-			IConsolePrint(CC_INFO, "nalet: prumysl {} na ({},{}) {} -> {}", id.base(), TileX(tile), TileY(tile),
-					before, gone ? "zbouran" : fmt::format("{}", (uint)i->health));
+			IConsolePrint(CC_INFO, "nalet: prumysl {} na ({},{}) {} -> {}, nalet c.{}", id.base(), TileX(tile), TileY(tile),
+					before, gone ? "zbouran" : fmt::format("{}", (uint)Industry::Get(id)->health), raid);
 		}
 	}
 
@@ -224,6 +283,10 @@ void DropRaidSmoke(TileIndex tile, Direction facing)
 	 * what clearing one does), and what is left is bare broken ground until
 	 * the town builds there again. */
 	uint levelled = 0;
+	/* What each town lost, so the papers can say it. Counted here rather than
+	 * asked for afterwards: pulling a house down is the only moment the number
+	 * of people in it is known. */
+	std::map<TownID, std::pair<uint, uint>> town_losses; // people, houses
 	if (!houses.empty()) {
 		uint wanted = RaidHousesToLevel();
 		while (levelled < wanted && !houses.empty()) {
@@ -233,11 +296,23 @@ void DropRaidSmoke(TileIndex tile, Direction facing)
 			if (!IsTileType(t, TileType::House)) continue; // a neighbour took it down with it
 
 			Town *town = Town::GetByTile(t);
+			uint before_pop = town->cache.population;
 			ClearTownHouse(town, t);
 			/* Rubble, not a lawn. */
 			if (IsTileType(t, TileType::Clear)) MakeClear(t, ClearGround::Rough, 3);
 			MarkTileDirtyByTile(t);
+			auto &loss = town_losses[town->index];
+			loss.first += before_pop - town->cache.population;
+			loss.second++;
 			levelled++;
+		}
+	}
+
+	/* One line per town, however many houses of it came down. */
+	if (Company::IsValidID(who)) {
+		for (const auto &[town_id, loss] : town_losses) {
+			AddTileNewsItem(GetEncodedString(STR_NEWS_RAID_TOWN, static_cast<CompanyID>(who), town_id, loss.first, loss.second),
+					NewsType::Accident, tile);
 		}
 	}
 

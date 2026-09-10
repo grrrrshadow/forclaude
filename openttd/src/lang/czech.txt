@@ -968,6 +968,12 @@ STR_NEWS_ROAD_VEHICLE_CRASH                                     :{BIG_FONT}{BLAC
 STR_NEWS_AIRCRAFT_CRASH                                         :{BIG_FONT}{BLACK}Pád letadla!{}{COMMA} {P člověk lidé lidí} zahynul{P "" i o} v plamenech v {STATION}
 STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLACK}Letecká havárie!{}Kvůli vyčerpání paliva {COMMA} {P člověk lidé lidí} zemřel{P "" i o} v ohnivém pekle!
 
+STR_NEWS_RAID_INDUSTRY_WORKERS                                  :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřelo {COMMA} dělníků
+STR_NEWS_RAID_INDUSTRY_CLERKS                                   :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřelo {COMMA} úředníků
+STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřelo {COMMA} akcionářů na prohlídce
+STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {RAW_STRING}, zemřeli tam všichni
+STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {TOWN}, zemřelo {COMMA} obyvatel, zbořeno {COMMA} domů
+
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin se zřítil do {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Silniční vozidlo bylo zničeno při srážce s UFO!
 STR_NEWS_DISASTER_AIRPLANE_OIL_REFINERY                         :{BIG_FONT}{BLACK}Výbuch ropné rafinerie u {TOWN}!

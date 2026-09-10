@@ -881,6 +881,12 @@ STR_NEWS_ROAD_VEHICLE_CRASH                                     :{BIG_FONT}{BLAC
 STR_NEWS_AIRCRAFT_CRASH                                         :{BIG_FONT}{BLACK}Plane Crash!{}{COMMA} die in fireball at {STATION}
 STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLACK}Plane Crash!{}Aircraft ran out of fuel, {COMMA} die in fireball
 
+STR_NEWS_RAID_INDUSTRY_WORKERS                                  :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. {COMMA} workers died
+STR_NEWS_RAID_INDUSTRY_CLERKS                                   :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. {COMMA} clerks died
+STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. {COMMA} shareholders on a visit died
+STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. Everybody there died
+STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {TOWN}. {COMMA} inhabitants died, {COMMA} houses levelled
+
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin disaster at {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Road vehicle destroyed in 'UFO' collision!
 STR_NEWS_DISASTER_AIRPLANE_OIL_REFINERY                         :{BIG_FONT}{BLACK}Oil refinery explosion near {TOWN}!
