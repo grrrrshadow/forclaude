@@ -9,7 +9,10 @@
 
 #include "stdafx.h"
 #include "train.h"
+#include "ship.h"
 #include "depot_base.h"
+#include "water_map.h"
+#include "water_cmd.h"
 #include "road_cmd.h"
 #include "roadveh.h"
 #include "industry.h"
@@ -879,38 +882,139 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
  * testnalet <x> <y> [unit number of the aircraft]
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Build a ship depot on the nearest open water and buy a ship in it.
+ * Usage: testlod [x] [y]
+ *
+ * A ship's raid can only be measured with a ship, and a ship can only be
+ * bought where there is water deep enough for a shed. The rig finds it
+ * rather than the scene having to know where the sea is.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBuildShip(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	if (argv.size() == 2 && argv[1] == "stav") {
+		for (const Ship *sh : Ship::Iterate()) {
+			IConsolePrint(CC_DEFAULT, "testlod: lod {} na ({},{}) rychlost {} v depu {} cil ({},{}) nalet ({},{}) plout ({},{}) nejbliz {} stale {}",
+					sh->unitnumber, TileX(sh->tile), TileY(sh->tile), sh->cur_speed, sh->IsInDepot() ? "ano" : "ne",
+					TileX(sh->dest_tile), TileY(sh->dest_tile), TileX(sh->raid_target), TileY(sh->raid_target),
+					TileX(sh->raid_sail_to), TileY(sh->raid_sail_to), sh->raid_closest, sh->raid_stale);
+		}
+		return true;
+	}
+	uint sx = argv.size() > 2 ? 0 : Map::MaxX() / 2;
+	uint sy = argv.size() > 2 ? 0 : Map::MaxY() / 2;
+	if (argv.size() > 2) {
+		auto px = ParseInteger(argv[1]);
+		auto py = ParseInteger(argv[2]);
+		if (!px.has_value() || !py.has_value()) return false;
+		sx = (uint)*px;
+		sy = (uint)*py;
+	}
+
+	if (!Company::IsValidID(CompanyID::Begin())) {
+		IConsolePrint(CC_ERROR, "testlod: hra nema firmu, pust to ze savu.");
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+
+	/* Two tiles of water side by side, as near the asked-for spot as there
+	 * is any. Tried for real rather than guessed at: the command knows what
+	 * counts as buildable water and the rig does not need to. */
+	TileIndex depot = INVALID_TILE;
+	Axis found_axis = Axis::X;
+	uint best = UINT_MAX;
+	for (TileIndex t : Map::Iterate()) {
+		if (!IsWaterTile(t)) continue;
+		uint dist = DistanceManhattan(t, TileXY(sx, sy));
+		if (dist >= best) continue;
+		for (Axis a : {Axis::X, Axis::Y}) {
+			if (Command<Commands::BuildShipDepot>::Do(DoCommandFlags{}, t, a).Failed()) continue;
+			best = dist;
+			depot = t;
+			found_axis = a;
+			break;
+		}
+	}
+	if (depot == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testlod: nikde na mape neni voda na depo.");
+		return true;
+	}
+
+	CommandCost built = Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, depot, found_axis);
+	if (built.Failed()) {
+		IConsolePrint(CC_ERROR, "testlod: depo na ({},{}) nejde postavit - {}", TileX(depot), TileY(depot), RefusalReason(built));
+		return true;
+	}
+
+	std::string why = "zadny typ lodi";
+	for (const Engine *e : Engine::IterateType(VehicleType::Ship)) {
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) {
+			why = RefusalReason(cost);
+			continue;
+		}
+		/* An order to its own shed, so the ship has something to go back to
+		 * after the errand: without one there is nothing to prove it was put
+		 * back where it was. */
+		if (const Depot *d = Depot::GetByTile(depot); d != nullptr) {
+			Order home{};
+			home.MakeGoToDepot(DestinationID(d->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, home);
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+		IConsolePrint(CC_DEFAULT, "testlod: depo na ({},{}), lod {} koupena, rozkazu {}.", TileX(depot), TileY(depot),
+				Vehicle::Get(veh)->unitnumber, Vehicle::Get(veh)->GetNumOrders());
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testlod: depo stoji na ({},{}), ale zadna lod nejde koupit - {}", TileX(depot), TileY(depot), why);
+	return true;
+}
+
 static bool ConTestAirRaid(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Fly an air raid at a spot. Usage: 'testnalet <x> <y> [unit number]'.");
+		IConsolePrint(CC_HELP, "Send a raid at a spot. Usage: 'testnalet <x> <y> [lod] [unit number]'.");
 		return true;
 	}
 	auto px = ParseInteger(argv[1]);
 	auto py = ParseInteger(argv[2]);
 	if (!px.has_value() || !py.has_value()) return false;
+	/* Which kind, and then which one: a ship's raid is a different journey
+	 * from an aircraft's and has to be walked separately. */
+	VehicleType want = VehicleType::Aircraft;
 	std::optional<uint> unit;
 	if (argv.size() > 3) {
-		unit = ParseInteger(argv[3]);
+		if (argv[3] == "lod") {
+			want = VehicleType::Ship;
+		} else {
+			unit = ParseInteger(argv[3]);
+			if (!unit.has_value()) return false;
+		}
+	}
+	if (argv.size() > 4) {
+		unit = ParseInteger(argv[4]);
 		if (!unit.has_value()) return false;
 	}
 
-	Vehicle *plane = nullptr;
-	uint planes = 0;
+	Vehicle *raider = nullptr;
+	uint candidates = 0;
 	for (Vehicle *v : Vehicle::Iterate()) {
-		if (v->type != VehicleType::Aircraft || v->First() != v) continue;
-		planes++;
-		if (unit.has_value() ? v->unitnumber == (UnitID)*unit : plane == nullptr) plane = v;
+		if (v->type != want || v->First() != v) continue;
+		candidates++;
+		if (unit.has_value() ? v->unitnumber == (UnitID)*unit : raider == nullptr) raider = v;
 	}
-	if (plane == nullptr) {
-		IConsolePrint(CC_ERROR, "testnalet: zadne letadlo (na mape jich je {}).", planes);
+	if (raider == nullptr) {
+		IConsolePrint(CC_ERROR, "testnalet: zadne takove vozidlo (na mape jich je {}).", candidates);
 		return true;
 	}
 
 	TileIndex tile = TileXY(*px, *py);
-	AutoRestoreBackup cur_company(_current_company, plane->owner);
-	CommandCost ret = Command<Commands::AirRaid>::Do(DoCommandFlag::Execute, tile, plane->index);
-	IConsolePrint(CC_DEFAULT, "testnalet: letadlo {} na ({},{}): {}", plane->unitnumber, *px, *py,
-			ret.Failed() ? RefusalReason(ret) : "nalet proveden");
+	AutoRestoreBackup cur_company(_current_company, raider->owner);
+	CommandCost ret = Command<Commands::Raid>::Do(DoCommandFlag::Execute, tile, raider->index);
+	IConsolePrint(CC_DEFAULT, "testnalet: {} {} na ({},{}): {}", want == VehicleType::Ship ? "lod" : "letadlo",
+			raider->unitnumber, *px, *py, ret.Failed() ? RefusalReason(ret) : "nalet zadan");
 	return true;
 }
 
@@ -7009,6 +7113,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
+	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
 	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);
 	IConsole::CmdRegister("testnalet",               ConTestAirRaid);
 	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);

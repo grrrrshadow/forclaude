@@ -33,6 +33,7 @@
 #include "sound_func.h"
 #include "animated_tile_func.h"
 #include "aircraft.h"
+#include "ship.h"
 #include "airport.h"
 #include "effectvehicle_func.h"
 #include "effectvehicle_base.h"
@@ -114,6 +115,8 @@ static const uint RAID_HURT = 30;
 static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
 /** How long what is left of the buildings stays readable after a raid. */
 static const int RAID_HEALTH_SHOWN_DAYS = 14;
+/** How far a ship's rocket carries, in tiles: past this there is nothing to sail for. */
+static const uint RAID_SHIP_RANGE = 50;
 
 /**
  * The tiles a raid covers: a carpet laid along the line of flight.
@@ -331,30 +334,90 @@ void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 }
 
 /**
- * Send an aircraft to drop smoke on a spot.
+ * Is anybody already out on an errand?
  *
- * The player points the crosshair; this hands the aircraft the errand and it
- * flies there itself (see AircraftRaidController()). One aircraft at a time,
- * and only one that is empty and standing on the ground -- the player's rule.
+ * One at a time across the whole fleet, not one of each: while an aircraft is
+ * on its way no ship can be sent, and while a ship is on its way no aircraft
+ * can. The player's rule.
+ *
+ * @param except a vehicle to overlook -- the one being given the errand
+ * @return whether somebody else is already out
+ */
+bool IsAnyoneRaiding(const Vehicle *except)
+{
+	for (const Aircraft *a : Aircraft::Iterate()) {
+		if (a != except && a->raid_target != INVALID_TILE) return true;
+	}
+	for (const Ship *s : Ship::Iterate()) {
+		if (s != except && s->raid_target != INVALID_TILE) return true;
+	}
+	return false;
+}
+
+/**
+ * Send an aircraft or a ship to drop smoke on a spot.
+ *
+ * The player points the crosshair; this hands the vehicle the errand and it
+ * makes its own way there (see AircraftRaidController() and
+ * ShipRaidController()). One vehicle at a time across the whole fleet.
+ *
+ * The two have different rules, because they are different jobs. An aircraft
+ * has to be empty and on the ground: it flies over and drops what it is
+ * carrying, so it must be carrying nothing else. A ship may be any ship at
+ * all -- loaded, empty, in a shed or at sea -- because it shoots from the
+ * water and goes back to what it was doing.
  *
  * A command rather than something the window does itself, because it changes
- * the world: in a network game the flight, the smoke and the damage have to
+ * the world: in a network game the journey, the smoke and the damage have to
  * happen on every machine alike.
  *
  * @param flags  type of operation
  * @param tile   where the crosshair was put down
- * @param veh_id the aircraft to send
+ * @param veh_id the aircraft or ship to send
  * @return the cost of this operation or an error
  */
-CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
+CommandCost CmdRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
-	if (v == nullptr || v->type != VehicleType::Aircraft || v->First() != v) return CMD_ERROR;
+	if (v == nullptr || v->First() != v) return CMD_ERROR;
+	if (v->type != VehicleType::Aircraft && v->type != VehicleType::Ship) return CMD_ERROR;
 
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 
 	if (tile >= Map::Size()) return CMD_ERROR;
+
+	/* One at a time, aircraft and ships together. */
+	if (IsAnyoneRaiding(v)) return CommandCost(STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT);
+
+	if (v->type == VehicleType::Ship) {
+		Ship *s = Ship::From(v);
+
+		/* Somewhere to shoot from. Out of the rocket's reach of any water,
+		 * there is no errand to give -- better said now than after a ship has
+		 * spent a season finding out. */
+		extern TileIndex FindRaidWaterForShip(const Ship *v, TileIndex target, uint range);
+		TileIndex sail_to = FindRaidWaterForShip(s, tile, RAID_SHIP_RANGE);
+		if (sail_to == INVALID_TILE) return CommandCost(STR_ERROR_RAID_OUT_OF_REACH);
+
+		if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();
+
+		s->raid_target = tile;
+		s->raid_sail_to = sail_to;
+		s->raid_return_to = s->dest_tile;
+		s->raid_closest = DistanceManhattan(s->tile, sail_to);
+		s->raid_stale = 0;
+		if (s->vehstatus.Test(VehState::Stopped)) s->vehstatus.Reset(VehState::Stopped);
+		s->SetDestTile(sail_to);
+		SetWindowDirty(WindowClass::VehicleView, s->index);
+		SetWindowClassesDirty(WindowClass::VehicleView);
+
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "nalet: lod {} poslana na ({},{}), plout na ({},{})", s->unitnumber,
+					TileX(tile), TileY(tile), TileX(sail_to), TileY(sail_to));
+		}
+		return CommandCost();
+	}
 
 	Aircraft *a = Aircraft::From(v);
 	if (!a->IsNormalAircraft()) return CMD_ERROR;
@@ -365,11 +428,6 @@ CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND);
 	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
 		if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
-	}
-
-	/* One at a time. */
-	for (const Aircraft *other : Aircraft::Iterate()) {
-		if (other != a && other->raid_target != INVALID_TILE) return CommandCost(STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT);
 	}
 
 	if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();

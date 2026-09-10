@@ -267,7 +267,7 @@ enum class Commands : uint8_t {
 	IndustrySetExclusivity, ///< change industry exclusive consumer/supplier
 	IndustrySetText, ///< change additional text for the industry
 	IndustrySetProduction, ///< change industry production
-	AirRaid, ///< an aircraft scatters smoke over a spot, taking it out of whatever industry stands there
+	Raid, ///< an aircraft or a ship scatters smoke over a spot, taking it out of whatever industry stands there
 
 	SetCompanyManagerFace, ///< set the manager's face of the company
 	SetCompanyColour, ///< set the colour of the company

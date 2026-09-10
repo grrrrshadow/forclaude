@@ -20,13 +20,13 @@ CommandCost CmdIndustrySetFlags(DoCommandFlags flags, IndustryID ind_id, Industr
 CommandCost CmdIndustrySetExclusivity(DoCommandFlags flags, IndustryID ind_id, Owner company_id, bool consumer);
 CommandCost CmdIndustrySetText(DoCommandFlags flags, IndustryID ind_id, const EncodedString &text);
 CommandCost CmdIndustrySetProduction(DoCommandFlags flags, IndustryID ind_id, uint8_t prod_level, bool show_news, const EncodedString &text);
-CommandCost CmdAirRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id);
+CommandCost CmdRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id);
 
 DEF_CMD_TRAIT(Commands::BuildIndustry, CmdBuildIndustry, CommandFlag::Deity, CommandType::LandscapeConstruction)
 DEF_CMD_TRAIT(Commands::IndustrySetFlags, CmdIndustrySetFlags, CommandFlag::Deity, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::IndustrySetExclusivity, CmdIndustrySetExclusivity, CommandFlag::Deity, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::IndustrySetText, CmdIndustrySetText, CommandFlags({CommandFlag::Deity, CommandFlag::StrCtrl}), CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::IndustrySetProduction, CmdIndustrySetProduction, CommandFlag::Deity, CommandType::OtherManagement)
-DEF_CMD_TRAIT(Commands::AirRaid,               CmdAirRaid,               {},                    CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::Raid,                  CmdRaid,                  {},                    CommandType::OtherManagement)
 
 #endif /* INDUSTRY_CMD_H */

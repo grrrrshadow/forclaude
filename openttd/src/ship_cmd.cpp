@@ -35,6 +35,8 @@
 #include "industry.h"
 #include "industry_map.h"
 #include "ship_cmd.h"
+#include "console_func.h"
+#include "train.h"
 
 #include "table/strings.h"
 
@@ -371,8 +373,13 @@ static bool CheckShipStayInDepot(Ship *v)
 	/* Check if we should wait here for unbunching. */
 	if (v->IsWaitingForUnbunching()) return true;
 
-	/* We are leaving a depot, but have to go to the exact same one; re-enter */
-	if (v->current_order.IsType(OT_GOTO_DEPOT) &&
+	/* We are leaving a depot, but have to go to the exact same one; re-enter.
+	 *
+	 * Unless it has been given an errand. A ship whose orders end at the shed
+	 * it is standing in would otherwise step out and back in for ever, and
+	 * the player's rule is that a ship in a shed can be sent -- so while the
+	 * errand is on, the shed lets go. */
+	if (v->raid_target == INVALID_TILE && v->current_order.IsType(OT_GOTO_DEPOT) &&
 			IsShipDepotTile(v->tile) && GetDepotIndex(v->tile) == v->current_order.GetDestination()) {
 		VehicleEnterDepot(v);
 		return true;
@@ -617,6 +624,142 @@ static void ReverseShip(Ship *v)
 	v->UpdateViewport(true, true);
 }
 
+/**
+ * Find the water a ship should make for to shoot at a spot.
+ *
+ * Near is not enough: the sea it is near has to be the sea the ship is on.
+ * A pond behind a hill is a tile away from the target and a world away from
+ * the ship, and steering at one is how a ship spends a season going nowhere.
+ * So the reachable water is worked out first -- the same way the game finds
+ * a shed to send a ship to -- and only then the nearest tile of it.
+ *
+ * @param v      the ship that would go
+ * @param target where the crosshair was put down
+ * @param range  how far from the target the water may be, in tiles
+ * @return the water tile to make for, or INVALID_TILE if there is none
+ */
+TileIndex FindRaidWaterForShip(const Ship *v, TileIndex target, uint range)
+{
+	/* Step 1: which water this ship can get to at all. Same walk as
+	 * FindClosestShipDepot(), bounded by how far the target is plus the
+	 * rocket's reach, so a ship does not walk the whole map. */
+	const uint reach = DistanceManhattan(v->tile, target) + range;
+	const int max_region_distance = (int)(reach / WATER_REGION_EDGE_LENGTH) + 1;
+
+	std::unordered_set<int> visited;
+	std::deque<WaterRegionPatchDesc> to_search;
+	const WaterRegionPatchDesc start = GetWaterRegionPatchInfo(v->tile);
+	to_search.push_back(start);
+	visited.insert(CalculateWaterRegionPatchHash(start));
+
+	while (!to_search.empty()) {
+		const WaterRegionPatchDesc current = to_search.front();
+		to_search.pop_front();
+
+		VisitWaterRegionPatchCallback visit = [&](const WaterRegionPatchDesc &patch) {
+			if (std::abs(patch.x - start.x) > max_region_distance ||
+					std::abs(patch.y - start.y) > max_region_distance) return;
+			const int hash = CalculateWaterRegionPatchHash(patch);
+			if (visited.count(hash) == 0) {
+				visited.insert(hash);
+				to_search.push_back(patch);
+			}
+		};
+		VisitWaterRegionPatchNeighbours(current, visit);
+	}
+
+	/* Step 2: the nearest tile of it to the target that a ship can float on.
+	 * A shore is water on the map and no water to a ship, so the question
+	 * asked is whether there is a track through it. */
+	TileIndex best = INVALID_TILE;
+	uint best_dist = range + 1;
+	for (int dy = -(int)range; dy <= (int)range; dy++) {
+		for (int dx = -(int)range; dx <= (int)range; dx++) {
+			int x = (int)TileX(target) + dx;
+			int y = (int)TileY(target) + dy;
+			if (x < 1 || y < 1 || x >= (int)Map::MaxX() || y >= (int)Map::MaxY()) continue;
+			TileIndex t = TileXY(x, y);
+			uint dist = DistanceManhattan(t, target);
+			if (dist >= best_dist) continue;
+			if (GetTileShipTrackStatus(t).None()) continue;
+			if (visited.count(CalculateWaterRegionPatchHash(GetWaterRegionPatchInfo(t))) == 0) continue;
+			best_dist = dist;
+			best = t;
+		}
+	}
+	return best;
+}
+
+/** How long a ship may make no headway towards its target before the errand is given up. */
+static const uint RAID_SHIP_PATIENCE = 2000;
+/** How near the water it is making for counts as arrived, in tiles. */
+static const uint RAID_SHIP_ARRIVED = 3;
+
+/**
+ * Steer a ship that has been given a raid, and let the rocket go when it is
+ * in place.
+ *
+ * A ship cannot go where the crosshair went, so it makes for the nearest
+ * water there is to the spot and shoots from there. While it is on its way
+ * its orders are left where they are and only its destination is overruled;
+ * when it is done, the destination it had before is put back and it carries
+ * on from where it was.
+ *
+ * Giving up is part of the job. An island in the way, a lake with no way
+ * out, a shed on the wrong sea -- the pathfinder will not say so, it will
+ * simply never arrive. So the ship is given a while to come closer than it
+ * has come before, and if it cannot, the errand is called off.
+ *
+ * @param v the ship
+ */
+static void ShipRaidController(Ship *v)
+{
+	if (v->raid_target == INVALID_TILE) return;
+
+	uint dist = DistanceManhattan(v->tile, v->raid_sail_to);
+
+	if (dist <= RAID_SHIP_ARRIVED) {
+		/* In place: the rocket goes off along the line from here to the spot,
+		 * so the smoke lies the way it flew, the same as a bombing run. */
+		TileIndex target = v->raid_target;
+		Direction facing = GetDirectionTowards(v, TileX(target) * TILE_SIZE + TILE_SIZE / 2,
+				TileY(target) * TILE_SIZE + TILE_SIZE / 2);
+		TileIndex back = v->raid_return_to;
+		v->raid_target = INVALID_TILE;
+		v->raid_sail_to = INVALID_TILE;
+		v->raid_return_to = INVALID_TILE;
+		DropRaidSmoke(target, facing, v->owner);
+		/* And on with what it was doing, from where it left off. */
+		v->SetDestTile(back);
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+		SetWindowClassesDirty(WindowClass::VehicleView);
+		return;
+	}
+
+	if (dist < v->raid_closest) {
+		v->raid_closest = dist;
+		v->raid_stale = 0;
+	} else if (++v->raid_stale > RAID_SHIP_PATIENCE) {
+		/* It is not getting there. Back to work. */
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "nalet: lod {} to vzdala, nejbliz byla {} policek", v->unitnumber, v->raid_closest);
+		}
+		v->raid_target = INVALID_TILE;
+		v->raid_sail_to = INVALID_TILE;
+		v->SetDestTile(v->raid_return_to);
+		v->raid_return_to = INVALID_TILE;
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+		SetWindowClassesDirty(WindowClass::VehicleView);
+		return;
+	}
+
+	/* Orders have had their say and set a destination; the errand overrules
+	 * it. Done here rather than instead of the orders, so loading, unloading
+	 * and everything else the ship was in the middle of runs as it always
+	 * does. */
+	v->SetDestTile(v->raid_sail_to);
+}
+
 static void ShipController(Ship *v)
 {
 	v->tick_counter++;
@@ -631,6 +774,11 @@ static void ShipController(Ship *v)
 	v->HandleLoading();
 
 	if (v->current_order.IsType(OT_LOADING)) return;
+
+	/* Before the shed lets it out, because the errand is what it is going
+	 * out for: a ship with nothing in its orders has no destination and
+	 * would stay in the shed for ever. */
+	ShipRaidController(v);
 
 	if (CheckShipStayInDepot(v)) return;
 

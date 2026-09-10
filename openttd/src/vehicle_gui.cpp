@@ -20,6 +20,7 @@
 #include "roadveh.h"
 #include "train.h"
 #include "aircraft.h"
+#include "ship.h"
 #include "airport.h"
 #include "industry.h"
 #include "industry_cmd.h"
@@ -3064,12 +3065,19 @@ static bool IsVehicleRefittable(const Vehicle *v)
 static bool ShowsRaidButton(const Vehicle *v)
 {
 	if (!_show_industry_health) return false;
-	if (v->type != VehicleType::Aircraft || v->owner != _local_company) return false;
-	/* One aircraft at a time: while one is out on an errand, no other window
-	 * offers the crosshair, and the one that is out does not offer it twice. */
-	for (const Aircraft *other : Aircraft::Iterate()) {
-		if (other->raid_target != INVALID_TILE) return false;
-	}
+	if (v->owner != _local_company) return false;
+	if (v->type != VehicleType::Aircraft && v->type != VehicleType::Ship) return false;
+
+	/* One at a time, aircraft and ships together: while anybody is out on an
+	 * errand, no other window offers the crosshair, and the one that is out
+	 * does not offer it twice. */
+	extern bool IsAnyoneRaiding(const Vehicle *except);
+	if (IsAnyoneRaiding(nullptr)) return false;
+
+	/* A ship is a ship: loaded or empty, in a shed or at sea, it shoots from
+	 * the water and goes back to what it was doing. Nothing more to ask. */
+	if (v->type == VehicleType::Ship) return true;
+
 	if (!Aircraft::From(v)->IsNormalAircraft()) return false;
 
 	const Aircraft *a = Aircraft::From(v);
@@ -3379,6 +3387,9 @@ public:
 			const Aircraft *a = Aircraft::From(v);
 			return GetString(a->state == FLYING ? STR_VEHICLE_STATUS_RAID_FLYING : STR_VEHICLE_STATUS_RAID_TAKEOFF);
 		}
+		if (v->type == VehicleType::Ship && Ship::From(v)->raid_target != INVALID_TILE) {
+			return GetString(STR_VEHICLE_STATUS_RAID_SAILING);
+		}
 
 		if (v->vehstatus.Test(VehState::Stopped) && (!mouse_over_start_stop || v->IsStoppedInDepot())) {
 			if (v->type != VehicleType::Train) return GetString(STR_VEHICLE_STATUS_STOPPED);
@@ -3596,10 +3607,19 @@ public:
 				break;
 
 			case WID_VV_GOTO_DEPOT: // goto hangar
-				/* Sending it to the shed calls the errand off; the player has
-				 * to ask for the crosshair again. */
+				/* Sending it to the shed calls the errand off, whichever kind
+				 * of errand it is; the player has to ask for the crosshair
+				 * again. */
 				if (v->type == VehicleType::Aircraft && Aircraft::From(v)->raid_target != INVALID_TILE) {
 					Aircraft::From(const_cast<Vehicle *>(v))->raid_target = INVALID_TILE;
+					_show_industry_health = false;
+					SetWindowClassesDirty(WindowClass::VehicleView);
+				}
+				if (v->type == VehicleType::Ship && Ship::From(v)->raid_target != INVALID_TILE) {
+					Ship *s = Ship::From(const_cast<Vehicle *>(v));
+					s->raid_target = INVALID_TILE;
+					s->raid_sail_to = INVALID_TILE;
+					s->raid_return_to = INVALID_TILE;
 					_show_industry_health = false;
 					SetWindowClassesDirty(WindowClass::VehicleView);
 				}
@@ -3696,7 +3716,7 @@ public:
 	/** The crosshair has been put down somewhere: that is the raid. */
 	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
 	{
-		Command<Commands::AirRaid>::Post(STR_ERROR_CAN_T_RAID_HERE, tile, static_cast<VehicleID>(this->window_number));
+		Command<Commands::Raid>::Post(STR_ERROR_CAN_T_RAID_HERE, tile, static_cast<VehicleID>(this->window_number));
 		/* One press, one raid. The player asked that nothing stay armed: the
 		 * mode ends here whether the raid came off or not, and the button
 		 * comes back up with it (see OnPlaceObjectAbort). */
@@ -3781,8 +3801,10 @@ public:
 		/* While the crosshair is out, or while the aircraft is away on the
 		 * errand, the orders button is dark: the errand is not an order and
 		 * the two must not be mixed up half way through. */
-		bool aiming = v->type == VehicleType::Aircraft &&
-				(Aircraft::From(v)->raid_target != INVALID_TILE || this->IsWidgetLowered(WID_VV_RAID));
+		bool on_errand = (v->type == VehicleType::Aircraft && Aircraft::From(v)->raid_target != INVALID_TILE) ||
+				(v->type == VehicleType::Ship && Ship::From(v)->raid_target != INVALID_TILE);
+		bool aiming = on_errand || ((v->type == VehicleType::Aircraft || v->type == VehicleType::Ship) &&
+				this->IsWidgetLowered(WID_VV_RAID));
 		this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, aiming);
 
 		bool changed = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE)->SetDisplayedPlane(depot_clone);

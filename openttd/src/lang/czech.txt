@@ -4797,6 +4797,7 @@ STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Čekám na volnou cestu
 STR_VEHICLE_STATUS_RAID_TAKEOFF                                 :{LTBLUE}Startuju bombardovat
 STR_VEHICLE_STATUS_RAID_FLYING                                  :{LTBLUE}Letím bombardovat
+STR_VEHICLE_STATUS_RAID_SAILING                                 :{LTBLUE}Plujem bombardovat
 STR_VEHICLE_STATUS_AIRCRAFT_TOO_FAR                             :{ORANGE}Příliš daleko k příští destinaci
 
 STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL                      :{LTBLUE}Míří do {STATION}, {VELOCITY}
@@ -5820,7 +5821,8 @@ STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze ot
 STR_ERROR_AIRCRAFT_IS_IN_FLIGHT                                 :{WHITE}Letadlo letí
 STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND                        :{WHITE}... letadlo musí být na zemi
 STR_ERROR_AIRCRAFT_MUST_BE_EMPTY                                :{WHITE}... letadlo musí být prázdné
-STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT                       :{WHITE}... jiné letadlo už je venku
+STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT                       :{WHITE}... někdo jiný už je venku
+STR_ERROR_RAID_OUT_OF_REACH                                     :{WHITE}... k tomuhle místu se loď nedostane na dostřel
 STR_VEHICLE_VIEW_AIRCRAFT_RAID_TOOLTIP                          :{BLACK}Zaměř místo na mapě
 STR_ERROR_CAN_T_RAID_HERE                                       :{WHITE}Sem to nejde shodit...
 

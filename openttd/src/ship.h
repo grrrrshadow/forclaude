@@ -36,6 +36,22 @@ struct Ship final : public SpecializedVehicle<Ship, VehicleType::Ship> {
 	int16_t rotation_x_pos = 0; ///< NOSAVE: X Position before rotation.
 	int16_t rotation_y_pos = 0; ///< NOSAVE: Y Position before rotation.
 
+	/**
+	 * Where this ship was sent to put its rocket, or INVALID_TILE.
+	 *
+	 * Not in the savegame, same as the aircraft's: an errand the player has
+	 * not finished does not follow them into the next game.
+	 */
+	TileIndex raid_target = INVALID_TILE;
+	/** NOSAVE: the water the ship is making for, the nearest there is to the target. */
+	TileIndex raid_sail_to = INVALID_TILE;
+	/** NOSAVE: where the ship was going before the errand, to be put back afterwards. */
+	TileIndex raid_return_to = INVALID_TILE;
+	/** NOSAVE: the closest the ship has come to the target so far, to tell progress from going nowhere. */
+	uint raid_closest = 0;
+	/** NOSAVE: ticks since it last came any closer; enough of them and the errand is given up. */
+	uint raid_stale = 0;
+
 	Ship(VehicleID index) : SpecializedVehicleBase(index) {}
 	/** We want to 'destruct' the right class. */
 	~Ship() override { this->PreDestructor(); }
