@@ -215,12 +215,12 @@ static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
 /**
  * The rocket a ship shoots: eight headings each, in two liveries.
  *
- * Drawn from the same artwork as this build's aircraft, taken into the base
- * set because an effect draws from the base set and cannot reach a vehicle
- * GRF's sprites. Which livery a rocket wears is decided when it is fired.
+ * The artwork is the player's, taken into the base set because an effect
+ * draws from the base set and cannot reach a vehicle GRF's sprites. Which
+ * livery a rocket wears is decided when it is fired.
  */
 static const SpriteID SPR_RAID_ROCKET_GREY           = SPR_OPENTTD_BASE + 212;
-static const SpriteID SPR_RAID_ROCKET_RED            = SPR_OPENTTD_BASE + 220;
+static const SpriteID SPR_RAID_ROCKET_YELLOW         = SPR_OPENTTD_BASE + 220;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

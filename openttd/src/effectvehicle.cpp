@@ -733,8 +733,8 @@ EffectVehicle *CreateEffectVehicle(int x, int y, int z, EffectVehicleType type)
 /**
  * Fire a raid rocket at a spot.
  *
- * The livery is drawn at the moment of firing and is nothing but looks: red
- * or grey, as the artwork has it, one or the other each time.
+ * The livery is drawn at the moment of firing and is nothing but looks:
+ * yellow or grey, as the artwork has it, one or the other each time.
  *
  * @param x      where it starts, in pixels
  * @param y      where it starts, in pixels
@@ -804,7 +804,7 @@ bool EffectVehicle::Tick()
 void EffectVehicle::UpdateSpriteSeq()
 {
 	if (this->subtype != EV_RAID_ROCKET) return;
-	SpriteID base = this->animation_substate == 0 ? SPR_RAID_ROCKET_GREY : SPR_RAID_ROCKET_RED;
+	SpriteID base = this->animation_substate == 0 ? SPR_RAID_ROCKET_GREY : SPR_RAID_ROCKET_YELLOW;
 	this->sprite_cache.sprite_seq.Set(base + to_underlying(this->direction));
 }
 
