@@ -664,9 +664,14 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
 		 * purse, which is the whole point of the scene. */
 		const Company *c = Company::GetIfValid(CompanyID::Begin());
 		const Train *t = Train::GetIfValid(_testprejezd_train);
-		IConsolePrint(CC_DEFAULT, "testprejezd: penize {}, vlak {} porucha {}/{} rychlost {}, auticek na mape {}",
+		/* The raid's hold is in ticks from now, so the line says how much of
+		 * it is left rather than the tick it ends on. */
+		uint64_t held = t == nullptr || t->raid_broken_until <= TimerGameTick::counter
+				? 0 : t->raid_broken_until - TimerGameTick::counter;
+		IConsolePrint(CC_DEFAULT, "testprejezd: penize {}, vlak {} porucha {}/{} nalet jeste {} tiku, rychlost {}, auticek na mape {}",
 				c == nullptr ? Money(0) : c->money, t == nullptr ? 0 : (uint)t->unitnumber, t == nullptr ? 0 : (uint)t->breakdown_ctr,
-				t == nullptr ? 0 : (uint)t->breakdown_delay, t == nullptr ? 0 : (uint)t->cur_speed, RoadVehicle::GetNumItems());
+				t == nullptr ? 0 : (uint)t->breakdown_delay, held,
+				t == nullptr ? 0 : (uint)t->cur_speed, RoadVehicle::GetNumItems());
 		return true;
 	}
 

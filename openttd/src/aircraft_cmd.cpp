@@ -1344,6 +1344,7 @@ static void HandleAircraftSmoke(Aircraft *v, bool mode)
 	if (v->cur_speed < 10) {
 		v->vehstatus.Reset(VehState::AircraftBroken);
 		v->breakdown_ctr = 0;
+		v->raid_broken_until = 0;
 		return;
 	}
 

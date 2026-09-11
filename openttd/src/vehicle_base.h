@@ -254,6 +254,16 @@ public:
 	uint8_t breakdown_delay = 0; ///< Counter for managing breakdown length.
 	uint8_t breakdowns_since_last_service = 0; ///< Counter for the amount of breakdowns.
 	uint8_t breakdown_chance = 0; ///< Current chance of breakdowns.
+	/**
+	 * Until when a vehicle the smoke of a raid came down on stays broken, in
+	 * ticks. Zero while nothing is wrong.
+	 *
+	 * A raid's breakdown outlasts its smoke by a week, and breakdown_delay is
+	 * one byte counting at a step every other tick -- seven days at the very
+	 * most, where a month is wanted. So the length is kept here instead and
+	 * breakdown_delay only finishes the job once this has run out.
+	 */
+	TimerGameTick::TickCounter raid_broken_until = 0;
 
 	int32_t x_pos = 0; ///< x coordinate.
 	int32_t y_pos = 0; ///< y coordinate.

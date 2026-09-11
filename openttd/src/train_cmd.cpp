@@ -4839,6 +4839,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 			 * its own orders the whole way -- being towed does not take a train's
 			 * orders off it, see TryConsistSplice. */
 			casualty->breakdown_ctr = 0;
+			casualty->raid_broken_until = 0;
 			casualty->breakdown_delay = 0;
 			casualty->rescue_deadline = TimerGameEconomy::Date{};
 			/* Put right means serviced: reliability back up, the next

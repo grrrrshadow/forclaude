@@ -786,6 +786,9 @@ public:
 		    SLE_VAR(Vehicle, breakdown_delay,       VarTypes::U8),
 		    SLE_VAR(Vehicle, breakdowns_since_last_service, VarTypes::U8),
 		    SLE_VAR(Vehicle, breakdown_chance,      VarTypes::U8),
+		/* How long a raid holds a vehicle down. Saved by name, so a game
+		 * saved before this existed loads with nothing held down. */
+		    SLE_VAR(Vehicle, raid_broken_until,     VarTypes::U64),
 		SLE_CONDVAR(Vehicle, build_year, VarFileType::U8 | VarMemType::I32, SaveLoadVersion::MinVersion, SaveLoadVersion::BigDates),
 		SLE_CONDVAR(Vehicle, build_year, VarTypes::I32, SaveLoadVersion::BigDates, SaveLoadVersion::MaxVersion),
 

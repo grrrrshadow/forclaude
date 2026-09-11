@@ -1447,10 +1447,25 @@ bool Vehicle::HandleBreakdown()
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			if (this->type == VehicleType::Train && TrainAwaitsRescue(Train::From(this))) return true;
 
+			/* The smoke of a raid holds a vehicle down for a month, which is
+			 * a week longer than the smoke itself hangs about. After the wait
+			 * to be fetched rather than before it, so the two run together
+			 * and a raided train is held for the month rather than for the
+			 * month and then the wait. Checked before the countdown so
+			 * breakdown_delay stands still meanwhile, and then set to end at
+			 * the next step, so the ending is the ordinary one with
+			 * everything it tidies up. */
+			if (this->raid_broken_until != 0) {
+				if (TimerGameTick::counter < this->raid_broken_until) return true;
+				this->raid_broken_until = 0;
+				this->breakdown_delay = 1;
+			}
+
 			/* For trains this function is called twice per tick, so decrease v->breakdown_delay at half the rate */
 			if ((this->tick_counter & (this->type == VehicleType::Train ? 3 : 1)) == 0) {
 				if (--this->breakdown_delay == 0) {
 					this->breakdown_ctr = 0;
+					this->raid_broken_until = 0;
 					/* The trouble is over, so the wait to be fetched is over
 					 * with it and the next breakdown starts its own. */
 					if (this->type == VehicleType::Train) {

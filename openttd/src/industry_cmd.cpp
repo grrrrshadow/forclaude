@@ -116,8 +116,18 @@ static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
 /** How long what is left of the buildings stays readable after a raid. */
 static const int RAID_HEALTH_SHOWN_DAYS = 14;
 /**
- * How long a vehicle caught under the smoke stays broken, in the game's own
- * countdown: the same spell a level crossing gives the train.
+ * How long a vehicle caught under the smoke stays broken, in ticks: a week
+ * longer than the smoke hangs about, so the wreckage outlasts the sight of
+ * it.
+ */
+static const uint RAID_BREAKDOWN_LIFE = RAID_SMOKE_LIFE + 7 * Ticks::DAY_TICKS;
+/**
+ * What the game's own countdown is set to meanwhile.
+ *
+ * It is one byte counting at a step every other tick, so it could never
+ * reach a month by itself; RAID_BREAKDOWN_LIFE holds the vehicle down and
+ * this only finishes the job afterwards. It has to be something other than
+ * zero all the same, or the countdown wraps round on its first step.
  */
 static const uint8_t RAID_BREAKDOWN_DELAY = 0xC0;
 
@@ -165,6 +175,7 @@ static uint RaidBreakVehicles(const std::vector<TileIndex> &carpet)
 		v->breakdown_ctr = 2;
 		v->breakdown_delay = RAID_BREAKDOWN_DELAY;
 		v->breakdown_chance = 0;
+		v->raid_broken_until = TimerGameTick::counter + RAID_BREAKDOWN_LIFE;
 		caught++;
 	}
 	return caught;
