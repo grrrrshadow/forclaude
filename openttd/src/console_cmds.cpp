@@ -1246,11 +1246,35 @@ static bool ConTestNews(std::span<std::string_view> argv)
  *
  * The smoke of a raid is meant to last three weeks from the moment it is
  * dropped; the only way to know that it does is to count it going away.
+ *
+ * testdym shod <x> <y> [smer] drops a carpet on the spot this tick, with no
+ * ship or aircraft in it. What the smoke does to what is under it can only
+ * be measured with the smoke falling on a known vehicle at a known moment,
+ * and a flight arrives when it arrives.
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestSmoke(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
+	if (argv.size() >= 4 && argv[1] == "shod") {
+		auto px = ParseInteger(argv[2]);
+		auto py = ParseInteger(argv[3]);
+		if (!px.has_value() || !py.has_value()) return false;
+		Direction facing = Direction::NE;
+		if (argv.size() >= 5) {
+			auto pd = ParseInteger(argv[4]);
+			if (!pd.has_value() || *pd > 7) return false;
+			facing = static_cast<Direction>(*pd);
+		}
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "testdym: hra nema firmu, pust to ze savu.");
+			return true;
+		}
+		/* Its own switch, so the output that follows says what it did. */
+		AutoRestoreBackup trace(_show_train_orientation, true);
+		DropRaidSmoke(TileXY((uint)*px, (uint)*py), facing, CompanyID::Begin());
+		return true;
+	}
 	uint count = 0;
 	uint16_t longest = 0;
 	for (const EffectVehicle *e : EffectVehicle::Iterate()) {

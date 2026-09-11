@@ -115,6 +115,62 @@ static const uint RAID_HURT = 30;
 static const uint16_t RAID_SMOKE_LIFE = 21 * Ticks::DAY_TICKS;
 /** How long what is left of the buildings stays readable after a raid. */
 static const int RAID_HEALTH_SHOWN_DAYS = 14;
+/**
+ * How long a vehicle caught under the smoke stays broken, in the game's own
+ * countdown: the same spell a level crossing gives the train.
+ */
+static const uint8_t RAID_BREAKDOWN_DELAY = 0xC0;
+
+/**
+ * Break down whatever the smoke came down on.
+ *
+ * Everything on the carpet the moment it lands -- trains, road vehicles,
+ * ships, and aircraft on the ground -- gets the breakdown the game itself
+ * hands out: due next tick, and the game does the smoke, the sound and the
+ * stopping. Whose it is does not come into it; a raid on your own junction
+ * stops your own trains.
+ *
+ * Aircraft in the air are above it and fly on. Nothing hidden -- in a shed,
+ * in a hangar, under a hill -- and nothing already stopped, broken or
+ * wrecked, since there is nothing left to stop.
+ *
+ * A train is a row of vehicles each on its own tile, so the carpet is looked
+ * for under every part and the breakdown given to the front once.
+ *
+ * @param carpet the tiles the smoke came down on
+ * @return how many vehicles were caught
+ */
+static uint RaidBreakVehicles(const std::vector<TileIndex> &carpet)
+{
+	std::set<TileIndex> under(carpet.begin(), carpet.end());
+	std::set<VehicleID> caught;
+	for (const Vehicle *part : Vehicle::Iterate()) {
+		switch (part->type) {
+			case VehicleType::Train:
+			case VehicleType::Road:
+			case VehicleType::Ship:
+			case VehicleType::Aircraft:
+				break;
+			default:
+				continue;
+		}
+		if (under.count(part->tile) == 0) continue;
+
+		const Vehicle *v = part->First();
+		if (v->vehstatus.Any({VehState::Stopped, VehState::Crashed, VehState::Hidden})) continue;
+		if (v->type == VehicleType::Aircraft && Aircraft::From(v)->state == FLYING) continue;
+		if (v->breakdown_ctr != 0) continue;
+		caught.insert(v->index);
+	}
+
+	for (VehicleID id : caught) {
+		Vehicle *v = Vehicle::Get(id);
+		v->breakdown_ctr = 2;
+		v->breakdown_delay = RAID_BREAKDOWN_DELAY;
+		v->breakdown_chance = 0;
+	}
+	return (uint)caught.size();
+}
 
 /**
  * The tiles a raid covers: a carpet laid along the line of flight.
@@ -249,6 +305,9 @@ void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 		puffs++;
 	}
 
+	/* And whatever was standing or driving under it. */
+	uint broken = RaidBreakVehicles(carpet);
+
 	/* What the smoke came down on. Each industry is hurt once however many of
 	 * its tiles are under the carpet, so a big works is not pulled down faster
 	 * than a small one for being big. Collected first and hurt afterwards,
@@ -330,8 +389,8 @@ void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 	SetWindowClassesDirty(WindowClass::VehicleView);
 
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "nalet: na ({},{}) smer {} - {} oblacku, prumyslu {}, domu srovnano {}",
-				TileX(tile), TileY(tile), to_underlying(facing), puffs, (uint)caught.size(), levelled);
+		IConsolePrint(CC_INFO, "nalet: na ({},{}) smer {} - {} oblacku, prumyslu {}, domu srovnano {}, porouchano {}",
+				TileX(tile), TileY(tile), to_underlying(facing), puffs, (uint)caught.size(), levelled, broken);
 	}
 }
 
