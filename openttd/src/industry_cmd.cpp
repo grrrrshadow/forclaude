@@ -134,8 +134,10 @@ static const uint8_t RAID_BREAKDOWN_DELAY = 0xC0;
  * in a hangar, under a hill -- and nothing already stopped, broken or
  * wrecked, since there is nothing left to stop.
  *
- * A train is a row of vehicles each on its own tile, so the carpet is looked
- * for under every part and the breakdown given to the front once.
+ * It is the engine that has to be under the smoke. A train is a row of
+ * vehicles each on its own tile, and the wagons do not count: the player
+ * said the engine is what breaks, and a carpet across the back of a train
+ * leaves it running.
  *
  * @param carpet the tiles the smoke came down on
  * @return how many vehicles were caught
@@ -143,9 +145,9 @@ static const uint8_t RAID_BREAKDOWN_DELAY = 0xC0;
 static uint RaidBreakVehicles(const std::vector<TileIndex> &carpet)
 {
 	std::set<TileIndex> under(carpet.begin(), carpet.end());
-	std::set<VehicleID> caught;
-	for (const Vehicle *part : Vehicle::Iterate()) {
-		switch (part->type) {
+	uint caught = 0;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		switch (v->type) {
 			case VehicleType::Train:
 			case VehicleType::Road:
 			case VehicleType::Ship:
@@ -154,22 +156,18 @@ static uint RaidBreakVehicles(const std::vector<TileIndex> &carpet)
 			default:
 				continue;
 		}
-		if (under.count(part->tile) == 0) continue;
-
-		const Vehicle *v = part->First();
+		if (v->First() != v) continue;
+		if (under.count(v->tile) == 0) continue;
 		if (v->vehstatus.Any({VehState::Stopped, VehState::Crashed, VehState::Hidden})) continue;
 		if (v->type == VehicleType::Aircraft && Aircraft::From(v)->state == FLYING) continue;
 		if (v->breakdown_ctr != 0) continue;
-		caught.insert(v->index);
-	}
 
-	for (VehicleID id : caught) {
-		Vehicle *v = Vehicle::Get(id);
 		v->breakdown_ctr = 2;
 		v->breakdown_delay = RAID_BREAKDOWN_DELAY;
 		v->breakdown_chance = 0;
+		caught++;
 	}
-	return (uint)caught.size();
+	return caught;
 }
 
 /**
