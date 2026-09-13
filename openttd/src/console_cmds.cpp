@@ -2858,8 +2858,13 @@ static bool ConTestTrainLength(std::span<std::string_view> argv)
 			bool depot = w->track == Track::Depot;
 			if (!depot && gap != want_gap) {
 				bad++;
-				IConsolePrint(CC_ERROR, "testdelka: vlak {} - clanek {} na ({},{}) a {} na ({},{}): mezera {}, ma byt {}",
-						v->unitnumber, u->index.base(), u->x_pos, u->y_pos, w->index.base(), w->x_pos, w->y_pos, gap, want_gap);
+				/* The offset is the mean of the two vehicles' lengths, and a
+				 * vehicle's length is a NewGRF property -- so both lengths are
+				 * said too. A save whose set is not loaded has the positions
+				 * of one length and the arithmetic of another. */
+				IConsolePrint(CC_ERROR, "testdelka: vlak {} - clanek {} (delka {}, stroj {}) na ({},{}) a {} (delka {}, stroj {}) na ({},{}): mezera {}, ma byt {}",
+						v->unitnumber, u->index.base(), u->gcache.cached_veh_length, u->engine_type.base(), u->x_pos, u->y_pos,
+						w->index.base(), w->gcache.cached_veh_length, w->engine_type.base(), w->x_pos, w->y_pos, gap, want_gap);
 			}
 		}
 		IConsolePrint(bad != 0 ? CC_ERROR : CC_INFO, "testdelka: vlak {} - {} spoju, z toho {} spatnych.",
