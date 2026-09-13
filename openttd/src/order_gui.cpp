@@ -1843,7 +1843,7 @@ public:
 					ShowQueryStringWithChoice(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {},
 							STR_ORDER_COUPLE_MAX_BUTTON, STR_ORDER_COUPLE_MIN_BUTTON,
 							order->IsCoupleCountMaximum() ? 1 : (order->IsCoupleCountMinimum() ? 2 : 0), STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP,
-							STR_ORDER_COUPLE_FOUND_BUTTON, order->ShouldFoundRake());
+							STR_ORDER_COUPLE_FOUND_BUTTON, order->ShouldFoundRake(), 2);
 				} else {
 					ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
 				}

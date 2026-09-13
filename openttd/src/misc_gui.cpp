@@ -1016,14 +1016,15 @@ struct QueryStringWindow : public Window
 	bool toggles = false; ///< The top and extra buttons are two exclusive toggles confirmed by OK, not an answer of their own.
 	uint8_t choice = 0; ///< Which of the exclusive toggles is down: 0 neither, 1 top, 2 bottom.
 	bool toggle2 = false; ///< Whether the toggle that stands on its own is down. Not part of #choice: it combines with either.
+	uint8_t toggle2_conflict = 0; ///< Which of the pair (1 top, 2 bottom) the lone toggle may not be down with; 0 if it goes with both.
 
 	WidgetID last_user_action = INVALID_WIDGET; ///< Last started user action.
 
 	QueryStringWindow(std::string_view str, StringID caption, uint max_bytes, uint max_chars, WindowDesc &desc, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID extra_button, StringID tooltip,
 			StringID top_button = INVALID_STRING_ID, bool toggles = false, uint8_t choice = 0,
-			StringID top2_button = INVALID_STRING_ID, bool toggle2 = false) :
+			StringID top2_button = INVALID_STRING_ID, bool toggle2 = false, uint8_t toggle2_conflict = 0) :
 			Window(desc), editbox(max_bytes, max_chars), extra_button(extra_button), top_button(top_button),
-			top2_button(top2_button), toggles(toggles), choice(choice), toggle2(toggle2)
+			top2_button(top2_button), toggles(toggles), choice(choice), toggle2(toggle2), toggle2_conflict(toggle2_conflict)
 	{
 		this->editbox.text.Assign(str);
 
@@ -1057,6 +1058,26 @@ struct QueryStringWindow : public Window
 		this->parent = parent;
 
 		this->SetFocusedWidget(WID_QS_TEXT);
+	}
+
+	/**
+	 * Lift whichever of the two just-pressed-against buttons has to give way.
+	 *
+	 * A window that lets a combination be pressed and then throws half of it
+	 * away on OK is a window that lies. Where the lone toggle and one of the
+	 * pair cannot both be down, the one just pressed stays and the other goes
+	 * up, where the player can see it go.
+	 *
+	 * @param pair_pressed whether the press was on the pair or on the lone toggle
+	 */
+	void KeepChoiceLegal(bool pair_pressed)
+	{
+		if (this->toggle2_conflict == 0 || !this->toggle2 || this->choice != this->toggle2_conflict) return;
+		if (pair_pressed) {
+			this->toggle2 = false;
+		} else {
+			this->choice = 0;
+		}
 	}
 
 	/** Press down whichever toggle is chosen and lift the other. */
@@ -1121,6 +1142,7 @@ struct QueryStringWindow : public Window
 				 * again lifts it. OK says what was chosen. */
 				if (this->toggles) {
 					this->choice = this->choice == 2 ? 0 : 2;
+					this->KeepChoiceLegal(true);
 					this->ShowChoice();
 					break;
 				}
@@ -1134,13 +1156,16 @@ struct QueryStringWindow : public Window
 
 			case WID_QS_TOP:
 				this->choice = this->choice == 1 ? 0 : 1;
+				this->KeepChoiceLegal(true);
 				this->ShowChoice();
 				break;
 
 			case WID_QS_TOP2:
 				/* This one is nobody's opposite: it goes down and up on its
-				 * own and combines with whichever of the other two is down. */
+				 * own and combines with whichever of the other two is down --
+				 * unless it was named as one it cannot. */
 				this->toggle2 = !this->toggle2;
+				this->KeepChoiceLegal(false);
 				this->ShowChoice();
 				break;
 
@@ -1286,15 +1311,17 @@ void ShowQueryString(std::string_view str, StringID caption, uint maxsize, Windo
  * @param top2_button label of the toggle that stands on its own, or
  *        INVALID_STRING_ID for none
  * @param toggle2 whether that one starts down
+ * @param toggle2_conflict which of the pair (1 top, 2 bottom) the lone toggle
+ *        may not be down with, or 0 if it goes with both
  * @param tooltip tooltip for both toggles and for OK, or INVALID_STRING_ID
  * @see ShowQueryString for the other parameters
  */
-void ShowQueryStringWithChoice(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID top_button, StringID bottom_button, uint8_t choice, StringID tooltip, StringID top2_button, bool toggle2)
+void ShowQueryStringWithChoice(std::string_view str, StringID caption, uint maxsize, Window *parent, CharSetFilter afilter, QueryStringFlags flags, StringID top_button, StringID bottom_button, uint8_t choice, StringID tooltip, StringID top2_button, bool toggle2, uint8_t toggle2_conflict)
 {
 	assert(parent != nullptr);
 
 	CloseWindowByClass(WindowClass::QueryString);
-	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, bottom_button, tooltip, top_button, true, choice, top2_button, toggle2);
+	new QueryStringWindow(str, caption, (flags.Test(QueryStringFlag::LengthIsInChars) ? MAX_CHAR_LENGTH : 1) * maxsize, maxsize, _query_string_desc, parent, afilter, flags, bottom_button, tooltip, top_button, true, choice, top2_button, toggle2, toggle2_conflict);
 }
 
 /**
