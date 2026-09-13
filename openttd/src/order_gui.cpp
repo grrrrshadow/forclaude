@@ -1839,10 +1839,16 @@ public:
 					 * answer -- at most above the box, at least below it,
 					 * neither down the exact count -- and whether to found a
 					 * rake is another, which is why it stands between them on
-					 * a button of its own. OK confirms all of it together. */
+					 * a button of its own. OK confirms all of it together.
+					 *
+					 * One help for all of it, the same one the box in the order
+					 * list carries: the number and the buttons are one setting
+					 * said three ways, and the player reading any part of it
+					 * wants the whole answer. Two texts also meant two texts to
+					 * keep true, and one of them was out of date twice. */
 					ShowQueryStringWithChoice(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {},
 							STR_ORDER_COUPLE_MAX_BUTTON, STR_ORDER_COUPLE_MIN_BUTTON,
-							order->IsCoupleCountMaximum() ? 1 : (order->IsCoupleCountMinimum() ? 2 : 0), STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP,
+							order->IsCoupleCountMaximum() ? 1 : (order->IsCoupleCountMinimum() ? 2 : 0), STR_ORDER_COUPLE_COUNT_TOOLTIP,
 							STR_ORDER_COUPLE_FOUND_BUTTON, order->ShouldFoundRake(), 2);
 				} else {
 					ShowQueryString(GetString(STR_JUST_INT, order->GetCoupleCount()), STR_ORDER_COUPLE_COUNT_CAPT, 4, this, CS_NUMERAL, {});
