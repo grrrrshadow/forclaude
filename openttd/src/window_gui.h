@@ -803,7 +803,7 @@ public:
 	 * @param text the text entered
 	 * @param choice 0 for neither toggle, 1 for the top one, 2 for the bottom one
 	 */
-	virtual void OnQueryTextChoice([[maybe_unused]] std::string_view text, [[maybe_unused]] uint8_t choice) {}
+	virtual void OnQueryTextChoice([[maybe_unused]] std::string_view text, [[maybe_unused]] uint8_t choice, [[maybe_unused]] bool toggle2) {}
 
 	/**
 	 * Some data on this window has become invalid.

@@ -201,6 +201,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_HONK,            ///< Toggle whether a train sounds its horn as it passes this station waypoint.
 	MOF_COUPLE_MIN,      ///< Toggle whether the couple count is a minimum: any rake of at least that many vehicles will do.
 	MOF_AUTO_DEPARTURE,  ///< Toggle whether a train leaving this station goes engine first and then the shortest way.
+	MOF_COUPLE_MAX,      ///< Toggle whether the couple count is a maximum: a rake of up to that many vehicles will do.
 	MOF_END
 };
 

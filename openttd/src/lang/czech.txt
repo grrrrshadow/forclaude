@@ -5110,6 +5110,9 @@ STR_ORDER_COUPLE_FOUND_BUTTON                                   :{BLACK}V příp
 STR_ORDER_COUPLE_MIN_BUTTON                                     :{BLACK}Minimálně: připojit řadu, jakmile má (0 - libovolně) a více vozů
 STR_ORDER_COUPLE_COUNT_MIN                                      :{BLACK}Vozů: aspoň {NUM}
 STR_ORDER_COUPLE_FILTER_SUFFIX_MIN                              :{SPACE}(aspoň {NUM} vozů)
+STR_ORDER_COUPLE_MAX_BUTTON                                     :{BLACK}Maximálně: připojit řadu, která má nejvýš (0 - libovolně) vozů
+STR_ORDER_COUPLE_COUNT_MAX                                      :{BLACK}Vozů: nejvýš {NUM}
+STR_ORDER_COUPLE_FILTER_SUFFIX_MAX                              :{SPACE}(nejvýš {NUM} vozů)
 STR_ORDER_COUPLE_COUNT_QUERY_TOOLTIP                            :{BLACK}Jedno číslo, tři významy. Bez zamáčknutého čudlíku to je připojit přesně takový počet vozů, 0 = kteroukoli řadu. Čudlíky to číslo mění na hranici: „Minimálně" připojí řadu, jakmile má tolik vozů a víc, takže rozestavěná řada se nechá dorůst. „Založit řadu" je naopak maximum: připojuje nejvýš do tolika vozů, 0 = kolik se vejde na nástupiště — a když není co připojit, mašinka si řadu sama založí ze svých vozů. Zamáčknutý může být jen jeden; OK potvrzuje číslo i čudlík najednou. Je vhodné použít směrování nástupišť
 STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Založit řadu: do {NUM}
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Založit řadu: podle nástupiště

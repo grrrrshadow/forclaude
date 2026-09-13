@@ -188,10 +188,24 @@ private:
 	/**
 	 * The couple count is a minimum: the order collects the rake once it has
 	 * grown to at least that many vehicles, rather than one of exactly that
-	 * size. Never together with founding, which reads the same number as the
-	 * rake's final size; the command keeps the two apart.
+	 * size. Never together with #couple_max, which is the other way about;
+	 * the command keeps the two apart.
 	 */
 	bool couple_min = false;
+
+	/**
+	 * The couple count is a maximum: the order collects a rake of up to that
+	 * many vehicles, 0 for as many as the platform holds.
+	 *
+	 * Founding used to carry this meaning with it, and for a while that was
+	 * the only way to say it -- so a train could be told to build a rake up
+	 * to a size, but not to collect one up to a size without building. The
+	 * two are separate buttons now. An order saved before they were
+	 * separated has only the founding flag, which is why every reading of
+	 * the number asks IsCoupleCountCeiling() rather than this field: an old
+	 * founding order is a ceiling whether or not this was ever written.
+	 */
+	bool couple_max = false;
 
 	/**
 	 * What a "go to couple" order will accept when it gets there: how full the
@@ -359,6 +373,23 @@ public:
 
 	/** Set whether the couple count is a minimum. */
 	inline void SetCoupleCountMinimum(bool minimum) { this->couple_min = minimum; }
+
+	/** Is the couple count a maximum -- a rake of up to that many vehicles -- rather than an exact size? */
+	inline bool IsCoupleCountMaximum() const { return this->couple_max; }
+
+	/** Set whether the couple count is a maximum. */
+	inline void SetCoupleCountMaximum(bool maximum) { this->couple_max = maximum; }
+
+	/**
+	 * Is the couple count a ceiling rather than the size of the rake to look for?
+	 *
+	 * Two ways to end up one: saying so, or founding a rake -- a rake being
+	 * built is by nature not yet its final size, so the number can only be
+	 * what it is being built up to. Everything that reads the number asks
+	 * this, which is also what keeps orders saved before the two were told
+	 * apart behaving as they did.
+	 */
+	inline bool IsCoupleCountCeiling() const { return this->couple_max || this->couple_found_rake; }
 
 	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
 	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }

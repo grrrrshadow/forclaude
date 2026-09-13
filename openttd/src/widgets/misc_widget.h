@@ -42,6 +42,8 @@ enum QueryStringWidgets : WidgetID {
 	WID_QS_EXTRA_SEL, ///< Container for the extra button, which can be hidden.
 	WID_QS_TOP,     ///< Optional full-width toggle above the text, the first of two exclusive choices (see ShowQueryStringWithChoice()).
 	WID_QS_TOP_SEL, ///< Container for the top toggle, which can be hidden.
+	WID_QS_TOP2,    ///< Optional full-width toggle above the text, standing on its own rather than in the exclusive pair (see ShowQueryStringWithChoice()).
+	WID_QS_TOP2_SEL, ///< Container for the second top toggle, which can be hidden.
 };
 
 /** Widgets of the #QueryWindow class. */

@@ -2320,16 +2320,26 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 		if (!carries_it) return false;
 	}
 
-	/* On a founding order the number is the rake's final size, not which rake
-	 * to take -- a rake being built is by nature not yet that size. Whether
-	 * there is room left in it is asked separately (RakeHasRoomFor()). */
+	/* One number, four readings. */
 	if (check_count && order.GetCoupleCount() != 0 && !order.ShouldFoundRake()) {
 		uint count = 0;
 		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;
-		/* "At least": a rake still being grown is left alone until it has
-		 * reached the number, then taken whole, however much bigger it got. */
-		if (order.IsCoupleCountMinimum() ? count < order.GetCoupleCount() : count != order.GetCoupleCount()) return false;
+		if (order.IsCoupleCountMinimum()) {
+			/* "At least": a rake still being grown is left alone until it has
+			 * reached the number, then taken whole, however much bigger it got. */
+			if (count < order.GetCoupleCount()) return false;
+		} else if (order.IsCoupleCountMaximum()) {
+			/* "At most": anything up to the number, and a rake that outgrew it
+			 * left for an order that will have it. */
+			if (count > order.GetCoupleCount()) return false;
+		} else {
+			if (count != order.GetCoupleCount()) return false;
+		}
 	}
+	/* Founding is the fourth reading and is not asked here at all: the number
+	 * is then the rake's final size, a rake being built is by nature not yet
+	 * that size, and whether there is room left in it is asked separately
+	 * (RakeHasRoomFor()). */
 
 	return true;
 }

@@ -1278,7 +1278,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
-					mof != MOF_AUTO_DEPARTURE) return CMD_ERROR;
+					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1463,6 +1463,14 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
 			break;
 
+		case MOF_COUPLE_MAX:
+			/* Same reason "at least" is a station's question only: a number on
+			 * a depot order is how many vehicles to take out of the store, not
+			 * which ready-made rake to pick, so neither end of it means
+			 * anything there. */
+			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			break;
+
 		/* Waiting to be collected is the opposite of going to collect, and a
 		 * train that is waiting does not decide how it leaves either --
 		 * whoever couples to it brings the orders, and reversing out is one of
@@ -1643,16 +1651,26 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				break;
 
 			case MOF_COUPLE_FOUND:
-				/* One number, two readings, never both: the rake's final size
-				 * when founding, the least a rake must have when collecting.
-				 * Switching one on switches the other off. */
+				/* Founding reads the number as the rake's final size, which is
+				 * the one thing "at least" cannot mean, so that one goes up.
+				 * "At most" is left alone: it says the same thing founding
+				 * implies, and a player who wants both may have both. */
 				order->SetFoundRake(data != 0);
 				if (data != 0) order->SetCoupleCountMinimum(false);
 				break;
 
 			case MOF_COUPLE_MIN:
+				/* The two ends of the same number; only one of them at a time. */
 				order->SetCoupleCountMinimum(data != 0);
-				if (data != 0) order->SetFoundRake(false);
+				if (data != 0) {
+					order->SetCoupleCountMaximum(false);
+					order->SetFoundRake(false);
+				}
+				break;
+
+			case MOF_COUPLE_MAX:
+				order->SetCoupleCountMaximum(data != 0);
+				if (data != 0) order->SetCoupleCountMinimum(false);
 				break;
 
 			case MOF_WAIT_COUPLE:
