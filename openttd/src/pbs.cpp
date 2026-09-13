@@ -404,6 +404,30 @@ Train *GetTrainForReservation(TileIndex tile, Track track)
 }
 
 /**
+ * Is the tile this collector would actually roll onto next clear of trains it
+ * neither is nor came for?
+ *
+ * The tile right in front, not the far end of a platform the follower crossed
+ * in one step -- the same distinction a rescue engine's road already makes for
+ * the same reason (see the casualty branch of IsSafeWaitingPosition() below).
+ * Both rules that let a collector's road end on the platform its rake stands on
+ * answered for the follower's new tile, which on a ten-tile platform is ten
+ * tiles past the one the train is about to enter. A train standing on the near
+ * tile was therefore never asked about at all: the collector booked its road
+ * over that train's ground, came down on it at full speed and stopped against
+ * its buffers, which is close enough to be a collision (saves/new1.sav, trains
+ * 2 and 4).
+ *
+ * @param v  the collector asking
+ * @param ft the follower, sitting on the step it has just taken
+ * @return whether the next tile is clear -- see IsCoupleRoadTileFree()
+ */
+static bool IsCoupleRoadStepFree(const Train *v, const CFollowTrackRail &ft)
+{
+	return IsCoupleRoadTileFree(v, ft.new_tile - TileOffsByDiagDir(ft.exitdir) * ft.tiles_skipped);
+}
+
+/**
  * Determine whether a certain track on a tile is a safe position to end a path.
  *
  * @param v the vehicle to test for
@@ -481,9 +505,14 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * the partner is standing on them, and gives up: the train is left waiting
 	 * at the last signal before the station for a path that will never come,
 	 * because what is in its way is what it was sent for. See
-	 * FEATURE_DESIGN_COUPLING_TOW.md. */
-	if (((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
-			IsCoupleTargetOnTile(v, ft.new_tile) || RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)))) {
+	 * FEATURE_DESIGN_COUPLING_TOW.md.
+	 *
+	 * Only where what is in the way really is what it was sent for, though --
+	 * see IsCoupleRoadTileFree(). */
+	bool couple_road_ends_here = (v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
+			IsCoupleTargetOnTile(v, ft.new_tile);
+	if ((couple_road_ends_here && IsCoupleRoadStepFree(v, ft)) ||
+			RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits))) {
 		return true;
 	}
 
@@ -544,8 +573,14 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	 * waiting at the last signal before the station for a path that can never
 	 * clear, since the wagons it is going to collect are not going to move on
 	 * their own. Pulling up against them is exactly right, and coupling takes
-	 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md. */
-	return ((v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
-			IsCoupleTargetOnTile(v, ft.new_tile) || RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)) ||
+	 * over from there. See FEATURE_DESIGN_COUPLING_TOW.md.
+	 *
+	 * Pulling up against somebody else is not: a stranger standing on the rake's
+	 * platform is a train to stop short of like any other, not an arrival. See
+	 * IsCoupleRoadTileFree(). */
+	bool couple_road_ends_here = (v->current_order.ShouldGoToCouple() && IsCouplePartnerOnPlatform(v, ft.new_tile)) ||
+			IsCoupleTargetOnTile(v, ft.new_tile);
+	return ((couple_road_ends_here && IsCoupleRoadStepFree(v, ft)) ||
+			RescueRoadTracksOnTile(v, ft.new_tile).Any(TrackdirBitsToTrackBits(ft.new_td_bits)) ||
 			IsCasualtyAheadOnPlatform(v, tile, trackdir));
 }
