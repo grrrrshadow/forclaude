@@ -2829,6 +2829,40 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 }
 
 /**
+ * Swap the signal on a tile for another kind, the way the toolbar's convert
+ * does. Usage: 'testnavest <x> <y> <kind>' -- 0 block, 4 path, 5 no-entry path
+ *
+ * A probe, not a repair: whether a reservation could have been booked through
+ * a given signal from behind is answered by putting one there that cannot be,
+ * and running the same save again.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSetSignal(std::span<std::string_view> argv)
+{
+	if (argv.size() < 4) {
+		IConsolePrint(CC_HELP, "Convert the signal on a tile. Usage: 'testnavest <x> <y> <kind>' (0 block, 4 path, 5 no-entry path).");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]), pk = ParseInteger(argv[3]);
+	if (!px || !py || !pk || *pk >= to_underlying(SignalType::End)) return false;
+	TileIndex tile = TileXY(*px, *py);
+	if (!IsTileType(tile, TileType::Railway) || GetRailTileType(tile) != RailTileType::Signals) {
+		IConsolePrint(CC_ERROR, "testnavest: na ({},{}) zadne navestidlo neni.", *px, *py);
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, GetTileOwner(tile));
+	SignalType want = static_cast<SignalType>(*pk);
+	for (Track tr : GetTrackBits(tile)) {
+		if (!HasSignalOnTrack(tile, tr)) continue;
+		CommandCost r = Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, tile, tr, want,
+				GetSignalVariant(tile, tr), true, false, false, SignalType::Block, SignalType::Block, 0, 0);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testnavest: ({},{}) kolej {} -> typ {} {}", *px, *py, (int)tr,
+				*pk, r.Succeeded() ? "prevedeno" : "ODMITNUTO");
+	}
+	return true;
+}
+
+/**
  * Take the rescue engine's home depot away and give it back again.
  *
  * The scene it serves is the one the player found and the rig had no way of
@@ -7337,6 +7371,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);
 	IConsole::CmdRegister("testnavesti",             ConTestSignals);
+	IConsole::CmdRegister("testnavest",              ConTestSetSignal);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testzatik",               ConTestAfterTicks);
