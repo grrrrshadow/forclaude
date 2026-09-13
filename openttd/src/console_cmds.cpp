@@ -2782,6 +2782,53 @@ static bool ConTestReservations(std::span<std::string_view> argv)
 }
 
 /**
+ * List the signals on a stretch of line, with their kind and which way they
+ * face. Usage: 'testnavesti <x0> <y0> <x1> <y1>'
+ *
+ * A reservation that reaches past a signal is only as safe as the signal is,
+ * and the two-way ones are not safe in the direction nobody is looking. What
+ * stands where was until now only readable by opening the map, which a
+ * headless run cannot do.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSignals(std::span<std::string_view> argv)
+{
+	if (argv.size() < 5) {
+		IConsolePrint(CC_HELP, "List signals and which way they face. Usage: 'testnavesti <x0> <y0> <x1> <y1>'.");
+		return true;
+	}
+	auto a0 = ParseInteger(argv[1]), b0 = ParseInteger(argv[2]), a1 = ParseInteger(argv[3]), b1 = ParseInteger(argv[4]);
+	if (!a0 || !b0 || !a1 || !b1) return false;
+
+	static const char *kind[] = { "blok", "predvest-vjezd", "predvest-vyjezd", "predvest-kombi", "cestne", "cestne-jednosmer" };
+	uint n = 0;
+	for (uint y = *b0; y <= *b1 && y < Map::SizeY(); y++) {
+		for (uint x = *a0; x <= *a1 && x < Map::SizeX(); x++) {
+			TileIndex tile = TileXY(x, y);
+			if (!IsTileType(tile, TileType::Railway) || GetRailTileType(tile) != RailTileType::Signals) continue;
+			for (Track tr : GetTrackBits(tile)) {
+				if (!HasSignalOnTrack(tile, tr)) continue;
+				/* Both trackdirs of the track carry a signal on a two-way one;
+				 * only one on a one-way. That is the whole difference and it
+				 * is what decides whether a path may be booked through it from
+				 * the other side. */
+				Trackdir td = TrackToTrackdir(tr);
+				bool fwd = HasSignalOnTrackdir(tile, td);
+				bool rev = HasSignalOnTrackdir(tile, ReverseTrackdir(td));
+				SignalType st = GetSignalType(tile, tr);
+				IConsolePrint(CC_DEFAULT, "testnavesti: ({},{}) kolej {} - {} {}, {}{}", x, y, (int)tr,
+						to_underlying(st) < lengthof(kind) ? kind[to_underlying(st)] : "?",
+						(fwd && rev) ? "OBOUSMERNE" : "jednosmerne",
+						fwd ? "tam" : "", rev ? " zpet" : "");
+				n++;
+			}
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testnavesti: celkem {} navestidel.", n);
+	return true;
+}
+
+/**
  * Take the rescue engine's home depot away and give it back again.
  *
  * The scene it serves is the one the player found and the rig had no way of
@@ -7289,6 +7336,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);
+	IConsole::CmdRegister("testnavesti",             ConTestSignals);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testzatik",               ConTestAfterTicks);
