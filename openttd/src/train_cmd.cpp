@@ -5843,6 +5843,18 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 {
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
+	/* Said on the way in, not only on the way out: a refusal tells you what
+	 * the train looked like when it was refused, which is no help at all if
+	 * the wagons went somewhere else before anyone asked. */
+	if (_show_train_orientation) {
+		std::string chain;
+		for (const Train *u = v; u != nullptr; u = u->Next()) {
+			chain += fmt::format(" {}{}", u->index.base(), u->IsEngine() ? "M" : (u->IsWagon() ? "v" : "?"));
+		}
+		SayOnChange(v, fmt::format("Vlak {}: odpojeni zadano - nechat {} vozu, cely vlak {}, seznam:{}",
+				v->unitnumber, keep_count, whole_train ? "ano" : "ne", chain));
+	}
+
 	/* "The whole train" is a place in the list, not a count. Where that place
 	 * is not written down there is nothing to keep but the engine, which is
 	 * what a count of nought says -- and what the player asked for, once told
@@ -6180,6 +6192,27 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 
 		FreeTrainTrackReservation(remainder);
 		remainder->ReserveTrackUnderConsist();
+
+		/* A decouple that works leaves no word in the log, which made twelve
+		 * refusals on the next tick read as twelve failures. Both halves are
+		 * named here, and with them the one thing a standing train must have:
+		 * the ground under itself. Everything else's safety is that booking --
+		 * a train that has let go of it is a train nobody's path search can
+		 * see. */
+		if (_show_train_orientation) {
+			auto booked = [](const Train *chain) {
+				uint held = 0, on = 0, parts = 0;
+				for (const Train *u = chain; u != nullptr; u = u->Next()) {
+					parts++;
+					if (u->track == Track::Depot) continue;
+					on++;
+					if (GetReservedTrackbits(u->tile).Any()) held++;
+				}
+				return fmt::format("{} clanku, drzi {}/{} policek", parts, held, on);
+			};
+			IConsolePrint(CC_INFO, "Vlak {}: odpojeno - masinka: {}; odlozena rada: {}",
+					v->unitnumber, booked(v), booked(remainder));
+		}
 		return true;
 	}
 
@@ -6219,6 +6252,21 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 		} else {
 			InvalidateWindowData(WindowClass::VehicleView, remainder->index);
 		}
+	}
+
+	if (_show_train_orientation) {
+		auto booked = [](const Train *chain) {
+			uint held = 0, on = 0, parts = 0;
+			for (const Train *u = chain; u != nullptr; u = u->Next()) {
+				parts++;
+				if (u->track == Track::Depot) continue;
+				on++;
+				if (GetReservedTrackbits(u->tile).Any()) held++;
+			}
+			return fmt::format("{} clanku, drzi {}/{} policek", parts, held, on);
+		};
+		IConsolePrint(CC_INFO, "Vlak {}: odpojeno (rada na nastupisti) - masinka: {}; odlozena rada: {}",
+				v->unitnumber, booked(v), booked(remainder));
 	}
 	return true;
 }
