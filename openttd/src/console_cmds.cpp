@@ -2829,6 +2829,46 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 }
 
 /**
+ * Walk a train and say where its parts actually are against where they
+ * should be. Usage: 'testdelka [unit number]' -- all trains if left out.
+ *
+ * The game's own check (CheckTrainsLengths()) says only that a train's parts
+ * are not spaced as they should be, and names the train. Which joint is
+ * wrong, and by how much, is the thing worth knowing and is not said.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestTrainLength(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	std::optional<uint> want;
+	if (argv.size() >= 2) {
+		auto p = ParseInteger(argv[1]);
+		if (!p.has_value()) return false;
+		want = (uint)*p;
+	}
+	for (const Train *v : Train::Iterate()) {
+		if (v->First() != v) continue;
+		if (want.has_value() && v->unitnumber != (UnitID)*want) continue;
+		uint bad = 0, parts = 0;
+		for (const Train *u = v->GetMovingFront(), *w = v->GetMovingNext(); w != nullptr; u = w, w = w->GetMovingNext()) {
+			parts++;
+			if (u->track == Track::Depot) continue;
+			int gap = std::max(abs(u->x_pos - w->x_pos), abs(u->y_pos - w->y_pos));
+			int want_gap = u->CalcNextVehicleOffset();
+			bool depot = w->track == Track::Depot;
+			if (!depot && gap != want_gap) {
+				bad++;
+				IConsolePrint(CC_ERROR, "testdelka: vlak {} - clanek {} na ({},{}) a {} na ({},{}): mezera {}, ma byt {}",
+						v->unitnumber, u->index.base(), u->x_pos, u->y_pos, w->index.base(), w->x_pos, w->y_pos, gap, want_gap);
+			}
+		}
+		IConsolePrint(bad != 0 ? CC_ERROR : CC_INFO, "testdelka: vlak {} - {} spoju, z toho {} spatnych.",
+				v->unitnumber, parts, bad);
+	}
+	return true;
+}
+
+/**
  * Swap the signal on a tile for another kind, the way the toolbar's convert
  * does. Usage: 'testnavest <x> <y> <kind>' -- 0 block, 4 path, 5 no-entry path
  *
@@ -7371,6 +7411,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);
 	IConsole::CmdRegister("testnavesti",             ConTestSignals);
+	IConsole::CmdRegister("testdelka",               ConTestTrainLength);
 	IConsole::CmdRegister("testnavest",              ConTestSetSignal);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
