@@ -524,6 +524,20 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 }
 
 /**
+ * How far ahead, in pixels along the track, the speed this train is doing
+ * now can ask anything of it: the gentle stopping distance from that speed,
+ * plus two tiles of margin, and never more than a few dozen tiles. Shared by
+ * the ceiling that brakes for what is on the road and the look-ahead that
+ * extends the road, so that the road is extended before the ceiling has
+ * reason to brake for its end.
+ */
+static int GentleLookAhead(const Train *v)
+{
+	int64_t gentle = GentleBrakeRate(v);
+	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, 48 * TILE_SIZE));
+}
+
+/**
  * The speed ceiling that lets this train brake gently for whatever fixed
  * thing is next on its road, instead of hitting it at full speed and
  * shedding a tenth of its speed a tick.
@@ -555,11 +569,8 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	Trackdir td = moving_front->GetVehicleTrackdir();
 	if (td == Trackdir::Invalid) return INT32_MAX;
 
-	/* How far ahead is worth looking: the gentle stopping distance from the
-	 * speed the train is doing now, plus a tile, and never more than a few
-	 * dozen tiles. */
-	int64_t gentle = GentleBrakeRate(v);
-	int look_px = static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, 48 * TILE_SIZE));
+	/* How far ahead is worth looking: see GentleLookAhead(). */
+	int look_px = GentleLookAhead(v);
 
 	/* Pixels left on the tile the leading end is on, along its axis; a
 	 * curved piece is half a tile, so half of it. */
@@ -576,10 +587,18 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 
 	constexpr int CROSSING_SPEED_FLOOR = 34;
 	int crossing_speed = std::max(v->vcache.cached_max_speed * 2 / 3, CROSSING_SPEED_FLOOR);
+	/* The crossing is the player's to switch off (the setting the flat ceiling
+	 * in GetCurrentMaxSpeed() answers to); the stops are not. */
+	bool slow_for_crossing = _settings_game.vehicle.train_slow_for_level_crossing;
 
+	/* Never below the slowest the game itself lets a train roll up to a line
+	 * end (_breakdown_speeds' last entry): the stop is the road-end code's,
+	 * not the ceiling's, and a ceiling of nought divides the smoke effect by
+	 * zero (crash20260914151914, ShowVisualEffect(): cur_speed * 3 / max). */
+	constexpr int CEILING_FLOOR = 15;
 	int ceiling = INT32_MAX;
 	auto ask = [&](int target, int at_px) {
-		ceiling = std::min(ceiling, SpeedAllowedFor(v, target, at_px));
+		ceiling = std::min(ceiling, std::max(SpeedAllowedFor(v, target, at_px), CEILING_FLOOR));
 	};
 
 	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
@@ -597,6 +616,20 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		}
 		TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
 		if (step == 0) on_booked_road = reserved.Any();
+
+		/* A tunnel or bridge is crossed in one step; its far end is that
+		 * much further. Read as a tile, a signal nineteen tiles off beyond a
+		 * tunnel was braked for three tiles short of the portal (measured on
+		 * the player's save). */
+		if (ft.is_tunnel || ft.is_bridge) px += ft.tiles_skipped * TILE_SIZE;
+
+		if (IsRailDepotTile(ft.new_tile)) {
+			/* A shed: in at the shed speed (the depot limit in
+			 * GetCurrentMaxSpeed()) and no further -- the follower would
+			 * turn round in it and read the train's own road backwards. */
+			ask(61, px);
+			break;
+		}
 
 		if (ft.is_station) {
 			/* A platform is crossed in one step; its tiles are booked one by
@@ -641,16 +674,26 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		Trackdir next_td = reserved.Any() ? FindFirstTrackdir(reserved) : (ft.new_td_bits.Count() == 1 ? FindFirstTrackdir(ft.new_td_bits) : Trackdir::Invalid);
 		if (next_td == Trackdir::Invalid) break; // a choice ahead and nothing booked: nothing to read off it yet
 
-		if (IsLevelCrossingTile(ft.new_tile)) {
+		if (reserved.None() && HasPbsSignalOnTrackdir(ft.new_tile, next_td)) {
+			/* A path signal with no road booked through it is red. The road
+			 * is asked for from as far as the train would need to brake (see
+			 * CheckNextTrainTile()); a signal still unbooked within that
+			 * distance is one that was refused, and the train stops short of
+			 * its tile. */
+			ask(0, px);
+			break;
+		}
+
+		if (slow_for_crossing && IsLevelCrossingTile(ft.new_tile)) {
 			/* At the crossing speed by the tile before the crossing. */
 			ask(crossing_speed, entered_at);
 		}
 		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td) &&
 				!IsPbsSignal(GetSignalType(ft.new_tile, TrackdirToTrack(next_td))) &&
 				GetSignalStateByTrackdir(ft.new_tile, next_td) == SignalState::Red) {
-			/* A red block signal: the train stops at it, on its tile. */
-			int tile_px = IsDiagonalTrackdir(next_td) ? TILE_SIZE : TILE_SIZE / 2;
-			ask(0, px + tile_px);
+			/* A red block signal: the train stops short of its tile, at the
+			 * end of the tile before (see TrainCheckIfLineEnds()). */
+			ask(0, px);
 			break;
 		}
 
@@ -7781,21 +7824,100 @@ static void CheckNextTrainTile(Train *consist)
 	/* On a tile with a red non-pbs signal, don't look ahead. */
 	if (HasBlockSignalOnTrackdir(moving_front->tile, td) && GetSignalStateByTrackdir(moving_front->tile, td) == SignalState::Red) return;
 
-	CFollowTrackRail ft(consist);
-	if (!ft.Follow(moving_front->tile, td)) return;
+	/* How far along its road the train looks for the path signal its road
+	 * ends at. The game reads one tile: the road is extended past a path
+	 * signal from the tile before it, and until then the signal is red. A
+	 * train that brakes gently for the end of its road (see BrakingCeiling())
+	 * then braked for every path signal on its way, green or not -- measured
+	 * on the player's save: it slowed towards each signal and picked up again
+	 * a tile short of it, once the road was extended and the signal turned
+	 * green. So under the realistic model the road is extended from as far
+	 * as the train would need to brake: the signal is then green before the
+	 * train has any reason to slow for it, or stays red because the road
+	 * beyond is taken, and the train brakes for a red. What a driver reads
+	 * off a distant signal. The original model keeps the one tile. */
+	int look_px = _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic ? GentleLookAhead(consist) : 0;
 
-	if (!HasReservedTracks(ft.new_tile, TrackdirBitsToTrackBits(ft.new_td_bits))) {
-		/* Next tile is not reserved. */
-		if (ft.new_td_bits.Count() == 1) {
-			if (HasPbsSignalOnTrackdir(ft.new_tile, FindFirstTrackdir(ft.new_td_bits))) {
-				/* If the next tile is a PBS signal, try to make a reservation. */
-				TrackBits tracks = TrackdirBitsToTrackBits(ft.new_td_bits);
-				if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), Forbid90DegFor(consist))) {
-					tracks.Reset(TrackCrossesTracks(TrackdirToTrack(ft.old_td)));
+	CFollowTrackRail ft(consist);
+	TileIndex tile = moving_front->tile;
+	int px = 0; // distance walked along the road, from the leading end's tile
+	for (int step = 0; step < 64; step++) {
+		if (!ft.Follow(tile, td)) return;
+
+		/* A shed is where a road ends, and so is the platform the train is
+		 * going to stop at. The follower turns round in a shed (it hands back
+		 * the trackdir a train leaves by), and walked on from there the look
+		 * ran back out along the train's own road and asked for the signal
+		 * it had just passed -- from the shed's side. The search from there
+		 * found nothing, and letting go of "the road beyond the shed" let go
+		 * of the tile under the train; the next train out of the shed booked
+		 * it and drove into the first (odtahvagony scene, measured). */
+		if (IsRailDepotTile(ft.new_tile)) return;
+		if (ft.is_station && consist->current_order.ShouldStopAtStation(consist, GetStationIndex(ft.new_tile))) return;
+
+		TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
+		if (reserved.None()) {
+			/* Next tile is not reserved. */
+			if (ft.new_td_bits.Count() != 1) return;
+			if (!HasPbsSignalOnTrackdir(ft.new_tile, FindFirstTrackdir(ft.new_td_bits))) {
+				/* Plain line with nothing on it, single track and no signal of
+				 * any kind: the train runs it unbooked, as the game has it, and
+				 * the path signal it may lead to is still ahead. Look on along
+				 * it, so that a signal within the look is asked for from here
+				 * -- and a road laid to it, or, refused, a red the train can
+				 * brake for from where it is. Measured on the player's save: a
+				 * train at line speed on thirty tiles of unsignalled line ran
+				 * up to the tile before a red path signal, booked the four
+				 * tiles behind it there, and had five tiles to stop in. A
+				 * block signal, a junction, a platform or a depot ends the look
+				 * as before. */
+				bool plain = IsPlainRailTile(ft.new_tile) ? !HasSignals(ft.new_tile) :
+						(IsTileType(ft.new_tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(ft.new_tile) == TransportType::Rail);
+				if (!plain || ft.is_station) return;
+				td = FindFirstTrackdir(ft.new_td_bits);
+				px += (ft.is_tunnel || ft.is_bridge) ? (ft.tiles_skipped + 1) * TILE_SIZE : (IsDiagonalTrackdir(td) ? TILE_SIZE : TILE_SIZE / 2);
+				if (px > look_px) return;
+				tile = ft.new_tile;
+				continue;
+			}
+			/* If the next tile is a PBS signal, try to make a reservation. */
+			TrackBits tracks = TrackdirBitsToTrackBits(ft.new_td_bits);
+			if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), Forbid90DegFor(consist))) {
+				tracks.Reset(TrackCrossesTracks(TrackdirToTrack(ft.old_td)));
+			}
+			/* Asked across unbooked line, the road is first laid up to the
+			 * waiting position before the signal and stops there, as a road
+			 * does; the signal itself is asked for by a second call, from that
+			 * position -- which is the one the game has always made. */
+			bool laid_here = step > 0 && !HasReservedTracks(tile, TrackBits{TrackdirToTrack(td)});
+			if (_show_train_orientation && step > 0) {
+				IConsolePrint(CC_INFO, "Vlak {}: rozhled - zada o cestu za navestidlo ({},{}) z ({},{}), {} px pred nim, dosah {} px",
+						consist->unitnumber, TileX(ft.new_tile), TileY(ft.new_tile), TileX(moving_front->tile), TileY(moving_front->tile), px, look_px);
+			}
+			ChooseTrainTrack(consist, ft.new_tile, ft.exitdir, tracks, false, nullptr, false);
+			if (laid_here && !HasReservedTracks(ft.new_tile, TrackdirBitsToTrackBits(ft.new_td_bits)) &&
+					HasReservedTracks(tile, TrackBits{TrackdirToTrack(td)})) {
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: rozhled - cesta polozena k ({},{}), zadam o navestidlo podruhe", consist->unitnumber, TileX(tile), TileY(tile));
 				}
 				ChooseTrainTrack(consist, ft.new_tile, ft.exitdir, tracks, false, nullptr, false);
 			}
+			/* Extended, it runs to the waiting position before the next path
+			 * signal, which may still be within the look: measured on the
+			 * player's save, signals four tiles apart after a tunnel had the
+			 * train at line speed, a road two signals short of its braking
+			 * distance, and one extension a tile -- so it braked for the
+			 * second signal until the next tile. Walk on along what was just
+			 * booked and extend again while the look reaches. */
+			reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
+			if (reserved.None()) return;
 		}
+
+		/* The road goes on: walk it as far as the look reaches. */
+		td = FindFirstTrackdir(reserved);
+		px += ft.is_station ? (ft.tiles_skipped + 1) * TILE_SIZE : (IsDiagonalTrackdir(td) ? TILE_SIZE : TILE_SIZE / 2);
+		if (px > look_px) return;
+		tile = ft.new_tile;
 	}
 }
 
@@ -8008,8 +8130,14 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 /**
  * Free the reserved path in front of a vehicle.
  * @param consist %Train owning the reserved path.
+ * @param from_tile Free only what lies beyond this tile of the path, or
+ *        INVALID_TILE for everything in front of the train. A road is now
+ *        extended from a distance (see CheckNextTrainTile()), and an
+ *        extension that comes to nothing must give back only what it laid,
+ *        not the road up to the waiting position it was asked from.
+ * @param from_td The trackdir of the path on @p from_tile.
  */
-void FreeTrainTrackReservation(const Train *consist)
+void FreeTrainTrackReservation(const Train *consist, TileIndex from_tile, Trackdir from_td)
 {
 	/* A headless "free wagon" chain left behind by a decouple order (see
 	 * FEATURE_DESIGN_COUPLING_TOW.md) can now be found here via
@@ -8046,6 +8174,16 @@ void FreeTrainTrackReservation(const Train *consist)
 	}
 	/* Don't free reservation if it's not ours. */
 	if (TracksOverlap(GetReservedTrackbits(tile) | TrackdirToTrack(td))) return;
+
+	if (from_tile != INVALID_TILE && from_tile != tile && IsValidTrackdir(from_td)) {
+		/* Walk from the given tile of the path instead; it stays booked. A
+		 * road ending in a shed has nothing beyond it: the follower would
+		 * turn round there and walk the road back towards the train. */
+		if (IsRailDepotTile(from_tile)) return;
+		tile = from_tile;
+		td = from_td;
+		free_tile = true;
+	}
 
 	CFollowTrackRail ft(consist, GetAllCompatibleRailTypes(consist->railtypes));
 	while (ft.Follow(tile, td)) {
@@ -8549,7 +8687,17 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 
 	PBSTileInfo   res_dest(tile, Trackdir::Invalid, false);
 	DiagDirection dest_enterdir = enterdir;
+	/* Where the train's road ended before this call. Vanilla only ever asked
+	 * from the road's end with the train standing on it, so "free the road in
+	 * front of the train" on a failed attempt gave back nothing that was good.
+	 * Asked from a distance (see CheckNextTrainTile()), the road up to the
+	 * waiting position before the signal is good and stays: measured on the
+	 * player's save, a train braking for a red beyond which another stood
+	 * had its four tiles of road dropped by every refused attempt and laid
+	 * again twenty ticks later, and its speed went up and down with it. */
+	PBSTileInfo road_before(INVALID_TILE, Trackdir::Invalid, false);
 	if (do_track_reservation) {
+		road_before = FollowTrainReservation(consist);
 		res_dest = ExtendTrainReservation(consist, &tracks, &dest_enterdir);
 		if (res_dest.tile == INVALID_TILE) {
 			/* ExtendTrainReservation() only walks a single, choice-free
@@ -8648,8 +8796,9 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		 * telling them apart, a rescue engine that will not leave its shed is
 		 * a guessing game -- and it has been guessed wrong twice already. */
 		if (_show_train_orientation) {
-			SayOnChange(consist, fmt::format("Vlak {}: hledani z ({},{}) na cil ({},{}) - {}, konec {}",
+			SayOnChange(consist, fmt::format("Vlak {}: hledani z ({},{}) [zadano na ({},{}), celo ({},{})] na cil ({},{}) - {}, konec {}",
 					consist->unitnumber, TileX(new_tile), TileY(new_tile),
+					TileX(tile), TileY(tile), TileX(moving_front->tile), TileY(moving_front->tile),
 					TileX(consist->dest_tile), TileY(consist->dest_tile),
 					path_found ? "cil nalezen" : "CIL NENALEZEN",
 					res_dest.tile == INVALID_TILE ? "nikde" :
@@ -8670,7 +8819,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	/* A path was found, but could not be reserved. */
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
 		if (mark_stuck) MarkTrainAsStuck(consist);
-		FreeTrainTrackReservation(consist);
+		FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 		if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 		/* Use tracks_on_tile, not best_track and not the (by now
 		 * overwritten) `tracks`: best_track can still be Track::Invalid
@@ -8709,7 +8858,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			if (_show_train_orientation) {
 				SayOnChange(consist, fmt::format("Vlak {}: rezervace - hledani nenaslo zadny cil (jsem v depu, zustavam)", consist->unitnumber));
 			}
-			FreeTrainTrackReservation(consist);
+			FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 			if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 			if (mark_stuck) MarkTrainAsStuck(consist);
 			return FindFirstTrack(tracks_on_tile);
@@ -8730,7 +8879,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			if (changed_signal) MarkTileDirtyByTile(tile);
 			return best_track;
 		}
-		FreeTrainTrackReservation(consist);
+		FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 		if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 		if (mark_stuck) MarkTrainAsStuck(consist);
 		/* See the tracks_on_tile comments above. */
@@ -8758,7 +8907,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 				res_dest = cur_dest;
 				if (res_dest.okay) continue;
 				/* Path found, but could not be reserved. */
-				FreeTrainTrackReservation(consist);
+				FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 				if (mark_stuck) MarkTrainAsStuck(consist);
 				if (got_reservation != nullptr) *got_reservation = false;
 				changed_signal = false;
@@ -8767,7 +8916,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		}
 		/* No order or no safe position found, try any position. */
 		if (!TryReserveSafeTrack(consist, res_dest.tile, res_dest.trackdir, true)) {
-			FreeTrainTrackReservation(consist);
+			FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 			if (mark_stuck) MarkTrainAsStuck(consist);
 			if (got_reservation != nullptr) *got_reservation = false;
 			changed_signal = false;

@@ -68,7 +68,7 @@ uint8_t FreightWagonMult(CargoType cargo);
 
 void CheckTrainsLengths();
 
-void FreeTrainTrackReservation(const Train *v);
+void FreeTrainTrackReservation(const Train *v, TileIndex from_tile = INVALID_TILE, Trackdir from_td = Trackdir::Invalid);
 bool TryPathReserve(Train *v, bool mark_as_stuck = false, bool first_tile_okay = false);
 
 int GetTrainStopLocation(StationID station_id, TileIndex tile, const Train *moving_front, int *station_ahead, int *station_length);
