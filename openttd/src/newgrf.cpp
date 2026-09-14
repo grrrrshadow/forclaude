@@ -579,6 +579,15 @@ GRFFile::GRFFile(const GRFConfig &config)
 	this->filename = config.filename;
 	this->grfid = config.ident.grfid;
 
+	/* What the file said about itself before there was a GRFFile to say it
+	 * to: the Action 0 properties it asked for by name, and the answers to
+	 * the feature tests it asked (see newgrf_act14.cpp). */
+	for (const auto &[key, id] : config.action0_property_remaps) {
+		this->action0_property_remaps[key] = static_cast<MappedProperty>(id);
+	}
+	this->feature_test_var8d = config.feature_test_var8d;
+	this->feature_test_var91 = config.feature_test_var91;
+
 	/* Initialise local settings to defaults */
 	this->traininfo_vehicle_pitch = 0;
 	this->traininfo_vehicle_width = TRAININFO_DEFAULT_VEHICLE_WIDTH;

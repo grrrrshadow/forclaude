@@ -2845,6 +2845,17 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 		if (SpriteExists(SPR_SIGNALS_WARNING_BASE + i)) have++;
 	}
 	IConsolePrint(CC_DEFAULT, "testnavesti: sprity vystrazne {}/32 nactenych (zaklad {}).", have, SPR_SIGNALS_WARNING_BASE);
+	/* What the loaded sets said about drawing more than two aspects: the
+	 * property JGR's patchpack calls "railtype_extra_aspects". Nought means
+	 * the set draws red and green only and the base set's own warning sprite
+	 * is used instead. */
+	for (uint r = 0; r < RAILTYPE_END; r++) {
+		RailType rt = static_cast<RailType>(r);
+		const RailTypeInfo *rti = GetRailTypeInfo(rt);
+		if (rti->label == 0) continue;
+		IConsolePrint(CC_DEFAULT, "testnavesti: kolej {} - navestidla z grf {}, aspektu navic {}", to_underlying(rt),
+				rti->group[RailSpriteType::Signals] != nullptr ? "ano" : "ne", rti->signal_extra_aspects);
+	}
 	IConsolePrint(CC_DEFAULT, "testnavesti: celkem {} navestidel.", n);
 	return true;
 }

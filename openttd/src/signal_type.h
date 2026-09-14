@@ -43,4 +43,19 @@ enum class SignalState : uint8_t {
 	End, ///< End marker.
 };
 
+/**
+ * What a signal is showing, as a NewGRF is asked for it. Red and green are
+ * the two the map stores; the warning aspect is worked out from the road
+ * ahead when the signal is drawn (see IsPathSignalWarning()).
+ *
+ * The numbering is JGR's patchpack's, since a set that draws more than two
+ * aspects is written for that and counts them this way: nought stop, one
+ * clear, and from two up the aspects in between, nearest to stop first.
+ */
+enum class SignalAspect : uint8_t {
+	Red = 0, ///< Stop.
+	Green = 1, ///< Clear.
+	Warning = 2, ///< Clear, but the next signal is at danger.
+};
+
 #endif /* SIGNAL_TYPE_H */

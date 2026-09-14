@@ -10,6 +10,8 @@
 #ifndef NEWGRF_H
 #define NEWGRF_H
 
+#include <map>
+
 #include "cargotype.h"
 #include "livery.h"
 #include "rail_type.h"
@@ -168,10 +170,53 @@ struct GRFFile {
 	GrfSpecFeatures grf_features{}; ///< Bitset of GrfSpecFeature the grf uses
 	PriceMultipliers price_base_multipliers{}; ///< Price base multipliers as set by the grf.
 
+	/**
+	 * The Action 0 properties of JGR's patchpack this game knows how to
+	 * answer. A set names the one it wants; these are the names understood.
+	 */
+	enum class MappedProperty : uint8_t {
+		None = 0,
+		RailtypeExtraAspects, ///< "railtype_extra_aspects": how many aspects beyond red and green a railtype's signals draw.
+	};
+
+	/**
+	 * Action 0 properties this file asked for by name, and the property
+	 * number it asked to have them under. JGR's patchpack has no fixed
+	 * numbers for the properties it added: a set names the one it wants in
+	 * an Action 14 'A0PM' block and picks the number itself, so a set built
+	 * for it can only be read by looking the number up here. Keyed by
+	 * feature and property number, holding one of GRFMappedProperty.
+	 *
+	 * Only the properties this game knows are recorded; the rest are left
+	 * unmapped and the Action 0 that uses them is ignored, as a set that
+	 * names a property nobody implements must expect.
+	 */
+	std::map<std::pair<uint8_t, uint8_t>, MappedProperty> action0_property_remaps{};
+
+	/**
+	 * Feature-test results this file asked to be told about. A set built for
+	 * JGR's patchpack asks whether a feature is there before it uses it, and
+	 * reads the answer back out of global variable 0x8D (a bit) or 0x91 (a
+	 * value). Without an answer it takes the feature to be missing and draws
+	 * what it would draw on plain OpenTTD.
+	 */
+	uint32_t feature_test_var8d = 0;    ///< Bits set by feature tests that passed.
+	std::vector<uint32_t> feature_test_var91{}; ///< Values a passing feature test asked variable 0x91 to match.
+
 	GRFFile(const GRFConfig &config);
 	GRFFile();
 	GRFFile(GRFFile &&other);
 	~GRFFile();
+
+	/**
+	 * Which known property, if any, this file mapped onto @p prop for @p feature.
+	 * @return the GRFMappedProperty, or GRFMappedProperty::None.
+	 */
+	MappedProperty GetMappedProperty(uint8_t feature, uint8_t prop) const
+	{
+		auto it = this->action0_property_remaps.find({feature, prop});
+		return it == std::end(this->action0_property_remaps) ? MappedProperty::None : it->second;
+	}
 
 	/**
 	 * Get GRF Parameter with range checking.

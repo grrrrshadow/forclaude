@@ -323,6 +323,14 @@ static void SkipIf(ByteReader &buf)
 
 			default: GrfMsg(1, "SkipIf: Unsupported GRF condition type {:02X}. Ignoring", condtype); return;
 		}
+	} else if (param == 0x91 && (condtype == 0x02 || condtype == 0x03) && cond_val > 0) {
+		/* The other way a set built for JGR's patchpack reads back the answer
+		 * to a feature test it asked: is this value among the answers given
+		 * (see the 'FTST' block in newgrf_act14.cpp). Condition 0x02 skips
+		 * when it is, 0x03 when it is not. */
+		const std::vector<uint32_t> &values = _cur_gps.grffile->feature_test_var91;
+		bool found = std::ranges::find(values, cond_val) != std::end(values);
+		result = (found == (condtype == 0x02));
 	} else {
 		/* Tests that use 'param' and are not GRF ID checks.  */
 		uint32_t param_val = GetParamVal(param, &cond_val); // cond_val is modified for param == 0x85

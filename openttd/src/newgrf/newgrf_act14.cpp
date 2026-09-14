@@ -354,9 +354,179 @@ static constexpr AllowedSubtags _tags_info[] = {
 	AllowedSubtags{'PARA', HandleParameterInfo},
 };
 
+/**
+ * What a set built for JGR's patchpack says about itself, and what this game
+ * answers. Two blocks matter, both read here:
+ *
+ * 'A0PM' asks for an Action 0 property by name and says which property number
+ * it will use for it. The patchpack gave its added properties no fixed
+ * numbers, so a set cannot use one without saying this first, and we cannot
+ * read one without listening.
+ *
+ * 'FTST' asks whether a feature is there at all. The answer goes back through
+ * global variable 0x8D (a bit) or 0x91 (a value), which the set then tests
+ * with an Action 7 or 9 and skips its own sprites if the answer is no. Left
+ * unanswered, a set draws what it would draw on plain OpenTTD -- which is why
+ * this is read even though nothing else here needs it.
+ *
+ * Only the names this game can honour are accepted. A name we do not know is
+ * left unmapped and reported, and the set carries on without that feature,
+ * which is what a set that names an unimplemented property has to expect.
+ */
+struct GRFNameMapAction {
+	std::string name{};
+	int feature = -1;
+	int prop_id = -1;
+	int var8d_bit = -1;
+	uint32_t var91_value = 0;
+
+	void Reset() { *this = GRFNameMapAction{}; }
+};
+static GRFNameMapAction _cur_name_map_action;
+
+/** Known Action 0 property names, by the patchpack's spelling. */
+struct MappableProperty {
+	const char *name;
+	GrfSpecFeature feature;
+	GRFFile::MappedProperty id;
+};
+static const MappableProperty _mappable_properties[] = {
+	{ "railtype_extra_aspects", GrfSpecFeature::RailTypes, GRFFile::MappedProperty::RailtypeExtraAspects },
+};
+
+/** Known feature names, and the version of each this game answers to. */
+struct KnownFeature {
+	const char *name;
+	uint8_t version;
+};
+static const KnownFeature _known_features[] = {
+	{ "action0_railtype_extra_aspects", 1 },
+};
+
+/** @copydoc TextHandler */
+static bool ChangeNameMapName(GRFLanguage, std::string_view str)
+{
+	_cur_name_map_action.name = str;
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapFeature(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	_cur_name_map_action.feature = buf.ReadByte();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapPropertyId(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	_cur_name_map_action.prop_id = buf.ReadByte();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapVar8DBit(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	_cur_name_map_action.var8d_bit = buf.ReadByte();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapVar91Value(size_t len, ByteReader &buf)
+{
+	if (len != 4) { buf.Skip(len); return true; }
+	_cur_name_map_action.var91_value = buf.ReadDWord();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapMinVersion(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	/* Kept as the feature's asked-for version; answered against what we do. */
+	_cur_name_map_action.prop_id = buf.ReadByte();
+	return true;
+}
+
+/** Action14 'A0PM' tags: name a property, and say which number it will use. */
+static constexpr AllowedSubtags _tags_a0pm[] = {
+	AllowedSubtags{'NAME', ChangeNameMapName},
+	AllowedSubtags{'FEAT', ChangeNameMapFeature},
+	AllowedSubtags{'PROP', ChangeNameMapPropertyId},
+	AllowedSubtags{'SETT', ChangeNameMapVar8DBit},
+	AllowedSubtags{'SVAL', ChangeNameMapVar91Value},
+};
+
+/** Action14 'FTST' tags: name a feature and ask whether it is here. */
+static constexpr AllowedSubtags _tags_ftst[] = {
+	AllowedSubtags{'NAME', ChangeNameMapName},
+	AllowedSubtags{'MINV', ChangeNameMapMinVersion},
+	AllowedSubtags{'SETP', ChangeNameMapVar8DBit},
+	AllowedSubtags{'SVAL', ChangeNameMapVar91Value},
+};
+
+/** Say that a test or mapping came out true, the way the set asked to be told. */
+static void AnswerNameMap(bool success)
+{
+	const GRFNameMapAction &action = _cur_name_map_action;
+	if (!success) return;
+	if (action.var8d_bit >= 0 && action.var8d_bit < 32) SetBit(_cur_gps.grfconfig->feature_test_var8d, action.var8d_bit);
+	if (action.var91_value != 0) {
+		std::vector<uint32_t> &values = _cur_gps.grfconfig->feature_test_var91;
+		if (std::ranges::find(values, action.var91_value) == std::end(values)) values.push_back(action.var91_value);
+	}
+}
+
+/** @copydoc BranchHandler */
+static bool HandleAction0PropertyMap(ByteReader &buf)
+{
+	_cur_name_map_action.Reset();
+	if (!HandleNodes(buf, _tags_a0pm)) return false;
+
+	const GRFNameMapAction &action = _cur_name_map_action;
+	if (action.name.empty() || action.feature < 0 || action.prop_id <= 0) {
+		GrfMsg(2, "StaticGRFInfo: 'A0PM' without a name, feature or property number, ignoring");
+		return true;
+	}
+	for (const MappableProperty &known : _mappable_properties) {
+		if (to_underlying(known.feature) != action.feature || action.name != known.name) continue;
+		_cur_gps.grfconfig->action0_property_remaps[{static_cast<uint8_t>(action.feature), static_cast<uint8_t>(action.prop_id)}] = to_underlying(known.id);
+		GrfMsg(2, "StaticGRFInfo: property '{}' of feature {:02X} read as number {:02X}", action.name, action.feature, action.prop_id);
+		AnswerNameMap(true);
+		return true;
+	}
+	GrfMsg(1, "StaticGRFInfo: property '{}' of feature {:02X} is not implemented, leaving it unmapped", action.name, action.feature);
+	return true;
+}
+
+/** @copydoc BranchHandler */
+static bool HandleFeatureTest(ByteReader &buf)
+{
+	_cur_name_map_action.Reset();
+	if (!HandleNodes(buf, _tags_ftst)) return false;
+
+	const GRFNameMapAction &action = _cur_name_map_action;
+	if (action.name.empty()) return true;
+	/* prop_id carries the asked-for minimum version here; see ChangeNameMapMinVersion(). */
+	uint8_t want = action.prop_id <= 0 ? 1 : static_cast<uint8_t>(action.prop_id);
+	for (const KnownFeature &known : _known_features) {
+		if (action.name != known.name || known.version < want) continue;
+		GrfMsg(2, "StaticGRFInfo: feature '{}' asked for and answered", action.name);
+		AnswerNameMap(true);
+		return true;
+	}
+	GrfMsg(2, "StaticGRFInfo: feature '{}' asked for and not here", action.name);
+	return true;
+}
+
 /** Action14 root tags */
 static constexpr AllowedSubtags _tags_root[] = {
 	AllowedSubtags{'INFO', std::make_pair(std::begin(_tags_info), std::end(_tags_info))},
+	AllowedSubtags{'FTST', HandleFeatureTest},
+	AllowedSubtags{'A0PM', HandleAction0PropertyMap},
 };
 
 

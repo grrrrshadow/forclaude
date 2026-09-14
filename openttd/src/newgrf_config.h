@@ -10,6 +10,8 @@
 #ifndef NEWGRF_CONFIG_H
 #define NEWGRF_CONFIG_H
 
+#include <map>
+
 #include "strings_type.h"
 #include "fileio_type.h"
 #include "textfile_type.h"
@@ -179,6 +181,17 @@ struct GRFConfig {
 	bool has_param_defaults = false; ///< NOSAVE: did this newgrf specify any defaults for it's parameters
 	std::vector<std::optional<GRFParameterInfo>> param_info; ///< NOSAVE: extra information about the parameters
 	std::vector<uint32_t> param; ///< GRF parameters
+
+	/**
+	 * What this file said about itself in its Action 14, in the blocks JGR's
+	 * patchpack added: which of that patchpack's Action 0 properties it wants
+	 * under which property number, and the answers to the feature tests it
+	 * asked. Read while the file is only being scanned, before there is a
+	 * GRFFile to put them on; GRFFile's constructor takes them from here.
+	 */
+	std::map<std::pair<uint8_t, uint8_t>, uint8_t> action0_property_remaps{}; ///< NOSAVE
+	uint32_t feature_test_var8d = 0; ///< NOSAVE
+	std::vector<uint32_t> feature_test_var91{}; ///< NOSAVE
 
 	bool IsCompatible(uint32_t old_version) const;
 	void SetParams(std::span<const uint32_t> pars);

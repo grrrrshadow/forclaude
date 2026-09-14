@@ -128,12 +128,21 @@ SpriteID GetCustomRailSprite(const RailTypeInfo *rti, TileIndex tile, RailSprite
  * @param gui Is the sprite being used on the map or in the GUI?
  * @return The sprite to draw.
  */
-SpriteID GetCustomSignalSprite(const RailTypeInfo *rti, TileIndex tile, SignalType type, SignalVariant var, SignalState state, bool gui)
+SpriteID GetCustomSignalSprite(const RailTypeInfo *rti, TileIndex tile, SignalType type, SignalVariant var, SignalAspect aspect, bool gui)
 {
 	if (rti->group[RailSpriteType::Signals] == nullptr) return 0;
 
+	/* What the set is asked for, in the low byte: nought red, one green, and
+	 * from two up the aspects between them, counted the way JGR's patchpack
+	 * counts them -- which is the only way a set that draws more than two
+	 * knows. A set that never said how many it draws is asked for red or
+	 * green and nothing else; it has no sprite for a third and would answer
+	 * with whatever its green happens to resolve to. */
+	uint8_t asked = to_underlying(aspect);
+	if (asked > 1 && rti->signal_extra_aspects + 1 < asked) asked = to_underlying(SignalAspect::Green);
+
 	uint32_t param1 = gui ? 0x10 : 0x00;
-	uint32_t param2 = (to_underlying(type) << 16) | (to_underlying(var) << 8) | to_underlying(state);
+	uint32_t param2 = (to_underlying(type) << 16) | (to_underlying(var) << 8) | asked;
 	RailTypeResolverObject object(rti, tile, TileContext::Normal, RailSpriteType::Signals, param1, param2);
 
 	const auto *group = object.Resolve<ResultSpriteGroup>();

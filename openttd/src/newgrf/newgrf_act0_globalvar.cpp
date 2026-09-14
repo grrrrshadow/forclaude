@@ -463,7 +463,10 @@ bool GetGlobalVariable(uint8_t param, uint32_t *value, const GRFFile *grffile)
 		}
 
 		case 0x0D: // TTD Version, 00=DOS, 01=Windows
-			*value = GetGRFConfig(grffile->grfid)->palette & GRFP_USE_MASK;
+			/* Plus the bits a feature test this file asked for was answered
+			 * with: that is where a set built for JGR's patchpack reads the
+			 * answer back (see the 'FTST' block in newgrf_act14.cpp). */
+			*value = (GetGRFConfig(grffile->grfid)->palette & GRFP_USE_MASK) | grffile->feature_test_var8d;
 			return true;
 
 		case 0x0E: // Y-offset for train sprites

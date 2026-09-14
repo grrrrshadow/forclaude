@@ -50,7 +50,10 @@ GRFConfig::GRFConfig(const GRFConfig &config) :
 	palette(config.palette),
 	has_param_defaults(config.has_param_defaults),
 	param_info(config.param_info),
-	param(config.param)
+	param(config.param),
+	action0_property_remaps(config.action0_property_remaps),
+	feature_test_var8d(config.feature_test_var8d),
+	feature_test_var91(config.feature_test_var91)
 {
 	this->flags.Reset(GRFConfigFlag::Copy);
 }

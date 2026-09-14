@@ -106,8 +106,8 @@ void ResolveRailTypeGUISprites(RailTypeInfo *rti)
 
 	for (SignalType type : EnumRange(SignalType::End)) {
 		for (SignalVariant var : {SignalVariant::Electric, SignalVariant::Semaphore}) {
-			SpriteID red = GetCustomSignalSprite(rti, INVALID_TILE, type, var, SignalState::Red, true);
-			SpriteID green = GetCustomSignalSprite(rti, INVALID_TILE, type, var, SignalState::Green, true);
+			SpriteID red = GetCustomSignalSprite(rti, INVALID_TILE, type, var, SignalAspect::Red, true);
+			SpriteID green = GetCustomSignalSprite(rti, INVALID_TILE, type, var, SignalAspect::Green, true);
 			rti->gui_sprites.signals[type][var][SignalState::Red] = (red != 0) ? red + SIGNAL_TO_SOUTH : _signal_lookup[var][type];
 			rti->gui_sprites.signals[type][var][SignalState::Green] = (green != 0) ? green + SIGNAL_TO_SOUTH : _signal_lookup[var][type] + 1;
 		}
@@ -1976,12 +1976,17 @@ static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track trac
 	SignalType type       = GetSignalType(tile, track);
 	SignalVariant variant = GetSignalVariant(tile, track);
 
-	SpriteID sprite = GetCustomSignalSprite(rti, tile, type, variant, condition);
+	/* Which of the three this signal is showing. The warning is worked out
+	 * from the road ahead and only a path signal can show it. */
+	SignalAspect aspect = condition == SignalState::Red ? SignalAspect::Red : SignalAspect::Green;
+	if (aspect == SignalAspect::Green && type >= SignalType::Path && IsPathSignalWarning(tile, td)) aspect = SignalAspect::Warning;
+
+	SpriteID sprite = GetCustomSignalSprite(rti, tile, type, variant, aspect);
 	if (sprite != 0) {
 		sprite += image;
-	} else if (type >= SignalType::Path && IsPathSignalWarning(tile, td)) {
-		/* The warning aspect, drawn only from the base set: a NewGRF that
-		 * brings its own signals has no sprite for it and keeps its green. */
+	} else if (aspect == SignalAspect::Warning) {
+		/* The set drew nothing for the warning -- it has only two aspects, or
+		 * none of its own at all -- so it is drawn from the base set. */
 		sprite = SPR_SIGNALS_WARNING_BASE + to_underlying(variant) * 16 +
 				(to_underlying(type) - to_underlying(SignalType::Path)) * 8 + image;
 	} else {

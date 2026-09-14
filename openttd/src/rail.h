@@ -271,6 +271,15 @@ public:
 	 */
 	EnumIndexArray<const SpriteGroup *, RailSpriteType, RailSpriteType::End> group{};
 
+	/**
+	 * How many aspects beyond red and green this railtype's signals can draw,
+	 * as the NewGRF said in the property JGR's patchpack calls
+	 * "railtype_extra_aspects". Nought means the set draws a signal two ways
+	 * only, and it is never asked for a third. This game asks for one extra
+	 * aspect at most: the warning a driver brakes to.
+	 */
+	uint8_t signal_extra_aspects = 0;
+
 	std::vector<BadgeID> badges;
 
 	inline bool UsesOverlay() const
