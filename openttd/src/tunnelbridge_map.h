@@ -134,7 +134,8 @@ inline TrackBits GetTunnelBridgeReservationTrackBits(Tile t)
  *
  * Bit 0 says a signal stands here facing into the tunnel (what a train
  * entering reads), bit 1 that it shows red; bits 2 and 3 say the same for the
- * signal facing out of it. Only the portals carry a signal that can be seen:
+ * signal facing out of it. Bits 4 to 7 hold which picture they are drawn
+ * with. Only the portals carry a signal that can be seen:
  * on a bridge there is nowhere to draw one but the ramps, so any division of
  * the bore itself is left invisible.
  */
@@ -183,6 +184,47 @@ inline void SetTunnelBridgeSignalState(Tile t, TunnelBridgeSignal which, SignalS
 {
 	assert(IsTileType(t, TileType::TunnelBridge));
 	AssignBit(t.m2(), to_underlying(which) + 1, state == SignalState::Red);
+}
+
+/**
+ * Which picture the signals on this portal are drawn with: the kind the
+ * player was building when they were put up.
+ *
+ * It is a picture and nothing more. A bore is one section whatever kind of
+ * signal stands on its mouths, so the type changes nothing about how it
+ * works -- it is there so a line of path signals does not turn into a block
+ * signal where it crosses a bridge. Bits 4 to 6 of m2 hold the type and bit
+ * 7 the variant, all zero in an old save, which reads as the plain electric
+ * block signal that was drawn before there was anything to read.
+ *
+ * @pre IsTileType(t, TileType::TunnelBridge)
+ */
+inline SignalType GetTunnelBridgeSignalType(Tile t)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	SignalType type = static_cast<SignalType>(GB(t.m2(), 4, 3));
+	return type < SignalType::End ? type : SignalType::Block;
+}
+
+/** Set which picture the signals on this portal are drawn with. */
+inline void SetTunnelBridgeSignalType(Tile t, SignalType type)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	SB(t.m2(), 4, 3, to_underlying(type));
+}
+
+/** Whether the signals on this portal are drawn as semaphores. @pre IsTileType(t, TileType::TunnelBridge) */
+inline SignalVariant GetTunnelBridgeSignalVariant(Tile t)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	return HasBit(t.m2(), 7) ? SignalVariant::Semaphore : SignalVariant::Electric;
+}
+
+/** Set whether the signals on this portal are drawn as semaphores. */
+inline void SetTunnelBridgeSignalVariant(Tile t, SignalVariant variant)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	AssignBit(t.m2(), 7, variant == SignalVariant::Semaphore);
 }
 
 #endif /* TUNNELBRIDGE_MAP_H */

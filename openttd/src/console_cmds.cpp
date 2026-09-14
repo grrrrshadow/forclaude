@@ -2518,11 +2518,16 @@ static bool ConTestMap(std::span<std::string_view> argv)
 			} else if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
 				TileIndex other = GetOtherTunnelBridgeEnd(tile);
 				tracks = TrackBits{DiagDirToDiagTrack(GetTunnelBridgeDirection(tile))};
-				desc = fmt::format("{} usti smer {} druhy konec ({},{}) navestidla {}{}",
+				desc = fmt::format("{} usti smer {} druhy konec ({},{}) navestidla {}",
 						IsTunnel(tile) ? "tunel" : "most", to_underlying(GetTunnelBridgeDirection(tile)),
 						TileX(other), TileY(other),
-						IsTunnelBridgeSignalled(tile) ? "ano" : "ne",
-						IsTunnelBridgeSignalled(tile) ? (GetTunnelBridgeSignalState(tile, TunnelBridgeSignal::Entry) == SignalState::Red ? " cervena" : " zelena") : "");
+						IsTunnelBridgeSignalled(tile) ? "ano" : "ne");
+				if (IsTunnelBridgeSignalled(tile)) {
+					desc += fmt::format(" {} typ {} {}",
+							GetTunnelBridgeSignalState(tile, TunnelBridgeSignal::Entry) == SignalState::Red ? "cervena" : "zelena",
+							to_underlying(GetTunnelBridgeSignalType(tile)),
+							GetTunnelBridgeSignalVariant(tile) == SignalVariant::Semaphore ? "mechanicke" : "svetelne");
+				}
 			} else {
 				continue;
 			}
@@ -2928,7 +2933,7 @@ static bool ConTestTrainLength(std::span<std::string_view> argv)
 static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Signal a rail tunnel or bridge. Usage: 'testtunel <x> <y> [pryc|tah|tahpryc]'.");
+		IConsolePrint(CC_HELP, "Signal a rail tunnel or bridge. Usage: 'testtunel <x> <y> [pryc|tah|tahctrl|tahpryc] [blok|mech]'.");
 		return true;
 	}
 	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]);
@@ -2941,6 +2946,11 @@ static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 	 * plain drag and has its own reasons to give up, so it is asked for
 	 * separately. */
 	bool autofill = how == "tahctrl";
+	/* Which signal the player would be building: the portal is drawn as that
+	 * kind, so the rig has to be able to ask for more than one. */
+	std::string_view kind = argv.size() >= 5 ? argv[4] : "";
+	SignalType sigtype = kind == "blok" ? SignalType::Block : SignalType::Path;
+	SignalVariant sigvar = kind == "mech" ? SignalVariant::Semaphore : SignalVariant::Electric;
 	TileIndex tile = TileXY(*px, *py);
 	if (!IsTileType(tile, TileType::TunnelBridge)) {
 		IConsolePrint(CC_ERROR, "testtunel: na ({},{}) neni tunel ani most.", *px, *py);
@@ -2948,7 +2958,7 @@ static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 	}
 	_pause_mode = {};
 	TileIndex other = GetOtherTunnelBridgeEnd(tile);
-	extern CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove);
+	extern CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove, SignalType sigtype, SignalVariant sigvar);
 	CommandCost r;
 	AutoRestoreBackup cur_company(_current_company, GetTileOwner(tile));
 	if (drag) {
@@ -2959,10 +2969,10 @@ static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 		Track track = DiagDirToDiagTrack(out);
 		r = remove
 				? Command<Commands::RemoveSignalLong>::Do(DoCommandFlag::Execute, from, to, track, autofill)
-				: Command<Commands::BuildSignalLong>::Do(DoCommandFlag::Execute, from, to, track, SignalType::Path, SignalVariant::Electric, false, autofill, false, 4);
+				: Command<Commands::BuildSignalLong>::Do(DoCommandFlag::Execute, from, to, track, sigtype, sigvar, false, autofill, false, 4);
 		IConsolePrint(CC_DEFAULT, "testtunel: tah ({},{})..({},{}){}", TileX(from), TileY(from), TileX(to), TileY(to), autofill ? " s ctrl" : "");
 	} else {
-		r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove);
+		r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove, sigtype, sigvar);
 	}
 	IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "testtunel: ({},{})..({},{}) {} - {}, navestidla {}/{}, sviti {}",
 			*px, *py, TileX(other), TileY(other), remove ? "odebrani" : "postaveni",

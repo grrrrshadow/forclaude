@@ -1046,17 +1046,19 @@ CommandCost CmdBuildTrainDepot(DoCommandFlags flags, TileIndex tile, RailType ra
  * out. A bore signalled at one end only would be a trap, and there is nowhere
  * to click in the middle of a bridge anyway.
  *
- * Not on the toolbar yet: a signal there is drawn and remembered, but the
- * bore is still one block from end to end, so until the stretches inside it
- * are in there is nothing for a player to gain by placing one. The rig builds
- * them (testtunel) so the ground work can be exercised and measured.
+ * The kind of signal the player was building is remembered and drawn, so that
+ * a line of path signals does not turn into a block signal where it crosses a
+ * bridge. It is a picture and nothing else: a bore is one section whichever
+ * kind stands on its mouths.
  *
  * @param flags type of operation
  * @param tile the portal clicked
  * @param remove take the signals off instead of putting them on
+ * @param sigtype which signal the player is building, for the picture
+ * @param sigvar electric or semaphore, likewise
  * @return the cost of this operation or an error
  */
-CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove)
+CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove, SignalType sigtype, SignalVariant sigvar)
 {
 	CommandCost ret = CheckTileOwnership(tile);
 	if (ret.Failed()) return ret;
@@ -1080,6 +1082,11 @@ CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool 
 			if (!remove) {
 				SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Entry, SignalState::Green);
 				SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Exit, SignalState::Green);
+				SetTunnelBridgeSignalType(t, sigtype);
+				SetTunnelBridgeSignalVariant(t, sigvar);
+			} else {
+				SetTunnelBridgeSignalType(t, SignalType::Block);
+				SetTunnelBridgeSignalVariant(t, SignalVariant::Electric);
 			}
 			MarkTileDirtyByTile(t);
 		}
@@ -1126,7 +1133,7 @@ CommandCost CmdBuildSingleSignal(DoCommandFlags flags, TileIndex tile, Track tra
 	 * way, which is the only arrangement that makes sense on a stretch a
 	 * train cannot stop in. */
 	if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
-		return BuildTunnelBridgeSignals(flags, tile, false);
+		return BuildTunnelBridgeSignals(flags, tile, false, sigtype, sigvar);
 	}
 
 	/* You can only build signals on plain rail tiles, and the selected track must exist */
@@ -1422,7 +1429,7 @@ static CommandCost CmdSignalTrackHelper(DoCommandFlags flags, TileIndex tile, Ti
 		 * a drag that runs across one is taken to mean them and the spacing
 		 * has no say in it. */
 		if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
-			CommandCost ret = BuildTunnelBridgeSignals(flags, tile, remove);
+			CommandCost ret = BuildTunnelBridgeSignals(flags, tile, remove, sigtype, sigvar);
 			if (ret.Succeeded()) {
 				had_success = true;
 				total_cost.AddCost(ret.GetCost());
@@ -1549,7 +1556,7 @@ CommandCost CmdRemoveSingleSignal(DoCommandFlags flags, TileIndex tile, Track tr
 	/* The mouths of a bore hold one set of signals between them, so they go
 	 * together the same way they were put up. */
 	if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
-		return BuildTunnelBridgeSignals(flags, tile, true);
+		return BuildTunnelBridgeSignals(flags, tile, true, SignalType::Block, SignalVariant::Electric);
 	}
 
 	if (!ValParamTrackOrientation(track) || !IsPlainRailTile(tile) || !HasTrack(tile, track)) {
@@ -2613,7 +2620,10 @@ void DrawTunnelBridgePortalSignal(const TileInfo *ti)
 	const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
 	SignalState state = GetTunnelBridgeSignalState(ti->tile, TunnelBridgeSignal::Entry);
 
-	DrawSignalSprite(ti->tile, rti, track, SignalType::Block, SignalVariant::Electric, state, images[dir], positions[dir], td);
+	/* Drawn as the kind the player was building when it was put here, so a
+	 * line of path signals keeps its look across a bridge. Which kind it is
+	 * changes nothing about the bore. */
+	DrawSignalSprite(ti->tile, rti, track, GetTunnelBridgeSignalType(ti->tile), GetTunnelBridgeSignalVariant(ti->tile), state, images[dir], positions[dir], td);
 }
 
 /** Draw one signal of a plain rail tile, reading its kind off the tile. */
