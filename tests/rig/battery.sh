@@ -259,6 +259,15 @@ testza 30000 testbrzda 3" 40000
 # unbooked into the junction (TEMATA 2.38, 4.22). Two couplings, no crash.
 run_scene zalozsmer "testpauza
 vlak123 on" 12000 -g $S/new1.sav
+# The same save run long enough for the yard to work through several rounds
+# of drop and collect. A collector's road used to be allowed to end on the
+# tile before its rake's platform with the platform tiles up to the rake
+# nobody's; the engine that had just put the rake down rolled onto the first
+# of them and came to a stand at the signal nose to nose with the collector,
+# about 25000 ticks in (TEMATA 20, trains 2 and 4). No crash, and the traffic
+# keeps running rather than stopping at the wreck: dozens of couplings, not two.
+run_scene zalozsmerdlouho "testpauza
+vlak123 on" 27000 -g $S/new1.sav
 # Player's save: the tow fetches a breakdown, is turned round on the way home
 # (a tick-timed testotoc, after the coupling) and backs into the depot wagons
 # first; autoreplace at the depot must leave the joined train alone and the

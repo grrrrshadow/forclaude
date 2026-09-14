@@ -328,8 +328,16 @@ public:
 		auto say = [&](std::string what) {
 			if (!_show_train_orientation) return;
 			const Train *v = Yapf().GetVehicle();
-			if (v == nullptr || !IsFetchingCasualty(v->First())) return;
-			IConsolePrint(CC_WARNING, "Vlak {}: odtah - {}", v->First()->unitnumber, what);
+			if (v == nullptr) return;
+			/* A collector's road fails on the same three things, and "no
+			 * route" said nothing about which; the yard that locked up in
+			 * the player's save was two trains each booking into the other's
+			 * ground, readable only from this line. */
+			if (IsFetchingCasualty(v->First())) {
+				IConsolePrint(CC_WARNING, "Vlak {}: odtah - {}", v->First()->unitnumber, what);
+			} else if (v->First()->current_order.ShouldGoToCouple()) {
+				IConsolePrint(CC_WARNING, "Vlak {}: cesta k rade - {}", v->First()->unitnumber, what);
+			}
 		};
 
 		/* Don't bother if the target is reserved. */
@@ -385,7 +393,7 @@ public:
 
 		if (target != nullptr) target->okay = true;
 
-		say(fmt::format("cesta k poruse zamluvena, {}", kudy()));
+		say(fmt::format("cesta zamluvena, {}", kudy()));
 
 		if (Yapf().CanUseGlobalCache(*this->res_dest_node)) {
 			YapfNotifyTrackLayoutChange(INVALID_TILE, Track::Invalid);
