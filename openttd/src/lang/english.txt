@@ -1412,7 +1412,7 @@ STR_CONFIG_SETTING_SMOKE_AMOUNT                                 :Amount of vehic
 STR_CONFIG_SETTING_SMOKE_AMOUNT_HELPTEXT                        :Set how much smoke or how many sparks are emitted by vehicles
 
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL                     :Train acceleration model: {STRING2}
-STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Select the physics model for train acceleration. The "original" model penalises slopes equally for all vehicles. The "realistic" model penalises slopes and curves depending on various properties of the consist, like length and tractive effort
+STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Select the physics model for train acceleration. The "original" model penalises slopes equally for all vehicles. The "realistic" model penalises slopes and curves depending on various properties of the consist, like length and tractive effort. Trains brake gently: they slow down from the right distance for the next red, crossing or the rake they are to couple to, instead of stopping dead. Best used with path signals showing yellow aspects
 
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING                          :Trains wait to be towed away: {STRING2}
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING_HELPTEXT                 :A train that has broken down or crashed stays where it is and waits for a rescue engine to fetch it, instead of repairing itself or falling apart where it stands. Turned off, breakdowns and crashes behave as they do in the unmodified game

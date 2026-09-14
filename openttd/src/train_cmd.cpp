@@ -487,6 +487,181 @@ static int DistanceToLevelCrossingAhead(const Train *moving_front, int max_tiles
 	return -1;
 }
 
+/**
+ * The gentle braking rate of this train: the deceleration that takes it
+ * from its top speed to a stand in BRAKE_TILES tiles, as the number such
+ * that speed^2 = target^2 + 2 * rate * pixels along a braking run.
+ *
+ * Fixed to the train, not read off the moment: a rate that changed with
+ * speed had the ceiling and the train chasing each other down the line. And
+ * not the game's own brake, which is the engine's pulling force turned round
+ * -- it stops a train inside a tile or two and grows as the train slows, so
+ * a slow goods train would brake harder than an express. Eight tiles from
+ * top speed is the player's measure of a train that sees a red in time; a
+ * train doing less needs less, by the square.
+ */
+static int64_t GentleBrakeRate(const Train *v)
+{
+	constexpr int64_t BRAKE_TILES = 8;
+	int64_t top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
+	return std::max<int64_t>(top * top / (2 * BRAKE_TILES * TILE_SIZE), 1);
+}
+
+/**
+ * The speed this train may be doing now so that it reaches @p target_speed
+ * by the time it has covered @p pixels, braking gently the whole way. With v
+ * the speed now, t the target and a the gentle rate, the distance covered
+ * while braking is (v^2 - t^2) / 2a pixels, so the most v may be is
+ * sqrt(t^2 + 2 a d). A pixel here is a pixel along the track. The full
+ * brake is left for what it is good at, stopping a train that has run out of
+ * road: the stop at the end of a reservation is untouched.
+ */
+static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
+{
+	if (pixels <= 0) return target_speed;
+	int64_t allowed_sq = int64_t(target_speed) * target_speed + 2 * GentleBrakeRate(v) * pixels;
+	return static_cast<int>(IntSqrt(static_cast<uint32_t>(std::min<int64_t>(allowed_sq, UINT32_MAX))));
+}
+
+/**
+ * The speed ceiling that lets this train brake gently for whatever fixed
+ * thing is next on its road, instead of hitting it at full speed and
+ * shedding a tenth of its speed a tick.
+ *
+ * What counts as a fixed thing is what a driver reads off the line ahead:
+ * the end of the train's own reservation (a red, a rake it is going to
+ * couple to, the end of the platform it is booked into) is a stop; a red
+ * block signal on its way is a stop at that signal; a level crossing asks
+ * for the crossing speed by the tile before it (the same two thirds as the
+ * flat ceiling in GetCurrentMaxSpeed(), which this replaces the run-up to).
+ * Nothing else: the ceiling only ever moves for one of those, so a train on
+ * clear line runs at line speed and a train that has to slow does it once,
+ * from the right distance, and arrives at the thing at the speed the thing
+ * asks for. Stops inside a station are the station code's own and are left
+ * to it.
+ *
+ * The road is followed from the leading end as far as the reservation goes,
+ * or, on line worked by block signals where nothing is reserved, as far as
+ * the next red. Bounded by the distance the train would need from where it
+ * is: past that nothing ahead can ask anything of it yet.
+ *
+ * @param v the train, front of its consist
+ * @param moving_front its leading end
+ * @return the ceiling, or INT32_MAX for nothing to slow for
+ */
+static int BrakingCeiling(const Train *v, const Train *moving_front)
+{
+	if (moving_front->track == Track::Depot || moving_front->track == Track::Wormhole) return INT32_MAX;
+	Trackdir td = moving_front->GetVehicleTrackdir();
+	if (td == Trackdir::Invalid) return INT32_MAX;
+
+	/* How far ahead is worth looking: the gentle stopping distance from the
+	 * speed the train is doing now, plus a tile, and never more than a few
+	 * dozen tiles. */
+	int64_t gentle = GentleBrakeRate(v);
+	int look_px = static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, 48 * TILE_SIZE));
+
+	/* Pixels left on the tile the leading end is on, along its axis; a
+	 * curved piece is half a tile, so half of it. */
+	int px = TILE_SIZE / 2;
+	if (IsDiagonalTrackdir(td)) {
+		switch (TrackdirToExitdir(td)) {
+			case DiagDirection::NE: px = moving_front->x_pos & 0xF; break;
+			case DiagDirection::SW: px = 0xF - (moving_front->x_pos & 0xF); break;
+			case DiagDirection::NW: px = moving_front->y_pos & 0xF; break;
+			case DiagDirection::SE: px = 0xF - (moving_front->y_pos & 0xF); break;
+			default: break;
+		}
+	}
+
+	constexpr int CROSSING_SPEED_FLOOR = 34;
+	int crossing_speed = std::max(v->vcache.cached_max_speed * 2 / 3, CROSSING_SPEED_FLOOR);
+
+	int ceiling = INT32_MAX;
+	auto ask = [&](int target, int at_px) {
+		ceiling = std::min(ceiling, SpeedAllowedFor(v, target, at_px));
+	};
+
+	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
+	TileIndex tile = moving_front->tile;
+	/* Whether the road ahead is booked: on such a road its end is a stop.
+	 * Decided by the first tile ahead, so that line worked by block signals,
+	 * where nothing is ever booked, is not read as a road that ends at once. */
+	bool on_booked_road = false;
+	int entered_at = 0; // distance at which the tile the walk is on was entered
+	for (int step = 0; px < look_px && step < 64; step++) {
+		if (!ft.Follow(tile, td)) {
+			/* End of line: a stop at the edge. */
+			ask(0, px);
+			break;
+		}
+		TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
+		if (step == 0) on_booked_road = reserved.Any();
+
+		if (ft.is_station) {
+			/* A platform is crossed in one step; its tiles are booked one by
+			 * one, and the road can end on any of them. */
+			TileIndexDiff diff = TileOffsByDiagDir(ft.exitdir);
+			TileIndex t = ft.new_tile - diff * ft.tiles_skipped;
+			bool ended = false;
+			for (int left = ft.tiles_skipped; left >= 0; left--, t += diff) {
+				if (on_booked_road && !HasStationReservation(t)) { ask(0, px); ended = true; break; }
+				px += TILE_SIZE;
+			}
+			if (ended) break;
+			if (ft.new_td_bits.Count() != 1) break;
+			tile = ft.new_tile;
+			td = FindFirstTrackdir(ft.new_td_bits);
+			continue;
+		}
+
+		if (on_booked_road && reserved.None()) {
+			/* A single tile with no booking on it, with the road booked again
+			 * beyond, is a hole, not the end: the waypoint tile a train has
+			 * just concluded its order on reads that way (see the reservation
+			 * it drops and re-lays in the waypoint hold). Read through it --
+			 * and only there: past a platform's first free tile the rest of
+			 * the platform is booked too, by the rake standing on it, and that
+			 * is the end of the road, not a hole in it. */
+			bool hole = false;
+			if (IsRailWaypointTile(ft.new_tile) && ft.new_td_bits.Count() == 1) {
+				CFollowTrackRail peek(v, GetAllCompatibleRailTypes(v->railtypes));
+				Trackdir through = FindFirstTrackdir(ft.new_td_bits);
+				if (peek.Follow(ft.new_tile, through) && !peek.is_station &&
+						(peek.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(peek.new_tile))).Any()) {
+					hole = true;
+				}
+			}
+			if (!hole) {
+				/* The road ends here: the train stops before entering this tile. */
+				ask(0, px);
+				break;
+			}
+		}
+		Trackdir next_td = reserved.Any() ? FindFirstTrackdir(reserved) : (ft.new_td_bits.Count() == 1 ? FindFirstTrackdir(ft.new_td_bits) : Trackdir::Invalid);
+		if (next_td == Trackdir::Invalid) break; // a choice ahead and nothing booked: nothing to read off it yet
+
+		if (IsLevelCrossingTile(ft.new_tile)) {
+			/* At the crossing speed by the tile before the crossing. */
+			ask(crossing_speed, entered_at);
+		}
+		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td) &&
+				!IsPbsSignal(GetSignalType(ft.new_tile, TrackdirToTrack(next_td))) &&
+				GetSignalStateByTrackdir(ft.new_tile, next_td) == SignalState::Red) {
+			/* A red block signal: the train stops at it, on its tile. */
+			int tile_px = IsDiagonalTrackdir(next_td) ? TILE_SIZE : TILE_SIZE / 2;
+			ask(0, px + tile_px);
+			break;
+		}
+
+		entered_at = px;
+		px += IsDiagonalTrackdir(next_td) ? TILE_SIZE : TILE_SIZE / 2;
+		tile = ft.new_tile;
+		td = next_td;
+	}
+	return ceiling;
+}
+
 int Train::GetCurrentMaxSpeed() const
 {
 	const Train *moving_front = this->GetMovingFront();
@@ -562,6 +737,13 @@ int Train::GetCurrentMaxSpeed() const
 		if (max_speed > crossing_speed && DistanceToLevelCrossingAhead(moving_front, CROSSING_LOOK_AHEAD) >= 0) {
 			max_speed = crossing_speed;
 		}
+	}
+
+	/* Brake gently, from the right distance, for whatever fixed thing is next
+	 * on the road: see BrakingCeiling(). Realistic model only, like the
+	 * crossing ceiling above, which this is the run-up to. */
+	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && this->cur_speed > 0) {
+		max_speed = std::min(max_speed, BrakingCeiling(this, moving_front));
 	}
 
 	max_speed = std::min<int>(max_speed, this->current_order.GetMaxSpeed());
