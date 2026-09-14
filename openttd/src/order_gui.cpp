@@ -1332,7 +1332,12 @@ public:
 				bool can_auto = can_reverse_out;
 				bool automatic = order->ShouldDepartAutomatically();
 				this->SetWidgetDisabledState(WID_O_AUTO_DEPARTURE, !can_auto);
-				this->SetWidgetLoweredState(WID_O_AUTO_DEPARTURE, can_auto && automatic);
+				/* Shown down even when greyed under a decouple: that is the
+				 * setting a decoupling order carries (the decouple switch writes
+				 * it), and the greyed-and-down look says "on, and not yours to
+				 * change" -- the same thing the order line says with
+				 * "(automatic)". */
+				this->SetWidgetLoweredState(WID_O_AUTO_DEPARTURE, automatic && (can_auto || decoupling));
 			} else if (is_train && order->IsType(OT_GOTO_DEPOT)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_DEPOT);
 				this->SetWidgetLoweredState(WID_O_TURN_AROUND_DEPOT, order->ShouldTurnAroundInDepot());
@@ -1720,6 +1725,17 @@ public:
 				if (order->ShouldDecoupleOnDeparture()) {
 					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE, 0);
 					break;
+				}
+				/* Reversing out becomes "automatic" the moment decoupling goes
+				 * on: a decoupling train never turns round, it drops its wagons
+				 * and goes away from them, backing off or pulling on as it came
+				 * in -- which is what automatic departure is. Rewriting the
+				 * setting, rather than leaving a reversing flag lying there
+				 * unused, keeps the buttons telling the truth. Reversing is
+				 * cleared first, since automatic will not go on beside it. */
+				if (order->ShouldReverseOutOfStation()) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, 0);
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_AUTO_DEPARTURE, 1);
 				}
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE, 1);
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_DECOUPLE_COUNT, 0);
