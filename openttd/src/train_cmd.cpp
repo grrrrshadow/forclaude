@@ -47,6 +47,7 @@
 #include "timetable.h"
 #include "economy_func.h"
 #include "waypoint_base.h"
+#include "tunnelbridge_map.h"
 
 #include "table/strings.h"
 #include "table/train_sprites.h"
@@ -602,34 +603,81 @@ static int SpeedOfTrainOn(const Train *v, TileIndex tile, DiagDirection exitdir)
 	return -1;
 }
 
+/**
+ * How far along a direction of travel a point lies, in pixels. The number
+ * itself means nothing; the difference between two of them is the distance
+ * from the first to the second, positive when the second is further on.
+ *
+ * @param dir the way the train is going
+ * @param x,y the point
+ */
+static int AlongDir(DiagDirection dir, int x, int y)
+{
+	switch (dir) {
+		case DiagDirection::NE: return -x;
+		case DiagDirection::SW: return x;
+		case DiagDirection::NW: return -y;
+		default: return y;
+	}
+}
+
+/** The same for the middle of a tile. */
+static int AlongDirOfTile(DiagDirection dir, TileIndex tile)
+{
+	return AlongDir(dir, TileX(tile) * TILE_SIZE + TILE_SIZE / 2, TileY(tile) * TILE_SIZE + TILE_SIZE / 2);
+}
+
+/**
+ * The nearest train inside a bore beyond a given point, and its speed.
+ *
+ * A train in a tunnel or on a bridge is not on either mouth to be found
+ * there, and the tiles between them are not walked: a path follower crosses
+ * the whole thing in one step. So the trains are asked instead, which is
+ * cheap because it is only ever done for a signalled bore -- an unsignalled
+ * one is booked end to end by whoever is in it, and nobody else can be
+ * coming up behind to need the answer.
+ *
+ * @param v the train asking
+ * @param mouth the mouth this train is heading in by
+ * @param from the point to measure from, as AlongDir() gives it
+ * @param[out] gap_px how far beyond @p from that train is
+ * @return that train's speed, or -1 for nobody in there
+ */
+static int SpeedOfTrainInBore(const Train *v, TileIndex mouth, int from, int *gap_px)
+{
+	if (!IsTunnelBridgeSignalled(mouth)) return -1;
+	DiagDirection dir = GetTunnelBridgeDirection(mouth);
+	TileIndex other = GetOtherTunnelBridgeEnd(mouth);
+
+	const Train *found = nullptr;
+	int best = 0;
+	for (const Train *t : Train::Iterate()) {
+		if (t->track != Track::Wormhole) continue;
+		if (t->tile != mouth && t->tile != other) continue;
+		if (t->First() == v) continue;
+		int at = AlongDir(dir, t->x_pos, t->y_pos) - from;
+		if (at < 0) continue; // behind us, or behind the mouth we are coming to
+		if (found == nullptr || at < best) { found = t; best = at; }
+	}
+	if (found == nullptr) return -1;
+
+	*gap_px = best;
+	/* One that went in by the same mouth is going our way and is fallen in
+	 * behind at its own speed. One that went in by the other is coming at us,
+	 * and the only thing to do about that is stand still. */
+	return found->tile == mouth ? found->cur_speed : 0;
+}
+
 static int BrakingCeiling(const Train *v, const Train *moving_front)
 {
-	if (moving_front->track == Track::Depot || moving_front->track == Track::Wormhole) return INT32_MAX;
-	Trackdir td = moving_front->GetVehicleTrackdir();
-	if (td == Trackdir::Invalid) return INT32_MAX;
+	if (moving_front->track == Track::Depot) return INT32_MAX;
 
 	/* How far ahead is worth looking: see GentleLookAhead(). */
 	int look_px = GentleLookAhead(v);
 
-	/* Pixels left on the tile the leading end is on, along its axis; a
-	 * curved piece is half a tile, so half of it. */
-	int px = TILE_SIZE / 2;
-	if (IsDiagonalTrackdir(td)) {
-		switch (TrackdirToExitdir(td)) {
-			case DiagDirection::NE: px = moving_front->x_pos & 0xF; break;
-			case DiagDirection::SW: px = 0xF - (moving_front->x_pos & 0xF); break;
-			case DiagDirection::NW: px = moving_front->y_pos & 0xF; break;
-			case DiagDirection::SE: px = 0xF - (moving_front->y_pos & 0xF); break;
-			default: break;
-		}
-	}
-
-	constexpr int CROSSING_SPEED_FLOOR = 34;
-	int crossing_speed = std::max(v->vcache.cached_max_speed * 2 / 3, CROSSING_SPEED_FLOOR);
-	/* The crossing is the player's to switch off (the setting the flat ceiling
-	 * in GetCurrentMaxSpeed() answers to); the stops are not. */
-	bool slow_for_crossing = _settings_game.vehicle.train_slow_for_level_crossing;
-
+	TileIndex tile;
+	Trackdir td;
+	int px;
 	/* Never below the slowest the game itself lets a train roll up to a line
 	 * end (_breakdown_speeds' last entry): the stop is the road-end code's,
 	 * not the ceiling's, and a ceiling of nought divides the smoke effect by
@@ -640,8 +688,54 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		ceiling = std::min(ceiling, std::max(SpeedAllowedFor(v, target, at_px), CEILING_FLOOR));
 	};
 
+	if (moving_front->track == Track::Wormhole) {
+		/* Inside a bore there are no tiles to read: the train is hidden
+		 * somewhere between two mouths and v->tile is the one it went in by,
+		 * which is behind it. The walk starts again at the far mouth and how
+		 * far that is comes off the train's own position. Before that, what
+		 * is in the bore with it -- which no tile can be asked about. */
+		TileIndex entry = moving_front->tile;
+		if (!IsTileType(entry, TileType::TunnelBridge)) return INT32_MAX;
+		DiagDirection dir = GetTunnelBridgeDirection(entry);
+		int here = AlongDir(dir, moving_front->x_pos, moving_front->y_pos);
+
+		int gap = 0;
+		int ahead = SpeedOfTrainInBore(v, entry, here, &gap);
+		if (ahead >= 0) {
+			ask(ahead, gap);
+			return ceiling;
+		}
+
+		tile = GetOtherTunnelBridgeEnd(entry);
+		td = DiagDirToDiagTrackdir(dir);
+		px = AlongDirOfTile(dir, tile) + TILE_SIZE / 2 - here;
+		if (px <= 0) return INT32_MAX; // already at the mouth; the tiles take over next tick
+	} else {
+		td = moving_front->GetVehicleTrackdir();
+		if (td == Trackdir::Invalid) return INT32_MAX;
+		tile = moving_front->tile;
+
+		/* Pixels left on the tile the leading end is on, along its axis; a
+		 * curved piece is half a tile, so half of it. */
+		px = TILE_SIZE / 2;
+		if (IsDiagonalTrackdir(td)) {
+			switch (TrackdirToExitdir(td)) {
+				case DiagDirection::NE: px = moving_front->x_pos & 0xF; break;
+				case DiagDirection::SW: px = 0xF - (moving_front->x_pos & 0xF); break;
+				case DiagDirection::NW: px = moving_front->y_pos & 0xF; break;
+				case DiagDirection::SE: px = 0xF - (moving_front->y_pos & 0xF); break;
+				default: break;
+			}
+		}
+	}
+
+	constexpr int CROSSING_SPEED_FLOOR = 34;
+	int crossing_speed = std::max(v->vcache.cached_max_speed * 2 / 3, CROSSING_SPEED_FLOOR);
+	/* The crossing is the player's to switch off (the setting the flat ceiling
+	 * in GetCurrentMaxSpeed() answers to); the stops are not. */
+	bool slow_for_crossing = _settings_game.vehicle.train_slow_for_level_crossing;
+
 	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
-	TileIndex tile = moving_front->tile;
 	int entered_at = 0; // distance at which the tile the walk is on was entered
 	int last_signal_px = -1; // distance at which the last signal facing this train was passed
 	bool on_our_booking = true; // every tile so far is booked to this train
@@ -656,7 +750,17 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		 * much further. Read as a tile, a signal nineteen tiles off beyond a
 		 * tunnel was braked for three tiles short of the portal (measured on
 		 * the player's save). */
-		if (ft.is_tunnel || ft.is_bridge) px += ft.tiles_skipped * TILE_SIZE;
+		if (ft.is_tunnel || ft.is_bridge) {
+			/* What is in there cannot be read off the mouths, and the tiles
+			 * between them are never walked, so the trains are asked. */
+			int gap = 0;
+			int inside = SpeedOfTrainInBore(v, ft.old_tile, AlongDirOfTile(ft.exitdir, ft.old_tile), &gap);
+			if (inside >= 0) {
+				ask(inside, px + gap);
+				break;
+			}
+			px += ft.tiles_skipped * TILE_SIZE;
+		}
 
 		if (IsRailDepotTile(ft.new_tile)) {
 			/* A shed: in at the shed speed (the depot limit in
