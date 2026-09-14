@@ -2908,30 +2908,49 @@ static bool ConTestTrainLength(std::span<std::string_view> argv)
 
 /**
  * Put a signal on a rail tunnel's or bridge's portal, or take it off.
- * Usage: 'testtunel <x> <y> [pryc]'.
+ * Usage: 'testtunel <x> <y> [pryc|tah|tahpryc]'.
  *
- * The toolbar does this with a click on the portal; this is the same command,
- * so the rig can signal a bore and run a save through it.
+ * Plain, this is the command a click on the portal sends. With 'tah' it is
+ * instead the drag the player does along the line -- started two tiles short
+ * of the near mouth and ended two past the far one -- so that the rig can
+ * check the bore is picked up by a drag that runs across it and not only by
+ * a click aimed at it.
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Signal a rail tunnel or bridge. Usage: 'testtunel <x> <y> [pryc]'.");
+		IConsolePrint(CC_HELP, "Signal a rail tunnel or bridge. Usage: 'testtunel <x> <y> [pryc|tah|tahpryc]'.");
 		return true;
 	}
 	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]);
 	if (!px.has_value() || !py.has_value()) return false;
-	bool remove = argv.size() >= 4 && argv[3] == "pryc";
+	std::string_view how = argv.size() >= 4 ? argv[3] : "";
+	bool remove = how == "pryc" || how == "tahpryc";
+	bool drag = how == "tah" || how == "tahpryc";
 	TileIndex tile = TileXY(*px, *py);
 	if (!IsTileType(tile, TileType::TunnelBridge)) {
 		IConsolePrint(CC_ERROR, "testtunel: na ({},{}) neni tunel ani most.", *px, *py);
 		return true;
 	}
 	_pause_mode = {};
-	extern CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove);
-	CommandCost r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove);
 	TileIndex other = GetOtherTunnelBridgeEnd(tile);
+	extern CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove);
+	CommandCost r;
+	AutoRestoreBackup cur_company(_current_company, GetTileOwner(tile));
+	if (drag) {
+		/* Out of the mouth, away from the bore, two tiles each way. */
+		DiagDirection out = ReverseDiagDir(GetTunnelBridgeDirection(tile));
+		TileIndexDiff step = TileOffsByDiagDir(out);
+		TileIndex from = tile + 2 * step, to = other - 2 * step;
+		Track track = DiagDirToDiagTrack(out);
+		r = remove
+				? Command<Commands::RemoveSignalLong>::Do(DoCommandFlag::Execute, from, to, track, false)
+				: Command<Commands::BuildSignalLong>::Do(DoCommandFlag::Execute, from, to, track, SignalType::Path, SignalVariant::Electric, false, false, false, 4);
+		IConsolePrint(CC_DEFAULT, "testtunel: tah ({},{})..({},{})", TileX(from), TileY(from), TileX(to), TileY(to));
+	} else {
+		r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove);
+	}
 	IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "testtunel: ({},{})..({},{}) {} - {}, navestidla {}/{}, sviti {}",
 			*px, *py, TileX(other), TileY(other), remove ? "odebrani" : "postaveni",
 			r.Succeeded() ? "ok" : "chyba",

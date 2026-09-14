@@ -1120,6 +1120,15 @@ CommandCost CmdBuildSingleSignal(DoCommandFlags flags, TileIndex tile, Track tra
 
 	if (ctrl_pressed) sigvar = (sigvar == SignalVariant::Electric ? SignalVariant::Semaphore : SignalVariant::Electric);
 
+	/* A tunnel or a bridge takes its signals at the mouths and nowhere else,
+	 * so a click on one means the whole bore. There is nothing to choose
+	 * about: no type, no variant, no direction -- both ends get a head each
+	 * way, which is the only arrangement that makes sense on a stretch a
+	 * train cannot stop in. */
+	if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
+		return BuildTunnelBridgeSignals(flags, tile, false);
+	}
+
 	/* You can only build signals on plain rail tiles, and the selected track must exist */
 	if (!ValParamTrackOrientation(track) || !IsPlainRailTile(tile) ||
 			!HasTrack(tile, track)) {
@@ -1408,7 +1417,19 @@ static CommandCost CmdSignalTrackHelper(DoCommandFlags flags, TileIndex tile, Ti
 	};
 
 	for (;;) {
-		if (remove) {
+		/* A bore counts as one section however close together the drag was
+		 * asked to put its signals: they can only stand at the two mouths, so
+		 * a drag that runs across one is taken to mean them and the spacing
+		 * has no say in it. */
+		if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
+			CommandCost ret = BuildTunnelBridgeSignals(flags, tile, remove);
+			if (ret.Succeeded()) {
+				had_success = true;
+				total_cost.AddCost(ret.GetCost());
+			} else if (last_error.GetErrorMessage() == INVALID_STRING_ID) {
+				last_error = ret;
+			}
+		} else if (remove) {
 			/* In remove mode last_* stuff doesn't matter, we simply try to clear every tile. */
 			build_signal(tile, trackdir, false);
 		} else if (minimise_gaps) {
@@ -1525,6 +1546,12 @@ CommandCost CmdBuildSignalTrack(DoCommandFlags flags, TileIndex tile, TileIndex 
  */
 CommandCost CmdRemoveSingleSignal(DoCommandFlags flags, TileIndex tile, Track track)
 {
+	/* The mouths of a bore hold one set of signals between them, so they go
+	 * together the same way they were put up. */
+	if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
+		return BuildTunnelBridgeSignals(flags, tile, true);
+	}
+
 	if (!ValParamTrackOrientation(track) || !IsPlainRailTile(tile) || !HasTrack(tile, track)) {
 		return CommandCost(STR_ERROR_THERE_IS_NO_RAILROAD_TRACK);
 	}

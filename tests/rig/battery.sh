@@ -419,3 +419,13 @@ testmof 21 1 14 0
 testauto 21 1
 testzatik 10 testbrzda 17
 testzatik 1500 testbrzda 21" 8000 -g $S/rig.sav
+
+# A bore with signals on its mouths, put there the way the player does it:
+# a drag along the line that runs across the bridge, then a train let out of
+# the depot to cross it. Watched for the usual -- nothing crashes, nothing
+# asserts, nobody hits anybody -- and the trace in reg_tunel.log says whether
+# the train got over. Skipped where the save is not in the working directory,
+# so the battery still runs without it.
+if [ -f $S/brzda.sav ]; then run_scene tunel "testtunel 48 66 tah
+teststartdepo 48 51
+testsleduj 3 100" 12000 -g $S/brzda.sav; fi
