@@ -1413,6 +1413,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool swap_mode = false;
 	bool store_mode = false;
 	bool found_mode = false;
+	bool waypoint_mode = false;
 	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "couvej") backing = true;
@@ -1425,6 +1426,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		if (argv[i] == "oboji") swap_mode = true;
 		if (argv[i] == "sklad") store_mode = true;
 		if (argv[i] == "zaloz") found_mode = true;
+		if (argv[i] == "smer") waypoint_mode = true;
 		/* A bare number is how many the collect order asks for, so the store
 		 * scene can be pointed at any count without a word for each one. */
 		uint n = 0;
@@ -1443,6 +1445,12 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * shed. Only a depot order may do both, and the point of the test is that
 	 * what was just put down is not what gets picked up. */
 	if (swap_mode) depot_mode = true;
+	/* 'smer' only means anything to the founding scene: it puts one station
+	 * waypoint across both platform roads and the founding order behind it,
+	 * which is the arrangement the player builds and the only one in which a
+	 * finished rake sends the feeder to the next platform instead of making
+	 * it wait. */
+	if (waypoint_mode) found_mode = true;
 
 	/* A headless newgame (null video driver has no GUI) starts like a
 	 * dedicated server: spectating, no company anywhere. Make one to build
@@ -1588,6 +1596,30 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 			return true;
 		}
 		UpdateSignalsInBuffer();
+
+		if (waypoint_mode) {
+			/* One station waypoint on the throat, ahead of the switch that
+			 * splits to the second platform, so both platforms lie behind it
+			 * and nothing else does. It is the waypoint that says which
+			 * platforms this founding order is about -- and when the rake on
+			 * one of them is finished, the other is somewhere to found the
+			 * next. (A waypoint laid across both roads past the switch is the
+			 * same thing to the code, which walks every tile of it; this side
+			 * of the switch is simply the shorter thing to build.) */
+			TileIndex wp_tile = TileXY(x0 + 14, y0);
+			if (Command<Commands::BuildRailWaypoint>::Do(DoCommandFlag::Execute, wp_tile, Axis::X, 1, 1, STAT_CLASS_WAYP, 0, StationID::Invalid(), false, true).Failed()) {
+				IConsolePrint(CC_ERROR, "testspoj zaloz smer: smerovani se nepodarilo postavit.");
+				return true;
+			}
+			/* The scene's signals are one-way path signals (that is what
+			 * building a path signal on bare track gives), and the one past
+			 * the waypoint faces the other way -- so a train standing on the
+			 * waypoint has nothing safe in front of it and never books its way
+			 * there at all. Only in this scene, the throat signal is made
+			 * two-way, which is how the player's own station is signalled. */
+			Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(x0 + 15, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, SignalOnTrack(Track::X));
+			UpdateSignalsInBuffer();
+		}
 	}
 
 	if (tow_mode) {
@@ -1904,6 +1936,13 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		fetch.SetGoToCouple(true);
 		fetch.SetCoupleCount(2);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 0, fetch);
+		uint slot = 1;
+		if (waypoint_mode) {
+			Order via;
+			via.MakeGoToWaypoint(GetStationIndex(TileXY(x0 + 14, y0)));
+			via.SetNonStopType(OrderNonStopFlag::NonStop);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, slot++, via);
+		}
 		Order found;
 		found.MakeGoToStation(st_id);
 		found.SetLoadType(OrderLoadType::NoLoad);
@@ -1911,14 +1950,14 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		found.SetGoToCouple(true);
 		found.SetFoundRake(true);
 		found.SetCoupleCount(want_n);
-		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 1, found);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, slot++, found);
 		Order grow;
 		grow.MakeGoToStation(st_id);
 		grow.SetLoadType(OrderLoadType::NoLoad);
 		grow.SetUnloadType(OrderUnloadType::NoUnload);
 		grow.SetDecouple(true);
 		grow.SetDecoupleCount(0);
-		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 2, grow);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, slot++, grow);
 
 		auto [cost4, veh4, unused_s, unused_t, unused_u] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
 		if (cost4.Failed()) {

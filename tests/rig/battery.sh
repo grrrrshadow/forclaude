@@ -258,6 +258,15 @@ testza 8000 testklon 21 3" 30000 -g $S/loko2.sav
 run_scene zaloz "vlak123 on
 testspoj zaloz 6
 testza 30000 testbrzda 3" 40000
+# The player's arrangement: one station waypoint on the throat, two platforms
+# behind it, and a founding order behind the waypoint. The rake fills at four,
+# and the feeder then founds the next one on the platform that is free instead
+# of standing and waiting for a collector -- which is the whole point of the
+# scene, so the line about it in reg_zalozsmerperon.log is what to read. It
+# also exercises two things that used to stop it dead: leaving the shed at all,
+# and coming out of it wagons first.
+run_scene zalozsmerperon "vlak123 on
+testspoj zaloz smer 4" 40000
 # Player's save: founding a rake behind a station waypoint while standing at
 # a plain one; the feeder must go through "peron3" and found on the platform
 # behind it, not on the loading platforms, and must not roll off the stub

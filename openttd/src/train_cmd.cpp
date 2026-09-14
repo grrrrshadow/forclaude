@@ -3330,6 +3330,61 @@ static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
 }
 
 /**
+ * Whether a platform behind @p wp has nothing standing on it and is long
+ * enough for this train -- somewhere to found the next rake when the one
+ * already at the station is finished.
+ *
+ * Only asked behind a station waypoint, which is the player's rule: the
+ * waypoint is what says which platforms this order is about, and a station
+ * whose platforms are not sorted out that way has no second place to go --
+ * the other platform there is the road past the rake, not another siding to
+ * fill.
+ *
+ * A train anywhere along a platform takes the whole of it: it is one place,
+ * not a row of tiles, and a rake put down beside somebody else's is two rakes
+ * on one platform. The asking train itself does not count -- it may well be
+ * standing on the platform it is about to found on.
+ *
+ * @param v the train that would found there
+ * @param dest the station
+ * @param wp the station waypoint the order sits behind
+ */
+static bool EmptyPlatformBehindWaypoint(const Train *v, StationID dest, const Waypoint *wp)
+{
+	if (wp == nullptr) return false;
+	std::set<TileIndex> behind;
+	CollectPlatformTilesBehindWaypoint(v, wp, dest, behind);
+
+	const Train *self = v->First();
+	std::set<TileIndex> done;
+	for (TileIndex tile : behind) {
+		if (!IsRailStationTile(tile) || done.count(tile) != 0) continue;
+
+		Axis axis = GetRailStationAxis(tile);
+		TileIndexDiff delta = TileOffsByAxis(axis);
+		TileIndex low = tile, high = tile;
+		while (IsCompatibleTrainStationTile(low - delta, tile)) low -= delta;
+		while (IsCompatibleTrainStationTile(high + delta, tile)) high += delta;
+
+		uint tiles = 0;
+		bool taken = false;
+		for (TileIndex t = low;; t += delta) {
+			done.insert(t);
+			tiles++;
+			for (const Vehicle *u : VehiclesOnTile(t)) {
+				if (u->type != VehicleType::Train || Train::From(u)->First() == self) continue;
+				taken = true;
+				break;
+			}
+			if (t == high) break;
+		}
+		if (taken) continue;
+		if (tiles * TILE_SIZE + TILE_SIZE >= v->gcache.cached_total_length) return true;
+	}
+	return false;
+}
+
+/**
  * What a founding couple order does when there is nothing for it to couple to
  * -- or nothing it may couple to.
  *
@@ -3340,8 +3395,10 @@ static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
  * couples to it (the ordinary claim) and the decouple order grows the rake.
  * Finding only a rake with no room -- its number reached, or its platform
  * full -- the train waits where it stands until a collector has taken the rake
- * away, and then founds the next. And a train whose own wagons would not fit
- * the platform waits too, rather than found a rake that already overhangs.
+ * away, unless the order sits behind a station waypoint and there is an empty
+ * platform behind it: then it founds the next rake there instead of waiting.
+ * And a train whose own wagons would not fit the platform waits too, rather
+ * than found a rake that already overhangs.
  *
  * @param v the train, standing still, its couple order current or behind the
  *          station waypoint it stands short of
@@ -3355,10 +3412,25 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
 {
 	if (!order.ShouldFoundRake() || !order.IsType(OT_GOTO_STATION)) return false;
 	StationID dest = order.GetDestination().ToStationID();
+	bool past_full_rake = false;
 
 	if (saw_full_rake) {
-		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), cekam, az ji nekdo odveze", v->unitnumber, dest.base()));
-		return false;
+		/* Behind a station waypoint the order is about the platforms behind
+		 * it, and an empty one of those is somewhere to found the next rake
+		 * rather than stand and wait for a collector. Without a waypoint the
+		 * station's other platforms are not the order's to fill -- they are
+		 * the road past the rake -- so it waits as it always did. */
+		if (!EmptyPlatformBehindWaypoint(v, dest, through)) {
+			SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), cekam, az ji nekdo odveze", v->unitnumber, dest.base()));
+			return false;
+		}
+		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), za smerovanim je volne nastupiste, zakladam dalsi", v->unitnumber, dest.base()));
+		/* And the road this train holds is no longer the road it wants: it
+		 * was booked toward the platform the finished rake is on, and a train
+		 * that carried on along it drove into the back of that rake
+		 * (measured, one collision). It is given back and planned again
+		 * below, rolling or not. */
+		past_full_rake = true;
 	}
 	if (!FeederWagonsFitAt(v, dest, through)) {
 		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - cely vlak ({} px) se ani s polickem navic na zadne nastupiste stanice {} nevejde, cekam", v->unitnumber, v->gcache.cached_total_length, dest.base()));
@@ -3383,7 +3455,7 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
 	 * order and keeps only its own ground; one still rolling over the station
 	 * waypoint keeps the road it is on -- it ends at the signal before the
 	 * platforms, where the decouple order plans its way in. */
-	if (v->cur_speed == 0 && !IsWholeTrainInsideDepot(v)) {
+	if ((v->cur_speed == 0 || past_full_rake) && !IsWholeTrainInsideDepot(v)) {
 		FreeTrainTrackReservation(v);
 		v->ReserveTrackUnderConsist();
 		/* Booked road or stuck, never an unbooked start (see the founding
@@ -6833,6 +6905,15 @@ static void TryCoupleAtDepot(Train *engine, Train *rake)
 			idx = (idx + 1) % engine->GetNumOrders();
 			const Order *next = engine->GetOrder(idx);
 			if (next == nullptr || next->IsType(OT_IMPLICIT)) continue;
+			/* A station waypoint on the way is not the errand: the founding
+			 * order sits behind it, and the wagons still have to lead. Read as
+			 * the errand itself, the feeder came out of the shed nose first
+			 * and then stood at the platform refusing to put its wagons down
+			 * -- quite right, since they would have stayed behind the engine. */
+			if (next->IsType(OT_GOTO_WAYPOINT)) {
+				const Order *behind = CoupleOrderBehindStationWaypointsFrom(engine, idx);
+				if (behind != nullptr) next = behind;
+			}
 			if (next->IsType(OT_GOTO_STATION) && next->ShouldGoToCouple() && next->ShouldFoundRake() &&
 					!engine->vehicle_flags.Test(VehicleFlag::DrivingBackwards)) {
 				/* Turned round whole, the way a train that backed in stands:
@@ -11019,7 +11100,13 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 				 * waypoint again (see the hold below); the decouple order then
 				 * drives in from there, and from there only its platforms are
 				 * to be reached. */
-				if (couple_order->ShouldFoundRake() && !saw_full_rake && FeederWagonsFitAt(consist, couple_order->GetDestination().ToStationID(), through)) {
+				StationID found_dest = couple_order->GetDestination().ToStationID();
+				/* A finished rake behind the waypoint does not hold this train
+				 * back while there is an empty platform behind that same
+				 * waypoint to found the next one on -- one waypoint can be
+				 * built across two platforms, and then both are its. */
+				bool may_found = !saw_full_rake || EmptyPlatformBehindWaypoint(consist, found_dest, through);
+				if (couple_order->ShouldFoundRake() && may_found && FeederWagonsFitAt(consist, found_dest, through)) {
 					if (_show_train_orientation) {
 						IConsolePrint(CC_INFO, "Vlak {}: zaklada radu - za smerovanim zadna rada, jede se na smerovani a zalozit za nim", consist->unitnumber);
 					}
@@ -11030,8 +11117,17 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 					 * turned on a stub is stuck until it has one). Lifting the
 					 * hold with the stuck mark rubbed off let it drive, unbooked,
 					 * straight into a junction another train had booked. So
-					 * either it has its road now, or it is stuck and asks again. */
-					TryPathReserve(consist, true, false);
+					 * either it has its road now, or it is stuck and asks again.
+					 *
+					 * Except from inside a shed, where asking for a road is the
+					 * one thing that keeps the train in: the request books the
+					 * depot tile, and the shed refuses to let anybody out of a
+					 * booked depot (CheckTrainStayInDepot()). A founding run
+					 * whose order sits behind a station waypoint stood in its
+					 * shed for good that way -- it fetched its wagons, said it
+					 * was going, and never moved again. The flag alone lifts
+					 * the hold; the shed then lets it out the ordinary way. */
+					if (!IsWholeTrainInsideDepot(consist)) TryPathReserve(consist, true, false);
 					return true;
 				}
 				/* A founding run says its own reason (the rake is full, or its
