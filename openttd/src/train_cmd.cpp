@@ -3330,15 +3330,13 @@ static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
 }
 
 /**
- * Whether a platform behind @p wp has nothing standing on it and is long
- * enough for this train -- somewhere to found the next rake when the one
- * already at the station is finished.
+ * Whether a platform at @p dest has nothing standing on it and is long enough
+ * for this train -- somewhere to found the next rake when the one already at
+ * the station is finished.
  *
- * Only asked behind a station waypoint, which is the player's rule: the
- * waypoint is what says which platforms this order is about, and a station
- * whose platforms are not sorted out that way has no second place to go --
- * the other platform there is the road past the rake, not another siding to
- * fill.
+ * Which platforms count is the same question the rest of a founding order
+ * asks: those behind the station waypoint when the order sits behind one,
+ * every platform of the station when it does not.
  *
  * A train anywhere along a platform takes the whole of it: it is one place,
  * not a row of tiles, and a rake put down beside somebody else's is two rakes
@@ -3347,13 +3345,20 @@ static const Order *CoupleOrderBehindStationWaypoints(const Train *v)
  *
  * @param v the train that would found there
  * @param dest the station
- * @param wp the station waypoint the order sits behind
+ * @param wp the station waypoint the order sits behind, or nullptr
  */
-static bool EmptyPlatformBehindWaypoint(const Train *v, StationID dest, const Waypoint *wp)
+static bool EmptyPlatformToFoundOn(const Train *v, StationID dest, const Waypoint *wp)
 {
-	if (wp == nullptr) return false;
 	std::set<TileIndex> behind;
-	CollectPlatformTilesBehindWaypoint(v, wp, dest, behind);
+	if (wp != nullptr) {
+		CollectPlatformTilesBehindWaypoint(v, wp, dest, behind);
+	} else {
+		const Station *st = Station::GetIfValid(dest);
+		if (st == nullptr) return false;
+		for (TileIndex t : st->train_station) {
+			if (IsRailStationTile(t) && GetStationIndex(t) == dest) behind.insert(t);
+		}
+	}
 
 	const Train *self = v->First();
 	std::set<TileIndex> done;
@@ -3415,16 +3420,16 @@ static bool FoundingCoupleOrderHold(Train *v, const Order &order, const Waypoint
 	bool past_full_rake = false;
 
 	if (saw_full_rake) {
-		/* Behind a station waypoint the order is about the platforms behind
-		 * it, and an empty one of those is somewhere to found the next rake
-		 * rather than stand and wait for a collector. Without a waypoint the
-		 * station's other platforms are not the order's to fill -- they are
-		 * the road past the rake -- so it waits as it always did. */
-		if (!EmptyPlatformBehindWaypoint(v, dest, through)) {
+		/* An empty platform is somewhere to found the next rake rather than
+		 * somewhere to wait for a collector. Which platforms count is the
+		 * same question the rest of the order asks: those behind the station
+		 * waypoint when the order sits behind one, every platform of the
+		 * station when it does not. */
+		if (!EmptyPlatformToFoundOn(v, dest, through)) {
 			SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), cekam, az ji nekdo odveze", v->unitnumber, dest.base()));
 			return false;
 		}
-		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), za smerovanim je volne nastupiste, zakladam dalsi", v->unitnumber, dest.base()));
+		SayOnChange(v, fmt::format("Vlak {}: zaklada radu - rada na stanici {} je hotova (plna), je volne nastupiste, zakladam na nem dalsi", v->unitnumber, dest.base()));
 		/* And the road this train holds is no longer the road it wants: it
 		 * was booked toward the platform the finished rake is on, and a train
 		 * that carried on along it drove into the back of that rake
@@ -11105,7 +11110,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 				 * back while there is an empty platform behind that same
 				 * waypoint to found the next one on -- one waypoint can be
 				 * built across two platforms, and then both are its. */
-				bool may_found = !saw_full_rake || EmptyPlatformBehindWaypoint(consist, found_dest, through);
+
+				bool may_found = !saw_full_rake || EmptyPlatformToFoundOn(consist, found_dest, through);
 				if (couple_order->ShouldFoundRake() && may_found && FeederWagonsFitAt(consist, found_dest, through)) {
 					if (_show_train_orientation) {
 						IConsolePrint(CC_INFO, "Vlak {}: zaklada radu - za smerovanim zadna rada, jede se na smerovani a zalozit za nim", consist->unitnumber);
