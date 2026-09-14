@@ -2932,10 +2932,11 @@ static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 	extern CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove);
 	CommandCost r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove);
 	TileIndex other = GetOtherTunnelBridgeEnd(tile);
-	IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "testtunel: ({},{})..({},{}) {} - {}, navestidla {}/{}",
+	IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "testtunel: ({},{})..({},{}) {} - {}, navestidla {}/{}, sviti {}",
 			*px, *py, TileX(other), TileY(other), remove ? "odebrani" : "postaveni",
 			r.Succeeded() ? "ok" : "chyba",
-			IsTunnelBridgeSignalled(tile) ? "ano" : "ne", IsTunnelBridgeSignalled(other) ? "ano" : "ne");
+			IsTunnelBridgeSignalled(tile) ? "ano" : "ne", IsTunnelBridgeSignalled(other) ? "ano" : "ne",
+			IsTunnelBridgeSignalled(tile) ? (GetTunnelBridgeSignalState(tile, TunnelBridgeSignal::Entry) == SignalState::Red ? "cervena" : "zelena") : "-");
 	return true;
 }
 

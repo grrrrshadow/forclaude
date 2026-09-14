@@ -1965,6 +1965,51 @@ static const uint8_t TUNNEL_SOUND_FRAME = 1;
  */
 extern const DiagDirectionIndexArray<uint8_t> _tunnel_visibility_frame{12, 8, 8, 12};
 
+/**
+ * Say what the signals on a signalled bore are showing: red while anything is
+ * inside it or has booked its way through, green when it is empty.
+ *
+ * Called when a train goes in and when one comes out, which are the only two
+ * moments the answer can change.
+ *
+ * @param tile either end of the bore
+ */
+void UpdateTunnelBridgeSignals(TileIndex tile)
+{
+	if (!IsTunnelBridgeSignalled(tile)) return;
+	TileIndex other = GetOtherTunnelBridgeEnd(tile);
+
+	/* Only what is actually in the bore. A booking through it means somebody
+	 * is coming, not that anybody is in there, and it is given back a moment
+	 * after the last vehicle leaves -- read here it was still set, and the
+	 * signal stayed red for good once a train had gone through. */
+	bool taken = false;
+	{
+		/* A train in the bore is not on either mouth to be found there: it is
+		 * hidden, somewhere between them, and the map's own list of what
+		 * stands on a tile goes by where a vehicle is, not by the tile it
+		 * belongs to. What it does keep is the mouth it went in by, so the
+		 * trains are asked instead. Only on the two moments this is called,
+		 * so walking them all costs nothing worth saving. */
+		for (const Train *t : Train::Iterate()) {
+			if (t->track != Track::Wormhole) continue;
+			if (t->tile != tile && t->tile != other) continue;
+			taken = true;
+			break;
+		}
+	}
+
+	SignalState want = taken ? SignalState::Red : SignalState::Green;
+	for (TileIndex t : {tile, other}) {
+		if (!IsTunnelBridgeSignalled(t)) continue;
+		if (GetTunnelBridgeSignalState(t, TunnelBridgeSignal::Entry) != want) {
+			SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Entry, want);
+			SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Exit, want);
+			MarkTileDirtyByTile(t);
+		}
+	}
+}
+
 /** @copydoc VehicleEnterTileProc */
 static VehicleEnterTileStates VehicleEnterTile_TunnelBridge(Vehicle *v, TileIndex tile, int x, int y)
 {
@@ -1995,6 +2040,7 @@ static VehicleEnterTileStates VehicleEnterTile_TunnelBridge(Vehicle *v, TileInde
 					t->tile = tile;
 					t->track = Track::Wormhole;
 					t->vehstatus.Set(VehState::Hidden);
+					UpdateTunnelBridgeSignals(tile);
 					return VehicleEnterTileState::EnteredWormhole;
 				}
 			}
@@ -2005,6 +2051,7 @@ static VehicleEnterTileStates VehicleEnterTile_TunnelBridge(Vehicle *v, TileInde
 				t->track = DiagDirToDiagTrack(vdir);
 				assert(t->track.Any());
 				t->vehstatus.Reset(VehState::Hidden);
+				UpdateTunnelBridgeSignals(tile);
 				return VehicleEnterTileState::EnteredWormhole;
 			}
 		} else if (v->type == VehicleType::Road) {
@@ -2051,6 +2098,7 @@ static VehicleEnterTileStates VehicleEnterTile_TunnelBridge(Vehicle *v, TileInde
 					Train *t = Train::From(v);
 					t->track = Track::Wormhole;
 					PrepareToEnterBridge(t);
+					UpdateTunnelBridgeSignals(tile);
 					break;
 				}
 
@@ -2075,6 +2123,7 @@ static VehicleEnterTileStates VehicleEnterTile_TunnelBridge(Vehicle *v, TileInde
 					Train *t = Train::From(v);
 					if (t->track == Track::Wormhole) {
 						t->track = DiagDirToDiagTrack(vdir);
+						UpdateTunnelBridgeSignals(tile);
 						return VehicleEnterTileState::EnteredWormhole;
 					}
 					break;

@@ -417,6 +417,13 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 {
 	if (IsRailDepotTile(tile)) return true;
 
+	/* A signalled tunnel or bridge mouth is a place to stand: that is what
+	 * the signal on it is for. Without one a train bound through a bore that
+	 * is taken has to wait at whatever signal it last passed, which on a long
+	 * approach can be most of the way back; with one it comes up to the mouth
+	 * and waits there, and the line behind is free for somebody else. */
+	if (IsTunnelBridgeSignalled(tile) && TrackdirToExitdir(trackdir) == GetTunnelBridgeDirection(tile)) return true;
+
 	/* A rescue engine on a call-out has one safe place to stop and it is up
 	 * against the casualty. Nowhere along the way will do.
 	 *
@@ -523,6 +530,10 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	/* Not reserved and depot or not a pbs signal -> free. */
 	if (IsRailDepotTile(tile)) return true;
 	if (HasBlockSignalOnTrackdir(tile, trackdir)) return true;
+	/* A signalled mouth is free if nothing holds it; what is inside the bore
+	 * beyond is the bore's own business and is asked about when the path is
+	 * booked on through it. */
+	if (IsTunnelBridgeSignalled(tile)) return true;
 
 	/* Check the next tile, it has to be free as well. Do not filter for compatible railtypes
 	 * to make sure we never accidentally join up reservations. */
