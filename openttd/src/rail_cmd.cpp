@@ -1039,6 +1039,63 @@ CommandCost CmdBuildTrainDepot(DoCommandFlags flags, TileIndex tile, RailType ra
 }
 
 /**
+ * Put a signal on a rail tunnel's or bridge's portal, or take it off again.
+ *
+ * Both ends are done at once: the end the player clicked gets the signal a
+ * train entering reads, the far end the one a train inside reads on its way
+ * out. A bore signalled at one end only would be a trap, and there is nowhere
+ * to click in the middle of a bridge anyway.
+ *
+ * Not on the toolbar yet: a signal there is drawn and remembered, but the
+ * bore is still one block from end to end, so until the stretches inside it
+ * are in there is nothing for a player to gain by placing one. The rig builds
+ * them (testtunel) so the ground work can be exercised and measured.
+ *
+ * @param flags type of operation
+ * @param tile the portal clicked
+ * @param remove take the signals off instead of putting them on
+ * @return the cost of this operation or an error
+ */
+CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove)
+{
+	CommandCost ret = CheckTileOwnership(tile);
+	if (ret.Failed()) return ret;
+
+	TileIndex other = GetOtherTunnelBridgeEnd(tile);
+	bool has = HasTunnelBridgeSignal(tile, TunnelBridgeSignal::Entry);
+	if (remove && !has) return CommandCost(STR_ERROR_THERE_ARE_NO_SIGNALS);
+	if (!remove && has) return CommandCost(); // already signalled, nothing to do and nothing to pay
+
+	/* A train in the bore would find the world changed under it. */
+	if (!remove || HasTunnelBridgeReservation(tile)) {
+		ret = TunnelBridgeIsFree(tile, other);
+		if (ret.Failed()) return ret;
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		Company *c = Company::GetIfValid(GetTileOwner(tile));
+		for (TileIndex t : {tile, other}) {
+			SetTunnelBridgeSignal(t, TunnelBridgeSignal::Entry, !remove);
+			SetTunnelBridgeSignal(t, TunnelBridgeSignal::Exit, !remove);
+			if (!remove) {
+				SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Entry, SignalState::Green);
+				SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Exit, SignalState::Green);
+			}
+			MarkTileDirtyByTile(t);
+		}
+		if (c != nullptr) {
+			c->infrastructure.signal += remove ? -4 : 4;
+			DirtyCompanyInfrastructureWindows(c->index);
+		}
+		AddSideToSignalBuffer(tile, DiagDirection::Invalid, GetTileOwner(tile));
+		AddSideToSignalBuffer(other, DiagDirection::Invalid, GetTileOwner(other));
+	}
+
+	/* Four signal heads, two at each end. */
+	return CommandCost(ExpensesType::Construction, 4 * (remove ? _price[Price::ClearSignals] : _price[Price::BuildSignals]));
+}
+
+/**
  * Build signals, alternate between double/single, signal/semaphore,
  * pre/exit/combo-signals, and what-else not. If the rail piece does not
  * have any signals, signal cycling is ignored
@@ -1953,7 +2010,12 @@ bool IsPathSignalWarning(TileIndex tile, Trackdir td)
 	return false;
 }
 
-static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track track, SignalState condition, SignalOffsets image, uint pos, Trackdir td)
+/**
+ * Draw one signal, of a kind and variant said outright rather than read off
+ * the tile: a tunnel or bridge portal carries a signal too and keeps it
+ * nowhere the rail map can be asked about it.
+ */
+static void DrawSignalSprite(TileIndex tile, const RailTypeInfo *rti, Track track, SignalType type, SignalVariant variant, SignalState condition, SignalOffsets image, uint pos, Trackdir td)
 {
 	static const Point SignalPositions[2][12] = {
 		{ // Signals on the left side
@@ -1972,9 +2034,6 @@ static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track trac
 	bool signal_on_right = IsTrainSignalSideRight();
 	uint x = TileX(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].x;
 	uint y = TileY(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].y;
-
-	SignalType type       = GetSignalType(tile, track);
-	SignalVariant variant = GetSignalVariant(tile, track);
 
 	/* Which of the three this signal is showing. The warning is worked out
 	 * from the road ahead and only a path signal can show it. */
@@ -2498,6 +2557,42 @@ static void DrawTrackBits(TileInfo *ti, TrackBits track)
 			DrawGroundSprite(corner_to_track_sprite[halftile_corner] + rti->base_sprites.single_n, PALETTE_CRASH, nullptr, 0, -static_cast<int>(TILE_HEIGHT));
 		}
 	}
+}
+
+/**
+ * Draw the signal on a rail tunnel's or bridge's portal.
+ *
+ * At the mouth, facing the way a train goes in, which is the only place there
+ * is: on a bridge nothing can be drawn between the ramps, so a bore divided
+ * into stretches keeps those divisions to itself and shows only its ends.
+ *
+ * @param ti the tile being drawn
+ */
+void DrawTunnelBridgePortalSignal(const TileInfo *ti)
+{
+	if (!IsTunnelBridgeSignalled(ti->tile)) return;
+	if (GetTunnelBridgeTransportType(ti->tile) != TransportType::Rail) return;
+	if (!HasTunnelBridgeSignal(ti->tile, TunnelBridgeSignal::Entry)) return;
+
+	/* By the direction a train takes going in: the same picture and the same
+	 * corner of the tile that a signal for that trackdir gets on plain rail
+	 * (see DrawSignals()). */
+	static const DiagDirectionIndexArray<SignalOffsets> images{{{SIGNAL_TO_NORTHEAST, SIGNAL_TO_SOUTHEAST, SIGNAL_TO_SOUTHWEST, SIGNAL_TO_NORTHWEST}}};
+	static const DiagDirectionIndexArray<uint8_t> positions{{{9, 10, 8, 11}}};
+
+	DiagDirection dir = GetTunnelBridgeDirection(ti->tile);
+	Track track = DiagDirToDiagTrack(dir);
+	Trackdir td = TrackExitdirToTrackdir(track, dir);
+	const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
+	SignalState state = GetTunnelBridgeSignalState(ti->tile, TunnelBridgeSignal::Entry);
+
+	DrawSignalSprite(ti->tile, rti, track, SignalType::Block, SignalVariant::Electric, state, images[dir], positions[dir], td);
+}
+
+/** Draw one signal of a plain rail tile, reading its kind off the tile. */
+static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track track, SignalState condition, SignalOffsets image, uint pos, Trackdir td)
+{
+	DrawSignalSprite(tile, rti, track, GetSignalType(tile, track), GetSignalVariant(tile, track), condition, image, pos, td);
 }
 
 static void DrawSignals(TileIndex tile, TrackBits rails, const RailTypeInfo *rti)

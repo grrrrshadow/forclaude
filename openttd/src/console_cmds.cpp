@@ -71,6 +71,7 @@
 #include "news_type.h"
 #include "road.h"
 #include "rail.h"
+#include "tunnelbridge_map.h"
 #include "game/game.hpp"
 #include "3rdparty/fmt/chrono.h"
 #include "company_cmd.h"
@@ -2902,6 +2903,39 @@ static bool ConTestTrainLength(std::span<std::string_view> argv)
 		IConsolePrint(bad != 0 ? CC_ERROR : CC_INFO, "testdelka: vlak {} - {} spoju, z toho {} spatnych.",
 				v->unitnumber, parts, bad);
 	}
+	return true;
+}
+
+/**
+ * Put a signal on a rail tunnel's or bridge's portal, or take it off.
+ * Usage: 'testtunel <x> <y> [pryc]'.
+ *
+ * The toolbar does this with a click on the portal; this is the same command,
+ * so the rig can signal a bore and run a save through it.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestTunnelSignal(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Signal a rail tunnel or bridge. Usage: 'testtunel <x> <y> [pryc]'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]);
+	if (!px.has_value() || !py.has_value()) return false;
+	bool remove = argv.size() >= 4 && argv[3] == "pryc";
+	TileIndex tile = TileXY(*px, *py);
+	if (!IsTileType(tile, TileType::TunnelBridge)) {
+		IConsolePrint(CC_ERROR, "testtunel: na ({},{}) neni tunel ani most.", *px, *py);
+		return true;
+	}
+	_pause_mode = {};
+	extern CommandCost BuildTunnelBridgeSignals(DoCommandFlags flags, TileIndex tile, bool remove);
+	CommandCost r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove);
+	TileIndex other = GetOtherTunnelBridgeEnd(tile);
+	IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "testtunel: ({},{})..({},{}) {} - {}, navestidla {}/{}",
+			*px, *py, TileX(other), TileY(other), remove ? "odebrani" : "postaveni",
+			r.Succeeded() ? "ok" : "chyba",
+			IsTunnelBridgeSignalled(tile) ? "ano" : "ne", IsTunnelBridgeSignalled(other) ? "ano" : "ne");
 	return true;
 }
 
@@ -7450,6 +7484,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testnavesti",             ConTestSignals);
 	IConsole::CmdRegister("testdelka",               ConTestTrainLength);
 	IConsole::CmdRegister("testnavest",              ConTestSetSignal);
+	IConsole::CmdRegister("testtunel",               ConTestTunnelSignal);
 	IConsole::CmdRegister("vlaksav",                 ConSaveConsoleLog);
 	IConsole::CmdRegister("testza",                  ConTestAfter);
 	IConsole::CmdRegister("testzatik",               ConTestAfterTicks);

@@ -12,6 +12,7 @@
 
 #include "bridge_map.h"
 #include "tunnel_map.h"
+#include "signal_type.h"
 
 
 /**
@@ -117,6 +118,71 @@ inline void SetTunnelBridgeReservation(Tile t, bool b)
 inline TrackBits GetTunnelBridgeReservationTrackBits(Tile t)
 {
 	return HasTunnelBridgeReservation(t) ? DiagDirToDiagTrack(GetTunnelBridgeDirection(t)) : TrackBits{};
+}
+
+/**
+ * Signals on a tunnel or bridge portal.
+ *
+ * A tunnel or a bridge is one block from end to end, however long it is, so a
+ * second train cannot follow the first into it and a long one is a wall
+ * across the line. A signal on the portal breaks that.
+ *
+ * The state lives in m2, which is free on both a tunnel head and a bridge
+ * ramp: two bits per side, so an old save loads with none of them set, which
+ * reads as "no signals here" and leaves the tunnel exactly as it was. Nothing
+ * is added to the save.
+ *
+ * Bit 0 says a signal stands here facing into the tunnel (what a train
+ * entering reads), bit 1 that it shows red; bits 2 and 3 say the same for the
+ * signal facing out of it. Only the portals carry a signal that can be seen:
+ * on a bridge there is nowhere to draw one but the ramps, so any division of
+ * the bore itself is left invisible.
+ */
+enum class TunnelBridgeSignal : uint8_t {
+	Entry = 0, ///< Facing into the tunnel or bridge: what a train entering reads.
+	Exit = 2, ///< Facing out of it: what a train inside reads at the far end.
+};
+
+/**
+ * Whether a signal of this kind stands on this portal.
+ * @pre IsTileType(t, TileType::TunnelBridge)
+ */
+inline bool HasTunnelBridgeSignal(Tile t, TunnelBridgeSignal which)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	return HasBit(t.m2(), to_underlying(which));
+}
+
+/** Whether this portal carries any signal at all. */
+inline bool IsTunnelBridgeSignalled(Tile t)
+{
+	return IsTileType(t, TileType::TunnelBridge) &&
+			(HasTunnelBridgeSignal(t, TunnelBridgeSignal::Entry) || HasTunnelBridgeSignal(t, TunnelBridgeSignal::Exit));
+}
+
+/** Put a signal of this kind on this portal, or take it away. */
+inline void SetTunnelBridgeSignal(Tile t, TunnelBridgeSignal which, bool present)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	assert(GetTunnelBridgeTransportType(t) == TransportType::Rail);
+	AssignBit(t.m2(), to_underlying(which), present);
+}
+
+/**
+ * What a signal of this kind is showing.
+ * @pre HasTunnelBridgeSignal(t, which)
+ */
+inline SignalState GetTunnelBridgeSignalState(Tile t, TunnelBridgeSignal which)
+{
+	assert(HasTunnelBridgeSignal(t, which));
+	return HasBit(t.m2(), to_underlying(which) + 1) ? SignalState::Red : SignalState::Green;
+}
+
+/** Set what a signal of this kind is showing. */
+inline void SetTunnelBridgeSignalState(Tile t, TunnelBridgeSignal which, SignalState state)
+{
+	assert(IsTileType(t, TileType::TunnelBridge));
+	AssignBit(t.m2(), to_underlying(which) + 1, state == SignalState::Red);
 }
 
 #endif /* TUNNELBRIDGE_MAP_H */

@@ -1288,6 +1288,11 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 	TransportType transport_type = GetTunnelBridgeTransportType(ti->tile);
 	DiagDirection tunnelbridge_direction = GetTunnelBridgeDirection(ti->tile);
 
+	/* The signal on the mouth, if this bore has one; drawn first so the
+	 * portal's own sprites sort in front of it where they overlap. */
+	extern void DrawTunnelBridgePortalSignal(const TileInfo *ti);
+	DrawTunnelBridgePortalSignal(ti);
+
 	if (IsTunnel(ti->tile)) {
 		/* Front view of tunnel bounding boxes:
 		 *
