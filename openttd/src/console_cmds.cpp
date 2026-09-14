@@ -2515,6 +2515,14 @@ static bool ConTestMap(std::span<std::string_view> argv)
 			} else if (IsLevelCrossingTile(tile)) {
 				tracks = TrackBits{GetCrossingRailTrack(tile)};
 				desc = "prejezd";
+			} else if (IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
+				TileIndex other = GetOtherTunnelBridgeEnd(tile);
+				tracks = TrackBits{DiagDirToDiagTrack(GetTunnelBridgeDirection(tile))};
+				desc = fmt::format("{} usti smer {} druhy konec ({},{}) navestidla {}{}",
+						IsTunnel(tile) ? "tunel" : "most", to_underlying(GetTunnelBridgeDirection(tile)),
+						TileX(other), TileY(other),
+						IsTunnelBridgeSignalled(tile) ? "ano" : "ne",
+						IsTunnelBridgeSignalled(tile) ? (GetTunnelBridgeSignalState(tile, TunnelBridgeSignal::Entry) == SignalState::Red ? " cervena" : " zelena") : "");
 			} else {
 				continue;
 			}
@@ -2927,7 +2935,12 @@ static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 	if (!px.has_value() || !py.has_value()) return false;
 	std::string_view how = argv.size() >= 4 ? argv[3] : "";
 	bool remove = how == "pryc" || how == "tahpryc";
-	bool drag = how == "tah" || how == "tahpryc";
+	bool drag = how == "tah" || how == "tahpryc" || how == "tahctrl";
+	/* Ctrl on the drag means autofill: the line is followed past the end of
+	 * the drag until something stops it. It is a different walk from the
+	 * plain drag and has its own reasons to give up, so it is asked for
+	 * separately. */
+	bool autofill = how == "tahctrl";
 	TileIndex tile = TileXY(*px, *py);
 	if (!IsTileType(tile, TileType::TunnelBridge)) {
 		IConsolePrint(CC_ERROR, "testtunel: na ({},{}) neni tunel ani most.", *px, *py);
@@ -2945,9 +2958,9 @@ static bool ConTestTunnelSignal(std::span<std::string_view> argv)
 		TileIndex from = tile + 2 * step, to = other - 2 * step;
 		Track track = DiagDirToDiagTrack(out);
 		r = remove
-				? Command<Commands::RemoveSignalLong>::Do(DoCommandFlag::Execute, from, to, track, false)
-				: Command<Commands::BuildSignalLong>::Do(DoCommandFlag::Execute, from, to, track, SignalType::Path, SignalVariant::Electric, false, false, false, 4);
-		IConsolePrint(CC_DEFAULT, "testtunel: tah ({},{})..({},{})", TileX(from), TileY(from), TileX(to), TileY(to));
+				? Command<Commands::RemoveSignalLong>::Do(DoCommandFlag::Execute, from, to, track, autofill)
+				: Command<Commands::BuildSignalLong>::Do(DoCommandFlag::Execute, from, to, track, SignalType::Path, SignalVariant::Electric, false, autofill, false, 4);
+		IConsolePrint(CC_DEFAULT, "testtunel: tah ({},{})..({},{}){}", TileX(from), TileY(from), TileX(to), TileY(to), autofill ? " s ctrl" : "");
 	} else {
 		r = BuildTunnelBridgeSignals(DoCommandFlag::Execute, tile, remove);
 	}
@@ -4633,6 +4646,37 @@ static const IntervalTimer<TimerGameTick> _testsleduj_timer({TimerGameTick::Prio
 		return;
 	}
 });
+
+/**
+ * Say where every train is, one line each, once.
+ * Usage: 'testkde'
+ *
+ * 'testsleduj' follows one train and needs its number; on a save brought in
+ * from the player's game nobody knows the numbers yet, and the question is
+ * usually "who is standing and where", which is the whole list at once.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestWhere(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFrontEngine()) continue;
+		const Train *front = t->GetMovingFront();
+		PBSTileInfo res = FollowTrainReservation(t);
+		const char *kde = "trat";
+		if (t->IsInDepot()) kde = "depo";
+		else if (IsTileType(front->tile, TileType::TunnelBridge)) kde = front->track == Track::Wormhole ? "v roure" : "usti";
+		else if (IsRailStationTile(front->tile)) kde = "stanice";
+		IConsolePrint(CC_DEFAULT, "kde {}: ({},{}) {} rychlost {}/{} rozkaz {} zasekly {} stoji {} rez-konec ({},{}) {}",
+				t->unitnumber, TileX(front->tile), TileY(front->tile), kde,
+				t->cur_speed, t->GetCurrentMaxSpeed(), to_underlying(t->current_order.GetType()),
+				t->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
+				t->vehstatus.Test(VehState::Stopped) ? "ano" : "ne",
+				res.tile == INVALID_TILE ? 0 : TileX(res.tile), res.tile == INVALID_TILE ? 0 : TileY(res.tile),
+				res.okay ? "bezpecny" : "NEbezpecny");
+	}
+	return true;
+}
 
 /**
  * Follow one train closely: report it every few ticks.
@@ -7524,6 +7568,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);
 	IConsole::CmdRegister("testsleduj",              ConTestFollow);
+	IConsole::CmdRegister("testkde",                 ConTestWhere);
 	IConsole::CmdRegister("testpostav",              ConTestBuildEngine);
 	IConsole::CmdRegister("testprojet",              ConTestForceProceed);
 	IConsole::CmdRegister("testporucha",             ConTestBreakdown);

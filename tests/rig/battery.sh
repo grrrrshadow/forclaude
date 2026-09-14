@@ -429,3 +429,15 @@ testzatik 1500 testbrzda 21" 8000 -g $S/rig.sav
 if [ -f $S/brzda.sav ]; then run_scene tunel "testtunel 48 66 tah
 teststartdepo 48 51
 testsleduj 3 100" 12000 -g $S/brzda.sav; fi
+
+# Two trains down one long signalled tunnel, one behind the other, on the
+# player's own save. Today the second one brakes smoothly and waits a couple
+# of tiles short of the mouth until the first is out -- a bore is still one
+# section -- and the scene is here so that the day it takes two the change
+# shows up as a difference and not as a crash. Skipped where the save is not
+# in the working directory.
+if [ -f $S/brzda2.sav ]; then run_scene tunel2 "testpauza
+testbrzda 4
+testbrzda 5
+testza 2000 testkde
+testza 6000 testkde" 12000 -g $S/brzda2.sav; fi
