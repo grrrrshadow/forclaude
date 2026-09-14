@@ -37,6 +37,7 @@ enum class VehicleRailFlag : uint8_t {
 	CoupledHere = 12, ///< The coupling that joined this vehicle's part to the train happened just in front of it; a "decouple the whole train" order cuts here. See FindCoupledBoundary().
 	AutomaticDeparture = 14, ///< (head only) Leaving a station on an order that asked for the shortest way: the next order advance may turn the train round for a shorter route if it can lead from both ends. Set on departure, cleared when that question has been asked. See YapfTrainCheckReverse().
 	FoundingViaWaypoint = 13, ///< (head only) A founding run found no rake behind the station waypoint it is bound for: the waypoint is driven to as a plain via, the couple order behind it is concluded there. See IsHoldingShortOfStationWaypoint().
+	HoldReleased = 15, ///< (head only) The player turned this train round by hand while it stood in the wait before a station waypoint: the wait is over, the train drives on booked like any other, until the waypoint order is done. See IsHoldingShortOfStationWaypoint().
 };
 /** Bitset of the %VehicleRailFlag elements. */
 using VehicleRailFlags = EnumBitSet<VehicleRailFlag, uint16_t>;

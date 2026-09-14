@@ -3054,6 +3054,18 @@ bool IsHoldingShortOfStationWaypoint(const Train *v)
 	 * a plain via; the flag is set by the waypoint hold and taken off once
 	 * the couple order behind the waypoint is current. */
 	if (v->flags.Test(VehicleRailFlag::FoundingViaWaypoint)) return false;
+	/* The player's hand ends the wait. "Proceed" on a held train did nothing
+	 * at all -- the hold never asked -- and "reverse" turned it round on the
+	 * spot and left it standing, now facing the other way; only a stop or a
+	 * depot order, which change the order underneath the hold, got it
+	 * moving. A train told to go goes: on to the waypoint as a plain via,
+	 * and the couple order behind it takes over by arriving, the ordinary
+	 * way. "Proceed" carries its own right to drive on without a road, as it
+	 * does everywhere; "reverse" only ends the wait (HoldReleased, set in
+	 * CmdReverseTrainDirection() and taken off with the waypoint order),
+	 * and the train books its road like any other. */
+	if (v->force_proceed != TFP_NONE) return false;
+	if (v->flags.Test(VehicleRailFlag::HoldReleased)) return false;
 	return CoupleOrderBehindStationWaypoints(v) != nullptr;
 }
 
@@ -7427,6 +7439,14 @@ CommandCost CmdReverseTrainDirection(DoCommandFlags flags, VehicleID veh_id, boo
 
 			/* We cancel any 'skip signal at dangers' here */
 			v->force_proceed = TFP_NONE;
+			/* A train standing in a wait of ours before a station waypoint,
+			 * turned round by hand, is the player taking it over: the wait is
+			 * over and it drives off the way it now faces -- booked, like any
+			 * train, never blind. Not "proceed": that is the right to drive on
+			 * without a road, and given here it sent a turned-round train
+			 * through a junction into whoever held it (rig, new1.sav). See
+			 * IsHoldingShortOfStationWaypoint(). */
+			if (IsHoldingShortOfStationWaypoint(v)) v->flags.Set(VehicleRailFlag::HoldReleased);
 			InvalidateWindowData(WindowClass::VehicleView, v->index);
 
 			if (_settings_game.vehicle.train_acceleration_model != AccelerationModel::Original && v->cur_speed != 0) {
@@ -10312,6 +10332,11 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
 	}
 
+	/* A wait before a station waypoint that the player ended by hand stays
+	 * ended for as long as that waypoint order is the current one; the next
+	 * order starts with a clean slate. See IsHoldingShortOfStationWaypoint(). */
+	if (!consist->current_order.IsType(OT_GOTO_WAYPOINT)) consist->flags.Reset(VehicleRailFlag::HoldReleased);
+
 	/* train is broken down? */
 	if (consist->HandleBreakdown()) return true;
 
@@ -10567,8 +10592,11 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * An ordinary waypoint is deliberately none of this: it stays a place to
 	 * drive to, so the player controls where the waiting happens by which
 	 * kind they build. See #WPF_STATION_SEARCH. */
+	/* Asked through IsHoldingShortOfStationWaypoint(), which is what every
+	 * path request asks too, so the hold and the refusal of a path agree --
+	 * and both give way to the player's hand at once. */
 	if (consist->current_order.IsType(OT_GOTO_WAYPOINT) && consist->IsFrontEngine() && consist->cur_speed == 0 &&
-			!consist->flags.Test(VehicleRailFlag::FoundingViaWaypoint)) {
+			IsHoldingShortOfStationWaypoint(consist)) {
 		const Order *couple_order = CoupleOrderBehindStationWaypoints(consist);
 		if (couple_order != nullptr) {
 			/* It came to a stand because no path was given to it (see
