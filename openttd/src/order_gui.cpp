@@ -901,6 +901,20 @@ private:
 	}
 
 	/**
+	 * Handle the click on the back button: the opposite of skip, to the
+	 * previous order. Steps over implicit orders the same way skip does --
+	 * one place in the list -- so the two are mirror images of each other.
+	 */
+	void OrderClick_Back()
+	{
+		uint num = this->vehicle->GetNumOrders();
+		if (num <= 1) return;
+
+		Command<Commands::SkipToOrder>::Post(STR_ERROR_CAN_T_SKIP_ORDER,
+				this->vehicle->tile, this->vehicle->index, (this->vehicle->cur_implicit_order_index + num - 1) % num);
+	}
+
+	/**
 	 * Handle the click on the delete button.
 	 */
 	void OrderClick_Delete()
@@ -1134,8 +1148,9 @@ public:
 		const Order *order = this->vehicle->GetOrder(sel);
 
 		/* Second row. */
-		/* skip */
+		/* skip, and back */
 		this->SetWidgetDisabledState(WID_O_SKIP, this->vehicle->GetNumOrders() <= 1);
+		this->SetWidgetDisabledState(WID_O_BACK, this->vehicle->GetNumOrders() <= 1);
 
 		/* delete / stop sharing */
 		NWidgetStacked *delete_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_BOTTOM_MIDDLE);
@@ -1598,6 +1613,10 @@ public:
 
 			case WID_O_SKIP:
 				this->OrderClick_Skip();
+				break;
+
+			case WID_O_BACK:
+				this->OrderClick_Back();
 				break;
 
 			case WID_O_DELETE:
@@ -2266,6 +2285,11 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(74, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_SKIP_BUTTON, STR_ORDERS_SKIP_TOOLTIP), SetResize(1, 0),
+			/* And its opposite beside it: back to the previous order. The
+			 * player's ask -- a train sent one order too far is otherwise
+			 * only brought back by skipping all the way round. */
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_BACK), SetMinimalSize(74, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDERS_BACK_BUTTON, STR_ORDERS_BACK_TOOLTIP), SetResize(1, 0),
 			/* Reversing out of a station is done to a whole order the way
 			 * skipping and deleting are, so it sits with them, and the
 			 * automatic departure next to it as the other answer to the same
@@ -2403,6 +2427,8 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_widgets = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SKIP), SetMinimalSize(124, 12), SetFill(1, 0),
 											SetStringTip(STR_ORDERS_SKIP_BUTTON, STR_ORDERS_SKIP_TOOLTIP), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_BACK), SetMinimalSize(124, 12), SetFill(1, 0),
+											SetStringTip(STR_ORDERS_BACK_BUTTON, STR_ORDERS_BACK_TOOLTIP), SetResize(1, 0),
 		NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_BOTTOM_MIDDLE),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DELETE), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDERS_DELETE_BUTTON, STR_ORDERS_DELETE_TOOLTIP), SetResize(1, 0),

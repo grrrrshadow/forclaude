@@ -17,6 +17,7 @@ enum OrderWidgets : WidgetID {
 	WID_O_ORDER_LIST,                ///< Order list panel.
 	WID_O_SCROLLBAR,                 ///< Order list scrollbar.
 	WID_O_SKIP,                      ///< Skip current order.
+	WID_O_BACK,                      ///< Go back to the previous order; the opposite of skip.
 	WID_O_DELETE,                    ///< Delete selected order.
 	WID_O_STOP_SHARING,              ///< Stop sharing orders.
 	WID_O_NON_STOP,                  ///< Goto non-stop to destination.
