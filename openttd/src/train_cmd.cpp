@@ -3328,57 +3328,6 @@ bool IsCoupleTargetOnTile(const Train *v, TileIndex tile)
 }
 
 /**
- * Is this tile clear of everybody the collector neither is nor came for?
- *
- * Two rules let a collector's road end on ground that is already taken: the
- * tile its rake stands on (IsCoupleTargetOnTile()) and any tile of the
- * platform its rake stands on (IsCouplePartnerOnPlatform()). Both say the same
- * thing -- what is in the way is what I was sent for, so pulling up against it
- * is arriving and not being blocked -- and neither of them looked at who is
- * actually standing on the tile they were asked about.
- *
- * The platform rule is the loose one: it asks only whether the rake is
- * somewhere along that platform, so every tile of that platform answered yes,
- * whoever was on it. A train that had stopped on the platform's own track thus
- * counted as "what I came for": the collector booked the tile behind its back,
- * came down on it at full speed, and the two ended up seven pixels apart --
- * near enough for vanilla's collision check, which does not care that they are
- * on different tiles. The engine that had just put the rake down and could not
- * pull away was the one standing there, so the crash landed on the pair of
- * trains that were working together (saves/new.sav, trains 2 and 4).
- *
- * A rescue engine's road has worked tile by tile, and refused anybody but its
- * own casualty, ever since two wrecks on one tile taught it to -- see
- * RescueRoadTracksOnTile(). This is that rule for the collector, and the
- * collision exception already draws the same line from the other end (see
- * IsValidCouplePartner(), which is what "came for" means here).
- *
- * @param v    the collector asking, any part of it
- * @param tile the tile its road wants to end on or step onto
- * @return whether only the collector itself and rakes it could collect are there
- */
-bool IsCoupleRoadTileFree(const Train *v, TileIndex tile)
-{
-	const Train *head = v->First();
-	const Train *target = Train::GetIfValid(head->couple_target);
-	if (target != nullptr) target = target->First();
-
-	for (const Vehicle *u : VehiclesOnTile(tile)) {
-		if (u->type != VehicleType::Train) continue;
-		const Train *other = Train::From(u)->First();
-		if (other == head) continue;
-		/* The one it has already spoken for counts whatever it looks like now.
-		 * A rake stops reading as "waiting to be collected" the moment somebody
-		 * claims it, so asking the general question a second time disowns the
-		 * very train this one is on its way to -- and then it has nowhere left
-		 * to stop and never arrives (rig scene odtahvagony). */
-		if (other == target) continue;
-		if (!IsValidCouplePartner(head, other)) return false;
-	}
-	return true;
-}
-
-/**
  * On which tracks of this tile may a rescue engine's road step onto it,
  * because its casualty stands there?
  *
@@ -7937,23 +7886,7 @@ void FreeTrainTrackReservation(const Train *consist)
 		}
 
 		/* Don't free first station/bridge/tunnel if we are on it. */
-		if (free_tile || (!(ft.is_station && GetStationIndex(ft.new_tile) == station_id) && !ft.is_tunnel && !ft.is_bridge)) {
-			/* Ground being let go with somebody else standing on it. A road
-			 * taken from under a train that is still on it is a collision
-			 * waiting to happen, and watching who lets go is the only way to
-			 * see it coming. Only that case is worth saying: a train letting go
-			 * of empty road does it thousands of times a game and drowns
-			 * everything else out. */
-			if (_show_train_orientation) {
-				for (const Vehicle *u : VehiclesOnTile(tile)) {
-					if (u->type != VehicleType::Train || Train::From(u)->First() == consist) continue;
-					IConsolePrint(CC_INFO, "Vlak {}: pousti koleje na ({},{}), kde stoji vlak {}",
-							consist->unitnumber, TileX(tile), TileY(tile), Train::From(u)->First()->unitnumber);
-					break;
-				}
-			}
-			ClearPathReservation(consist, tile, td);
-		}
+		if (free_tile || (!(ft.is_station && GetStationIndex(ft.new_tile) == station_id) && !ft.is_tunnel && !ft.is_bridge)) ClearPathReservation(consist, tile, td);
 
 		free_tile = true;
 	}
