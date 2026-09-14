@@ -20,6 +20,9 @@
 /** Every style every loaded set has defined, in the order they were read. */
 std::vector<SignalStyle> _signal_styles;
 
+/** Which of them is drawn with; worked out once per set of loaded files. */
+static uint _signal_style_in_use = UINT_MAX;
+
 /** Forget every style; a new game reads them again from the sets it loads. */
 void ResetSignalStyles()
 {
@@ -31,24 +34,50 @@ void ResetSignalStyles()
 	 * few came out as "(undefined string)". Fifteen is the limit, so the room
 	 * is taken once and never moves. */
 	_signal_styles.reserve(15);
+	_signal_style_in_use = UINT_MAX;
 }
 
 /**
  * Which style the signals are drawn in.
  *
- * The first one any loaded set defines, and the built-in pictures where no set
- * defines one. A set that draws ten of them is offering a choice, and choosing
- * is the player's; until there is somewhere to make that choice, taking the
- * first is the same answer the player would get by loading one set at a time,
- * and it makes a set that was refused entry do something visible the moment it
- * is let in.
+ * The first one that draws the aspect between red and green -- what this game
+ * shows as yellow -- with a picture of its own. A set offers several styles
+ * and some of them draw two aspects only: the one the set this was built
+ * against calls "Two Aspect" answers the yellow with its green, and a game
+ * drawn in that style never shows a yellow at all, which is the whole reason
+ * for reading the set. So the list is asked rather than taken in order, and
+ * only a set that draws no third aspect anywhere falls back to its first
+ * style.
+ *
+ * There is nothing to choose here and no window to choose it in: the styles
+ * are not kinds of signal a player builds, they are pictures for the six
+ * kinds this game already has.
+ *
+ * The answer depends on nothing but the loaded files, so it is worked out
+ * once and kept.
  *
  * @return the index into #_signal_styles, or #_signal_styles.size() for the
  *         built-in pictures
  */
 uint GetSignalStyleInUse()
 {
-	return _signal_styles.empty() ? 0 : 0;
+	if (_signal_style_in_use != UINT_MAX) return _signal_style_in_use;
+	if (_signal_styles.empty()) return 0;
+
+	const RailTypeInfo *rti = GetRailTypeInfo(RAILTYPE_RAIL);
+	uint first_drawing = _signal_styles.size();
+	for (uint i = 0; i < _signal_styles.size(); i++) {
+		SpriteID green = GetCustomSignalStyleSprite(i, rti, INVALID_TILE, SignalType::Path, SignalVariant::Electric, SignalAspect::Green, true);
+		if (green == 0) continue;
+		if (first_drawing == _signal_styles.size()) first_drawing = i;
+		SpriteID yellow = GetCustomSignalStyleSprite(i, rti, INVALID_TILE, SignalType::Path, SignalVariant::Electric, SignalAspect::Warning, true);
+		if (yellow != 0 && yellow != green) {
+			_signal_style_in_use = i;
+			return i;
+		}
+	}
+	_signal_style_in_use = first_drawing;
+	return first_drawing;
 }
 
 /** Resolver for a signal drawn in a style a set defined. */
