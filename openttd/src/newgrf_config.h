@@ -17,6 +17,7 @@
 #include "textfile_type.h"
 #include "newgrf_text.h"
 #include "3rdparty/md5/md5.h"
+#include "newgrf_remap_type.h"
 
 /** GRF config bit flags */
 enum class GRFConfigFlag : uint8_t {
@@ -190,6 +191,7 @@ struct GRFConfig {
 	 * GRFFile to put them on; GRFFile's constructor takes them from here.
 	 */
 	std::map<std::pair<uint8_t, uint8_t>, uint8_t> action0_property_remaps{}; ///< NOSAVE
+	std::vector<GRFVariableRemap> mapped_variables{}; ///< NOSAVE
 	uint32_t feature_test_var8d = 0; ///< NOSAVE
 	uint32_t feature_test_var9d = 0; ///< NOSAVE
 	std::vector<uint32_t> feature_test_var91{}; ///< NOSAVE

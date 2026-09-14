@@ -63,6 +63,7 @@
 #include "ai/ai_config.hpp"
 #include "newgrf.h"
 #include "newgrf_profiling.h"
+#include "newgrf_signals.h"
 #include "console_func.h"
 #include "engine_base.h"
 #include "effectvehicle_base.h"
@@ -2909,7 +2910,22 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testnavesti: kolej {} - navestidla z grf {}, aspektu navic {}", to_underlying(rt),
 				rti->group[RailSpriteType::Signals] != nullptr ? "ano" : "ne", rti->signal_extra_aspects);
 	}
-	IConsolePrint(CC_DEFAULT, "testnavesti: celkem {} navestidel.", n);
+	/* And what the loaded sets offered as signal styles of their own (feature
+	 * 0E). For each one, which aspects it actually answers with a picture:
+	 * red, green and the one this game draws yellow. A style that answers
+	 * nothing is a style whose sprites never arrived. */
+	for (uint i = 0; i < _signal_styles.size(); i++) {
+		const SignalStyle &st = _signal_styles[i];
+		std::string got;
+		for (SignalAspect a : {SignalAspect::Red, SignalAspect::Green, SignalAspect::Warning}) {
+			SpriteID sp = GetCustomSignalStyleSprite(i, GetRailTypeInfo(RAILTYPE_RAIL), INVALID_TILE, SignalType::Path, SignalVariant::Electric, a, true);
+			got += fmt::format(" {}={}", a == SignalAspect::Red ? "cervena" : (a == SignalAspect::Green ? "zelena" : "zluta"), sp);
+		}
+        IConsolePrint(CC_DEFAULT, "testnavesti: styl {} '{}' (grf {:08X}, cislo {}) aspektu navic {}, sprity{}{}",
+				i, GetString(st.name), st.grf != nullptr ? std::byteswap(st.grf->grfid) : 0, st.local_id, st.extra_aspects, got,
+				i == GetSignalStyleInUse() ? " <- kresli se timhle" : "");
+	}
+	IConsolePrint(CC_DEFAULT, "testnavesti: celkem {} navestidel, stylu z grf {}.", n, _signal_styles.size());
 	return true;
 }
 

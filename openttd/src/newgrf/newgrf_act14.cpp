@@ -12,6 +12,7 @@
 #include "../newgrf_text.h"
 #include "newgrf_bytereader.h"
 #include "newgrf_internal.h"
+#include "../newgrf_signals.h"
 
 #include "../safeguards.h"
 
@@ -385,6 +386,10 @@ struct GRFNameMapAction {
 	uint32_t var91_value = 0;
 	uint16_t min_version = 1;
 	uint16_t max_version = 0xFFFF;
+	uint8_t key_shift = 0; ///< 'RSFT': the shift the set's own read carries.
+	uint32_t key_mask = 0; ///< 'RMSK': the mask it carries.
+	uint8_t want_shift = 0; ///< 'VSFT': the shift to apply to the answer instead.
+	uint32_t want_mask = 0; ///< 'VMSK': the mask to apply to it.
 
 	void Reset() { *this = GRFNameMapAction{}; }
 };
@@ -398,6 +403,20 @@ struct MappableProperty {
 };
 static const MappableProperty _mappable_properties[] = {
 	{ "railtype_extra_aspects", GrfSpecFeature::RailTypes, GRFFile::MappedProperty::RailtypeExtraAspects },
+	{ "signals_extra_aspects", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsExtraAspects },
+	{ "signals_define_style", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsDefineStyle },
+	{ "signals_style_name", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsStyleName },
+	{ "signals_style_electric_enabled", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsStyleElectric },
+};
+
+/** Known Variational Action 2 variable names, by the patchpack's spelling. */
+struct MappableVariable {
+	const char *name;
+	GrfSpecFeature feature;
+	uint8_t to; ///< The variable this game answers instead.
+};
+static const MappableVariable _mappable_variables[] = {
+	{ "signals_signal_style", GrfSpecFeature::Signals, NEWGRF_SIGNAL_STYLE_VAR },
 };
 
 /** Known feature names, and the version of each this game answers to. */
@@ -411,7 +430,14 @@ static const KnownFeature _known_features[] = {
 	 * the patchpack", and a set written to insist then refuses to load. */
 	{ "feature_test", 2 },
 	{ "property_mapping", 1 },
+	{ "variable_mapping", 1 },
 	{ "action0_railtype_extra_aspects", 1 },
+	/* Signal graphics out of a set: the styles it defines, how many aspects
+	 * each draws, and the group of sprites an Action 3 hangs on. What the
+	 * styles mean here is our own business -- the pictures are the set's. */
+	{ "action0_signals_extra_aspects", 1 },
+	{ "action0_signals_style", 1 },
+	{ "action3_signals_custom_signal_sprites", 1 },
 };
 
 /** @copydoc TextHandler */
@@ -462,6 +488,38 @@ static bool ChangeNameMapVar91Value(size_t len, ByteReader &buf)
 }
 
 /** @copydoc DataHandler */
+static bool ChangeNameMapKeyShift(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	_cur_name_map_action.key_shift = buf.ReadByte();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapKeyMask(size_t len, ByteReader &buf)
+{
+	if (len != 4) { buf.Skip(len); return true; }
+	_cur_name_map_action.key_mask = buf.ReadDWord();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapWantShift(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	_cur_name_map_action.want_shift = buf.ReadByte();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapWantMask(size_t len, ByteReader &buf)
+{
+	if (len != 4) { buf.Skip(len); return true; }
+	_cur_name_map_action.want_mask = buf.ReadDWord();
+	return true;
+}
+
+/** @copydoc DataHandler */
 static bool ChangeNameMapMinVersion(size_t len, ByteReader &buf)
 {
 	if (len != 2) { buf.Skip(len); return true; }
@@ -482,6 +540,25 @@ static constexpr AllowedSubtags _tags_a0pm[] = {
 	AllowedSubtags{'NAME', ChangeNameMapName},
 	AllowedSubtags{'FEAT', ChangeNameMapFeature},
 	AllowedSubtags{'PROP', ChangeNameMapPropertyId},
+	AllowedSubtags{'SETT', ChangeNameMapVar8DBit},
+	AllowedSubtags{'SVAL', ChangeNameMapVar91Value},
+};
+
+/**
+ * Action14 'A2VM' tags: name a variable, and say which read stands for it.
+ *
+ * The read the set makes is the key -- a variable number with a shift and a
+ * mask -- and 'VSFT'/'VMSK' are the shift and mask it wants applied to the
+ * answer. The variable number itself is not in the block: the patchpack has
+ * the set read a fixed one (0x11) and tells them apart by the shift and mask.
+ */
+static constexpr AllowedSubtags _tags_a2vm[] = {
+	AllowedSubtags{'NAME', ChangeNameMapName},
+	AllowedSubtags{'FEAT', ChangeNameMapFeature},
+	AllowedSubtags{'RSFT', ChangeNameMapKeyShift},
+	AllowedSubtags{'RMSK', ChangeNameMapKeyMask},
+	AllowedSubtags{'VSFT', ChangeNameMapWantShift},
+	AllowedSubtags{'VMSK', ChangeNameMapWantMask},
 	AllowedSubtags{'SETT', ChangeNameMapVar8DBit},
 	AllowedSubtags{'SVAL', ChangeNameMapVar91Value},
 };
@@ -530,6 +607,36 @@ static bool HandleAction0PropertyMap(ByteReader &buf)
 	return true;
 }
 
+/**
+ * Action14 'A2VM': a Variational Action 2 variable asked for by name.
+ * @copydoc BranchHandler
+ */
+static bool HandleVariableMap(ByteReader &buf)
+{
+	_cur_name_map_action.Reset();
+	if (!HandleNodes(buf, _tags_a2vm)) return false;
+
+	const GRFNameMapAction &action = _cur_name_map_action;
+	if (action.name.empty() || action.feature < 0) {
+		GrfMsg(2, "StaticGRFInfo: 'A2VM' without a name or feature, ignoring");
+		return true;
+	}
+	for (const MappableVariable &known : _mappable_variables) {
+		if (to_underlying(known.feature) != action.feature || action.name != known.name) continue;
+		/* The patchpack has the set read variable 0x11 and tells the named
+		 * variables apart by the shift and mask on that read. */
+		_cur_gps.grfconfig->mapped_variables.push_back(GRFVariableRemap{
+				static_cast<uint8_t>(action.feature), 0x11, action.key_shift, action.key_mask,
+				known.to, action.want_shift, action.want_mask});
+		GrfMsg(2, "StaticGRFInfo: variable '{}' of feature {:02X} read as 0x11 with shift {} mask {:08X}",
+				action.name, action.feature, action.key_shift, action.key_mask);
+		AnswerNameMap(true);
+		return true;
+	}
+	GrfMsg(1, "StaticGRFInfo: variable '{}' of feature {:02X} is not implemented, leaving it unmapped", action.name, action.feature);
+	return true;
+}
+
 /** @copydoc BranchHandler */
 static bool HandleFeatureTest(ByteReader &buf)
 {
@@ -555,6 +662,7 @@ static constexpr AllowedSubtags _tags_root[] = {
 	AllowedSubtags{'INFO', std::make_pair(std::begin(_tags_info), std::end(_tags_info))},
 	AllowedSubtags{'FTST', HandleFeatureTest},
 	AllowedSubtags{'A0PM', HandleAction0PropertyMap},
+	AllowedSubtags{'A2VM', HandleVariableMap},
 };
 
 

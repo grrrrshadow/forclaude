@@ -18,6 +18,7 @@
 #include "road_type.h"
 #include "fileio_type.h"
 #include "newgrf_badge_type.h"
+#include "newgrf_remap_type.h"
 #include "newgrf_callbacks.h"
 #include "newgrf_text_type.h"
 #include "vehicle_type.h"
@@ -177,7 +178,14 @@ struct GRFFile {
 	enum class MappedProperty : uint8_t {
 		None = 0,
 		RailtypeExtraAspects, ///< "railtype_extra_aspects": how many aspects beyond red and green a railtype's signals draw.
+		SignalsExtraAspects,  ///< "signals_extra_aspects": the same, for the signal styles this set defines.
+		SignalsDefineStyle,   ///< "signals_define_style": start a style and give it its number.
+		SignalsStyleName,     ///< "signals_style_name": what to call the style being defined.
+		SignalsStyleElectric, ///< "signals_style_electric_enabled": which kinds it draws an electric picture for.
 	};
+
+	/** Variational Action 2 variables this file asked for by name; see #GRFVariableRemap. */
+	std::vector<GRFVariableRemap> mapped_variables{};
 
 	/**
 	 * Action 0 properties this file asked for by name, and the property
@@ -202,6 +210,15 @@ struct GRFFile {
 	 * answer the set takes the feature to be missing and draws what it would
 	 * draw on plain OpenTTD.
 	 */
+	/**
+	 * The group of sprites this file draws signals with, hung on by an
+	 * Action 3 for feature 0E. One group answers for every style the file
+	 * defines; which one is being asked for goes in by variable (see
+	 * newgrf_signals.cpp).
+	 */
+	const struct SpriteGroup *signal_group = nullptr;
+	uint8_t signal_extra_aspects = 0; ///< How many aspects beyond red and green the styles of this file draw.
+
 	uint32_t feature_test_var8d = 0;    ///< Bits a name mapping that succeeded was asked to set.
 	uint32_t feature_test_var9d = 0;    ///< Bits a feature test that passed was asked to set.
 	std::vector<uint32_t> feature_test_var91{}; ///< Values a passing test or mapping asked variable 0x91 to match.
@@ -219,6 +236,19 @@ struct GRFFile {
 	{
 		auto it = this->action0_property_remaps.find({feature, prop});
 		return it == std::end(this->action0_property_remaps) ? MappedProperty::None : it->second;
+	}
+
+	/**
+	 * Which variable, if any, this file asked to have answered in place of a
+	 * read of @p from with @p shift and @p mask, for groups of @p feature.
+	 * @return the variable to answer instead, or 0 for none.
+	 */
+	const GRFVariableRemap *GetMappedVariable(uint8_t feature, uint8_t from, uint8_t shift, uint32_t mask) const
+	{
+		for (const GRFVariableRemap &mv : this->mapped_variables) {
+			if (mv.feature == feature && mv.from == from && mv.key_shift == shift && mv.key_mask == mask) return &mv;
+		}
+		return nullptr;
 	}
 
 	/**

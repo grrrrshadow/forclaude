@@ -14,6 +14,7 @@
 #include "pathfinder/yapf/yapf_cache.h"
 #include "newgrf_debug.h"
 #include "newgrf_railtype.h"
+#include "newgrf_signals.h"
 #include "train.h"
 #include "autoslope.h"
 #include "water.h"
@@ -2074,7 +2075,12 @@ static void DrawSignalSprite(TileIndex tile, const RailTypeInfo *rti, Track trac
 	SignalAspect aspect = condition == SignalState::Red ? SignalAspect::Red : SignalAspect::Green;
 	if (aspect == SignalAspect::Green && type >= SignalType::Path && IsPathSignalWarning(tile, td)) aspect = SignalAspect::Warning;
 
+	/* The rail type's own signals first, as the patchpack orders it: a set
+	 * that draws signals for one kind of track means them for that track. A
+	 * set that draws signal styles means them for everything, so it is asked
+	 * next; and the base set answers last. */
 	SpriteID sprite = GetCustomSignalSprite(rti, tile, type, variant, aspect);
+	if (sprite == 0) sprite = GetCustomSignalStyleSprite(GetSignalStyleInUse(), rti, tile, type, variant, aspect, false);
 	if (sprite != 0) {
 		sprite += image;
 	} else if (aspect == SignalAspect::Warning) {

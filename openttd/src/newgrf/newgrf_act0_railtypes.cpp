@@ -47,7 +47,11 @@ static ChangeInfoResult RailTypeChangeInfo(uint first, uint last, int prop, Byte
 		 * the set's own choosing, so it is looked up before the numbers this
 		 * game has always had. */
 		if (_cur_gps.grffile->GetMappedProperty(to_underlying(GrfSpecFeature::RailTypes), prop) == GRFFile::MappedProperty::RailtypeExtraAspects) {
-			rti->signal_extra_aspects = buf.ReadByte();
+			/* A property asked for by name carries its own length first. */
+			uint16_t size = buf.ReadExtendedByte();
+			size_t after = buf.Remaining() - size;
+			if (size >= 1) rti->signal_extra_aspects = buf.ReadByte();
+			while (buf.Remaining() > after) buf.ReadByte();
 			GrfMsg(2, "RailTypeChangeInfo: railtype {} draws {} aspects beyond red and green", id, rti->signal_extra_aspects);
 			continue;
 		}
@@ -187,7 +191,8 @@ static ChangeInfoResult RailTypeReserveInfo(uint first, uint last, int prop, Byt
 		 * or it takes the property for one nobody implements and turns the
 		 * whole set off. */
 		if (_cur_gps.grffile->GetMappedProperty(to_underlying(GrfSpecFeature::RailTypes), prop) == GRFFile::MappedProperty::RailtypeExtraAspects) {
-			buf.ReadByte();
+			uint16_t size = buf.ReadExtendedByte();
+			for (uint16_t i = 0; i < size; i++) buf.ReadByte();
 			continue;
 		}
 

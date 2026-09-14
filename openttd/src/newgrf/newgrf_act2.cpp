@@ -406,6 +406,20 @@ static void NewSpriteGroup(ByteReader &buf)
 				adjust.type = static_cast<DeterministicSpriteGroupAdjustType>(GB(varadjust, 6, 2));
 				adjust.and_mask = buf.ReadVarSize(varsize);
 
+				/* A variable this set asked for by name, the way a set built
+				 * for JGR's patchpack does: it reads a fixed variable with a
+				 * shift and a mask that together are the key, and the read is
+				 * replaced by the one this game answers, with the shift and
+				 * mask the set asked to have applied (see the 'A2VM' block in
+				 * newgrf_act14.cpp). */
+				if (const GRFVariableRemap *mv = _cur_gps.grffile->GetMappedVariable(to_underlying(feature), adjust.variable, adjust.shift_num, adjust.and_mask); mv != nullptr) {
+					GrfMsg(6, "NewSpriteGroup: read of variable {:02X} shift {} mask {:08X} answered with variable {:02X}",
+							adjust.variable, adjust.shift_num, adjust.and_mask, mv->to);
+					adjust.variable = mv->to;
+					adjust.shift_num = mv->shift;
+					adjust.and_mask = mv->mask;
+				}
+
 				if (adjust.type != DeterministicSpriteGroupAdjustType::None) {
 					adjust.add_val = buf.ReadVarSize(varsize);
 					adjust.divmod_val = buf.ReadVarSize(varsize);
@@ -543,6 +557,7 @@ static void NewSpriteGroup(ByteReader &buf)
 				case GrfSpecFeature::RoadTypes:
 				case GrfSpecFeature::TramTypes:
 				case GrfSpecFeature::Badges:
+				case GrfSpecFeature::Signals:
 				{
 					uint8_t num_loaded  = type;
 					uint8_t num_loading = buf.ReadByte();

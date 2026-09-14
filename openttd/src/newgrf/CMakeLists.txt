@@ -14,6 +14,7 @@ add_files(
     newgrf_act0_roadtypes.cpp
     newgrf_act0_roadvehs.cpp
     newgrf_act0_ships.cpp
+    newgrf_act0_signals.cpp
     newgrf_act0_sounds.cpp
     newgrf_act0_stations.cpp
     newgrf_act0_trains.cpp

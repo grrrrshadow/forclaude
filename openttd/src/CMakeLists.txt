@@ -326,6 +326,9 @@ add_files(
     newgrf_railtype.cpp
     newgrf_railtype.h
     newgrf_roadstop.cpp
+    newgrf_remap_type.h
+    newgrf_signals.cpp
+    newgrf_signals.h
     newgrf_roadstop.h
     newgrf_roadtype.cpp
     newgrf_roadtype.h

@@ -332,6 +332,31 @@ struct AirportTileMapSpriteGroupHandler : PurchaseDefaultMapSpriteGroupHandler<A
 template <> auto *GetSpec<RoadStopSpec>(GRFFile *grffile, uint16_t local_id) { return local_id < grffile->roadstops.size() ? grffile->roadstops[local_id].get() : nullptr; }
 struct RoadStopMapSpriteGroupHandler : CargoTypeMapSpriteGroupHandler<RoadStopSpec, RoadStopClass> {};
 
+/**
+ * Signals (feature 0E): one group answers for every signal this set draws.
+ *
+ * Only the default group of id 0 is used. There is no list of signals to hang
+ * anything on -- which style is being drawn, what kind of signal it is and
+ * what it is showing all go in by variable -- so the group is kept on the set
+ * itself (see newgrf_signals.cpp).
+ */
+struct SignalMapSpriteGroupHandler : MapSpriteGroupHandler {
+	void MapSpecific(uint16_t, uint8_t, const SpriteGroup *) override
+	{
+		GrfMsg(1, "SignalMapSpriteGroup: signals have no cargo types, ignoring");
+	}
+
+	void MapDefault(uint16_t local_id, const SpriteGroup *group) override
+	{
+		if (local_id != 0) {
+			GrfMsg(1, "SignalMapSpriteGroup: id {} is not 0, ignoring", local_id);
+			return;
+		}
+		_cur_gps.grffile->signal_group = group;
+		GrfMsg(2, "SignalMapSpriteGroup: signal sprites taken from this set");
+	}
+};
+
 struct BadgeMapSpriteGroupHandler : MapSpriteGroupHandler {
 	void MapSpecific(uint16_t local_id, uint8_t cid, const SpriteGroup *group) override
 	{
@@ -449,6 +474,7 @@ static void FeatureMapSpriteGroup(ByteReader &buf)
 		case GrfSpecFeature::TramTypes: MapSpriteGroup(buf, idcount, RoadTypeMapSpriteGroupHandler<RoadTramType::Tram>{}); return;
 		case GrfSpecFeature::AirportTiles: MapSpriteGroup(buf, idcount, AirportTileMapSpriteGroupHandler{}); return;
 		case GrfSpecFeature::RoadStops: MapSpriteGroup(buf, idcount, RoadStopMapSpriteGroupHandler{}); return;
+		case GrfSpecFeature::Signals: MapSpriteGroup(buf, idcount, SignalMapSpriteGroupHandler{}); return;
 		case GrfSpecFeature::Badges: MapSpriteGroup(buf, idcount, BadgeMapSpriteGroupHandler{}); return;
 
 		default:

@@ -42,6 +42,7 @@
 #include "vehicle_base.h"
 #include "road.h"
 #include "newgrf_roadstop.h"
+#include "newgrf_signals.h"
 #include "newgrf/newgrf_bytereader.h"
 #include "newgrf/newgrf_internal_vehicle.h"
 #include "newgrf/newgrf_internal.h"
@@ -426,6 +427,8 @@ void ResetNewGRFData()
 
 	/* Reset rail type information */
 	ResetRailTypes();
+	/* Signal styles come out of the sets that are about to be read. */
+	ResetSignalStyles();
 
 	/* Copy/reset original road type info data */
 	ResetRoadTypes();
@@ -585,6 +588,7 @@ GRFFile::GRFFile(const GRFConfig &config)
 	for (const auto &[key, id] : config.action0_property_remaps) {
 		this->action0_property_remaps[key] = static_cast<MappedProperty>(id);
 	}
+	this->mapped_variables = config.mapped_variables;
 	this->feature_test_var8d = config.feature_test_var8d;
 	this->feature_test_var9d = config.feature_test_var9d;
 	this->feature_test_var91 = config.feature_test_var91;
