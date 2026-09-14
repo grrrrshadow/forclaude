@@ -250,6 +250,11 @@ testza 8000 testklon 21 3" 30000 -g $S/loko2.sav
 # onto the rake at the platform (2, 4 -- the four-tile platform has no room for
 # the feeder plus a tile after that), then waits with "rake full"; the collector,
 # released at 30000, takes the four; the feeder founds the next rake.
+# Noisy: the scene builds its own second platform on a fresh random map and
+# on some of them there is nowhere to put it ("druhe nastupiste se nepodarilo
+# postavit"), which gives spojeno=0 instead of 7 with no crash and no change
+# of build. Measured 7, 7, 0 on three runs of one binary. Read it, do not
+# chase it -- same family as nakladcekat and nakladsmer.
 run_scene zaloz "vlak123 on
 testspoj zaloz 6
 testza 30000 testbrzda 3" 40000

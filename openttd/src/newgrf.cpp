@@ -586,6 +586,7 @@ GRFFile::GRFFile(const GRFConfig &config)
 		this->action0_property_remaps[key] = static_cast<MappedProperty>(id);
 	}
 	this->feature_test_var8d = config.feature_test_var8d;
+	this->feature_test_var9d = config.feature_test_var9d;
 	this->feature_test_var91 = config.feature_test_var91;
 
 	/* Initialise local settings to defaults */

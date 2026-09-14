@@ -509,7 +509,12 @@ bool GetGlobalVariable(uint8_t param, uint32_t *value, const GRFFile *grffile)
 			return true;
 
 		case 0x1D: // TTD Platform, 00=TTDPatch, 01=OpenTTD
-			*value = 1;
+			/* Plus the bits a feature test this file asked for came out true
+			 * on. This is where the patchpack's 'FTST' block puts its answer
+			 * and where a set built for it looks (see newgrf_act14.cpp); the
+			 * bits a name mapping answers on are variable 0x8D instead, which
+			 * is a different question and a different block. */
+			*value = 1 | grffile->feature_test_var9d;
 			return true;
 
 		case 0x1E: { // Miscellaneous GRF features

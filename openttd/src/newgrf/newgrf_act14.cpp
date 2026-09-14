@@ -363,10 +363,13 @@ static constexpr AllowedSubtags _tags_info[] = {
  * numbers, so a set cannot use one without saying this first, and we cannot
  * read one without listening.
  *
- * 'FTST' asks whether a feature is there at all. The answer goes back through
- * global variable 0x8D (a bit) or 0x91 (a value), which the set then tests
- * with an Action 7 or 9 and skips its own sprites if the answer is no. Left
- * unanswered, a set draws what it would draw on plain OpenTTD -- which is why
+ * 'FTST' asks whether a feature is there at all, and by which version of it.
+ * The answer goes back through a bit of global variable 0x9D, or a value on
+ * 0x91, which the set then tests with an Action 7 or 9 and skips its own
+ * sprites if the answer is no. A mapping answers on 0x8D instead: they are
+ * different questions, and answering the wrong variable is the same as saying
+ * nothing. Left unanswered, a set draws what it would draw on plain OpenTTD,
+ * or, if it was written to insist, refuses to load at all -- which is why
  * this is read even though nothing else here needs it.
  *
  * Only the names this game can honour are accepted. A name we do not know is
@@ -377,8 +380,11 @@ struct GRFNameMapAction {
 	std::string name{};
 	int feature = -1;
 	int prop_id = -1;
-	int var8d_bit = -1;
+	int var8d_bit = -1; ///< Bit to set on 0x8D: a mapping's 'SETT'.
+	int var9d_bit = -1; ///< Bit to set on 0x9D: a feature test's 'SETP'.
 	uint32_t var91_value = 0;
+	uint16_t min_version = 1;
+	uint16_t max_version = 0xFFFF;
 
 	void Reset() { *this = GRFNameMapAction{}; }
 };
@@ -400,6 +406,11 @@ struct KnownFeature {
 	uint8_t version;
 };
 static const KnownFeature _known_features[] = {
+	/* The asking mechanisms themselves have names, and a set that means to be
+	 * careful tests those first. Saying nothing to them reads as "this is not
+	 * the patchpack", and a set written to insist then refuses to load. */
+	{ "feature_test", 2 },
+	{ "property_mapping", 1 },
 	{ "action0_railtype_extra_aspects", 1 },
 };
 
@@ -435,6 +446,14 @@ static bool ChangeNameMapVar8DBit(size_t len, ByteReader &buf)
 }
 
 /** @copydoc DataHandler */
+static bool ChangeNameMapVar9DBit(size_t len, ByteReader &buf)
+{
+	if (len != 1) { buf.Skip(len); return true; }
+	_cur_name_map_action.var9d_bit = buf.ReadByte();
+	return true;
+}
+
+/** @copydoc DataHandler */
 static bool ChangeNameMapVar91Value(size_t len, ByteReader &buf)
 {
 	if (len != 4) { buf.Skip(len); return true; }
@@ -445,9 +464,16 @@ static bool ChangeNameMapVar91Value(size_t len, ByteReader &buf)
 /** @copydoc DataHandler */
 static bool ChangeNameMapMinVersion(size_t len, ByteReader &buf)
 {
-	if (len != 1) { buf.Skip(len); return true; }
-	/* Kept as the feature's asked-for version; answered against what we do. */
-	_cur_name_map_action.prop_id = buf.ReadByte();
+	if (len != 2) { buf.Skip(len); return true; }
+	_cur_name_map_action.min_version = buf.ReadWord();
+	return true;
+}
+
+/** @copydoc DataHandler */
+static bool ChangeNameMapMaxVersion(size_t len, ByteReader &buf)
+{
+	if (len != 2) { buf.Skip(len); return true; }
+	_cur_name_map_action.max_version = buf.ReadWord();
 	return true;
 }
 
@@ -464,7 +490,8 @@ static constexpr AllowedSubtags _tags_a0pm[] = {
 static constexpr AllowedSubtags _tags_ftst[] = {
 	AllowedSubtags{'NAME', ChangeNameMapName},
 	AllowedSubtags{'MINV', ChangeNameMapMinVersion},
-	AllowedSubtags{'SETP', ChangeNameMapVar8DBit},
+	AllowedSubtags{'MAXV', ChangeNameMapMaxVersion},
+	AllowedSubtags{'SETP', ChangeNameMapVar9DBit},
 	AllowedSubtags{'SVAL', ChangeNameMapVar91Value},
 };
 
@@ -474,6 +501,7 @@ static void AnswerNameMap(bool success)
 	const GRFNameMapAction &action = _cur_name_map_action;
 	if (!success) return;
 	if (action.var8d_bit >= 0 && action.var8d_bit < 32) SetBit(_cur_gps.grfconfig->feature_test_var8d, action.var8d_bit);
+	if (action.var9d_bit >= 0 && action.var9d_bit < 32) SetBit(_cur_gps.grfconfig->feature_test_var9d, action.var9d_bit);
 	if (action.var91_value != 0) {
 		std::vector<uint32_t> &values = _cur_gps.grfconfig->feature_test_var91;
 		if (std::ranges::find(values, action.var91_value) == std::end(values)) values.push_back(action.var91_value);
@@ -510,11 +538,11 @@ static bool HandleFeatureTest(ByteReader &buf)
 
 	const GRFNameMapAction &action = _cur_name_map_action;
 	if (action.name.empty()) return true;
-	/* prop_id carries the asked-for minimum version here; see ChangeNameMapMinVersion(). */
-	uint8_t want = action.prop_id <= 0 ? 1 : static_cast<uint8_t>(action.prop_id);
 	for (const KnownFeature &known : _known_features) {
-		if (action.name != known.name || known.version < want) continue;
-		GrfMsg(2, "StaticGRFInfo: feature '{}' asked for and answered", action.name);
+		if (action.name != known.name) continue;
+		if (known.version < action.min_version || known.version > action.max_version) break;
+		GrfMsg(2, "StaticGRFInfo: feature '{}' asked for (version {}..{}) and answered with {}",
+				action.name, action.min_version, action.max_version, known.version);
 		AnswerNameMap(true);
 		return true;
 	}

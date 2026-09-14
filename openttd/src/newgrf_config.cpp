@@ -53,6 +53,7 @@ GRFConfig::GRFConfig(const GRFConfig &config) :
 	param(config.param),
 	action0_property_remaps(config.action0_property_remaps),
 	feature_test_var8d(config.feature_test_var8d),
+	feature_test_var9d(config.feature_test_var9d),
 	feature_test_var91(config.feature_test_var91)
 {
 	this->flags.Reset(GRFConfigFlag::Copy);

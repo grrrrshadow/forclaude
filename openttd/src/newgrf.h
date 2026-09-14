@@ -194,14 +194,17 @@ struct GRFFile {
 	std::map<std::pair<uint8_t, uint8_t>, MappedProperty> action0_property_remaps{};
 
 	/**
-	 * Feature-test results this file asked to be told about. A set built for
-	 * JGR's patchpack asks whether a feature is there before it uses it, and
-	 * reads the answer back out of global variable 0x8D (a bit) or 0x91 (a
-	 * value). Without an answer it takes the feature to be missing and draws
-	 * what it would draw on plain OpenTTD.
+	 * Answers this file asked to be told about. A set built for JGR's
+	 * patchpack asks whether a feature is there before it uses it, and reads
+	 * the answer back out of a global variable: a feature test ('FTST')
+	 * answers on a bit of 0x9D, a name mapping ('A0PM' and its kin) on a bit
+	 * of 0x8D, and either can also answer with a value on 0x91. Without an
+	 * answer the set takes the feature to be missing and draws what it would
+	 * draw on plain OpenTTD.
 	 */
-	uint32_t feature_test_var8d = 0;    ///< Bits set by feature tests that passed.
-	std::vector<uint32_t> feature_test_var91{}; ///< Values a passing feature test asked variable 0x91 to match.
+	uint32_t feature_test_var8d = 0;    ///< Bits a name mapping that succeeded was asked to set.
+	uint32_t feature_test_var9d = 0;    ///< Bits a feature test that passed was asked to set.
+	std::vector<uint32_t> feature_test_var91{}; ///< Values a passing test or mapping asked variable 0x91 to match.
 
 	GRFFile(const GRFConfig &config);
 	GRFFile();
