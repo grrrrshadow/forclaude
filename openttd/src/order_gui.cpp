@@ -376,13 +376,17 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				}
 
 				/* Reversing out is about where the train goes next, not about
-				 * how long it stays, so it has no place in the timetable. Nor
-				 * is it shown when the order decouples here, because then it is
-				 * not carried out -- an order saved before the two were made
-				 * exclusive can still have both set, and saying so would be a
-				 * plain lie about what the train is going to do. */
-				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation() &&
-						!order->ShouldDecoupleOnDeparture()) {
+				 * how long it stays, so it has no place in the timetable.
+				 *
+				 * A decoupling order says it as well, whatever its own flag
+				 * holds: in the player's words a decoupling delivery is always
+				 * a reversing one -- backed in, wagons left at the far end, out
+				 * the way it came -- and the line is to say so, so the reader
+				 * is not left looking for it. The train itself does not turn
+				 * round on a decouple (it leaves the way it is pointing), so
+				 * the flag is not what is being reported here. */
+				if (!timetable && v->type == VehicleType::Train &&
+						(order->ShouldReverseOutOfStation() || order->ShouldDecoupleOnDeparture())) {
 					second += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
 				}
 				if (!timetable && v->type == VehicleType::Train && order->ShouldDepartAutomatically() &&
@@ -1370,8 +1374,15 @@ public:
 			bool can_decouple = this->vehicle->type == VehicleType::Train && order != nullptr && order->IsType(OT_GOTO_STATION);
 			bool decoupling = can_decouple && order->ShouldDecoupleOnDeparture();
 
+			/* Reversing out does not grey this one: the player's way of putting
+			 * it is that a decoupling delivery is always a reversing one -- the
+			 * train backs in, leaves the wagons at the far end, and goes out the
+			 * way it came -- so the switch has to stay within reach with the
+			 * reversing button down. The reversing button itself stays greyed
+			 * under a decouple (see above); what the train does on departure is
+			 * unchanged, decoupling leaves the way it is pointing. */
 			this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
-					order->ShouldReverseOutOfStation() || order->ShouldWaitForCouple() || order->ShouldGoToCouple());
+					order->ShouldWaitForCouple() || order->ShouldGoToCouple());
 			this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
 		}
 
