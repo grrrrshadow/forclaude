@@ -1893,9 +1893,15 @@ static bool IsTrainSignalSideRight()
 
 /**
  * Whether a path signal should show the warning aspect instead of a plain
- * green: it has a road booked through it, but that road ends at or before the
- * next signal, so a train passing it is going to have to stop and ought to be
- * braking already. Green means the way is clear past the next signal too.
+ * green: the next signal along the line is at danger, so a train may pass this
+ * one but is going to have to stop at that one and ought to be braking
+ * already. Green keeps its old meaning, the way is clear.
+ *
+ * What it is not: "the road booked through me ends here". A road is only ever
+ * booked as far ahead as a train needs (see CheckNextTrainTile()), so its end
+ * is where the look-ahead stopped and not something in the way -- read that
+ * way, every signal a few tiles in front of a train warned on a clear line,
+ * which is no warning at all.
  *
  * This is the aspect trains have been driving to since gentle braking came in
  * -- a train looks a braking distance ahead and slows for the end of its road
@@ -1916,12 +1922,6 @@ bool IsPathSignalWarning(TileIndex tile, Trackdir td)
 {
 	if (!HasPbsSignalOnTrackdir(tile, td)) return false;
 	if (GetSignalStateByTrackdir(tile, td) != SignalState::Green) return false;
-	/* There has to be a road booked through the signal itself. A path signal
-	 * stands green over track that merely happens to be free, and a train
-	 * parked beyond one holds its own ground booked without anybody having
-	 * asked to come through: that is a green signal over an occupied block,
-	 * which is what it has always been, and not a warning to anyone. */
-	if (!HasReservedTracks(tile, TrackBits{TrackdirToTrack(td)})) return false;
 
 	/* How far to look for the next signal. A signal further off than this
 	 * says nothing useful to a driver at this one, and the walk has to end
@@ -1932,18 +1932,18 @@ bool IsPathSignalWarning(TileIndex tile, Trackdir td)
 	TileIndex cur = tile;
 	Trackdir cur_td = td;
 	for (int i = 0; i < MAX_TILES; i++) {
-		/* On the first step, nothing booked means nobody is coming this way
-		 * and green says what it has always said: the way is clear. A path
-		 * signal stands green over an empty line, so without this the whole
-		 * line would warn at once. Later on, it means the booked road ends
-		 * here, which is exactly what there is to warn about. */
-		if (!ft.Follow(cur, cur_td)) return i > 0;
+		if (!ft.Follow(cur, cur_td)) return false; // the line ends: nothing ahead shows anything
+		/* Which way on: the booked road where there is one, otherwise the
+		 * only way there is. At a junction with nothing booked, where a train
+		 * would go is not settled, and a signal down one of the ways says
+		 * nothing about the other. */
 		TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
-		if (reserved.None()) return i > 0;
+		TrackdirBits onward = reserved.Any() ? reserved : ft.new_td_bits;
+		if (onward.Count() != 1) return false;
 		cur = ft.new_tile;
-		cur_td = FindFirstTrackdir(reserved);
+		cur_td = FindFirstTrackdir(onward);
 		/* Only plain rail carries signals, and asking anything else about one
-		 * puts the game down: the road runs through platforms, sheds, tunnels
+		 * puts the game down: the line runs through platforms, sheds, tunnels
 		 * and bridges as well (measured -- the rig draws, so the battery
 		 * caught it on the station scenes). */
 		if (IsTileType(cur, TileType::Railway) && HasSignalOnTrackdir(cur, cur_td)) {

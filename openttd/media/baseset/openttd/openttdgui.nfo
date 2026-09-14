@@ -234,3 +234,48 @@
    -1 sprites/openttdgui_rocket_1_6.png 8bpp   2    2  25   5 -12  -2 normal
    -1 sprites/openttdgui_rocket_1_7.png 8bpp   2    2  19  10  -8  -4 normal
 
+// The warning (yellow) aspect of a path signal: the road booked through it
+// ends at or before the next signal. Drawn from each signal's green sprite with
+// the lamp repainted. Kept here, among this build's own extra sprites, and not
+// in the signal block: a base set supplies that block whole (OpenGFX does) and
+// would paint over them, while nothing but this file reaches past the sprites
+// the game has upstream. Order: plain and no-entry path signals, electric then
+// semaphore, eight images each.
+// NFORenum knows an older, smaller size for this sprite block and warns that
+// the sprites run past its end. They do not: the game sizes the block by
+// OPENTTD_SPRITE_COUNT, which these are counted in.
+//@@WARNING DISABLE 61
+   -1 * 4	 05 95 \b 32 \b 228 // the warning aspect, at OPENTTD_SPRITE_COUNT - 32
+   -1 sprites/openttdgui_signal_warning.png 8bpp   2    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  34    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  66    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  98    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 130    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 162    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 194    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 226    2   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp   2   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  34   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  66   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  98   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 130   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 162   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 194   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 226   34   6  19  -2  -17 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp   2   66   7  23  -3  -21 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  34   66   9  21   1  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  66   66   6  23   1  -21 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  98   66  10  21  -7  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 130   66   2  24   1  -22 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 162   66   2  26   1  -24 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 194   66   8  21  -4  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 226   66   8  21   1  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp   2   98   9  23  -3  -21 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  34   98  11  21  -1  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  66   98   8  23  -1  -21 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp  98   98  12  21  -7  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 130   98   4  24  -1  -22 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 162   98   4  26   1  -24 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 194   98  10  21  -4  -19 normal
+   -1 sprites/openttdgui_signal_warning.png 8bpp 226   98  10  21  -1  -19 normal
+//@@WARNING ENABLE 61

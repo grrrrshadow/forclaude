@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 228;
+static const uint16_t OPENTTD_SPRITE_COUNT = 260;
 /** @} */
 
 /** @{
@@ -222,25 +222,29 @@ static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
 static const SpriteID SPR_RAID_ROCKET_GREY           = SPR_OPENTTD_BASE + 212;
 static const SpriteID SPR_RAID_ROCKET_YELLOW         = SPR_OPENTTD_BASE + 220;
 
+/**
+ * The warning (yellow) aspect of a path signal: the next signal along the
+ * line is at danger, so a train may pass this one but has to be braking
+ * already. See DrawSingleSignal().
+ *
+ * Here among this build's own extra sprites, and deliberately not in the
+ * signal block: a base set supplies that block whole -- OpenGFX does, and its
+ * unused slots are blank -- so sprites put there are painted over and the
+ * signal simply vanishes. Nothing but our own openttd.grf reaches past the
+ * sprites the game has upstream (see OPENTTD_VANILLA_SPRITE_COUNT), so this
+ * is the one range no base set can take away.
+ *
+ * Laid out as variant * 16 + (type - Path) * 8 + image: the four kinds of
+ * path signal (plain and no-entry, electric and semaphore), eight images each.
+ */
+static const SpriteID SPR_SIGNALS_WARNING_BASE       = SPR_OPENTTD_BASE + 228;
+/** How many sprites that is: four kinds of path signal, eight images each. */
+static const uint16_t SIGNALS_WARNING_SPRITE_COUNT   = 32;
+
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
 static const uint16_t PRESIGNAL_AND_SEMAPHORE_SPRITE_COUNT     = 112;
 static const uint16_t PRESIGNAL_SEMAPHORE_AND_PBS_SPRITE_COUNT = 240;
-
-/**
- * The warning ("orange") aspect of a path signal: the road booked through the
- * signal ends at or before the next one, so a train may pass it but has to be
- * braking already. See DrawSingleSignal().
- *
- * The signal block holds 240 sprites, of which the game only ever addresses
- * 176: the sprite number is packed as type * 16 + variant * 64 + ..., which
- * leaves two runs of 32 slots with nothing in them. The warning aspect lives
- * in the first of those runs, so the block keeps its size and everything
- * after it in the sprite numbering stays where it was. Laid out as
- * variant * 16 + (type - Path) * 8 + image: the four kinds of path signal
- * (plain and no-entry, electric and semaphore), eight images each.
- */
-static const SpriteID SPR_SIGNALS_WARNING_BASE = SPR_SIGNALS_BASE + 144;
 
 static const SpriteID SPR_CANALS_BASE   = SPR_SIGNALS_BASE + PRESIGNAL_SEMAPHORE_AND_PBS_SPRITE_COUNT;
 static const uint16_t CANALS_SPRITE_COUNT = 65;

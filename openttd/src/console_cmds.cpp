@@ -18,6 +18,7 @@
 #include "industry.h"
 #include "town.h"
 #include "spritecache.h"
+#include "table/sprites.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
 #include "console_gui.h"
@@ -2823,7 +2824,7 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 				auto aspect = [&](Trackdir d) -> const char * {
 					if (!HasSignalOnTrackdir(tile, d)) return "";
 					if (GetSignalStateByTrackdir(tile, d) == SignalState::Red) return " cervena";
-					return IsPathSignalWarning(tile, d) ? " ORANZOVA" : " zelena";
+					return IsPathSignalWarning(tile, d) ? " ZLUTA" : " zelena";
 				};
 				IConsolePrint(CC_DEFAULT, "testnavesti: ({},{}) kolej {} - {} {}, {}{}{}{}", x, y, (int)tr,
 						to_underlying(st) < lengthof(kind) ? kind[to_underlying(st)] : "?",
@@ -2834,6 +2835,16 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 			}
 		}
 	}
+	/* Whether the warning aspect actually has artwork to draw with. A base
+	 * set brings its own sprites for everything the game upstream has, so
+	 * the ones this build added are the ones worth checking (they went
+	 * missing once already: drawn into the signal block, which OpenGFX
+	 * supplies whole, and painted over). */
+	uint have = 0;
+	for (uint i = 0; i < 32; i++) {
+		if (SpriteExists(SPR_SIGNALS_WARNING_BASE + i)) have++;
+	}
+	IConsolePrint(CC_DEFAULT, "testnavesti: sprity vystrazne {}/32 nactenych (zaklad {}).", have, SPR_SIGNALS_WARNING_BASE);
 	IConsolePrint(CC_DEFAULT, "testnavesti: celkem {} navestidel.", n);
 	return true;
 }
