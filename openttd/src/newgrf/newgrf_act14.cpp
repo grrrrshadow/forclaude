@@ -407,6 +407,7 @@ static const MappableProperty _mappable_properties[] = {
 	{ "signals_define_style", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsDefineStyle },
 	{ "signals_style_name", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsStyleName },
 	{ "signals_style_electric_enabled", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsStyleElectric },
+	{ "signals_style_semaphore_enabled", GrfSpecFeature::Signals, GRFFile::MappedProperty::SignalsStyleSemaphore },
 };
 
 /** Known Variational Action 2 variable names, by the patchpack's spelling. */

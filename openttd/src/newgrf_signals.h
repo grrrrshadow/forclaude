@@ -44,6 +44,7 @@ struct SignalStyle {
 	StringID name = 0; ///< What to call it in the list.
 	uint8_t extra_aspects = 0; ///< How many aspects it draws beyond red and green.
 	uint32_t electric_enabled = 0; ///< Which signal types it draws an electric picture for.
+	uint32_t semaphore_enabled = 0; ///< Which it draws a semaphore picture for.
 };
 
 /** Every style every loaded set has defined, in the order they were read. */

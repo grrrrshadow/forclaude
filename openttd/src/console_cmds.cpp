@@ -2914,6 +2914,7 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 	 * 0E). For each one, which aspects it actually answers with a picture:
 	 * red, green and the one this game draws yellow. A style that answers
 	 * nothing is a style whose sprites never arrived. */
+	static const char *druh[] = { "blok", "predvest-vjezd", "predvest-vyjezd", "predvest-kombi", "cestne", "cestne-jednosmer" };
 	for (uint i = 0; i < _signal_styles.size(); i++) {
 		const SignalStyle &st = _signal_styles[i];
 		std::string got;
@@ -2921,9 +2922,24 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 			SpriteID sp = GetCustomSignalStyleSprite(i, GetRailTypeInfo(RAILTYPE_RAIL), INVALID_TILE, SignalType::Path, SignalVariant::Electric, a, true);
 			got += fmt::format(" {}={}", a == SignalAspect::Red ? "cervena" : (a == SignalAspect::Green ? "zelena" : "zluta"), sp);
 		}
-        IConsolePrint(CC_DEFAULT, "testnavesti: styl {} '{}' (grf {:08X}, cislo {}) aspektu navic {}, sprity{}{}",
+		IConsolePrint(CC_DEFAULT, "testnavesti: styl {} '{}' (grf {:08X}, cislo {}) aspektu navic {}, sprity{}{}",
 				i, GetString(st.name), st.grf != nullptr ? std::byteswap(st.grf->grfid) : 0, st.local_id, st.extra_aspects, got,
 				i == GetSignalStyleInUse() ? " <- kresli se timhle" : "");
+	}
+	/* And, for the style actually drawn with, which of this game's own six
+	 * kinds of signal the set answers for at all. What it has nothing for is
+	 * drawn from the base set, so a set that answers for only some of them
+	 * leaves the rest looking as they always did. */
+	if (GetSignalStyleInUse() < _signal_styles.size()) {
+		for (SignalVariant var : {SignalVariant::Electric, SignalVariant::Semaphore}) {
+			std::string got;
+			for (uint t = 0; t < lengthof(druh); t++) {
+				SpriteID sp = GetCustomSignalStyleSprite(GetSignalStyleInUse(), GetRailTypeInfo(RAILTYPE_RAIL), INVALID_TILE,
+						static_cast<SignalType>(t), var, SignalAspect::Green, true);
+				got += fmt::format(" {}={}", druh[t], sp);
+			}
+			IConsolePrint(CC_DEFAULT, "testnavesti: styl v pouziti, {}:{}", var == SignalVariant::Electric ? "svetelne" : "mechanicke", got);
+		}
 	}
 	IConsolePrint(CC_DEFAULT, "testnavesti: celkem {} navestidel, stylu z grf {}.", n, _signal_styles.size());
 	return true;

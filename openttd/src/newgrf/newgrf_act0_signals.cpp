@@ -100,11 +100,16 @@ static ChangeInfoResult SignalsChangeInfo(uint first, uint last, int prop, ByteR
 			}
 
 			case GRFFile::MappedProperty::SignalsStyleElectric:
+			case GRFFile::MappedProperty::SignalsStyleSemaphore:
 				if (style == nullptr) {
 					GrfMsg(1, "SignalsChangeInfo: a kind list before any style was defined, ignoring");
 					break;
 				}
-				style->electric_enabled = buf.ReadDWord();
+				if (mapped == GRFFile::MappedProperty::SignalsStyleElectric) {
+					style->electric_enabled = buf.ReadDWord();
+				} else {
+					style->semaphore_enabled = buf.ReadDWord();
+				}
 				break;
 
 			default:

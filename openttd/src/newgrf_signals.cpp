@@ -119,6 +119,15 @@ SpriteID GetCustomSignalStyleSprite(uint style, const RailTypeInfo *rti, TileInd
 	const SignalStyle &st = _signal_styles[style];
 	if (st.grf == nullptr || st.grf->signal_group == nullptr) return 0;
 
+	/* A style names the kinds of signal it draws, one bit each and in this
+	 * game's own order, and does it separately for the two variants. Asked
+	 * for one it never said it draws, it answers with something -- the set
+	 * that prompted this drew no semaphores at all and handed back its
+	 * electric picture for them, which would have turned every semaphore on
+	 * the map into a lamp. What a set does not draw is left to the base set. */
+	uint32_t drawn = variant == SignalVariant::Semaphore ? st.semaphore_enabled : st.electric_enabled;
+	if (!HasBit(drawn, to_underlying(type))) return 0;
+
 	/* A style says how many aspects it draws; asked for one it has not got,
 	 * it would answer with whatever its green happens to resolve to. */
 	uint8_t asked = to_underlying(aspect);

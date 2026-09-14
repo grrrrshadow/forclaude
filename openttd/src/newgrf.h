@@ -182,6 +182,7 @@ struct GRFFile {
 		SignalsDefineStyle,   ///< "signals_define_style": start a style and give it its number.
 		SignalsStyleName,     ///< "signals_style_name": what to call the style being defined.
 		SignalsStyleElectric, ///< "signals_style_electric_enabled": which kinds it draws an electric picture for.
+		SignalsStyleSemaphore, ///< "signals_style_semaphore_enabled": which kinds it draws a semaphore picture for.
 	};
 
 	/** Variational Action 2 variables this file asked for by name; see #GRFVariableRemap. */
