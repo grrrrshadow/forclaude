@@ -24,6 +24,7 @@
 #include "elrail_func.h"
 #include "town.h"
 #include "pbs.h"
+#include "pathfinder/follow_track.hpp"
 #include "company_base.h"
 #include "core/backup_type.hpp"
 #include "core/container_func.hpp"
@@ -1890,7 +1891,69 @@ static bool IsTrainSignalSideRight()
 	}
 }
 
-static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track track, SignalState condition, SignalOffsets image, uint pos)
+/**
+ * Whether a path signal should show the warning aspect instead of a plain
+ * green: it has a road booked through it, but that road ends at or before the
+ * next signal, so a train passing it is going to have to stop and ought to be
+ * braking already. Green means the way is clear past the next signal too.
+ *
+ * This is the aspect trains have been driving to since gentle braking came in
+ * -- a train looks a braking distance ahead and slows for the end of its road
+ * (see BrakingCeiling() and CheckNextTrainTile() in train_cmd.cpp) -- only
+ * now it is on the signal as well, so a player can see why a train is slowing
+ * where the line looks clear.
+ *
+ * Read off the map at drawing time and nowhere stored: it is the state of the
+ * road beyond, which changes as trains book and give back track, and there is
+ * no room on the map for it (and no reason to make room, since it is only a
+ * picture). Nothing here changes anything.
+ *
+ * @param tile the signal's tile
+ * @param td the trackdir the signal faces along
+ * @return true to draw the warning aspect
+ */
+bool IsPathSignalWarning(TileIndex tile, Trackdir td)
+{
+	if (!HasPbsSignalOnTrackdir(tile, td)) return false;
+	if (GetSignalStateByTrackdir(tile, td) != SignalState::Green) return false;
+	/* There has to be a road booked through the signal itself. A path signal
+	 * stands green over track that merely happens to be free, and a train
+	 * parked beyond one holds its own ground booked without anybody having
+	 * asked to come through: that is a green signal over an occupied block,
+	 * which is what it has always been, and not a warning to anyone. */
+	if (!HasReservedTracks(tile, TrackBits{TrackdirToTrack(td)})) return false;
+
+	/* How far to look for the next signal. A signal further off than this
+	 * says nothing useful to a driver at this one, and the walk has to end
+	 * somewhere: it runs every time the signal is drawn. */
+	constexpr int MAX_TILES = 24;
+
+	CFollowTrackRail ft(GetTileOwner(tile), GetRailTypeInfo(GetRailType(tile))->compatible_railtypes);
+	TileIndex cur = tile;
+	Trackdir cur_td = td;
+	for (int i = 0; i < MAX_TILES; i++) {
+		/* On the first step, nothing booked means nobody is coming this way
+		 * and green says what it has always said: the way is clear. A path
+		 * signal stands green over an empty line, so without this the whole
+		 * line would warn at once. Later on, it means the booked road ends
+		 * here, which is exactly what there is to warn about. */
+		if (!ft.Follow(cur, cur_td)) return i > 0;
+		TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
+		if (reserved.None()) return i > 0;
+		cur = ft.new_tile;
+		cur_td = FindFirstTrackdir(reserved);
+		/* Only plain rail carries signals, and asking anything else about one
+		 * puts the game down: the road runs through platforms, sheds, tunnels
+		 * and bridges as well (measured -- the rig draws, so the battery
+		 * caught it on the station scenes). */
+		if (IsTileType(cur, TileType::Railway) && HasSignalOnTrackdir(cur, cur_td)) {
+			return GetSignalStateByTrackdir(cur, cur_td) == SignalState::Red;
+		}
+	}
+	return false;
+}
+
+static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track track, SignalState condition, SignalOffsets image, uint pos, Trackdir td)
 {
 	static const Point SignalPositions[2][12] = {
 		{ // Signals on the left side
@@ -1916,6 +1979,11 @@ static void DrawSingleSignal(TileIndex tile, const RailTypeInfo *rti, Track trac
 	SpriteID sprite = GetCustomSignalSprite(rti, tile, type, variant, condition);
 	if (sprite != 0) {
 		sprite += image;
+	} else if (type >= SignalType::Path && IsPathSignalWarning(tile, td)) {
+		/* The warning aspect, drawn only from the base set: a NewGRF that
+		 * brings its own signals has no sprite for it and keeps its green. */
+		sprite = SPR_SIGNALS_WARNING_BASE + to_underlying(variant) * 16 +
+				(to_underlying(type) - to_underlying(SignalType::Path)) * 8 + image;
 	} else {
 		/* Normal electric signals are stored in a different sprite block than all other signals. */
 		sprite = (type == SignalType::Block && variant == SignalVariant::Electric) ? SPR_ORIGINAL_SIGNALS_BASE : SPR_SIGNALS_BASE - 16;
@@ -2430,7 +2498,13 @@ static void DrawTrackBits(TileInfo *ti, TrackBits track)
 static void DrawSignals(TileIndex tile, TrackBits rails, const RailTypeInfo *rti)
 {
 	auto MAYBE_DRAW_SIGNAL = [&](uint8_t signalbit, SignalOffsets image, uint pos, Track track) {
-		if (IsSignalPresent(tile, signalbit)) DrawSingleSignal(tile, rti, track, GetSingleSignalState(tile, signalbit), image, pos);
+		if (!IsSignalPresent(tile, signalbit)) return;
+		/* Which way this signal faces, as a trackdir: the warning aspect has
+		 * to read the road beyond it, and only a trackdir says which way that
+		 * is. Of the track's two, it is the one this signal sits along. */
+		Trackdir td = TrackToTrackdir(track);
+		if (!HasBit(SignalAlongTrackdir(td), signalbit)) td = ReverseTrackdir(td);
+		DrawSingleSignal(tile, rti, track, GetSingleSignalState(tile, signalbit), image, pos, td);
 	};
 
 	if (!rails.Test(Track::Y)) {

@@ -227,6 +227,21 @@ static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
 static const uint16_t PRESIGNAL_AND_SEMAPHORE_SPRITE_COUNT     = 112;
 static const uint16_t PRESIGNAL_SEMAPHORE_AND_PBS_SPRITE_COUNT = 240;
 
+/**
+ * The warning ("orange") aspect of a path signal: the road booked through the
+ * signal ends at or before the next one, so a train may pass it but has to be
+ * braking already. See DrawSingleSignal().
+ *
+ * The signal block holds 240 sprites, of which the game only ever addresses
+ * 176: the sprite number is packed as type * 16 + variant * 64 + ..., which
+ * leaves two runs of 32 slots with nothing in them. The warning aspect lives
+ * in the first of those runs, so the block keeps its size and everything
+ * after it in the sprite numbering stays where it was. Laid out as
+ * variant * 16 + (type - Path) * 8 + image: the four kinds of path signal
+ * (plain and no-entry, electric and semaphore), eight images each.
+ */
+static const SpriteID SPR_SIGNALS_WARNING_BASE = SPR_SIGNALS_BASE + 144;
+
 static const SpriteID SPR_CANALS_BASE   = SPR_SIGNALS_BASE + PRESIGNAL_SEMAPHORE_AND_PBS_SPRITE_COUNT;
 static const uint16_t CANALS_SPRITE_COUNT = 65;
 

@@ -2816,10 +2816,20 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 				bool fwd = HasSignalOnTrackdir(tile, td);
 				bool rev = HasSignalOnTrackdir(tile, ReverseTrackdir(td));
 				SignalType st = GetSignalType(tile, tr);
-				IConsolePrint(CC_DEFAULT, "testnavesti: ({},{}) kolej {} - {} {}, {}{}", x, y, (int)tr,
+				/* What the signal is showing, each way it faces: red, green,
+				 * or the warning aspect a green shows when the road booked
+				 * through it ends at or before the next signal (the "orange"
+				 * a driver brakes to; see IsPathSignalWarning()). */
+				auto aspect = [&](Trackdir d) -> const char * {
+					if (!HasSignalOnTrackdir(tile, d)) return "";
+					if (GetSignalStateByTrackdir(tile, d) == SignalState::Red) return " cervena";
+					return IsPathSignalWarning(tile, d) ? " ORANZOVA" : " zelena";
+				};
+				IConsolePrint(CC_DEFAULT, "testnavesti: ({},{}) kolej {} - {} {}, {}{}{}{}", x, y, (int)tr,
 						to_underlying(st) < lengthof(kind) ? kind[to_underlying(st)] : "?",
 						(fwd && rev) ? "OBOUSMERNE" : "jednosmerne",
-						fwd ? "tam" : "", rev ? " zpet" : "");
+						fwd ? "tam" : "", fwd ? aspect(td) : "",
+						rev ? " zpet" : "", rev ? aspect(ReverseTrackdir(td)) : "");
 				n++;
 			}
 		}

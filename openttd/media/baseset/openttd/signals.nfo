@@ -149,38 +149,38 @@
    -1 sprites/signals.png 8bpp  82  136   6  19  -2 -17 normal
    -1 sprites/signals.png 8bpp  98  136   6  19  -2 -17 normal
    -1 sprites/signals.png 8bpp 114  136   6  19  -2 -17 normal
-   -1 sprites/signals.png 8bpp 130  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 146  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 162  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 178  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 194  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 210  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 226  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 242  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 258  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 274  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 290  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 306  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 322  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 338  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 354  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 370  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 386  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 402  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 418  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 434  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 450  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 466  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 482  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 498  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 514  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 530  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 546  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 562  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 578  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 594  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 610  136   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 626  136   6  21  -2 -19 normal
+   -1 sprites/signals.png 8bpp   2  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp  34  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp  66  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp  98  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 130  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 162  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 194  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 226  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 258  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 290  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 322  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 354  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 386  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 418  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 450  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 482  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp   2  530   7  23  -3  -21 normal
+   -1 sprites/signals.png 8bpp  34  530   9  21   1  -19 normal
+   -1 sprites/signals.png 8bpp  66  530   6  23   1  -21 normal
+   -1 sprites/signals.png 8bpp  98  530  10  21  -7  -19 normal
+   -1 sprites/signals.png 8bpp 130  530   2  24   1  -22 normal
+   -1 sprites/signals.png 8bpp 162  530   2  26   1  -24 normal
+   -1 sprites/signals.png 8bpp 194  530   8  21  -4  -19 normal
+   -1 sprites/signals.png 8bpp 226  530   8  21   1  -19 normal
+   -1 sprites/signals.png 8bpp 258  530   9  23  -3  -21 normal
+   -1 sprites/signals.png 8bpp 290  530  11  21  -1  -19 normal
+   -1 sprites/signals.png 8bpp 322  530   8  23  -1  -21 normal
+   -1 sprites/signals.png 8bpp 354  530  12  21  -7  -19 normal
+   -1 sprites/signals.png 8bpp 386  530   4  24  -1  -22 normal
+   -1 sprites/signals.png 8bpp 418  530   4  26   1  -24 normal
+   -1 sprites/signals.png 8bpp 450  530  10  21  -4  -19 normal
+   -1 sprites/signals.png 8bpp 482  530  10  21  -1  -19 normal
    -1 sprites/signals.png 8bpp 642  136  10  21  -6 -19 normal
    -1 sprites/signals.png 8bpp 658  136   7  23  -3 -21 normal
    -1 sprites/signals.png 8bpp 674  136  10  21   1 -19 normal
@@ -392,38 +392,38 @@
    -1 sprites/signals.png 8bpp 290  376   6  19  -2 -17 normal
    -1 sprites/signals.png 8bpp 306  376   6  19  -2 -17 normal
    -1 sprites/signals.png 8bpp 322  376   6  19  -2 -17 normal
-   -1 sprites/signals.png 8bpp 338  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 354  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 370  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 386  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 402  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 418  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 434  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 450  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 466  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 482  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 498  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 514  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 530  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 546  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 562  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 578  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 594  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 610  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 626  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 642  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 658  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 674  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 690  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 706  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 722  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 738  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 754  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 770  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp 786  376   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp   2  408   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp  18  408   6  21  -2 -19 normal
-   -1 sprites/signals.png 8bpp  34  408   6  21  -2 -19 normal
+   -1 sprites/signals.png 8bpp   2  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp  34  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp  66  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp  98  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 130  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 162  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 194  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 226  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 258  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 290  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 322  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 354  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 386  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 418  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 450  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp 482  498   6  19  -2  -17 normal
+   -1 sprites/signals.png 8bpp   2  530   7  23  -3  -21 normal
+   -1 sprites/signals.png 8bpp  34  530   9  21   1  -19 normal
+   -1 sprites/signals.png 8bpp  66  530   6  23   1  -21 normal
+   -1 sprites/signals.png 8bpp  98  530  10  21  -7  -19 normal
+   -1 sprites/signals.png 8bpp 130  530   2  24   1  -22 normal
+   -1 sprites/signals.png 8bpp 162  530   2  26   1  -24 normal
+   -1 sprites/signals.png 8bpp 194  530   8  21  -4  -19 normal
+   -1 sprites/signals.png 8bpp 226  530   8  21   1  -19 normal
+   -1 sprites/signals.png 8bpp 258  530   9  23  -3  -21 normal
+   -1 sprites/signals.png 8bpp 290  530  11  21  -1  -19 normal
+   -1 sprites/signals.png 8bpp 322  530   8  23  -1  -21 normal
+   -1 sprites/signals.png 8bpp 354  530  12  21  -7  -19 normal
+   -1 sprites/signals.png 8bpp 386  530   4  24  -1  -22 normal
+   -1 sprites/signals.png 8bpp 418  530   4  26   1  -24 normal
+   -1 sprites/signals.png 8bpp 450  530  10  21  -4  -19 normal
+   -1 sprites/signals.png 8bpp 482  530  10  21  -1  -19 normal
    -1 sprites/signals.png 8bpp  50  408  10  21  -7 -19 normal
    -1 sprites/signals.png 8bpp  66  408  10  23  -8 -21 normal
    -1 sprites/signals.png 8bpp  82  408  10  23  -7 -21 normal
