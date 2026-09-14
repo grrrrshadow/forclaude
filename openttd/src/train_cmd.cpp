@@ -3328,6 +3328,33 @@ bool IsCoupleTargetOnTile(const Train *v, TileIndex tile)
 }
 
 /**
+ * Is something this collector may couple to standing on this tile -- the
+ * rake it has spoken for, or any other it could legitimately take?
+ *
+ * Where a collector's road ends: its booking runs along the platform until
+ * it meets this, and what it meets is what it came for. See the platform
+ * booking in CYapfReserveTrack::TryReservePath() (yapf_rail.cpp). The rake
+ * spoken for is asked about by name, since a claimed rake no longer reads as
+ * waiting to be collected (IsWaitingToBeCoupled()) and the general question
+ * would disown the very train the collector is on its way to.
+ *
+ * @param v    the collector asking, any part of it
+ * @param tile the tile its booking has reached
+ * @return whether a rake it may couple to stands there
+ */
+bool IsCouplePartnerStandingOn(const Train *v, TileIndex tile)
+{
+	const Train *head = v->First();
+	if (IsCoupleTargetOnTile(head, tile)) return true;
+	for (const Vehicle *u : VehiclesOnTile(tile)) {
+		if (u->type != VehicleType::Train) continue;
+		const Train *other = Train::From(u)->First();
+		if (other != head && IsValidCouplePartner(head, other)) return true;
+	}
+	return false;
+}
+
+/**
  * On which tracks of this tile may a rescue engine's road step onto it,
  * because its casualty stands there?
  *
@@ -7826,6 +7853,29 @@ void FreeTrainTrackReservation(const Train *consist)
 		assert(bits.None());
 
 		if (!IsValidTrackdir(td)) break;
+
+		/* A collector books the free tiles of its rake's platform along with
+		 * its road (CYapfReserveTrack::TryReservePath(), yapf_rail.cpp), and
+		 * they are its to give back. The platform is crossed here in one step
+		 * and the walk stops at the rake standing on it, so nothing further
+		 * down would ever reach them -- and a platform tile left booked by a
+		 * train that has gone elsewhere is a platform nobody can use again.
+		 * Only the tiles with nobody on them: the rake's own ground is the
+		 * rake's, and so is any other train's. */
+		if (ft.is_station && consist->current_order.ShouldGoToCouple()) {
+			TileIndexDiff step = TileOffsByDiagDir(ft.exitdir);
+			TileIndex t = ft.new_tile - step * ft.tiles_skipped;
+			for (int left = ft.tiles_skipped; left >= 0; left--, t += step) {
+				if (!IsRailStationTile(t) || !HasStationReservation(t)) break;
+				bool occupied = false;
+				for (const Vehicle *u : VehiclesOnTile(t)) {
+					if (u->type == VehicleType::Train) { occupied = true; break; }
+				}
+				if (occupied) break;
+				SetRailStationReservation(t, false);
+				MarkTileDirtyByTile(t);
+			}
+		}
 
 		/* Ground another train is standing on is that train's, whatever is
 		 * booked on it and however it joins on to this one's road. Vanilla

@@ -72,12 +72,83 @@ private:
 	std::vector<TileIndex> rescue_booked;
 	bool rescue_watching = false; ///< Whether this attempt is a rescue engine's, so the tiles are worth keeping.
 
+	std::vector<TileIndex> couple_booked; ///< Platform tiles a collector booked beyond its road's end, up to its rake; given back if the road itself fails.
+
 	bool FindSafePositionProc(TileIndex tile, Trackdir td)
 	{
 		if (IsSafeWaitingPosition(Yapf().GetVehicle(), tile, td, true, !TrackFollower::Allow90degTurns())) {
 			this->res_dest_tile = tile;
 			this->res_dest_td = td;
 			return false;   // Stop iterating segment
+		}
+		return true;
+	}
+
+	/**
+	 * Book a collector's road on from where it ends to the rake it is going
+	 * for -- the whole way, or none of it.
+	 *
+	 * A collector's road is allowed to end on the tile before its rake's
+	 * platform (IsSafeWaitingPosition(), the couple rule), because a platform
+	 * with a rake standing on it cannot be booked the way this file books
+	 * platforms: whole, from the far end back, and failing on the first taken
+	 * tile. The rest of the way was left to the tile-by-tile extension the
+	 * train does as it drives (ExtendTrainReservation()). That left a gap:
+	 * the platform tiles between the road's end and the rake belonged to
+	 * nobody until the collector got there, and another train could roll onto
+	 * them first and come to a stand nose to nose with the collector at the
+	 * road's end -- which, on the far side of a path signal, is exactly where
+	 * a train waiting at that signal stands. Seven pixels apart, and that is a
+	 * collision (saves/new1.sav, trains 2 and 4; TEMATA 20).
+	 *
+	 * So the gap is looked at here, at the same moment as the road, one tile
+	 * at a time along the platform until the rake. A train standing on any of
+	 * those tiles -- the engine that has just put the rake down and not yet
+	 * pulled clear, typically -- means the road is not clear, and the whole
+	 * booking fails: the collector waits where it is, and sets off when the
+	 * way to its rake is genuinely empty. Tiles nobody stands on are made the
+	 * collector's: booked if they were free, and left as they are if they
+	 * already carry the platform's booking, which a platform with a rake on it
+	 * keeps from the day the rake was put down (see ClearPathReservation()) --
+	 * that booking is nobody's to drive in on from outside, so it holds the
+	 * gap as well as the collector's own would. Nothing to do for a road that
+	 * does not end before a platform; that is every other train.
+	 *
+	 * @return whether the way on to the rake is clear (or there was none to check)
+	 */
+	bool BookOnToRake()
+	{
+		this->couple_booked.clear();
+		const Train *v = Yapf().GetVehicle();
+		if (v == nullptr || !v->current_order.ShouldGoToCouple()) return true;
+
+		TileIndexDiff step = TileOffsByDiagDir(TrackdirToExitdir(this->res_dest_td));
+		TileIndex first = TileAdd(this->res_dest_tile, step);
+		if (!IsValidTile(first) || !IsRailStationTile(first)) return true;
+
+		for (TileIndex t = first; IsCompatibleTrainStationTile(t, first); t = TileAdd(t, step)) {
+			if (IsCouplePartnerStandingOn(v, t)) break;
+			const Train *stranger = nullptr;
+			for (const Vehicle *u : VehiclesOnTile(t)) {
+				if (u->type == VehicleType::Train) { stranger = Train::From(u)->First(); break; }
+			}
+			if (stranger != nullptr) {
+				if (_show_train_orientation) {
+					IConsolePrint(CC_WARNING, "Vlak {}: cesta k rade - na nastupisti ({},{}) stoji vlak {}, cekam",
+							v->First()->unitnumber, TileX(t), TileY(t), stranger->unitnumber);
+				}
+				for (TileIndex b : this->couple_booked) SetRailStationReservation(b, false);
+				this->couple_booked.clear();
+				return false;
+			}
+			if (HasStationReservation(t)) continue;
+			SetRailStationReservation(t, true);
+			MarkTileDirtyByTile(t);
+			this->couple_booked.push_back(t);
+		}
+		if (_show_train_orientation && !this->couple_booked.empty()) {
+			IConsolePrint(CC_INFO, "Vlak {}: cesta k rade - zamluveno {} policek nastupiste az k rade",
+					v->First()->unitnumber, this->couple_booked.size());
 		}
 		return true;
 	}
@@ -268,6 +339,9 @@ public:
 			return false;
 		}
 
+		/* A collector's road runs on to its rake, or it is no road. */
+		if (!this->BookOnToRake()) return false;
+
 		this->signals_set_to_red.clear();
 		for (Node *node = this->res_dest_node; node->parent != nullptr; node = node->parent) {
 			node->IterateTiles(Yapf().GetVehicle(), Yapf(), *this, &CYapfReserveTrack<Types>::ReserveSingleTrack);
@@ -300,6 +374,10 @@ public:
 				for (auto [sig_tile, td] : this->signals_set_to_red) {
 					SetSignalStateByTrackdir(sig_tile, td, SignalState::Green);
 				}
+
+				/* And the platform tiles booked on beyond the road: no road, no gap to hold. */
+				for (TileIndex b : this->couple_booked) SetRailStationReservation(b, false);
+				this->couple_booked.clear();
 
 				return false;
 			}
