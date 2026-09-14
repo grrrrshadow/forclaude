@@ -378,19 +378,23 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				/* Reversing out is about where the train goes next, not about
 				 * how long it stays, so it has no place in the timetable.
 				 *
-				 * A decoupling order says it as well, whatever its own flag
-				 * holds: in the player's words a decoupling delivery is always
-				 * a reversing one -- backed in, wagons left at the far end, out
-				 * the way it came -- and the line is to say so, so the reader
-				 * is not left looking for it. The train itself does not turn
-				 * round on a decouple (it leaves the way it is pointing), so
-				 * the flag is not what is being reported here. */
-				if (!timetable && v->type == VehicleType::Train &&
-						(order->ShouldReverseOutOfStation() || order->ShouldDecoupleOnDeparture())) {
+				 * Not shown when the order decouples here, because then it is
+				 * not carried out (Vehicle::LeaveStation) -- an order can hold
+				 * both flags, and saying so would be a plain lie about what the
+				 * train is going to do. */
+				if (!timetable && v->type == VehicleType::Train && order->ShouldReverseOutOfStation() &&
+						!order->ShouldDecoupleOnDeparture()) {
 					second += GetString(STR_ORDER_REVERSE_OUT_SUFFIX);
 				}
-				if (!timetable && v->type == VehicleType::Train && order->ShouldDepartAutomatically() &&
-						!order->ShouldDecoupleOnDeparture()) {
+				/* A decoupling order says "automatic" whatever its own flags
+				 * hold, the player's word for it: how the engine leaves depends
+				 * on how it came in -- it drops the wagons and goes away from
+				 * them, backing off or pulling on -- and that is decided by the
+				 * train, not by a button. Saying so on the line keeps the
+				 * reader from looking for a reversing setting that is not there
+				 * and not needed. */
+				if (!timetable && v->type == VehicleType::Train &&
+						(order->ShouldDepartAutomatically() || order->ShouldDecoupleOnDeparture())) {
 					second += GetString(STR_ORDER_AUTO_DEPARTURE_SUFFIX);
 				}
 			}
