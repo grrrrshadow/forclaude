@@ -48,6 +48,7 @@
 #include "economy_func.h"
 #include "waypoint_base.h"
 #include "tunnelbridge_map.h"
+#include "tunnelbridge.h"
 
 #include "table/strings.h"
 #include "table/train_sprites.h"
@@ -666,6 +667,102 @@ static int SpeedOfTrainInBore(const Train *v, TileIndex mouth, int from, int *ga
 	 * behind at its own speed. One that went in by the other is coming at us,
 	 * and the only thing to do about that is stand still. */
 	return found->tile == mouth ? found->cur_speed : 0;
+}
+
+/**
+ * How far into a signalled bore the train in front has to be before another
+ * may follow it in, in pixels.
+ *
+ * Two tiles. Inside a bore there is no track to book and no signal to stand
+ * at, so the whole of what keeps the one behind off the back of the one in
+ * front is the distance it goes in with and the braking that holds it. Two
+ * tiles is enough for the one coming in to see the one ahead and match its
+ * speed before it has gone anywhere, and short enough that a bore of four
+ * tiles can still hold two trains -- which is most of the bridges a player
+ * builds.
+ */
+static constexpr int BORE_HEADWAY = TILE_SIZE * 2;
+
+/** And how close one may ever get to the other in there before it stops dead. */
+static constexpr int BORE_MIN_GAP = TILE_SIZE;
+
+/**
+ * Whether anybody is inside this bore.
+ *
+ * Not the same question as whether anything stands on its mouths: a train in
+ * a tunnel or on a bridge is hidden between them and is not on either tile to
+ * be found there. What it keeps is the mouth it went in by, so the trains are
+ * asked.
+ *
+ * @param tile either mouth
+ */
+bool IsTunnelBridgeOccupied(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::TunnelBridge)) return false;
+	TileIndex other = GetOtherTunnelBridgeEnd(tile);
+
+	for (const Train *t : Train::Iterate()) {
+		if (t->track != Track::Wormhole) continue;
+		if (t->tile == tile || t->tile == other) return true;
+	}
+	return false;
+}
+
+/**
+ * Whether a train may go into this bore behind the one already in it.
+ *
+ * A tunnel or a bridge used to be one block from end to end: whoever booked
+ * it had the whole of it, and the next train waited outside however long the
+ * thing was. A signal on the mouth makes it a stretch of line like any other,
+ * and this says when the next train may have it.
+ *
+ * Three things have to hold. There has to be somebody in there already -- a
+ * bore that is booked but still empty belongs to a train that is on its way to
+ * it, and letting a second one in would mean two trains arriving at the same
+ * mouth. Everybody in there has to have gone in by this mouth, because a train
+ * coming the other way is a head-on collision and nothing else. And the
+ * nearest of them has to be #BORE_HEADWAY in, with nothing of it left standing
+ * on the mouth.
+ *
+ * @param entry the mouth the train would go in by
+ * @return true if it may
+ */
+bool TunnelBridgeCanFollowIn(TileIndex entry)
+{
+	if (!IsTileType(entry, TileType::TunnelBridge)) return false;
+	if (!HasTunnelBridgeSignal(entry, TunnelBridgeSignal::Entry)) return false;
+
+	TileIndex other = GetOtherTunnelBridgeEnd(entry);
+
+	/* Nobody has the bore, so there is nobody to follow -- and the ordinary
+	 * booking has it anyway. Asked first because what follows walks every
+	 * vehicle in the game, and this is asked while a path is being searched. */
+	if (!HasTunnelBridgeReservation(entry) && !HasTunnelBridgeReservation(other)) return false;
+
+	DiagDirection dir = GetTunnelBridgeDirection(entry);
+	int mouth = AlongDirOfTile(dir, entry);
+
+	int nearest = INT32_MAX;
+	for (const Train *t : Train::Iterate()) {
+		if (t->track != Track::Wormhole) continue;
+		if (t->tile != entry && t->tile != other) continue;
+		/* Somebody in there going the other way. */
+		if (t->tile != entry) return false;
+		nearest = std::min(nearest, AlongDir(dir, t->x_pos, t->y_pos) - mouth);
+	}
+
+	if (nearest == INT32_MAX) return false; // nobody in there: booked by one still coming
+	if (nearest < BORE_HEADWAY) return false;
+
+	/* A long train's head is in there while its tail is still on the ramp, and
+	 * the ramp is one tile like any other. The hidden part of it is on this
+	 * tile too as far as the map is concerned, so only what is still visible
+	 * counts. */
+	for (const Vehicle *u : VehiclesOnTile(entry)) {
+		if (u->type != VehicleType::Train) continue;
+		if (Train::From(u)->track != Track::Wormhole) return false;
+	}
+	return true;
 }
 
 static int BrakingCeiling(const Train *v, const Train *moving_front)
@@ -8533,7 +8630,7 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 		Trackdir rev_td = ReverseTrackdir(cur_td);
 		if (IsSafeWaitingPosition(v, tile, cur_td, true, Forbid90DegFor(v))) {
 			bool wp_free = IsWaitingPositionFree(v, tile, cur_td, Forbid90DegFor(v));
-			if (!(wp_free && TryReserveRailTrack(tile, TrackdirToTrack(cur_td)))) break;
+			if (!(wp_free && TryReserveRailTrack(tile, TrackdirToTrack(cur_td), true, cur_td))) break;
 			/* Green path signal opposing the path? Turn to red. */
 			if (HasPbsSignalOnTrackdir(tile, rev_td) && GetSignalStateByTrackdir(tile, rev_td) == SignalState::Green) {
 				signals_set_to_red.emplace_back(tile, rev_td);
@@ -8544,7 +8641,7 @@ static PBSTileInfo ExtendTrainReservation(const Train *v, TrackBits *new_tracks,
 			return PBSTileInfo(tile, cur_td, true);
 		}
 
-		if (!TryReserveRailTrack(tile, TrackdirToTrack(cur_td))) break;
+		if (!TryReserveRailTrack(tile, TrackdirToTrack(cur_td), true, cur_td)) break;
 
 		/* Green path signal opposing the path? Turn to red. */
 		if (HasPbsSignalOnTrackdir(tile, rev_td) && GetSignalStateByTrackdir(tile, rev_td) == SignalState::Green) {
@@ -10367,6 +10464,12 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				v->y_pos = gp.y;
 				v->UpdatePosition();
 				if (!v->vehstatus.Test(VehState::Hidden)) v->Vehicle::UpdateViewport(true);
+				/* The signal on the mouth behind this train turns green as
+				 * soon as it is far enough in for the next one to follow it.
+				 * Nothing else would ask -- going in and coming out are the
+				 * other two moments -- so it is asked once a tile as this one
+				 * gets on. */
+				if (v->IsMovingFront() && gp.new_tile != gp.old_tile) UpdateTunnelBridgeSignals(v->tile);
 				continue;
 			}
 		}
@@ -10777,6 +10880,25 @@ static bool TrainCheckIfLineEnds(Train *moving_front, bool reverse)
 		if (break_speed < consist->cur_speed) consist->cur_speed = break_speed;
 	} else {
 		consist->vehstatus.Reset(VehState::TrainSlowing);
+	}
+
+	/* Inside a bore there are no tiles to read and no signal to stand at, so
+	 * nothing below this says anything about what is in there. The braking
+	 * ceiling brings a train down to the speed of the one in front of it; this
+	 * is what that comes down to when the one in front stops anyway. Without
+	 * it the ceiling's own floor (CEILING_FLOOR, which is there so the smoke
+	 * is not divided by nought) would carry the follower gently into the back
+	 * of it. */
+	if (moving_front->track == Track::Wormhole && IsTileType(moving_front->tile, TileType::TunnelBridge) &&
+			IsTunnelBridgeSignalled(moving_front->tile)) {
+		DiagDirection bore_dir = GetTunnelBridgeDirection(moving_front->tile);
+		int here = AlongDir(bore_dir, moving_front->x_pos, moving_front->y_pos);
+		int gap = 0;
+		if (SpeedOfTrainInBore(consist, moving_front->tile, here, &gap) >= 0 && gap < BORE_MIN_GAP) {
+			consist->vehstatus.Set(VehState::TrainSlowing);
+			consist->cur_speed = 0;
+			consist->subspeed = 0;
+		}
 	}
 
 	if (!TrainCanLeaveTile(moving_front)) return true;

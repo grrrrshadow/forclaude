@@ -272,6 +272,26 @@ struct CFollowTrackT {
 			}
 		}
 
+		/* A bore with signals on its mouths is not one block from end to end:
+		 * a train may go in behind the one already in there, so its booking is
+		 * not a wall to a train going the same way. The step that crosses a
+		 * bore lands on the far mouth, so which mouth the traffic is going in
+		 * by is read off the step rather than off the tile.
+		 *
+		 * Only for a train, and only the bore itself -- everything else about
+		 * a booking stays exactly as it was. */
+		if constexpr (Ttr_type_ == TransportType::Rail) {
+			if (IsTileType(this->new_tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(this->new_tile) == TransportType::Rail) {
+				TileIndex entry = INVALID_TILE;
+				if (this->is_tunnel || this->is_bridge) {
+					entry = this->old_tile; // gone through: the near mouth is where we came from
+				} else if (GetTunnelBridgeDirection(this->new_tile) == this->exitdir) {
+					entry = this->new_tile; // arriving at the mouth from outside
+				}
+				if (entry != INVALID_TILE && TunnelBridgeCanFollowIn(entry)) return true;
+			}
+		}
+
 		TrackBits reserved = GetReservedTrackbits(this->new_tile);
 		/* Mask already reserved trackdirs. */
 		this->new_td_bits.Reset(TrackBitsToTrackdirBits(reserved));

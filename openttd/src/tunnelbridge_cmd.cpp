@@ -1966,11 +1966,17 @@ static const uint8_t TUNNEL_SOUND_FRAME = 1;
 extern const DiagDirectionIndexArray<uint8_t> _tunnel_visibility_frame{12, 8, 8, 12};
 
 /**
- * Say what the signals on a signalled bore are showing: red while anything is
- * inside it or has booked its way through, green when it is empty.
+ * Say what the signals on a signalled bore are showing.
  *
- * Called when a train goes in and when one comes out, which are the only two
- * moments the answer can change.
+ * The answer is not the same at both ends any more. A bore used to be one
+ * block from end to end, so both mouths showed the one thing: red while
+ * anybody was in there, green when it was empty. Now a train may go in behind
+ * another, so each mouth says whether a train may go in by it -- green behind
+ * the traffic and red in front of it, which is what a signal on a line does.
+ *
+ * Called when a train goes in, when one comes out, and once a tile as one runs
+ * through, since the mouth behind it turns green the moment it is far enough
+ * in for the next one to follow.
  *
  * @param tile either end of the bore
  */
@@ -1979,29 +1985,19 @@ void UpdateTunnelBridgeSignals(TileIndex tile)
 	if (!IsTunnelBridgeSignalled(tile)) return;
 	TileIndex other = GetOtherTunnelBridgeEnd(tile);
 
-	/* Only what is actually in the bore. A booking through it means somebody
-	 * is coming, not that anybody is in there, and it is given back a moment
-	 * after the last vehicle leaves -- read here it was still set, and the
-	 * signal stayed red for good once a train had gone through. */
-	bool taken = false;
-	{
-		/* A train in the bore is not on either mouth to be found there: it is
-		 * hidden, somewhere between them, and the map's own list of what
-		 * stands on a tile goes by where a vehicle is, not by the tile it
-		 * belongs to. What it does keep is the mouth it went in by, so the
-		 * trains are asked instead. Only on the two moments this is called,
-		 * so walking them all costs nothing worth saving. */
-		for (const Train *t : Train::Iterate()) {
-			if (t->track != Track::Wormhole) continue;
-			if (t->tile != tile && t->tile != other) continue;
-			taken = true;
-			break;
-		}
-	}
+	/* An empty bore nobody has booked is open at both ends. A booked one that
+	 * is still empty belongs to a train on its way to it and is open to
+	 * nobody; one with somebody in it is open behind them, and that is
+	 * TunnelBridgeCanFollowIn()'s question. Note that the booking is given
+	 * back a moment after the last vehicle leaves, so it cannot stand in for
+	 * "anybody in there" -- read that way the signal stayed red for good once
+	 * a train had gone through. */
+	bool booked = HasTunnelBridgeReservation(tile) || HasTunnelBridgeReservation(other);
+	bool empty = !IsTunnelBridgeOccupied(tile);
 
-	SignalState want = taken ? SignalState::Red : SignalState::Green;
 	for (TileIndex t : {tile, other}) {
 		if (!IsTunnelBridgeSignalled(t)) continue;
+		SignalState want = (!booked && empty) || TunnelBridgeCanFollowIn(t) ? SignalState::Green : SignalState::Red;
 		if (GetTunnelBridgeSignalState(t, TunnelBridgeSignal::Entry) != want) {
 			SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Entry, want);
 			SetTunnelBridgeSignalState(t, TunnelBridgeSignal::Exit, want);

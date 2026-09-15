@@ -200,7 +200,10 @@ private:
 				this->res_fail_td = td;
 			}
 		} else {
-			if (!TryReserveRailTrack(tile, TrackdirToTrack(td))) {
+			/* The trackdir as well as the track: a bore is the same track
+			 * both ways and which way this train is going is what says
+			 * whether it may go in behind another (see TryReserveRailTrack()). */
+			if (!TryReserveRailTrack(tile, TrackdirToTrack(td), true, td)) {
 				/* Tile couldn't be reserved, undo. */
 				this->res_fail_tile = tile;
 				this->res_fail_td = td;

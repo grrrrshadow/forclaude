@@ -445,11 +445,12 @@ teststartdepo 48 51
 testsleduj 3 100" 12000 -g $S/brzda.sav; fi
 
 # Two trains down one long signalled tunnel, one behind the other, on the
-# player's own save. Today the second one brakes smoothly and waits a couple
-# of tiles short of the mouth until the first is out -- a bore is still one
-# section -- and the scene is here so that the day it takes two the change
-# shows up as a difference and not as a crash. Skipped where the save is not
-# in the working directory.
+# player's own save. The second one now follows the first in rather than
+# waiting outside for the bore to empty: it comes down to the leader's speed
+# on the way to the mouth and goes in behind it. What is watched here is what
+# the battery always watches -- nothing crashes, nothing asserts, nobody hits
+# anybody -- with the positions in reg_tunel2.log saying whether both were in
+# there at once. Skipped where the save is not in the working directory.
 if [ -f $S/brzda2.sav ]; then run_scene tunel2 "testpauza
 testbrzda 4
 testbrzda 5

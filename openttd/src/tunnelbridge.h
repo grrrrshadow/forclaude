@@ -44,6 +44,8 @@ inline void SetTunnelBridgeOwner(TileIndex begin, TileIndex end, Owner owner)
 	SetTileOwner(end, owner);
 }
 
+void UpdateTunnelBridgeSignals(TileIndex tile);
+
 extern TileIndex _build_tunnel_endtile;
 
 #endif /* TUNNELBRIDGE_H */

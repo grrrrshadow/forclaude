@@ -11,6 +11,7 @@
 #include "viewport_func.h"
 #include "vehicle_func.h"
 #include "newgrf_station.h"
+#include "train.h"
 #include "pathfinder/follow_track.hpp"
 
 #include "safeguards.h"
@@ -74,10 +75,11 @@ void SetRailStationPlatformReservation(TileIndex start, DiagDirection dir, bool 
  * @param tile the tile
  * @param t the track
  * @param trigger_stations whether to call station randomisation trigger
+ * @param td the direction of travel over the track, where it is known
  * @return \c true if reservation was successful, i.e. the track was
  *     free and didn't cross any other reserved tracks.
  */
-bool TryReserveRailTrack(TileIndex tile, Track t, bool trigger_stations)
+bool TryReserveRailTrack(TileIndex tile, Track t, bool trigger_stations, Trackdir td)
 {
 	assert(TrackdirBitsToTrackBits(GetTileTrackStatus(tile, TransportType::Rail, RoadTramType::Invalid).trackdirs).Test(t));
 
@@ -124,9 +126,27 @@ bool TryReserveRailTrack(TileIndex tile, Track t, bool trigger_stations)
 			break;
 
 		case TileType::TunnelBridge:
-			if (GetTunnelBridgeTransportType(tile) == TransportType::Rail && GetTunnelBridgeReservationTrackBits(tile).None()) {
+			if (GetTunnelBridgeTransportType(tile) != TransportType::Rail) break;
+			if (GetTunnelBridgeReservationTrackBits(tile).None()) {
 				SetTunnelBridgeReservation(tile, true);
 				return true;
+			}
+			/* Taken -- but a bore with signals on its mouths is not one block
+			 * from end to end any more, and a train may go in behind the one
+			 * already in there.
+			 *
+			 * Which way this train means to go cannot be read off the tile:
+			 * the one track through a bore is the same track both ways. So the
+			 * direction of travel is handed in where it is known, and without
+			 * it the old answer stands.
+			 *
+			 * Going out of the bore at this mouth is the far end of a passage
+			 * that was already allowed at the near one, or a train already in
+			 * there booking its way out. Either way the booking is its own and
+			 * there is nothing to ask. */
+			if (td != Trackdir::Invalid && IsTunnelBridgeSignalled(tile)) {
+				if (TrackdirToExitdir(td) != GetTunnelBridgeDirection(tile)) return true;
+				if (TunnelBridgeCanFollowIn(tile)) return true;
 			}
 			break;
 
@@ -178,7 +198,14 @@ void UnreserveRailTrack(TileIndex tile, Track t)
 			break;
 
 		case TileType::TunnelBridge:
-			if (GetTunnelBridgeTransportType(tile) == TransportType::Rail) SetTunnelBridgeReservation(tile, false);
+			if (GetTunnelBridgeTransportType(tile) != TransportType::Rail) break;
+			/* One booking given back is not the bore given back. With signals
+			 * on the mouths there may be a second train in there, and the bit
+			 * is the whole of what tells everything else that the bore is
+			 * taken -- given back under somebody still inside it, the next
+			 * train drives straight in on top of them. */
+			if (IsTunnelBridgeSignalled(tile) && IsTunnelBridgeOccupied(tile)) break;
+			SetTunnelBridgeReservation(tile, false);
 			break;
 
 		default:
@@ -522,10 +549,22 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	Track     track = TrackdirToTrack(trackdir);
 	TrackBits reserved = GetReservedTrackbits(tile);
 
+	/* A signalled bore this train may go into behind the one already in there
+	 * is not taken as far as this train is concerned; see
+	 * TunnelBridgeCanFollowIn(). Told apart by the way the train is heading:
+	 * the mouth it is coming to is the one it would go in by. */
+	auto may_follow_into = [](TileIndex t, DiagDirection heading) {
+		return IsTileType(t, TileType::TunnelBridge) && GetTunnelBridgeTransportType(t) == TransportType::Rail &&
+				GetTunnelBridgeDirection(t) == heading && TunnelBridgeCanFollowIn(t);
+	};
+
 	/* Tile reserved? Can never be a free waiting position. Unless the
 	 * booking is the casualty's own platform booking and the tile is a free
 	 * tile of that platform: that is where a rescue engine pulls up. */
-	if (TrackOverlapsTracks(reserved, track) && !IsCasualtyPlatformTileFree(v, tile)) return false;
+	if (TrackOverlapsTracks(reserved, track) && !IsCasualtyPlatformTileFree(v, tile) &&
+			!may_follow_into(tile, TrackdirToExitdir(trackdir))) {
+		return false;
+	}
 
 	/* Not reserved and depot or not a pbs signal -> free. */
 	if (IsRailDepotTile(tile)) return true;
@@ -546,6 +585,13 @@ bool IsWaitingPositionFree(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	if (Rail90DegTurnDisallowed(GetTileRailType(ft.old_tile), GetTileRailType(ft.new_tile), forbid_90deg)) ft.new_td_bits.Reset(TrackdirCrossesTrackdirs(trackdir));
 
 	if (!HasReservedTracks(ft.new_tile, TrackdirBitsToTrackBits(ft.new_td_bits))) return true;
+
+	/* The one thing booked in front that is not a reason to look further: the
+	 * mouth of a bore this train may follow another into. Standing at the last
+	 * signal before a tunnel until it is empty from end to end is the whole of
+	 * what this work is about; the booking in there belongs to a train that is
+	 * on its way out of the far end. */
+	if (may_follow_into(ft.new_tile, ft.exitdir)) return true;
 
 	/* The next tile being taken is normally the whole point of not stopping
 	 * here: a train that waits with something reserved right in front of it is
