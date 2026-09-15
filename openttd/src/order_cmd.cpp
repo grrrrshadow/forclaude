@@ -31,6 +31,8 @@
 
 #include "table/strings.h"
 
+#include "train.h"
+
 #include "safeguards.h"
 
 /* DestinationID must be at least as large as every these below, because it can
@@ -835,6 +837,7 @@ CommandCost CmdInsertOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					break;
 
 				case OrderConditionVariable::DrivingBackwards:
+				case OrderConditionVariable::NothingToCouple:
 					if (v->type != VehicleType::Train) return CMD_ERROR;
 					[[fallthrough]];
 
@@ -1392,7 +1395,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			OrderConditionVariable cond_variable = static_cast<OrderConditionVariable>(data);
 			if (cond_variable >= OrderConditionVariable::End) return CMD_ERROR;
 			if ((cond_variable == OrderConditionVariable::DrivingBackwards || cond_variable == OrderConditionVariable::WagonCount ||
-					cond_variable == OrderConditionVariable::TrainLength) && v->type != VehicleType::Train) {
+					cond_variable == OrderConditionVariable::TrainLength || cond_variable == OrderConditionVariable::NothingToCouple) &&
+					v->type != VehicleType::Train) {
 				return CMD_ERROR;
 			}
 			break;
@@ -1406,6 +1410,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 				case OrderConditionVariable::RequiresService:
 				case OrderConditionVariable::DrivingBackwards:
+				case OrderConditionVariable::NothingToCouple:
 					if (cond_comparator != OrderConditionComparator::IsTrue && cond_comparator != OrderConditionComparator::IsFalse) return CMD_ERROR;
 					break;
 
@@ -1421,6 +1426,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				case OrderConditionVariable::Unconditionally:
 				case OrderConditionVariable::RequiresService:
 				case OrderConditionVariable::DrivingBackwards:
+				case OrderConditionVariable::NothingToCouple:
 					return CMD_ERROR;
 
 				case OrderConditionVariable::LoadPercentage:
@@ -1620,6 +1626,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 					case OrderConditionVariable::RequiresService:
 					case OrderConditionVariable::DrivingBackwards:
+					case OrderConditionVariable::NothingToCouple:
 						if (occ != OrderConditionComparator::IsTrue && occ != OrderConditionComparator::IsFalse) order->SetConditionComparator(OrderConditionComparator::IsTrue);
 						order->SetConditionValue(0);
 						break;
@@ -2301,6 +2308,41 @@ static bool OrderConditionCompare(OrderConditionComparator occ, ConvertibleThrou
 }
 
 /**
+ * The next "go to couple" order after this one in a vehicle's list.
+ *
+ * "Next" goes all the way round, so a condition written after the couple order
+ * it is about still finds it -- on the following lap, which is when it matters.
+ * Found by walking from the asking order itself rather than from whatever index
+ * the caller happened to be working with, so the two cannot drift apart.
+ *
+ * @param v the vehicle
+ * @param from the conditional order doing the asking
+ * @return that couple order, or nullptr when the list holds none
+ */
+static const Order *NextCoupleOrderAfter(const Vehicle *v, const Order *from)
+{
+	VehicleOrderID num = v->GetNumOrders();
+	if (num == 0) return nullptr;
+
+	VehicleOrderID at = 0;
+	bool found = false;
+	for (VehicleOrderID i = 0; i < num; i++) {
+		if (v->GetOrder(i) == from) {
+			at = i;
+			found = true;
+			break;
+		}
+	}
+	if (!found) return nullptr;
+
+	for (VehicleOrderID step = 1; step <= num; step++) {
+		const Order *o = v->GetOrder((at + step) % num);
+		if (o != nullptr && o->ShouldGoToCouple()) return o;
+	}
+	return nullptr;
+}
+
+/**
  * Process a conditional order and determine the next order.
  * @param order the order the vehicle currently has
  * @param v the vehicle to update
@@ -2331,6 +2373,15 @@ VehicleOrderID ProcessConditionalOrder(const Order *order, const Vehicle *v)
 		 * does not fit on it -- the same rounding the game does everywhere it
 		 * asks how many tiles a train takes up. */
 		case OrderConditionVariable::TrainLength: skip_order = OrderConditionCompare(occ, CeilDiv(Train::From(v)->gcache.cached_total_length, TILE_SIZE), value); break;
+		/* Asked of the next "go to couple" order in the list, with its own
+		 * station, filter and count, so that what this train wants is written
+		 * down in one place. See CoupleOrderWouldFindSomething(). */
+		case OrderConditionVariable::NothingToCouple: {
+			const Order *couple = NextCoupleOrderAfter(v, order);
+			bool nothing = couple == nullptr || !CoupleOrderWouldFindSomething(Train::From(v), *couple);
+			skip_order = OrderConditionCompare(occ, nothing, value);
+			break;
+		}
 		default: NOT_REACHED();
 	}
 

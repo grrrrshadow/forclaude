@@ -3055,12 +3055,28 @@ static uint CountUnits(const Train *rake)
  * @param want       how many vehicles it was told to collect
  * @return the assembled rake, or nullptr if the shed cannot fill the order
  */
-static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_tile, uint want)
+/**
+ * How many stored units in a shed a "go to couple" order could draw on.
+ *
+ * Count first, touch nothing: a shed that cannot fill the order must be left
+ * exactly as it was -- rearranged and then not collected from would be the
+ * worst of both. Which is also what makes this the right thing to ask when
+ * the question is merely "would there be anything there", with no intention
+ * of taking it (see CoupleOrderWouldFindSomething()); asked that way it is
+ * the same count from the same rakes through the same filter, so the answer
+ * and the collecting can never disagree.
+ *
+ * @param v          the collecting engine
+ * @param order      its "go to couple" order
+ * @param depot_tile the shed the order names
+ * @param[out] pile  the rakes counted, where the caller means to draw on them
+ * @param tidy       whether to let go of claims that have gone stale; a
+ *                   question that is only being asked writes nothing at all,
+ *                   and a stale claim answers the same either way
+ * @return how many units are on offer
+ */
+static uint FreeDepotUnitsFor(Train *v, const Order &order, TileIndex depot_tile, std::vector<Train *> *pile, bool tidy)
 {
-	/* Count first, touch nothing. A shed that cannot fill the order must be
-	 * left exactly as it was -- rearranged and then not collected from would
-	 * be the worst of both. */
-	std::vector<Train *> pile;
 	uint available = 0;
 	for (Train *rake : Train::Iterate()) {
 		if (rake == v) continue;
@@ -3068,16 +3084,24 @@ static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_ti
 		if (!rake->IsFreeWagon()) continue;
 		if (rake->track != Track::Depot || rake->tile != depot_tile) continue;
 		if (rake->index == v->depot_dropped_rake) continue; // this train's own leavings
-		if (IsCoupleClaimStale(rake)) {
+		bool stale = IsCoupleClaimStale(rake);
+		if (stale && tidy) {
 			rake->couple_claim = VehicleID::Invalid();
 			MarkCoupleClaimChanged(rake);
 		}
-		if (rake->couple_claim != VehicleID::Invalid()) continue; // spoken for
+		if (!stale && rake->couple_claim != VehicleID::Invalid()) continue; // spoken for
 		if (!MatchesCoupleFilter(order, rake, false)) continue;
 
-		pile.push_back(rake);
+		if (pile != nullptr) pile->push_back(rake);
 		available += CountUnits(rake);
 	}
+	return available;
+}
+
+static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_tile, uint want)
+{
+	std::vector<Train *> pile;
+	uint available = FreeDepotUnitsFor(v, order, depot_tile, &pile, true);
 
 	/* Not enough: nothing is taken and nothing is moved. The waiting train says
 	 * why for itself, once, from the hold in TrainLocoHandler() -- said again
@@ -3310,7 +3334,7 @@ static void CollectPlatformTilesBehindWaypoint(const Train *v, const Waypoint *w
  *                rakes on platforms along its rails are on offer
  * @return the rake it is to fetch, or nullptr if there is nothing for it
  */
-static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoint *through = nullptr, bool *saw_full_rake = nullptr)
+static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoint *through = nullptr, bool *saw_full_rake = nullptr, bool claim = true)
 {
 	/* A couple order can name a station or a depot. At a station the offer is
 	 * anything waiting there to be coupled -- a rake, or a whole train. In a
@@ -3389,16 +3413,17 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 			}
 		}
 
-		if (IsCoupleClaimStale(rake)) {
+		bool stale = IsCoupleClaimStale(rake);
+		if (stale && claim) {
 			rake->couple_claim = VehicleID::Invalid();
 			MarkCoupleClaimChanged(rake);
 		}
 
-		if (rake->couple_claim == v->index) {
-			v->couple_target = rake->index; // already ours
+		if (!stale && rake->couple_claim == v->index) {
+			if (claim) v->couple_target = rake->index; // already ours
 			return rake;
 		}
-		if (rake->couple_claim != VehicleID::Invalid()) continue; // somebody else's
+		if (!stale && rake->couple_claim != VehicleID::Invalid()) continue; // somebody else's
 		if (!MatchesCoupleFilter(order, rake)) continue;
 		/* A founding order grows a rake only while there is room in it for
 		 * what this train brings; a finished rake is left for a collector. */
@@ -3409,6 +3434,9 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 
 		if (unclaimed == nullptr) unclaimed = rake;
 	}
+
+	/* Only asked about, not wanted: nothing is spoken for and nothing written. */
+	if (!claim) return unclaimed;
 
 	if (unclaimed != nullptr) {
 		if (_show_train_orientation && v->couple_target != unclaimed->index) {
@@ -3426,6 +3454,48 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 		v->couple_target = VehicleID::Invalid();
 	}
 	return unclaimed;
+}
+
+/**
+ * Would a "go to couple" order find anything, asked without speaking for it?
+ *
+ * The question a conditional order asks on the player's behalf: "if there is
+ * nothing to couple where I am going, send me elsewhere". It is asked of the
+ * couple order itself -- its station or shed, its cargo filter, its count --
+ * so that there is one place where what this train wants is written down.
+ * A filter of its own on the condition would be a second place to say the
+ * same thing, and the moment the two differed the condition would be
+ * answering about something the train was never going to pick up.
+ *
+ * Nothing is claimed and nothing is written: this is a look, and a look that
+ * spoke for a rake would take it out of the reach of the train that is
+ * actually going there.
+ *
+ * @param v     the train asking
+ * @param order the "go to couple" order to ask about
+ * @return whether that order would find something
+ */
+bool CoupleOrderWouldFindSomething(const Train *v, const Order &order)
+{
+	if (!order.ShouldGoToCouple()) return false;
+
+	/* The search below is written to be able to speak for what it finds, so it
+	 * takes the train as something it may write on. Handed "do not claim" it
+	 * writes nothing -- which is what makes this cast safe, and the only
+	 * reason it is here. */
+	Train *asker = const_cast<Train *>(v);
+
+	/* A shed with a number on the order is a store to draw that many out of,
+	 * and the search would make the rake up on the spot. Asked rather than
+	 * wanted, the question is whether the shed holds that many -- the same
+	 * count off the same rakes that the making would start from. */
+	if (order.IsType(OT_GOTO_DEPOT) && order.GetCoupleCount() != 0) {
+		const Depot *depot = Depot::GetIfValid(order.GetDestination().ToDepotID());
+		if (depot == nullptr) return false;
+		return FreeDepotUnitsFor(asker, order, depot->xy, nullptr, false) >= order.GetCoupleCount();
+	}
+
+	return FindOrClaimCoupleTarget(asker, order, nullptr, nullptr, false) != nullptr;
 }
 
 /**

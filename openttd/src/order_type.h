@@ -157,6 +157,7 @@ enum class OrderConditionVariable : uint8_t {
 	DrivingBackwards = 8, ///< Skip when the train is driving backwards
 	WagonCount = 9, ///< Skip based on how many wagons the train has, the engine not counted
 	TrainLength = 10, ///< Skip based on how long the train is, in tiles
+	NothingToCouple = 11, ///< Skip when the next "go to couple" order in the list would find nothing
 	End, ///< End marker.
 };
 

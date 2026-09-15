@@ -4428,14 +4428,27 @@ static bool ConTestConditionalOrder(std::span<std::string_view> argv)
 		auto pcmp = ParseInteger(argv[4]);
 		auto pval = ParseInteger(argv[5]);
 		if (!punit.has_value() || !pvar.has_value() || !pcmp.has_value() || !pval.has_value()) return false;
-		for (const Train *t : Train::Iterate()) {
+		for (Train *t : Train::Iterate()) {
 			if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+			AutoRestoreBackup cur_company(_current_company, t->owner);
+
+			/* Put into the list, asked, and taken out again. Asked off a loose
+			 * order it would be a different question: a condition that looks at
+			 * the orders around it (nothing to couple) has to be standing among
+			 * them to have anything to look at. */
 			Order order;
 			order.MakeConditional(0);
 			order.SetConditionVariable((OrderConditionVariable)*pvar);
 			order.SetConditionComparator((OrderConditionComparator)*pcmp);
 			order.SetConditionValue((uint16_t)*pval);
-			VehicleOrderID to = ProcessConditionalOrder(&order, t);
+			VehicleOrderID at = t->GetNumOrders();
+			if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, t->index, at, order).Failed()) {
+				IConsolePrint(CC_ERROR, "testpodminka: vlak {} - podminku {} {} {} nelze vlozit.", *punit, *pvar, *pcmp, *pval);
+				return true;
+			}
+			VehicleOrderID to = ProcessConditionalOrder(t->GetOrder(at), t);
+			Command<Commands::DeleteOrder>::Do(DoCommandFlag::Execute, t->index, at);
+
 			IConsolePrint(CC_DEFAULT, "testpodminka: vlak {} vagonu {} delka {} - podminka {} {} {} -> {}",
 					*punit, WagonUnitsBehindEngine(t), CeilDiv(t->gcache.cached_total_length, TILE_SIZE),
 					*pvar, *pcmp, *pval, to == INVALID_VEH_ORDER_ID ? "propadne" : "SKOK");
@@ -4448,13 +4461,13 @@ static bool ConTestConditionalOrder(std::span<std::string_view> argv)
 	if (argv.size() != 7) {
 		IConsolePrint(CC_HELP, "Add a conditional order. Usage: 'testpodminka <vlak> <kam vlozit> <promenna> <srovnani> <hodnota> <skoc na>'.");
 		IConsolePrint(CC_HELP, "Or ask without adding anything: 'testpodminka <vlak> zkus <promenna> <srovnani> <hodnota>'.");
-		IConsolePrint(CC_HELP, "promenna: {}=naklad% {}=spolehlivost {}=max rychlost {}=vek {}=servis {}=vzdy {}=zivotnost {}=max spolehlivost {}=couva {}=vagonu {}=delka",
+		IConsolePrint(CC_HELP, "promenna: {}=naklad% {}=spolehlivost {}=max rychlost {}=vek {}=servis {}=vzdy {}=zivotnost {}=max spolehlivost {}=couva {}=vagonu {}=delka {}=neni-co-pripojit",
 				to_underlying(OrderConditionVariable::LoadPercentage), to_underlying(OrderConditionVariable::Reliability),
 				to_underlying(OrderConditionVariable::MaxSpeed), to_underlying(OrderConditionVariable::Age),
 				to_underlying(OrderConditionVariable::RequiresService), to_underlying(OrderConditionVariable::Unconditionally),
 				to_underlying(OrderConditionVariable::RemainingLifetime), to_underlying(OrderConditionVariable::MaxReliability),
 				to_underlying(OrderConditionVariable::DrivingBackwards), to_underlying(OrderConditionVariable::WagonCount),
-				to_underlying(OrderConditionVariable::TrainLength));
+				to_underlying(OrderConditionVariable::TrainLength), to_underlying(OrderConditionVariable::NothingToCouple));
 		IConsolePrint(CC_HELP, "srovnani: 0=rovno 1=nerovno 2=mensi 3=mensi-rovno 4=vetsi 5=vetsi-rovno 6=je 7=neni");
 		return true;
 	}
