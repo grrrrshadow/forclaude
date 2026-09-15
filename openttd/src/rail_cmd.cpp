@@ -2012,7 +2012,15 @@ static bool IsTrainSignalSideRight()
  */
 bool IsPathSignalWarning(TileIndex tile, Trackdir td)
 {
-	if (!HasPbsSignalOnTrackdir(tile, td)) return false;
+	/* Any kind of signal, not only a path one. "The next signal along is at
+	 * danger" is what a distant signal has always said, and the plain block
+	 * signal is what most track is laid with -- it is the one the aspect is
+	 * worth the most on. */
+	/* Asked about a bore's mouth as well, which carries a signal of its own
+	 * but is not a rail tile: asking one of those about a signal puts the game
+	 * down (the headless rig draws, and the battery caught it). The kind that
+	 * guards itself was what stood here before; this one does not. */
+	if (!IsTileType(tile, TileType::Railway) || !HasSignalOnTrackdir(tile, td)) return false;
 	if (GetSignalStateByTrackdir(tile, td) != SignalState::Green) return false;
 
 	/* How far to look for the next signal. A signal further off than this
@@ -2071,30 +2079,42 @@ static void DrawSignalSprite(TileIndex tile, const RailTypeInfo *rti, Track trac
 	uint y = TileY(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].y;
 
 	/* Which of the three this signal is showing. The warning is worked out
-	 * from the road ahead and only a path signal can show it. */
+	 * from the road ahead; every kind of signal can show it, a block signal
+	 * included -- "the next one along is at danger" is what a distant signal
+	 * has always said, and the block signal is the one most track is laid
+	 * with. */
 	SignalAspect aspect = condition == SignalState::Red ? SignalAspect::Red : SignalAspect::Green;
-	if (aspect == SignalAspect::Green && type >= SignalType::Path && IsPathSignalWarning(tile, td)) aspect = SignalAspect::Warning;
+	if (aspect == SignalAspect::Green && IsPathSignalWarning(tile, td)) aspect = SignalAspect::Warning;
 
 	/* The rail type's own signals first, as the patchpack orders it: a set
 	 * that draws signals for one kind of track means them for that track. A
 	 * set that draws signal styles means them for everything, so it is asked
 	 * next; and the base set answers last. */
+	PaletteID pal = PAL_NONE;
 	SpriteID sprite = GetCustomSignalSprite(rti, tile, type, variant, aspect);
 	if (sprite == 0) sprite = GetCustomSignalStyleSprite(GetSignalStyleInUse(), rti, tile, type, variant, aspect, false);
+
+	if (sprite == 0 && aspect == SignalAspect::Warning) {
+		/* Nothing drew the warning -- the set has two aspects only, or none of
+		 * its own at all. Then it is that signal's own green with the lamp
+		 * repainted, which is a picture of the right signal whoever drew it. */
+		pal = PALETTE_SIGNAL_WARNING;
+		sprite = GetCustomSignalSprite(rti, tile, type, variant, SignalAspect::Green);
+		if (sprite == 0) sprite = GetCustomSignalStyleSprite(GetSignalStyleInUse(), rti, tile, type, variant, SignalAspect::Green, false);
+	}
+
 	if (sprite != 0) {
 		sprite += image;
-	} else if (aspect == SignalAspect::Warning) {
-		/* The set drew nothing for the warning -- it has only two aspects, or
-		 * none of its own at all -- so it is drawn from the base set. */
-		sprite = SPR_SIGNALS_WARNING_BASE + to_underlying(variant) * 16 +
-				(to_underlying(type) - to_underlying(SignalType::Path)) * 8 + image;
 	} else {
 		/* Normal electric signals are stored in a different sprite block than all other signals. */
 		sprite = (type == SignalType::Block && variant == SignalVariant::Electric) ? SPR_ORIGINAL_SIGNALS_BASE : SPR_SIGNALS_BASE - 16;
-		sprite += to_underlying(type) * 16 + to_underlying(variant) * 64 + image * 2 + to_underlying(condition) + (type >= SignalType::Path ? 64 : 0);
+		/* The warning is the green one repainted, so it is the green that is
+		 * asked for here. */
+		SignalState shown = aspect == SignalAspect::Warning ? SignalState::Green : condition;
+		sprite += to_underlying(type) * 16 + to_underlying(variant) * 64 + image * 2 + to_underlying(shown) + (type >= SignalType::Path ? 64 : 0);
 	}
 
-	AddSortableSpriteToDraw(sprite, PAL_NONE, x, y, GetSafeSlopeZ(x, y, track), {{}, {1, 1, BB_HEIGHT_UNDER_BRIDGE}, {}});
+	AddSortableSpriteToDraw(sprite, pal, x, y, GetSafeSlopeZ(x, y, track), {{}, {1, 1, BB_HEIGHT_UNDER_BRIDGE}, {}});
 }
 
 /** Offsets for drawing fences */

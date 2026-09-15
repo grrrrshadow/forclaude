@@ -2889,16 +2889,11 @@ static bool ConTestSignals(std::span<std::string_view> argv)
 			}
 		}
 	}
-	/* Whether the warning aspect actually has artwork to draw with. A base
-	 * set brings its own sprites for everything the game upstream has, so
-	 * the ones this build added are the ones worth checking (they went
-	 * missing once already: drawn into the signal block, which OpenGFX
-	 * supplies whole, and painted over). */
-	uint have = 0;
-	for (uint i = 0; i < 32; i++) {
-		if (SpriteExists(SPR_SIGNALS_WARNING_BASE + i)) have++;
-	}
-	IConsolePrint(CC_DEFAULT, "testnavesti: sprity vystrazne {}/32 nactenych (zaklad {}).", have, SPR_SIGNALS_WARNING_BASE);
+	/* Whether the aspect has anything to draw with. It is the green signal
+	 * repainted, so what has to be there is the recolour map; the pictures
+	 * are whatever drew the green. */
+	IConsolePrint(CC_DEFAULT, "testnavesti: prebarveni na zlutou {} (sprite {}).",
+			SpriteExists(PALETTE_SIGNAL_WARNING) ? "nacteno" : "CHYBI", PALETTE_SIGNAL_WARNING);
 	/* What the loaded sets said about drawing more than two aspects: the
 	 * property JGR's patchpack calls "railtype_extra_aspects". Nought means
 	 * the set draws red and green only and the base set's own warning sprite

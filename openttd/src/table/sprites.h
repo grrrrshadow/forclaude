@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 260;
+static const uint16_t OPENTTD_SPRITE_COUNT = 228;
 /** @} */
 
 /** @{
@@ -222,25 +222,6 @@ static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
 static const SpriteID SPR_RAID_ROCKET_GREY           = SPR_OPENTTD_BASE + 212;
 static const SpriteID SPR_RAID_ROCKET_YELLOW         = SPR_OPENTTD_BASE + 220;
 
-/**
- * The warning (yellow) aspect of a path signal: the next signal along the
- * line is at danger, so a train may pass this one but has to be braking
- * already. See DrawSingleSignal().
- *
- * Here among this build's own extra sprites, and deliberately not in the
- * signal block: a base set supplies that block whole -- OpenGFX does, and its
- * unused slots are blank -- so sprites put there are painted over and the
- * signal simply vanishes. Nothing but our own openttd.grf reaches past the
- * sprites the game has upstream (see OPENTTD_VANILLA_SPRITE_COUNT), so this
- * is the one range no base set can take away.
- *
- * Laid out as variant * 16 + (type - Path) * 8 + image: the four kinds of
- * path signal (plain and no-entry, electric and semaphore), eight images each.
- */
-static const SpriteID SPR_SIGNALS_WARNING_BASE       = SPR_OPENTTD_BASE + 228;
-/** How many sprites that is: four kinds of path signal, eight images each. */
-static const uint16_t SIGNALS_WARNING_SPRITE_COUNT   = 32;
-
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
 static const uint16_t PRESIGNAL_AND_SEMAPHORE_SPRITE_COUNT     = 112;
@@ -395,7 +376,7 @@ static const uint16_t EMPTY_BOUNDING_BOX_SPRITE_COUNT = 1;
 /** @{
  * Black palette sprite, needed for painting (fictive) tiles outside map. */
 static const SpriteID SPR_PALETTE_BASE = SPR_EMPTY_BOUNDING_BOX + EMPTY_BOUNDING_BOX_SPRITE_COUNT;
-static const uint16_t PALETTE_SPRITE_COUNT = 1;
+static const uint16_t PALETTE_SPRITE_COUNT = 2;
 /** @} */
 
 /** @{
@@ -1845,5 +1826,14 @@ static const PaletteID PALETTE_CHURCH_RED          = 1438; ///< Recolour sprite 
 static const PaletteID PALETTE_CHURCH_CREAM        = 1439; ///< Recolour sprite for white churches
 
 static const PaletteID PALETTE_ALL_BLACK           = SPR_PALETTE_BASE; ///< Exchange any colour by black, needed for painting fictive tiles outside map
+
+/**
+ * The warning (yellow) aspect of a signal: a green one whose booked road ends
+ * at or before the next signal, so a train may pass it but has to be braking
+ * already. Drawn as that signal's own green with the lamp repainted, which is
+ * what this map does -- so it is a picture of the right signal whoever drew
+ * it, base set or NewGRF. See DrawSignalSprite().
+ */
+static const PaletteID PALETTE_SIGNAL_WARNING      = SPR_PALETTE_BASE + 1;
 
 #endif /* SPRITES_H */

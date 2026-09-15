@@ -79,19 +79,6 @@ static constexpr auto _action5_types = std::to_array<Action5Type>({
 	/* 0x19 */ { Action5BlockType::AllowOffset, SPR_ROAD_WAYPOINTS_BASE,      1, ROAD_WAYPOINTS_SPRITE_COUNT,                 "Road waypoints"           },
 	/* 0x1A */ { Action5BlockType::AllowOffset, SPR_OVERLAY_ROCKS_BASE,       1, OVERLAY_ROCKS_SPRITE_COUNT,                  "Overlay rocks"            },
 	/* 0x1B */ { Action5BlockType::AllowOffset, SPR_BRIDGE_DECKS_BASE,        1, BRIDGE_DECKS_SPRITE_COUNT,                   "Bridge decks"             },
-	/* So a signal set can draw the warning aspect in its own hand instead of
-	 * wearing ours. Same order as our own sprites for it (see
-	 * SPR_SIGNALS_WARNING_BASE): variant * 16 + (type - Path) * 8 + image,
-	 * and an offset may be given to supply only some of them.
-	 *
-	 * The number is this game's own. There was nothing to borrow: the table
-	 * up to here is the same one JGR's patchpack has, and the extra aspects
-	 * it draws do not come through Action 5 at all -- they come through
-	 * feature 0E, where a set declares how many aspects it has and hands
-	 * back sprites from a sprite group, asked for the aspect in variable
-	 * 0x18. Reading that is a different piece of work and is not done here,
-	 * so a set written for the patchpack still shows its plain green. */
-	/* 0x1C */ { Action5BlockType::AllowOffset, SPR_SIGNALS_WARNING_BASE,     1, SIGNALS_WARNING_SPRITE_COUNT,                "Path signal warning aspect" },
 });
 
 /**
