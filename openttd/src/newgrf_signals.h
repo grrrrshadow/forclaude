@@ -17,7 +17,7 @@
 
 struct GRFFile;
 struct SpriteGroup;
-struct RailTypeInfo;
+class RailTypeInfo;
 
 /**
  * The variable a set reads to find out which style it is being asked to draw.
