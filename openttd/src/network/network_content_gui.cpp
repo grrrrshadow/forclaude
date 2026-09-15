@@ -25,6 +25,8 @@
 #include "../core/geometry_func.hpp"
 #include "../textfile_gui.h"
 #include "../fios.h"
+#include "../newgrf_config.h"
+#include "network.h"
 #include "network_content_gui.h"
 
 
@@ -323,6 +325,273 @@ public:
 		}
 	}
 };
+
+/** Nested widgets for the window that fetches what a savegame names. */
+static constexpr std::initializer_list<NWidgetPart> _nested_savegame_content_fetch_widgets = {
+	NWidget(WWT_CAPTION, Colours::Grey), SetStringTip(STR_CONTENT_FETCH_SAVEGAME_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+	NWidget(WWT_PANEL, Colours::Grey),
+		NWidget(NWID_VERTICAL), SetPIP(0, WidgetDimensions::unscaled.vsep_wide, 0), SetPadding(WidgetDimensions::unscaled.modalpopup),
+			NWidget(WWT_EMPTY, Colours::Invalid, WID_NCDS_PROGRESS_BAR), SetFill(1, 0),
+			NWidget(WWT_EMPTY, Colours::Invalid, WID_NCDS_PROGRESS_TEXT), SetFill(1, 0), SetMinimalSize(350, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::White, WID_NCDS_CANCELOK), SetStringTip(STR_BUTTON_CANCEL), SetFill(1, 0),
+		EndContainer(),
+	EndContainer(),
+};
+
+/** Window description for the window that fetches what a savegame names. */
+static WindowDesc _savegame_content_fetch_window_desc(
+	WindowPosition::Center, {}, 0, 0,
+	WindowClass::NetworkStatus, WindowClass::None,
+	WindowDefaultFlag::Modal,
+	_nested_savegame_content_fetch_widgets
+);
+
+/**
+ * Getting from the content service the exact NewGRF releases a savegame names,
+ * before that savegame is loaded.
+ *
+ * Ordinarily a newer release of a set stands in for an older one and the game
+ * simply loads. For one pair of sets it may not (see MustMatchSavegameRelease()),
+ * and then the release the savegame names is not a nicety -- without it the game
+ * loads with the set switched off. So it is fetched first, which is the only
+ * moment it is any use: afterwards the game is already loaded without it.
+ *
+ * The service keeps superseded releases for exactly this, marked as being for
+ * savegames only: they are not offered to somebody browsing for something to
+ * play with, but a savegame may ask for one by checksum, which is what this does.
+ *
+ * Whatever happens -- no network, no answer, the service has not got it, the
+ * player presses cancel -- the load goes ahead afterwards. A game that refuses
+ * to load without the network would be a worse thing than one that loads short
+ * of a set and says so, which is what it did before any of this.
+ */
+struct SavegameContentFetchWindow : public Window, ContentCallback, NewGRFScanCallback {
+	/** How far this has got. */
+	enum class Stage : uint8_t {
+		Asking, ///< Asked the service about the releases; waiting to hear which of them it has.
+		Downloading, ///< Fetching them.
+		Scanning, ///< Fetched; the game is looking at the disk again.
+	};
+
+	/** How long to wait for an answer before giving up and loading anyway. */
+	static constexpr uint ANSWER_TIMEOUT_MS = 20000;
+
+	std::vector<GRFIdentifier> wanted; ///< The releases the savegame names.
+	std::function<void()> on_done; ///< The load, held until there is nothing left to wait for.
+	Stage stage = Stage::Asking;
+	uint answered = 0; ///< How many of #wanted the service has said something about.
+	uint waited_ms = 0; ///< How long there has been nothing to show for it.
+
+	uint total_bytes = 0; ///< Bytes to fetch.
+	uint downloaded_bytes = 0; ///< Bytes fetched.
+	uint total_files = 0; ///< Files to fetch.
+	uint downloaded_files = 0; ///< Files started.
+	uint completed_files = 0; ///< Files finished.
+	uint32_t cur_id = UINT32_MAX; ///< Which file the progress is about.
+	std::string name; ///< Its name.
+
+	SavegameContentFetchWindow(std::vector<GRFIdentifier> wanted, std::function<void()> on_done)
+		: Window(_savegame_content_fetch_window_desc), wanted(std::move(wanted)), on_done(std::move(on_done))
+	{
+		this->InitNested(NetworkStatusWindowNumber::ContentDownload);
+
+		ContentVector cv;
+		for (const GRFIdentifier &id : this->wanted) {
+			auto ci = std::make_unique<ContentInfo>();
+			ci->type = ContentType::NewGRF;
+			ci->state = ContentInfo::State::DoesNotExist;
+			ci->unique_id = std::byteswap(id.grfid);
+			ci->md5sum = id.md5sum;
+			cv.push_back(std::move(ci));
+		}
+
+		_network_content_client.Clear();
+		_network_content_client.AddCallback(this);
+		_network_content_client.RequestContentList(&cv, true);
+	}
+
+	/**
+	 * Stop waiting and let whatever was held go ahead.
+	 * @note Closing is what runs it, so that a window shut from outside does not
+	 *       swallow the load along with itself.
+	 */
+	void Finish()
+	{
+		this->Close();
+	}
+
+	void Close([[maybe_unused]] int data = 0) override
+	{
+		_network_content_client.RemoveCallback(this);
+		/* Taken out of the window before the window goes, and run afterwards:
+		 * what it does is start a game load, which is no thing to be doing from
+		 * inside the closing of a window. */
+		std::function<void()> done = std::move(this->on_done);
+		this->on_done = nullptr;
+		this->Window::Close(data);
+		if (done) done();
+	}
+
+	void OnReceiveContentInfo(const ContentInfo &ci) override
+	{
+		if (this->stage != Stage::Asking) return;
+
+		for (const GRFIdentifier &id : this->wanted) {
+			if (ci.unique_id != std::byteswap(id.grfid) || ci.md5sum != id.md5sum) continue;
+			this->answered++;
+			this->waited_ms = 0;
+			/* One it has not got comes back as well, saying so; nothing to select then. */
+			if (ci.IsValid() && ci.state != ContentInfo::State::DoesNotExist) _network_content_client.Select(ci.id);
+			break;
+		}
+
+		if (this->answered >= this->wanted.size()) this->StartDownload();
+	}
+
+	/** Everything the service had to say has been said; fetch what it has. */
+	void StartDownload()
+	{
+		_network_content_client.DownloadSelectedContent(this->total_files, this->total_bytes);
+		if (this->total_files == 0 || this->total_bytes == 0) {
+			/* It has not got any of them. Nothing more to wait for. */
+			this->Finish();
+			return;
+		}
+		this->stage = Stage::Downloading;
+		this->waited_ms = 0;
+		this->SetDirty();
+	}
+
+	void OnDownloadProgress(const ContentInfo &ci, int bytes) override
+	{
+		if (ci.id != this->cur_id) {
+			this->name = ci.filename;
+			this->cur_id = ci.id;
+			this->downloaded_files++;
+		}
+
+		/* A negative value means we are resetting; for example, when retrying or using a fallback. */
+		if (bytes < 0) {
+			this->downloaded_bytes = 0;
+		} else {
+			this->downloaded_bytes += bytes;
+		}
+
+		this->waited_ms = 0;
+		this->SetDirty();
+	}
+
+	void OnDownloadComplete([[maybe_unused]] ContentID cid) override
+	{
+		this->completed_files++;
+		if (this->completed_files < this->total_files) return;
+
+		/* On the disk now, but the game's list of what is on the disk was made
+		 * before it was. Nothing may load until that list has been made again. */
+		this->stage = Stage::Scanning;
+		this->waited_ms = 0;
+		this->SetDirty();
+		if (!RequestNewGRFScan(this)) this->Finish();
+	}
+
+	void OnNewGRFsScanned() override
+	{
+		this->Finish();
+	}
+
+	void OnDisconnect() override
+	{
+		if (this->stage == Stage::Asking) this->Finish();
+	}
+
+	void OnRealtimeTick(uint delta_ms) override
+	{
+		/* A scan is the game's own work and takes as long as it takes; everything
+		 * else here is somebody else's machine answering, and may never answer. */
+		if (this->stage == Stage::Scanning) return;
+
+		this->waited_ms += delta_ms;
+		if (this->waited_ms < ANSWER_TIMEOUT_MS) return;
+
+		_network_content_client.Cancel();
+		this->Finish();
+	}
+
+	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		if (widget != WID_NCDS_CANCELOK) return;
+		_network_content_client.Cancel();
+		this->Finish();
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		switch (widget) {
+			case WID_NCDS_PROGRESS_BAR: {
+				auto max_value = GetParamMaxDigits(8);
+				size = GetStringBoundingBox(GetString(STR_CONTENT_DOWNLOAD_PROGRESS_SIZE, max_value, max_value, max_value));
+				size.height += WidgetDimensions::scaled.frametext.Horizontal();
+				size.width += WidgetDimensions::scaled.frametext.Vertical();
+				break;
+			}
+
+			case WID_NCDS_PROGRESS_TEXT:
+				size.height = GetCharacterHeight(FontSize::Normal) * 2 + WidgetDimensions::scaled.vsep_normal;
+				break;
+		}
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		switch (widget) {
+			case WID_NCDS_PROGRESS_BAR: {
+				DrawFrameRect(r, Colours::Grey, {FrameFlag::BorderOnly, FrameFlag::Lowered});
+				if (this->total_bytes == 0) break;
+				Rect ir = r.Shrink(WidgetDimensions::scaled.bevel);
+				DrawFrameRect(ir.WithWidth((uint64_t)ir.Width() * this->downloaded_bytes / this->total_bytes, _current_text_dir == TD_RTL), Colours::Mauve, {});
+				DrawString(ir.left, ir.right, CentreBounds(ir.top, ir.bottom, GetCharacterHeight(FontSize::Normal)),
+					GetString(STR_CONTENT_DOWNLOAD_PROGRESS_SIZE, this->downloaded_bytes, this->total_bytes, this->downloaded_bytes * 100LL / this->total_bytes),
+					TextColour::FromString, AlignmentH::Centre);
+				break;
+			}
+
+			case WID_NCDS_PROGRESS_TEXT:
+				if (this->stage == Stage::Asking) {
+					DrawStringMultiLine(r, STR_CONTENT_FETCH_SAVEGAME_ASKING, TextColour::FromString, {AlignmentH::Centre, AlignmentV::Middle});
+				} else if (this->stage == Stage::Scanning || this->downloaded_bytes == this->total_bytes) {
+					DrawStringMultiLine(r, STR_CONTENT_DOWNLOAD_COMPLETE, TextColour::FromString, {AlignmentH::Centre, AlignmentV::Middle});
+				} else if (!this->name.empty()) {
+					DrawStringMultiLine(r,
+						GetString(STR_CONTENT_DOWNLOAD_FILE, this->name, this->downloaded_files, this->total_files),
+						TextColour::FromString, {AlignmentH::Centre, AlignmentV::Middle});
+				} else {
+					DrawStringMultiLine(r, STR_CONTENT_DOWNLOAD_INITIALISE, TextColour::FromString, {AlignmentH::Centre, AlignmentV::Middle});
+				}
+				break;
+		}
+	}
+};
+
+/**
+ * Fetch the exact NewGRF releases a savegame names, and then carry on.
+ * @param wanted The releases, checksums and all.
+ * @param on_done What was waiting for them; run once there is nothing left to
+ *                wait for, whether they were got or not.
+ * @return Whether the fetching was started. When it was not, @p on_done has not
+ *         been run and the caller still has it to do.
+ */
+bool FetchExactNewGRFs(std::vector<GRFIdentifier> wanted, std::function<void()> on_done)
+{
+#if defined(WITH_ZLIB)
+	if (wanted.empty() || !_network_available) return false;
+
+	CloseWindowById(WindowClass::NetworkStatus, NetworkStatusWindowNumber::ContentDownload);
+	new SavegameContentFetchWindow(std::move(wanted), std::move(on_done));
+	return true;
+#else
+	return false;
+#endif /* WITH_ZLIB */
+}
 
 /** Filter data for NetworkContentListWindow. */
 struct ContentListFilterData {

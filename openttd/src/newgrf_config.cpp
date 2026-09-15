@@ -439,6 +439,18 @@ GRFListCompatibility IsGoodGRFConfigList(GRFConfigList &grfconfig)
 	for (auto &c : grfconfig) {
 		const GRFConfig *f = FindGRFConfig(c->ident.grfid, FindGRFConfigMode::Exact, &c->ident.md5sum);
 		if (f == nullptr || f->flags.Test(GRFConfigFlag::Invalid)) {
+			/* A set this game will run in one release and no other (see
+			 * MustMatchSavegameRelease()): another release of it is not a
+			 * substitute at all, because loading the game is what then refuses
+			 * it. Reported missing, which is what it is, so that everything
+			 * that works on missing files works on this too. */
+			if (MustMatchSavegameRelease(grfconfig, *c)) {
+				Debug(grf, 0, "NewGRF {:08X} ({}) is wanted in exactly the release the savegame names; checksum {}", std::byteswap(c->ident.grfid), c->filename, FormatArrayAsHex(c->ident.md5sum));
+				c->status = GRFStatus::NotFound;
+				res = GRFListCompatibility::NotFound;
+				continue;
+			}
+
 			/* If we have not found the exactly matching GRF try to find one with the
 			 * same grfid, as it most likely is compatible */
 			f = FindGRFConfig(c->ident.grfid, FindGRFConfigMode::Compatible, nullptr, c->version);

@@ -249,6 +249,10 @@ void AppendToGRFConfigList(GRFConfigList &dst, std::unique_ptr<GRFConfig> &&el);
 void ClearGRFConfigList(GRFConfigList &config);
 void ResetGRFConfig(bool defaults);
 GRFListCompatibility IsGoodGRFConfigList(GRFConfigList &grfconfig);
+
+/* Implemented in newgrf.cpp, where the sets these are about are named. */
+bool MustMatchSavegameRelease(const GRFConfigList &list, const GRFConfig &config);
+std::vector<GRFIdentifier> GetSavegameReleasesToFetch(const GRFConfigList &list);
 bool FillGRFDetails(GRFConfig &config, bool is_static, Subdirectory subdir = Subdirectory::NewGrf);
 std::string GRFBuildParamList(const GRFConfig &c);
 

@@ -793,9 +793,22 @@ public:
 						extern bool _sl_legacy_decouple_import;
 						_file_to_saveload.legacy_decouple_import = _sl_legacy_decouple_import;
 					}
-					_switch_mode = (_game_mode == GameMode::Editor) ? SwitchMode::LoadScenario : SwitchMode::LoadGame;
+					SwitchMode mode = (_game_mode == GameMode::Editor) ? SwitchMode::LoadScenario : SwitchMode::LoadGame;
 					ClearErrorMessages();
+
+					/* A release this savegame names that the game has not got and
+					 * will not take another release of (see
+					 * MustMatchSavegameRelease()) is fetched now, because now is
+					 * the only moment it is any use: once the game is loaded
+					 * without it there is nothing useful left to do with it. Read
+					 * out before the window goes, since that takes the savegame's
+					 * list with it. Nothing else about missing files changes --
+					 * every other set still loads in whatever release is on the
+					 * disk, as it always did. */
+					std::vector<GRFIdentifier> fetch;
+					if (_network_available) fetch = GetSavegameReleasesToFetch(_load_check_data.grfconfig);
 					this->Close();
+					if (!FetchExactNewGRFs(std::move(fetch), [mode]() { _switch_mode = mode; })) _switch_mode = mode;
 				}
 				break;
 			}

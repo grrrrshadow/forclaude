@@ -4507,6 +4507,56 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
 }
 
 /**
+ * Say what the game makes of a savegame's NewGRFs, and fetch what it will not
+ * take a substitute for.
+ *
+ * The question this answers cannot be got at from a headless game any other
+ * way: which releases the savegame names, which of them are on the disk, which
+ * were swapped for another release of the same set, and which this game refuses
+ * to swap (see MustMatchSavegameRelease()). Those last are what the load button
+ * fetches before it loads, and "stahni" does that same fetching here.
+ *
+ * Usage: testgrf <savegame> [stahni]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSavegameGrfs(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2 && argv.size() != 3) {
+		IConsolePrint(CC_HELP, "Say what a savegame's NewGRFs come to. Usage: 'testgrf <soubor> [stahni]'.");
+		return true;
+	}
+
+	_load_check_data.Clear();
+	if (SaveOrLoad(std::string(argv[1]), SaveLoadOperation::Check, DetailedFileType::GameFile, Subdirectory::None, false) == SaveLoadResult::Error) {
+		IConsolePrint(CC_ERROR, "testgrf: soubor {} nejde precist.", argv[1]);
+		return true;
+	}
+
+	static const char * const stav[] = {"neznamo", "vypnuto", "nenalezeno", "pripraveno", "aktivni"};
+	for (const auto &c : _load_check_data.grfconfig) {
+		const char *jak = c->status == GRFStatus::NotFound ? "CHYBI" :
+				(c->flags.Test(GRFConfigFlag::Compatible) ? "nahrazeno jinym vydanim" : "presne to, ktere sav jmenuje");
+		IConsolePrint(CC_DEFAULT, "testgrf: {:08X} ({}) - {}, stav {}", std::byteswap(c->ident.grfid), c->filename, jak,
+				to_underlying(c->status) < lengthof(stav) ? stav[to_underlying(c->status)] : "?");
+	}
+
+	std::vector<GRFIdentifier> fetch = GetSavegameReleasesToFetch(_load_check_data.grfconfig);
+	IConsolePrint(CC_DEFAULT, "testgrf: nahrada se neuznava u {} sad, sit {}", fetch.size(), _network_available ? "je" : "neni");
+	for (const GRFIdentifier &id : fetch) {
+		IConsolePrint(CC_DEFAULT, "testgrf:   chce {:08X} soucet {}", std::byteswap(id.grfid), FormatArrayAsHex(id.md5sum));
+	}
+
+	if (argv.size() == 3 && argv[2] == "stahni") {
+		if (FetchExactNewGRFs(std::move(fetch), []() { IConsolePrint(CC_DEFAULT, "testgrf: stahovani dobehlo, tady by se nacetla hra."); })) {
+			IConsolePrint(CC_DEFAULT, "testgrf: stahovani zacalo.");
+		} else {
+			IConsolePrint(CC_DEFAULT, "testgrf: neni co stahovat, nebo neni sit.");
+		}
+	}
+	return true;
+}
+
+/**
  * Turn a train round, the same as the player's reverse button.
  * Usage: testotoc <unit number>
  * @copydoc IConsoleCmdProc
@@ -7622,6 +7672,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
+	IConsole::CmdRegister("testgrf",                  ConTestSavegameGrfs);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("testpreklop",             ConTestFlipInDepot);
 	IConsole::CmdRegister("testpresun",              ConTestMoveInDepot);

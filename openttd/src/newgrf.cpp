@@ -915,6 +915,71 @@ bool IsWagonCargoExceptionGrf(const GRFConfig &config)
 	return std::byteswap(config.ident.grfid) == WAGON_CARGO_EXCEPTION_GRFID && config.GetName() == WAGON_CARGO_EXCEPTION_NAME;
 }
 
+/** FIRS 5. Written the way it reads in the file; the id is stored the other way round in memory. */
+static constexpr GrfID FIRS_5_GRFID = 0xF1250009;
+
+/**
+ * Is FIRS 5 among these NewGRFs?
+ * @param list NewGRFs to look through -- a game's, or a savegame's.
+ */
+static bool HasFirs5(const GRFConfigList &list)
+{
+	for (const auto &c : list) {
+		if (c->status == GRFStatus::NotFound) continue;
+		if (std::byteswap(c->ident.grfid) == FIRS_5_GRFID) return true;
+	}
+	return false;
+}
+
+/**
+ * Is this a NewGRF the game must have in the very release a savegame names, rather
+ * than in whatever release of the same set happens to be on the disk?
+ *
+ * Ordinarily a newer release of a set stands in for an older one and that is the
+ * right thing: sets say in their own header which releases they may stand in for,
+ * and where they say nothing the game takes the newest. That stays exactly as it
+ * was for everything.
+ *
+ * Except here. The wagons that make FIRS 5 work alongside the CZTR sets are one
+ * release and no other -- it is the release the cargo exception above is written
+ * for, and the one LoadNewGRF() refuses to run any substitute for. So a savegame
+ * naming that release and a disk holding a different one is not a case of "near
+ * enough": the substitute would be loaded, refused, and switched off, and the
+ * game would run with no wagons at all. Reported missing instead, which is what
+ * it is, so that the machinery for fetching what is missing works on it.
+ *
+ * All of this set's releases declare version nought and lowest-loadable nought,
+ * so the game cannot tell them apart by version -- only the savegame's checksum
+ * says which one is meant.
+ *
+ * @param list The NewGRFs of the game or savegame @p config belongs to.
+ * @param config The NewGRF in question.
+ */
+bool MustMatchSavegameRelease(const GRFConfigList &list, const GRFConfig &config)
+{
+	if (std::byteswap(config.ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) return false;
+	return HasFirs5(list);
+}
+
+/**
+ * Which releases a savegame names this game has not got and will not take a
+ * substitute for.
+ * @param list A savegame's NewGRFs, already looked up against the disk by
+ *             IsGoodGRFConfigList() -- the ones it could not find are the ones
+ *             asked about here.
+ * @return Their identities, checksums and all, ready to be asked for.
+ */
+std::vector<GRFIdentifier> GetSavegameReleasesToFetch(const GRFConfigList &list)
+{
+	std::vector<GRFIdentifier> wanted;
+	for (const auto &c : list) {
+		if (c->status != GRFStatus::NotFound) continue;
+		if (!MustMatchSavegameRelease(list, *c)) continue;
+		wanted.push_back(c->ident);
+	}
+	return wanted;
+}
+
 /**
  * Find the activated NewGRF the wagon-cargo exception is written for.
  * @return Its configuration, or nullptr when it is not in this game.
@@ -2233,7 +2298,7 @@ void LoadNewGRF(SpriteID load_index, uint num_baseset)
 		bool firs5 = false;
 		for (const auto &c : _grfconfig) {
 			if (c->status == GRFStatus::NotFound) continue;
-			if (std::byteswap(c->ident.grfid) == 0xF1250009) {
+			if (std::byteswap(c->ident.grfid) == FIRS_5_GRFID) {
 				firs5 = true;
 				break;
 			}
