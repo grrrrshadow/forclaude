@@ -163,6 +163,8 @@ static const OrderConditionVariable _order_conditional_variable[] = {
 	OrderConditionVariable::RemainingLifetime,
 	OrderConditionVariable::RequiresService,
 	OrderConditionVariable::DrivingBackwards,
+	OrderConditionVariable::WagonCount,
+	OrderConditionVariable::TrainLength,
 	OrderConditionVariable::Unconditionally,
 };
 
@@ -1697,7 +1699,10 @@ public:
 			case WID_O_COND_VARIABLE: {
 				DropDownList list;
 				for (const auto &ocv : _order_conditional_variable) {
-					if (ocv == OrderConditionVariable::DrivingBackwards && this->vehicle->type != VehicleType::Train) continue;
+					if ((ocv == OrderConditionVariable::DrivingBackwards || ocv == OrderConditionVariable::WagonCount ||
+							ocv == OrderConditionVariable::TrainLength) && this->vehicle->type != VehicleType::Train) {
+						continue;
+					}
 					list.push_back(MakeDropDownListStringItem(STR_ORDER_CONDITIONAL_LOAD_PERCENTAGE + to_underlying(ocv), to_underlying(ocv)));
 				}
 				ShowDropDownList(this, std::move(list), to_underlying(this->vehicle->GetOrder(this->OrderGetSel())->GetConditionVariable()), WID_O_COND_VARIABLE);

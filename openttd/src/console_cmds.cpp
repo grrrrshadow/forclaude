@@ -50,6 +50,7 @@
 #include "vehicle_func.h"
 #include "station_cmd.h"
 #include "order_cmd.h"
+#include "order_func.h"
 #include "timetable_cmd.h"
 #include "order_base.h"
 #include "order_func.h"
@@ -2459,8 +2460,13 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 	for (const Train *t : Train::Iterate()) {
 		if (t->First() != t) continue;
 		if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
-		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) vozu {} {} rozkazu {}",
-				t->unitnumber, TileX(t->tile), TileY(t->tile), CountVehiclesInChain(t),
+		/* Two counts, because they are two different numbers and the orders
+		 * speak the second one: vehicles in the chain, and units behind the
+		 * engine -- which is what a couple, a decouple and now a conditional
+		 * order all mean by "wagons". */
+		IConsolePrint(CC_DEFAULT, "vlak {}: ({},{}) vozu {} vagonu {} delka {} {} rozkazu {}",
+				t->unitnumber, TileX(t->tile), TileY(t->tile), CountVehiclesInChain(t), WagonUnitsBehindEngine(t),
+				CeilDiv(t->gcache.cached_total_length, TILE_SIZE),
 				t->IsInDepot() ? "v depu" : (t->vehstatus.Test(VehState::Stopped) ? "stopnut" : "venku"),
 				t->GetNumOrders());
 		int n = 0;
@@ -2476,6 +2482,11 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 			if (o.ShouldDecoupleOnDeparture()) extra += o.ShouldDecoupleWholeTrain() ? " ODPOJIT:cely vlak" : (o.GetDecoupleCount() == 0 ? " ODPOJIT:vse" : fmt::format(" ODPOJIT:nechat {}", o.GetDecoupleCount()));
 			if (o.ShouldReverseOutOfStation()) extra += " REVERZ";
 			if (o.IsType(OT_GOTO_DEPOT) && o.ShouldTurnAroundInDepot()) extra += " OTOC-DEPO";
+			if (o.IsType(OT_CONDITIONAL)) {
+				extra += fmt::format(" PODMINKA:promenna {} srovnani {} hodnota {} skok na {}",
+						to_underlying(o.GetConditionVariable()), to_underlying(o.GetConditionComparator()),
+						o.GetConditionValue(), o.GetConditionSkipToOrder());
+			}
 			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);
 		}
 	}
@@ -4390,6 +4401,87 @@ static bool ConTestHonk(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testhoukat: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Put a conditional order at the end of a train's orders, for the rig.
+ *
+ * The order window is the player's way in and a headless game has none, so
+ * without this there is no way to measure what a conditional order actually
+ * does -- which is the whole question when a new thing to ask about is added.
+ * The numbers are those of OrderConditionVariable and OrderConditionComparator
+ * in order_type.h; the help lists the ones this build has.
+ *
+ * Usage: testpodminka <unit number> <where> <variable> <comparator> <value> <skip to>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestConditionalOrder(std::span<std::string_view> argv)
+{
+	/* "zkus" asks the condition about the train as it stands, without putting
+	 * an order anywhere: the answer alone, which is the thing worth measuring
+	 * when a new thing to ask about is added. Getting a train to actually walk
+	 * onto a conditional order in a headless game is a scene of its own. */
+	if (argv.size() == 6 && argv[2] == "zkus") {
+		auto punit = ParseInteger(argv[1]);
+		auto pvar = ParseInteger(argv[3]);
+		auto pcmp = ParseInteger(argv[4]);
+		auto pval = ParseInteger(argv[5]);
+		if (!punit.has_value() || !pvar.has_value() || !pcmp.has_value() || !pval.has_value()) return false;
+		for (const Train *t : Train::Iterate()) {
+			if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+			Order order;
+			order.MakeConditional(0);
+			order.SetConditionVariable((OrderConditionVariable)*pvar);
+			order.SetConditionComparator((OrderConditionComparator)*pcmp);
+			order.SetConditionValue((uint16_t)*pval);
+			VehicleOrderID to = ProcessConditionalOrder(&order, t);
+			IConsolePrint(CC_DEFAULT, "testpodminka: vlak {} vagonu {} delka {} - podminka {} {} {} -> {}",
+					*punit, WagonUnitsBehindEngine(t), CeilDiv(t->gcache.cached_total_length, TILE_SIZE),
+					*pvar, *pcmp, *pval, to == INVALID_VEH_ORDER_ID ? "propadne" : "SKOK");
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testpodminka: vlak {} nenalezen.", argv[1]);
+		return true;
+	}
+
+	if (argv.size() != 7) {
+		IConsolePrint(CC_HELP, "Add a conditional order. Usage: 'testpodminka <vlak> <kam vlozit> <promenna> <srovnani> <hodnota> <skoc na>'.");
+		IConsolePrint(CC_HELP, "Or ask without adding anything: 'testpodminka <vlak> zkus <promenna> <srovnani> <hodnota>'.");
+		IConsolePrint(CC_HELP, "promenna: {}=naklad% {}=spolehlivost {}=max rychlost {}=vek {}=servis {}=vzdy {}=zivotnost {}=max spolehlivost {}=couva {}=vagonu {}=delka",
+				to_underlying(OrderConditionVariable::LoadPercentage), to_underlying(OrderConditionVariable::Reliability),
+				to_underlying(OrderConditionVariable::MaxSpeed), to_underlying(OrderConditionVariable::Age),
+				to_underlying(OrderConditionVariable::RequiresService), to_underlying(OrderConditionVariable::Unconditionally),
+				to_underlying(OrderConditionVariable::RemainingLifetime), to_underlying(OrderConditionVariable::MaxReliability),
+				to_underlying(OrderConditionVariable::DrivingBackwards), to_underlying(OrderConditionVariable::WagonCount),
+				to_underlying(OrderConditionVariable::TrainLength));
+		IConsolePrint(CC_HELP, "srovnani: 0=rovno 1=nerovno 2=mensi 3=mensi-rovno 4=vetsi 5=vetsi-rovno 6=je 7=neni");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto pwhere = ParseInteger(argv[2]);
+	auto pvar = ParseInteger(argv[3]);
+	auto pcmp = ParseInteger(argv[4]);
+	auto pval = ParseInteger(argv[5]);
+	auto pskip = ParseInteger(argv[6]);
+	if (!punit.has_value() || !pwhere.has_value() || !pvar.has_value() || !pcmp.has_value() || !pval.has_value() || !pskip.has_value()) return false;
+
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+
+		Order order;
+		order.MakeConditional((VehicleOrderID)*pskip);
+		order.SetConditionVariable((OrderConditionVariable)*pvar);
+		order.SetConditionComparator((OrderConditionComparator)*pcmp);
+		order.SetConditionValue((uint16_t)*pval);
+
+		CommandCost r = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*pwhere, order);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testpodminka: vlak {} na misto {} -> podminka {} {} {}, skok na {} - {}",
+				*punit, *pwhere, *pvar, *pcmp, *pval, *pskip, r.Succeeded() ? "vlozeno" : GetString(r.GetErrorMessage()));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testpodminka: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -7634,6 +7726,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testpauza",               ConTestUnpause);
 	IConsole::CmdRegister("testfiltr",               ConTestCoupleFilter);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
+	IConsole::CmdRegister("testpodminka",            ConTestConditionalOrder);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);

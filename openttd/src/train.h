@@ -111,6 +111,7 @@ bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
 bool IsCouplePartnerStandingOn(const Train *v, TileIndex tile);
 bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks);
 Train *FindCoupledBoundary(Train *v);
+uint WagonUnitsBehindEngine(const Train *v);
 bool IsTunnelBridgeOccupied(TileIndex tile);
 bool TunnelBridgeCanFollowIn(TileIndex entry);
 

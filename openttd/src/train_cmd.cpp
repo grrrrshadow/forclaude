@@ -2882,8 +2882,16 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 	return true;
 }
 
-/** How many units this train would leave standing under a "decouple all" order. */
-static uint WagonUnitsBehindEngine(const Train *v)
+/**
+ * How many units this train would leave standing under a "decouple all" order.
+ *
+ * The engine is not counted, and a double-headed engine's rear half and any
+ * articulated part are stepped over, so this is the same number the player
+ * writes into a couple or a decouple order -- and the same one the conditional
+ * order asks about (OrderConditionVariable::WagonCount). One meaning of "how
+ * many wagons", used everywhere it is asked.
+ */
+uint WagonUnitsBehindEngine(const Train *v)
 {
 	uint units = 0;
 	for (const Train *u = v->GetNextUnit(); u != nullptr; u = u->GetNextUnit()) units++;

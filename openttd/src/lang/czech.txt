@@ -5000,6 +5000,8 @@ STR_ORDER_CONDITIONAL_UNCONDITIONALLY                           :Vždy
 STR_ORDER_CONDITIONAL_REMAINING_LIFETIME                        :Zbývající životnost (v letech)
 STR_ORDER_CONDITIONAL_MAX_RELIABILITY                           :Nejvyšší dosažitelná spolehlivost
 STR_ORDER_CONDITIONAL_DRIVING_BACKWARDS                         :Jízda dozadu
+STR_ORDER_CONDITIONAL_WAGON_COUNT                               :Počet vagonů (mašinka se nepočítá)
+STR_ORDER_CONDITIONAL_TRAIN_LENGTH                              :Délka vlaku (v dlaždicích)
 ###next-name-looks-similar
 
 STR_ORDER_CONDITIONAL_COMPARATOR_TOOLTIP                        :{BLACK}Jak porovnat vlastnost vozidla se zadanou hodnotou

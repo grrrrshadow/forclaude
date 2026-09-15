@@ -826,6 +826,14 @@ CommandCost CmdInsertOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			OrderConditionComparator occ = new_order.GetConditionComparator();
 			if (occ >= OrderConditionComparator::End) return CMD_ERROR;
 			switch (new_order.GetConditionVariable()) {
+				case OrderConditionVariable::WagonCount:
+				case OrderConditionVariable::TrainLength:
+					/* Numbers like the others, but about things only a train
+					 * has; asked of anything else they would have no answer. */
+					if (v->type != VehicleType::Train) return CMD_ERROR;
+					if (occ == OrderConditionComparator::IsTrue || occ == OrderConditionComparator::IsFalse) return CMD_ERROR;
+					break;
+
 				case OrderConditionVariable::DrivingBackwards:
 					if (v->type != VehicleType::Train) return CMD_ERROR;
 					[[fallthrough]];
@@ -1383,7 +1391,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_COND_VARIABLE: {
 			OrderConditionVariable cond_variable = static_cast<OrderConditionVariable>(data);
 			if (cond_variable >= OrderConditionVariable::End) return CMD_ERROR;
-			if (cond_variable == OrderConditionVariable::DrivingBackwards && v->type != VehicleType::Train) return CMD_ERROR;
+			if ((cond_variable == OrderConditionVariable::DrivingBackwards || cond_variable == OrderConditionVariable::WagonCount ||
+					cond_variable == OrderConditionVariable::TrainLength) && v->type != VehicleType::Train) {
+				return CMD_ERROR;
+			}
 			break;
 		}
 
@@ -2313,6 +2324,13 @@ VehicleOrderID ProcessConditionalOrder(const Order *order, const Vehicle *v)
 		case OrderConditionVariable::Unconditionally: skip_order = true; break;
 		case OrderConditionVariable::RemainingLifetime: skip_order = OrderConditionCompare(occ, std::max(TimerGameCalendar::DateToYear(v->max_age - v->age + CalendarTime::DAYS_IN_LEAP_YEAR - 1), TimerGameCalendar::Year(0)), value); break;
 		case OrderConditionVariable::DrivingBackwards: skip_order = OrderConditionCompare(occ, v->IsDrivingBackwards(), value); break;
+		/* The engine is not counted, so that this is the same number the player
+		 * writes into a couple or a decouple order. */
+		case OrderConditionVariable::WagonCount: skip_order = OrderConditionCompare(occ, WagonUnitsBehindEngine(Train::From(v)), value); break;
+		/* Rounded up, because a train that sticks a pixel out of a platform
+		 * does not fit on it -- the same rounding the game does everywhere it
+		 * asks how many tiles a train takes up. */
+		case OrderConditionVariable::TrainLength: skip_order = OrderConditionCompare(occ, CeilDiv(Train::From(v)->gcache.cached_total_length, TILE_SIZE), value); break;
 		default: NOT_REACHED();
 	}
 
