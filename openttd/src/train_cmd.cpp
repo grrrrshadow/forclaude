@@ -5516,7 +5516,40 @@ bool HandleRescueEngineInDepot(Train *tow)
 	/* Still to be fetched, so the job is not over and there is nothing here to
 	 * put down. Say so rather than doing anything: the caller has to let the
 	 * engine reach the code that lets a train out of a depot. */
-	if (!in_tow && casualty != nullptr && IsWaitingToBeRescued(casualty->First())) return false;
+	if (!in_tow && casualty != nullptr && IsWaitingToBeRescued(casualty->First())) {
+		/* Unless the brake is on. Brake off is what puts an engine on call and
+		 * brake on is what parks it -- that is already the rule for being given
+		 * a job (see TryDispatchRescueEngine()), and it has to mean the same for
+		 * a job already given. Parked, this engine is never going to leave the
+		 * shed: the code that lets a train out is a long way past the gate that
+		 * stops a stopped one, and so is the giving-up that happens when no road
+		 * to the casualty can be found. So it stood here with the case in its
+		 * hand for good, while every other engine on call read the case as taken
+		 * and stayed at home -- the player's "another one is going, the stopped
+		 * one". It lets the case go instead, and the next engine's look picks it
+		 * up within a few dozen ticks.
+		 *
+		 * In a shed only: an engine the player stops out on the line is stopped,
+		 * not stood down, and keeps what it was sent for (the player's ruling).
+		 * And with nothing in tow, which is the case this branch is. The road it
+		 * booked towards the casualty was booked for this errand and goes back
+		 * with it; it keeps the ground under itself like anything standing. */
+		if (tow->vehstatus.Test(VehState::Stopped)) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: odtah - zabrzdena v depu, pousti pripad {} pro ostatni (tik {})",
+						tow->unitnumber, tow->rescue_target.base(), TimerGameTick::counter);
+			}
+			FreeTrainTrackReservation(tow);
+			tow->ReserveTrackUnderConsist();
+			EndRescueErrand(tow);
+			tow->rescue_hold = RescueHold::Braked;
+			tow->current_order.MakeDummy();
+			tow->SetDestTile(INVALID_TILE);
+			InvalidateWindowData(WindowClass::VehicleView, tow->index);
+			SetWindowDirty(WindowClass::VehicleDepot, tow->tile);
+		}
+		return false;
+	}
 
 	EndRescueErrand(tow);
 
@@ -5986,6 +6019,19 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * settled. */
 	Direction arrived_heading = (collector != nullptr ? collector : leading)->GetMovingDirection();
 
+	/* Some gap is normal -- a train cannot reserve the tile its partner stands
+	 * on, so it stops about a tile short and the two are closed up after the
+	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
+	 * of closing up should be asked to cover. */
+	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+
+	/* Said here rather than above, where it is worked out: a train standing
+	 * still with a partner somewhere along its booked road is asked to couple
+	 * on every tick, and most of those askings are a train that has simply not
+	 * arrived yet -- the player stopping a rescue engine halfway to its
+	 * casualty leaves it saying this twenty times a second, into the one log
+	 * that has to stay readable. Past the distance check it is a coupling that
+	 * is really about to happen. */
 	if (_show_train_orientation) {
 		const Train *c = collector != nullptr ? collector : leading;
 		IConsolePrint(CC_INFO, "Vlak {}: pred spojenim - smer prijezdu {}, couva {}, nos {}",
@@ -5993,12 +6039,6 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 				c->First()->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
 				to_underlying(c->direction));
 	}
-
-	/* Some gap is normal -- a train cannot reserve the tile its partner stands
-	 * on, so it stops about a tile short and the two are closed up after the
-	 * splice by CloseUpCoupledConsist(). Only refuse a distance that no amount
-	 * of closing up should be asked to cover. */
-	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
 	/* Near is not joined. At a junction the two ends can stand a tile apart
 	 * with no rail leading from one to the other, and a splice made there is a

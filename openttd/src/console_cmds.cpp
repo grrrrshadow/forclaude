@@ -3141,7 +3141,7 @@ static bool ConTestRescueDepot(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo] [signal cycle] [dve]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -3180,6 +3180,11 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * down once the tow is out (testzbourat depo) and the only depot left to
 	 * bring the casualty to is the one it is half inside of, behind the tow. */
 	bool stub_shed = argv.size() >= 2 && argv[1] == "depo";
+	/* A second rescue engine, on call in the depot at the far end -- the one
+	 * nearer the casualty, so it is the one sent. Built here rather than by
+	 * testpostav because only the scene knows where it put its depots: the
+	 * strip lands wherever the map happens to be flat. */
+	bool second_tow = argv.size() >= 4 ? argv[3] == "dve" : (argv.size() >= 3 && argv[2] == "dve");
 	uint8_t sig_cycle = 0;
 	if (oneway && argv.size() >= 3) {
 		auto n = ParseInteger(argv[2]);
@@ -3386,6 +3391,20 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		return true;
 	}
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+
+	/* And a second one in the east depot, when asked for: it stands nearer the
+	 * casualty, so the call goes to it and the west engine is the one left to
+	 * pick the case up if it lets go. */
+	if (second_tow) {
+		auto [cost_r2, veh_r2, un_j, un_k, un_l] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_r2.Failed() || Command<Commands::SetRescueEngine>::Do(DoCommandFlag::Execute, veh_r2, true).Failed()) {
+			IConsolePrint(CC_ERROR, "testodtah: second rescue engine failed.");
+			return true;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r2, false);
+		IConsolePrint(CC_DEFAULT, "testodtah: druha odtahovka = vlak {} v depu ({},{}).",
+				Train::Get(veh_r2)->unitnumber, TileX(depot_e), TileY(depot_e));
+	}
 
 	/* Send the casualty off; the tick watcher breaks it down the moment its
 	 * front turns onto the branch. */

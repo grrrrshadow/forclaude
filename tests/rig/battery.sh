@@ -523,3 +523,17 @@ setting vehicle.rescue_wait_days 2
 testodtah daleko 0
 testzatik 300 testvrak 1
 testzatik 2400 teststav" 5000
+
+# The engine sent for a casualty is stopped by the player while still in its
+# shed. Parked, it is never going to leave, so it lets the case go and the
+# other engine on call fetches it instead (odtazeno=1).
+run_scene stopkadepo "vlak123 on
+testodtah daleko 0 dve
+testzatik 260 testbrzda 2" 8000
+
+# And stopped out on the line it keeps what it was sent for -- stopping is not
+# standing down. Started again, it finishes the job (odtazeno=1).
+run_scene stopkatrat "vlak123 on
+testodtah daleko 0
+testzatik 700 testbrzda 2
+testzatik 1720 testbrzda 2" 6000
