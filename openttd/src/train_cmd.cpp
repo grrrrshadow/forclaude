@@ -808,7 +808,16 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		 * booked ends the look: which way the train will go is not settled,
 		 * and a signal down one of the ways says nothing about the other. */
 		TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
-		if (reserved.None()) on_our_booking = false;
+		if (reserved.None()) {
+			on_our_booking = false;
+		} else if (!on_our_booking) {
+			/* Past the end of this train's own road and somebody has booked
+			 * this ground: that is a stop, and the last place to stand is the
+			 * tile before it. Every tile from here on is somebody else's, so
+			 * there is nothing further to read. */
+			ask(0, entered_at);
+			break;
+		}
 		TrackdirBits onward = reserved.Any() ? reserved : ft.new_td_bits;
 		if (onward.Count() != 1) break;
 		Trackdir next_td = FindFirstTrackdir(onward);
@@ -820,8 +829,8 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 
 		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td) &&
 				GetSignalStateByTrackdir(ft.new_tile, next_td) == SignalState::Red) {
-			/* A red signal, of whatever kind: the train stops short of its
-			 * tile, at the end of the tile before (see TrainCheckIfLineEnds()).
+			/* A red signal: the train stops short of its tile, at the end of
+			 * the tile before (see TrainCheckIfLineEnds()).
 			 *
 			 * Read off the line, not off this train's booking. The booking
 			 * only ever runs to the next signal, and reading its end as a stop
@@ -830,9 +839,23 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 			 * held three blocks at once and nothing could follow it closely
 			 * (measured on the player's save: seventeen tiles held, three
 			 * signals). A driver reads the signals instead, and the booking is
-			 * left as the game has always laid it. */
-			ask(0, px);
-			break;
+			 * left as the game has always laid it.
+			 *
+			 * A path signal is the exception, and only past this train's own
+			 * road. Such a signal is red until somebody books a way through
+			 * it, so its red says nothing at all about whether this train may
+			 * pass -- on an empty line every signal ahead is red until the
+			 * train reaches the one before it. Braking for them had a train
+			 * alone on a clear line slowing at every block: measured on the
+			 * player's save, 98 down to 48 and back every four tiles, which is
+			 * the spacing of his signals. What a train cannot pass is ground
+			 * somebody else has booked or is standing on, and both are read
+			 * above. A block signal keeps its meaning: its red is the block's
+			 * own state and nobody has to book anything for it to clear. */
+			if (on_our_booking || !IsPbsSignal(GetSignalType(ft.new_tile, TrackdirToTrack(next_td)))) {
+				ask(0, px);
+				break;
+			}
 		}
 
 		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td)) last_signal_px = px;
