@@ -456,3 +456,15 @@ testbrzda 4
 testbrzda 5
 testza 2000 testkde
 testza 6000 testkde" 12000 -g $S/brzda2.sav; fi
+
+# The same two trains, with the first stopped by hand while it is inside the
+# tunnel with the second one behind it. Nothing in a bore brings a train to a
+# stand -- no tile boundary to refuse to cross, no signal to stand at -- so
+# this is the scene that says the hold behind the train in front is a real
+# stop and not merely a slower speed. It crashed both trains until it was.
+if [ -f $S/brzda2.sav ]; then run_scene tunelstop "vlak123 on
+testpauza
+testbrzda 4
+testbrzda 5
+testzatik 1500 testbrzda 4
+testzatik 2600 testkde" 2800 -g $S/brzda2.sav; fi

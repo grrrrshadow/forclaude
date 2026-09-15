@@ -765,6 +765,59 @@ bool TunnelBridgeCanFollowIn(TileIndex entry)
 	return true;
 }
 
+/**
+ * Whether a train inside a bore has to stand where it is, because what is in
+ * front of it in there is within #BORE_MIN_GAP.
+ *
+ * This is the last thing between two trains in one tunnel and it has to be a
+ * real stop, not a slower speed. Everywhere else on the railway a train is
+ * brought to a stand by the ground: its booking ends, the tile boundary it
+ * may not cross is the end of it, and TrainApproachingLineEnd() sees to the
+ * run-up. A bore has none of that -- no tiles, no signal, nothing but the
+ * pixels between the two -- so the braking ceiling was all there was, and a
+ * ceiling cannot stop anything: it may not go below CEILING_FLOOR (a ceiling
+ * of nought divides the smoke by zero), and anything above nought carries the
+ * follower into the back of the leader a pixel a tick. Which is what happened
+ * the moment the player stopped the first train inside a tunnel: seven pixels
+ * apart is a collision, and the second train crept the last nine.
+ *
+ * So the hold is on the movement itself and not on the speed. Its answer is
+ * read once a tick, before the train is moved (see TrainLocoHandler()); while
+ * it holds, the train does not advance at all, whatever its speed works out
+ * to be.
+ *
+ * "In front" is the bore and the mouth it is coming out of. A train standing
+ * on the far mouth is not in the bore -- it is on an ordinary tile -- but to
+ * a train inside there is nothing between them either, and the player's first
+ * train came to a stand on exactly that tile.
+ *
+ * @param consist the train asking, its head
+ * @param moving_front its leading end
+ */
+static bool TrainHeldInBore(const Train *consist, const Train *moving_front)
+{
+	if (moving_front->track != Track::Wormhole) return false;
+
+	TileIndex entry = moving_front->tile;
+	if (!IsTileType(entry, TileType::TunnelBridge)) return false;
+	if (!IsTunnelBridgeSignalled(entry)) return false;
+
+	DiagDirection dir = GetTunnelBridgeDirection(entry);
+	TileIndex other = GetOtherTunnelBridgeEnd(entry);
+	int here = AlongDir(dir, moving_front->x_pos, moving_front->y_pos);
+
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() == consist) continue;
+		bool in_bore = t->track == Track::Wormhole && (t->tile == entry || t->tile == other);
+		bool on_far_mouth = t->track != Track::Wormhole && t->tile == other;
+		if (!in_bore && !on_far_mouth) continue;
+
+		int at = AlongDir(dir, t->x_pos, t->y_pos) - here;
+		if (at >= 0 && at < BORE_MIN_GAP) return true;
+	}
+	return false;
+}
+
 static int BrakingCeiling(const Train *v, const Train *moving_front)
 {
 	if (moving_front->track == Track::Depot) return INT32_MAX;
@@ -10882,25 +10935,6 @@ static bool TrainCheckIfLineEnds(Train *moving_front, bool reverse)
 		consist->vehstatus.Reset(VehState::TrainSlowing);
 	}
 
-	/* Inside a bore there are no tiles to read and no signal to stand at, so
-	 * nothing below this says anything about what is in there. The braking
-	 * ceiling brings a train down to the speed of the one in front of it; this
-	 * is what that comes down to when the one in front stops anyway. Without
-	 * it the ceiling's own floor (CEILING_FLOOR, which is there so the smoke
-	 * is not divided by nought) would carry the follower gently into the back
-	 * of it. */
-	if (moving_front->track == Track::Wormhole && IsTileType(moving_front->tile, TileType::TunnelBridge) &&
-			IsTunnelBridgeSignalled(moving_front->tile)) {
-		DiagDirection bore_dir = GetTunnelBridgeDirection(moving_front->tile);
-		int here = AlongDir(bore_dir, moving_front->x_pos, moving_front->y_pos);
-		int gap = 0;
-		if (SpeedOfTrainInBore(consist, moving_front->tile, here, &gap) >= 0 && gap < BORE_MIN_GAP) {
-			consist->vehstatus.Set(VehState::TrainSlowing);
-			consist->cur_speed = 0;
-			consist->subspeed = 0;
-		}
-	}
-
 	if (!TrainCanLeaveTile(moving_front)) return true;
 
 	/* Determine the non-diagonal direction in which we will exit this tile */
@@ -11624,6 +11658,17 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	}
 
 	int j = consist->UpdateSpeed();
+
+	/* Held against the back of the train in front of it in the same bore: it
+	 * does not advance this tick, whatever the speed above works out to be.
+	 * See TrainHeldInBore() for why this is on the movement and not on the
+	 * speed. */
+	if (TrainHeldInBore(consist, consist->GetMovingFront())) {
+		consist->vehstatus.Set(VehState::TrainSlowing);
+		consist->cur_speed = 0;
+		consist->subspeed = 0;
+		j = 0;
+	}
 
 	/* we need to invalidate the widget if we are stopping from 'Stopping 0 km/h' to 'Stopped' */
 	if (consist->cur_speed == 0 && consist->vehstatus.Test(VehState::Stopped)) {
