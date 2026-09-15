@@ -1319,21 +1319,18 @@ static bool ConTestSmoke(std::span<std::string_view> argv)
 static bool ConIndustryHealth(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
-	/* "mm" is the same switch with less typing, for as long as this is being
-	 * tried out; it goes away with the testing. Under that name there is no
-	 * second word to step over. */
-	const size_t first = (argv[0] == "mm") ? 1 : 2;
-	if (first == 2 && (argv.size() < 2 || argv[1] != "karla")) {
+	if (argv.size() < 2 || argv[1] != "karla") {
 		IConsolePrint(CC_HELP, "Show how much of an industry's building is left, in its own window.");
 		IConsolePrint(CC_HELP, "Usage: 'miluju karla' to flip it, or 'miluju karla on' / 'miluju karla off'.");
-		IConsolePrint(CC_HELP, "'mm' is the short way of typing the same thing, while this is being tested.");
 		return true;
 	}
 
-	if (argv.size() > first) {
-		if (argv[first] == "on" || argv[first] == "1") {
+	/* The switch itself is the third word: the console took the first as the
+	 * command name and the second is the rest of the name. */
+	if (argv.size() > 2) {
+		if (argv[2] == "on" || argv[2] == "1") {
 			_show_industry_health = true;
-		} else if (argv[first] == "off" || argv[first] == "0") {
+		} else if (argv[2] == "off" || argv[2] == "0") {
 			_show_industry_health = false;
 		} else {
 			return false;
@@ -7720,7 +7717,6 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
 
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
-	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
 	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);
