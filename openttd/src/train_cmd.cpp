@@ -6442,6 +6442,18 @@ void LeaveHeadlessChainWaiting(Train *chain)
 	chain->flags.Reset(VehicleRailFlag::LeavingStation);
 	chain->wait_counter = 0;
 
+	/* A chain that is already standing in a stop the station knows about --
+	 * a rake put down earlier and waiting, or one still filling up -- is
+	 * about to be entered into the station afresh below. Two stops over the
+	 * one chain is not a thing: the station would list it twice and the
+	 * second payment would be opened over the first, which is the assert in
+	 * PrepareUnload(). So the stop it is in is put to rest first, the way a
+	 * splice puts one to rest, and the fresh one is started over it as it
+	 * now is. The coupling that calls this never arrives here mid-stop (the
+	 * splice settled both halves already), so this is for the rig command
+	 * that asks for the wait on whatever it finds outside a depot. */
+	SettleLoadingBeforeSplice(chain);
+
 	StationID at = StationUnderChain(chain);
 	if (at != StationID::Invalid()) {
 		LeaveRakeWaitingAtStation(chain, at, OrderLoadType::NoLoad, OrderUnloadType::NoUnload);
