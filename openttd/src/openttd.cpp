@@ -93,6 +93,8 @@
 #	include <emscripten/html5.h>
 #endif
 
+#include "anomaly_log.h"
+
 #include "safeguards.h"
 
 void CallLandscapeTick();
@@ -290,6 +292,7 @@ static void ParseResolution(Dimension &res, std::string_view s)
 static void ShutdownGame()
 {
 	IConsoleFree();
+	CloseAnomalyLog();
 
 	if (_network_available) NetworkShutDown(); // Shut down the network and close any open connections
 

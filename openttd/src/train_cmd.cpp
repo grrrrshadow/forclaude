@@ -54,6 +54,7 @@
 #include "table/train_sprites.h"
 
 #include "crashlog.h"
+#include "anomaly_log.h"
 
 #include "safeguards.h"
 
@@ -5037,6 +5038,12 @@ bool TrainAwaitsRescue(Train *v)
 	 * every few ticks, which is indistinguishable from never. It is cleared
 	 * where the trouble actually ends -- the breakdown lifting, or the depot
 	 * putting the train right. */
+	/* And it is worth a line: something stood on the line waiting to be
+	 * fetched for the whole of its wait and nothing came for it. Either the
+	 * player has no rescue engine, which is their business, or one was held
+	 * up by something that is ours. */
+	LogAnomaly("Vlak {}: cekal na odtah na ({},{}) a nikdo nedojel - lhuta vyprsela",
+			v->unitnumber, TileX(v->tile), TileY(v->tile));
 	return false;
 }
 
@@ -6008,7 +6015,8 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	if (collector != nullptr && collector->current_order.ShouldFoundRake() && HasAnyWagon(collector)) {
 		const Train *other = collector == v->First() ? partner : v->First();
 		if (FoundingEndIsEngine(collector, other)) {
-			SayOnChange(collector, fmt::format("Vlak {}: zaklada radu - prijel masinkou napred, vozy by zustaly za ni; k rade se prijizdi vozy napred, stojim", collector->unitnumber));
+			LogAnomaly("Vlak {}: zaklada radu - prijel masinkou napred na ({},{}), tak to nejde a stoji; ceka na otoceni",
+					collector->unitnumber, TileX(collector->tile), TileY(collector->tile));
 			return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST);
 		}
 	}
@@ -8454,9 +8462,8 @@ static bool CheckTrainStayInDepot(Train *v)
 			 * puts the others first; this one is tried again when it is
 			 * alone, or once another case has been seen to. */
 			if (++v->rescue_nopath_tries >= 8) {
-				if (_show_train_orientation) {
-					IConsolePrint(CC_INFO, "Vlak {}: odtah - k pripadu {} se ted nejde dostat, zkusim jine (tik {})", v->unitnumber, v->rescue_target.base(), TimerGameTick::counter);
-				}
+				LogAnomaly("Vlak {}: odtah - k pripadu {} se osmkrat po sobe nedalo dostat, pousti ho",
+						v->unitnumber, v->rescue_target.base());
 				v->rescue_skip = v->rescue_target;
 				v->rescue_nopath_tries = 0;
 				EndRescueErrand(v);
@@ -10493,8 +10500,8 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							std::string what = fmt::format("krok ROZBITY pred rezervaci: {} na ({},{}), enterdir {}, chosen {:#x}",
 									v->IsEngine() ? "masinka" : "vagon", TileX(gp.new_tile), TileY(gp.new_tile),
 									to_underlying(enterdir), chosen_track.base());
-							IConsolePrint(CC_ERROR, "  {}", what);
 							CrashLog::SetNote(what);
+							LogAnomaly("{}", what);
 						}
 						assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 						TryReserveRailTrack(gp.new_tile, TrackBitsToTrack(chosen_track), false);
@@ -10573,7 +10580,9 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				 * coming from where, picked what. Two of these have now been
 				 * reported from a machine that cannot produce a stack trace, and
 				 * both times the answer was in a console the player had no reason
-				 * to have switched on. */
+				 * to have switched on. It goes in the record as well as the crash
+				 * report, because most of the time it no longer ends in a crash:
+				 * the game copes and the player never knows it happened. */
 				if (chosen_track.Count() != 1 || chosen_track.Any({Track::Wormhole, Track::Depot})) {
 					std::string what = fmt::format("krok ROZBITY: {} z ({},{}) na ({},{}), enterdir {}, chosen {:#x}, smer {}, prev {} na ({},{}) kolej {:#x}",
 							v->IsEngine() ? "masinka" : "vagon", TileX(gp.old_tile), TileY(gp.old_tile), TileX(gp.new_tile), TileY(gp.new_tile),
@@ -10581,8 +10590,8 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							prev == nullptr ? "nikdo" : (prev->IsEngine() ? "masinka" : "vagon"),
 							prev == nullptr ? 0 : TileX(prev->tile), prev == nullptr ? 0 : TileY(prev->tile),
 							prev == nullptr ? 0 : prev->track.base());
-					IConsolePrint(CC_ERROR, "  {}", what);
 					CrashLog::SetNote(what);
+					LogAnomaly("{}", what);
 				}
 				assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 				Direction chosen_dir = VehicleEnterTileCoordinates(gp, enterdir, TrackBitsToTrack(chosen_track));
@@ -11332,9 +11341,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * is the path search's to decide, as for any other train. In a shed the
 	 * errand is settled by HandleRescueEngineInDepot() instead. */
 	if (consist->rescue_target != VehicleID::Invalid() && Train::GetIfValid(consist->rescue_target) == nullptr && !consist->IsInDepot()) {
-		if (_show_train_orientation) {
-			IConsolePrint(CC_INFO, "Vlak {}: odtah - pripad {} uz neexistuje, koncim a jedu domu (tik {})", consist->unitnumber, consist->rescue_target.base(), TimerGameTick::counter);
-		}
+		LogAnomaly("Vlak {}: odtah - pripad {} zmizel cestou, koncim a jedu domu", consist->unitnumber, consist->rescue_target.base());
 		FreeTrainTrackReservation(consist);
 		consist->ReserveTrackUnderConsist();
 		EndRescueErrand(consist);
@@ -11808,6 +11815,17 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			if (turn_around && !WouldReverseIntoFreeWagons(consist)) ReverseTrainDirection(consist, "zaseknuty vlak");
 
 			if (consist->flags.Test(VehicleRailFlag::Stuck) && consist->wait_counter > 2 * _settings_game.pf.wait_for_pbs_path * Ticks::DAY_TICKS) {
+				/* A train that has been asking this long is the shape the old
+				 * crashes now take: nothing falls over, it simply never goes
+				 * anywhere again, and nobody finds out. Written whoever it
+				 * belongs to and whatever the news setting says -- the record
+				 * is ours, the news is the player's. */
+				LogAnomaly("Vlak {}: zasekly uz dlouho na ({},{}) - rozkaz {}, cil ({},{}), couva {}",
+						consist->unitnumber, TileX(consist->tile), TileY(consist->tile),
+						to_underlying(consist->current_order.GetType()),
+						TileX(consist->dest_tile), TileY(consist->dest_tile),
+						consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne");
+
 				/* Show message to player. */
 				if (_settings_client.gui.lost_vehicle_warn && consist->owner == _local_company) {
 					AddVehicleAdviceNewsItem(AdviceType::TrainStuck, GetEncodedString(STR_NEWS_TRAIN_IS_STUCK, consist->index), consist->index);
@@ -11922,12 +11940,18 @@ Money Train::GetRunningCost() const
  * @return True if the vehicle still exists, false if it has ceased to exist (front of consists only).
  */
 /**
- * Rig: does a standing train hold the ground under itself?
+ * Does a standing train hold the ground under itself?
  *
  * The one rule everything about standing trains leans on: a train that is not
  * moving holds a booking on every tile it stands on, so that no other train's
- * search can lay a road through it. Said once when it stops holding, and once
- * again when it holds again, so the log counts the breaches and not the ticks.
+ * search can lay a road through it. A train that has let go of it is invisible
+ * to every other train's search and is about to be driven through, which is
+ * why a breach goes in the record (anomaly_log.h) rather than on the trace.
+ *
+ * Asked of each train once in a while rather than every tick: this is a state
+ * a train is in for as long as it stands there, not an instant, and asking
+ * every standing train every tick is a walk over every vehicle in the game.
+ * Each train has its own tick counter, so the asking spreads itself out.
  *
  * @param v head of a standing train or rake
  */
@@ -11946,14 +11970,14 @@ static void CheckStandingTrainHoldsGround(const Train *v)
 				break;
 		}
 		if (!held) {
-			SayOnChange(v, fmt::format("Vlak {}: ZEM NEDRZI na ({},{}) clanek {} kolej {:#x} - rozkaz {}, stuck {}, ceka-spoj {}, reversing {}",
+			LogAnomaly("Vlak {}: ZEM NEDRZI na ({},{}) clanek {} kolej {:#x} - rozkaz {}, stuck {}, ceka-spoj {}, reversing {}",
 					v->unitnumber, TileX(u->tile), TileY(u->tile), u->index, u->track.base(),
 					to_underlying(v->current_order.GetType()), v->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
-					v->current_order.ShouldWaitForCouple() ? "ano" : "ne", v->flags.Test(VehicleRailFlag::Reversing) ? "ano" : "ne"));
+					v->current_order.ShouldWaitForCouple() ? "ano" : "ne", v->flags.Test(VehicleRailFlag::Reversing) ? "ano" : "ne");
 			return;
 		}
 	}
-	SayOnChange(v, fmt::format("Vlak {}: zem drzi", v->unitnumber));
+	if (_show_train_orientation) SayOnChange(v, fmt::format("Vlak {}: zem drzi", v->unitnumber));
 }
 
 bool Train::Tick()
@@ -12013,7 +12037,7 @@ bool Train::Tick()
 			if (!(this->tick_counter & WRECK_SMOKE_PERIOD)) SmokeOverWreck(this);
 		}
 
-		if (_show_train_orientation && this->cur_speed == 0 && !this->IsWrecked()) CheckStandingTrainHoldsGround(this);
+		if (this->cur_speed == 0 && !this->IsWrecked() && (this->tick_counter & 0x3F) == 0) CheckStandingTrainHoldsGround(this);
 
 		if (!this->vehstatus.Test(VehState::Stopped) || this->cur_speed > 0) this->running_ticks++;
 
@@ -12032,7 +12056,7 @@ bool Train::Tick()
 
 		return TrainLocoHandler(this, true);
 	} else if (this->IsFreeWagon() && !this->vehstatus.Test(VehState::Crashed)) {
-		if (_show_train_orientation && !this->IsInDepot()) CheckStandingTrainHoldsGround(this);
+		if (!this->IsInDepot() && (this->tick_counter & 0x3F) == 0) CheckStandingTrainHoldsGround(this);
 
 		/* A rake put down by an order with a timetabled stay waits that stay
 		 * out first, idle: it has not entered the station, so it loads and

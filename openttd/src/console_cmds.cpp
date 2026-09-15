@@ -100,6 +100,7 @@
 #include "table/strings.h"
 
 #include "mouse_debug.h"
+#include "anomaly_log.h"
 
 #include "safeguards.h"
 
@@ -4705,6 +4706,47 @@ static bool ConTestReverse(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * The running record of what the game had to work around: say where it is,
+ * put a line of the player's own in it, or turn it off.
+ *
+ * Nothing here starts the writing -- it writes by itself, into the folder the
+ * savegames are in, from the moment the game runs. That is the whole point of
+ * it: what it is for is the thing nobody expected, and nobody switches on a
+ * log for something they did not expect.
+ *
+ * Usage: log | log <text> | log vyp | log zap
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConAnomalyLog(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+
+	if (argv.size() >= 2 && (argv[1] == "vyp" || argv[1] == "zap")) {
+		SetAnomalyLogOn(argv[1] == "zap");
+		IConsolePrint(CC_DEFAULT, "log: zaznam je {}.", IsAnomalyLogOn() ? "zapnuty" : "vypnuty");
+		return true;
+	}
+
+	if (argv.size() >= 2) {
+		/* The player's own mark. Worth as much as anything the game writes: it
+		 * is the line that says which of the hundred things in the file was the
+		 * one that looked wrong on the screen. */
+		std::string note;
+		for (size_t i = 1; i < argv.size(); i++) {
+			if (i > 1) note += " ";
+			note += argv[i];
+		}
+		LogAnomaly("HRAC: {}", note);
+		return true;
+	}
+
+	IConsolePrint(CC_DEFAULT, "log: {} ({} radek tento beh), zaznam {}.", GetAnomalyLogPath(),
+			GetAnomalyLogLines(), IsAnomalyLogOn() ? "zapnuty" : "vypnuty");
+	IConsolePrint(CC_HELP, "Zapisuje se sam. 'log <text>' prida tvoji poznamku, 'log vyp' / 'log zap' vypne a zapne.");
+	return true;
+}
+
 /** Find the head of a train by its unit number, or nullptr. */
 static Train *FindTrainByUnit(uint unit)
 {
@@ -7788,6 +7830,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
+	IConsole::CmdRegister("log",                     ConAnomalyLog);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);

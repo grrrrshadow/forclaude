@@ -62,6 +62,8 @@ add_files(
     animated_tile.cpp
     animated_tile_func.h
     animated_tile_map.h
+    anomaly_log.cpp
+    anomaly_log.h
     articulated_vehicles.cpp
     articulated_vehicles.h
     autocompletion.cpp
