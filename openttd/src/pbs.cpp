@@ -13,8 +13,45 @@
 #include "newgrf_station.h"
 #include "train.h"
 #include "pathfinder/follow_track.hpp"
+#include "console_func.h"
+#include "timer/timer_game_tick.h"
 
 #include "safeguards.h"
+
+/* Rig: who is giving ground back at this moment, so that a booking taken from
+ * under a standing train can be laid at somebody's door. Set by the two walks
+ * in train_cmd.cpp that give ground back on a train's behalf; nullptr means the
+ * ground was given back by something that is not a train's own doing -- track
+ * being pulled up, a vehicle being sold. See SayIfGroundUnderTrainGivenBack(). */
+const Train *_ground_freer = nullptr;
+const char *_ground_freer_why = nullptr;
+
+/**
+ * Rig: say so if the booking being given back on this tile is the ground a
+ * train is standing on. The rule everything else leans on is that a standing
+ * train holds the ground under itself, so any train's ground going here is
+ * worth a line -- its own included, since giving back the tile under one's
+ * own wheels is the very thing that should never happen.
+ * @param tile the tile whose booking is being given back
+ */
+static void SayIfGroundUnderTrainGivenBack(TileIndex tile)
+{
+	if (!_show_train_orientation) return;
+	for (const Vehicle *u : VehiclesOnTile(tile)) {
+		if (u->type != VehicleType::Train) continue;
+		/* Inside a shed a train holds no ground; and a moving train giving
+		 * back the tile its own tail has just left is the ordinary way a
+		 * road is handed back behind a train, not a breach. */
+		if (Train::From(u)->track == Track::Depot) continue;
+		const Train *t = Train::From(u)->First();
+		if (t == _ground_freer && t->cur_speed > 0) continue;
+		IConsolePrint(CC_WARNING, "ZEM: ({},{}) pod vlakem {} (clanek {}, kolej {:#x}) pousti {} vlak {} - tik {}",
+				TileX(tile), TileY(tile), t->unitnumber, u->index, Train::From(u)->track.base(),
+				_ground_freer_why == nullptr ? "NEKDO JINY" : _ground_freer_why,
+				_ground_freer == nullptr ? -1 : (int)_ground_freer->unitnumber, TimerGameTick::counter);
+		return;
+	}
+}
 
 /**
  * Get the reserved trackbits for any tile, regardless of type.
@@ -64,6 +101,7 @@ void SetRailStationPlatformReservation(TileIndex start, DiagDirection dir, bool 
 	assert(GetRailStationAxis(start) == DiagDirToAxis(dir));
 
 	do {
+		if (!b && HasStationReservation(tile)) SayIfGroundUnderTrainGivenBack(tile);
 		SetRailStationReservation(tile, b);
 		MarkTileDirtyByTile(tile);
 		tile = TileAdd(tile, diff);
@@ -164,6 +202,8 @@ bool TryReserveRailTrack(TileIndex tile, Track t, bool trigger_stations, Trackdi
 void UnreserveRailTrack(TileIndex tile, Track t)
 {
 	assert(TrackdirBitsToTrackBits(GetTileTrackStatus(tile, TransportType::Rail, RoadTramType::Invalid).trackdirs).Test(t));
+
+	if (GetReservedTrackbits(tile).Test(t)) SayIfGroundUnderTrainGivenBack(tile);
 
 	if (_settings_client.gui.show_track_reservation) {
 		if (IsBridgeTile(tile)) {

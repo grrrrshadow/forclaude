@@ -5350,6 +5350,31 @@ static void TryDispatchRescueEngine(Train *tow)
 }
 
 /**
+ * Point a rescue engine home once its errand is over -- or, if it has no home
+ * to go to, or is standing in it, leave it on call where it is. Named
+ * explicitly rather than asking for the nearest depot: it lives in one
+ * particular depot, that is where the player put it.
+ *
+ * Without the halt: a halted depot order pulls the brake on arrival, and the
+ * brake is the player's -- pulled, the engine reads as parked and takes no
+ * more calls. In the shed the on-call block holds it by itself.
+ *
+ * @param tow the rescue engine, front of its consist
+ */
+static void SendTowHome(Train *tow)
+{
+	if (tow->tile != tow->rescue_home_depot && IsRailDepotTile(tow->rescue_home_depot)) {
+		tow->current_order.MakeGoToDepot(GetDepotIndex(tow->rescue_home_depot), OrderDepotTypeFlags{},
+				OrderNonStopFlags{}, OrderDepotActionFlags{});
+		tow->SetDestTile(tow->rescue_home_depot);
+	} else {
+		tow->current_order.MakeDummy();
+		tow->SetDestTile(INVALID_TILE);
+	}
+	tow->vehstatus.Reset(VehState::Stopped);
+}
+
+/**
  * Deal with a rescue engine standing in a depot with a call-out on it.
  *
  * Two things bring one here. It has towed a casualty in, in which case the
@@ -5630,23 +5655,8 @@ bool HandleRescueEngineInDepot(Train *tow)
 				tow->unitnumber, wagons ? "vagonky odlozeny" : "porucha slozena", TileX(tow->tile), TileY(tow->tile));
 	}
 
-	/* Home if this is not home, otherwise straight back on call. Named
-	 * explicitly rather than asking for the nearest depot: it lives in one
-	 * particular depot, that is where the player put it, and the nearest one is
-	 * the one it is standing in. */
-	if (tow->tile != tow->rescue_home_depot && IsRailDepotTile(tow->rescue_home_depot)) {
-		/* Without the halt: a halted depot order pulls the brake on arrival,
-		 * and the brake is the player's -- pulled, the engine reads as parked
-		 * and takes no more calls. In the shed the on-call block holds it by
-		 * itself. */
-		tow->current_order.MakeGoToDepot(GetDepotIndex(tow->rescue_home_depot), OrderDepotTypeFlags{},
-				OrderNonStopFlags{}, OrderDepotActionFlags{});
-		tow->SetDestTile(tow->rescue_home_depot);
-		tow->vehstatus.Reset(VehState::Stopped);
-	} else {
-		tow->current_order.MakeDummy();
-		tow->vehstatus.Reset(VehState::Stopped);
-	}
+	/* Home if this is not home, otherwise straight back on call. */
+	SendTowHome(tow);
 
 	/* The job is put down; the engine is straightened out before it waits
 	 * for the next, whichever shed it is standing in. */
@@ -8475,6 +8485,11 @@ static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore = 
 
 static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_dir)
 {
+	/* Rig: given back on this train's behalf, unless a wider walk already
+	 * said whose it was. */
+	AutoRestoreBackup ground_freer(_ground_freer, _ground_freer == nullptr ? v->First() : _ground_freer);
+	AutoRestoreBackup ground_freer_why(_ground_freer_why, _ground_freer_why == nullptr ? "ClearPathReservation" : _ground_freer_why);
+
 	DiagDirection dir = TrackdirToExitdir(track_dir);
 
 	if (IsTileType(tile, TileType::TunnelBridge)) {
@@ -8553,6 +8568,10 @@ void FreeTrainTrackReservation(const Train *consist, TileIndex from_tile, Trackd
 	 * under-body reservation is set once by ReserveTrackUnderConsist() and
 	 * isn't this function's concern, so just no-op instead of asserting. */
 	if (!consist->IsFrontEngine()) return;
+
+	/* Rig: whatever this walk gives back is given back on this train's behalf. */
+	AutoRestoreBackup ground_freer(_ground_freer, consist);
+	AutoRestoreBackup ground_freer_why(_ground_freer_why, "FreeTrainTrackReservation");
 
 	const Train *moving_front = consist->GetMovingFront();
 	TileIndex tile = moving_front->tile;
@@ -9996,7 +10015,7 @@ uint Train::Crash(bool flooded)
  * @param v first vehicle of chain
  * @return number of victims (including 2 drivers; zero if train was already crashed)
  */
-static uint TrainCrashed(Train *v)
+uint TrainCrashed(Train *v)
 {
 	uint victims = 0;
 
@@ -11259,6 +11278,33 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		consist->couple_target = VehicleID::Invalid();
 	}
 
+	/* A rescue engine whose case is gone -- the wreck it was sent for gave up
+	 * waiting and cleared itself off the line, or was sold -- has nothing to
+	 * fetch any more. Left with the errand on it, it drove on to where the
+	 * case had been; on the player's line that was a platform with wagons
+	 * standing behind the wreck, and the engine, its name for the case rubbed
+	 * out just above, took the first rake it found there and carried it off.
+	 * So the errand ends the moment the case is gone, and the engine goes
+	 * home. The road it booked to the case ran against the signals, and can
+	 * only be given back the same way, which means while it still reads as
+	 * fetching -- before the errand is rubbed out. It keeps its own ground and
+	 * asks for a way home from where it is; whether that means turning round
+	 * is the path search's to decide, as for any other train. In a shed the
+	 * errand is settled by HandleRescueEngineInDepot() instead. */
+	if (consist->rescue_target != VehicleID::Invalid() && Train::GetIfValid(consist->rescue_target) == nullptr && !consist->IsInDepot()) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: odtah - pripad {} uz neexistuje, koncim a jedu domu (tik {})", consist->unitnumber, consist->rescue_target.base(), TimerGameTick::counter);
+		}
+		FreeTrainTrackReservation(consist);
+		consist->ReserveTrackUnderConsist();
+		EndRescueErrand(consist);
+		SendTowHome(consist);
+		InvalidateWindowData(WindowClass::VehicleView, consist->index);
+		/* Standing, it asks for the road home now; rolling, it asks at the
+		 * next tile the way every train does once its road runs out. */
+		if (consist->cur_speed == 0) TryPathReserve(consist, true, false);
+	}
+
 	/* What this train left in a shed is out of its own reach only while it is
 	 * still standing in that shed working the order that put it down. Once it
 	 * has driven out, those wagons are an ordinary stored rake and it may be
@@ -11835,6 +11881,41 @@ Money Train::GetRunningCost() const
  * Update train vehicle data for a tick.
  * @return True if the vehicle still exists, false if it has ceased to exist (front of consists only).
  */
+/**
+ * Rig: does a standing train hold the ground under itself?
+ *
+ * The one rule everything about standing trains leans on: a train that is not
+ * moving holds a booking on every tile it stands on, so that no other train's
+ * search can lay a road through it. Said once when it stops holding, and once
+ * again when it holds again, so the log counts the breaches and not the ticks.
+ *
+ * @param v head of a standing train or rake
+ */
+static void CheckStandingTrainHoldsGround(const Train *v)
+{
+	for (const Train *u = v; u != nullptr; u = u->Next()) {
+		bool held;
+		switch (u->track.base()) {
+			case TrackBits{Track::Depot}.base():
+				continue;
+			case TrackBits{Track::Wormhole}.base():
+				held = HasTunnelBridgeReservation(u->tile);
+				break;
+			default:
+				held = (GetReservedTrackbits(u->tile) & u->track).Any();
+				break;
+		}
+		if (!held) {
+			SayOnChange(v, fmt::format("Vlak {}: ZEM NEDRZI na ({},{}) clanek {} kolej {:#x} - rozkaz {}, stuck {}, ceka-spoj {}, reversing {}",
+					v->unitnumber, TileX(u->tile), TileY(u->tile), u->index, u->track.base(),
+					to_underlying(v->current_order.GetType()), v->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
+					v->current_order.ShouldWaitForCouple() ? "ano" : "ne", v->flags.Test(VehicleRailFlag::Reversing) ? "ano" : "ne"));
+			return;
+		}
+	}
+	SayOnChange(v, fmt::format("Vlak {}: zem drzi", v->unitnumber));
+}
+
 bool Train::Tick()
 {
 	this->tick_counter++;
@@ -11892,6 +11973,8 @@ bool Train::Tick()
 			if (!(this->tick_counter & WRECK_SMOKE_PERIOD)) SmokeOverWreck(this);
 		}
 
+		if (_show_train_orientation && this->cur_speed == 0 && !this->IsWrecked()) CheckStandingTrainHoldsGround(this);
+
 		if (!this->vehstatus.Test(VehState::Stopped) || this->cur_speed > 0) this->running_ticks++;
 
 		this->current_order_time++;
@@ -11909,6 +11992,8 @@ bool Train::Tick()
 
 		return TrainLocoHandler(this, true);
 	} else if (this->IsFreeWagon() && !this->vehstatus.Test(VehState::Crashed)) {
+		if (_show_train_orientation && !this->IsInDepot()) CheckStandingTrainHoldsGround(this);
+
 		/* A rake put down by an order with a timetabled stay waits that stay
 		 * out first, idle: it has not entered the station, so it loads and
 		 * unloads nothing and takes no cargo from the platform next door, and

@@ -530,6 +530,12 @@ protected: // These functions should not be called outside acceleration code.
  */
 extern bool _show_train_orientation;
 
+/* Rig: who is giving ground back right now (pbs.cpp), and a way to wreck a
+ * train where it stands. See SayIfGroundUnderTrainGivenBack(). */
+extern const Train *_ground_freer;
+extern const char *_ground_freer_why;
+uint TrainCrashed(Train *v);
+
 bool IsHoldingShortOfStationWaypoint(const Train *v);
 
 inline bool IsWaitingWagonChain(const Vehicle *v)

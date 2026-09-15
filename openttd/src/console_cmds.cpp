@@ -4696,6 +4696,35 @@ static Train *FindTrainByUnit(uint unit)
 }
 
 /**
+ * Wreck a train where it stands, the way a collision would, so a scene can
+ * have a wreck exactly where it wants one and at the tick it wants it.
+ * Usage: testvrak <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestWreck(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Wreck a train where it stands. Usage: 'testvrak <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	Train *t = FindTrainByUnit(*punit);
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testvrak: vlak {} nenalezen.", argv[1]);
+		return true;
+	}
+	if (t->IsWrecked()) {
+		IConsolePrint(CC_ERROR, "testvrak: vlak {} uz je vrak.", t->unitnumber);
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+	TrainCrashed(t);
+	IConsolePrint(CC_DEFAULT, "testvrak: vlak {} je vrak na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+	return true;
+}
+
+/**
  * Flip a single vehicle standing in a depot, the way Ctrl+click in the depot
  * window does. Usage: testpreklop <unit number> [vehicle position, 0 = head]
  * @copydoc IConsoleCmdProc
@@ -7739,6 +7768,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
+	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
 	IConsole::CmdRegister("testrez",                 ConTestReservations);

@@ -512,3 +512,14 @@ teststartdepo 48 51
 testzatik 480 testotoc 3
 testzatik 560 testmapa 48 66 48 82
 testzatik 1400 testkde" 1500 -g $S/brzda.sav; fi
+
+# The wreck the tow was sent for clears itself off the line while the tow is
+# still on its way (a two-day wait, the tow far off). The tow must end its
+# errand there and then and come home -- not drive on to where the wreck was
+# and take whatever stands there. Measured as: no coupling, the tow back in
+# its shed (depa).
+run_scene vrakzmizi "vlak123 on
+setting vehicle.rescue_wait_days 2
+testodtah daleko 0
+testzatik 300 testvrak 1
+testzatik 2400 teststav" 5000
