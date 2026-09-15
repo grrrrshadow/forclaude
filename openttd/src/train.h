@@ -519,16 +519,6 @@ protected: // These functions should not be called outside acceleration code.
  * @return Whether this is such a rake.
  */
 /**
- * Whether the button that turns a train round is left usable while the train is
- * half in a depot.
- *
- * A testing switch, not a setting: the console command "depo123" flips it. It
- * exists because turning a train round on the depot doorstep is what freezes
- * one, and the freeze has to stay reachable to be worked on.
- */
-extern bool _allow_reverse_on_depot_doorstep;
-
-/**
  * Show a train's orientation in its status line.
  *
  * A testing switch, not a setting: the console command "vlak123" flips it. The two
@@ -539,52 +529,6 @@ extern bool _allow_reverse_on_depot_doorstep;
 extern bool _show_train_orientation;
 
 bool IsHoldingShortOfStationWaypoint(const Train *v);
-
-/**
- * Would asking this train to turn round do nothing, because of where it is
- * standing relative to a depot?
- *
- * Out on the line turning a train round is always fine: it changes which end
- * leads and nothing moves. Inside a depot it is fine too, but only while the
- * train is standing still -- there the whole train is on one tile with no
- * extent, so both which end leads and the order of the vehicles can be turned
- * at once. Neither of those holds anywhere in between:
- *
- * - **across the doorway**, part of the train inside and part of it out, the
- *   two halves live under different rules and turning it tears the consist
- *   apart;
- * - **inside but started**, on its way out, the train is already a train lying
- *   along the track even while every vehicle is still hidden on the depot tile,
- *   and turning it then leaves the ones still inside on the wrong side of the
- *   ones already out.
- *
- * ReverseTrainDirection() refuses in exactly these cases and returns without
- * doing anything, which from the player's side is a button that does nothing at
- * all -- so they press it again, and again. This is what greys it out instead,
- * and it is the same question the command itself asks, so the two cannot drift
- * apart. It can be turned back on from the console; see
- * #_allow_reverse_on_depot_doorstep.
- *
- * @param v The train; may be any part, the question is about the whole consist.
- * @return Whether a request to turn it round here would be refused.
- */
-inline bool IsTrainReverseBlockedByDepot(const Vehicle *v)
-{
-	if (v->type != VehicleType::Train) return false;
-
-	bool any_in = false;
-	bool all_in = true;
-	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
-		if (Train::From(u)->track == Track::Depot) {
-			any_in = true;
-		} else {
-			all_in = false;
-		}
-	}
-
-	if (!any_in) return false;
-	return !(all_in && v->First()->vehstatus.Test(VehState::Stopped));
-}
 
 inline bool IsWaitingWagonChain(const Vehicle *v)
 {

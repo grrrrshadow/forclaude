@@ -3287,7 +3287,19 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 		assert(DiagDirToDir(ReverseDiagDir(dir)) == v->GetMovingDirection());
 		Train::From(v)->track = Track::Depot;
 		v->vehstatus.Set(VehState::Hidden);
-		if (v->GetMovingNext() == nullptr) {
+		v->tile = tile;
+		/* The train is parked when the last of it is in -- which used to be
+		 * read as "this vehicle has nobody behind it". That is the same thing
+		 * for a train that drives in the ordinary way, and a different thing
+		 * for one turned round in the doorway on its way out: the vehicles
+		 * that never got out are behind the ones driving back in, so the last
+		 * to come through the door has a whole hidden tail behind it, and the
+		 * one with nobody behind it is standing in here already -- hidden at
+		 * the door point, where every parked vehicle stands, and where turning
+		 * the train round asks this of it (UpdateStatusAfterSwap()). Read that
+		 * way the train was parked the moment it was turned, with a wagon
+		 * still out on the line. So the question is asked of the whole train. */
+		if (IsWholeTrainInsideDepot(Train::From(v))) {
 			Train *consist = Train::From(v)->First();
 			/* A train comes back out of a depot the same way round it went
 			 * in: the end that led the way in leads the way out again, so one
@@ -3340,7 +3352,6 @@ static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, 
 
 			VehicleEnterDepot(consist);
 		}
-		v->tile = tile;
 
 		InvalidateWindowData(WindowClass::VehicleDepot, v->tile);
 		return VehicleEnterTileState::EnteredWormhole;

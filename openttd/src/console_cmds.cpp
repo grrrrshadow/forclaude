@@ -4055,13 +4055,19 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 			 * a dual-headed engine, or a NewGRF's reversed sprite). */
 			Direction nose = u->flags.Test(VehicleRailFlag::Flipped) ? ReverseDir(u->direction) : u->direction;
 			if (u->spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED || (!IsCustomVehicleSpriteNum(u->spritenum) && u->spritenum == RailVehInfo(u->engine_type)->image_index + 1)) nose = ReverseDir(nose);
-			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) smer {} otoceny {} sprite {} nos {}", i, u->index.base(), u->engine_type.base(),
+			/* Where it stands, as the map sees it: the tile, and then the
+			 * track word and the pixels, which is what tells a vehicle hidden
+			 * in a shed from one out on the line at the same tile -- the
+			 * question every fault around a depot door comes down to. */
+			const char *kolej = u->track == Track::Depot ? "depo" : (u->track == Track::Wormhole ? "roura" : "trat");
+			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) {} {}px ({},{}) smer {} otoceny {} sprite {} nos {}", i, u->index.base(), u->engine_type.base(),
 					u->IsEngine() ? "masinka" : (u->IsWagon() ? "vagon" : "cast"),
 					u->IsMultiheaded() ? (u->IsRearDualheaded() ? " (zadni hlava)" : " (predni hlava)") : "",
 					u->IsArticulatedPart() ? " (kloub)" : "",
 					u->IsFrontEngine() ? " CELO" : "",
 					u->IsFreeWagon() ? " VOLNY" : "",
-					TileX(u->tile), TileY(u->tile), to_underlying(u->direction),
+					TileX(u->tile), TileY(u->tile), kolej, u->vehstatus.Test(VehState::Hidden) ? "schovany " : "",
+					u->x_pos, u->y_pos, to_underlying(u->direction),
 					u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne", u->spritenum, to_underlying(nose));
 		}
 		if (!all_rakes) return true;
@@ -4797,42 +4803,6 @@ static const IntervalTimer<TimerGameTick> _testspoj_heartbeat({TimerGameTick::Pr
 	std::span<std::string_view> args(&name, 1);
 	ConTestCoupleState(args);
 });
-
-/**
- * Turn the depot-doorway lock on the reverse button on or off.
- *
- * A train standing half in and half out of a depot has its turn-round button
- * greyed out, because asking for it there is what freezes a train. This lets
- * that button be pressed anyway, which is the only way to work on the freeze.
- * @copydoc IConsoleCmdProc
- */
-static bool ConDepotDoorstepReverse(std::span<std::string_view> argv)
-{
-	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Allow the turn-round button while a train straddles a depot doorway.");
-		IConsolePrint(CC_HELP, "Usage: 'depo123' to flip it, or 'depo123 on' / 'depo123 off'.");
-		return true;
-	}
-
-	if (argv.size() >= 2) {
-		if (argv[1] == "on" || argv[1] == "1") {
-			_allow_reverse_on_depot_doorstep = true;
-		} else if (argv[1] == "off" || argv[1] == "0") {
-			_allow_reverse_on_depot_doorstep = false;
-		} else {
-			return false;
-		}
-	} else {
-		_allow_reverse_on_depot_doorstep = !_allow_reverse_on_depot_doorstep;
-	}
-
-	IConsolePrint(CC_DEFAULT, "Turning round on a depot doorway is now {}.",
-			_allow_reverse_on_depot_doorstep ? "allowed" : "blocked");
-	/* The button is drawn from this, so every open vehicle window has to be
-	 * told to look again. */
-	InvalidateWindowClassesData(WindowClass::VehicleView);
-	return true;
-}
 
 /**
  * Scroll to a tile on the map.
@@ -7594,7 +7564,6 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
 
-	IConsole::CmdRegister("depo123",                 ConDepotDoorstepReverse);
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);

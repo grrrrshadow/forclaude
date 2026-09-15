@@ -3272,16 +3272,7 @@ public:
 		}
 
 		if (v->type == VehicleType::Train || v->type == VehicleType::Road) {
-			/* Greyed out wherever the command would refuse: across a depot
-			 * doorway, and inside a depot once the train has been started and is
-			 * on its way out. In both the press does nothing at all, so a player
-			 * presses it again and again with no way of telling that the game has
-			 * declined. A dead button is how every other button in the game says
-			 * that, and this asks the same question the command asks, so the two
-			 * cannot drift apart. It can be turned back on from the console to
-			 * work on it -- see _allow_reverse_on_depot_doorstep. */
-			bool refused = !_allow_reverse_on_depot_doorstep && IsTrainReverseBlockedByDepot(v);
-			this->SetWidgetDisabledState(WID_VV_TURN_AROUND, !is_localcompany || refused);
+			this->SetWidgetDisabledState(WID_VV_TURN_AROUND, !is_localcompany);
 		}
 
 		this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);

@@ -468,3 +468,47 @@ testbrzda 4
 testbrzda 5
 testzatik 1500 testbrzda 4
 testzatik 2600 testkde" 2800 -g $S/brzda2.sav; fi
+
+# Turning a train round in a depot doorway, which used to freeze it: the
+# reverse button on a moving train sets a mark and lets it brake, and the
+# turn itself was refused on the doorstep, so the mark stayed and the train
+# stood there for good. Three moments on the player's save, all with the
+# seven-vehicle train 2: on its way out with one vehicle through the door
+# (otocvyjezd), started but still wholly inside (otocuvnitr), and on its way
+# back in with part of it hidden already (otocvjezd -- it is sent back by an
+# earlier turn out on the line). Each ends with the train running again;
+# testdelka says the spacing survived and the log says whether it moved.
+if [ -f $S/brzda2.sav ]; then run_scene otocvyjezd "vlak123 on
+testpauza
+testbrzda 2
+testzatik 40 testotoc 2
+testzatik 300 testkde
+testzatik 300 testdelka 2
+testzatik 900 testkde
+testzatik 900 testdelka 2" 1000 -g $S/brzda2.sav; fi
+if [ -f $S/brzda2.sav ]; then run_scene otocuvnitr "vlak123 on
+testpauza
+testbrzda 2
+testzatik 5 testotoc 2
+testzatik 300 testkde
+testzatik 300 testdelka 2" 400 -g $S/brzda2.sav; fi
+if [ -f $S/brzda2.sav ]; then run_scene otocvjezd "vlak123 on
+testpauza
+testbrzda 2
+testzatik 300 testotoc 2
+testzatik 830 testotoc 2
+testzatik 1000 testkde
+testzatik 1000 testdelka 2
+testzatik 1500 testkde
+testzatik 1500 testdelka 2" 1600 -g $S/brzda2.sav; fi
+
+# And on a bridge: turned round halfway across, the train has to say it is
+# now going the other way -- the mouths read that off its vehicles -- come
+# back out of the mouth it went in by, and drive home into its shed. Skipped
+# where the save is not in the working directory.
+if [ -f $S/brzda.sav ]; then run_scene otocmost "vlak123 on
+testtunel 48 66 tah
+teststartdepo 48 51
+testzatik 480 testotoc 3
+testzatik 560 testmapa 48 66 48 82
+testzatik 1400 testkde" 1500 -g $S/brzda.sav; fi

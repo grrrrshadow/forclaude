@@ -7731,12 +7731,6 @@ bool IsWholeTrainInsideDepot(const Train *v)
  * rearranges a train has to keep away from it while that lasts.
  */
 /**
- * Whether the turn-round button stays usable while a train straddles a depot
- * doorway. Off by default; the console command "depo123" turns it back on.
- */
-bool _allow_reverse_on_depot_doorstep = false;
-
-/**
  * Whether a train's status line spells out which way round it is running.
  * Off by default; the console command "vlak123" turns it on. See train.h.
  */
@@ -7870,30 +7864,16 @@ static void ReverseTrainDirection(Train *consist, const char *why)
 	 * that bounces off the depot guard has not turned anything. */
 	Train *moving_front = consist->GetMovingFront();
 	if (IsRailDepotTile(moving_front->tile)) {
-		/* A train on its way out of a depot is half in a world where it has no
-		 * extent and half in one where it lies along the track, and everything
-		 * below assumes one or the other. Turning it round here mangles the
-		 * consist: the vehicles still hidden inside end up on the wrong side of
-		 * the ones already out, and the first of them to be moved cannot find
-		 * any track that connects it to the vehicle ahead. Leave it alone and
-		 * let it finish coming out -- there is nothing to gain by turning a
-		 * train round at the exact moment it is leaving, and the player asked
-		 * for it to leave this way. */
-		/* Standing in a depot is the one place a train can be turned round for
-		 * nothing, because it has no extent there. On its way out it does: the
-		 * moment it is started, it is a train partly in a world where it lies
-		 * along the track, even while every vehicle is still hidden on the
-		 * depot tile waiting its turn to come out. Turning it then leaves the
-		 * vehicles still inside on the wrong side of those already out, and it
-		 * jams on the first tile. Being stopped is exactly the line between
-		 * the two, and it is the line the player sees: it is when the train
-		 * stops saying it is stopped that turning it stops being free.
-		 *
-		 * Asked through the same predicate the vehicle window greys the button
-		 * with, so a button that looks alive and a command that declines can
-		 * never be two different answers. */
-		if (IsTrainReverseBlockedByDepot(consist)) return;
-
+		/* A train half in a depot and half out used to be refused here -- and
+		 * refused silently, which was the freeze the player kept meeting: the
+		 * button turns a moving train round by setting a mark and letting it
+		 * brake, and when the braking ended here and nothing happened, the
+		 * mark stayed and the train stood on the doorstep waiting for a turn
+		 * that never came. The refusal was there because turning such a train
+		 * round parked it (see VehicleEnterTile_Rail()). It is not refused any
+		 * more: a train that is turned round in the doorway backs the rest of
+		 * the way in, or pulls the hidden part of itself back out, the same
+		 * way it would have driven on. */
 		if (IsWholeTrainInsideDepot(consist)) {
 			/* Everything below works on where vehicles sit along the track and
 			 * which tiles they occupy, none of which means anything for a
@@ -7938,7 +7918,17 @@ static void ReverseTrainDirection(Train *consist, const char *why)
 			if (u->gv_flags.Any({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown})) {
 				u->gv_flags.Flip({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown});
 			}
+			/* A vehicle inside a bore says which mouth it went in by, and
+			 * everything that reads a bore -- which way its traffic runs, who
+			 * may follow whom in, what the mouths show -- reads that. Turned
+			 * round, it is going the other way, so it says the other mouth. */
+			if (u->track == Track::Wormhole && IsTileType(u->tile, TileType::TunnelBridge)) {
+				u->tile = GetOtherTunnelBridgeEnd(u->tile);
+			}
 			UpdateStatusAfterSwap(u, false);
+		}
+		if (moving_front->track == Track::Wormhole && IsTileType(moving_front->tile, TileType::TunnelBridge)) {
+			UpdateTunnelBridgeSignals(moving_front->tile);
 		}
 		/* We may have entered a depot and stopped driving backwards. */
 		moving_front = consist->GetMovingFront();
@@ -8406,6 +8396,11 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 				/* Free the reservation only if no other train is on the tiles. */
 				SetTunnelBridgeReservation(tile, false);
 				SetTunnelBridgeReservation(end, false);
+				/* The mouths read as booked until this moment, and the last
+				 * vehicle coming out asked them what to show before it. Asked
+				 * again now, an empty bore shows green at both ends instead of
+				 * staying red until the next train comes. */
+				UpdateTunnelBridgeSignals(tile);
 
 				if (_settings_client.gui.show_track_reservation) {
 					if (IsBridge(tile)) {
