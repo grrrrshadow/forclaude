@@ -5041,12 +5041,23 @@ bool TrainAwaitsRescue(Train *v)
 	 * every few ticks, which is indistinguishable from never. It is cleared
 	 * where the trouble actually ends -- the breakdown lifting, or the depot
 	 * putting the train right. */
-	/* And it is worth a line: something stood on the line waiting to be
-	 * fetched for the whole of its wait and nothing came for it. Either the
-	 * player has no rescue engine, which is their business, or one was held
-	 * up by something that is ours. */
-	LogAnomaly("Vlak {}: cekal na odtah na ({},{}) a nikdo nedojel - lhuta vyprsela",
-			v->unitnumber, TileX(v->tile), TileY(v->tile));
+	/* Worth a line, but only if somebody could have come. A player with no
+	 * rescue engine at all gets an ordinary vanilla breakdown that mends
+	 * itself after the wait, and writing that down is writing down ordinary
+	 * play -- the player's own polygon produced six such lines in three
+	 * months of an empty line. With an engine on call it is the opposite: one
+	 * existed, it had the whole deadline, and it never got there. */
+	bool could_have_come = false;
+	for (const Train *tow : Train::Iterate()) {
+		if (tow->IsFrontEngine() && tow->owner == v->owner && tow->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
+			could_have_come = true;
+			break;
+		}
+	}
+	if (could_have_come) {
+		LogAnomaly("Vlak {}: cekal na odtah na ({},{}) a nikdo nedojel - lhuta vyprsela",
+				v->unitnumber, TileX(v->tile), TileY(v->tile));
+	}
 	return false;
 }
 
@@ -11959,11 +11970,28 @@ Money Train::GetRunningCost() const
 /**
  * Does a standing train hold the ground under itself?
  *
- * The one rule everything about standing trains leans on: a train that is not
+ * The rule the collision fix of chapter 16 leans on: a train that is not
  * moving holds a booking on every tile it stands on, so that no other train's
  * search can lay a road through it. A train that has let go of it is invisible
  * to every other train's search and is about to be driven through, which is
  * why a breach goes in the record (anomaly_log.h) rather than on the trace.
+ *
+ * But the rule only holds where the game books at all. Under block signalling
+ * a train books nothing and is protected by the signals seeing it, which is
+ * ordinary, correct play: the player's own polygon runs that way, and the
+ * first thing this said about a real game was a train crossing a bridge with
+ * nothing booked under it -- true, and no fault of anybody's. So what is
+ * reported is a train that holds *part* of itself and not the rest, which is
+ * wrong however the line is signalled; a train holding nothing at all is only
+ * reported when the game books for everything (pf.reserve_paths), where
+ * holding nothing cannot be innocent.
+ *
+ * The cost of that narrowing, written down so it is not forgotten: a train
+ * that loses its footing all at once on a path-signalled line, which is the
+ * shape of the crash in chapter 16, is no longer reported unless the loss is
+ * caught while it is still uneven. Telling that apart from block-signalled
+ * running needs the signalling of the block the train is in, which is a walk
+ * of the block and too dear to do for every standing train.
  *
  * Asked of each train once in a while rather than every tick: this is a state
  * a train is in for as long as it stands there, not an instant, and asking
@@ -11974,6 +12002,10 @@ Money Train::GetRunningCost() const
  */
 static void CheckStandingTrainHoldsGround(const Train *v)
 {
+	const Train *loose = nullptr;
+	uint held_count = 0;
+	uint loose_count = 0;
+
 	for (const Train *u = v; u != nullptr; u = u->Next()) {
 		bool held;
 		switch (u->track.base()) {
@@ -11986,15 +12018,25 @@ static void CheckStandingTrainHoldsGround(const Train *v)
 				held = (GetReservedTrackbits(u->tile) & u->track).Any();
 				break;
 		}
-		if (!held) {
-			LogAnomaly("Vlak {}: ZEM NEDRZI na ({},{}) clanek {} kolej {:#x} - rozkaz {}, stuck {}, ceka-spoj {}, reversing {}",
-					v->unitnumber, TileX(u->tile), TileY(u->tile), u->index, u->track.base(),
-					to_underlying(v->current_order.GetType()), v->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
-					v->current_order.ShouldWaitForCouple() ? "ano" : "ne", v->flags.Test(VehicleRailFlag::Reversing) ? "ano" : "ne");
-			return;
+		if (held) {
+			held_count++;
+		} else {
+			loose_count++;
+			if (loose == nullptr) loose = u;
 		}
 	}
-	if (_show_train_orientation) SayOnChange(v, fmt::format("Vlak {}: zem drzi", v->unitnumber));
+
+	if (loose == nullptr) {
+		if (_show_train_orientation) SayOnChange(v, fmt::format("Vlak {}: zem drzi", v->unitnumber));
+		return;
+	}
+	if (held_count == 0 && !_settings_game.pf.reserve_paths) return;
+
+	LogAnomaly("Vlak {}: ZEM NEDRZI na ({},{}) clanek {} kolej {:#x} - drzi {} z {} vozu, rozkaz {}, stuck {}, ceka-spoj {}, reversing {}",
+			v->unitnumber, TileX(loose->tile), TileY(loose->tile), loose->index, loose->track.base(),
+			held_count, held_count + loose_count,
+			to_underlying(v->current_order.GetType()), v->flags.Test(VehicleRailFlag::Stuck) ? "ano" : "ne",
+			v->current_order.ShouldWaitForCouple() ? "ano" : "ne", v->flags.Test(VehicleRailFlag::Reversing) ? "ano" : "ne");
 }
 
 bool Train::Tick()
