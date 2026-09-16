@@ -4975,7 +4975,7 @@ STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Founding
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Founding a rake: platform length
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting for wagons to collect
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Founding a rake: has to arrive wagons first
-STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}Arrived nose first: wagons hang off the tender, turn it round
+STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}With a tender it cannot couple wagons at the front
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(load onto train)
