@@ -4975,6 +4975,7 @@ STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Founding
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Founding a rake: platform length
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting for wagons to collect
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Founding a rake: has to arrive wagons first
+STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}Arrived nose first: wagons hang off the tender, turn it round
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(load onto train)
@@ -5514,6 +5515,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... no s
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... the engine would end up behind the wagons, which is not supported yet
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... it is too far away to couple to
 STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST                 :{WHITE}... to found a rake it has to arrive wagons first, the engine would end up inside the rake
+STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST                         :{WHITE}... the engine and its tender are one vehicle and wagons can only hang off the tender; it arrived nose first
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Can't station this train as a rescue engine...
 STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Can't call a tow for these wagons...
 STR_ERROR_TOW_ALREADY_COMING                                    :{WHITE}... a rescue engine is already on its way for them

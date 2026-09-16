@@ -4326,17 +4326,28 @@ static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore);
 
 static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 {
-	/* Depots stack their chains on one tile and couple by their own rules;
-	 * wormholes have no per-tile geometry to walk. Neither is this check's
-	 * business. */
-	if (from->track.Any({Track::Depot, Track::Wormhole}) || to->track.Any({Track::Depot, Track::Wormhole})) return true;
-	if (from->tile == to->tile) return from->track == to->track;
+	/* A wormhole has no per-tile geometry to walk. */
+	if (from->track.Test(Track::Wormhole) || to->track.Test(Track::Wormhole)) return true;
+
+	/* Two chains stacked in the same shed couple by the shed's own rules. One
+	 * end in a shed and the other outside is not that: the shed has a door and
+	 * a line leading from it, and that is where the walk starts. This used to
+	 * say "connected" for any end in a shed, which made a rescue engine parked
+	 * inside one connected to whatever stood anywhere near its door. */
+	bool from_in_depot = from->track.Test(Track::Depot);
+	bool to_in_depot = to->track.Test(Track::Depot);
+	if (from_in_depot && to_in_depot) return from->tile == to->tile;
+	if (to_in_depot) {
+		std::swap(from, to);
+		std::swap(from_in_depot, to_in_depot);
+	}
+	if (!from_in_depot && from->tile == to->tile) return from->track == to->track;
 
 	/* Two ends standing on the same platform are joined by the platform: a
 	 * platform is straight connected track by construction. This cannot be
 	 * left to the walk below, because the track follower crosses a whole
 	 * platform in one step and never visits the tiles in the middle. */
-	if (IsRailStationTile(from->tile) && IsRailStationTile(to->tile) &&
+	if (!from_in_depot && IsRailStationTile(from->tile) && IsRailStationTile(to->tile) &&
 			IsCompatibleTrainStationTile(to->tile, from->tile)) {
 		TileIndexDiff delta = TileOffsByAxis(GetRailStationAxis(from->tile));
 		for (TileIndex t = from->tile + delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, from->tile); t += delta) {
@@ -4347,13 +4358,34 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 		}
 	}
 
+	/* A tile on the way with a vehicle of either train standing on it is a
+	 * wall: the end found beyond it is not the end that faces this one,
+	 * whatever the rails say. A casualty lying round a curve had its head on
+	 * the tow's line just past the shed door and its second engine on the tile
+	 * in between; the rails ran from door to head, the head was spliced on,
+	 * and the close-up walk tore the train apart over the vehicle standing in
+	 * the hole (save eka, scene ekaodtah). Vehicles of the far train on its
+	 * own end's tile are its body behind that end and do not count. */
+	auto walled = [&](TileIndex tile) {
+		for (const Vehicle *o : VehiclesOnTile(tile)) {
+			if (o->type != VehicleType::Train) continue;
+			const Train *t = Train::From(o);
+			if (t->First() == from->First() || t->First() == to->First()) return true;
+		}
+		return false;
+	};
+
 	Track target = TrackBitsToTrack(to->track);
 
 	std::vector<std::pair<TileIndex, Trackdir>> queue;
 	std::vector<std::pair<TileIndex, Trackdir>> seen;
-	for (Trackdir td : TRACKDIR_BIT_MASK) {
-		if (TrackdirToTrack(td) != TrackBitsToTrack(from->track)) continue;
-		queue.emplace_back(from->tile, td);
+	if (from_in_depot) {
+		queue.emplace_back(from->tile, DiagDirToDiagTrackdir(GetRailDepotDirection(from->tile)));
+	} else {
+		for (Trackdir td : TRACKDIR_BIT_MASK) {
+			if (TrackdirToTrack(td) != TrackBitsToTrack(from->track)) continue;
+			queue.emplace_back(from->tile, td);
+		}
 	}
 
 	/* The distance test in AreConsistsCloseEnoughToCouple() allows about two
@@ -4374,6 +4406,7 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 						IsRailStationTile(to->tile) && IsCompatibleTrainStationTile(to->tile, ft.new_tile)) {
 					return true;
 				}
+				if (walled(ft.new_tile)) continue;
 				auto key = std::pair(ft.new_tile, cand);
 				if (std::ranges::find(seen, key) != seen.end()) continue;
 				seen.push_back(key);
@@ -5954,6 +5987,48 @@ bool IsFoundingHeldEngineFirst(const Train *v)
 }
 
 /**
+ * Whether the end of @p unit that meets @p other is the head of its list,
+ * measured the way CmdCoupleTrains() measures it before it relinks a consist
+ * back to front: the head against the other train's head vehicle, the tail
+ * likewise.
+ */
+static bool MeetsOtherHeadEndFirst(const Train *unit, const Train *other)
+{
+	const Train *first = unit->First();
+	return DistanceSquaredBetweenVehicles(first, other) < DistanceSquaredBetweenVehicles(first->Last(), other);
+}
+
+/**
+ * Whether a consist can be relinked back to front at all.
+ *
+ * A list is turned round unit by unit, and a unit that is one vehicle with
+ * articulated parts -- a steam engine with its tender, a multi-part wagon --
+ * is one unit: there is nothing to turn. Its parts follow its head in the
+ * list whichever way it stands on the rails, so the only end of it anything
+ * can hang off is the far end of its last part.
+ */
+static bool ConsistCanBeRelinked(const Train *consist)
+{
+	return consist->GetNextVehicle() != nullptr || consist->Next() == nullptr;
+}
+
+/**
+ * Whether @p v is a collector standing against its partner, held because it
+ * arrived nose first and is a single articulated unit that cannot be relinked
+ * (see the refusal in CmdCoupleTrains()).
+ *
+ * @param v the train, front of its consist
+ * @return true when that hold is what is keeping it standing
+ */
+bool IsCoupleHeldNoseFirst(const Train *v)
+{
+	if (v->cur_speed != 0 || !v->current_order.ShouldGoToCouple()) return false;
+	if (ConsistCanBeRelinked(v)) return false;
+	const Train *partner = GetTrainCouplePartner(v);
+	return partner != nullptr && MeetsOtherHeadEndFirst(v, partner);
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -6047,6 +6122,24 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * of closing up should be asked to cover. */
 	if (!AreConsistsCloseEnoughToCouple(v, partner)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 
+	/* The splice below hangs the partner off the end of the list, so a train
+	 * that meets its partner with the head of its list has that list turned
+	 * round first -- and a single vehicle with articulated parts cannot be
+	 * turned round: an engine and its tender are one unit, and the tender
+	 * follows the engine in the list whichever way they stand on the rails.
+	 * Spliced anyway, the list says the tender is next to the wagons while
+	 * the engine actually is, and the close-up walk drags the tender through
+	 * the engine towards them: the player's steam engine, turned round in a
+	 * shed by its orders and back at its rake nose first, came apart on the
+	 * first step (save sivy2). Wagons can only hang off the tender, so it
+	 * stands here, the window says why (IsCoupleHeldNoseFirst()), and the
+	 * player turns it round -- or stops turning it round on the way. */
+	if (!ConsistCanBeRelinked(leading) && MeetsOtherHeadEndFirst(leading, trailing)) {
+		LogAnomaly("Vlak {}: spojeni nosem napred - masinka s tendrem je jeden vuz a vozy jdou jen za tendr; stoji na ({},{}) a ceka na otoceni",
+				leading->unitnumber, TileX(leading->tile), TileY(leading->tile));
+		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
+	}
+
 	/* Said here rather than above, where it is worked out: a train standing
 	 * still with a partner somewhere along its booked road is asked to couple
 	 * on every tick, and most of those askings are a train that has simply not
@@ -6106,6 +6199,15 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 				TileX(t_end->tile), TileY(t_end->tile), t_end->track.base());
 	}
 	if (!ends_clean && tow == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+
+	/* The same question of the other train, once its ends are known to meet
+	 * cleanly: a casualty about to be straightened is laid down head nearest
+	 * the tow (LayCasualtyAlongTow()), so it never needs turning. */
+	if (ends_clean && !ConsistCanBeRelinked(trailing) && !MeetsOtherHeadEndFirst(trailing, leading)) {
+		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz - seznam se otocit neda, spojeni odmitnuto",
+				leading->unitnumber, trailing->unitnumber);
+		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
+	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		/* A casualty is taken in tow exactly as it stood and is put down in

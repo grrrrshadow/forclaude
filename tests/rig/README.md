@@ -25,6 +25,13 @@ never happened. Anything the battery says about a build is only worth as much
 as the number of scenes that actually loaded -- if a run looks suspiciously
 unchanged, count `Game load failed` across `reg_*.log` first.
 
+A save made with NewGRFs needs those sets in the rig's `HOME` as well
+(`<home>/.openttd/newgrf/`, the `.tar` files as the game downloaded them),
+or the game disables them, replaces every vehicle with a default one of
+another length and shape, and the save is a different game. The player's
+`sivy2.sav` (nose-first coupling of a steam engine with its tender) needs
+CZTR Rails 2.2.4, CZTR Engines Steam 1.0.2 and CZTR Wagons Cargo 1.1.0.
+
 Four saves the battery asks for are the player's and are not in `saves/`:
 `s.sav` (scene `nakladsav`), `save91.sav` (`save91`, `save91rev`),
 `umak.sav` (`mess`) and `umins.sav` (`messodvoz`, `messodtah`). Those six

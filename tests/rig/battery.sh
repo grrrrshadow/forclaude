@@ -557,9 +557,12 @@ testzatik 400 testauta" 8000
 
 # Two road vehicles and one wagon, so one of them always has to wait its turn:
 # the queue the "how many are waiting for a train" condition is about. The
-# first rides twice and the second once in 8000 ticks, so auto=6. The condition
-# sits at the head of the second one's list and is asked as it comes round; the
-# answers are in the scene's own log, next to what the cars were doing.
+# first rides twice and the second once in 8000 ticks, so auto=6 -- or 4 when
+# the random map's road is long enough that the second one's turn falls past
+# the end of the scene; like nakladcekat, this one moves between runs. The
+# condition sits at the head of the second one's list and is asked as it
+# comes round; the answers are in the scene's own log, next to what the cars
+# were doing.
 run_scene autodve "vlak123 on
 testautovlak 2
 testpodminka auto 2 0 12 4 0 2

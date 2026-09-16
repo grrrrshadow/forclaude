@@ -86,6 +86,7 @@ bool IsAnyPartInsideDepot(const Train *v);
 bool IsDepotDoorBookedByAnother(const Train *v);
 bool HasCoupleTarget(const Train *v);
 bool IsFoundingHeldEngineFirst(const Train *v);
+bool IsCoupleHeldNoseFirst(const Train *v);
 bool IsWaitingToBeCoupled(const Train *v);
 bool IsRakeClaimedForCoupling(const Train *rake);
 void MarkCoupleClaimChanged(const Train *rake);

@@ -3445,6 +3445,10 @@ public:
 					 * first stands there refused (see CmdCoupleTrains()); with no
 					 * word it looks like a train that has simply stopped. */
 					if (IsFoundingHeldEngineFirst(Train::From(v))) return GetString(STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST);
+					/* An engine with its tender that pulled up nose first: the
+					 * two are one vehicle and wagons can only hang off the
+					 * tender, so it is refused the same way (CmdCoupleTrains()). */
+					if (IsCoupleHeldNoseFirst(Train::From(v))) return GetString(STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST);
 					return GetString(STR_VEHICLE_STATUS_HEADING_FOR_COUPLE_VEL, v->current_order.GetDestination(), PackVelocity(v->GetDisplaySpeed(), v->type));
 				}
 				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_STATION_VEL : STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL,
