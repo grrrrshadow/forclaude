@@ -4262,6 +4262,38 @@ static bool ConTestRequestTow(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Send a train to a depot, the way the button in its window does.
+ *
+ * The rig had no way to press that button, so what a train does when the
+ * player calls it in could only be guessed at from the code -- and what it
+ * did was stand still with its window saying it was on its way.
+ *
+ * Usage: testdodepa <unit number> [1 for "service only"]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSendToDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Send a train to a depot. Usage: 'testdodepa <unit number> [1 = jen servis]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	bool service = argv.size() >= 3 && ParseInteger(argv[2]).value_or(0) != 0;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, t->index,
+				service ? DepotCommandFlags{DepotCommandFlag::Service} : DepotCommandFlags{}, VehicleListIdentifier{});
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testdodepa: vlak {} -> depo ({}) - {}", *punit,
+				service ? "servis" : "zastavit", r.Succeeded() ? std::string("poslano") : RefusalReason(r));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testdodepa: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestToggleBrake(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2 || argv.size() > 3) {
@@ -8179,6 +8211,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmodely",              ConTestListEngineModels);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
+	IConsole::CmdRegister("testdodepa",              ConTestSendToDepot);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);

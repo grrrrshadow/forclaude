@@ -2862,6 +2862,14 @@ CommandCost Vehicle::SendToDepot(DoCommandFlags flags, DepotCommandFlags command
 			this->GetGroundVehicleFlags().Set(GroundVehicleFlag::SuppressImplicitOrders);
 		}
 
+		/* Being sent to a depot by hand calls off a coupling errand, exactly as
+		 * skipping past the coupling order does -- the player has said where
+		 * the train is to go, and it is not to the wagons. Left on, the claim
+		 * alone went on counting the train as a party to a coupling and held it
+		 * standing against its partner with its window saying it was on its way
+		 * here. See ReleaseCoupleErrand(). */
+		if (this->type == VehicleType::Train) ReleaseCoupleErrand(Train::From(this));
+
 		this->SetDestTile(closest_depot.location);
 		this->current_order.MakeGoToDepot(closest_depot.destination.ToDepotID(), {});
 		if (!command.Test(DepotCommandFlag::Service)) this->current_order.SetDepotActionType(OrderDepotActionFlag::Halt);

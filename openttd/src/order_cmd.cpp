@@ -1138,21 +1138,10 @@ CommandCost CmdSkipToOrder(DoCommandFlags flags, VehicleID veh_id, VehicleOrderI
 		 * player's side the engine simply froze the moment they tried to call
 		 * the job off, which is the one moment they most needed it not to.
 		 *
-		 * The claim goes with it. A rake that was spoken for by this engine is
-		 * nobody's again, or no other engine will ever be sent for it. */
-		if (v->type == VehicleType::Train) {
-			Train *t = Train::From(v);
-			if (t->couple_target != VehicleID::Invalid()) {
-				Train *claimed = Train::GetIfValid(t->couple_target);
-				if (claimed != nullptr && claimed->couple_claim == t->index) {
-					claimed->couple_claim = VehicleID::Invalid();
-					MarkCoupleClaimChanged(claimed);
-				}
-				t->couple_target = VehicleID::Invalid();
-			}
-			t->current_order.SetGoToCouple(false);
-			t->current_order.SetWaitForCouple(false);
-		}
+		 * The claim on a rake goes stale with it, so no rake is left spoken
+		 * for by an engine that is not coming. See ReleaseCoupleErrand(),
+		 * which the depot button goes through as well. */
+		if (v->type == VehicleType::Train) ReleaseCoupleErrand(Train::From(v));
 
 		/* Unbunching data is no longer valid. */
 		v->ResetDepotUnbunching();

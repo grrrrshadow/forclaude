@@ -2743,6 +2743,58 @@ static bool IsPartyToACoupling(const Train *v)
 }
 
 /**
+ * Is a coupling this train's *present* errand -- something its live order or
+ * its role says it is doing right now?
+ *
+ * The difference from #IsPartyToACoupling is the claim on a rake. A claim says
+ * where this train was going, and it outlives being told to go somewhere else;
+ * that is on purpose, because the pair have to be allowed to part without
+ * running into each other, which is what the claim tells the collision check
+ * (see CheckTrainCollision()). But it must never be what keeps a train
+ * standing: a train whose live order says "go to the depot" is going to the
+ * depot, and anything that holds it there instead is disobeying the player.
+ *
+ * @param v any part of the consist
+ * @return whether the train is on a coupling errand at this moment
+ */
+static bool IsOnALiveCouplingErrand(const Train *v)
+{
+	const Train *head = v->First();
+	return head->current_order.ShouldGoToCouple() || IsOnRescueRun(head) || IsWaitingToBeCoupled(head);
+}
+
+/**
+ * Call off whatever coupling errand a train was on, because it has been told
+ * to do something else.
+ *
+ * Two commands do this -- skipping past the coupling order, and sending the
+ * train to a depot by hand -- and they are the same act, so they share this.
+ * Written as one routine because the two were written apart and one of them
+ * forgot half of it: a train sent to a depot kept its claim, the claim kept it
+ * counting as a party to a coupling, and it stood against its partner refusing
+ * to move while its window said it was heading for the depot. The player could
+ * only free it by skipping the order, which is the half that was right.
+ *
+ * What is *not* done here is rubbing out the mark on the rake. That mark is
+ * how the collision check tells "these two are parting" from "this one is
+ * driving into that one" (see CheckTrainCollision()), and the two are touching
+ * at exactly this moment -- wiped now, the engine crashes into what it came to
+ * collect as it pulls away. It is stale from this moment (IsCoupleClaimStale()
+ * asks the engine, and the engine no longer says it is coming), so it holds
+ * nothing up: the rake reads as unclaimed to every other engine at once, and
+ * the next one that goes looking tidies the field away.
+ *
+ * @param t the train, any part of it
+ */
+void ReleaseCoupleErrand(Train *t)
+{
+	Train *head = t->First();
+	head->couple_target = VehicleID::Invalid();
+	head->current_order.SetGoToCouple(false);
+	head->current_order.SetWaitForCouple(false);
+}
+
+/**
  * Has the engine that spoke for this rake stopped coming for it?
  *
  * A claim is only worth as much as the engine behind it. One that has been
@@ -11288,7 +11340,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * there). Covers a train that drove here under a "go to couple" order
 	 * as well as one already parked on "wait to couple" that a partner has
 	 * since been pushed up against. See FEATURE_DESIGN_COUPLING_TOW.md. */
-	if (consist->cur_speed == 0 && IsPartyToACoupling(consist) &&
+	/* Asked of a live errand, not of the claim: see IsOnALiveCouplingErrand().
+	 * A claim that has been called off must not be able to pin a train, or the
+	 * hold outlives the job and the train stands there disobeying its orders. */
+	if (consist->cur_speed == 0 && IsOnALiveCouplingErrand(consist) &&
 			GetTrainCouplePartner(consist) != nullptr) {
 		/* Commands check ownership against the company that is "current" right
 		 * now, which during a vehicle tick is simply whatever ran last -- not
@@ -11302,7 +11357,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		/* Only claim the tick if the coupling really happened. Returning
 		 * unconditionally would leave a train that cannot couple for some
 		 * other reason frozen here for good, doing nothing else ever again. */
-		if (CmdCoupleTrains(DoCommandFlag::Execute, consist->index).Succeeded()) return true;
+		CommandCost coupled = CmdCoupleTrains(DoCommandFlag::Execute, consist->index);
+		if (coupled.Succeeded()) return true;
 
 		/* Refused with the partner right against it: stay put. The collision
 		 * check lets these two overlap rather than crash, and a train that
@@ -11312,6 +11368,16 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * asks again; the reason is on the console. */
 		const Train *partner = GetTrainCouplePartner(consist);
 		if (partner != nullptr && AreConsistsTouching(consist, partner)) {
+			/* And it goes in the record, because from outside this looks like
+			 * a train that has simply stopped: it is standing on its own
+			 * orders, against a partner, with nothing in the game saying why.
+			 * The record's own repeat limit keeps a refusal that lasts from
+			 * filling the file; a coupling refused for one tick and made on
+			 * the next writes one line and is worth that much. */
+			StringID why = coupled.GetErrorMessage();
+			LogAnomaly("Vlak {}: stoji u partnera {} na ({},{}) a spojeni se odmita - {}",
+					consist->unitnumber, partner->unitnumber, TileX(consist->tile), TileY(consist->tile),
+					why == INVALID_STRING_ID ? std::string("bez duvodu") : GetString(why));
 			consist->cur_speed = 0;
 			consist->subspeed = 0;
 			return true;
