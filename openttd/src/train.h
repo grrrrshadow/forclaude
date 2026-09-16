@@ -87,6 +87,7 @@ bool IsFoundingHeldEngineFirst(const Train *v);
 bool IsWaitingToBeCoupled(const Train *v);
 bool IsRakeClaimedForCoupling(const Train *rake);
 void MarkCoupleClaimChanged(const Train *rake);
+void CancelCoupleErrand(Train *t);
 void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index);
 bool IsWaitingToBeRescued(const Train *v);
 bool IsOnRescueRun(const Train *v);

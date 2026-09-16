@@ -3,6 +3,52 @@
 Doslovné poznámky od hráče z testování Windows buildů. Nic se z toho zatím
 neřeší — vyhodnotí se to najednou, až budou testy hotové.
 
+## Sběračka poslaná do depa stojí a tvrdí, že tam míří (2026-09-16)
+
+Hlášení hráče: *„s tendrem nelze připojit píše, to je dobrý, zmačknu do
+depa, nemuže najít cestu, to je dobrý, dám otočit, znova zmačknu do depa
+a píše že míří do depa ale nejede, to je špatný. nutim ji jet semaforkem,
+nejede, až když poskočím příkaz na depo tak jede. já myslim že takhle
+neposlušný jsou asi všechny co jedou na připojení."*
+
+Hráč měl pravdu, že to není o tendru a že to bude platit pro všechny, co
+jedou na připojení. Tendr je jen důvod, proč to spojení nevyšlo a
+sběračka zůstala stát s rozkazem „jeď spojit" — a v tu chvíli se to týká
+každé takové sběračky.
+
+**Příčina.** Rozkaz, který vlak zrovna plní, je kopie. `MakeGoToDepot()`
+do té kopie zapíše jen svoje pole, ostatní v ní nechá — takže po zmáčknutí
+čudlíku do depa zůstal na rozkazu příznak „jeď spojit". A depo s příznakem
+„jeď spojit" je poctivá věc (vyzvednutí vagonů z kůlny), takže sběrací
+držení v `TrainController()` ten rozkaz respektuje: vlak stojí a čeká na
+vagonky, o kterých jeho nový rozkaz nic neříká. Okno přitom hlásí „míří do
+depa", protože typ rozkazu opravdu je depo — a z venku se to nedá poznat.
+Semaforek nepomůže, protože to není držení návěstí. Skip pomůže, protože
+skip po sobě uklízel (`CmdSkipToOrder()` si ten příznak mazal sám).
+
+**Oprava.** Ten úklid je teď jedna funkce, `CancelCoupleErrand()`, a jdou
+přes ni všechny způsoby, jak se pochuzka odvolává: skip i ruční poslání do
+depa (obojí větve `Vehicle::SendToDepot()` — nová jízda do depa i zrušení
+té stávající). Pustí nárok na řadu, kterou si vlak zamluvil, a smaže
+příznaky „jeď spojit" / „čekej na spojení" z kopie rozkazu.
+
+**Změřeno rigem** (scéna `dodepa`: sběračka čeká na vagonky, které zatím
+nemůže dostat, a je ručně poslána do depa):
+
+| | před opravou | po opravě |
+|---|---|---|
+| vjel do depa | 1 | **2** |
+| poslední stav vlaku 2 | rychlost 0, rozkaz „depo", drží se | vjel dovnitř |
+
+Zbytek baterie beze změny: 19 scén `testspoj`/`testodtah` (zakl, couvej,
+depo, depopocet, depostoji, depooboji, sklad2/6, skladdve, filtrspatný,
+filtropravený, rad, blok, vlek, vlekblok, zaloz, okruh, odtahrovina,
+odtahkrizeni) dává **stejná čísla před i po** — spojení se dějí, 0 asertů,
+0 srážek, 0 havárií.
+
+Rig k tomu dostal příkaz `testdodepa <číslo vlaku>` (pošli vlak do
+nejbližšího depa, jako hráčův čudlík).
+
 ## Build #103 — mašinka po odložení vlečeného vlaku stojí navždy (2026-08-28)
 
 Hlášení: vedoucí mašinky po odpojení, když nemají hned volnou cestu,

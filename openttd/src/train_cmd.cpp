@@ -2258,6 +2258,42 @@ void MarkCoupleClaimChanged(const Train *rake)
 }
 
 /**
+ * Call a train's coupling errand off: let go of the rake it had spoken for
+ * and take the "go and couple" / "wait to be coupled" flags off the order it
+ * is working on.
+ *
+ * The order a train works on is a copy, and the copy is what the game reads.
+ * Replacing that copy -- a skip, or the player's depot button -- leaves the
+ * coupling flags on it unless they are taken off by hand, because the order
+ * types that replace it only write their own fields. A depot order that
+ * still says "go and couple" is a real thing (collecting from a shed), so
+ * the collecting hold in TrainController() honours it: the train stands
+ * where it is, waiting for wagons its new order never asked for, with the
+ * window saying "heading for depot" and nothing else to tell the player
+ * why. Force-proceed does not touch it; only a skip did, because a skip
+ * cleaned up after itself. So the cleaning up is one function, and every
+ * way of calling the errand off goes through it.
+ *
+ * The claim goes with it: a rake that was spoken for by this engine is
+ * nobody's again, or no other engine will ever be sent for it.
+ *
+ * @param t the train, front of its consist
+ */
+void CancelCoupleErrand(Train *t)
+{
+	if (t->couple_target != VehicleID::Invalid()) {
+		Train *claimed = Train::GetIfValid(t->couple_target);
+		if (claimed != nullptr && claimed->couple_claim == t->index) {
+			claimed->couple_claim = VehicleID::Invalid();
+			MarkCoupleClaimChanged(claimed);
+		}
+		t->couple_target = VehicleID::Invalid();
+	}
+	t->current_order.SetGoToCouple(false);
+	t->current_order.SetWaitForCouple(false);
+}
+
+/**
  * Does the rake @p rake answer the description the order @p order gives of
  * what it is going to collect?
  *

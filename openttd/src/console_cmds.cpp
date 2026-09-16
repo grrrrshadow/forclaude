@@ -4317,6 +4317,35 @@ static bool ConTestSkipOrder(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Send a train to the nearest depot, the same as the player's depot button.
+ * Meant for staged scenes: a train on some errand is called off to a depot
+ * by hand, and what it does next is the thing under test.
+ * Usage: testdodepa <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSendToDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Send a train to the nearest depot. Usage: 'testdodepa <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		/* Fired from the heartbeat timer there is no acting company set, and
+		 * the command would bounce off its ownership check, silently. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost ret = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, t->index, DepotCommandFlags{}, VehicleListIdentifier{});
+		IConsolePrint(ret.Failed() ? CC_ERROR : CC_DEFAULT, "testdodepa: vlak {} - {}.", t->unitnumber,
+				ret.Failed() ? GetString(ret.GetErrorMessage()) : std::string("poslan do depa"));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testdodepa: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 /** A train being followed closely: unit number and how often it is reported. */
 static UnitID _testsleduj_unit = 0;
 static uint _testsleduj_every = 50;
@@ -7231,6 +7260,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testefekty",              ConTestCountEffects);
 	IConsole::CmdRegister("testmodely",              ConTestListEngineModels);
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
+	IConsole::CmdRegister("testdodepa",              ConTestSendToDepot);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);

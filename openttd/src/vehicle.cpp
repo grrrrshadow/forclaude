@@ -2800,6 +2800,9 @@ CommandCost Vehicle::SendToDepot(DoCommandFlags flags, DepotCommandFlags command
 			}
 
 			this->current_order.MakeDummy();
+			/* Called off, so the coupling it was here for is called off too;
+			 * see CancelCoupleErrand(). */
+			if (this->type == VehicleType::Train) CancelCoupleErrand(Train::From(this));
 			InvalidateWindowData(WindowClass::VehicleView, this->index);
 		}
 		return CommandCost();
@@ -2819,6 +2822,12 @@ CommandCost Vehicle::SendToDepot(DoCommandFlags flags, DepotCommandFlags command
 		this->SetDestTile(closest_depot.location);
 		this->current_order.MakeGoToDepot(closest_depot.destination.ToDepotID(), {});
 		if (!command.Test(DepotCommandFlag::Service)) this->current_order.SetDepotActionType(OrderDepotActionFlag::Halt);
+		/* The depot button is the player calling the train's errand off. A
+		 * train that came to collect wagons -- and could not, or was still
+		 * waiting for them -- keeps the "go and couple" flag on this new order
+		 * otherwise, and the collecting hold then keeps it standing where it
+		 * is, "heading for depot" and not moving. See CancelCoupleErrand(). */
+		if (this->type == VehicleType::Train) CancelCoupleErrand(Train::From(this));
 		InvalidateWindowData(WindowClass::VehicleView, this->index);
 
 		/* If there is no depot in front and the train is not already reversing, reverse automatically (trains only) */

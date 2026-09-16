@@ -1119,19 +1119,7 @@ CommandCost CmdSkipToOrder(DoCommandFlags flags, VehicleID veh_id, VehicleOrderI
 		 *
 		 * The claim goes with it. A rake that was spoken for by this engine is
 		 * nobody's again, or no other engine will ever be sent for it. */
-		if (v->type == VehicleType::Train) {
-			Train *t = Train::From(v);
-			if (t->couple_target != VehicleID::Invalid()) {
-				Train *claimed = Train::GetIfValid(t->couple_target);
-				if (claimed != nullptr && claimed->couple_claim == t->index) {
-					claimed->couple_claim = VehicleID::Invalid();
-					MarkCoupleClaimChanged(claimed);
-				}
-				t->couple_target = VehicleID::Invalid();
-			}
-			t->current_order.SetGoToCouple(false);
-			t->current_order.SetWaitForCouple(false);
-		}
+		if (v->type == VehicleType::Train) CancelCoupleErrand(Train::From(v));
 
 		/* Unbunching data is no longer valid. */
 		v->ResetDepotUnbunching();
