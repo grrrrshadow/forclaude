@@ -309,7 +309,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				}
 			} else {
 				/* Show non-stop, refit and stop location only in the order window. */
-				if (!order->GetNonStopType().Test(OrderNonStopFlag::GoVia)) {
+				/* A boarding order says "no load, no unload" only because boarding
+				 * a train set it so (MOF_LOAD_ON_TRAIN); printing that is a bracket
+				 * which tells the reader nothing and costs the width the station
+				 * name needs. The line said it twice over and ran into the
+				 * end-of-list line beneath it. See road_on_rail.h. */
+				if (!order->GetNonStopType().Test(OrderNonStopFlag::GoVia) && !order->ShouldLoadOnTrain()) {
 					StringID str = _station_load_types[order->IsRefit()][to_underlying(unload)][to_underlying(load)];
 					if (str != INVALID_STRING_ID) {
 						if (order->IsRefit()) {
@@ -365,7 +370,11 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * order at a time. Everything an order is going to do belongs
 				 * on its own line, where a whole list can be read at once. */
 				if (v->type == VehicleType::Train && order->ShouldWaitForCouple()) second += GetString(STR_ORDER_WAIT_COUPLE_SUFFIX);
-				if (v->type == VehicleType::Road && order->ShouldLoadOnTrain()) second += GetString(STR_ORDER_LOAD_ON_TRAIN_SUFFIX);
+				/* On the order's own line, not on the second one under it. A train's
+				 * couple suffixes go below because there can be a whole filter of
+				 * them; a road vehicle has this one short word, and put below it
+				 * was written across the end-of-list line beneath. */
+				if (v->type == VehicleType::Road && order->ShouldLoadOnTrain()) line += GetString(STR_ORDER_LOAD_ON_TRAIN_SUFFIX);
 
 				/* How many vehicles stay with the train belongs on the order
 				 * line with everything else the order is going to do. A button
@@ -1381,8 +1390,8 @@ public:
 				this->SetWidgetLoweredState(WID_O_HONK, order->ShouldHonk());
 			} else if (this->vehicle->type == VehicleType::Road && order != nullptr && order->IsType(OT_GOTO_STATION)) {
 				/* A road vehicle's station order: one button, boarding a train
-				 * here. The player asked for one big button to start with, to
-				 * be split up as the need arises. See road_on_rail.h. */
+				 * here. The player asked for one big button, to be split up as
+				 * the need arises. See road_on_rail.h. */
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_ROAD);
 				this->SetWidgetLoweredState(WID_O_LOAD_ON_TRAIN, order->ShouldLoadOnTrain());
 			} else {

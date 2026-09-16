@@ -551,4 +551,6 @@ testzatik 1720 testbrzda 2" 6000
 # there, works the stop, and drives back by road to do it again. Two full
 # rounds in 8000 ticks: auto=4.
 run_scene autovlak "vlak123 on
-testauto" 8000
+testauto
+testzatik 200 testokno rozkazy auto
+testzatik 400 testauta" 8000

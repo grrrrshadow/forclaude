@@ -752,8 +752,21 @@ public:
 		 * rubbed off the live order: a train standing on "wait for couple"
 		 * stopped knowing it was waiting and left, one on its way to collect
 		 * forgot what it had set out to do, and one that was to put wagons down
-		 * on arrival simply did not. Same list of fields as the one in
-		 * order_sl.cpp, and for the same reason. */
+		 * on arrival simply did not.
+		 *
+		 * It has to be the SAME LIST as the one in order_sl.cpp, field for
+		 * field, and it drifted out of step the moment it was left to be kept
+		 * in step by remembering: nine fields added to Order after this list
+		 * was written were never added here, and each of them was a setting
+		 * the live order lost on load -- decoupling on arrival, founding a
+		 * rake, the horn, the count being a minimum or a maximum, departing
+		 * automatically, and boarding a train. The player found the last of
+		 * them: a road vehicle told to board a train came back from a save
+		 * not knowing it, drove past its train and carried on. Whatever is
+		 * added to Order goes in both lists. */
+		SLE_VAR(Vehicle, current_order.decouple, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.decouple_keep_wagons, VarTypes::U8),
+		SLE_VAR(Vehicle, current_order.decouple_whole_train, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.decouple_count, VarTypes::U8),
 		SLE_VAR(Vehicle, current_order.wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.go_to_couple, VarTypes::BOOL),
@@ -762,6 +775,12 @@ public:
 		SLE_VAR(Vehicle, current_order.couple_load, VarTypes::U8),
 		SLE_VAR(Vehicle, current_order.couple_cargo, VarTypes::U8),
 		SLE_VAR(Vehicle, current_order.couple_count, VarTypes::U8),
+		SLE_VAR(Vehicle, current_order.couple_found_rake, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.honk, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.couple_min, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.couple_max, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.automatic_departure, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.load_on_train, VarTypes::BOOL),
 		SLE_CONDVAR(Vehicle, timetable_start, VarFileType::I32 | VarMemType::U64, SaveLoadVersion::TimetableStart, SaveLoadVersion::TimetableStartTicks),
 		SLE_CONDVAR(Vehicle, timetable_start, VarTypes::U64, SaveLoadVersion::TimetableStartTicks, SaveLoadVersion::MaxVersion),
 

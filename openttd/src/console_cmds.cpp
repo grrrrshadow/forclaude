@@ -3972,7 +3972,7 @@ static bool ConTestDemolishDepot(std::span<std::string_view> argv)
 static bool ConTestOpenWindow(std::span<std::string_view> argv)
 {
 	if (argv.size() != 2 && !(argv.size() == 3 && (argv[1] == "smer" || argv[1] == "letadlo" || argv[1] == "rozkazy"))) {
-		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|<unit number>]' or 'testokno smer <waypoint index>'.");
+		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|auto|<unit number>]' or 'testokno smer <waypoint index>'.");
 		return true;
 	}
 	if (argv.size() == 3 && argv[1] == "smer") {
@@ -4009,6 +4009,12 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 				want = VehicleType::Aircraft;
 			} else if (argv[2] == "lod") {
 				want = VehicleType::Ship;
+			} else if (argv[2] == "auto") {
+				/* The order window of a road vehicle: it is built from the
+				 * ground-vehicle tree like a train's, but the row of buttons
+				 * at the bottom is filled in differently (road_on_rail.h), and
+				 * a mistake there shows only when a road vehicle's is opened. */
+				want = VehicleType::Road;
 			} else {
 				punit2 = ParseInteger(argv[2]);
 			}
@@ -4258,12 +4264,28 @@ static bool ConTestRequestTow(std::span<std::string_view> argv)
 
 static bool ConTestToggleBrake(std::span<std::string_view> argv)
 {
-	if (argv.size() != 2) {
-		IConsolePrint(CC_HELP, "Toggle a train's hand brake. Usage: 'testbrzda <unit number>'.");
+	if (argv.size() < 2 || argv.size() > 3) {
+		IConsolePrint(CC_HELP, "Toggle a vehicle's hand brake. Usage: 'testbrzda <unit number>' or 'testbrzda auto <unit number>'.");
 		return true;
 	}
-	auto punit = ParseInteger(argv[1]);
+	/* Road vehicles have hand brakes too, and their numbers are a series of
+	 * their own -- so which is meant has to be said: 'testbrzda auto 3'. */
+	bool road = argv[1] == "auto";
+	auto punit = ParseInteger(argv[road ? 2 : 1]);
 	if (!punit.has_value()) return false;
+
+	if (road) {
+		for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+			if (!rv->IsFrontEngine() || rv->unitnumber != (UnitID)*punit) continue;
+			AutoRestoreBackup cur_company(_current_company, rv->owner);
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, rv->index, false);
+			IConsolePrint(CC_DEFAULT, "testbrzda: auto {} prepnuto.", rv->unitnumber);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testbrzda: auto {} nenalezeno.", argv[2]);
+		return true;
+	}
+
 	for (Train *t : Train::Iterate()) {
 		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
 		/* Fired from the heartbeat timer there is no acting company set, and
@@ -4273,6 +4295,39 @@ static bool ConTestToggleBrake(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testbrzda: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Print a road vehicle's orders and what its live order says, so that a
+ * savegame can be checked for the live order having lost what the list still
+ * has. Usage: testauta [unit number]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRoadOrders(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	std::optional<uint64_t> punit;
+	if (argv.size() >= 2) {
+		punit = ParseInteger(argv[1]);
+		if (!punit.has_value()) return false;
+	}
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine()) continue;
+		if (punit.has_value() && rv->unitnumber != (UnitID)*punit) continue;
+		IConsolePrint(CC_DEFAULT, "auto {}: zivy rozkaz typ {} kam {} naloz-na-vlak {}; c.{} z {} rozkazu",
+				rv->unitnumber, to_underlying(rv->current_order.GetType()),
+				rv->current_order.IsType(OT_GOTO_STATION) ? (int)rv->current_order.GetDestination().ToStationID().base() : -1,
+				rv->current_order.ShouldLoadOnTrain() ? "ano" : "ne",
+				rv->cur_real_order_index, rv->GetNumOrders());
+		VehicleOrderID i = 0;
+		for (const Order &o : rv->Orders()) {
+			IConsolePrint(CC_DEFAULT, "  {}{}: typ {} kam {} naloz-na-vlak {}", i == rv->cur_real_order_index ? "*" : " ", i,
+					to_underlying(o.GetType()), o.IsType(OT_GOTO_STATION) ? (int)o.GetDestination().ToStationID().base() : -1,
+					o.ShouldLoadOnTrain() ? "ano" : "ne");
+			i++;
+		}
+	}
 	return true;
 }
 
@@ -8043,6 +8098,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testauto",                ConTestRoadOnRail);
+	IConsole::CmdRegister("testauta",                ConTestRoadOrders);
 	IConsole::CmdRegister("log",                     ConAnomalyLog);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);
