@@ -5005,6 +5005,7 @@ STR_ORDER_CONDITIONAL_DRIVING_BACKWARDS                         :Jízda dozadu
 STR_ORDER_CONDITIONAL_WAGON_COUNT                               :Počet vagonů (mašinka se nepočítá)
 STR_ORDER_CONDITIONAL_TRAIN_LENGTH                              :Délka vlaku (v dlaždicích)
 STR_ORDER_CONDITIONAL_NOTHING_TO_COUPLE                         :Není co připojit
+STR_ORDER_CONDITIONAL_ROAD_WAITING                              :Aut čeká na naložení
 ###next-name-looks-similar
 
 STR_ORDER_CONDITIONAL_COMPARATOR_TOOLTIP                        :{BLACK}Jak porovnat vlastnost vozidla se zadanou hodnotou

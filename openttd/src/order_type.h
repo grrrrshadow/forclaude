@@ -158,6 +158,7 @@ enum class OrderConditionVariable : uint8_t {
 	WagonCount = 9, ///< Skip based on how many wagons the train has, the engine not counted
 	TrainLength = 10, ///< Skip based on how long the train is, in tiles
 	NothingToCouple = 11, ///< Skip when the next "go to couple" order in the list would find nothing
+	RoadVehiclesWaitingToBoard = 12, ///< Skip based on how many road vehicles are waiting to board a train at the station of the next "load onto train" order
 	End, ///< End marker.
 };
 

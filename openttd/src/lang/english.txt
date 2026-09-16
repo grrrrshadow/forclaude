@@ -4909,6 +4909,7 @@ STR_ORDER_CONDITIONAL_DRIVING_BACKWARDS                         :Driving backwar
 STR_ORDER_CONDITIONAL_WAGON_COUNT                               :Number of wagons (engine not counted)
 STR_ORDER_CONDITIONAL_TRAIN_LENGTH                              :Train length (in tiles)
 STR_ORDER_CONDITIONAL_NOTHING_TO_COUPLE                         :Nothing to couple
+STR_ORDER_CONDITIONAL_ROAD_WAITING                              :Road vehicles waiting for a train
 ###next-name-looks-similar
 
 STR_ORDER_CONDITIONAL_COMPARATOR_TOOLTIP                        :{BLACK}How to compare the vehicle data to the given value

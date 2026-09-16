@@ -27,6 +27,8 @@
 #include "cheat_type.h"
 #include "order_cmd.h"
 #include "train.h"
+#include "roadveh.h"
+#include "road_on_rail.h"
 #include "train_cmd.h"
 
 #include "table/strings.h"
@@ -837,6 +839,13 @@ CommandCost CmdInsertOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					if (occ == OrderConditionComparator::IsTrue || occ == OrderConditionComparator::IsFalse) return CMD_ERROR;
 					break;
 
+				case OrderConditionVariable::RoadVehiclesWaitingToBoard:
+					/* About a queue of road vehicles, so only a road vehicle can be
+					 * asked it; a number, like the counts above. */
+					if (v->type != VehicleType::Road) return CMD_ERROR;
+					if (occ == OrderConditionComparator::IsTrue || occ == OrderConditionComparator::IsFalse) return CMD_ERROR;
+					break;
+
 				case OrderConditionVariable::DrivingBackwards:
 				case OrderConditionVariable::NothingToCouple:
 					if (v->type != VehicleType::Train) return CMD_ERROR;
@@ -1400,6 +1409,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					v->type != VehicleType::Train) {
 				return CMD_ERROR;
 			}
+			if (cond_variable == OrderConditionVariable::RoadVehiclesWaitingToBoard && v->type != VehicleType::Road) return CMD_ERROR;
 			break;
 		}
 
@@ -2343,6 +2353,40 @@ static bool OrderConditionCompare(OrderConditionComparator occ, ConvertibleThrou
  * @param from the conditional order doing the asking
  * @return that couple order, or nullptr when the list holds none
  */
+/**
+ * The next "load onto train" order after this one in a road vehicle's list.
+ *
+ * Same walk as NextCoupleOrderAfter(), and for the same reason: a condition
+ * asking about the boarding stop has to find the order that names it, all the
+ * way round the list.
+ *
+ * @param v the vehicle
+ * @param from the conditional order doing the asking
+ * @return that boarding order, or nullptr when the list holds none
+ */
+static const Order *NextBoardingOrderAfter(const Vehicle *v, const Order *from)
+{
+	VehicleOrderID num = v->GetNumOrders();
+	if (num == 0) return nullptr;
+
+	VehicleOrderID at = 0;
+	bool found = false;
+	for (VehicleOrderID i = 0; i < num; i++) {
+		if (v->GetOrder(i) == from) {
+			at = i;
+			found = true;
+			break;
+		}
+	}
+	if (!found) return nullptr;
+
+	for (VehicleOrderID step = 1; step <= num; step++) {
+		const Order *o = v->GetOrder((at + step) % num);
+		if (o != nullptr && o->IsType(OT_GOTO_STATION) && o->ShouldLoadOnTrain()) return o;
+	}
+	return nullptr;
+}
+
 static const Order *NextCoupleOrderAfter(const Vehicle *v, const Order *from)
 {
 	VehicleOrderID num = v->GetNumOrders();
@@ -2404,6 +2448,28 @@ VehicleOrderID ProcessConditionalOrder(const Order *order, const Vehicle *v)
 			const Order *couple = NextCoupleOrderAfter(v, order);
 			bool nothing = couple == nullptr || !CoupleOrderWouldFindSomething(Train::From(v), *couple);
 			skip_order = OrderConditionCompare(occ, nothing, value);
+			break;
+		}
+		/* How many road vehicles are standing at a stop waiting for a train, at
+		 * the station the next "load onto train" order names. Asked of that
+		 * order rather than carrying a station of its own, for the same reason
+		 * the couple condition is: a second place to say which station is a
+		 * second place to disagree with the first. Only those actually waiting
+		 * are counted -- one already on a wagon is leaving, and the room it
+		 * took goes with it (the player's ruling). */
+		case OrderConditionVariable::RoadVehiclesWaitingToBoard: {
+			const Order *board = NextBoardingOrderAfter(v, order);
+			uint waiting = 0;
+			if (board != nullptr) {
+				StationID at = board->GetDestination().ToStationID();
+				for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+					if (!rv->IsFrontEngine() || rv->owner != v->owner) continue;
+					if (rv->last_station_visited != at) continue;
+					if (!IsWaitingToBoardTrain(rv)) continue;
+					waiting++;
+				}
+			}
+			skip_order = OrderConditionCompare(occ, waiting, value);
 			break;
 		}
 		default: NOT_REACHED();

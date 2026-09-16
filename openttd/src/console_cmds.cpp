@@ -4315,11 +4315,13 @@ static bool ConTestRoadOrders(std::span<std::string_view> argv)
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (!rv->IsFrontEngine()) continue;
 		if (punit.has_value() && rv->unitnumber != (UnitID)*punit) continue;
-		IConsolePrint(CC_DEFAULT, "auto {}: zivy rozkaz typ {} kam {} naloz-na-vlak {}; c.{} z {} rozkazu",
+		IConsolePrint(CC_DEFAULT, "auto {}: zivy rozkaz typ {} kam {} naloz-na-vlak {}; c.{} z {} rozkazu; posledni stanice {} ceka-na-vlak {} vezen {}",
 				rv->unitnumber, to_underlying(rv->current_order.GetType()),
 				rv->current_order.IsType(OT_GOTO_STATION) ? (int)rv->current_order.GetDestination().ToStationID().base() : -1,
 				rv->current_order.ShouldLoadOnTrain() ? "ano" : "ne",
-				rv->cur_real_order_index, rv->GetNumOrders());
+				rv->cur_real_order_index, rv->GetNumOrders(),
+				rv->last_station_visited == StationID::Invalid() ? -1 : (int)rv->last_station_visited.base(),
+				IsWaitingToBoardTrain(rv) ? "ano" : "ne", rv->IsCarried() ? "ano" : "ne");
 		VehicleOrderID i = 0;
 		for (const Order &o : rv->Orders()) {
 			IConsolePrint(CC_DEFAULT, "  {}{}: typ {} kam {} naloz-na-vlak {}", i == rv->cur_real_order_index ? "*" : " ", i,
@@ -4492,7 +4494,32 @@ static bool ConTestHonk(std::span<std::string_view> argv)
 }
 
 /**
- * Put a conditional order at the end of a train's orders, for the rig.
+ * The front vehicle of a given unit number, train or road vehicle.
+ *
+ * The rig addresses vehicles by the number the player sees, and since road
+ * vehicles carry their own numbering the same number means two different
+ * vehicles; which of the two a command means is said by the word "auto".
+ *
+ * @param road look among road vehicles instead of trains
+ * @param unit the unit number to look for
+ * @return that vehicle, or nullptr when there is none
+ */
+static Vehicle *FindRigFrontVehicle(bool road, UnitID unit)
+{
+	if (road) {
+		for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+			if (rv->IsFrontEngine() && rv->unitnumber == unit) return rv;
+		}
+		return nullptr;
+	}
+	for (Train *t : Train::Iterate()) {
+		if (t->First() == t && t->unitnumber == unit) return t;
+	}
+	return nullptr;
+}
+
+/**
+ * Put a conditional order at the end of a vehicle's orders, for the rig.
  *
  * The order window is the player's way in and a headless game has none, so
  * without this there is no way to measure what a conditional order actually
@@ -4500,88 +4527,113 @@ static bool ConTestHonk(std::span<std::string_view> argv)
  * The numbers are those of OrderConditionVariable and OrderConditionComparator
  * in order_type.h; the help lists the ones this build has.
  *
- * Usage: testpodminka <unit number> <where> <variable> <comparator> <value> <skip to>
+ * Usage: testpodminka [auto] <unit number> <where> <variable> <comparator> <value> <skip to>
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestConditionalOrder(std::span<std::string_view> argv)
 {
-	/* "zkus" asks the condition about the train as it stands, without putting
+	/* Road vehicles have conditions of their own now (how many are waiting for
+	 * a train), so the command has to be able to mean a road vehicle. Saying so
+	 * with a word in front keeps every argument after it where it was. */
+	std::vector<std::string_view> a(argv.begin(), argv.end());
+	bool road = a.size() >= 2 && a[1] == "auto";
+	if (road) a.erase(a.begin() + 1);
+	const char *what = road ? "auto" : "vlak";
+
+	/* "zkus" asks the condition about the vehicle as it stands, without putting
 	 * an order anywhere: the answer alone, which is the thing worth measuring
-	 * when a new thing to ask about is added. Getting a train to actually walk
+	 * when a new thing to ask about is added. Getting a vehicle to actually walk
 	 * onto a conditional order in a headless game is a scene of its own. */
-	if (argv.size() == 6 && argv[2] == "zkus") {
-		auto punit = ParseInteger(argv[1]);
-		auto pvar = ParseInteger(argv[3]);
-		auto pcmp = ParseInteger(argv[4]);
-		auto pval = ParseInteger(argv[5]);
+	if (a.size() == 6 && a[2] == "zkus") {
+		auto punit = ParseInteger(a[1]);
+		auto pvar = ParseInteger(a[3]);
+		auto pcmp = ParseInteger(a[4]);
+		auto pval = ParseInteger(a[5]);
 		if (!punit.has_value() || !pvar.has_value() || !pcmp.has_value() || !pval.has_value()) return false;
-		for (Train *t : Train::Iterate()) {
-			if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
-			AutoRestoreBackup cur_company(_current_company, t->owner);
+		Vehicle *v = FindRigFrontVehicle(road, (UnitID)*punit);
+		if (v == nullptr) {
+			IConsolePrint(CC_ERROR, "testpodminka: {} {} nenalezen.", what, *punit);
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, v->owner);
 
-			/* Put into the list, asked, and taken out again. Asked off a loose
-			 * order it would be a different question: a condition that looks at
-			 * the orders around it (nothing to couple) has to be standing among
-			 * them to have anything to look at. */
-			Order order;
-			order.MakeConditional(0);
-			order.SetConditionVariable((OrderConditionVariable)*pvar);
-			order.SetConditionComparator((OrderConditionComparator)*pcmp);
-			order.SetConditionValue((uint16_t)*pval);
-			VehicleOrderID at = t->GetNumOrders();
-			if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, t->index, at, order).Failed()) {
-				IConsolePrint(CC_ERROR, "testpodminka: vlak {} - podminku {} {} {} nelze vlozit.", *punit, *pvar, *pcmp, *pval);
-				return true;
-			}
-			VehicleOrderID to = ProcessConditionalOrder(t->GetOrder(at), t);
-			Command<Commands::DeleteOrder>::Do(DoCommandFlag::Execute, t->index, at);
+		/* Put into the list, asked, and taken out again. Asked off a loose
+		 * order it would be a different question: a condition that looks at
+		 * the orders around it (nothing to couple, how many are waiting for a
+		 * train) has to be standing among them to have anything to look at. */
+		Order order;
+		order.MakeConditional(0);
+		order.SetConditionVariable((OrderConditionVariable)*pvar);
+		order.SetConditionComparator((OrderConditionComparator)*pcmp);
+		order.SetConditionValue((uint16_t)*pval);
+		VehicleOrderID at = v->GetNumOrders();
+		if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, v->index, at, order).Failed()) {
+			IConsolePrint(CC_ERROR, "testpodminka: {} {} - podminku {} {} {} nelze vlozit.", what, *punit, *pvar, *pcmp, *pval);
+			return true;
+		}
+		VehicleOrderID to = ProcessConditionalOrder(v->GetOrder(at), v);
+		Command<Commands::DeleteOrder>::Do(DoCommandFlag::Execute, v->index, at);
 
+		if (road) {
+			IConsolePrint(CC_DEFAULT, "testpodminka: auto {} - podminka {} {} {} -> {}",
+					*punit, *pvar, *pcmp, *pval, to == INVALID_VEH_ORDER_ID ? "propadne" : "SKOK");
+		} else {
+			const Train *t = Train::From(v);
 			IConsolePrint(CC_DEFAULT, "testpodminka: vlak {} vagonu {} delka {} - podminka {} {} {} -> {}",
 					*punit, WagonUnitsBehindEngine(t), CeilDiv(t->gcache.cached_total_length, TILE_SIZE),
 					*pvar, *pcmp, *pval, to == INVALID_VEH_ORDER_ID ? "propadne" : "SKOK");
-			return true;
 		}
-		IConsolePrint(CC_ERROR, "testpodminka: vlak {} nenalezen.", argv[1]);
 		return true;
 	}
 
-	if (argv.size() != 7) {
-		IConsolePrint(CC_HELP, "Add a conditional order. Usage: 'testpodminka <vlak> <kam vlozit> <promenna> <srovnani> <hodnota> <skoc na>'.");
-		IConsolePrint(CC_HELP, "Or ask without adding anything: 'testpodminka <vlak> zkus <promenna> <srovnani> <hodnota>'.");
-		IConsolePrint(CC_HELP, "promenna: {}=naklad% {}=spolehlivost {}=max rychlost {}=vek {}=servis {}=vzdy {}=zivotnost {}=max spolehlivost {}=couva {}=vagonu {}=delka {}=neni-co-pripojit",
+	if (a.size() != 7) {
+		IConsolePrint(CC_HELP, "Add a conditional order. Usage: 'testpodminka [auto] <vozidlo> <kam vlozit> <promenna> <srovnani> <hodnota> <skoc na>'.");
+		IConsolePrint(CC_HELP, "Or ask without adding anything: 'testpodminka [auto] <vozidlo> zkus <promenna> <srovnani> <hodnota>'.");
+		IConsolePrint(CC_HELP, "promenna: {}=naklad% {}=spolehlivost {}=max rychlost {}=vek {}=servis {}=vzdy {}=zivotnost {}=max spolehlivost {}=couva {}=vagonu {}=delka {}=neni-co-pripojit {}=aut-ceka",
 				to_underlying(OrderConditionVariable::LoadPercentage), to_underlying(OrderConditionVariable::Reliability),
 				to_underlying(OrderConditionVariable::MaxSpeed), to_underlying(OrderConditionVariable::Age),
 				to_underlying(OrderConditionVariable::RequiresService), to_underlying(OrderConditionVariable::Unconditionally),
 				to_underlying(OrderConditionVariable::RemainingLifetime), to_underlying(OrderConditionVariable::MaxReliability),
 				to_underlying(OrderConditionVariable::DrivingBackwards), to_underlying(OrderConditionVariable::WagonCount),
-				to_underlying(OrderConditionVariable::TrainLength), to_underlying(OrderConditionVariable::NothingToCouple));
+				to_underlying(OrderConditionVariable::TrainLength), to_underlying(OrderConditionVariable::NothingToCouple),
+				to_underlying(OrderConditionVariable::RoadVehiclesWaitingToBoard));
 		IConsolePrint(CC_HELP, "srovnani: 0=rovno 1=nerovno 2=mensi 3=mensi-rovno 4=vetsi 5=vetsi-rovno 6=je 7=neni");
 		return true;
 	}
-	auto punit = ParseInteger(argv[1]);
-	auto pwhere = ParseInteger(argv[2]);
-	auto pvar = ParseInteger(argv[3]);
-	auto pcmp = ParseInteger(argv[4]);
-	auto pval = ParseInteger(argv[5]);
-	auto pskip = ParseInteger(argv[6]);
+	auto punit = ParseInteger(a[1]);
+	auto pwhere = ParseInteger(a[2]);
+	auto pvar = ParseInteger(a[3]);
+	auto pcmp = ParseInteger(a[4]);
+	auto pval = ParseInteger(a[5]);
+	auto pskip = ParseInteger(a[6]);
 	if (!punit.has_value() || !pwhere.has_value() || !pvar.has_value() || !pcmp.has_value() || !pval.has_value() || !pskip.has_value()) return false;
 
-	for (Train *t : Train::Iterate()) {
-		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
-		AutoRestoreBackup cur_company(_current_company, t->owner);
-
-		Order order;
-		order.MakeConditional((VehicleOrderID)*pskip);
-		order.SetConditionVariable((OrderConditionVariable)*pvar);
-		order.SetConditionComparator((OrderConditionComparator)*pcmp);
-		order.SetConditionValue((uint16_t)*pval);
-
-		CommandCost r = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*pwhere, order);
-		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testpodminka: vlak {} na misto {} -> podminka {} {} {}, skok na {} - {}",
-				*punit, *pwhere, *pvar, *pcmp, *pval, *pskip, r.Succeeded() ? "vlozeno" : GetString(r.GetErrorMessage()));
+	Vehicle *v = FindRigFrontVehicle(road, (UnitID)*punit);
+	if (v == nullptr) {
+		IConsolePrint(CC_ERROR, "testpodminka: {} {} nenalezen.", what, *punit);
 		return true;
 	}
-	IConsolePrint(CC_ERROR, "testpodminka: vlak {} nenalezen.", argv[1]);
+	AutoRestoreBackup cur_company(_current_company, v->owner);
+
+	/* The condition goes in aiming at order zero and is pointed where it is
+	 * wanted afterwards. Inserting it is checked against the list as it stands,
+	 * so an order that only exists once the condition is in -- everything past
+	 * where it was put -- cannot be named in the insert itself. */
+	Order order;
+	order.MakeConditional(0);
+	order.SetConditionVariable((OrderConditionVariable)*pvar);
+	order.SetConditionComparator((OrderConditionComparator)*pcmp);
+	order.SetConditionValue((uint16_t)*pval);
+
+	CommandCost r = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, v->index, (VehicleOrderID)*pwhere, order);
+	if (r.Failed()) {
+		IConsolePrint(CC_ERROR, "testpodminka: {} {} na misto {} -> podminka {} {} {} - {}",
+				what, *punit, *pwhere, *pvar, *pcmp, *pval, RefusalReason(r));
+		return true;
+	}
+	CommandCost d = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, v->index, (VehicleOrderID)*pwhere, MOF_COND_DESTINATION, (uint16_t)*pskip);
+	IConsolePrint(d.Succeeded() ? CC_INFO : CC_ERROR, "testpodminka: {} {} na misto {} -> podminka {} {} {}, skok na {} - {}",
+			what, *punit, *pwhere, *pvar, *pcmp, *pval, *pskip, d.Succeeded() ? "vlozeno" : RefusalReason(d));
 	return true;
 }
 
@@ -4862,17 +4914,23 @@ static bool ConTestWreck(std::span<std::string_view> argv)
  * an empty wagon) shuttling between the two stations, and one road vehicle
  * ordered to board the train at the first and get off at the second. See
  * road_on_rail.h.
- * Usage: testauto
+ * Usage: testautovlak [how many road vehicles, 1 by default]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testauto'.");
+		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut]'.");
 		return true;
 	}
+	uint cars = 1;
+	if (argv.size() >= 2) {
+		auto pcars = ParseInteger(argv[1]);
+		if (!pcars.has_value() || *pcars < 1) return false;
+		cars = (uint)*pcars;
+	}
 	if (_game_mode != GameMode::Normal) {
-		IConsolePrint(CC_ERROR, "testauto: only in a running game.");
+		IConsolePrint(CC_ERROR, "testautovlak: only in a running game.");
 		return true;
 	}
 
@@ -4880,7 +4938,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
 		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
 		if (made == nullptr) {
-			IConsolePrint(CC_ERROR, "testauto: no company to build as.");
+			IConsolePrint(CC_ERROR, "testautovlak: no company to build as.");
 			return true;
 		}
 		SetLocalCompany(made->index);
@@ -4907,7 +4965,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 		break;
 	}
 	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid() || eid_road == EngineID::Invalid()) {
-		IConsolePrint(CC_ERROR, "testauto: no engine, wagon or road vehicle available.");
+		IConsolePrint(CC_ERROR, "testautovlak: no engine, wagon or road vehicle available.");
 		return true;
 	}
 	bool bus = IsCargoInClass(Engine::Get(eid_road)->GetDefaultCargoType(), CargoClass::Passengers);
@@ -4941,33 +4999,33 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 		}
 	}
 	if (strip == INVALID_TILE) {
-		IConsolePrint(CC_ERROR, "testauto: no flat clear strip of {}x3 tiles found.", LEN);
+		IConsolePrint(CC_ERROR, "testautovlak: no flat clear strip of {}x3 tiles found.", LEN);
 		return true;
 	}
 	uint x0 = TileX(strip), y0 = TileY(strip);
-	IConsolePrint(CC_DEFAULT, "testauto: strip at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0);
+	IConsolePrint(CC_DEFAULT, "testautovlak: strip at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0);
 
 	TileIndex depot_w = TileXY(x0, y0);
 	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
 	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_w, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
 			Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_e, RAILTYPE_RAIL, DiagDirection::NE).Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: depot failed.");
+		IConsolePrint(CC_ERROR, "testautovlak: depot failed.");
 		return true;
 	}
 	if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: track failed.");
+		IConsolePrint(CC_ERROR, "testautovlak: track failed.");
 		return true;
 	}
 	TileIndex st_a = TileXY(x0 + 10, y0);
 	TileIndex st_b = TileXY(x0 + 26, y0);
 	if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st_a, RAILTYPE_RAIL, Axis::X, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed() ||
 			Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st_b, RAILTYPE_RAIL, Axis::X, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), true).Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: station failed.");
+		IConsolePrint(CC_ERROR, "testautovlak: station failed.");
 		return true;
 	}
 	for (uint sx : {x0 + 2, x0 + 8, x0 + 14, x0 + 24, x0 + 30, x0 + LEN - 3}) {
 		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
-			IConsolePrint(CC_ERROR, "testauto: signal at ({},{}) failed.", sx, y0);
+			IConsolePrint(CC_ERROR, "testautovlak: signal at ({},{}) failed.", sx, y0);
 			return true;
 		}
 	}
@@ -4979,13 +5037,13 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0 + 1), TileXY(x0 + 1, y0 + 1),
 			ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
 	if (road.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: road failed - {}", RefusalReason(road));
+		IConsolePrint(CC_ERROR, "testautovlak: road failed - {}", RefusalReason(road));
 		return true;
 	}
 	CommandCost rs_a = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + 11, y0 + 1), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_a, false);
 	CommandCost rs_b = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + 27, y0 + 1), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_b, false);
 	if (rs_a.Failed() || rs_b.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: road stop failed - {} / {}", RefusalReason(rs_a), RefusalReason(rs_b));
+		IConsolePrint(CC_ERROR, "testautovlak: road stop failed - {} / {}", RefusalReason(rs_a), RefusalReason(rs_b));
 		return true;
 	}
 	TileIndex road_depot = TileXY(x0 + 3, y0 + 2);
@@ -4994,7 +5052,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	 * drove out of the door onto nothing and turned round for good. */
 	CommandCost rd_link = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 3, y0 + 1), RoadBits{RoadBit::SE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
 	if (rd.Failed() || rd_link.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: road depot failed - {} / {}", RefusalReason(rd), RefusalReason(rd_link));
+		IConsolePrint(CC_ERROR, "testautovlak: road depot failed - {} / {}", RefusalReason(rd), RefusalReason(rd_link));
 		return true;
 	}
 	UpdateSignalsInBuffer();
@@ -5003,7 +5061,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	auto [cost_l, veh_l, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
 	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
 	if (cost_l.Failed() || cost_w.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: train failed.");
+		IConsolePrint(CC_ERROR, "testautovlak: train failed.");
 		return true;
 	}
 	Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_w, veh_l, false);
@@ -5017,37 +5075,44 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_l, 1, to_b);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_l, false);
 
-	/* The road vehicle: to A to board, then B. */
-	auto [cost_r, veh_r, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
-	if (cost_r.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: road vehicle failed - {}", RefusalReason(cost_r));
-		return true;
+	/* The road vehicles: to A to board, then B. One is enough to see the ride
+	 * work; more than one is what the "how many are waiting" condition is
+	 * about, since a one-wagon train can only take the first of them. */
+	std::string built;
+	for (uint n = 0; n < cars; n++) {
+		auto [cost_r, veh_r, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_r.Failed()) {
+			IConsolePrint(CC_ERROR, "testautovlak: road vehicle failed - {}", RefusalReason(cost_r));
+			return true;
+		}
+		/* Road vehicles have no choice of where on a platform to stop, and the
+		 * order code insists on the one answer that means that. */
+		Order car_a{};
+		car_a.MakeGoToStation(id_a);
+		car_a.SetStopLocation(OrderStopLocation::FarEnd);
+		Order car_b{};
+		car_b.MakeGoToStation(id_b);
+		car_b.SetStopLocation(OrderStopLocation::FarEnd);
+		CommandCost ins_a = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
+		CommandCost ins_b = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
+		if (ins_a.Failed() || ins_b.Failed()) {
+			IConsolePrint(CC_ERROR, "testautovlak: road vehicle orders refused - {} / {} (stop tiles belong to stations {} and {})",
+					RefusalReason(ins_a), RefusalReason(ins_b), GetStationIndex(TileXY(x0 + 11, y0 + 1)), GetStationIndex(TileXY(x0 + 27, y0 + 1)));
+			return true;
+		}
+		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_LOAD_ON_TRAIN, 1);
+		if (mod.Failed()) {
+			IConsolePrint(CC_ERROR, "testautovlak: load-on-train order refused - {}", RefusalReason(mod));
+			return true;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+		if (!built.empty()) built += ",";
+		built += fmt::format("{}", RoadVehicle::Get(veh_r)->unitnumber);
 	}
-	/* Road vehicles have no choice of where on a platform to stop, and the
-	 * order code insists on the one answer that means that. */
-	Order car_a{};
-	car_a.MakeGoToStation(id_a);
-	car_a.SetStopLocation(OrderStopLocation::FarEnd);
-	Order car_b{};
-	car_b.MakeGoToStation(id_b);
-	car_b.SetStopLocation(OrderStopLocation::FarEnd);
-	CommandCost ins_a = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
-	CommandCost ins_b = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
-	if (ins_a.Failed() || ins_b.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: road vehicle orders refused - {} / {} (stop tiles belong to stations {} and {})",
-				RefusalReason(ins_a), RefusalReason(ins_b), GetStationIndex(TileXY(x0 + 11, y0 + 1)), GetStationIndex(TileXY(x0 + 27, y0 + 1)));
-		return true;
-	}
-	CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_LOAD_ON_TRAIN, 1);
-	if (mod.Failed()) {
-		IConsolePrint(CC_ERROR, "testauto: load-on-train order refused - {}", RefusalReason(mod));
-		return true;
-	}
-	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
 
 	_testspoj_active = true;
-	IConsolePrint(CC_DEFAULT, "testauto: scene ready. vlak={}, auto={} ({}), stanice A={} ({},{}), B={} ({},{}).",
-			Train::Get(veh_l)->unitnumber, RoadVehicle::Get(veh_r)->unitnumber, bus ? "bus" : "nakladak",
+	IConsolePrint(CC_DEFAULT, "testautovlak: scene ready. vlak={}, auta={} ({}), stanice A={} ({},{}), B={} ({},{}).",
+			Train::Get(veh_l)->unitnumber, built, bus ? "bus" : "nakladak",
 			id_a, x0 + 10, y0, id_b, x0 + 26, y0);
 	return true;
 }
@@ -8097,7 +8162,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
-	IConsole::CmdRegister("testauto",                ConTestRoadOnRail);
+	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
 	IConsole::CmdRegister("testauta",                ConTestRoadOrders);
 	IConsole::CmdRegister("log",                     ConAnomalyLog);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);

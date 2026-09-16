@@ -166,6 +166,7 @@ static const OrderConditionVariable _order_conditional_variable[] = {
 	OrderConditionVariable::WagonCount,
 	OrderConditionVariable::TrainLength,
 	OrderConditionVariable::NothingToCouple,
+	OrderConditionVariable::RoadVehiclesWaitingToBoard,
 	OrderConditionVariable::Unconditionally,
 };
 
@@ -1722,6 +1723,7 @@ public:
 							this->vehicle->type != VehicleType::Train) {
 						continue;
 					}
+					if (ocv == OrderConditionVariable::RoadVehiclesWaitingToBoard && this->vehicle->type != VehicleType::Road) continue;
 					list.push_back(MakeDropDownListStringItem(STR_ORDER_CONDITIONAL_LOAD_PERCENTAGE + to_underlying(ocv), to_underlying(ocv)));
 				}
 				ShowDropDownList(this, std::move(list), to_underlying(this->vehicle->GetOrder(this->OrderGetSel())->GetConditionVariable()), WID_O_COND_VARIABLE);

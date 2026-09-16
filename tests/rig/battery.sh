@@ -551,6 +551,19 @@ testzatik 1720 testbrzda 2" 6000
 # there, works the stop, and drives back by road to do it again. Two full
 # rounds in 8000 ticks: auto=4.
 run_scene autovlak "vlak123 on
-testauto
+testautovlak
 testzatik 200 testokno rozkazy auto
 testzatik 400 testauta" 8000
+
+# Two road vehicles and one wagon, so one of them always has to wait its turn:
+# the queue the "how many are waiting for a train" condition is about. The
+# first rides twice and the second once in 8000 ticks, so auto=6. The condition
+# sits at the head of the second one's list and is asked as it comes round; the
+# answers are in the scene's own log, next to what the cars were doing.
+run_scene autodve "vlak123 on
+testautovlak 2
+testpodminka auto 2 0 12 4 0 2
+testzatik 400 testauta
+testzatik 420 testpodminka auto 2 zkus 12 4 0
+testzatik 1700 testpodminka auto 2 zkus 12 4 0
+testzatik 3400 testpodminka auto 2 zkus 12 4 0" 8000

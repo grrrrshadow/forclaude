@@ -10,7 +10,25 @@ Working directory layout, pointed to by `RIG_DIR`:
 - `ttdhome/`, `h2/`, `h3/` — three `HOME` directories (each with
   `.openttd/scripts/`, an `openttd.cfg` with `vlak123` tracing on, base
   graphics), so three scenes can run at once,
-- the saves from `saves/` copied in (`rig.sav`, `vlak31.sav`, ...).
+- the saves from `saves/` copied in, under the names the battery calls them
+  by: `eka.sav`, `emu.sav`, `emu_reverz.sav` as `emu2.sav`,
+  `loko_obou_stran.sav` as `loko2.sav`, `new1.sav`, `obmena.sav`,
+  `obmenaporucha.sav`, `odtah_peron.sav` as `back2.sav`, `porucha.sav`,
+  `porucha_nastupiste.sav` as `porucha2.sav`, `porucha_za_vlakem.sav` as
+  `porucha3.sav`, `rig.sav`, `vlak31.sav`.
+
+**Copy them before the first run.** A scene whose save is not there does not
+fail: the game says "Game load failed", the scene ends after six lines, and
+every counter comes out zero. Zero equals zero, so the stable file matches
+the last one and the battery reports the run as clean while a third of it
+never happened. Anything the battery says about a build is only worth as much
+as the number of scenes that actually loaded -- if a run looks suspiciously
+unchanged, count `Game load failed` across `reg_*.log` first.
+
+Four saves the battery asks for are the player's and are not in `saves/`:
+`s.sav` (scene `nakladsav`), `save91.sav` (`save91`, `save91rev`),
+`umak.sav` (`mess`) and `umins.sav` (`messodvoz`, `messodtah`). Those six
+scenes cannot run without them.
 
 `battery.sh` — the regression battery, 64 scenes. Prints one line per scene:
 `spojeno` (couplings), `odtazeno` (tows completed), `havaroval`, `srazka`,
