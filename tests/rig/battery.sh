@@ -74,6 +74,15 @@ run_scene rad "vlak123 on
 testspoj rad" 10000
 run_scene blok "vlak123 on
 testspoj blok" 8000
+# A collector standing at the far end waiting for wagons it cannot have yet
+# (the dropper still holds the platform) is called off to a depot by hand.
+# The depot order must not come out still carrying the coupling errand: with
+# it the train stood where it was, its window saying "heading for depot", and
+# only skipping the order ever freed it -- the player's report. It drives in,
+# so depa 2: the dropper's own arrival and this one.
+run_scene dodepa "vlak123 on
+testspoj blok
+testza 600 testdodepa 2" 8000
 run_scene vlek "vlak123 on
 testspoj vlek" 8000
 run_scene vlekblok "vlak123 on

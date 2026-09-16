@@ -2846,6 +2846,12 @@ CommandCost Vehicle::SendToDepot(DoCommandFlags flags, DepotCommandFlags command
 			}
 
 			this->current_order.MakeDummy();
+			/* The other way the button is pressed: calling the trip off
+			 * again. MakeDummy() clears the order's flag word, but the
+			 * coupling switches are fields of their own and survive it --
+			 * a dummy order that says "go and couple" then reads as a live
+			 * coupling errand and can hold the train where it stands. */
+			if (this->type == VehicleType::Train) ReleaseCoupleErrand(Train::From(this));
 			InvalidateWindowData(WindowClass::VehicleView, this->index);
 		}
 		return CommandCost();
@@ -2862,16 +2868,21 @@ CommandCost Vehicle::SendToDepot(DoCommandFlags flags, DepotCommandFlags command
 			this->GetGroundVehicleFlags().Set(GroundVehicleFlag::SuppressImplicitOrders);
 		}
 
-		/* Being sent to a depot by hand calls off a coupling errand, exactly as
-		 * skipping past the coupling order does -- the player has said where
-		 * the train is to go, and it is not to the wagons. Left on, the claim
-		 * alone went on counting the train as a party to a coupling and held it
-		 * standing against its partner with its window saying it was on its way
-		 * here. See ReleaseCoupleErrand(). */
-		if (this->type == VehicleType::Train) ReleaseCoupleErrand(Train::From(this));
-
 		this->SetDestTile(closest_depot.location);
 		this->current_order.MakeGoToDepot(closest_depot.destination.ToDepotID(), {});
+		/* Being sent to a depot by hand calls off a coupling errand, exactly as
+		 * skipping past the coupling order does -- the player has said where
+		 * the train is to go, and it is not to the wagons.
+		 *
+		 * After the order is written, not before, because writing it does not
+		 * clean it: MakeGoToDepot() sets only its own fields, and the coupling
+		 * switches are fields of their own, so they come through onto the new
+		 * order. And a depot order that says "go and couple" is a real thing --
+		 * collecting stored wagons out of a shed -- so the collecting hold
+		 * honours it and the train stands waiting for wagons its new order
+		 * never asked for. That, and the claim left behind, are two separate
+		 * ways the same freeze happened. See ReleaseCoupleErrand(). */
+		if (this->type == VehicleType::Train) ReleaseCoupleErrand(Train::From(this));
 		if (!command.Test(DepotCommandFlag::Service)) this->current_order.SetDepotActionType(OrderDepotActionFlag::Halt);
 		InvalidateWindowData(WindowClass::VehicleView, this->index);
 
