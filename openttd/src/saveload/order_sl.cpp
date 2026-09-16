@@ -260,6 +260,7 @@ public:
 		SLE_VAR(Order, couple_min, VarTypes::BOOL),
 		SLE_VAR(Order, couple_max, VarTypes::BOOL),
 		SLE_VAR(Order, automatic_departure, VarTypes::BOOL),
+		SLE_VAR(Order, load_on_train, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

@@ -179,6 +179,14 @@ private:
 	bool automatic_departure = false;
 
 	/**
+	 * A road vehicle's order: at this station, board a train standing at the
+	 * platform instead of driving on, and ride it to the station the next
+	 * order names. Dedicated field, same rationale as decouple_count ("Bug
+	 * D"). See road_on_rail.h.
+	 */
+	bool load_on_train = false;
+
+	/**
 	 * A train passing this station waypoint sounds its horn there. The
 	 * player's touch of life on a waypoint that otherwise only names a group
 	 * of platforms; off by default, so nothing honks that was not asked to.
@@ -393,6 +401,12 @@ public:
 
 	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
 	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }
+
+	/** Does a road vehicle board a train at this station instead of driving on? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldLoadOnTrain() const { return this->load_on_train; }
+
+	/** Set whether a road vehicle boards a train at this station. */
+	inline void SetLoadOnTrain(bool load) { this->load_on_train = load; }
 
 	/** Should a train visiting this depot turn around there? @pre IsType(OT_GOTO_DEPOT) */
 	inline bool ShouldTurnAroundInDepot() const { return this->turn_around_in_depot; }

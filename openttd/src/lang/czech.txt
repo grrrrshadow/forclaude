@@ -4793,6 +4793,8 @@ STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Má vý
 STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED                          :{LTBLUE}Má výjezd, koleje před depem jsou obsazené
 STR_VEHICLE_STATUS_RESCUE_NO_PATH                               :{LTBLUE}Má výjezd, nenachází cestu k případu
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuje vlak do depa
+STR_VEHICLE_STATUS_ON_TRAIN                                     :{ORANGE}Veze se vlakem {COMMA}
+STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Čeká na vlak, na který se naloží
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Připojeno, ale žádné depo v dosahu
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu
@@ -5092,6 +5094,8 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i reversním chodem) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
+STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}Naložit na vlak
+STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Dojet na zastávku této stanice a naložit se na prázdný vagon vlaku, který stojí u nástupiště a jede do stanice z dalšího rozkazu. Dojet na něm, na její zastávce sjet a pokračovat podle rozkazů
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
@@ -5126,6 +5130,7 @@ STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká 
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Zakládá řadu: musí přijet vagony napřed
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
+STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(naložit na vlak)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
 STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(a odpojit vše)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(nechat si {NUM})
@@ -5823,6 +5828,7 @@ STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... mus�
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... odtahovka čeká na zavolání a nemůže mít vlastní příkazy
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... odtahovka jezdí pro vlaky a musí být sama
 STR_ERROR_RESCUE_ENGINE_IS_TOWING                               :{WHITE}... právě odtahuje vlak a musí ho nejdřív dovézt
+STR_ERROR_WAGON_CARRIES_ROAD_VEHICLE                            :{WHITE}... na tom vagonu se veze auto
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

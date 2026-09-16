@@ -64,6 +64,8 @@
 
 #include "table/strings.h"
 
+#include "road_on_rail.h"
+
 #include "safeguards.h"
 
 /** @{
@@ -867,6 +869,15 @@ void Vehicle::PreDestructor()
 		}
 
 		if (v->disaster_vehicle != VehicleID::Invalid()) ReleaseDisasterVehicle(v->disaster_vehicle);
+
+		/* Riding on a wagon: the wagon is empty again. */
+		if (v->carried_by != VehicleID::Invalid()) UnlinkFromWagon(v);
+	}
+
+	/* A wagon with a road vehicle on it: the vehicle is left with nothing to
+	 * ride, which its own tick deals with. See road_on_rail.h. */
+	if (this->type == VehicleType::Train && Train::From(this)->carrying != VehicleID::Invalid()) {
+		UnlinkCarriedRoadVehicle(Train::From(this));
 	}
 
 	if (this->Previous() == nullptr) {
@@ -2591,6 +2602,26 @@ void Vehicle::HandleLoading(bool mode)
 					 * does nothing. */
 					AutoRestoreBackup cur_company(_current_company, t->owner);
 					if (CmdCoupleTrains(DoCommandFlag::Execute, t->index).Failed()) return;
+				}
+			}
+
+			/* A road vehicle whose order here is to board a train does not
+			 * leave by road at all. Loaded and ready, it stands at its stop
+			 * until a train it can ride is standing at the platform, and then
+			 * it goes onto the wagon instead of onto the road (TryBoardTrain(),
+			 * which settles this stop itself). Only at the station the real
+			 * order names -- the same guard as the coupling above, for the same
+			 * reason: with non-stop off the flag rides along into every stop on
+			 * the way. See road_on_rail.h. */
+			if (this->type == VehicleType::Road && this->current_order.ShouldLoadOnTrain()) {
+				const Order *real_order = this->GetOrder(this->cur_real_order_index);
+				if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
+						real_order->GetDestination().ToStationID() == this->last_station_visited) {
+					/* Asked every tick, not now and then: a train with nothing to
+					 * load stands at a platform for a couple of ticks and is gone,
+					 * and a look every sixteen ticks missed it every time. */
+					TryBoardTrain(RoadVehicle::From(this));
+					return;
 				}
 			}
 

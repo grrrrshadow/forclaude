@@ -21,12 +21,15 @@ run_scene() { # name scr-content ticks extra-args
   # work around something. Always on, so a scene that starts writing them is
   # saying something changed even when every other counter holds.
   local zaz=$(grep -c 'ZAZNAM:' $S/reg_$name.log)
+  # Road vehicles boarding and leaving trains (road_on_rail.h): boardings plus
+  # alightings, so a scene where the ride works counts an even number of them.
+  local aut=$(( $(grep -c 'nalozeno na vlak' $S/reg_$name.log) + $(grep -c 'slozeno z vlaku' $S/reg_$name.log) ))
   # Two lines, one file each. The seven counters above are the load-bearing
   # ones and do not move between runs of the same build; the depot-arrival
   # tally does, by one, on the long tow scenes -- it is worth reading and
   # not worth diffing, so it is kept out of the file meant for diffing.
-  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz depa=$dep"
-  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz" >> ${BATTERY_STABLE:-/dev/null}
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut depa=$dep"
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut" >> ${BATTERY_STABLE:-/dev/null}
 }
 : > ${BATTERY_STABLE:-/dev/null}
 printf 'newgame\n' > $H/.openttd/scripts/autoexec.scr
@@ -541,3 +544,11 @@ run_scene stopkatrat "vlak123 on
 testodtah daleko 0
 testzatik 700 testbrzda 2
 testzatik 1720 testbrzda 2" 6000
+
+# A road vehicle ordered to board a train at one station and ride it to the
+# next (road_on_rail.h): a bus goes to the first station's stop, waits for
+# the shuttle, rides the wagon to the second station, gets off onto its stop
+# there, works the stop, and drives back by road to do it again. Two full
+# rounds in 8000 ticks: auto=4.
+run_scene autovlak "vlak123 on
+testauto" 8000

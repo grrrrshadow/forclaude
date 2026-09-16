@@ -4704,6 +4704,8 @@ STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Called 
 STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED                          :{LTBLUE}Called out, the track outside the depot is occupied
 STR_VEHICLE_STATUS_RESCUE_NO_PATH                               :{LTBLUE}Called out, cannot find a route to the casualty
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Towing a train to a depot
+STR_VEHICLE_STATUS_ON_TRAIN                                     :{ORANGE}Riding on train {COMMA}
+STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Waiting for a train to board
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Coupled up, but no depot within reach
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}No power
@@ -4938,6 +4940,8 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Travel to this depot to couple with a rake of wagons stored there. The wagons couple onto the end facing the door and leave the depot first, pushed
+STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}Load onto train
+STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Drive to this station's road stop and board an empty wagon of a train standing at the platform that is going to the station of the next order. Ride there, get off at its road stop and carry on with the orders
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Leave part of the train behind in this depot, stored. How much is left is set in the box that appears
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Wagons: any
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Wagons: empty
@@ -4972,6 +4976,7 @@ STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Founding a rake: has to arrive wagons first
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
+STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(load onto train)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(keep {NUM})
 STR_ORDER_DEPOT_COUPLE_SUFFIX                                   :{SPACE}(couple)
@@ -5515,6 +5520,7 @@ STR_ERROR_RESCUE_ENGINE_NOT_IN_DEPOT                            :{WHITE}... it h
 STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... a rescue engine waits for a call-out and cannot have orders of its own
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... a rescue engine goes out to fetch a train and has to be on its own
 STR_ERROR_RESCUE_ENGINE_IS_TOWING                               :{WHITE}... it is towing a train and has to bring that in first
+STR_ERROR_WAGON_CARRIES_ROAD_VEHICLE                            :{WHITE}... a road vehicle is riding on that wagon
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

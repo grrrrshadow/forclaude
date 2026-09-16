@@ -365,6 +365,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * order at a time. Everything an order is going to do belongs
 				 * on its own line, where a whole list can be read at once. */
 				if (v->type == VehicleType::Train && order->ShouldWaitForCouple()) second += GetString(STR_ORDER_WAIT_COUPLE_SUFFIX);
+				if (v->type == VehicleType::Road && order->ShouldLoadOnTrain()) second += GetString(STR_ORDER_LOAD_ON_TRAIN_SUFFIX);
 
 				/* How many vehicles stay with the train belongs on the order
 				 * line with everything else the order is going to do. A button
@@ -717,6 +718,7 @@ private:
 		DP_COUPLE_ROW_DEPOT   = 1, ///< Display the turn-around button for a train's depot order.
 		DP_COUPLE_ROW_WAYPOINT = 2, ///< Display the horn button for a train's station waypoint order.
 		DP_COUPLE_ROW_EMPTY   = 3, ///< Hold the row's height open when it has no buttons to show.
+		DP_COUPLE_ROW_ROAD    = 4, ///< Display the 'load onto train' button for a road vehicle's station order.
 	};
 
 	int selected_order = -1;
@@ -1377,6 +1379,12 @@ public:
 				 * horn to live there. Pressed, the train honks as it passes. */
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_WAYPOINT);
 				this->SetWidgetLoweredState(WID_O_HONK, order->ShouldHonk());
+			} else if (this->vehicle->type == VehicleType::Road && order != nullptr && order->IsType(OT_GOTO_STATION)) {
+				/* A road vehicle's station order: one button, boarding a train
+				 * here. The player asked for one big button to start with, to
+				 * be split up as the need arises. See road_on_rail.h. */
+				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_ROAD);
+				this->SetWidgetLoweredState(WID_O_LOAD_ON_TRAIN, order->ShouldLoadOnTrain());
 			} else {
 				/* Nothing to put in the row -- a waypoint order, the end of the
 				 * list, a vehicle that is not a train -- but the row stays open
@@ -1827,6 +1835,13 @@ public:
 					 * be pressed either way afterwards. */
 					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_REVERSE_OUT, turning_on ? 1 : 0);
 				}
+				break;
+			}
+
+			case WID_O_LOAD_ON_TRAIN: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_LOAD_ON_TRAIN, order->ShouldLoadOnTrain() ? 0 : 1);
 				break;
 			}
 
@@ -2352,6 +2367,12 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		NWidget(NWID_HORIZONTAL),
 			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 			EndContainer(),
+		EndContainer(),
+		/* A road vehicle's station order: one big button, to be split up as the
+		 * need arises (the player's wish). See road_on_rail.h. */
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_LOAD_ON_TRAIN), SetMinimalSize(372, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_LOAD_ON_TRAIN, STR_ORDER_LOAD_ON_TRAIN_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

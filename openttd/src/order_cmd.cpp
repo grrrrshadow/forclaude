@@ -196,6 +196,7 @@ bool Order::Equals(const Order &other) const
 			this->decouple_whole_train == other.decouple_whole_train &&
 			this->reverse_out_of_station == other.reverse_out_of_station &&
 			this->automatic_departure == other.automatic_departure &&
+			this->load_on_train == other.load_on_train &&
 			this->turn_around_in_depot == other.turn_around_in_depot;
 }
 
@@ -1289,7 +1290,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
-					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE) return CMD_ERROR;
+					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_LOAD_ON_TRAIN) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1521,6 +1522,13 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (!order->IsType(OT_GOTO_DEPOT)) return CMD_ERROR;
 			break;
 
+		case MOF_LOAD_ON_TRAIN:
+			/* Road vehicles only, at a station: the boarding happens at a road
+			 * stop of a station that also has a platform, see road_on_rail.h. */
+			if (v->type != VehicleType::Road) return CMD_ERROR;
+			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			break;
+
 		case MOF_REVERSE_OUT:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
@@ -1693,6 +1701,22 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_WAIT_COUPLE:
 				order->SetWaitForCouple(data != 0);
+				break;
+
+			case MOF_LOAD_ON_TRAIN:
+				order->SetLoadOnTrain(data != 0);
+				/* Boarding a train is not a cargo stop, the same way collecting
+				 * wagons is not: the vehicle drives onto the platform's road
+				 * stop and waits for its train, and what it carries stays
+				 * aboard. Filled in as "no load, no unload" while the order
+				 * boards, and put back when it stops boarding. */
+				if (data != 0) {
+					order->SetLoadType(OrderLoadType::NoLoad);
+					order->SetUnloadType(OrderUnloadType::NoUnload);
+				} else {
+					order->SetLoadType(OrderLoadType::LoadIfPossible);
+					order->SetUnloadType(OrderUnloadType::UnloadIfPossible);
+				}
 				break;
 
 			case MOF_GOTO_COUPLE:

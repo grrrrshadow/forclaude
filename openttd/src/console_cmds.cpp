@@ -101,6 +101,7 @@
 
 #include "mouse_debug.h"
 #include "anomaly_log.h"
+#include "road_on_rail.h"
 
 #include "safeguards.h"
 
@@ -2410,6 +2411,20 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 				t->flags.Test(VehicleRailFlag::LeavingStation) ? 'L' : '-',
 				t->flags.Test(VehicleRailFlag::Reversing) ? 'R' : '-',
 				t->vehicle_flags.Test(VehicleFlag::LoadingFinished) ? 'F' : '-');
+	}
+
+	/* Road vehicles too, since one of them may be riding a train or waiting
+	 * for one (road_on_rail.h): where it is, what it is doing, and whose
+	 * wagon it is on. */
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine()) continue;
+		const Train *wagon = rv->IsCarried() ? Train::GetIfValid(rv->carried_by) : nullptr;
+		IConsolePrint(CC_DEFAULT, "auto {}: ({},{}) rychlost {} rozkaz {} [c.{} kam ({},{})] stav {:#x} snimek {} posledni stanice {} {}{}",
+				rv->unitnumber, TileX(rv->tile), TileY(rv->tile), rv->cur_speed,
+				to_underlying(rv->current_order.GetType()), rv->cur_real_order_index, TileX(rv->dest_tile), TileY(rv->dest_tile),
+				rv->state, rv->frame, rv->last_station_visited,
+				rv->IsCarried() ? fmt::format("VEZE SE na vlaku {}", wagon != nullptr ? (int)wagon->First()->unitnumber : -1) : (IsWaitingToBoardTrain(rv) ? "CEKA NA VLAK" : ""),
+				rv->vehstatus.Test(VehState::Stopped) ? " [S]" : "");
 	}
 
 	/* The rescue side of the same picture, on the same command. Working it out
@@ -4782,6 +4797,203 @@ static bool ConTestWreck(std::span<std::string_view> argv)
 	AutoRestoreBackup cur_company(_current_company, t->owner);
 	TrainCrashed(t);
 	IConsolePrint(CC_DEFAULT, "testvrak: vlak {} je vrak na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+	return true;
+}
+
+/**
+ * Build the road-on-rail scene: one straight line with a shed at each end and
+ * two through platforms, a road alongside with a drive-through stop at each
+ * platform belonging to the same station, a road shed, one train (engine and
+ * an empty wagon) shuttling between the two stations, and one road vehicle
+ * ordered to board the train at the first and get off at the second. See
+ * road_on_rail.h.
+ * Usage: testauto
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRoadOnRail(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testauto'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testauto: only in a running game.");
+		return true;
+	}
+
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testauto: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	EngineID eid_loco = EngineID::Invalid();
+	EngineID eid_wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+		} else if (eid_loco == EngineID::Invalid()) {
+			eid_loco = e->index;
+		}
+	}
+	EngineID eid_road = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (GetRoadTramType(e->VehInfo<RoadVehicleInfo>().roadtype) != RoadTramType::Road) continue;
+		eid_road = e->index;
+		break;
+	}
+	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid() || eid_road == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testauto: no engine, wagon or road vehicle available.");
+		return true;
+	}
+	bool bus = IsCargoInClass(Engine::Get(eid_road)->GetDefaultCargoType(), CargoClass::Passengers);
+	RoadStopType stop_type = bus ? RoadStopType::Bus : RoadStopType::Truck;
+
+	/* The flattest clear run: three rows deep this time, rails, road, shed. */
+	static const uint LEN = 40;
+	TileIndex strip = INVALID_TILE;
+	for (uint y = 8; y < Map::SizeY() - 8 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			bool ok = true;
+			int z = -1;
+			for (uint dy = 0; dy < 3 && ok; dy++) {
+				TileIndex t = TileXY(x, y + dy);
+				ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+				if (ok) {
+					if (dy == 0) z = GetTileZ(t); else if (GetTileZ(t) != z) ok = false;
+				}
+			}
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					strip = TileXY(x - LEN + 1, y);
+					break;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testauto: no flat clear strip of {}x3 tiles found.", LEN);
+		return true;
+	}
+	uint x0 = TileX(strip), y0 = TileY(strip);
+	IConsolePrint(CC_DEFAULT, "testauto: strip at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0);
+
+	TileIndex depot_w = TileXY(x0, y0);
+	TileIndex depot_e = TileXY(x0 + LEN - 1, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_w, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
+			Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_e, RAILTYPE_RAIL, DiagDirection::NE).Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: depot failed.");
+		return true;
+	}
+	if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: track failed.");
+		return true;
+	}
+	TileIndex st_a = TileXY(x0 + 10, y0);
+	TileIndex st_b = TileXY(x0 + 26, y0);
+	if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st_a, RAILTYPE_RAIL, Axis::X, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed() ||
+			Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, st_b, RAILTYPE_RAIL, Axis::X, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), true).Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: station failed.");
+		return true;
+	}
+	for (uint sx : {x0 + 2, x0 + 8, x0 + 14, x0 + 24, x0 + 30, x0 + LEN - 3}) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, SignalType::Path, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) {
+			IConsolePrint(CC_ERROR, "testauto: signal at ({},{}) failed.", sx, y0);
+			return true;
+		}
+	}
+	StationID id_a = GetStationIndex(st_a);
+	StationID id_b = GetStationIndex(st_b);
+
+	/* The road one row over, with a stop beside each platform joined to its
+	 * station, and a shed at the west end. */
+	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0 + 1), TileXY(x0 + 1, y0 + 1),
+			ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+	if (road.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: road failed - {}", RefusalReason(road));
+		return true;
+	}
+	CommandCost rs_a = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + 11, y0 + 1), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_a, false);
+	CommandCost rs_b = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + 27, y0 + 1), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_b, false);
+	if (rs_a.Failed() || rs_b.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: road stop failed - {} / {}", RefusalReason(rs_a), RefusalReason(rs_b));
+		return true;
+	}
+	TileIndex road_depot = TileXY(x0 + 3, y0 + 2);
+	CommandCost rd = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, road_depot, ROADTYPE_ROAD, DiagDirection::NW);
+	/* A straight road has no piece pointing at a shed beside it; the vehicle
+	 * drove out of the door onto nothing and turned round for good. */
+	CommandCost rd_link = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 3, y0 + 1), RoadBits{RoadBit::SE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+	if (rd.Failed() || rd_link.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: road depot failed - {} / {}", RefusalReason(rd), RefusalReason(rd_link));
+		return true;
+	}
+	UpdateSignalsInBuffer();
+
+	/* The train: engine and one empty wagon, shuttling A - B. */
+	auto [cost_l, veh_l, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_l.Failed() || cost_w.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: train failed.");
+		return true;
+	}
+	Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_w, veh_l, false);
+	Order to_a{};
+	to_a.MakeGoToStation(id_a);
+	to_a.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
+	Order to_b{};
+	to_b.MakeGoToStation(id_b);
+	to_b.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_l, 0, to_a);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_l, 1, to_b);
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_l, false);
+
+	/* The road vehicle: to A to board, then B. */
+	auto [cost_r, veh_r, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_r.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: road vehicle failed - {}", RefusalReason(cost_r));
+		return true;
+	}
+	/* Road vehicles have no choice of where on a platform to stop, and the
+	 * order code insists on the one answer that means that. */
+	Order car_a{};
+	car_a.MakeGoToStation(id_a);
+	car_a.SetStopLocation(OrderStopLocation::FarEnd);
+	Order car_b{};
+	car_b.MakeGoToStation(id_b);
+	car_b.SetStopLocation(OrderStopLocation::FarEnd);
+	CommandCost ins_a = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
+	CommandCost ins_b = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
+	if (ins_a.Failed() || ins_b.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: road vehicle orders refused - {} / {} (stop tiles belong to stations {} and {})",
+				RefusalReason(ins_a), RefusalReason(ins_b), GetStationIndex(TileXY(x0 + 11, y0 + 1)), GetStationIndex(TileXY(x0 + 27, y0 + 1)));
+		return true;
+	}
+	CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_LOAD_ON_TRAIN, 1);
+	if (mod.Failed()) {
+		IConsolePrint(CC_ERROR, "testauto: load-on-train order refused - {}", RefusalReason(mod));
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+
+	_testspoj_active = true;
+	IConsolePrint(CC_DEFAULT, "testauto: scene ready. vlak={}, auto={} ({}), stanice A={} ({},{}), B={} ({},{}).",
+			Train::Get(veh_l)->unitnumber, RoadVehicle::Get(veh_r)->unitnumber, bus ? "bus" : "nakladak",
+			id_a, x0 + 10, y0, id_b, x0 + 26, y0);
 	return true;
 }
 
@@ -7830,6 +8042,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
+	IConsole::CmdRegister("testauto",                ConTestRoadOnRail);
 	IConsole::CmdRegister("log",                     ConAnomalyLog);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);
 	IConsole::CmdRegister("testokruh",               ConTestRescueLoop);

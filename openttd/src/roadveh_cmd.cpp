@@ -39,6 +39,7 @@
 #include "roadveh_cmd.h"
 #include "road_cmd.h"
 #include "newgrf_roadstop.h"
+#include "road_on_rail.h"
 
 #include "table/strings.h"
 
@@ -699,6 +700,10 @@ static void FindClosestBlockingRoadVeh(Vehicle *v, RoadVehFindData *rvf)
 
 	/* Not a close Road vehicle when it's not a road vehicle, in the depot, or ourself. */
 	if (v->type != VehicleType::Road || v->IsInDepot() || rvf->veh->First() == v->First()) return;
+	/* Nor when it is riding on a train: it is on no road, and a line running
+	 * beside one would otherwise have its traffic stopping for the cars on
+	 * passing wagons. */
+	if (RoadVehicle::From(v)->IsCarried()) return;
 
 	/* Not close when at a different height or when going in a different direction. */
 	if (abs(v->z_pos - rvf->veh->z_pos) >= 6 || v->direction != rvf->dir) return;
@@ -1101,6 +1106,49 @@ bool RoadVehLeaveDepot(RoadVehicle *v, bool first)
 	InvalidateWindowData(WindowClass::VehicleDepot, v->tile);
 
 	return true;
+}
+
+/**
+ * Put a road vehicle at the mouth of a road stop, about to drive in, as if it
+ * had just come off the road onto the stop's tile. Used when a vehicle gets
+ * off a train at a station (see road_on_rail.h): from here the ordinary
+ * controller drives it into the bay, where it arrives the way any vehicle
+ * arrives and loads or unloads by its order.
+ *
+ * Same recipe as leaving a depot: the piece of road is a straight one along
+ * the entry direction, the first frame of it is the tile's edge, and the
+ * position comes from the same table the controller reads. The stop is
+ * entered here too (RoadStop::Enter()), which is what the tile-entry code
+ * would otherwise do on the first frame -- and it will not do it twice, since
+ * the state then already says "in a road stop".
+ *
+ * @param v    the road vehicle, front of its chain, a single vehicle
+ * @param tile the road stop tile
+ * @param into the direction of travel into the stop, a straight trackdir
+ */
+void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir into)
+{
+	assert(IsStationRoadStopTile(tile));
+
+	v->tile = tile;
+	v->direction = DiagDirToDir(TrackdirToExitdir(into));
+	v->state = to_underlying(into);
+	v->frame = RVC_DEFAULT_START_FRAME;
+	v->cur_speed = 0;
+	v->subspeed = 0;
+	v->overtaking = 0;
+	v->path.clear();
+
+	const RoadDriveEntry *rdp = _road_drive_data[GetRoadTramType(v->roadtype)][(to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE) + to_underlying(into)];
+	v->x_pos = TileX(tile) * TILE_SIZE + (rdp[v->frame].x & 0xF);
+	v->y_pos = TileY(tile) * TILE_SIZE + (rdp[v->frame].y & 0xF);
+
+	v->vehstatus.Reset(VehState::Hidden);
+	RoadStop::GetByTile(tile, GetRoadStopType(tile))->Enter(v);
+
+	v->UpdatePosition();
+	v->UpdateInclination(true, true);
+	v->UpdateViewport(true, true);
 }
 
 static Trackdir FollowPreviousRoadVehicle(const RoadVehicle *v, const RoadVehicle *prev, TileIndex tile, DiagDirection entry_dir, bool already_reversed)
@@ -1648,6 +1696,10 @@ static bool RoadVehController(RoadVehicle *v)
 	ProcessOrders(v);
 	v->HandleLoading();
 
+	/* The loading may have ended in boarding a train (see TryBoardTrain()),
+	 * and a vehicle on a wagon is not driven any further this tick. */
+	if (v->IsCarried()) return true;
+
 	if (v->current_order.IsType(OT_LOADING)) return true;
 
 	if (v->IsInDepot()) {
@@ -1716,6 +1768,10 @@ bool RoadVehicle::Tick()
 	this->tick_counter++;
 
 	if (this->IsFrontEngine()) {
+		/* Riding on a train: none of the driving below applies, it goes where
+		 * the wagon goes. See road_on_rail.h. */
+		if (this->IsCarried()) return CarriedRoadVehicleTick(this);
+
 		if (!this->vehstatus.Test(VehState::Stopped)) this->running_ticks++;
 		return RoadVehController(this);
 	}

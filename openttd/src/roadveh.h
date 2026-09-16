@@ -86,6 +86,7 @@ static const uint RVC_DEPOT_STOP_FRAME                   = 11;
 static const uint8_t RV_OVERTAKE_TIMEOUT = 35;
 
 void RoadVehUpdateCache(RoadVehicle *v, bool same_length = false);
+void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir into);
 void GetRoadVehSpriteSize(EngineID engine, uint &width, uint &height, int &xoffs, int &yoffs, EngineImageType image_type);
 
 /** Element of the RoadVehPathCache. */
@@ -111,6 +112,14 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VehicleType::Road> 
 	uint8_t overtaking_ctr = 0; ///< The length of the current overtake attempt.
 	uint16_t crashed_ctr = 0; ///< Animation counter when the vehicle has crashed. @see RoadVehIsCrashed
 	uint8_t reverse_ctr = 0;
+
+	/**
+	 * The rail wagon this vehicle is riding on, or invalid when it is on the
+	 * road. While set, the vehicle is not on any road: it is drawn where the
+	 * wagon is, moves with it, and none of its own driving runs. See
+	 * road_on_rail.h.
+	 */
+	VehicleID carried_by = VehicleID::Invalid();
 
 	RoadType roadtype = INVALID_ROADTYPE; ///< NOSAVE: Roadtype of this vehicle.
 	VehicleID disaster_vehicle = VehicleID::Invalid(); ///< NOSAVE: Disaster vehicle targetting this vehicle.
@@ -141,6 +150,9 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VehicleType::Road> 
 	ClosestDepot FindClosestDepot() override;
 
 	bool IsBus() const;
+
+	/** Is this vehicle riding on a train rather than standing on a road? */
+	inline bool IsCarried() const { return this->First()->carried_by != VehicleID::Invalid(); }
 
 	int GetCurrentMaxSpeed() const override;
 	int UpdateSpeed();

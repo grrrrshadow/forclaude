@@ -80,6 +80,7 @@ void NormalizeTrainVehInDepot(const Train *u);
 
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
+bool IsConsistStandingAtStation(const Train *consist, StationID station);
 bool IsWholeTrainInsideDepot(const Train *v);
 bool IsAnyPartInsideDepot(const Train *v);
 bool IsDepotDoorBookedByAnother(const Train *v);
@@ -222,6 +223,13 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	 * of its order has to remember which rake is its own leavings.
 	 */
 	VehicleID depot_dropped_rake = VehicleID::Invalid();
+
+	/**
+	 * The road vehicle riding on this wagon, or invalid. One wagon carries one
+	 * road vehicle; the vehicle keeps its own number and orders and gets off
+	 * by itself at the station its next order names. See road_on_rail.h.
+	 */
+	VehicleID carrying = VehicleID::Invalid();
 
 	/**
 	 * Which engine has spoken for this rake of wagons, set on the rake itself.

@@ -51,6 +51,8 @@
 
 #include "table/strings.h"
 
+#include "road_on_rail.h"
+
 #include "safeguards.h"
 
 
@@ -3314,6 +3316,21 @@ public:
 		if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return GetString(STR_VEHICLE_STATUS_CRASHED);
 
 		if (v->type != VehicleType::Aircraft && v->breakdown_ctr == 1) return GetString(STR_VEHICLE_STATUS_BROKEN_DOWN);
+
+		/* A road vehicle on a train, or standing at its stop waiting for one:
+		 * neither is anything the order line could say. See road_on_rail.h. */
+		if (v->type == VehicleType::Road) {
+			const RoadVehicle *rv = RoadVehicle::From(v);
+			if (rv->IsCarried()) {
+				const Train *wagon = Train::GetIfValid(rv->carried_by);
+				text_colour = TextColour::Orange;
+				return GetString(STR_VEHICLE_STATUS_ON_TRAIN, wagon != nullptr ? wagon->First()->unitnumber : 0);
+			}
+			if (IsWaitingToBoardTrain(rv)) {
+				text_colour = TextColour::Orange;
+				return GetString(STR_VEHICLE_STATUS_WAITING_FOR_TRAIN);
+			}
+		}
 
 		/* A rescue engine waiting in its depot is not idle, it is on call, and
 		 * saying so is the only way to tell one apart from a train that has

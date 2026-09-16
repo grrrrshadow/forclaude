@@ -205,6 +205,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_COUPLE_MIN,      ///< Toggle whether the couple count is a minimum: any rake of at least that many vehicles will do.
 	MOF_AUTO_DEPARTURE,  ///< Toggle whether a train leaving this station goes engine first and then the shortest way.
 	MOF_COUPLE_MAX,      ///< Toggle whether the couple count is a maximum: a rake of up to that many vehicles will do.
+	MOF_LOAD_ON_TRAIN,   ///< Toggle whether a road vehicle boards a train at this station instead of driving on (see road_on_rail.h).
 	MOF_END
 };
 

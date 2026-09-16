@@ -864,6 +864,7 @@ public:
 		     SLE_VAR(Train, couple_target,     VarTypes::U32),
 		     SLE_VAR(Train, depot_decouple_pending, VarTypes::U8),
 		     SLE_VAR(Train, depot_dropped_rake, VarTypes::U32),
+		     SLE_VAR(Train, carrying,          VarTypes::U32),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 
@@ -914,6 +915,7 @@ public:
 		      SLE_VAR(RoadVehicle, overtaking_ctr,       VarTypes::U8),
 		      SLE_VAR(RoadVehicle, crashed_ctr,          VarTypes::U16),
 		      SLE_VAR(RoadVehicle, reverse_ctr,          VarTypes::U8),
+		      SLE_VAR(RoadVehicle, carried_by,           VarTypes::U32),
 		SLEG_CONDVECTOR("path.td", rv_path_td, VarTypes::U8, SaveLoadVersion::RoadvehPathCache, SaveLoadVersion::PathCacheFormat),
 		SLEG_CONDVECTOR("path.tile", rv_path_tile, VarTypes::U32, SaveLoadVersion::RoadvehPathCache, SaveLoadVersion::PathCacheFormat),
 		SLEG_CONDSTRUCTLIST("path", SlVehicleRoadVehPath, SaveLoadVersion::PathCacheFormat, SaveLoadVersion::MaxVersion),

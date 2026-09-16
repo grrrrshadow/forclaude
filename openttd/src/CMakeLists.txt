@@ -405,6 +405,8 @@ add_files(
     road_internal.h
     road_map.cpp
     road_map.h
+    road_on_rail.cpp
+    road_on_rail.h
     road_type.h
     roadstop.cpp
     roadstop_base.h

@@ -55,6 +55,7 @@
 
 #include "crashlog.h"
 #include "anomaly_log.h"
+#include "road_on_rail.h"
 
 #include "safeguards.h"
 
@@ -2019,7 +2020,6 @@ static StationID StationUnderChain(const Train *chain);
 static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
-static bool IsConsistStandingAtStation(const Train *consist, StationID station);
 static void ConcludeCoupleOrderInPlace(Train *new_head);
 static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist, const char *why);
@@ -2566,6 +2566,9 @@ bool IsRescueTargetAttached(const Train *v)
 bool CarriesAnotherTrain(const Train *v)
 {
 	if (IsRescueTargetAttached(v)) return true;
+	/* A road vehicle riding on a wagon is somebody else's vehicle in the same
+	 * sense, and rebuilding the wagon under it would leave it on nothing. */
+	if (TrainCarriesRoadVehicle(v)) return true;
 	for (const Train *u = v->Next(); u != nullptr; u = u->Next()) {
 		if (u->IsEngine() && u->unitnumber != 0) return true;
 	}
@@ -5210,7 +5213,7 @@ static bool IsRailStationTileOfStation(TileIndex tile, StationID station)
  * Being merely near it does not count; the vehicle has to be on the station's
  * own tiles.
  */
-static bool IsConsistStandingAtStation(const Train *consist, StationID station)
+bool IsConsistStandingAtStation(const Train *consist, StationID station)
 {
 	for (const Train *u = consist; u != nullptr; u = u->Next()) {
 		if (IsRailStationTileOfStation(u->tile, station)) return true;
@@ -7328,6 +7331,17 @@ CommandCost CmdSellRailWagon(DoCommandFlags flags, Vehicle *t, bool sell_chain, 
 		/* Restore the train we had. */
 		RestoreTrainBackup(original);
 		return CommandCost(STR_ERROR_NO_MORE_SPACE_FOR_ORDERS);
+	}
+
+	/* A wagon with a road vehicle riding on it is not for sale: the vehicle
+	 * would be left on nothing. The player gets it off first, by letting the
+	 * train stand where the vehicle's order wants to get off. See
+	 * road_on_rail.h. */
+	for (const Train *part = sell_head; part != nullptr; part = part->Next()) {
+		if (part->carrying != VehicleID::Invalid()) {
+			RestoreTrainBackup(original);
+			return CommandCost(STR_ERROR_WAGON_CARRIES_ROAD_VEHICLE);
+		}
 	}
 
 	CommandCost cost(ExpensesType::NewVehicles);
@@ -9980,6 +9994,9 @@ uint Train::Crash(bool flooded)
 
 		/* Remove the loading indicators (if any) */
 		HideFillingPercent(&this->fill_percent_te_id);
+
+		/* Whatever rode on the wagons is destroyed with them. See road_on_rail.h. */
+		DestroyCarriedRoadVehicles(this);
 
 		/* And it starts waiting to be fetched now, not later. The wait was being
 		 * started from the place where a wreck begins losing its wagons one at a
