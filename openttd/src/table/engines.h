@@ -224,7 +224,17 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MW(  1827,  20,  20,  50, CT_BATTERIES   , LandscapeTypes({      Y})), // 113 Battery Truck
 	MW(  1827,  20,  20,  50, CT_FIZZY_DRINKS, LandscapeTypes({      Y})), // 114 Fizzy Drink Truck
 	MW(  1827,  20,  20,  50, CT_PLASTIC     , LandscapeTypes({      Y})), // 115 Plastic Truck
-	MR(  3378,  20,  12,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 116 MPS Regal Bus
+	/* The wagons road vehicles ride on (CT_ROLA, see road_on_rail.h): the steel
+	 * truck over again, flat bed and all, one per railtype and in every climate
+	 * -- the cargo is ours and in every climate, so the wagon for it has to be
+	 * too, and no other original wagon is a flat bed in every climate's
+	 * graphics. Added at the end of the rail block on purpose: engines are
+	 * numbered within their own kind and a savegame keeps that number, so the
+	 * numbers already handed out stay where they are. */
+	MW(  1827,  20,  20,  50, CT_ROLA        , LandscapeTypes({T,A,S,Y})), // 116 Car Carrier
+	MW(  1827,  20,  20,  50, CT_ROLA        , LandscapeTypes({T,A,S,Y})), // 117 Car Carrier (monorail)
+	MW(  1827,  20,  20,  50, CT_ROLA        , LandscapeTypes({T,A,S,Y})), // 118 Car Carrier (maglev)
+	MR(  3378,  20,  12,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 119 MPS Regal Bus
 	MR( 16071,  20,  15,  30, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 117 Hereford Leopard Bus
 	MR( 24107,  20,  15,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 118 Foster Bus
 	MR( 32142,  20,  15,  80, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 119 Foster MkII Superbus
@@ -539,6 +549,15 @@ static constexpr RailVehicleInfo _orig_rail_vehicle_info[] = {
 	RVI(57, W, 196,   0,       0,  18,     0, RC_W, 29, L, A), // 113 Battery Truck
 	RVI(58, W, 193,   0,       0,  18,     0, RC_W, 32, L, A), // 114 Fizzy Drink Truck
 	RVI(59, W, 191,   0,       0,  18,     0, RC_W, 37, L, A), // 115 Plastic Truck
+	/* Copies of the steel truck of each railtype (36, 66, 98), down to the
+	 * picture: what carries a lorry is a flat bed, and that is the flat bed the
+	 * original graphics have. The stated capacity is the steel truck's and is
+	 * never used -- a wagon carrying road vehicles holds one, whatever its
+	 * numbers say (Engine::DetermineCapacity()) -- but it must not be nought,
+	 * or the game reads the wagon as carrying nothing at all. */
+	RVI(42, W, 196,   0,       0,  18,     0, RC_W, 20, R, A), // 116 Car Carrier
+	RVI(69, W, 196,   0,       0,  18,     0, RC_W, 25, O, A), // 117 Car Carrier (monorail)
+	RVI(69, W, 196,   0,       0,  18,     0, RC_W, 27, L, A), // 118 Car Carrier (maglev)
 };
 #undef RC_W
 #undef RC_E

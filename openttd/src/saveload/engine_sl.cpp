@@ -202,6 +202,10 @@ struct EIDSChunkHandler : ChunkHandler {
 			SlObject(&eid, slt);
 			_engine_mngr.SetID(eid.type, eid.internal_id, eid.grfid, eid.substitute_id, static_cast<EngineID>(index));
 		}
+
+		/* A save written before a vehicle was added to the original set knows
+		 * nothing of it, and the engine pool is built from this mapping. */
+		_engine_mngr.AddMissingOriginalEngines();
 	}
 };
 

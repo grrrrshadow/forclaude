@@ -277,6 +277,7 @@ struct EngineOverrideManager {
 	VehicleTypeIndexArray<std::vector<EngineIDMapping>> mappings;
 
 	void ResetToDefaultMapping();
+	void AddMissingOriginalEngines();
 	EngineID GetID(VehicleType type, uint16_t grf_local_id, GrfID grfid);
 	EngineID UseUnreservedID(VehicleType type, uint16_t grf_local_id, GrfID grfid, bool static_access);
 	void SetID(VehicleType type, uint16_t grf_local_id, GrfID grfid, uint8_t substitute_id, EngineID engine);

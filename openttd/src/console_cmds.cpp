@@ -5031,7 +5031,14 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
 		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
-			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+			/* The car carrier for choice -- it is the wagon the player buys for
+			 * this -- and any wagon if this game has none, since the scene then
+			 * still has the refit to fall back on. */
+			if (e->info.cargo_type == _road_vehicle_cargo) {
+				eid_wagon = e->index;
+			} else if (eid_wagon == EngineID::Invalid()) {
+				eid_wagon = e->index;
+			}
 		} else if (eid_loco == EngineID::Invalid()) {
 			eid_loco = e->index;
 		}
@@ -8048,13 +8055,18 @@ static void ConDumpCargoTypes()
 	 * the one thing the table above cannot show, since it is what the fitting
 	 * reads, not what the table holds. */
 	if (IsValidCargoType(_road_vehicle_cargo)) {
-		uint wagons = 0, offering = 0;
+		uint wagons = 0, offering = 0, carriers = 0, carriers_buildable = 0;
 		for (const Engine *e : Engine::Iterate()) {
 			if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
 			wagons++;
 			if (e->info.refit_mask.Test(_road_vehicle_cargo)) offering++;
+			if (e->info.cargo_type == _road_vehicle_cargo) {
+				carriers++;
+				if (e->info.climates.Any()) carriers_buildable++;
+			}
 		}
-		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): slot {}, in cargo mask: {}, in the refit mask of {} of {} wagon types", _road_vehicle_cargo, _cargo_mask.Test(_road_vehicle_cargo) ? "yes" : "NO", offering, wagons);
+		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): slot {}, in cargo mask: {}, in the refit mask of {} of {} wagon types; car carriers {} ({} available in this climate)",
+				_road_vehicle_cargo, _cargo_mask.Test(_road_vehicle_cargo) ? "yes" : "NO", offering, wagons, carriers, carriers_buildable);
 	} else {
 		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): NOT IN THIS GAME (label not found)");
 	}

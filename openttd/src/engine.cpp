@@ -245,12 +245,17 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 	assert(v == nullptr || this->index == v->engine_type);
 	if (mail_capacity != nullptr) *mail_capacity = 0;
 
-	/* A wagon fitted for road vehicles carries one, whatever its set says it
+	/* A wagon carrying road vehicles carries one, whatever its set says it
 	 * holds of anything else -- including a flat wagon that declares no cargo
 	 * at all, which is why this comes before the test for that -- and its
 	 * articulated parts carry nothing: one wagon, one vehicle. (CT_ROLA, see
-	 * road_on_rail.h.) */
-	if (v != nullptr && v->cargo_type == _road_vehicle_cargo) return v->IsArticulatedPart() ? 0 : 1;
+	 * road_on_rail.h.) Asked of the cargo in question and not of the vehicle,
+	 * because the purchase list asks about an engine with no vehicle built
+	 * yet, and the car carrier's own cargo is this one. */
+	CargoType asked_cargo = (v != nullptr) ? v->cargo_type : this->GetDefaultCargoType();
+	if (IsValidCargoType(_road_vehicle_cargo) && asked_cargo == _road_vehicle_cargo) {
+		return (v != nullptr && v->IsArticulatedPart()) ? 0 : 1;
+	}
 
 	if (!this->CanCarryCargo()) return 0;
 
@@ -565,6 +570,37 @@ void EngineOverrideManager::ResetToDefaultMapping()
 		map.clear();
 		for (uint internal_id = 0; internal_id < GetOriginalEngineCount(type); internal_id++, ++id) {
 			map.emplace_back(INVALID_GRFID, internal_id, type, internal_id, id);
+		}
+	}
+}
+
+/**
+ * Give every original vehicle this game has a place in the mapping, adding the
+ * ones that are not in it yet.
+ *
+ * A savegame carries its own mapping and it is loaded over this one, so a save
+ * written before a vehicle was added to the original set has no entry for that
+ * vehicle -- and the engine pool is built from the mapping, so the vehicle
+ * would simply not exist, and the check that every original vehicle has a place
+ * would fail before it (SetupEngines()). The missing ones are added here, after
+ * the numbers the savegame handed out, so that nothing it did refer to moves.
+ */
+void EngineOverrideManager::AddMissingOriginalEngines()
+{
+	/* The first number no entry uses, so that what is added cannot land on top
+	 * of one the savegame already gave out. */
+	uint32_t next = 0;
+	for (const auto &map : this->mappings) {
+		for (const EngineIDMapping &eid : map) {
+			next = std::max<uint32_t>(next, eid.engine.base() + 1);
+		}
+	}
+
+	for (VehicleType type : EnumRange(VehicleType::CompanyEnd)) {
+		for (uint16_t internal_id = 0; internal_id < GetOriginalEngineCount(type); internal_id++) {
+			if (this->GetID(type, internal_id, INVALID_GRFID) != EngineID::Invalid()) continue;
+			this->SetID(type, internal_id, INVALID_GRFID, static_cast<uint8_t>(internal_id), static_cast<EngineID>(next));
+			next++;
 		}
 	}
 }

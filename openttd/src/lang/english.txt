@@ -5942,7 +5942,7 @@ STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING2}
 ############ end of savegame specific region!
 
 ##id 0x8000
-###length 116
+###length 119
 # Vehicle names
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM        :Kirby Paul Tank (Steam)
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_MJS_250_DIESEL               :MJS 250 (Diesel)
@@ -6060,6 +6060,9 @@ STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_TOY_VAN                     :Toy Van
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_BATTERY_TRUCK               :Battery Truck
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_FIZZY_DRINK_TRUCK           :Fizzy Drink Truck
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_PLASTIC_TRUCK               :Plastic Truck
+STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_CAR_CARRIER                   :Car Carrier
+STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_CAR_CARRIER               :Car Carrier
+STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_CAR_CARRIER                 :Car Carrier
 
 ###length 88
 STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS                     :MPS Regal Bus

@@ -1246,7 +1246,19 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 	assert(IsValidImageIndex<VehicleType::Train>(spritenum));
 	SpriteID sprite = GetDefaultTrainSprite(spritenum, direction);
 
-	if (this->cargo.StoredCount() >= this->cargo_cap / 2U) sprite += _wagon_full_adder[spritenum];
+	/* Drawn loaded once it is at least half full -- and only if it is carrying
+	 * something at all. Half of a capacity of one is nought, and nought is what
+	 * an empty wagon holds, so a wagon that takes a single unit was drawn with
+	 * its load on its back from the day it was bought.
+	 *
+	 * A wagon carrying a road vehicle is never drawn loaded whatever it holds:
+	 * what it is carrying is drawn on its back as the vehicle it is, and the
+	 * load the original graphics would put there is a heap of steel under the
+	 * lorry. (CT_ROLA, see road_on_rail.h.) */
+	if (this->cargo_type != _road_vehicle_cargo && this->cargo.StoredCount() > 0 &&
+			this->cargo.StoredCount() >= this->cargo_cap / 2U) {
+		sprite += _wagon_full_adder[spritenum];
+	}
 
 	result->Set(sprite);
 }
