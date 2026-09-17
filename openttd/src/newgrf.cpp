@@ -1434,6 +1434,14 @@ static void FinaliseEngineArray()
 /** Check for invalid cargoes */
 void FinaliseCargoArray()
 {
+	/* First, the cargo for road vehicles on wagons, now that the NewGRFs have
+	 * had their say: still where it was put if nobody touched that slot, and
+	 * moved to the highest free one if a set took it or blanked it. Before the
+	 * loop below and not after it, because a slot filled in here is a cargo
+	 * like any other and wants what that loop hands out -- a town production
+	 * effect above all, which everything that sorts cargoes insists on. */
+	PlaceRoadVehicleCargo();
+
 	for (CargoSpec &cs : CargoSpec::array) {
 		if (cs.town_production_effect == TownProductionEffect::Invalid) {
 			/* Set default town production effect by cargo label. */
@@ -1449,11 +1457,6 @@ void FinaliseCargoArray()
 			cs.abbrev = STR_NEWGRF_INVALID_CARGO_ABBREV;
 		}
 	}
-
-	/* And the cargo for road vehicles on wagons, now that the NewGRFs have had
-	 * their say: still where it was put if nobody touched that slot, and moved
-	 * to the highest free one if a set took it or blanked it. */
-	PlaceRoadVehicleCargo();
 }
 
 /**

@@ -132,3 +132,26 @@ put down crossed go on to their next stop and home.
 
 Scenes are to be re-run once the engine–wagons–engine depots (A/B) are
 worked on again.
+
+## Two tiny NewGRFs that fight over our cargo slot
+
+`grf/slot63_blank.nfo` and `grf/slot63_taken.nfo` are complete NewGRFs of two
+or three pseudo-sprites each. One blanks cargo slot 63 and the other puts a
+cargo of its own there -- the slot the cargo for road vehicles on wagons is
+put in (road_on_rail.h). They exist because the player's set does one of those
+two things and nothing here reproduced it: with them, it reproduces in one
+run.
+
+    cd <dir with sprites/slot63_taken.nfo>
+    grfcodec -e -p1 slot63_taken.grf
+    cp slot63_taken.grf <rig home>/.local/share/openttd/newgrf/
+
+then add a line `slot63_taken.grf =` under `[newgrf]` in that home's
+`openttd.cfg`, start a game and read the last line of `dump_info cargotypes`.
+Blanked, the cargo takes the slot back; taken, it moves down to 62. Either
+way it must still be in the cargo mask and in every wagon's refit mask.
+
+Worth keeping because the first of them found a crash: a cargo moved to
+another slot after the NewGRFs had spoken never got the once-over that gives
+every cargo a town production effect, and the next thing that sorted cargoes
+walked into an assertion.

@@ -1,0 +1,4 @@
+// Test GRF: puts a real cargo of its own in slot 63, the slot CT_ROLA wants.
+    0 * 4	 02 00 00 00
+    1 * 15	 08 08 "ROL2Slot63" 00 "T" 00
+    2 * 12	 00 0B 02 01 3F 08 1C 17 "TSTC"

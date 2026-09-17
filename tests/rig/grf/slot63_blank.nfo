@@ -1,0 +1,4 @@
+// Test GRF: blanks cargo slot 63, the slot CT_ROLA is put in.
+    0 * 4	 02 00 00 00
+    1 * 15	 08 08 "ROL1Slot63" 00 "T" 00
+    2 * 7	 00 0B 01 01 3F 08 FF
