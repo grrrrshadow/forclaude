@@ -583,3 +583,17 @@ testzatik 400 testauta
 testzatik 420 testpodminka auto 2 zkus 12 4 0
 testzatik 1700 testpodminka auto 2 zkus 12 4 0
 testzatik 3400 testpodminka auto 2 zkus 12 4 0" 8000
+
+# The other way of boarding (road_on_rail.h): the train is a shunter with one
+# order, the first station, where it then stands for good. "Load onto wagons
+# or a shunter" boards it anyway -- the car goes wherever the wagon goes, and
+# this one goes nowhere, so auto=1: one boarding, no alighting. The control
+# gives the same shunter and the same car the "by train" order: the shunter
+# does not go to the car's next stop, so the car rightly refuses it, auto=0.
+# Same map-random caveat as autovlak.
+run_scene autoposun "vlak123 on
+testautovlak 1 posun
+testzatik 400 testauta" 6000
+run_scene autoposunne "vlak123 on
+testautovlak 1 vlakem
+testzatik 400 testauta" 6000

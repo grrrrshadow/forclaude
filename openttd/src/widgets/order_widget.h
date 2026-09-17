@@ -47,6 +47,7 @@ enum OrderWidgets : WidgetID {
 	WID_O_TURN_AROUND_DEPOT,         ///< Toggle turning the train around while it is in this depot.
 	WID_O_GOTO_COUPLE_DEPOT,         ///< Toggle travelling to this depot to couple with a rake of wagons stored there.
 	WID_O_LOAD_ON_TRAIN,             ///< Road vehicles: toggle boarding a train at this station and riding it to the next order's station.
+	WID_O_LOAD_ON_WAGONS,            ///< Road vehicles: toggle boarding any fitted wagon standing at this station, wherever it is going.
 	WID_O_DECOUPLE_DEPOT,            ///< Toggle decoupling wagons in this depot.
 	WID_O_REVERSE_OUT,               ///< Toggle reversing out of this station on departure.
 	WID_O_AUTO_DEPARTURE,            ///< Toggle leaving this station engine first and then the shortest way.

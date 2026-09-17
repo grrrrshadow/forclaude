@@ -187,6 +187,16 @@ private:
 	bool load_on_train = false;
 
 	/**
+	 * The other way a road vehicle boards at this station: onto any wagon
+	 * fitted for road vehicles that stands here -- a headless rake, a
+	 * shunter marshalling such wagons into one -- without asking where it is
+	 * going. The vehicle rides wherever the wagon goes and gets off where its
+	 * next order names, the same as after boarding a train. The two are
+	 * exclusive; setting one clears the other. See road_on_rail.h.
+	 */
+	bool load_on_wagons = false;
+
+	/**
 	 * A train passing this station waypoint sounds its horn there. The
 	 * player's touch of life on a waypoint that otherwise only names a group
 	 * of platforms; off by default, so nothing honks that was not asked to.
@@ -407,6 +417,15 @@ public:
 
 	/** Set whether a road vehicle boards a train at this station. */
 	inline void SetLoadOnTrain(bool load) { this->load_on_train = load; }
+
+	/** Does a road vehicle board whatever fitted wagon stands at this station, wherever it goes? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldLoadOnWagons() const { return this->load_on_wagons; }
+
+	/** Set whether a road vehicle boards any fitted wagon standing at this station. */
+	inline void SetLoadOnWagons(bool load) { this->load_on_wagons = load; }
+
+	/** Does a road vehicle board something at this station, either way? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldBoardAtStation() const { return this->load_on_train || this->load_on_wagons; }
 
 	/** Should a train visiting this depot turn around there? @pre IsType(OT_GOTO_DEPOT) */
 	inline bool ShouldTurnAroundInDepot() const { return this->turn_around_in_depot; }

@@ -746,8 +746,10 @@ static void DrawVehicleRefitWindow(const RefitOptions &refits, const RefitOption
 			}
 
 			TextColour colour = (sel != nullptr && sel->cargo == refit.cargo && sel->subtype == refit.subtype) ? TextColour::White : TextColour::Black;
-			/* Get the cargo name. */
-			DrawString(tr, GetString(STR_JUST_STRING_STRING, CargoSpec::Get(refit.cargo)->name, refit.string), colour);
+			/* Get the cargo name. The fitting for road vehicles is not a cargo
+			 * and has a name of its own (CARGO_ROAD_VEHICLES). */
+			StringID name = refit.cargo == CARGO_ROAD_VEHICLES ? STR_CARGO_ROAD_VEHICLES : CargoSpec::Get(refit.cargo)->name;
+			DrawString(tr, GetString(STR_JUST_STRING_STRING, name, refit.string), colour);
 
 			tr.top += delta;
 			current++;
@@ -874,6 +876,18 @@ struct RefitWindow : public Window {
 				}
 			}
 		} while (v->IsGroundVehicle() && (v = v->Next()) != nullptr);
+
+		/* And the fitting for road vehicles, offered for any wagon in the set
+		 * (CARGO_ROAD_VEHICLES): not a cargo, so not in any refit mask, and
+		 * not for the order refit window, which is about cargo. */
+		if (this->order == INVALID_VEH_ORDER_ID && Vehicle::Get(this->window_number)->type == VehicleType::Train) {
+			for (const Train *t = Train::Get(this->window_number); t != nullptr; t = t->Next()) {
+				if (std::ranges::find(vehicles_to_refit, t->index) == vehicles_to_refit.end()) continue;
+				if (t->IsEngine() || t->IsArticulatedPart()) continue;
+				this->refit_list[CARGO_ROAD_VEHICLES].emplace_back(CARGO_ROAD_VEHICLES, UINT8_MAX, STR_EMPTY);
+				break;
+			}
+		}
 
 		/* Restore the previously selected RefitOption. */
 		if (current_refit_option.has_value()) {

@@ -781,6 +781,7 @@ public:
 		SLE_VAR(Vehicle, current_order.couple_max, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.automatic_departure, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.load_on_train, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.load_on_wagons, VarTypes::BOOL),
 		SLE_CONDVAR(Vehicle, timetable_start, VarFileType::I32 | VarMemType::U64, SaveLoadVersion::TimetableStart, SaveLoadVersion::TimetableStartTicks),
 		SLE_CONDVAR(Vehicle, timetable_start, VarTypes::U64, SaveLoadVersion::TimetableStartTicks, SaveLoadVersion::MaxVersion),
 
@@ -884,6 +885,7 @@ public:
 		     SLE_VAR(Train, depot_decouple_pending, VarTypes::U8),
 		     SLE_VAR(Train, depot_dropped_rake, VarTypes::U32),
 		     SLE_VAR(Train, carrying,          VarTypes::U32),
+		     SLE_VAR(Train, carries_road_vehicles, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 

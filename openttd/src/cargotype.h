@@ -242,7 +242,10 @@ inline bool IsCargoInClass(CargoType cargo, CargoClasses cc)
 
 /** Comparator to sort CargoType by according to desired order. */
 struct CargoTypeComparator {
-	bool operator() (const CargoType &lhs, const CargoType &rhs) const { return _sorted_cargo_types[lhs] < _sorted_cargo_types[rhs]; }
+	/* A refit target that is not a cargo (CARGO_ROAD_VEHICLES) has no place in
+	 * the sort table; it goes after every cargo that does. */
+	static uint8_t Key(CargoType c) { return c < NUM_CARGO ? _sorted_cargo_types[c] : UINT8_MAX; }
+	bool operator() (const CargoType &lhs, const CargoType &rhs) const { return Key(lhs) < Key(rhs); }
 };
 
 #endif /* CARGOTYPE_H */

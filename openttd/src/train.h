@@ -234,6 +234,16 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	VehicleID carrying = VehicleID::Invalid();
 
 	/**
+	 * This wagon is fitted to carry a road vehicle rather than any cargo: the
+	 * refit target CARGO_ROAD_VEHICLES. Exclusive like every refit -- its cargo
+	 * capacity is nought while this is set (Train::ConsistChanged()), and a
+	 * refit to a real cargo takes it off again. Only such a wagon takes a road
+	 * vehicle (FindTrainToBoard()); the player marks the wagons meant for it,
+	 * and the wagons waiting for their grain are left alone.
+	 */
+	bool carries_road_vehicles = false;
+
+	/**
 	 * Which engine has spoken for this rake of wagons, set on the rake itself.
 	 *
 	 * An engine sent to collect wagons has nowhere to stop once it has set off

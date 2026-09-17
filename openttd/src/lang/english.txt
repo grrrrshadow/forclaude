@@ -4364,6 +4364,7 @@ STR_PURCHASE_INFO_PWAGPOWER_PWAGWEIGHT                          :{BLACK}Powered 
 STR_PURCHASE_INFO_REFITTABLE_TO                                 :{BLACK}Refittable to: {GOLD}{STRING1}
 STR_PURCHASE_INFO_ALL_TYPES                                     :All cargo types
 STR_PURCHASE_INFO_NONE                                          :None
+STR_CARGO_ROAD_VEHICLES                                         :Road vehicles
 STR_PURCHASE_INFO_ENGINES_ONLY                                  :Engines only
 STR_PURCHASE_INFO_ALL_BUT                                       :All but {CARGO_LIST}
 STR_PURCHASE_INFO_MAX_TE                                        :{BLACK}Max. Tractive Effort: {GOLD}{FORCE}
@@ -4760,6 +4761,7 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Reliabil
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Built: {LTBLUE}{NUM}{BLACK} Value: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Capacity: {LTBLUE}None{STRING}
+STR_VEHICLE_INFO_ROAD_VEHICLES                                  :{BLACK}Capacity: {LTBLUE}one road vehicle
 STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Capacity: {LTBLUE}{CARGO_LONG}{STRING}
 STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Capacity: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Capacity: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
@@ -4941,8 +4943,10 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Travel to this depot to couple with a rake of wagons stored there. The wagons couple onto the end facing the door and leave the depot first, pushed
-STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}Load onto train
-STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Drive to this station's road stop and board an empty wagon of a train standing at the platform that is going to the station of the next order. Ride there, get off at its road stop and carry on with the orders
+STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}To the next stop by train
+STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Drive to this station's road stop and board a train standing at its platform that goes to the station of the next order; get off there
+STR_ORDER_LOAD_ON_WAGONS                                        :{BLACK}Load onto wagons or a shunter
+STR_ORDER_LOAD_ON_WAGONS_TOOLTIP                                :{BLACK}Drive to this station's road stop and board any wagon fitted for road vehicles standing at its platform -- a rake, a shunter -- wherever it is going; get off wherever it stands at the station of the next order
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Leave part of the train behind in this depot, stored. How much is left is set in the box that appears
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Wagons: any
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Wagons: empty
@@ -4979,6 +4983,7 @@ STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}With a 
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(load onto train)
+STR_ORDER_LOAD_ON_WAGONS_SUFFIX                                 :{SPACE}(load onto wagons)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(keep {NUM})
 STR_ORDER_DEPOT_COUPLE_SUFFIX                                   :{SPACE}(couple)
@@ -5516,6 +5521,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... the 
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... it is too far away to couple to
 STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST                 :{WHITE}... to found a rake it has to arrive wagons first, the engine would end up inside the rake
 STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST                         :{WHITE}... the engine and its tender are one vehicle and wagons can only hang off the tender; it arrived nose first
+STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY                             :{WHITE}... only a wagon can be fitted for road vehicles
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Can't station this train as a rescue engine...
 STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Can't call a tow for these wagons...
 STR_ERROR_TOW_ALREADY_COMING                                    :{WHITE}... a rescue engine is already on its way for them

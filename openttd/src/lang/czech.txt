@@ -4457,6 +4457,7 @@ STR_PURCHASE_INFO_PWAGPOWER_PWAGWEIGHT                          :{BLACK}Poháně
 STR_PURCHASE_INFO_REFITTABLE_TO                                 :{BLACK}Lze přestavět na: {GOLD}{STRING}
 STR_PURCHASE_INFO_ALL_TYPES                                     :Všechny druhy nákladu
 STR_PURCHASE_INFO_NONE                                          :Žádné
+STR_CARGO_ROAD_VEHICLES                                         :Silniční vozidla
 STR_PURCHASE_INFO_ENGINES_ONLY                                  :Pouze lokomotivy
 STR_PURCHASE_INFO_ALL_BUT                                       :Všechny kromě {CARGO_LIST}
 STR_PURCHASE_INFO_MAX_TE                                        :{BLACK}Max. tažná síla: {GOLD}{FORCE}
@@ -4856,6 +4857,7 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Spolehli
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Koupeno: {LTBLUE}{NUM}{BLACK} Cena: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Kapacita: {LTBLUE}nic{STRING}
+STR_VEHICLE_INFO_ROAD_VEHICLES                                  :{BLACK}Kapacita: {LTBLUE}jedno silniční vozidlo
 STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapacita: {LTBLUE}{CARGO_LONG}{STRING}
 STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapacita: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Kapacita: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
@@ -5095,8 +5097,10 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i reversním chodem) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
-STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}Naložit na vlak
-STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Dojet na zastávku této stanice a naložit se na prázdný vagon vlaku, který stojí u nástupiště a jede do stanice z dalšího rozkazu. Dojet na něm, na její zastávce sjet a pokračovat podle rozkazů
+STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}Na příští zastávku vlakem
+STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Dojet na zastávku této stanice a naložit se na vlak stojící u nástupiště, který jede do stanice dalšího rozkazu; tam vystoupit
+STR_ORDER_LOAD_ON_WAGONS                                        :{BLACK}Naložit na vagony nebo na posun
+STR_ORDER_LOAD_ON_WAGONS_TOOLTIP                                :{BLACK}Dojet na zastávku této stanice a naložit se na kterýkoli vagon přestavěný na silniční vozidla, který stojí u nástupiště – řadu, posun – ať jede kamkoli; vystoupit, až bude stát ve stanici dalšího rozkazu
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
@@ -5133,6 +5137,7 @@ STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}S tendr
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(naložit na vlak)
+STR_ORDER_LOAD_ON_WAGONS_SUFFIX                                 :{SPACE}(naložit na vagony)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
 STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(a odpojit vše)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(nechat si {NUM})
@@ -5824,6 +5829,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... maš
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je moc daleko na spojení
 STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST                 :{WHITE}... k zakládané řadě musí přijet vagony napřed, mašinka by skončila uvnitř řady
 STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST                         :{WHITE}... mašinka s tendrem je jeden vůz a vozy jdou zavěsit jen za tendr; přijela nosem napřed
+STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY                             :{WHITE}... na silniční vozidla jde přestavět jen vagon
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto vlaku nelze udělat odtahovku...
 STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Pro tyto vagony nelze zavolat odtah...
 STR_ERROR_TOW_ALREADY_COMING                                    :{WHITE}... už pro ně jede odtahovka

@@ -76,7 +76,7 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 bool IsWaitingToBoardTrain(const RoadVehicle *rv)
 {
 	if (rv->IsCarried()) return false;
-	if (!rv->current_order.IsType(OT_LOADING) || !rv->current_order.ShouldLoadOnTrain()) return false;
+	if (!rv->current_order.IsType(OT_LOADING) || !rv->current_order.ShouldBoardAtStation()) return false;
 	const Order *real = rv->GetOrder(rv->cur_real_order_index);
 	return real != nullptr && real->IsType(OT_GOTO_STATION) && real->GetDestination().ToStationID() == rv->last_station_visited;
 }
@@ -105,15 +105,25 @@ bool IsWaitingToBoardTrain(const RoadVehicle *rv)
  * @param[out] wagon the wagon it would ride on
  * @return the train, or nullptr if none is standing there with room
  */
-static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, StationID next, Train **wagon, std::string &why)
+static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, StationID next, bool any_chain, Train **wagon, std::string &why)
 {
-	why = "u nastupiste nestoji zadny vlak";
+	why = any_chain ? "u nastupiste nestoji zadny vagon" : "u nastupiste nestoji zadny vlak";
 	for (Train *t : Train::Iterate()) {
-		if (!t->IsFrontEngine() || t->owner != rv->owner) continue;
-		if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Any({VehState::Crashed, VehState::Stopped})) continue;
+		if (t->owner != rv->owner) continue;
+		/* By train: a train, running, that the player has not parked. Onto
+		 * wagons: whatever chain stands here -- a headless rake, a shunter
+		 * with nowhere to go, a train the player has stopped to marshal --
+		 * because standing here is the whole of what is asked of it. */
+		if (any_chain) {
+			if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
+			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Test(VehState::Crashed)) continue;
+		} else {
+			if (!t->IsFrontEngine()) continue;
+			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Any({VehState::Crashed, VehState::Stopped})) continue;
+		}
 		if (!IsConsistStandingAtStation(t, station)) continue;
 
-		if (next != StationID::Invalid()) {
+		if (!any_chain && next != StationID::Invalid()) {
 			bool goes = false;
 			for (const Order &o : t->Orders()) {
 				if (o.IsType(OT_GOTO_STATION) && o.GetDestination().ToStationID() == next) {
@@ -127,14 +137,24 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 			}
 		}
 
+		bool any_fitted = false;
 		for (Train *u = t; u != nullptr; u = u->Next()) {
 			if (u->IsEngine() || u->IsArticulatedPart()) continue;
+			/* Only a wagon fitted for road vehicles (CARGO_ROAD_VEHICLES).
+			 * The rule used to be any empty wagon, and the player's own
+			 * finding was that this cannot stand once boarding stops asking
+			 * where the wagons are going: a rake of grain wagons waiting for
+			 * its collector is not a car carrier. */
+			if (!u->carries_road_vehicles) continue;
+			any_fitted = true;
 			if (u->carrying != VehicleID::Invalid()) continue;
 			if (u->cargo.TotalCount() != 0) continue;
 			*wagon = u;
 			return t;
 		}
-		why = fmt::format("vlak {} stoji a jede spravne, ale nema volny prazdny vagon", t->unitnumber);
+		why = any_fitted ?
+				fmt::format("vlak {} stoji, ale zadny jeho vagon na auta neni volny", t->unitnumber) :
+				fmt::format("vlak {} stoji, ale nema zadny vagon prestaveny na silnicni vozidla", t->unitnumber);
 	}
 	return nullptr;
 }
@@ -163,9 +183,14 @@ bool TryBoardTrain(RoadVehicle *rv)
 	rv->GetNextStoppingStation(next);
 	StationID target = next.empty() ? StationID::Invalid() : next.front();
 
+	/* The other way of boarding: onto any fitted wagon standing here, and
+	 * never mind where it is going. The vehicle still gets off where its
+	 * next order names, whenever whatever it rides on stands there. */
+	bool any_chain = rv->current_order.ShouldLoadOnWagons();
+
 	Train *wagon = nullptr;
 	std::string why;
-	Train *t = FindTrainToBoard(rv, rv->last_station_visited, target, &wagon, why);
+	Train *t = FindTrainToBoard(rv, rv->last_station_visited, target, any_chain, &wagon, why);
 	if (t == nullptr) {
 		SayRoad(rv, fmt::format("Auto {}: ceka na vlak ve stanici {} (dal do {}) - {}", rv->unitnumber, rv->last_station_visited,
 				target == StationID::Invalid() ? -1 : (int)target.base(), why));

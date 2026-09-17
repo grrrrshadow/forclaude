@@ -2613,7 +2613,7 @@ void Vehicle::HandleLoading(bool mode)
 			 * order names -- the same guard as the coupling above, for the same
 			 * reason: with non-stop off the flag rides along into every stop on
 			 * the way. See road_on_rail.h. */
-			if (this->type == VehicleType::Road && this->current_order.ShouldLoadOnTrain()) {
+			if (this->type == VehicleType::Road && this->current_order.ShouldBoardAtStation()) {
 				const Order *real_order = this->GetOrder(this->cur_real_order_index);
 				if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&
 						real_order->GetDestination().ToStationID() == this->last_station_visited) {

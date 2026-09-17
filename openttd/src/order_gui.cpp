@@ -315,7 +315,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * which tells the reader nothing and costs the width the station
 				 * name needs. The line said it twice over and ran into the
 				 * end-of-list line beneath it. See road_on_rail.h. */
-				if (!order->GetNonStopType().Test(OrderNonStopFlag::GoVia) && !order->ShouldLoadOnTrain()) {
+				if (!order->GetNonStopType().Test(OrderNonStopFlag::GoVia) && !order->ShouldBoardAtStation()) {
 					StringID str = _station_load_types[order->IsRefit()][to_underlying(unload)][to_underlying(load)];
 					if (str != INVALID_STRING_ID) {
 						if (order->IsRefit()) {
@@ -376,6 +376,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * them; a road vehicle has this one short word, and put below it
 				 * was written across the end-of-list line beneath. */
 				if (v->type == VehicleType::Road && order->ShouldLoadOnTrain()) line += GetString(STR_ORDER_LOAD_ON_TRAIN_SUFFIX);
+				if (v->type == VehicleType::Road && order->ShouldLoadOnWagons()) line += GetString(STR_ORDER_LOAD_ON_WAGONS_SUFFIX);
 
 				/* How many vehicles stay with the train belongs on the order
 				 * line with everything else the order is going to do. A button
@@ -1390,11 +1391,13 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_WAYPOINT);
 				this->SetWidgetLoweredState(WID_O_HONK, order->ShouldHonk());
 			} else if (this->vehicle->type == VehicleType::Road && order != nullptr && order->IsType(OT_GOTO_STATION)) {
-				/* A road vehicle's station order: one button, boarding a train
-				 * here. The player asked for one big button, to be split up as
-				 * the need arises. See road_on_rail.h. */
+				/* A road vehicle's station order: the two ways of boarding
+				 * here, one lit at a time. The player asked for one big button
+				 * to begin with, to be split up as the need arose; this is the
+				 * first split. See road_on_rail.h. */
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_ROAD);
 				this->SetWidgetLoweredState(WID_O_LOAD_ON_TRAIN, order->ShouldLoadOnTrain());
+				this->SetWidgetLoweredState(WID_O_LOAD_ON_WAGONS, order->ShouldLoadOnWagons());
 			} else {
 				/* Nothing to put in the row -- a waypoint order, the end of the
 				 * list, a vehicle that is not a train -- but the row stays open
@@ -1853,6 +1856,13 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_LOAD_ON_TRAIN, order->ShouldLoadOnTrain() ? 0 : 1);
+				break;
+			}
+
+			case WID_O_LOAD_ON_WAGONS: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_LOAD_ON_WAGONS, order->ShouldLoadOnWagons() ? 0 : 1);
 				break;
 			}
 
@@ -2379,11 +2389,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 			EndContainer(),
 		EndContainer(),
-		/* A road vehicle's station order: one big button, to be split up as the
-		 * need arises (the player's wish). See road_on_rail.h. */
+		/* A road vehicle's station order: the two ways of boarding here. One
+		 * big button to begin with, split as the need arose (the player's
+		 * wish): by a train that goes where the vehicle goes next, or onto any
+		 * fitted wagon standing here, wherever it may go. See road_on_rail.h. */
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_LOAD_ON_TRAIN), SetMinimalSize(372, 12), SetFill(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_LOAD_ON_TRAIN), SetMinimalSize(186, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_LOAD_ON_TRAIN, STR_ORDER_LOAD_ON_TRAIN_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_LOAD_ON_WAGONS), SetMinimalSize(186, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_LOAD_ON_WAGONS, STR_ORDER_LOAD_ON_WAGONS_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

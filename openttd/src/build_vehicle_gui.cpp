@@ -499,6 +499,11 @@ static bool CargoAndEngineFilter(const GUIEngineListItem *item, const CargoType 
 		return true;
 	} else if (cargo_type == CargoFilterCriteria::CF_ENGINES) {
 		return Engine::Get(item->engine_id)->GetPower() != 0;
+	} else if (cargo_type == CARGO_ROAD_VEHICLES) {
+		/* Any wagon can be fitted for road vehicles; which ones should be is
+		 * the player's to find out, and a rule for it comes after that. */
+		const Engine *e = Engine::Get(item->engine_id);
+		return e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
 	} else {
 		CargoTypes refit_mask = GetUnionOfArticulatedRefitMasks(item->engine_id, true) & _standard_cargo_mask;
 		return (cargo_type == CargoFilterCriteria::CF_NONE ? refit_mask.None() : refit_mask.Test(cargo_type));
@@ -1346,6 +1351,7 @@ struct BuildVehicleWindow : Window {
 			case CargoFilterCriteria::CF_ANY: return STR_PURCHASE_INFO_ALL_TYPES;
 			case CargoFilterCriteria::CF_ENGINES: return STR_PURCHASE_INFO_ENGINES_ONLY;
 			case CargoFilterCriteria::CF_NONE: return STR_PURCHASE_INFO_NONE;
+			case CARGO_ROAD_VEHICLES: return STR_CARGO_ROAD_VEHICLES;
 			default: return CargoSpec::Get(cargo_type)->name;
 		}
 	}
@@ -1364,7 +1370,9 @@ struct BuildVehicleWindow : Window {
 	void SelectEngine(EngineID engine)
 	{
 		CargoType cargo = this->cargo_filter_criteria;
-		if (cargo == CargoFilterCriteria::CF_ANY || cargo == CargoFilterCriteria::CF_ENGINES || cargo == CargoFilterCriteria::CF_NONE) cargo = INVALID_CARGO;
+		/* The purchase details are about cargo; a fitting for road vehicles
+		 * has none to tell of, so they are shown as for the default cargo. */
+		if (cargo == CargoFilterCriteria::CF_ANY || cargo == CargoFilterCriteria::CF_ENGINES || cargo == CargoFilterCriteria::CF_NONE || cargo == CARGO_ROAD_VEHICLES) cargo = INVALID_CARGO;
 
 		this->sel_engine = engine;
 		this->SetBuyVehicleText();
@@ -1672,6 +1680,9 @@ struct BuildVehicleWindow : Window {
 			/* Add item for vehicles not carrying anything, e.g. train engines.
 			 * This could also be useful for eyecandy vehicles of other types, but is likely too confusing for joe, */
 			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(CargoFilterCriteria::CF_NONE), CargoFilterCriteria::CF_NONE));
+			/* And wagons to be fitted for road vehicles, bought fitted the way
+			 * a wagon is bought refitted to any cargo (see road_on_rail.h). */
+			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(CARGO_ROAD_VEHICLES), CARGO_ROAD_VEHICLES));
 		}
 
 		/* Add cargos */

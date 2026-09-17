@@ -75,6 +75,14 @@ static constexpr CargoType NUM_ORIGINAL_CARGO{12}; ///< Original number of cargo
 static constexpr CargoType NUM_CARGO{64}; ///< Maximum number of cargo types in a game.
 
 /* CARGO_AUTO_REFIT and CARGO_NO_REFIT are stored in save-games for refit-orders, so should not be changed. */
+/**
+ * Refit target "road vehicles": a rail wagon fitted to carry a road vehicle
+ * on its back instead of any cargo (see road_on_rail.h). Not a cargo -- no
+ * industry makes it, no station rates it, and a set's cargo table cannot take
+ * it away -- but offered wherever a wagon's cargo is chosen, and exclusive
+ * the way any refit is: fitted for road vehicles, a wagon loads nothing else.
+ */
+static constexpr CargoType CARGO_ROAD_VEHICLES{0xFC};
 static constexpr CargoType CARGO_AUTO_REFIT{0xFD}; ///< Automatically choose cargo type when doing auto refitting.
 static constexpr CargoType CARGO_NO_REFIT{0xFE}; ///< Do not refit cargo of a vehicle (used in vehicle orders and auto-replace/auto-renew).
 

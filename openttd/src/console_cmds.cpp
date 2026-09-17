@@ -4294,6 +4294,46 @@ static bool ConTestSendToDepot(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Fit every wagon of a train, or of a headless rake, for road vehicles -- the
+ * refit to CARGO_ROAD_VEHICLES, as the refit window does it. The train has to
+ * be stopped in a depot, as for any refit; a rake in a depot needs nothing.
+ * With a cargo number instead, it is refitted to that cargo, which is how the
+ * fitting comes off again -- the rig's way of putting a wagon back the way a
+ * save made before the fitting existed has it.
+ * Usage: testnaauta <unit number> [cargo]   (0 for the first headless rake in a depot)
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestFitForRoadVehicles(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Fit a train's wagons for road vehicles. Usage: 'testnaauta <unit number> [naklad]' (0 = first headless rake in a depot; naklad = refit to that cargo instead).");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	CargoType to = CARGO_ROAD_VEHICLES;
+	if (argv.size() >= 3) {
+		auto pcargo = ParseInteger(argv[2]);
+		if (!pcargo.has_value() || *pcargo >= NUM_CARGO) return false;
+		to = (CargoType)*pcargo;
+	}
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t) continue;
+		if (*punit == 0 ? !(t->IsFreeWagon() && t->track == Track::Depot) : (!t->IsFrontEngine() || t->unitnumber != (UnitID)*punit)) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		auto [r, cap, mail_cap, caps] = Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, t->index, to, 0, false, false, 0);
+		uint fitted = 0;
+		for (const Train *u = t; u != nullptr; u = u->Next()) if (u->carries_road_vehicles) fitted++;
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testnaauta: vlak {} na {} - {}; vagonu na auta {}", t->unitnumber,
+				to == CARGO_ROAD_VEHICLES ? std::string("auta") : fmt::format("naklad {}", to),
+				r.Succeeded() ? "prestaveno" : RefusalReason(r), fitted);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testnaauta: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestToggleBrake(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2 || argv.size() > 3) {
@@ -4952,7 +4992,7 @@ static bool ConTestWreck(std::span<std::string_view> argv)
 static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut]'.");
+		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem]'.");
 		return true;
 	}
 	uint cars = 1;
@@ -4961,6 +5001,13 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 		if (!pcars.has_value() || *pcars < 1) return false;
 		cars = (uint)*pcars;
 	}
+	/* "posun": the train is a shunter with nowhere to go -- one order, the
+	 * first station, where it then stands -- and the cars are told to board
+	 * whatever fitted wagon stands there rather than a train bound for their
+	 * next stop. A car boards it that way and never the other way. "vlakem"
+	 * keeps the shunter but gives the cars the by-train order, the control. */
+	bool shunter = argv.size() >= 3 && (argv[2] == "posun" || argv[2] == "vlakem");
+	bool by_train = argv.size() >= 3 && argv[2] == "vlakem";
 	if (_game_mode != GameMode::Normal) {
 		IConsolePrint(CC_ERROR, "testautovlak: only in a running game.");
 		return true;
@@ -5091,9 +5138,10 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 
 	/* The train: engine and one empty wagon, shuttling A - B. */
 	auto [cost_l, veh_l, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
-	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+	/* Bought fitted for road vehicles, the way the buy window does it. */
+	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, CARGO_ROAD_VEHICLES, ClientID::Invalid);
 	if (cost_l.Failed() || cost_w.Failed()) {
-		IConsolePrint(CC_ERROR, "testautovlak: train failed.");
+		IConsolePrint(CC_ERROR, "testautovlak: train failed - {} / {}", RefusalReason(cost_l), RefusalReason(cost_w));
 		return true;
 	}
 	Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_w, veh_l, false);
@@ -5104,7 +5152,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	to_b.MakeGoToStation(id_b);
 	to_b.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
 	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_l, 0, to_a);
-	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_l, 1, to_b);
+	if (!shunter) Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_l, 1, to_b);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_l, false);
 
 	/* The road vehicles: to A to board, then B. One is enough to see the ride
@@ -5132,7 +5180,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 					RefusalReason(ins_a), RefusalReason(ins_b), GetStationIndex(TileXY(x0 + 11, y0 + 1)), GetStationIndex(TileXY(x0 + 27, y0 + 1)));
 			return true;
 		}
-		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_LOAD_ON_TRAIN, 1);
+		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, (shunter && !by_train) ? MOF_LOAD_ON_WAGONS : MOF_LOAD_ON_TRAIN, 1);
 		if (mod.Failed()) {
 			IConsolePrint(CC_ERROR, "testautovlak: load-on-train order refused - {}", RefusalReason(mod));
 			return true;
@@ -8212,6 +8260,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testskip",                ConTestSkipOrder);
 	IConsole::CmdRegister("testbrzda",               ConTestToggleBrake);
 	IConsole::CmdRegister("testdodepa",              ConTestSendToDepot);
+	IConsole::CmdRegister("testnaauta",              ConTestFitForRoadVehicles);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
