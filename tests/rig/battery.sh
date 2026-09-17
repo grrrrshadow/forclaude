@@ -1,6 +1,26 @@
 #!/bin/bash
 S=${RIG_DIR:?set RIG_DIR to the rig working directory (build/, ttdhome/, h2/, h3/, *.sav)}
 H=$S/ttdhome
+
+# One map for every scene that starts a new game, instead of a fresh random one
+# each time. A scene builds its own track, stations and road stops on whatever
+# land it is given, and on a hilly or watery map some of that simply cannot be
+# built: the scene then ends early, every counter comes out zero, and the run
+# reads as a change in the game when it is a change in the map. That was the
+# standing wobble in nakladcekat, nakladsmer, zaloz and the two car scenes, and
+# it cost a reading of the battery every few runs.
+#
+# A fixed seed alone is not enough -- it is the flat land that makes the scenes
+# buildable, and the flattest, least watery setting the generator has. With
+# both, three runs of the same scene come out identical line for line.
+#
+# Changing any of these three makes a different map and therefore different
+# numbers in the stable file: it is a re-baselining, not a regression.
+NEWGAME='setting_newgame game_creation.generation_seed 1
+setting_newgame difficulty.terrain_type 0
+setting_newgame difficulty.quantity_sea_lakes 0
+newgame'
+
 run_scene() { # name scr-content ticks extra-args
   local name=$1 scr=$2 ticks=$3; shift 3
   # The rig runs the breakdown length long (a quarter of a year, the value the
@@ -8,7 +28,7 @@ run_scene() { # name scr-content ticks extra-args
   printf 'setting vehicle.rescue_wait_days 90\n%s\n' "$scr" > $H/.openttd/scripts/game_start.scr
   # A scene played from a save must not have autoexec start a new game over it;
   # that silently ran every save scene on a fresh map for weeks.
-  case "$*" in *-g*) : > $H/.openttd/scripts/autoexec.scr ;; *) printf 'newgame\n' > $H/.openttd/scripts/autoexec.scr ;; esac
+  case "$*" in *-g*) : > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr ;; esac
   HOME=$H timeout 300 $S/build/openttd -vnull:ticks=$ticks -snull -mnull "$@" > $S/reg_$name.log 2>&1
   local spoj=$(grep -c 'spojeno' $S/reg_$name.log)
   local hav=$(grep -c 'HAVAROVAL' $S/reg_$name.log)
@@ -32,7 +52,7 @@ run_scene() { # name scr-content ticks extra-args
   echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut" >> ${BATTERY_STABLE:-/dev/null}
 }
 : > ${BATTERY_STABLE:-/dev/null}
-printf 'newgame\n' > $H/.openttd/scripts/autoexec.scr
+printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
 run_scene zakl "vlak123 on
 testspoj" 8000
 run_scene couvej "vlak123 on
@@ -266,11 +286,13 @@ testza 8000 testklon 21 3" 30000 -g $S/loko2.sav
 # onto the rake at the platform (2, 4 -- the four-tile platform has no room for
 # the feeder plus a tile after that), then waits with "rake full"; the collector,
 # released at 30000, takes the four; the feeder founds the next rake.
-# Noisy: the scene builds its own second platform on a fresh random map and
-# on some of them there is nowhere to put it ("druhe nastupiste se nepodarilo
-# postavit"), which gives spojeno=0 instead of 7 with no crash and no change
-# of build. Measured 7, 7, 0 on three runs of one binary. Read it, do not
-# chase it -- same family as nakladcekat and nakladsmer.
+# This scene builds its own second platform, and used to be the noisiest in
+# the battery: on a random map there was sometimes nowhere to put it ("druhe
+# nastupiste se nepodarilo postavit"), which gave spojeno=0 instead of 7 with
+# no crash and no change of build -- 7, 7, 0 on three runs of one binary. The
+# fixed flat map at the top of this file is what stopped that; if this ever
+# comes out zero again, look in the scene's log for that line before believing
+# anything else.
 run_scene zaloz "vlak123 on
 testspoj zaloz 6
 testza 30000 testbrzda 3" 40000
@@ -558,12 +580,12 @@ testzatik 1720 testbrzda 2" 6000
 # next (road_on_rail.h): a bus goes to the first station's stop, waits for
 # the shuttle, rides the wagon to the second station, gets off onto its stop
 # there, works the stop, and drives back by road to do it again. Two full
-# rounds: auto=4 -- or 0 on a map whose town refuses the road stop, the same
-# way autodve below can come out empty. Twelve thousand ticks and not eight:
-# how long the round takes depends on how far the random map put the road
-# stop from the station, and at eight thousand the second alighting fell off
-# the end on the longer maps, which read as a change in the feature when it
-# was only a change in the map.
+# rounds: auto=4. Twelve thousand ticks and not eight: how long a round takes
+# depends on how far the map put the road stop from the station, and at eight
+# thousand the second alighting fell off the end on the longer maps, which
+# read as a change in the feature when it was only a change in the map. The
+# map is fixed now (see the top of this file), so the length is comfort rather
+# than necessity -- and cheap.
 run_scene autovlak "vlak123 on
 testautovlak
 testzatik 200 testokno rozkazy auto
@@ -571,14 +593,12 @@ testzatik 400 testauta" 12000
 
 # Two road vehicles and one wagon, so one of them always has to wait its turn:
 # the queue the "how many are waiting for a train" condition is about. The
-# first rides twice and the second once, so auto=6 -- or 4 when the random
-# map's road is long enough that the second one's turn falls past the end of
-# the scene even at twelve thousand ticks (see autovlak above), or 0 when the
-# town's local authority refuses the road stop and the scene never gets built
-# at all ("road stop failed" in its log).
-# Like nakladcekat and zaloz, this one moves between runs; read it, do not
-# chase it, and look in the scene's log before believing a change. The
-# condition sits at the head of the second one's list and is asked as it
+# first rides twice and the second once, so auto=6. On a random map this one
+# used to come out 4, when the road was long enough that the second car's turn
+# fell past the end of the scene, or 0 when the town's local authority refused
+# the road stop and the scene never got built at all ("road stop failed" in
+# its log) -- both are what the fixed map at the top of this file is for.
+# The condition sits at the head of the second one's list and is asked as it
 # comes round; the answers are in the scene's own log, next to what the cars
 # were doing.
 run_scene autodve "vlak123 on
@@ -595,7 +615,6 @@ testzatik 3400 testpodminka auto 2 zkus 12 4 0" 12000
 # this one goes nowhere, so auto=1: one boarding, no alighting. The control
 # gives the same shunter and the same car the "by train" order: the shunter
 # does not go to the car's next stop, so the car rightly refuses it, auto=0.
-# Same map-random caveat as autovlak.
 run_scene autoposun "vlak123 on
 testautovlak 1 posun
 testzatik 400 testauta" 6000

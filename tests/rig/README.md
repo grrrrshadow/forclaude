@@ -76,11 +76,40 @@ there as well; diff those:
     RIG_DIR=... BATTERY_STABLE=run2.stable ./battery.sh > run2.out
     diff run1.stable run2.stable
 
+Since the map is fixed (below), one run is enough and there is something to
+diff it against: `battery_baseline.stable` here is a full run and the file to
+compare a change to.
+
+    RIG_DIR=... BATTERY_STABLE=run.stable ./battery.sh > run.out
+    diff battery_baseline.stable run.stable
+
+Six of its scenes need saves that are not in the repository and come out all
+zeroes without them, so on a rig missing those the difference is those six
+lines and nothing else. Take the baseline again when a change is meant to
+move a counter, and say in the commit which counters moved and why.
+
 Two things that look like fixes for the wobble and are not, both tried:
 turning random breakdowns off steadies it but guts three scenes built on a
 breakdown happening (`odtahotoc` drops to nothing at all), and turning
 automatic servicing off changes nothing -- the wobble is in the tow scenes
 themselves.
+
+## The map every new-game scene is built on
+
+A scene that does not load a save builds its own track, stations and road
+stops on the land the generator gave it, and on hilly or watery land some of
+that cannot be built at all: the scene ends early, every counter reads zero,
+and the run looks like a change in the game. `battery.sh` therefore fixes the
+map for those scenes -- one seed, the flattest land and the lowest sea level
+the generator offers (`NEWGAME` at the top of the script). Three runs of the
+same scene then come out identical line for line, and two whole runs of the
+battery give the same stable file.
+
+It is the flat land that does the work, not the seed: every seed tried builds
+every scene once the land is flat. Changing any of the three settings makes a
+different map, so the stable file has to be taken again -- that is a
+re-baselining, not a regression. Scenes that load a save are untouched by
+this; their map is in the save.
 
 `matrix_gen.py [mx] [mw] [me]` — the coupling matrix on `rig.sav`: four
 waiters released slowly from one side of station 1, then a collector and
