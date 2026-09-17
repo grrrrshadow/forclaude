@@ -8044,6 +8044,20 @@ static void ConDumpCargoTypes()
 	for (const auto &grf : grfs) {
 		IConsolePrint(CC_DEFAULT, "  GRF: {:08X} = {}", std::byteswap(grf.first), grf.second->filename);
 	}
+	/* Where the cargo for road vehicles on wagons ended up (road_on_rail.h):
+	 * the one thing the table above cannot show, since it is what the fitting
+	 * reads, not what the table holds. */
+	if (IsValidCargoType(_road_vehicle_cargo)) {
+		uint wagons = 0, offering = 0;
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+			wagons++;
+			if (e->info.refit_mask.Test(_road_vehicle_cargo)) offering++;
+		}
+		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): slot {}, in cargo mask: {}, in the refit mask of {} of {} wagon types", _road_vehicle_cargo, _cargo_mask.Test(_road_vehicle_cargo) ? "yes" : "NO", offering, wagons);
+	} else {
+		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): NOT IN THIS GAME (label not found)");
+	}
 }
 
 /** Dump information about some NewGRF types. @copydoc IConsoleCmdProc */

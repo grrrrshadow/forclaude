@@ -805,6 +805,9 @@ struct RefitWindow : public Window {
 				CargoType cargo_type = cs->Index();
 				/* Skip cargo type if it's not listed */
 				if (!cmask.Test(cargo_type)) continue;
+				/* Road vehicles (CT_ROLA) are fitted in a depot only: not by an
+				 * order, not by auto-refit at a station (see RefitVehicle()). */
+				if (cargo_type == _road_vehicle_cargo && (this->auto_refit || this->order != INVALID_VEH_ORDER_ID)) continue;
 
 				auto &list = this->refit_list[cargo_type];
 				bool first_vehicle = list.empty();

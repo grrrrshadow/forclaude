@@ -32,6 +32,31 @@ another length and shape, and the save is a different game. The player's
 `sivy2.sav` (nose-first coupling of a steam engine with its tender) needs
 CZTR Rails 2.2.4, CZTR Engines Steam 1.0.2 and CZTR Wagons Cargo 1.1.0.
 
+The rig has **only those three** sets; the player plays with about a dozen
+(road set, diesel, electric and EMU engines, passenger wagons, stations,
+rail add-ons). A save of his therefore loads here with most of its sets
+disabled, and the log says so: `NewGRF ... not found`. Count those lines
+before concluding anything about a save of his, and do not read "it works
+here" as "it works for him" when the question is about what a set does.
+
+## Memory errors: the rig does not see them
+
+The battery measures behaviour, not memory. A write past the end of an
+array can leave every scene green on one compiler and break the game on
+another, which is exactly what happened with the cargo for road vehicles
+(TEMATA8 §37). When a change touches tables, arrays or indices, build with
+the sanitizers and run a scene or two through that build:
+
+    cmake <srcdir> -DCMAKE_BUILD_TYPE=Debug -DOPTION_DEDICATED=ON \
+        -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+        -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+in a build directory of its own (it is slow and the binary is huge, so not
+the one the battery uses), then run it with `ASAN_OPTIONS=detect_leaks=0`.
+Generating `openttd.grf` needs `media/baseset/openttd/sprites/` from a
+working build directory copied in, and the baseset graphics beside the
+binary, or the build stops at GRFCodec.
+
 Four saves the battery asks for are the player's and are not in `saves/`:
 `s.sav` (scene `nakladsav`), `save91.sav` (`save91`, `save91rev`),
 `umak.sav` (`mess`) and `umins.sav` (`messodvoz`, `messodtah`). Those six

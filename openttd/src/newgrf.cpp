@@ -40,6 +40,7 @@
 #include "genworld.h"
 #include "error_func.h"
 #include "vehicle_base.h"
+#include "anomaly_log.h"
 #include "road.h"
 #include "newgrf_roadstop.h"
 #include "newgrf_signals.h"
@@ -857,6 +858,43 @@ static void CalculateRefitMasks()
 		if (e->type == VehicleType::Ship && !e->VehInfo<ShipVehicleInfo>().old_refittable) {
 			ei->refit_mask.Reset();
 		}
+	}
+}
+
+/**
+ * Put the cargo for road vehicles on wagons (CT_ROLA, see road_on_rail.h) into
+ * the refit mask of every rail wagon in the game, the way the wagon cargo
+ * exception above widens its wagons: through the mask, so that the refit
+ * window, the buy window's filter and the refit command all find it by the
+ * one road they already know, and no window has to know about it by name.
+ *
+ * Any wagon, whoever made it and whatever it declares; which wagons should
+ * take a lorry is the player's to find out first, and a rule for it comes
+ * after that. Engines never: a lorry rides on a wagon. Articulated parts of
+ * a wagon get the bit too, so that a refit of the wagon carries them along
+ * (RefitVehicle() refits a vehicle part by part, each by its own mask).
+ *
+ * Done after CalculateRefitMasks() and not in it, on purpose: that function
+ * picks a wagon's default cargo from its mask when the set's own choice is
+ * not in this game, and disables the wagon when nothing is left -- a bit
+ * added before that would have made a wagon with no cargo of its own a
+ * buildable car carrier by accident.
+ */
+static void OfferRoadVehiclesToAllWagons()
+{
+	if (!IsValidCargoType(_road_vehicle_cargo)) {
+		/* The cargo is not in this game at all, so no wagon can be fitted and
+		 * the fitting is simply absent from every window -- which looks to a
+		 * player exactly like a fault, and says nothing about itself. A set
+		 * having taken the slot is the one way this happens on purpose; any
+		 * other way is a fault, and either way this is where it is said. */
+		LogAnomaly("Naklad na prepravu vozidel (ROLA) v teto hre neni - vagony nejde prestavet na auta. Slot {} obsadila jina sada?", NUM_CARGO - 1);
+		return;
+	}
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Train) continue;
+		if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+		e->info.refit_mask.Set(_road_vehicle_cargo);
 	}
 }
 
@@ -2119,6 +2157,9 @@ static void AfterLoadGRFs()
 
 	/* And then finish the exception off. */
 	ApplyWagonCargoException();
+
+	/* Every rail wagon may carry a road vehicle. */
+	OfferRoadVehiclesToAllWagons();
 
 	/* No NewGRF gets a say in how its trains turn round. */
 	IgnoreNewGRFReversingFlags();

@@ -1366,6 +1366,10 @@ struct BuildVehicleWindow : Window {
 				!_standard_cargo_mask.Test(this->cargo_filter_criteria)) {
 			this->cargo_filter_criteria = CargoFilterCriteria::CF_ANY;
 		}
+		/* "Carries nothing" is no longer offered (see BuildCargoDropDownList()),
+		 * so a game that remembers it from before shows everything instead of a
+		 * filter that is not in the list. */
+		if (this->cargo_filter_criteria == CargoFilterCriteria::CF_NONE) this->cargo_filter_criteria = CargoFilterCriteria::CF_ANY;
 
 		this->eng_list.SetFilterFuncs(_engine_filter_funcs);
 		this->eng_list.SetFilterState(this->cargo_filter_criteria != CargoFilterCriteria::CF_ANY);
@@ -1679,9 +1683,10 @@ struct BuildVehicleWindow : Window {
 		if (this->vehicle_type == VehicleType::Train) {
 			/* Add item for locomotives only in case of trains. */
 			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(CargoFilterCriteria::CF_ENGINES), CargoFilterCriteria::CF_ENGINES));
-			/* Add item for vehicles not carrying anything, e.g. train engines.
-			 * This could also be useful for eyecandy vehicles of other types, but is likely too confusing for joe, */
-			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(CargoFilterCriteria::CF_NONE), CargoFilterCriteria::CF_NONE));
+			/* No "carries nothing" here. Vanilla offers it for the sake of
+			 * eyecandy vehicles and its own comment calls it confusing; next to
+			 * "engines only" it is a second way of asking nearly the same thing,
+			 * and the player's word for it was that it does not belong. */
 			/* And wagons to be fitted for road vehicles. Named here rather than
 			 * with the cargoes below because it is not a standard cargo, and
 			 * only here because it rides on rail wagons and nothing else. */

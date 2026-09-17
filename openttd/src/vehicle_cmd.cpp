@@ -426,6 +426,9 @@ static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitVehicle(Vehicle 
 		bool refittable = e->info.refit_mask.Test(new_cargo_type) && (!auto_refit || e->info.misc_flags.Test(EngineMiscFlag::AutoRefit));
 		if (fit_for_road_vehicles) refittable = true;
 		if (wagon_head != nullptr && wagon_head->carrying != VehicleID::Invalid()) refittable = false;
+		/* The bit is in every wagon's mask (OfferRoadVehiclesToAllWagons()), but
+		 * a lorry is put on in a depot, never by auto-refit at a station. */
+		if (new_cargo_type == _road_vehicle_cargo && auto_refit) refittable = false;
 
 		if (!refittable && v->cargo_type != new_cargo_type) {
 			uint amount = e->DetermineCapacity(v, nullptr);
