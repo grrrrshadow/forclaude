@@ -862,6 +862,11 @@ static void LogGameStart(std::string_view what)
 	IConsolePrint(CC_WHITE, "==========================================================");
 	IConsolePrint(CC_WHITE, "=== {} ===", what);
 	IConsolePrint(CC_WHITE, "==========================================================");
+
+	/* And the same heading in the record kept beside the savegames, which is
+	 * read days later and by then needs to say for itself which game it is
+	 * about, and that it was running at all. See anomaly_log.h. */
+	StartAnomalyLogForGame(what);
 }
 
 static void OnStartGame(bool dedicated_server)

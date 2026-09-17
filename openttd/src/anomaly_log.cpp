@@ -44,10 +44,11 @@ static const uint ANOMALY_MAX_LINES = 5000;
  */
 static const uint ANOMALY_MAX_SAME = 10;
 
-static std::optional<FileHandle> _anomaly_file; ///< Open on first write, then kept open.
-static bool _anomaly_on = true;                 ///< Whether anything is written at all.
+static std::optional<FileHandle> _anomaly_file; ///< Opened when a game begins, then kept open.
+static bool _anomaly_on = true;                 ///< The player's switch: whether anything is written at all.
+static bool _anomaly_broken = false;            ///< This game's file could not be opened; retried at the next start.
 static bool _anomaly_full = false;              ///< The cap has been reached and said so.
-static uint _anomaly_lines = 0;                 ///< How many lines this session has written.
+static uint _anomaly_lines = 0;                 ///< How many lines this game has written.
 
 /** What has been said already, so that saying it again can be counted instead of repeated. */
 struct AnomalySaid {
@@ -78,24 +79,67 @@ void CloseAnomalyLog()
 }
 
 /**
+ * A game has begun: start its part of the record.
+ *
+ * Written whether or not anything ever goes wrong, and that is the point. The
+ * record used to be opened by the first fault, so a game in which nothing went
+ * wrong left nothing at all -- and a player looking at a file last touched
+ * hours ago cannot tell "nothing happened" from "the record is broken". Now
+ * the heading is there from the start: a file whose last heading is this
+ * game's is a file that is working, and an empty stretch under it means what
+ * it says.
+ *
+ * It also puts everything counted back to nought. What a line has already
+ * said, how many lines there are and whether the cap was reached are all about
+ * one game; carrying them from one game into the next quietly muted the next
+ * one, because a line said ten times in the game before was already taken as
+ * said. The player's own switch is left alone -- that is his, not the game's.
+ *
+ * @param what what kind of start this is, already in words.
+ */
+void StartAnomalyLogForGame(std::string_view what)
+{
+	_anomaly_said.clear();
+	_anomaly_lines = 0;
+	_anomaly_full = false;
+	_anomaly_broken = false;
+	_anomaly_file.reset();
+
+	if (!_anomaly_on) return;
+
+	_anomaly_file = FileHandle::Open(GetAnomalyLogPath(), "ab");
+	if (!_anomaly_file.has_value()) {
+		IConsolePrint(CC_ERROR, "log: nejde psat do '{}' - zaznam vypnut do dalsi hry.", GetAnomalyLogPath());
+		_anomaly_broken = true;
+		return;
+	}
+
+	fmt::print(*_anomaly_file, "\n=== {} {} | {} ===\n", GetLogPrefix(true), _openttd_revision, what);
+	fflush(*_anomaly_file);
+}
+
+/**
  * Put one line in the file, opening it if this is the first.
  * @param line the line, already put together
  */
 static void WriteAnomalyLine(const std::string &line)
 {
 	if (!_anomaly_file.has_value()) {
+		/* A game normally opens the file when it begins, so this is a line from
+		 * before any game did -- while the NewGRFs of a game being loaded are
+		 * read, for one. It gets a heading of its own so that it does not read
+		 * as belonging to whatever game the file last held. */
 		_anomaly_file = FileHandle::Open(GetAnomalyLogPath(), "ab");
 		if (!_anomaly_file.has_value()) {
 			/* Said once, to the console only: a log that cannot be written is
 			 * not worth a second message every time something happens. */
-			if (!_anomaly_full) {
-				IConsolePrint(CC_ERROR, "log: nejde psat do '{}' - zaznam vypnut.", GetAnomalyLogPath());
-				_anomaly_full = true;
-				_anomaly_on = false;
+			if (!_anomaly_broken) {
+				IConsolePrint(CC_ERROR, "log: nejde psat do '{}' - zaznam vypnut do dalsi hry.", GetAnomalyLogPath());
+				_anomaly_broken = true;
 			}
 			return;
 		}
-		fmt::print(*_anomaly_file, "\n=== {} {} ===\n", GetLogPrefix(true), _openttd_revision);
+		fmt::print(*_anomaly_file, "\n=== {} {} | pred zacatkem hry ===\n", GetLogPrefix(true), _openttd_revision);
 	}
 
 	try {
@@ -106,8 +150,8 @@ static void WriteAnomalyLine(const std::string &line)
 		fflush(*_anomaly_file);
 	} catch (const std::system_error &) {
 		_anomaly_file.reset();
-		_anomaly_on = false;
-		IConsolePrint(CC_ERROR, "log: psani selhalo - zaznam vypnut.");
+		_anomaly_broken = true;
+		IConsolePrint(CC_ERROR, "log: psani selhalo - zaznam vypnut do dalsi hry.");
 		return;
 	}
 
@@ -125,7 +169,7 @@ static void WriteAnomalyLine(const std::string &line)
  */
 void LogAnomaly(const std::string &what)
 {
-	if (!_anomaly_on) return;
+	if (!_anomaly_on || _anomaly_broken) return;
 
 	AnomalySaid &said = _anomaly_said[what];
 	said.count++;

@@ -4935,7 +4935,7 @@ static bool ConAnomalyLog(std::span<std::string_view> argv)
 		return true;
 	}
 
-	IConsolePrint(CC_DEFAULT, "log: {} ({} radek tento beh), zaznam {}.", GetAnomalyLogPath(),
+	IConsolePrint(CC_DEFAULT, "log: {} ({} radek v teto hre), zaznam {}.", GetAnomalyLogPath(),
 			GetAnomalyLogLines(), IsAnomalyLogOn() ? "zapnuty" : "vypnuty");
 	IConsolePrint(CC_HELP, "Zapisuje se sam. 'log <text>' prida tvoji poznamku, 'log vyp' / 'log zap' vypne a zapne.");
 	return true;

@@ -38,6 +38,7 @@ inline void LogAnomaly(fmt::format_string<A, Args...> format, A &&first_arg, Arg
 	LogAnomaly(fmt::format(format, std::forward<A>(first_arg), std::forward<Args>(other_args)...));
 }
 
+void StartAnomalyLogForGame(std::string_view what);
 std::string GetAnomalyLogPath();
 uint GetAnomalyLogLines();
 bool IsAnomalyLogOn();
