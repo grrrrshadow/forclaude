@@ -275,8 +275,26 @@ bool TryBoardTrain(RoadVehicle *rv)
 }
 
 /**
+ * Is this train, standing at a station, under orders to put down everything it
+ * is carrying? A road vehicle on a wagon is something the train is carrying,
+ * so "unload all" and "transfer" mean it too -- that is the player's way of
+ * getting a vehicle off a train that is not going where the vehicle wanted,
+ * and the only way at all for one that boarded with nowhere to go (the second
+ * boarding button, see Order::ShouldLoadOnWagons()).
+ * @param t the train, its head
+ * @return whether everything aboard is to be put down here
+ */
+static bool IsTrainUnloadingEverything(const Train *t)
+{
+	if (!t->current_order.IsType(OT_LOADING)) return false;
+	OrderUnloadType unload = t->current_order.GetUnloadType();
+	return unload == OrderUnloadType::Unload || unload == OrderUnloadType::Transfer;
+}
+
+/**
  * Get off at a station, onto one of its road stops, if the train is standing
- * at the station the vehicle's order names and a stop has room.
+ * at the station the vehicle's order names -- or wherever it stands, if the
+ * train has been told to unload everything -- and a stop has room.
  * @param rv    the road vehicle
  * @param wagon the wagon it rides on
  * @return whether it got off
@@ -285,9 +303,21 @@ static bool TryLeaveTrain(RoadVehicle *rv, Train *wagon)
 {
 	Train *t = wagon->First();
 	if (t->cur_speed != 0) return false;
-	if (!rv->current_order.IsType(OT_GOTO_STATION)) return false;
-	StationID dest = rv->current_order.GetDestination().ToStationID();
-	if (!IsConsistStandingAtStation(t, dest)) return false;
+
+	/* Where it gets off: the station its own next order names, if the train is
+	 * standing there. */
+	StationID dest = StationID::Invalid();
+	if (rv->current_order.IsType(OT_GOTO_STATION)) {
+		StationID wanted = rv->current_order.GetDestination().ToStationID();
+		if (IsConsistStandingAtStation(t, wanted)) dest = wanted;
+	}
+	/* Failing that, wherever the train stands if it is putting everything
+	 * down. The vehicle carries on from there under its own orders, by road. */
+	if (dest == StationID::Invalid() && IsTrainUnloadingEverything(t) &&
+			t->last_station_visited != StationID::Invalid() && IsConsistStandingAtStation(t, t->last_station_visited)) {
+		dest = t->last_station_visited;
+	}
+	if (dest == StationID::Invalid()) return false;
 
 	const Station *st = Station::Get(dest);
 	for (const RoadStop *rs = st->GetPrimaryRoadStop(rv); rs != nullptr; rs = rs->GetNextRoadStop(rv)) {

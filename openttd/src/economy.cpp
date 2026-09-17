@@ -1680,10 +1680,20 @@ static void LoadUnloadVehicle(Vehicle *front)
 	for (Vehicle *v = front; v != nullptr; v = v->Next()) {
 		if (v == front || !v->Previous()->HasArticulatedPart()) artic_part = 0;
 		if (v->cargo_cap == 0) continue;
-		/* A road vehicle on a wagon is not loaded or unloaded by a station:
-		 * it drives on and off by itself (road_on_rail.h), and the one unit
-		 * of CT_ROLA the wagon then holds only says that it is there. */
-		if (v->cargo_type == _road_vehicle_cargo) continue;
+		/* A road vehicle on a wagon is not loaded or unloaded by a station: it
+		 * drives on and off by itself (road_on_rail.h), and the one unit of
+		 * CT_ROLA the wagon then holds only says that it is there. Full and
+		 * empty still mean what they mean, though -- a train told to wait for
+		 * a full load waits for a car to climb aboard the same as it waits for
+		 * grain, which is the whole use of a car carrier on a full-load order. */
+		if (v->cargo_type == _road_vehicle_cargo) {
+			if (v->cargo.StoredCount() >= v->cargo_cap) {
+				cargo_full.Set(v->cargo_type);
+			} else {
+				cargo_not_full.Set(v->cargo_type);
+			}
+			continue;
+		}
 		artic_part++;
 
 		GoodsEntry *ge = &st->goods[v->cargo_type];

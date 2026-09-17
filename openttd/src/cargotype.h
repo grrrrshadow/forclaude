@@ -201,6 +201,7 @@ private:
 	static inline std::map<CargoLabel, CargoType> label_map{}; ///< Translation map from CargoLabel to Cargo type.
 
 	friend void SetupCargoForClimate(LandscapeType l);
+	friend void PlaceRoadVehicleCargo();
 	friend void BuildCargoLabelMap();
 	friend inline CargoType GetCargoTypeByLabel(CargoLabel ct);
 	friend void FinaliseCargoArray();
@@ -210,6 +211,7 @@ extern CargoTypes _cargo_mask;
 extern CargoTypes _standard_cargo_mask;
 
 void SetupCargoForClimate(LandscapeType l);
+void PlaceRoadVehicleCargo();
 bool IsDefaultCargo(CargoType cargo_type);
 void BuildCargoLabelMap();
 

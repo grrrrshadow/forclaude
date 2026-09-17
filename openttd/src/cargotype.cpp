@@ -116,18 +116,43 @@ void SetupCargoForClimate(LandscapeType l)
 	 * to write, and GetCargoTranslation() only ever reads these tables within
 	 * their own length, so a cargo outside them is simply not offered to a
 	 * NewGRF that brought no table of its own. */
-	{
-		auto found = std::ranges::find(_default_cargo, CT_ROLA, &CargoSpec::label);
-		assert(found != std::end(_default_cargo));
-		CargoSpec &rola = CargoSpec::array[NUM_CARGO - 1];
-		rola = *found;
-		_cargo_mask.Set(rola.Index());
-	}
-
 	BuildCargoLabelMap();
-	/* Which slot the cargo ended up in; asked by label so that it is right
-	 * again once the NewGRFs have had their say (FinaliseCargoArray()). */
+	PlaceRoadVehicleCargo();
+}
+
+/**
+ * Put the cargo for road vehicles on wagons (CT_ROLA, see road_on_rail.h) into
+ * the topmost cargo slot that is free, and record where it went.
+ *
+ * Called once when the cargoes are set up, where the top slot is always free,
+ * and again once the NewGRFs have had their say (FinaliseCargoArray()). A set
+ * may address any slot by number, this one included, and blank it or take it
+ * for a cargo of its own; when that happens the cargo is simply gone, which
+ * looks to a player exactly like a fault in the game. So the second call puts
+ * it back, in the highest slot nobody is using. If it is still there the call
+ * finds it by label and does nothing.
+ *
+ * If every slot is taken, this game has no such cargo and no wagon can be
+ * fitted; OfferRoadVehiclesToAllWagons() says so in the record.
+ */
+void PlaceRoadVehicleCargo()
+{
 	_road_vehicle_cargo = GetCargoTypeByLabel(CT_ROLA);
+	if (IsValidCargoType(_road_vehicle_cargo)) return;
+
+	auto found = std::ranges::find(_default_cargo, CT_ROLA, &CargoSpec::label);
+	assert(found != std::end(_default_cargo));
+
+	for (uint i = NUM_CARGO; i-- > 0; ) {
+		CargoSpec &slot = CargoSpec::array[i];
+		if (slot.IsValid()) continue;
+
+		slot = *found;
+		_cargo_mask.Set(slot.Index());
+		BuildCargoLabelMap();
+		_road_vehicle_cargo = slot.Index();
+		return;
+	}
 }
 
 /**
