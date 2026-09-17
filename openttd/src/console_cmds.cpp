@@ -8078,6 +8078,24 @@ static void ConDumpCargoTypes()
 					e->grf_prop.local_id, grf == nullptr ? 0 : std::byteswap(grf->grfid), e->info.climates.Any() ? "" : "not ",
 					e->info.refit_mask.base(), GetString(e->info.string_id));
 		}
+		/* Vehicles as freight (the label VEHI): a car carrier could borrow the
+		 * picture a set drew for that, since it is a car transporter and the
+		 * right shape -- but only in a game that has no such cargo of its own,
+		 * or a wagon carrying cars as freight and one carrying a car that
+		 * drives itself would look alike. See TEMATA8 46. Whether a set drew
+		 * one cannot be counted here: what is drawn is only worked out for the
+		 * one set with a cargo exception, and is found for anybody else by
+		 * asking its sprite chains and seeing what comes back. So this says
+		 * only how many wagons could be asked at all. */
+		static constexpr CargoLabel CT_VEHI{'VEHI'};
+		uint in_table = 0;
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+			const GRFFile *grf = e->GetGRF();
+			if (grf != nullptr && find_index(grf->cargo_list, CT_VEHI) >= 0) in_table++;
+		}
+		IConsolePrint(CC_DEFAULT, "  VEHI (vehicles as freight): a cargo in this game: {}; wagon types naming it in their cargo table: {}",
+				IsValidCargoType(GetCargoTypeByLabel(CT_VEHI)) ? "yes" : "no", in_table);
 	} else {
 		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): NOT IN THIS GAME (label not found)");
 	}
