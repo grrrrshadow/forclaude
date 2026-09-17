@@ -558,7 +558,8 @@ testzatik 1720 testbrzda 2" 6000
 # next (road_on_rail.h): a bus goes to the first station's stop, waits for
 # the shuttle, rides the wagon to the second station, gets off onto its stop
 # there, works the stop, and drives back by road to do it again. Two full
-# rounds in 8000 ticks: auto=4.
+# rounds in 8000 ticks: auto=4 -- or 0 on a map whose town refuses the road
+# stop, the same way autodve below can come out empty.
 run_scene autovlak "vlak123 on
 testautovlak
 testzatik 200 testokno rozkazy auto
@@ -568,7 +569,10 @@ testzatik 400 testauta" 8000
 # the queue the "how many are waiting for a train" condition is about. The
 # first rides twice and the second once in 8000 ticks, so auto=6 -- or 4 when
 # the random map's road is long enough that the second one's turn falls past
-# the end of the scene; like nakladcekat, this one moves between runs. The
+# the end of the scene, or 0 when the town's local authority refuses the road
+# stop and the scene never gets built at all ("road stop failed" in its log).
+# Like nakladcekat and zaloz, this one moves between runs; read it, do not
+# chase it, and look in the scene's log before believing a change. The
 # condition sits at the head of the second one's list and is asked as it
 # comes round; the answers are in the scene's own log, next to what the cars
 # were doing.
