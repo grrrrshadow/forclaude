@@ -8067,6 +8067,17 @@ static void ConDumpCargoTypes()
 		}
 		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): slot {}, in cargo mask: {}, in the refit mask of {} of {} wagon types; car carriers {} ({} available in this climate)",
 				_road_vehicle_cargo, _cargo_mask.Test(_road_vehicle_cargo) ? "yes" : "NO", offering, wagons, carriers, carriers_buildable);
+		/* Which ones they are. A car carrier is meant to be one of ours; a
+		 * wagon out of somebody's set turning up here is a set's wagon that
+		 * landed on this cargo by accident, and worth seeing by name. */
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+			if (e->info.cargo_type != _road_vehicle_cargo) continue;
+			const GRFFile *grf = e->GetGRF();
+			IConsolePrint(CC_DEFAULT, "    carrier: engine {}, local id {}, GRF {:08X}, {}available, refits {}, '{}'", e->index,
+					e->grf_prop.local_id, grf == nullptr ? 0 : std::byteswap(grf->grfid), e->info.climates.Any() ? "" : "not ",
+					e->info.refit_mask.base(), GetString(e->info.string_id));
+		}
 	} else {
 		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): NOT IN THIS GAME (label not found)");
 	}

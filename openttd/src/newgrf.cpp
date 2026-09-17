@@ -1190,15 +1190,28 @@ static void CollectDrawnCargoSlots(const SpriteGroup *g, std::bitset<256> &slots
  */
 static CargoType PickWagonCargoExceptionDefaultCargo(const Engine *e)
 {
+	/* Never the cargo for road vehicles on wagons, whatever the widened mask
+	 * says. A wagon that carries one is a car carrier, and a car carrier is a
+	 * vehicle of its own that the player buys as such (road_on_rail.h); a
+	 * wagon of somebody's set landing on it by accident would be one, with a
+	 * capacity of one vehicle, without its author or the player ever asking.
+	 * It is class Special, and so is the livery cargo a set uses for its
+	 * repaints -- which is exactly the kind of wagon this picks a cargo for. */
+	auto usable = [&](const CargoSpec *cs) {
+		return e->info.refit_mask.Test(cs->Index()) && cs->Index() != _road_vehicle_cargo;
+	};
+
 	auto found = _wagon_cargo_exception_state.find(e->index);
 	if (found != std::end(_wagon_cargo_exception_state) && found->second.classes.Any()) {
 		for (const CargoSpec *cs : CargoSpec::Iterate()) {
-			if (!e->info.refit_mask.Test(cs->Index())) continue;
+			if (!usable(cs)) continue;
 			if (cs->classes.Any(found->second.classes)) return cs->Index();
 		}
 	}
 
-	if (e->info.refit_mask.Any()) return *e->info.refit_mask.begin();
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		if (usable(cs)) return cs->Index();
+	}
 	return INVALID_CARGO;
 }
 

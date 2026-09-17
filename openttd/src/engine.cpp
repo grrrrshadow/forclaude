@@ -598,7 +598,13 @@ void EngineOverrideManager::AddMissingOriginalEngines()
 
 	for (VehicleType type : EnumRange(VehicleType::CompanyEnd)) {
 		for (uint16_t internal_id = 0; internal_id < GetOriginalEngineCount(type); internal_id++) {
+			/* Asked of the original vehicle's own place -- the number with no
+			 * set against it. A NewGRF vehicle may carry the same number under
+			 * its own mark and the two live side by side, so the question
+			 * cannot be about the number alone: asking that way found a set's
+			 * vehicle and left the original one out of the game altogether. */
 			if (this->GetID(type, internal_id, INVALID_GRFID) != EngineID::Invalid()) continue;
+
 			this->SetID(type, internal_id, INVALID_GRFID, static_cast<uint8_t>(internal_id), static_cast<EngineID>(next));
 			next++;
 		}
