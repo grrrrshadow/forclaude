@@ -229,19 +229,11 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	/**
 	 * The road vehicle riding on this wagon, or invalid. One wagon carries one
 	 * road vehicle; the vehicle keeps its own number and orders and gets off
-	 * by itself at the station its next order names. See road_on_rail.h.
+	 * by itself at the station its next order names. Only a wagon refitted to
+	 * CT_ROLA takes one, and while it rides the wagon holds one unit of that
+	 * cargo so that it counts as full. See road_on_rail.h.
 	 */
 	VehicleID carrying = VehicleID::Invalid();
-
-	/**
-	 * This wagon is fitted to carry a road vehicle rather than any cargo: the
-	 * refit target CARGO_ROAD_VEHICLES. Exclusive like every refit -- its cargo
-	 * capacity is nought while this is set (Train::ConsistChanged()), and a
-	 * refit to a real cargo takes it off again. Only such a wagon takes a road
-	 * vehicle (FindTrainToBoard()); the player marks the wagons meant for it,
-	 * and the wagons waiting for their grain are left alone.
-	 */
-	bool carries_road_vehicles = false;
 
 	/**
 	 * Which engine has spoken for this rake of wagons, set on the rake itself.

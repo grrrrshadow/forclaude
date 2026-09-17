@@ -24,6 +24,17 @@
  * road vehicle's own order list, which says where it gets on and where it gets
  * off.
  *
+ * Which wagons take one: those refitted to road vehicles, a cargo of our own
+ * (CT_ROLA, label "ROLA", after the rolling road) that no industry makes and
+ * no station takes. It is a real cargo so that a wagon fitted for it has a
+ * capacity -- one vehicle -- and is full or empty like any other wagon, and so
+ * that a wagon set can name it in its cargo table and draw its own loaded
+ * sprites for it. Any rail wagon takes the refit (RefitVehicle()); a rule for
+ * which wagons should comes when it is needed. While a vehicle rides, the
+ * wagon holds one unit of the cargo (MirrorRideAsCargo()); the stations leave
+ * that unit alone, so it pays nothing -- the vehicle on top earns with its own
+ * cargo.
+ *
  * The road vehicle keeps its number, its orders and its cargo throughout, the
  * same way a train carried by a rescue engine does (see CarriesAnotherTrain()).
  * Unlike that, it cannot ride in the train's own chain -- the chain is made of

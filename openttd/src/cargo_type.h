@@ -69,20 +69,23 @@ static constexpr CargoLabel CT_FIZZY_DRINKS{'FZDR'};
 /** Dummy label for engines that carry no cargo; they actually carry 0 passengers. */
 static constexpr CargoLabel CT_NONE = CT_PASSENGERS;
 
+/**
+ * Road vehicles carried on rail wagons -- "Rollende Landstrasse", ROLA. A real
+ * cargo so that a wagon fitted for it has a capacity (one vehicle), is full
+ * or empty like any other, and can be named in a set's cargo table by its
+ * label; no industry makes it and no station takes it, the vehicle on the
+ * wagon is the cargo. It sits in the topmost cargo slot, out of the way of
+ * every set that defines its own cargoes from the bottom up. See
+ * road_on_rail.h.
+ */
+static constexpr CargoLabel CT_ROLA{'ROLA'};
+
 static constexpr CargoLabel CT_INVALID{UINT32_MAX}; ///< Invalid cargo type.
 
 static constexpr CargoType NUM_ORIGINAL_CARGO{12}; ///< Original number of cargo types.
 static constexpr CargoType NUM_CARGO{64}; ///< Maximum number of cargo types in a game.
 
 /* CARGO_AUTO_REFIT and CARGO_NO_REFIT are stored in save-games for refit-orders, so should not be changed. */
-/**
- * Refit target "road vehicles": a rail wagon fitted to carry a road vehicle
- * on its back instead of any cargo (see road_on_rail.h). Not a cargo -- no
- * industry makes it, no station rates it, and a set's cargo table cannot take
- * it away -- but offered wherever a wagon's cargo is chosen, and exclusive
- * the way any refit is: fitted for road vehicles, a wagon loads nothing else.
- */
-static constexpr CargoType CARGO_ROAD_VEHICLES{0xFC};
 static constexpr CargoType CARGO_AUTO_REFIT{0xFD}; ///< Automatically choose cargo type when doing auto refitting.
 static constexpr CargoType CARGO_NO_REFIT{0xFE}; ///< Do not refit cargo of a vehicle (used in vehicle orders and auto-replace/auto-renew).
 

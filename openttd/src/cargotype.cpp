@@ -102,6 +102,23 @@ void SetupCargoForClimate(LandscapeType l)
 	/* Reset and disable remaining cargo types. */
 	std::fill(insert, std::end(CargoSpec::array), CargoSpec{});
 
+	/* Road vehicles on wagons (CT_ROLA), in every climate, in the topmost
+	 * slot: sets that define their own cargoes take slots from the bottom up
+	 * (FIRS, ECS), so the top is the one place none of them reaches. Kept out
+	 * of the default translation tables on purpose -- a set that wants to
+	 * name it names it in its own cargo table, which is the one line its
+	 * author has to write. */
+	{
+		auto found = std::ranges::find(_default_cargo, CT_ROLA, &CargoSpec::label);
+		assert(found != std::end(_default_cargo));
+		CargoSpec &rola = CargoSpec::array[NUM_CARGO - 1];
+		rola = *found;
+		_cargo_mask.Set(rola.Index());
+		_climate_dependent_cargo_labels[rola.Index()] = rola.label;
+		_climate_independent_cargo_labels[rola.bitnum] = rola.label;
+		_road_vehicle_cargo = rola.Index();
+	}
+
 	BuildCargoLabelMap();
 }
 
@@ -186,6 +203,7 @@ SpriteID CargoSpec::GetCargoIcon() const
 }
 
 std::array<uint8_t, NUM_CARGO> _sorted_cargo_types; ///< Sort order of cargoes by cargo type.
+CargoType _road_vehicle_cargo = INVALID_CARGO; ///< The slot CT_ROLA sits in this game.
 std::vector<const CargoSpec *> _sorted_cargo_specs;   ///< Cargo specifications sorted alphabetically by name.
 std::span<const CargoSpec *> _sorted_standard_cargo_specs; ///< Standard cargo specifications sorted alphabetically by name.
 

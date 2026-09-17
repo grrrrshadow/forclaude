@@ -280,11 +280,7 @@ static void TrainDetailsInfoTab(const Vehicle *v, int left, int right, int y)
 static void TrainDetailsCapacityTab(const CargoSummaryItem *item, int left, int right, int y)
 {
 	std::string str;
-	if (item->subtype == STR_VEHICLE_INFO_ROAD_VEHICLES) {
-		/* A wagon fitted for road vehicles: no cargo, one vehicle on its
-		 * back. Told apart by the string it was summarised with. */
-		str = GetString(STR_VEHICLE_INFO_ROAD_VEHICLES);
-	} else if (!IsValidCargoType(item->cargo)) {
+	if (!IsValidCargoType(item->cargo)) {
 		/* Draw subtype only */
 		str = GetString(STR_VEHICLE_INFO_NO_CAPACITY, item->subtype);
 	} else if (FreightWagonMult(item->cargo) > 1) {
@@ -309,12 +305,6 @@ static void GetCargoSummaryOfArticulatedVehicle(const Train *v, CargoSummary &su
 		CargoSummaryItem new_item;
 		new_item.cargo = v->cargo_cap > 0 ? v->cargo_type : INVALID_CARGO;
 		new_item.subtype = GetCargoSubtypeText(v);
-		if (v->carries_road_vehicles) {
-			/* Fitted for road vehicles (CARGO_ROAD_VEHICLES): says so instead
-			 * of "no capacity", see TrainDetailsCapacityTab(). */
-			new_item.cargo = INVALID_CARGO;
-			new_item.subtype = STR_VEHICLE_INFO_ROAD_VEHICLES;
-		}
 		if (!IsValidCargoType(new_item.cargo) && new_item.subtype == STR_EMPTY) continue;
 
 		auto item = std::ranges::find(summary, new_item);

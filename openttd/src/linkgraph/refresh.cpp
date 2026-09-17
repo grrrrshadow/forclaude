@@ -10,6 +10,7 @@
 #include "../stdafx.h"
 #include "../core/bitmath_func.hpp"
 #include "../station_func.h"
+#include "../cargotype.h"
 #include "../engine_base.h"
 #include "../vehicle_func.h"
 #include "refresh.h"
@@ -53,7 +54,9 @@ LinkRefresher::LinkRefresher(Vehicle *vehicle, HopSet *seen_hops, bool allow_mer
 	/* Assemble list of capacities and set last loading stations to 0. */
 	for (Vehicle *v = this->vehicle; v != nullptr; v = v->Next()) {
 		this->refit_capacities.push_back(RefitDesc(v->cargo_type, v->cargo_cap, v->refit_cap));
-		if (v->refit_cap > 0) {
+		/* Road vehicles on wagons (CT_ROLA) are no station's cargo and make
+		 * no link: each drives to the station of its own orders. */
+		if (v->refit_cap > 0 && v->cargo_type != _road_vehicle_cargo) {
 			assert(v->cargo_type < NUM_CARGO);
 			this->capacities[v->cargo_type] += v->refit_cap;
 		}

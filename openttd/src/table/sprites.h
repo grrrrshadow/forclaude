@@ -1372,6 +1372,7 @@ static const SpriteID SPR_CARGO_SUGAR                 = 4316;
 static const SpriteID SPR_CARGO_TOYS                  = 4317;
 static const SpriteID SPR_CARGO_CANDYFLOSS            = 4318;
 static const SpriteID SPR_CARGO_FIZZY_DRINKS          = 4319;
+static const SpriteID SPR_CARGO_ROAD_VEHICLES         = 0; ///< No icon of its own yet (CT_ROLA); GetCargoIcon() draws the goods crate for 0.
 static const SpriteID SPR_CARGO_TOFFEE                = 4320;
 static const SpriteID SPR_CARGO_BUBBLES               = 4321;
 static const SpriteID SPR_CARGO_PLASTIC               = 4322;

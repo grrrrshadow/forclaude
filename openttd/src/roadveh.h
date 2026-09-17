@@ -290,6 +290,9 @@ protected: // These functions should not be called outside acceleration code.
 	 */
 	inline uint16_t GetMaxTrackSpeed() const
 	{
+		/* On a rail wagon there is no road under the vehicle to ask, and no
+		 * road limit either (road_on_rail.h). */
+		if (this->IsCarried()) return 0;
 		return GetRoadTypeInfo(GetRoadType(this->tile, GetRoadTramType(this->roadtype)))->max_speed;
 	}
 

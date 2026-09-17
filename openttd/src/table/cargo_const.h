@@ -92,6 +92,16 @@ static const CargoSpec _default_cargo[] = {
 	MK(  24, CT_BUBBLES,       10,  1, 0x100, 5077, 20,  80,  true,       TownAcceptanceEffect::None,      BUBBLES,       BUBBLE,      STR_ITEMS, CargoClasses({CargoClass::PieceGoods})),
 	MK(  25, CT_PLASTIC,      202, 16, 0x100, 4664, 30, 255,  true,       TownAcceptanceEffect::None,      PLASTIC,      PLASTIC,     STR_LITERS, CargoClasses({CargoClass::Liquid})),
 	MK(  26, CT_FIZZY_DRINKS,  48,  2, 0x100, 6250, 30,  50,  true,       TownAcceptanceEffect::Food, FIZZY_DRINKS,  FIZZY_DRINK,      STR_ITEMS, CargoClasses({CargoClass::PieceGoods})),
+	/* Road vehicles riding on wagons (CT_ROLA): a vehicle is one unit, weighs
+	 * about a lorry, pays nothing -- the vehicle earns with its own cargo,
+	 * the wagon is only its carrier. Freight, so a freight-train multiplier
+	 * weighs it. Every climate; placed by SetupCargoForClimate(), not by the
+	 * climate tables below. No cargo class on purpose: sets let vehicles
+	 * refit by class, and any class here would put this cargo into the refit
+	 * list of every lorry, ship and aircraft of that class. Which vehicles
+	 * take it is decided in code (RefitVehicle()) and by a set naming the
+	 * label outright. */
+	MK(  63, CT_ROLA,         194, 160, 0x100,    0,  0, 255,  true,       TownAcceptanceEffect::None, ROAD_VEHICLES, ROAD_VEHICLE,    STR_ROAD_VEHICLES_UNIT, CargoClasses({})),
 
 	/* Void slot in temperate */
 	MK(0xFF, CT_INVALID,        1,  0, 0x100, 5688,  0,  30,  true,       TownAcceptanceEffect::None,      NOTHING,      NOTHING,       STR_TONS, CargoClasses({})),

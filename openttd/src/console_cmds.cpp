@@ -4295,24 +4295,24 @@ static bool ConTestSendToDepot(std::span<std::string_view> argv)
 }
 
 /**
- * Fit every wagon of a train, or of a headless rake, for road vehicles -- the
- * refit to CARGO_ROAD_VEHICLES, as the refit window does it. The train has to
- * be stopped in a depot, as for any refit; a rake in a depot needs nothing.
- * With a cargo number instead, it is refitted to that cargo, which is how the
- * fitting comes off again -- the rig's way of putting a wagon back the way a
- * save made before the fitting existed has it.
+ * Refit every wagon of a train, or of a headless rake, to road vehicles
+ * (CT_ROLA), as the refit window does it. The train has to be stopped in a
+ * depot, as for any refit; a rake in a depot needs nothing. With a cargo
+ * number instead, it is refitted to that cargo, which is how the fitting
+ * comes off again -- the rig's way of putting a wagon back the way a save
+ * made before the fitting existed has it.
  * Usage: testnaauta <unit number> [cargo]   (0 for the first headless rake in a depot)
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestFitForRoadVehicles(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
-		IConsolePrint(CC_HELP, "Fit a train's wagons for road vehicles. Usage: 'testnaauta <unit number> [naklad]' (0 = first headless rake in a depot; naklad = refit to that cargo instead).");
+		IConsolePrint(CC_HELP, "Refit a train's wagons to road vehicles. Usage: 'testnaauta <unit number> [naklad]' (0 = first headless rake in a depot; naklad = refit to that cargo instead).");
 		return true;
 	}
 	auto punit = ParseInteger(argv[1]);
 	if (!punit.has_value()) return false;
-	CargoType to = CARGO_ROAD_VEHICLES;
+	CargoType to = _road_vehicle_cargo;
 	if (argv.size() >= 3) {
 		auto pcargo = ParseInteger(argv[2]);
 		if (!pcargo.has_value() || *pcargo >= NUM_CARGO) return false;
@@ -4324,9 +4324,9 @@ static bool ConTestFitForRoadVehicles(std::span<std::string_view> argv)
 		AutoRestoreBackup cur_company(_current_company, t->owner);
 		auto [r, cap, mail_cap, caps] = Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, t->index, to, 0, false, false, 0);
 		uint fitted = 0;
-		for (const Train *u = t; u != nullptr; u = u->Next()) if (u->carries_road_vehicles) fitted++;
+		for (const Train *u = t; u != nullptr; u = u->Next()) if (u->cargo_type == _road_vehicle_cargo && u->cargo_cap > 0) fitted++;
 		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testnaauta: vlak {} na {} - {}; vagonu na auta {}", t->unitnumber,
-				to == CARGO_ROAD_VEHICLES ? std::string("auta") : fmt::format("naklad {}", to),
+				to == _road_vehicle_cargo ? std::string("auta") : fmt::format("naklad {}", to),
 				r.Succeeded() ? "prestaveno" : RefusalReason(r), fitted);
 		return true;
 	}
@@ -5139,7 +5139,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	/* The train: engine and one empty wagon, shuttling A - B. */
 	auto [cost_l, veh_l, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
 	/* Bought fitted for road vehicles, the way the buy window does it. */
-	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, CARGO_ROAD_VEHICLES, ClientID::Invalid);
+	auto [cost_w, veh_w, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_wagon, true, _road_vehicle_cargo, ClientID::Invalid);
 	if (cost_l.Failed() || cost_w.Failed()) {
 		IConsolePrint(CC_ERROR, "testautovlak: train failed - {} / {}", RefusalReason(cost_l), RefusalReason(cost_w));
 		return true;

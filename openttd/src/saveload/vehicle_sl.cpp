@@ -477,7 +477,9 @@ void AfterLoadVehiclesPhase2(bool part_of_load)
 					for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 						u->roadtype = rv->roadtype;
 						u->compatible_roadtypes = rv->compatible_roadtypes;
-						if (GetRoadType(u->tile, rtt) == INVALID_ROADTYPE) SlErrorCorrupt("Road vehicle on invalid road type");
+						/* A vehicle riding on a rail wagon is on the wagon's
+						 * tile, which has no road at all (road_on_rail.h). */
+						if (!rv->IsCarried() && GetRoadType(u->tile, rtt) == INVALID_ROADTYPE) SlErrorCorrupt("Road vehicle on invalid road type");
 					}
 
 					RoadVehUpdateCache(rv);
@@ -885,7 +887,6 @@ public:
 		     SLE_VAR(Train, depot_decouple_pending, VarTypes::U8),
 		     SLE_VAR(Train, depot_dropped_rake, VarTypes::U32),
 		     SLE_VAR(Train, carrying,          VarTypes::U32),
-		     SLE_VAR(Train, carries_road_vehicles, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 

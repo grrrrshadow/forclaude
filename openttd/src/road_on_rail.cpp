@@ -11,6 +11,8 @@
 #include "road_on_rail.h"
 #include "roadveh.h"
 #include "train.h"
+#include "cargotype.h"
+#include "cargopacket.h"
 #include "station_base.h"
 #include "station_map.h"
 #include "roadstop_base.h"
@@ -66,6 +68,35 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 	rv->vehstatus.Set(VehState::Hidden, wagon->vehstatus.Test(VehState::Hidden));
 	rv->UpdatePosition();
 	rv->UpdateViewport(true, true);
+}
+
+/**
+ * Say in the wagon's cargo that a road vehicle is riding on it: one unit of
+ * CT_ROLA, from the station it got on at. The link (Train::carrying) is the
+ * truth; the cargo is its mirror, so that the wagon is full to everything that
+ * asks a wagon whether it is full -- the details window, the shunting rules
+ * that move full and empty wagons apart, a set's own sprites for a loaded
+ * wagon -- without each of them having to know about the link. No station
+ * ever loads or unloads it (see LoadUnloadVehicle()), so it never earns and is
+ * never delivered; it goes when the vehicle gets off (ClearRideMirror()).
+ * @param wagon   the wagon being ridden
+ * @param station the station the vehicle got on at
+ */
+static void MirrorRideAsCargo(Train *wagon, StationID station)
+{
+	if (wagon->cargo_type != _road_vehicle_cargo || wagon->cargo.TotalCount() != 0) return;
+	if (!CargoPacket::CanAllocateItem()) return;
+	wagon->cargo.Append(CargoPacket::Create(station, 1, Source{}));
+}
+
+/**
+ * The road vehicle is off the wagon, or gone: the wagon is empty again.
+ * @param wagon the wagon that was ridden
+ */
+static void ClearRideMirror(Train *wagon)
+{
+	if (wagon->cargo_type != _road_vehicle_cargo) return;
+	wagon->cargo.Truncate();
 }
 
 /**
@@ -140,12 +171,13 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 		bool any_fitted = false;
 		for (Train *u = t; u != nullptr; u = u->Next()) {
 			if (u->IsEngine() || u->IsArticulatedPart()) continue;
-			/* Only a wagon fitted for road vehicles (CARGO_ROAD_VEHICLES).
-			 * The rule used to be any empty wagon, and the player's own
-			 * finding was that this cannot stand once boarding stops asking
-			 * where the wagons are going: a rake of grain wagons waiting for
-			 * its collector is not a car carrier. */
-			if (!u->carries_road_vehicles) continue;
+			/* Only a wagon refitted to road vehicles (CT_ROLA), and an empty
+			 * one: one wagon, one vehicle, and the unit of cargo a ridden
+			 * wagon holds says it is taken. The rule used to be any empty
+			 * wagon, and the player's own finding was that this cannot stand
+			 * once boarding stops asking where the wagons are going: a rake
+			 * of grain wagons waiting for its collector is not a car carrier. */
+			if (u->cargo_type != _road_vehicle_cargo || u->cargo_cap == 0) continue;
 			any_fitted = true;
 			if (u->carrying != VehicleID::Invalid()) continue;
 			if (u->cargo.TotalCount() != 0) continue;
@@ -227,6 +259,7 @@ bool TryBoardTrain(RoadVehicle *rv)
 
 	rv->carried_by = wagon->index;
 	wagon->carrying = rv->index;
+	MirrorRideAsCargo(wagon, rv->last_station_visited);
 	FollowWagon(rv, wagon);
 
 	if (_show_train_orientation) {
@@ -273,6 +306,7 @@ static bool TryLeaveTrain(RoadVehicle *rv, Train *wagon)
 
 		wagon->carrying = VehicleID::Invalid();
 		rv->carried_by = VehicleID::Invalid();
+		ClearRideMirror(wagon);
 		PlaceRoadVehicleAtStopEntrance(rv, rs->xy, into);
 
 		if (_show_train_orientation) {
@@ -345,6 +379,7 @@ void DestroyCarriedRoadVehicles(Train *t)
 		if (u->carrying == VehicleID::Invalid()) continue;
 		RoadVehicle *rv = RoadVehicle::GetIfValid(u->carrying);
 		u->carrying = VehicleID::Invalid();
+		ClearRideMirror(u);
 		if (rv == nullptr || rv->carried_by != u->index) continue;
 		LogAnomaly("Auto {}: znicene pri havarii vlaku {} na ({},{})", rv->unitnumber, t->unitnumber, TileX(u->tile), TileY(u->tile));
 		rv->carried_by = VehicleID::Invalid();
@@ -372,6 +407,9 @@ void UnlinkCarriedRoadVehicle(Train *wagon)
 void UnlinkFromWagon(RoadVehicle *rv)
 {
 	Train *wagon = Train::GetIfValid(rv->carried_by);
-	if (wagon != nullptr && wagon->carrying == rv->index) wagon->carrying = VehicleID::Invalid();
+	if (wagon != nullptr && wagon->carrying == rv->index) {
+		wagon->carrying = VehicleID::Invalid();
+		ClearRideMirror(wagon);
+	}
 	rv->carried_by = VehicleID::Invalid();
 }

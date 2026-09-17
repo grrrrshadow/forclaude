@@ -515,6 +515,10 @@ static void CheckGroundVehiclesAtCorrectZ()
 {
 	for (Vehicle *v : Vehicle::Iterate()) {
 		if (v->IsGroundVehicle()) {
+			/* A road vehicle riding on a rail wagon sits on the wagon's deck,
+			 * above the ground, and is put back there by the wagon every
+			 * tick (road_on_rail.h). */
+			if (v->type == VehicleType::Road && RoadVehicle::From(v)->IsCarried()) continue;
 			/*
 			 * Either the vehicle is not actually on the given tile, i.e. it is
 			 * in the wormhole of a bridge or a tunnel, or the Z-coordinate must

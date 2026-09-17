@@ -226,6 +226,7 @@ Dimension GetLargestCargoIconSize();
 
 void InitializeSortedCargoSpecs();
 extern std::array<uint8_t, NUM_CARGO> _sorted_cargo_types;
+extern CargoType _road_vehicle_cargo; ///< The slot CT_ROLA sits in this game, INVALID_CARGO before the cargo set-up.
 extern std::vector<const CargoSpec *> _sorted_cargo_specs;
 extern std::span<const CargoSpec *> _sorted_standard_cargo_specs;
 
@@ -242,10 +243,7 @@ inline bool IsCargoInClass(CargoType cargo, CargoClasses cc)
 
 /** Comparator to sort CargoType by according to desired order. */
 struct CargoTypeComparator {
-	/* A refit target that is not a cargo (CARGO_ROAD_VEHICLES) has no place in
-	 * the sort table; it goes after every cargo that does. */
-	static uint8_t Key(CargoType c) { return c < NUM_CARGO ? _sorted_cargo_types[c] : UINT8_MAX; }
-	bool operator() (const CargoType &lhs, const CargoType &rhs) const { return Key(lhs) < Key(rhs); }
+	bool operator() (const CargoType &lhs, const CargoType &rhs) const { return _sorted_cargo_types[lhs] < _sorted_cargo_types[rhs]; }
 };
 
 #endif /* CARGOTYPE_H */

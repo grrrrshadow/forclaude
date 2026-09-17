@@ -220,10 +220,6 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 				RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type != RailVehicleType::Wagon) {
 			new_cap = 0;
 		}
-		/* Fitted for road vehicles: it carries one of those on its back and
-		 * no cargo at all. This is what makes the fitting a refit rather than
-		 * a badge beside one -- see CARGO_ROAD_VEHICLES. */
-		if (u->carries_road_vehicles) new_cap = 0;
 		if (allowed_changes.Test(ConsistChangeFlag::Capacity)) {
 			/* Update vehicle capacity. */
 			if (u->cargo_cap > new_cap) u->cargo.Truncate(new_cap);

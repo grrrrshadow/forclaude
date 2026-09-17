@@ -8,6 +8,7 @@
 /** @file engine.cpp Base for all engine handling. */
 
 #include "stdafx.h"
+#include "cargotype.h"
 #include "core/container_func.hpp"
 #include "company_func.h"
 #include "command_func.h"
@@ -245,6 +246,11 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 	if (mail_capacity != nullptr) *mail_capacity = 0;
 
 	if (!this->CanCarryCargo()) return 0;
+
+	/* A wagon fitted for road vehicles carries one, whatever its set says
+	 * it holds of anything else, and its articulated parts carry nothing:
+	 * one wagon, one vehicle (CT_ROLA, see road_on_rail.h). */
+	if (v != nullptr && v->cargo_type == _road_vehicle_cargo) return v->IsArticulatedPart() ? 0 : 1;
 
 	bool new_multipliers = this->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier);
 	CargoType default_cargo = this->GetDefaultCargoType();

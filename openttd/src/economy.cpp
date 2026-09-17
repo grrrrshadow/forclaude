@@ -1272,6 +1272,9 @@ void PrepareUnload(Vehicle *front_v)
 	if (front_v->orders == nullptr || front_v->current_order.GetUnloadType() != OrderUnloadType::NoUnload) {
 		Station *st = Station::Get(front_v->last_station_visited);
 		for (Vehicle *v = front_v; v != nullptr; v = v->Next()) {
+			/* A road vehicle on a wagon gets off by itself, where its own
+			 * orders say; the station has nothing to unload (road_on_rail.h). */
+			if (v->cargo_type == _road_vehicle_cargo) continue;
 			const GoodsEntry *ge = &st->goods[v->cargo_type];
 			if (v->cargo_cap > 0 && v->cargo.TotalCount() > 0) {
 				v->cargo.Stage(
@@ -1541,6 +1544,9 @@ struct ReserveCargoAction {
 
 	bool operator()(Vehicle *v)
 	{
+		/* Nothing to reserve for a wagon that takes road vehicles: they drive
+		 * on by themselves, and no station has any waiting (road_on_rail.h). */
+		if (v->cargo_type == _road_vehicle_cargo) return true;
 		if (v->cargo_cap > v->cargo.RemainingCount() && MayLoadUnderExclusiveRights(st, v)) {
 			st->goods[v->cargo_type].GetOrCreateData().cargo.Reserve(v->cargo_cap - v->cargo.RemainingCount(),
 					&v->cargo, next_station, v->GetCargoTile());
@@ -1674,6 +1680,10 @@ static void LoadUnloadVehicle(Vehicle *front)
 	for (Vehicle *v = front; v != nullptr; v = v->Next()) {
 		if (v == front || !v->Previous()->HasArticulatedPart()) artic_part = 0;
 		if (v->cargo_cap == 0) continue;
+		/* A road vehicle on a wagon is not loaded or unloaded by a station:
+		 * it drives on and off by itself (road_on_rail.h), and the one unit
+		 * of CT_ROLA the wagon then holds only says that it is there. */
+		if (v->cargo_type == _road_vehicle_cargo) continue;
 		artic_part++;
 
 		GoodsEntry *ge = &st->goods[v->cargo_type];

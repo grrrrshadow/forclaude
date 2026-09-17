@@ -119,10 +119,8 @@ std::tuple<CommandCost, VehicleID, uint, uint16_t, CargoArray> CmdBuildVehicle(D
 	/* Validate the engine type. */
 	if (!IsEngineBuildable(eid, type, _current_company)) return { CommandCost(STR_ERROR_RAIL_VEHICLE_NOT_AVAILABLE + to_underlying(type)), VehicleID::Invalid(), 0, 0, {} };
 
-	/* Validate the cargo type. Fitting a wagon for road vehicles is a refit
-	 * target that is not a cargo (CARGO_ROAD_VEHICLES), and is bought that
-	 * way like any other refit. */
-	if (cargo >= NUM_CARGO && IsValidCargoType(cargo) && cargo != CARGO_ROAD_VEHICLES) return { CMD_ERROR, VehicleID::Invalid(), 0, 0, {} };
+	/* Validate the cargo type */
+	if (cargo >= NUM_CARGO && IsValidCargoType(cargo)) return { CMD_ERROR, VehicleID::Invalid(), 0, 0, {} };
 
 	const Engine *e = Engine::Get(eid);
 	CommandCost value(ExpensesType::NewVehicles, e->GetCost());
@@ -404,6 +402,23 @@ static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitVehicle(Vehicle 
 		/* If the vehicle is not refittable, or does not allow automatic refitting,
 		 * count its capacity nevertheless if the cargo matches */
 		bool refittable = e->info.refit_mask.Test(new_cargo_type) && (!auto_refit || e->info.misc_flags.Test(EngineMiscFlag::AutoRefit));
+		/* Road vehicles (CT_ROLA) are in no set's refit mask, the cargo being
+		 * ours and not theirs: any rail wagon takes the refit, in a depot only.
+		 * Which wagons should is the player's to find out, and a rule for it
+		 * comes after that. A wagon with a road vehicle on its back is left as
+		 * it is -- the vehicle is the cargo, and there is nothing to refit it
+		 * into (see road_on_rail.h). Asked of the wagon's head, as
+		 * Train::ConsistChanged() does: its articulated parts go with it. */
+		if (v->type == VehicleType::Train) {
+			const Train *head = Train::From(v)->GetFirstEnginePart();
+			if (RailVehInfo(head->engine_type)->railveh_type == RailVehicleType::Wagon) {
+				if (head->carrying != VehicleID::Invalid()) {
+					refittable = false;
+				} else if (new_cargo_type == _road_vehicle_cargo && !auto_refit) {
+					refittable = true;
+				}
+			}
+		}
 		if (!refittable && v->cargo_type != new_cargo_type) {
 			uint amount = e->DetermineCapacity(v, nullptr);
 			if (amount > 0) cargo_capacities[v->cargo_type] += amount;
@@ -476,9 +491,6 @@ static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitVehicle(Vehicle 
 			u->refit_cap = (u->cargo_type == new_cargo_type) ? std::min<uint16_t>(result.capacity, u->refit_cap) : 0;
 			if (u->cargo.TotalCount() > u->refit_cap) u->cargo.Truncate(u->cargo.TotalCount() - u->refit_cap);
 			u->cargo_type = new_cargo_type;
-			/* A refit to a cargo takes the road-vehicle fitting off: one or the
-			 * other, never both (CARGO_ROAD_VEHICLES). */
-			if (u->type == VehicleType::Train) Train::From(u)->carries_road_vehicles = false;
 			u->cargo_cap = result.capacity;
 			u->cargo_subtype = result.subtype;
 			if (u->type == VehicleType::Aircraft) {
@@ -507,50 +519,6 @@ static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitVehicle(Vehicle 
  *                     Only used if "refit only this vehicle" is false.
  * @return the cost of this operation or an error
  */
-/**
- * Fit rail wagons to carry road vehicles: the refit target CARGO_ROAD_VEHICLES.
- *
- * Walks the same set of vehicles an ordinary refit would and marks every
- * wagon in it (Train::carries_road_vehicles); the caller's ConsistChanged()
- * then takes the cargo capacity to nought, which is what makes this a refit
- * and not a badge -- fitted for road vehicles, the wagon loads nothing else,
- * and a refit back to a cargo takes the fitting off (RefitVehicle()). Engines
- * and their articulated parts are passed over: only a wagon can be fitted.
- * Costs nothing; there is no cargo to price it against. See road_on_rail.h.
- *
- * @param v            first vehicle of the set (the whole chain unless @p only_this)
- * @param only_this    fit only this vehicle
- * @param num_vehicles how many vehicles from @p v on, 0 for all
- * @param flags        type of operation
- * @return the (nil) cost and no capacity, or an error when nothing in the set is a wagon
- */
-static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitWagonsForRoadVehicles(Vehicle *v, bool only_this, uint8_t num_vehicles, DoCommandFlags flags)
-{
-	if (v->type != VehicleType::Train) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
-	CommandCost cost(v->GetExpenseType(false));
-	num_vehicles = num_vehicles == 0 ? UINT8_MAX : num_vehicles;
-
-	VehicleSet vehicles_to_refit;
-	if (!only_this) {
-		GetVehicleSet(vehicles_to_refit, v, num_vehicles);
-		v = v->First();
-	}
-
-	uint fitted = 0;
-	for (; v != nullptr; v = (only_this ? nullptr : v->Next())) {
-		if (!only_this && std::ranges::find(vehicles_to_refit, v->index) == vehicles_to_refit.end()) continue;
-		Train *t = Train::From(v);
-		if (t->IsEngine() || t->IsArticulatedPart()) continue;
-		if (flags.Test(DoCommandFlag::Execute)) {
-			t->carries_road_vehicles = true;
-			t->refit_cap = 0;
-		}
-		fitted++;
-	}
-	if (fitted == 0) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
-	return { cost, 0, 0, {} };
-}
-
 std::tuple<CommandCost, uint, uint16_t, CargoArray> CmdRefitVehicle(DoCommandFlags flags, VehicleID veh_id, CargoType new_cargo_type, uint8_t new_subtype, bool auto_refit, bool only_this, uint8_t num_vehicles)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
@@ -577,15 +545,14 @@ std::tuple<CommandCost, uint, uint16_t, CargoArray> CmdRefitVehicle(DoCommandFla
 	if (front->vehstatus.Test(VehState::Crashed)) return { CommandCost(STR_ERROR_VEHICLE_IS_DESTROYED), 0, 0, {} };
 
 	/* Check cargo */
-	bool road_vehicles = new_cargo_type == CARGO_ROAD_VEHICLES;
-	if (!road_vehicles && new_cargo_type >= NUM_CARGO) return { CMD_ERROR, 0, 0, {} };
+	if (new_cargo_type >= NUM_CARGO) return { CMD_ERROR, 0, 0, {} };
+	/* Road vehicles ride on rail wagons and on nothing else (see RefitVehicle()). */
+	if (new_cargo_type == _road_vehicle_cargo && front->type != VehicleType::Train) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
 
 	/* For ships and aircraft there is always only one. */
 	only_this |= front->type == VehicleType::Ship || front->type == VehicleType::Aircraft;
 
-	auto [cost, refit_capacity, mail_capacity, cargo_capacities] = road_vehicles ?
-			RefitWagonsForRoadVehicles(v, only_this, num_vehicles, flags) :
-			RefitVehicle(v, only_this, num_vehicles, new_cargo_type, new_subtype, flags, auto_refit);
+	auto [cost, refit_capacity, mail_capacity, cargo_capacities] = RefitVehicle(v, only_this, num_vehicles, new_cargo_type, new_subtype, flags, auto_refit);
 	if (cost.Failed()) return { cost, 0, 0, {} };
 
 	if (flags.Test(DoCommandFlag::Execute)) {
