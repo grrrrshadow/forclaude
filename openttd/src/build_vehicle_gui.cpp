@@ -1360,7 +1360,12 @@ struct BuildVehicleWindow : Window {
 	{
 		/* Set the last cargo filter criteria. */
 		this->cargo_filter_criteria = _engine_sort_last_cargo_criteria[this->vehicle_type];
-		if (this->cargo_filter_criteria < NUM_CARGO && !_standard_cargo_mask.Test(this->cargo_filter_criteria)) this->cargo_filter_criteria = CargoFilterCriteria::CF_ANY;
+		/* Road vehicles on wagons are not a standard cargo (see cargo_const.h),
+		 * but they are a filter this window offers, so it survives here. */
+		if (this->cargo_filter_criteria < NUM_CARGO && this->cargo_filter_criteria != _road_vehicle_cargo &&
+				!_standard_cargo_mask.Test(this->cargo_filter_criteria)) {
+			this->cargo_filter_criteria = CargoFilterCriteria::CF_ANY;
+		}
 
 		this->eng_list.SetFilterFuncs(_engine_filter_funcs);
 		this->eng_list.SetFilterState(this->cargo_filter_criteria != CargoFilterCriteria::CF_ANY);
@@ -1677,13 +1682,17 @@ struct BuildVehicleWindow : Window {
 			/* Add item for vehicles not carrying anything, e.g. train engines.
 			 * This could also be useful for eyecandy vehicles of other types, but is likely too confusing for joe, */
 			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(CargoFilterCriteria::CF_NONE), CargoFilterCriteria::CF_NONE));
+			/* And wagons to be fitted for road vehicles. Named here rather than
+			 * with the cargoes below because it is not a standard cargo, and
+			 * only here because it rides on rail wagons and nothing else. */
+			if (IsValidCargoType(_road_vehicle_cargo)) {
+				list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(_road_vehicle_cargo), _road_vehicle_cargo));
+			}
 		}
 
-		/* Add cargos. Road vehicles (CT_ROLA) ride on rail wagons only, so the
-		 * other depots have nothing to show for them. */
+		/* Add cargos */
 		Dimension d = GetLargestCargoIconSize();
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-			if (cs->Index() == _road_vehicle_cargo && this->vehicle_type != VehicleType::Train) continue;
 			list.push_back(MakeDropDownListIconItem(d, cs->GetCargoIcon(), PAL_NONE, cs->name, cs->Index()));
 		}
 

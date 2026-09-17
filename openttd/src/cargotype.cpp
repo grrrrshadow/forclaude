@@ -104,22 +104,30 @@ void SetupCargoForClimate(LandscapeType l)
 
 	/* Road vehicles on wagons (CT_ROLA), in every climate, in the topmost
 	 * slot: sets that define their own cargoes take slots from the bottom up
-	 * (FIRS, ECS), so the top is the one place none of them reaches. Kept out
-	 * of the default translation tables on purpose -- a set that wants to
-	 * name it names it in its own cargo table, which is the one line its
-	 * author has to write. */
+	 * (FIRS, ECS), so the top is the one place none of them reaches.
+	 *
+	 * Neither default translation table is written here, and not only out of
+	 * taste: the climate-dependent one has a place per original climate slot
+	 * (twelve) and the climate-independent one a place per bitnum (thirty-two),
+	 * and this cargo's slot and bitnum are both past the end of both. Writing
+	 * them by those numbers wrote over whatever followed the tables, which is
+	 * how the first cut of this went wrong. A set that wants the cargo names
+	 * it in its own cargo table by label, which is the one line its author has
+	 * to write, and GetCargoTranslation() only ever reads these tables within
+	 * their own length, so a cargo outside them is simply not offered to a
+	 * NewGRF that brought no table of its own. */
 	{
 		auto found = std::ranges::find(_default_cargo, CT_ROLA, &CargoSpec::label);
 		assert(found != std::end(_default_cargo));
 		CargoSpec &rola = CargoSpec::array[NUM_CARGO - 1];
 		rola = *found;
 		_cargo_mask.Set(rola.Index());
-		_climate_dependent_cargo_labels[rola.Index()] = rola.label;
-		_climate_independent_cargo_labels[rola.bitnum] = rola.label;
-		_road_vehicle_cargo = rola.Index();
 	}
 
 	BuildCargoLabelMap();
+	/* Which slot the cargo ended up in; asked by label so that it is right
+	 * again once the NewGRFs have had their say (FinaliseCargoArray()). */
+	_road_vehicle_cargo = GetCargoTypeByLabel(CT_ROLA);
 }
 
 /**

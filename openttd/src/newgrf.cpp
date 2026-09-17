@@ -1411,6 +1411,13 @@ void FinaliseCargoArray()
 			cs.abbrev = STR_NEWGRF_INVALID_CARGO_ABBREV;
 		}
 	}
+
+	/* Where the cargo for road vehicles on wagons ended up, now that the
+	 * NewGRFs have had their say. A set may address any slot by number, this
+	 * one included, so it is asked for by label: if a set has taken the slot
+	 * for a cargo of its own, this comes back invalid and no wagon can be
+	 * fitted, rather than the fitting quietly meaning that set's cargo. */
+	_road_vehicle_cargo = GetCargoTypeByLabel(CT_ROLA);
 }
 
 /**

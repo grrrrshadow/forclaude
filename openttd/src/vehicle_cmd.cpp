@@ -397,28 +397,36 @@ static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitVehicle(Vehicle 
 		if (v->type == VehicleType::Train && std::ranges::find(vehicles_to_refit, v->index) == vehicles_to_refit.end() && !only_this) continue;
 
 		const Engine *e = v->GetEngine();
-		if (!e->CanCarryCargo()) continue;
 
-		/* If the vehicle is not refittable, or does not allow automatic refitting,
-		 * count its capacity nevertheless if the cargo matches */
-		bool refittable = e->info.refit_mask.Test(new_cargo_type) && (!auto_refit || e->info.misc_flags.Test(EngineMiscFlag::AutoRefit));
+		/* Is this a rail wagon, and is anything riding on it? Asked of the
+		 * wagon's head, as Train::ConsistChanged() does, so that a wagon's
+		 * articulated parts go the way their head goes. */
+		const Train *wagon_head = nullptr;
+		if (v->type == VehicleType::Train) {
+			const Train *head = Train::From(v)->GetFirstEnginePart();
+			if (RailVehInfo(head->engine_type)->railveh_type == RailVehicleType::Wagon) wagon_head = head;
+		}
 		/* Road vehicles (CT_ROLA) are in no set's refit mask, the cargo being
 		 * ours and not theirs: any rail wagon takes the refit, in a depot only.
 		 * Which wagons should is the player's to find out, and a rule for it
 		 * comes after that. A wagon with a road vehicle on its back is left as
 		 * it is -- the vehicle is the cargo, and there is nothing to refit it
-		 * into (see road_on_rail.h). Asked of the wagon's head, as
-		 * Train::ConsistChanged() does: its articulated parts go with it. */
-		if (v->type == VehicleType::Train) {
-			const Train *head = Train::From(v)->GetFirstEnginePart();
-			if (RailVehInfo(head->engine_type)->railveh_type == RailVehicleType::Wagon) {
-				if (head->carrying != VehicleID::Invalid()) {
-					refittable = false;
-				} else if (new_cargo_type == _road_vehicle_cargo && !auto_refit) {
-					refittable = true;
-				}
-			}
-		}
+		 * into. See road_on_rail.h. */
+		bool fit_for_road_vehicles = wagon_head != nullptr && new_cargo_type == _road_vehicle_cargo &&
+				!auto_refit && wagon_head->carrying == VehicleID::Invalid();
+
+		/* A vehicle that carries nothing is passed over -- but a wagon declaring
+		 * no capacity at all is the very wagon one wants under a lorry, so the
+		 * fitting for road vehicles is decided before that test rather than
+		 * after it. */
+		if (!fit_for_road_vehicles && !e->CanCarryCargo()) continue;
+
+		/* If the vehicle is not refittable, or does not allow automatic refitting,
+		 * count its capacity nevertheless if the cargo matches */
+		bool refittable = e->info.refit_mask.Test(new_cargo_type) && (!auto_refit || e->info.misc_flags.Test(EngineMiscFlag::AutoRefit));
+		if (fit_for_road_vehicles) refittable = true;
+		if (wagon_head != nullptr && wagon_head->carrying != VehicleID::Invalid()) refittable = false;
+
 		if (!refittable && v->cargo_type != new_cargo_type) {
 			uint amount = e->DetermineCapacity(v, nullptr);
 			if (amount > 0) cargo_capacities[v->cargo_type] += amount;

@@ -245,12 +245,14 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 	assert(v == nullptr || this->index == v->engine_type);
 	if (mail_capacity != nullptr) *mail_capacity = 0;
 
-	if (!this->CanCarryCargo()) return 0;
-
-	/* A wagon fitted for road vehicles carries one, whatever its set says
-	 * it holds of anything else, and its articulated parts carry nothing:
-	 * one wagon, one vehicle (CT_ROLA, see road_on_rail.h). */
+	/* A wagon fitted for road vehicles carries one, whatever its set says it
+	 * holds of anything else -- including a flat wagon that declares no cargo
+	 * at all, which is why this comes before the test for that -- and its
+	 * articulated parts carry nothing: one wagon, one vehicle. (CT_ROLA, see
+	 * road_on_rail.h.) */
 	if (v != nullptr && v->cargo_type == _road_vehicle_cargo) return v->IsArticulatedPart() ? 0 : 1;
+
+	if (!this->CanCarryCargo()) return 0;
 
 	bool new_multipliers = this->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier);
 	CargoType default_cargo = this->GetDefaultCargoType();

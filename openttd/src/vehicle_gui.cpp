@@ -878,7 +878,8 @@ struct RefitWindow : public Window {
 		/* And road vehicles (CT_ROLA), offered for any wagon in the set the
 		 * way RefitVehicle() takes it: in no set's refit mask, so not found
 		 * above, and only in a depot, so not for the order refit window. */
-		if (this->order == INVALID_VEH_ORDER_ID && !this->auto_refit && Vehicle::Get(this->window_number)->type == VehicleType::Train) {
+		if (this->order == INVALID_VEH_ORDER_ID && !this->auto_refit && IsValidCargoType(_road_vehicle_cargo) &&
+				Vehicle::Get(this->window_number)->type == VehicleType::Train) {
 			for (const Train *t = Train::Get(this->window_number); t != nullptr; t = t->Next()) {
 				if (std::ranges::find(vehicles_to_refit, t->index) == vehicles_to_refit.end()) continue;
 				if (t->IsArticulatedPart() || RailVehInfo(t->engine_type)->railveh_type != RailVehicleType::Wagon) continue;

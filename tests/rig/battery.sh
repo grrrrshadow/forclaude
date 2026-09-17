@@ -558,19 +558,24 @@ testzatik 1720 testbrzda 2" 6000
 # next (road_on_rail.h): a bus goes to the first station's stop, waits for
 # the shuttle, rides the wagon to the second station, gets off onto its stop
 # there, works the stop, and drives back by road to do it again. Two full
-# rounds in 8000 ticks: auto=4 -- or 0 on a map whose town refuses the road
-# stop, the same way autodve below can come out empty.
+# rounds: auto=4 -- or 0 on a map whose town refuses the road stop, the same
+# way autodve below can come out empty. Twelve thousand ticks and not eight:
+# how long the round takes depends on how far the random map put the road
+# stop from the station, and at eight thousand the second alighting fell off
+# the end on the longer maps, which read as a change in the feature when it
+# was only a change in the map.
 run_scene autovlak "vlak123 on
 testautovlak
 testzatik 200 testokno rozkazy auto
-testzatik 400 testauta" 8000
+testzatik 400 testauta" 12000
 
 # Two road vehicles and one wagon, so one of them always has to wait its turn:
 # the queue the "how many are waiting for a train" condition is about. The
-# first rides twice and the second once in 8000 ticks, so auto=6 -- or 4 when
-# the random map's road is long enough that the second one's turn falls past
-# the end of the scene, or 0 when the town's local authority refuses the road
-# stop and the scene never gets built at all ("road stop failed" in its log).
+# first rides twice and the second once, so auto=6 -- or 4 when the random
+# map's road is long enough that the second one's turn falls past the end of
+# the scene even at twelve thousand ticks (see autovlak above), or 0 when the
+# town's local authority refuses the road stop and the scene never gets built
+# at all ("road stop failed" in its log).
 # Like nakladcekat and zaloz, this one moves between runs; read it, do not
 # chase it, and look in the scene's log before believing a change. The
 # condition sits at the head of the second one's list and is asked as it
@@ -582,7 +587,7 @@ testpodminka auto 2 0 12 4 0 2
 testzatik 400 testauta
 testzatik 420 testpodminka auto 2 zkus 12 4 0
 testzatik 1700 testpodminka auto 2 zkus 12 4 0
-testzatik 3400 testpodminka auto 2 zkus 12 4 0" 8000
+testzatik 3400 testpodminka auto 2 zkus 12 4 0" 12000
 
 # The other way of boarding (road_on_rail.h): the train is a shunter with one
 # order, the first station, where it then stands for good. "Load onto wagons
