@@ -4065,6 +4065,48 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 }
 
 /**
+ * The shape of a train's wagons: how many pieces each one is made of, how long
+ * each piece is and where it sits. A set builds a long wagon out of a visible
+ * head and invisible articulated pieces, so a wagon that looks like one vehicle
+ * on the screen is several here, and anything put "on the wagon" lands on the
+ * head -- at one end of it. Which is what this is for reading.
+ * Usage: testtvar <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestWagonShape(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Print the shape of a train's wagons. Usage: 'testtvar <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+
+	for (const Train *t : Train::Iterate()) {
+		if (!t->IsFrontEngine() || t->unitnumber != (UnitID)*punit) continue;
+		uint index = 0;
+		for (const Train *u = t; u != nullptr; u = u->Next(), index++) {
+			uint pieces = 0, unit_len = 0;
+			if (!u->IsArticulatedPart()) {
+				for (const Train *p = u; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+					pieces++;
+					unit_len += p->gcache.cached_veh_length;
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "testtvar: {:2d} {} delka {} {}poz ({},{},{}) smer {} veze {}",
+					index, u->IsArticulatedPart() ? "cast " : (u->IsEngine() ? "masin" : "vagon"),
+					u->gcache.cached_veh_length,
+					u->IsArticulatedPart() ? "" : fmt::format("(celkem {} v {} kusech) ", unit_len, pieces),
+					u->x_pos, u->y_pos, u->z_pos, (int)u->direction,
+					u->carrying == VehicleID::Invalid() ? -1 : (int)u->carrying.base());
+		}
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testtvar: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * List every vehicle of a train with what it is, for reading a consist
  * headless. Usage: testvozy <unit number>
  * @copydoc IConsoleCmdProc
@@ -8334,6 +8376,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testporucha",             ConTestBreakdown);
 	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
+	IConsole::CmdRegister("testtvar",                ConTestWagonShape);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);

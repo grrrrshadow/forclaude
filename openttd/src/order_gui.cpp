@@ -1432,6 +1432,20 @@ public:
 			this->SetWidgetDisabledState(WID_O_DECOUPLE, !can_decouple ||
 					order->ShouldWaitForCouple() || order->ShouldGoToCouple());
 			this->SetWidgetLoweredState(WID_O_DECOUPLE, decoupling);
+
+			/* Backing out of a station and leaving by itself are a train's
+			 * business, and their two buttons were only ever decided on a
+			 * train's order -- so in a road vehicle's window they sat there
+			 * lit, offering what a lorry cannot do. The row itself has to
+			 * stay: it also carries skipping and deleting, which every
+			 * vehicle needs. So the two are greyed out rather than taken
+			 * away, which is what the player asked for. */
+			if (this->vehicle->type != VehicleType::Train) {
+				this->SetWidgetDisabledState(WID_O_REVERSE_OUT, true);
+				this->SetWidgetLoweredState(WID_O_REVERSE_OUT, false);
+				this->SetWidgetDisabledState(WID_O_AUTO_DEPARTURE, true);
+				this->SetWidgetLoweredState(WID_O_AUTO_DEPARTURE, false);
+			}
 		}
 
 		/* What a coupling order will accept is only worth showing on an order
