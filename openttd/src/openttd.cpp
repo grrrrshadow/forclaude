@@ -137,24 +137,25 @@ void UserErrorI(const std::string &str)
 /* Doxygen in error_func.h */
 void FatalErrorI(const std::string &str)
 {
-	/* Into our own record first, before anything waits for the player.
-	 * Everything below this line needs a click: the box is shown, and only
-	 * once it is dismissed does abort() reach the crash handler that writes
-	 * the report, the savegame and the screenshot. A player who cannot reach
-	 * that button -- the mouse pointer is not drawn outside the box on the
-	 * player's machine, so hitting OK is a matter of luck -- is left with a
-	 * game to kill and nothing written down at all. The record is flushed
-	 * line by line, so this line survives being killed. */
+	/* Into our own record first, before anything else is tried. Whatever
+	 * happens further down -- a handler that writes a report, a window that
+	 * waits for a click, a game killed from the task manager -- this line is
+	 * already on disk, because the record is flushed line by line. */
 	LogAnomaly("KONEC HRY: {}", str);
 
-	/* Set the error message for the crash log before the box, for the same
-	 * reason: a report made by a handler further down still has it. */
+	/* Set the error message for the crash log, and then let the crash handler
+	 * have it. No message box of our own first: that box waits for a click,
+	 * and everything a report is made of -- the log, the savegame, the
+	 * screenshot -- is written by the handler abort() reaches, so a box in
+	 * front of it means a player who cannot click gets no report at all. The
+	 * handler shows a window of its own once it has written everything, so
+	 * nothing is lost by not showing this one; the message is in the report,
+	 * and in our own record above.
+	 *
+	 * This is the whole difference between the two ways a game can end. An
+	 * exception or a failed assertion goes straight to the handler, which is
+	 * why those always produced a report; only this path asked first. */
 	CrashLog::SetErrorMessage(str);
-
-	if (VideoDriver::GetInstance() == nullptr || VideoDriver::GetInstance()->HasGUI()) {
-		ShowOSErrorBox(str, true);
-	}
-
 	abort();
 }
 
