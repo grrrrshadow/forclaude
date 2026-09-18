@@ -8432,6 +8432,46 @@ static bool ConDumpInfo(std::span<std::string_view> argv)
 }
 
 /** Console command registration. */
+/**
+ * Everything worth reading about a game at once, so that a fault caught while
+ * playing needs one word typed and not five.
+ *
+ * The player plays; the game goes wrong; what is wanted then is the whole
+ * picture, and typing five commands from memory with a broken train on the
+ * screen is how half of it gets forgotten. This runs them all in one go --
+ * where every train stands, where it is, what its orders say, whether any
+ * wagon is pointing two ways at once, and the shape of every consist -- and
+ * then 'vlaksav' puts the lot in a file.
+ * Usage: testvse
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestEverything(std::span<std::string_view>)
+{
+	std::array<std::string_view, 1> self{"testvse"};
+
+	IConsolePrint(CC_WARNING, "=== testvse: kde co stoji ===");
+	ConTestCoupleState(self);
+	IConsolePrint(CC_WARNING, "=== testvse: kde jsou vlaky ===");
+	ConTestWhere(self);
+	IConsolePrint(CC_WARNING, "=== testvse: rozkazy ===");
+	ConTestOrders(self);
+	IConsolePrint(CC_WARNING, "=== testvse: natoceni clanku ===");
+	ConTestFacings(self);
+	IConsolePrint(CC_WARNING, "=== testvse: rozkazy aut ===");
+	ConTestRoadOrders(self);
+
+	IConsolePrint(CC_WARNING, "=== testvse: tvar souprav ===");
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFrontEngine()) continue;
+		std::string number = fmt::format("{}", t->unitnumber);
+		std::array<std::string_view, 2> args{"testtvar", number};
+		ConTestWagonShape(args);
+	}
+
+	IConsolePrint(CC_WARNING, "=== testvse: konec. Ulozit: vlaksav ===");
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -8594,6 +8634,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testpauza",               ConTestUnpause);
 	IConsole::CmdRegister("testfiltr",               ConTestCoupleFilter);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
+	IConsole::CmdRegister("testvse",                 ConTestEverything);
 	IConsole::CmdRegister("testpodminka",            ConTestConditionalOrder);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
