@@ -184,6 +184,11 @@ testza 3000 testokno 1
 testnaklad smerovani
 testza 2500 testbrzda 2" 20000
 printf '' > $H/.openttd/scripts/autoexec.scr
+run_scene nakladcil "vlak123 on
+setting linkgraph.distribution_default asymmetric
+testnaklad cil
+testza 4000 testbrzda 1
+testza 9000 testcil" 12000
 run_scene nakladsav "vlak123 on
 unpause
 testza 50 testbrzda 1" 6000 -g $S/s.sav

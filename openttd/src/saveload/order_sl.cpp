@@ -262,6 +262,7 @@ public:
 		SLE_VAR(Order, automatic_departure, VarTypes::BOOL),
 		SLE_VAR(Order, load_on_train, VarTypes::BOOL),
 		SLE_VAR(Order, load_on_wagons, VarTypes::BOOL),
+		SLE_VAR(Order, decouple_cargo_dest, VarTypes::U16),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

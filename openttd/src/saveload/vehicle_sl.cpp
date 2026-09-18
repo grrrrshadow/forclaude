@@ -784,6 +784,7 @@ public:
 		SLE_VAR(Vehicle, current_order.automatic_departure, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.load_on_train, VarTypes::BOOL),
 		SLE_VAR(Vehicle, current_order.load_on_wagons, VarTypes::BOOL),
+		SLE_VAR(Vehicle, current_order.decouple_cargo_dest, VarTypes::U16),
 		SLE_CONDVAR(Vehicle, timetable_start, VarFileType::I32 | VarMemType::U64, SaveLoadVersion::TimetableStart, SaveLoadVersion::TimetableStartTicks),
 		SLE_CONDVAR(Vehicle, timetable_start, VarTypes::U64, SaveLoadVersion::TimetableStartTicks, SaveLoadVersion::MaxVersion),
 

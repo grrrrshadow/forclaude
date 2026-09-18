@@ -1289,7 +1289,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
-					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_LOAD_ON_TRAIN && mof != MOF_LOAD_ON_WAGONS) return CMD_ERROR;
+					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_LOAD_ON_TRAIN && mof != MOF_LOAD_ON_WAGONS &&
+					mof != MOF_DECOUPLE_CARGO_DEST) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1567,6 +1568,21 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			if (data > UINT8_MAX) return CMD_ERROR;
 			break;
+
+		/* Where the cargo the dropped wagons are to load is bound. A station of
+		 * ours that still exists, or nothing at all; the order does not have to
+		 * be a decoupling one yet, because the button that sets this sits beside
+		 * the one that switches decoupling on and the player may press them in
+		 * either order. */
+		case MOF_DECOUPLE_CARGO_DEST:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			if (StationID(data) != StationID::Invalid()) {
+				const Station *st = Station::GetIfValid(StationID(data));
+				if (st == nullptr) return CMD_ERROR;
+				if (st->owner != OWNER_NONE && st->owner != v->owner) return CMD_ERROR;
+			}
+			break;
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -1779,6 +1795,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_COUPLE_COUNT:
 				order->SetCoupleCount(static_cast<uint8_t>(data));
+				break;
+
+			case MOF_DECOUPLE_CARGO_DEST:
+				order->SetDecoupleCargoDest(StationID(data));
 				break;
 
 			default: NOT_REACHED();

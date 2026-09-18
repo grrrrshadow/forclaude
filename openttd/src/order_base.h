@@ -252,6 +252,34 @@ private:
 	 */
 	bool couple_found_rake = false;
 
+	/**
+	 * Which station's cargo the wagons this order puts down are to load while
+	 * they stand and wait for somebody to collect them.
+	 *
+	 * Only for a game with cargo distribution switched on, where cargo waiting
+	 * at a station is sorted by where it is going next and a vehicle is handed
+	 * only what suits its own route. A rake left at a platform has no route --
+	 * its two orders both name the platform it is standing on, so the walk
+	 * that collects "the stations you will stop at" skips them both and comes
+	 * back empty -- and the station therefore hands it nothing but the cargo
+	 * it never found a route for. The player watches wagons stand all day and
+	 * take on a crumb at a time.
+	 *
+	 * This is the player saying where that cargo is bound, so the wagons can
+	 * be filled with something that wants to go there. It buys nothing in a
+	 * game with distribution off, where any cargo goes on any vehicle.
+	 *
+	 * It is not a journey and it promises none: the wagons go wherever the
+	 * engine that collects them is going, which may be somewhere else
+	 * entirely. Cargo carried off the plan's way is simply planned afresh at
+	 * the next station it reaches -- a worse route, never a lost load -- which
+	 * is why this can be a hint rather than a contract.
+	 *
+	 * Dedicated field, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D").
+	 */
+	StationID decouple_cargo_dest = StationID::Invalid();
+
 public:
 	Order() {}
 	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
@@ -351,6 +379,12 @@ public:
 
 	/** Set whether the decoupling drops exactly what the train coupled. */
 	inline void SetDecoupleWholeTrain(bool whole) { this->decouple_whole_train = whole; }
+
+	/** Where the cargo the wagons this order puts down are to load is bound, or StationID::Invalid() for no such hint. See #decouple_cargo_dest. */
+	inline StationID GetDecoupleCargoDest() const { return this->decouple_cargo_dest; }
+
+	/** Set where the cargo the dropped wagons are to load is bound; StationID::Invalid() clears it. */
+	inline void SetDecoupleCargoDest(StationID dest) { this->decouple_cargo_dest = dest; }
 
 	/**
 	 * Convert an order written under the old single count into the switch and

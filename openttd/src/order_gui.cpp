@@ -42,6 +42,22 @@
 
 #include "safeguards.h"
 
+/**
+ * Is cargo distribution switched on for anything in this game?
+ *
+ * Four settings, one per kind of cargo, and any of them above "manual" means
+ * the game sorts waiting cargo by where it is going and hands a vehicle only
+ * what suits its route. That is the whole reason a rake left at a platform
+ * needs to be told where its load is bound; with all four off, every load is
+ * offered to everybody and saying it buys nothing.
+ */
+static bool IsCargoDistributionOn()
+{
+	const LinkGraphSettings &lg = _settings_game.linkgraph;
+	return lg.distribution_pax != DistributionType::Manual || lg.distribution_mail != DistributionType::Manual ||
+			lg.distribution_armoured != DistributionType::Manual || lg.distribution_default != DistributionType::Manual;
+}
+
 
 /** Order load types that could be given to station orders. */
 static const StringID _station_load_types[][5][5] = {
@@ -388,6 +404,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					} else {
 						second += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DECOUPLE_SUFFIX_ALL : STR_ORDER_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 					}
+					/* And where their load is bound, on the same line: it is one
+					 * of the things this order does, and a button only ever
+					 * speaks for the one order that is selected. */
+					if (order->GetDecoupleCargoDest() != StationID::Invalid() && Station::IsValidID(order->GetDecoupleCargoDest())) {
+						second += GetString(STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX, order->GetDecoupleCargoDest());
+					}
 				}
 
 				/* Reversing out is about where the train goes next, not about
@@ -694,6 +716,7 @@ private:
 		OPOS_GOTO,
 		OPOS_CONDITIONAL,
 		OPOS_SHARE,
+		OPOS_DECOUPLE_DEST, ///< Picking the station whose cargo a decoupling order's wagons are to load.
 		OPOS_END,
 	};
 
@@ -799,6 +822,7 @@ private:
 			HT_RECT | HT_VEHICLE, // OPOS_GOTO
 			HT_NONE,              // OPOS_CONDITIONAL
 			HT_VEHICLE,           // OPOS_SHARE
+			HT_RECT,              // OPOS_DECOUPLE_DEST
 		};
 		SetObjectToPlaceWnd(ANIMCURSOR_PICKSTATION, PAL_NONE, goto_place_style[type - 1], this);
 		this->goto_type = type;
@@ -1014,6 +1038,11 @@ public:
 		 * means it is built the right height from the first frame. */
 		if (NWidgetStacked *filter_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_COUPLE_FILTER); filter_sel != nullptr) {
 			filter_sel->SetDisplayedPlane(SZSP_NONE);
+		}
+		/* And the same for the row that says where a decoupling order's wagons
+		 * are to load for. */
+		if (NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST); dest_sel != nullptr) {
+			dest_sel->SetDisplayedPlane(SZSP_NONE);
 		}
 		this->FinishInitNested(v->index);
 
@@ -1466,6 +1495,23 @@ public:
 			if (filter_sel->SetDisplayedPlane(collecting ? 0 : SZSP_NONE)) this->couple_filter_resized = true;
 		}
 
+		/* Where the wagons an order puts down are to load for. Same reasoning as
+		 * the filter row: only on an order that is going to put wagons down. */
+		NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST);
+		if (dest_sel != nullptr) {
+			bool dropping = this->vehicle->type == VehicleType::Train && order != nullptr &&
+					order->IsType(OT_GOTO_STATION) && order->ShouldDecoupleOnDeparture();
+			if (dest_sel->SetDisplayedPlane(dropping ? 0 : SZSP_NONE)) this->couple_filter_resized = true;
+			if (dropping) {
+				/* It says nothing in a game where cargo goes on whatever comes:
+				 * there the station hands every load to every vehicle and the
+				 * wagons fill up on their own. Greyed rather than hidden, so a
+				 * player who wonders where it went can see it is there and,
+				 * from the tooltip, why it is not his to press. */
+				this->SetWidgetDisabledState(WID_O_DECOUPLE_CARGO_DEST, !IsCargoDistributionOn());
+			}
+		}
+
 		this->SetDirty();
 	}
 
@@ -1593,6 +1639,14 @@ public:
 				return GetString(STR_ORDER_COUPLE_COUNT_BUTTON, order->GetCoupleCount());
 			}
 
+			case WID_O_DECOUPLE_CARGO_DEST: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) return {};
+				StationID dest = order->GetDecoupleCargoDest();
+				if (dest == StationID::Invalid() || !Station::IsValidID(dest)) return GetString(STR_ORDER_DECOUPLE_CARGO_DEST_NONE);
+				return GetString(STR_ORDER_DECOUPLE_CARGO_DEST, dest);
+			}
+
 			default:
 				return this->Window::GetWidgetString(widget, stringid);
 		}
@@ -1690,6 +1744,9 @@ public:
 						case OPOS_GOTO:        sel =  0; break;
 						case OPOS_CONDITIONAL: sel =  2; break;
 						case OPOS_SHARE:       sel =  3; break;
+						/* Picking a station for a decoupling order is not one of
+						 * this dropdown's entries; nothing in it is selected. */
+						case OPOS_DECOUPLE_DEST: sel = -1; break;
 						default: NOT_REACHED();
 					}
 					ShowDropDownMenu(this, this->vehicle->type == VehicleType::Aircraft ? _order_goto_dropdown_aircraft : _order_goto_dropdown, sel, WID_O_GOTO, 0, 0);
@@ -1964,6 +2021,23 @@ public:
 				break;
 			}
 
+			case WID_O_DECOUPLE_CARGO_DEST: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				/* Set, the button takes it back off; the same gesture as the
+				 * decouple switch beside it. Unset, it puts the pointer into
+				 * station-picking, because a station is picked on the map here
+				 * exactly as it is for a "go to" order -- there is nothing new
+				 * to learn. */
+				if (order->GetDecoupleCargoDest() != StationID::Invalid()) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+							this->OrderGetSel(), MOF_DECOUPLE_CARGO_DEST, StationID::Invalid().base());
+					break;
+				}
+				this->OrderClick_Goto(OPOS_DECOUPLE_DEST);
+				break;
+			}
+
 			case WID_O_SHARED_ORDER_LIST:
 				ShowVehicleListWindow(this->vehicle);
 				break;
@@ -2155,6 +2229,24 @@ public:
 
 	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
 	{
+		if (this->goto_type == OPOS_DECOUPLE_DEST) {
+			/* A station of ours under the pointer, read the same way a "go to"
+			 * order reads one. Anything else -- open land, somebody else's
+			 * station -- is not an answer, so the pointer stays loaded and the
+			 * player can try again rather than having the picking silently
+			 * end on a misclick. */
+			if (!IsTileType(tile, TileType::Station)) return;
+			StationID st = GetStationIndex(tile);
+			const Station *station = Station::GetIfValid(st);
+			if (station == nullptr || (station->owner != OWNER_NONE && station->owner != this->vehicle->owner)) return;
+
+			if (Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+					this->OrderGetSel(), MOF_DECOUPLE_CARGO_DEST, st.base())) {
+				ResetObjectToPlace();
+			}
+			return;
+		}
+
 		if (this->goto_type == OPOS_GOTO) {
 			const Order cmd = GetOrderCmdFromTile(this->vehicle, tile);
 			if (cmd.IsType(OT_NOTHING)) return;
@@ -2428,6 +2520,16 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetToolTip(STR_ORDER_COUPLE_CARGO_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_COUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_COUPLE_COUNT_BUTTON, STR_ORDER_COUPLE_COUNT_TOOLTIP), SetResize(1, 0),
+		EndContainer(),
+	EndContainer(),
+
+	/* Where the cargo of the wagons this order puts down is bound. Only there
+	 * while an order is actually going to put some down, the same way the
+	 * couple filter above is only there while one is going to collect. */
+	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE_DEST),
+		NWidget(NWID_HORIZONTAL),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_CARGO_DEST), SetMinimalSize(372, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_DECOUPLE_CARGO_DEST_NONE, STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

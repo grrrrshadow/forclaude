@@ -6755,8 +6755,11 @@ static StationID StationUnderChain(const Train *chain)
  * @param station     the station it is standing at
  * @param load_type   how the wagons load while they stand here
  * @param unload_type how they unload
+ * @param cargo_dest  where the cargo they are to load is bound, or
+ *                    StationID::Invalid() for no such hint (see the third
+ *                    order below and Order::decouple_cargo_dest)
  */
-static void LeaveRakeWaitingAtStation(Train *rake, StationID station, OrderLoadType load_type, OrderUnloadType unload_type)
+static void LeaveRakeWaitingAtStation(Train *rake, StationID station, OrderLoadType load_type, OrderUnloadType unload_type, StationID cargo_dest = StationID::Invalid())
 {
 	rake->current_order.MakeGoToStation(station);
 	/* The wagons keep being handled the way the train was told to handle
@@ -6815,6 +6818,36 @@ static void LeaveRakeWaitingAtStation(Train *rake, StationID station, OrderLoadT
 		InsertOrder(rake, std::move(waiting), 1);
 		rake->cur_real_order_index = rake->cur_implicit_order_index =
 				rake->current_order.ShouldWaitForCouple() ? 1 : 0;
+
+		/* And, if the player said where the load is bound, a third order
+		 * naming that station. The rake never reaches it -- it has no engine,
+		 * and the waiting order it sits on is one it never moves off (see
+		 * Train::Tick(), which only advances a rake that is NOT waiting for a
+		 * couple). It is there to be read, by the one thing that reads an
+		 * order list without driving it: the walk that answers "which stations
+		 * will you stop at", which is what a station hands its cargo out by.
+		 *
+		 * That walk skips every order naming the station the vehicle is
+		 * already at and stops at the first one that names another -- which is
+		 * exactly why the two orders above answer nothing at all, both naming
+		 * this platform. This third one is the first that names somewhere
+		 * else, so it is the answer, and the wagons are handed the cargo that
+		 * wants to go there. Nothing else in the game is told anything new.
+		 *
+		 * Only worth writing in a game with cargo distribution on; with it off
+		 * every load is offered to everybody and this would say nothing. */
+		if (cargo_dest != StationID::Invalid() && cargo_dest != station) {
+			Order bound{};
+			bound.MakeGoToStation(cargo_dest);
+			/* Left to load and unload as an ordinary stop would, because the
+			 * walk skips any order that can do neither (Order::CanLoadOrUnload(),
+			 * asked by OrderList::GetNextDecisionNode()). Written with "load
+			 * nothing, unload nothing" -- which is what it does, since the rake
+			 * never gets there -- the walk stepped straight over it and the
+			 * whole thing said nothing at all. It is a name to be read, and it
+			 * has to look like a stop to be read as one. */
+			InsertOrder(rake, std::move(bound), 2);
+		}
 	}
 }
 
@@ -6980,9 +7013,12 @@ Train *FindCoupledBoundary(Train *v)
  *                   when no coupling is remembered
  * @param hold_ticks how long the put-down rake stands idle before it starts
  *                   its job -- the decouple order's timetabled stay
+ * @param cargo_dest where the cargo the put-down wagons are to load is bound,
+ *                   or StationID::Invalid() for no such hint; see
+ *                   Order::decouple_cargo_dest
  * @return whether the train was actually split
  */
-bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks)
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest)
 {
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
@@ -7375,7 +7411,7 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 	}
 	if (on_platform != INVALID_TILE) {
 		StationID station = GetStationIndex(on_platform);
-		LeaveRakeWaitingAtStation(remainder, station, load_type, unload_type);
+		LeaveRakeWaitingAtStation(remainder, station, load_type, unload_type, cargo_dest);
 
 		/* Until the engine that put them down has pulled clear, the wagons
 		 * are not on offer: a collector sent now would find the platform
@@ -11672,7 +11708,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (order_names_here && TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
 						consist->current_order.ShouldDecoupleWholeTrain(),
 						real_order->GetLoadType(), real_order->GetUnloadType(),
-						real_order->GetTimetabledWait())) {
+						real_order->GetTimetabledWait(), real_order->GetDecoupleCargoDest())) {
 			/* The order's timetabled stay was just handed to the rake -- the
 			 * point of the stay is that the wagons stand out a spell, not
 			 * that the engine sits coupled to them watching it pass. The

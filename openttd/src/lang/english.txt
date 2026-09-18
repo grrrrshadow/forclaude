@@ -4937,6 +4937,9 @@ STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(and dro
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL                             :{SPACE}(drop them all)
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}How many wagons stay on with the engine (0 = drop them all)
 STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Decouple the whole coupled train
+STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Load the dropped wagons for: anywhere
+STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Load the dropped wagons for: {STATION}
+STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Where the cargo these wagons are to load is bound. Only does anything with cargo distribution switched on: there a station sorts what is waiting by where it goes next and hands a vehicle only what suits its route, and wagons left standing with no engine have no route, so they are handed nothing. This is where you say it for them. It is not a journey and promises none - the wagons go wherever the engine that collects them goes, and cargo carried the wrong way is simply planned afresh at the next station. Greyed out when cargo distribution is off everywhere, because then every load is offered to everybody anyway
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(and drop the coupled train)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(drop the coupled train)
 
@@ -4988,6 +4991,7 @@ STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wai
 STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(load onto train)
 STR_ORDER_LOAD_ON_WAGONS_SUFFIX                                 :{SPACE}(load onto wagons)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})
+STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX                            :, and load the dropped ones for {STATION}
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(keep {NUM})
 STR_ORDER_DEPOT_COUPLE_SUFFIX                                   :{SPACE}(couple)
 STR_ORDER_DEPOT_COUPLE_SUFFIX_AND                               :{SPACE}(and couple)

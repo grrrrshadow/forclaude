@@ -56,6 +56,8 @@ enum OrderWidgets : WidgetID {
 	WID_O_COUPLE_LOAD,               ///< Choose how full the wagons to be collected have to be.
 	WID_O_COUPLE_CARGO,              ///< Choose which cargo the wagons to be collected have to carry.
 	WID_O_COUPLE_COUNT,              ///< Set how many vehicles the rake to be collected has to have.
+	WID_O_SEL_DECOUPLE_DEST,         ///< #NWID_SELECTION widget for the row saying where the cargo of the wagons this order puts down is bound, shown once it is going to put some down.
+	WID_O_DECOUPLE_CARGO_DEST,       ///< Pick the station whose cargo the wagons this order puts down are to load.
 };
 
 #endif /* WIDGETS_ORDER_WIDGET_H */

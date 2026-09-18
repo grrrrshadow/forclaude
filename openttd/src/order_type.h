@@ -208,6 +208,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_COUPLE_MAX,      ///< Toggle whether the couple count is a maximum: a rake of up to that many vehicles will do.
 	MOF_LOAD_ON_TRAIN,   ///< Toggle whether a road vehicle boards a train at this station instead of driving on (see road_on_rail.h).
 	MOF_LOAD_ON_WAGONS,  ///< Toggle whether a road vehicle boards any fitted wagon standing at this station, wherever it is going (see road_on_rail.h).
+	MOF_DECOUPLE_CARGO_DEST,///< Passes the StationID whose cargo the wagons this order puts down are to load, or StationID::Invalid() for none.
 	MOF_END
 };
 

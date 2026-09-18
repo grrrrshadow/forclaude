@@ -2050,6 +2050,12 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 	}
 	bool wait_mode = argv.size() >= 2 && argv[1] == "cekat";
 	bool waypoint_mode = argv.size() >= 2 && argv[1] == "smerovani";
+	/* 'cil' is the plain scene with the decouple order carrying a station for
+	 * the wagons it puts down to load for -- the thing a rake left standing
+	 * has no way of knowing on its own. A second station is built up the line
+	 * to be that answer; nothing ever drives to it, it is there to be named.
+	 * Read the result with 'testcil'. */
+	bool dest_mode = argv.size() >= 2 && argv[1] == "cil";
 
 	if (Company::GetIfValid(_local_company) == nullptr) {
 		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
@@ -2331,6 +2337,22 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 		deliver.SetUnloadType(OrderUnloadType::Transfer);
 		deliver.SetDecouple(true);
 		deliver.SetDecoupleCount(0);
+		/* 'cil': and where the wagons it leaves behind are to load for. A
+		 * second station up the line, built only to have a name to give --
+		 * no train ever goes there. What is being measured is whether the
+		 * put-down rake ends up with an order naming it and whether the walk
+		 * that hands out cargo finds it; 'testcil' says both. */
+		if (dest_mode) {
+			TileIndex far_tile = TileXY(x0 + 8, y0);
+			if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, far_tile, RAILTYPE_RAIL, Axis::X, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed()) {
+				IConsolePrint(CC_ERROR, "testnaklad cil: druha stanice se nepostavila.");
+				return true;
+			}
+			UpdateSignalsInBuffer();
+			deliver.SetDecoupleCargoDest(GetStationIndex(far_tile));
+			IConsolePrint(CC_DEFAULT, "testnaklad cil: odpojene se maji nakladat pro stanici {} na ({},{}).",
+					GetStationIndex(far_tile), x0 + 8, y0);
+		}
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh1, 2, deliver);
 		Order home_e;
 		home_e.MakeGoToDepot(DestinationID(dep_e), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlag::Halt);
@@ -4568,6 +4590,55 @@ static bool ConTestRequestTow(std::span<std::string_view> argv)
 		done++;
 	}
 	if (done == 0) IConsolePrint(CC_ERROR, "testodvoz: zadna cekajici rada.");
+	return true;
+}
+
+/**
+ * Say what every rake standing and waiting is loading for: the orders it was
+ * left with, and the answer the game gets when it asks that rake which
+ * stations it will stop at -- which is what a station hands its cargo out by.
+ *
+ * Both halves matter and they are not the same question. A rake gets two
+ * orders when it is put down, both naming the platform it is standing on, and
+ * the walk that answers "which stations will you stop at" skips every order
+ * naming the station the vehicle is already at. So those two answer nothing,
+ * and with cargo distribution on the station hands such a rake only the cargo
+ * it never found a route for. A third order naming somewhere else is the
+ * answer, and this is how to see whether it is there and whether the walk
+ * finds it. Usage: testcil
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRakeCargoDest(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Say what each waiting rake is loading for. Usage: 'testcil'.");
+		return true;
+	}
+	uint seen = 0;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || !t->IsFreeWagon()) continue;
+		seen++;
+		std::vector<StationID> next;
+		t->GetNextStoppingStation(next);
+		std::string stops;
+		for (StationID s : next) {
+			if (!stops.empty()) stops += ", ";
+			stops += fmt::format("{}", s);
+		}
+		if (stops.empty()) stops = "zadna";
+		IConsolePrint(CC_DEFAULT, "testcil: rada {} na ({},{}) - rozkazu {}, rozkaz c.{}, ceka {}, zastavky pro nakladku: {}",
+				t->index.base(), TileX(t->tile), TileY(t->tile), t->GetNumOrders(), t->cur_real_order_index,
+				t->current_order.ShouldWaitForCouple() ? "ano" : "ne", stops);
+		/* Into the record, so the battery's own counter catches it: a rake
+		 * carrying the third order and still answering nothing is the one way
+		 * this can quietly stop working. It did exactly that once already --
+		 * the order was written as "load nothing, unload nothing" and the walk
+		 * stepped over it -- and nothing but this line would have said so. */
+		if (t->GetNumOrders() > 2 && next.empty()) {
+			LogAnomaly("Rada {}: ma rozkaz s cilem nakladky, ale zadnou zastavku pro nakladku nehlasi", t->index.base());
+		}
+	}
+	if (seen == 0) IConsolePrint(CC_ERROR, "testcil: zadna odpojena rada.");
 	return true;
 }
 
@@ -8695,6 +8766,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testminimalne",           ConTestCoupleMin);
 	IConsole::CmdRegister("testmaximalne",           ConTestCoupleMax);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
+	IConsole::CmdRegister("testcil",                 ConTestRakeCargoDest);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);
 	IConsole::CmdRegister("testsleduj",              ConTestFollow);
