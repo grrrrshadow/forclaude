@@ -1417,8 +1417,16 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	bool store_mode = false;
 	bool found_mode = false;
 	bool waypoint_mode = false;
+	/* 'tendr' gives the collector an engine that carries its tender as an
+	 * articulated part -- a steam engine, the whole of it one vehicle. Such a
+	 * consist is a single unit and its list cannot be turned round, so meeting
+	 * the rake nose first is the one coupling the game used to refuse. Nothing
+	 * in the rig ever built one: the default set has no engine with a tender,
+	 * so this scene wants a set that does (the rig's h2 home). */
+	bool tender_mode = false;
 	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
+		if (argv[i] == "tendr") tender_mode = true;
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
@@ -1480,6 +1488,10 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * only way to put two separate rakes in one shed is to make them of
 	 * different stock. Which is the ordinary case in a real game anyway. */
 	EngineID eid_wagon2 = EngineID::Invalid();
+	/* The collector's engine in 'tendr': one that brings a tender along as an
+	 * articulated part. Kept apart from eid_loco so the deliverer stays an
+	 * ordinary engine and only the collector is the awkward one. */
+	EngineID eid_tender = EngineID::Invalid();
 	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
@@ -1491,8 +1503,13 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 			}
 		} else {
 			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
+			if (eid_tender == EngineID::Invalid() && CountArticulatedParts(e->index) > 0) eid_tender = e->index;
 		}
-		if (eid_loco != EngineID::Invalid() && eid_wagon2 != EngineID::Invalid()) break;
+		if (eid_loco != EngineID::Invalid() && eid_wagon2 != EngineID::Invalid() && (!tender_mode || eid_tender != EngineID::Invalid())) break;
+	}
+	if (tender_mode && eid_tender == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testspoj tendr: v teto hre neni zadna masinka s tendrem (kloubova). Chce to sadu, ktera ji ma.");
+		return true;
 	}
 	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
 		IConsolePrint(CC_ERROR, "testspoj: no available engine or wagon.");
@@ -1854,10 +1871,14 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	/* The collector: a light engine sent to couple, with its next stop lying
 	 * behind it -- the depot it starts from -- which is the exact shape of the
 	 * player's failing case. */
-	auto [cost1, veh1, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, parked ? depot_w : depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+	auto [cost1, veh1, unused_g, unused_h, unused_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, parked ? depot_w : depot_e, tender_mode ? eid_tender : eid_loco, true, INVALID_CARGO, ClientID::Invalid);
 	if (cost1.Failed()) {
 		IConsolePrint(CC_ERROR, "testspoj: engine 1 failed.");
 		return true;
+	}
+	if (tender_mode) {
+		IConsolePrint(CC_DEFAULT, "testspoj tendr: sberacka je vlak {}, {} clanku - jede na radu nosem napred.",
+				Train::Get(veh1)->unitnumber, CountArticulatedParts(eid_tender) + 1);
 	}
 	Order collect;
 	if (depot_mode) {

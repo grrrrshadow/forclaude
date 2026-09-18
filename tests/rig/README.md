@@ -184,3 +184,30 @@ The scene then picks the longest wagon the game has -- the one built of the
 most pieces -- rather than the car carrier, because nothing shorter than the
 lorry can carry it. Four rides in nine thousand ticks, and the trailer is put
 down on the road behind its lorry and drives on at its own length behind it.
+
+## A steam engine with its tender, which needs a set that has one
+
+The game's own engines are all one vehicle, so nothing in a plain rig run
+ever built a consist that is a single articulated unit -- an engine whose
+tender comes along as a part of it. That shape is the one coupling the game
+used to refuse outright, and the refusal was never measured: `testspoj tendr`
+measures it. It needs the same home as the lorry scene, or any home with a
+set of steam engines in it:
+
+    <home>/.openttd/newgrf/   4d490207-cztr_engines_steam-1.0.2.tar
+                              4d490213-cztr_wagons_cargo-1.1.0.tar
+    openttd.cfg               landscape = temperate, starting_year = 1930
+
+Without such a set the scene says so and stops, which is why it is not in the
+battery: on the game's own engines there is nothing to build it with.
+
+Two runs to make:
+
+    testspoj tendr            the collector meets the rake nose first
+    testspoj tendr couvej     it backs onto the rake instead
+
+The second is the way that works, and it couples clean. The first is the
+awkward one: the collector is one unit, so its list cannot be turned round,
+and a list that has the tender next to the wagons while the engine is what
+physically stands there cannot be walked shut. Seventeen broken steps, the
+same seventeen in every run.
