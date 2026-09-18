@@ -38,6 +38,22 @@ void ConnectMultiheadedTrains()
 		v->other_multiheaded_part = nullptr;
 	}
 
+	/* A steam engine and its tender made into a pair (MakeTenderRearHead())
+	 * are paired by standing next to each other, not by engine type: the
+	 * tender keeps its own type, for its picture, and the matching below
+	 * pairs only like with like -- and, finding a rear head with no partner,
+	 * makes an engine of it. Done first, so that the matching below finds
+	 * both already linked and passes them by. The tender is always the next
+	 * vehicle: nothing can be put between the two. */
+	for (Train *v : Train::Iterate()) {
+		if (!v->flags.Test(VehicleRailFlag::TenderPair) || !v->IsMultiheaded() || v->other_multiheaded_part != nullptr) continue;
+		Train *w = v->Next();
+		if (w == nullptr || !w->flags.Test(VehicleRailFlag::TenderPair) || !w->IsMultiheaded() || w->other_multiheaded_part != nullptr) continue;
+		if (v->IsEngine() == w->IsEngine()) continue;
+		v->other_multiheaded_part = w;
+		w->other_multiheaded_part = v;
+	}
+
 	for (Train *v : Train::Iterate()) {
 		if (v->IsFrontEngine() || v->IsFreeWagon()) {
 			/* Two ways to associate multiheaded parts to each other:

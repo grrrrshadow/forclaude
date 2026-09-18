@@ -1034,6 +1034,14 @@ bool AfterLoadGame()
 	 * subtype to the new format */
 	if (IsSavegameVersionBefore(SaveLoadVersion::StoreWaypointIdInMap, 1)) ConvertOldMultiheadToNew();
 
+	/* A steam engine saved with its tender as an articulated part is made
+	 * into a pair here, the same way a newly built one is
+	 * (MakeTenderRearHead()); the linking is done just below. Every game
+	 * loaded, not only old ones: a set may add a tender to an engine that
+	 * had none, and the rule is one rule. */
+	CrashLog::SetStage("afterload: MakeTenderRearHead");
+	for (Train *t : Train::Iterate()) MakeTenderRearHead(t);
+
 	/* Connect front and rear engines of multiheaded trains */
 	CrashLog::SetStage("afterload: ConnectMultiheadedTrains");
 	ConnectMultiheadedTrains();

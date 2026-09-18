@@ -293,7 +293,10 @@ static CommandCost GetNewEngineType(const Vehicle *v, const Company *c, bool alw
 	}
 
 	bool replace_when_old;
-	e = EngineReplacementForCompany(c, v->engine_type, v->group_id, &replace_when_old);
+	/* A train running tender first has its tender at the head of the list;
+	 * the engine to look a replacement up for is the one behind it. */
+	EngineID lookup = v->type == VehicleType::Train ? Train::From(v)->GetPairEngine()->engine_type : v->engine_type;
+	e = EngineReplacementForCompany(c, lookup, v->group_id, &replace_when_old);
 	if (!always_replace && replace_when_old && !v->NeedsAutorenewing(c, false)) e = EngineID::Invalid();
 
 	/* Autoreplace, if engine is available */

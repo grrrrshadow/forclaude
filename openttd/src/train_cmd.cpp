@@ -147,7 +147,9 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 		u->gcache.first_engine = this == u ? EngineID::Invalid() : first_engine;
 		u->railtypes = rvi_u->railtypes;
 
-		if (u->IsEngine()) first_engine = u->engine_type;
+		/* The engine of a tender pair running tender first is the engine
+		 * behind the tender, not the tender at the head of the list. */
+		if (u->IsEngine()) first_engine = u->GetPairEngine()->engine_type;
 
 		/* Set user defined data to its default value */
 		u->tcache.user_def_data = rvi_u->user_def_data;
@@ -186,7 +188,10 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 			u->flags.Reset(VehicleRailFlag::PoweredWagon);
 		}
 
-		if (!u->IsArticulatedPart()) {
+		/* Nor a tender made into a rear head: the articulated part it was, in
+		 * everything but the list. Its set never meant its speed limit or its
+		 * railtypes to be read. */
+		if (!u->IsArticulatedPart() && !u->IsTender()) {
 			/* Do not count powered wagons for the compatible railtypes, as wagons always
 			   have railtype normal */
 			if (rvi_u->power > 0) {
@@ -217,7 +222,7 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 		 * regularly register tenders and other articulated pieces of an
 		 * engine as wagon-typed, and those are still the engine. */
 		if (_settings_game.vehicle.no_engine_cargo &&
-				RailVehInfo(u->GetFirstEnginePart()->engine_type)->railveh_type != RailVehicleType::Wagon) {
+				RailVehInfo((u->IsTender() ? u->other_multiheaded_part : u->GetFirstEnginePart())->engine_type)->railveh_type != RailVehicleType::Wagon) {
 			new_cap = 0;
 		}
 		if (allowed_changes.Test(ConsistChangeFlag::Capacity)) {
@@ -1526,6 +1531,61 @@ static void AddRearEngineToMultiheadedTrain(Train *v)
 }
 
 /**
+ * Make a steam engine's tender into that engine's rear head, so that the pair
+ * can be turned round in the list the way a two-headed engine can.
+ *
+ * An engine and its tender come out of a set as one vehicle with one
+ * articulated part, and a list is turned round unit by unit: an articulated
+ * part follows its head whichever way the unit stands on the rails, so such a
+ * list cannot be turned round at all. Meeting a rake nose first, the list
+ * would then end at the tender while the engine is what physically stands
+ * against the wagons, and the walk that closes the gap after a coupling
+ * pulled the tender through the engine. That coupling had to be refused.
+ *
+ * A two-headed engine has no such trouble: its two heads are two vehicles,
+ * and turning the list round swaps their roles and nothing on the ground
+ * (SwapDualHeadRoles()). So the tender becomes a rear head. It keeps its own
+ * engine type, and with it its own picture; it contributes nothing -- no
+ * power, no weight, no running cost -- exactly as the articulated part it
+ * was; and the engine is not halved the way a real dual head's is, since it
+ * is the whole engine. Both carry VehicleRailFlag::TenderPair so that every
+ * place which treats dual heads specially can tell this pair from a real
+ * one, and so that the pair is found again on load
+ * (ConnectMultiheadedTrains()); the tender alone carries
+ * VehicleRailFlag::Tender, because which of the two is the tender is a fact
+ * about the vehicle and not about its place in the list -- turned round, the
+ * tender is the front head and the engine the rear one.
+ *
+ * Only an engine with exactly one articulated part. A longer articulated
+ * engine keeps its parts and the refusal: turning such a unit round would
+ * mean the parts trading places on the ground, and for an engine that is
+ * visible.
+ *
+ * Nothing is asked of the set: the player wants this for every set, and no
+ * set is going to be rewritten for it.
+ *
+ * @param engine the engine, just built with its parts, or freshly loaded
+ * @return whether it was made into a pair
+ */
+bool MakeTenderRearHead(Train *engine)
+{
+	if (!engine->IsEngine() || engine->IsMultiheaded() || engine->IsArticulatedPart()) return false;
+	if (!engine->HasArticulatedPart()) return false;
+	Train *tender = engine->GetNextArticulatedPart();
+	if (tender->HasArticulatedPart()) return false;
+
+	tender->ClearArticulatedPart();
+	tender->SetMultiheaded();
+	engine->SetMultiheaded();
+	tender->flags.Set(VehicleRailFlag::TenderPair);
+	engine->flags.Set(VehicleRailFlag::TenderPair);
+	tender->flags.Set(VehicleRailFlag::Tender);
+	engine->other_multiheaded_part = tender;
+	tender->other_multiheaded_part = engine;
+	return true;
+}
+
+/**
  * Build a railroad vehicle.
  * @param flags    type of operation.
  * @param tile     tile of the depot where rail-vehicle is built.
@@ -1603,7 +1663,15 @@ CommandCost CmdBuildRailVehicle(DoCommandFlags flags, TileIndex tile, const Engi
 		v->ConsistChanged(CCF_ARRANGE);
 		UpdateTrainGroupID(v);
 
+		/* Asked about the parts as the set made them and once the consist
+		 * has settled its capacities -- before a tender is made into a rear
+		 * head and stops counting as a part. Asked after the conversion, the
+		 * walk stopped short of the tender, the refit masks no longer added
+		 * up to the purchase list's, and the set was blamed for it: a warning
+		 * on every steam engine bought, and with it vanilla's pause on a set
+		 * error, which is what froze the rig. */
 		CheckConsistencyOfArticulatedVehicle(v);
+		if (MakeTenderRearHead(v)) v->ConsistChanged(CCF_ARRANGE);
 	}
 
 	return CommandCost();
@@ -1718,6 +1786,21 @@ static void NormaliseDualHeads(Train *t)
 {
 	for (; t != nullptr; t = t->GetNextVehicle()) {
 		if (!t->IsMultiheaded() || !t->IsEngine()) continue;
+
+		/* A steam engine's tender made into its rear head (MakeTenderRearHead())
+		 * is not a second cab for the far end of the train: it stays glued to
+		 * the engine, and wagons hang off the tender. The rule below -- the
+		 * rear head goes behind every wagon that follows -- is right for a
+		 * two-cab set and put the tender at the tail of the train, wagons
+		 * between engine and tender, the first time wagons were added in a
+		 * shed. The player had asked whether exactly that would happen. */
+		if (t->flags.Test(VehicleRailFlag::TenderPair)) {
+			Train *tender = t->other_multiheaded_part;
+			if (tender == nullptr || t->Next() == tender) continue;
+			RemoveFromConsist(tender);
+			InsertInConsist(t, tender);
+			continue;
+		}
 
 		/* Make sure that there are no free cars before next engine */
 		Train *u;
@@ -6345,15 +6428,18 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * stands here, the window says why (IsCoupleHeldNoseFirst()), and the
 	 * player turns it round -- or stops turning it round on the way.
 	 *
-	 * TEMPORARY: the refusal is off, the record still says it happened. The
-	 * hold was put in because the coupling that follows it came apart, and
-	 * since then the reason one came apart has been found and mended, so the
-	 * question is open again: the way to answer it is to let the coupling
-	 * through and watch. Not for a player -- this can end the game. Put the
-	 * refusal back, or take the hold out for good, once we know. */
+	 * Since MakeTenderRearHead() this no longer applies to a steam engine with
+	 * a tender: the pair is two heads and its list turns round like any
+	 * other, and the coupling goes through nose first and clean (measured by
+	 * 'testspoj tendr'). What is left under it is an engine built of more
+	 * than one articulated part, which is deliberately not made into a pair,
+	 * and for that the refusal is as true as it ever was. It was switched
+	 * off for an afternoon to watch what it was holding back, and what it
+	 * was holding back was seventeen broken steps. */
 	if (!ConsistCanBeRelinked(leading) && MeetsOtherHeadEndFirst(leading, trailing)) {
-		LogAnomaly("Vlak {}: spojeni nosem napred - masinka s tendrem je jeden vuz a vozy jdou jen za tendr; stoji na ({},{}) a ceka na otoceni",
+		LogAnomaly("Vlak {}: spojeni nosem napred - kloubova masinka je jeden vuz a vozy jdou jen za jeji posledni clanek; stoji na ({},{}) a ceka na otoceni",
 				leading->unitnumber, TileX(leading->tile), TileY(leading->tile));
+		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
 	}
 
 	/* Said here rather than above, where it is worked out: a train standing
@@ -6420,10 +6506,9 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * cleanly: a casualty about to be straightened is laid down head nearest
 	 * the tow (LayCasualtyAlongTow()), so it never needs turning. */
 	if (ends_clean && !ConsistCanBeRelinked(trailing) && !MeetsOtherHeadEndFirst(trailing, leading)) {
-		/* TEMPORARY, and for the same reason as the one above: off to see
-		 * what the coupling does now. */
-		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz - seznam se otocit neda, spojeni pousteno pres zakaz",
+		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz - seznam se otocit neda, spojeni odmitnuto",
 				leading->unitnumber, trailing->unitnumber);
+		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -12382,8 +12467,11 @@ Money Train::GetRunningCost() const
 		uint cost_factor = GetVehicleProperty(v, PROP_TRAIN_RUNNING_COST_FACTOR, e->VehInfo<RailVehicleInfo>().running_cost);
 		if (cost_factor == 0) continue;
 
-		/* Halve running cost for multiheaded parts */
-		if (v->IsMultiheaded()) cost_factor /= 2;
+		/* Halve running cost for multiheaded parts -- a real dual head is the
+		 * same engine twice. The engine of a tender pair is the whole engine,
+		 * and its tender is the articulated part it was and costs nothing. */
+		if (v->IsTender()) continue;
+		if (v->IsMultiheaded() && !v->flags.Test(VehicleRailFlag::TenderPair)) cost_factor /= 2;
 
 		cost += GetPrice(e->VehInfo<RailVehicleInfo>().running_cost_class, cost_factor, e->GetGRF());
 	} while ((v = v->GetNextVehicle()) != nullptr);

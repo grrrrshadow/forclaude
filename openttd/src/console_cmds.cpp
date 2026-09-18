@@ -4319,12 +4319,21 @@ static bool ConTestWagonShape(std::span<std::string_view> argv)
 					unit_len += p->gcache.cached_veh_length;
 				}
 			}
-			IConsolePrint(CC_DEFAULT, "testtvar: {:2d} {} delka {} {}poz ({},{},{}) smer {} veze {}",
-					index, u->IsArticulatedPart() ? "cast " : (u->IsEngine() ? "masin" : "vagon"),
+			/* A tender made into its engine's rear head (MakeTenderRearHead())
+			 * says so, and with whom: it is neither a part nor a wagon, and a
+			 * pair that has come apart on load would show here as a tender with
+			 * nobody, which is the one way that conversion can quietly fail. */
+			std::string pair;
+			if (u->flags.Test(VehicleRailFlag::TenderPair)) {
+				pair = fmt::format(" par{}{}", u->IsTender() ? " tendr" : " masinka",
+						u->other_multiheaded_part == nullptr ? " BEZ PARTNERA" : fmt::format(" s {}", u->other_multiheaded_part->index.base()));
+			}
+			IConsolePrint(CC_DEFAULT, "testtvar: {:2d} {} delka {} {}poz ({},{},{}) smer {} veze {}{}",
+					index, u->IsArticulatedPart() ? "cast " : (u->IsTender() ? "tendr" : ((u->IsEngine() || u->flags.Test(VehicleRailFlag::TenderPair)) ? "masin" : "vagon")),
 					u->gcache.cached_veh_length,
 					u->IsArticulatedPart() ? "" : fmt::format("(celkem {} v {} kusech) ", unit_len, pieces),
 					u->x_pos, u->y_pos, u->z_pos, (int)u->direction,
-					u->carrying == VehicleID::Invalid() ? -1 : (int)u->carrying.base());
+					u->carrying == VehicleID::Invalid() ? -1 : (int)u->carrying.base(), pair);
 		}
 		return true;
 	}

@@ -25,8 +25,10 @@ struct Train;
 /** Rail vehicle flags. */
 enum class VehicleRailFlag : uint8_t {
 	Reversing = 0, ///< Train is slowing down to reverse.
+	Tender = 1, ///< (the tender only) The tender of a tender pair, whichever end of the list it is at. See MakeTenderRearHead().
 	PoweredWagon = 3, ///< Wagon is powered.
 	Flipped = 4, ///< Reverse the visible direction of the vehicle.
+	TenderPair = 5, ///< (both heads) A steam engine and its tender made into a two-headed engine at build time, so the list can be turned round with the tender first. The tender keeps its own engine type and picture, contributes nothing, and the engine is not halved the way a real dual head is. See MakeTenderRearHead().
 
 	AllowedOnNormalRail = 6, ///< Electric train engine is allowed to run on normal rail. */
 	Reversed = 7, ///< Used for vehicle var 0xFE bit 8 (toggled each time the train is reversed, accurate for first vehicle only).
@@ -114,6 +116,7 @@ bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
 bool IsCouplePartnerStandingOn(const Train *v, TileIndex tile);
 bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest = StationID::Invalid());
 Train *FindCoupledBoundary(Train *v);
+bool MakeTenderRearHead(Train *engine);
 uint WagonUnitsBehindEngine(const Train *v);
 bool CoupleOrderWouldFindSomething(const Train *v, const struct Order &order);
 bool IsTunnelBridgeOccupied(TileIndex tile);
@@ -303,6 +306,35 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	int GetCurrentMaxSpeed() const override;
 
 	/**
+	 * Is this the tender of a steam engine, made into one head of a pair at
+	 * build time so the pair can be turned round in the list? See
+	 * MakeTenderRearHead(). It is the articulated part it used to be in every
+	 * respect but the list: it draws itself, weighs nothing of its own, pulls
+	 * nothing, costs nothing, and cannot be parted from its engine.
+	 *
+	 * A property of the vehicle, not a place in the list. Turned round, the
+	 * tender is the front head and the engine the rear one -- and asked by
+	 * role, the engine was the one that "contributed nothing": the train had
+	 * no power at all and crept at the platform, turning at each end of
+	 * itself.
+	 */
+	inline bool IsTender() const
+	{
+		return this->flags.Test(VehicleRailFlag::Tender);
+	}
+
+	/**
+	 * The engine of this vehicle's unit for anything that names or replaces
+	 * it: itself, unless it is the tender of a pair -- a tender at the head of
+	 * the list is still a tender, and the train is still the engine beside it.
+	 */
+	inline const Train *GetPairEngine() const
+	{
+		if (this->IsTender() && this->other_multiheaded_part != nullptr) return this->other_multiheaded_part;
+		return this;
+	}
+
+	/**
 	 * Get the next real (non-articulated part and non rear part of dualheaded engine) vehicle in the consist.
 	 * @return Next vehicle in the consist.
 	 */
@@ -357,11 +389,14 @@ protected: // These functions should not be called outside acceleration code.
 	 */
 	inline uint16_t GetPower() const
 	{
-		/* Power is not added for articulated parts */
-		if (!this->IsArticulatedPart() && HasPowerOnRail(this->railtypes, GetRailType(this->tile))) {
+		/* Power is not added for articulated parts -- nor for a tender made
+		 * into a rear head, which is the articulated part it was. */
+		if (!this->IsArticulatedPart() && !this->IsTender() && HasPowerOnRail(this->railtypes, GetRailType(this->tile))) {
 			uint16_t power = GetVehicleProperty(this, PROP_TRAIN_POWER, RailVehInfo(this->engine_type)->power);
-			/* Halve power for multiheaded parts */
-			if (this->IsMultiheaded()) power /= 2;
+			/* Halve power for multiheaded parts: a real dual head is the same
+			 * engine twice and each half carries half. The engine of a tender
+			 * pair is the whole engine and its tender carries nothing. */
+			if (this->IsMultiheaded() && !this->flags.Test(VehicleRailFlag::TenderPair)) power /= 2;
 			return power;
 		}
 
@@ -390,8 +425,10 @@ protected: // These functions should not be called outside acceleration code.
 	{
 		uint16_t weight = CargoSpec::Get(this->cargo_type)->WeightOfNUnitsInTrain(this->cargo.StoredCount());
 
-		/* Vehicle weight is not added for articulated parts. */
-		if (!this->IsArticulatedPart()) {
+		/* Vehicle weight is not added for articulated parts -- a set puts the
+		 * whole unit's weight on its head -- and a tender made into a rear head
+		 * is the articulated part it was, so it is not counted twice. */
+		if (!this->IsArticulatedPart() && !this->IsTender()) {
 			weight += GetVehicleProperty(this, PROP_TRAIN_WEIGHT, RailVehInfo(this->engine_type)->weight);
 		}
 

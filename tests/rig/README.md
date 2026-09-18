@@ -188,11 +188,15 @@ down on the road behind its lorry and drives on at its own length behind it.
 ## A steam engine with its tender, which needs a set that has one
 
 The game's own engines are all one vehicle, so nothing in a plain rig run
-ever built a consist that is a single articulated unit -- an engine whose
-tender comes along as a part of it. That shape is the one coupling the game
-used to refuse outright, and the refusal was never measured: `testspoj tendr`
-measures it. It needs the same home as the lorry scene, or any home with a
-set of steam engines in it:
+ever built an engine that comes with a tender. Such an engine used to be one
+vehicle with one articulated part, and that shape was the one coupling the
+game refused outright: its list cannot be turned round, so meeting a rake
+nose first it would have ended at the tender while the engine is what stands
+against the wagons. Now the pair is made into a two-headed engine at build
+time (MakeTenderRearHead() in train_cmd.cpp): the tender keeps its own
+picture and contributes nothing, and the list turns round like any other.
+`testspoj tendr` is where that is measured. It needs the same home as the
+lorry scene, or any home with a set of steam engines in it:
 
     <home>/.openttd/newgrf/   4d490207-cztr_engines_steam-1.0.2.tar
                               4d490213-cztr_wagons_cargo-1.1.0.tar
@@ -206,8 +210,18 @@ Two runs to make:
     testspoj tendr            the collector meets the rake nose first
     testspoj tendr couvej     it backs onto the rake instead
 
-The second is the way that works, and it couples clean. The first is the
-awkward one: the collector is one unit, so its list cannot be turned round,
-and a list that has the tender next to the wagons while the engine is what
-physically stands there cannot be walked shut. Seventeen broken steps, the
-same seventeen in every run.
+Both couple clean and both trains reach their depot: spojeno=1, no broken
+step, nothing in the record, depa=3. Nose first, the joined train runs
+tender first to the far depot, the way a steam engine backs a train. Before
+the pair, the first run broke seventeen steps, the same seventeen every
+time, and that number is what the refusal had been holding back.
+
+`testtvar <unit>` shows the pair: `par masinka s N` on the engine and
+`par tendr s N` on the tender, N being the other's index. A tender with
+`BEZ PARTNERA` is a pair that came apart on load, which is the one way this
+can quietly fail; save the scene (`save x`) and load it back to check.
+
+The refusal itself stays, for an engine built of more than one articulated
+part -- deliberately not made into a pair, since its parts would have to
+trade places on the ground and for an engine that shows. No such engine is
+in the rig's sets; the refusal is read, not measured.
