@@ -48,6 +48,7 @@
 #include "signal_func.h"
 #include "pbs.h"
 #include "vehicle_func.h"
+#include "articulated_vehicles.h"
 #include "station_cmd.h"
 #include "order_cmd.h"
 #include "order_func.h"
@@ -5062,7 +5063,7 @@ static bool ConTestWreck(std::span<std::string_view> argv)
 static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem]'.");
+		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem|tirak]'.");
 		return true;
 	}
 	uint cars = 1;
@@ -5078,6 +5079,11 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	 * keeps the shunter but gives the cars the by-train order, the control. */
 	bool shunter = argv.size() >= 3 && (argv[2] == "posun" || argv[2] == "vlakem");
 	bool by_train = argv.size() >= 3 && argv[2] == "vlakem";
+	/* "tirak": a road vehicle made of several pieces -- a lorry with a trailer
+	 * -- where the game has one, which is what the wagon lengths and the way
+	 * a vehicle is laid out on a wagon are about. The game's own set has
+	 * none, so this only bites with a set loaded. */
+	bool want_long = argv.size() >= 3 && argv[2] == "tirak";
 	if (_game_mode != GameMode::Normal) {
 		IConsolePrint(CC_ERROR, "testautovlak: only in a running game.");
 		return true;
@@ -5117,6 +5123,7 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (GetRoadTramType(e->VehInfo<RoadVehicleInfo>().roadtype) != RoadTramType::Road) continue;
+		if (want_long && CountArticulatedParts(e->index) == 0) continue;
 		eid_road = e->index;
 		break;
 	}

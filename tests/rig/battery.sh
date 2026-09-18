@@ -14,9 +14,18 @@ H=$S/ttdhome
 # buildable, and the flattest, least watery setting the generator has. With
 # both, three runs of the same scene come out identical line for line.
 #
-# Changing any of these three makes a different map and therefore different
+# The climate belongs in here for the same reason, and it was the one setting
+# left out: the home's own openttd.cfg decided it, and the game writes that
+# file every time it exits -- so a scene played from a savegame of another
+# climate, or a game of the player's opened in this home, left the next run's
+# new games in that climate. Three scenes then built themselves somewhere else
+# on a different map and came out with different numbers, which reads as a
+# regression and is nothing of the sort.
+#
+# Changing any of these four makes a different map and therefore different
 # numbers in the stable file: it is a re-baselining, not a regression.
-NEWGAME='setting_newgame game_creation.generation_seed 1
+NEWGAME='setting_newgame game_creation.landscape toyland
+setting_newgame game_creation.generation_seed 1
 setting_newgame difficulty.terrain_type 0
 setting_newgame difficulty.quantity_sea_lakes 0
 newgame'

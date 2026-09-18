@@ -460,6 +460,19 @@ void RoadVehicle::UpdateDeltaXY()
 				NOT_REACHED();
 		}
 	}
+
+	/* Riding on a wagon: lift the box clear of the wagon's own, without
+	 * lifting the picture with it. Both boxes are six high and the vehicle is
+	 * drawn three above the wagon, so they overlap, and two overlapping boxes
+	 * are sorted by a rule of thumb -- which is how a wagon came to be drawn
+	 * over the car it was carrying. A box that starts above the wagon's is
+	 * always drawn after it, and taking the same off the picture's own offset
+	 * leaves the car where it was on the screen. */
+	if (this->IsCarried()) {
+		static const int CARRIED_BOX_LIFT = 4;
+		this->bounds.origin.z += CARRIED_BOX_LIFT;
+		this->bounds.offset.z -= CARRIED_BOX_LIFT;
+	}
 }
 
 /**
@@ -1149,6 +1162,52 @@ void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir int
 	v->UpdatePosition();
 	v->UpdateInclination(true, true);
 	v->UpdateViewport(true, true);
+
+	/* A trailer goes behind its lorry, on the road the lorry is driving in
+	 * from. Each piece of a road vehicle drives on from wherever it stands and
+	 * by its own frame, so pieces left on top of each other would stay on top
+	 * of each other for good; they have to be laid out with the gaps they are
+	 * to keep. Frames are a pixel apart and a tile is TILE_SIZE of them, so a
+	 * piece that belongs D pixels behind the entrance stands D pixels back
+	 * along that road, however many tiles back that is.
+	 *
+	 * Where there is no road to stand on -- nothing promises there is any
+	 * behind a stop -- the chain stays folded into the lorry. That is the one
+	 * thing this cannot get right, and it comes apart again as the lorry
+	 * drives away from anything it meets on the way. */
+	DiagDirection behind = ReverseDiagDir(TrackdirToExitdir(into));
+	Trackdir along = DiagDirToDiagTrackdir(ReverseDiagDir(behind));
+	const RoadDriveEntry *back_rdp = _road_drive_data[GetRoadTramType(v->roadtype)][(to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE) + to_underlying(along)];
+	TileIndexDiffC step = TileIndexDiffCByDiagDir(behind);
+
+	uint behind_by = 0;
+	for (RoadVehicle *u = v->Next(); u != nullptr; u = u->Next()) {
+		behind_by += u->Previous()->gcache.cached_veh_length;
+		uint tiles_back = (behind_by + TILE_SIZE - 1) / TILE_SIZE;
+		uint frame = tiles_back * TILE_SIZE - behind_by;
+		TileIndex back_tile = TileAddWrap(tile, (int)tiles_back * step.x, (int)tiles_back * step.y);
+
+		u->direction = v->direction;
+		u->overtaking = 0;
+		u->vehstatus.Reset(VehState::Hidden);
+		if (back_tile == INVALID_TILE || !HasTileAnyRoadType(back_tile, v->compatible_roadtypes)) {
+			/* Folded into the piece ahead of it. */
+			u->tile = u->Previous()->tile;
+			u->state = u->Previous()->state;
+			u->frame = u->Previous()->frame;
+			u->x_pos = u->Previous()->x_pos;
+			u->y_pos = u->Previous()->y_pos;
+		} else {
+			u->tile = back_tile;
+			u->state = to_underlying(along);
+			u->frame = frame;
+			u->x_pos = TileX(back_tile) * TILE_SIZE + (back_rdp[frame].x & 0xF);
+			u->y_pos = TileY(back_tile) * TILE_SIZE + (back_rdp[frame].y & 0xF);
+		}
+		u->UpdatePosition();
+		u->UpdateInclination(true, true);
+		u->UpdateViewport(true, true);
+	}
 }
 
 static Trackdir FollowPreviousRoadVehicle(const RoadVehicle *v, const RoadVehicle *prev, TileIndex tile, DiagDirection entry_dir, bool already_reversed)

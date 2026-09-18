@@ -35,6 +35,33 @@
 static const int CARRIED_Z_OFFSET = 3;
 
 /**
+ * How far behind the front of its drawn box a road vehicle's own position
+ * sits. A rail vehicle is drawn about its middle and a road vehicle from its
+ * front -- "Unlike trains, road vehicles do not have their offsets moved to
+ * the centre", as RoadVehicle::UpdateDeltaXY() puts it -- so putting a road
+ * vehicle at a wagon's position does not put it on the wagon. Both numbers
+ * are read off the two UpdateDeltaXY().
+ */
+static const int ROAD_VEHICLE_NOSE = 3;
+
+/**
+ * How long a wagon is, counting the pieces a set builds one wagon out of: a
+ * long wagon is a short visible head with invisible articulated pieces behind
+ * it (CZTR's freight wagons are 3 + 8 + 3 long), and it is the whole of them
+ * that a road vehicle stands on.
+ * @param wagon the wagon, its head
+ * @return the length, in the eighths of a tile that lengths are measured in
+ */
+static uint WagonUnitLength(const Train *wagon)
+{
+	uint length = 0;
+	for (const Train *p = wagon; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+		length += p->gcache.cached_veh_length;
+	}
+	return length;
+}
+
+/**
  * Say something about a road vehicle on the console, but only when it is news
  * -- the same discipline as SayOnChange() for trains: a vehicle that cannot
  * board goes on not being able to, every tick, for as long as it waits.
@@ -52,22 +79,92 @@ static void SayRoad(const RoadVehicle *rv, std::string what)
 }
 
 /**
- * Put the road vehicle where its wagon is. Called every tick while it rides,
- * so that it moves with the train and is drawn on it.
- * @param rv    the road vehicle
- * @param wagon the wagon it rides on
+ * Put the road vehicle on its wagon, nose to the wagon's nose. Called every
+ * tick while it rides, so that it moves with the train and is drawn on it.
+ *
+ * Where the vehicle goes is not simply where the wagon is, for two reasons.
+ * A long wagon is several pieces and the one the vehicle rides on -- the head,
+ * the only piece a train's chain names -- can be a short stub at either end of
+ * it, so its position is not the wagon's middle. And the two kinds of vehicle
+ * are drawn from different places: a wagon about its own position, a road
+ * vehicle from its front. Put together, a vehicle put where the wagon's head
+ * is starts at one end of the wagon and hangs over onto the next one, which is
+ * what the player saw. So the whole wagon's ends are worked out from its
+ * pieces, and the vehicle is laid out from the front one -- its trailer, if it
+ * has one, behind it.
+ *
+ * @param rv    the road vehicle, front of its chain
+ * @param wagon the wagon it rides on, its head
  */
 static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 {
-	rv->tile = wagon->tile;
-	rv->x_pos = wagon->x_pos;
-	rv->y_pos = wagon->y_pos;
-	rv->z_pos = wagon->z_pos + CARRIED_Z_OFFSET;
-	rv->direction = wagon->direction;
-	/* In a tunnel with the wagon, out of sight with it. */
-	rv->vehstatus.Set(VehState::Hidden, wagon->vehstatus.Test(VehState::Hidden));
-	rv->UpdatePosition();
-	rv->UpdateViewport(true, true);
+	Direction dir = wagon->direction;
+	int x = wagon->x_pos;
+	int y = wagon->y_pos;
+
+	if (IsDiagonalDirection(dir)) {
+		/* Along the rails: which axis they run on, and which way along it the
+		 * wagon faces. */
+		bool along_y = (dir == Direction::NW || dir == Direction::SE);
+		bool forward = (dir == Direction::SE || dir == Direction::SW);
+
+		/* Both ends of the whole wagon. A rail vehicle is drawn about its own
+		 * position, half its length reaching either way. */
+		int lo = INT_MAX;
+		int hi = INT_MIN;
+		for (const Train *p = wagon; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+			int pos = along_y ? p->y_pos : p->x_pos;
+			int len = p->gcache.cached_veh_length;
+			lo = std::min(lo, pos - (forward ? len / 2 : (len + 1) / 2));
+			hi = std::max(hi, pos + (forward ? (len + 1) / 2 : len / 2));
+		}
+
+		/* The wagon's nose, less the road vehicle's own: its position is that
+		 * much behind the front of its box. */
+		int at = forward ? hi - (VEHICLE_LENGTH - ROAD_VEHICLE_NOSE) : lo + ROAD_VEHICLE_NOSE;
+		if (along_y) {
+			y = at;
+		} else {
+			x = at;
+		}
+	} else {
+		/* On a curve neither kind is drawn from its front -- both sit about
+		 * their own position -- so the middle of the wagon is the place. */
+		const Train *last = wagon;
+		while (last->HasArticulatedPart()) last = last->GetNextArticulatedPart();
+		x = (wagon->x_pos + last->x_pos) / 2;
+		y = (wagon->y_pos + last->y_pos) / 2;
+	}
+
+	/* One step backwards along the wagon, for laying out a trailer behind its
+	 * lorry. On a curve this is only roughly the way the vehicle points, which
+	 * is as much as a moving train needs. */
+	static const DiagDirectionIndexArray<Point> _step_back{{{
+		{  1,  0 }, // DiagDirection::NE, which faces -x
+		{  0, -1 }, // DiagDirection::SE, which faces +y
+		{ -1,  0 }, // DiagDirection::SW, which faces +x
+		{  0,  1 }, // DiagDirection::NW, which faces -y
+	}}};
+	const Point &back = _step_back[DirToDiagDir(dir)];
+
+
+	const RoadVehicle *ahead = nullptr;
+	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+		if (ahead != nullptr) {
+			x += back.x * ahead->gcache.cached_veh_length;
+			y += back.y * ahead->gcache.cached_veh_length;
+		}
+		u->tile = TileVirtXY(x, y);
+		u->x_pos = x;
+		u->y_pos = y;
+		u->z_pos = wagon->z_pos + CARRIED_Z_OFFSET;
+		u->direction = dir;
+		/* In a tunnel with the wagon, out of sight with it. */
+		u->vehstatus.Set(VehState::Hidden, wagon->vehstatus.Test(VehState::Hidden));
+		u->UpdatePosition();
+		u->UpdateViewport(true, true);
+		ahead = u;
+	}
 }
 
 /**
@@ -125,10 +222,12 @@ bool IsWaitingToBoardTrain(const RoadVehicle *rv)
  * shuttle.
  *
  * "A wagon to spare" is one wagon, one road vehicle: a wagon that is not an
- * engine, carries nothing and is not already carrying, whatever its length or
- * the vehicle's. Lengths differ every which way -- wagons, cars, lorries --
- * and the player's answer was to start with the rule that cannot be wrong and
- * refine it if it ever matters.
+ * engine, carries nothing, is not already carrying, and is at least as long as
+ * the whole vehicle -- a lorry with a trailer is one vehicle and needs a wagon
+ * that it fits on lengthwise. That is what decides which of a set's wagons can
+ * carry what, without this code having to know any of their names: a short
+ * flat wagon takes a car, and only the long ones take a lorry and trailer. A
+ * vehicle that finds nothing long enough waits at the stop and says so.
  *
  * @param rv        the road vehicle at the stop
  * @param station   the station it is at
@@ -169,6 +268,7 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 		}
 
 		bool any_fitted = false;
+		bool any_short = false;
 		for (Train *u = t; u != nullptr; u = u->Next()) {
 			if (u->IsEngine() || u->IsArticulatedPart()) continue;
 			/* Only a wagon refitted to road vehicles (CT_ROLA), and an empty
@@ -181,12 +281,21 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 			any_fitted = true;
 			if (u->carrying != VehicleID::Invalid()) continue;
 			if (u->cargo.TotalCount() != 0) continue;
+			/* Long enough for the whole of it, trailer and all. */
+			if (WagonUnitLength(u) < rv->gcache.cached_total_length) {
+				any_short = true;
+				continue;
+			}
 			*wagon = u;
 			return t;
 		}
-		why = any_fitted ?
-				fmt::format("vlak {} stoji, ale zadny jeho vagon na auta neni volny", t->unitnumber) :
-				fmt::format("vlak {} stoji, ale nema zadny vagon prestaveny na silnicni vozidla", t->unitnumber);
+		if (any_short) {
+			why = fmt::format("vlak {} stoji, ale jeho volne vagony jsou na auto dlouhe {} kratke", t->unitnumber, rv->gcache.cached_total_length);
+		} else {
+			why = any_fitted ?
+					fmt::format("vlak {} stoji, ale zadny jeho vagon na auta neni volny", t->unitnumber) :
+					fmt::format("vlak {} stoji, ale nema zadny vagon prestaveny na silnicni vozidla", t->unitnumber);
+		}
 	}
 	return nullptr;
 }
@@ -207,13 +316,23 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
  */
 bool TryBoardTrain(RoadVehicle *rv)
 {
-	/* One wagon, one vehicle: a chain of several parts would need several. */
-	if (rv->HasArticulatedPart()) return false;
 	if (!rv->current_order.IsType(OT_LOADING)) return false;
 
 	std::vector<StationID> next;
 	rv->GetNextStoppingStation(next);
 	StationID target = next.empty() ? StationID::Invalid() : next.front();
+
+	/* Somewhere to get off first. A vehicle whose orders name no further
+	 * station has no ride to take: it used to get on anyway and then off
+	 * again at the next station the train stood at, which -- for a train
+	 * unloading everything where it stood -- was the stop it had just left,
+	 * so it hopped on and off in the same place for ever. Standing at the
+	 * stop and saying that it is waiting is the honest state; the player
+	 * gives it orders, or tells the train to unload everything, and it goes. */
+	if (target == StationID::Invalid()) {
+		SayRoad(rv, fmt::format("Auto {}: ceka ve stanici {} - nema prikaz, kde vystoupit", rv->unitnumber, rv->last_station_visited));
+		return false;
+	}
 
 	/* The other way of boarding: onto any fitted wagon standing here, and
 	 * never mind where it is going. The vehicle still gets off where its
@@ -247,14 +366,16 @@ bool TryBoardTrain(RoadVehicle *rv)
 	rv->current_order.Free();
 	ProcessOrders(rv);
 
-	/* Not on any road now. The wormhole state is the one state the rest of
-	 * the road code already knows to leave alone -- nothing asks a vehicle in
-	 * it which piece of road it is on. */
-	rv->state = RVSB_WORMHOLE;
-	rv->frame = 0;
+	/* Not on any road now, trailer and all. The wormhole state is the one
+	 * state the rest of the road code already knows to leave alone -- nothing
+	 * asks a vehicle in it which piece of road it is on. */
+	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+		u->state = RVSB_WORMHOLE;
+		u->frame = 0;
+		u->overtaking = 0;
+	}
 	rv->cur_speed = 0;
 	rv->subspeed = 0;
-	rv->overtaking = 0;
 	rv->path.clear();
 
 	rv->carried_by = wagon->index;
@@ -318,6 +439,13 @@ static bool TryLeaveTrain(RoadVehicle *rv, Train *wagon)
 		dest = t->last_station_visited;
 	}
 	if (dest == StationID::Invalid()) return false;
+
+	/* Never back down at the stop it got on at. A vehicle put down where it
+	 * got on drives round to the stop, gets on again and is put down again,
+	 * for ever -- which is what a train told to unload everything did to a
+	 * vehicle that had just got on there. Where it got on is written in the
+	 * wagon's own cargo (see MirrorRideAsCargo()), so the ride carries it. */
+	if (dest == wagon->cargo.GetFirstStation()) return false;
 
 	const Station *st = Station::Get(dest);
 	for (const RoadStop *rs = st->GetPrimaryRoadStop(rv); rs != nullptr; rs = rs->GetNextRoadStop(rv)) {
