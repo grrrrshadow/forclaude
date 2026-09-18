@@ -4136,6 +4136,69 @@ static bool ConTestWagonShape(std::span<std::string_view> argv)
 }
 
 /**
+ * Where a vehicle's picture sits around the point the vehicle is at: the
+ * sprite's own size and offsets, for each of the eight directions, and the
+ * box the game draws it in.
+ *
+ * This is the other half of the question testtvar answers. How long a vehicle
+ * counts as is one thing; where its picture is hung is another, and a set
+ * chooses it freely -- so a set's lorry can sit in a different place on a
+ * wagon than the game's own does, with nothing in the lengths to say why.
+ * Read without a set and with one, the two answers can be compared.
+ * Usage: testobraz auto|vlak <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSpriteOffsets(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Print a vehicle's sprite offsets. Usage: 'testobraz auto|vlak <unit number>'.");
+		return true;
+	}
+	bool road = argv[1] == "auto";
+	auto punit = ParseInteger(argv[2]);
+	if (!punit.has_value()) return false;
+
+	const Vehicle *found = nullptr;
+	if (road) {
+		for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+			if (rv->IsFrontEngine() && rv->unitnumber == (UnitID)*punit) { found = rv; break; }
+		}
+	} else {
+		for (const Train *t : Train::Iterate()) {
+			if (t->IsFrontEngine() && t->unitnumber == (UnitID)*punit) { found = t; break; }
+		}
+	}
+	if (found == nullptr) {
+		IConsolePrint(CC_ERROR, "testobraz: {} {} nenalezeno.", road ? "auto" : "vlak", argv[2]);
+		return true;
+	}
+
+	uint index = 0;
+	for (const Vehicle *u = found; u != nullptr; u = u->Next(), index++) {
+		IConsolePrint(CC_DEFAULT, "testobraz: {} {:2d} delka {} obalka poc ({},{},{}) roz ({},{},{}) pos ({},{},{})",
+				road ? "auto" : "vuz", index, road ? RoadVehicle::From(u)->gcache.cached_veh_length : Train::From(u)->gcache.cached_veh_length,
+				u->bounds.origin.x, u->bounds.origin.y, u->bounds.origin.z,
+				u->bounds.extent.x, u->bounds.extent.y, u->bounds.extent.z,
+				u->bounds.offset.x, u->bounds.offset.y, u->bounds.offset.z);
+		for (uint dir = 0; dir < to_underlying(Direction::End); dir++) {
+			Direction d = (Direction)dir;
+			VehicleSpriteSeq seq;
+			if (road) {
+				RoadVehicle::From(u)->GetImage(d, EngineImageType::OnMap, &seq);
+			} else {
+				Train::From(u)->GetImage(d, EngineImageType::OnMap, &seq);
+			}
+			if (!seq.IsValid()) continue;
+			Rect r;
+			seq.GetBounds(&r);
+			IConsolePrint(CC_DEFAULT, "testobraz:    smer {} sprajtu {} obrazek {}x{} px, roh ({},{})",
+					dir, seq.count, r.right - r.left + 1, r.bottom - r.top + 1, r.left, r.top);
+		}
+	}
+	return true;
+}
+
+/**
  * List every vehicle of a train with what it is, for reading a consist
  * headless. Usage: testvozy <unit number>
  * @copydoc IConsoleCmdProc
@@ -5103,10 +5166,24 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 
 	EngineID eid_loco = EngineID::Invalid();
 	EngineID eid_wagon = EngineID::Invalid();
+	uint longest_wagon = 0;
 	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
 		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			/* For a lorry and trailer, the longest wagon the game has: one
+			 * built out of several pieces, which is how a set builds a wagon
+			 * longer than the game's own can be. Nothing shorter can carry
+			 * one, so the car carrier would leave the scene with a lorry that
+			 * rightly never boards. */
+			if (want_long) {
+				uint pieces = CountArticulatedParts(e->index);
+				if (pieces > longest_wagon) {
+					longest_wagon = pieces;
+					eid_wagon = e->index;
+				}
+				continue;
+			}
 			/* The car carrier for choice -- it is the wagon the player buys for
 			 * this -- and any wagon if this game has none, since the scene then
 			 * still has the refit to fall back on. */
@@ -8412,6 +8489,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testtvar",                ConTestWagonShape);
+	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);

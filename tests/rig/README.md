@@ -155,3 +155,32 @@ Worth keeping because the first of them found a crash: a cargo moved to
 another slot after the NewGRFs had spoken never got the once-over that gives
 every cargo a town production effect, and the next thing that sorted cargoes
 walked into an assertion.
+
+## A lorry with a trailer, which needs the player's own sets
+
+The game's own road vehicles are all one piece, so nothing in a plain rig
+run says what a lorry and trailer does on a wagon -- and that is the case
+the wagon lengths are about (road_on_rail.h). `testautovlak 1 tirak` builds
+the scene with one, and it needs a home set up with three of the player's
+NewGRFs and a late enough year:
+
+    <home>/.openttd/newgrf/   CZTR_Truck_SetBRYLE1-rozestupy-cisty.grf
+                              4d490213-cztr_wagons_cargo-1.1.0.tar
+                              4d490207-cztr_engines_steam-1.0.2.tar
+    openttd.cfg               landscape = temperate, starting_year = 2030
+
+Each of the three is needed for its own reason. The truck set as it is
+published has no vehicle a company can buy -- the player's own build of it
+does, and that is the one to use. The wagon set brings the long wagons: its
+freight wagons are built of several pieces and run from 14 to 20 eighths,
+where the game's own are 8, and a lorry and trailer measures 15. And the
+steam engines are there only so that plain rail exists at all: a railtype is
+available to a company once an engine of it has been introduced, and with the
+wagon set loaded and no engine set, the scene cannot build so much as a shed
+("depot failed"). The year has to be late enough for the long lorries and
+early enough for a long wagon to still be in production; 2030 is both.
+
+The scene then picks the longest wagon the game has -- the one built of the
+most pieces -- rather than the car carrier, because nothing shorter than the
+lorry can carry it. Four rides in nine thousand ticks, and the trailer is put
+down on the road behind its lorry and drives on at its own length behind it.
