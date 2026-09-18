@@ -49,6 +49,7 @@
 #include "pbs.h"
 #include "vehicle_func.h"
 #include "articulated_vehicles.h"
+#include "cargopacket.h"
 #include "station_cmd.h"
 #include "order_cmd.h"
 #include "order_func.h"
@@ -2158,7 +2159,13 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 				uint ix = x0 + 10 + dx, iy = y0 + dy;
 				if (ix >= Map::SizeX() - 2 || iy >= Map::SizeY() - 2) continue;
 				for (uint layout = 0; layout < (uint)GetIndustrySpec(ind_type)->layouts.size() && !ind_built; layout++) {
-					if (Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, TileXY(ix, iy), ind_type, layout, true, InteractiveRandom()).Succeeded()) {
+					/* A fixed number, not InteractiveRandom(): that generator is
+					 * not part of the game's own state and gives a different
+					 * answer every run, so the industry took in one run of the
+					 * scene and would not take in the next. This was the standing
+					 * wobble in the two cargo scenes -- they came out zero every
+					 * few runs and read as a regression each time. */
+					if (Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, TileXY(ix, iy), ind_type, layout, true, 0).Succeeded()) {
 						ind_built = true;
 						IConsolePrint(CC_DEFAULT, "testnaklad: prumysl '{}' zalozen u ({},{}).", GetIndustrySpec(ind_type)->name, ix, iy);
 					}
@@ -3815,6 +3822,40 @@ static bool ConTestWagonLengths(std::span<std::string_view>)
 }
 
 /**
+ * Fill a road vehicle with its own cargo, without a station or an industry.
+ * A set draws a loaded vehicle differently from an empty one, and reading
+ * which picture it draws needs a vehicle that has something in it; getting
+ * there by waiting for an industry to produce is a scene of its own.
+ * Usage: testnalozit auto <unit number>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Fill a road vehicle with cargo. Usage: 'testnalozit auto <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[2]);
+	if (!punit.has_value()) return false;
+
+	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || rv->unitnumber != (UnitID)*punit) continue;
+		uint put = 0;
+		for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+			uint room = u->cargo_cap - u->cargo.StoredCount();
+			if (room == 0 || !CargoPacket::CanAllocateItem()) continue;
+			u->cargo.Append(CargoPacket::Create(rv->last_station_visited, room, Source{}));
+			put += room;
+		}
+		rv->MarkDirty();
+		IConsolePrint(CC_DEFAULT, "testnalozit: auto {} nalozeno {} jednotek nakladu {}.", rv->unitnumber, put, (int)rv->cargo_type);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testnalozit: auto {} nenalezeno.", argv[2]);
+	return true;
+}
+
+/**
  * Count the effect vehicles alive, by kind.
  * Smoke and explosions are effect vehicles that each count their own life
  * down; a kind whose count never falls is a kind that never expires. That is
@@ -4172,12 +4213,13 @@ static bool ConTestWagonShape(std::span<std::string_view> argv)
 			if (!rv->IsFrontEngine() || rv->unitnumber != (UnitID)*punit) continue;
 			uint index = 0;
 			for (const RoadVehicle *u = rv; u != nullptr; u = u->Next(), index++) {
-				IConsolePrint(CC_DEFAULT, "testtvar: auto {:2d} {} delka {} {}poz ({},{},{}) smer {} vezen {}",
+				IConsolePrint(CC_DEFAULT, "testtvar: auto {:2d} {} delka {} {}poz ({},{},{}) smer {} vezen {} naklad {} {}/{}",
 						index, u->IsArticulatedPart() ? "cast " : "hlava",
 						u->gcache.cached_veh_length,
 						u->IsArticulatedPart() ? "" : fmt::format("(celkem {}) ", u->gcache.cached_total_length),
 						u->x_pos, u->y_pos, u->z_pos, (int)u->direction,
-						u->carried_by == VehicleID::Invalid() ? -1 : (int)u->carried_by.base());
+						u->carried_by == VehicleID::Invalid() ? -1 : (int)u->carried_by.base(),
+						IsValidCargoType(u->cargo_type) ? (int)u->cargo_type : -1, u->cargo.StoredCount(), u->cargo_cap);
 			}
 			return true;
 		}
@@ -8564,6 +8606,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testtvar",                ConTestWagonShape);
 	IConsole::CmdRegister("testvagonky",             ConTestWagonLengths);
+	IConsole::CmdRegister("testnalozit",             ConTestFillRoadVehicle);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
