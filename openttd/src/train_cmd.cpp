@@ -5003,7 +5003,27 @@ static Train *MakeEngineLeadTheList(Train *chain)
  */
 static void NormaliseCoupledConsistFacing(Train *consist)
 {
+	Train *unit = nullptr; // the piece the articulated ones behind it belong to
 	for (Train *u = consist; u != nullptr; u = u->Next()) {
+		/* An articulated piece is not a vehicle of its own. It is part of the
+		 * one in front of it -- one wagon, drawn in several pieces -- and it
+		 * faces the way that one faces, whatever the arithmetic below would
+		 * make of it on its own. Deciding for each piece separately is how a
+		 * wagon came to be pointing two ways at once: pieces standing in a
+		 * shed are all at the one spot, so there is no line between them to
+		 * hold a facing up against, and a piece then kept the facing its own
+		 * head had just been turned out of. The train that came of it walked
+		 * apart in both directions at once -- half its pieces one way, half
+		 * the other -- which is the broken step reported three times over. */
+		if (u->IsArticulatedPart()) {
+			if (unit != nullptr && u->direction != unit->direction) {
+				u->direction = unit->direction;
+				u->flags.Flip(VehicleRailFlag::Flipped);
+			}
+			continue;
+		}
+		unit = u;
+
 		/* Line each vehicle up against the one ahead of it in the list. The
 		 * head has none, so it uses the one behind it and the opposite sense:
 		 * its facing points away from the body of the train. */

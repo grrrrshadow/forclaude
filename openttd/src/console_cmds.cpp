@@ -3822,6 +3822,38 @@ static bool ConTestWagonLengths(std::span<std::string_view>)
 }
 
 /**
+ * Check every train and loose rake for a wagon whose pieces do not all face
+ * the same way. One wagon drawn in several pieces is one vehicle, and its
+ * pieces facing different ways is a consist that will walk apart in both
+ * directions the moment it moves -- which is what three crash reports turned
+ * out to be. Cheap enough to ask after anything that joins or turns a train.
+ * Usage: testnatoceni
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestFacings(std::span<std::string_view>)
+{
+	uint bad = 0;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t) continue;
+		const Train *unit = nullptr;
+		uint index = 0;
+		for (const Train *u = t; u != nullptr; u = u->Next(), index++) {
+			if (!u->IsArticulatedPart()) {
+				unit = u;
+				continue;
+			}
+			if (unit == nullptr || u->direction == unit->direction) continue;
+			bad++;
+			IConsolePrint(CC_ERROR, "testnatoceni: {} {} - clanek {} na ({},{}) smer {}, jeho hlava smer {}",
+					t->IsFrontEngine() ? "vlak" : "rada", t->IsFrontEngine() ? t->unitnumber : (UnitID)0,
+					index, TileX(u->tile), TileY(u->tile), to_underlying(u->direction), to_underlying(unit->direction));
+		}
+	}
+	IConsolePrint(bad != 0 ? CC_ERROR : CC_INFO, "testnatoceni: rozhozenych clanku {}.", bad);
+	return true;
+}
+
+/**
  * Fill a road vehicle with its own cargo, without a station or an industry.
  * A set draws a loaded vehicle differently from an empty one, and reading
  * which picture it draws needs a vehicle that has something in it; getting
@@ -8607,6 +8639,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testtvar",                ConTestWagonShape);
 	IConsole::CmdRegister("testvagonky",             ConTestWagonLengths);
 	IConsole::CmdRegister("testnalozit",             ConTestFillRoadVehicle);
+	IConsole::CmdRegister("testnatoceni",            ConTestFacings);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
