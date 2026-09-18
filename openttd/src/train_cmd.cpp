@@ -10786,6 +10786,28 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							prev == nullptr ? 0 : prev->track.base());
 					CrashLog::SetNote(what);
 					LogAnomaly("{}", what);
+
+					/* And then carry on, if there is any track here to carry on
+					 * along. A follower works out its track from where the
+					 * vehicle ahead of it is, and comes out with nothing when
+					 * that vehicle is not where it should be -- behind it
+					 * instead of in front of it, which is the consist come
+					 * apart. That is a fault and is said so above; what it must
+					 * not be is the end of the player's game. The tile's own
+					 * track is not the right answer, only a real one: the piece
+					 * stays on the rails, the train can be picked up, and the
+					 * record has the whole of it for reading afterwards.
+					 *
+					 * Nothing can be done when the tile has no track at all --
+					 * there is nowhere to put the vehicle -- and that is a
+					 * different fault, so it still ends here. */
+					TrackBits usable = bits;
+					usable.Reset(Track::Wormhole);
+					usable.Reset(Track::Depot);
+					if (usable.Any()) {
+						chosen_track = TrackBits{FindFirstTrack(usable)};
+						LogAnomaly("krok ROZBITY: pokracuje se po koleji {:#x} na ({},{})", chosen_track.base(), TileX(gp.new_tile), TileY(gp.new_tile));
+					}
 				}
 				assert(chosen_track.Count() == 1 && !chosen_track.Any({Track::Wormhole, Track::Depot}));
 				Direction chosen_dir = VehicleEnterTileCoordinates(gp, enterdir, TrackBitsToTrack(chosen_track));

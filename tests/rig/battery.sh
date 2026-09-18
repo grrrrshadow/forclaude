@@ -14,21 +14,42 @@ H=$S/ttdhome
 # buildable, and the flattest, least watery setting the generator has. With
 # both, three runs of the same scene come out identical line for line.
 #
-# The climate belongs in here for the same reason, and it was the one setting
-# left out: the home's own openttd.cfg decided it, and the game writes that
-# file every time it exits -- so a scene played from a savegame of another
-# climate, or a game of the player's opened in this home, left the next run's
-# new games in that climate. Three scenes then built themselves somewhere else
-# on a different map and came out with different numbers, which reads as a
-# regression and is nothing of the sort.
+# Everything the generator reads belongs in here, and most of it was left to
+# the home's own openttd.cfg: the game writes that file every time it exits,
+# so a scene played from a savegame -- or a game of the player's opened in
+# this home to look at something -- left the next run's new games with that
+# game's climate, map size, year, towns and industries. Scenes then built
+# themselves somewhere else on a different map: three of them came out with
+# different numbers the first time this happened, and two failed to build at
+# all the second. Both read as a regression and were nothing of the sort.
 #
-# Changing any of these four makes a different map and therefore different
-# numbers in the stable file: it is a re-baselining, not a regression.
+# Changing any of these makes a different map and therefore different numbers
+# in the stable file: it is a re-baselining, not a regression.
 NEWGAME='setting_newgame game_creation.landscape toyland
 setting_newgame game_creation.generation_seed 1
+setting_newgame game_creation.map_x 8
+setting_newgame game_creation.map_y 8
+setting_newgame game_creation.starting_year 1950
+setting_newgame game_creation.land_generator 1
+setting_newgame game_creation.variety 0
+setting_newgame game_creation.tree_placer 2
+setting_newgame game_creation.amount_of_rivers 2
 setting_newgame difficulty.terrain_type 0
 setting_newgame difficulty.quantity_sea_lakes 0
+setting_newgame difficulty.number_towns 2
+setting_newgame difficulty.industry_density 4
 newgame'
+
+# The game writes the home's openttd.cfg every time it exits, with whatever
+# settings the game it just played had. A scene played from a savegame
+# therefore hands the next scene that savegame's settings -- and not only the
+# map's: a scene that funds an industry or founds a town reads settings the
+# block above says nothing about. Rather than chase them one at a time, the
+# config is put back the way it was after every scene, so each one starts from
+# the same place whatever the one before it played.
+CFG=$H/.config/openttd/openttd.cfg
+CFG_KEEP=$S/battery_openttd.cfg
+cp "$CFG" "$CFG_KEEP"
 
 run_scene() { # name scr-content ticks extra-args
   local name=$1 scr=$2 ticks=$3; shift 3
@@ -39,6 +60,7 @@ run_scene() { # name scr-content ticks extra-args
   # that silently ran every save scene on a fresh map for weeks.
   case "$*" in *-g*) : > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr ;; esac
   HOME=$H timeout 300 $S/build/openttd -vnull:ticks=$ticks -snull -mnull "$@" > $S/reg_$name.log 2>&1
+  cp "$CFG_KEEP" "$CFG"
   local spoj=$(grep -c 'spojeno' $S/reg_$name.log)
   local hav=$(grep -c 'HAVAROVAL' $S/reg_$name.log)
   local srz=$(grep -c 'Srazka' $S/reg_$name.log)
