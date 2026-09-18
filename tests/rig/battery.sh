@@ -71,7 +71,10 @@ run_scene() { # name scr-content ticks extra-args
   # The anomaly record (anomaly_log.h): lines the game writes when it had to
   # work around something. Always on, so a scene that starts writing them is
   # saying something changed even when every other counter holds.
-  local zaz=$(grep -c 'ZAZNAM:' $S/reg_$name.log)
+  # The temporary consist dump (VYPIS, see LogConsistState()) writes to the
+  # same record and would drown this counter, which is here to say that
+  # something happened that should not have. It goes out with the dump.
+  local zaz=$(grep 'ZAZNAM:' $S/reg_$name.log | grep -vc 'VYPIS')
   # Road vehicles boarding and leaving trains (road_on_rail.h): boardings plus
   # alightings, so a scene where the ride works counts an even number of them.
   local aut=$(( $(grep -c 'nalozeno na vlak' $S/reg_$name.log) + $(grep -c 'slozeno z vlaku' $S/reg_$name.log) ))

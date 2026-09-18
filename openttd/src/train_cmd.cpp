@@ -4645,6 +4645,95 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 }
 
 /**
+ * Write the whole of a consist into the record, one line per vehicle: what it
+ * is, where it stands, which way it faces, what track it is on and how far it
+ * is from the vehicle ahead of it in movement order against how far it should
+ * be.
+ *
+ * TEMPORARY. This is here to catch a consist that comes apart while being
+ * coupled -- the player plays a savegame where it happens within a few minutes
+ * and there is no other way to see the state the coupling left behind. It is
+ * to come out again once that is understood: the record is for things the game
+ * had to work around, not for a running commentary.
+ *
+ * @param consist the train, its list head
+ * @param why     what the dump is about, said on the first line
+ */
+static void LogConsistState(const Train *consist, std::string_view why)
+{
+	const Train *first = consist->First();
+	/* Every line carries the number of the dump it belongs to. The record
+	 * writes a repeated line only once in a while (see LogAnomaly()), and two
+	 * dumps of a train that has not moved are the same lines twice -- which is
+	 * exactly the pair worth comparing, so they have to be told apart. */
+	static uint dump_no = 0;
+	dump_no++;
+	LogAnomaly("VYPIS #{} {}: {} {}, {} clanku, couva {}, rychlost {}, rozkaz {}, celo {}",
+			dump_no, why, first->IsFrontEngine() ? "vlak" : "rada", first->IsFrontEngine() ? first->unitnumber : (UnitID)0,
+			CountVehiclesInChain(first), first->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+			first->cur_speed, first->current_order.GetType(),
+			first->GetMovingFront() == first ? "hlava seznamu" : "konec seznamu");
+
+	uint index = 0;
+	for (const Train *u = first; u != nullptr; u = u->Next(), index++) {
+		const Train *ahead = u->GetMovingPrev();
+		int gap = -1;
+		int want = -1;
+		if (ahead != nullptr) {
+			gap = std::max(abs(ahead->x_pos - u->x_pos), abs(ahead->y_pos - u->y_pos));
+			want = ahead->CalcNextVehicleOffset();
+		}
+		LogAnomaly("VYPIS #{}  {:2d} {:5} poz ({},{},{}) smer {} kolej {:#x} delka {} mezera {} chce {} preklopen {} vezeno {}",
+				dump_no, index, u->IsArticulatedPart() ? "cast" : (u->IsEngine() ? "masin" : "vagon"),
+				u->x_pos, u->y_pos, u->z_pos, to_underlying(u->direction), u->track.base(),
+				u->gcache.cached_veh_length, gap, want,
+				u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne",
+				u->carrying == VehicleID::Invalid() ? -1 : (int)u->carrying.base());
+	}
+}
+
+/**
+ * Does the list agree with the ground? Walk the consist in movement order and
+ * check that each vehicle stands behind the one it follows.
+ *
+ * This is the one thing a coupling must leave true. Splicing two lists
+ * together says nothing about where the vehicles stand: the two ends that meet
+ * in the middle of the new list have to be the two that meet on the rails, and
+ * when they are not, the list runs one way and the train lies the other. Then
+ * the close-up walk drags vehicles through each other -- pieces end up stacked,
+ * a rake looks shorter than it was, an engine appears at the end it did not
+ * come back to -- and a few tiles later a follower asks which track connects it
+ * to the vehicle ahead, finds it behind instead, and the game has nowhere to go.
+ * Every crash report of this so far reads that way.
+ *
+ * Said rather than mended: what to do about it is a decision, and a decision
+ * wants the state it was made on, which is what the dump above is for.
+ *
+ * @param consist the freshly joined train
+ * @return whether the list and the ground agree
+ */
+static bool ConsistListAgreesWithGround(const Train *consist)
+{
+	bool ok = true;
+	uint index = 0;
+	for (const Train *u = consist->GetMovingFront(); u != nullptr; u = u->GetMovingNext(), index++) {
+		const Train *next = u->GetMovingNext();
+		if (next == nullptr) break;
+		/* The one it pulls must lie behind it. Behind is measured against the
+		 * way it is travelling, so a vehicle on a curve -- up to 45 degrees off
+		 * the line to its neighbour -- is still behind and still right. */
+		TileIndexDiffC ahead = TileIndexDiffCByDir(u->GetMovingDirection());
+		int towards_x = next->x_pos - u->x_pos;
+		int towards_y = next->y_pos - u->y_pos;
+		if (ahead.x * towards_x + ahead.y * towards_y <= 2) continue;
+		ok = false;
+		LogAnomaly("SPOJENI ROZHAZENE: clanek {} na ({},{}) stoji pred clankem {} na ({},{}), ktery ho ma tahnout (smer jizdy {})",
+				index + 1, next->x_pos, next->y_pos, index, u->x_pos, u->y_pos, to_underlying(u->GetMovingDirection()));
+	}
+	return ok;
+}
+
+/**
  * Pull a freshly coupled part up against the rest of its train, closing the gap
  * the coupling was made across.
  *
@@ -6463,7 +6552,15 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 
 	/* The two halves were joined across a gap; walk it shut before anything
 	 * tries to drive this train. */
+	LogConsistState(new_head, "po sesiti, pred dotazenim"); // TEMPORARY, see LogConsistState()
+	/* Before anything is dragged anywhere: does the list the splice produced
+	 * agree with where the vehicles actually stand? */
+	bool agrees = ConsistListAgreesWithGround(new_head);
 	CloseUpCoupledConsist(new_head);
+	LogConsistState(new_head, "po dotazeni"); // TEMPORARY, see LogConsistState()
+	if (agrees && !ConsistListAgreesWithGround(new_head)) {
+		LogAnomaly("SPOJENI ROZHAZENE: seznam sedel po sesiti a nesedi po dotazeni - rozhodilo to dotazeni");
+	}
 
 	if (_show_train_orientation) {
 		const Train *front = new_head->GetMovingFront();
@@ -10823,6 +10920,18 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							prev == nullptr ? "nikdo" : (prev == v->Next() ? "dalsi v retezu" : (prev == v->Previous() ? "predchozi v retezu" : "nesoused")));
 					CrashLog::SetNote(what);
 					LogAnomaly("{}", what);
+
+					/* And the whole consist with it, once per train per tick:
+					 * the same tick produces a hundred of these lines and one
+					 * dump is enough to read the state from. TEMPORARY, see
+					 * LogConsistState(). */
+					static TimerGameTick::TickCounter dumped_tick = 0;
+					static VehicleID dumped_train = VehicleID::Invalid();
+					if (dumped_tick != TimerGameTick::counter || dumped_train != first->index) {
+						dumped_tick = TimerGameTick::counter;
+						dumped_train = first->index;
+						LogConsistState(first, "pri rozbitem kroku");
+					}
 
 					/* And then carry on, if there is any track here to carry on
 					 * along. A follower works out its track from where the
