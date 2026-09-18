@@ -47,9 +47,14 @@ newgame'
 # block above says nothing about. Rather than chase them one at a time, the
 # config is put back the way it was after every scene, so each one starts from
 # the same place whatever the one before it played.
+# The kept copy is the battery's own, not whatever the home happens to hold
+# when a run starts: anything played in this home between two runs -- a
+# savegame opened to look at something -- leaves its settings behind, and
+# snapshotting those would hand them to every scene of the next run. The first
+# run ever takes the copy; every run after it puts that copy back first.
 CFG=$H/.config/openttd/openttd.cfg
 CFG_KEEP=$S/battery_openttd.cfg
-cp "$CFG" "$CFG_KEEP"
+if [ -f "$CFG_KEEP" ]; then cp "$CFG_KEEP" "$CFG"; else cp "$CFG" "$CFG_KEEP"; fi
 
 run_scene() { # name scr-content ticks extra-args
   local name=$1 scr=$2 ticks=$3; shift 3

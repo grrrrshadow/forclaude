@@ -137,12 +137,24 @@ void UserErrorI(const std::string &str)
 /* Doxygen in error_func.h */
 void FatalErrorI(const std::string &str)
 {
+	/* Into our own record first, before anything waits for the player.
+	 * Everything below this line needs a click: the box is shown, and only
+	 * once it is dismissed does abort() reach the crash handler that writes
+	 * the report, the savegame and the screenshot. A player who cannot reach
+	 * that button -- the mouse pointer is not drawn outside the box on the
+	 * player's machine, so hitting OK is a matter of luck -- is left with a
+	 * game to kill and nothing written down at all. The record is flushed
+	 * line by line, so this line survives being killed. */
+	LogAnomaly("KONEC HRY: {}", str);
+
+	/* Set the error message for the crash log before the box, for the same
+	 * reason: a report made by a handler further down still has it. */
+	CrashLog::SetErrorMessage(str);
+
 	if (VideoDriver::GetInstance() == nullptr || VideoDriver::GetInstance()->HasGUI()) {
 		ShowOSErrorBox(str, true);
 	}
 
-	/* Set the error message for the crash log and then invoke it. */
-	CrashLog::SetErrorMessage(str);
 	abort();
 }
 
