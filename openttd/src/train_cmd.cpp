@@ -6343,11 +6343,17 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * shed by its orders and back at its rake nose first, came apart on the
 	 * first step (save sivy2). Wagons can only hang off the tender, so it
 	 * stands here, the window says why (IsCoupleHeldNoseFirst()), and the
-	 * player turns it round -- or stops turning it round on the way. */
+	 * player turns it round -- or stops turning it round on the way.
+	 *
+	 * TEMPORARY: the refusal is off, the record still says it happened. The
+	 * hold was put in because the coupling that follows it came apart, and
+	 * since then the reason one came apart has been found and mended, so the
+	 * question is open again: the way to answer it is to let the coupling
+	 * through and watch. Not for a player -- this can end the game. Put the
+	 * refusal back, or take the hold out for good, once we know. */
 	if (!ConsistCanBeRelinked(leading) && MeetsOtherHeadEndFirst(leading, trailing)) {
 		LogAnomaly("Vlak {}: spojeni nosem napred - masinka s tendrem je jeden vuz a vozy jdou jen za tendr; stoji na ({},{}) a ceka na otoceni",
 				leading->unitnumber, TileX(leading->tile), TileY(leading->tile));
-		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
 	}
 
 	/* Said here rather than above, where it is worked out: a train standing
@@ -6414,9 +6420,10 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * cleanly: a casualty about to be straightened is laid down head nearest
 	 * the tow (LayCasualtyAlongTow()), so it never needs turning. */
 	if (ends_clean && !ConsistCanBeRelinked(trailing) && !MeetsOtherHeadEndFirst(trailing, leading)) {
-		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz - seznam se otocit neda, spojeni odmitnuto",
+		/* TEMPORARY, and for the same reason as the one above: off to see
+		 * what the coupling does now. */
+		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz - seznam se otocit neda, spojeni pousteno pres zakaz",
 				leading->unitnumber, trailing->unitnumber);
-		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
