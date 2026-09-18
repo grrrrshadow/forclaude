@@ -3741,6 +3741,80 @@ static bool ConTestListEngineModels(std::span<std::string_view>)
 }
 
 /**
+ * How long every wagon the company can buy really is, and how many pieces a
+ * set builds it out of. One wagon of each is bought in a shed put up for the
+ * purpose, measured and sold again.
+ *
+ * Length is what decides which wagon can carry which road vehicle
+ * (road_on_rail.h), and it cannot be read off an engine: a set builds a long
+ * wagon out of several pieces and only says how long each piece is through a
+ * callback, which is only answered once the wagon exists. So this buys one.
+ * Usage: testvagonky
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestWagonLengths(std::span<std::string_view>)
+{
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testvagonky: only in a running game.");
+		return true;
+	}
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testvagonky: no company to buy as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	/* One flat clear tile is all a shed needs. */
+	TileIndex depot = INVALID_TILE;
+	for (uint y = 4; y < Map::SizeY() - 4 && depot == INVALID_TILE; y++) {
+		for (uint x = 4; x < Map::SizeX() - 4; x++) {
+			TileIndex t = TileXY(x, y);
+			if (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) continue;
+			if (GetTileSlope(t) != SLOPE_FLAT) continue;
+			if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, t, RAILTYPE_RAIL, DiagDirection::SW).Succeeded()) {
+				depot = t;
+				break;
+			}
+		}
+	}
+	if (depot == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testvagonky: nikde se nepodarilo postavit depo.");
+		return true;
+	}
+
+	uint counted = 0;
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (RailVehInfo(e->index)->railveh_type != RailVehicleType::Wagon) continue;
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) {
+			IConsolePrint(CC_ERROR, "testvagonky: {:<28} nekoupen - {}", GetString(e->info.string_id), RefusalReason(cost));
+			continue;
+		}
+		const Train *t = Train::GetIfValid(veh);
+		if (t == nullptr) continue;
+		uint pieces = 0, length = 0;
+		for (const Train *p = t; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+			pieces++;
+			length += p->gcache.cached_veh_length;
+		}
+		IConsolePrint(CC_DEFAULT, "testvagonky: {:<28} delka {:2d} v {} kusech, unese auto do delky {}",
+				GetString(e->info.string_id), length, pieces, length);
+		counted++;
+		Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, veh, false, false, ClientID::Invalid);
+	}
+	Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, depot);
+	IConsolePrint(CC_INFO, "testvagonky: zmereno {} vagonu (delka je v osminach dlazdice, cela dlazdice je 16).", counted);
+	return true;
+}
+
+/**
  * Count the effect vehicles alive, by kind.
  * Smoke and explosions are effect vehicles that each count their own life
  * down; a kind whose count never falls is a kind that never expires. That is
@@ -8489,6 +8563,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodtahovka",           ConTestMakeRescueEngine);
 	IConsole::CmdRegister("testvozy",                ConTestListUnits);
 	IConsole::CmdRegister("testtvar",                ConTestWagonShape);
+	IConsole::CmdRegister("testvagonky",             ConTestWagonLengths);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
