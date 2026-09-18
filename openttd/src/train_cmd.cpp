@@ -10778,12 +10778,29 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				 * report, because most of the time it no longer ends in a crash:
 				 * the game copes and the player never knows it happened. */
 				if (chosen_track.Count() != 1 || chosen_track.Any({Track::Wormhole, Track::Depot})) {
-					std::string what = fmt::format("krok ROZBITY: {} z ({},{}) na ({},{}), enterdir {}, chosen {:#x}, smer {}, prev {} na ({},{}) kolej {:#x}",
+					/* Which of the two neighbours the piece ahead of it actually
+					 * is, and which end of the chain the consist is driving
+					 * from. Three of these have now been reported and all three
+					 * read the same: a vehicle going one way while it faces the
+					 * other, with the piece it follows behind it instead of in
+					 * front. That is the movement order of the consist
+					 * disagreeing with where its vehicles stand, and which way
+					 * round it is disagreeing is the whole question -- so the
+					 * chain says so itself here. */
+					uint index = 0;
+					for (const Train *u = first; u != nullptr && u != v; u = u->Next()) index++;
+					std::string what = fmt::format("krok ROZBITY: {} z ({},{}) na ({},{}), enterdir {}, chosen {:#x}, smer {}, prev {} na ({},{}) kolej {:#x}"
+							" | souprava {} {}, couva {}, clanek {} z {}, prev je {}",
 							v->IsEngine() ? "masinka" : "vagon", TileX(gp.old_tile), TileY(gp.old_tile), TileX(gp.new_tile), TileY(gp.new_tile),
 							to_underlying(enterdir), chosen_track.base(), to_underlying(v->direction),
 							prev == nullptr ? "nikdo" : (prev->IsEngine() ? "masinka" : "vagon"),
 							prev == nullptr ? 0 : TileX(prev->tile), prev == nullptr ? 0 : TileY(prev->tile),
-							prev == nullptr ? 0 : prev->track.base());
+							prev == nullptr ? 0 : prev->track.base(),
+							first->IsFrontEngine() ? "vlak" : (first->IsFreeWagon() ? "rada" : "?"),
+							first->IsFrontEngine() ? first->unitnumber : (UnitID)0,
+							first->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+							index, CountVehiclesInChain(first),
+							prev == nullptr ? "nikdo" : (prev == v->Next() ? "dalsi v retezu" : (prev == v->Previous() ? "predchozi v retezu" : "nesoused")));
 					CrashLog::SetNote(what);
 					LogAnomaly("{}", what);
 
