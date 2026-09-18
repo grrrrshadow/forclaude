@@ -5005,6 +5005,43 @@ static Train *ReverseConsistOrder(Train *head)
 		InsertInConsist(units[i]->GetLastEnginePart(), units[i - 1]);
 	}
 
+	/* A wagon drawn in several pieces has to be turned round inside itself as
+	 * well. The list says where each piece of a unit stands -- the first piece
+	 * is its front and the rest follow behind it -- so a unit whose place in
+	 * the train has just been mirrored is now read from the wrong end: its
+	 * pieces are laid out along the rails the opposite way to the order the
+	 * list gives them.
+	 *
+	 * Nothing moves on the ground here either: the pieces trade places with
+	 * each other, exactly as ReverseTrainSwapVeh() has whole vehicles trade
+	 * places when a train is turned round. The piece that was at the back of
+	 * the wagon is now the one at its front, which is what the list says.
+	 *
+	 * Left undone, the player's own game showed what follows: every wagon of a
+	 * freshly coupled train lay backwards, the gap-closing walk then dragged
+	 * the pieces into each other until the train had folded up -- wagons ahead
+	 * of the engine, the engine under the last wagon, the two halves driving
+	 * apart -- and a few tiles later a piece asked which track connected it to
+	 * the one ahead and found it behind. */
+	for (Train *u : units) {
+		std::vector<Train *> pieces;
+		for (Train *p = u; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) pieces.push_back(p);
+		for (size_t i = 0, j = pieces.size(); i + 1 < j--; i++) {
+			Train *a = pieces[i];
+			Train *b = pieces[j];
+			bool a_hidden = a->vehstatus.Test(VehState::Hidden);
+			bool b_hidden = b->vehstatus.Test(VehState::Hidden);
+			a->vehstatus.Set(VehState::Hidden, b_hidden);
+			b->vehstatus.Set(VehState::Hidden, a_hidden);
+			std::swap(a->track, b->track);
+			std::swap(a->direction, b->direction);
+			std::swap(a->x_pos, b->x_pos);
+			std::swap(a->y_pos, b->y_pos);
+			std::swap(a->tile, b->tile);
+			std::swap(a->z_pos, b->z_pos);
+		}
+	}
+
 	/* A dual-headed engine lies in the list front head first, rear head last,
 	 * and everything that tidies a train after a change relies on that: the
 	 * rear is moved to sit behind its front wherever it is found. Turned
