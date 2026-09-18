@@ -2145,6 +2145,7 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 	 * Funded as the game's own deity would fund one -- that path may place it
 	 * anywhere the layout fits, so several spots are offered until one takes. */
 	bool ind_built = false;
+	CommandCost last_refusal;
 	{
 		/* Whatever the ground beside the strip looks like, the industry needs
 		 * a flat patch; the strip finder only ever guaranteed the strip row. */
@@ -2159,6 +2160,7 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 				uint ix = x0 + 10 + dx, iy = y0 + dy;
 				if (ix >= Map::SizeX() - 2 || iy >= Map::SizeY() - 2) continue;
 				for (uint layout = 0; layout < (uint)GetIndustrySpec(ind_type)->layouts.size() && !ind_built; layout++) {
+					last_refusal = Command<Commands::BuildIndustry>::Do(DoCommandFlags{}, TileXY(ix, iy), ind_type, layout, true, 0);
 					/* A fixed number, not InteractiveRandom(): that generator is
 					 * not part of the game's own state and gives a different
 					 * answer every run, so the industry took in one run of the
@@ -2174,7 +2176,11 @@ static bool ConTestCargoScene(std::span<std::string_view> argv)
 		}
 	}
 	if (!ind_built) {
-		IConsolePrint(CC_ERROR, "testnaklad: industry would not build anywhere beside the platform.");
+		/* With the reason the last spot gave: this scene has come out empty
+		 * every so often for a long time and guessing why has cost three
+		 * readings of the battery. */
+		IConsolePrint(CC_ERROR, "testnaklad: industry would not build anywhere beside the platform - {} (prumysl {}, typ {})",
+				RefusalReason(last_refusal), GetString(GetIndustrySpec(ind_type)->name), ind_type);
 		return true;
 	}
 
