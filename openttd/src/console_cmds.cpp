@@ -4070,17 +4070,45 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
  * head and invisible articulated pieces, so a wagon that looks like one vehicle
  * on the screen is several here, and anything put "on the wagon" lands on the
  * head -- at one end of it. Which is what this is for reading.
- * Usage: testtvar <unit number>
+ *
+ * The same for a road vehicle ('testtvar auto <unit number>'), which is the
+ * other half of the same question: a lorry with a trailer is one vehicle to
+ * the player and several pieces here, and how long the whole of it is decides
+ * whether it fits on a wagon.
+ * Usage: testtvar <unit number> | testtvar auto <unit number>
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestWagonShape(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
-		IConsolePrint(CC_HELP, "Print the shape of a train's wagons. Usage: 'testtvar <unit number>'.");
+		IConsolePrint(CC_HELP, "Print the shape of a train's wagons. Usage: 'testtvar <unit number>' or 'testtvar auto <unit number>'.");
 		return true;
 	}
-	auto punit = ParseInteger(argv[1]);
+	bool road = argv[1] == "auto";
+	if (road && argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Print the shape of a road vehicle. Usage: 'testtvar auto <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[road ? 2 : 1]);
 	if (!punit.has_value()) return false;
+
+	if (road) {
+		for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+			if (!rv->IsFrontEngine() || rv->unitnumber != (UnitID)*punit) continue;
+			uint index = 0;
+			for (const RoadVehicle *u = rv; u != nullptr; u = u->Next(), index++) {
+				IConsolePrint(CC_DEFAULT, "testtvar: auto {:2d} {} delka {} {}poz ({},{},{}) smer {} vezen {}",
+						index, u->IsArticulatedPart() ? "cast " : "hlava",
+						u->gcache.cached_veh_length,
+						u->IsArticulatedPart() ? "" : fmt::format("(celkem {}) ", u->gcache.cached_total_length),
+						u->x_pos, u->y_pos, u->z_pos, (int)u->direction,
+						u->carried_by == VehicleID::Invalid() ? -1 : (int)u->carried_by.base());
+			}
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testtvar: auto {} nenalezeno.", argv[2]);
+		return true;
+	}
 
 	for (const Train *t : Train::Iterate()) {
 		if (!t->IsFrontEngine() || t->unitnumber != (UnitID)*punit) continue;
