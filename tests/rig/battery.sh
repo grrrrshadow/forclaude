@@ -25,14 +25,14 @@ H=$S/ttdhome
 #
 # Changing any of these makes a different map and therefore different numbers
 # in the stable file: it is a re-baselining, not a regression.
+# The seed is handed to the newgame command itself, not left in the settings
+# below. That command carries a seed of its own, and when it is not given one
+# it puts a fresh random number into the setting before generating: the seed
+# line below was therefore overwritten every single time, and every scene that
+# starts a new game has been playing a different map -- the very thing this
+# block says it stops. The setting is kept as well, so anything that reads it
+# rather than the command's argument sees the same number.
 NEWGAME='setting_newgame game_creation.landscape toyland
-# The seed is handed to 'newgame' itself, not left in the settings: the
-# console command takes a seed of its own and, when it is not given one,
-# quietly puts a fresh random number in this setting before generating. The
-# line below was therefore overwritten every single time and every scene that
-# starts a new game has been playing a different map -- the very thing the
-# block above says it stops. It is kept as well, so anything that reads the
-# setting rather than the command's argument sees the same number.
 setting_newgame game_creation.generation_seed 1
 setting_newgame game_creation.map_x 8
 setting_newgame game_creation.map_y 8
