@@ -682,6 +682,21 @@ static void AfterLoadDecoupleCounts()
 	if (couple_orders != 0) {
 		IConsolePrint(CC_INFO, "Prevedeno {} rozkazu pripojeni na nenakladat/nevykladat (pripojit a jet).", couple_orders);
 	}
+
+	/* The same for a road vehicle's two old boarding flags, now one field with
+	 * four ways in it. See Order::MigrateLegacyBoardMode(). */
+	size_t boarding = 0;
+	for (OrderList *ol : OrderList::Iterate()) {
+		for (Order &o : ol->GetOrders()) {
+			if (o.MigrateLegacyBoardMode()) boarding++;
+		}
+	}
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (v->current_order.MigrateLegacyBoardMode()) boarding++;
+	}
+	if (boarding != 0) {
+		IConsolePrint(CC_INFO, "Prevedeno {} rozkazu aut na novy zapis nakladani na koleje.", boarding);
+	}
 }
 
 /** @copydoc AfterLoadLegacyDecoupleImportReferences */

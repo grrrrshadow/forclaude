@@ -179,22 +179,23 @@ private:
 	bool automatic_departure = false;
 
 	/**
-	 * A road vehicle's order: at this station, board a train standing at the
-	 * platform instead of driving on, and ride it to the station the next
-	 * order names. Dedicated field, same rationale as decouple_count ("Bug
-	 * D"). See road_on_rail.h.
+	 * A road vehicle's order: how it gets itself carried on from this station,
+	 * instead of driving on. One of four ways, or none at all. Dedicated
+	 * field, same rationale as decouple_count ("Bug D"). See OrderBoardMode
+	 * and road_on_rail.h.
 	 */
-	bool load_on_train = false;
+	OrderBoardMode board_mode = OrderBoardMode::None;
 
 	/**
-	 * The other way a road vehicle boards at this station: onto any wagon
-	 * fitted for road vehicles that stands here -- a headless rake, a
-	 * shunter marshalling such wagons into one -- without asking where it is
-	 * going. The vehicle rides wherever the wagon goes and gets off where its
-	 * next order names, the same as after boarding a train. The two are
-	 * exclusive; setting one clears the other. See road_on_rail.h.
+	 * What #board_mode was before it was one field: two flags, "board a train
+	 * going my way" and "board any wagons standing here". They are read from
+	 * old savegames and turned into the field above (AfterLoadGame()), and
+	 * they are still written, always false, because a savegame's field list is
+	 * matched by name and a game saved with them cannot be loaded by a build
+	 * that has dropped them.
 	 */
-	bool load_on_wagons = false;
+	bool load_on_train = false;
+	bool load_on_wagons = false; ///< @copydoc load_on_train
 
 	/**
 	 * A train passing this station waypoint sounds its horn there. The
@@ -405,6 +406,29 @@ public:
 		return true;
 	}
 
+	/**
+	 * Turn the two old boarding flags into the one #board_mode field, once, on
+	 * load.
+	 *
+	 * "By train" always meant a train going where this vehicle is going, and
+	 * "on wagons" always meant whatever stands here -- so each old flag is one
+	 * of the four ways, and the player's orders come through saying what they
+	 * said. Emptying the old fields is what keeps "has an old field set" a
+	 * reliable mark of a save written before this.
+	 *
+	 * @return whether there was anything to convert.
+	 */
+	bool MigrateLegacyBoardMode()
+	{
+		if (!this->load_on_train && !this->load_on_wagons) return false;
+		if (this->board_mode == OrderBoardMode::None) {
+			this->board_mode = this->load_on_train ? OrderBoardMode::TrainToNext : OrderBoardMode::WagonsAnywhere;
+		}
+		this->load_on_train = false;
+		this->load_on_wagons = false;
+		return true;
+	}
+
 	/** Should we delay leaving this station until a partner train arrives to couple with? @pre IsType(OT_GOTO_STATION) */
 	inline bool ShouldWaitForCouple() const { return this->wait_for_couple; }
 
@@ -446,20 +470,20 @@ public:
 	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
 	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }
 
-	/** Does a road vehicle board a train at this station instead of driving on? @pre IsType(OT_GOTO_STATION) */
-	inline bool ShouldLoadOnTrain() const { return this->load_on_train; }
+	/** How a road vehicle gets itself carried on from this station. @pre IsType(OT_GOTO_STATION) */
+	inline OrderBoardMode GetBoardMode() const { return this->board_mode; }
 
-	/** Set whether a road vehicle boards a train at this station. */
-	inline void SetLoadOnTrain(bool load) { this->load_on_train = load; }
+	/** Set how a road vehicle gets itself carried on from this station. */
+	inline void SetBoardMode(OrderBoardMode mode) { this->board_mode = mode; }
 
-	/** Does a road vehicle board whatever fitted wagon stands at this station, wherever it goes? @pre IsType(OT_GOTO_STATION) */
-	inline bool ShouldLoadOnWagons() const { return this->load_on_wagons; }
+	/** Does a road vehicle board something at this station at all? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldBoardAtStation() const { return this->board_mode != OrderBoardMode::None; }
 
-	/** Set whether a road vehicle boards any fitted wagon standing at this station. */
-	inline void SetLoadOnWagons(bool load) { this->load_on_wagons = load; }
+	/** Does it ask for a ride that is going where it is going, rather than any ride at all? */
+	inline bool BoardsOnlyTowardsNext() const { return this->board_mode == OrderBoardMode::TrainToNext || this->board_mode == OrderBoardMode::WagonsToNext; }
 
-	/** Does a road vehicle board something at this station, either way? @pre IsType(OT_GOTO_STATION) */
-	inline bool ShouldBoardAtStation() const { return this->load_on_train || this->load_on_wagons; }
+	/** Does it want a train (or a shunter), rather than a rake of wagons standing by itself? */
+	inline bool BoardsATrain() const { return this->board_mode == OrderBoardMode::TrainToNext || this->board_mode == OrderBoardMode::TrainAnywhere; }
 
 	/** Should a train visiting this depot turn around there? @pre IsType(OT_GOTO_DEPOT) */
 	inline bool ShouldTurnAroundInDepot() const { return this->turn_around_in_depot; }

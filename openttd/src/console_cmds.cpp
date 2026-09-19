@@ -5272,18 +5272,18 @@ static bool ConTestRoadOrders(std::span<std::string_view> argv)
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (!rv->IsFrontEngine()) continue;
 		if (punit.has_value() && rv->unitnumber != (UnitID)*punit) continue;
-		IConsolePrint(CC_DEFAULT, "auto {}: zivy rozkaz typ {} kam {} naloz-na-vlak {}; c.{} z {} rozkazu; posledni stanice {} ceka-na-vlak {} vezen {}",
+		IConsolePrint(CC_DEFAULT, "auto {}: zivy rozkaz typ {} kam {} nakladani {}; c.{} z {} rozkazu; posledni stanice {} ceka-na-vlak {} vezen {}",
 				rv->unitnumber, to_underlying(rv->current_order.GetType()),
 				rv->current_order.IsType(OT_GOTO_STATION) ? (int)rv->current_order.GetDestination().ToStationID().base() : -1,
-				rv->current_order.ShouldLoadOnTrain() ? "ano" : "ne",
+				to_underlying(rv->current_order.GetBoardMode()),
 				rv->cur_real_order_index, rv->GetNumOrders(),
 				rv->last_station_visited == StationID::Invalid() ? -1 : (int)rv->last_station_visited.base(),
 				IsWaitingToBoardTrain(rv) ? "ano" : "ne", rv->IsCarried() ? "ano" : "ne");
 		VehicleOrderID i = 0;
 		for (const Order &o : rv->Orders()) {
-			IConsolePrint(CC_DEFAULT, "  {}{}: typ {} kam {} naloz-na-vlak {}", i == rv->cur_real_order_index ? "*" : " ", i,
+			IConsolePrint(CC_DEFAULT, "  {}{}: typ {} kam {} nakladani {}", i == rv->cur_real_order_index ? "*" : " ", i,
 					to_underlying(o.GetType()), o.IsType(OT_GOTO_STATION) ? (int)o.GetDestination().ToStationID().base() : -1,
-					o.ShouldLoadOnTrain() ? "ano" : "ne");
+					to_underlying(o.GetBoardMode()));
 			i++;
 		}
 	}
@@ -5888,9 +5888,10 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	}
 	/* "posun": the train is a shunter with nowhere to go -- one order, the
 	 * first station, where it then stands -- and the cars are told to board
-	 * whatever fitted wagon stands there rather than a train bound for their
-	 * next stop. A car boards it that way and never the other way. "vlakem"
-	 * keeps the shunter but gives the cars the by-train order, the control. */
+	 * any train standing there, wherever it goes, rather than one bound for
+	 * their next stop. A car boards it that way and never the other way.
+	 * "vlakem" keeps the shunter but gives the cars the by-train order, which
+	 * asks where the train is going; that is the control. */
 	bool shunter = argv.size() >= 3 && (argv[2] == "posun" || argv[2] == "vlakem");
 	bool by_train = argv.size() >= 3 && argv[2] == "vlakem";
 	/* "tirak": a road vehicle made of several pieces -- a lorry with a trailer
@@ -6092,7 +6093,8 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 					RefusalReason(ins_a), RefusalReason(ins_b), GetStationIndex(TileXY(x0 + 11, y0 + 1)), GetStationIndex(TileXY(x0 + 27, y0 + 1)));
 			return true;
 		}
-		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, (shunter && !by_train) ? MOF_LOAD_ON_WAGONS : MOF_LOAD_ON_TRAIN, 1);
+		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_BOARD_MODE,
+				to_underlying((shunter && !by_train) ? OrderBoardMode::TrainAnywhere : OrderBoardMode::TrainToNext));
 		if (mod.Failed()) {
 			IConsolePrint(CC_ERROR, "testautovlak: load-on-train order refused - {}", RefusalReason(mod));
 			return true;

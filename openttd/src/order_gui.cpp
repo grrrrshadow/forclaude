@@ -42,23 +42,6 @@
 
 #include "safeguards.h"
 
-/**
- * Is cargo distribution switched on for anything in this game?
- *
- * Four settings, one per kind of cargo, and any of them above "manual" means
- * the game sorts waiting cargo by where it is going and hands a vehicle only
- * what suits its route. That is the whole reason a rake left at a platform
- * needs to be told where its load is bound; with all four off, every load is
- * offered to everybody and saying it buys nothing.
- */
-static bool IsCargoDistributionOn()
-{
-	const LinkGraphSettings &lg = _settings_game.linkgraph;
-	return lg.distribution_pax != DistributionType::Manual || lg.distribution_mail != DistributionType::Manual ||
-			lg.distribution_armoured != DistributionType::Manual || lg.distribution_default != DistributionType::Manual;
-}
-
-
 /** Order load types that could be given to station orders. */
 static const StringID _station_load_types[][5][5] = {
 	{
@@ -206,6 +189,38 @@ static const StringID _order_couple_load_dropdown[] = {
 	STR_ORDER_COUPLE_LOAD_EMPTY,
 	STR_ORDER_COUPLE_LOAD_FULL,
 };
+
+/**
+ * How a road vehicle gets carried on from a station, as the player reads it.
+ * The four ways first and "none of them" last, which is the order they were
+ * asked for in; what each one means is in OrderBoardMode, and the list is
+ * kept beside the values it names so the two cannot drift apart.
+ */
+static const StringID _order_board_mode_dropdown[] = {
+	STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT,
+	STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE,
+	STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT,
+	STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE,
+	STR_ORDER_BOARD_MODE_NONE,
+};
+
+/** @copydoc _order_board_mode_dropdown */
+static const OrderBoardMode _order_board_mode_values[] = {
+	OrderBoardMode::TrainToNext,
+	OrderBoardMode::TrainAnywhere,
+	OrderBoardMode::WagonsToNext,
+	OrderBoardMode::WagonsAnywhere,
+	OrderBoardMode::None,
+};
+
+/** Which line of #_order_board_mode_dropdown shows a given way of boarding. */
+static int BoardModeToIndex(OrderBoardMode mode)
+{
+	for (size_t i = 0; i < std::size(_order_board_mode_values); i++) {
+		if (_order_board_mode_values[i] == mode) return (int)i;
+	}
+	return (int)std::size(_order_board_mode_values) - 1;
+}
 
 /**
  * Build the list of cargoes a coupling order can ask for: every cargo in the
@@ -400,8 +415,9 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * couple suffixes go below because there can be a whole filter of
 				 * them; a road vehicle has this one short word, and put below it
 				 * was written across the end-of-list line beneath. */
-				if (v->type == VehicleType::Road && order->ShouldLoadOnTrain()) line += GetString(STR_ORDER_LOAD_ON_TRAIN_SUFFIX);
-				if (v->type == VehicleType::Road && order->ShouldLoadOnWagons()) line += GetString(STR_ORDER_LOAD_ON_WAGONS_SUFFIX);
+				if (v->type == VehicleType::Road && order->ShouldBoardAtStation()) {
+					line += GetString(STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_TO_NEXT + to_underlying(order->GetBoardMode()) - 1);
+				}
 
 				/* How many vehicles stay with the train belongs on the order
 				 * line with everything else the order is going to do. A button
@@ -1429,13 +1445,13 @@ public:
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_WAYPOINT);
 				this->SetWidgetLoweredState(WID_O_HONK, order->ShouldHonk());
 			} else if (this->vehicle->type == VehicleType::Road && order != nullptr && order->IsType(OT_GOTO_STATION)) {
-				/* A road vehicle's station order: the two ways of boarding
-				 * here, one lit at a time. The player asked for one big button
-				 * to begin with, to be split up as the need arose; this is the
-				 * first split. See road_on_rail.h. */
+				/* A road vehicle's station order: how it gets carried on from
+				 * here. One big button to begin with, then two, now a dropdown
+				 * of five -- the four ways and none of them -- because four
+				 * buttons' worth of words does not fit across the window and
+				 * the player wanted the whole sentence readable. See
+				 * road_on_rail.h. */
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_ROAD);
-				this->SetWidgetLoweredState(WID_O_LOAD_ON_TRAIN, order->ShouldLoadOnTrain());
-				this->SetWidgetLoweredState(WID_O_LOAD_ON_WAGONS, order->ShouldLoadOnWagons());
 			} else {
 				/* Nothing to put in the row -- a waypoint order, the end of the
 				 * list, a vehicle that is not a train -- but the row stays open
@@ -1511,14 +1527,13 @@ public:
 			bool dropping = this->vehicle->type == VehicleType::Train && order != nullptr &&
 					order->IsType(OT_GOTO_STATION) && order->ShouldDecoupleOnDeparture();
 			if (dest_sel->SetDisplayedPlane(dropping ? 0 : SZSP_NONE)) this->couple_filter_resized = true;
-			if (dropping) {
-				/* It says nothing in a game where cargo goes on whatever comes:
-				 * there the station hands every load to every vehicle and the
-				 * wagons fill up on their own. Greyed rather than hidden, so a
-				 * player who wonders where it went can see it is there and,
-				 * from the tooltip, why it is not his to press. */
-				this->SetWidgetDisabledState(WID_O_DECOUPLE_CARGO_DEST, !IsCargoDistributionOn());
-			}
+			/* It used to be greyed out with cargo distribution off, because
+			 * without it a station hands every load to everybody and saying
+			 * where the wagons are bound bought nothing. It buys something
+			 * now: a road vehicle told to ride "on wagons meant for my next
+			 * stop" reads exactly this, and distribution has nothing to do
+			 * with cars. So the button has one meaning in every game -- this
+			 * rake is for that station -- and is never greyed. */
 		}
 
 		this->SetDirty();
@@ -1630,6 +1645,12 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) return {};
 				return GetString(STR_ORDER_COUPLE_LOAD_ANY + to_underlying(order->GetCoupleLoad()));
+			}
+
+			case WID_O_BOARD_MODE: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) return {};
+				return GetString(_order_board_mode_dropdown[BoardModeToIndex(order->GetBoardMode())]);
 			}
 
 			case WID_O_COUPLE_CARGO: {
@@ -1936,17 +1957,10 @@ public:
 				break;
 			}
 
-			case WID_O_LOAD_ON_TRAIN: {
+			case WID_O_BOARD_MODE: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_LOAD_ON_TRAIN, order->ShouldLoadOnTrain() ? 0 : 1);
-				break;
-			}
-
-			case WID_O_LOAD_ON_WAGONS: {
-				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
-				if (order == nullptr) break;
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_LOAD_ON_WAGONS, order->ShouldLoadOnWagons() ? 0 : 1);
+				ShowDropDownMenu(this, _order_board_mode_dropdown, BoardModeToIndex(order->GetBoardMode()), WID_O_BOARD_MODE, 0, 0);
 				break;
 			}
 
@@ -2170,6 +2184,11 @@ public:
 
 			case WID_O_COUPLE_LOAD:
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_COUPLE_LOAD, index);
+				break;
+
+			case WID_O_BOARD_MODE:
+				if (index < 0 || (size_t)index >= std::size(_order_board_mode_values)) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_BOARD_MODE, to_underlying(_order_board_mode_values[index]));
 				break;
 
 			case WID_O_COUPLE_CARGO:
@@ -2520,15 +2539,14 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 			EndContainer(),
 		EndContainer(),
-		/* A road vehicle's station order: the two ways of boarding here. One
-		 * big button to begin with, split as the need arose (the player's
-		 * wish): by a train that goes where the vehicle goes next, or onto any
-		 * fitted wagon standing here, wherever it may go. See road_on_rail.h. */
-		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_LOAD_ON_TRAIN), SetMinimalSize(186, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDER_LOAD_ON_TRAIN, STR_ORDER_LOAD_ON_TRAIN_TOOLTIP), SetResize(1, 0),
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_LOAD_ON_WAGONS), SetMinimalSize(186, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDER_LOAD_ON_WAGONS, STR_ORDER_LOAD_ON_WAGONS_TOOLTIP), SetResize(1, 0),
+		/* A road vehicle's station order: how it gets carried on from here.
+		 * The whole row is one dropdown, because the four ways plus "none"
+		 * cannot be written across four buttons in the width there is, and
+		 * what they say has to be readable -- a list has room for a sentence.
+		 * See road_on_rail.h. */
+		NWidget(NWID_HORIZONTAL),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_BOARD_MODE), SetMinimalSize(372, 12), SetFill(1, 0),
+													SetToolTip(STR_ORDER_BOARD_MODE_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

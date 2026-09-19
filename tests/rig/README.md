@@ -319,3 +319,21 @@ Found on the player's game with a steam engine coupling nose first and cargo
 distribution on. The rig ran that coupling clean, because the rig plays with
 distribution off and has no screen; the probe was written to make the rig
 ask what the player's game asked.
+
+## Which half of "load onto wagons" a scene measures
+
+Boarding a train used to be two choices, by train or onto wagons, and it is
+now five: by train to my next stop, by train or shunter wherever it goes, on
+wagons meant for my next stop, on any wagons, and not at all. `testautovlak`
+takes the same two words it always did, and they now name two of the five:
+`posun` is by train or shunter wherever it goes, `vlakem` is by train to my
+next stop. `posun` is not the wagon choice, although it reads like one --
+the scene builds a shunter, an engine with a wagon, and a shunter is a
+train. The wagon choices want a rake standing with no engine, which this
+scene does not build.
+
+That is worth knowing before reading `autoposun` as a regression: when one
+choice is split into two, what the scene measured is split with it, and the
+scene has to be told which half it still measures. The battery caught this
+as `autoposun: auto=1` turning into `auto=0`, and nothing in the game was
+wrong.

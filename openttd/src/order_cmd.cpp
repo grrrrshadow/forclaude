@@ -198,8 +198,7 @@ bool Order::Equals(const Order &other) const
 			this->decouple_whole_train == other.decouple_whole_train &&
 			this->reverse_out_of_station == other.reverse_out_of_station &&
 			this->automatic_departure == other.automatic_departure &&
-			this->load_on_train == other.load_on_train &&
-			this->load_on_wagons == other.load_on_wagons &&
+			this->board_mode == other.board_mode &&
 			this->turn_around_in_depot == other.turn_around_in_depot;
 }
 
@@ -1289,7 +1288,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case OT_GOTO_STATION:
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
-					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_LOAD_ON_TRAIN && mof != MOF_LOAD_ON_WAGONS &&
+					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_BOARD_MODE &&
 					mof != MOF_DECOUPLE_CARGO_DEST) return CMD_ERROR;
 			break;
 
@@ -1523,12 +1522,12 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (!order->IsType(OT_GOTO_DEPOT)) return CMD_ERROR;
 			break;
 
-		case MOF_LOAD_ON_TRAIN:
-		case MOF_LOAD_ON_WAGONS:
+		case MOF_BOARD_MODE:
 			/* Road vehicles only, at a station: the boarding happens at a road
 			 * stop of a station that also has a platform, see road_on_rail.h. */
 			if (v->type != VehicleType::Road) return CMD_ERROR;
 			if (!order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			if (data >= to_underlying(OrderBoardMode::End)) return CMD_ERROR;
 			break;
 
 		case MOF_REVERSE_OUT:
@@ -1720,17 +1719,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				order->SetWaitForCouple(data != 0);
 				break;
 
-			case MOF_LOAD_ON_TRAIN:
-			case MOF_LOAD_ON_WAGONS:
-				/* Two ways of boarding, one at a time: switching one on
-				 * switches the other off. */
-				if (mof == MOF_LOAD_ON_TRAIN) {
-					order->SetLoadOnTrain(data != 0);
-					if (data != 0) order->SetLoadOnWagons(false);
-				} else {
-					order->SetLoadOnWagons(data != 0);
-					if (data != 0) order->SetLoadOnTrain(false);
-				}
+			case MOF_BOARD_MODE:
+				/* Four ways of getting carried on, and none, in one field:
+				 * picking one is picking one. */
+				order->SetBoardMode(static_cast<OrderBoardMode>(data));
 				/* Boarding a train is not a cargo stop, the same way collecting
 				 * wagons is not: the vehicle drives onto the platform's road
 				 * stop and waits for its train, and what it carries stays

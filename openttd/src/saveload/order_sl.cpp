@@ -261,6 +261,7 @@ public:
 		SLE_VAR(Order, couple_max, VarTypes::BOOL),
 		SLE_VAR(Order, automatic_departure, VarTypes::BOOL),
 		SLE_VAR(Order, load_on_train, VarTypes::BOOL),
+		SLE_VAR(Order, board_mode, VarTypes::U8),
 		SLE_VAR(Order, load_on_wagons, VarTypes::BOOL),
 		SLE_VAR(Order, decouple_cargo_dest, VarTypes::U16),
 	};

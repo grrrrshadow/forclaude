@@ -259,10 +259,17 @@ bool IsWaitingToBoardTrain(const RoadVehicle *rv)
  * "Standing at the station" is the same test a collector uses to know its
  * partner has arrived (IsConsistStandingAtStation()): some part of the train
  * on the station's own tiles and the train at a stand. A stopped train is the
- * player's and is left alone, as it is for coupling. "Going where the road
- * vehicle wants to go" is read off the train's order list: any station order
+ * player's and is left alone -- unless any ride at all will do, where a train
+ * the player has stopped to marshal is one of the rides meant. "Going where
+ * the road vehicle wants to go" is read off the order list: any station order
  * for that station will do, so a train on a loop is as good as one on a
- * shuttle.
+ * shuttle. A rake left at a platform has an order list too -- the one the
+ * engine that dropped it wrote, whose last order names what the rake is for
+ * (Order::GetDecoupleCargoDest()) -- so the same question is asked of it in
+ * the same way.
+ *
+ * Which of the two kinds is looked at, and whether the question about where it
+ * is going is asked at all, is the player's choice of OrderBoardMode.
  *
  * "A wagon to spare" is one wagon, one road vehicle: a wagon that is not an
  * engine, carries nothing, is not already carrying, and is at least as long as
@@ -275,28 +282,32 @@ bool IsWaitingToBoardTrain(const RoadVehicle *rv)
  * @param rv        the road vehicle at the stop
  * @param station   the station it is at
  * @param next      the station its next order names, or invalid for "anywhere"
+ * @param mode      which kind of ride it asked for
  * @param[out] wagon the wagon it would ride on
  * @return the train, or nullptr if none is standing there with room
  */
-static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, StationID next, bool any_chain, Train **wagon, std::string &why)
+static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, StationID next, OrderBoardMode mode, Train **wagon, std::string &why)
 {
-	why = any_chain ? "u nastupiste nestoji zadny vagon" : "u nastupiste nestoji zadny vlak";
+	/* A train -- which a shunter is, and so is a train the player has stopped
+	 * -- or a rake standing at the platform by itself. And whether it has to
+	 * be going this vehicle's way, or may be going anywhere. */
+	bool want_train = (mode == OrderBoardMode::TrainToNext || mode == OrderBoardMode::TrainAnywhere);
+	bool only_towards = (mode == OrderBoardMode::TrainToNext || mode == OrderBoardMode::WagonsToNext);
+
+	why = want_train ? "u nastupiste nestoji zadny vlak" : "u nastupiste nestoji zadna rada vagonu";
 	for (Train *t : Train::Iterate()) {
 		if (t->owner != rv->owner) continue;
-		/* By train: a train, running, that the player has not parked. Onto
-		 * wagons: whatever chain stands here -- a headless rake, a shunter
-		 * with nowhere to go, a train the player has stopped to marshal --
-		 * because standing here is the whole of what is asked of it. */
-		if (any_chain) {
-			if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
-			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Test(VehState::Crashed)) continue;
-		} else {
+		if (want_train) {
 			if (!t->IsFrontEngine()) continue;
-			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Any({VehState::Crashed, VehState::Stopped})) continue;
+			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Test(VehState::Crashed)) continue;
+			if (only_towards && t->vehstatus.Test(VehState::Stopped)) continue;
+		} else {
+			if (!t->IsFreeWagon()) continue;
+			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Test(VehState::Crashed)) continue;
 		}
 		if (!IsConsistStandingAtStation(t, station)) continue;
 
-		if (!any_chain && next != StationID::Invalid()) {
+		if (only_towards && next != StationID::Invalid()) {
 			bool goes = false;
 			for (const Order &o : t->Orders()) {
 				if (o.IsType(OT_GOTO_STATION) && o.GetDestination().ToStationID() == next) {
@@ -305,7 +316,9 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 				}
 			}
 			if (!goes) {
-				why = fmt::format("vlak {} stoji, ale nejede do stanice {}", t->unitnumber, next);
+				why = want_train ?
+							fmt::format("vlak {} stoji, ale nejede do stanice {}", t->unitnumber, next) :
+							fmt::format("rada u nastupiste stoji, ale neni urcena pro stanici {}", next);
 				continue;
 			}
 		}
@@ -377,14 +390,9 @@ bool TryBoardTrain(RoadVehicle *rv)
 		return false;
 	}
 
-	/* The other way of boarding: onto any fitted wagon standing here, and
-	 * never mind where it is going. The vehicle still gets off where its
-	 * next order names, whenever whatever it rides on stands there. */
-	bool any_chain = rv->current_order.ShouldLoadOnWagons();
-
 	Train *wagon = nullptr;
 	std::string why;
-	Train *t = FindTrainToBoard(rv, rv->last_station_visited, target, any_chain, &wagon, why);
+	Train *t = FindTrainToBoard(rv, rv->last_station_visited, target, rv->current_order.GetBoardMode(), &wagon, why);
 	if (t == nullptr) {
 		SayRoad(rv, fmt::format("Auto {}: ceka na vlak ve stanici {} (dal do {}) - {}", rv->unitnumber, rv->last_station_visited,
 				target == StationID::Invalid() ? -1 : (int)target.base(), why));
@@ -443,8 +451,8 @@ bool TryBoardTrain(RoadVehicle *rv)
  * is carrying? A road vehicle on a wagon is something the train is carrying,
  * so "unload all" and "transfer" mean it too -- that is the player's way of
  * getting a vehicle off a train that is not going where the vehicle wanted,
- * and the only way at all for one that boarded with nowhere to go (the second
- * boarding button, see Order::ShouldLoadOnWagons()).
+ * and the only way at all for one that boarded with nowhere to go (one of the
+ * "anywhere" ways of boarding, see OrderBoardMode).
  * @param t the train, its head
  * @return whether everything aboard is to be put down here
  */

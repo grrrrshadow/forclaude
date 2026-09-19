@@ -5097,7 +5097,7 @@ STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Kolik va
 STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Odpojit celý vlak
 STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Odpojené naložit pro: kamkoliv
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Odpojené naložit pro: {STATION}
-STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Kam míří náklad, který se má na tyhle vagony naložit. Má to smysl jen se zapnutou distribucí nákladu: tam si stanice třídí, co na ní leží, podle toho, kam to jede dál, a vozidlu vydá jen to, co se hodí na jeho trasu. Odpojené vagony bez mašinky žádnou trasu nemají, takže jim nevydá nic - a tohle je místo, kde ji za ně řekneš. Není to jízda a nic neslibuje: vagony pojedou tam, kam je odveze sběračka, a náklad, který se sveze jinam, se na příští stanici naplánuje znovu. Zatmavené, když je distribuce nákladu všude vypnutá, protože pak se stejně nabízí každý náklad každému
+STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Řekne, pro kterou stanici je tahle odložená řada určená. Auta to čtou vždycky: auto, které má v rozkazu „naložit na vagony na příští zastávku", nastoupí jen na řadu určenou tam, kam jede ono. Se zapnutou distribucí nákladu to navíc platí i pro náklad - stanice si třídí, co na ní leží, podle toho, kam to jede dál, a vydá vozidlu jen to, co se hodí na jeho trasu; odpojené vagony bez mašinky žádnou trasu nemají, takže jim bez tohohle nevydá nic. Není to jízda a nic neslibuje: vagony pojedou tam, kam je odveze sběračka, a náklad, který se sveze jinam, se na příští stanici naplánuje znovu
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(a odpojit celý vlak)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(odpojit celý vlak)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
@@ -5105,10 +5105,12 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i reversním chodem) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
-STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}Na příští zastávku vlakem
-STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Dojet na zastávku této stanice a naložit se na vlak stojící u nástupiště, který jede do stanice dalšího rozkazu; tam vystoupit
-STR_ORDER_LOAD_ON_WAGONS                                        :{BLACK}Naložit na vagony nebo na posun
-STR_ORDER_LOAD_ON_WAGONS_TOOLTIP                                :{BLACK}Dojet na zastávku této stanice a naložit se na kterýkoli vagon přestavěný na silniční vozidla, který stojí u nástupiště – řadu, posun – ať jede kamkoli; vystoupit, až bude stát ve stanici dalšího rozkazu
+STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :{BLACK}vlakem na příští zastávku
+STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :{BLACK}vlakem kamkoli-posun
+STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}naložit na vagony na příští zastávku
+STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}naložit na vagony kamkoli
+STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}zrušit nakládání
+STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}Jak se tohle auto nechá odvézt z téhle stanice: vlakem, který jede tam, kam ono; kterýmkoli vlakem nebo posunovačkou, co tu stojí; vagony, které tu někdo nechal pro stanici, kam ono jede; nebo kterýmikoli vagony, co tu stojí. Vybírá se jedno, ne několik naráz. Poslední v seznamu je nenakládat se vůbec a jet dál po silnici
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
@@ -5144,8 +5146,10 @@ STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Zaklád
 STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}Kloubová mašinka s nestejnými články nepřipojí k předku vagonky
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
-STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(naložit na vlak)
-STR_ORDER_LOAD_ON_WAGONS_SUFFIX                                 :{SPACE}(naložit na vagony)
+STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_TO_NEXT                       :{SPACE}(vlakem na příští zastávku)
+STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_ANYWHERE                      :{SPACE}(vlakem kamkoliv)
+STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_TO_NEXT                      :{SPACE}(vagony na příští zastávku)
+STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_ANYWHERE                     :{SPACE}(vagony kamkoliv)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
 STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX                            :, a odpojené naložit pro {STATION}
 STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(a odpojit vše)

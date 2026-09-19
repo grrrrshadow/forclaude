@@ -82,6 +82,32 @@ enum class OrderLoadType : uint8_t {
 };
 
 /**
+ * How a road vehicle gets itself carried on from this station, if at all.
+ *
+ * Two questions, so four answers: by a train or on a rake of wagons, and
+ * either only one that is going where this vehicle is going, or whatever
+ * happens to be standing at the platform. The player picks one of the four;
+ * they are not combined, on purpose -- "take a train if one is going my way,
+ * otherwise any wagons at all" was asked for and turned down, because a
+ * vehicle that settles for the wrong ride is a vehicle the player then has to
+ * go and find. See road_on_rail.h.
+ *
+ * "Going my way" means the station the vehicle's next order names. A train is
+ * asked its order list. A rake has no orders of its own worth the name -- it
+ * stands where an engine left it -- so what it is for is what the engine said
+ * when it put it down (the decoupling order's destination, see
+ * Order::GetDecoupleCargoDest()).
+ */
+enum class OrderBoardMode : uint8_t {
+	None = 0,       ///< Drive on; this station is an ordinary stop.
+	TrainToNext,    ///< A train whose orders name the station of the next order.
+	TrainAnywhere,  ///< Any train or shunter standing here, wherever it is going.
+	WagonsToNext,   ///< A rake meant for the station of the next order.
+	WagonsAnywhere, ///< Any rake standing here, wherever it is going.
+	End,
+};
+
+/**
  * How full the wagons a "go to couple" order sends a train to fetch have to
  * be, for that train to accept them.
  *
@@ -206,8 +232,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_COUPLE_MIN,      ///< Toggle whether the couple count is a minimum: any rake of at least that many vehicles will do.
 	MOF_AUTO_DEPARTURE,  ///< Toggle whether a train leaving this station goes engine first and then the shortest way.
 	MOF_COUPLE_MAX,      ///< Toggle whether the couple count is a maximum: a rake of up to that many vehicles will do.
-	MOF_LOAD_ON_TRAIN,   ///< Toggle whether a road vehicle boards a train at this station instead of driving on (see road_on_rail.h).
-	MOF_LOAD_ON_WAGONS,  ///< Toggle whether a road vehicle boards any fitted wagon standing at this station, wherever it is going (see road_on_rail.h).
+	MOF_BOARD_MODE,      ///< Passes an OrderBoardMode: how a road vehicle gets itself carried on from this station (see road_on_rail.h).
 	MOF_DECOUPLE_CARGO_DEST,///< Passes the StationID whose cargo the wagons this order puts down are to load, or StationID::Invalid() for none.
 	MOF_END
 };

@@ -4941,7 +4941,7 @@ STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}How many
 STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Decouple the whole coupled train
 STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Load the dropped wagons for: anywhere
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Load the dropped wagons for: {STATION}
-STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Where the cargo these wagons are to load is bound. Only does anything with cargo distribution switched on: there a station sorts what is waiting by where it goes next and hands a vehicle only what suits its route, and wagons left standing with no engine have no route, so they are handed nothing. This is where you say it for them. It is not a journey and promises none - the wagons go wherever the engine that collects them goes, and cargo carried the wrong way is simply planned afresh at the next station. Greyed out when cargo distribution is off everywhere, because then every load is offered to everybody anyway
+STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Says which station this rake is meant for. Road vehicles read it always: one whose order says "on wagons meant for my next stop" boards only a rake meant for where it is going. With cargo distribution switched on it counts for cargo as well - a station sorts what is waiting by where it goes next and hands a vehicle only what suits its route, and wagons left standing with no engine have no route, so without this they are handed nothing. It is not a journey and promises none: the wagons go wherever the engine that collects them goes, and cargo carried the wrong way is planned afresh at the next station
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(and drop the coupled train)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(drop the coupled train)
 
@@ -4951,10 +4951,12 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Wait at 
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Couple
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Travel to this station (reversing along the way if needed) to couple with a train waiting there, then continue as one consist
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Travel to this depot to couple with a rake of wagons stored there. The wagons couple onto the end facing the door and leave the depot first, pushed
-STR_ORDER_LOAD_ON_TRAIN                                         :{BLACK}To the next stop by train
-STR_ORDER_LOAD_ON_TRAIN_TOOLTIP                                 :{BLACK}Drive to this station's road stop and board a train standing at its platform that goes to the station of the next order; get off there
-STR_ORDER_LOAD_ON_WAGONS                                        :{BLACK}Load onto wagons or a shunter
-STR_ORDER_LOAD_ON_WAGONS_TOOLTIP                                :{BLACK}Drive to this station's road stop and board any wagon fitted for road vehicles standing at its platform -- a rake, a shunter -- wherever it is going; get off wherever it stands at the station of the next order
+STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :{BLACK}By train, to my next stop
+STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :{BLACK}By train or shunter, wherever it goes
+STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}On wagons meant for my next stop
+STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}On any wagons, wherever they go
+STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}Not at all
+STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}How this vehicle gets itself carried on from this station: by a train that goes where it is going, by any train or shunter standing here, on wagons that were left here for where it is going, or on any wagons standing here. Chosen one at a time -- picking one is picking one. Last in the list is not at all, and then it drives on by road
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Leave part of the train behind in this depot, stored. How much is left is set in the box that appears
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Wagons: any
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Wagons: empty
@@ -4990,8 +4992,10 @@ STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Foundin
 STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}An engine of unequal articulated parts cannot couple wagons at the front
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
-STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(load onto train)
-STR_ORDER_LOAD_ON_WAGONS_SUFFIX                                 :{SPACE}(load onto wagons)
+STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_TO_NEXT                       :{SPACE}(by train, to the next stop)
+STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_ANYWHERE                      :{SPACE}(by train, anywhere)
+STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_TO_NEXT                      :{SPACE}(on wagons, to the next stop)
+STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_ANYWHERE                     :{SPACE}(on wagons, anywhere)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})
 STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX                            :, and load the dropped ones for {STATION}
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(keep {NUM})
