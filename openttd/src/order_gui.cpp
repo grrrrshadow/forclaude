@@ -216,6 +216,15 @@ static DropDownList BuildCoupleCargoDropDown()
 {
 	DropDownList list;
 	list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_CARGO_ANY, INVALID_CARGO, false));
+	/* Wagons fitted for road vehicles, named here the way the purchase list
+	 * names them: their cargo is not a standard one -- it is of the special
+	 * class, and the sorted list of standard cargoes stops short of those --
+	 * so the loop below never offered it, while the refit and purchase menus,
+	 * which add it by hand, did. A collector could be told to take wagons of
+	 * every cargo but the one it was built to shuttle. See road_on_rail.h. */
+	if (IsValidCargoType(_road_vehicle_cargo)) {
+		list.push_back(MakeDropDownListStringItem(CargoSpec::Get(_road_vehicle_cargo)->name, _road_vehicle_cargo, false));
+	}
 	for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 		list.push_back(MakeDropDownListStringItem(cs->name, cs->Index(), false));
 	}
