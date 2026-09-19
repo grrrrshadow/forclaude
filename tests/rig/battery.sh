@@ -47,7 +47,14 @@ setting_newgame difficulty.number_towns 2
 setting_newgame difficulty.industry_density 4
 newgame 1'
 
-# The game writes the home's openttd.cfg every time it exits, with whatever
+# This build keeps its config beside its own binary, not in the home, so that
+# a player who installs it next to the game they already play keeps their own
+# settings (fileio.cpp, DeterminePaths). The config the battery puts back is
+# therefore the one in build/, and the home's own openttd.cfg -- the vanilla
+# one, if the home has one at all -- is never touched by a run. Everything
+# else still comes out of the home: savegames, base graphics, NewGRFs.
+#
+# The game writes that openttd.cfg every time it exits, with whatever
 # settings the game it just played had. A scene played from a savegame
 # therefore hands the next scene that savegame's settings -- and not only the
 # map's: a scene that funds an industry or founds a town reads settings the
@@ -59,8 +66,13 @@ newgame 1'
 # savegame opened to look at something -- leaves its settings behind, and
 # snapshotting those would hand them to every scene of the next run. The first
 # run ever takes the copy; every run after it puts that copy back first.
-CFG=$H/.config/openttd/openttd.cfg
+CFG=$S/build/openttd.cfg
 CFG_KEEP=$S/battery_openttd.cfg
+# A rig set up before the config moved has the settings the scenes are written
+# against in the home; take them from there the one time build/ has none yet.
+if [ ! -f "$CFG_KEEP" ] && [ ! -f "$CFG" ] && [ -f "$H/.config/openttd/openttd.cfg" ]; then
+  cp "$H/.config/openttd/openttd.cfg" "$CFG"
+fi
 if [ -f "$CFG_KEEP" ]; then cp "$CFG_KEEP" "$CFG"; else cp "$CFG" "$CFG_KEEP"; fi
 
 run_scene() { # name scr-content ticks extra-args

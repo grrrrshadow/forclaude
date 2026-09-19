@@ -6,10 +6,16 @@ through scripted scenes and count what the trace lines say.
 
 Working directory layout, pointed to by `RIG_DIR`:
 
-- `build/openttd` — a build of this tree,
+- `build/openttd` — a build of this tree, and beside it `build/openttd.cfg`,
+  the config this build writes (it keeps its config next to its own binary,
+  not in the home, so that a player's vanilla config is left alone — see
+  `DeterminePaths()`). The settings the scenes are written against, `vlak123`
+  tracing among them, live there; the battery puts its kept copy back after
+  every scene,
 - `ttdhome/`, `h2/`, `h3/` — three `HOME` directories (each with
-  `.openttd/scripts/`, an `openttd.cfg` with `vlak123` tracing on, base
-  graphics), so three scenes can run at once,
+  `.openttd/scripts/`, base graphics), so three scenes can run at once. A
+  home's own `openttd.cfg`, if it has one, is no longer read or written by a
+  run,
 - the saves from `saves/` copied in, under the names the battery calls them
   by: `eka.sav`, `emu.sav`, `emu_reverz.sav` as `emu2.sav`,
   `loko_obou_stran.sav` as `loko2.sav`, `new1.sav`, `obmena.sav`,

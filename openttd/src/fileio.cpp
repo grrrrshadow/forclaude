@@ -957,14 +957,32 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 		Debug(misc, 3, "{} added as search path", _searchpaths[sp]);
 	}
 
+	/* Two directories, where the game has one. The config directory is still
+	 * worked out the way the game works it out, because it decides the
+	 * personal directory: savegames, NewGRFs, base graphics, screenshots --
+	 * everything this build shares with the game the player already has
+	 * installed, and has to share to be able to open their games at all.
+	 *
+	 * The config files themselves are ours and are kept apart, beside our own
+	 * binary. A player who installs this build next to the game they play
+	 * would otherwise find their settings, their window layout and their name
+	 * rewritten by it, and there is nothing in a config file worth that. */
+	const bool config_file_given = !_config_file.empty();
+
 	std::string config_dir;
-	if (!_config_file.empty()) {
+	if (config_file_given) {
 		config_dir = _searchpaths[Searchpath::WorkingDir];
 	} else {
 		std::string personal_dir = FioFindFullPath(Subdirectory::Base, "openttd.cfg");
 		if (!personal_dir.empty()) {
 			auto end = personal_dir.find_last_of(PATHSEPCHAR);
 			if (end != std::string::npos) personal_dir.erase(end + 1);
+			/* Our own config file lives beside the binary, and finding that one
+			 * must not make the binary's folder the personal folder: savegames
+			 * and NewGRFs would move there with it, away from the player's. */
+			if (IsValidSearchPath(Searchpath::BinaryDir) && personal_dir == _searchpaths[Searchpath::BinaryDir]) personal_dir.clear();
+		}
+		if (!personal_dir.empty()) {
 			config_dir = std::move(personal_dir);
 		} else {
 #ifdef USE_XDG
@@ -984,22 +1002,9 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 			}
 #endif
 		}
-		_config_file = config_dir + "openttd.cfg";
 	}
 
 	Debug(misc, 1, "{} found as config directory", config_dir);
-
-	_highscore_file = config_dir + "hs.dat";
-	extern std::string _hotkeys_file;
-	_hotkeys_file = config_dir + "hotkeys.cfg";
-	extern std::string _windows_file;
-	_windows_file = config_dir + "windows.cfg";
-	extern std::string _private_file;
-	_private_file = config_dir + "private.cfg";
-	extern std::string _secrets_file;
-	_secrets_file = config_dir + "secrets.cfg";
-	extern std::string _favs_file;
-	_favs_file = config_dir + "favs.cfg";
 
 #ifdef USE_XDG
 	if (config_dir == config_home) {
@@ -1034,6 +1039,46 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	for (const auto &default_subdir : default_subdirs) {
 		FioCreateDirectory(fmt::format("{}{}", _personal_dir, _subdirs[default_subdir]));
 	}
+
+	/* Where our own config files go, now that the folders they might go in
+	 * exist. Beside the binary, unless the player said where with "-c", and
+	 * unless that folder cannot be written to -- an install under Program
+	 * Files -- in which case the save folder, which is ours to write by
+	 * definition.
+	 *
+	 * Opening the file for appending both asks the question and leaves behind
+	 * the file the game fills on the way out; a new one is empty, and an empty
+	 * config file reads as every setting at its default. That is the whole of
+	 * it: a config of our own, with nothing copied out of the player's. */
+	/* "-c <file>" is the player saying where the config lives, and that answer
+	 * stands: the game already made that file's folder the working directory
+	 * (DetermineBasePaths), so config_dir is it and the other six belong with
+	 * it. Only when nothing was said do we pick the folder ourselves. */
+	std::string our_config_dir = config_dir;
+	if (!config_file_given) {
+		bool beside_binary = false;
+		if (IsValidSearchPath(Searchpath::BinaryDir)) {
+			beside_binary = FileHandle::Open(_searchpaths[Searchpath::BinaryDir] + "openttd.cfg", "ab").has_value();
+		}
+		our_config_dir = beside_binary ?
+				_searchpaths[Searchpath::BinaryDir] :
+				fmt::format("{}{}", _personal_dir, _subdirs[Subdirectory::Save]);
+		_config_file = our_config_dir + "openttd.cfg";
+	}
+
+	Debug(misc, 1, "{} used for this build's own config files", our_config_dir);
+
+	_highscore_file = our_config_dir + "hs.dat";
+	extern std::string _hotkeys_file;
+	_hotkeys_file = our_config_dir + "hotkeys.cfg";
+	extern std::string _windows_file;
+	_windows_file = our_config_dir + "windows.cfg";
+	extern std::string _private_file;
+	_private_file = our_config_dir + "private.cfg";
+	extern std::string _secrets_file;
+	_secrets_file = our_config_dir + "secrets.cfg";
+	extern std::string _favs_file;
+	_favs_file = our_config_dir + "favs.cfg";
 
 	/* If we have network we make a directory for the autodownloading of content */
 	_searchpaths[Searchpath::AutodownloadDir] = _personal_dir + "content_download" PATHSEP;
