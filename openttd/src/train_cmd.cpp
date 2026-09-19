@@ -586,17 +586,41 @@ static int GentleLookAhead(const Train *v)
  * line is not something to match speed with; the signals and the end of the
  * booking are what stop this train, as they always did.
  *
+ * And only trains that are in the way. A tile is not a place -- it holds up to
+ * six pieces of track, and two of them can pass each other without touching:
+ * the two halves of a bend (upper and lower, left and right) are two separate
+ * lines that happen to share a square. A train on one of them is no more in
+ * the way than a train on the next field. Asked of the whole tile, this braked
+ * every train that passed another one on the parallel line, and only ever on
+ * the four headings a train has on a half-tile bend -- which is exactly where
+ * two trains can share a tile -- while the same pair passing on straight track
+ * went by at speed. The player found that and said which four headings they
+ * were, which is what named the cause.
+ *
  * @param v the train asking
  * @param tile the tile to look at
  * @param exitdir the way this train is heading through it
+ * @param ours the trackdirs this train may take through the tile
  * @return that train's speed, or -1 for nobody in the way
  */
-static int SpeedOfTrainOn(const Train *v, TileIndex tile, DiagDirection exitdir)
+static int SpeedOfTrainOn(const Train *v, TileIndex tile, DiagDirection exitdir, TrackdirBits ours)
 {
+	/* Whatever this train may run over on that tile, plus whatever crosses it:
+	 * both are in its way, and nothing else on the tile is. */
+	TrackBits mine = TrackdirBitsToTrackBits(ours);
+	TrackBits in_the_way = mine;
+	for (Track t : mine) in_the_way |= TrackCrossesTracks(t);
+
 	for (const Vehicle *u : VehiclesOnTile(tile)) {
 		if (u->type != VehicleType::Train) continue;
 		const Train *other = Train::From(u);
 		if (other->First() == v) continue;
+		/* A vehicle in a shed or inside a bore stands on no track of this
+		 * tile's; those two are read elsewhere and are left alone here. */
+		if (other->track != Track::Depot && other->track != Track::Wormhole &&
+				!other->track.Any(in_the_way)) {
+			continue;
+		}
 		if (other->cur_speed > 0) {
 			/* Going the same way, read off the vehicle standing on this very
 			 * tile: the head of that train is tiles further on by now and may
@@ -933,7 +957,14 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		 * red, and a train just beyond a green signal is a train all the same.
 		 * Its own speed is the target, so falling in behind a moving one is a
 		 * roll, not a stop and a fresh start. */
-		int ahead = SpeedOfTrainOn(v, ft.new_tile, ft.exitdir);
+		/* Which way this train would go on through that tile: what it has
+		 * booked there, or else whatever the tile offers from this side. The
+		 * answer is wanted here, before the trains on the tile are asked about,
+		 * because "in the way" means in the way of this train's own road. */
+		TrackdirBits ours_here = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
+		if (ours_here.None()) ours_here = ft.new_td_bits;
+
+		int ahead = SpeedOfTrainOn(v, ft.new_tile, ft.exitdir, ours_here);
 		if (ahead >= 0) {
 			/* One that is moving is fallen in behind at its own speed. One
 			 * standing still is stopped short of -- but where depends on

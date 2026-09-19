@@ -2456,6 +2456,10 @@ static bool ConTestUnpause(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
 	extern PauseModes _pause_mode;
+	/* Which pause it was, and which mode the game is in: a save that will not
+	 * run in the rig says nothing about why, and the difference between "paused"
+	 * and "not a running game at all" is the whole answer. */
+	IConsolePrint(CC_DEFAULT, "testpauza: pauzy {:#x}, rezim hry {}", _pause_mode.base(), to_underlying(_game_mode));
 	_pause_mode = {};
 	IConsolePrint(CC_DEFAULT, "testpauza: vsechny pauzy smazany.");
 	return true;
