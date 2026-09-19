@@ -6,10 +6,10 @@ through scripted scenes and count what the trace lines say.
 
 Working directory layout, pointed to by `RIG_DIR`:
 
-- `build/openttd` — a build of this tree, and beside it `build/openttd.cfg`,
-  the config this build writes (it keeps its config next to its own binary,
-  not in the home, so that a player's vanilla config is left alone — see
-  `DeterminePaths()`). The settings the scenes are written against, `vlak123`
+- `build/openttd` — a build of this tree, and beside it
+  `build/openttdDecouple.cfg`, the config this build writes (it keeps its
+  config next to its own binary and under a name of its own, so that a
+  player's vanilla config is left alone — see `DeterminePaths()`). The settings the scenes are written against, `vlak123`
   tracing among them, live there; the battery puts its kept copy back after
   every scene,
 - `ttdhome/`, `h2/`, `h3/` — three `HOME` directories (each with

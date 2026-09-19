@@ -756,6 +756,17 @@ struct GameOptionsWindow : Window {
 							help_text += '\n';
 							help_text += GetString(STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS);
 						}
+						/* Cargo distribution plans a load's journey from station to
+						 * station before it boards anything, and this game is played
+						 * with the load already sitting in a wagon that a shunter
+						 * moves. The two do not contradict each other, but a player
+						 * who switches distribution on expecting it to do the work
+						 * here is expecting the wrong thing, so the settings say so
+						 * where the choice is made. */
+						if (sd->GetName().starts_with("linkgraph.distribution_")) {
+							help_text += '\n';
+							help_text += GetString(STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT);
+						}
 						DrawStringMultiLine(0, r.Width() - 1, -scrolls_pos, r.Height() - 1, help_text, TextColour::White);
 					}
 				}

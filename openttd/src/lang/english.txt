@@ -5020,6 +5020,7 @@ STR_ORDER_AUTO_DEPARTURE_TOOLTIP                                :{BLACK}Engine f
 STR_ORDER_AUTO_DEPARTURE_SUFFIX                                 :{SPACE}(automatic)
 
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and an autonomous reversal here could drive straight into wagons a train just left behind
+STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT                   :{WHITE}Recommended here: leave this on "Manual". {RED}You are playing decouple, cargo does not wait for the right train, cargo is in a wagon on the shunt
 
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
 STR_ORDERS_DECOUPLE_BUTTON                                      :{BLACK}Decouple

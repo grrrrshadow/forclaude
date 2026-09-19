@@ -47,12 +47,13 @@ setting_newgame difficulty.number_towns 2
 setting_newgame difficulty.industry_density 4
 newgame 1'
 
-# This build keeps its config beside its own binary, not in the home, so that
-# a player who installs it next to the game they already play keeps their own
-# settings (fileio.cpp, DeterminePaths). The config the battery puts back is
-# therefore the one in build/, and the home's own openttd.cfg -- the vanilla
-# one, if the home has one at all -- is never touched by a run. Everything
-# else still comes out of the home: savegames, base graphics, NewGRFs.
+# This build keeps its config beside its own binary and under a name of its
+# own, so that a player who installs it next to the game they already play
+# keeps their own settings (fileio.cpp, DeterminePaths). The config the battery
+# puts back is therefore build/openttdDecouple.cfg, and a home's own
+# openttd.cfg -- the vanilla one, if the home has one at all -- is never read
+# or written by a run. Everything else still comes out of the home: savegames,
+# base graphics, NewGRFs.
 #
 # The game writes that openttd.cfg every time it exits, with whatever
 # settings the game it just played had. A scene played from a savegame
@@ -66,7 +67,7 @@ newgame 1'
 # savegame opened to look at something -- leaves its settings behind, and
 # snapshotting those would hand them to every scene of the next run. The first
 # run ever takes the copy; every run after it puts that copy back first.
-CFG=$S/build/openttd.cfg
+CFG=$S/build/openttdDecouple.cfg
 CFG_KEEP=$S/battery_openttd.cfg
 # A rig set up before the config moved has the settings the scenes are written
 # against in the home; take them from there the one time build/ has none yet.

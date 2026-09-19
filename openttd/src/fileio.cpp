@@ -35,6 +35,16 @@ static bool _do_scan_working_directory = true;
 extern std::string _config_file;
 extern std::string _highscore_file;
 
+/**
+ * The stem every file this build writes for itself is named after, and the
+ * config file itself. The game's own names are left to the game: a player who
+ * has it installed keeps their settings, their window layout, their hotkeys
+ * and their name, even when both are run out of one folder. It also means the
+ * search for "openttd.cfg" can never turn up ours. See DeterminePaths().
+ */
+#define OUR_CONFIG_NAME "openttdDecouple"
+#define OUR_CONFIG_FILE OUR_CONFIG_NAME ".cfg"
+
 /** Subdirectory names. */
 static const EnumIndexArray<std::string_view, Subdirectory, Subdirectory::End> _subdirs = {
 	"",
@@ -963,10 +973,14 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	 * everything this build shares with the game the player already has
 	 * installed, and has to share to be able to open their games at all.
 	 *
-	 * The config files themselves are ours and are kept apart, beside our own
-	 * binary. A player who installs this build next to the game they play
-	 * would otherwise find their settings, their window layout and their name
-	 * rewritten by it, and there is nothing in a config file worth that. */
+	 * The config files themselves are ours and are kept apart: beside our own
+	 * binary, and under names of our own. A player who installs this build next
+	 * to the game they play would otherwise find their settings, their window
+	 * layout and their name rewritten by it, and there is nothing in a config
+	 * file worth that. The names are what makes it hold even where the two sit
+	 * in one folder, as a portable install does; they are also why the search
+	 * below, which looks for "openttd.cfg", can never find ours and mistake the
+	 * binary's folder for the personal one. */
 	const bool config_file_given = !_config_file.empty();
 
 	std::string config_dir;
@@ -977,12 +991,6 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 		if (!personal_dir.empty()) {
 			auto end = personal_dir.find_last_of(PATHSEPCHAR);
 			if (end != std::string::npos) personal_dir.erase(end + 1);
-			/* Our own config file lives beside the binary, and finding that one
-			 * must not make the binary's folder the personal folder: savegames
-			 * and NewGRFs would move there with it, away from the player's. */
-			if (IsValidSearchPath(Searchpath::BinaryDir) && personal_dir == _searchpaths[Searchpath::BinaryDir]) personal_dir.clear();
-		}
-		if (!personal_dir.empty()) {
 			config_dir = std::move(personal_dir);
 		} else {
 #ifdef USE_XDG
@@ -1049,36 +1057,37 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	 * Opening the file for appending both asks the question and leaves behind
 	 * the file the game fills on the way out; a new one is empty, and an empty
 	 * config file reads as every setting at its default. That is the whole of
-	 * it: a config of our own, with nothing copied out of the player's. */
-	/* "-c <file>" is the player saying where the config lives, and that answer
+	 * it: a config of our own, with nothing copied out of the player's.
+	 *
+	 * "-c <file>" is the player saying where the config lives, and that answer
 	 * stands: the game already made that file's folder the working directory
-	 * (DetermineBasePaths), so config_dir is it and the other six belong with
+	 * (DetermineBasePaths), so config_dir is it and the other files belong with
 	 * it. Only when nothing was said do we pick the folder ourselves. */
 	std::string our_config_dir = config_dir;
 	if (!config_file_given) {
 		bool beside_binary = false;
 		if (IsValidSearchPath(Searchpath::BinaryDir)) {
-			beside_binary = FileHandle::Open(_searchpaths[Searchpath::BinaryDir] + "openttd.cfg", "ab").has_value();
+			beside_binary = FileHandle::Open(_searchpaths[Searchpath::BinaryDir] + OUR_CONFIG_FILE, "ab").has_value();
 		}
 		our_config_dir = beside_binary ?
 				_searchpaths[Searchpath::BinaryDir] :
 				fmt::format("{}{}", _personal_dir, _subdirs[Subdirectory::Save]);
-		_config_file = our_config_dir + "openttd.cfg";
+		_config_file = our_config_dir + OUR_CONFIG_FILE;
 	}
 
 	Debug(misc, 1, "{} used for this build's own config files", our_config_dir);
 
-	_highscore_file = our_config_dir + "hs.dat";
+	_highscore_file = our_config_dir + OUR_CONFIG_NAME "_hs.dat";
 	extern std::string _hotkeys_file;
-	_hotkeys_file = our_config_dir + "hotkeys.cfg";
+	_hotkeys_file = our_config_dir + OUR_CONFIG_NAME "_hotkeys.cfg";
 	extern std::string _windows_file;
-	_windows_file = our_config_dir + "windows.cfg";
+	_windows_file = our_config_dir + OUR_CONFIG_NAME "_windows.cfg";
 	extern std::string _private_file;
-	_private_file = our_config_dir + "private.cfg";
+	_private_file = our_config_dir + OUR_CONFIG_NAME "_private.cfg";
 	extern std::string _secrets_file;
-	_secrets_file = our_config_dir + "secrets.cfg";
+	_secrets_file = our_config_dir + OUR_CONFIG_NAME "_secrets.cfg";
 	extern std::string _favs_file;
-	_favs_file = our_config_dir + "favs.cfg";
+	_favs_file = our_config_dir + OUR_CONFIG_NAME "_favs.cfg";
 
 	/* If we have network we make a directory for the autodownloading of content */
 	_searchpaths[Searchpath::AutodownloadDir] = _personal_dir + "content_download" PATHSEP;
@@ -1093,7 +1102,7 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	}
 
 	extern std::string _log_file;
-	_log_file = _personal_dir + "openttd.log";
+	_log_file = _personal_dir + OUR_CONFIG_NAME ".log";
 }
 
 /**
