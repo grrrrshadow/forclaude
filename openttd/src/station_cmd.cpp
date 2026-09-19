@@ -4253,6 +4253,24 @@ void DeleteStaleLinks(Station *from)
 					auto iter = vehicles.begin();
 					while (iter != vehicles.end()) {
 						Vehicle *v = *iter;
+						/* A list can be held by a vehicle that is not the head of
+						 * anything: a train collected by another and riding along
+						 * as its wagons keeps its orders, dormant, until it is put
+						 * down again (see TryConsistSplice()). Such a train serves
+						 * no link while it is carried, and it cannot be asked the
+						 * questions below -- IsStoppedInDepot() is a head's
+						 * question and asserts on anything else. */
+						if (v != v->First()) {
+							Vehicle *next_shared = v->NextShared();
+							if (next_shared) {
+								*iter = next_shared;
+								++iter;
+							} else {
+								iter = vehicles.erase(iter);
+							}
+							if (iter == vehicles.end()) iter = vehicles.begin();
+							continue;
+						}
 						/* Do not refresh links of vehicles that have been stopped in depot for a long time. */
 						if (!v->IsStoppedInDepot() || TimerGameEconomy::date - v->date_of_last_service <= LinkGraph::STALE_LINK_DEPOT_TIMEOUT) {
 							LinkRefresher::Run(v, false); // Don't allow merging. Otherwise lg might get deleted.

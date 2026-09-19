@@ -225,3 +225,26 @@ The refusal itself stays, for an engine built of more than one articulated
 part -- deliberately not made into a pair, since its parts would have to
 trade places on the ground and for an engine that shows. No such engine is
 in the rig's sets; the refusal is read, not measured.
+
+## A wagon holding an order list, and a window left on the wrong vehicle
+
+Two faults the rig cannot see by counting, because both are a state that
+hurts only when something asks about it: a vehicle that is not the head of
+any train yet carries an order list (a rake head that was collected and never
+gave its list up), and a window left open on a vehicle that has since stopped
+being a head (a train turned round in the list keeps its identity on the
+other head). Cargo distribution asks the first with `IsStoppedInDepot()` on
+its stale-link sweep, the player's screen asks the second on the next
+refresh, and both are an assert, `this == this->First()`.
+
+`testokna` asks both questions itself: it lists every open vehicle window
+and every order list's first shared vehicle, says which are not heads, writes
+a record line for each, and then refreshes every vehicle window the way a
+livery change does. `testspoj ... okno` opens the collector's window before it
+sets off, so there is a window to leave behind. The battery runs `testokna`
+on `zakl` and `vlek`; its record counter is what catches a regression.
+
+Found on the player's game with a steam engine coupling nose first and cargo
+distribution on. The rig ran that coupling clean, because the rig plays with
+distribution off and has no screen; the probe was written to make the rig
+ask what the player's game asked.

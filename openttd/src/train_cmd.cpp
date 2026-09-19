@@ -2507,8 +2507,27 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 				 * the tail -- and that reads as a rake to everything that only
 				 * looks at the head. Throwing its orders away on that reading is
 				 * how a whole train was turned into a nameless set of wagons
-				 * standing at a platform. */
-				if (u->IsFreeWagon() && u->orders != nullptr && !ChainHasEngine(u)) DeleteVehicleOrders(u);
+				 * standing at a platform.
+				 *
+				 * And "no engine anywhere in it" has to be asked of what the
+				 * chain was, not of what it has just become: this runs on the
+				 * joined train, which always has an engine in it -- the one
+				 * that did the collecting -- so the question came back "not a
+				 * rake" for every rake ever collected, and not one of them lost
+				 * its orders. The list lived on, on a wagon that was no longer
+				 * the head of anything, and the sweep that cargo distribution
+				 * makes over every order list (DeleteStaleLinks()) took that
+				 * wagon for the train and asked it what only a head may be
+				 * asked. The rig's probe ('testokna') found the wagon still
+				 * holding the list after every coupling; the player found the
+				 * assert.
+				 *
+				 * So the question is asked of the vehicle: a wagon holding an
+				 * order list is a rake head that has been collected, and the
+				 * list goes. An engine holding one -- the head of a train, or a
+				 * train riding along dormant, whichever way round it lies -- is
+				 * left exactly as before. */
+				if (u->IsWagon() && u->orders != nullptr) DeleteVehicleOrders(u);
 
 				if (u->IsFrontEngine() || u->IsFreeWagon()) continue;
 				/* An engine travelling as somebody else's wagons keeps its
@@ -5031,6 +5050,23 @@ static void TransferTrainIdentity(Train *from, Train *to)
 	to->force_proceed = from->force_proceed;
 	from->wait_counter = 0;
 	from->force_proceed = TFP_NONE;
+
+	/* And everything on the screen that follows the train by the index of
+	 * its head: its windows, the news about it, the viewports centred on it.
+	 * Left on the old head, the vehicle window kept showing a vehicle that
+	 * was no longer the head of anything, and the first time it refreshed it
+	 * asked that vehicle a question only a head may be asked
+	 * (IsStoppedInDepot()) and the game went down on the assert. The rig
+	 * never saw it: the rig has no windows. The player did, with the window
+	 * of a steam engine open while it coupled nose first and turned round.
+	 * These three are what autoreplace does when it hands a train a new
+	 * head, which is the only other place a head changes identity. */
+	extern void ChangeVehicleViewports(VehicleID from_index, VehicleID to_index);
+	extern void ChangeVehicleNews(VehicleID from_index, VehicleID to_index);
+	extern void ChangeVehicleViewWindow(VehicleID from_index, VehicleID to_index);
+	ChangeVehicleViewports(from->index, to->index);
+	ChangeVehicleViewWindow(from->index, to->index);
+	ChangeVehicleNews(from->index, to->index);
 
 	if (_show_train_orientation) {
 		IConsolePrint(CC_INFO, "  identita vlaku {}: z clanku {} na clanek {}, rozkazu {}, c.{}/{}", to->unitnumber,

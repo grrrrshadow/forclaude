@@ -100,7 +100,8 @@ run_scene() { # name scr-content ticks extra-args
 : > ${BATTERY_STABLE:-/dev/null}
 printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
 run_scene zakl "vlak123 on
-testspoj" 8000
+testspoj
+testza 6000 testokna" 8000
 run_scene couvej "vlak123 on
 testspoj couvej" 8000
 run_scene depo "vlak123 on
@@ -150,7 +151,8 @@ run_scene dodepa "vlak123 on
 testspoj blok
 testza 600 testdodepa 2" 8000
 run_scene vlek "vlak123 on
-testspoj vlek" 8000
+testspoj vlek
+testza 9000 testokna" 8000
 run_scene vlekblok "vlak123 on
 testspoj vlek blok" 8000
 run_scene odtahrovina "vlak123 on

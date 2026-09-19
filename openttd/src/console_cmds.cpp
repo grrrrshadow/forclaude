@@ -1424,9 +1424,18 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * in the rig ever built one: the default set has no engine with a tender,
 	 * so this scene wants a set that does (the rig's h2 home). */
 	bool tender_mode = false;
+	/* 'okno' opens the collector's vehicle window before it sets off. A window
+	 * follows its train by the index of the head, and a coupling that turns
+	 * the list round gives the train a new head: the window has to be handed
+	 * on with the rest of the identity, or it goes on asking the old head
+	 * questions only a head may be asked. The rig has no screen, but it has
+	 * windows -- they are built and refreshed, just never drawn -- and that
+	 * refresh is where it broke for the player. */
+	bool window_mode = false;
 	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "tendr") tender_mode = true;
+		if (argv[i] == "okno") window_mode = true;
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
@@ -1879,6 +1888,10 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	if (tender_mode) {
 		IConsolePrint(CC_DEFAULT, "testspoj tendr: sberacka je vlak {}, {} clanku - jede na radu nosem napred.",
 				Train::Get(veh1)->unitnumber, CountArticulatedParts(eid_tender) + 1);
+	}
+	if (window_mode) {
+		ShowVehicleViewWindow(Train::Get(veh1));
+		IConsolePrint(CC_DEFAULT, "testspoj okno: okno sberacky (vlak {}) otevreno.", Train::Get(veh1)->unitnumber);
 	}
 	Order collect;
 	if (depot_mode) {
@@ -4599,6 +4612,59 @@ static bool ConTestRequestTow(std::span<std::string_view> argv)
 		done++;
 	}
 	if (done == 0) IConsolePrint(CC_ERROR, "testodvoz: zadna cekajici rada.");
+	return true;
+}
+
+/**
+ * Refresh every vehicle window the way the game itself does now and then --
+ * a livery changed, a setting flipped -- so that a window left pointing at a
+ * vehicle which is no longer the head of anything is asked the questions it
+ * would be asked in a played game. The rig never moves a mouse and never
+ * changes a livery, so without this a stale window sat quiet for a whole run
+ * and the crash it holds was only ever seen on the player's screen.
+ * Usage: testokna
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRefreshWindows(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Refresh every vehicle window, as the game does on a livery change. Usage: 'testokna'.");
+		return true;
+	}
+	/* Said first, before the refresh, because the refresh is what a stale
+	 * window falls over on: which vehicle windows are open, and whether the
+	 * vehicle each one follows is still the head of anything. A window on a
+	 * vehicle that is not is the fault this command exists to provoke. */
+	for (const Window *w : Window::Iterate()) {
+		if (w->window_class != WindowClass::VehicleView) continue;
+		const Vehicle *v = Vehicle::GetIfValid(static_cast<VehicleID>(w->window_number));
+		if (v == nullptr) {
+			IConsolePrint(CC_DEFAULT, "testokna: okno vozidla {} - vozidlo uz neni", static_cast<int>(w->window_number));
+			continue;
+		}
+		bool head = v == v->First();
+		IConsolePrint(head ? CC_DEFAULT : CC_ERROR, "testokna: okno vozidla {} (vlak {}) - {}", v->index.base(),
+				v->First()->unitnumber, head ? "hlava" : "NENI HLAVA, okno zustalo na stare hlave");
+		if (!head) LogAnomaly("Okno vozidla {} zustalo na clanku, ktery uz neni hlavou vlaku {}", v->index.base(), v->First()->unitnumber);
+	}
+	/* And the same question of every order list: the vehicle it names as the
+	 * first of those sharing it. That is the vehicle the stale-link sweep of
+	 * cargo distribution (DeleteStaleLinks()) asks IsStoppedInDepot(), a
+	 * question only a head may be asked -- and a list still naming a vehicle
+	 * whose train has since got another head is the same fault as a stale
+	 * window, only found by the game itself rather than by the player's
+	 * screen. */
+	for (const OrderList *l : OrderList::Iterate()) {
+		const Vehicle *v = l->GetFirstSharedVehicle();
+		if (v == nullptr) continue;
+		if (v == v->First()) continue;
+		IConsolePrint(CC_ERROR, "testokna: rozkaznik vlaku {} jmenuje prvni sdilene vozidlo {}, ktere NENI HLAVA", v->First()->unitnumber, v->index.base());
+		LogAnomaly("Rozkaznik jmenuje prvni sdilene vozidlo {}, ktere uz neni hlavou vlaku {}", v->index.base(), v->First()->unitnumber);
+	}
+	InvalidateWindowClassesData(WindowClass::VehicleView);
+	InvalidateWindowClassesData(WindowClass::VehicleDetails);
+	InvalidateWindowClassesData(WindowClass::VehicleOrders);
+	IConsolePrint(CC_DEFAULT, "testokna: okna vozidel obnovena.");
 	return true;
 }
 
@@ -8775,6 +8841,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testminimalne",           ConTestCoupleMin);
 	IConsole::CmdRegister("testmaximalne",           ConTestCoupleMax);
 	IConsole::CmdRegister("testokno",                ConTestOpenWindow);
+	IConsole::CmdRegister("testokna",                ConTestRefreshWindows);
 	IConsole::CmdRegister("testcil",                 ConTestRakeCargoDest);
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);
