@@ -137,6 +137,18 @@ run_scene filtropraveny "vlak123 on
 testspoj depo pocet
 testza 200 testfiltr 6
 testza 6000 testfiltr" 12000
+# A collector whose engine is one unit of three equal pieces (the shape a set
+# draws its shunters in, MakeEngineOfPieces()), meeting the rake nose first:
+# its pieces trade places on the ground and it couples at its nose, where the
+# same unit of unequal pieces is refused. The record's picture check
+# (PictureKeptAfterJoin()) runs on every coupling; a line from it here is the
+# flipped pieces being drawn wrong. 'couvej' is the same engine backing on.
+run_scene clanky "vlak123 on
+testspoj clanky
+testza 6000 testnatoceni" 8000
+run_scene clankycouvej "vlak123 on
+testspoj clanky couvej
+testza 6000 testnatoceni" 8000
 # A mixed rake -- wagons of two cargoes -- and a collector asking for one of
 # them when it is full. The empty wagon of the other cargo must not keep the
 # rake from counting as full: the fullness question is the named cargo's.

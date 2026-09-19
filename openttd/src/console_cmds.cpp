@@ -1381,6 +1381,9 @@ static bool ConIndustryHealth(std::span<std::string_view> argv)
 static bool _testspoj_active = false;
 static uint _testmapa_area[4]; ///< Last built test scene's surroundings, for a no-argument testmapa.
 
+static Train *FindTrainByUnit(uint unit);
+static bool MakeEngineOfPieces(Train *t, uint pieces);
+
 static bool ConTestCouple(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
@@ -1438,11 +1441,25 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * of the other cargo standing in it, a rake whose asked-for wagons are
 	 * full is either collected or it is not. The player's own case. */
 	bool mixed_mode = false;
+	/* 'kloub' builds the rake of a set's wagons drawn in several pieces, and
+	 * wants a set that has them (the rig's h_tir home). A collector meeting
+	 * such a rake head on has every wagon flipped and its pieces traded round
+	 * -- the coupling the player saw come out as two wagons drawn over each
+	 * other. 'jeden' makes the rake one wagon: a single unit that has to be
+	 * turned round inside itself, which used to be refused. 'clanky' makes
+	 * the collector's engine a unit of three pieces (MakeEngineOfPieces()),
+	 * the shape of the player's shunter, arriving nose first. */
+	bool artic_wagon_mode = false;
+	bool single_mode = false;
+	bool pieces_mode = false;
 	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "tendr") tender_mode = true;
 		if (argv[i] == "okno") window_mode = true;
 		if (argv[i] == "smes") mixed_mode = true;
+		if (argv[i] == "kloub") artic_wagon_mode = true;
+		if (argv[i] == "jeden") single_mode = true;
+		if (argv[i] == "clanky") pieces_mode = true;
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
@@ -1508,6 +1525,8 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * articulated part. Kept apart from eid_loco so the deliverer stays an
 	 * ordinary engine and only the collector is the awkward one. */
 	EngineID eid_tender = EngineID::Invalid();
+	/* The rake's wagon in 'kloub': one drawn in several pieces. */
+	EngineID eid_artic_wagon = EngineID::Invalid();
 	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
@@ -1517,15 +1536,25 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 			} else if (eid_wagon2 == EngineID::Invalid()) {
 				eid_wagon2 = e->index;
 			}
+			if (eid_artic_wagon == EngineID::Invalid() && CountArticulatedParts(e->index) > 0) eid_artic_wagon = e->index;
 		} else {
 			if (eid_loco == EngineID::Invalid()) eid_loco = e->index;
 			if (eid_tender == EngineID::Invalid() && CountArticulatedParts(e->index) > 0) eid_tender = e->index;
 		}
-		if (eid_loco != EngineID::Invalid() && eid_wagon2 != EngineID::Invalid() && (!tender_mode || eid_tender != EngineID::Invalid())) break;
+		if (eid_loco != EngineID::Invalid() && eid_wagon2 != EngineID::Invalid() && (!tender_mode || eid_tender != EngineID::Invalid()) &&
+				(!artic_wagon_mode || eid_artic_wagon != EngineID::Invalid())) break;
 	}
 	if (tender_mode && eid_tender == EngineID::Invalid()) {
 		IConsolePrint(CC_ERROR, "testspoj tendr: v teto hre neni zadna masinka s tendrem (kloubova). Chce to sadu, ktera ji ma.");
 		return true;
+	}
+	if (artic_wagon_mode) {
+		if (eid_artic_wagon == EngineID::Invalid()) {
+			IConsolePrint(CC_ERROR, "testspoj kloub: v teto hre neni zadny vagon z vice clanku. Chce to sadu, ktera ho ma.");
+			return true;
+		}
+		eid_wagon = eid_artic_wagon;
+		IConsolePrint(CC_DEFAULT, "testspoj kloub: rada bude z vagonu typu {} o {} clancich.", eid_wagon.base(), CountArticulatedParts(eid_wagon) + 1);
 	}
 	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
 		IConsolePrint(CC_ERROR, "testspoj: no available engine or wagon.");
@@ -1761,7 +1790,7 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "testspoj smes: v teto hre je jen jeden druh vagonu, smiseny vlak nejde postavit.");
 		return true;
 	}
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < (single_mode ? 1 : 3); i++) {
 		/* 'smes': the last of the three is of the other kind, and stays empty.
 		 * That is the wagon the fullness question must not be asked about. */
 		EngineID what = (mixed_mode && i == 2) ? eid_wagon2 : eid_wagon;
@@ -1917,6 +1946,14 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	if (tender_mode) {
 		IConsolePrint(CC_DEFAULT, "testspoj tendr: sberacka je vlak {}, {} clanku - jede na radu nosem napred.",
 				Train::Get(veh1)->unitnumber, CountArticulatedParts(eid_tender) + 1);
+	}
+	if (pieces_mode) {
+		if (!MakeEngineOfPieces(Train::Get(veh1), 2)) {
+			IConsolePrint(CC_ERROR, "testspoj clanky: sberacku se nepodarilo rozdelit na clanky.");
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "testspoj clanky: sberacka je vlak {}, masinka ze 3 clanku ({} dilku) - jede na radu nosem napred.",
+				Train::Get(veh1)->unitnumber, Train::Get(veh1)->gcache.cached_total_length);
 	}
 	if (window_mode) {
 		ShowVehicleViewWindow(Train::Get(veh1));
@@ -3986,7 +4023,13 @@ static bool ConTestFacings(std::span<std::string_view>)
 				unit = u;
 				continue;
 			}
-			if (unit == nullptr || u->direction == unit->direction) continue;
+			if (unit == nullptr) continue;
+			/* A piece on a curve stands up to 45 degrees off its head and is
+			 * right to; the player's log had eight such pieces reported, all of
+			 * them one step off in a bend. What walks a wagon apart is a piece
+			 * turned a right angle or more away from its own head. */
+			DirDiff off = DirDifference(u->direction, unit->direction);
+			if (off == DirDiff::Same || off == DirDiff::Left45 || off == DirDiff::Right45) continue;
 			bad++;
 			IConsolePrint(CC_ERROR, "testnatoceni: {} {} - clanek {} na ({},{}) smer {}, jeho hlava smer {}",
 					t->IsFrontEngine() ? "vlak" : "rada", t->IsFrontEngine() ? t->unitnumber : (UnitID)0,
@@ -4457,6 +4500,208 @@ static bool ConTestWagonShape(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testtvar: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Everything the drawing of one train is made of, piece by piece: what the
+ * piece is and which set it comes from, how long it counts as, where it stands
+ * and which way it faces, whether it is flipped or hidden, which piece it draws
+ * itself as (a flipped piece of an articulated unit draws its mirror piece,
+ * PieceDrawnAs()), the very sprites it puts on the screen, the box they are
+ * drawn in, and what it carries. Long on purpose: a picture that has come
+ * apart can only be read from the whole of this, and the player cannot say
+ * more than "the wagons look wrong".
+ *
+ * @param t the train or rake, its list head
+ */
+static void PrintConsistDrawing(const Train *t)
+{
+	IConsolePrint(CC_WARNING, "testkresba: {} {}: {} clanku, couva {}, celo {}, na ({},{})",
+			t->IsFrontEngine() ? "vlak" : "rada", t->IsFrontEngine() ? t->unitnumber : (UnitID)0,
+			CountVehiclesInChain(t), t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
+			t->GetMovingFront() == t ? "hlava seznamu" : "konec seznamu", TileX(t->tile), TileY(t->tile));
+	uint index = 0;
+	for (const Train *u = t; u != nullptr; u = u->Next(), index++) {
+		/* Its place in its own unit: the k-th of n pieces. */
+		const Train *unit = u->GetFirstEnginePart();
+		uint n = 0;
+		uint k = 0;
+		for (const Train *p = unit; ; p = p->GetNextArticulatedPart()) {
+			if (p == u) k = n;
+			n++;
+			if (!p->HasArticulatedPart()) break;
+		}
+		const Train *drawn = PieceDrawnAs(u);
+		VehicleSpriteSeq seq;
+		u->GetImage(u->direction, EngineImageType::OnMap, &seq);
+		std::string sprites;
+		for (uint i = 0; i < seq.count; i++) {
+			if (!sprites.empty()) sprites += '+';
+			sprites += fmt::format("{}/{}", seq.seq[i].sprite, seq.seq[i].pal);
+		}
+		const Engine *e = u->GetEngine();
+		const char *role = u->IsArticulatedPart() ? "cast" : (u->IsTender() ? "tendr" : (u->IsRearDualheaded() ? "zadni" : (u->IsEngine() ? "masin" : "vagon")));
+		std::string kolej = u->track == Track::Depot ? "depo" : (u->track == Track::Wormhole ? "roura" : fmt::format("{:#x}", u->track.base()));
+		IConsolePrint(CC_DEFAULT, "testkresba: {:2d} id {} {:5} kus {}/{} typ {} grf {:08X}/{} delka {} poz ({},{},{}) dl ({},{}) kolej {} smer {} preklopen {} schovany {} kresli {} sprajty {} obalka poc ({},{},{}) roz ({},{},{}) pos ({},{},{}) naklad {} {}/{} vezeno {}",
+				index, u->index.base(), role, k, n, u->engine_type.base(),
+				e->GetGRF() != nullptr ? std::byteswap(e->GetGRF()->grfid) : 0, e->grf_prop.local_id,
+				u->gcache.cached_veh_length, u->x_pos, u->y_pos, u->z_pos, TileX(u->tile), TileY(u->tile),
+				kolej, to_underlying(u->direction), u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne",
+				u->vehstatus.Test(VehState::Hidden) ? "ano" : "ne",
+				drawn == u ? "sebe" : fmt::format("jako id {}", drawn->index.base()),
+				sprites.empty() ? "nic" : sprites,
+				u->bounds.origin.x, u->bounds.origin.y, u->bounds.origin.z,
+				u->bounds.extent.x, u->bounds.extent.y, u->bounds.extent.z,
+				u->bounds.offset.x, u->bounds.offset.y, u->bounds.offset.z,
+				IsValidCargoType(u->cargo_type) ? (int)u->cargo_type : -1, u->cargo.StoredCount(), u->cargo_cap,
+				u->carrying == VehicleID::Invalid() ? -1 : (int)u->carrying.base());
+	}
+}
+
+/**
+ * The drawing dump for one train, one rake, or everything on rails.
+ * Usage: testkresba <unit number> | testkresba <x> <y> | testkresba vse
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDrawing(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Print how a train is drawn, piece by piece. Usage: 'testkresba <unit number>', 'testkresba <x> <y>' (a rake by the tile of its first vehicle) or 'testkresba vse'.");
+		return true;
+	}
+	bool all = argv[1] == "vse";
+	auto punit = all ? std::optional<uint32_t>(0) : ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	std::optional<uint64_t> py;
+	if (argv.size() == 3) {
+		py = ParseInteger(argv[2]);
+		if (!py.has_value()) return false;
+	}
+	bool found = false;
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t) continue;
+		if (!all && (py.has_value() ? t->tile != TileXY((uint)*punit, (uint)*py) : (!t->IsFrontEngine() || t->unitnumber != (UnitID)*punit))) continue;
+		found = true;
+		PrintConsistDrawing(t);
+		if (!all) return true;
+	}
+	if (!found) IConsolePrint(CC_ERROR, "testkresba: {} nenalezen.", all ? "zadny vlak" : "vlak");
+	return true;
+}
+
+/**
+ * Make an engine standing in a shed into a unit of several pieces, for the rig:
+ * the engine keeps its picture and its place, and gets articulated pieces of
+ * its own kind behind it, the way a set's engine drawn in pieces has them.
+ *
+ * The rig's own sets have no such engine and the player's do, all of them: a
+ * body between two invisible stubs, which is the shape that meets the
+ * nose-first rule (ConsistCanBeRelinked()). The pieces made here are full
+ * length, since only a set can say a piece is short, so the unit is the same
+ * shape from either end and every piece shows the engine's own picture -- the
+ * list and the ground can be measured on it, the picture cannot.
+ *
+ * @param t the engine, alone or at the head of its train, stopped in a shed
+ * @param pieces how many pieces to add behind it
+ * @return whether it was done
+ */
+static bool MakeEngineOfPieces(Train *t, uint pieces)
+{
+	if (!t->IsStoppedInDepot() || t->HasArticulatedPart() || t->IsMultiheaded()) return false;
+	Train *v = t;
+	for (uint i = 0; i < pieces; i++) {
+		if (!Vehicle::CanAllocateItem()) return false;
+		Train *rest = v->Next();
+		Train *p = Train::Create();
+		v->SetNext(p);
+		if (rest != nullptr) p->SetNext(rest);
+
+		p->subtype = 0;
+		p->track = t->track;
+		p->railtypes = t->railtypes;
+		p->spritenum = t->spritenum;
+		p->cargo_type = t->cargo_type;
+		p->cargo_cap = 0;
+		p->refit_cap = 0;
+		p->SetArticulatedPart();
+
+		p->direction = t->direction;
+		p->owner = t->owner;
+		p->tile = t->tile;
+		p->x_pos = t->x_pos;
+		p->y_pos = t->y_pos;
+		p->z_pos = t->z_pos;
+		p->date_of_last_service = t->date_of_last_service;
+		p->date_of_last_service_newgrf = t->date_of_last_service_newgrf;
+		p->build_year = t->build_year;
+		p->vehstatus = t->vehstatus;
+		p->vehstatus.Reset(VehState::Stopped);
+		p->cargo_subtype = 0;
+		p->max_age = CalendarTime::MIN_DATE;
+		p->engine_type = t->engine_type;
+		p->value = 0;
+		p->sprite_cache.sprite_seq.Set(SPR_IMG_QUERY);
+		p->random_bits = Random();
+		p->UpdatePosition();
+		v = p;
+	}
+	t->ConsistChanged(CCF_ARRANGE);
+	InvalidateWindowData(WindowClass::VehicleDepot, t->tile);
+	return true;
+}
+
+/**
+ * Switch the mirror drawing of flipped articulated pieces (PieceDrawnAs()) on
+ * or off, so the two can be compared on the same coupling: with it off, the
+ * record's picture check (PictureKeptAfterJoin()) says what the old drawing
+ * did to a flipped wagon of several pieces. Usage: testzrcadlo [on|off]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestMirrorDrawing(std::span<std::string_view> argv)
+{
+	extern bool _mirror_flipped_pieces;
+	if (argv.size() >= 2) {
+		if (argv[1] == "on") _mirror_flipped_pieces = true;
+		else if (argv[1] == "off") _mirror_flipped_pieces = false;
+		else { IConsolePrint(CC_HELP, "Usage: 'testzrcadlo [on|off]'."); return true; }
+		for (Train *t : Train::Iterate()) t->UpdateViewport(true, false);
+	}
+	IConsolePrint(CC_DEFAULT, "testzrcadlo: preklopeny clanek kresli {}.", _mirror_flipped_pieces ? "svuj zrcadlovy kus (on)" : "sam sebe (off)");
+	return true;
+}
+
+/**
+ * Give a stopped engine articulated pieces, see MakeEngineOfPieces().
+ * Usage: testclanky <unit number> [pieces]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestMakePieces(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Make an engine stopped in a depot a unit of several pieces. Usage: 'testclanky <unit number> [pieces, default 2]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	uint pieces = 2;
+	if (argv.size() > 2) {
+		auto pp = ParseInteger(argv[2]);
+		if (!pp.has_value()) return false;
+		pieces = (uint)*pp;
+	}
+	Train *t = FindTrainByUnit((uint)*punit);
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testclanky: vlak {} nenalezen.", argv[1]);
+		return true;
+	}
+	if (!MakeEngineOfPieces(t, pieces)) {
+		IConsolePrint(CC_ERROR, "testclanky: vlak {} musi stat v depu a jeho masinka byt z jednoho kusu.", argv[1]);
+		return true;
+	}
+	uint n = 0;
+	for (const Train *p = t; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) n++;
+	IConsolePrint(CC_DEFAULT, "testclanky: vlak {} - masinka ma {} clanku, celkem {} dilku.", t->unitnumber, n, t->gcache.cached_total_length);
 	return true;
 }
 
@@ -8747,6 +8992,14 @@ static bool ConTestEverything(std::span<std::string_view>)
 		ConTestWagonShape(args);
 	}
 
+	/* And how every one of them is drawn, rakes too -- the picture is the one
+	 * thing the player can see and the rig cannot, so the rig writes it down. */
+	IConsolePrint(CC_WARNING, "=== testvse: kresleni ===");
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t) continue;
+		PrintConsistDrawing(t);
+	}
+
 	IConsolePrint(CC_WARNING, "=== testvse: konec. Ulozit: vlaksav ===");
 	return true;
 }
@@ -8962,6 +9215,9 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testvagonky",             ConTestWagonLengths);
 	IConsole::CmdRegister("testnalozit",             ConTestFillRoadVehicle);
 	IConsole::CmdRegister("testnatoceni",            ConTestFacings);
+	IConsole::CmdRegister("testkresba",              ConTestDrawing);
+	IConsole::CmdRegister("testclanky",              ConTestMakePieces);
+	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);

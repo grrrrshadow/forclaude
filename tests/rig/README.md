@@ -221,10 +221,62 @@ time, and that number is what the refusal had been holding back.
 `BEZ PARTNERA` is a pair that came apart on load, which is the one way this
 can quietly fail; save the scene (`save x`) and load it back to check.
 
-The refusal itself stays, for an engine built of more than one articulated
-part -- deliberately not made into a pair, since its parts would have to
-trade places on the ground and for an engine that shows. No such engine is
-in the rig's sets; the refusal is read, not measured.
+The refusal itself stays only for an engine built of *unequal* articulated
+parts -- deliberately not made into a pair, since its parts would have to
+trade places on the ground and for such an engine that shows. No such engine
+is in the rig's sets; the refusal is read, not measured.
+
+## An engine of equal pieces, and a wagon of pieces drawn flipped
+
+The player's sets draw every engine as three pieces -- an invisible stub, the
+body, an invisible stub -- and every wagon likewise. Two things follow from
+that shape, and the rig measures both.
+
+**The engine couples at its nose.** A unit whose pieces are the same length two
+by two from the ends is the same shape read from either end, so its pieces can
+trade places on the ground with nothing visibly moving (`MirrorUnitPieces()`),
+and the list turns round like any other (`ConsistCanBeRelinked()`). The rig's
+own sets have no such engine, so `testspoj clanky` makes one: the collector's
+engine gets two articulated pieces of its own kind behind it in the shed
+(`MakeEngineOfPieces()`, console `testclanky <unit> [pieces]`). They are full
+length, since only a set can say a piece is short, so every piece shows the
+engine's own picture -- the list and the ground can be measured on it, the
+picture cannot.
+
+    testspoj clanky           three-piece engine meets the rake nose first
+    testspoj clanky couvej    the same engine backs onto it
+
+Both: spojeno=1, no broken step, nothing in the record, depa=3. Before the
+rule the first was the refusal, and the player's log shows what the refusal
+did to his shunter: it drove into a shed to turn, came back tail first, and
+coupled a lap late.
+
+**The wagon keeps its picture.** A rake met head on has every wagon's
+direction reversed and Flipped set, which for a one-piece wagon leaves the
+picture as it was. A wagon of several pieces was drawn wrong: each piece
+painted its own cut of the picture mirrored, in place, after the pieces had
+traded places -- the front of the wagon at its back. Now a flipped piece
+draws its mirror piece (`PieceDrawnAs()`), and every coupling checks the
+promise that nothing on the screen changes: `PictureKeptAfterJoin()` reads
+the sprites at every spot before and after and writes `SPOJENI PREKRESLILO`
+into the record for any spot that looks different. That check needs wagons of
+several pieces, so it is measured in the lorry-scene home (h_tir), whose
+wagon set draws them:
+
+    testspoj kloub            three such wagons, met head on: every wagon flips
+    testspoj kloub jeden      one such wagon: a single unit turned round inside itself
+    testspoj kloub couvej     backing on: nothing flips
+
+All three: spojeno=1, record empty. With `testzrcadlo off` (the old drawing)
+the first writes six `SPOJENI PREKRESLILO` lines, one per end piece of each
+wagon; `testzrcadlo on` writes none. `testkresba <unit>|<x> <y>|vse` prints
+every piece's sprites, box, facing, flip, which piece it draws as, and what it
+carries -- the whole of what a picture is made of, since the rig cannot look
+at one; `testvse` includes it.
+
+`testnatoceni` reports a piece only when it faces a right angle or more away
+from its head. A piece in a bend stands 45 degrees off and is right to; the
+player's log had eight of those reported as faults.
 
 ## A wagon holding an order list, and a window left on the wrong vehicle
 

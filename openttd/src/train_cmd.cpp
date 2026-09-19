@@ -1184,6 +1184,58 @@ static SpriteID GetDefaultTrainSprite(uint8_t spritenum, Direction direction)
 }
 
 /**
+ * Which piece of an articulated unit a flipped piece draws itself as.
+ *
+ * A wagon drawn in several pieces is one picture cut up along the vehicle: the
+ * set hangs the front of the wagon on its first piece, the middle on the next
+ * and so on, each cut placed by where that piece stands in the unit. Flipping
+ * a vehicle -- direction reversed, Flipped set, nothing moved on the ground --
+ * is the ordinary bookkeeping for one that has been coupled up the other way
+ * round, and for a one-piece vehicle GetImage() makes the picture come out
+ * unchanged by drawing the sprite for the opposite direction. Piece by piece
+ * that goes wrong: once the pieces have traded places on the ground
+ * (ReverseConsistOrder()) the piece carrying the front of the wagon stands at
+ * its back, and paints the front there, mirrored. The player saw two wagons
+ * drawn over each other, one each way. Vanilla knows this much and refuses to
+ * flip an articulated vehicle in the depot at all (CmdReverseTrainDirection()).
+ *
+ * The picture that belongs at a flipped piece's place is the mirrored picture
+ * of the piece that stood there before it -- the one the same distance from
+ * the other end. So that is whose sprite is drawn: piece i draws as piece
+ * n-1-i, for the opposite direction, at its own spot. For a unit whose pieces
+ * are the same length two by two from the ends -- the ordinary shape: a long
+ * wagon between two invisible stubs, a body between two like cabs -- that is
+ * to the pixel the picture it had before it was flipped, which is what
+ * flipping promises. Only when the mirror piece is flipped the same way: a
+ * unit whose pieces are flipped apart from each other is nothing this code
+ * ever writes, and is left to draw itself.
+ *
+ * @param piece the piece about to be drawn
+ * @return the piece whose sprite it draws -- itself, or its mirror in the unit
+ */
+/** Whether a flipped piece draws its mirror piece at all; off, it draws itself, as it used to. Console 'testzrcadlo', for measuring the difference. */
+bool _mirror_flipped_pieces = true;
+
+const Train *PieceDrawnAs(const Train *piece)
+{
+	if (!_mirror_flipped_pieces || !piece->flags.Test(VehicleRailFlag::Flipped)) return piece;
+	const Train *head = piece->GetFirstEnginePart();
+	if (!head->HasArticulatedPart()) return piece;
+
+	uint n = 0;
+	uint i = 0;
+	for (const Train *p = head; ; p = p->GetNextArticulatedPart()) {
+		if (p == piece) i = n;
+		n++;
+		if (!p->HasArticulatedPart()) break;
+	}
+	const Train *mirror = head;
+	for (uint k = n - 1 - i; k > 0; k--) mirror = mirror->GetNextArticulatedPart();
+	if (!mirror->flags.Test(VehicleRailFlag::Flipped)) return piece;
+	return mirror;
+}
+
+/**
  * Get the sprite to display the train.
  * @param direction Direction of view/travel.
  * @param image_type Visualisation context.
@@ -1191,13 +1243,16 @@ static SpriteID GetDefaultTrainSprite(uint8_t spritenum, Direction direction)
  */
 void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpriteSeq *result) const
 {
-	uint8_t spritenum = this->spritenum;
+	/* A flipped piece of an articulated unit is drawn as its mirror piece, see
+	 * PieceDrawnAs(); everything below reads the picture off 'drawn'. */
+	const Train *drawn = PieceDrawnAs(this);
+	uint8_t spritenum = drawn->spritenum;
 
 	if (this->flags.Test(VehicleRailFlag::Flipped)) direction = ReverseDir(direction);
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
 		if (spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) direction = ReverseDir(direction);
-		GetCustomVehicleSprite(this, direction, image_type, result);
+		GetCustomVehicleSprite(drawn, direction, image_type, result);
 		if (result->IsValid()) return;
 
 		/* A wagon of the borrowed set whose chains found no picture is drawn as itself
@@ -1216,13 +1271,13 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 		 * deliberately a single transparent pixel, and the ordinary fallback would paint a
 		 * whole extra vehicle where the set wants empty air. See
 		 * ApplyWagonCargoException(). */
-		if (this->GetEngine()->has_drawn_cargoes) {
-			Engine *e = Engine::Get(this->engine_type);
+		if (drawn->GetEngine()->has_drawn_cargoes) {
+			Engine *e = Engine::Get(drawn->engine_type);
 
 			auto resolves_as = [&](uint16_t slot) {
 				if (slot == UINT16_MAX) return false;
 				AutoRestoreBackup forced(_wagon_exception_forced_slot, slot);
-				GetCustomVehicleSprite(this, direction, image_type, result);
+				GetCustomVehicleSprite(drawn, direction, image_type, result);
 				return result->IsValid();
 			};
 
@@ -1238,14 +1293,14 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 				}
 			}
 
-			GetCustomVehicleIcon(this->engine_type, direction, image_type, result);
+			GetCustomVehicleIcon(drawn->engine_type, direction, image_type, result);
 			if (result->IsValid()) return;
 
 			result->Set(SPR_EMPTY);
 			return;
 		}
 
-		spritenum = this->GetEngine()->original_image_index;
+		spritenum = drawn->GetEngine()->original_image_index;
 	}
 
 	assert(IsValidImageIndex<VehicleType::Train>(spritenum));
@@ -1260,8 +1315,8 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 	 * what it is carrying is drawn on its back as the vehicle it is, and the
 	 * load the original graphics would put there is a heap of steel under the
 	 * lorry. (CT_ROLA, see road_on_rail.h.) */
-	if (this->cargo_type != _road_vehicle_cargo && this->cargo.StoredCount() > 0 &&
-			this->cargo.StoredCount() >= this->cargo_cap / 2U) {
+	if (drawn->cargo_type != _road_vehicle_cargo && drawn->cargo.StoredCount() > 0 &&
+			drawn->cargo.StoredCount() >= drawn->cargo_cap / 2U) {
 		sprite += _wagon_full_adder[spritenum];
 	}
 
@@ -5116,11 +5171,95 @@ static void SwapDualHeadRoles(Train *front, Train *rear)
 	TransferTrainIdentity(front, rear);
 }
 
+/**
+ * Turn one unit round inside itself: its pieces trade places on the ground.
+ *
+ * A wagon drawn in several pieces has to be turned round inside itself when
+ * its place in the train is mirrored. The list says where each piece of a unit
+ * stands -- the first piece is its front and the rest follow behind it -- so a
+ * unit whose place in the train has just been mirrored is now read from the
+ * wrong end: its pieces are laid out along the rails the opposite way to the
+ * order the list gives them.
+ *
+ * Nothing moves on the ground here: the pieces trade places with each other,
+ * exactly as ReverseTrainSwapVeh() has whole vehicles trade places when a
+ * train is turned round. The piece that was at the back of the wagon is now
+ * the one at its front, which is what the list says.
+ *
+ * Left undone, the player's own game showed what follows: every wagon of a
+ * freshly coupled train lay backwards, the gap-closing walk then dragged the
+ * pieces into each other until the train had folded up -- wagons ahead of the
+ * engine, the engine under the last wagon, the two halves driving apart -- and
+ * a few tiles later a piece asked which track connected it to the one ahead
+ * and found it behind.
+ *
+ * @param unit the first piece of the unit
+ */
+static void MirrorUnitPieces(Train *unit)
+{
+	std::vector<Train *> pieces;
+	for (Train *p = unit; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) pieces.push_back(p);
+	for (size_t i = 0, j = pieces.size(); i + 1 < j--; i++) {
+		Train *a = pieces[i];
+		Train *b = pieces[j];
+		bool a_hidden = a->vehstatus.Test(VehState::Hidden);
+		bool b_hidden = b->vehstatus.Test(VehState::Hidden);
+		a->vehstatus.Set(VehState::Hidden, b_hidden);
+		b->vehstatus.Set(VehState::Hidden, a_hidden);
+		std::swap(a->track, b->track);
+		std::swap(a->direction, b->direction);
+		std::swap(a->x_pos, b->x_pos);
+		std::swap(a->y_pos, b->y_pos);
+		std::swap(a->tile, b->tile);
+		std::swap(a->z_pos, b->z_pos);
+	}
+}
+
+/**
+ * Is this one articulated unit the same shape read from either end?
+ *
+ * Pieces the same length two by two from the ends: a body between two
+ * invisible stubs, a body between two like cabs. Such a unit can be turned
+ * round inside itself (MirrorUnitPieces()) without anything on the ground
+ * moving -- each piece lands exactly where a piece of its own length stood --
+ * and drawn flipped its picture is the one it had (PieceDrawnAs()). A unit of
+ * unequal pieces cannot: turned round, its long piece would stand where its
+ * short one was, and that shows.
+ *
+ * @param unit the first piece of the unit
+ * @return whether the unit's pieces mirror each other in length
+ */
+static bool IsMirrorSymmetricUnit(const Train *unit)
+{
+	std::vector<uint8_t> lengths;
+	for (const Train *p = unit; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+		lengths.push_back(p->gcache.cached_veh_length);
+	}
+	for (size_t i = 0, j = lengths.size(); i + 1 < j--; i++) {
+		if (lengths[i] != lengths[j]) return false;
+	}
+	return true;
+}
+
 static Train *ReverseConsistOrder(Train *head)
 {
 	std::vector<Train *> units;
 	for (Train *u = head; u != nullptr; u = u->GetNextVehicle()) units.push_back(u);
-	if (units.size() < 2) return head;
+
+	/* One unit alone has no order of units to turn round -- but a unit of
+	 * several pieces still reads from one end, and it is that end the splice
+	 * hangs the other train on. So the pieces trade places on the ground
+	 * (nothing visibly moves for a unit that mirrors itself, which is the only
+	 * kind asked to do this, see ConsistCanBeRelinked()), and the same physical
+	 * end that led before now leads as the list's tail. The player's shunting
+	 * engine is such a unit -- a body between two invisible stubs -- and it
+	 * couples at its nose like the one-piece engine it looks like. */
+	if (units.size() < 2) {
+		if (!head->HasArticulatedPart()) return head;
+		MirrorUnitPieces(head);
+		head->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
+		return head;
+	}
 
 	bool driving_backwards = head->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
 
@@ -5147,41 +5286,8 @@ static Train *ReverseConsistOrder(Train *head)
 	}
 
 	/* A wagon drawn in several pieces has to be turned round inside itself as
-	 * well. The list says where each piece of a unit stands -- the first piece
-	 * is its front and the rest follow behind it -- so a unit whose place in
-	 * the train has just been mirrored is now read from the wrong end: its
-	 * pieces are laid out along the rails the opposite way to the order the
-	 * list gives them.
-	 *
-	 * Nothing moves on the ground here either: the pieces trade places with
-	 * each other, exactly as ReverseTrainSwapVeh() has whole vehicles trade
-	 * places when a train is turned round. The piece that was at the back of
-	 * the wagon is now the one at its front, which is what the list says.
-	 *
-	 * Left undone, the player's own game showed what follows: every wagon of a
-	 * freshly coupled train lay backwards, the gap-closing walk then dragged
-	 * the pieces into each other until the train had folded up -- wagons ahead
-	 * of the engine, the engine under the last wagon, the two halves driving
-	 * apart -- and a few tiles later a piece asked which track connected it to
-	 * the one ahead and found it behind. */
-	for (Train *u : units) {
-		std::vector<Train *> pieces;
-		for (Train *p = u; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) pieces.push_back(p);
-		for (size_t i = 0, j = pieces.size(); i + 1 < j--; i++) {
-			Train *a = pieces[i];
-			Train *b = pieces[j];
-			bool a_hidden = a->vehstatus.Test(VehState::Hidden);
-			bool b_hidden = b->vehstatus.Test(VehState::Hidden);
-			a->vehstatus.Set(VehState::Hidden, b_hidden);
-			b->vehstatus.Set(VehState::Hidden, a_hidden);
-			std::swap(a->track, b->track);
-			std::swap(a->direction, b->direction);
-			std::swap(a->x_pos, b->x_pos);
-			std::swap(a->y_pos, b->y_pos);
-			std::swap(a->tile, b->tile);
-			std::swap(a->z_pos, b->z_pos);
-		}
-	}
+	 * well, see MirrorUnitPieces(). */
+	for (Train *u : units) MirrorUnitPieces(u);
 
 	/* A dual-headed engine lies in the list front head first, rear head last,
 	 * and everything that tidies a train after a change relies on that: the
@@ -6349,18 +6455,101 @@ static bool MeetsOtherHeadEndFirst(const Train *unit, const Train *other)
 	return DistanceSquaredBetweenVehicles(first, other) < DistanceSquaredBetweenVehicles(first->Last(), other);
 }
 
+/** What one vehicle looks like where it stands: its spot, and the sprites drawn there. */
+struct PieceLook {
+	int x, y, z;
+	VehicleSpriteSeq seq;
+	VehicleID id;
+};
+
+/** Spell a sprite sequence out for the record: sprite/palette, plus-joined. */
+static std::string DescribeLook(const VehicleSpriteSeq &seq)
+{
+	std::string out;
+	for (uint i = 0; i < seq.count; i++) {
+		if (!out.empty()) out += '+';
+		out += fmt::format("{}/{}", seq.seq[i].sprite, seq.seq[i].pal);
+	}
+	return out.empty() ? std::string("nic") : out;
+}
+
+/**
+ * The look of every vehicle of a consist, as it stands now.
+ * @param consist the train, any part of it
+ */
+static std::vector<PieceLook> LookOfConsist(const Train *consist)
+{
+	std::vector<PieceLook> looks;
+	for (const Train *u = consist->First(); u != nullptr; u = u->Next()) {
+		PieceLook look{u->x_pos, u->y_pos, u->z_pos, {}, u->index};
+		u->GetImage(u->direction, EngineImageType::OnMap, &look.seq);
+		looks.push_back(look);
+	}
+	return looks;
+}
+
+/**
+ * Has a coupling left every spot looking as it did?
+ *
+ * Joining two trains turns lists round, flips vehicles and has the pieces of
+ * a unit trade places -- all bookkeeping, none of it movement, so the promise
+ * is that the picture on the screen does not change by a pixel. This asks
+ * that promise directly: for every vehicle of the joined train standing where
+ * some vehicle stood before, the sprites drawn there are the same sprites.
+ * Which vehicle it is does not matter; the spot does. A spot nothing stood on
+ * before is not asked about (the close-up walk moves the collector afterwards,
+ * and this runs before it).
+ *
+ * A broken promise goes into the record with both pictures, because from the
+ * screen it is only "the wagons look wrong" and the player cannot say more:
+ * the first report was two wagons drawn over each other, one each way.
+ *
+ * @param before the looks taken before anything was touched (LookOfConsist())
+ * @param joined the joined train, its head
+ */
+static void PictureKeptAfterJoin(const std::vector<PieceLook> &before, const Train *joined)
+{
+	for (const Train *u = joined; u != nullptr; u = u->Next()) {
+		/* A spot is only a spot when one vehicle stood on it. Everything in a
+		 * shed stands on the one hidden spot, engine and wagons alike, and
+		 * there the question has no answer -- the battery's depot scene said
+		 * so with four lines about an engine's spot now showing a wagon. */
+		if (u->vehstatus.Test(VehState::Hidden)) continue;
+		const PieceLook *was = nullptr;
+		uint stood_here = 0;
+		for (const PieceLook &look : before) {
+			if (look.x == u->x_pos && look.y == u->y_pos && look.z == u->z_pos) { was = &look; stood_here++; }
+		}
+		if (stood_here != 1) continue;
+		VehicleSpriteSeq now;
+		u->GetImage(u->direction, EngineImageType::OnMap, &now);
+		if (now == was->seq) continue;
+		LogAnomaly("SPOJENI PREKRESLILO: na ({},{},{}) kreslil vuz {} {} a ted tam vuz {} kresli {} (smer {}, preklopen {})",
+				u->x_pos, u->y_pos, u->z_pos, was->id.base(), DescribeLook(was->seq), u->index.base(), DescribeLook(now),
+				to_underlying(u->direction), u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne");
+	}
+}
+
 /**
  * Whether a consist can be relinked back to front at all.
  *
- * A list is turned round unit by unit, and a unit that is one vehicle with
- * articulated parts -- a steam engine with its tender, a multi-part wagon --
- * is one unit: there is nothing to turn. Its parts follow its head in the
- * list whichever way it stands on the rails, so the only end of it anything
- * can hang off is the far end of its last part.
+ * A list is turned round unit by unit, and a consist that is one unit with
+ * articulated parts is one unit: there is no order of units to turn. Its
+ * parts follow its head in the list whichever way it stands on the rails, so
+ * the only end of it anything can hang off is the far end of its last part.
+ *
+ * Unless the unit is the same shape from either end (IsMirrorSymmetricUnit()):
+ * then its pieces can trade places on the ground with nothing visibly moving,
+ * and the far end of its last part is whichever end faces the partner. That is
+ * the shape of a set's shunting engine drawn with an invisible stub at each
+ * end, and it is why such an engine couples at its nose like the one-piece
+ * engine it looks like. A unit of unequal pieces -- a tender that is not a pair
+ * (MakeTenderRearHead()), a Garratt -- stays what it was: not turnable.
  */
 static bool ConsistCanBeRelinked(const Train *consist)
 {
-	return consist->GetNextVehicle() != nullptr || consist->Next() == nullptr;
+	if (consist->GetNextVehicle() != nullptr || consist->Next() == nullptr) return true;
+	return IsMirrorSymmetricUnit(consist);
 }
 
 /**
@@ -6489,13 +6678,17 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * Since MakeTenderRearHead() this no longer applies to a steam engine with
 	 * a tender: the pair is two heads and its list turns round like any
 	 * other, and the coupling goes through nose first and clean (measured by
-	 * 'testspoj tendr'). What is left under it is an engine built of more
-	 * than one articulated part, which is deliberately not made into a pair,
-	 * and for that the refusal is as true as it ever was. It was switched
-	 * off for an afternoon to watch what it was holding back, and what it
-	 * was holding back was seventeen broken steps. */
+	 * 'testspoj tendr'). Nor to an engine whose pieces mirror each other --
+	 * a body between two invisible stubs, the shape a set draws its shunting
+	 * engines in: its pieces trade places on the ground with nothing visibly
+	 * moving (ReverseConsistOrder()), and the player's shunter couples at its
+	 * nose, which is what a shunter is for. What is left under it is an
+	 * engine built of unequal articulated parts, which cannot be turned round
+	 * without showing, and for that the refusal is as true as it ever was. It
+	 * was switched off for an afternoon to watch what it was holding back,
+	 * and what it was holding back was seventeen broken steps. */
 	if (!ConsistCanBeRelinked(leading) && MeetsOtherHeadEndFirst(leading, trailing)) {
-		LogAnomaly("Vlak {}: spojeni nosem napred - kloubova masinka je jeden vuz a vozy jdou jen za jeji posledni clanek; stoji na ({},{}) a ceka na otoceni",
+		LogAnomaly("Vlak {}: spojeni nosem napred - kloubova masinka z nestejnych clanku je jeden vuz a vozy jdou jen za jeji posledni clanek; stoji na ({},{}) a ceka na otoceni",
 				leading->unitnumber, TileX(leading->tile), TileY(leading->tile));
 		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
 	}
@@ -6564,12 +6757,19 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * cleanly: a casualty about to be straightened is laid down head nearest
 	 * the tow (LayCasualtyAlongTow()), so it never needs turning. */
 	if (ends_clean && !ConsistCanBeRelinked(trailing) && !MeetsOtherHeadEndFirst(trailing, leading)) {
-		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz - seznam se otocit neda, spojeni odmitnuto",
+		LogAnomaly("Vlak {}: partner {} stoji nosem k nemu a je jeden kloubovy vuz z nestejnych clanku - seznam se otocit neda, spojeni odmitnuto",
 				leading->unitnumber, trailing->unitnumber);
 		return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST);
 	}
 
+	/* What every piece of both trains looks like where it stands, before
+	 * anything is turned round; asked again after, see PictureKeptAfterJoin(). */
+	std::vector<PieceLook> looks;
 	if (flags.Test(DoCommandFlag::Execute)) {
+		looks = LookOfConsist(v->First());
+		std::vector<PieceLook> more = LookOfConsist(partner);
+		looks.insert(looks.end(), more.begin(), more.end());
+
 		/* A casualty is taken in tow exactly as it stood and is put down in
 		 * the shed the same way, so that it carries on with its orders the way
 		 * round it was going. Being towed rewrites all of that -- the list is
@@ -6672,6 +6872,9 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * other; line them up along the list so nothing reads a nose that
 	 * contradicts its neighbours. */
 	NormaliseCoupledConsistFacing(new_head);
+
+	/* Nothing has moved on the ground yet, so nothing may look different. */
+	PictureKeptAfterJoin(looks, new_head);
 
 	/* Which end of the joined train leads: always the end the partner was
 	 * attached to. Not measured, because there is nothing left to measure --

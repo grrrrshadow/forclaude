@@ -5139,7 +5139,7 @@ STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Založit
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Založit řadu: podle nástupiště
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Zakládá řadu: musí přijet vagony napřed
-STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}S tendrem nepřipojí k předku vagonky
+STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}Kloubová mašinka s nestejnými články nepřipojí k předku vagonky
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(a čekat na spojení)
 STR_ORDER_LOAD_ON_TRAIN_SUFFIX                                  :{SPACE}(naložit na vlak)
@@ -5835,7 +5835,7 @@ STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER                         :{WHITE}... hned
 STR_ERROR_CAN_T_COUPLE_TRAIN_WRONG_END                          :{WHITE}... mašinka by skončila za vagonky, což zatím není podporováno
 STR_ERROR_CAN_T_COUPLE_TRAIN_GAP                                :{WHITE}... je moc daleko na spojení
 STR_ERROR_CAN_T_COUPLE_TRAIN_FOUND_ENGINE_FIRST                 :{WHITE}... k zakládané řadě musí přijet vagony napřed, mašinka by skončila uvnitř řady
-STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST                         :{WHITE}... mašinka s tendrem je jeden vůz a vozy jdou zavěsit jen za tendr; přijela nosem napřed
+STR_ERROR_CAN_T_COUPLE_TRAIN_NOSE_FIRST                         :{WHITE}... kloubová mašinka s nestejnými články je jeden vůz a vozy jdou zavěsit jen za její poslední článek; přijela nosem napřed
 STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY                             :{WHITE}... na silniční vozidla jde přestavět jen vagon
 STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE                              :{WHITE}Z tohoto vlaku nelze udělat odtahovku...
 STR_ERROR_CAN_T_REQUEST_TOW                                     :{WHITE}Pro tyto vagony nelze zavolat odtah...
