@@ -2221,6 +2221,14 @@ static void DrawTrackFence_SW(const TileInfo *ti, const PalSpriteID &psid, uint 
  */
 static void DrawTrackDetails(const TileInfo *ti, const RailTypeInfo *rti, PaletteID pal)
 {
+	/* A player who does not want fences beside his tracks says so in the
+	 * settings, rather than having to find a graphics set that draws them as
+	 * nothing. Only the picture is left out: the tile goes on recording where a
+	 * fence belongs (see TileLoop_Track()), so the fences are all back the
+	 * moment this is turned on again, and a game played with them off is the
+	 * same game as one played with them on. */
+	if (!_settings_client.gui.show_rail_fences) return;
+
 	/* Base sprite for track fences.
 	 * Note: Halftile slopes only have fences on the upper part. */
 	uint num_sprites = 0;

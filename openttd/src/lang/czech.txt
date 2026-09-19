@@ -1937,6 +1937,8 @@ STR_CONFIG_SETTING_DEFAULT_RAIL_ROAD_TYPE_MOST_USED             :Nejvíce použ�
 
 STR_CONFIG_SETTING_SHOW_TRACK_RESERVATION                       :Vyznačovat rezervovanou trať: {STRING}
 STR_CONFIG_SETTING_SHOW_TRACK_RESERVATION_HELPTEXT              :Vyznačí rezervovanou trať jinou barvou tak, aby bylo snadnější zjišťování důvodů, proč vlak odmítá vjet do určitého úseku tratě
+STR_CONFIG_SETTING_SHOW_RAIL_FENCES                             :Zobrazovat ploty podél kolejí: {STRING}
+STR_CONFIG_SETTING_SHOW_RAIL_FENCES_HELPTEXT                    :Kreslí plůtky, které hra dává na okraj kolejového políčka tam, kde sousedí s cizím pozemkem. Vynechá se jen obrázek; ve hře se nemění nic a po zapnutí jsou všechny ploty zase zpátky
 
 STR_CONFIG_SETTING_PERSISTENT_BUILDINGTOOLS                     :Nevypínat po použití nástroje pro výstavbu: {STRING}
 STR_CONFIG_SETTING_PERSISTENT_BUILDINGTOOLS_HELPTEXT            :Nechat nástroje pro stavbu mostů, tunelů, atd. po použití otevřené
