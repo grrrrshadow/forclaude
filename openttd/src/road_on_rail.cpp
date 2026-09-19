@@ -30,9 +30,11 @@
 /**
  * How far above the wagon's own position the road vehicle is drawn: the deck
  * of a flat wagon. The same for every wagon, since no wagon says how high its
- * deck is.
+ * deck is -- so it is a number chosen by eye against the wagons this is
+ * actually used with, and 'testpaluba' moves it while the game runs, because
+ * the eye that has to choose it is at the screen and not here.
  */
-static const int CARRIED_Z_OFFSET = 3;
+int _carried_z_offset = 4;
 
 /**
  * How far behind the front of its drawn box a road vehicle's own position
@@ -93,6 +95,22 @@ static void SayRoad(const RoadVehicle *rv, std::string what)
  * pieces, and the vehicle is laid out from the front one -- its trailer, if it
  * has one, behind it.
  *
+ * It stands in the middle of the wagon, and that is a decision rather than an
+ * accident. Nose to the leading end is where a lorry driven onto a flat wagon
+ * really does come to rest, and it is what this did at first, but it only
+ * looked right while the train ran straight: the four directions a train takes
+ * on a curve went through the other branch below and came out in the middle
+ * instead, so a lorry slid along its wagon every time the train went round a
+ * bend. And the end of a wagon is the worst place to put the join, because
+ * every disagreement about where a picture sits around its vehicle -- between
+ * a wagon and a lorry, between a set and the game's own graphics, between one
+ * heading and the next in the same set -- shows there with nothing beside it
+ * to hide it. In the middle the same error is half as far from either end and
+ * reads as "not quite centred" rather than "hanging off the end". Exact it
+ * cannot be: the deck of every wagon is at its own height and no wagon says
+ * where it is. The player asked for the middle after aligning a set by hand,
+ * and for the vehicle to ride a little higher.
+ *
  * @param rv    the road vehicle, front of its chain
  * @param wagon the wagon it rides on, its head
  */
@@ -112,6 +130,32 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 	int x = wagon->x_pos;
 	int y = wagon->y_pos;
 
+	/* One step backwards along the wagon, for laying a trailer out behind its
+	 * lorry and for finding the middle of the two together. On a curve this is
+	 * only roughly the way the vehicle points, which is as much as a moving
+	 * train needs. */
+	static const DiagDirectionIndexArray<Point> _step_back{{{
+		{  1,  0 }, // DiagDirection::NE, which faces -x
+		{  0, -1 }, // DiagDirection::SE, which faces +y
+		{ -1,  0 }, // DiagDirection::SW, which faces +x
+		{  0,  1 }, // DiagDirection::NW, which faces -y
+	}}};
+	const Point &back = _step_back[DirToDiagDir(dir)];
+
+	/* A lorry and its trailer are put on as one, so the whole chain's length is
+	 * what has to end up in the middle.
+	 *
+	 * How far in front of the wagon's middle the first vehicle stands follows
+	 * from that: half the chain reaches forward from its middle, and the
+	 * vehicle's own position sits that much behind the front of its box. The
+	 * wagon's length does not come into it at all -- put the chain's middle on
+	 * the wagon's middle and a wagon of any length is right. Both cases below
+	 * use this one line, which is what makes a lorry stop jumping along its
+	 * wagon when the train goes round a bend. */
+	int chain = 0;
+	for (const RoadVehicle *u = rv; u != nullptr; u = u->Next()) chain += u->gcache.cached_veh_length;
+	const int ahead_of_middle = chain / 2 - (VEHICLE_LENGTH - ROAD_VEHICLE_NOSE);
+
 	if (IsDiagonalDirection(dir)) {
 		/* Along the rails: which axis they run on, and which way along it the
 		 * wagon faces. */
@@ -129,33 +173,22 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 			hi = std::max(hi, pos + (forward ? (len + 1) / 2 : len / 2));
 		}
 
-		/* The wagon's nose, less the road vehicle's own: its position is that
-		 * much behind the front of its box. */
-		int at = forward ? hi - (VEHICLE_LENGTH - ROAD_VEHICLE_NOSE) : lo + ROAD_VEHICLE_NOSE;
+		/* The middle of the whole wagon, and the chain set forward from it. */
+		int at = (lo + hi) / 2 + (forward ? ahead_of_middle : -ahead_of_middle);
 		if (along_y) {
 			y = at;
 		} else {
 			x = at;
 		}
 	} else {
-		/* On a curve neither kind is drawn from its front -- both sit about
-		 * their own position -- so the middle of the wagon is the place. */
+		/* On a curve the wagon's pieces lie round the bend, so its middle is
+		 * taken as the middle of its two ends and the way it faces is only
+		 * roughly the step below -- which is as much as a moving train needs. */
 		const Train *last = wagon;
 		while (last->HasArticulatedPart()) last = last->GetNextArticulatedPart();
-		x = (wagon->x_pos + last->x_pos) / 2;
-		y = (wagon->y_pos + last->y_pos) / 2;
+		x = (wagon->x_pos + last->x_pos) / 2 - back.x * ahead_of_middle;
+		y = (wagon->y_pos + last->y_pos) / 2 - back.y * ahead_of_middle;
 	}
-
-	/* One step backwards along the wagon, for laying out a trailer behind its
-	 * lorry. On a curve this is only roughly the way the vehicle points, which
-	 * is as much as a moving train needs. */
-	static const DiagDirectionIndexArray<Point> _step_back{{{
-		{  1,  0 }, // DiagDirection::NE, which faces -x
-		{  0, -1 }, // DiagDirection::SE, which faces +y
-		{ -1,  0 }, // DiagDirection::SW, which faces +x
-		{  0,  1 }, // DiagDirection::NW, which faces -y
-	}}};
-	const Point &back = _step_back[DirToDiagDir(dir)];
 
 
 	const RoadVehicle *ahead = nullptr;
@@ -167,7 +200,7 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		u->tile = TileVirtXY(x, y);
 		u->x_pos = x;
 		u->y_pos = y;
-		u->z_pos = wagon->z_pos + CARRIED_Z_OFFSET;
+		u->z_pos = wagon->z_pos + _carried_z_offset;
 		u->direction = dir;
 		/* In a tunnel with the wagon, out of sight with it. */
 		u->vehstatus.Set(VehState::Hidden, wagon->vehstatus.Test(VehState::Hidden));

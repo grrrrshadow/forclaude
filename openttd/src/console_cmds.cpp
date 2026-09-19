@@ -4676,6 +4676,32 @@ static bool MakeEngineOfPieces(Train *t, uint pieces)
 }
 
 /**
+ * Move the deck a carried road vehicle stands on up or down while the game is
+ * running, and put every one of them on the new deck at once.
+ *
+ * How high a wagon's deck is, is not written anywhere -- no wagon says, and
+ * every set draws its own at its own height -- so the number is chosen by eye,
+ * and the eye is at the screen. This is how the player finds it without a
+ * build for each guess: try, look, say the number, and it gets written in.
+ * Usage: testpaluba [pixels]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDeckHeight(std::span<std::string_view> argv)
+{
+	extern int _carried_z_offset;
+	if (argv.size() >= 2) {
+		auto p = ParseInteger(argv[1]);
+		if (!p.has_value()) return false;
+		_carried_z_offset = (int)*p;
+		/* The vehicles are put where they belong once a tick, so they arrive on
+		 * the new deck by themselves; this only makes them redraw at once. */
+		for (RoadVehicle *rv : RoadVehicle::Iterate()) rv->UpdateViewport(true, true);
+	}
+	IConsolePrint(CC_DEFAULT, "testpaluba: auta stoji {} bodu nad vagonem.", _carried_z_offset);
+	return true;
+}
+
+/**
  * Write a note of the player's own into the record, so that what he saw on the
  * screen stands in the log beside what the game wrote at that moment, with the
  * same tick on it. He has been typing his notes at the console and getting
@@ -9268,6 +9294,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testclanky",              ConTestMakePieces);
 	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
 	IConsole::CmdRegister("pozn",                    ConNote);
+	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);

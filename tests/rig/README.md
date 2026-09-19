@@ -289,6 +289,14 @@ save that was 24 `NESEDI` against 0 after the fix.
 `pozn <text>` writes a line of the player's own into the record, with the tick
 on it, for saying what was on the screen at that moment.
 
+`testpaluba [pixels]` moves the deck a carried lorry stands on, while the game
+runs, and redraws every one of them at once. How high a wagon's deck is is
+written nowhere -- no wagon says, and every set draws its own at its own
+height -- so that number is chosen by eye at the screen and then written into
+the source. Where along the wagon the lorry stands is not chosen by eye: its
+chain's middle goes on the wagon's middle, which needs no number and comes out
+right for a wagon of any length.
+
 ## A wagon holding an order list, and a window left on the wrong vehicle
 
 Two faults the rig cannot see by counting, because both are a state that
