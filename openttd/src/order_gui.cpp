@@ -1530,6 +1530,10 @@ public:
 			this->selected_order = -1; // Disable selection any selected row at a competitor order window.
 		} else {
 			this->SetWidgetLoweredState(WID_O_GOTO, this->goto_type != OPOS_NONE);
+			/* Held down while it is the one waiting for a station to be
+			 * clicked, so the player can see which button loaded the pointer
+			 * and which one will put it down again. */
+			this->SetWidgetLoweredState(WID_O_DECOUPLE_CARGO_DEST, this->goto_type == OPOS_DECOUPLE_DEST);
 		}
 		this->DrawWidgets();
 	}
@@ -2033,6 +2037,14 @@ public:
 			case WID_O_DECOUPLE_CARGO_DEST: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
+				/* Pressed while the pointer is already loaded, it puts it down
+				 * again -- the same gesture the Go To button answers to, and
+				 * the player's word for it: there was no way out of the
+				 * picking but to name a station or close the window. */
+				if (this->goto_type == OPOS_DECOUPLE_DEST) {
+					ResetObjectToPlace();
+					break;
+				}
 				/* Set, the button takes it back off; the same gesture as the
 				 * decouple switch beside it. Unset, it puts the pointer into
 				 * station-picking, because a station is picked on the map here
@@ -2325,6 +2337,10 @@ public:
 	{
 		this->goto_type = OPOS_NONE;
 		this->SetWidgetDirty(WID_O_GOTO);
+		/* The other button that loads the pointer comes back up with it,
+		 * however the picking ended -- a station clicked, Escape, or the
+		 * button pressed a second time. */
+		this->SetWidgetDirty(WID_O_DECOUPLE_CARGO_DEST);
 
 		/* Remove drag highlighting if it exists. */
 		if (this->order_over != INVALID_VEH_ORDER_ID) {
