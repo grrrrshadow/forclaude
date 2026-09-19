@@ -2991,26 +2991,44 @@ void MarkCoupleClaimChanged(const Train *rake)
  */
 static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool check_count = true)
 {
+	/* Name a cargo and the fullness question is asked of the wagons carrying
+	 * it and of nothing else. "Fetch the wagons for road vehicles once they
+	 * are full" is what the two settings together read as, and it is what the
+	 * window promises -- each setting narrows the choice further. Asked of
+	 * every vehicle in the rake it meant something else and something
+	 * unreachable: one empty oil tanker standing in the same rake has room in
+	 * it, so the rake was never full and the collector never came. The
+	 * player's own case.
+	 *
+	 * With no cargo named nothing changes: the question is the whole rake's,
+	 * as it always was. */
+	auto in_scope = [&order](const Train *u) {
+		if (!IsValidCargoType(order.GetCoupleCargo())) return true;
+		return u->cargo_type == order.GetCoupleCargo() && u->cargo_cap != 0;
+	};
+
 	switch (order.GetCoupleLoad()) {
 		case OrderCoupleLoad::Any:
 			break;
 
 		case OrderCoupleLoad::Empty:
 			for (const Train *u = rake; u != nullptr; u = u->Next()) {
-				if (u->cargo.StoredCount() != 0) return false;
+				if (in_scope(u) && u->cargo.StoredCount() != 0) return false;
 			}
 			break;
 
 		case OrderCoupleLoad::Full:
 			/* A rake the player has called done counts as full whatever is in
 			 * it: it has finished what it was told to do here and nothing more
-			 * is going into it. See CmdFinishWagonLoading(). */
+			 * is going into it. The player says it with the ordinary Skip
+			 * button on the rake's own orders, which moves it from the job it
+			 * was left with to waiting to be collected. */
 			if (rake->current_order.GetLoadType() == OrderLoadType::NoLoad) break;
 			/* Otherwise, room left anywhere means it is not full. A vehicle that
 			 * carries nothing at all -- a brake van, say -- has no room either,
 			 * so it neither makes a rake full nor stops it being full. */
 			for (const Train *u = rake; u != nullptr; u = u->Next()) {
-				if (u->cargo.StoredCount() < u->cargo_cap) return false;
+				if (in_scope(u) && u->cargo.StoredCount() < u->cargo_cap) return false;
 			}
 			break;
 
@@ -3028,7 +3046,11 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 		if (!carries_it) return false;
 	}
 
-	/* One number, four readings. */
+	/* One number, four readings -- and asked of the whole rake, whatever cargo
+	 * is named. Deliberately not narrowed the way the fullness question above
+	 * is: how many wagons is about the length of the train being made, which a
+	 * platform and a train-length limit measure whole, while how full they are
+	 * is about the cargo work and belongs to the cargo. The player's call. */
 	if (check_count && order.GetCoupleCount() != 0 && !order.ShouldFoundRake()) {
 		uint count = 0;
 		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) count++;

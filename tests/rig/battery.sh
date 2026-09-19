@@ -137,6 +137,16 @@ run_scene filtropraveny "vlak123 on
 testspoj depo pocet
 testza 200 testfiltr 6
 testza 6000 testfiltr" 12000
+# A mixed rake -- wagons of two cargoes -- and a collector asking for one of
+# them when it is full. The empty wagon of the other cargo must not keep the
+# rake from counting as full: the fullness question is the named cargo's.
+run_scene smes "vlak123 on
+testspoj smes
+testfiltr 0
+testfiltr plne
+testza 1500 testfiltr zkouska
+testza 2000 testnalozit rada 0
+testza 2400 testfiltr zkouska" 12000
 run_scene rad "vlak123 on
 testspoj rad" 10000
 run_scene blok "vlak123 on

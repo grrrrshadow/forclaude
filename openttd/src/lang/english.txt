@@ -4960,7 +4960,7 @@ STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Wagons: 
 STR_ORDER_COUPLE_LOAD_SHORT_ANY                                 :any
 STR_ORDER_COUPLE_LOAD_SHORT_EMPTY                               :empty
 STR_ORDER_COUPLE_LOAD_SHORT_FULL                                :full
-STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Only collect wagons that are this full. Combines with the other two settings; each one narrows the choice further
+STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Only collect wagons that are this full. Combines with the other two settings; each one narrows the choice further. With a cargo named, this asks only the wagons carrying it, so one empty wagon of something else standing in the same rake does not keep it from counting as full
 STR_ORDER_COUPLE_CARGO_ANY                                      :{BLACK}Cargo: any
 STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Cargo: {STRING}
 STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Only collect wagons carrying this cargo. Combines with the other two settings; each one narrows the choice further

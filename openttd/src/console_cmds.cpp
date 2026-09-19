@@ -1432,10 +1432,17 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 	 * windows -- they are built and refreshed, just never drawn -- and that
 	 * refresh is where it broke for the player. */
 	bool window_mode = false;
+	/* 'smes' makes the dropped rake a mixed one: wagons of two cargoes, and
+	 * the collector asking for one of them. The question that needs is how
+	 * much of the rake the fullness filter looks at -- with one empty wagon
+	 * of the other cargo standing in it, a rake whose asked-for wagons are
+	 * full is either collected or it is not. The player's own case. */
+	bool mixed_mode = false;
 	uint want_n = 0;
 	for (size_t i = 1; i < argv.size(); i++) {
 		if (argv[i] == "tendr") tender_mode = true;
 		if (argv[i] == "okno") window_mode = true;
+		if (argv[i] == "smes") mixed_mode = true;
 		if (argv[i] == "couvej") backing = true;
 		if (argv[i] == "depo") depot_mode = true;
 		if (argv[i] == "rad") timetabled = true;
@@ -1750,12 +1757,23 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "testspoj: engine 2 failed.");
 		return true;
 	}
+	if (mixed_mode && eid_wagon2 == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testspoj smes: v teto hre je jen jeden druh vagonu, smiseny vlak nejde postavit.");
+		return true;
+	}
 	for (int i = 0; i < 3; i++) {
-		auto [costw, wid, unused_d, unused_e, unused_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+		/* 'smes': the last of the three is of the other kind, and stays empty.
+		 * That is the wagon the fullness question must not be asked about. */
+		EngineID what = (mixed_mode && i == 2) ? eid_wagon2 : eid_wagon;
+		auto [costw, wid, unused_d, unused_e, unused_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, what, true, INVALID_CARGO, ClientID::Invalid);
 		if (costw.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, wid, Train::Get(veh2)->Last()->index, false).Failed()) {
 			IConsolePrint(CC_ERROR, "testspoj: wagon failed.");
 			return true;
 		}
+	}
+	if (mixed_mode) {
+		IConsolePrint(CC_DEFAULT, "testspoj smes: rada je dva vagony nakladu {} a jeden nakladu {}.",
+				(int)Engine::Get(eid_wagon)->GetDefaultCargoType(), (int)Engine::Get(eid_wagon2)->GetDefaultCargoType());
 	}
 
 	if (store_mode) {
@@ -1845,6 +1863,17 @@ static bool ConTestCouple(std::span<std::string_view> argv)
 			deliver.SetDecouple(true);
 			deliver.SetDecoupleCount(1);
 			IConsolePrint(CC_DEFAULT, "testspoj: odkladacka si necha vagon na plnou nakladku - z nastupiste neodjede.");
+		} else if (mixed_mode) {
+			/* Left to load as an ordinary stop would, not told "load nothing".
+			 * A rake put down under "load nothing" counts as full whatever is
+			 * in it -- it has been told nothing more is going into it -- and
+			 * the fullness filter then never has a question to answer. This
+			 * scene is about that question, so the rake is dropped with an
+			 * ordinary loading job, which leaves it collectable and genuinely
+			 * as full or as empty as its wagons are. */
+			deliver.SetUnloadType(OrderUnloadType::NoUnload);
+			deliver.SetDecouple(true);
+			deliver.SetDecoupleCount(0);
 		} else {
 			deliver.SetLoadType(OrderLoadType::NoLoad);
 			deliver.SetUnloadType(OrderUnloadType::NoUnload);
@@ -2426,7 +2455,60 @@ static bool ConTestStationCargo(std::span<std::string_view> argv)
 static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Change the cargo filter on a collect order. Usage: 'testfiltr' to clear it, or 'testfiltr <cargo>'.");
+		IConsolePrint(CC_HELP, "Change what a collect order accepts. Usage: 'testfiltr' to clear the cargo filter, 'testfiltr <cargo>', or 'testfiltr plne|prazdne|jakekoliv'.");
+		return true;
+	}
+
+	/* A word instead of a number sets the other half of the filter: how full
+	 * the wagons have to be. The two are asked together -- with a cargo named,
+	 * the fullness question is asked only of the wagons carrying it -- so the
+	 * rig has to be able to set both. */
+	/* 'zkouska' asks the filter its own question of every waiting rake, instead
+	 * of playing a coupling out and reading the answer from where the trains
+	 * end up. Timing, platform holds and who claimed what all drop out of it;
+	 * what is left is the filter. */
+	if (argv.size() >= 2 && argv[1] == "zkouska") {
+		for (const Train *t : Train::Iterate()) {
+			if (t->First() != t || !t->IsFrontEngine()) continue;
+			for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
+				const Order *o = t->GetOrder(i);
+				if (o == nullptr || !o->ShouldGoToCouple()) continue;
+				bool found = CoupleOrderWouldFindSomething(t, *o);
+				/* With how many rakes are standing there to be found at all:
+				 * "nothing found" means one thing when a rake is waiting and
+				 * the filter turned it down, and quite another when the rake
+				 * has already been collected and there is nothing left to
+				 * turn down. Without the count the two read the same. */
+				uint waiting = 0;
+				for (const Train *r : Train::Iterate()) {
+					if (r->First() == r && r->IsFreeWagon()) waiting++;
+				}
+				IConsolePrint(CC_DEFAULT, "testfiltr: vlak {} rozkaz {} (naklad {}, naplneni {}) - {}, cekajicich rad {}",
+						t->unitnumber, i, (int)(int8_t)o->GetCoupleCargo(), to_underlying(o->GetCoupleLoad()),
+						found ? "NASEL BY radu" : "nenasel by nic", waiting);
+				return true;
+			}
+		}
+		IConsolePrint(CC_ERROR, "testfiltr: zadny vlak nema rozkaz jet se spojit.");
+		return true;
+	}
+
+	if (argv.size() >= 2 && (argv[1] == "plne" || argv[1] == "prazdne" || argv[1] == "jakekoliv")) {
+		OrderCoupleLoad want = argv[1] == "plne" ? OrderCoupleLoad::Full :
+				(argv[1] == "prazdne" ? OrderCoupleLoad::Empty : OrderCoupleLoad::Any);
+		for (const Train *t : Train::Iterate()) {
+			if (t->First() != t || !t->IsFrontEngine()) continue;
+			for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
+				const Order *o = t->GetOrder(i);
+				if (o == nullptr || !o->ShouldGoToCouple()) continue;
+				AutoRestoreBackup cur_company(_current_company, t->owner);
+				CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, i, MOF_COUPLE_LOAD, to_underlying(want));
+				IConsolePrint(r.Failed() ? CC_ERROR : CC_DEFAULT, "testfiltr: vlak {} rozkaz {} - filtr naplneni na {} {}.",
+						t->unitnumber, i, argv[1], r.Failed() ? "SELHAL" : "nastaven");
+				return true;
+			}
+		}
+		IConsolePrint(CC_ERROR, "testfiltr: zadny vlak nema rozkaz jet se spojit.");
 		return true;
 	}
 
@@ -3926,9 +4008,33 @@ static bool ConTestFacings(std::span<std::string_view>)
 static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Fill a road vehicle with cargo. Usage: 'testnalozit auto <unit number>'.");
+		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number>' or 'testnalozit rada <cargo>'.");
 		return true;
 	}
+	/* 'rada <cargo>': fill the wagons of that cargo in every waiting rake, and
+	 * leave every other wagon alone. What the fullness filter is asked about
+	 * is exactly this difference, so the rig has to be able to make it. */
+	if (argv[1] == "rada") {
+		auto pcargo = ParseInteger(argv[2]);
+		if (!pcargo.has_value()) return false;
+		CargoType want = (CargoType)*pcargo;
+		uint rakes = 0, put = 0;
+		for (Train *t : Train::Iterate()) {
+			if (t->First() != t || !t->IsFreeWagon()) continue;
+			rakes++;
+			for (Train *u = t; u != nullptr; u = u->Next()) {
+				if (u->cargo_type != want) continue;
+				uint room = u->cargo_cap - u->cargo.StoredCount();
+				if (room == 0 || !CargoPacket::CanAllocateItem()) continue;
+				u->cargo.Append(CargoPacket::Create(t->last_station_visited, room, Source{}));
+				put += room;
+			}
+			t->MarkDirty();
+		}
+		IConsolePrint(rakes == 0 ? CC_ERROR : CC_DEFAULT, "testnalozit: {} odpojenych rad, nalozeno {} jednotek nakladu {}.", rakes, put, (int)want);
+		return true;
+	}
+
 	auto punit = ParseInteger(argv[2]);
 	if (!punit.has_value()) return false;
 

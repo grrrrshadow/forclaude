@@ -5114,7 +5114,7 @@ STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Vagony: 
 STR_ORDER_COUPLE_LOAD_SHORT_ANY                                 :jakékoliv
 STR_ORDER_COUPLE_LOAD_SHORT_EMPTY                               :prázdné
 STR_ORDER_COUPLE_LOAD_SHORT_FULL                                :plné
-STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Odvézt jen takto naložené vagony. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
+STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Odvézt jen takto naložené vagony. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje. Je-li vybrán náklad, ptá se to jen vozů s tímto nákladem - jeden prázdný vagon na něco jiného ve stejné řadě pak nebrání tomu, aby se řada počítala za plnou
 STR_ORDER_COUPLE_CARGO_ANY                                      :{BLACK}Náklad: jakýkoliv
 STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Náklad: {STRING}
 STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Odvézt jen vagony s tímto nákladem. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
