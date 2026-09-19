@@ -4556,6 +4556,30 @@ static void PrintConsistDrawing(const Train *t)
 				u->bounds.offset.x, u->bounds.offset.y, u->bounds.offset.z,
 				IsValidCargoType(u->cargo_type) ? (int)u->cargo_type : -1, u->cargo.StoredCount(), u->cargo_cap,
 				u->carrying == VehicleID::Invalid() ? -1 : (int)u->carrying.base());
+
+		/* And whatever rides on it. A lorry on a wagon is part of the wagon's
+		 * picture, so the question asked of it is the same one: does it face
+		 * the way the wagon under it is drawn (FollowWagon())? Printed beside
+		 * the wagon's own line, because the two are only ever wrong together. */
+		if (u->carrying == VehicleID::Invalid()) continue;
+		const RoadVehicle *carried = RoadVehicle::GetIfValid(u->carrying);
+		if (carried == nullptr) continue;
+		Direction drawn_dir = u->flags.Test(VehicleRailFlag::Flipped) ? ReverseDir(u->direction) : u->direction;
+		uint part = 0;
+		for (const RoadVehicle *c = carried; c != nullptr; c = c->Next(), part++) {
+			VehicleSpriteSeq cseq;
+			c->GetImage(c->direction, EngineImageType::OnMap, &cseq);
+			std::string csprites;
+			for (uint i = 0; i < cseq.count; i++) {
+				if (!csprites.empty()) csprites += '+';
+				csprites += fmt::format("{}/{}", cseq.seq[i].sprite, cseq.seq[i].pal);
+			}
+			IConsolePrint(c->direction == drawn_dir ? CC_DEFAULT : CC_ERROR,
+					"testkresba:      veze auto {} kus {} smer {} (vagon kresleny smer {}) {} poz ({},{},{}) sprajty {}",
+					c->index.base(), part, to_underlying(c->direction), to_underlying(drawn_dir),
+					c->direction == drawn_dir ? "sedi" : "NESEDI", c->x_pos, c->y_pos, c->z_pos,
+					csprites.empty() ? "nic" : csprites);
+		}
 	}
 }
 
@@ -4648,6 +4672,31 @@ static bool MakeEngineOfPieces(Train *t, uint pieces)
 	}
 	t->ConsistChanged(CCF_ARRANGE);
 	InvalidateWindowData(WindowClass::VehicleDepot, t->tile);
+	return true;
+}
+
+/**
+ * Write a note of the player's own into the record, so that what he saw on the
+ * screen stands in the log beside what the game wrote at that moment, with the
+ * same tick on it. He has been typing his notes at the console and getting
+ * "Command not found" back -- which does land in the log, but as an error, at
+ * the top of the console's own output rather than among the game's lines.
+ * Usage: pozn <whatever you want to say>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConNote(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Write a note of your own into the record. Usage: 'pozn <text>'.");
+		return true;
+	}
+	std::string text;
+	for (size_t i = 1; i < argv.size(); i++) {
+		if (!text.empty()) text += ' ';
+		text += argv[i];
+	}
+	LogAnomaly("POZNAMKA HRACE: {}", text);
+	IConsolePrint(CC_DEFAULT, "pozn: zapsano do zaznamu.");
 	return true;
 }
 
@@ -9218,6 +9267,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testkresba",              ConTestDrawing);
 	IConsole::CmdRegister("testclanky",              ConTestMakePieces);
 	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
+	IConsole::CmdRegister("pozn",                    ConNote);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);

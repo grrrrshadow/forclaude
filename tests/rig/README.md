@@ -278,6 +278,17 @@ at one; `testvse` includes it.
 from its head. A piece in a bend stands 45 degrees off and is right to; the
 player's log had eight of those reported as faults.
 
+A lorry riding on a wagon is part of that wagon's picture and keeps the same
+promise, so `testkresba` prints it too: its facing, the facing the wagon under
+it is drawn with, and `sedi` or `NESEDI` between them. It went wrong in
+exactly the place the wagons did -- a flipped wagon laid its lorry out from
+the recorded direction, so the lorry spun round on the spot and moved to the
+wagon's other end while the wagon itself did not move at all. On the player's
+save that was 24 `NESEDI` against 0 after the fix.
+
+`pozn <text>` writes a line of the player's own into the record, with the tick
+on it, for saying what was on the screen at that moment.
+
 ## A wagon holding an order list, and a window left on the wrong vehicle
 
 Two faults the rig cannot see by counting, because both are a state that

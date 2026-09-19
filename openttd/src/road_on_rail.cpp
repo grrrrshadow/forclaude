@@ -98,7 +98,17 @@ static void SayRoad(const RoadVehicle *rv, std::string what)
  */
 static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 {
-	Direction dir = wagon->direction;
+	/* Which way the wagon is drawn, not which way it is written down. A wagon
+	 * coupled up the other way round has its recorded direction reversed and
+	 * its Flipped flag set, which leaves its picture exactly as it was --
+	 * nothing moved, so nothing may look different (see
+	 * NormaliseCoupledConsistFacing()). A lorry standing on its deck is part of
+	 * that picture: read off the recorded direction it spun round on the spot
+	 * while the wagon under it did not, and moved to the wagon's other end
+	 * besides, because which end is the nose is worked out from this too. The
+	 * player saw it at one station and not at the other, which is exactly where
+	 * the coupling flips the rake and where it does not. */
+	Direction dir = wagon->flags.Test(VehicleRailFlag::Flipped) ? ReverseDir(wagon->direction) : wagon->direction;
 	int x = wagon->x_pos;
 	int y = wagon->y_pos;
 
