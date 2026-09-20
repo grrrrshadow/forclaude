@@ -251,7 +251,7 @@ Money Ship::GetRunningCost() const
 {
 	const Engine *e = this->GetEngine();
 	uint cost_factor = GetVehicleProperty(this, PROP_SHIP_RUNNING_COST_FACTOR, e->VehInfo<ShipVehicleInfo>().running_cost);
-	return GetPrice(Price::RunningShip, cost_factor, e->GetGRF());
+	return WithEngineCare(GetPrice(Price::RunningShip, cost_factor, e->GetGRF()));
 }
 
 /** Calendar day handler. */

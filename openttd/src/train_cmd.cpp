@@ -12988,7 +12988,7 @@ Money Train::GetRunningCost() const
 		cost += GetPrice(e->VehInfo<RailVehicleInfo>().running_cost_class, cost_factor, e->GetGRF());
 	} while ((v = v->GetNextVehicle()) != nullptr);
 
-	return cost;
+	return WithEngineCare(cost);
 }
 
 /**

@@ -38,6 +38,7 @@ void PrepareUnload(Vehicle *front_v);
 void LoadUnloadStation(Station *st);
 
 Money GetPrice(Price index, uint cost_factor, const struct GRFFile *grf_file, int shift = 0);
+Money WithEngineCare(Money running_cost);
 
 void InitializeEconomy();
 void RecomputePrices();

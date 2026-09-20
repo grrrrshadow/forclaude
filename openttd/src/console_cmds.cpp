@@ -4023,10 +4023,15 @@ static bool ConTestListEngineModels(std::span<std::string_view>)
 	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon) continue;
 		if (!e->info.climates.Test(_settings_game.game_creation.landscape)) continue;
-		IConsolePrint(CC_DEFAULT, "model {:2}: {:<24} k dispozici {} stari {} mesicu, faze {}+{}+{}={} mesicu{}",
+		/* Upkeep and reliability as the purchase list shows them: the two
+		 * figures the engine-care setting moves, so that turning it on and off
+		 * is something the rig can read rather than something to take on
+		 * trust. */
+		IConsolePrint(CC_DEFAULT, "model {:2}: {:<24} k dispozici {} stari {} mesicu, faze {}+{}+{}={} mesicu, udrzba {} spolehlivost {}{}",
 				e->index.base(), GetString(e->info.string_id), e->company_avail.Test(CompanyID::Begin()) ? "ano" : "ne ", e->age,
 				e->duration_phase_1, e->duration_phase_2, e->duration_phase_3,
 				e->duration_phase_1 + e->duration_phase_2 + e->duration_phase_3,
+				e->GetRunningCost(), e->reliability,
 				e->info.base_life == 0xFF ? " (vyrabi se navzdy)" : "");
 	}
 	return true;

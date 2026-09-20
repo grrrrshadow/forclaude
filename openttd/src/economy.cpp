@@ -949,6 +949,27 @@ Money GetPrice(Price index, uint cost_factor, const GRFFile *grf_file, int shift
 	return cost;
 }
 
+/**
+ * Add what looking after an engine properly costs on top of its ordinary
+ * upkeep: a fifth again.
+ *
+ * One place does it for all four kinds of vehicle and for the purchase list as
+ * well, so the figure the player is shown before he buys is the figure he is
+ * charged afterwards. Everything asks the vehicle or the engine what it costs
+ * to run, and this is the last thing that answer passes through.
+ *
+ * See _settings_game.vehicle.engine_care, which is where the other half of the
+ * bargain lives: the engine stops growing more prone to breaking down with age.
+ *
+ * @param running_cost what running it costs without the care
+ * @return what it costs with it
+ */
+Money WithEngineCare(Money running_cost)
+{
+	if (!_settings_game.vehicle.engine_care) return running_cost;
+	return running_cost + running_cost / 5;
+}
+
 Money GetTransportedGoodsIncome(uint num_pieces, uint dist, uint16_t transit_periods, CargoType cargo_type)
 {
 	const CargoSpec *cs = CargoSpec::Get(cargo_type);

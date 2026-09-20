@@ -196,7 +196,17 @@ void VehicleServiceInDepot(Vehicle *v)
 		v->date_of_last_service = TimerGameEconomy::date;
 		v->date_of_last_service_newgrf = TimerGameCalendar::date;
 		v->breakdowns_since_last_service = 0;
-		v->reliability = v->GetEngine()->reliability;
+		/* Looked after, a vehicle never comes out of a shed in worse shape than
+		 * it went in. Ordinarily a service sets it to whatever the engine model
+		 * is worth now, and a model past its prime is worth less every year, so
+		 * a service is how an old engine's reliability actually falls. With the
+		 * player's upkeep paid for, the best it has ever been is what it keeps.
+		 * See _settings_game.vehicle.engine_care. */
+		if (_settings_game.vehicle.engine_care) {
+			v->reliability = std::max<uint16_t>(v->reliability, v->GetEngine()->reliability);
+		} else {
+			v->reliability = v->GetEngine()->reliability;
+		}
 		/* Prevent vehicles from breaking down directly after exiting the depot. */
 		v->breakdown_chance /= 4;
 		if (_settings_game.difficulty.vehicle_breakdowns == VehicleBreakdowns::Reduced) v->breakdown_chance = 0; // on reduced breakdown
@@ -1378,10 +1388,16 @@ void CheckVehicleBreakdown(Vehicle *v)
 	 * is wholly on the line. */
 	if (v->type == VehicleType::Train && IsAnyPartInsideDepot(Train::From(v))) return;
 
-	/* Decrease reliability. */
+	/* Decrease reliability. Not for a player who pays to have his engines
+	 * looked after: this is the whole of how a vehicle gets more prone to
+	 * breaking down as it runs, so leaving it out is what keeps one as good as
+	 * it was new. It still breaks down -- at the rate a new one does, which is
+	 * what was paid for, and not never. */
 	int rel, rel_old;
-	v->reliability = rel = std::max((rel_old = v->reliability) - v->reliability_spd_dec, 0);
-	if ((rel_old >> 8) != (rel >> 8)) SetWindowDirty(WindowClass::VehicleDetails, v->index);
+	if (!_settings_game.vehicle.engine_care) {
+		v->reliability = rel = std::max((rel_old = v->reliability) - v->reliability_spd_dec, 0);
+		if ((rel_old >> 8) != (rel >> 8)) SetWindowDirty(WindowClass::VehicleDetails, v->index);
+	}
 
 	/* Some vehicles lose reliability but won't break down. */
 	/* Breakdowns are disabled. */
@@ -1547,11 +1563,16 @@ void AgeVehicle(Vehicle *v)
 
 	if (!v->IsPrimaryVehicle() && (v->type != VehicleType::Train || !Train::From(v)->IsEngine())) return;
 
+	/* Past its years a vehicle loses reliability twice as fast for each year it
+	 * goes on, and again the year after. Not one that is looked after: the
+	 * point of the upkeep is that age stops telling. */
 	auto age = v->age - v->max_age;
-	for (int32_t i = 0; i <= 4; i++) {
-		if (age == TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{i})) {
-			v->reliability_spd_dec <<= 1;
-			break;
+	if (!_settings_game.vehicle.engine_care) {
+		for (int32_t i = 0; i <= 4; i++) {
+			if (age == TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{i})) {
+				v->reliability_spd_dec <<= 1;
+				break;
+			}
 		}
 	}
 
