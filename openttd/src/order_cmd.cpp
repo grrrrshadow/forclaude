@@ -2149,6 +2149,24 @@ void CheckOrders(const Vehicle *v)
 	/* Do nothing if we're not the first vehicle in a share-chain. */
 	if (v->FirstShared() != v) return;
 
+	/* And nothing at all for a vehicle whose orders use the coupling, the
+	 * decoupling or the riding this build added.
+	 *
+	 * The review is vanilla's and it reads an order list the vanilla way: a
+	 * station named twice is a mistake, a list that ends where it begins is a
+	 * mistake. Neither holds here. A train that drops wagons at a station and
+	 * comes back for them names it twice on purpose; a shunter's list begins
+	 * and ends in the same place because that is its whole job. The player's
+	 * word for it was that we cannot judge order lists we did not invent --
+	 * and he is right: every warning this gave him was wrong, and a warning
+	 * that is always wrong teaches a player to stop reading warnings.
+	 *
+	 * A list with none of our orders in it is still reviewed, exactly as
+	 * before: there the vanilla reading is the right one. */
+	for (const Order &o : v->Orders()) {
+		if (o.ShouldGoToCouple() || o.ShouldWaitForCouple() || o.ShouldDecoupleOnDeparture() || o.ShouldBoardAtStation()) return;
+	}
+
 	/* Only check every 20 days, so that we don't flood the message log */
 	if (v->owner == _local_company && v->day_counter % 20 == 0) {
 		StringID message = INVALID_STRING_ID;

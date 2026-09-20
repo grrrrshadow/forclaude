@@ -8,6 +8,7 @@
 /** @file build_vehicle_gui.cpp GUI for building vehicles. */
 
 #include "stdafx.h"
+#include "road_on_rail.h"
 #include "engine_base.h"
 #include "engine_func.h"
 #include "station_base.h"
@@ -500,10 +501,11 @@ static bool CargoAndEngineFilter(const GUIEngineListItem *item, const CargoType 
 	} else if (cargo_type == CargoFilterCriteria::CF_ENGINES) {
 		return Engine::Get(item->engine_id)->GetPower() != 0;
 	} else if (cargo_type == _road_vehicle_cargo) {
-		/* Any rail wagon takes the refit to road vehicles (RefitVehicle()),
-		 * and no set's refit mask says so. */
-		const Engine *e = Engine::Get(item->engine_id);
-		return e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
+		/* Whatever can be fitted to carry road vehicles: every rail wagon, and
+		 * the ships and aircraft big enough to take one (CanCarryRoadVehicles(),
+		 * road_on_rail.h). Asked of that one function rather than of a set's
+		 * refit mask, because the fitting is ours and no set knows about it. */
+		return CanCarryRoadVehicles(Engine::Get(item->engine_id));
 	} else {
 		CargoTypes refit_mask = GetUnionOfArticulatedRefitMasks(item->engine_id, true) & _standard_cargo_mask;
 		return (cargo_type == CargoFilterCriteria::CF_NONE ? refit_mask.None() : refit_mask.Test(cargo_type));
@@ -1687,12 +1689,15 @@ struct BuildVehicleWindow : Window {
 			 * eyecandy vehicles and its own comment calls it confusing; next to
 			 * "engines only" it is a second way of asking nearly the same thing,
 			 * and the player's word for it was that it does not belong. */
-			/* And wagons to be fitted for road vehicles. Named here rather than
-			 * with the cargoes below because it is not a standard cargo, and
-			 * only here because it rides on rail wagons and nothing else. */
-			if (IsValidCargoType(_road_vehicle_cargo)) {
-				list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(_road_vehicle_cargo), _road_vehicle_cargo));
-			}
+		}
+
+		/* And the vehicles that can be fitted to carry road vehicles: rail
+		 * wagons, ships and aircraft. Named apart from the cargoes below
+		 * because it is not a standard cargo; offered for every kind of
+		 * vehicle that can take the fitting, which is what the player looked
+		 * for in the ship and aircraft depots and did not find. */
+		if (IsValidCargoType(_road_vehicle_cargo) && this->vehicle_type != VehicleType::Road) {
+			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(_road_vehicle_cargo), _road_vehicle_cargo));
 		}
 
 		/* Add cargos */
