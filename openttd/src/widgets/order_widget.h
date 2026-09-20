@@ -55,8 +55,10 @@ enum OrderWidgets : WidgetID {
 	WID_O_COUPLE_LOAD,               ///< Choose how full the wagons to be collected have to be.
 	WID_O_COUPLE_CARGO,              ///< Choose which cargo the wagons to be collected have to carry.
 	WID_O_COUPLE_COUNT,              ///< Set how many vehicles the rake to be collected has to have.
-	WID_O_SEL_DECOUPLE_DEST,         ///< #NWID_SELECTION widget for the row saying where the cargo of the wagons this order puts down is bound, shown once it is going to put some down.
+	WID_O_SEL_DECOUPLE_DEST,         ///< #NWID_SELECTION widget for the bottom row of the train orders window; trains only, always shown, because the sell button in it is not tied to any one order.
+	WID_O_SEL_DECOUPLE_DEST_BTN,     ///< #NWID_SELECTION widget for the middle place of that row: the cargo destination button, or nothing while the selected order puts no wagons down.
 	WID_O_DECOUPLE_CARGO_DEST,       ///< Pick the station whose cargo the wagons this order puts down are to load.
+	WID_O_SELL_TRAIN,                ///< Sell this train to the scrapyard where it stands.
 };
 
 #endif /* WIDGETS_ORDER_WIDGET_H */

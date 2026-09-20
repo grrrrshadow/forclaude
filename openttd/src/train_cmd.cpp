@@ -2676,9 +2676,46 @@ bool IsWaitingToBeRescued(const Train *v)
 	 * the tow couples to the tail and pushes it the rest of the way in.
 	 * See CmdCoupleTrains(). */
 	if (IsWholeTrainInsideDepot(v)) return false;
+	/* Sold to the scrapyard: not broken, not wrecked, simply not the player's
+	 * any more. The call stands until somebody answers it, the same as a rake
+	 * the player asked to have taken away -- a deadline is there so that a
+	 * breakdown can mend itself in the end, and nothing mends a sold train.
+	 * See CmdSellTrainForScrap(). */
+	if (v->IsSoldForScrap()) return true;
 	if (v->breakdown_ctr != 1 && !v->IsWrecked()) return false;
 	if (v->rescue_deadline == TimerGameEconomy::Date{}) return false;
 	return TimerGameEconomy::date < v->rescue_deadline;
+}
+
+/**
+ * Is there anybody who could come for this train at all?
+ *
+ * Asked so that a train standing and waiting can say which of the two things is
+ * happening to it: somebody is on the way, or there is nobody to come. A train
+ * the player sold says the second out loud -- "sold, no tow available" -- and
+ * that line is the whole of what tells him he has to station an engine
+ * somewhere, because a sold train waits for ever and never mends itself.
+ *
+ * The plain question is asked: has this company an engine standing on call, or
+ * is one already coming for this train. Whether that engine will manage to
+ * reach it is another matter and one the engine's own window answers (see
+ * RescueHold); this is about there being one at all.
+ *
+ * @param v the train, front of its consist
+ * @return whether a rescue engine of this company exists that could be sent
+ */
+bool IsAnyRescueEngineAvailable(const Train *v)
+{
+	if (!_settings_game.vehicle.train_rescue_towing) return false;
+	if (Train::GetIfValid(v->couple_claim) != nullptr) return true;
+
+	for (const Train *tow : Train::Iterate()) {
+		if (tow->owner != v->owner) continue;
+		if (!tow->IsFrontEngine()) continue;
+		if (!tow->vehicle_flags.Test(VehicleFlag::RescueEngine)) continue;
+		return true;
+	}
+	return false;
 }
 
 /**
@@ -2898,8 +2935,11 @@ bool IsWaitingToBeCoupled(const Train *v)
 	 * IsRakeHeldByDropper(). */
 	if (head->IsFreeWagon()) return head->wait_counter == 0 && !IsRakeHeldByDropper(head);
 
-	/* Stranded is the same thing said another way. */
-	if (head->breakdown_ctr == 1 || head->IsWrecked()) return true;
+	/* Stranded is the same thing said another way. A train that has been sold
+	 * is stranded on purpose: it is standing still and stopped, waiting for the
+	 * engine that will take it to be broken up, and the brake it is standing
+	 * with is not the player saying "hands off" but the sale itself. */
+	if (head->breakdown_ctr == 1 || head->IsWrecked() || head->IsSoldForScrap()) return true;
 
 	/* A train the player has stopped is the player's, not a partner. Stopping
 	 * is the one gesture that says "hands off" about everything else a train
@@ -3012,7 +3052,7 @@ static bool IsCoupleClaimStale(const Train *rake)
 	const Train *claimer = Train::GetIfValid(rake->couple_claim);
 	if (claimer == nullptr) return true;
 	if (!claimer->IsFrontEngine()) return true;
-	if (claimer->vehstatus.Test(VehState::Crashed) || claimer->IsWrecked()) return true;
+	if (claimer->vehstatus.Test(VehState::Crashed) || claimer->IsWrecked() || claimer->IsSoldForScrap()) return true;
 	/* The two halves of the claim have to agree. If the engine no longer says
 	 * it is coming for this rake -- it was given other orders, or it has
 	 * already collected something -- then it is not coming. */
@@ -3497,7 +3537,7 @@ static bool IsValidCouplePartner(const Train *v, const Train *partner)
 	 *
 	 * The rescue engine reaches its casualty by the answer given further up,
 	 * where it is named outright, so this takes nothing away from it. */
-	if (partner->breakdown_ctr == 1 || partner->IsWrecked()) return false;
+	if (partner->breakdown_ctr == 1 || partner->IsWrecked() || partner->IsSoldForScrap()) return false;
 	/* Either a rake of wagons or a whole train of its own that is waiting to be
 	 * picked up and carried along as part of a bigger one. Two little trains
 	 * joining to run as one is the same arrangement as an engine collecting
@@ -5676,6 +5716,175 @@ CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool requ
 	return CommandCost();
 }
 
+/**
+ * What the scrapyard pays for a train, whatever it is worth and however much of
+ * it there is. It is scrap value and nothing else: a train sold this way is not
+ * sold to anybody who wants to run it, it is sold to be broken up, and the
+ * player's price for that is a hundred dollars flat.
+ *
+ * Fifty, because the game counts money in a unit the player's dollars are worth
+ * two of. In another currency the note reads as whatever a hundred dollars is
+ * worth there, which is the same thing said in that money.
+ */
+static const Money TRAIN_SCRAP_PRICE = 50;
+
+/**
+ * How long the papers leave a company alone after writing that it sold a train
+ * for scrap: two months, the player's figure.
+ *
+ * One line per sale would mean thirty lines from a player who is tidying up,
+ * and a newspaper that says the same thing thirty times is a newspaper nobody
+ * reads. It is counted per company, so one player's clear-out never uses up
+ * another's line.
+ */
+static const int SCRAP_NEWS_QUIET_DAYS = 62;
+
+/**
+ * Sell a train to the scrapyard where it stands.
+ *
+ * The player's way of getting rid of a train that is nowhere near a depot and
+ * is not worth driving to one. The money is paid at once and the papers write
+ * it up, and from that moment the train is not the player's to drive any more:
+ * it stands where it stood, waiting for a rescue engine, exactly as a breakdown
+ * waits. The engine that comes for it takes it to a depot and the depot breaks
+ * it up -- the same road a wreck travels (see HandleRescueEngineInDepot()), and
+ * deliberately so: one mechanism does both, and the two never meet, because a
+ * train that is already broken down or already a wreck cannot be sold at all.
+ *
+ * Standing in a depot there is nobody to wait for. The breaking-up is what the
+ * shed is for, so it happens on the spot.
+ *
+ * @param flags type of operation
+ * @param veh_id the train to sell
+ * @return the scrap price, paid to the player, or an error
+ */
+/**
+ * Why this train cannot be sold to the scrapyard, if it cannot.
+ *
+ * One place decides, and both the command and the button in the orders window
+ * ask it -- the button so that it can grey itself out, the command so that the
+ * sale is refused whoever asks for it. Written as one function for the reason
+ * every such pair is: a window carrying its own copy of the conditions can say
+ * one thing while the game does another.
+ *
+ * @param v the train, front of its consist
+ * @return the refusal to show, or STR_NULL when it may be sold
+ */
+StringID SellTrainForScrapRefusal(const Train *v)
+{
+	if (v == nullptr || !v->IsFrontEngine()) return STR_ERROR_CAN_T_SELL_TRAIN;
+
+	/* Sold once. Selling a sold train would pay for it twice and start a second
+	 * wait on top of the first. */
+	if (v->IsSoldForScrap()) return STR_ERROR_TRAIN_ALREADY_SOLD;
+
+	/* Nobody buys a breakdown and nobody buys a wreck -- the player's rule. It
+	 * is also what keeps the two uses of the rescue engine apart: a broken-down
+	 * train is already waiting for one, and a train that could be sold on top of
+	 * that would be waiting for the same engine twice over, with two different
+	 * ideas of what should happen when it arrives. */
+	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return STR_ERROR_SCRAPYARD_REFUSES_WRECK;
+	if (v->breakdown_ctr == 1) return STR_ERROR_SCRAPYARD_REFUSES_BREAKDOWN;
+
+	/* An engine on call is an arrangement, not a train doing a job, and one out
+	 * fetching somebody is in the middle of one. Neither is something to sell
+	 * out from under itself. */
+	if (v->vehicle_flags.Test(VehicleFlag::RescueEngine)) return STR_ERROR_RESCUE_ENGINE_IS_TOWING;
+
+	/* Somebody is already coming for it, which can only be an engine collecting
+	 * wagons it is part of or a tow fetching a case. Either way it is spoken
+	 * for and the sale would leave that errand pointing at a train that is
+	 * about to be somebody else's business. */
+	if (v->couple_claim != VehicleID::Invalid()) return STR_ERROR_SCRAPYARD_REFUSES_CLAIMED;
+
+	return STR_NULL;
+}
+
+CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsFrontEngine()) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	StringID refusal = SellTrainForScrapRefusal(v);
+	if (refusal != STR_NULL) return CommandCost(refusal);
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		/* Written up before anything happens to the train, so the paper has a
+		 * spot to show even when the shed breaks it up in the next line. And
+		 * not every time: the papers leave a company alone for two months
+		 * afterwards, so that tidying up a railway does not fill them. */
+		Company *c = Company::Get(v->owner);
+		if (TimerGameEconomy::date - c->last_scrap_news >= SCRAP_NEWS_QUIET_DAYS) {
+			c->last_scrap_news = TimerGameEconomy::date;
+
+			/* And not in front of the seller himself, when there is anybody
+			 * else to read it. A player knows perfectly well that he has just
+			 * sold a train -- he pressed the button and answered the question
+			 * -- and being handed a newspaper about it is being told his own
+			 * news. What the paper is for is the others: somebody else's
+			 * railway losing a train is worth knowing. On his own he is the
+			 * only reader there is, so he gets it.
+			 *
+			 * The date above is company state and is written on every client
+			 * alike; only whether the paper is put in front of this one player
+			 * is decided here, and a news item is neither saved nor part of
+			 * what the clients agree on, so the two cannot drift apart. */
+			if (!_networking || v->owner != _local_company) {
+				AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_SOLD_FOR_SCRAP, v->owner), NewsType::General, v->tile);
+			}
+		}
+
+		if (IsWholeTrainInsideDepot(v)) {
+			/* In a shed already: nobody has to come for it. */
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: prodan do srotu a rovnou sesrotovan v depu ({},{})", v->unitnumber, TileX(v->tile), TileY(v->tile));
+			}
+			TileIndex depot = v->tile;
+			delete v;
+			InvalidateWindowData(WindowClass::VehicleDepot, depot);
+			SetWindowClassesDirty(WindowClass::TrainList);
+			return CommandCost(ExpensesType::NewVehicles, -TRAIN_SCRAP_PRICE);
+		}
+
+		v->vehicle_flags.Set(VehicleFlag::SoldForScrap);
+
+		/* It stops where it is, the same three lines a crash uses. */
+		v->vehstatus.Set(VehState::Stopped);
+		v->cur_speed = 0;
+		v->subspeed = 0;
+
+		/* And it gives back the road it had booked ahead of itself, keeping only
+		 * the ground under its own wheels. It is never going to drive that road,
+		 * and the engine coming for it may well have to come in over it -- the
+		 * same reasoning as a breakdown's, see TrainAwaitsRescue(). */
+		FreeTrainTrackReservation(v);
+		v->ReserveTrackUnderConsist();
+
+		/* From here it is a case like any other: it says it is waiting to be
+		 * coupled, and an engine on call reads that and comes. The call stands
+		 * until it is answered -- there is no deadline on it, because a deadline
+		 * is there to let a breakdown mend itself in the end, and nothing mends
+		 * a sold train back into an unsold one. */
+		v->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
+		v->current_order.SetWaitForCouple(true);
+		v->current_order.SetGoToCouple(false);
+
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "Vlak {}: PRODAN do srotu na ({},{}), ceka na odtah", v->unitnumber, TileX(v->tile), TileY(v->tile));
+		}
+
+		InvalidateWindowData(WindowClass::VehicleView, v->index);
+		InvalidateWindowData(WindowClass::VehicleOrders, v->index);
+		SetWindowDirty(WindowClass::VehicleDetails, v->index);
+		SetWindowClassesDirty(WindowClass::TrainList);
+	}
+
+	return CommandCost(ExpensesType::NewVehicles, -TRAIN_SCRAP_PRICE);
+}
+
 CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue)
 {
 	Train *v = Train::GetIfValid(veh_id);
@@ -5814,7 +6023,7 @@ static void TryDispatchRescueEngine(Train *tow)
 		 * Told apart from "waiting to be fetched" so that an engine which never
 		 * leaves says which of the two it is looking at, rather than the same
 		 * "nothing to do" for both. */
-		if (casualty->IsFrontEngine() && (casualty->breakdown_ctr == 1 || casualty->IsWrecked())) saw_trouble = true;
+		if (casualty->IsFrontEngine() && (casualty->breakdown_ctr == 1 || casualty->IsWrecked() || casualty->IsSoldForScrap())) saw_trouble = true;
 
 		if (casualty->owner != tow->owner) continue;
 		if (!IsWaitingToBeRescued(casualty)) continue;
@@ -5853,7 +6062,7 @@ static void TryDispatchRescueEngine(Train *tow)
 	tow->rescue_nopath_tries = 0;
 	if (_show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: odtah - vyjizdim pro {} ({}) na ({},{}) (tik {})", tow->unitnumber, nearest->index.base(),
-				nearest->IsFreeWagon() ? "vagonky" : "poruchu", TileX(nearest->tile), TileY(nearest->tile), TimerGameTick::counter);
+				nearest->IsFreeWagon() ? "vagonky" : (nearest->IsSoldForScrap() ? "prodany vlak" : "poruchu"), TileX(nearest->tile), TileY(nearest->tile), TimerGameTick::counter);
 	}
 	/* Going for somebody else clears the way for another try at the one
 	 * given up on; going for that one is the try. */
@@ -6098,8 +6307,13 @@ bool HandleRescueEngineInDepot(Train *tow)
 	/* Nothing was ever picked up -- the casualty was sold, or sorted itself out
 	 * before this engine got there. Nothing to put down. */
 	bool wagons = false;
+	bool sold = false;
 	if (in_tow) {
 		bool wrecked = casualty->IsWrecked();
+		/* Asked here, on the vehicle the call was written on, because once the
+		 * chain has been split and turned round the head may be a different
+		 * vehicle and the flag is only ever on the one that was sold. */
+		sold = casualty->IsSoldForScrap();
 
 		/* Split it back off. It is standing in a depot, which is where taking
 		 * trains apart is an ordinary thing to do.
@@ -6164,8 +6378,14 @@ bool HandleRescueEngineInDepot(Train *tow)
 				casualty->ConsistChanged(CCF_ARRANGE);
 			}
 			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
-		} else if (wrecked) {
-			/* A wreck brought into a depot is scrapped there. */
+		} else if (wrecked || sold) {
+			/* A wreck brought into a depot is scrapped there, and so is a train
+			 * the player sold to the scrapyard -- which is what the depot was
+			 * fetched for. The player was paid when he sold it; nothing more is
+			 * due for it here. */
+			if (sold && _show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: odtah - prodany vlak sesrotovan v depu ({},{})", casualty->unitnumber, TileX(tow->tile), TileY(tow->tile));
+			}
 			delete casualty;
 			casualty = nullptr;
 		} else {
@@ -6227,7 +6447,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 	 * loop scene reported a delivery for an engine that never left its shed. */
 	if (in_tow && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - {} v depu na ({},{})",
-				tow->unitnumber, wagons ? "vagonky odlozeny" : "porucha slozena", TileX(tow->tile), TileY(tow->tile));
+				tow->unitnumber, wagons ? "vagonky odlozeny" : (sold ? "prodany vlak sesrotovan" : "porucha slozena"), TileX(tow->tile), TileY(tow->tile));
 	}
 
 	/* Home if this is not home, otherwise straight back on call. */

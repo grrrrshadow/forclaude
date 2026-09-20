@@ -537,6 +537,16 @@ public:
 	inline bool IsWrecked() const { return this->vehicle_flags.Test(VehicleFlag::Wreck); }
 
 	/**
+	 * Has the player sold this train to the scrapyard?
+	 *
+	 * It stands where it stood, it is no longer the player's to drive, and it
+	 * waits for a rescue engine to take it to a depot and break it up. The flag
+	 * lives on the head of the consist only, the same as the call-out it writes.
+	 * See CmdSellTrainForScrap().
+	 */
+	inline bool IsSoldForScrap() const { return this->vehicle_flags.Test(VehicleFlag::SoldForScrap); }
+
+	/**
 	 * Gets the speed in km-ish/h that can be sent into string parameters for string processing.
 	 * @return the vehicle's speed
 	 */

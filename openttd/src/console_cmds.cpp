@@ -3012,6 +3012,9 @@ static bool ConTestReleaseClone(std::span<std::string_view> argv)
  * @copydoc IConsoleCmdProc
  */
 static VehicleID _testodtah_casualty = VehicleID::Invalid();
+static bool _testodtah_sell = false; ///< The armed tile sells the train for scrap instead of breaking it down.
+static bool _testodtah_sell_broken = false; ///< Try to sell the train shortly after it breaks down, which the scrapyard has to refuse.
+static int _testodtah_sell_after = 0; ///< Ticks left until that attempt. Zero while nothing is pending.
 static TileIndex _testodtah_break_tile = INVALID_TILE;
 static TileIndex _testodtah_cross_tile = INVALID_TILE;
 static TileIndex _testodtah_depot_w = INVALID_TILE;
@@ -3354,10 +3357,72 @@ static bool ConTestRescueDepot(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Sell a train to the scrapyard the way the player does it, and say what came
+ * of it.
+ *
+ * Through the command and not by setting the flag by hand: what is worth
+ * measuring is the whole gesture, refusals and all. A refusal is said out loud
+ * and in the rig's word for it, because a sale that does not happen leaves a
+ * train driving happily on and no other counter would notice.
+ *
+ * @param t the train to sell, front of its consist
+ */
+static void TestSellTrainForScrap(Train *t)
+{
+	/* Same trap as every other command run from a tick: it reads whichever
+	 * company happens to be current, and in a timer that is nobody. */
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+	Money before = Company::Get(t->owner)->money;
+	CommandCost r = Command<Commands::SellTrainForScrap>::Do(DoCommandFlag::Execute, t->index);
+	if (r.Failed()) {
+		IConsolePrint(CC_ERROR, "testprodat: ODMITNUTO - {}", GetString(r.GetErrorMessage()));
+		return;
+	}
+	IConsolePrint(CC_INFO, "testprodat: vlak {} PRODAN na ({},{}), kasa {} -> {}",
+			t->unitnumber, TileX(t->tile), TileY(t->tile), before, Company::Get(t->owner)->money);
+}
+
+/**
+ * Sell the test scene's train for scrap, or a named one. Usage: 'testprodat
+ * [unit number]'.
+ *
+ * Scheduled with testza, so that a scene can sell a train at a moment of its
+ * choosing -- notably a train that has just broken down, which the scrapyard
+ * has to refuse.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSell(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Sell a train for scrap the way the player does. Usage: 'testprodat [cislo vlaku]'.");
+		return true;
+	}
+	Train *t = nullptr;
+	if (argv.size() >= 2) {
+		auto n = ParseInteger(argv[1]);
+		if (!n.has_value()) {
+			IConsolePrint(CC_ERROR, "testprodat: cislo vlaku nedava smysl.");
+			return true;
+		}
+		for (Train *v : Train::Iterate()) {
+			if (v->IsFrontEngine() && v->unitnumber == (UnitID)*n) { t = v; break; }
+		}
+	} else {
+		t = Train::GetIfValid(_testodtah_casualty);
+	}
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testprodat: takovy vlak tu neni.");
+		return true;
+	}
+	TestSellTrainForScrap(t->First());
+	return true;
+}
+
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo] [signal cycle] [dve]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha] [signal cycle] [dve]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -3392,6 +3457,18 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * the branch platform (decouple all) and goes home; the wagon then stands
 	 * there until 'testodvoz' calls the tow for it. */
 	bool wagons_variant = argv.size() >= 2 && argv[1] == "vagony";
+	/* 'prodat': no breakdown either. The casualty is sold to the scrapyard out
+	 * on the plain line, which is the other thing a rescue engine is sent to --
+	 * the tow fetches it and the depot breaks it up instead of repairing it.
+	 * Built on the same strip as 'rovina' so the two can be read side by side:
+	 * same road, same engine, different reason for standing there. */
+	bool sell_variant = argv.size() >= 2 && argv[1] == "prodat";
+	/* 'prodatporucha': break the casualty down and then try to sell it a moment
+	 * later, which the scrapyard has to refuse -- the player's rule that nobody
+	 * buys a breakdown, and the thing that keeps the two uses of the rescue
+	 * engine from meeting. A moment later and not the same tick, because a
+	 * breakdown takes a tick or two to actually start. */
+	bool sell_broken_variant = argv.size() >= 2 && argv[1] == "prodatporucha";
 	/* 'depozpet' is 'depo' without the shed on the stub: pull the west depot
 	 * down once the tow is out (testzbourat depo) and the only depot left to
 	 * bring the casualty to is the one it is half inside of, behind the tow. */
@@ -3626,8 +3703,11 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
 	_testodtah_casualty = veh_c;
+	_testodtah_sell = sell_variant;
+	_testodtah_sell_broken = sell_broken_variant;
+	_testodtah_sell_after = 0;
 	_testodtah_break_tile = wagons_variant ? INVALID_TILE : half_in_depot ? TileXY(x0 + LEN - 2, y0) : faraway ? TileXY(x0 + LEN - 6, y0) :
-			((plain || oneway) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
+			((plain || oneway || sell_variant || sell_broken_variant) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testodtah_depot_w = depot_w;
 	_testspoj_active = true;
@@ -3871,6 +3951,14 @@ static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Prior
 		}
 	}
 
+	/* The deliberate refusal: a breakdown the rig then tries to sell. Counted
+	 * down rather than done on the spot, because a breakdown needs a tick or
+	 * two to actually start and a train that is not broken yet would be sold. */
+	if (_testodtah_sell_after > 0 && --_testodtah_sell_after == 0) {
+		Train *broken = Train::GetIfValid(_testodtah_casualty);
+		if (broken != nullptr) TestSellTrainForScrap(broken->First());
+	}
+
 	if (_testodtah_break_tile == INVALID_TILE) return;
 	Train *t = Train::GetIfValid(_testodtah_casualty);
 	if (t == nullptr) {
@@ -3878,8 +3966,13 @@ static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Prior
 		return;
 	}
 	if (t->tile != _testodtah_break_tile) return;
-	t->breakdown_ctr = 2;
 	_testodtah_break_tile = INVALID_TILE;
+	if (_testodtah_sell) {
+		TestSellTrainForScrap(t);
+		return;
+	}
+	t->breakdown_ctr = 2;
+	if (_testodtah_sell_broken) _testodtah_sell_after = 30;
 	IConsolePrint(CC_INFO, "testodtah: vlak {} porouchan na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
 	if (_testodtah_cross_tile != INVALID_TILE) {
 		/* A stranger's reservation across the casualty's tile, staged: the
@@ -9814,6 +9907,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
+	IConsole::CmdRegister("testprodat",              ConTestSell);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);

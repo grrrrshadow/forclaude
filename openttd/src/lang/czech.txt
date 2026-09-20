@@ -981,6 +981,8 @@ STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřeli tam všichni
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {TOWN}, zemřelo {COMMA} obyvatel, zbořeno {COMMA} domů
 
+STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} prodal svůj vlak do šrotu
+
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin se zřítil do {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Silniční vozidlo bylo zničeno při srážce s UFO!
 STR_NEWS_DISASTER_AIRPLANE_OIL_REFINERY                         :{BIG_FONT}{BLACK}Výbuch ropné rafinerie u {TOWN}!
@@ -4814,6 +4816,8 @@ STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Veze se
 STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Veze se letadlem {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Čeká na vlak, na který se naloží
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Připojeno, ale žádné depo v dosahu
+STR_VEHICLE_STATUS_SOLD                                         :{ORANGE}Prodáno
+STR_VEHICLE_STATUS_SOLD_NO_TOW                                  :{RED}Prodáno, odtah není dostupný
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}Bez proudu
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Čekám na volnou cestu
@@ -5110,6 +5114,10 @@ STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Odpojit 
 STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Odpojené naložit pro: kamkoliv
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Odpojené naložit pro: {STATION}
 STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Řekne, pro kterou stanici je tahle odložená řada určená. Auta to čtou vždycky: auto, které má v rozkazu „naložit na vagony na příští zastávku", nastoupí jen na řadu určenou tam, kam jede ono. Se zapnutou distribucí nákladu to navíc platí i pro náklad - stanice si třídí, co na ní leží, podle toho, kam to jede dál, a vydá vozidlu jen to, co se hodí na jeho trasu; odpojené vagony bez mašinky žádnou trasu nemají, takže jim bez tohohle nevydá nic. Není to jízda a nic neslibuje: vagony pojedou tam, kam je odveze sběračka, a náklad, který se sveze jinam, se na příští stanici naplánuje znovu
+STR_ORDER_SELL_TRAIN                                            :{BLACK}Prodat vlak
+STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Prodá tenhle vlak do šrotu tam, kde stojí. Peníze přijdou hned a napíšou o tom noviny; od té chvíle vlak není tvůj, nerozjedeš ho a čeká na odtahovku, která ho odveze do depa a tam se sešrotuje. Poruchu ani vrak nikdo nekoupí
+STR_ORDER_SELL_TRAIN_CAPTION                                    :{WHITE}Prodat vlak do šrotu
+STR_ORDER_SELL_TRAIN_QUERY                                      :{YELLOW}Prodat vlak?
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(a odpojit celý vlak)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(odpojit celý vlak)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
@@ -5867,6 +5875,11 @@ STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... odta
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... odtahovka jezdí pro vlaky a musí být sama
 STR_ERROR_RESCUE_ENGINE_IS_TOWING                               :{WHITE}... právě odtahuje vlak a musí ho nejdřív dovézt
 STR_ERROR_WAGON_CARRIES_ROAD_VEHICLE                            :{WHITE}... na tom vagonu se veze auto
+STR_ERROR_TRAIN_IS_SOLD                                         :{WHITE}... je prodaný do šrotu
+STR_ERROR_TRAIN_ALREADY_SOLD                                    :{WHITE}... už je prodaný
+STR_ERROR_SCRAPYARD_REFUSES_WRECK                               :{WHITE}... vrak nikdo nekoupí
+STR_ERROR_SCRAPYARD_REFUSES_BREAKDOWN                           :{WHITE}... poruchu nikdo nekoupí
+STR_ERROR_SCRAPYARD_REFUSES_CLAIMED                             :{WHITE}... už si pro něj jede jiná mašinka
 STR_ERROR_TRAIN_START_NO_POWER                                  :Vlak potřebuje trolej
 
 STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze otočit vozidlo...

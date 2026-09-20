@@ -34,6 +34,8 @@
 #include "error.h"
 #include "order_cmd.h"
 #include "company_cmd.h"
+#include "train.h"
+#include "train_cmd.h"
 #include "core/string_consumer.hpp"
 
 #include "widgets/order_widget.h"
@@ -1068,10 +1070,12 @@ public:
 		if (NWidgetStacked *filter_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_COUPLE_FILTER); filter_sel != nullptr) {
 			filter_sel->SetDisplayedPlane(SZSP_NONE);
 		}
-		/* And the same for the row that says where a decoupling order's wagons
-		 * are to load for. */
-		if (NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST); dest_sel != nullptr) {
-			dest_sel->SetDisplayedPlane(SZSP_NONE);
+		/* The bottom row itself stays for a train, because the sell button in it
+		 * belongs to the train and not to any one order. Only its middle place
+		 * comes and goes: the cargo destination button, or nothing, and no order
+		 * is selected yet. */
+		if (NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST_BTN); dest_sel != nullptr) {
+			dest_sel->SetDisplayedPlane(1);
 		}
 		this->FinishInitNested(v->index);
 
@@ -1525,12 +1529,14 @@ public:
 		}
 
 		/* Where the wagons an order puts down are to load for. Same reasoning as
-		 * the filter row: only on an order that is going to put wagons down. */
-		NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST);
+		 * the filter row: only on an order that is going to put wagons down.
+		 * Only the button changes, not the row it stands in, so the window keeps
+		 * its height and nothing has to be laid out again. */
+		NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST_BTN);
 		if (dest_sel != nullptr) {
 			bool dropping = this->vehicle->type == VehicleType::Train && order != nullptr &&
 					order->IsType(OT_GOTO_STATION) && order->ShouldDecoupleOnDeparture();
-			if (dest_sel->SetDisplayedPlane(dropping ? 0 : SZSP_NONE)) this->couple_filter_resized = true;
+			dest_sel->SetDisplayedPlane(dropping ? 0 : 1);
 			/* It used to be greyed out with cargo distribution off, because
 			 * without it a station hands every load to everybody and saying
 			 * where the wagons are bound bought nothing. It buys something
@@ -1563,6 +1569,17 @@ public:
 			 * decouple_sel in UpdateButtonState(). */
 			if (this->GetWidget<NWidgetCore>(WID_O_DECOUPLE_CARGO_DEST) != nullptr) {
 				this->SetWidgetLoweredState(WID_O_DECOUPLE_CARGO_DEST, this->goto_type == OPOS_DECOUPLE_DEST);
+			}
+			/* Nobody buys a breakdown and nobody buys a wreck, and a train that
+			 * has been sold is sold. The button is greyed in all three cases,
+			 * rather than refusing the sale afterwards: a press that opens a
+			 * window asking "sell the train?" and then says no is a worse way of
+			 * saying the same thing. Done here, on every repaint, because
+			 * breaking down and crashing happen to the train out on the line and
+			 * do not come past this window at all. */
+			if (this->GetWidget<NWidgetCore>(WID_O_SELL_TRAIN) != nullptr) {
+				this->SetWidgetDisabledState(WID_O_SELL_TRAIN, this->vehicle->type != VehicleType::Train ||
+						SellTrainForScrapRefusal(Train::From(this->vehicle)) != STR_NULL);
 			}
 		}
 		this->DrawWidgets();
@@ -2088,10 +2105,33 @@ public:
 				break;
 			}
 
+			case WID_O_SELL_TRAIN:
+				/* Asked first, because it cannot be taken back: the money is
+				 * paid, the papers write it up, and from that moment the train
+				 * is not the player's to drive. The window it asks in is the
+				 * game's own yes/no window, which is red with yellow buttons --
+				 * the colours an important question is asked in here. */
+				ShowQuery(GetEncodedString(STR_ORDER_SELL_TRAIN_CAPTION), GetEncodedString(STR_ORDER_SELL_TRAIN_QUERY),
+						this, OrdersWindow::SellTrainCallback);
+				break;
+
 			case WID_O_SHARED_ORDER_LIST:
 				ShowVehicleListWindow(this->vehicle);
 				break;
 		}
+	}
+
+	/**
+	 * The answer to "sell the train?". Nothing happens on a no, and on a yes
+	 * the sale goes through the ordinary command, which asks all the questions
+	 * again for itself -- the train may have broken down or crashed in the
+	 * seconds the window stood open.
+	 */
+	static void SellTrainCallback(Window *w, bool confirmed)
+	{
+		if (!confirmed) return;
+		const OrdersWindow *ow = static_cast<OrdersWindow *>(w);
+		Command<Commands::SellTrainForScrap>::Post(STR_ERROR_CAN_T_SELL_TRAIN, ow->vehicle->tile, ow->vehicle->index);
 	}
 
 	void OnQueryTextExtra(std::string_view text) override
@@ -2581,13 +2621,31 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 		EndContainer(),
 	EndContainer(),
 
-	/* Where the cargo of the wagons this order puts down is bound. Only there
-	 * while an order is actually going to put some down, the same way the
-	 * couple filter above is only there while one is going to collect. */
+	/* The bottom row, three places wide. On the left, selling the train for
+	 * scrap -- which is about the train and not about any one order, and is
+	 * therefore always there. In the middle, where the cargo of the wagons the
+	 * selected order puts down is bound, which is only there while an order is
+	 * actually going to put some down, the same way the couple filter above is
+	 * only there while one is going to collect; the place itself stays, empty.
+	 * The right-hand place is kept free for whatever comes next.
+	 *
+	 * The row used to come and go with the middle button. It stays now, because
+	 * a button the player can only reach by first selecting the right kind of
+	 * order is a button he cannot reach when he needs it -- and the moment he
+	 * needs this one is when a train is stuck somewhere with no order worth
+	 * selecting. */
 	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE_DEST),
 		NWidget(NWID_HORIZONTAL),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_CARGO_DEST), SetMinimalSize(372, 12), SetFill(1, 0),
-													SetStringTip(STR_ORDER_DECOUPLE_CARGO_DEST_NONE, STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_SELL_TRAIN), SetMinimalSize(124, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_SELL_TRAIN, STR_ORDER_SELL_TRAIN_TOOLTIP), SetResize(1, 0),
+			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_DECOUPLE_DEST_BTN),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_DECOUPLE_CARGO_DEST), SetMinimalSize(124, 12), SetFill(1, 0),
+														SetStringTip(STR_ORDER_DECOUPLE_CARGO_DEST_NONE, STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP), SetResize(1, 0),
+				NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
+				EndContainer(),
+			EndContainer(),
+			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
+			EndContainer(),
 		EndContainer(),
 	EndContainer(),
 

@@ -100,6 +100,8 @@ struct CompanyProperties {
 	TimerGameEconomy::Year inaugurated_year{}; ///< Economy year of starting the company.
 	TimerGameCalendar::Year inaugurated_year_calendar{}; ///< Calendar year of starting the company. Used to display proper Inauguration year while in wallclock mode.
 
+	TimerGameEconomy::Date last_scrap_news{}; ///< When the papers last wrote that this company sold a train for scrap. They will not write it again for a while; see CmdSellTrainForScrap().
+
 	uint8_t months_empty = 0; ///< NOSAVE: Number of months this company has not had a client in multiplayer.
 	uint8_t months_of_bankruptcy = 0; ///< Number of months that the company is unable to pay its debts
 	CompanyMask bankrupt_asked{}; ///< which companies were asked about buying it?

@@ -253,6 +253,7 @@ enum class Commands : uint8_t {
 	CoupleTrains, ///< couple two trains together
 	SetRescueEngine, ///< station a train in its depot as a rescue engine
 	RequestWagonTow, ///< have a rescue engine take a waiting rake of wagons to a depot
+	SellTrainForScrap, ///< sell a train to the scrapyard where it stands; a rescue engine fetches it and a depot breaks it up
 
 	ClearOrderBackup, ///< clear the order backup of a given user/tile
 	ModifyOrder, ///< modify an order (like set full-load)

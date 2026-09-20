@@ -646,6 +646,11 @@ CommandCost CmdStartStopVehicle(DoCommandFlags flags, VehicleID veh_id, bool eva
 	 * wreck. See Train::Crash(). */
 	if (v->IsWrecked()) return CommandCost(STR_ERROR_TRAIN_HAS_CRASHED);
 
+	/* Sold to the scrapyard, and so not the player's to drive any more. It
+	 * stands where it stands until an engine comes for it, exactly as a wreck
+	 * does. See CmdSellTrainForScrap(). */
+	if (v->IsSoldForScrap()) return CommandCost(STR_ERROR_TRAIN_IS_SOLD);
+
 	switch (v->type) {
 		case VehicleType::Train:
 			/* Wagons have no engine and never will have; refusing to release

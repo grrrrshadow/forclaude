@@ -894,6 +894,8 @@ STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. Everybody there died
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {TOWN}. {COMMA} inhabitants died, {COMMA} houses levelled
 
+STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} sold his train for scrap
+
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin disaster at {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Road vehicle destroyed in 'UFO' collision!
 STR_NEWS_DISASTER_AIRPLANE_OIL_REFINERY                         :{BIG_FONT}{BLACK}Oil refinery explosion near {TOWN}!
@@ -4725,6 +4727,8 @@ STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Riding 
 STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Riding on aircraft {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Waiting for a train to board
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Coupled up, but no depot within reach
+STR_VEHICLE_STATUS_SOLD                                         :{ORANGE}Sold
+STR_VEHICLE_STATUS_SOLD_NO_TOW                                  :{RED}Sold, no rescue engine available
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
 STR_VEHICLE_STATUS_TRAIN_NO_POWER                               :{RED}No power
 STR_VEHICLE_STATUS_TRAIN_STUCK                                  :{ORANGE}Waiting for free path
@@ -4953,6 +4957,10 @@ STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Decouple
 STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Load the dropped wagons for: anywhere
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Load the dropped wagons for: {STATION}
 STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Says which station this rake is meant for. Road vehicles read it always: one whose order says "on wagons meant for my next stop" boards only a rake meant for where it is going. With cargo distribution switched on it counts for cargo as well - a station sorts what is waiting by where it goes next and hands a vehicle only what suits its route, and wagons left standing with no engine have no route, so without this they are handed nothing. It is not a journey and promises none: the wagons go wherever the engine that collects them goes, and cargo carried the wrong way is planned afresh at the next station
+STR_ORDER_SELL_TRAIN                                            :{BLACK}Sell the train
+STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Sell this train to the scrapyard where it stands. The money is paid at once and the papers write it up; from that moment the train is not yours to drive and it waits for a rescue engine to take it to a depot, which breaks it up. A broken-down train and a wreck cannot be sold
+STR_ORDER_SELL_TRAIN_CAPTION                                    :{WHITE}Sell the train for scrap
+STR_ORDER_SELL_TRAIN_QUERY                                      :{YELLOW}Sell the train?
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(and drop the coupled train)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(drop the coupled train)
 
@@ -5559,6 +5567,11 @@ STR_ERROR_RESCUE_ENGINE_HAS_ORDERS                              :{WHITE}... a re
 STR_ERROR_RESCUE_ENGINE_HAS_WAGONS                              :{WHITE}... a rescue engine goes out to fetch a train and has to be on its own
 STR_ERROR_RESCUE_ENGINE_IS_TOWING                               :{WHITE}... it is towing a train and has to bring that in first
 STR_ERROR_WAGON_CARRIES_ROAD_VEHICLE                            :{WHITE}... a road vehicle is riding on that wagon
+STR_ERROR_TRAIN_IS_SOLD                                         :{WHITE}... it has been sold for scrap
+STR_ERROR_TRAIN_ALREADY_SOLD                                    :{WHITE}... it has already been sold
+STR_ERROR_SCRAPYARD_REFUSES_WRECK                               :{WHITE}... nobody buys a wreck
+STR_ERROR_SCRAPYARD_REFUSES_BREAKDOWN                           :{WHITE}... nobody buys a broken-down train
+STR_ERROR_SCRAPYARD_REFUSES_CLAIMED                             :{WHITE}... another engine is already on its way to it
 STR_ERROR_UNABLE_TO_FIND_ROUTE_TO                               :unable to find route to local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_DEPOT                            :unable to find local depot
 STR_ERROR_UNABLE_TO_FIND_LOCAL_HANGAR                           :unable to find local hangar

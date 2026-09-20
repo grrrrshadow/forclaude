@@ -3331,6 +3331,19 @@ public:
 
 		if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return GetString(STR_VEHICLE_STATUS_CRASHED);
 
+		/* Sold to the scrapyard, waiting for the engine that will take it to a
+		 * depot to be broken up. Ahead of the orders, the same as a breakdown
+		 * and a crash are: what the train is waiting for is written on its
+		 * running order, but what the player needs to read is why it is standing
+		 * there. And if nobody can come, the line says so -- a sold train waits
+		 * for ever, so "nobody is coming" is something he has to be told rather
+		 * than left to work out. See CmdSellTrainForScrap(). */
+		if (v->IsSoldForScrap()) {
+			text_colour = TextColour::Orange;
+			if (v->type == VehicleType::Train && !IsAnyRescueEngineAvailable(Train::From(v))) return GetString(STR_VEHICLE_STATUS_SOLD_NO_TOW);
+			return GetString(STR_VEHICLE_STATUS_SOLD);
+		}
+
 		if (v->type != VehicleType::Aircraft && v->breakdown_ctr == 1) return GetString(STR_VEHICLE_STATUS_BROKEN_DOWN);
 
 		/* A road vehicle on a train, or standing at its stop waiting for one:

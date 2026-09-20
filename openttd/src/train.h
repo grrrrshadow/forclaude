@@ -95,6 +95,8 @@ bool IsRakeClaimedForCoupling(const Train *rake);
 void MarkCoupleClaimChanged(const Train *rake);
 void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index);
 bool IsWaitingToBeRescued(const Train *v);
+bool IsAnyRescueEngineAvailable(const Train *v);
+StringID SellTrainForScrapRefusal(const Train *v);
 bool IsOnRescueRun(const Train *v);
 bool IsFetchingCasualty(const Train *v);
 bool IsRescueTargetAttached(const Train *v);

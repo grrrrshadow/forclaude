@@ -29,6 +29,7 @@ enum class VehicleFlag : uint8_t {
 	DrivingBackwards = 10, ///< Vehicle is driving backwards.
 	RescueEngine = 11, ///< Train waits in its depot to be sent out to fetch broken-down and crashed trains.
 	Wreck = 12, ///< This vehicle has been in a crash. It is still an ordinary vehicle in every other respect; see Train::Crash().
+	SoldForScrap = 13, ///< (train head only) Sold to the scrapyard by the player. It stands where it is and waits for a rescue engine to take it to a depot, where it is broken up. See CmdSellTrainForScrap().
 };
 
 /** Bitset of \c VehicleFlag elements. */

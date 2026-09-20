@@ -211,6 +211,17 @@ run_scene odtahvagony "vlak123 on
 testodtah vagony
 testza 5000 testokno 0
 testza 6000 testodvoz vse" 20000
+# A train the player sells to the scrapyard out on the line: the other reason a
+# rescue engine is sent for something. The tow fetches it and the depot breaks
+# it up instead of repairing it, so this scene counts a tow like the breakdown
+# scenes do -- what tells them apart is the line saying the train was scrapped.
+run_scene odtahprodat "vlak123 on
+testodtah prodat" 16000
+# And the rule that keeps the two apart: nobody buys a breakdown. The scene
+# breaks the train down and tries to sell it a moment later, so odmitnuto=1 is
+# the pass here -- a zero would mean the scrapyard took it.
+run_scene odtahprodatporucha "vlak123 on
+testodtah prodatporucha" 16000
 run_scene okruh "vlak123 on
 testokruh" 16000
 run_scene naklad "vlak123 on

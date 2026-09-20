@@ -1502,10 +1502,16 @@ bool Vehicle::HandleBreakdown()
 					 * with it and the next breakdown starts its own. */
 					if (this->type == VehicleType::Train) {
 						Train *head = Train::From(this)->First();
-						head->rescue_deadline = TimerGameEconomy::Date{};
-						/* Going again under its own steam, so it is not waiting
-						 * for anybody to come and fetch it any more. */
-						head->current_order.SetWaitForCouple(false);
+						/* Unless it is waiting for a reason a mended engine does
+						 * not touch: a train the player has sold is waiting to be
+						 * taken away and broken up, and that call stands whatever
+						 * else stops being wrong with it. */
+						if (!head->IsSoldForScrap()) {
+							head->rescue_deadline = TimerGameEconomy::Date{};
+							/* Going again under its own steam, so it is not waiting
+							 * for anybody to come and fetch it any more. */
+							head->current_order.SetWaitForCouple(false);
+						}
 					}
 					this->MarkDirty();
 					SetWindowDirty(WindowClass::VehicleView, this->index);
