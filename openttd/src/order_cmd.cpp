@@ -203,6 +203,27 @@ bool Order::Equals(const Order &other) const
 }
 
 /**
+ * Compare with another order the way the player wrote them, coupling and all.
+ *
+ * Equals() leaves the two coupling fields out on purpose, because on a current
+ * order they are execution state rather than a request (see the note there).
+ * Anything that asks about the order *list* wants the other question: is this
+ * the same thing the player asked for? Without the coupling fields a list that
+ * begins "go here and couple" and ends "go here" answers yes, and the order
+ * review then tells the player about duplicate orders that are nothing of the
+ * sort.
+ *
+ * @param other The order to compare with.
+ * @return Whether both orders ask for the same thing.
+ */
+bool Order::EqualsAsWritten(const Order &other) const
+{
+	return this->Equals(other) &&
+			this->wait_for_couple == other.wait_for_couple &&
+			this->go_to_couple == other.go_to_couple;
+}
+
+/**
  * Pack this order into a 16 bits integer as close to the TTD
  * representation as possible.
  * @return the TTD-like packed representation.
@@ -2162,7 +2183,10 @@ void CheckOrders(const Vehicle *v)
 		if (v->GetNumOrders() > 1) {
 			auto orders = v->Orders();
 
-			if (orders.front().Equals(orders.back())) {
+			/* Asked as the player wrote it, not as the order machinery reads
+			 * it: a list that begins "go here and couple" and ends "go here"
+			 * is two different orders, however alike they look. */
+			if (orders.front().EqualsAsWritten(orders.back())) {
 				message = STR_NEWS_VEHICLE_HAS_DUPLICATE_ENTRY;
 			}
 		}
