@@ -3422,7 +3422,7 @@ static bool ConTestSell(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha] [signal cycle] [dve]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy] [signal cycle] [dve]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -3469,6 +3469,12 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * engine from meeting. A moment later and not the same tick, because a
 	 * breakdown takes a tick or two to actually start. */
 	bool sell_broken_variant = argv.size() >= 2 && argv[1] == "prodatporucha";
+	/* 'prodatdlouhy': the sale again, but on a train long enough to hang round
+	 * the junction while the tow pulls it -- the player's own shape. His was
+	 * nineteen vehicles behind the tow and it came apart on the curve; the
+	 * two-vehicle casualty the plain variant sells never bends at all. */
+	bool sell_long_variant = argv.size() >= 2 && argv[1] == "prodatdlouhy";
+	if (sell_long_variant) sell_variant = true;
 	/* 'depozpet' is 'depo' without the shed on the stub: pull the west depot
 	 * down once the tow is out (testzbourat depo) and the only depot left to
 	 * bring the casualty to is the one it is half inside of, behind the tow. */
@@ -3621,6 +3627,18 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "testodtah: casualty wagon failed.");
 		return true;
 	}
+	if (sell_long_variant) {
+		/* Long enough that its tail is still on the straight while its head is
+		 * round the curve, which is where the player's came apart. */
+		for (int i = 0; i < 12; i++) {
+			auto [cost_x, veh_x, un_x1, un_x2, un_x3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost_x.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_x, Train::Get(veh_c)->Last()->index, false).Failed()) {
+				IConsolePrint(CC_ERROR, "testodtah: dlouhy prodavany vlak - vagon se nepodaril.");
+				return true;
+			}
+		}
+	}
+
 	if (half_in_depot) {
 		/* A long casualty, so that most of it is still in the shed when the
 		 * engine has cleared the door; and points right outside that door,

@@ -11815,6 +11815,17 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					TrackBits usable = bits;
 					usable.Reset(Track::Wormhole);
 					usable.Reset(Track::Depot);
+					/* And only a track this vehicle can actually get onto from
+					 * the side it is coming in on. Any track on the tile is not
+					 * good enough: entering a tile by a track that does not lead
+					 * in from that side is refused a few lines further down, and
+					 * a refused entry with a vehicle ahead of it is the fatal
+					 * "Disconnecting train" -- which is the very thing this
+					 * recovery exists to avoid. It picked the tile's first track
+					 * and handed the player exactly that crash; the whole point
+					 * is to keep the piece on the rails, and a track it cannot
+					 * reach is not keeping it on the rails. */
+					usable &= DiagdirReachesTracks(enterdir);
 					if (usable.Any()) {
 						chosen_track = TrackBits{FindFirstTrack(usable)};
 						LogAnomaly("krok ROZBITY: pokracuje se po koleji {:#x} na ({},{})", chosen_track.base(), TileX(gp.new_tile), TileY(gp.new_tile));
