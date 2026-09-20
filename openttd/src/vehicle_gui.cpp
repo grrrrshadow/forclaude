@@ -3451,7 +3451,13 @@ public:
 
 		switch (v->current_order.GetType()) {
 			case OT_GOTO_STATION:
-				if (v->type == VehicleType::Train && v->current_order.ShouldGoToCouple() && !v->vehicle_flags.Test(VehicleFlag::PathfinderLost)) {
+				/* The lost flag used to be asked about here as well, so that a
+				 * train that could not find its way said so. A collector waiting
+				 * for its wagons has no way to find -- that is what waiting is
+				 * (see Vehicle::HandlePathfindingResult()) -- and the word for
+				 * what it is doing is better than the word for what it cannot
+				 * do, so the couple order answers for itself. */
+				if (v->type == VehicleType::Train && v->current_order.ShouldGoToCouple()) {
 					/* A train told to go and collect wagons does not set off
 					 * until there are wagons for it to collect that nobody else
 					 * is already on the way for. Standing still with no reason

@@ -794,6 +794,21 @@ void Vehicle::ShiftDates(TimerGameEconomy::Date interval)
  */
 void Vehicle::HandlePathfindingResult(bool path_found)
 {
+	/* A train sent to couple is sent at wagons standing on the rails -- often
+	 * on the very track it would have to use, and sometimes not standing there
+	 * yet at all -- and it waits where it is until there are wagons for it to
+	 * collect. "No path" is then what waiting looks like, not a fault. So a
+	 * train on a couple order is never read as lost: neither the word in its
+	 * window, which has a better one ("waiting for wagons", see
+	 * GetVehicleStatusString()), nor the news item.
+	 *
+	 * The trade this makes is that a couple order written to a station the
+	 * train really cannot reach says nothing about it. That is the cheaper
+	 * mistake: the other way round, every collector that waits for its rake
+	 * tells the player it is lost, over and over, and the message stops being
+	 * worth reading. */
+	if (!path_found && this->type == VehicleType::Train && this->current_order.ShouldGoToCouple()) path_found = true;
+
 	if (path_found) {
 		/* Route found, is the vehicle marked with "lost" flag? */
 		if (!this->vehicle_flags.Test(VehicleFlag::PathfinderLost)) return;
