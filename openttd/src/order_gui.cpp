@@ -537,8 +537,9 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				/* And which wagon it buys when the shed is short, in a bracket
 				 * of its own: it is not one of the filters, it is what the
 				 * order does when the filters find too little. */
-				if (order->ShouldBuyWagons() && Engine::GetIfValid(order->GetCoupleBuyEngine()) != nullptr) {
-					second += GetString(STR_ORDER_COUPLE_BUY_SUFFIX, PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
+				if (Engine::GetIfValid(order->GetCoupleBuyEngine()) != nullptr) {
+					second += GetString(order->ShouldBuyWagons() ? STR_ORDER_COUPLE_BUY_SUFFIX : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX,
+							PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
 				}
 			}
 
@@ -1723,12 +1724,15 @@ public:
 			}
 
 			case WID_O_COUPLE_BUY: {
+				/* Three states on one button, in the order a yard goes through
+				 * them: no wagon of its own, then a wagon it buys, then the
+				 * same wagon as the only one it will couple. */
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) return GetString(STR_ORDER_COUPLE_BUY_OFF);
-				if (!order->ShouldBuyWagons()) return GetString(STR_ORDER_COUPLE_BUY_OFF);
-				const Engine *e = Engine::GetIfValid(order->GetCoupleBuyEngine());
-				if (e == nullptr) return GetString(STR_ORDER_COUPLE_BUY_OFF);
-				return GetString(STR_ORDER_COUPLE_BUY_ON, PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
+				EngineID eid = order->GetCoupleBuyEngine();
+				if (Engine::GetIfValid(eid) == nullptr) return GetString(STR_ORDER_COUPLE_BUY_OFF);
+				return GetString(order->ShouldBuyWagons() ? STR_ORDER_COUPLE_BUY_ON : STR_ORDER_COUPLE_BUY_ONLY,
+						PackEngineNameDParam(eid, EngineNameContext::PurchaseList));
 			}
 
 			case WID_O_COUPLE_COUNT: {
@@ -2088,17 +2092,24 @@ public:
 			case WID_O_COUPLE_BUY: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
-				/* Set, the press lets go of the buying -- the model stays
-				 * written down, so switching it back on needs no second trip to
-				 * the list. Unset, the list opens to be asked which wagon. */
-				if (order->ShouldBuyWagons()) {
-					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
-							this->OrderGetSel(), MOF_COUPLE_BUY, EngineID::Invalid().base());
+				/* The press walks the three states round. No wagon named: the
+				 * list opens to be asked which. Buying: the buying stops and
+				 * the wagon stays as the one this order will couple. Only
+				 * couples: the wagon is let go of and the order is back to
+				 * taking whatever the filter allows. */
+				if (Engine::GetIfValid(order->GetCoupleBuyEngine()) == nullptr) {
+					ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),
+							order->IsType(OT_GOTO_DEPOT) ? Depot::Get(order->GetDestination().ToDepotID())->xy : INVALID_TILE,
+							order->GetCoupleCargo());
 					break;
 				}
-				ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),
-						order->IsType(OT_GOTO_DEPOT) ? Depot::Get(order->GetDestination().ToDepotID())->xy : INVALID_TILE,
-						order->GetCoupleCargo());
+				if (order->ShouldBuyWagons()) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+							this->OrderGetSel(), MOF_COUPLE_BUY_ON, 0);
+					break;
+				}
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+						this->OrderGetSel(), MOF_COUPLE_BUY, EngineID::Invalid().base());
 				break;
 			}
 

@@ -3161,6 +3161,21 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 		default: NOT_REACHED();
 	}
 
+	/* Named a wagon, and only that wagon will do -- every vehicle in the rake
+	 * has to be one. The player's reason: a wagon does not carry just any road
+	 * vehicle, a lorry is longer than a car, so which wagon it is decides what
+	 * can ride on it and a rake of the wrong ones is no use whatever it is
+	 * carrying. The same model the order buys when the shed is short (see
+	 * BuyWagonsIntoDepot()), because those are the two halves of one thought:
+	 * this order works with these wagons. It goes on filtering when the buying
+	 * is switched off -- that is what lets a yard buy its wagons once and then
+	 * go on collecting its own ones for the rest of the game. */
+	if (order.GetCoupleBuyEngine() != EngineID::Invalid()) {
+		for (const Train *u = rake; u != nullptr; u = u->Next()) {
+			if (u->engine_type != order.GetCoupleBuyEngine()) return false;
+		}
+	}
+
 	if (IsValidCargoType(order.GetCoupleCargo())) {
 		bool carries_it = false;
 		for (const Train *u = rake; u != nullptr; u = u->Next()) {

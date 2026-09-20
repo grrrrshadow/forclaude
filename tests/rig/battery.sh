@@ -229,6 +229,14 @@ run_scene koupitvagonky "vlak123 on
 testspoj depo
 testpocet 2 0 6
 testkoupit 2 0" 12000
+# And the wagon named on the order is the only one it will couple: the shed
+# is given three wagons of one kind by the deliverer and the order asks for
+# another, so it leaves them alone and buys three of its own. A wagon does not
+# carry just any road vehicle, which is why which one it is has to count.
+run_scene koupitjinytyp "vlak123 on
+testspoj depo
+testpocet 2 0 3
+testkoupit 2 0 28" 12000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000
