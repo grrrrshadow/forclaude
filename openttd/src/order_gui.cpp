@@ -1608,6 +1608,17 @@ public:
 			 * saying the same thing. Done here, on every repaint, because
 			 * breaking down and crashing happen to the train out on the line and
 			 * do not come past this window at all. */
+			/* Wagons are bought in a shed, so the button belongs to a depot
+			 * order and to no other. It sits in the filter row, which a
+			 * station order has too, so on one of those it is greyed rather
+			 * than left to open a list that could answer nothing: pressed
+			 * there, it opened the wagon list with no depot behind it, the
+			 * window built itself as a plain list with no button, and the
+			 * player clicked a wagon and watched nothing happen. */
+			if (this->GetWidget<NWidgetCore>(WID_O_COUPLE_BUY) != nullptr) {
+				const Order *sel = this->vehicle->GetOrder(this->OrderGetSel());
+				this->SetWidgetDisabledState(WID_O_COUPLE_BUY, sel == nullptr || !sel->IsType(OT_GOTO_DEPOT) || !sel->ShouldGoToCouple());
+			}
 			if (this->GetWidget<NWidgetCore>(WID_O_SELL_TRAIN) != nullptr) {
 				this->SetWidgetDisabledState(WID_O_SELL_TRAIN, this->vehicle->type != VehicleType::Train ||
 						SellTrainForScrapRefusal(Train::From(this->vehicle)) != STR_NULL);
@@ -2097,10 +2108,12 @@ public:
 				 * the wagon stays as the one this order will couple. Only
 				 * couples: the wagon is let go of and the order is back to
 				 * taking whatever the filter allows. */
+				/* Depot orders only; the button is greyed everywhere else. */
+				if (!order->IsType(OT_GOTO_DEPOT) || !order->ShouldGoToCouple()) break;
+				const Depot *depot = Depot::GetIfValid(order->GetDestination().ToDepotID());
 				if (Engine::GetIfValid(order->GetCoupleBuyEngine()) == nullptr) {
 					ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),
-							order->IsType(OT_GOTO_DEPOT) ? Depot::Get(order->GetDestination().ToDepotID())->xy : INVALID_TILE,
-							order->GetCoupleCargo());
+							depot != nullptr ? depot->xy : INVALID_TILE, order->GetCoupleCargo());
 					break;
 				}
 				if (order->ShouldBuyWagons()) {

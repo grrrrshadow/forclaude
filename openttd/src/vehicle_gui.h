@@ -58,6 +58,7 @@ void DrawAircraftImage(const Vehicle *v, const Rect &r, VehicleID selection, Eng
 
 void ShowBuildVehicleWindow(TileIndex tile, VehicleType type);
 void ShowPickCoupleWagonWindow(const Vehicle *v, VehicleOrderID index, TileIndex tile, CargoType cargo);
+void TestPickCoupleWagon(const Vehicle *v, VehicleOrderID index, TileIndex tile, CargoType cargo);
 
 uint ShowRefitOptionsList(int left, int right, int y, EngineID engine);
 StringID GetCargoSubtypeText(const Vehicle *v);

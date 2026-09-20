@@ -5502,6 +5502,41 @@ static bool ConTestSellDecoupled(std::span<std::string_view> argv)
 }
 
 /**
+ * Open the wagon list for a depot couple order and press its button, the way
+ * the player does. Usage: testvybervagonu <unit number> <order index>
+ *
+ * The rig's only look into that window. It was written after the player found
+ * by hand that the window could open with no button in it at all -- pressed
+ * from a station order, which has no depot behind it, so there was nothing to
+ * answer with and clicking a wagon did nothing.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestPickWagon(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Open the wagon list for an order and press its button. Usage: 'testvybervagonu <cislo vlaku> <rozkaz>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		const Order *o = t->GetOrder((VehicleOrderID)*porder);
+		if (o == nullptr) {
+			IConsolePrint(CC_ERROR, "testvybervagonu: rozkaz {} neexistuje.", *porder);
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		const Depot *depot = o->IsType(OT_GOTO_DEPOT) ? Depot::GetIfValid(o->GetDestination().ToDepotID()) : nullptr;
+		TestPickCoupleWagon(t, (VehicleOrderID)*porder, depot != nullptr ? depot->xy : INVALID_TILE, o->GetCoupleCargo());
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testvybervagonu: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * Set a couple order's count -- how many vehicles the rake it collects has to
  * have. Usage: testpocet <unit number> <order index> <count>
  * @copydoc IConsoleCmdProc
@@ -10055,6 +10090,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
 	IConsole::CmdRegister("testpocet",               ConTestCoupleCount);
+	IConsole::CmdRegister("testvybervagonu",         ConTestPickWagon);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
 	IConsole::CmdRegister("testauto",                ConTestAutoDeparture);

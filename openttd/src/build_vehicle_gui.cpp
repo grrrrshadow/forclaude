@@ -30,6 +30,7 @@
 #include "timer/timer_game_calendar.h"
 #include "vehicle_func.h"
 #include "order_cmd.h"
+#include "console_func.h"
 #include "dropdown_type.h"
 #include "dropdown_func.h"
 #include "engine_gui.h"
@@ -1804,7 +1805,7 @@ struct BuildVehicleWindow : Window {
 				this->SetDirty();
 				if (_ctrl_pressed) {
 					this->OnClick(pt, WID_BV_SHOW_HIDE, 1);
-				} else if (click_count > 1 && !this->listview_mode) {
+				} else if (click_count > 1 && (!this->listview_mode || this->pick_for_order != nullptr)) {
 					this->OnClick(pt, WID_BV_BUILD, 1);
 				}
 				break;
@@ -2130,8 +2131,73 @@ void ShowPickCoupleWagonWindow(const Vehicle *v, VehicleOrderID index, TileIndex
 	/* Opened already showing what the order is short of, so the list cannot
 	 * offer a wagon that could not carry it. */
 	if (cargo != INVALID_CARGO) w->cargo_filter_criteria = cargo;
+	/* The button back, whatever the window would otherwise have done with it.
+	 * Without a depot tile the window builds itself as a plain list of what
+	 * exists and hides the button, because there is nowhere to build -- and
+	 * that is exactly right when the list is only being looked at. Here it is
+	 * being asked a question, and a question with no way to answer it is the
+	 * window the player got: he clicked a wagon and nothing happened. */
+	if (NWidgetStacked *sel = w->GetWidget<NWidgetStacked>(WID_BV_BUILD_SEL); sel != nullptr) sel->SetDisplayedPlane(0);
 	w->SetBuyVehicleText();
+	/* The list was made in the constructor, before this window knew it was
+	 * being asked a question -- so it is the ordinary list, engines and all.
+	 * Made again now that it knows, rather than left for the first repaint:
+	 * anything that reads the list before then (the rig does) would read the
+	 * old one, and the window itself would flash the wrong list for a frame. */
+	w->eng_list.ForceRebuild();
+	w->GenerateBuildList();
 	w->InvalidateData();
+}
+
+/**
+ * Open the wagon list for an order and press its button, as the player does.
+ *
+ * The rig's only way into this window. Two things are measured, and both are
+ * things the player found by hand because nothing here was ever looked at:
+ * that the button to answer with is there at all, and that pressing it writes
+ * the choice into the order.
+ *
+ * @param v     the train whose order is being written
+ * @param index which of its orders
+ * @param tile  the depot the order names, or INVALID_TILE
+ * @param cargo the cargo the order's filter asks for, or INVALID_CARGO
+ */
+void TestPickCoupleWagon(const Vehicle *v, VehicleOrderID index, TileIndex tile, CargoType cargo)
+{
+	ShowPickCoupleWagonWindow(v, index, tile, cargo);
+
+	BuildVehicleWindow *w = dynamic_cast<BuildVehicleWindow *>(FindWindowByClass(WindowClass::BuildVehicle));
+	if (w == nullptr) {
+		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - okno vyberu se neotevrelo.");
+		return;
+	}
+
+	NWidgetStacked *sel = w->GetWidget<NWidgetStacked>(WID_BV_BUILD_SEL);
+	if (sel == nullptr || sel->shown_plane == SZSP_NONE) {
+		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - v okne vyberu neni cudlik, nema se cim odpovedet.");
+		w->Close();
+		return;
+	}
+
+	if (w->eng_list.empty()) {
+		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - seznam vagonu je prazdny.");
+		w->Close();
+		return;
+	}
+
+	EngineID chosen = w->eng_list.front().engine_id;
+	w->SelectEngine(chosen);
+	IConsolePrint(CC_INFO, "testvybervagonu: v okne je {} vagonu, mackam cudlik na {}", w->eng_list.size(), GetString(Engine::Get(chosen)->info.string_id));
+	w->OnClick(Point{}, WID_BV_BUILD, 1);
+
+	/* Said from the order, not from the window: what is being measured is
+	 * whether the press reached the order at all. */
+	const Order *o = v->GetOrder(index);
+	if (o == nullptr || o->GetCoupleBuyEngine() != chosen) {
+		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - vyber se do rozkazu nezapsal.");
+		return;
+	}
+	IConsolePrint(CC_INFO, "testvybervagonu: do rozkazu {} zapsan vagon {}", index, GetString(Engine::Get(chosen)->info.string_id));
 }
 
 void ShowBuildVehicleWindow(TileIndex tile, VehicleType type)

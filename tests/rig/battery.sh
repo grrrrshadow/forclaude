@@ -229,6 +229,16 @@ run_scene koupitvagonky "vlak123 on
 testspoj depo
 testpocet 2 0 6
 testkoupit 2 0" 12000
+# The wagon list opened from an order, and its button pressed, the way the
+# player does it. The only scene that looks into that window at all: it opened
+# with no button in it when it was reached from a station order (no depot
+# behind it, so nothing to answer with), and its list still held locomotives
+# because the list was made before the window knew what it was being asked.
+# Both were found by hand, neither by any counter.
+run_scene vybervagonu "vlak123 on
+testspoj depo
+testpocet 2 0 3
+testvybervagonu 2 0" 3000
 # And the wagon named on the order is the only one it will couple: the shed
 # is given three wagons of one kind by the deliverer and the order asks for
 # another, so it leaves them alone and buys three of its own. A wagon does not
