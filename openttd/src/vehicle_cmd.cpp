@@ -562,9 +562,12 @@ std::tuple<CommandCost, uint, uint16_t, CargoArray> CmdRefitVehicle(DoCommandFla
 	/* Check cargo */
 	if (new_cargo_type >= NUM_CARGO) return { CMD_ERROR, 0, 0, {} };
 	/* Road vehicles ride on rail wagons, in ships and in aircraft, and on
-	 * nothing else -- not on other road vehicles, and not on a locomotive (see
-	 * RefitVehicle() and CanCarryRoadVehicles()). */
-	if (new_cargo_type == _road_vehicle_cargo && !CanCarryRoadVehicles(front->GetEngine())) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
+	 * nothing else. A train is asked wagon by wagon further down
+	 * (RefitVehicle()), because its front is the engine and an engine never
+	 * carries one -- asked here of the front it would refuse every train. A
+	 * ship or an aircraft is one vehicle, so it is asked here
+	 * (CanCarryRoadVehicles()). */
+	if (new_cargo_type == _road_vehicle_cargo && front->type != VehicleType::Train && !CanCarryRoadVehicles(front->GetEngine())) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
 
 	/* For ships and aircraft there is always only one. */
 	only_this |= front->type == VehicleType::Ship || front->type == VehicleType::Aircraft;

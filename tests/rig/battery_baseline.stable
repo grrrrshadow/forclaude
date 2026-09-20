@@ -1,86 +1,87 @@
-zakl: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-couvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-depo: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-depopocet: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-depostoji: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-depozrus: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-depovagony: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-depooboji: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-sklad2: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-sklad6: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-sklad20: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
-skladdve: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-koupitpri: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-filtrspatny: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
-filtropraveny: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-clanky: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-clankycouvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-smes: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-rad: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-blok: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
-dodepa: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-vlek: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-vlekblok: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-odtahrovina: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-odtahkrizeni: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=6
-odtahjednosmer: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=54
-odtahdaleko: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=61
-odtahbezdepa: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=59
-odtahvagony: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 depa=8
-okruh: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=11
-naklad: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-nakladcekat: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-nakladsmer: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-nakladcil: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-nakladsav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-emu: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-emujz: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-save91: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-save91rev: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-mess: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-messodvoz: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-messodtah: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-ekaodtah: spojeno=5 odtazeno=3 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=8 auto=0 depa=10
-vlak31: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=8 auto=0 depa=1
-protlacit: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=16
-poruchavrata: spojeno=11 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=4 auto=0 depa=6
-poruchanastup: spojeno=14 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=10
-poruchazavlakem: spojeno=4 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=3 auto=0 depa=2
-odtahperon: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-lokonula: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-lokocely: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-zaloz: spojeno=7 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=7
-zalozsmerperon: spojeno=6 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-zalozsmer: spojeno=10 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 depa=4
-zalozsmerdlouho: spojeno=25 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 depa=10
-odtahotoc: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 depa=3
-odtahvyhybka: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-mezera: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
-auto: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-rigC2h: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-rigC1m: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
-rigD0: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-rigD3: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-rigD1: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-rigD2: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-rigD5: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-rigD4: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
-cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-tunel: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=1 vyjimka=0 zaznam=1 auto=0 depa=0
-tunel2: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-tunelstop: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-otocvyjezd: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
-otocuvnitr: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-otocvjezd: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-otocmost: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-vrakzmizi: spojeno=0 odtazeno=0 havaroval=1 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 depa=1
-stopkadepo: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=29
-stopkatrat: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=11
-autovlak: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=4 depa=9
-autodve: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=6 depa=9
-autoposun: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 depa=4
-autoposunne: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=4
-autoletadlo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=7 depa=0
-autolod: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=16 depa=0
+zakl: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+couvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+depo: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+depopocet: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+depostoji: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+depozrus: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+depovagony: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+depooboji: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+sklad2: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=5
+sklad6: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+sklad20: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=1
+skladdve: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=5
+koupitpri: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=5
+filtrspatny: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=1
+filtropraveny: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+clanky: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+clankycouvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+smes: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+rad: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+blok: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=1
+dodepa: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+vlek: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+vlekblok: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+odtahrovina: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=5
+odtahkrizeni: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=6
+odtahjednosmer: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=54
+odtahdaleko: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=61
+odtahbezdepa: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=59
+odtahvagony: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0 depa=8
+okruh: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=11
+naklad: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+nakladcekat: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+nakladsmer: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+nakladcil: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+nakladsav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+emu: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+emujz: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+save91: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+save91rev: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+mess: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+messodvoz: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+messodtah: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+ekaodtah: spojeno=5 odtazeno=3 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=8 auto=0 odmitnuto=0 depa=10
+vlak31: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=8 auto=0 odmitnuto=0 depa=1
+protlacit: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=16
+poruchavrata: spojeno=11 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=4 auto=0 odmitnuto=0 depa=6
+poruchanastup: spojeno=14 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=10
+poruchazavlakem: spojeno=4 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=3 auto=0 odmitnuto=0 depa=2
+odtahperon: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+lokonula: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+lokocely: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+zaloz: spojeno=7 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=7
+zalozsmerperon: spojeno=6 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=5
+zalozsmer: spojeno=10 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0 depa=4
+zalozsmerdlouho: spojeno=25 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0 depa=10
+odtahotoc: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0 depa=3
+odtahvyhybka: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+mezera: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=1
+auto: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=5
+rigC2h: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+rigC1m: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=3
+rigD0: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+rigD3: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+rigD1: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+rigD2: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+rigD5: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+rigD4: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=8
+cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=2
+tunel: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=1 vyjimka=0 zaznam=1 auto=0 odmitnuto=0 depa=0
+tunel2: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+tunelstop: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+otocvyjezd: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=1
+otocuvnitr: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+otocvjezd: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+otocmost: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=0
+vrakzmizi: spojeno=0 odtazeno=0 havaroval=1 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0 depa=1
+stopkadepo: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=29
+stopkatrat: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=11
+autovlak: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=4 odmitnuto=0 depa=9
+autodve: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=6 odmitnuto=0 depa=9
+autoposun: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 odmitnuto=0 depa=4
+autoposunne: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0 depa=4
+autoletadlo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=7 odmitnuto=0 depa=0
+autolod: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=16 odmitnuto=0 depa=0
+autonaauta: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=4 odmitnuto=0 depa=9

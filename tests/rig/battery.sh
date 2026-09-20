@@ -104,12 +104,16 @@ run_scene() { # name scr-content ticks extra-args
   # or an aircraft (road_on_rail.h): boardings plus alightings, so a scene where
   # the ride works counts an even number of them.
   local aut=$(( $(grep -c 'nalozeno na' $S/reg_$name.log) + $(grep -c 'slozeno z' $S/reg_$name.log) ))
+  # Rig commands the game refused (written ODMITNUTO by the command): a scene
+  # that asks the game to do something and is told no, where the numbers
+  # above would go on looking the same.
+  local odm=$(grep -c 'ODMITNUTO' $S/reg_$name.log)
   # Two lines, one file each. The seven counters above are the load-bearing
   # ones and do not move between runs of the same build; the depot-arrival
   # tally does, by one, on the long tow scenes -- it is worth reading and
   # not worth diffing, so it is kept out of the file meant for diffing.
-  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut depa=$dep"
-  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut" >> ${BATTERY_STABLE:-/dev/null}
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut odmitnuto=$odm depa=$dep"
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut odmitnuto=$odm" >> ${BATTERY_STABLE:-/dev/null}
 }
 : > ${BATTERY_STABLE:-/dev/null}
 printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
@@ -723,3 +727,17 @@ testzatik 3000 testauta" 12000
 run_scene autolod "vlak123 on
 testautolod 2
 testzatik 3000 testauta" 12000
+
+# The fitting put on through the train's front, the way the refit window does
+# it, with the train held in the shed. It once was refused -- the check meant
+# for ships and aircraft was asked of the locomotive -- and nothing in the
+# battery noticed, because the scenes buy their wagons fitted. The wagon here
+# is a car carrier by birth (in toyland it takes nothing else), so the refit
+# changes nothing and the ride goes on as in autovlak; what the scene watches
+# is the refusal itself: odmitnuto=0.
+run_scene autonaauta "vlak123 on
+testautovlak
+testbrzda 1
+testnaauta 1
+testbrzda 1
+testzatik 400 testauta" 12000

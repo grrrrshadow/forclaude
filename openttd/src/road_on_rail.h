@@ -63,7 +63,7 @@
 
 #include "vehicle_type.h"
 
-struct Engine;
+class Engine; // a class in engine_base.h; MSVC mangles class and struct apart, so this must match
 struct RoadVehicle;
 struct Train;
 struct Vehicle;

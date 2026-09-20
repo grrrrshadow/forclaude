@@ -5203,21 +5203,50 @@ static bool ConTestFitForRoadVehicles(std::span<std::string_view> argv)
 	auto punit = ParseInteger(argv[1]);
 	if (!punit.has_value()) return false;
 	CargoType to = _road_vehicle_cargo;
+	bool back_to_own = false;
 	if (argv.size() >= 3) {
-		auto pcargo = ParseInteger(argv[2]);
-		if (!pcargo.has_value() || *pcargo >= NUM_CARGO) return false;
-		to = (CargoType)*pcargo;
+		/* "puvodni": whatever the first wagon was built to carry, which is the
+		 * one cargo a scene can be sure the wagon takes in any climate. */
+		if (argv[2] == "puvodni") {
+			back_to_own = true;
+		} else {
+			auto pcargo = ParseInteger(argv[2]);
+			if (!pcargo.has_value() || *pcargo >= NUM_CARGO) return false;
+			to = (CargoType)*pcargo;
+		}
 	}
 	for (Train *t : Train::Iterate()) {
 		if (t->First() != t) continue;
 		if (*punit == 0 ? !(t->IsFreeWagon() && t->track == Track::Depot) : (!t->IsFrontEngine() || t->unitnumber != (UnitID)*punit)) continue;
+		if (back_to_own) {
+			/* The wagon's own cargo -- or, where the wagon is a car carrier by
+			 * birth (the rig's toyland one is), the first other cargo it takes,
+			 * so that "back to its own" really does take the fitting off. */
+			for (const Train *u = t; u != nullptr; u = u->Next()) {
+				if (RailVehInfo(u->engine_type)->railveh_type != RailVehicleType::Wagon) continue;
+				const Engine *e = Engine::Get(u->engine_type);
+				to = e->GetDefaultCargoType();
+				if (to == _road_vehicle_cargo || !IsValidCargoType(to)) {
+					for (const CargoSpec *cs : CargoSpec::Iterate()) {
+						if (cs->Index() != _road_vehicle_cargo && e->info.refit_mask.Test(cs->Index())) {
+							to = cs->Index();
+							break;
+						}
+					}
+				}
+				break;
+			}
+		}
 		AutoRestoreBackup cur_company(_current_company, t->owner);
 		auto [r, cap, mail_cap, caps] = Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, t->index, to, 0, false, false, 0);
 		uint fitted = 0;
 		for (const Train *u = t; u != nullptr; u = u->Next()) if (u->cargo_type == _road_vehicle_cargo && u->cargo_cap > 0) fitted++;
+		/* A refusal is written in capitals so that the battery can count it:
+		 * the fitting being refused through a train's front is a fault this
+		 * scene exists to catch, and nothing else in the run would notice. */
 		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testnaauta: vlak {} na {} - {}; vagonu na auta {}", t->unitnumber,
 				to == _road_vehicle_cargo ? std::string("auta") : fmt::format("naklad {}", to),
-				r.Succeeded() ? "prestaveno" : RefusalReason(r), fitted);
+				r.Succeeded() ? std::string("prestaveno") : fmt::format("ODMITNUTO: {}", RefusalReason(r)), fitted);
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testnaauta: vlak {} nenalezen.", argv[1]);

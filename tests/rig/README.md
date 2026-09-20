@@ -68,9 +68,13 @@ Four saves the battery asks for are the player's and are not in `saves/`:
 `umak.sav` (`mess`) and `umins.sav` (`messodvoz`, `messodtah`). Those six
 scenes cannot run without them.
 
-`battery.sh` — the regression battery, 64 scenes. Prints one line per scene:
+`battery.sh` — the regression battery. Prints one line per scene:
 `spojeno` (couplings), `odtazeno` (tows completed), `havaroval`, `srazka`,
-`assert`, `vyjimka`, `depa` (arrivals in a depot).
+`assert`, `vyjimka`, `zaznam` (anomaly record lines), `auto` (road vehicles
+boarding and leaving whatever carries them), `odmitnuto` (rig commands the
+game refused -- a command writes `ODMITNUTO` when it is told no, for the
+scenes where the other numbers would go on looking the same), `depa`
+(arrivals in a depot).
 
 The first six do not move between runs of the same build. **`depa` does** --
 by one, on the long tow scenes -- so a plain diff of two runs reports

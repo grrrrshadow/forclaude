@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "company_func.h"
 #include "train.h"
+#include "road_on_rail.h"
 #include "command_func.h"
 #include "engine_func.h"
 #include "vehicle_func.h"
@@ -815,6 +816,11 @@ CommandCost CmdAutoreplaceVehicle(DoCommandFlags flags, VehicleID veh_id)
 	 * after it has put the casualty down, the casualty on being put down
 	 * (see HandleRescueEngineInDepot()), a coupled pair once decoupled. */
 	if (v->type == VehicleType::Train && !free_wagon && CarriesAnotherTrain(Train::From(v))) return CommandCost();
+	/* A ship or an aircraft with road vehicles inside is the same case: the
+	 * replacement sells the vessel and everything that was in it goes with it
+	 * (see DestroyRoadVehiclesAboard()). It is replaced on a visit when it is
+	 * empty. */
+	if ((v->type == VehicleType::Ship || v->type == VehicleType::Aircraft) && CarriesRoadVehicles(v)) return CommandCost();
 
 	const Company *c = Company::Get(_current_company);
 	bool wagon_removal = c->settings.renew_keep_length;
