@@ -1923,7 +1923,7 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticky
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Ukazovat v jízdním řádu příjezdy a odjezdy: {STRING}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Zobrazit předpokládané časy příjezdu a odjezdu v jízdních řádech.
 
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Předvyplnit „Reversní chod" u příkazu připojit: {STRING2}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Předvyplnit „Reversní chod" u příkazu připojit: {STRING}
 STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :Zapnuto: když u rozkazu zmáčkneš „Jet se spojit", hra za tebe zmáčkne i „Reversní chod" — po připojení se vlak vrátí, kudy přijel; zrušením „Jet se spojit" zase zmizí. Vypnuto: nic se nepředvyplní, čudlík je na tobě. „Automaticky" tahle volba nikdy nepředvyplní — ten si zmáčkni sám
 STR_CONFIG_SETTING_QUICKGOTO                                    :Rychlejší zadávání příkazů pro vozidla: {STRING}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Předvybere "jet do" po otevření okna jízdního řádu
@@ -2046,6 +2046,15 @@ STR_CONFIG_SETTING_STATION_LENGTH_LOADING_PENALTY_HELPTEXT      :Pokud je zapnut
 STR_CONFIG_SETTING_WAGONSPEEDLIMITS                             :Zapnout omezení rychlosti vagonů: {STRING}
 STR_CONFIG_SETTING_WAGONSPEEDLIMITS_HELPTEXT                    :Pokud zapnuto, použije rychlostní omezení vagónů při stanovení maximální rychlosti vlaku
 STR_CONFIG_SETTING_NO_ENGINE_CARGO                              :Zákaz nákladu u lokomotivy: {STRING}
+STR_CONFIG_SETTING_ORIGINAL_ROADVEH                             :Auta ze hry: {STRING}
+STR_CONFIG_SETTING_ORIGINAL_SHIPS                               :Lodě ze hry: {STRING}
+STR_CONFIG_SETTING_ORIGINAL_AIRCRAFT                            :Letadla ze hry: {STRING}
+STR_CONFIG_SETTING_ORIGINAL_TRAINS                              :Mašinky a vagonky ze hry: {STRING}
+STR_CONFIG_SETTING_ORIGINAL_VEHICLES_HELPTEXT                   :Sada vozidel obvykle originální vozidla ze hry vypne, protože je chce nahradit — a přesně proto si ji hráč instaluje. „Jak řekne sada" to nechá na ní. „Vždy" originální vozidla vrátí, ať s nimi sada udělala cokoliv, a „Nikdy" je vypne i tam, kde proti nim žádná sada nic neměla. Každý druh vozidla se ptá zvlášť, takže kvůli sadě kamionů nemusíš přijít o mašinky ze hry. Už postavená vozidla jezdí dál v obou případech a vozidlo se vrací vždy jen do podnebí, pro která bylo dělané
+STR_CONFIG_SETTING_ORIGINAL_VEHICLES_AS_SETS                    :Jak řekne sada
+STR_CONFIG_SETTING_ORIGINAL_VEHICLES_ALWAYS                     :Vždy
+STR_CONFIG_SETTING_ORIGINAL_VEHICLES_NEVER                      :Nikdy
+STR_CONFIG_SETTING_VEHICLES_ORIGINAL                            :{ORANGE}Vozidla ze hry
 STR_CONFIG_SETTING_NO_ENGINE_CARGO_HELPTEXT                     :Pokud zapnuto, mašinky nevozí žádný náklad, ať jejich sada tvrdí cokoliv — vozí vagony, mašinka táhne. Uhlí v tendru nebo pošta v mašince je palivo, ne náklad. Stávající mašinky o kapacitu přijdou (a náklad vysypou) při zapnutí volby nebo načtení hry s ní
 
 STR_CONFIG_SETTING_AIRCRAFT_RANGE                               :Maximální dolet letadel: {STRING}

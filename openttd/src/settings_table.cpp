@@ -18,6 +18,7 @@
 #include "linkgraph/linkgraphschedule.h"
 #include "genworld.h"
 #include "train.h"
+#include "engine_func.h"
 #include "news_func.h"
 #include "window_func.h"
 #include "company_func.h"
@@ -209,6 +210,15 @@ static void EngineCargoBanChanged(int32_t)
 	}
 	InvalidateWindowClassesData(WindowClass::BuildVehicle, 0);
 	SetWindowClassesDirty(WindowClass::VehicleDetails);
+}
+
+/**
+ * The game's own vehicles were switched on or off for one vehicle type.
+ * The work is the engine code's; see OriginalVehiclesSettingChanged().
+ */
+static void OriginalVehiclesChanged(int32_t)
+{
+	OriginalVehiclesSettingChanged();
 }
 
 /**

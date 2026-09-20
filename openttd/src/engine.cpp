@@ -791,6 +791,117 @@ void CalcEngineReliability(Engine *e, bool new_month)
 
 }
 
+/**
+ * What the player asked for the game's own vehicles of one type.
+ * @param type The vehicle type.
+ * @return The setting for that type.
+ */
+static OriginalVehicles OriginalVehiclesSetting(VehicleType type)
+{
+	switch (type) {
+		case VehicleType::Train: return _settings_game.vehicle.original_trains;
+		case VehicleType::Road: return _settings_game.vehicle.original_roadveh;
+		case VehicleType::Ship: return _settings_game.vehicle.original_ships;
+		case VehicleType::Aircraft: return _settings_game.vehicle.original_aircraft;
+		default: return OriginalVehicles::AsSets;
+	}
+}
+
+/**
+ * Take the say over the game's own vehicles away from the NewGRFs, where the
+ * player asked for that.
+ *
+ * A set switches the game's own vehicles off by taking away the climates they
+ * are available in, which is also how the game itself keeps a vehicle out of a
+ * climate it was never meant for. Both live in the same field, so "available
+ * again" means the field as the game shipped it (#_orig_engine_info), not
+ * simply "all climates": a bus that never ran in the arctic does not start
+ * running there because a set was switched off.
+ *
+ * Only vehicles the game brings itself are touched. A vehicle that came from a
+ * set belongs to that set, in both directions.
+ *
+ * Called after the NewGRFs have had their say (see AfterLoadGRFs()), so
+ * whatever they did is what this overrides, and again whenever the player
+ * changes one of the settings.
+ */
+void ApplyOriginalVehicleSettings()
+{
+	for (Engine *e : Engine::Iterate()) {
+		if (e->grf_prop.HasGrfFile()) continue;
+		if (!IsCompanyBuildableVehicleType(e->type)) continue;
+		if (e->grf_prop.local_id >= GetOriginalEngineCount(e->type)) continue;
+
+		switch (OriginalVehiclesSetting(e->type)) {
+			case OriginalVehicles::Always:
+				e->info.climates = _orig_engine_info[GetOriginalEngineOffset(e->type) + e->grf_prop.local_id].climates;
+				break;
+
+			case OriginalVehicles::Never:
+				e->info.climates = {};
+				break;
+
+			default:
+				break;
+		}
+	}
+}
+
+/**
+ * One of the settings above was changed while a game is running, so the say
+ * has to be taken (or given back) now rather than at the next game.
+ *
+ * Availability is two things: the climates, which ApplyOriginalVehicleSettings()
+ * has just set, and whether a company may buy the vehicle, which is decided
+ * once when a game starts (see StartupOneEngine()) and then only moves forward
+ * with the calendar. The second one is what this puts right.
+ *
+ * Vehicles already built are not touched, the way they are not touched when a
+ * vehicle grows too old to buy: the ones on the map keep running.
+ */
+void OriginalVehiclesSettingChanged()
+{
+	ApplyOriginalVehicleSettings();
+
+	for (Engine *e : Engine::Iterate()) {
+		if (e->grf_prop.HasGrfFile()) continue;
+		if (!IsCompanyBuildableVehicleType(e->type)) continue;
+		if (e->grf_prop.local_id >= GetOriginalEngineCount(e->type)) continue;
+
+		if (!e->IsEnabled()) {
+			/* Out, and left standing the way a vehicle kept out of its climate
+			 * stands from the start of a game: introduced as far as the game
+			 * is concerned, and available to nobody. */
+			e->flags.Set(EngineFlag::Available);
+			e->company_avail = CompanyMask{};
+		} else if (TimerGameCalendar::date >= e->intro_date) {
+			/* Back in, and its day has come: handed to every company at once,
+			 * and without the "new vehicle available" news -- a setting being
+			 * changed is not an invention. */
+			e->flags.Set(EngineFlag::Available);
+			e->company_avail.Set();
+		} else {
+			/* Back in, but its day is still ahead: put back to waiting, and
+			 * the monthly round introduces it when the date arrives. */
+			e->flags.Reset(EngineFlag::Available);
+			e->company_avail = CompanyMask{};
+		}
+	}
+
+	for (Company *c : Company::Iterate()) {
+		c->avail_railtypes = GetCompanyRailTypes(c->index);
+		c->avail_roadtypes = GetCompanyRoadTypes(c->index);
+	}
+
+	AddRemoveEngineFromAutoreplaceAndBuildWindows(VehicleType::Train);
+	AddRemoveEngineFromAutoreplaceAndBuildWindows(VehicleType::Road);
+	AddRemoveEngineFromAutoreplaceAndBuildWindows(VehicleType::Ship);
+	AddRemoveEngineFromAutoreplaceAndBuildWindows(VehicleType::Aircraft);
+	InvalidateWindowClassesData(WindowClass::BuildVehicle);
+	SetWindowClassesDirty(WindowClass::BuildVehicle);
+	SetWindowClassesDirty(WindowClass::ReplaceVehicle);
+}
+
 /** Compute the value for #_year_engine_aging_stops. */
 void SetYearEngineAgingStops()
 {

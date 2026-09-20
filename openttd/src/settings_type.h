@@ -608,6 +608,22 @@ enum class RoadVehicleDrivingSide : uint8_t {
 };
 
 /** Settings related to vehicles. */
+/**
+ * What to do with the vehicles the game brings itself, of one vehicle type.
+ *
+ * A vehicle set usually switches the game's own vehicles off, because it means
+ * to replace them, and that is what a player who installs one expects. It is
+ * not always what they want: the game's own vehicles are the ones every save
+ * and every test has, and sometimes a set is loaded for one thing and its
+ * silence about the rest is a nuisance. So the answer can be taken away from
+ * the set, in either direction, for each type of vehicle on its own.
+ */
+enum class OriginalVehicles : uint8_t {
+	AsSets = 0, ///< Leave it to the NewGRFs: what a set says goes.
+	Always, ///< Available whatever the sets say.
+	Never, ///< Not available, even where no set objected.
+};
+
 struct VehicleSettings {
 	uint8_t max_train_length; ///< maximum length for trains
 	uint8_t smoke_amount; ///< amount of smoke/sparks locomotives produce
@@ -633,6 +649,10 @@ struct VehicleSettings {
 	RoadVehicleDrivingSide road_side; ///< the side of the road vehicles drive on
 	uint8_t plane_crashes; ///< number of plane crashes, 0 = none, 1 = reduced, 2 = normal
 	bool aircraft_range; ///< enable range limits for aircraft
+	OriginalVehicles original_trains; ///< whether the game's own trains and wagons are available
+	OriginalVehicles original_roadveh; ///< whether the game's own road vehicles are available
+	OriginalVehicles original_aircraft; ///< whether the game's own aircraft are available
+	OriginalVehicles original_ships; ///< whether the game's own ships are available
 };
 
 /** Settings related to the economy. */

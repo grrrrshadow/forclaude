@@ -34,6 +34,7 @@
 #include "network/network_client.h"
 #include "command_func.h"
 #include "settings_func.h"
+#include "settings_internal.h"
 #include "fios.h"
 #include "fileio_func.h"
 #include "fontcache.h"
@@ -9085,6 +9086,40 @@ static bool ConTestEverything(std::span<std::string_view>)
 	return true;
 }
 
+/**
+ * Print one setting's line the way the settings window draws it: the title
+ * with the value written into it, in the language the game is running in.
+ *
+ * Written to answer a question that cannot be answered by reading the
+ * language file: a setting's title and the string that carries its value are
+ * two strings that have to agree about how many parameters pass between them,
+ * and each language decides that for itself. English wraps the value in
+ * STR_CONFIG_SETTING_VALUE = "{ORANGE}{STRING1}" and its titles therefore say
+ * {STRING2}; Czech wraps it in "{STRING}" and its titles say {STRING}. Get it
+ * wrong and the line ends in "(invalid parameter)" -- in that language only,
+ * which is how it goes unnoticed. This asks the game, which settles it.
+ *
+ * Usage: testnapis <setting name>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestNapis(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Print a setting's line as the window draws it. Usage: 'testnapis <nastaveni>'.");
+		return true;
+	}
+	const SettingDesc *sd = GetSettingFromName(argv[1]);
+	if (sd == nullptr || !sd->IsIntSetting()) {
+		IConsolePrint(CC_ERROR, "testnapis: nezname nastaveni");
+		return true;
+	}
+	const IntSettingDesc *isd = sd->AsIntSetting();
+	int32_t value = isd->Read(&GetGameSettings());
+	auto [param1, param2] = isd->GetValueParams(value);
+	IConsolePrint(CC_INFO, "NAPIS: {}", GetString(isd->GetTitle(), STR_CONFIG_SETTING_VALUE, param1, param2));
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -9253,6 +9288,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
+	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
 	IConsole::CmdRegister("testauta",                ConTestRoadOrders);
 	IConsole::CmdRegister("log",                     ConAnomalyLog);

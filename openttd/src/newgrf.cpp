@@ -2287,6 +2287,12 @@ static void AfterLoadGRFs()
 		}
 	}
 
+	/* The sets have had their say about the game's own vehicles; where the
+	 * player asked for it, it is taken back (engine.cpp). Before the year
+	 * engine aging stops is worked out, because that reads which vehicles
+	 * exist at all. */
+	ApplyOriginalVehicleSettings();
+
 	SetYearEngineAgingStops();
 
 	FinalisePriceBaseMultipliers();

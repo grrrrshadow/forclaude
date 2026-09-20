@@ -767,6 +767,14 @@ SettingsContainer &GetSettingsTree()
 				physics->Add(new SettingEntry("vehicle.aircraft_range"));
 			}
 
+			SettingsPage *original = vehicles->Add(new SettingsPage(STR_CONFIG_SETTING_VEHICLES_ORIGINAL));
+			{
+				original->Add(new SettingEntry("vehicle.original_roadveh"));
+				original->Add(new SettingEntry("vehicle.original_ships"));
+				original->Add(new SettingEntry("vehicle.original_aircraft"));
+				original->Add(new SettingEntry("vehicle.original_trains"));
+			}
+
 			SettingsPage *routing = vehicles->Add(new SettingsPage(STR_CONFIG_SETTING_VEHICLES_ROUTING));
 			{
 				routing->Add(new SettingEntry("vehicle.road_side"));
@@ -778,7 +786,7 @@ SettingsContainer &GetSettingsTree()
 			SettingsPage *orders = vehicles->Add(new SettingsPage(STR_CONFIG_SETTING_VEHICLES_ORDERS));
 			{
 				orders->Add(new SettingEntry("gui.couple_auto_reverse_out"));
-			orders->Add(new SettingEntry("gui.new_nonstop"));
+				orders->Add(new SettingEntry("gui.new_nonstop"));
 				orders->Add(new SettingEntry("gui.quick_goto"));
 				orders->Add(new SettingEntry("gui.stop_location"));
 				orders->Add(new SettingEntry("order.improved_load"));
