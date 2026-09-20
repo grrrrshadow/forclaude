@@ -15,6 +15,16 @@
 #include "stringfilter_type.h"
 
 /**
+ * The help text of a setting as the settings window shows it: what the setting
+ * itself says, plus the notes this build adds to some settings. Both the
+ * drawing and the height the scrollbar is told about read it from here, so a
+ * note can never end up below what the window lets the player scroll to.
+ * @param sd The setting whose help text is wanted.
+ * @return The whole text.
+ */
+std::string GetSettingHelpText(const IntSettingDesc *sd);
+
+/**
  * Flags for #SettingEntry
  * @note The #SEF_BUTTONS_MASK matches expectations of the formal parameter 'state' of #DrawArrowButtons
  */

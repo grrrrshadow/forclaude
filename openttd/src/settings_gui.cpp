@@ -747,27 +747,10 @@ struct GameOptionsWindow : Window {
 					if (FillDrawPixelInfo(&tmp_dpi, r)) {
 						AutoRestoreBackup dpi_backup(_cur_dpi, &tmp_dpi);
 						int scrolls_pos = this->vscroll_description->GetPosition() * GetCharacterHeight(FontSize::Normal);
-						/* Not localised on purpose: this warning must show
-						 * up regardless of UI language, without relying on
-						 * every translation file being kept in sync. See
-						 * FEATURE_DESIGN_COUPLING_TOW.md. */
-						std::string help_text = GetString(sd->GetHelp());
-						if (sd->GetName() == "difficulty.train_flip_reverse_allowed" || sd->GetName() == "pf.reverse_at_signals") {
-							help_text += '\n';
-							help_text += GetString(STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS);
-						}
-						/* Cargo distribution plans a load's journey from station to
-						 * station before it boards anything, and this game is played
-						 * with the load already sitting in a wagon that a shunter
-						 * moves. The two do not contradict each other, but a player
-						 * who switches distribution on expecting it to do the work
-						 * here is expecting the wrong thing, so the settings say so
-						 * where the choice is made. */
-						if (sd->GetName().starts_with("linkgraph.distribution_")) {
-							help_text += '\n';
-							help_text += GetString(STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT);
-						}
-						DrawStringMultiLine(0, r.Width() - 1, -scrolls_pos, r.Height() - 1, help_text, TextColour::White);
+						/* The notes this build adds are built in one place with
+						 * the height the scrollbar was told about; see
+						 * GetSettingHelpText(). */
+						DrawStringMultiLine(0, r.Width() - 1, -scrolls_pos, r.Height() - 1, GetSettingHelpText(sd), TextColour::White);
 					}
 				}
 				break;

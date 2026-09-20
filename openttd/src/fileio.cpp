@@ -27,6 +27,8 @@
 #include <sys/stat.h>
 #include <filesystem>
 
+#include "table/decouple_default_config.h"
+
 #include "safeguards.h"
 
 /** Whether the working directory should be scanned. */
@@ -44,6 +46,22 @@ extern std::string _highscore_file;
  */
 #define OUR_CONFIG_NAME "openttdDecouple"
 #define OUR_CONFIG_FILE OUR_CONFIG_NAME ".cfg"
+
+/**
+ * Make sure our config file is there, and start it off the way this build is
+ * meant to be played when it is not. Opening it for appending answers both
+ * questions at once: whether the folder can be written to at all, and whether
+ * the file is new, since a new one is empty.
+ * @param file The config file to write.
+ * @return Whether the file is ours to write.
+ */
+static bool SeedOurConfigFile(const std::string &file)
+{
+	auto f = FileHandle::Open(file, "ab");
+	if (!f.has_value()) return false;
+	if (ftell(*f) == 0) fwrite(OUR_DEFAULT_CONFIG.data(), 1, OUR_DEFAULT_CONFIG.size(), *f);
+	return true;
+}
 
 /** Subdirectory names. */
 static const EnumIndexArray<std::string_view, Subdirectory, Subdirectory::End> _subdirs = {
@@ -1054,10 +1072,10 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	 * Files -- in which case the save folder, which is ours to write by
 	 * definition.
 	 *
-	 * Opening the file for appending both asks the question and leaves behind
-	 * the file the game fills on the way out; a new one is empty, and an empty
-	 * config file reads as every setting at its default. That is the whole of
-	 * it: a config of our own, with nothing copied out of the player's.
+	 * Writing the file both asks the question and leaves behind the file the
+	 * game reads a moment later: a config of our own, started from the way this
+	 * build is meant to be played (decouple_default_config.h) and with nothing
+	 * copied out of the player's.
 	 *
 	 * "-c <file>" is the player saying where the config lives, and that answer
 	 * stands: the game already made that file's folder the working directory
@@ -1065,14 +1083,13 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	 * it. Only when nothing was said do we pick the folder ourselves. */
 	std::string our_config_dir = config_dir;
 	if (!config_file_given) {
-		bool beside_binary = false;
-		if (IsValidSearchPath(Searchpath::BinaryDir)) {
-			beside_binary = FileHandle::Open(_searchpaths[Searchpath::BinaryDir] + OUR_CONFIG_FILE, "ab").has_value();
-		}
+		bool beside_binary = IsValidSearchPath(Searchpath::BinaryDir) &&
+				SeedOurConfigFile(_searchpaths[Searchpath::BinaryDir] + OUR_CONFIG_FILE);
 		our_config_dir = beside_binary ?
 				_searchpaths[Searchpath::BinaryDir] :
 				fmt::format("{}{}", _personal_dir, _subdirs[Subdirectory::Save]);
 		_config_file = our_config_dir + OUR_CONFIG_FILE;
+		if (!beside_binary) SeedOurConfigFile(_config_file);
 	}
 
 	Debug(misc, 1, "{} used for this build's own config files", our_config_dir);

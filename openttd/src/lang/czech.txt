@@ -1923,7 +1923,7 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticky
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Ukazovat v jízdním řádu příjezdy a odjezdy: {STRING}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Zobrazit předpokládané časy příjezdu a odjezdu v jízdních řádech.
 
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Předvyplnit „Reversní chod" u příkazu připojit: {STRING}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Předvyplnit „Reversní chod" u příkazu připojit: {STRING2}
 STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :Zapnuto: když u rozkazu zmáčkneš „Jet se spojit", hra za tebe zmáčkne i „Reversní chod" — po připojení se vlak vrátí, kudy přijel; zrušením „Jet se spojit" zase zmizí. Vypnuto: nic se nepředvyplní, čudlík je na tobě. „Automaticky" tahle volba nikdy nepředvyplní — ten si zmáčkni sám
 STR_CONFIG_SETTING_QUICKGOTO                                    :Rychlejší zadávání příkazů pro vozidla: {STRING}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Předvybere "jet do" po otevření okna jízdního řádu
@@ -5090,7 +5090,7 @@ STR_ORDER_AUTO_DEPARTURE_TOOLTIP                                :{BLACK}Mašinka
 STR_ORDER_AUTO_DEPARTURE_SUFFIX                                 :{SPACE}(automaticky)
 
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Zamčeno: hraješ s rozpojováním, a samovolné otočení by tu mohlo vjet přímo do vozů, které vlak právě odstavil
-STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT                   :{WHITE}Doporučení: nechte „Manuální". {RED}Hrajete decouple, náklad nečeká na správnej vlak, náklad je ve vagonu na posun
+STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT                   :{RED}Doporučení: nechte „Manuální". Hrajete decouple, náklad nečeká na správnej vlak, náklad je ve vagonu na posun
 STR_ORDER_DECOUPLE_COUNT                                        :{BLACK}Odpojit: {NUM}
 STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat si vagonů
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Kolik vagonů zůstane s mašinkou; zbytek se tu nechá stát. Mašinka se nepočítá, takže 0 znamená odpojit všechny vagonky

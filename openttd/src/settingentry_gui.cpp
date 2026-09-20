@@ -152,9 +152,35 @@ uint SettingEntry::Length() const
 	return this->IsFiltered() ? 0 : 1;
 }
 
+std::string GetSettingHelpText(const IntSettingDesc *sd)
+{
+	std::string help_text = GetString(sd->GetHelp());
+
+	/* A reversal of its own accord would drive straight into wagons a train
+	 * has just left behind, so these two are held where they are while
+	 * decouple orders are in play, and the setting says why. */
+	if (sd->GetName() == "difficulty.train_flip_reverse_allowed" || sd->GetName() == "pf.reverse_at_signals") {
+		help_text += '\n';
+		help_text += GetString(STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS);
+	}
+
+	/* Cargo distribution plans a load's journey from station to station before
+	 * it boards anything, and this game is played with the load already sitting
+	 * in a wagon that a shunter moves. The two do not contradict each other,
+	 * but a player who switches distribution on expecting it to do the work
+	 * here is expecting the wrong thing, so the settings say so where the
+	 * choice is made. */
+	if (sd->GetName().starts_with("linkgraph.distribution_")) {
+		help_text += '\n';
+		help_text += GetString(STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT);
+	}
+
+	return help_text;
+}
+
 uint SettingEntry::GetMaxHelpHeight(int maxw)
 {
-	return GetStringHeight(this->setting->GetHelp(), maxw);
+	return GetStringHeight(GetSettingHelpText(this->setting), maxw);
 }
 
 /**

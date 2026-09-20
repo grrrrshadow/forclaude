@@ -1836,7 +1836,7 @@ STR_CONFIG_SETTING_TIMETABLE_MODE_TICKS                         :Ticks
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE             :Show arrival and departure in timetables: {STRING2}
 STR_CONFIG_SETTING_TIMETABLE_SHOW_ARRIVAL_DEPARTURE_HELPTEXT    :Display anticipated arrival and departure times in timetables
 
-STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Fill in "Reverse out" by itself on a couple order: {STRING}
+STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE                          :Fill in "Reverse out" by itself on a couple order: {STRING2}
 STR_CONFIG_SETTING_COUPLE_AUTO_REVERSE_HELPTEXT                 :On: pressing "Go to couple" on an order also presses "Reverse out" for you, so after coupling the train goes back the way it came; taking "Go to couple" off takes it off again. Off: nothing is filled in and the button is yours. This never fills in "Automatic" - press that one yourself
 STR_CONFIG_SETTING_QUICKGOTO                                    :Quick creation of vehicle orders: {STRING2}
 STR_CONFIG_SETTING_QUICKGOTO_HELPTEXT                           :Pre-select the 'goto cursor' when opening the orders window
@@ -5020,7 +5020,7 @@ STR_ORDER_AUTO_DEPARTURE_TOOLTIP                                :{BLACK}Engine f
 STR_ORDER_AUTO_DEPARTURE_SUFFIX                                 :{SPACE}(automatic)
 
 STR_CONFIG_SETTING_LOCKED_DECOUPLE_ORDERS                       :{WHITE}Locked: you are playing with decouple orders, and an autonomous reversal here could drive straight into wagons a train just left behind
-STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT                   :{WHITE}Recommended here: leave this on "Manual". {RED}You are playing decouple, cargo does not wait for the right train, cargo is in a wagon on the shunt
+STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT                   :{RED}Recommended here: leave this on "Manual". You are playing decouple, cargo does not wait for the right train, cargo is in a wagon on the shunt
 
 STR_ORDERS_SKIP_BUTTON                                          :{BLACK}Skip
 STR_ORDERS_DECOUPLE_BUTTON                                      :{BLACK}Decouple
