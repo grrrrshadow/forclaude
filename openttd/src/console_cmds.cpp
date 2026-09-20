@@ -5470,6 +5470,38 @@ static bool ConTestDecoupleWhole(std::span<std::string_view> argv)
 }
 
 /**
+ * Make a decouple order sell what it puts down, the way the button at the
+ * bottom right of the orders window does. Usage: testprodatvagonky <unit
+ * number> <order index> [0|1]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSellDecoupled(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Make a decouple order sell what it puts down. Usage: 'testprodatvagonky <cislo vlaku> <rozkaz> [0|1]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	uint32_t on = 1;
+	if (argv.size() >= 4) {
+		auto pon = ParseInteger(argv[3]);
+		if (!pon.has_value()) return false;
+		on = *pon;
+	}
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_SELL_DECOUPLED, on);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testprodatvagonky: vlak {} rozkaz {} -> odpojene prodat {} {}", *punit, *porder, on, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testprodatvagonky: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * Switch a train's couple order to "found a rake here", the way the button in
  * the count box does. Usage: testzalozit <unit number> <order> [<max>]
  * @copydoc IConsoleCmdProc
@@ -9938,6 +9970,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testdodepa",              ConTestSendToDepot);
 	IConsole::CmdRegister("testnaauta",              ConTestFitForRoadVehicles);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
+	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
 	IConsole::CmdRegister("testauto",                ConTestAutoDeparture);

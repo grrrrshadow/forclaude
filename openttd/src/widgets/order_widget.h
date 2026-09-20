@@ -59,6 +59,8 @@ enum OrderWidgets : WidgetID {
 	WID_O_SEL_DECOUPLE_DEST_BTN,     ///< #NWID_SELECTION widget for the middle place of that row: the cargo destination button, or nothing while the selected order puts no wagons down.
 	WID_O_DECOUPLE_CARGO_DEST,       ///< Pick the station whose cargo the wagons this order puts down are to load.
 	WID_O_SELL_TRAIN,                ///< Sell this train to the scrapyard where it stands.
+	WID_O_SEL_SELL_WAGONS,           ///< #NWID_SELECTION widget for the right-hand place of that row: the sell-the-dropped-wagons button, or nothing while the selected order puts no wagons down.
+	WID_O_SELL_WAGONS,               ///< Sell the wagons this order puts down instead of leaving them to be collected.
 };
 
 #endif /* WIDGETS_ORDER_WIDGET_H */

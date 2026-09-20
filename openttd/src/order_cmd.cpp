@@ -1310,7 +1310,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
 					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_BOARD_MODE &&
-					mof != MOF_DECOUPLE_CARGO_DEST) return CMD_ERROR;
+					mof != MOF_DECOUPLE_CARGO_DEST && mof != MOF_SELL_DECOUPLED) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1321,7 +1321,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * the player can see it; the only thing to couple to in a depot is
 			 * a rake of stored wagons. */
 			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_GOTO_COUPLE &&
-					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND) return CMD_ERROR;
+					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND &&
+					mof != MOF_SELL_DECOUPLED) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -1487,6 +1488,10 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			break;
 
 		case MOF_DECOUPLE_WHOLE:
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			break;
+
+		case MOF_SELL_DECOUPLED:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			break;
 
@@ -1711,6 +1716,16 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_DECOUPLE_WHOLE:
 				order->SetDecoupleWholeTrain(data != 0);
+				break;
+
+			case MOF_SELL_DECOUPLED:
+				order->SetSellDecoupled(data != 0);
+				/* Wagons that are being sold are not being left for anybody,
+				 * so where their cargo was bound stops meaning anything.
+				 * Cleared rather than left set, so the order line does not go
+				 * on saying it is putting a rake down for a station it is not
+				 * putting anything down for. */
+				if (data != 0) order->SetDecoupleCargoDest(StationID::Invalid());
 				break;
 
 			case MOF_COUPLE_FOUND:

@@ -116,7 +116,7 @@ bool Forbid90DegFor(const Train *v);
 TrackBits RescueRoadTracksOnTile(const Train *v, TileIndex tile);
 bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
 bool IsCouplePartnerStandingOn(const Train *v, TileIndex tile);
-bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest = StationID::Invalid());
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest = StationID::Invalid(), bool sell = false);
 Train *FindCoupledBoundary(Train *v);
 bool MakeTenderRearHead(Train *engine);
 const Train *PieceDrawnAs(const Train *piece);
@@ -214,6 +214,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	 */
 	uint8_t depot_decouple_pending = 0;
 	static constexpr uint8_t DEPOT_DECOUPLE_WHOLE = 0xFF; ///< #depot_decouple_pending value for "drop the whole coupled train" rather than a count.
+	bool depot_decouple_sell = false; ///< The wagons that #depot_decouple_pending is about are sold once they are down, not stored. Written and honoured at the same two moments, and saved for the same reason.
 
 	/**
 	 * The rake this train has just left standing in the shed it is in.

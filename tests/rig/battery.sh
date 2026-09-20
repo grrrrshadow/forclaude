@@ -215,6 +215,17 @@ testza 6000 testodvoz vse" 20000
 # rescue engine is sent for something. The tow fetches it and the depot breaks
 # it up instead of repairing it, so this scene counts a tow like the breakdown
 # scenes do -- what tells them apart is the line saying the train was scrapped.
+# Wagons an order puts down and sells, the two ways round. In a depot they are
+# sold on the spot; at a platform a tow is called for them and they are sold
+# when it brings them in, so that scene counts a tow like the others do. The
+# price is the ordinary one -- the sale goes through the same command the
+# player's own sell button uses.
+run_scene prodatvagonkydepo "vlak123 on
+testspoj depo
+testprodatvagonky 1 0 1" 12000
+run_scene prodatvagonkyperon "vlak123 on
+testodtah vagony
+testprodatvagonky 1 0 1" 20000
 run_scene odtahprodat "vlak123 on
 testodtah prodat" 16000
 # And the rule that keeps the two apart: nobody buys a breakdown. The scene

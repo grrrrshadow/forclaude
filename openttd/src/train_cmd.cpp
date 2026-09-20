@@ -6237,6 +6237,8 @@ static Train *RestoreCasualtyOrientation(Train *casualty, Train *called)
 	return casualty;
 }
 
+static bool SellDroppedRake(Train *rake);
+
 bool HandleRescueEngineInDepot(Train *tow)
 {
 	if (!tow->IsFrontEngine()) return false;
@@ -6363,21 +6365,37 @@ bool HandleRescueEngineInDepot(Train *tow)
 			 * now, a rake in a shed for the next engine to collect, and the
 			 * call is answered. */
 			wagons = true;
-			if (casualty->IsFrontEngine()) casualty = RestoreCasualtyOrientation(casualty, called);
-			casualty->rescue_deadline = TimerGameEconomy::Date{};
-			casualty->couple_claim = VehicleID::Invalid();
-			if (called != nullptr) called->rescue_deadline = TimerGameEconomy::Date{};
-			casualty->current_order.Free();
-			casualty->SetDestTile(INVALID_TILE);
-			if (casualty->IsFrontEngine()) {
-				/* An engine at its head makes it a train again. Parked, as a
-				 * whole train put down in a shed is (see TryDecoupleAtDepot()):
-				 * it keeps whatever orders it had and moves when the player
-				 * lets the brake off, not the moment it is put down. */
-				casualty->vehstatus.Set(VehState::Stopped);
-				casualty->ConsistChanged(CCF_ARRANGE);
+
+			/* Unless the call was made to have them sold. A shed is where a
+			 * vehicle is sold, and this is the shed they were fetched to, so
+			 * the errand ends with the sale rather than with a rake put away.
+			 * The price is the ordinary one -- what the player would get for
+			 * selling them himself. See TryDecoupleAtStation(). */
+			if (sold) {
+				if (called != nullptr) called->rescue_deadline = TimerGameEconomy::Date{};
+				casualty->rescue_deadline = TimerGameEconomy::Date{};
+				casualty->couple_claim = VehicleID::Invalid();
+				casualty->current_order.Free();
+				casualty->SetDestTile(INVALID_TILE);
+				SellDroppedRake(casualty);
+				casualty = nullptr;
+			} else {
+				if (casualty->IsFrontEngine()) casualty = RestoreCasualtyOrientation(casualty, called);
+				casualty->rescue_deadline = TimerGameEconomy::Date{};
+				casualty->couple_claim = VehicleID::Invalid();
+				if (called != nullptr) called->rescue_deadline = TimerGameEconomy::Date{};
+				casualty->current_order.Free();
+				casualty->SetDestTile(INVALID_TILE);
+				if (casualty->IsFrontEngine()) {
+					/* An engine at its head makes it a train again. Parked, as a
+					 * whole train put down in a shed is (see TryDecoupleAtDepot()):
+					 * it keeps whatever orders it had and moves when the player
+					 * lets the brake off, not the moment it is put down. */
+					casualty->vehstatus.Set(VehState::Stopped);
+					casualty->ConsistChanged(CCF_ARRANGE);
+				}
+				InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 			}
-			InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 		} else if (wrecked || sold) {
 			/* A wreck brought into a depot is scrapped there, and so is a train
 			 * the player sold to the scrapyard -- which is what the depot was
@@ -6447,7 +6465,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 	 * loop scene reported a delivery for an engine that never left its shed. */
 	if (in_tow && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - {} v depu na ({},{})",
-				tow->unitnumber, wagons ? "vagonky odlozeny" : (sold ? "prodany vlak sesrotovan" : "porucha slozena"), TileX(tow->tile), TileY(tow->tile));
+				tow->unitnumber, (wagons && sold) ? "vagonky prodany" : wagons ? "vagonky odlozeny" : (sold ? "prodany vlak sesrotovan" : "porucha slozena"), TileX(tow->tile), TileY(tow->tile));
 	}
 
 	/* Home if this is not home, otherwise straight back on call. */
@@ -7615,7 +7633,39 @@ Train *FindCoupledBoundary(Train *v)
  *                   Order::decouple_cargo_dest
  * @return whether the train was actually split
  */
-bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest)
+/**
+ * Sell a rake of wagons an order has just put down, for what the player would
+ * be paid for selling them by hand.
+ *
+ * The ordinary sell command does it, which is the whole point: the price, the
+ * expense line and the windows are the ones the player already knows, and a
+ * rake sold this way is worth exactly what the same rake sold in a shed is
+ * worth. Nothing here is scrap -- that is the train sale, which is a different
+ * thing at a different price (see CmdSellTrainForScrap()).
+ *
+ * @param rake head of the headless chain to sell
+ * @return whether it was sold
+ */
+static bool SellDroppedRake(Train *rake)
+{
+	AutoRestoreBackup cur_company(_current_company, rake->owner);
+
+	UnitID number = rake->unitnumber;
+	TileIndex where = rake->tile;
+	CommandCost cost = ExtractCommandCost(Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, rake->index, true, false, ClientID::Invalid));
+	if (cost.Failed()) {
+		if (_show_train_orientation) {
+			IConsolePrint(CC_ERROR, "Vlak {}: odlozene vagonky prodat nejdou - {}", number, GetString(cost.GetErrorMessage()));
+		}
+		return false;
+	}
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: odlozene vagonky PRODANY na ({},{}) za {}", number, TileX(where), TileY(where), -cost.GetCost());
+	}
+	return true;
+}
+
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest, bool sell)
 {
 	if (v->vehstatus.Test(VehState::Crashed) || v->IsWrecked()) return false;
 
@@ -8028,6 +8078,27 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 		} else {
 			InvalidateWindowData(WindowClass::VehicleView, remainder->index);
 		}
+
+		/* Sold rather than left for a collector: the wagons are still an
+		 * ordinary rake standing at an ordinary platform -- that is what makes
+		 * a rescue engine able to come for them at all -- but a call is written
+		 * on them, the same call the player writes by hand when he wants a rake
+		 * taken away, and a mark saying what is to happen when it gets them to
+		 * a shed. They are sold there, because a shed is where a vehicle is
+		 * sold. See HandleRescueEngineInDepot().
+		 *
+		 * No ordinary collector will take them: a rake under this mark is not a
+		 * partner (see IsTrainCouplePartner()), so the only engine that can
+		 * come is one named outright, which is the tow. */
+		if (sell) {
+			remainder->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
+			remainder->current_order.SetWaitForCouple(true);
+			remainder->vehicle_flags.Set(VehicleFlag::SoldForScrap);
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: odlozene vagonky na prodej - ceka na odtah na ({},{})",
+						remainder->unitnumber, TileX(remainder->tile), TileY(remainder->tile));
+			}
+		}
 	}
 
 	if (_show_train_orientation) {
@@ -8065,7 +8136,7 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
  * @param whole_train drop exactly what the train coupled instead; see
  *                    TryDecoupleAtStation()
  */
-static void TryDecoupleAtDepot(Train *v, uint8_t keep_count, bool whole_train)
+static void TryDecoupleAtDepot(Train *v, uint8_t keep_count, bool whole_train, bool sell)
 {
 	/* Every way of doing nothing here says so. The player watched a train
 	 * stand in a shed with its wagons still on it under an order that plainly
@@ -8119,10 +8190,17 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count, bool whole_train)
 
 	if (remainder->IsFrontEngine()) {
 		/* Parked, not abandoned: it stays a train, keeps its orders, and waits
-		 * for the player to let the brake off. */
+		 * for the player to let the brake off. Never sold, whatever the order
+		 * says: what the button sells is wagons, and a part that came apart
+		 * with an engine at its head is a train. */
 		remainder->vehstatus.Set(VehState::Stopped);
 		remainder->ConsistChanged(CCF_ARRANGE);
 		InvalidateWindowData(WindowClass::VehicleView, remainder->index);
+	} else if (sell) {
+		/* Wagons put down in a shed and sold there. Nobody has to come for
+		 * them -- this is the place they would have been brought to. */
+		v->depot_dropped_rake = VehicleID::Invalid();
+		SellDroppedRake(remainder);
 	}
 
 	InvalidateWindowData(WindowClass::VehicleDepot, v->tile);
@@ -12305,7 +12383,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (order_names_here && TryDecoupleAtStation(consist, consist->current_order.GetDecoupleCount(),
 						consist->current_order.ShouldDecoupleWholeTrain(),
 						real_order->GetLoadType(), real_order->GetUnloadType(),
-						real_order->GetTimetabledWait(), real_order->GetDecoupleCargoDest())) {
+						real_order->GetTimetabledWait(), real_order->GetDecoupleCargoDest(),
+						real_order->ShouldSellDecoupled())) {
 			/* The order's timetabled stay was just handed to the rake -- the
 			 * point of the stay is that the wagons stand out a spell, not
 			 * that the engine sits coupled to them watching it pass. The
@@ -12423,7 +12502,9 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			bool whole = consist->depot_decouple_pending == Train::DEPOT_DECOUPLE_WHOLE;
 			uint8_t keep = whole ? 0 : consist->depot_decouple_pending - 1;
 			consist->depot_decouple_pending = 0;
-			TryDecoupleAtDepot(consist, keep, whole);
+			bool sell = consist->depot_decouple_sell;
+			consist->depot_decouple_sell = false;
+			TryDecoupleAtDepot(consist, keep, whole, sell);
 			return true;
 		}
 		/* Speak for a rake right here if nobody has yet. Choosing one is

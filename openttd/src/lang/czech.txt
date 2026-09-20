@@ -5113,6 +5113,9 @@ STR_ORDER_DECOUPLE_COUNT_BUTTON                                 :{BLACK}Nechat s
 STR_ORDER_DECOUPLE_COUNT_TOOLTIP                                :{BLACK}Kolik vagonů zůstane s mašinkou; zbytek se tu nechá stát. Mašinka se nepočítá, takže 0 znamená odpojit všechny vagonky
 STR_ORDER_DECOUPLE_COUNT_CAPT                                   :{WHITE}Kolik vagonů zůstane s mašinkou (0 = odpojit všechny)
 STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Odpojit celý vlak
+STR_ORDER_SELL_WAGONS                                           :{BLACK}Odpojené prodat
+STR_ORDER_SELL_WAGONS_TOOLTIP                                   :{BLACK}Vagonky, které tenhle rozkaz odpojí, se prodají místo aby zůstaly stát a čekaly na odvoz. V depu se prodají rovnou; na peroně se na ně zavolá odtahovka a prodají se, až je přiveze do depa, protože vozidlo se prodává v depu. Cena je běžná - kolik bys za ně dostal, kdybys je prodal sám. Co se odpojí i s mašinkou v čele, je vlak a takhle se neprodá
+STR_ORDER_SELL_WAGONS_SUFFIX                                    :{SPACE}(a prodat)
 STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Odpojené naložit pro: kamkoliv
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Odpojené naložit pro: {STATION}
 STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Řekne, pro kterou stanici je tahle odložená řada určená. Auta to čtou vždycky: auto, které má v rozkazu „naložit na vagony na příští zastávku", nastoupí jen na řadu určenou tam, kam jede ono. Se zapnutou distribucí nákladu to navíc platí i pro náklad - stanice si třídí, co na ní leží, podle toho, kam to jede dál, a vydá vozidlu jen to, co se hodí na jeho trasu; odpojené vagony bez mašinky žádnou trasu nemají, takže jim bez tohohle nevydá nic. Není to jízda a nic neslibuje: vagony pojedou tam, kam je odveze sběračka, a náklad, který se sveze jinam, se na příští stanici naplánuje znovu

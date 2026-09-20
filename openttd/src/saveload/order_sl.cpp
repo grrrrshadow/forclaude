@@ -247,6 +247,7 @@ public:
 		SLE_VAR(Order, decouple, VarTypes::BOOL),
 		SLE_VAR(Order, decouple_keep_wagons, VarTypes::U8),
 		SLE_VAR(Order, decouple_whole_train, VarTypes::BOOL),
+		SLE_VAR(Order, sell_decoupled, VarTypes::BOOL),
 		SLE_VAR(Order, decouple_count, VarTypes::U8),
 		SLE_VAR(Order, wait_for_couple, VarTypes::BOOL),
 		SLE_VAR(Order, go_to_couple, VarTypes::BOOL),

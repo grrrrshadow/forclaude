@@ -903,6 +903,7 @@ public:
 		     SLE_VAR(Train, couple_claim,      VarTypes::U32),
 		     SLE_VAR(Train, couple_target,     VarTypes::U32),
 		     SLE_VAR(Train, depot_decouple_pending, VarTypes::U8),
+		     SLE_VAR(Train, depot_decouple_sell,    VarTypes::BOOL),
 		     SLE_VAR(Train, depot_dropped_rake, VarTypes::U32),
 		     SLE_VAR(Train, carrying,          VarTypes::U32),
 	};

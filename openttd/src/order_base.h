@@ -93,6 +93,16 @@ private:
 	bool decouple_whole_train = false;
 
 	/**
+	 * If true, the wagons this order puts down are not put down to be
+	 * collected again -- they are sold. In a depot that happens on the spot;
+	 * at a platform a rescue engine is called for them and they are sold when
+	 * it brings them in, because a depot is where a vehicle is sold. The
+	 * player is paid what he would be paid for selling them by hand.
+	 * Only meaningful if #decouple. See TryDecoupleAtStation().
+	 */
+	bool sell_decoupled = false;
+
+	/**
 	 * The old "how many vehicles from the front stay on, zero means do not
 	 * decouple" field, kept only so that orders written before the two
 	 * questions were separated still mean what they meant.
@@ -380,6 +390,12 @@ public:
 
 	/** Set whether the decoupling drops exactly what the train coupled. */
 	inline void SetDecoupleWholeTrain(bool whole) { this->decouple_whole_train = whole; }
+
+	/** Are the wagons this order puts down sold rather than left to be collected? Only meaningful if #ShouldDecoupleOnDeparture. */
+	inline bool ShouldSellDecoupled() const { return this->sell_decoupled; }
+
+	/** Set whether the wagons this order puts down are sold. */
+	inline void SetSellDecoupled(bool sell) { this->sell_decoupled = sell; }
 
 	/** Where the cargo the wagons this order puts down are to load is bound, or StationID::Invalid() for no such hint. See #decouple_cargo_dest. */
 	inline StationID GetDecoupleCargoDest() const { return this->decouple_cargo_dest; }

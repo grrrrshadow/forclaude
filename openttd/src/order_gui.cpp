@@ -441,6 +441,9 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					if (order->GetDecoupleCargoDest() != StationID::Invalid() && Station::IsValidID(order->GetDecoupleCargoDest())) {
 						second += GetString(STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX, order->GetDecoupleCargoDest());
 					}
+					/* And whether they are being put down at all or sold, which
+					 * is the biggest thing an order can be doing to them. */
+					if (order->ShouldSellDecoupled()) second += GetString(STR_ORDER_SELL_WAGONS_SUFFIX);
 				}
 
 				/* Reversing out is about where the train goes next, not about
@@ -513,6 +516,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				} else {
 					second += GetString(order->GetDecoupleCount() == 0 ? STR_ORDER_DEPOT_DECOUPLE_SUFFIX_ALL : STR_ORDER_DEPOT_DECOUPLE_SUFFIX, order->GetDecoupleCount());
 				}
+				if (order->ShouldSellDecoupled()) second += GetString(STR_ORDER_SELL_WAGONS_SUFFIX);
 			}
 			if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
 				bool after_decouple = !timetable && order->ShouldDecoupleOnDeparture();
@@ -1077,6 +1081,9 @@ public:
 		if (NWidgetStacked *dest_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST_BTN); dest_sel != nullptr) {
 			dest_sel->SetDisplayedPlane(1);
 		}
+		if (NWidgetStacked *sell_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_SELL_WAGONS); sell_sel != nullptr) {
+			sell_sel->SetDisplayedPlane(1);
+		}
 		this->FinishInitNested(v->index);
 
 		this->owner = v->owner;
@@ -1544,6 +1551,19 @@ public:
 			 * stop" reads exactly this, and distribution has nothing to do
 			 * with cars. So the button has one meaning in every game -- this
 			 * rake is for that station -- and is never greyed. */
+		}
+
+		/* And the right-hand place: selling what the order puts down. That one
+		 * belongs to a depot order as much as to a station order -- a shed is
+		 * where a vehicle is sold -- so it is offered on both, and the middle
+		 * one is not, because where a rake's cargo is bound is a platform's
+		 * question. */
+		NWidgetStacked *sell_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_SELL_WAGONS);
+		if (sell_sel != nullptr) {
+			bool dropping_any = this->vehicle->type == VehicleType::Train && order != nullptr &&
+					(order->IsType(OT_GOTO_STATION) || order->IsType(OT_GOTO_DEPOT)) && order->ShouldDecoupleOnDeparture();
+			sell_sel->SetDisplayedPlane(dropping_any ? 0 : 1);
+			if (dropping_any) this->SetWidgetLoweredState(WID_O_SELL_WAGONS, order->ShouldSellDecoupled());
 		}
 
 		this->SetDirty();
@@ -2105,6 +2125,14 @@ public:
 				break;
 			}
 
+			case WID_O_SELL_WAGONS: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+						this->OrderGetSel(), MOF_SELL_DECOUPLED, order->ShouldSellDecoupled() ? 0 : 1);
+				break;
+			}
+
 			case WID_O_SELL_TRAIN:
 				/* Asked first, because it cannot be taken back: the money is
 				 * paid, the papers write it up, and from that moment the train
@@ -2644,7 +2672,11 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 				NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 				EndContainer(),
 			EndContainer(),
-			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
+			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_SELL_WAGONS),
+				NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_SELL_WAGONS), SetMinimalSize(124, 12), SetFill(1, 0),
+														SetStringTip(STR_ORDER_SELL_WAGONS, STR_ORDER_SELL_WAGONS_TOOLTIP), SetResize(1, 0),
+				NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
+				EndContainer(),
 			EndContainer(),
 		EndContainer(),
 	EndContainer(),
