@@ -5740,6 +5740,34 @@ static const Money TRAIN_SCRAP_PRICE = 50;
 static const int SCRAP_NEWS_QUIET_DAYS = 62;
 
 /**
+ * Put a train sold for scrap in the papers, if the papers will have it.
+ *
+ * Two rules, and both are the player's. The papers leave a company alone for
+ * two months after writing about it, so that tidying up a railway does not
+ * fill them; and the seller is not shown his own news when there is anybody
+ * else to read it, because he knows perfectly well what he did -- he pressed
+ * the button and answered the question. What the paper is for is the others.
+ * On his own he is the only reader there is, so he gets it.
+ *
+ * The date is company state and is written on every client alike; only whether
+ * the paper is put in front of this one player is decided here, and a news
+ * item is neither saved nor part of what the clients agree on, so the two
+ * cannot drift apart.
+ *
+ * @param v the sold train, front of its consist
+ */
+static void ReportTrainSoldForScrap(const Train *v)
+{
+	Company *c = Company::GetIfValid(v->owner);
+	if (c == nullptr) return;
+	if (TimerGameEconomy::date - c->last_scrap_news < SCRAP_NEWS_QUIET_DAYS) return;
+	c->last_scrap_news = TimerGameEconomy::date;
+
+	if (_networking && v->owner == _local_company) return;
+	AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_SOLD_FOR_SCRAP, v->owner), NewsType::General, v->tile);
+}
+
+/**
  * Sell a train to the scrapyard where it stands.
  *
  * The player's way of getting rid of a train that is nowhere near a depot and
@@ -5812,33 +5840,13 @@ CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 	if (refusal != STR_NULL) return CommandCost(refusal);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		/* Written up before anything happens to the train, so the paper has a
-		 * spot to show even when the shed breaks it up in the next line. And
-		 * not every time: the papers leave a company alone for two months
-		 * afterwards, so that tidying up a railway does not fill them. */
-		Company *c = Company::Get(v->owner);
-		if (TimerGameEconomy::date - c->last_scrap_news >= SCRAP_NEWS_QUIET_DAYS) {
-			c->last_scrap_news = TimerGameEconomy::date;
-
-			/* And not in front of the seller himself, when there is anybody
-			 * else to read it. A player knows perfectly well that he has just
-			 * sold a train -- he pressed the button and answered the question
-			 * -- and being handed a newspaper about it is being told his own
-			 * news. What the paper is for is the others: somebody else's
-			 * railway losing a train is worth knowing. On his own he is the
-			 * only reader there is, so he gets it.
-			 *
-			 * The date above is company state and is written on every client
-			 * alike; only whether the paper is put in front of this one player
-			 * is decided here, and a news item is neither saved nor part of
-			 * what the clients agree on, so the two cannot drift apart. */
-			if (!_networking || v->owner != _local_company) {
-				AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_SOLD_FOR_SCRAP, v->owner), NewsType::General, v->tile);
-			}
-		}
-
 		if (IsWholeTrainInsideDepot(v)) {
-			/* In a shed already: nobody has to come for it. */
+			/* In a shed already: nobody has to come for it -- so this is the
+			 * only moment the papers will ever have, and they get it now.
+			 * Everywhere else they wait for the tow (see
+			 * TryDispatchRescueEngine()), because what is worth looking at is
+			 * the train standing there with an engine on its way to it. */
+			ReportTrainSoldForScrap(v);
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vlak {}: prodan do srotu a rovnou sesrotovan v depu ({},{})", v->unitnumber, TileX(v->tile), TileY(v->tile));
 			}
@@ -6073,6 +6081,14 @@ static void TryDispatchRescueEngine(Train *tow)
 	 * says which engine is coming and the engine says what it is going for. */
 	tow->couple_target = nearest->index;
 	nearest->couple_claim = tow->index;
+
+	/* This is the moment a sold train is worth reading about: an engine has
+	 * been sent for it and is about to book its road there, so a reader who
+	 * opens the paper is shown the train standing where it was sold with
+	 * somebody coming for it. Written at the sale instead, the paper pointed
+	 * at a train nothing was happening to yet -- and at one nobody might ever
+	 * come for. See CmdSellTrainForScrap(). */
+	if (nearest->IsSoldForScrap()) ReportTrainSoldForScrap(nearest);
 	/* Where to go for it: a case half inside a shed is reached at the end
 	 * that stands outside, the shed itself being no place for a road. */
 	TileIndex target_tile = nearest->tile;
