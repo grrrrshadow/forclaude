@@ -5502,6 +5502,88 @@ static bool ConTestSellDecoupled(std::span<std::string_view> argv)
 }
 
 /**
+ * Set a couple order's count -- how many vehicles the rake it collects has to
+ * have. Usage: testpocet <unit number> <order index> <count>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCoupleCount(std::span<std::string_view> argv)
+{
+	if (argv.size() < 4) {
+		IConsolePrint(CC_HELP, "Set a couple order's count. Usage: 'testpocet <cislo vlaku> <rozkaz> <pocet>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	auto pcount = ParseInteger(argv[3]);
+	if (!punit.has_value() || !porder.has_value() || !pcount.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_COUNT, *pcount);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testpocet: vlak {} rozkaz {} -> sebrat {} vozu {}", *punit, *porder, *pcount,
+				r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testpocet: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Tell a depot couple order which wagon to buy when the shed is short of them,
+ * the way the button in the filter row does. Usage: testkoupit <unit number>
+ * <order index> [<engine id>|vypnout]
+ *
+ * With no engine given it takes the first wagon this company can buy, which is
+ * what a scene wants: any wagon will do, the question being measured is whether
+ * it buys at all and how many.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBuyWagons(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Tell a depot couple order which wagon to buy. Usage: 'testkoupit <cislo vlaku> <rozkaz> [<model>|vypnout]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+
+		uint32_t data = EngineID::Invalid().base();
+		if (argv.size() < 4 || argv[3] != "vypnout") {
+			EngineID eid = EngineID::Invalid();
+			if (argv.size() >= 4) {
+				auto pe = ParseInteger(argv[3]);
+				if (!pe.has_value()) return false;
+				eid = static_cast<EngineID>(*pe);
+			} else {
+				for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+					if (!e->company_avail.Test(t->owner)) continue;
+					if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+					eid = e->index;
+					break;
+				}
+			}
+			if (eid == EngineID::Invalid()) {
+				IConsolePrint(CC_ERROR, "testkoupit: zadny vagon k dispozici.");
+				return true;
+			}
+			data = eid.base();
+		}
+
+		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_BUY, data);
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testkoupit: vlak {} rozkaz {} -> koupit model {} {}", *punit, *porder,
+				data, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testkoupit: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * Switch a train's couple order to "found a rake here", the way the button in
  * the count box does. Usage: testzalozit <unit number> <order> [<max>]
  * @copydoc IConsoleCmdProc
@@ -9971,6 +10053,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testnaauta",              ConTestFitForRoadVehicles);
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
+	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
+	IConsole::CmdRegister("testpocet",               ConTestCoupleCount);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
 	IConsole::CmdRegister("testhoukat",              ConTestHonk);
 	IConsole::CmdRegister("testauto",                ConTestAutoDeparture);

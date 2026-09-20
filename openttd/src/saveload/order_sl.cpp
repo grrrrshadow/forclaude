@@ -257,6 +257,8 @@ public:
 		SLE_VAR(Order, couple_cargo, VarTypes::U8),
 		SLE_VAR(Order, couple_count, VarTypes::U8),
 		SLE_VAR(Order, couple_found_rake, VarTypes::BOOL),
+		SLE_VAR(Order, couple_buy_engine, VarTypes::U16),
+		SLE_VAR(Order, couple_buy_wagons, VarTypes::BOOL),
 		SLE_VAR(Order, honk, VarTypes::BOOL),
 		SLE_VAR(Order, couple_min, VarTypes::BOOL),
 		SLE_VAR(Order, couple_max, VarTypes::BOOL),

@@ -243,6 +243,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_BOARD_MODE,      ///< Passes an OrderBoardMode: how a road vehicle gets itself carried on from this station (see road_on_rail.h).
 	MOF_DECOUPLE_CARGO_DEST,///< Passes the StationID whose cargo the wagons this order puts down are to load, or StationID::Invalid() for none.
 	MOF_SELL_DECOUPLED,  ///< Toggle whether the wagons this order puts down are sold instead of being left to be collected.
+	MOF_COUPLE_BUY,      ///< Passes the EngineID of the wagon this order buys when the depot is short of them, or EngineID::Invalid() to stop buying.
 	MOF_END
 };
 

@@ -3416,10 +3416,89 @@ static uint FreeDepotUnitsFor(Train *v, const Order &order, TileIndex depot_tile
 	return available;
 }
 
+/**
+ * Buy the wagons a depot order is short of, into the shed it collects from.
+ *
+ * The player's design: early on there are no wagons in circulation to collect,
+ * so a shunter working a yard buys what it is short of and couples that; once
+ * enough of them are going round, the player switches the buying off and the
+ * same order goes on collecting what comes back. See Order::couple_buy_engine.
+ *
+ * It tops up rather than buying a fresh set: what already stands in the shed
+ * has been counted by the caller and only the difference is bought. The number
+ * is the couple filter's own -- "couple 8" is what the order wants, whether
+ * the eight are bought or found.
+ *
+ * Each wagon is bought already fitted for the cargo the filter asks for, which
+ * is why the purchase list opens filtered to it: what can be bought can carry
+ * what the order came for, and nothing has to be refitted afterwards.
+ *
+ * Bought into the shed the order names rather than where the engine happens to
+ * be standing, and at the moment the order comes up rather than on arrival.
+ * That is not a shortcut -- it is the only moment there is. A collector does
+ * not set off for a shed that has not got what it came for (see
+ * CoupleOrderWouldFindSomething()), so an engine that waited to arrive before
+ * buying would wait for ever.
+ *
+ * @param v          the collecting engine
+ * @param order      its "go to couple" order
+ * @param depot_tile the shed the order names
+ * @param missing    how many it is short of
+ * @return how many were bought
+ */
+static uint BuyWagonsIntoDepot(Train *v, const Order &order, TileIndex depot_tile, uint missing)
+{
+	if (!order.ShouldBuyWagons()) return 0;
+
+	EngineID eid = order.GetCoupleBuyEngine();
+	const Engine *e = Engine::GetIfValid(eid);
+	if (e == nullptr || e->type != VehicleType::Train) return 0;
+	if (!e->company_avail.Test(v->owner)) return 0;
+
+	/* Same trap as every other command run from a vehicle tick: it reads
+	 * whichever company happens to be current. */
+	AutoRestoreBackup cur_company(_current_company, v->owner);
+
+	CargoType cargo = IsValidCargoType(order.GetCoupleCargo()) ? order.GetCoupleCargo() : INVALID_CARGO;
+	uint bought = 0;
+	for (uint i = 0; i < missing; i++) {
+		auto [cost, new_id, refit_cap, mail_cap, caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute,
+				depot_tile, eid, true, cargo, ClientID::Invalid);
+		if (cost.Failed()) {
+			/* Out of money, or the shed will not hold another one. Whatever was
+			 * bought stays bought; the order is still short, and being short is
+			 * the ordinary answer to a filter that is not met -- the train
+			 * waits and says so, exactly as it did before. */
+			if (_show_train_orientation) {
+				SayOnChange(v, fmt::format("Vlak {}: nakup vagonku do depa ({},{}) ODMITNUTO - {}", v->unitnumber,
+						TileX(depot_tile), TileY(depot_tile), GetString(cost.GetErrorMessage())));
+			}
+			break;
+		}
+		if (Train::GetIfValid(new_id) == nullptr) break;
+		bought++;
+	}
+
+	if (bought != 0 && _show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vlak {}: koupeno {} vagonku ({}) do depa ({},{}), chybelo {}", v->unitnumber, bought,
+				GetString(e->info.string_id), TileX(depot_tile), TileY(depot_tile), missing);
+	}
+	return bought;
+}
+
 static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_tile, uint want)
 {
 	std::vector<Train *> pile;
 	uint available = FreeDepotUnitsFor(v, order, depot_tile, &pile, true);
+
+	/* Short, and told to buy what is missing: bought now, and counted again
+	 * from scratch -- what was bought is an ordinary free wagon standing in
+	 * that shed and has to pass the same filter as anything else that stands
+	 * there. See BuyWagonsIntoDepot(). */
+	if (available < want && order.ShouldBuyWagons() && BuyWagonsIntoDepot(v, order, depot_tile, want - available) != 0) {
+		pile.clear();
+		available = FreeDepotUnitsFor(v, order, depot_tile, &pile, true);
+	}
 
 	/* Not enough: nothing is taken and nothing is moved. The waiting train says
 	 * why for itself, once, from the hold in TrainLocoHandler() -- said again

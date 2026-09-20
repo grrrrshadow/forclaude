@@ -220,6 +220,15 @@ testza 6000 testodvoz vse" 20000
 # when it brings them in, so that scene counts a tow like the others do. The
 # price is the ordinary one -- the sale goes through the same command the
 # player's own sell button uses.
+# A depot order told to buy the wagons the shed has not got: the shed starts
+# empty, the order wants six, so six are bought into it, made up into a rake
+# and collected. The buying is switched on before the train sets off, because
+# an order already being worked is a copy the train is carrying -- the same
+# thing that is true of every other order flag.
+run_scene koupitvagonky "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0" 12000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

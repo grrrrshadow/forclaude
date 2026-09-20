@@ -29,6 +29,7 @@
 #include "window_func.h"
 #include "timer/timer_game_calendar.h"
 #include "vehicle_func.h"
+#include "order_cmd.h"
 #include "dropdown_type.h"
 #include "dropdown_func.h"
 #include "engine_gui.h"
@@ -1230,6 +1231,18 @@ struct BuildVehicleWindow : Window {
 	uint8_t sort_criteria = 0; ///< Current sort criterium.
 	bool show_hidden_engines = false; ///< State of the 'show hidden engines' button.
 	bool listview_mode = false; ///< If set, only display the available vehicles and do not show a 'build' button.
+	/**
+	 * Opened from a depot order to choose the wagon it buys when the shed is
+	 * short of them, rather than to buy anything now.
+	 *
+	 * The same list, because it is the same question -- which wagon -- and a
+	 * second list of wagons would be a second thing to keep in step with every
+	 * NewGRF. What changes is what the window is called, that it shows wagons
+	 * only, and that its button writes the choice into the order instead of
+	 * buying. See Order::couple_buy_engine.
+	 */
+	const Vehicle *pick_for_order = nullptr; ///< Whose order is being written, or nullptr when this is an ordinary purchase list.
+	VehicleOrderID pick_order_index = 0;     ///< Which of its orders.
 	EngineID sel_engine = EngineID::Invalid(); ///< Currently selected engine, or #EngineID::Invalid()
 	EngineID rename_engine = EngineID::Invalid(); ///< Engine being renamed.
 	GUIEngineList eng_list{};
@@ -1254,7 +1267,9 @@ struct BuildVehicleWindow : Window {
 		bool refit = this->sel_engine != EngineID::Invalid() && this->cargo_filter_criteria != CargoFilterCriteria::CF_ANY && this->cargo_filter_criteria != CargoFilterCriteria::CF_NONE && this->cargo_filter_criteria != CargoFilterCriteria::CF_ENGINES;
 		if (refit) refit = Engine::Get(this->sel_engine)->GetDefaultCargoType() != this->cargo_filter_criteria;
 
-		if (refit) {
+		if (this->pick_for_order != nullptr) {
+			widget->SetStringTip(STR_COUPLE_BUY_PICK_BUTTON, STR_COUPLE_BUY_PICK_TOOLTIP);
+		} else if (refit) {
 			widget->SetStringTip(STR_BUY_VEHICLE_TRAIN_BUY_REFIT_VEHICLE_BUTTON + to_underlying(this->vehicle_type), STR_BUY_VEHICLE_TRAIN_BUY_REFIT_VEHICLE_TOOLTIP + to_underlying(this->vehicle_type));
 		} else {
 			widget->SetStringTip(STR_BUY_VEHICLE_TRAIN_BUY_VEHICLE_BUTTON + to_underlying(this->vehicle_type), STR_BUY_VEHICLE_TRAIN_BUY_VEHICLE_TOOLTIP + to_underlying(this->vehicle_type));
@@ -1484,6 +1499,11 @@ struct BuildVehicleWindow : Window {
 
 			if (this->filter.railtype != INVALID_RAILTYPE && !HasPowerOnRail(rvi->railtypes, this->filter.railtype)) continue;
 			if (!IsEngineBuildable(eid, VehicleType::Train, _local_company)) continue;
+
+			/* Wagons only when an order is asking which wagon to couple: what
+			 * it is short of is wagons, and an engine in that list is an
+			 * answer that cannot be given. */
+			if (this->pick_for_order != nullptr && rvi->railveh_type != RailVehicleType::Wagon) continue;
 
 			/* Filter now! So num_engines and num_wagons is valid */
 			if (!FilterSingleEngine(eid)) continue;
@@ -1814,6 +1834,13 @@ struct BuildVehicleWindow : Window {
 			}
 
 			case WID_BV_BUILD:
+				if (this->pick_for_order != nullptr) {
+					if (this->sel_engine == EngineID::Invalid()) break;
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->pick_for_order->tile, this->pick_for_order->index,
+							this->pick_order_index, MOF_COUPLE_BUY, this->sel_engine.base());
+					this->Close();
+					break;
+				}
 				this->BuildVehicle();
 				break;
 
@@ -1857,6 +1884,10 @@ struct BuildVehicleWindow : Window {
 	{
 		switch (widget) {
 			case WID_BV_CAPTION:
+				/* Not a purchase list when it is being asked which wagon an
+				 * order should couple: the player is not being sent shopping,
+				 * he is answering a question the order asked. */
+				if (this->pick_for_order != nullptr) return GetString(STR_COUPLE_BUY_PICK_CAPTION);
 				if (this->vehicle_type == VehicleType::Train && !this->listview_mode) {
 					const RailTypeInfo *rti = GetRailTypeInfo(this->filter.railtype);
 					return GetString(rti->strings.build_caption);
@@ -1923,6 +1954,7 @@ struct BuildVehicleWindow : Window {
 			case WID_BV_BUILD:
 				size = GetStringBoundingBox(STR_BUY_VEHICLE_TRAIN_BUY_VEHICLE_BUTTON + to_underlying(this->vehicle_type));
 				size = maxdim(size, GetStringBoundingBox(STR_BUY_VEHICLE_TRAIN_BUY_REFIT_VEHICLE_BUTTON + to_underlying(this->vehicle_type)));
+				size = maxdim(size, GetStringBoundingBox(STR_COUPLE_BUY_PICK_BUTTON));
 				size.width += padding.width;
 				size.height += padding.height;
 				break;
@@ -2073,6 +2105,34 @@ static WindowDesc _build_vehicle_desc(
 	_nested_build_vehicle_widgets,
 	&BuildVehicleWindow::hotkeys
 );
+
+/**
+ * Open the wagon list so that a depot order can be told which wagon to buy
+ * when the shed it collects from is short of them.
+ *
+ * The purchase list, under another name: it shows this company's wagons, it
+ * opens filtered to the cargo the order asked for, and its button writes the
+ * choice into the order instead of buying anything. Opened on the depot the
+ * order names, so the list is the one for that depot's track type.
+ *
+ * @param v      the train whose order is being written
+ * @param index  which of its orders
+ * @param tile   the depot the order names, or INVALID_TILE
+ * @param cargo  the cargo the order's filter asks for, or INVALID_CARGO
+ */
+void ShowPickCoupleWagonWindow(const Vehicle *v, VehicleOrderID index, TileIndex tile, CargoType cargo)
+{
+	CloseWindowByClass(WindowClass::BuildVehicle);
+
+	BuildVehicleWindow *w = new BuildVehicleWindow(_build_vehicle_desc, tile, VehicleType::Train);
+	w->pick_for_order = v;
+	w->pick_order_index = index;
+	/* Opened already showing what the order is short of, so the list cannot
+	 * offer a wagon that could not carry it. */
+	if (cargo != INVALID_CARGO) w->cargo_filter_criteria = cargo;
+	w->SetBuyVehicleText();
+	w->InvalidateData();
+}
 
 void ShowBuildVehicleWindow(TileIndex tile, VehicleType type)
 {

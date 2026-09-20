@@ -4997,6 +4997,13 @@ STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Only col
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vehicles: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vehicles: any
 STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}One number, and one of three ways to read it. With neither toggle down it couples a rake of exactly this many vehicles, 0 for any rake. "At least" takes a rake once it has grown to this many or more, so one still being built is left to grow. "At most" is a rake of up to this many, 0 for as many as fit on the platform. "Found a rake" - what to do when there is nothing here to couple to, wait or put wagons down anyway: couple nothing, and lay your own wagons down as the start of a rake instead; with "at most" the number is the greatest length, and it then waits until it can couple or found. The whole rake is always taken; leaving part of a rake standing is what a decoupling order at the same platform is for. OK confirms the number and the buttons together. Station waypoints are worth using here.
+STR_ORDER_COUPLE_BUY_OFF                                        :{BLACK}Buy: off
+STR_ORDER_COUPLE_BUY_ON                                         :{BLACK}Buy: {ENGINE}
+STR_ORDER_COUPLE_BUY_TOOLTIP                                    :{BLACK}Which wagon this order buys when the depot it collects from has not got enough of them. It buys what it is short of, already fitted for the cargo the filter asks for, and couples that. Press it to pick a wagon from the list; press it again to stop buying, which leaves the choice written down for when it is switched back on
+STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(buy {ENGINE})
+STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Which wagon to couple
+STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Couple this one
+STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Write this wagon into the order. The order buys one whenever the depot is short, fits it for the cargo the filter asks for, and couples it
 STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}How many vehicles the rake to couple to has to have (0 - any)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})

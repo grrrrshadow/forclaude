@@ -36,6 +36,10 @@
 #include "company_cmd.h"
 #include "train.h"
 #include "train_cmd.h"
+#include "depot_base.h"
+#include "engine_base.h"
+#include "engine_func.h"
+#include "vehicle_gui.h"
 #include "core/string_consumer.hpp"
 
 #include "widgets/order_widget.h"
@@ -529,6 +533,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				}
 				if (order->GetCoupleCount() != 0) {
 					second += GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT, order->GetCoupleCount());
+				}
+				/* And which wagon it buys when the shed is short, in a bracket
+				 * of its own: it is not one of the filters, it is what the
+				 * order does when the filters find too little. */
+				if (order->ShouldBuyWagons() && Engine::GetIfValid(order->GetCoupleBuyEngine()) != nullptr) {
+					second += GetString(STR_ORDER_COUPLE_BUY_SUFFIX, PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
 				}
 			}
 
@@ -1712,6 +1722,15 @@ public:
 				return GetString(STR_ORDER_COUPLE_CARGO_TYPE, CargoSpec::Get(order->GetCoupleCargo())->name);
 			}
 
+			case WID_O_COUPLE_BUY: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) return GetString(STR_ORDER_COUPLE_BUY_OFF);
+				if (!order->ShouldBuyWagons()) return GetString(STR_ORDER_COUPLE_BUY_OFF);
+				const Engine *e = Engine::GetIfValid(order->GetCoupleBuyEngine());
+				if (e == nullptr) return GetString(STR_ORDER_COUPLE_BUY_OFF);
+				return GetString(STR_ORDER_COUPLE_BUY_ON, PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
+			}
+
 			case WID_O_COUPLE_COUNT: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) return {};
@@ -2063,6 +2082,23 @@ public:
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
 				ShowDropDownList(this, BuildCoupleCargoDropDown(), order->GetCoupleCargo(), WID_O_COUPLE_CARGO);
+				break;
+			}
+
+			case WID_O_COUPLE_BUY: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				/* Set, the press lets go of the buying -- the model stays
+				 * written down, so switching it back on needs no second trip to
+				 * the list. Unset, the list opens to be asked which wagon. */
+				if (order->ShouldBuyWagons()) {
+					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+							this->OrderGetSel(), MOF_COUPLE_BUY, EngineID::Invalid().base());
+					break;
+				}
+				ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),
+						order->IsType(OT_GOTO_DEPOT) ? Depot::Get(order->GetDestination().ToDepotID())->xy : INVALID_TILE,
+						order->GetCoupleCargo());
 				break;
 			}
 
@@ -2640,12 +2676,16 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_COUPLE_FILTER),
 		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
-			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_LOAD), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_LOAD), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetToolTip(STR_ORDER_COUPLE_LOAD_TOOLTIP), SetResize(1, 0),
-			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_CARGO), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_CARGO), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetToolTip(STR_ORDER_COUPLE_CARGO_TOOLTIP), SetResize(1, 0),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_COUPLE_COUNT), SetMinimalSize(124, 12), SetFill(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_O_COUPLE_COUNT), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_COUPLE_COUNT_BUTTON, STR_ORDER_COUPLE_COUNT_TOOLTIP), SetResize(1, 0),
+			/* Three buttons of 124 re-laid as four of 93: the row is the same
+			 * 372 wide it was and the window does not grow by a point. */
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_COUPLE_BUY), SetMinimalSize(93, 12), SetFill(1, 0),
+													SetStringTip(STR_ORDER_COUPLE_BUY_OFF, STR_ORDER_COUPLE_BUY_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 

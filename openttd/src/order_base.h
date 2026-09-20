@@ -264,6 +264,26 @@ private:
 	bool couple_found_rake = false;
 
 	/**
+	 * The wagon this order buys when the depot it collects from has not got
+	 * enough of them, and #couple_buy_wagons, which says whether it buys at
+	 * all.
+	 *
+	 * The player's design: early on there are no wagons in circulation to
+	 * collect, so a shunter working a yard buys what it is short of and
+	 * couples that; once enough of them are going round, the player turns the
+	 * buying off and the same order goes on collecting what comes back. The
+	 * model is picked from the ordinary purchase list, which opens showing
+	 * wagons only and already filtered to #couple_cargo -- so what is bought
+	 * can always carry what the order asked for, and it is bought already
+	 * fitted for it.
+	 *
+	 * The model stays written down when the buying is switched off, so
+	 * switching it back on needs no second trip to the purchase list.
+	 */
+	EngineID couple_buy_engine = EngineID::Invalid();
+	bool couple_buy_wagons = false;
+
+	/**
 	 * Which station's cargo the wagons this order puts down are to load while
 	 * they stand and wait for somebody to collect them.
 	 *
@@ -459,6 +479,18 @@ public:
 
 	/** Set whether this couple order founds and grows a rake. */
 	inline void SetFoundRake(bool found) { this->couple_found_rake = found; }
+
+	/** Which wagon this order buys when the depot is short of them; EngineID::Invalid() for none chosen. */
+	inline EngineID GetCoupleBuyEngine() const { return this->couple_buy_engine; }
+
+	/** Set which wagon this order buys when the depot is short of them. */
+	inline void SetCoupleBuyEngine(EngineID engine) { this->couple_buy_engine = engine; }
+
+	/** Does this order buy wagons in the depot when there are not enough to collect? */
+	inline bool ShouldBuyWagons() const { return this->couple_buy_wagons; }
+
+	/** Set whether this order buys wagons when there are not enough to collect. */
+	inline void SetBuyWagons(bool buy) { this->couple_buy_wagons = buy; }
 
 	/** Is the couple count a minimum -- any rake of at least that many vehicles will do -- rather than an exact size? */
 	inline bool IsCoupleCountMinimum() const { return this->couple_min; }

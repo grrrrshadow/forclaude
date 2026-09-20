@@ -1322,7 +1322,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * a rake of stored wagons. */
 			if (mof != MOF_NON_STOP && mof != MOF_DEPOT_ACTION && mof != MOF_TURN_AROUND_DEPOT && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_GOTO_COUPLE &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND &&
-					mof != MOF_SELL_DECOUPLED) return CMD_ERROR;
+					mof != MOF_SELL_DECOUPLED && mof != MOF_COUPLE_BUY) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_WAYPOINT:
@@ -1494,6 +1494,22 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 		case MOF_SELL_DECOUPLED:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
 			break;
+
+		case MOF_COUPLE_BUY: {
+			/* Wagons are bought in a shed, so this belongs to a depot order and
+			 * only to one that is going there to collect: buying is what it
+			 * does when it finds too few, and an order that collects nothing
+			 * has nothing to be short of. */
+			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_DEPOT)) return CMD_ERROR;
+			if (data == EngineID::Invalid().base()) break; // switching the buying off needs no model
+			if (data > EngineID::Invalid().base()) return CMD_ERROR;
+			const Engine *e = Engine::GetIfValid(static_cast<EngineID>(data));
+			if (e == nullptr || e->type != VehicleType::Train) return CMD_ERROR;
+			/* A wagon, because what the order is short of is wagons. */
+			if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return CMD_ERROR;
+			if (!e->company_avail.Test(v->owner)) return CMD_ERROR;
+			break;
+		}
 
 		case MOF_COUPLE_FOUND:
 			/* Rakes are founded on platforms, in the open; a shed is a store. */
@@ -1717,6 +1733,21 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			case MOF_DECOUPLE_WHOLE:
 				order->SetDecoupleWholeTrain(data != 0);
 				break;
+
+			case MOF_COUPLE_BUY: {
+				/* One press does both: picking a model switches the buying on,
+				 * and letting go of the model switches it off. The model is
+				 * kept when it is switched off, so turning it back on needs no
+				 * second trip to the purchase list. */
+				EngineID chosen = static_cast<EngineID>(data);
+				if (chosen == EngineID::Invalid()) {
+					order->SetBuyWagons(false);
+				} else {
+					order->SetCoupleBuyEngine(chosen);
+					order->SetBuyWagons(true);
+				}
+				break;
+			}
 
 			case MOF_SELL_DECOUPLED:
 				order->SetSellDecoupled(data != 0);

@@ -5152,6 +5152,13 @@ STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Odvézt 
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vozů: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vozů: libovolně
 STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Jedno číslo a tři způsoby, jak ho číst. Bez zamáčknutého čudlíku to je připojit řadu o přesně tolika vozech, 0 = kterákoli řada. „Minimálně" vezme řadu, jakmile dorostla na tolik vozů a víc, takže rozestavěná se nechá dorůst. „Maximálně" je řada nejvýš o tolika vozech, 0 = kolik se vejde na nástupiště. „Založit řadu" — co dělat, když není co připojit, čekat nebo i tak odpojit, to znamená nepřipojit nic a místo toho položit svoje vozy jako začátek řady, maximálně číslo je maximální délka, pak čeká až bude možné připojit nebo založit. Bere se vždy celá řada; nechat část řady stát umí příkaz odpojit na tom samém nástupišti. OK potvrzuje číslo i čudlíky najednou. Je vhodné použít směrování nástupišť.
+STR_ORDER_COUPLE_BUY_OFF                                        :{BLACK}Koupit: ne
+STR_ORDER_COUPLE_BUY_ON                                         :{BLACK}Koupit: {ENGINE}
+STR_ORDER_COUPLE_BUY_TOOLTIP                                    :{BLACK}Jaký vagon tenhle rozkaz koupí, když jich v depu není dost. Koupí, co mu chybí, rovnou přestavěné na náklad, který chce filtr, a připojí to. Zmáčkni a vyber vagon ze seznamu; dalším zmáčknutím nakupování vypneš a vybraný typ zůstane zapsaný na příště
+STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(koupit typ {ENGINE})
+STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Který vagon připojit
+STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Připojit tenhle
+STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Zapíše tenhle vagon do rozkazu. Rozkaz ho koupí vždycky, když v depu chybí, přestaví ho na náklad z filtru a připojí
 STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má mít připojovaná řada (0 - libovolně)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
