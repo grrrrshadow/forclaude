@@ -201,6 +201,8 @@ static const StringID _order_board_mode_dropdown[] = {
 	STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE,
 	STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT,
 	STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE,
+	STR_ORDER_BOARD_MODE_PLANE_TO_NEXT,
+	STR_ORDER_BOARD_MODE_SHIP_TO_NEXT,
 	STR_ORDER_BOARD_MODE_NONE,
 };
 
@@ -210,6 +212,8 @@ static const OrderBoardMode _order_board_mode_values[] = {
 	OrderBoardMode::TrainAnywhere,
 	OrderBoardMode::WagonsToNext,
 	OrderBoardMode::WagonsAnywhere,
+	OrderBoardMode::PlaneToNext,
+	OrderBoardMode::ShipToNext,
 	OrderBoardMode::None,
 };
 

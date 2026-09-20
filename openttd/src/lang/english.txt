@@ -4721,6 +4721,8 @@ STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED                          :{LTBLUE}Called 
 STR_VEHICLE_STATUS_RESCUE_NO_PATH                               :{LTBLUE}Called out, cannot find a route to the casualty
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Towing a train to a depot
 STR_VEHICLE_STATUS_ON_TRAIN                                     :{ORANGE}Riding on train {COMMA}
+STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Riding on ship {COMMA}
+STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Riding on aircraft {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Waiting for a train to board
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Coupled up, but no depot within reach
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping
@@ -4964,8 +4966,10 @@ STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :{BLACK}By train
 STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :{BLACK}By train or shunter, wherever it goes
 STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}On wagons meant for my next stop
 STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}On any wagons, wherever they go
+STR_ORDER_BOARD_MODE_PLANE_TO_NEXT                              :{BLACK}To my next stop by air
+STR_ORDER_BOARD_MODE_SHIP_TO_NEXT                               :{BLACK}To my next stop by ship
 STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}Carriage of road vehicles by rail: not used
-STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}How this vehicle gets itself carried on from this station: by a train that goes where it is going, by any train or shunter standing here, on wagons that were left here for where it is going, or on any wagons standing here. Chosen one at a time -- picking one is picking one. Last in the list is not at all, and then it drives on by road
+STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}How this vehicle gets itself carried on from this station: by a train that goes where it is going, by any train or shunter standing here, on wagons that were left here for where it is going, on any wagons standing here, or by an aircraft or a ship that goes where it is going. Chosen one at a time -- picking one is picking one. There is no "wherever it goes" by air or sea, because a vehicle put down at the wrong port has no rails to be shunted along. Last in the list is not at all, and then it drives on by road
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Leave part of the train behind in this depot, stored. How much is left is set in the box that appears
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Wagons: any
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Wagons: empty
@@ -5005,6 +5009,8 @@ STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_TO_NEXT                       :{SPACE}(by trai
 STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_ANYWHERE                      :{SPACE}(by train, anywhere)
 STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_TO_NEXT                      :{SPACE}(on wagons, to the next stop)
 STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_ANYWHERE                     :{SPACE}(on wagons, anywhere)
+STR_ORDER_BOARD_MODE_SUFFIX_PLANE_TO_NEXT                       :{SPACE}(by air, to the next stop)
+STR_ORDER_BOARD_MODE_SUFFIX_SHIP_TO_NEXT                        :{SPACE}(by ship, to the next stop)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(and keep {NUM})
 STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX                            :, and load the dropped ones for {STATION}
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX                                 :{SPACE}(keep {NUM})

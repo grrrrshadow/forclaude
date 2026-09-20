@@ -15,6 +15,7 @@
 #include "fileio_func.h"
 #include "engine_func.h"
 #include "engine_base.h"
+#include "road_on_rail.h"
 #include "newgrf_spritegroup.h"
 #include "bridge.h"
 #include "town.h"
@@ -874,13 +875,17 @@ static void CalculateRefitMasks()
  * a wagon get the bit too, so that a refit of the wagon carries them along
  * (RefitVehicle() refits a vehicle part by part, each by its own mask).
  *
+ * Ships and aircraft are offered it too, as far as they can carry anything
+ * (CanCarryRoadVehicles()): the player asked that any of them be usable, not
+ * one special vessel per climate the way a car-carrying wagon would have been.
+ *
  * Done after CalculateRefitMasks() and not in it, on purpose: that function
  * picks a wagon's default cargo from its mask when the set's own choice is
  * not in this game, and disables the wagon when nothing is left -- a bit
  * added before that would have made a wagon with no cargo of its own a
  * buildable car carrier by accident.
  */
-static void OfferRoadVehiclesToAllWagons()
+static void OfferRoadVehiclesToCarriers()
 {
 	if (!IsValidCargoType(_road_vehicle_cargo)) {
 		/* The cargo is not in this game at all, so no wagon can be fitted and
@@ -892,8 +897,7 @@ static void OfferRoadVehiclesToAllWagons()
 		return;
 	}
 	for (Engine *e : Engine::Iterate()) {
-		if (e->type != VehicleType::Train) continue;
-		if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+		if (!CanCarryRoadVehicles(e)) continue;
 		e->info.refit_mask.Set(_road_vehicle_cargo);
 	}
 }
@@ -2173,7 +2177,7 @@ static void AfterLoadGRFs()
 	ApplyWagonCargoException();
 
 	/* Every rail wagon may carry a road vehicle. */
-	OfferRoadVehiclesToAllWagons();
+	OfferRoadVehiclesToCarriers();
 
 	/* No NewGRF gets a say in how its trains turn round. */
 	IgnoreNewGRFReversingFlags();

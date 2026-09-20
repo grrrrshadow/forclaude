@@ -11,6 +11,11 @@
 #include "road_on_rail.h"
 #include "roadveh.h"
 #include "train.h"
+#include "ship.h"
+#include "aircraft.h"
+#include "engine_base.h"
+#include "engine_func.h"
+#include "newgrf_engine.h"
 #include "cargotype.h"
 #include "cargopacket.h"
 #include "station_base.h"
@@ -47,6 +52,16 @@ int _carried_z_offset = 4;
 static const int ROAD_VEHICLE_NOSE = 3;
 
 /**
+ * How much of a ship's own capacity one road vehicle takes up, and how much an
+ * aircraft has to hold before it carries one at all. Two numbers chosen
+ * against the game's own vehicles: at 40 the small ferry takes two cars and the
+ * largest tanker eight, and at 60 the smallest aeroplanes are left out of the
+ * fitting while everything from the second one up takes its single car.
+ */
+static const uint SHIP_CAPACITY_PER_ROAD_VEHICLE = 40;
+static const uint AIRCRAFT_CAPACITY_FOR_ONE_ROAD_VEHICLE = 60;
+
+/**
  * How long a wagon is, counting the pieces a set builds one wagon out of: a
  * long wagon is a short visible head with invisible articulated pieces behind
  * it (CZTR's freight wagons are 3 + 8 + 3 long), and it is the whole of them
@@ -61,6 +76,65 @@ static uint WagonUnitLength(const Train *wagon)
 		length += p->gcache.cached_veh_length;
 	}
 	return length;
+}
+
+/**
+ * How many road vehicles a vehicle of this engine carries when it is fitted
+ * for them (CT_ROLA).
+ *
+ * A wagon carries one: one wagon, one vehicle, and the wagon's own length then
+ * says whether a lorry and trailer fits on it (see FindTrainToBoard()). A ship
+ * carries one for every 40 of whatever it otherwise holds, which puts the
+ * game's own ships between two (a small ferry) and eight (the largest tanker)
+ * and scales with a set's ships without knowing any of their names. An
+ * aircraft carries exactly one, and only if it is big enough to be worth it --
+ * the player asked for one car per aircraft, and a four-seater is not a car
+ * ferry.
+ *
+ * Whatever comes out as none is never offered the fitting at all
+ * (CanCarryRoadVehicles()), so the purchase list never shows a ship that would
+ * carry nothing.
+ *
+ * @param e the engine
+ * @param v the vehicle being asked about, or nullptr for the purchase list
+ * @return how many road vehicles it carries
+ */
+uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v)
+{
+	switch (e->type) {
+		case VehicleType::Train:
+			return (v != nullptr && v->IsArticulatedPart()) ? 0 : 1;
+
+		case VehicleType::Ship:
+			return GetEngineProperty(e->index, PROP_SHIP_CARGO_CAPACITY, e->VehInfo<ShipVehicleInfo>().capacity, v) / SHIP_CAPACITY_PER_ROAD_VEHICLE;
+
+		case VehicleType::Aircraft:
+			return GetEngineProperty(e->index, PROP_AIRCRAFT_PASSENGER_CAPACITY, e->VehInfo<AircraftVehicleInfo>().passenger_capacity, v) >= AIRCRAFT_CAPACITY_FOR_ONE_ROAD_VEHICLE ? 1 : 0;
+
+		default:
+			return 0;
+	}
+}
+
+/**
+ * May a vehicle of this engine be fitted for road vehicles at all?
+ * @param e the engine
+ * @return whether the fitting is offered for it
+ */
+bool CanCarryRoadVehicles(const Engine *e)
+{
+	if (!IsValidCargoType(_road_vehicle_cargo)) return false;
+	switch (e->type) {
+		case VehicleType::Train:
+			return e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
+
+		case VehicleType::Ship:
+		case VehicleType::Aircraft:
+			return RoadVehiclesCarriedBy(e, nullptr) > 0;
+
+		default:
+			return false;
+	}
 }
 
 /**
@@ -357,6 +431,140 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 }
 
 /**
+ * How many road vehicles are riding on this ship or aircraft.
+ *
+ * A wagon carries one and says so in a link of its own (Train::carrying),
+ * because its picture has to be drawn with the lorry on it every tick. A ship
+ * carries several and draws none of them, so it keeps no list: the vehicles
+ * themselves say where they are (RoadVehicle::carried_by), and counting them
+ * is asked only when one wants to get on, never in a tick.
+ *
+ * @param carrier the ship or aircraft
+ * @return how many are aboard
+ */
+static uint RoadVehiclesAboard(const Vehicle *carrier)
+{
+	uint aboard = 0;
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine()) continue;
+		if (rv->carried_by == carrier->index) aboard++;
+	}
+	return aboard;
+}
+
+/**
+ * Say in a ship's or aircraft's cargo that one more road vehicle is riding on
+ * it, the way MirrorRideAsCargo() does for a wagon: one unit of CT_ROLA per
+ * vehicle, so that the vessel fills up and reads as full to everything that
+ * asks, and the player sees how many cars are aboard without any of them being
+ * drawn.
+ * @param carrier the ship or aircraft
+ * @param station the station the vehicle got on at
+ */
+static void AddRideMirror(Vehicle *carrier, StationID station)
+{
+	if (carrier->cargo_type != _road_vehicle_cargo) return;
+	if (!CargoPacket::CanAllocateItem()) return;
+	carrier->cargo.Append(CargoPacket::Create(station, 1, Source{}));
+}
+
+/**
+ * One road vehicle has got off: one unit of the mirror goes with it.
+ * @param carrier the ship or aircraft
+ */
+static void RemoveRideMirror(Vehicle *carrier)
+{
+	if (carrier->cargo_type != _road_vehicle_cargo) return;
+	carrier->cargo.Truncate(1);
+}
+
+/**
+ * Is this ship or aircraft standing at the station, loading, with room for one
+ * more road vehicle and orders that take it where the vehicle wants to go?
+ *
+ * "Standing at the station" is its own loading state rather than the walk over
+ * the station's tiles a train needs: a ship at a dock and an aircraft at an
+ * airport are at the station by being there at all, and the loading state is
+ * what says they have not left yet.
+ *
+ * @param rv      the road vehicle at the stop
+ * @param station the station it is at
+ * @param next    the station its next order names
+ * @param type    ship or aircraft
+ * @param[out] why what to say when none is found
+ * @return the ship or aircraft, or nullptr
+ */
+static Vehicle *FindVesselToBoard(const RoadVehicle *rv, StationID station, StationID next, VehicleType type, std::string &why)
+{
+	why = type == VehicleType::Ship ? "u pristavu nestoji zadna lod" : "na letisti nestoji zadne letadlo";
+
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (v->type != type || v->owner != rv->owner) continue;
+		if (!v->IsPrimaryVehicle()) continue;
+		if (v->vehstatus.Test(VehState::Crashed) || v->vehstatus.Test(VehState::Stopped)) continue;
+		if (!v->current_order.IsType(OT_LOADING) || v->last_station_visited != station) continue;
+
+		if (v->cargo_type != _road_vehicle_cargo || v->cargo_cap == 0) {
+			why = type == VehicleType::Ship ?
+					fmt::format("lod {} stoji, ale neni prestavena na auta", v->unitnumber) :
+					fmt::format("letadlo {} stoji, ale neni prestavene na auta", v->unitnumber);
+			continue;
+		}
+
+		bool goes = false;
+		for (const Order &o : v->Orders()) {
+			if (o.IsType(OT_GOTO_STATION) && o.GetDestination().ToStationID() == next) {
+				goes = true;
+				break;
+			}
+		}
+		if (!goes) {
+			why = type == VehicleType::Ship ?
+					fmt::format("lod {} stoji, ale nejede do stanice {}", v->unitnumber, next) :
+					fmt::format("letadlo {} stoji, ale nejede do stanice {}", v->unitnumber, next);
+			continue;
+		}
+
+		if (RoadVehiclesAboard(v) >= v->cargo_cap) {
+			why = type == VehicleType::Ship ?
+					fmt::format("lod {} stoji, ale je plna aut ({})", v->unitnumber, v->cargo_cap) :
+					fmt::format("letadlo {} stoji, ale je plne ({})", v->unitnumber, v->cargo_cap);
+			continue;
+		}
+
+		return v;
+	}
+	return nullptr;
+}
+
+/**
+ * Put a road vehicle riding on a ship or an aircraft where the vessel is, and
+ * out of sight.
+ *
+ * Nothing of it is drawn: the player asked for the cars to disappear into the
+ * vessel and be no more than "the ship is full" until they are put down again.
+ * It is still put where the vessel is rather than left where it got on, so
+ * that everything that asks a vehicle where it is -- the viewport lists, the
+ * "follow this vehicle" button, the map -- gets an answer that is not a lie.
+ *
+ * @param rv      the road vehicle, front of its chain
+ * @param carrier the ship or aircraft
+ */
+static void RideInside(RoadVehicle *rv, const Vehicle *carrier)
+{
+	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+		u->tile = carrier->tile;
+		u->x_pos = carrier->x_pos;
+		u->y_pos = carrier->y_pos;
+		u->z_pos = carrier->z_pos;
+		u->direction = carrier->direction;
+		u->vehstatus.Set(VehState::Hidden);
+		u->UpdatePosition();
+		u->UpdateViewport(true, true);
+	}
+}
+
+/**
  * Board a train, if one is standing at the platform with room and going the
  * right way. Asked from the road vehicle's loading stop, once its loading is
  * done (see Vehicle::HandleLoading()).
@@ -390,11 +598,22 @@ bool TryBoardTrain(RoadVehicle *rv)
 		return false;
 	}
 
+	/* Rails, water or air: which of them was asked for decides what is looked
+	 * for at this station. A ship and an aircraft are only ever taken towards
+	 * the next stop, so there is no question about where they are going beyond
+	 * asking their order lists. */
+	OrderBoardMode mode = rv->current_order.GetBoardMode();
 	Train *wagon = nullptr;
 	std::string why;
-	Train *t = FindTrainToBoard(rv, rv->last_station_visited, target, rv->current_order.GetBoardMode(), &wagon, why);
-	if (t == nullptr) {
-		SayRoad(rv, fmt::format("Auto {}: ceka na vlak ve stanici {} (dal do {}) - {}", rv->unitnumber, rv->last_station_visited,
+	Vehicle *carrier = nullptr;
+	if (mode == OrderBoardMode::ShipToNext || mode == OrderBoardMode::PlaneToNext) {
+		carrier = FindVesselToBoard(rv, rv->last_station_visited, target,
+				mode == OrderBoardMode::ShipToNext ? VehicleType::Ship : VehicleType::Aircraft, why);
+	} else {
+		carrier = FindTrainToBoard(rv, rv->last_station_visited, target, mode, &wagon, why);
+	}
+	if (carrier == nullptr) {
+		SayRoad(rv, fmt::format("Auto {}: ceka na odvoz ve stanici {} (dal do {}) - {}", rv->unitnumber, rv->last_station_visited,
 				target == StationID::Invalid() ? -1 : (int)target.base(), why));
 		return false;
 	}
@@ -429,21 +648,68 @@ bool TryBoardTrain(RoadVehicle *rv)
 	rv->subspeed = 0;
 	rv->path.clear();
 
-	rv->carried_by = wagon->index;
-	wagon->carrying = rv->index;
-	MirrorRideAsCargo(wagon, rv->last_station_visited);
-	FollowWagon(rv, wagon);
+	/* What carries it, which on rails is the wagon and not the train: the link
+	 * back (Train::carrying) is the wagon's, and the two have to name each
+	 * other or the ride's own tick finds nothing underneath it. */
+	rv->carried_by = (wagon != nullptr) ? wagon->index : carrier->index;
+	if (wagon != nullptr) {
+		/* On a wagon it rides in the open, on the deck, and is drawn there. */
+		wagon->carrying = rv->index;
+		MirrorRideAsCargo(wagon, rv->last_station_visited);
+		FollowWagon(rv, wagon);
+	} else {
+		/* In a ship or an aircraft it rides inside, out of sight, and the only
+		 * sign of it is that the vessel is that much fuller. */
+		AddRideMirror(carrier, rv->last_station_visited);
+		RideInside(rv, carrier);
+	}
 
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "Auto {}: nalozeno na vlak {} (vagon {}) ve stanici {}, vystoupi ve stanici {} (tik {})",
-				rv->unitnumber, t->unitnumber, wagon->index, rv->last_station_visited,
+		IConsolePrint(CC_INFO, "Auto {}: nalozeno na {} {}{} ve stanici {}, vystoupi ve stanici {} (tik {})",
+				rv->unitnumber,
+				wagon != nullptr ? "vlak" : (carrier->type == VehicleType::Ship ? "lod" : "letadlo"),
+				carrier->unitnumber,
+				wagon != nullptr ? fmt::format(" (vagon {})", wagon->index) : std::string{},
+				rv->last_station_visited,
 				target == StationID::Invalid() ? -1 : (int)target.base(), TimerGameTick::counter);
 	}
 
 	InvalidateWindowData(WindowClass::VehicleView, rv->index);
-	InvalidateWindowData(WindowClass::VehicleView, t->index);
-	SetWindowDirty(WindowClass::VehicleDetails, t->index);
+	InvalidateWindowData(WindowClass::VehicleView, carrier->index);
+	SetWindowDirty(WindowClass::VehicleDetails, carrier->index);
 	return true;
+}
+
+/**
+ * Find a road stop of this station that the whole of this road vehicle fits
+ * into, the way it would fit when driving in off the road.
+ * @param rv        the road vehicle, front of its chain
+ * @param dest      the station to get out at
+ * @param[out] stop the stop's tile
+ * @param[out] into the way it drives in
+ * @return whether one was found
+ */
+static bool FindFreeStop(const RoadVehicle *rv, StationID dest, TileIndex *stop, Trackdir *into)
+{
+	const Station *st = Station::GetIfValid(dest);
+	if (st == nullptr) return false;
+
+	for (const RoadStop *rs = st->GetPrimaryRoadStop(rv); rs != nullptr; rs = rs->GetNextRoadStop(rv)) {
+		if (IsBayRoadStopTile(rs->xy)) {
+			/* Driven into against the way it faces, like every vehicle that
+			 * uses it. */
+			if (rs->IsEntranceBusy() || !rs->HasFreeBay()) continue;
+			*into = DiagDirToDiagTrackdir(ReverseDiagDir(GetBayRoadStopDir(rs->xy)));
+		} else {
+			DiagDirection along = AxisToDiagDir(GetDriveThroughStopAxis(rs->xy));
+			const RoadStop::Entry &entry = rs->GetEntry(along);
+			if (entry.GetOccupied() + rv->gcache.cached_total_length > entry.GetLength()) continue;
+			*into = DiagDirToDiagTrackdir(along);
+		}
+		*stop = rs->xy;
+		return true;
+	}
+	return false;
 }
 
 /**
@@ -498,36 +764,73 @@ static bool TryLeaveTrain(RoadVehicle *rv, Train *wagon)
 	 * wagon's own cargo (see MirrorRideAsCargo()), so the ride carries it. */
 	if (dest == wagon->cargo.GetFirstStation()) return false;
 
-	const Station *st = Station::Get(dest);
-	for (const RoadStop *rs = st->GetPrimaryRoadStop(rv); rs != nullptr; rs = rs->GetNextRoadStop(rv)) {
-		Trackdir into;
-		if (IsBayRoadStopTile(rs->xy)) {
-			/* Driven into against the way it faces, like every vehicle that
-			 * uses it. */
-			if (rs->IsEntranceBusy() || !rs->HasFreeBay()) continue;
-			into = DiagDirToDiagTrackdir(ReverseDiagDir(GetBayRoadStopDir(rs->xy)));
-		} else {
-			DiagDirection along = AxisToDiagDir(GetDriveThroughStopAxis(rs->xy));
-			const RoadStop::Entry &entry = rs->GetEntry(along);
-			if (entry.GetOccupied() + rv->gcache.cached_total_length > entry.GetLength()) continue;
-			into = DiagDirToDiagTrackdir(along);
-		}
+	TileIndex stop = INVALID_TILE;
+	Trackdir into = Trackdir::Invalid;
+	if (!FindFreeStop(rv, dest, &stop, &into)) return false;
 
-		wagon->carrying = VehicleID::Invalid();
-		rv->carried_by = VehicleID::Invalid();
-		ClearRideMirror(wagon);
-		PlaceRoadVehicleAtStopEntrance(rv, rs->xy, into);
+	wagon->carrying = VehicleID::Invalid();
+	rv->carried_by = VehicleID::Invalid();
+	ClearRideMirror(wagon);
+	PlaceRoadVehicleAtStopEntrance(rv, stop, into);
 
-		if (_show_train_orientation) {
-			IConsolePrint(CC_INFO, "Auto {}: slozeno z vlaku {} ve stanici {} na ({},{}) (tik {})",
-					rv->unitnumber, t->unitnumber, dest, TileX(rs->xy), TileY(rs->xy), TimerGameTick::counter);
-		}
-		InvalidateWindowData(WindowClass::VehicleView, rv->index);
-		InvalidateWindowData(WindowClass::VehicleView, t->index);
-		SetWindowDirty(WindowClass::VehicleDetails, t->index);
-		return true;
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Auto {}: slozeno z vlaku {} ve stanici {} na ({},{}) (tik {})",
+				rv->unitnumber, t->unitnumber, dest, TileX(stop), TileY(stop), TimerGameTick::counter);
 	}
-	return false;
+	InvalidateWindowData(WindowClass::VehicleView, rv->index);
+	InvalidateWindowData(WindowClass::VehicleView, t->index);
+	SetWindowDirty(WindowClass::VehicleDetails, t->index);
+	return true;
+}
+
+/**
+ * Get out of a ship or an aircraft, onto one of the station's road stops.
+ *
+ * Only ever at the station the vehicle's own next order names, and only while
+ * the vessel is there and loading. There is no "put everything down here" the
+ * way a train has one: a car left at the wrong port has no rails to be shunted
+ * along and nothing coming to fetch it, which is the whole reason boarding a
+ * ship or an aircraft is only ever offered towards the next stop.
+ *
+ * A station with no free road stop -- or none at all -- keeps the car aboard,
+ * and it says so. It rides on to wherever the vessel goes next and tries again
+ * when the vessel is back; nothing is ever dropped into the sea.
+ *
+ * @param rv      the road vehicle
+ * @param carrier the ship or aircraft it rides in
+ * @return whether it got out
+ */
+static bool TryLeaveVessel(RoadVehicle *rv, Vehicle *carrier)
+{
+	if (!carrier->current_order.IsType(OT_LOADING)) return false;
+	if (carrier->last_station_visited == StationID::Invalid()) return false;
+	if (!rv->current_order.IsType(OT_GOTO_STATION)) return false;
+
+	StationID dest = rv->current_order.GetDestination().ToStationID();
+	if (dest != carrier->last_station_visited) return false;
+
+	TileIndex stop = INVALID_TILE;
+	Trackdir into = Trackdir::Invalid;
+	if (!FindFreeStop(rv, dest, &stop, &into)) {
+		SayRoad(rv, fmt::format("Auto {}: ceka v {} {} ve stanici {} - neni volna zastavka",
+				rv->unitnumber, carrier->type == VehicleType::Ship ? "lodi" : "letadle", carrier->unitnumber, dest));
+		return false;
+	}
+
+	rv->carried_by = VehicleID::Invalid();
+	RemoveRideMirror(carrier);
+	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) u->vehstatus.Reset(VehState::Hidden);
+	PlaceRoadVehicleAtStopEntrance(rv, stop, into);
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Auto {}: slozeno z {} {} ve stanici {} na ({},{}) (tik {})",
+				rv->unitnumber, carrier->type == VehicleType::Ship ? "lodi" : "letadla", carrier->unitnumber,
+				dest, TileX(stop), TileY(stop), TimerGameTick::counter);
+	}
+	InvalidateWindowData(WindowClass::VehicleView, rv->index);
+	InvalidateWindowData(WindowClass::VehicleView, carrier->index);
+	SetWindowDirty(WindowClass::VehicleDetails, carrier->index);
+	return true;
 }
 
 /**
@@ -544,22 +847,30 @@ static bool TryLeaveTrain(RoadVehicle *rv, Train *wagon)
  */
 bool CarriedRoadVehicleTick(RoadVehicle *rv)
 {
-	Train *wagon = Train::GetIfValid(rv->carried_by);
-	if (wagon == nullptr || wagon->carrying != rv->index) {
-		LogAnomaly("Auto {}: vagon, na kterem se vezlo, uz neexistuje - auto zaniklo na ({},{})",
+	Vehicle *carrier = Vehicle::GetIfValid(rv->carried_by);
+	Train *wagon = (carrier != nullptr && carrier->type == VehicleType::Train) ? Train::From(carrier) : nullptr;
+	bool lost = carrier == nullptr || (wagon != nullptr && wagon->carrying != rv->index);
+	if (!lost && wagon == nullptr && carrier->type != VehicleType::Ship && carrier->type != VehicleType::Aircraft) lost = true;
+	if (lost) {
+		LogAnomaly("Auto {}: to, na cem se vezlo, uz neexistuje - auto zaniklo na ({},{})",
 				rv->unitnumber, TileX(rv->tile), TileY(rv->tile));
 		rv->carried_by = VehicleID::Invalid();
 		delete rv;
 		return false;
 	}
 
-	FollowWagon(rv, wagon);
+	if (wagon != nullptr) {
+		FollowWagon(rv, wagon);
 
-	/* Asked every tick: a train with nothing to load stands at a platform for
-	 * a couple of ticks and is gone, and a look every sixteen ticks rode past
-	 * the station every time. Cheap enough -- the walk over the station's
-	 * stops only happens once the train is standing at the right station. */
-	TryLeaveTrain(rv, wagon);
+		/* Asked every tick: a train with nothing to load stands at a platform for
+		 * a couple of ticks and is gone, and a look every sixteen ticks rode past
+		 * the station every time. Cheap enough -- the walk over the station's
+		 * stops only happens once the train is standing at the right station. */
+		TryLeaveTrain(rv, wagon);
+	} else {
+		RideInside(rv, carrier);
+		TryLeaveVessel(rv, carrier);
+	}
 	return true;
 }
 
@@ -610,15 +921,57 @@ void UnlinkCarriedRoadVehicle(Train *wagon)
 }
 
 /**
- * The road vehicle is going away: the wagon it rode on is empty again.
+ * The road vehicle is going away: whatever carried it has that much room
+ * again -- the wagon it stood on, or the ship or aircraft it sat inside.
  * @param rv the road vehicle being deleted
  */
-void UnlinkFromWagon(RoadVehicle *rv)
+void UnlinkFromCarrier(RoadVehicle *rv)
 {
-	Train *wagon = Train::GetIfValid(rv->carried_by);
-	if (wagon != nullptr && wagon->carrying == rv->index) {
-		wagon->carrying = VehicleID::Invalid();
-		ClearRideMirror(wagon);
+	Vehicle *carrier = Vehicle::GetIfValid(rv->carried_by);
+	if (carrier != nullptr) {
+		if (carrier->type == VehicleType::Train) {
+			Train *wagon = Train::From(carrier);
+			if (wagon->carrying == rv->index) {
+				wagon->carrying = VehicleID::Invalid();
+				ClearRideMirror(wagon);
+			}
+		} else {
+			RemoveRideMirror(carrier);
+		}
 	}
 	rv->carried_by = VehicleID::Invalid();
+}
+
+/**
+ * Does this vehicle carry road vehicles right now? Asked of a whole train, or
+ * of a ship or an aircraft.
+ * @param v the vehicle, its front
+ * @return whether anything is riding on or in it
+ */
+bool CarriesRoadVehicles(const Vehicle *v)
+{
+	if (v->type == VehicleType::Train) return TrainCarriesRoadVehicle(Train::From(v));
+	if (v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) return false;
+	return RoadVehiclesAboard(v) > 0;
+}
+
+/**
+ * The ship or aircraft is going away -- sold, or crashed and cleared -- and
+ * whatever rode inside goes with it. A car inside a vessel is on no road and
+ * has nothing to be put down on, so it goes at once, and the record says so:
+ * a vehicle vanishing is exactly what the record is for.
+ * @param carrier the ship or aircraft
+ */
+void DestroyRoadVehiclesAboard(Vehicle *carrier)
+{
+	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || rv->carried_by != carrier->index) continue;
+		LogAnomaly("Auto {}: zaniklo s {} {} na ({},{})", rv->unitnumber,
+				carrier->type == VehicleType::Ship ? "lodi" : "letadlem", carrier->unitnumber,
+				TileX(carrier->tile), TileY(carrier->tile));
+		rv->carried_by = VehicleID::Invalid();
+		delete rv;
+	}
+	RemoveRideMirror(carrier);
+	carrier->cargo.Truncate();
 }

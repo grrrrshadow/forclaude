@@ -33,6 +33,10 @@
 #include "network/network_admin.h"
 #include "network/network_client.h"
 #include "command_func.h"
+#include "aircraft.h"
+#include "airport.h"
+#include "linkgraph/linkgraphschedule.h"
+#include "timer/timer_game_economy.h"
 #include "settings_func.h"
 #include "settings_internal.h"
 #include "fios.h"
@@ -5288,6 +5292,26 @@ static bool ConTestRoadOrders(std::span<std::string_view> argv)
 			i++;
 		}
 	}
+
+	/* And what there is to ride in: every ship and aircraft fitted for cars,
+	 * because "the car is still waiting" is answered as often by the vessel as
+	 * by the car -- where it is, whether it is standing at a station at all,
+	 * and how full it is. */
+	for (const Vehicle *v : Vehicle::Iterate()) {
+		if (v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) continue;
+		if (!v->IsPrimaryVehicle()) continue;
+		uint aboard = 0;
+		for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+			if (rv->IsFrontEngine() && rv->carried_by == v->index) aboard++;
+		}
+		IConsolePrint(CC_DEFAULT, "{} {}: rozkaz typ {} kam {}, posledni stanice {}, naklad {} kapacita {}, aut {}, stoji {}",
+				v->type == VehicleType::Ship ? "lod" : "letadlo", v->unitnumber,
+				to_underlying(v->current_order.GetType()),
+				v->current_order.IsType(OT_GOTO_STATION) ? (int)v->current_order.GetDestination().ToStationID().base() : -1,
+				v->last_station_visited == StationID::Invalid() ? -1 : (int)v->last_station_visited.base(),
+				v->cargo_type == _road_vehicle_cargo ? "auta" : "jiny", v->cargo_cap, aboard,
+				v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
+	}
 	return true;
 }
 
@@ -9120,6 +9144,444 @@ static bool ConTestNapis(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Build the scene for road vehicles riding in a ship: a canal with a dock at
+ * each end, a road stop of each dock's station beside it, one ship fitted to
+ * carry road vehicles shuttling between them, and road vehicles ordered to
+ * board at the first and get off at the second.
+ *
+ * The water is dug rather than found. A dock needs an inclined tile with water
+ * in front of it, and a map generated flat -- which is what the rig generates,
+ * on purpose (see tests/rig/README.md) -- has neither. So the scene raises two
+ * corners of each dock's tile to make the slope, digs a canal along the row in
+ * front, and builds the docks against it.
+ *
+ * Usage: testautolod [how many road vehicles, 1 by default]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRoadOnWater(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the road-vehicle-in-a-ship scene. Usage: 'testautolod [pocet aut]'.");
+		return true;
+	}
+	uint cars = 1;
+	if (argv.size() >= 2) {
+		auto pcars = ParseInteger(argv[1]);
+		if (!pcars.has_value() || *pcars < 1) return false;
+		cars = (uint)*pcars;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testautolod: only in a running game.");
+		return true;
+	}
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testautolod: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	/* A ship that carries road vehicles at all, and any road vehicle. */
+	EngineID eid_ship = EngineID::Invalid();
+	EngineID eid_road = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Ship)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!CanCarryRoadVehicles(e)) continue;
+		eid_ship = e->index;
+		break;
+	}
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		eid_road = e->index;
+		break;
+	}
+	if (eid_ship == EngineID::Invalid() || eid_road == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testautolod: no ship that carries cars, or no road vehicle.");
+		return true;
+	}
+
+	/* Five rows: the dock land, two rows of canal -- a dock reaches two tiles
+	 * out over the water and refuses to be built with only one -- the road,
+	 * and room for the shed. */
+	static const uint LEN = 30;
+	static const uint DEPTH = 5;
+	TileIndex strip = INVALID_TILE;
+	for (uint y = 4; y + DEPTH < Map::SizeY() - 4 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			bool ok = true;
+			int z = -1;
+			for (uint dy = 0; dy < DEPTH && ok; dy++) {
+				TileIndex t = TileXY(x, y + dy);
+				ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+				if (ok) {
+					if (dy == 0) z = GetTileZ(t); else if (GetTileZ(t) != z) ok = false;
+				}
+			}
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					strip = TileXY(x - LEN + 1, y);
+					break;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testautolod: no flat clear area of {}x{} tiles found.", LEN, DEPTH);
+		return true;
+	}
+	uint x0 = TileX(strip), y0 = TileY(strip);
+	IConsolePrint(CC_DEFAULT, "testautolod: area at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0 + DEPTH - 1);
+
+	/* The canal first, along the row the docks will face. Water is built here,
+	 * not dug: a hole in flat land stays a hole, since nothing floods it
+	 * unless it reaches the sea. */
+	CommandCost canal = Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, TileXY(x0 + 1, y0 + 1), TileXY(x0 + LEN - 2, y0 + 2), WaterClass::Canal, false);
+	if (canal.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: canal failed - {}", RefusalReason(canal));
+		return true;
+	}
+
+	/* Then the shore: a dock wants an inclined tile with water in front of it,
+	 * so the north and west corners of each dock tile go up, which leaves the
+	 * tile falling towards the canal. It has to be done in this order -- the
+	 * corners a tile shares with the water beside it cannot be raised once the
+	 * water is there, and these two are the pair it does not share. */
+	uint dock_ax = x0 + 3;
+	uint dock_bx = x0 + LEN - 4;
+	for (uint x : {dock_ax, dock_bx}) {
+		auto [terra, cost_t, tile_t] = Command<Commands::TerraformLand>::Do(DoCommandFlag::Execute, TileXY(x, y0), SLOPE_NW, true);
+		if (terra.Failed()) {
+			IConsolePrint(CC_ERROR, "testautolod: terraform at ({},{}) failed - {}", x, y0, RefusalReason(terra));
+			return true;
+		}
+	}
+
+	CommandCost dock_a = Command<Commands::BuildDock>::Do(DoCommandFlag::Execute, TileXY(dock_ax, y0), StationID::Invalid(), false);
+	CommandCost dock_b = Command<Commands::BuildDock>::Do(DoCommandFlag::Execute, TileXY(dock_bx, y0), StationID::Invalid(), false);
+	if (dock_a.Failed() || dock_b.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: dock failed - {} / {} (zeme {:#x} v {}, voda {:#x} v {}, voda? {})",
+				RefusalReason(dock_a), RefusalReason(dock_b),
+				(uint)GetTileSlope(TileXY(dock_ax, y0)), GetTileZ(TileXY(dock_ax, y0)),
+				(uint)GetTileSlope(TileXY(dock_ax, y0 + 1)), GetTileZ(TileXY(dock_ax, y0 + 1)),
+				HasTileWaterGround(TileXY(dock_ax, y0 + 1)) ? "ano" : "ne");
+		return true;
+	}
+	StationID id_a = GetStationIndex(TileXY(dock_ax, y0));
+	StationID id_b = GetStationIndex(TileXY(dock_bx, y0));
+
+	/* A ship depot at the far end of the canal, out of the way of the docks. */
+	TileIndex depot = TileXY(x0 + LEN / 2, y0 + 1);
+	CommandCost sd = Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, depot, Axis::X);
+	if (sd.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: ship depot failed - {}", RefusalReason(sd));
+		return true;
+	}
+
+	/* The road along the row behind the canal, with a stop below each dock. */
+	uint road_y = y0 + 3;
+	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, road_y), TileXY(x0 + 1, road_y),
+			ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+	if (road.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: road failed - {}", RefusalReason(road));
+		return true;
+	}
+	bool bus = IsCargoInClass(Engine::Get(eid_road)->GetDefaultCargoType(), CargoClass::Passengers);
+	RoadStopType stop_type = bus ? RoadStopType::Bus : RoadStopType::Truck;
+	CommandCost rs_a = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(dock_ax, road_y), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_a, false);
+	CommandCost rs_b = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(dock_bx, road_y), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_b, false);
+	if (rs_a.Failed() || rs_b.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: road stop failed - {} / {}", RefusalReason(rs_a), RefusalReason(rs_b));
+		return true;
+	}
+	TileIndex road_depot = TileXY(x0 + 6, road_y + 1);
+	CommandCost rd = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, road_depot, ROADTYPE_ROAD, DiagDirection::NW);
+	CommandCost rd_link = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 6, road_y), RoadBits{RoadBit::SE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+	if (rd.Failed() || rd_link.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: road depot failed - {} / {}", RefusalReason(rd), RefusalReason(rd_link));
+		return true;
+	}
+
+	/* The ship, bought fitted for road vehicles, shuttling A - B. */
+	auto [cost_s, veh_s, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_ship, true, _road_vehicle_cargo, ClientID::Invalid);
+	if (cost_s.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: ship failed - {}", RefusalReason(cost_s));
+		return true;
+	}
+	Order ship_to_a{};
+	ship_to_a.MakeGoToStation(id_a);
+	ship_to_a.SetStopLocation(OrderStopLocation::FarEnd);
+	Order ship_to_b{};
+	ship_to_b.MakeGoToStation(id_b);
+	ship_to_b.SetStopLocation(OrderStopLocation::FarEnd);
+	CommandCost ins_sa = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_s, 0, ship_to_a);
+	CommandCost ins_sb = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_s, 1, ship_to_b);
+	if (ins_sa.Failed() || ins_sb.Failed()) {
+		IConsolePrint(CC_ERROR, "testautolod: ship orders refused - {} / {}", RefusalReason(ins_sa), RefusalReason(ins_sb));
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_s, false);
+
+	/* The cars: to the first station and aboard, off at the second. */
+	std::string built;
+	for (uint i = 0; i < cars; i++) {
+		auto [cost_r, veh_r, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_r.Failed()) {
+			IConsolePrint(CC_ERROR, "testautolod: road vehicle failed - {}", RefusalReason(cost_r));
+			return true;
+		}
+		Order car_a{};
+		car_a.MakeGoToStation(id_a);
+		car_a.SetStopLocation(OrderStopLocation::FarEnd);
+		Order car_b{};
+		car_b.MakeGoToStation(id_b);
+		car_b.SetStopLocation(OrderStopLocation::FarEnd);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
+		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_BOARD_MODE, to_underlying(OrderBoardMode::ShipToNext));
+		if (mod.Failed()) {
+			IConsolePrint(CC_ERROR, "testautolod: boarding order refused - {}", RefusalReason(mod));
+			return true;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+		if (!built.empty()) built += ",";
+		built += fmt::format("{}", RoadVehicle::Get(veh_r)->unitnumber);
+	}
+
+	IConsolePrint(CC_DEFAULT, "testautolod: lod {} (mista pro {} aut) vozi auta {} mezi stanicemi {} a {}.",
+			Ship::Get(veh_s)->unitnumber, Ship::Get(veh_s)->cargo_cap, built, id_a, id_b);
+	return true;
+}
+
+/**
+ * Build the scene for road vehicles riding in an aircraft: two small airports
+ * with a road stop of their own station beside each, one aeroplane fitted to
+ * carry road vehicles shuttling between them, and one road vehicle ordered to
+ * board at the first and get off at the second.
+ *
+ * The sister of testautovlak for the air (road_on_rail.h). An aircraft takes
+ * one road vehicle and only ever towards the vehicle's next stop, so there is
+ * no choice of how to board to make here.
+ *
+ * Usage: testautoletadlo
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRoadOnAir(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build the road-vehicle-in-an-aircraft scene. Usage: 'testautoletadlo'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: only in a running game.");
+		return true;
+	}
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testautoletadlo: no company to build as.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	/* The aeroplanes of the earliest years seat too few people to carry a car
+	 * (see RoadVehiclesCarriedBy()), which is the rule working as asked and a
+	 * scene that cannot be built. So the scene moves the calendar on the way
+	 * the date cheat does -- set the date, then let the monthly round introduce
+	 * whatever has been invented by then. */
+	extern void CalendarEnginesMonthlyLoop();
+	if (TimerGameCalendar::year < TimerGameCalendar::Year{1970}) {
+		TimerGameCalendar::YearMonthDay ymd = TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date);
+		TimerGameCalendar::Date moved = TimerGameCalendar::ConvertYMDToDate(TimerGameCalendar::Year{1970}, ymd.month, ymd.day);
+		TimerGameCalendar::SetDate(moved, TimerGameCalendar::date_fract);
+		if (!TimerGameEconomy::UsingWallclockUnits()) {
+			TimerGameEconomy::Date moved_economy{moved.base()};
+			for (Vehicle *v : Vehicle::Iterate()) v->ShiftDates(moved_economy - TimerGameEconomy::date);
+			LinkGraphSchedule::instance.ShiftDates(moved_economy - TimerGameEconomy::date);
+			TimerGameEconomy::SetDate(moved_economy, TimerGameEconomy::date_fract);
+		}
+		CalendarEnginesMonthlyLoop();
+	}
+
+	/* An aeroplane that carries a road vehicle at all (60 seats, see
+	 * RoadVehiclesCarriedBy()) and can use a small airport, and any road
+	 * vehicle to put in it. */
+	EngineID eid_air = EngineID::Invalid();
+	EngineID eid_road = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Aircraft)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (e->VehInfo<AircraftVehicleInfo>().subtype != AIR_CTOL) continue;
+		if (!CanCarryRoadVehicles(e)) continue;
+		eid_air = e->index;
+		break;
+	}
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		eid_road = e->index;
+		break;
+	}
+	if (eid_air == EngineID::Invalid() || eid_road == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: no aeroplane that carries cars, or no road vehicle.");
+		return true;
+	}
+
+	/* Which airport to build: the first kind this year offers that aeroplanes
+	 * can use at all. The small airport is the obvious one and it is also the
+	 * one that stops being available part way through the game -- the very
+	 * years this scene has to move to for an aeroplane big enough to take a
+	 * car -- so the kind cannot be written down here. */
+	uint8_t airport_type = NUM_AIRPORTS;
+	uint ap_w = 0;
+	uint ap_h = 0;
+	for (uint8_t i = 0; i < NUM_AIRPORTS; i++) {
+		const AirportSpec *as = AirportSpec::Get(i);
+		if (!as->IsAvailable() || as->layouts.empty()) continue;
+		if (!GetAirport(i)->flags.Test(AirportFTAClass::Flag::Airplanes)) continue;
+		airport_type = i;
+		ap_w = as->size_x;
+		ap_h = as->size_y;
+		break;
+	}
+	if (airport_type == NUM_AIRPORTS) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: no airport for aeroplanes is available this year.");
+		return true;
+	}
+
+	/* Two airports side by side with a gap between them, and the road along the
+	 * row below. */
+	const uint LEN = 2 * ap_w + 16;
+	const uint DEPTH = ap_h + 2;
+	TileIndex strip = INVALID_TILE;
+	for (uint y = 4; y + DEPTH < Map::SizeY() - 4 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			bool ok = true;
+			int z = -1;
+			for (uint dy = 0; dy < DEPTH && ok; dy++) {
+				TileIndex t = TileXY(x, y + dy);
+				ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+				if (ok) {
+					if (dy == 0) z = GetTileZ(t); else if (GetTileZ(t) != z) ok = false;
+				}
+			}
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					strip = TileXY(x - LEN + 1, y);
+					break;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: no flat clear area of {}x{} tiles found.", LEN, DEPTH);
+		return true;
+	}
+	uint x0 = TileX(strip), y0 = TileY(strip);
+	IConsolePrint(CC_DEFAULT, "testautoletadlo: area at ({},{})..({},{}).", x0, y0, x0 + LEN - 1, y0 + DEPTH - 1);
+
+	TileIndex ap_a = TileXY(x0 + 2, y0);
+	TileIndex ap_b = TileXY(x0 + ap_w + 12, y0);
+	CommandCost air_a = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, ap_a, airport_type, 0, StationID::Invalid(), false);
+	CommandCost air_b = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, ap_b, airport_type, 0, StationID::Invalid(), false);
+	if (air_a.Failed() || air_b.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: airport failed - {} / {}", RefusalReason(air_a), RefusalReason(air_b));
+		return true;
+	}
+	StationID id_a = GetStationIndex(ap_a);
+	StationID id_b = GetStationIndex(ap_b);
+
+	/* The road along the last row, with a stop below each airport joined to
+	 * its station, and a shed to build the car in. */
+	uint road_y = y0 + DEPTH - 1;
+	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, road_y), TileXY(x0 + 1, road_y),
+			ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+	if (road.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: road failed - {}", RefusalReason(road));
+		return true;
+	}
+	bool bus = IsCargoInClass(Engine::Get(eid_road)->GetDefaultCargoType(), CargoClass::Passengers);
+	RoadStopType stop_type = bus ? RoadStopType::Bus : RoadStopType::Truck;
+	CommandCost rs_a = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + 3, road_y), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_a, false);
+	CommandCost rs_b = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + ap_w + 13, road_y), 1, 1, stop_type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, id_b, false);
+	if (rs_a.Failed() || rs_b.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: road stop failed - {} / {}", RefusalReason(rs_a), RefusalReason(rs_b));
+		return true;
+	}
+	TileIndex road_depot = TileXY(x0 + 6, road_y + 1);
+	CommandCost rd = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, road_depot, ROADTYPE_ROAD, DiagDirection::NW);
+	CommandCost rd_link = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 6, road_y), RoadBits{RoadBit::SE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+	if (rd.Failed() || rd_link.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: road depot failed - {} / {}", RefusalReason(rd), RefusalReason(rd_link));
+		return true;
+	}
+
+	/* The aeroplane, bought fitted for road vehicles, shuttling A - B. */
+	const Station *st_a = Station::Get(id_a);
+	auto [cost_p, veh_p, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, st_a->airport.GetHangarTile(0), eid_air, true, _road_vehicle_cargo, ClientID::Invalid);
+	if (cost_p.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: aeroplane failed - {}", RefusalReason(cost_p));
+		return true;
+	}
+	/* Aircraft, like road vehicles, have no choice of where on a platform to
+	 * stop, and the order code insists on the one answer that means that. */
+	Order air_to_a{};
+	air_to_a.MakeGoToStation(id_a);
+	air_to_a.SetStopLocation(OrderStopLocation::FarEnd);
+	Order air_to_b{};
+	air_to_b.MakeGoToStation(id_b);
+	air_to_b.SetStopLocation(OrderStopLocation::FarEnd);
+	CommandCost ins_pa = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_p, 0, air_to_a);
+	CommandCost ins_pb = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_p, 1, air_to_b);
+	if (ins_pa.Failed() || ins_pb.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: aeroplane orders refused - {} / {}", RefusalReason(ins_pa), RefusalReason(ins_pb));
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_p, false);
+
+	/* The car: to the first station and aboard, off at the second. */
+	auto [cost_r, veh_r, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost_r.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: road vehicle failed - {}", RefusalReason(cost_r));
+		return true;
+	}
+	Order car_a{};
+	car_a.MakeGoToStation(id_a);
+	car_a.SetStopLocation(OrderStopLocation::FarEnd);
+	Order car_b{};
+	car_b.MakeGoToStation(id_b);
+	car_b.SetStopLocation(OrderStopLocation::FarEnd);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
+	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
+	CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_BOARD_MODE, to_underlying(OrderBoardMode::PlaneToNext));
+	if (mod.Failed()) {
+		IConsolePrint(CC_ERROR, "testautoletadlo: boarding order refused - {}", RefusalReason(mod));
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
+
+	IConsolePrint(CC_DEFAULT, "testautoletadlo: letadlo {} vozi auto {} mezi stanicemi {} a {}.",
+			Aircraft::Get(veh_p)->unitnumber, RoadVehicle::Get(veh_r)->unitnumber, id_a, id_b);
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -9290,6 +9752,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
+	IConsole::CmdRegister("testautoletadlo",         ConTestRoadOnAir);
+	IConsole::CmdRegister("testautolod",             ConTestRoadOnWater);
 	IConsole::CmdRegister("testauta",                ConTestRoadOrders);
 	IConsole::CmdRegister("log",                     ConAnomalyLog);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);

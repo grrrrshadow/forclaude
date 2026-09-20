@@ -24,6 +24,22 @@
  * road vehicle's own order list, which says where it gets on and where it gets
  * off.
  *
+ * Ships and aircraft carry them too, and differently. A car goes inside rather
+ * than on top: nothing of it is drawn, and the only sign of it is that the
+ * vessel is that much fuller, which is what the player asked for. A ship holds
+ * several -- one for every 40 of whatever it otherwise holds -- and an aircraft
+ * exactly one, and only if it seats 60; the ones that come out at none are
+ * never offered the fitting at all (RoadVehiclesCarriedBy(),
+ * CanCarryRoadVehicles()). A vessel keeps no list of what it carries: the cars
+ * say where they are, and counting them is asked only when one wants to get on.
+ *
+ * Boarding a ship or an aircraft is only ever offered towards the vehicle's own
+ * next stop, never "wherever it goes". A car put down at the wrong port has no
+ * rails to be shunted along and nothing coming to fetch it -- it would simply
+ * be somewhere its driver never meant to be. For the same reason it gets out
+ * only at the station its own order names, and a station with no free road stop
+ * keeps it aboard for another round rather than dropping it into the sea.
+ *
  * Which wagons take one: those refitted to road vehicles, a cargo of our own
  * (CT_ROLA, label "ROLA", after the rolling road) that no industry makes and
  * no station takes. It is a real cargo so that a wagon fitted for it has a
@@ -47,8 +63,13 @@
 
 #include "vehicle_type.h"
 
+struct Engine;
 struct RoadVehicle;
 struct Train;
+struct Vehicle;
+
+uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v);
+bool CanCarryRoadVehicles(const Engine *e);
 
 bool TryBoardTrain(RoadVehicle *rv);
 bool CarriedRoadVehicleTick(RoadVehicle *rv);
@@ -57,6 +78,8 @@ bool IsWaitingToBoardTrain(const RoadVehicle *rv);
 bool TrainCarriesRoadVehicle(const Train *t);
 void DestroyCarriedRoadVehicles(Train *t);
 void UnlinkCarriedRoadVehicle(Train *wagon);
-void UnlinkFromWagon(RoadVehicle *rv);
+void UnlinkFromCarrier(RoadVehicle *rv);
+bool CarriesRoadVehicles(const Vehicle *v);
+void DestroyRoadVehiclesAboard(Vehicle *carrier);
 
 #endif /* ROAD_ON_RAIL_H */

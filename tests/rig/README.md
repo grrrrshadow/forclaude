@@ -343,3 +343,34 @@ choice is split into two, what the scene measured is split with it, and the
 scene has to be told which half it still measures. The battery caught this
 as `autoposun: auto=1` turning into `auto=0`, and nothing in the game was
 wrong.
+
+## Riding in a ship and in an aircraft, and the water the rig has to dig
+
+`testautoletadlo` and `testautolod` are the sisters of `testautovlak` for the
+air and the water: two stations with a road stop of their own beside them, a
+carrier fitted for road vehicles shuttling between them, and cars ordered to
+board at the first and get off at the second. `testautolod` takes a count, so
+`testautolod 2` fills a two-car ship and shows both cars getting on at once --
+the one thing rails never had, since a wagon takes exactly one.
+
+Both scenes have to make their own ground, and neither is as simple as it
+looks:
+
+- **The aircraft scene moves the calendar on.** The aeroplanes of the early
+  years seat too few people to carry a car at all, which is the rule working
+  as asked; the scene therefore sets the date forward the way the date cheat
+  does before it looks for one. It also asks which airport is available in that
+  year rather than naming one, because the small airport -- the obvious choice
+  -- stops being available part way through the game.
+- **The ship scene digs its own canal.** The rig's map is generated as flat as
+  the generator will make it (above), so there is no water and no shore. Water
+  is *built* rather than dug: a hole in flat land stays a hole, since nothing
+  floods it unless it reaches the sea. And a dock needs an inclined tile with
+  **two** tiles of water in front of it, so the canal is two rows wide; with
+  one row it fails with "site unsuitable" and says nothing about which of its
+  half-dozen conditions was the one that failed.
+
+The order in the ship scene matters: canal first, then the shore. The corners
+a tile shares with the water beside it cannot be raised once the water is
+there, and the pair that makes the tile fall towards the water is the pair it
+does not share.

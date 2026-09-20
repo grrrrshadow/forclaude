@@ -4810,6 +4810,8 @@ STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED                          :{LTBLUE}Má vý
 STR_VEHICLE_STATUS_RESCUE_NO_PATH                               :{LTBLUE}Má výjezd, nenachází cestu k případu
 STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuje vlak do depa
 STR_VEHICLE_STATUS_ON_TRAIN                                     :{ORANGE}Veze se vlakem {COMMA}
+STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Veze se lodí {COMMA}
+STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Veze se letadlem {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Čeká na vlak, na který se naloží
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Připojeno, ale žádné depo v dosahu
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje
@@ -5119,8 +5121,10 @@ STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :{BLACK}vlakem n
 STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :{BLACK}vlakem kamkoli-posun
 STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}naložit se na vagony na příští zastávku
 STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}naložit se na vagony kamkoli
+STR_ORDER_BOARD_MODE_PLANE_TO_NEXT                              :{BLACK}do příští stanice letadlem
+STR_ORDER_BOARD_MODE_SHIP_TO_NEXT                               :{BLACK}do příští stanice lodí
 STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}přeprava aut po železnici : nevyužít
-STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}Jak se tohle auto nechá odvézt z téhle stanice: vlakem, který jede tam, kam ono; kterýmkoli vlakem nebo posunovačkou, co tu stojí; vagony, které tu někdo nechal pro stanici, kam ono jede; nebo kterýmikoli vagony, co tu stojí. Vybírá se jedno, ne několik naráz. Poslední v seznamu je nenakládat se vůbec a jet dál po silnici
+STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}Jak se tohle auto nechá odvézt z téhle stanice: vlakem, který jede tam, kam ono; kterýmkoli vlakem nebo posunovačkou, co tu stojí; vagony, které tu někdo nechal pro stanici, kam ono jede; kterýmikoli vagony, co tu stojí; letadlem nebo lodí, které jedou tam, kam ono. Vybírá se jedno, ne několik naráz. U letadla a lodi není „kamkoliv“ — auto vysazené v cizím přístavu nemá koleje, po kterých by ho někdo odtáhl. Poslední v seznamu je nenakládat se vůbec a jet dál po silnici
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
@@ -5160,6 +5164,8 @@ STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_TO_NEXT                       :{SPACE}(vlakem 
 STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_ANYWHERE                      :{SPACE}(vlakem kamkoliv)
 STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_TO_NEXT                      :{SPACE}(vagony na příští zastávku)
 STR_ORDER_BOARD_MODE_SUFFIX_WAGONS_ANYWHERE                     :{SPACE}(vagony kamkoliv)
+STR_ORDER_BOARD_MODE_SUFFIX_PLANE_TO_NEXT                       :{SPACE}(letadlem na příští zastávku)
+STR_ORDER_BOARD_MODE_SUFFIX_SHIP_TO_NEXT                        :{SPACE}(lodí na příští zastávku)
 STR_ORDER_DECOUPLE_SUFFIX                                       :{SPACE}(a nechat si {NUM})
 STR_ORDER_DECOUPLE_CARGO_DEST_SUFFIX                            :, a odpojené naložit pro {STATION}
 STR_ORDER_DECOUPLE_SUFFIX_ALL                                   :{SPACE}(a odpojit vše)

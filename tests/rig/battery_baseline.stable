@@ -13,13 +13,16 @@ skladdve: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 
 koupitpri: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
 filtrspatny: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
 filtropraveny: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
+clanky: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
+clankycouvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
+smes: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
 rad: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
 blok: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
 dodepa: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 vlek: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 vlekblok: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 odtahrovina: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
-odtahkrizeni: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=5
+odtahkrizeni: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=6
 odtahjednosmer: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=54
 odtahdaleko: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=61
 odtahbezdepa: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=59
@@ -28,6 +31,7 @@ okruh: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 aut
 naklad: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 nakladcekat: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 nakladsmer: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
+nakladcil: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 nakladsav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
 emu: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
 emujz: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
@@ -36,11 +40,11 @@ save91rev: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0
 mess: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
 messodvoz: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
 messodtah: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
-ekaodtah: spojeno=5 odtazeno=3 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=10 auto=0 depa=9
+ekaodtah: spojeno=5 odtazeno=3 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=8 auto=0 depa=10
 vlak31: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=8 auto=0 depa=1
 protlacit: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=16
 poruchavrata: spojeno=11 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=4 auto=0 depa=6
-poruchanastup: spojeno=14 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=11
+poruchanastup: spojeno=14 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=10
 poruchazavlakem: spojeno=4 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=3 auto=0 depa=2
 odtahperon: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=3
 lokonula: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=8
@@ -64,7 +68,7 @@ rigD4: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 aut
 cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
 cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=2
-tunel: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
+tunel: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=1 vyjimka=0 zaznam=1 auto=0 depa=0
 tunel2: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
 tunelstop: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=0
 otocvyjezd: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=1
@@ -78,3 +82,5 @@ autovlak: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 
 autodve: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=6 depa=9
 autoposun: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 depa=4
 autoposunne: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 depa=4
+autoletadlo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=7 depa=0
+autolod: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=16 depa=0

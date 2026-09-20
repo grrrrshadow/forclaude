@@ -133,7 +133,7 @@ void SetupCargoForClimate(LandscapeType l)
  * finds it by label and does nothing.
  *
  * If every slot is taken, this game has no such cargo and no wagon can be
- * fitted; OfferRoadVehiclesToAllWagons() says so in the record.
+ * fitted; OfferRoadVehiclesToCarriers() says so in the record.
  */
 void PlaceRoadVehicleCargo()
 {

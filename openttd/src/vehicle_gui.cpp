@@ -3338,9 +3338,14 @@ public:
 		if (v->type == VehicleType::Road) {
 			const RoadVehicle *rv = RoadVehicle::From(v);
 			if (rv->IsCarried()) {
-				const Train *wagon = Train::GetIfValid(rv->carried_by);
+				const Vehicle *carrier = Vehicle::GetIfValid(rv->First()->carried_by);
 				text_colour = TextColour::Orange;
-				return GetString(STR_VEHICLE_STATUS_ON_TRAIN, wagon != nullptr ? wagon->First()->unitnumber : 0);
+				if (carrier == nullptr) return GetString(STR_VEHICLE_STATUS_ON_TRAIN, 0);
+				switch (carrier->type) {
+					case VehicleType::Ship: return GetString(STR_VEHICLE_STATUS_ON_SHIP, carrier->unitnumber);
+					case VehicleType::Aircraft: return GetString(STR_VEHICLE_STATUS_ON_PLANE, carrier->unitnumber);
+					default: return GetString(STR_VEHICLE_STATUS_ON_TRAIN, carrier->First()->unitnumber);
+				}
 			}
 			if (IsWaitingToBoardTrain(rv)) {
 				text_colour = TextColour::Orange;

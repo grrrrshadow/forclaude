@@ -100,9 +100,10 @@ run_scene() { # name scr-content ticks extra-args
   # same record and would drown this counter, which is here to say that
   # something happened that should not have. It goes out with the dump.
   local zaz=$(grep 'ZAZNAM:' $S/reg_$name.log | grep -vc 'VYPIS')
-  # Road vehicles boarding and leaving trains (road_on_rail.h): boardings plus
-  # alightings, so a scene where the ride works counts an even number of them.
-  local aut=$(( $(grep -c 'nalozeno na vlak' $S/reg_$name.log) + $(grep -c 'slozeno z vlaku' $S/reg_$name.log) ))
+  # Road vehicles boarding and leaving whatever carries them -- a train, a ship
+  # or an aircraft (road_on_rail.h): boardings plus alightings, so a scene where
+  # the ride works counts an even number of them.
+  local aut=$(( $(grep -c 'nalozeno na' $S/reg_$name.log) + $(grep -c 'slozeno z' $S/reg_$name.log) ))
   # Two lines, one file each. The seven counters above are the load-bearing
   # ones and do not move between runs of the same build; the depot-arrival
   # tally does, by one, on the long tow scenes -- it is worth reading and
@@ -709,3 +710,16 @@ testzatik 400 testauta" 6000
 run_scene autoposunne "vlak123 on
 testautovlak 1 vlakem
 testzatik 400 testauta" 6000
+
+# Riding in an aircraft and in a ship (road_on_rail.h). Both count boardings
+# plus alightings, so a working ride comes out even. The aircraft takes one
+# car; the ship in this scene takes two and both get on at once, which is what
+# the counter is really watching -- a carrier that holds several is the one
+# thing rails never had. The ship scene digs its own canal and raises its own
+# shore, since the rig's map is generated flat and has neither.
+run_scene autoletadlo "vlak123 on
+testautoletadlo
+testzatik 3000 testauta" 12000
+run_scene autolod "vlak123 on
+testautolod 2
+testzatik 3000 testauta" 12000

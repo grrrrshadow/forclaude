@@ -885,14 +885,20 @@ void Vehicle::PreDestructor()
 
 		if (v->disaster_vehicle != VehicleID::Invalid()) ReleaseDisasterVehicle(v->disaster_vehicle);
 
-		/* Riding on a wagon: the wagon is empty again. */
-		if (v->carried_by != VehicleID::Invalid()) UnlinkFromWagon(v);
+		/* Riding on a wagon or inside a vessel: it has that much room again. */
+		if (v->carried_by != VehicleID::Invalid()) UnlinkFromCarrier(v);
 	}
 
 	/* A wagon with a road vehicle on it: the vehicle is left with nothing to
 	 * ride, which its own tick deals with. See road_on_rail.h. */
 	if (this->type == VehicleType::Train && Train::From(this)->carrying != VehicleID::Invalid()) {
 		UnlinkCarriedRoadVehicle(Train::From(this));
+	}
+
+	/* A ship or an aircraft with road vehicles inside: they are inside it and
+	 * nowhere else, so they go with it. See road_on_rail.h. */
+	if ((this->type == VehicleType::Ship || this->type == VehicleType::Aircraft) && this->IsPrimaryVehicle()) {
+		DestroyRoadVehiclesAboard(this);
 	}
 
 	if (this->Previous() == nullptr) {

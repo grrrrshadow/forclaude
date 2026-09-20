@@ -14,6 +14,7 @@
 #include "command_func.h"
 #include "company_func.h"
 #include "train.h"
+#include "road_on_rail.h"
 #include "aircraft.h"
 #include "newgrf_text.h"
 #include "vehicle_func.h"
@@ -426,7 +427,10 @@ static std::tuple<CommandCost, uint, uint16_t, CargoArray> RefitVehicle(Vehicle 
 		bool refittable = e->info.refit_mask.Test(new_cargo_type) && (!auto_refit || e->info.misc_flags.Test(EngineMiscFlag::AutoRefit));
 		if (fit_for_road_vehicles) refittable = true;
 		if (wagon_head != nullptr && wagon_head->carrying != VehicleID::Invalid()) refittable = false;
-		/* The bit is in every wagon's mask (OfferRoadVehiclesToAllWagons()), but
+		/* A ship or an aircraft with cars inside is left as it is, the same way:
+		 * the cars are the cargo, and there is nothing to refit them into. */
+		if ((v->type == VehicleType::Ship || v->type == VehicleType::Aircraft) && v->IsPrimaryVehicle() && CarriesRoadVehicles(v)) refittable = false;
+		/* The bit is in every wagon's mask (OfferRoadVehiclesToCarriers()), but
 		 * a lorry is put on in a depot, never by auto-refit at a station. */
 		if (new_cargo_type == _road_vehicle_cargo && auto_refit) refittable = false;
 
@@ -557,8 +561,10 @@ std::tuple<CommandCost, uint, uint16_t, CargoArray> CmdRefitVehicle(DoCommandFla
 
 	/* Check cargo */
 	if (new_cargo_type >= NUM_CARGO) return { CMD_ERROR, 0, 0, {} };
-	/* Road vehicles ride on rail wagons and on nothing else (see RefitVehicle()). */
-	if (new_cargo_type == _road_vehicle_cargo && front->type != VehicleType::Train) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
+	/* Road vehicles ride on rail wagons, in ships and in aircraft, and on
+	 * nothing else -- not on other road vehicles, and not on a locomotive (see
+	 * RefitVehicle() and CanCarryRoadVehicles()). */
+	if (new_cargo_type == _road_vehicle_cargo && !CanCarryRoadVehicles(front->GetEngine())) return { CommandCost(STR_ERROR_ROAD_VEHICLES_WAGONS_ONLY), 0, 0, {} };
 
 	/* For ships and aircraft there is always only one. */
 	only_this |= front->type == VehicleType::Ship || front->type == VehicleType::Aircraft;

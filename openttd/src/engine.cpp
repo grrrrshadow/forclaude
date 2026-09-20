@@ -25,6 +25,7 @@
 #include "core/pool_func.hpp"
 #include "engine_gui.h"
 #include "engine_func.h"
+#include "road_on_rail.h"
 #include "engine_base.h"
 #include "company_base.h"
 #include "vehicle_func.h"
@@ -254,7 +255,7 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 	 * yet, and the car carrier's own cargo is this one. */
 	CargoType asked_cargo = (v != nullptr) ? v->cargo_type : this->GetDefaultCargoType();
 	if (IsValidCargoType(_road_vehicle_cargo) && asked_cargo == _road_vehicle_cargo) {
-		return (v != nullptr && v->IsArticulatedPart()) ? 0 : 1;
+		return RoadVehiclesCarriedBy(this, v);
 	}
 
 	if (!this->CanCarryCargo()) return 0;
