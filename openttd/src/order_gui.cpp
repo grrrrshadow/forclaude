@@ -1551,8 +1551,19 @@ public:
 			this->SetWidgetLoweredState(WID_O_GOTO, this->goto_type != OPOS_NONE);
 			/* Held down while it is the one waiting for a station to be
 			 * clicked, so the player can see which button loaded the pointer
-			 * and which one will put it down again. */
-			this->SetWidgetLoweredState(WID_O_DECOUPLE_CARGO_DEST, this->goto_type == OPOS_DECOUPLE_DEST);
+			 * and which one will put it down again.
+			 *
+			 * Asked whether the button is there at all, because a ship's and an
+			 * aircraft's order window is built from a different set of widgets
+			 * and has none of ours -- and a widget that is not there answers
+			 * with nothing, which this used to walk straight into. Opening an
+			 * aircraft's orders brought the game down for the player the first
+			 * day he had an aircraft; the same line had been waiting for a ship
+			 * just as long. The rest of our row does the same test through
+			 * decouple_sel in UpdateButtonState(). */
+			if (this->GetWidget<NWidgetCore>(WID_O_DECOUPLE_CARGO_DEST) != nullptr) {
+				this->SetWidgetLoweredState(WID_O_DECOUPLE_CARGO_DEST, this->goto_type == OPOS_DECOUPLE_DEST);
+			}
 		}
 		this->DrawWidgets();
 	}

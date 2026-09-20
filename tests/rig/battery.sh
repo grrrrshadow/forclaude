@@ -681,6 +681,7 @@ testzatik 1720 testbrzda 2" 6000
 # than necessity -- and cheap.
 run_scene autovlak "vlak123 on
 testautovlak
+testzatik 200 testrozkazokna
 testzatik 200 testokno rozkazy auto
 testzatik 400 testauta" 12000
 
@@ -721,11 +722,20 @@ testzatik 400 testauta" 6000
 # the counter is really watching -- a carrier that holds several is the one
 # thing rails never had. The ship scene digs its own canal and raises its own
 # shore, since the rig's map is generated flat and has neither.
+# testrozkazokna opens the orders window of every vehicle and repaints it. A
+# ship's and an aircraft's window is built from a different set of widgets than
+# a train's and has none of ours, and a line that touched one of ours without
+# asking whether it is there took the game down the first time the player
+# opened an aircraft's orders. Nothing in the rig had ever opened a window --
+# every scene drives vehicles, none of them looks at one -- so it ran for days
+# unseen. A crash here ends the scene, and every counter after it is missing.
 run_scene autoletadlo "vlak123 on
 testautoletadlo
+testzatik 2000 testrozkazokna
 testzatik 3000 testauta" 12000
 run_scene autolod "vlak123 on
 testautolod 2
+testzatik 2000 testrozkazokna
 testzatik 3000 testauta" 12000
 
 # The fitting put on through the train's front, the way the refit window does

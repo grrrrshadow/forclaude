@@ -37,6 +37,8 @@
 #include "airport.h"
 #include "linkgraph/linkgraphschedule.h"
 #include "timer/timer_game_economy.h"
+#include "gui.h"
+#include "window_gui.h"
 #include "settings_func.h"
 #include "settings_internal.h"
 #include "fios.h"
@@ -9174,6 +9176,40 @@ static bool ConTestNapis(std::span<std::string_view> argv)
 }
 
 /**
+ * Open the orders window of every vehicle the company has, one kind at a time,
+ * and then refresh them all the way a repaint does.
+ *
+ * The windows exist without a screen -- the null video driver draws nothing
+ * but the window system is the same one -- so a window that goes down when it
+ * is opened goes down here too. Written when opening an aircraft's orders
+ * brought the game down for the player and the rig had never opened one: every
+ * scene drives vehicles, none of them looks at them.
+ *
+ * Usage: testrozkazokna
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestOrderWindows(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Open every vehicle's orders window. Usage: 'testrozkazokna'.");
+		return true;
+	}
+	uint opened = 0;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (!v->IsPrimaryVehicle()) continue;
+		AutoRestoreBackup cur_company(_current_company, v->owner);
+		IConsolePrint(CC_DEFAULT, "testrozkazokna: otviram rozkazy {} {}", to_underlying(v->type), v->unitnumber);
+		ShowOrdersWindow(v);
+		opened++;
+	}
+	/* And a repaint of all of them, which is where a window that only looks
+	 * right until something asks it to draw gives itself away. */
+	for (Window *w : Window::Iterate()) w->SetDirty();
+	IConsolePrint(CC_DEFAULT, "testrozkazokna: otevreno {} oken.", opened);
+	return true;
+}
+
+/**
  * Build the scene for road vehicles riding in a ship: a canal with a dock at
  * each end, a road stop of each dock's station beside it, one ship fitted to
  * carry road vehicles shuttling between them, and road vehicles ordered to
@@ -9783,6 +9819,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
 	IConsole::CmdRegister("testautoletadlo",         ConTestRoadOnAir);
 	IConsole::CmdRegister("testautolod",             ConTestRoadOnWater);
+	IConsole::CmdRegister("testrozkazokna",          ConTestOrderWindows);
 	IConsole::CmdRegister("testauta",                ConTestRoadOrders);
 	IConsole::CmdRegister("log",                     ConAnomalyLog);
 	IConsole::CmdRegister("testdepo",                ConTestRescueDepot);

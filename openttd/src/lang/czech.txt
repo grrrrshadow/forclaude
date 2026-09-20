@@ -5117,24 +5117,24 @@ STR_ORDER_WAIT_COUPLE_TOOLTIP                                   :{BLACK}Čekat v
 STR_ORDER_GOTO_COUPLE                                           :{BLACK}Připojit
 STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do této stanice (v případě potřeby i reversním chodem) a spojit se s vlakem, který tam čeká, pak pokračovat jako jedna souprava
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
-STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :{BLACK}vlakem na příští zastávku
-STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :{BLACK}vlakem kamkoli-posun
-STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}naložit se na vagony na příští zastávku
-STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}naložit se na vagony kamkoli
-STR_ORDER_BOARD_MODE_PLANE_TO_NEXT                              :{BLACK}do příští stanice letadlem
-STR_ORDER_BOARD_MODE_SHIP_TO_NEXT                               :{BLACK}do příští stanice lodí
-STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}přeprava aut po železnici : nevyužít
+STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :vlakem na příští zastávku
+STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :vlakem kamkoli-posun
+STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :naložit se na vagony na příští zastávku
+STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :naložit se na vagony kamkoli
+STR_ORDER_BOARD_MODE_PLANE_TO_NEXT                              :do příští stanice letadlem
+STR_ORDER_BOARD_MODE_SHIP_TO_NEXT                               :do příští stanice lodí
+STR_ORDER_BOARD_MODE_NONE                                       :přeprava aut po železnici : nevyužít
 STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}Jak se tohle auto nechá odvézt z téhle stanice: vlakem, který jede tam, kam ono; kterýmkoli vlakem nebo posunovačkou, co tu stojí; vagony, které tu někdo nechal pro stanici, kam ono jede; kterýmikoli vagony, co tu stojí; letadlem nebo lodí, které jedou tam, kam ono. Vybírá se jedno, ne několik naráz. U letadla a lodi není „kamkoliv“ — auto vysazené v cizím přístavu nemá koleje, po kterých by ho někdo odtáhl. Poslední v seznamu je nenakládat se vůbec a jet dál po silnici
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
-STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
-STR_ORDER_COUPLE_LOAD_EMPTY                                     :{BLACK}Vagony: prázdné
-STR_ORDER_COUPLE_LOAD_FULL                                      :{BLACK}Vagony: plné
+STR_ORDER_COUPLE_LOAD_ANY                                       :Vagony: jakékoliv
+STR_ORDER_COUPLE_LOAD_EMPTY                                     :Vagony: prázdné
+STR_ORDER_COUPLE_LOAD_FULL                                      :Vagony: plné
 STR_ORDER_COUPLE_LOAD_SHORT_ANY                                 :jakékoliv
 STR_ORDER_COUPLE_LOAD_SHORT_EMPTY                               :prázdné
 STR_ORDER_COUPLE_LOAD_SHORT_FULL                                :plné
 STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Odvézt jen takto naložené vagony. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje. Je-li vybrán náklad, ptá se to jen vozů s tímto nákladem - jeden prázdný vagon na něco jiného ve stejné řadě pak nebrání tomu, aby se řada počítala za plnou
-STR_ORDER_COUPLE_CARGO_ANY                                      :{BLACK}Náklad: jakýkoliv
-STR_ORDER_COUPLE_CARGO_TYPE                                     :{BLACK}Náklad: {STRING}
+STR_ORDER_COUPLE_CARGO_ANY                                      :Náklad: jakýkoliv
+STR_ORDER_COUPLE_CARGO_TYPE                                     :Náklad: {STRING}
 STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Odvézt jen vagony s tímto nákladem. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vozů: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vozů: libovolně
