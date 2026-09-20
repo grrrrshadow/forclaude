@@ -255,6 +255,15 @@ testodtah vagony
 testprodatvagonky 1 0 1" 20000
 run_scene odtahprodat "vlak123 on
 testodtah prodat" 16000
+# A sold train the tow turns out not to be able to take: joined, the two would
+# be longer than the game allows, so the coupling is refused on the first tick
+# and on every tick after it. The engine used to stand against it asking for
+# the rest of the game, silently. It gives the case up now and goes home, and
+# the sold train -- which nobody else will be able to take either, by the same
+# rule -- disappears, because the player has been paid and the line is his
+# again. The record lines are the point of the scene, so zaznam is not zero.
+run_scene odtahprodatdlouhy "vlak123 on
+testodtah prodatdlouhy" 24000
 # And the rule that keeps the two apart: nobody buys a breakdown. The scene
 # breaks the train down and tries to sell it a moment later, so odmitnuto=1 is
 # the pass here -- a zero would mean the scrapyard took it.

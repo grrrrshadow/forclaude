@@ -5834,6 +5834,18 @@ static const Money TRAIN_SCRAP_PRICE = 50;
 static const int SCRAP_NEWS_QUIET_DAYS = 62;
 
 /**
+ * How many ticks in a row a rescue engine stands against its case being refused
+ * the coupling before it gives the case up.
+ *
+ * Long, because most refusals come right: the ends are not lined up yet and the
+ * engine is still straightening the casualty out, which takes a while on a
+ * junction. What this is for is the refusal that never comes right -- a
+ * casualty that would make the joined train longer than the game allows is
+ * refused on the first tick and on every tick for ever after.
+ */
+static const uint16_t COUPLE_REFUSALS_BEFORE_GIVING_UP = 600;
+
+/**
  * Put a train sold for scrap in the papers, if the papers will have it.
  *
  * Two rules, and both are the player's. The papers leave a company alone for
@@ -12414,7 +12426,10 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		 * unconditionally would leave a train that cannot couple for some
 		 * other reason frozen here for good, doing nothing else ever again. */
 		CommandCost coupled = CmdCoupleTrains(DoCommandFlag::Execute, consist->index);
-		if (coupled.Succeeded()) return true;
+		if (coupled.Succeeded()) {
+			consist->couple_refuse_tries = 0;
+			return true;
+		}
 
 		/* Refused with the partner right against it: stay put. The collision
 		 * check lets these two overlap rather than crash, and a train that
@@ -12436,6 +12451,49 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 					why == INVALID_STRING_ID ? std::string("bez duvodu") : GetString(why));
 			consist->cur_speed = 0;
 			consist->subspeed = 0;
+
+			/* And an engine sent for a case it turns out it cannot take gives
+			 * up on it. Some refusals pass -- the ends are not lined up yet and
+			 * the tow is still straightening the casualty -- so it is given a
+			 * long spell to come right in. Others never will: a casualty that
+			 * would make the joined train longer than the game allows is
+			 * refused on the first tick and on every tick after it, and the
+			 * engine stood against it asking for the rest of the game, saying
+			 * nothing the player could see. Standing there it is also of no use
+			 * to anybody else.
+			 *
+			 * Only a rescue engine gives up. An ordinary collector refused at a
+			 * platform is the player's own arrangement and stays his to sort
+			 * out. */
+			if (consist->vehicle_flags.Test(VehicleFlag::RescueEngine) && IsOnRescueRun(consist) &&
+					++consist->couple_refuse_tries > COUPLE_REFUSALS_BEFORE_GIVING_UP) {
+				Train *casualty = Train::GetIfValid(consist->rescue_target);
+				LogAnomaly("Vlak {}: odtah - spojeni s pripadem {} se odmita porad dokola, vzdavam to ({})",
+						consist->unitnumber, consist->rescue_target.base(),
+						why == INVALID_STRING_ID ? std::string("bez duvodu") : GetString(why));
+
+				/* A train the player sold is not going anywhere on its own and
+				 * nobody else is coming for it either -- the next engine sent
+				 * would be refused by the same rule. Left standing it is a
+				 * train on the line that is not the player's any more and never
+				 * will be moved, so it goes: the player has been paid, and the
+				 * line is his again. It is handed to the ordinary expiry rather
+				 * than deleted from here, so it disappears where every other
+				 * casualty that nobody came for disappears (Train::Tick). */
+				if (casualty != nullptr && casualty->IsSoldForScrap()) {
+					casualty->rescue_deadline = TimerGameEconomy::date;
+					LogAnomaly("Vlak {}: prodany vlak, pro ktery nikdo neprijede - zmizi", casualty->unitnumber);
+				}
+
+				consist->couple_refuse_tries = 0;
+				EndRescueErrand(consist);
+				consist->rescue_hold = RescueHold::CannotCouple;
+				FreeTrainTrackReservation(consist);
+				consist->ReserveTrackUnderConsist();
+				SendTowHome(consist);
+				InvalidateWindowData(WindowClass::VehicleView, consist->index);
+				if (consist->cur_speed == 0) TryPathReserve(consist, true, false);
+			}
 			return true;
 		}
 	}
@@ -13285,6 +13343,27 @@ bool Train::Tick()
 		 * train that is still standing on its own -- one that has been coupled
 		 * to a rescue engine is not the head of anything and never gets here,
 		 * which is what makes being fetched in time mean something. */
+		/* A train the player sold that nobody ever came for goes the same way a
+		 * wreck does. It is not the player's any more -- he has been paid --
+		 * and it cannot mend itself the way a breakdown can, so leaving it
+		 * would leave a train standing on the line for the rest of the game
+		 * that nothing in the world will ever move. The wait is the ordinary
+		 * one, and it is cut short when an engine sent for it gives up
+		 * (TrainLocoHandler), because then there is nothing left to wait for. */
+		if (this->IsSoldForScrap() && this->rescue_deadline != TimerGameEconomy::Date{} &&
+				TimerGameEconomy::date >= this->rescue_deadline) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vlak {}: prodany vlak nikdo neodvezl - mizi z ({},{})", this->unitnumber, TileX(this->tile), TileY(this->tile));
+			}
+			LogAnomaly("Vlak {}: prodany vlak nikdo neodvezl - mizi z ({},{})", this->unitnumber, TileX(this->tile), TileY(this->tile));
+			FreeTrainTrackReservation(this);
+			for (const Train *u = this; u != nullptr; u = u->Next()) {
+				ClearPathReservation(u, u->tile, u->GetVehicleTrackdir());
+			}
+			delete this;
+			return false;
+		}
+
 		if (this->IsWrecked()) {
 			/* Start the clock here if nothing else did. It is set when the
 			 * crash happens, but several things clear it again -- a breakdown

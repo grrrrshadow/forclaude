@@ -162,6 +162,7 @@ enum class RescueHold : uint8_t {
 	ExitBlocked,   ///< Called out, but the block outside the depot is occupied.
 	NoPath,        ///< Called out, but no route to the casualty can be reserved.
 	NoDepot,       ///< Has the casualty in tow, but no depot it can reach to put it down in.
+	CannotCouple,  ///< Reached the casualty and stood against it, but the coupling was refused again and again, so it gave up on it.
 };
 
 /**
@@ -193,6 +194,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	VehicleID rescue_skip = VehicleID::Invalid(); ///< NOSAVE: a case this engine gave up on for now because no road to it could be booked; others come first.
 	StationID honk_waypoint = StationID::Invalid(); ///< NOSAVE: a station waypoint whose order was concluded short of it and asked for the horn; sounded when the train passes its tile.
 	uint8_t rescue_nopath_tries = 0; ///< NOSAVE: how many times in a row the road to the current case could not be booked.
+	uint16_t couple_refuse_tries = 0; ///< NOSAVE: how many ticks in a row a coupling has been refused while standing against the partner. A rescue engine gives the case up when it runs out; see TrainLocoHandler().
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
 	/**

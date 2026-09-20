@@ -2638,7 +2638,7 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 		if (t->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
 			static const char * const drzi[] = {"nic - jede nebo vyjizdi", "ma zatazenou brzdu", "ma vlastni rozkazy",
 					"nikdo necaka", "porucha se nepocita", "uz pro ni jede jina", "vyjezd z depa je blokovany",
-					"nenajde cestu k poruse", "nema kam s poruchou"};
+					"nenajde cestu k poruse", "nema kam s poruchou", "spojeni se porad odmita, vzdala to"};
 			const Train *cil = Train::GetIfValid(t->rescue_target);
 			IConsolePrint(CC_DEFAULT, "odtahovka {}: {} cil {} {} - drzi ji: {}",
 					t->unitnumber,

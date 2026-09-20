@@ -4729,6 +4729,7 @@ STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Riding 
 STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Riding on aircraft {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Waiting for a train to board
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Coupled up, but no depot within reach
+STR_VEHICLE_STATUS_RESCUE_CANNOT_COUPLE                         :{RED}Could not couple to the train it was sent for
 STR_VEHICLE_STATUS_SOLD                                         :{ORANGE}Sold
 STR_VEHICLE_STATUS_SOLD_NO_TOW                                  :{RED}Sold, no rescue engine available
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Stopping

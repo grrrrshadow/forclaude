@@ -4818,6 +4818,7 @@ STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Veze se
 STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Veze se letadlem {COMMA}
 STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Čeká na vlak, na který se naloží
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Připojeno, ale žádné depo v dosahu
+STR_VEHICLE_STATUS_RESCUE_CANNOT_COUPLE                         :{RED}S vlakem, pro který jela, se nešlo spojit
 STR_VEHICLE_STATUS_SOLD                                         :{ORANGE}Prodáno
 STR_VEHICLE_STATUS_SOLD_NO_TOW                                  :{RED}Prodáno, odtah není dostupný
 STR_VEHICLE_STATUS_TRAIN_STOPPING_VEL                           :{RED}{VELOCITY} - Zastavuje

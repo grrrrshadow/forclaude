@@ -3401,6 +3401,7 @@ public:
 				 * not worked out a second time here. */
 				if (v->IsInDepot()) {
 					switch (Train::From(v)->rescue_hold) {
+						case RescueHold::CannotCouple: return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_COUPLE);
 						case RescueHold::ExitBlocked: return GetString(STR_VEHICLE_STATUS_RESCUE_EXIT_BLOCKED);
 						case RescueHold::NoPath: return GetString(STR_VEHICLE_STATUS_RESCUE_NO_PATH);
 						default: return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE);
@@ -3414,6 +3415,7 @@ public:
 				 * second time, so the window cannot say one thing while the game
 				 * does another. */
 				switch (Train::From(v)->rescue_hold) {
+					case RescueHold::CannotCouple: return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_COUPLE);
 					case RescueHold::HasOrders: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS);
 					case RescueHold::AllTaken: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN);
 					case RescueHold::NotEligible: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE);
