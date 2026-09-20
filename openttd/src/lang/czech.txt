@@ -5108,9 +5108,9 @@ STR_ORDER_GOTO_COUPLE_TOOLTIP                                   :{BLACK}Dojet do
 STR_ORDER_GOTO_COUPLE_DEPOT_TOOLTIP                             :{BLACK}Dojet do tohoto depa a spojit se s vagonky, které tam jsou odstavené. Vagonky se připojí na konec u dveří a z depa vyjedou první, tlačené
 STR_ORDER_BOARD_MODE_TRAIN_TO_NEXT                              :{BLACK}vlakem na příští zastávku
 STR_ORDER_BOARD_MODE_TRAIN_ANYWHERE                             :{BLACK}vlakem kamkoli-posun
-STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}naložit na vagony na příští zastávku
-STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}naložit na vagony kamkoli
-STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}zrušit nakládání
+STR_ORDER_BOARD_MODE_WAGONS_TO_NEXT                             :{BLACK}naložit se na vagony na příští zastávku
+STR_ORDER_BOARD_MODE_WAGONS_ANYWHERE                            :{BLACK}naložit se na vagony kamkoli
+STR_ORDER_BOARD_MODE_NONE                                       :{BLACK}přeprava aut po železnici: nevyužít
 STR_ORDER_BOARD_MODE_TOOLTIP                                    :{BLACK}Jak se tohle auto nechá odvézt z téhle stanice: vlakem, který jede tam, kam ono; kterýmkoli vlakem nebo posunovačkou, co tu stojí; vagony, které tu někdo nechal pro stanici, kam ono jede; nebo kterýmikoli vagony, co tu stojí. Vybírá se jedno, ne několik naráz. Poslední v seznamu je nenakládat se vůbec a jet dál po silnici
 STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v tomto depu část vlaku odstavenou. Kolik si vlak nechá, se nastaví v okénku, které vyskočí
 STR_ORDER_COUPLE_LOAD_ANY                                       :{BLACK}Vagony: jakékoliv
