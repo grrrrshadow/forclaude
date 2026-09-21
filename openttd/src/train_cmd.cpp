@@ -6727,6 +6727,13 @@ bool HandleRescueEngineInDepot(Train *tow)
 				casualty->couple_claim = VehicleID::Invalid();
 				casualty->current_order.Free();
 				casualty->SetDestTile(INVALID_TILE);
+				/* Standing still: a sale is refused to anything that is not stopped
+				 * in its shed, and being coupled up, dragged here and split off
+				 * again does not leave a rake the way it was found. */
+				casualty->vehstatus.Set(VehState::Stopped);
+				casualty->cur_speed = 0;
+				casualty->subspeed = 0;
+				casualty->ConsistChanged(CCF_ARRANGE);
 				SellDroppedRake(casualty);
 				casualty = nullptr;
 			} else {
@@ -6759,11 +6766,24 @@ bool HandleRescueEngineInDepot(Train *tow)
 				casualty->couple_claim = VehicleID::Invalid();
 				casualty->current_order.Free();
 				casualty->SetDestTile(INVALID_TILE);
+				/* Standing still, because a sale is refused to anything that is
+				 * not stopped in its shed. It was stopped when it was sold, out
+				 * on the line -- but it has been coupled up, dragged here and
+				 * split off again since, and it does not come out of that the
+				 * way it went in. Without this the sale was refused and the
+				 * train simply stood in the shed, sold and unsellable, which is
+				 * what the player found. */
+				casualty->vehstatus.Set(VehState::Stopped);
+				casualty->cur_speed = 0;
+				casualty->subspeed = 0;
+				casualty->ConsistChanged(CCF_ARRANGE);
 				/* Taken before the sale, which deletes the train. */
 				Owner owner = casualty->owner;
 				TileIndex where = tow->tile;
 				Money paid = 0;
-				if (SellDroppedRake(casualty, &paid)) ReportTrainSoldForScrap(owner, where, paid);
+				if (SellDroppedRake(casualty, &paid)) {
+					ReportTrainSoldForScrap(owner, where, paid);
+				}
 			} else {
 				delete casualty;
 			}
@@ -8022,6 +8042,13 @@ static bool SellDroppedRake(Train *rake, Money *paid)
 		if (_show_train_orientation) {
 			IConsolePrint(CC_ERROR, "Vlak {}: {} prodat nejde - {}", number, what, GetString(cost.GetErrorMessage()));
 		}
+		/* Into the record, not only the console. A sale that does not happen
+		 * leaves something standing in a shed marked sold, which nothing in the
+		 * game will touch again -- and the reason it was refused is the whole
+		 * of what tells us why. It is the one thing the player could not see
+		 * when this happened to him. */
+		LogAnomaly("Vlak {}: {} na ({},{}) PRODAT NEJDE - {}. Zustava stat prodane", number, what,
+				TileX(where), TileY(where), GetString(cost.GetErrorMessage()));
 		return false;
 	}
 	/* What the sale fetched, so that whoever asked for it can say so. A sale

@@ -1438,6 +1438,15 @@ static const std::string_view _take_over_misc_keys[] = {
 	"screenshot_format", "savegame_format",
 };
 
+/**
+ * And the few things worth taking that are not in [misc]: the colours the
+ * player's companies start in, which they chose once and would have to choose
+ * again.
+ */
+static const std::string_view _take_over_gui_keys[] = {
+	"starting_colour", "starting_colour_secondary",
+};
+
 /** Whole groups taken over as they stand. */
 static const std::string_view _take_over_groups[] = {
 	"graphicsset", // the chosen set's name, version and checksum, which [misc] only names
@@ -1496,6 +1505,7 @@ void TakeOverPlayersConfig(const std::string &theirs_dir, const std::string &our
 	ConfigIniFile mine(ours);
 
 	TakeOverGroup(theirs, mine, "misc", _take_over_misc_keys);
+	TakeOverGroup(theirs, mine, "gui", _take_over_gui_keys);
 	for (std::string_view group : _take_over_groups) TakeOverGroup(theirs, mine, group, {});
 	mine.SaveToDisk(ours);
 
