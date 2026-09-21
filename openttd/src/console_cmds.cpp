@@ -3629,7 +3629,12 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	}
 	if (sell_long_variant) {
 		/* Long enough that its tail is still on the straight while its head is
-		 * round the curve, which is where the player's came apart. */
+		 * round the curve, which is where the player's came apart. Twelve, so
+		 * the joined train would be over the length the game allows and the
+		 * coupling is refused for good -- which is what this scene measures:
+		 * the tow gives the case up and the sold train disappears. Shortened
+		 * to five it is towed in and scrapped like any other, and that is the
+		 * plain 'prodat' scene's job. */
 		for (int i = 0; i < 12; i++) {
 			auto [cost_x, veh_x, un_x1, un_x2, un_x3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
 			if (cost_x.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_x, Train::Get(veh_c)->Last()->index, false).Failed()) {

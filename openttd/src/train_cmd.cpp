@@ -11386,8 +11386,26 @@ static bool CheckTrainCollision(Train *moving_front)
 		for (Vehicle *u : VehiclesOnTile(moving_front->tile)) {
 			num_victims += CheckTrainCollision(u, moving_front);
 		}
-		for (Vehicle *u : VehiclesOnTile(GetOtherTunnelBridgeEnd(moving_front->tile))) {
-			num_victims += CheckTrainCollision(u, moving_front);
+		/* A vehicle that says it is inside a bore has to be standing on a
+		 * bore's mouth; the two are written together wherever one goes in (see
+		 * the tunnel's own enter code). Asking for the far end of something
+		 * that is not a bore at all brings the game down on an assert naming a
+		 * line in a header and nothing else, which is what the player was sent
+		 * -- twice, from a machine that cannot produce a stack trace. Asked
+		 * here, where the vehicle and the tile can still be named, and the
+		 * search simply skips the far end it has not got. Whatever put the
+		 * vehicle into that state is a fault and stays one; this is so the next
+		 * report says which vehicle and where instead of a line number. */
+		if (IsTileType(moving_front->tile, TileType::TunnelBridge)) {
+			for (Vehicle *u : VehiclesOnTile(GetOtherTunnelBridgeEnd(moving_front->tile))) {
+				num_victims += CheckTrainCollision(u, moving_front);
+			}
+		} else {
+			LogAnomaly("Vlak {}: clanek {} rika, ze je v roure, ale ({},{}) zadna roura neni - druhy konec se nehleda",
+					moving_front->First()->unitnumber, moving_front->index.base(),
+					TileX(moving_front->tile), TileY(moving_front->tile));
+			CrashLog::SetNote(fmt::format("clanek {} ma kolej roura na ({},{}), ktera rourou neni", moving_front->index.base(),
+					TileX(moving_front->tile), TileY(moving_front->tile)));
 		}
 	} else {
 		for (Vehicle *u : VehiclesNearTileXY(moving_front->x_pos, moving_front->y_pos, 7)) {
@@ -12504,7 +12522,20 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	 * through the depot door would be doing it from inside the very loop that
 	 * is stepping over its vehicles. Putting a casualty down is exactly that
 	 * kind of surgery, which is why coupling waits for this moment too. */
-	if (consist->vehicle_flags.Test(VehicleFlag::RescueEngine) && consist->IsInDepot() && consist->cur_speed == 0) {
+	/* Wholly inside, not merely nosed in. IsInDepot() asks the head and the
+	 * head only, so a tow that had just put its nose through the doors was
+	 * already putting its case down -- splitting it off and, for a sold train,
+	 * scrapping it -- while most of it still stood out on the line. Vehicles
+	 * were deleted off track they were standing on, and what was left behind
+	 * was a consist whose vehicles disagreed with the ground they were on; the
+	 * player's game went down an assert deep in the tunnel code, asking for the
+	 * far end of a bore that a vehicle only thought it was in.
+	 *
+	 * A depot swallows a train however long it is, so waiting costs nothing: a
+	 * tick or two later the whole train is in and the job is done then. Every
+	 * other piece of consist surgery in a shed asks the same question this way
+	 * (see the decoupling above). */
+	if (consist->vehicle_flags.Test(VehicleFlag::RescueEngine) && IsWholeTrainInsideDepot(consist) && consist->cur_speed == 0) {
 		/* Only the tick that actually does something is claimed. An engine that
 		 * has just been given a call-out is standing here with the job on it
 		 * and nothing to hand over; claiming its tick would stop it ever
