@@ -122,6 +122,8 @@ bool MakeTenderRearHead(Train *engine);
 const Train *PieceDrawnAs(const Train *piece);
 uint WagonUnitsBehindEngine(const Train *v);
 bool CoupleOrderWouldFindSomething(const Train *v, const struct Order &order);
+const Train *CoupleOrderWouldTake(const Train *v, const struct Order &order);
+uint CoupleRakeFullness(const Train *rake, const struct Order &order);
 bool IsTunnelBridgeOccupied(TileIndex tile);
 bool TunnelBridgeCanFollowIn(TileIndex entry);
 

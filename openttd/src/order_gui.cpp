@@ -196,7 +196,10 @@ static const StringID _order_couple_load_dropdown[] = {
 	STR_ORDER_COUPLE_LOAD_ANY,
 	STR_ORDER_COUPLE_LOAD_EMPTY,
 	STR_ORDER_COUPLE_LOAD_FULL,
+	STR_ORDER_COUPLE_LOAD_ANY_FULL_FIRST,
+	STR_ORDER_COUPLE_LOAD_ANY_EMPTY_FIRST,
 };
+static_assert(std::size(_order_couple_load_dropdown) == to_underlying(OrderCoupleLoad::End));
 
 /**
  * How a road vehicle gets carried on from a station, as the player reads it.

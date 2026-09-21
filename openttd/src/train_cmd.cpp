@@ -3135,6 +3135,13 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 
 	switch (order.GetCoupleLoad()) {
 		case OrderCoupleLoad::Any:
+		/* The two preferences take anything. They do not choose whether a rake
+		 * will do, only which of the ones that will do is taken first, and that
+		 * is asked elsewhere (RakeFullness(), used where a target is picked).
+		 * Asked here they would be filters, and the whole point of them is that
+		 * they never leave a train waiting. */
+		case OrderCoupleLoad::AnyFullFirst:
+		case OrderCoupleLoad::AnyEmptyFirst:
 			break;
 
 		case OrderCoupleLoad::Empty:
@@ -3213,6 +3220,58 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 	 * (RakeHasRoomFor()). */
 
 	return true;
+}
+
+/**
+ * How full a rake is, as a percentage, for the two orders that say "the fullest
+ * first" or "the emptiest first".
+ *
+ * Asked of the same vehicles the fullness filter is asked of: with a cargo
+ * named, only of the wagons carrying it; with none, of the whole rake. The two
+ * have to agree, or an order set to "fullest first" would sort by one thing
+ * while its cargo filter picked by another.
+ *
+ * A rake with no room in it at all -- an engine, a brake van -- comes out
+ * empty, which puts it last among the full and first among the empty. There is
+ * no better answer: it is neither, and nothing is carried either way.
+ *
+ * @param rake  the rake, its head
+ * @param order the order asking
+ * @return 0 for empty, 100 for full
+ */
+static uint RakeFullness(const Train *rake, const Order &order)
+{
+	uint stored = 0;
+	uint cap = 0;
+	for (const Train *u = rake; u != nullptr; u = u->Next()) {
+		if (IsValidCargoType(order.GetCoupleCargo()) && u->cargo_type != order.GetCoupleCargo()) continue;
+		stored += u->cargo.StoredCount();
+		cap += u->cargo_cap;
+	}
+	if (cap == 0) return 0;
+	return ClampTo<uint>(stored * 100 / cap);
+}
+
+/**
+ * Of two rakes this order would take, is the first the one to take first?
+ *
+ * Only the two preferences have an opinion; every other setting takes whatever
+ * comes to hand first, which is what it always did. A preference never refuses
+ * a rake -- see MatchesCoupleFilter() -- it only puts them in an order.
+ *
+ * @param order     the order asking
+ * @param candidate the rake being considered
+ * @param best      the best one found so far (may be nullptr)
+ * @return whether the candidate should be preferred
+ */
+static bool PreferredOverForCoupling(const Order &order, const Train *candidate, const Train *best)
+{
+	if (best == nullptr) return true;
+	switch (order.GetCoupleLoad()) {
+		case OrderCoupleLoad::AnyFullFirst: return RakeFullness(candidate, order) > RakeFullness(best, order);
+		case OrderCoupleLoad::AnyEmptyFirst: return RakeFullness(candidate, order) < RakeFullness(best, order);
+		default: return false;
+	}
 }
 
 /**
@@ -3592,6 +3651,21 @@ static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_ti
 	std::vector<Train *> pile;
 	uint available = FreeDepotUnitsFor(v, order, depot_tile, &pile, true);
 
+	/* Which of the shed's wagons go into the rake, when the order has an
+	 * opinion about how full they should be. A rake made to a number is made
+	 * out of whatever the shed holds, so "the fullest first" has to be said
+	 * here as well as where a ready-made rake is picked -- otherwise the
+	 * setting would work at a platform and quietly do nothing in a shed, which
+	 * is the worst of both. */
+	if (order.GetCoupleLoad() == OrderCoupleLoad::AnyFullFirst || order.GetCoupleLoad() == OrderCoupleLoad::AnyEmptyFirst) {
+		bool fullest = order.GetCoupleLoad() == OrderCoupleLoad::AnyFullFirst;
+		std::stable_sort(pile.begin(), pile.end(), [&order, fullest](const Train *a, const Train *b) {
+			uint fa = RakeFullness(a, order);
+			uint fb = RakeFullness(b, order);
+			return fullest ? fa > fb : fa < fb;
+		});
+	}
+
 	/* Short, and told to buy what is missing: bought now, and counted again
 	 * from scratch -- what was bought is an ordinary free wagon standing in
 	 * that shed and has to pass the same filter as anything else that stands
@@ -3876,8 +3950,11 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 		if (made == nullptr) return nullptr;
 
 		if (_show_train_orientation) {
-			IConsolePrint(CC_INFO, "Vlak {}: v depu ({},{}) si odlozil {} vozu k sebrani (rada {})", v->unitnumber,
-					TileX(depot_tile), TileY(depot_tile), want, made->index.base());
+			/* How full what it made up is: with "the fullest first" set, that
+			 * number is the whole of what the setting does, and no other line
+			 * says it. */
+			IConsolePrint(CC_INFO, "Vlak {}: v depu ({},{}) si odlozil {} vozu k sebrani (rada {}, naplnena na {}%)", v->unitnumber,
+					TileX(depot_tile), TileY(depot_tile), want, made->index.base(), RakeFullness(made, order));
 		}
 		made->couple_claim = v->index;
 		v->couple_target = made->index;
@@ -3943,7 +4020,9 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 			continue;
 		}
 
-		if (unclaimed == nullptr) unclaimed = rake;
+		/* First come, first served -- unless the order says which to take
+		 * first, and then the whole offer is looked at before one is picked. */
+		if (PreferredOverForCoupling(order, rake, unclaimed)) unclaimed = rake;
 	}
 
 	/* Only asked about, not wanted: nothing is spoken for and nothing written. */
@@ -4007,6 +4086,35 @@ bool CoupleOrderWouldFindSomething(const Train *v, const Order &order)
 	}
 
 	return FindOrClaimCoupleTarget(asker, order, nullptr, nullptr, false) != nullptr;
+}
+
+/**
+ * Which rake this order would take, without taking it.
+ *
+ * The same look as CoupleOrderWouldFindSomething(), answering with the rake
+ * rather than with yes or no. There for the rig: "prefer the fullest" is a
+ * question of which of several is picked, and no counter can see that -- the
+ * train ends up coupled either way.
+ *
+ * @param v     the train asking
+ * @param order the "go to couple" order to ask about
+ * @return the rake it would take, or nullptr
+ */
+const Train *CoupleOrderWouldTake(const Train *v, const Order &order)
+{
+	if (!order.ShouldGoToCouple()) return nullptr;
+	return FindOrClaimCoupleTarget(const_cast<Train *>(v), order, nullptr, nullptr, false);
+}
+
+/**
+ * How full a rake is, as the couple filter reads it. For the rig.
+ * @param rake  the rake, its head
+ * @param order the order asking, for the cargo it names
+ * @return 0 for empty, 100 for full
+ */
+uint CoupleRakeFullness(const Train *rake, const Order &order)
+{
+	return RakeFullness(rake, order);
 }
 
 /**

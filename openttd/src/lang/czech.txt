@@ -5146,9 +5146,13 @@ STR_ORDERS_DECOUPLE_DEPOT_TOOLTIP                               :{BLACK}Nechat v
 STR_ORDER_COUPLE_LOAD_ANY                                       :Vagony: jakékoliv
 STR_ORDER_COUPLE_LOAD_EMPTY                                     :Vagony: prázdné
 STR_ORDER_COUPLE_LOAD_FULL                                      :Vagony: plné
+STR_ORDER_COUPLE_LOAD_ANY_FULL_FIRST                            :Vagony: přednostně plné
+STR_ORDER_COUPLE_LOAD_ANY_EMPTY_FIRST                           :Vagony: přednostně prázdné
 STR_ORDER_COUPLE_LOAD_SHORT_ANY                                 :jakékoliv
 STR_ORDER_COUPLE_LOAD_SHORT_EMPTY                               :prázdné
 STR_ORDER_COUPLE_LOAD_SHORT_FULL                                :plné
+STR_ORDER_COUPLE_LOAD_SHORT_ANY_FULL_FIRST                      :přednostně plné
+STR_ORDER_COUPLE_LOAD_SHORT_ANY_EMPTY_FIRST                     :přednostně prázdné
 STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Odvézt jen takto naložené vagony. Kombinuje se se zbylými dvěma volbami, každá výběr dál zužuje. Je-li vybrán náklad, ptá se to jen vozů s tímto nákladem - jeden prázdný vagon na něco jiného ve stejné řadě pak nebrání tomu, aby se řada počítala za plnou
 STR_ORDER_COUPLE_CARGO_ANY                                      :Náklad: jakýkoliv
 STR_ORDER_COUPLE_CARGO_ANY_DROPS_TYPE                           :Všechny náklady (pustí i typ vagonu)

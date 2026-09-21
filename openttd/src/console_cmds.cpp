@@ -2504,7 +2504,7 @@ static bool ConTestStationCargo(std::span<std::string_view> argv)
 static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Change what a collect order accepts. Usage: 'testfiltr' to clear the cargo filter, 'testfiltr <cargo>', or 'testfiltr plne|prazdne|jakekoliv'.");
+		IConsolePrint(CC_HELP, "Change what a collect order accepts. Usage: 'testfiltr' to clear the cargo filter, 'testfiltr <cargo>', or 'testfiltr plne|prazdne|jakekoliv|radsiplne|radsiprazdne'.");
 		return true;
 	}
 
@@ -2517,8 +2517,15 @@ static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 	 * end up. Timing, platform holds and who claimed what all drop out of it;
 	 * what is left is the filter. */
 	if (argv.size() >= 2 && argv[1] == "zkouska") {
+		/* Asked of a train that has not chosen yet, when there is one. A train
+		 * that has already spoken for a rake is handed that rake and does not
+		 * look at the offer at all -- rightly, it is its own -- so asking it
+		 * which of several it prefers answers a question it is not being
+		 * asked. Two passes: first the undecided, then anybody. */
+		for (int pass = 0; pass < 2; pass++) {
 		for (const Train *t : Train::Iterate()) {
 			if (t->First() != t || !t->IsFrontEngine()) continue;
+			if (pass == 0 && t->couple_target != VehicleID::Invalid()) continue;
 			for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
 				const Order *o = t->GetOrder(i);
 				if (o == nullptr || !o->ShouldGoToCouple()) continue;
@@ -2536,6 +2543,18 @@ static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 				 * wagon are set together now, and "every cargo" lets go of
 				 * both -- which is a thing no counter can show and this line
 				 * can. */
+				/* Which of the waiting rakes it would take, and how full each
+				 * of them is. "Prefer the fullest" is a question of which one
+				 * is picked out of several, and no counter can see that: the
+				 * train ends up coupled either way. */
+				const Train *would = CoupleOrderWouldTake(t, *o);
+				for (const Train *r : Train::Iterate()) {
+					if (r->First() != r || !r->IsFreeWagon() || r->owner != t->owner) continue;
+					IConsolePrint(CC_DEFAULT, "testfiltr: rada {} naplnena na {}%, zamluvena {}{}", r->index.base(),
+							CoupleRakeFullness(r, *o),
+							r->couple_claim == VehicleID::Invalid() ? "ne" : fmt::format("vlakem {}", r->couple_claim.base()),
+							r == would ? " <- tuhle by vzal" : "");
+				}
 				IConsolePrint(CC_DEFAULT, "testfiltr: vlak {} rozkaz {} (naklad {}, naplneni {}, vagon {}, nakup {}) - {}, cekajicich rad {}",
 						t->unitnumber, i, (int)(int8_t)o->GetCoupleCargo(), to_underlying(o->GetCoupleLoad()),
 						(int)o->GetCoupleBuyEngine().base(), o->ShouldBuyWagons() ? "ano" : "ne",
@@ -2543,13 +2562,17 @@ static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 				return true;
 			}
 		}
+		}
 		IConsolePrint(CC_ERROR, "testfiltr: zadny vlak nema rozkaz jet se spojit.");
 		return true;
 	}
 
-	if (argv.size() >= 2 && (argv[1] == "plne" || argv[1] == "prazdne" || argv[1] == "jakekoliv")) {
+	if (argv.size() >= 2 && (argv[1] == "plne" || argv[1] == "prazdne" || argv[1] == "jakekoliv" ||
+			argv[1] == "radsiplne" || argv[1] == "radsiprazdne")) {
 		OrderCoupleLoad want = argv[1] == "plne" ? OrderCoupleLoad::Full :
-				(argv[1] == "prazdne" ? OrderCoupleLoad::Empty : OrderCoupleLoad::Any);
+				(argv[1] == "prazdne" ? OrderCoupleLoad::Empty :
+				(argv[1] == "radsiplne" ? OrderCoupleLoad::AnyFullFirst :
+				(argv[1] == "radsiprazdne" ? OrderCoupleLoad::AnyEmptyFirst : OrderCoupleLoad::Any)));
 		for (const Train *t : Train::Iterate()) {
 			if (t->First() != t || !t->IsFrontEngine()) continue;
 			for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
@@ -4272,7 +4295,7 @@ static bool ConTestFacings(std::span<std::string_view>)
 static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number>' or 'testnalozit rada <cargo>'.");
+		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number>' or 'testnalozit rada <cargo> [<cislo rady>|kazdy2|kazdy2od2]'.");
 		return true;
 	}
 	/* 'rada <cargo>': fill the wagons of that cargo in every waiting rake, and
@@ -4282,9 +4305,20 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 		auto pcargo = ParseInteger(argv[2]);
 		if (!pcargo.has_value()) return false;
 		CargoType want = (CargoType)*pcargo;
-		uint rakes = 0, put = 0;
+		/* One rake by its number, when the scene needs them to differ: "prefer
+		 * the fullest" cannot be measured at all while every rake in the shed
+		 * is equally empty. Without a number, all of them, as before. */
+		bool every_other = argv.size() >= 4 && (argv[3] == "kazdy2" || argv[3] == "kazdy2od2");
+		bool odd_first = argv.size() >= 4 && argv[3] == "kazdy2od2";
+		auto pwhich = (argv.size() >= 4 && !every_other) ? ParseInteger(argv[3]) : std::nullopt;
+		uint rakes = 0, put = 0, seen = 0;
 		for (Train *t : Train::Iterate()) {
 			if (t->First() != t || !t->IsFreeWagon()) continue;
+			if (pwhich.has_value() && t->index.base() != (uint)*pwhich) continue;
+			/* Every second one, so a shed comes out half full and half empty:
+			 * "the fullest first" cannot be measured while everything in it is
+			 * the same. */
+			if (every_other && ((seen++ & 1) != 0) != odd_first) continue;
 			rakes++;
 			for (Train *u = t; u != nullptr; u = u->Next()) {
 				if (u->cargo_type != want) continue;

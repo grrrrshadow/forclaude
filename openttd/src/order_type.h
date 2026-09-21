@@ -129,6 +129,13 @@ enum class OrderCoupleLoad : uint8_t {
 	Any = 0,   ///< However full they are.
 	Empty = 1, ///< Only wagons carrying nothing at all.
 	Full = 2,  ///< Only wagons that have no room left.
+	/* The two below take anything, like Any, and only choose between what they
+	 * are offered: with several rakes on offer the fullest (or the emptiest) is
+	 * taken first. A filter says "this and nothing else" and waits when there
+	 * is nothing; a preference never waits, which is what makes it worth having
+	 * beside the two that do. The player's idea. */
+	AnyFullFirst = 3,  ///< Anything, but the fullest first.
+	AnyEmptyFirst = 4, ///< Anything, but the emptiest first.
 	End,       ///< End marker.
 };
 
