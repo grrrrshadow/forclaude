@@ -908,16 +908,36 @@ void DestroyCarriedRoadVehicles(Train *t)
 }
 
 /**
- * The wagon is going away: the road vehicle riding on it is left with nothing
- * to ride, and its own tick deals with that (see CarriedRoadVehicleTick()).
- * Only the link from this side is rubbed out here.
+ * The wagon is going away and the road vehicle riding on it goes with it.
+ *
+ * It has to go, and leaving it behind was a crash waiting to happen. A carried
+ * vehicle is parked in the wormhole state -- the state nothing asks questions
+ * of -- with its tile set to whatever its wagon stands on, which is rail. That
+ * holds only for as long as it is carried: its tick goes to
+ * CarriedRoadVehicleTick() and never reaches the driving code. Cut loose, the
+ * ordinary road code runs, and the first thing it asks is how fast this
+ * vehicle may go -- which for a vehicle in a wormhole means reading the bridge
+ * under it. There is no bridge, and the game goes down on the spot
+ * (GetBridgeType(), the player's crash of 2026-09-21).
+ *
+ * Putting it down instead is no answer: under a wagon is rail, and a lorry has
+ * nothing to stand on there. So it goes the way a lorry inside a ship or an
+ * aircraft goes when the vessel does (DestroyRoadVehiclesAboard()), and for
+ * the same reason -- and the record says so, because a vehicle vanishing is
+ * exactly what the record is for.
+ *
  * @param wagon the wagon being deleted
  */
 void UnlinkCarriedRoadVehicle(Train *wagon)
 {
 	RoadVehicle *rv = RoadVehicle::GetIfValid(wagon->carrying);
-	if (rv != nullptr && rv->carried_by == wagon->index) rv->carried_by = VehicleID::Invalid();
 	wagon->carrying = VehicleID::Invalid();
+	if (rv == nullptr || rv->carried_by != wagon->index) return;
+
+	rv->carried_by = VehicleID::Invalid();
+	LogAnomaly("Auto {}: zaniklo s vagonem {}, na kterem se vezlo, na ({},{})", rv->unitnumber,
+			wagon->index.base(), TileX(rv->tile), TileY(rv->tile));
+	delete rv;
 }
 
 /**

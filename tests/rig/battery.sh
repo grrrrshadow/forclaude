@@ -794,6 +794,16 @@ testzatik 200 testrozkazokna
 testzatik 200 testokno rozkazy auto
 testzatik 400 testauta" 12000
 
+# A train that vanishes with a car still standing on it. The car used to be cut
+# loose and left in the state a carried vehicle is parked in -- the wormhole
+# state, on a rail tile -- and the first thing the ordinary road code asks of a
+# vehicle in a wormhole is which bridge it is on. There is none, and the game
+# went down there (the player's crash of 2026-09-21). It goes with the wagon
+# now, and the record says so; the scene reads that line.
+run_scene autozanik "vlak123 on
+setting vehicle.rescue_wait_days 1
+testautovlak
+testzatik 2400 testprodat 1" 9000
 # Two road vehicles and one wagon, so one of them always has to wait its turn:
 # the queue the "how many are waiting for a train" condition is about. The
 # first rides twice and the second once, so auto=6. On a random map this one
