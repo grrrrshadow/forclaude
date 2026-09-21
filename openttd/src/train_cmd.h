@@ -23,7 +23,7 @@ CommandCost CmdForceTrainProceed(DoCommandFlags flags, VehicleID veh_id);
 CommandCost CmdReverseTrainDirection(DoCommandFlags flags, VehicleID veh_id, bool reverse_single_veh);
 CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id);
 CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue);
-CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool request);
+CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool request, bool sell);
 CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id);
 
 DEF_CMD_TRAIT(Commands::MoveRailVehicle, CmdMoveRailVehicle, CommandFlag::Location, CommandType::VehicleConstruction)

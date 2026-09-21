@@ -1661,9 +1661,12 @@ public:
 				const Order *sel = this->vehicle->GetOrder(this->OrderGetSel());
 				this->SetWidgetDisabledState(WID_O_COUPLE_BUY, sel == nullptr || !sel->IsType(OT_GOTO_DEPOT) || !sel->ShouldGoToCouple());
 			}
+			/* Selling moved to the vehicle's own window, where there is an
+			 * icon for it in the row that stood dark out on the line. This
+			 * button is kept, dark and doing nothing, because the player asked
+			 * for the place to be held in case something wants it later. */
 			if (this->GetWidget<NWidgetCore>(WID_O_SELL_TRAIN) != nullptr) {
-				this->SetWidgetDisabledState(WID_O_SELL_TRAIN, this->vehicle->type != VehicleType::Train ||
-						SellTrainForScrapRefusal(Train::From(this->vehicle)) != STR_NULL);
+				this->SetWidgetDisabledState(WID_O_SELL_TRAIN, true);
 			}
 		}
 		this->DrawWidgets();
@@ -2236,32 +2239,15 @@ public:
 			}
 
 			case WID_O_SELL_TRAIN:
-				/* Asked first, because it cannot be taken back: the money is
-				 * paid, the papers write it up, and from that moment the train
-				 * is not the player's to drive. The window it asks in is the
-				 * game's own yes/no window, which is red with yellow buttons --
-				 * the colours an important question is asked in here. */
-				ShowQuery(GetEncodedString(STR_ORDER_SELL_TRAIN_CAPTION), GetEncodedString(STR_ORDER_SELL_TRAIN_QUERY),
-						this, OrdersWindow::SellTrainCallback);
+				/* Held open and doing nothing; the selling is done from the
+				 * vehicle's own window now. Dark, so that it is plain the
+				 * button is put by rather than broken. */
 				break;
 
 			case WID_O_SHARED_ORDER_LIST:
 				ShowVehicleListWindow(this->vehicle);
 				break;
 		}
-	}
-
-	/**
-	 * The answer to "sell the train?". Nothing happens on a no, and on a yes
-	 * the sale goes through the ordinary command, which asks all the questions
-	 * again for itself -- the train may have broken down or crashed in the
-	 * seconds the window stood open.
-	 */
-	static void SellTrainCallback(Window *w, bool confirmed)
-	{
-		if (!confirmed) return;
-		const OrdersWindow *ow = static_cast<OrdersWindow *>(w);
-		Command<Commands::SellTrainForScrap>::Post(STR_ERROR_CAN_T_SELL_TRAIN, ow->vehicle->tile, ow->vehicle->index);
 	}
 
 	void OnQueryTextExtra(std::string_view text) override

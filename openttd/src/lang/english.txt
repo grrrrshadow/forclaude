@@ -894,7 +894,7 @@ STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. Everybody there died
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {TOWN}. {COMMA} inhabitants died, {COMMA} houses levelled
 
-STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} sold his train for scrap
+STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} sold his train for 20 dollars
 
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin disaster at {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Road vehicle destroyed in 'UFO' collision!
@@ -4671,6 +4671,8 @@ STR_VEHICLE_VIEW_CLONE_AIRCRAFT_INFO                            :{BLACK}Buy a co
 
 STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Force train to proceed without waiting for signal to clear it
 STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Couple this train to the stopped train immediately ahead of it
+STR_VEHICLE_VIEW_TRAIN_SELL_TOOLTIP                             :{BLACK}Sell this train. A rescue engine comes for it and sells it in the depot; the money arrives when it is actually sold there
+STR_VEHICLE_VIEW_WAGONS_SELL_TOOLTIP                            :{BLACK}Sell these wagons. A rescue engine comes for them and sells them in the depot; the money arrives when they are actually sold there
 STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Station this train in this depot as a rescue engine. It waits here and is sent out to fetch trains that break down or crash, and returns here afterwards
 STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP                             :{BLACK}Call a rescue engine to take these wagons to a depot. Click again to take the call back
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reverse direction of train
@@ -4964,7 +4966,7 @@ STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Load the
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Load the dropped wagons for: {STATION}
 STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Says which station this rake is meant for. Road vehicles read it always: one whose order says "on wagons meant for my next stop" boards only a rake meant for where it is going. With cargo distribution switched on it counts for cargo as well - a station sorts what is waiting by where it goes next and hands a vehicle only what suits its route, and wagons left standing with no engine have no route, so without this they are handed nothing. It is not a journey and promises none: the wagons go wherever the engine that collects them goes, and cargo carried the wrong way is planned afresh at the next station
 STR_ORDER_SELL_TRAIN                                            :{BLACK}Sell the train
-STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Sell this train to the scrapyard where it stands. The money is paid at once and the papers write it up; from that moment the train is not yours to drive and it waits for a rescue engine to take it to a depot, which breaks it up. A broken-down train and a wreck cannot be sold
+STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Put by, and does nothing for now. A train is sold from the icon in its own window, where the refit button stands dark out on the line
 STR_ORDER_SELL_TRAIN_CAPTION                                    :{WHITE}Sell the train for scrap
 STR_ORDER_SELL_TRAIN_QUERY                                      :{YELLOW}Sell the train?
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(and drop the coupled train)

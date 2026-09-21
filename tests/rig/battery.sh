@@ -291,6 +291,19 @@ testprodatvagonky 1 0 1" 12000
 run_scene prodatvagonkyperon "vlak123 on
 testodtah vagony
 testprodatvagonky 1 0 1" 20000
+# The sell icon in the vehicle's own window -- the row where refitting stands
+# dark out on the line. The only scene that looks into that window at all:
+# which of the two buttons is in the row, and whether it can be pressed, are
+# things no counter can see. The wagon list had exactly that hole once (a
+# window opened with no way to answer it) and the player found it by hand.
+run_scene ikonaprodatvlak "vlak123 on
+testodtah prodat
+testza 100 testikonaprodat 1" 16000
+# And the wagons' own icon, pressed: it marks them sold, the tow comes for them
+# as it does for any rake, and the shed is where they are sold.
+run_scene ikonaprodatvagonky "vlak123 on
+testodtah vagony
+testza 3000 testikonaprodat vagonky" 20000
 run_scene odtahprodat "vlak123 on
 testodtah prodat" 16000
 # A sold train the tow turns out not to be able to take: joined, the two would

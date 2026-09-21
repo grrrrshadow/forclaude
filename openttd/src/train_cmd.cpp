@@ -5879,7 +5879,7 @@ void EndRescueErrand(Train *tow)
  * @param request true to call a tow, false to take the call back
  * @return the cost of this operation or an error
  */
-CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool request)
+CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool request, bool sell)
 {
 	Train *v = Train::GetIfValid(veh_id);
 	if (v == nullptr || v->First() != v || !v->IsFreeWagon()) return CMD_ERROR;
@@ -5888,6 +5888,11 @@ CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool requ
 	if (ret.Failed()) return ret;
 
 	if (v->IsInDepot()) return CMD_ERROR;
+
+	/* Selling is a call with a sale on the end of it, never a call taken back,
+	 * and never made twice: once they are sold the engine is already coming
+	 * and there is nothing left to decide. */
+	if (sell && (!request || v->IsSoldForScrap())) return CMD_ERROR;
 
 	if (!request) {
 		/* Once an engine is on its way the call stands, as with a breakdown:
@@ -5904,22 +5909,16 @@ CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool requ
 		/* Whatever it was doing, from now on it is a rake waiting to be
 		 * fetched -- which is what lets the tow couple to it at all. */
 		if (request) v->current_order.SetWaitForCouple(true);
+		/* And the one thing that tells the tow what to do with them at the far
+		 * end: put them away in the shed, or sell them there. The same flag a
+		 * decouple order sets when it is told to sell what it drops, read in
+		 * the same place (HandleRescueEngineInDepot()), so the icon and the
+		 * order cannot end up meaning two different things. */
+		if (sell) v->vehicle_flags.Set(VehicleFlag::SoldForScrap);
 		InvalidateWindowData(WindowClass::VehicleView, v->index);
 	}
 	return CommandCost();
 }
-
-/**
- * What the scrapyard pays for a train, whatever it is worth and however much of
- * it there is. It is scrap value and nothing else: a train sold this way is not
- * sold to anybody who wants to run it, it is sold to be broken up, and the
- * player's price for that is a hundred dollars flat.
- *
- * Fifty, because the game counts money in a unit the player's dollars are worth
- * two of. In another currency the note reads as whatever a hundred dollars is
- * worth there, which is the same thing said in that money.
- */
-static const Money TRAIN_SCRAP_PRICE = 50;
 
 /**
  * How long the papers leave a company alone after writing that it sold a train
@@ -6033,6 +6032,12 @@ StringID SellTrainForScrapRefusal(const Train *v)
 	return STR_NULL;
 }
 
+/* Selling a chain is one thing wherever it is done -- the ordinary sale for
+ * the ordinary price -- so both the sale in a shed and the one the tow ends
+ * with go through the same function. Declared here, defined further down with
+ * the rest of the decoupling. */
+static bool SellDroppedRake(Train *rake);
+
 CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 {
 	Train *v = Train::GetIfValid(veh_id);
@@ -6053,13 +6058,16 @@ CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 			 * the train standing there with an engine on its way to it. */
 			ReportTrainSoldForScrap(v);
 			if (_show_train_orientation) {
-				IConsolePrint(CC_INFO, "Vlak {}: prodan do srotu a rovnou sesrotovan v depu ({},{})", v->unitnumber, TileX(v->tile), TileY(v->tile));
+				IConsolePrint(CC_INFO, "Vlak {}: prodan a rovnou prodan v depu ({},{})", v->unitnumber, TileX(v->tile), TileY(v->tile));
 			}
 			TileIndex depot = v->tile;
-			delete v;
+			/* Sold, not broken up: the ordinary sale, for the ordinary price --
+			 * what the player would get for selling it here himself, which is
+			 * what he is doing. */
+			SellDroppedRake(v);
 			InvalidateWindowData(WindowClass::VehicleDepot, depot);
 			SetWindowClassesDirty(WindowClass::TrainList);
-			return CommandCost(ExpensesType::NewVehicles, -TRAIN_SCRAP_PRICE);
+			return CommandCost();
 		}
 
 		v->vehicle_flags.Set(VehicleFlag::SoldForScrap);
@@ -6095,7 +6103,13 @@ CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 		SetWindowClassesDirty(WindowClass::TrainList);
 	}
 
-	return CommandCost(ExpensesType::NewVehicles, -TRAIN_SCRAP_PRICE);
+	/* Nothing is paid here. The train is sold where a train is sold -- in a
+	 * shed, once the tow has brought it in -- and the money comes then, for
+	 * what it is worth by then. The player's own rule, and his own answer to
+	 * what happens when the tow gives the case up and the train disappears:
+	 * "when it disappears he gets nothing". What was never sold is never paid
+	 * for. See HandleRescueEngineInDepot(). */
+	return CommandCost();
 }
 
 CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue)
@@ -6458,8 +6472,6 @@ static Train *RestoreCasualtyOrientation(Train *casualty, Train *called)
 	return casualty;
 }
 
-static bool SellDroppedRake(Train *rake);
-
 bool HandleRescueEngineInDepot(Train *tow)
 {
 	if (!tow->IsFrontEngine()) return false;
@@ -6618,14 +6630,22 @@ bool HandleRescueEngineInDepot(Train *tow)
 				InvalidateWindowData(WindowClass::VehicleView, casualty->index);
 			}
 		} else if (wrecked || sold) {
-			/* A wreck brought into a depot is scrapped there, and so is a train
-			 * the player sold to the scrapyard -- which is what the depot was
-			 * fetched for. The player was paid when he sold it; nothing more is
-			 * due for it here. */
-			if (sold && _show_train_orientation) {
-				IConsolePrint(CC_INFO, "Vlak {}: odtah - prodany vlak sesrotovan v depu ({},{})", casualty->unitnumber, TileX(tow->tile), TileY(tow->tile));
+			/* A wreck brought into a depot is scrapped there and nothing is due
+			 * for it. A train the player sold is a different thing: this shed
+			 * is where the sale happens, so it is sold here, for the ordinary
+			 * price, and that is the moment the money arrives. */
+			if (sold) {
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vlak {}: odtah - prodany vlak PRODAN v depu ({},{})", casualty->unitnumber, TileX(tow->tile), TileY(tow->tile));
+				}
+				casualty->rescue_deadline = TimerGameEconomy::Date{};
+				casualty->couple_claim = VehicleID::Invalid();
+				casualty->current_order.Free();
+				casualty->SetDestTile(INVALID_TILE);
+				SellDroppedRake(casualty);
+			} else {
+				delete casualty;
 			}
-			delete casualty;
 			casualty = nullptr;
 		} else {
 			/* First the way round it was going when it broke down -- the same
@@ -6686,7 +6706,7 @@ bool HandleRescueEngineInDepot(Train *tow)
 	 * loop scene reported a delivery for an engine that never left its shed. */
 	if (in_tow && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: odtah dokoncen - {} v depu na ({},{})",
-				tow->unitnumber, (wagons && sold) ? "vagonky prodany" : wagons ? "vagonky odlozeny" : (sold ? "prodany vlak sesrotovan" : "porucha slozena"), TileX(tow->tile), TileY(tow->tile));
+				tow->unitnumber, (wagons && sold) ? "vagonky prodany" : wagons ? "vagonky odlozeny" : (sold ? "prodany vlak prodan" : "porucha slozena"), TileX(tow->tile), TileY(tow->tile));
 	}
 
 	/* Home if this is not home, otherwise straight back on call. */
@@ -7873,15 +7893,18 @@ static bool SellDroppedRake(Train *rake)
 
 	UnitID number = rake->unitnumber;
 	TileIndex where = rake->tile;
+	/* Wagons or a whole train: the same sale either way, and the line says
+	 * which it was rather than calling a train a rake of wagons. */
+	const char *what = rake->IsFrontEngine() ? "vlak" : "odlozene vagonky";
 	CommandCost cost = ExtractCommandCost(Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, rake->index, true, false, ClientID::Invalid));
 	if (cost.Failed()) {
 		if (_show_train_orientation) {
-			IConsolePrint(CC_ERROR, "Vlak {}: odlozene vagonky prodat nejdou - {}", number, GetString(cost.GetErrorMessage()));
+			IConsolePrint(CC_ERROR, "Vlak {}: {} prodat nejde - {}", number, what, GetString(cost.GetErrorMessage()));
 		}
 		return false;
 	}
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "Vlak {}: odlozene vagonky PRODANY na ({},{}) za {}", number, TileX(where), TileY(where), -cost.GetCost());
+		IConsolePrint(CC_INFO, "Vlak {}: {} PRODAN na ({},{}) za {}", number, what, TileX(where), TileY(where), -cost.GetCost());
 	}
 	return true;
 }
@@ -12585,9 +12608,15 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 			if (consist->vehicle_flags.Test(VehicleFlag::RescueEngine) && IsOnRescueRun(consist) &&
 					++consist->couple_refuse_tries > COUPLE_REFUSALS_BEFORE_GIVING_UP) {
 				Train *casualty = Train::GetIfValid(consist->rescue_target);
-				LogAnomaly("Vlak {}: odtah - spojeni s pripadem {} se odmita porad dokola, vzdavam to ({})",
-						consist->unitnumber, consist->rescue_target.base(),
-						why == INVALID_STRING_ID ? std::string("bez duvodu") : GetString(why));
+				/* Said in full, because this is the one place where something
+				 * of the player's is about to be thrown away and he is not
+				 * standing over it watching. The reason the coupling was
+				 * refused is the whole of the answer to "why did my train
+				 * vanish", so it is written out in words and not left as a
+				 * number to be looked up. */
+				LogAnomaly("Vlak {}: odtah - spojeni s pripadem {} odmitnuto {}x za sebou, vzdavam to. Duvod: {}",
+						consist->unitnumber, consist->rescue_target.base(), COUPLE_REFUSALS_BEFORE_GIVING_UP,
+						why == INVALID_STRING_ID ? std::string("neznamy - spojeni se neodmitlo s duvodem") : GetString(why));
 
 				/* A train the player sold is not going anywhere on its own and
 				 * nobody else is coming for it either -- the next engine sent
@@ -12599,7 +12628,8 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 				 * casualty that nobody came for disappears (Train::Tick). */
 				if (casualty != nullptr && casualty->IsSoldForScrap()) {
 					casualty->rescue_deadline = TimerGameEconomy::date;
-					LogAnomaly("Vlak {}: prodany vlak, pro ktery nikdo neprijede - zmizi", casualty->unitnumber);
+					LogAnomaly("Vlak {}: prodany vlak na ({},{}) zmizi - odtah ho nepripojil ze stejneho duvodu, ze ktereho ho nepripoji nikdo dalsi, a rozjet uz se neda. Zaplaceno nebude, protoze prodej se nikdy neuskutecnil",
+							casualty->unitnumber, TileX(casualty->tile), TileY(casualty->tile));
 				}
 
 				consist->couple_refuse_tries = 0;
@@ -13485,7 +13515,15 @@ bool Train::Tick()
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vlak {}: prodany vlak nikdo neodvezl - mizi z ({},{})", this->unitnumber, TileX(this->tile), TileY(this->tile));
 			}
-			LogAnomaly("Vlak {}: prodany vlak nikdo neodvezl - mizi z ({},{})", this->unitnumber, TileX(this->tile), TileY(this->tile));
+			/* Two ways lead here: no engine ever came and the wait ran out, or
+			 * one came, could not couple and gave up -- and that one cut the
+			 * wait to today. Which of the two it was is not a thing this line
+			 * can tell afterwards, and a line that guesses is worse than one
+			 * that does not: the engine that gives up writes its own reason
+			 * down, in words, at the moment it gives up. So this one says the
+			 * plain event and points at that. */
+			LogAnomaly("Vlak {}: prodany vlak mizi z ({},{}) - lhuta na odtah vyprsela. Zaplaceno nebylo, prodej se neuskutecnil. Jel-li pro nej odtah a vzdal to, je duvod v zaznamu vys",
+					this->unitnumber, TileX(this->tile), TileY(this->tile));
 			FreeTrainTrackReservation(this);
 			for (const Train *u = this; u != nullptr; u = u->Next()) {
 				ClearPathReservation(u, u->tile, u->GetVehicleTrackdir());

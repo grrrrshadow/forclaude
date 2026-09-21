@@ -981,7 +981,7 @@ STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřeli tam všichni
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {TOWN}, zemřelo {COMMA} obyvatel, zbořeno {COMMA} domů
 
-STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} prodal svůj vlak do šrotu
+STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} prodal svůj vlak za 20 dolarů
 
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin se zřítil do {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Silniční vozidlo bylo zničeno při srážce s UFO!
@@ -4768,6 +4768,8 @@ STR_VEHICLE_VIEW_CLONE_AIRCRAFT_INFO                            :{BLACK}Vytvoři
 STR_VEHICLE_VIEW_TRAIN_IGNORE_SIGNAL_TOOLTIP                    :{BLACK}Donuť vlak pokračovat bez čekání na povolení od semaforu
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reversní chod
 STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Spojit tento vlak se stojícím vlakem hned před ním
+STR_VEHICLE_VIEW_TRAIN_SELL_TOOLTIP                             :{BLACK}Prodat tenhle vlak. Přijede pro něj odtahovka a prodá ho v depu; zaplaceno dostaneš, až se tam opravdu prodá
+STR_VEHICLE_VIEW_WAGONS_SELL_TOOLTIP                            :{BLACK}Prodat tyhle vagonky. Přijede pro ně odtahovka a prodá je v depu; zaplaceno dostaneš, až se tam opravdu prodají
 STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Určit tento vlak jako odtahovku v tomto depu. Čeká tady, vyjíždí pro porouchané a havarované vlaky a potom se sem vrací
 STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP                             :{BLACK}Zavolat odtahovku, ať tyto vagony odtáhne do depa. Druhým kliknutím se volání zruší
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Otoč vozidlo
@@ -5121,7 +5123,7 @@ STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Odpojen�
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Odpojené naložit pro: {STATION}
 STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Řekne, pro kterou stanici je tahle odložená řada určená. Auta to čtou vždycky: auto, které má v rozkazu „naložit na vagony na příští zastávku", nastoupí jen na řadu určenou tam, kam jede ono. Se zapnutou distribucí nákladu to navíc platí i pro náklad - stanice si třídí, co na ní leží, podle toho, kam to jede dál, a vydá vozidlu jen to, co se hodí na jeho trasu; odpojené vagony bez mašinky žádnou trasu nemají, takže jim bez tohohle nevydá nic. Není to jízda a nic neslibuje: vagony pojedou tam, kam je odveze sběračka, a náklad, který se sveze jinam, se na příští stanici naplánuje znovu
 STR_ORDER_SELL_TRAIN                                            :{BLACK}Prodat vlak
-STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Prodá tenhle vlak do šrotu tam, kde stojí. Peníze přijdou hned a napíšou o tom noviny; od té chvíle vlak není tvůj, nerozjedeš ho a čeká na odtahovku, která ho odveze do depa a tam se sešrotuje. Poruchu ani vrak nikdo nekoupí
+STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Odloženo, zatím nedělá nic. Prodat vlak se dá ikonkou v jeho vlastním okně, tam, kde je venku zatmavená přestavba
 STR_ORDER_SELL_TRAIN_CAPTION                                    :{WHITE}Prodat vlak do šrotu
 STR_ORDER_SELL_TRAIN_QUERY                                      :{YELLOW}Prodat vlak?
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(a odpojit celý vlak)

@@ -2631,7 +2631,14 @@ struct VehicleDetailsWindow : Window {
 
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
-		if (widget == WID_VD_CAPTION) return GetString(STR_VEHICLE_DETAILS_CAPTION, Vehicle::Get(this->window_number)->index);
+		if (widget == WID_VD_CAPTION) {
+			const Vehicle *v = Vehicle::Get(this->window_number);
+			/* Same as the view window's caption, and for the same reason: a
+			 * rake of wagons has no unit number to be called by. That belongs
+			 * to the engine that left it here and went on without it. */
+			if (IsWaitingWagonChain(v)) return GetString(STR_VEHICLE_VIEW_WAGONS_CAPTION);
+			return GetString(STR_VEHICLE_DETAILS_CAPTION, v->index);
+		}
 
 		return this->Window::GetWidgetString(widget, stringid);
 	}
@@ -2752,8 +2759,16 @@ struct VehicleDetailsWindow : Window {
 			this->vscroll->SetCount(GetTrainDetailsWndVScroll(v->index, this->tab));
 		}
 
-		/* Disable service-scroller when interval is set to disabled */
-		this->SetWidgetsDisabledState(!IsVehicleServiceIntervalEnabled(v->type, v->owner),
+		/* Disable service-scroller when interval is set to disabled.
+		 *
+		 * A rake of wagons has no servicing interval to set: an interval is a
+		 * thing a vehicle carries to the depot on its own, and a rake goes
+		 * nowhere by itself. The command would refuse it anyway -- it asks for
+		 * a primary vehicle -- so the controls are dark rather than dead. What
+		 * the player opened this window for is on the tabs below: what is in
+		 * these wagons and how much more would go in. */
+		bool wagons = IsWaitingWagonChain(v);
+		this->SetWidgetsDisabledState(wagons || !IsVehicleServiceIntervalEnabled(v->type, v->owner),
 			WID_VD_INCREASE_SERVICING_INTERVAL,
 			WID_VD_DECREASE_SERVICING_INTERVAL);
 
@@ -2762,7 +2777,7 @@ struct VehicleDetailsWindow : Window {
 			v->ServiceIntervalIsPercent() ? STR_VEHICLE_DETAILS_PERCENT :
 			TimerGameEconomy::UsingWallclockUnits() ? STR_VEHICLE_DETAILS_MINUTES : STR_VEHICLE_DETAILS_DAYS;
 		this->GetWidget<NWidgetCore>(WID_VD_SERVICE_INTERVAL_DROPDOWN)->SetString(str);
-		this->SetWidgetDisabledState(WID_VD_SERVICE_INTERVAL_DROPDOWN, v->owner != _local_company);
+		this->SetWidgetDisabledState(WID_VD_SERVICE_INTERVAL_DROPDOWN, wagons || v->owner != _local_company);
 
 		this->DrawWidgets();
 	}
@@ -2925,6 +2940,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 			 * FEATURE_DESIGN_COUPLING_TOW.md. */
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_REFIT_TURN),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_REFIT), SetMinimalSize(18, 18), SetSpriteTip(SPR_REFIT_VEHICLE),
+				/* Second plane: selling. Refitting is only ever on offer to a
+				 * train standing in a shed, so out on the line that button sat
+				 * there dark and the row was wasted -- and selling is exactly
+				 * what a player wants of a train out on the line that he is
+				 * done with. A rake of wagons gets the same button for the
+				 * same reason: its column is nearly empty. The two never show
+				 * together, because the one is only useful where the other is
+				 * not. The player's own reading of the space. */
+				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SELL), SetMinimalSize(18, 18), SetSpriteTip(SPR_SELL_TRAIN),
 			EndContainer(),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VV_SELECT_TURN),
 				NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_TURN_AROUND), SetMinimalSize(18, 18),
@@ -3137,6 +3161,9 @@ private:
 		SEL_DC_RESCUE,      ///< Display 'rescue engine' button in #WID_VV_SELECT_DEPOT_CLONE stacked widget, in place of 'clone'.
 
 		SEL_DC_BASEPLANE = SEL_DC_GOTO_DEPOT, ///< First plane of the #WID_VV_SELECT_DEPOT_CLONE stacked widget.
+
+		SEL_RS_REFIT = 0,   ///< Display the 'refit' button in #WID_VV_SELECT_REFIT_TURN.
+		SEL_RS_SELL = 1,    ///< Display the 'sell' button there instead.
 	};
 	bool mouse_over_start_stop = false;
 
@@ -3258,16 +3285,32 @@ public:
 			 * left it with, and opening it is how the player says "never mind
 			 * the load, take them away". */
 			this->SetWidgetDisabledState(WID_VV_SHOW_ORDERS, !is_localcompany);
-			this->SetWidgetDisabledState(WID_VV_SHOW_DETAILS, true);
+			/* The details window is theirs as much as any vehicle's: what is
+			 * in these wagons and how much more would go in them is the whole
+			 * question the player opened them for. It used to be dark because
+			 * the window had never been opened on anything without an engine;
+			 * what in it does not apply to a rake is left out there. */
+			this->SetWidgetDisabledState(WID_VV_SHOW_DETAILS, false);
 			this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);
 			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany);
 			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, IsWagonTowRequested(Train::From(v)));
+			/* Sold and waiting is not a thing to press twice; the tow is
+			 * already coming and the sale is already made. */
+			this->SetWidgetDisabledState(WID_VV_SELL, !is_localcompany || Train::From(v)->IsSoldForScrap());
+			this->GetWidget<NWidgetCore>(WID_VV_SELL)->SetToolTip(STR_VEHICLE_VIEW_WAGONS_SELL_TOOLTIP);
 			return;
 		}
 
 		this->SetWidgetDisabledState(WID_VV_RENAME, !is_localcompany);
 		this->SetWidgetDisabledState(WID_VV_GOTO_DEPOT, !is_localcompany);
 		this->SetWidgetDisabledState(WID_VV_REFIT, !refittable_and_stopped_in_depot || !is_localcompany);
+		/* The button says why it cannot be pressed by not being pressable, and
+		 * the window that opens on a press says it in words: both ask
+		 * SellTrainForScrapRefusal(), so they can never disagree. */
+		if (v->type == VehicleType::Train) {
+			this->SetWidgetDisabledState(WID_VV_SELL, !is_localcompany || SellTrainForScrapRefusal(Train::From(v)) != STR_NULL);
+			this->GetWidget<NWidgetCore>(WID_VV_SELL)->SetToolTip(STR_VEHICLE_VIEW_TRAIN_SELL_TOOLTIP);
+		}
 		this->SetWidgetDisabledState(WID_VV_CLONE, !is_localcompany);
 
 		/* Lower the Send To Depot button when clicking it would cause the
@@ -3736,16 +3779,49 @@ public:
 				}
 				break;
 
+			case WID_VV_SELL: // sell this train, or these wagons, and let a tow come for them
+				assert(v->type == VehicleType::Train);
+				if (IsWaitingWagonChain(v)) {
+					/* Wagons go without a question being asked. Nothing is
+					 * destroyed by it that the player cannot see standing
+					 * there, and the tow button beside it asks nothing either
+					 * -- this is that same button with a sale on the end. */
+					Command<Commands::RequestWagonTow>::Post(STR_ERROR_CAN_T_REQUEST_TOW, v->tile, v->index, true, true);
+					break;
+				}
+				/* A whole train is asked about first: it is a lot of money and
+				 * a lot of vehicles, and from the yes onwards it is not the
+				 * player's to drive. The game's own yes/no window, which is
+				 * red with yellow buttons -- the colours an important question
+				 * is asked in here. */
+				ShowQuery(GetEncodedString(STR_ORDER_SELL_TRAIN_CAPTION), GetEncodedString(STR_ORDER_SELL_TRAIN_QUERY),
+						this, VehicleViewWindow::SellTrainCallback);
+				break;
+
 			case WID_VV_RESCUE_ENGINE: // station here as a rescue engine, or stand down; on wagons: call a tow for them
 				assert(v->type == VehicleType::Train);
 				if (IsWaitingWagonChain(v)) {
-					Command<Commands::RequestWagonTow>::Post(STR_ERROR_CAN_T_REQUEST_TOW, v->tile, v->index, !IsWagonTowRequested(Train::From(v)));
+					Command<Commands::RequestWagonTow>::Post(STR_ERROR_CAN_T_REQUEST_TOW, v->tile, v->index, !IsWagonTowRequested(Train::From(v)), false);
 					break;
 				}
 				Command<Commands::SetRescueEngine>::Post(STR_ERROR_CAN_T_MAKE_RESCUE_ENGINE, v->tile, v->index,
 						!v->vehicle_flags.Test(VehicleFlag::RescueEngine));
 				break;
 		}
+	}
+
+	/**
+	 * The answer to "sell the train?". Nothing happens on a no, and on a yes
+	 * the sale goes through the ordinary command, which asks all the questions
+	 * again for itself -- the train may have broken down or crashed in the
+	 * seconds the window stood open.
+	 */
+	static void SellTrainCallback(Window *w, bool confirmed)
+	{
+		if (!confirmed) return;
+		const Vehicle *v = Vehicle::GetIfValid(static_cast<VehicleViewWindow *>(w)->window_number);
+		if (v == nullptr) return;
+		Command<Commands::SellTrainForScrap>::Post(STR_ERROR_CAN_T_SELL_TRAIN, v->tile, v->index);
 	}
 
 	EventState OnHotkey(int hotkey) override
@@ -3865,7 +3941,19 @@ public:
 
 		bool changed = this->GetWidget<NWidgetStacked>(WID_VV_SELECT_DEPOT_CLONE)->SetDisplayedPlane(depot_clone);
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_FORCE_PROCEED_SEL)->SetDisplayedPlane(!wagons && v->type == VehicleType::Train ? 0 : SZSP_NONE);
-		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN)->SetDisplayedPlane(wagons ? SZSP_NONE : 0);
+		/* Refit or sell, in the one row. A train standing in a shed can be
+		 * refitted and is not what anybody sells from here -- it is already
+		 * where selling is an ordinary thing to do. Anywhere else refitting is
+		 * refused, so the row would be a dark button; selling takes it over.
+		 * Wagons had no row at all and now have this one, with selling in it.
+		 * Only trains: the tow that comes for what is sold is a train's. */
+		int refit_sell = SZSP_NONE;
+		if (v->type == VehicleType::Train) {
+			refit_sell = (!wagons && IsVehicleRefittable(v)) ? SEL_RS_REFIT : SEL_RS_SELL;
+		} else if (!wagons) {
+			refit_sell = SEL_RS_REFIT;
+		}
+		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN)->SetDisplayedPlane(refit_sell);
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_TURN)->SetDisplayedPlane(!wagons && v->IsGroundVehicle() ? 0 : SZSP_NONE);
 		changed |= this->GetWidget<NWidgetStacked>(WID_VV_SELECT_RAID)->SetDisplayedPlane(ShowsRaidButton(v) ? 0 : SZSP_NONE);
 		return changed;

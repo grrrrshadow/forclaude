@@ -25,6 +25,7 @@ enum VehicleViewWidgets : WidgetID {
 	WID_VV_CLONE,              ///< Clone this vehicle.
 	WID_VV_SELECT_DEPOT_CLONE, ///< Selection widget between 'goto depot', and 'clone vehicle' buttons.
 	WID_VV_SELECT_REFIT_TURN,  ///< Container for the 'refit' button, which can be hidden.
+	WID_VV_SELL,               ///< Sell this train, or these wagons; shares a row with 'refit', which it replaces wherever refitting is not on offer.
 	WID_VV_TURN_AROUND,        ///< Turn this vehicle around.
 	WID_VV_FORCE_PROCEED,      ///< Force this vehicle to pass a signal at danger.
 	WID_VV_FORCE_PROCEED_SEL,  ///< Container for 'force proceed' button, which can be hidden.

@@ -96,6 +96,7 @@
 #include "waypoint_base.h"
 #include "waypoint_func.h"
 #include "vehicle_gui.h"
+#include "widgets/vehicle_widget.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -3389,6 +3390,89 @@ static void TestSellTrainForScrap(Train *t)
 }
 
 /**
+ * Open a vehicle's own window and look at the row where refitting and selling
+ * take turns. Usage: 'testikonaprodat <cislo vlaku>|vagonky'
+ *
+ * The rig's only way into that window. Two things are measured, and both are
+ * things no counter can see: which of the two buttons is in the row at all,
+ * and whether the one that is there can be pressed. The same hole the wagon
+ * list had -- a window opened with no way to answer it -- and the player found
+ * that one by hand.
+ *
+ * On a rake of wagons it goes on to press the button, because there the press
+ * is the whole gesture: a train is asked "are you sure?" first and the sale
+ * itself is measured by testprodat.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSellIcon(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Look at the sell icon in a vehicle's window. Usage: 'testikonaprodat <cislo vlaku>|vagonky'.");
+		return true;
+	}
+
+	Train *v = nullptr;
+	if (argv[1] == "vagonky") {
+		for (Train *t : Train::Iterate()) {
+			if (t->First() != t || !t->IsFreeWagon() || t->IsInDepot()) continue;
+			v = t;
+			break;
+		}
+		if (v == nullptr) {
+			IConsolePrint(CC_ERROR, "testikonaprodat: ODMITNUTO - zadne vagonky venku nestoji.");
+			return true;
+		}
+	} else {
+		auto punit = ParseInteger(argv[1]);
+		if (!punit.has_value()) return false;
+		for (Train *t : Train::Iterate()) {
+			if (t->First() == t && t->IsFrontEngine() && t->unitnumber == (UnitID)*punit) {
+				v = t;
+				break;
+			}
+		}
+		if (v == nullptr) {
+			IConsolePrint(CC_ERROR, "testikonaprodat: vlak {} nenalezen.", argv[1]);
+			return true;
+		}
+	}
+
+	AutoRestoreBackup cur_company(_current_company, v->owner);
+	ShowVehicleViewWindow(v);
+	Window *w = FindWindowById(WindowClass::VehicleView, v->index);
+	if (w == nullptr) {
+		IConsolePrint(CC_ERROR, "testikonaprodat: ODMITNUTO - okno vozidla se neotevrelo.");
+		return true;
+	}
+
+	NWidgetStacked *sel = w->GetWidget<NWidgetStacked>(WID_VV_SELECT_REFIT_TURN);
+	if (sel == nullptr || sel->shown_plane == SZSP_NONE) {
+		IConsolePrint(CC_ERROR, "testikonaprodat: ODMITNUTO - v okne neni ani prestavba, ani prodej.");
+		return true;
+	}
+	bool selling = sel->shown_plane == 1;
+	bool usable = selling && !w->IsWidgetDisabled(WID_VV_SELL);
+	IConsolePrint(CC_INFO, "testikonaprodat: v okne je {}, {}", selling ? "prodej" : "prestavba",
+			selling ? (usable ? "da se zmacknout" : "zatmaveny") : "prodej tam neni");
+	if (!selling) return true;
+	if (!usable) {
+		IConsolePrint(CC_ERROR, "testikonaprodat: ODMITNUTO - cudlik prodeje nejde zmacknout.");
+		return true;
+	}
+	if (!v->IsFreeWagon()) return true;
+
+	w->OnClick(Point{}, WID_VV_SELL, 1);
+	/* Said from the wagons, not from the window: what is measured is whether
+	 * the press reached them at all. */
+	if (!v->IsSoldForScrap()) {
+		IConsolePrint(CC_ERROR, "testikonaprodat: ODMITNUTO - vagonky se po zmacknuti neoznacily jako prodane.");
+		return true;
+	}
+	IConsolePrint(CC_INFO, "testikonaprodat: vagonky PRODANY, ceka se na odtah");
+	return true;
+}
+
+/**
  * Sell the test scene's train for scrap, or a named one. Usage: 'testprodat
  * [unit number]'.
  *
@@ -5169,7 +5253,7 @@ static bool ConTestRequestTow(std::span<std::string_view> argv)
 		if (t->First() != t || !IsWaitingWagonChain(t)) continue;
 		if (!all && (at != INVALID_TILE ? t->tile != at : t->unitnumber != (UnitID)unit)) continue;
 		AutoRestoreBackup cur_company(_current_company, t->owner);
-		CommandCost res = Command<Commands::RequestWagonTow>::Do(DoCommandFlag::Execute, t->index, true);
+		CommandCost res = Command<Commands::RequestWagonTow>::Do(DoCommandFlag::Execute, t->index, true, false);
 		IConsolePrint(res.Failed() ? CC_ERROR : CC_DEFAULT, "testodvoz: rada {} na ({},{}) - {}", t->unitnumber, TileX(t->tile), TileY(t->tile),
 				res.Failed() ? GetString(res.GetErrorMessage()) : std::string("odtah zavolan"));
 		done++;
@@ -10102,6 +10186,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmapa",                ConTestMap);
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testprodat",              ConTestSell);
+	IConsole::CmdRegister("testikonaprodat",         ConTestSellIcon);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
