@@ -819,6 +819,16 @@ void Vehicle::HandlePathfindingResult(bool path_found)
 	 * worth reading. */
 	if (!path_found && this->type == VehicleType::Train && this->current_order.ShouldGoToCouple()) path_found = true;
 
+	/* The same for a rescue engine, and for the same reason. It stands in its
+	 * shed with nowhere to be until something breaks down, and "nowhere to be"
+	 * is what having no path looks like to this function. The player's words:
+	 * "jen stoji v depu a ceka co by odtahl". A train he has sold is in the
+	 * same position: it is not going anywhere by itself and never will. */
+	if (!path_found && this->type == VehicleType::Train) {
+		const Train *t = Train::From(this);
+		if (t->vehicle_flags.Test(VehicleFlag::RescueEngine) || t->IsSoldForScrap()) path_found = true;
+	}
+
 	if (path_found) {
 		/* Route found, is the vehicle marked with "lost" flag? */
 		if (!this->vehicle_flags.Test(VehicleFlag::PathfinderLost)) return;

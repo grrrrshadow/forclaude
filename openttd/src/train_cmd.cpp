@@ -6396,10 +6396,60 @@ static void TryDispatchRescueEngine(Train *tow)
 		}
 	}
 
-	if (nearest == nullptr) nearest = skipped;
+	if (nearest == nullptr && skipped != nullptr) {
+		/* Falling back on the one it gave up on: its distance has to be worked
+		 * out here, because the loop above passed it over without measuring it.
+		 * Left at "infinity" every other engine would count as nearer and this
+		 * one would defer to all of them for ever. */
+		nearest = skipped;
+		nearest_distance = DistanceManhattan(tow->tile, skipped->tile);
+	}
 	if (nearest == nullptr) {
 		if (saw_casualty) return hold(RescueHold::AllTaken);
 		return hold(saw_trouble ? RescueHold::NotEligible : RescueHold::NobodyWaiting);
+	}
+
+	/* Is somebody nearer to it? Each engine used to ask only which casualty was
+	 * nearest to itself and then take it, and whose turn came first decided who
+	 * went -- the engines never compared themselves with each other. So an
+	 * engine at the far end of the map took a breakdown that another one was
+	 * standing a few tiles from, which is what the player found.
+	 *
+	 * Only genuinely free engines count here. One that is braked, has orders of
+	 * its own, or is already out on a call is not going to come, and deferring
+	 * to it would leave the casualty with nobody. Ties go to the lower vehicle
+	 * id, so of two engines the same distance away exactly one holds back and
+	 * the other goes.
+	 *
+	 * Nothing is reserved by this: the nearer engine takes the case on its own
+	 * next look, within a few dozen ticks. If it stops being free in the
+	 * meantime, this one stops deferring and goes. */
+	for (const Train *other : Train::Iterate()) {
+		if (other == tow) continue;
+		if (other->First() != other || !other->IsFrontEngine()) continue;
+		if (other->owner != tow->owner) continue;
+		if (!other->vehicle_flags.Test(VehicleFlag::RescueEngine)) continue;
+		if (other->rescue_target != VehicleID::Invalid()) continue; // already out
+		if (!other->IsInDepot()) continue;
+		if (other->vehstatus.Test(VehState::Stopped)) continue;
+		if (other->GetNumManualOrders() != 0) continue;
+		if (other->rescue_skip == nearest->index) continue; // it gave this one up
+
+		uint other_distance = DistanceManhattan(other->tile, nearest->tile);
+		/* Standing on the casualty's own tile is not "nearer", it is behind it:
+		 * that is the shed whose door the casualty is blocking, and the engine
+		 * inside is the one that cannot get out past it. Measured on the rig:
+		 * deferring to it turned a scene that did eleven couplings into one
+		 * that did none. */
+		if (other_distance == 0) continue;
+		if (other_distance > nearest_distance) continue;
+		if (other_distance == nearest_distance && other->index > tow->index) continue;
+
+		if (_show_train_orientation) {
+			SayOnChange(tow, fmt::format("Vlak {}: odtah - pro {} jede odtahovka {}, stoji bliz ({} proti {})",
+					tow->unitnumber, nearest->index.base(), other->unitnumber, other_distance, nearest_distance));
+		}
+		return hold(RescueHold::CloserOne);
 	}
 
 	tow->rescue_hold = RescueHold::None;

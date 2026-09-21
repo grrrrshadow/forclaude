@@ -4721,6 +4721,7 @@ STR_VEHICLE_STATUS_STOPPED                                      :{RED}Stopped
 STR_VEHICLE_STATUS_RESCUE_ON_CALL                               :{BLACK}On call for breakdowns
 STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS                           :{BLACK}On call, but it has orders
 STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN                            :{BLACK}On call, another engine is going
+STR_VEHICLE_STATUS_RESCUE_HOLD_CLOSER                           :{LTBLUE}On call - a nearer engine is going for it
 STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE                     :{BLACK}On call, sees trouble but cannot go
 STR_VEHICLE_STATUS_RESCUE_ON_THE_WAY                            :{ORANGE}On the way to a stranded train
 STR_VEHICLE_STATUS_RESCUE_CANNOT_LEAVE                          :{LTBLUE}Called out, cannot leave the depot

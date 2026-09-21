@@ -161,6 +161,7 @@ enum class RescueHold : uint8_t {
 	NobodyWaiting, ///< Nothing anywhere is broken down or wrecked.
 	NotEligible,   ///< Something is, but it does not count as waiting to be fetched.
 	AllTaken,      ///< Something is waiting, but another engine is already going for it.
+	CloserOne,     ///< Something is waiting, but another engine on call stands nearer to it and is the one to go.
 	ExitBlocked,   ///< Called out, but the block outside the depot is occupied.
 	NoPath,        ///< Called out, but no route to the casualty can be reserved.
 	NoDepot,       ///< Has the casualty in tow, but no depot it can reach to put it down in.

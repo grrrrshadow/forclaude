@@ -203,6 +203,12 @@ run_scene odtahjednosmer "vlak123 on
 testodtah jednosmer 0" 14000
 run_scene odtahdaleko "vlak123 on
 testodtah daleko 0" 16000
+# Two rescue engines, one five tiles from the casualty and one thirty-four
+# away. Each used to ask only which casualty was nearest to itself and then
+# take it, so whose turn came first decided who went -- and the far one went
+# (the player's report of 21. 9.). They compare themselves with each other now.
+run_scene odtahdveblizsi "vlak123 on
+testodtah daleko 0 dve" 16000
 run_scene odtahbezdepa "vlak123 on
 testodtah daleko 0
 testza 1000 testdepo pryc

@@ -3480,6 +3480,7 @@ public:
 					case RescueHold::CannotCouple: return GetString(STR_VEHICLE_STATUS_RESCUE_CANNOT_COUPLE);
 					case RescueHold::HasOrders: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_ORDERS);
 					case RescueHold::AllTaken: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_TAKEN);
+						case RescueHold::CloserOne: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_CLOSER);
 					case RescueHold::NotEligible: return GetString(STR_VEHICLE_STATUS_RESCUE_HOLD_NOT_ELIGIBLE);
 					case RescueHold::NobodyWaiting: return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
 					default: return GetString(STR_VEHICLE_STATUS_RESCUE_ON_CALL);
