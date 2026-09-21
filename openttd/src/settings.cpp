@@ -1417,6 +1417,104 @@ bool IsConversionNeeded(const ConfigIniFile &ini, const std::string &group, cons
 }
 
 /**
+ * The things in a config file that belong to the player and to their machine
+ * rather than to the way the game is played.
+ *
+ * Everything else this build decides for itself: how many competitors there
+ * are, what breaks down, how towns grow -- that is the point of having a
+ * config of our own (decouple_default_config.h). What is here is the other
+ * half, the half nobody would thank us for deciding: which graphics they
+ * bought, which language they read, how big they made the interface, which
+ * NewGRFs they play with.
+ */
+static const std::string_view _take_over_misc_keys[] = {
+	"graphicsset", "soundsset", "musicset", "language",
+	"gui_scale", "allow_hidpi", "resolution", "fullscreen", "video_hw_accel", "video_vsync",
+	"videodriver", "musicdriver", "sounddriver", "blitter",
+	"small_font", "medium_font", "large_font", "mono_font",
+	"small_size", "medium_size", "large_size", "mono_size",
+	"global_aa", "prefer_sprite_font", "sprite_cache_size_px", "support8bpp",
+	"player_face", "keyboard", "keyboard_caps", "rightclick_emulate",
+	"screenshot_format", "savegame_format",
+};
+
+/** Whole groups taken over as they stand. */
+static const std::string_view _take_over_groups[] = {
+	"graphicsset", // the chosen set's name, version and checksum, which [misc] only names
+	"newgrf",
+	"newgrf-static",
+	"currency",    // only means anything if they made a currency of their own
+	"music",
+	"sound",
+};
+
+/**
+ * Copy one group, or the named keys of it, from one config into another.
+ * @param from  the config read from
+ * @param to    the config written to
+ * @param group the group name
+ * @param keys  the keys to take, or an empty span for the whole group
+ */
+static void TakeOverGroup(const IniFile &from, IniFile &to, std::string_view group, std::span<const std::string_view> keys)
+{
+	const IniGroup *src = from.GetGroup(group);
+	if (src == nullptr) return;
+
+	IniGroup &dst = to.GetOrCreateGroup(group);
+	for (const IniItem &item : src->items) {
+		if (!keys.empty() && std::ranges::find(keys, item.name) == keys.end()) continue;
+		dst.GetOrCreateItem(item.name).SetValue(item.value.value_or(""));
+	}
+}
+
+/**
+ * Start this build's brand-new config off from the player's own OpenTTD.
+ *
+ * Only ever on the first run, when our config has just been made: from then on
+ * it is the player's file and nothing reaches into it. And only the half of a
+ * config that is about them and their machine -- see _take_over_misc_keys and
+ * _take_over_groups -- because the other half is what this build sets for
+ * itself and is the reason it keeps a config of its own at all.
+ *
+ * Three things are deliberately left where they are. The version line, because
+ * the game writes that itself and a copied one would have our new file claim to
+ * have been written by another version, which sets off conversions that do not
+ * belong. The secrets file, because passwords are passwords and a copied
+ * network id would make two installations look like one and the same client.
+ * And the list of servers played on, which the player said not to take.
+ *
+ * The player's name is not in openttd.cfg at all -- it lives in the private
+ * file, under [network] -- so that one is fetched separately.
+ *
+ * @param theirs_dir  the folder the player's config is in, with the separator
+ * @param ours        our config file, already written with our own defaults
+ * @param ours_private our private config file, which need not exist yet
+ */
+void TakeOverPlayersConfig(const std::string &theirs_dir, const std::string &ours, const std::string &ours_private)
+{
+	ConfigIniFile theirs(theirs_dir + "openttd.cfg");
+	ConfigIniFile mine(ours);
+
+	TakeOverGroup(theirs, mine, "misc", _take_over_misc_keys);
+	for (std::string_view group : _take_over_groups) TakeOverGroup(theirs, mine, group, {});
+	mine.SaveToDisk(ours);
+
+	/* And the name they play under, which is kept apart from the rest because
+	 * it says who they are. */
+	const std::string their_private = theirs_dir + "openttd_private.cfg";
+	if (!FileExists(their_private)) return;
+	ConfigIniFile theirs_private(their_private);
+	const IniGroup *network = theirs_private.GetGroup("network");
+	if (network == nullptr) return;
+	const IniItem *name = network->GetItem("client_name");
+	if (name == nullptr || !name->value.has_value()) return;
+
+	ConfigIniFile mine_private(ours_private);
+	mine_private.GetOrCreateGroup("network").GetOrCreateItem("client_name").SetValue(*name->value);
+	mine_private.SaveToDisk(ours_private);
+}
+
+/**
  * Load the values from the configuration files
  * @param startup Load the minimal amount of the configuration to "bootstrap" the blitter and such.
  */

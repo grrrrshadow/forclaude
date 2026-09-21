@@ -53,15 +53,22 @@ extern std::string _highscore_file;
  * questions at once: whether the folder can be written to at all, and whether
  * the file is new, since a new one is empty.
  * @param file The config file to write.
+ * @param[out] created Set when the file was not there and has just been made,
+ *             which is the one moment anything may be taken over from the
+ *             player's own config (see TakeOverPlayersConfig()).
  * @return Whether the file is ours to write.
  */
-static bool SeedOurConfigFile(const std::string &file)
+static bool SeedOurConfigFile(const std::string &file, bool *created = nullptr)
 {
 	auto f = FileHandle::Open(file, "ab");
 	if (!f.has_value()) return false;
-	if (ftell(*f) == 0) fwrite(OUR_DEFAULT_CONFIG.data(), 1, OUR_DEFAULT_CONFIG.size(), *f);
+	if (ftell(*f) == 0) {
+		fwrite(OUR_DEFAULT_CONFIG.data(), 1, OUR_DEFAULT_CONFIG.size(), *f);
+		if (created != nullptr) *created = true;
+	}
 	return true;
 }
+
 
 /** Subdirectory names. */
 static const EnumIndexArray<std::string_view, Subdirectory, Subdirectory::End> _subdirs = {
@@ -953,6 +960,27 @@ extern std::string CocoaGetAppSupportDir();
 std::string _personal_dir;
 
 /**
+ * Where the player's own OpenTTD keeps its config, if it is anywhere this
+ * build can see.
+ *
+ * Beside the binary first, because that is where a player who unpacked this
+ * build into their game folder has it; then the personal directory, which is
+ * where the game itself would have put it. The first one that exists wins, and
+ * nothing at all is a perfectly ordinary answer -- somebody who has never run
+ * OpenTTD before has no config to take anything from.
+ *
+ * @param config_dir the personal directory this build settled on
+ * @return the folder the player's config is in, with the separator, or empty
+ */
+static std::string FindPlayersConfigDir(const std::string &config_dir)
+{
+	std::string beside_binary = IsValidSearchPath(Searchpath::BinaryDir) ? _searchpaths[Searchpath::BinaryDir] : std::string{};
+	if (!beside_binary.empty() && FileExists(beside_binary + "openttd.cfg")) return beside_binary;
+	if (FileExists(config_dir + "openttd.cfg")) return config_dir;
+	return {};
+}
+
+/**
  * Acquire the base paths (personal dir and game data dir),
  * fill all other paths (save dir, autosave dir etc) and
  * make the save and scenario directories.
@@ -1082,14 +1110,15 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	 * (DetermineBasePaths), so config_dir is it and the other files belong with
 	 * it. Only when nothing was said do we pick the folder ourselves. */
 	std::string our_config_dir = config_dir;
+	bool config_created = false;
 	if (!config_file_given) {
 		bool beside_binary = IsValidSearchPath(Searchpath::BinaryDir) &&
-				SeedOurConfigFile(_searchpaths[Searchpath::BinaryDir] + OUR_CONFIG_FILE);
+				SeedOurConfigFile(_searchpaths[Searchpath::BinaryDir] + OUR_CONFIG_FILE, &config_created);
 		our_config_dir = beside_binary ?
 				_searchpaths[Searchpath::BinaryDir] :
 				fmt::format("{}{}", _personal_dir, _subdirs[Subdirectory::Save]);
 		_config_file = our_config_dir + OUR_CONFIG_FILE;
-		if (!beside_binary) SeedOurConfigFile(_config_file);
+		if (!beside_binary) SeedOurConfigFile(_config_file, &config_created);
 	}
 
 	Debug(misc, 1, "{} used for this build's own config files", our_config_dir);
@@ -1105,6 +1134,20 @@ void DeterminePaths(std::string_view exe, bool only_local_path)
 	_secrets_file = our_config_dir + OUR_CONFIG_NAME "_secrets.cfg";
 	extern std::string _favs_file;
 	_favs_file = our_config_dir + OUR_CONFIG_NAME "_favs.cfg";
+
+	/* First run, and the player has an OpenTTD of their own: their name, their
+	 * graphics, their language, the size they made the interface and the
+	 * NewGRFs they play with are taken over, so that this build does not open
+	 * as a stranger. Only now, only once, and only the half of a config that
+	 * is theirs -- see TakeOverPlayersConfig(). */
+	if (config_created) {
+		std::string theirs_dir = FindPlayersConfigDir(config_dir);
+		if (!theirs_dir.empty()) {
+			extern void TakeOverPlayersConfig(const std::string &theirs_dir, const std::string &ours, const std::string &ours_private);
+			TakeOverPlayersConfig(theirs_dir, _config_file, _private_file);
+			Debug(misc, 1, "settings of your own taken over from {}openttd.cfg", theirs_dir);
+		}
+	}
 
 	/* If we have network we make a directory for the autodownloading of content */
 	_searchpaths[Searchpath::AutodownloadDir] = _personal_dir + "content_download" PATHSEP;
