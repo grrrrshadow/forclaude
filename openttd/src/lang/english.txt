@@ -5001,9 +5001,10 @@ STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}One numb
 STR_ORDER_COUPLE_BUY_OFF                                        :{BLACK}Wagon: any
 STR_ORDER_COUPLE_BUY_ON                                         :{BLACK}Buy: {ENGINE}
 STR_ORDER_COUPLE_BUY_TOOLTIP                                    :{BLACK}Which wagon this order works with. Press it to pick one from the list: from then on the order couples that wagon and no other - a wagon does not carry just any road vehicle, and which one it is decides what can ride on it - and buys one whenever the depot is short, already fitted for the cargo the filter asks for. Press it again and the buying stops while the wagon goes on saying which ones to couple, which is what a yard wants once it has enough of them going round. Press it a third time to let go of the wagon and take whatever the filter allows
-STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(buy {ENGINE})
+STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(buy {ENGINE}{STRING})
 STR_ORDER_COUPLE_BUY_ONLY                                       :{BLACK}Wagon: {ENGINE}
-STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(wagon {ENGINE})
+STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(wagon {ENGINE}{STRING})
+STR_ORDER_COUPLE_BUY_CARGO_PART                                 :{SPACE}{STRING}
 STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Which wagon to couple
 STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Couple this one
 STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Write this wagon into the order. The order buys one whenever the depot is short, fits it for the cargo the filter asks for, and couples it

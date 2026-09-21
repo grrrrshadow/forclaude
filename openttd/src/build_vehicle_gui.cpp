@@ -104,6 +104,63 @@ static constexpr std::initializer_list<NWidgetPart> _nested_build_vehicle_widget
 };
 
 
+/**
+ * The same window, laid out for the question a depot order asks it.
+ *
+ * Which widgets are in it is the same list; where two of them sit is not. The
+ * player's own arrangement: a window that is being asked "which wagon" has no
+ * use for a cargo filter at the top, where the eye goes first and where it is
+ * read as what the order will be given. Hiding and renaming a model go up
+ * there instead, and the cargo filter goes down beside the button that
+ * answers, where it plainly belongs to the answer.
+ *
+ * A second layout rather than a switch inside the first: a widget lives at one
+ * place in a tree, so a widget that moves between rows means two trees. The
+ * ids are the same in both, which is why nothing else in the window has to
+ * know which of them it was built from.
+ */
+static constexpr std::initializer_list<NWidgetPart> _nested_pick_couple_wagon_widgets = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, Colours::Grey),
+		NWidget(WWT_CAPTION, Colours::Grey, WID_BV_CAPTION), SetTextStyle(TextColour::White),
+		NWidget(WWT_SHADEBOX, Colours::Grey),
+		NWidget(WWT_DEFSIZEBOX, Colours::Grey),
+		NWidget(WWT_STICKYBOX, Colours::Grey),
+	EndContainer(),
+	NWidget(NWID_VERTICAL),
+		NWidget(NWID_HORIZONTAL),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_BV_SORT_ASCENDING_DESCENDING), SetStringTip(STR_BUTTON_SORT_BY, STR_TOOLTIP_SORT_ORDER),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_BV_SORT_DROPDOWN), SetResize(1, 0), SetFill(1, 0), SetToolTip(STR_TOOLTIP_SORT_CRITERIA),
+		EndContainer(),
+		NWidget(NWID_HORIZONTAL),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_BV_SHOW_HIDDEN_ENGINES),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_BV_SHOW_HIDE), SetResize(1, 0), SetFill(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_BV_RENAME), SetResize(1, 0), SetFill(1, 0),
+			NWidget(WWT_IMGBTN, Colours::Grey, WID_BV_CONFIGURE_BADGES), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON), SetResize(0, 0), SetFill(0, 1), SetSpriteTip(SPR_EXTRA_MENU, STR_BADGE_CONFIG_MENU_TOOLTIP),
+		EndContainer(),
+		NWidget(WWT_PANEL, Colours::Grey),
+			NWidget(WWT_EDITBOX, Colours::Grey, WID_BV_FILTER), SetResize(1, 0), SetFill(1, 0), SetPadding(2), SetStringTip(STR_LIST_FILTER_OSKTITLE, STR_LIST_FILTER_TOOLTIP),
+		EndContainer(),
+		NWidget(NWID_VERTICAL, NWidContainerFlag{}, WID_BV_BADGE_FILTER),
+		EndContainer(),
+	EndContainer(),
+	/* Vehicle list. */
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_MATRIX, Colours::Grey, WID_BV_LIST), SetResize(1, 1), SetFill(1, 0), SetMatrixDataTip(1, 0), SetScrollbar(WID_BV_SCROLLBAR),
+		NWidget(NWID_VSCROLLBAR, Colours::Grey, WID_BV_SCROLLBAR),
+	EndContainer(),
+	/* Panel with details. */
+	NWidget(WWT_PANEL, Colours::Grey, WID_BV_PANEL), SetMinimalSize(240, 122), SetResize(1, 0), EndContainer(),
+	/* The button that answers, the cargo it answers with, resize button. */
+	NWidget(NWID_HORIZONTAL),
+		NWidget(NWID_SELECTION, Colours::Invalid, WID_BV_BUILD_SEL),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_BV_BUILD), SetResize(1, 0), SetFill(1, 0),
+		EndContainer(),
+		NWidget(WWT_DROPDOWN, Colours::Grey, WID_BV_CARGO_FILTER_DROPDOWN), SetResize(1, 0), SetFill(1, 0), SetToolTip(STR_TOOLTIP_FILTER_CRITERIA),
+		NWidget(WWT_RESIZEBOX, Colours::Grey),
+	EndContainer(),
+};
+
 bool _engine_sort_direction; ///< \c false = descending, \c true = ascending.
 VehicleTypeIndexArray<uint8_t> _engine_sort_last_criteria = {0, 0, 0, 0}; ///< Last set sort criteria, for each vehicle type.
 VehicleTypeIndexArray<bool> _engine_sort_last_order = {false, false, false, false}; ///< Last set direction of the sort order, for each vehicle type.
@@ -2107,6 +2164,15 @@ static WindowDesc _build_vehicle_desc(
 	&BuildVehicleWindow::hotkeys
 );
 
+/** Window definition for the same window asked which wagon an order should buy. */
+static WindowDesc _pick_couple_wagon_desc(
+	WindowPosition::Automatic, "pick_couple_wagon", 240, 268,
+	WindowClass::BuildVehicle, WindowClass::None,
+	WindowDefaultFlag::Construction,
+	_nested_pick_couple_wagon_widgets,
+	&BuildVehicleWindow::hotkeys
+);
+
 /**
  * Open the wagon list so that a depot order can be told which wagon to buy
  * when the shed it collects from is short of them.
@@ -2125,7 +2191,7 @@ void ShowPickCoupleWagonWindow(const Vehicle *v, VehicleOrderID index, TileIndex
 {
 	CloseWindowByClass(WindowClass::BuildVehicle);
 
-	BuildVehicleWindow *w = new BuildVehicleWindow(_build_vehicle_desc, tile, VehicleType::Train);
+	BuildVehicleWindow *w = new BuildVehicleWindow(_pick_couple_wagon_desc, tile, VehicleType::Train);
 	w->pick_for_order = v;
 	w->pick_order_index = index;
 	/* Opened already showing what the order is short of, so the list cannot

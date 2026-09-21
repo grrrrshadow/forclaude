@@ -247,6 +247,26 @@ run_scene koupitjinytyp "vlak123 on
 testspoj depo
 testpocet 2 0 3
 testkoupit 2 0 28" 12000
+# "Any number" on an order that buys its own wagons: a full train's worth, the
+# player having set his own limit to fifteen tiles and read any as fifteen
+# tiles. The limit is put down to five here so the number is small enough to
+# read: the engine is one tile, so eight wagons fit behind it and nine are
+# bought -- one to measure a wagon by and eight by division. Bought and
+# collected are one question, not two: wagons stand in a shed one by one, so
+# an order that bought nine and then collected "any rake" would leave with one
+# of them.
+# The same reading without any buying: "if he leaves any number, it buys the
+# maximum allowed length, or it couples what is in the shed". The limit is put
+# down to two tiles, which is the engine plus three wagons, and three is what
+# stands in the shed -- so the whole of it leaves, and the arithmetic that says
+# so is the same one the buying uses.
+run_scene depocelyvlak "vlak123 on
+setting vehicle.max_train_length 2
+testspoj depo" 12000
+run_scene koupitcelyvlak "vlak123 on
+setting vehicle.max_train_length 5
+testspoj depo
+testkoupit 2 0" 12000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

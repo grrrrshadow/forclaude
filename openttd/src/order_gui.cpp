@@ -537,9 +537,20 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				/* And which wagon it buys when the shed is short, in a bracket
 				 * of its own: it is not one of the filters, it is what the
 				 * order does when the filters find too little. */
-				if (Engine::GetIfValid(order->GetCoupleBuyEngine()) != nullptr) {
+				if (const Engine *buy = Engine::GetIfValid(order->GetCoupleBuyEngine()); buy != nullptr) {
+					/* With a wagon named, the cargo filter is off -- the two
+					 * rule each other out -- so the line would say nothing at
+					 * all about what this order hauls. The wagon's own cargo
+					 * is written out beside it instead: read, not asked for,
+					 * which is why it is inside the wagon's bracket and not a
+					 * filter of its own. The player's line: "koupit typ uacs
+					 * cement". */
+					std::string cargo;
+					if (IsValidCargoType(buy->GetDefaultCargoType())) {
+						cargo = GetString(STR_ORDER_COUPLE_BUY_CARGO_PART, CargoSpec::Get(buy->GetDefaultCargoType())->name);
+					}
 					second += GetString(order->ShouldBuyWagons() ? STR_ORDER_COUPLE_BUY_SUFFIX : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX,
-							PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
+							PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList), cargo);
 				}
 			}
 

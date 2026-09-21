@@ -3501,6 +3501,92 @@ static uint BuyWagonsIntoDepot(Train *v, const Order &order, TileIndex depot_til
 	return bought;
 }
 
+/**
+ * Total length of a chain, in the units the train-length limit is counted in.
+ */
+static uint ChainLength(const Train *t)
+{
+	uint len = 0;
+	for (const Train *u = t; u != nullptr; u = u->Next()) len += u->gcache.cached_veh_length;
+	return len;
+}
+
+/**
+ * How long the free wagons standing in this shed that the order would take
+ * are, together.
+ */
+static uint DepotPileLength(Train *v, const Order &order, TileIndex depot_tile)
+{
+	std::vector<Train *> pile;
+	FreeDepotUnitsFor(v, order, depot_tile, &pile, false);
+	uint len = 0;
+	for (const Train *rake : pile) len += ChainLength(rake);
+	return len;
+}
+
+/**
+ * How many wagons a shed is asked for when the order names no number at all:
+ * as many as make the train as long as the game allows.
+ *
+ * The player's own reading of a depot order with no number on it: "a train may
+ * be fifteen tiles here, so any is fifteen tiles' worth" -- and either way
+ * round, in his words, "it buys the maximum allowed length, or it couples what
+ * is in the shed". A yard given no count wants a full train, not one wagon,
+ * whether the wagons are bought or already standing there. (The other two
+ * readings of the number, "at least" and "at most", are a platform's question
+ * and cannot be set on a depot order at all -- the count box opens there
+ * without those buttons.)
+ *
+ * The length is reckoned from the engine, not left to the shed. A shed refuses
+ * to splice a rake longer than the limit -- which is the limit on the rake
+ * alone. Filled to that, the rake would be a full train by itself and the
+ * engine that came for it would not fit in front; so the engine's own length
+ * comes off the room first.
+ *
+ * Buying and counting are one question, not two. A wagon bought into a shed
+ * stands there on its own, so buying fifteen tiles' worth and then collecting
+ * "any rake" would fetch exactly one of them; the number this returns is the
+ * one the ordinary count path then makes a rake of, which is what leaves with
+ * the engine.
+ *
+ * One wagon is bought and measured rather than reckoned from the model: an
+ * articulated wagon is several vehicles and its length is not something this
+ * can be told. The rest is a division, every wagon of a model being the same.
+ *
+ * @param v          the collecting engine
+ * @param order      its "go to couple" order
+ * @param depot_tile the shed the order names
+ * @return how many units to take, 0 if not one of them would fit
+ */
+static uint WantFullTrainFromDepot(Train *v, const Order &order, TileIndex depot_tile)
+{
+	int room = _settings_game.vehicle.max_train_length * TILE_SIZE - (int)ChainLength(v);
+	if (room <= 0) return 0;
+
+	if (order.ShouldBuyWagons()) {
+		int have = (int)DepotPileLength(v, order, depot_tile);
+		if (have < room && BuyWagonsIntoDepot(v, order, depot_tile, 1) != 0) {
+			int one = (int)DepotPileLength(v, order, depot_tile) - have;
+			int more = one > 0 ? (room - have - one) / one : 0;
+			if (more > 0) BuyWagonsIntoDepot(v, order, depot_tile, more);
+		}
+	}
+
+	/* What the shed holds now, taken in the order it would be taken in and for
+	 * as long as it fits behind this engine. */
+	std::vector<Train *> pile;
+	FreeDepotUnitsFor(v, order, depot_tile, &pile, true);
+	uint units = 0;
+	int len = 0;
+	for (const Train *rake : pile) {
+		int l = (int)ChainLength(rake);
+		if (len + l > room) break;
+		len += l;
+		units += CountUnits(rake);
+	}
+	return units;
+}
+
 static Train *AssembleDepotRake(Train *v, const Order &order, TileIndex depot_tile, uint want)
 {
 	std::vector<Train *> pile;
@@ -3774,24 +3860,24 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 	 * made up when it was claimed and is not remade every tick. */
 	/* No number on the order -- "any rake of my wagon will do" -- and told to
 	 * buy. Buying still has to know how many, and with no number the answer is
-	 * one: enough that something of the right kind is standing there to be
-	 * collected. Without this the order could never buy at all, because buying
-	 * was only ever done on the way to making up a rake of a named size: the
-	 * train jumped to the order, found nothing it would take, and stood there.
-	 * The player's report, word for word: "poskoci to na ten prikaz ale
-	 * nejede". */
-	if (depot_order && v->couple_target == VehicleID::Invalid() && order.ShouldBuyWagons() &&
-			order.GetCoupleCount() == 0 && FreeDepotUnitsFor(v, order, depot_tile, nullptr, false) == 0) {
-		BuyWagonsIntoDepot(v, order, depot_tile, 1);
+	 * a full train: a train may be as many tiles long as the game allows, so
+	 * that is what any is worth (the player's own reading, WantFullTrainFromDepot()).
+	 * Without this the order could never buy at all, because buying was only
+	 * ever done on the way to making up a rake of a named size: the train
+	 * jumped to the order, found nothing it would take, and stood there. The
+	 * player's report, word for word: "poskoci to na ten prikaz ale nejede". */
+	uint want = order.GetCoupleCount();
+	if (depot_order && want == 0 && v->couple_target == VehicleID::Invalid()) {
+		want = WantFullTrainFromDepot(v, order, depot_tile);
 	}
 
-	if (depot_order && order.GetCoupleCount() != 0 && v->couple_target == VehicleID::Invalid()) {
-		Train *made = AssembleDepotRake(v, order, depot_tile, order.GetCoupleCount());
+	if (depot_order && want != 0 && v->couple_target == VehicleID::Invalid()) {
+		Train *made = AssembleDepotRake(v, order, depot_tile, want);
 		if (made == nullptr) return nullptr;
 
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "Vlak {}: v depu ({},{}) si odlozil {} vozu k sebrani (rada {})", v->unitnumber,
-					TileX(depot_tile), TileY(depot_tile), order.GetCoupleCount(), made->index.base());
+					TileX(depot_tile), TileY(depot_tile), want, made->index.base());
 		}
 		made->couple_claim = v->index;
 		v->couple_target = made->index;

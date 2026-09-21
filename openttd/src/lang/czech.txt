@@ -5156,9 +5156,10 @@ STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}Jedno č
 STR_ORDER_COUPLE_BUY_OFF                                        :{BLACK}Vagon: jakýkoliv
 STR_ORDER_COUPLE_BUY_ON                                         :{BLACK}Koupit: {ENGINE}
 STR_ORDER_COUPLE_BUY_TOOLTIP                                    :{BLACK}S jakým vagonem tenhle rozkaz pracuje. Zmáčkni a vyber ho ze seznamu: od té chvíle rozkaz připojuje jen ten vagon a žádný jiný - vagon neuveze jakékoliv auto, kamion je delší, takže na tom, který to je, záleží - a kdykoliv jich v depu není dost, koupí je, rovnou přestavěné na náklad z filtru. Dalším zmáčknutím se nakupování zastaví a vagon dál říká, které připojovat; to chce posunovačka, jakmile jich má v oběhu dost. Třetím zmáčknutím se typ pustí a rozkaz zase bere, co projde filtrem
-STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(koupit typ {ENGINE})
+STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(koupit typ {ENGINE}{STRING})
 STR_ORDER_COUPLE_BUY_ONLY                                       :{BLACK}Vagon: {ENGINE}
-STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(vagon {ENGINE})
+STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(vagon {ENGINE}{STRING})
+STR_ORDER_COUPLE_BUY_CARGO_PART                                 :{SPACE}{STRING}
 STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Který vagon připojit
 STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Připojit tenhle
 STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Zapíše tenhle vagon do rozkazu. Rozkaz ho koupí vždycky, když v depu chybí, přestaví ho na náklad z filtru a připojí
