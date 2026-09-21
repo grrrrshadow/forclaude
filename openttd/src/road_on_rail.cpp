@@ -42,6 +42,27 @@
 int _carried_z_offset = 4;
 
 /**
+ * How far to the side of the wagon's own position the road vehicle is drawn,
+ * to the right of the way the wagon faces; a minus puts it to the left.
+ *
+ * The height above the deck ('testpaluba') alone could never get it right,
+ * and the reason is the view. Raising a vehicle moves its picture straight up
+ * the screen and nothing else, while a wagon's deck is seen from the side as
+ * well -- so a vehicle standing beside the middle of its wagon rather than on
+ * it looks, on the screen, partly like a vehicle standing too low or too
+ * high. Chasing that with the height gives a different best height for every
+ * direction the train can face, which is the ring of numbers the player read
+ * off a circle of track: eight directions, eight heights, and the ones facing
+ * opposite ways agreeing with each other.
+ *
+ * Hence this. One step is a sixteenth of a tile, which the view turns into
+ * four pixels sideways (two pixels across and one down on a diagonal) -- the
+ * grid vehicles stand on, and as fine as moving one gets. Getting inside a
+ * pixel is the sprites' own business, not this.
+ */
+int _carried_side_offset = 0;
+
+/**
  * How far behind the front of its drawn box a road vehicle's own position
  * sits. A rail vehicle is drawn about its middle and a road vehicle from its
  * front -- "Unlike trains, road vehicles do not have their offsets moved to
@@ -264,6 +285,29 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		y = (wagon->y_pos + last->y_pos) / 2 - back.y * ahead_of_middle;
 	}
 
+	/* Off the middle of the wagon, across the rails (_carried_side_offset).
+	 * Which way is across follows from the way the wagon faces, so a train
+	 * going round a circle of track carries its load on the same side of
+	 * itself the whole way round -- and on a circle that is towards the middle
+	 * of it, or away from it, which is how the player reads the number off. */
+	int side_x = 0;
+	int side_y = 0;
+	if (_carried_side_offset != 0) {
+		/* One step in each of the eight directions, the way a vehicle moves. */
+		static const DirectionIndexArray<Point> _step{{{
+			{ -1, -1 }, // Direction::N
+			{ -1,  0 }, // Direction::NE
+			{ -1,  1 }, // Direction::E
+			{  0,  1 }, // Direction::SE
+			{  1,  1 }, // Direction::S
+			{  1,  0 }, // Direction::SW
+			{  1, -1 }, // Direction::W
+			{  0, -1 }, // Direction::NW
+		}}};
+		const Point &side = _step[ChangeDir(dir, DirDiff::Right90)];
+		side_x = side.x * _carried_side_offset;
+		side_y = side.y * _carried_side_offset;
+	}
 
 	const RoadVehicle *ahead = nullptr;
 	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
@@ -271,9 +315,13 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 			x += back.x * ahead->gcache.cached_veh_length;
 			y += back.y * ahead->gcache.cached_veh_length;
 		}
+		/* The tile is taken from where the vehicle rides, not from where it is
+		 * drawn: a step to the side near the edge of a tile would otherwise say
+		 * it is on the tile next door, and what a carried vehicle's tile says
+		 * has already taken the game down once. */
 		u->tile = TileVirtXY(x, y);
-		u->x_pos = x;
-		u->y_pos = y;
+		u->x_pos = x + side_x;
+		u->y_pos = y + side_y;
 		u->z_pos = wagon->z_pos + _carried_z_offset;
 		u->direction = dir;
 		/* In a tunnel with the wagon, out of sight with it. */
@@ -281,6 +329,25 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		u->UpdatePosition();
 		u->UpdateViewport(true, true);
 		ahead = u;
+	}
+}
+
+/**
+ * Put every carried road vehicle back where it belongs on its wagon, at once.
+ *
+ * For the two probes that move the deck ('testpaluba', 'testkruh'), and it is
+ * not a nicety. A vehicle is put on its wagon by its own tick, and a train
+ * standing still in a station or a shed ticks nothing -- so changing the deck
+ * and watching a standing train showed no change at all, whatever number was
+ * given. A standing train is exactly what the player stops to look at.
+ */
+void RestandCarriedRoadVehicles()
+{
+	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || !rv->IsCarried()) continue;
+		Vehicle *carrier = Vehicle::GetIfValid(rv->carried_by);
+		if (carrier == nullptr || carrier->type != VehicleType::Train) continue;
+		FollowWagon(rv, Train::From(carrier));
 	}
 }
 

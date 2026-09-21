@@ -895,3 +895,22 @@ testbrzda 1
 testnaauta 1
 testbrzda 1
 testzatik 400 testauta" 12000
+
+# The load standing off the middle of its wagon, across the rails -- the knob
+# the height ('testpaluba') could never be, because raising something moves its
+# picture straight up the screen while a deck is seen from the side as well.
+# The train is held still on purpose: putting a vehicle on its wagon is the
+# vehicle's own tick, so a standing train never moved it, and standing is when
+# anyone looks. The probe therefore puts them back itself, and this scene is
+# what says it does -- the dump must show the same wagon and the car beside it
+# at three different numbers.
+run_scene autobok "vlak123 on
+testautovlak
+testza 2990 testbrzda 1
+testza 3000 testkresba 1
+testza 3005 testkruh 4
+testza 3010 testkresba 1
+testza 3015 testkruh -4
+testza 3020 testkresba 1
+testza 3025 testkruh 0
+testzatik 3100 testauta" 4000

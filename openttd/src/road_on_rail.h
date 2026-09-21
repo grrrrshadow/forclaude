@@ -81,5 +81,6 @@ void UnlinkCarriedRoadVehicle(Train *wagon);
 void UnlinkFromCarrier(RoadVehicle *rv);
 bool CarriesRoadVehicles(const Vehicle *v);
 void DestroyRoadVehiclesAboard(Vehicle *carrier);
+void RestandCarriedRoadVehicles();
 
 #endif /* ROAD_ON_RAIL_H */
