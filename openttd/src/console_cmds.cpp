@@ -98,6 +98,7 @@
 #include "vehicle_gui.h"
 #include "widgets/vehicle_widget.h"
 #include "widgets/misc_widget.h"
+#include "widgets/order_widget.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -5662,6 +5663,82 @@ static bool ConTestSellDecoupled(std::span<std::string_view> argv)
 }
 
 /**
+ * Open a train's orders window and say how tall it is and how many orders fit
+ * in the list, with the couple filter row off and on. Usage: 'testoknorozkazu
+ * <cislo vlaku> <rozkaz>'
+ *
+ * The rig's only way of looking at that. A row appearing in a window either
+ * makes the window taller or takes the room from whatever in it can stretch --
+ * here the order list -- and which of the two it does is invisible to every
+ * counter. The player had it the wrong way round: switching the filter on cost
+ * him a line of orders and moved everything above it up.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestOrderWindowGrows(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Measure the orders window as the couple filter comes and goes. Usage: 'testoknorozkazu <cislo vlaku> <rozkaz>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+
+	Train *t = nullptr;
+	for (Train *u : Train::Iterate()) {
+		if (u->First() == u && u->IsFrontEngine() && u->unitnumber == (UnitID)*punit) {
+			t = u;
+			break;
+		}
+	}
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testoknorozkazu: vlak {} nenalezen.", argv[1]);
+		return true;
+	}
+
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+	ShowOrdersWindow(t);
+	Window *w = FindWindowById(WindowClass::VehicleOrders, t->index);
+	if (w == nullptr) {
+		IConsolePrint(CC_ERROR, "testoknorozkazu: ODMITNUTO - okno rozkazu se neotevrelo.");
+		return true;
+	}
+
+	auto say = [&](const char *when) {
+		const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST);
+		const NWidgetBase *row = w->GetWidget<NWidgetBase>(WID_O_SEL_COUPLE_FILTER);
+		IConsolePrint(CC_INFO, "testoknorozkazu: {} - okno vysoke {}, seznam vysoky {}, radek filtru {}",
+				when, w->height, list != nullptr ? (int)list->current_y : -1, row != nullptr ? (int)row->current_y : -1);
+	};
+
+	/* The window asks about the order the player has picked, and a window that
+	 * has just opened has picked nothing. Click the first line of the list, the
+	 * way he would. */
+	if (const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST); list != nullptr) {
+		w->OnClick(Point{(int)list->pos_x + 4, (int)list->pos_y + 4}, WID_O_ORDER_LIST, 1);
+	}
+
+	/* Taller than its smallest, which is the window the player has: he has
+	 * dragged it out or it has grown with his orders. At its smallest the row
+	 * has nowhere to come from but the window's own height, so both the old
+	 * behaviour and the new one look the same and the scene measures nothing. */
+	ResizeWindow(w, 0, 40, false, false);
+
+	say("filtr vypnuty");
+	/* Switch the order to collecting, which is what puts the row in. */
+	CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_GOTO_COUPLE, 1);
+	if (r.Failed()) IConsolePrint(CC_ERROR, "testoknorozkazu: ODMITNUTO - prikaz nejde prepnout na pripojit: {}", GetString(r.GetErrorMessage()));
+	w->OnInvalidateData();
+	w->OnMouseLoop();
+	say("filtr zapnuty");
+	Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_GOTO_COUPLE, 0);
+	w->OnInvalidateData();
+	w->OnMouseLoop();
+	say("filtr zase vypnuty");
+	return true;
+}
+
+/**
  * Open the wagon list for a depot couple order and press its button, the way
  * the player does. Usage: testvybervagonu <unit number> <order index>
  *
@@ -10235,6 +10312,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodtah",               ConTestRescue);
 	IConsole::CmdRegister("testprodat",              ConTestSell);
 	IConsole::CmdRegister("testikonaprodat",         ConTestSellIcon);
+	IConsole::CmdRegister("testoknorozkazu",         ConTestOrderWindowGrows);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);

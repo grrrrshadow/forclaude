@@ -291,6 +291,15 @@ testfiltr 0
 testkoupit 2 0
 testza 200 testfiltr
 testza 400 testfiltr zkouska" 12000
+# The filter row drops out of the window downwards instead of taking a line
+# from the order list. Nothing in the rig had ever measured a window's height,
+# and that is exactly where this went wrong: pressing "couple" cost the player
+# a line of orders and pushed every button above it up. The scene reads three
+# heights three times -- row off, on, off -- and what it watches is the list
+# staying the same size while the window grows by the row and shrinks back.
+run_scene oknorozkazu "vlak123 on
+testspoj depo
+testza 100 testoknorozkazu 1 0" 12000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

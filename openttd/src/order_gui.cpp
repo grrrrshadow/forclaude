@@ -2607,7 +2607,30 @@ public:
 		 * the one safe moment to move every widget in the window. */
 		if (this->couple_filter_resized) {
 			this->couple_filter_resized = false;
+
+			/* Grow the window by the row rather than take the row out of the
+			 * order list. A plain ReInit() keeps the window the height it was
+			 * and hands the difference to whatever in it can stretch, which is
+			 * the list -- so switching the filter on cost the player a line of
+			 * orders and shoved everything above it up a row. The player's
+			 * own reading of it: let the row drop out of the bottom and leave
+			 * what is above it where it was.
+			 *
+			 * How much it grew by is not something this can be told in advance,
+			 * so it is measured: the row's height before the re-layout and
+			 * after it. The second call then moves the window's bottom edge by
+			 * exactly that, top-left staying where it is. It goes both ways --
+			 * the row leaving shrinks the window again. */
+			NWidgetBase *list = this->GetWidget<NWidgetBase>(WID_O_ORDER_LIST);
+			int list_before = list != nullptr ? (int)list->current_y : 0;
 			this->ReInit();
+			int list_after = list != nullptr ? (int)this->GetWidget<NWidgetBase>(WID_O_ORDER_LIST)->current_y : 0;
+			/* Keyed on the list and not on the row: what the player must not
+			 * lose is his orders, and whatever the re-layout took from them is
+			 * exactly what the window has to grow by. Measured rather than
+			 * reckoned, because a re-layout also clamps the window to its new
+			 * smallest size and the two do not add up to the row's height. */
+			if (list_after != list_before) this->ReInit(0, list_before - list_after);
 		}
 	}
 
