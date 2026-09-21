@@ -4971,6 +4971,8 @@ STR_ORDER_SELL_TRAIN                                            :{BLACK}Sell the
 STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Put by, and does nothing for now. A train is sold from the icon in its own window, where the refit button stands dark out on the line
 STR_ORDER_SELL_TRAIN_CAPTION                                    :{WHITE}Sell the train for scrap
 STR_ORDER_SELL_TRAIN_QUERY                                      :{YELLOW}Sell the train?
+STR_ORDER_SELL_WAGONS_CAPTION                                   :{WHITE}Sell the wagons for scrap
+STR_ORDER_SELL_WAGONS_QUERY                                     :{YELLOW}Sell the wagons?
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(and drop the coupled train)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(drop the coupled train)
 

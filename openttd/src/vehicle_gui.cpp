@@ -3799,24 +3799,22 @@ public:
 				}
 				break;
 
-			case WID_VV_SELL: // sell this train, or these wagons, and let a tow come for them
+			case WID_VV_SELL: { // sell this train, or these wagons, and let a tow come for them
 				assert(v->type == VehicleType::Train);
-				if (IsWaitingWagonChain(v)) {
-					/* Wagons go without a question being asked. Nothing is
-					 * destroyed by it that the player cannot see standing
-					 * there, and the tow button beside it asks nothing either
-					 * -- this is that same button with a sale on the end. */
-					Command<Commands::RequestWagonTow>::Post(STR_ERROR_CAN_T_REQUEST_TOW, v->tile, v->index, true, true);
-					break;
-				}
-				/* A whole train is asked about first: it is a lot of money and
-				 * a lot of vehicles, and from the yes onwards it is not the
-				 * player's to drive. The game's own yes/no window, which is
-				 * red with yellow buttons -- the colours an important question
-				 * is asked in here. */
-				ShowQuery(GetEncodedString(STR_ORDER_SELL_TRAIN_CAPTION), GetEncodedString(STR_ORDER_SELL_TRAIN_QUERY),
+				/* Asked about first, either way. Selling wagons the player
+				 * left standing is as final as selling a whole train -- his
+				 * own reading, and he is right: from the yes onwards they are
+				 * not his. The icon above this one, which only calls a tow to
+				 * take them to a shed, asks nothing, because nothing is lost
+				 * by it. The game's own yes/no window, which is red with
+				 * yellow buttons -- the colours an important question is asked
+				 * in here. */
+				bool wagons = IsWaitingWagonChain(v);
+				ShowQuery(GetEncodedString(wagons ? STR_ORDER_SELL_WAGONS_CAPTION : STR_ORDER_SELL_TRAIN_CAPTION),
+						GetEncodedString(wagons ? STR_ORDER_SELL_WAGONS_QUERY : STR_ORDER_SELL_TRAIN_QUERY),
 						this, VehicleViewWindow::SellTrainCallback);
 				break;
+			}
 
 			case WID_VV_RESCUE_ENGINE: // station here as a rescue engine, or stand down; on wagons: call a tow for them
 				assert(v->type == VehicleType::Train);
@@ -3841,6 +3839,12 @@ public:
 		if (!confirmed) return;
 		const Vehicle *v = Vehicle::GetIfValid(static_cast<VehicleViewWindow *>(w)->window_number);
 		if (v == nullptr) return;
+		/* A rake of wagons is sold by calling the tow with the sale on the end
+		 * of it: there is no engine in it to sell a train with. */
+		if (IsWaitingWagonChain(v)) {
+			Command<Commands::RequestWagonTow>::Post(STR_ERROR_CAN_T_REQUEST_TOW, v->tile, v->index, true, true);
+			return;
+		}
 		Command<Commands::SellTrainForScrap>::Post(STR_ERROR_CAN_T_SELL_TRAIN, v->tile, v->index);
 	}
 

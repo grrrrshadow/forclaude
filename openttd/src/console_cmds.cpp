@@ -97,6 +97,7 @@
 #include "waypoint_func.h"
 #include "vehicle_gui.h"
 #include "widgets/vehicle_widget.h"
+#include "widgets/misc_widget.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -3485,6 +3486,19 @@ static bool ConTestSellIcon(std::span<std::string_view> argv)
 	if (!v->IsFreeWagon()) return true;
 
 	w->OnClick(Point{}, WID_VV_SELL, 1);
+
+	/* And the red window the press opens. Selling what the player left standing
+	 * is as final as selling a whole train, so he is asked first -- which means
+	 * the scene has to answer. That the window is there at all is worth
+	 * measuring on its own: without it the press would go straight through. */
+	Window *q = FindWindowById(WindowClass::ConfirmPopupQuery, 0);
+	if (q == nullptr) {
+		IConsolePrint(CC_ERROR, "testikonaprodat: ODMITNUTO - cervene okno se nezeptalo.");
+		return true;
+	}
+	IConsolePrint(CC_INFO, "testikonaprodat: cervene okno se pta, mackam ano");
+	q->OnClick(Point{}, WID_Q_YES, 1);
+
 	/* Said from the wagons, not from the window: what is measured is whether
 	 * the press reached them at all. */
 	if (!v->IsSoldForScrap()) {

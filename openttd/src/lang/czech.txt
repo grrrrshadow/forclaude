@@ -5128,6 +5128,8 @@ STR_ORDER_SELL_TRAIN                                            :{BLACK}Prodat v
 STR_ORDER_SELL_TRAIN_TOOLTIP                                    :{BLACK}Odloženo, zatím nedělá nic. Prodat vlak se dá ikonkou v jeho vlastním okně, tam, kde je venku zatmavená přestavba
 STR_ORDER_SELL_TRAIN_CAPTION                                    :{WHITE}Prodat vlak do šrotu
 STR_ORDER_SELL_TRAIN_QUERY                                      :{YELLOW}Prodat vlak?
+STR_ORDER_SELL_WAGONS_CAPTION                                   :{WHITE}Prodat vagonky do šrotu
+STR_ORDER_SELL_WAGONS_QUERY                                     :{YELLOW}Prodat vagonky?
 STR_ORDER_DECOUPLE_SUFFIX_WHOLE                                 :{SPACE}(a odpojit celý vlak)
 STR_ORDER_DEPOT_DECOUPLE_SUFFIX_WHOLE                           :{SPACE}(odpojit celý vlak)
 STR_ORDER_WAIT_COUPLE                                           :{BLACK}Čekat na spojení
