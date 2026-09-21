@@ -1896,6 +1896,16 @@ struct BuildVehicleWindow : Window {
 					if (this->sel_engine == EngineID::Invalid()) break;
 					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->pick_for_order->tile, this->pick_for_order->index,
 							this->pick_order_index, MOF_COUPLE_BUY, this->sel_engine.base());
+					/* And the cargo the window is standing on, which is why the
+					 * filter sits beside this button: the two are one answer --
+					 * this wagon, fitted for that. The player's own line, "let
+					 * him pick from the purchase menu and let them be bought
+					 * for the cargo he sets". The wagon goes first, because the
+					 * cargo is checked against it. */
+					if (IsValidCargoType(this->cargo_filter_criteria)) {
+						Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->pick_for_order->tile, this->pick_for_order->index,
+								this->pick_order_index, MOF_COUPLE_CARGO, this->cargo_filter_criteria);
+					}
 					this->Close();
 					break;
 				}

@@ -2531,8 +2531,13 @@ static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 				for (const Train *r : Train::Iterate()) {
 					if (r->First() == r && r->IsFreeWagon()) waiting++;
 				}
-				IConsolePrint(CC_DEFAULT, "testfiltr: vlak {} rozkaz {} (naklad {}, naplneni {}) - {}, cekajicich rad {}",
+				/* The named wagon is said as well: the cargo filter and the
+				 * wagon are set together now, and "every cargo" lets go of
+				 * both -- which is a thing no counter can show and this line
+				 * can. */
+				IConsolePrint(CC_DEFAULT, "testfiltr: vlak {} rozkaz {} (naklad {}, naplneni {}, vagon {}) - {}, cekajicich rad {}",
 						t->unitnumber, i, (int)(int8_t)o->GetCoupleCargo(), to_underlying(o->GetCoupleLoad()),
+						(int)o->GetCoupleBuyEngine().base(),
 						found ? "NASEL BY radu" : "nenasel by nic", waiting);
 				return true;
 			}
@@ -5618,9 +5623,21 @@ static bool ConTestBuyWagons(std::span<std::string_view> argv)
 				if (!pe.has_value()) return false;
 				eid = static_cast<EngineID>(*pe);
 			} else {
+				/* The first wagon this company can buy -- and, when the order
+				 * already names a cargo, the first that can carry it. The
+				 * window the player uses opens filtered to that cargo for the
+				 * same reason, and the command refuses a pair that can never
+				 * match; picking blind would hand it one. */
+				const Order *o = t->GetOrder((VehicleOrderID)*porder);
+				CargoType want = o != nullptr ? o->GetCoupleCargo() : INVALID_CARGO;
 				for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 					if (!e->company_avail.Test(t->owner)) continue;
 					if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+					if (IsValidCargoType(want)) {
+						bool carries = want == _road_vehicle_cargo ? CanCarryRoadVehicles(e)
+								: GetUnionOfArticulatedRefitMasks(e->index, true).Test(want);
+						if (!carries) continue;
+					}
 					eid = e->index;
 					break;
 				}

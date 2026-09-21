@@ -267,6 +267,24 @@ run_scene koupitcelyvlak "vlak123 on
 setting vehicle.max_train_length 5
 testspoj depo
 testkoupit 2 0" 12000
+# The wagon type and the cargo filter said together -- "this model, carrying
+# that". They used to rule each other out; now the cargo list is narrowed to
+# what the named wagon can be fitted for, and both stand on the order at once.
+# The probe line is the point: no counter can show what an order holds.
+run_scene typsnakladem "vlak123 on
+testspoj depo
+testfiltr 0
+testkoupit 2 0
+testza 200 testfiltr zkouska" 12000
+# And the way back out, which is one press: "every cargo" lets go of the named
+# wagon as well, so the cargo list is the whole of it again and the order takes
+# whatever comes. The probe must then say no cargo and no wagon.
+run_scene typvsechny "vlak123 on
+testspoj depo
+testfiltr 0
+testkoupit 2 0
+testza 200 testfiltr
+testza 400 testfiltr zkouska" 12000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

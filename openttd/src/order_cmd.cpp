@@ -29,6 +29,7 @@
 #include "train.h"
 #include "roadveh.h"
 #include "road_on_rail.h"
+#include "articulated_vehicles.h"
 #include "train_cmd.h"
 
 #include "table/strings.h"
@@ -1606,10 +1607,25 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (data >= to_underlying(OrderCoupleLoad::End)) return CMD_ERROR;
 			break;
 
-		case MOF_COUPLE_CARGO:
+		case MOF_COUPLE_CARGO: {
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (CargoType(data) != INVALID_CARGO && CargoType(data) >= NUM_CARGO) return CMD_ERROR;
+			if (CargoType(data) == INVALID_CARGO) break; // "every cargo", which also lets the wagon go
+			if (CargoType(data) >= NUM_CARGO) return CMD_ERROR;
+			/* With a wagon named, the cargo is narrowed to what that wagon can
+			 * be fitted for -- the player's rule. The list the player picks
+			 * from is built that way already (BuildCoupleCargoDropDown()), but
+			 * the rule belongs here as well: the rig and a client on the far
+			 * end of a network game both come through this door, and a pair
+			 * that can never match anything is not worth storing. */
+			const Engine *named = Engine::GetIfValid(order->GetCoupleBuyEngine());
+			if (named == nullptr) break;
+			if (CargoType(data) == _road_vehicle_cargo) {
+				if (!CanCarryRoadVehicles(named)) return CMD_ERROR;
+			} else if (!GetUnionOfArticulatedRefitMasks(order->GetCoupleBuyEngine(), true).Test(CargoType(data))) {
+				return CMD_ERROR;
+			}
 			break;
+		}
 
 		case MOF_COUPLE_COUNT:
 			if (v->type != VehicleType::Train) return CMD_ERROR;
@@ -1749,12 +1765,19 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				order->SetCoupleBuyEngine(chosen);
 				order->SetBuyWagons(chosen != EngineID::Invalid());
 				/* And the cargo filter goes, for the reason given at
-				 * MOF_COUPLE_CARGO: naming one model says everything there is
-				 * to say about which wagons are wanted, and what that model
-				 * carries is the model's own business. The list the model was
-				 * picked from opened filtered to the cargo that was set, so
-				 * what has just been named can carry it anyway. */
-				if (chosen != EngineID::Invalid()) order->SetCoupleCargo(INVALID_CARGO);
+				 * MOF_COUPLE_CARGO: the two say different things and are meant
+				 * to be said together -- this model, carrying that cargo. What
+				 * the model cannot carry is dropped, because a filter nothing
+				 * can ever meet is worse than no filter; and the list the
+				 * model was picked from opened filtered to the cargo that was
+				 * set, so in the ordinary way round there is nothing to drop. */
+				if (chosen != EngineID::Invalid() && IsValidCargoType(order->GetCoupleCargo())) {
+					const Engine *e = Engine::GetIfValid(chosen);
+					bool carries = e != nullptr && (order->GetCoupleCargo() == _road_vehicle_cargo
+							? CanCarryRoadVehicles(e)
+							: GetUnionOfArticulatedRefitMasks(chosen, true).Test(order->GetCoupleCargo()));
+					if (!carries) order->SetCoupleCargo(INVALID_CARGO);
+				}
 				break;
 			}
 
@@ -1866,13 +1889,13 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_COUPLE_CARGO:
 				order->SetCoupleCargo(CargoType(data));
-				/* The two ways of saying which wagons this order takes are one
-				 * or the other, never both -- the player's rule. Naming a cargo
-				 * means "every wagon carrying this", which is the opposite of
-				 * "this one model and no other", so it lets the model go. The
-				 * other half of the same rule is below, where naming a model
-				 * lets the cargo go. */
-				if (CargoType(data) != INVALID_CARGO) {
+				/* "Every cargo" is the way back out of the whole filter, and
+				 * the player's own words for it: it lets go of the named wagon
+				 * as well. That is one press rather than two, and it is what
+				 * puts the cargo list back to the whole of it -- the only
+				 * thing that ever narrowed the list was that wagon. A cargo
+				 * picked instead keeps the wagon: the two are said together. */
+				if (CargoType(data) == INVALID_CARGO) {
 					order->SetCoupleBuyEngine(EngineID::Invalid());
 					order->SetBuyWagons(false);
 				}

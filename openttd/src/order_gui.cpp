@@ -37,6 +37,8 @@
 #include "train.h"
 #include "train_cmd.h"
 #include "depot_base.h"
+#include "articulated_vehicles.h"
+#include "road_on_rail.h"
 #include "engine_base.h"
 #include "engine_func.h"
 #include "vehicle_gui.h"
@@ -233,24 +235,49 @@ static int BoardModeToIndex(OrderBoardMode mode)
 }
 
 /**
- * Build the list of cargoes a coupling order can ask for: every cargo in the
- * game, plus asking for none in particular.
+ * Build the list of cargoes a coupling order can ask for.
+ *
+ * Every cargo in the game, plus asking for none in particular -- unless the
+ * order names a wagon, and then only what that wagon can be fitted for. The
+ * player's rule: the cargo filter is narrowed by the type. Offering a cargo
+ * the named wagon cannot take would be offering an order that can never match
+ * anything, and the list is where that is easiest to say.
+ *
+ * The first entry is the way back out. With a wagon named it lets go of the
+ * wagon as well, which is what puts the whole list back -- one press, not two,
+ * and the only thing that ever narrowed the list was that wagon.
+ *
+ * @param order the order the list is being opened for
  * @return the list to show
  */
-static DropDownList BuildCoupleCargoDropDown()
+static DropDownList BuildCoupleCargoDropDown(const Order *order)
 {
+	/* What the named wagon can carry, or everything when none is named. Taken
+	 * unmasked on purpose: the union is masked with _standard_cargo_mask
+	 * wherever the purchase list uses it, and that mask leaves out the cargo
+	 * for road vehicles -- the very one the hand-written entry below is here
+	 * for. Masked, a car carrier would be the one wagon that could not be
+	 * asked for its own cargo. */
+	const Engine *named = order != nullptr ? Engine::GetIfValid(order->GetCoupleBuyEngine()) : nullptr;
+	CargoTypes allowed = named != nullptr ? GetUnionOfArticulatedRefitMasks(order->GetCoupleBuyEngine(), true) : ALL_CARGOTYPES;
+
 	DropDownList list;
-	list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_CARGO_ANY, INVALID_CARGO, false));
+	list.push_back(MakeDropDownListStringItem(named != nullptr ? STR_ORDER_COUPLE_CARGO_ANY_DROPS_TYPE : STR_ORDER_COUPLE_CARGO_ANY, INVALID_CARGO, false));
 	/* Wagons fitted for road vehicles, named here the way the purchase list
 	 * names them: their cargo is not a standard one -- it is of the special
 	 * class, and the sorted list of standard cargoes stops short of those --
 	 * so the loop below never offered it, while the refit and purchase menus,
 	 * which add it by hand, did. A collector could be told to take wagons of
-	 * every cargo but the one it was built to shuttle. See road_on_rail.h. */
-	if (IsValidCargoType(_road_vehicle_cargo)) {
+	 * every cargo but the one it was built to shuttle. See road_on_rail.h.
+	 *
+	 * Whether a named wagon carries it is asked of that one function rather
+	 * than of a refit mask, for the same reason the purchase list asks it
+	 * there: the fitting is ours and no set knows about it. */
+	if (IsValidCargoType(_road_vehicle_cargo) && (named == nullptr || CanCarryRoadVehicles(named))) {
 		list.push_back(MakeDropDownListStringItem(CargoSpec::Get(_road_vehicle_cargo)->name, _road_vehicle_cargo, false));
 	}
 	for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
+		if (!allowed.Test(cs->Index())) continue;
 		list.push_back(MakeDropDownListStringItem(cs->name, cs->Index(), false));
 	}
 	return list;
@@ -545,8 +572,12 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					 * which is why it is inside the wagon's bracket and not a
 					 * filter of its own. The player's line: "koupit typ uacs
 					 * cement". */
+					/* Only when the order has no cargo of its own. With one
+					 * set, the line above has already said it -- and said the
+					 * one that counts, the filter rather than what the model
+					 * happens to come out of the works carrying. */
 					std::string cargo;
-					if (IsValidCargoType(buy->GetDefaultCargoType())) {
+					if (!IsValidCargoType(order->GetCoupleCargo()) && IsValidCargoType(buy->GetDefaultCargoType())) {
 						cargo = GetString(STR_ORDER_COUPLE_BUY_CARGO_PART, CargoSpec::Get(buy->GetDefaultCargoType())->name);
 					}
 					second += GetString(order->ShouldBuyWagons() ? STR_ORDER_COUPLE_BUY_SUFFIX : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX,
@@ -2107,7 +2138,7 @@ public:
 			case WID_O_COUPLE_CARGO: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
-				ShowDropDownList(this, BuildCoupleCargoDropDown(), order->GetCoupleCargo(), WID_O_COUPLE_CARGO);
+				ShowDropDownList(this, BuildCoupleCargoDropDown(order), order->GetCoupleCargo(), WID_O_COUPLE_CARGO);
 				break;
 			}
 
