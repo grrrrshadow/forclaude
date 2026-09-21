@@ -444,6 +444,18 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 						if (order->IsCoupleCountMaximum()) reading = STR_ORDER_COUPLE_FILTER_SUFFIX_MAX;
 						second += GetString(reading, order->GetCoupleCount());
 					}
+					/* And which type it couples, which a platform can be told as
+					 * well as a shed. It was written on the shed's line only, so
+					 * an order set at a platform said everything about itself
+					 * except the one thing that had just been set. */
+					if (const Engine *buy = Engine::GetIfValid(order->GetCoupleBuyEngine()); buy != nullptr) {
+						bool own_cargo = !IsValidCargoType(order->GetCoupleCargo()) && IsValidCargoType(buy->GetDefaultCargoType());
+						StringID suffix = own_cargo ? STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX;
+						auto engine = PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList);
+						second += own_cargo
+								? GetString(suffix, engine, CargoSpec::Get(buy->GetDefaultCargoType())->name)
+								: GetString(suffix, engine);
+					}
 				}
 
 				/* Waiting for a couple had no way of showing at all, so the

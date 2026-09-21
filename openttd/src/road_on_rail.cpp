@@ -371,6 +371,12 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
 	why = want_train ? "u nastupiste nestoji zadny vlak" : "u nastupiste nestoji zadna rada vagonu";
 	for (Train *t : Train::Iterate()) {
 		if (t->owner != rv->owner) continue;
+		/* Nothing gets on what the player has sold. It is waiting for the tow
+		 * that will take it to a shed and sell it there, and a car that climbed
+		 * aboard in the meantime would be sold with it -- which is what
+		 * happened to the player's lorries. Said once for both kinds, because a
+		 * whole train and a rake of wagons are sold the same way. */
+		if (t->IsSoldForScrap()) continue;
 		if (want_train) {
 			if (!t->IsFrontEngine()) continue;
 			if (t->cur_speed != 0 || t->IsWrecked() || t->vehstatus.Test(VehState::Crashed)) continue;
