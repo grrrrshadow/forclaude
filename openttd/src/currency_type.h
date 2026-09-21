@@ -69,6 +69,7 @@ enum class Currency : uint8_t {
 	PTE, ///< Portuguese Escudo
 	UAH, ///< Ukrainian Hryvnia
 	VND, ///< Vietnamese Dong
+	BTC, ///< Bitcoin, which this build counts in
 
 	End, ///< Always the last item.
 };

@@ -271,7 +271,7 @@ demand_size = 100
 short_path_saturation = 80
 
 [locale]
-currency = USD
+currency = BTC
 units_velocity = metric
 units_velocity_nautical = metric
 units_power = metric

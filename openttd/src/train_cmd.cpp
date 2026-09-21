@@ -5960,15 +5960,20 @@ static const uint16_t COUPLE_REFUSALS_BEFORE_GIVING_UP = 600;
  *
  * @param v the sold train, front of its consist
  */
-static void ReportTrainSoldForScrap(const Train *v)
+static void ReportTrainSoldForScrap(Owner owner, TileIndex tile, Money paid)
 {
-	Company *c = Company::GetIfValid(v->owner);
+	Company *c = Company::GetIfValid(owner);
 	if (c == nullptr) return;
 	if (TimerGameEconomy::date - c->last_scrap_news < SCRAP_NEWS_QUIET_DAYS) return;
 	c->last_scrap_news = TimerGameEconomy::date;
 
-	if (_networking && v->owner == _local_company) return;
-	AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_SOLD_FOR_SCRAP, v->owner), NewsType::General, v->tile);
+	if (_networking && owner == _local_company) return;
+	/* The figure is the one that was actually paid, not a round number put
+	 * there for the joke: a newspaper that prints a price nobody got is a
+	 * newspaper telling a lie, and the player would rather it did not. Which
+	 * is why this is said at the sale and not when the tow sets off -- before
+	 * the sale there is no figure to print. */
+	AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_SOLD_FOR_SCRAP, owner, paid), NewsType::General, tile);
 }
 
 /**
@@ -6036,7 +6041,7 @@ StringID SellTrainForScrapRefusal(const Train *v)
  * the ordinary price -- so both the sale in a shed and the one the tow ends
  * with go through the same function. Declared here, defined further down with
  * the rest of the decoupling. */
-static bool SellDroppedRake(Train *rake);
+static bool SellDroppedRake(Train *rake, Money *paid = nullptr);
 
 CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 {
@@ -6056,15 +6061,19 @@ CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 			 * Everywhere else they wait for the tow (see
 			 * TryDispatchRescueEngine()), because what is worth looking at is
 			 * the train standing there with an engine on its way to it. */
-			ReportTrainSoldForScrap(v);
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vlak {}: prodan a rovnou prodan v depu ({},{})", v->unitnumber, TileX(v->tile), TileY(v->tile));
 			}
 			TileIndex depot = v->tile;
 			/* Sold, not broken up: the ordinary sale, for the ordinary price --
 			 * what the player would get for selling it here himself, which is
-			 * what he is doing. */
-			SellDroppedRake(v);
+			 * what he is doing. The papers come after it, because what they
+			 * print is what it fetched. */
+			/* Taken before the sale: selling deletes the train, and the news
+			 * is about a train that is no longer there to be asked. */
+			Owner owner = v->owner;
+			Money paid = 0;
+			if (SellDroppedRake(v, &paid)) ReportTrainSoldForScrap(owner, depot, paid);
 			InvalidateWindowData(WindowClass::VehicleDepot, depot);
 			SetWindowClassesDirty(WindowClass::TrainList);
 			return CommandCost();
@@ -6301,13 +6310,13 @@ static void TryDispatchRescueEngine(Train *tow)
 	tow->couple_target = nearest->index;
 	nearest->couple_claim = tow->index;
 
-	/* This is the moment a sold train is worth reading about: an engine has
-	 * been sent for it and is about to book its road there, so a reader who
-	 * opens the paper is shown the train standing where it was sold with
-	 * somebody coming for it. Written at the sale instead, the paper pointed
-	 * at a train nothing was happening to yet -- and at one nobody might ever
-	 * come for. See CmdSellTrainForScrap(). */
-	if (nearest->IsSoldForScrap()) ReportTrainSoldForScrap(nearest);
+	/* The papers used to be written here, the moment an engine was sent. They
+	 * are not any more: what they print is the price the train fetched, and
+	 * before the sale there is no such price -- an estimate would be a figure
+	 * nobody ever got, which is the one thing the player did not want in
+	 * them. So they wait for the shed, where the sale actually happens. See
+	 * HandleRescueEngineInDepot(). */
+
 	/* Where to go for it: a case half inside a shed is reached at the end
 	 * that stands outside, the shed itself being no place for a road. */
 	TileIndex target_tile = nearest->tile;
@@ -6642,7 +6651,11 @@ bool HandleRescueEngineInDepot(Train *tow)
 				casualty->couple_claim = VehicleID::Invalid();
 				casualty->current_order.Free();
 				casualty->SetDestTile(INVALID_TILE);
-				SellDroppedRake(casualty);
+				/* Taken before the sale, which deletes the train. */
+				Owner owner = casualty->owner;
+				TileIndex where = tow->tile;
+				Money paid = 0;
+				if (SellDroppedRake(casualty, &paid)) ReportTrainSoldForScrap(owner, where, paid);
 			} else {
 				delete casualty;
 			}
@@ -7887,7 +7900,7 @@ Train *FindCoupledBoundary(Train *v)
  * @param rake head of the headless chain to sell
  * @return whether it was sold
  */
-static bool SellDroppedRake(Train *rake)
+static bool SellDroppedRake(Train *rake, Money *paid)
 {
 	AutoRestoreBackup cur_company(_current_company, rake->owner);
 
@@ -7903,6 +7916,10 @@ static bool SellDroppedRake(Train *rake)
 		}
 		return false;
 	}
+	/* What the sale fetched, so that whoever asked for it can say so. A sale
+	 * costs a negative amount -- money coming in -- and the figure the player
+	 * reads is that turned round. */
+	if (paid != nullptr) *paid = -cost.GetCost();
 	if (_show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: {} PRODAN na ({},{}) za {}", number, what, TileX(where), TileY(where), -cost.GetCost());
 	}
@@ -13522,7 +13539,13 @@ bool Train::Tick()
 			 * that does not: the engine that gives up writes its own reason
 			 * down, in words, at the moment it gives up. So this one says the
 			 * plain event and points at that. */
-			LogAnomaly("Vlak {}: prodany vlak mizi z ({},{}) - lhuta na odtah vyprsela. Zaplaceno nebylo, prodej se neuskutecnil. Jel-li pro nej odtah a vzdal to, je duvod v zaznamu vys",
+			/* And nothing is paid for it. The player's rule, and his own reason
+			 * for it: a player who tears up his own track to break the tow's
+			 * road, so that the engine gives up and the train clears itself
+			 * off the line, has found a way of tidying a train away that the
+			 * game otherwise has not got. He is welcome to it -- at the price
+			 * of the whole train, which is what he threw away to get it. */
+			LogAnomaly("Vlak {}: prodany vlak mizi z ({},{}) - lhuta na odtah vyprsela. Prodej se neuskutecnil, takze zaplaceno nebylo a nebude. Jel-li pro nej odtah a vzdal to, je duvod v zaznamu vys",
 					this->unitnumber, TileX(this->tile), TileY(this->tile));
 			FreeTrainTrackReservation(this);
 			for (const Train *u = this; u != nullptr; u = u->Next()) {

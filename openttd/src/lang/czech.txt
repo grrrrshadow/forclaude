@@ -981,7 +981,7 @@ STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřeli tam všichni
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {TOWN}, zemřelo {COMMA} obyvatel, zbořeno {COMMA} domů
 
-STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} prodal svůj vlak za 20 dolarů
+STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} prodal svůj vlak za {CURRENCY_LONG}
 
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin se zřítil do {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Silniční vozidlo bylo zničeno při srážce s UFO!
@@ -1156,6 +1156,7 @@ STR_GAME_OPTIONS_CURRENCY_LVL                                   :Lotyšský lat
 STR_GAME_OPTIONS_CURRENCY_PTE                                   :Portugalské escudo
 STR_GAME_OPTIONS_CURRENCY_UAH                                   :Ukrajinská hřivna
 STR_GAME_OPTIONS_CURRENCY_VND                                   :Vietnamský Dong
+STR_GAME_OPTIONS_CURRENCY_BTC                                   :Bitcoin
 
 STR_GAME_OPTIONS_AUTOSAVE_FRAME                                 :Automatické ukládání
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_TOOLTIP                      :Volba intervalu mezi automatickým ukládáním hry

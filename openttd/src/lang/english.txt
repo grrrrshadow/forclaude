@@ -894,7 +894,7 @@ STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. Everybody there died
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {TOWN}. {COMMA} inhabitants died, {COMMA} houses levelled
 
-STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} sold his train for 20 dollars
+STR_NEWS_TRAIN_SOLD_FOR_SCRAP                                   :{BIG_FONT}{BLACK}givmi {PRESIDENT_NAME} sold his train for {CURRENCY_LONG}
 
 STR_NEWS_DISASTER_ZEPPELIN                                      :{BIG_FONT}{BLACK}Zeppelin disaster at {STATION}!
 STR_NEWS_DISASTER_SMALL_UFO                                     :{BIG_FONT}{BLACK}Road vehicle destroyed in 'UFO' collision!
@@ -1069,6 +1069,7 @@ STR_GAME_OPTIONS_CURRENCY_LVL                                   :Latvian Lats
 STR_GAME_OPTIONS_CURRENCY_PTE                                   :Portuguese Escudo
 STR_GAME_OPTIONS_CURRENCY_UAH                                   :Ukrainian Hryvnia
 STR_GAME_OPTIONS_CURRENCY_VND                                   :Vietnamese Dong
+STR_GAME_OPTIONS_CURRENCY_BTC                                   :Bitcoin
 
 STR_GAME_OPTIONS_AUTOSAVE_FRAME                                 :Autosave
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_TOOLTIP                      :Select interval between automatic game saves

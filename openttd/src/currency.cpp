@@ -74,6 +74,12 @@ static const EnumIndexArray<CurrencySpec, Currency, Currency::End> _origin_curre
 	{  400, "", TimerGameCalendar::Year{2002}, "",         "$00",          "PTE", CurrencySymbolPosition::Suffix, STR_GAME_OPTIONS_CURRENCY_PTE }, ///< portuguese escudo
 	{   50, "", CF_NOEURO,                     "",         NBSP "\u20B4",  "UAH", CurrencySymbolPosition::Suffix, STR_GAME_OPTIONS_CURRENCY_UAH }, ///< ukrainian hryvnia
 	{35000, "", CF_NOEURO,                     "",         NBSP "\u20AB",  "VND", CurrencySymbolPosition::Suffix, STR_GAME_OPTIONS_CURRENCY_VND }, ///< Vietnamese Dong
+	/* The money this build counts in, and what it starts a new config with.
+	 * Worth a dollar, on the player's instruction and for his reason: at a
+	 * real bitcoin's worth every price in the game would read as nought point
+	 * nought nought nought something, which is no way to read a price list.
+	 * So the figures are the dollar's and only the sign is the crossed B. */
+	{    2, "", CF_NOEURO,                     "\u20bf",   "",             "BTC", CurrencySymbolPosition::Prefix, STR_GAME_OPTIONS_CURRENCY_BTC }, ///< bitcoin
 }}};
 
 /** Array of currencies used by the system */
