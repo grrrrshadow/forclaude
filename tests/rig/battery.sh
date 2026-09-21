@@ -804,6 +804,16 @@ run_scene autozanik "vlak123 on
 setting vehicle.rescue_wait_days 1
 testautovlak
 testzatik 2400 testprodat 1" 9000
+# Selling a train with a lorry still standing on it. A wagon with a lorry on
+# its back is not for sale -- the lorry would be left on nothing -- and that is
+# right when the player is doing the selling: he gets it off first. An engine
+# sent to sell a train in a shed cannot, and the refusal left the whole train
+# standing there sold and unsellable (the player's report of 21. 9., twice).
+# The lorries go first and the train after them, which is his own reading.
+run_scene prodatsautem "vlak123 on
+testautovlak
+testzatik 2400 testdodepa 1
+testzatik 5000 testprodat 1" 12000
 # Two road vehicles and one wagon, so one of them always has to wait its turn:
 # the queue the "how many are waiting for a train" condition is about. The
 # first rides twice and the second once, so auto=6. On a random map this one

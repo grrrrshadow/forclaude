@@ -8037,6 +8037,19 @@ static bool SellDroppedRake(Train *rake, Money *paid)
 	/* Wagons or a whole train: the same sale either way, and the line says
 	 * which it was rather than calling a train a rake of wagons. */
 	const char *what = rake->IsFrontEngine() ? "vlak" : "odlozene vagonky";
+
+	/* First whatever is riding on it, then it. A wagon with a lorry on its
+	 * back is not for sale -- the lorry would be left standing on nothing --
+	 * and that rule is right where the player is doing the selling: he gets it
+	 * off first. Here nobody can. This is a sale that has already been made,
+	 * being carried out in a shed by an engine sent to do it, and the refusal
+	 * left the whole train standing there sold and unsellable, which is what
+	 * the player found twice. The lorries go the way they go whenever the
+	 * wagon under them goes (UnlinkCarriedRoadVehicle()), and the record says
+	 * so for each of them. The player's own words: "nejdriv auta, pak vlak". */
+	for (Train *u = rake; u != nullptr; u = u->Next()) {
+		if (u->carrying != VehicleID::Invalid()) UnlinkCarriedRoadVehicle(u);
+	}
 	CommandCost cost = ExtractCommandCost(Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, rake->index, true, false, ClientID::Invalid));
 	if (cost.Failed()) {
 		if (_show_train_orientation) {
