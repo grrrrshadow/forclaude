@@ -1311,7 +1311,8 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			if (mof != MOF_NON_STOP && mof != MOF_STOP_LOCATION && mof != MOF_UNLOAD && mof != MOF_LOAD && mof != MOF_DECOUPLE && mof != MOF_DECOUPLE_COUNT && mof != MOF_DECOUPLE_WHOLE && mof != MOF_WAIT_COUPLE && mof != MOF_GOTO_COUPLE && mof != MOF_REVERSE_OUT &&
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
 					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_BOARD_MODE &&
-					mof != MOF_DECOUPLE_CARGO_DEST && mof != MOF_SELL_DECOUPLED) return CMD_ERROR;
+					mof != MOF_DECOUPLE_CARGO_DEST && mof != MOF_SELL_DECOUPLED &&
+					mof != MOF_COUPLE_BUY) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1503,11 +1504,14 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			break;
 
 		case MOF_COUPLE_BUY: {
-			/* Wagons are bought in a shed, so this belongs to a depot order and
-			 * only to one that is going there to collect: buying is what it
-			 * does when it finds too few, and an order that collects nothing
-			 * has nothing to be short of. */
-			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_DEPOT)) return CMD_ERROR;
+			/* Which type of wagon this order works with. A shed can go on to
+			 * buy that type when it is short of it; a platform cannot -- there
+			 * is nothing there to buy into -- so at a platform the same setting
+			 * only says which type to couple. Either way it belongs to an order
+			 * that is going somewhere to collect. */
+			if (v->type != VehicleType::Train) return CMD_ERROR;
+			if (!order->IsType(OT_GOTO_DEPOT) && !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			if (!order->ShouldGoToCouple()) return CMD_ERROR;
 			if (data == EngineID::Invalid().base()) break; // letting go of the wagon names none
 			if (data > EngineID::Invalid().base()) return CMD_ERROR;
 			const Engine *e = Engine::GetIfValid(static_cast<EngineID>(data));
@@ -1763,7 +1767,11 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				 * so there is nothing to buy and nothing to be picky about. */
 				EngineID chosen = static_cast<EngineID>(data);
 				order->SetCoupleBuyEngine(chosen);
-				order->SetBuyWagons(chosen != EngineID::Invalid());
+				/* Naming one is the gesture that means "buy this one" -- in a
+				 * shed. At a platform there is nothing to buy into and no shed
+				 * to buy from, so the same gesture only says which type to
+				 * couple, and the button there has two states instead of three. */
+				order->SetBuyWagons(chosen != EngineID::Invalid() && order->IsType(OT_GOTO_DEPOT));
 				/* And the cargo filter goes, for the reason given at
 				 * MOF_COUPLE_CARGO: the two say different things and are meant
 				 * to be said together -- this model, carrying that cargo. What

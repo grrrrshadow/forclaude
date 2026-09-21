@@ -2536,9 +2536,9 @@ static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 				 * wagon are set together now, and "every cargo" lets go of
 				 * both -- which is a thing no counter can show and this line
 				 * can. */
-				IConsolePrint(CC_DEFAULT, "testfiltr: vlak {} rozkaz {} (naklad {}, naplneni {}, vagon {}) - {}, cekajicich rad {}",
+				IConsolePrint(CC_DEFAULT, "testfiltr: vlak {} rozkaz {} (naklad {}, naplneni {}, vagon {}, nakup {}) - {}, cekajicich rad {}",
 						t->unitnumber, i, (int)(int8_t)o->GetCoupleCargo(), to_underlying(o->GetCoupleLoad()),
-						(int)o->GetCoupleBuyEngine().base(),
+						(int)o->GetCoupleBuyEngine().base(), o->ShouldBuyWagons() ? "ano" : "ne",
 						found ? "NASEL BY radu" : "nenasel by nic", waiting);
 				return true;
 			}

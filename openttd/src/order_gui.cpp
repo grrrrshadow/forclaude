@@ -576,12 +576,20 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					 * set, the line above has already said it -- and said the
 					 * one that counts, the filter rather than what the model
 					 * happens to come out of the works carrying. */
-					std::string cargo;
-					if (!IsValidCargoType(order->GetCoupleCargo()) && IsValidCargoType(buy->GetDefaultCargoType())) {
-						cargo = GetString(STR_ORDER_COUPLE_BUY_CARGO_PART, CargoSpec::Get(buy->GetDefaultCargoType())->name);
-					}
-					second += GetString(order->ShouldBuyWagons() ? STR_ORDER_COUPLE_BUY_SUFFIX : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX,
-							PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList), cargo);
+					/* Four strings rather than one with a piece slotted into it:
+					 * a cargo is named by a StringID and so is the line it goes in,
+					 * and a line built by hand and handed on as plain text is not
+					 * something the string system can read back. Handed over that
+					 * way it printed "invalid parameter", which is exactly what the
+					 * player saw after the wagon type. */
+					bool own_cargo = !IsValidCargoType(order->GetCoupleCargo()) && IsValidCargoType(buy->GetDefaultCargoType());
+					StringID suffix = order->ShouldBuyWagons()
+							? (own_cargo ? STR_ORDER_COUPLE_BUY_SUFFIX_CARGO : STR_ORDER_COUPLE_BUY_SUFFIX)
+							: (own_cargo ? STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX);
+					auto engine = PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList);
+					second += own_cargo
+							? GetString(suffix, engine, CargoSpec::Get(buy->GetDefaultCargoType())->name)
+							: GetString(suffix, engine);
 				}
 			}
 
@@ -1658,8 +1666,12 @@ public:
 			 * window built itself as a plain list with no button, and the
 			 * player clicked a wagon and watched nothing happen. */
 			if (this->GetWidget<NWidgetCore>(WID_O_COUPLE_BUY) != nullptr) {
-				const Order *sel = this->vehicle->GetOrder(this->OrderGetSel());
-				this->SetWidgetDisabledState(WID_O_COUPLE_BUY, sel == nullptr || !sel->IsType(OT_GOTO_DEPOT) || !sel->ShouldGoToCouple());
+					const Order *sel = this->vehicle->GetOrder(this->OrderGetSel());
+					/* A platform has it too now, with the buying left out:
+					 * which type to couple is worth asking wherever the order
+					 * collects, and only the buying needs a shed. */
+					this->SetWidgetDisabledState(WID_O_COUPLE_BUY, sel == nullptr || !sel->ShouldGoToCouple() ||
+							(!sel->IsType(OT_GOTO_DEPOT) && !sel->IsType(OT_GOTO_STATION)));
 			}
 			/* Selling moved to the vehicle's own window, where there is an
 			 * icon for it in the row that stood dark out on the line. This
@@ -2148,13 +2160,18 @@ public:
 			case WID_O_COUPLE_BUY: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
-				/* The press walks the three states round. No wagon named: the
-				 * list opens to be asked which. Buying: the buying stops and
-				 * the wagon stays as the one this order will couple. Only
-				 * couples: the wagon is let go of and the order is back to
-				 * taking whatever the filter allows. */
-				/* Depot orders only; the button is greyed everywhere else. */
-				if (!order->IsType(OT_GOTO_DEPOT) || !order->ShouldGoToCouple()) break;
+				/* The press walks the states round. No type named: the list
+				 * opens to be asked which. Buying: the buying stops and the
+				 * type stays as the only one this order will couple. Couples
+				 * only: the type is let go of and the order is back to taking
+				 * whatever the other filters allow.
+				 *
+				 * At a platform there are two of those states and not three:
+				 * there is nothing to buy into and no shed to buy from, so
+				 * naming a type there only says which one to couple. The
+				 * middle state is skipped on the way round. */
+				if (!order->ShouldGoToCouple()) break;
+				if (!order->IsType(OT_GOTO_DEPOT) && !order->IsType(OT_GOTO_STATION)) break;
 				const Depot *depot = Depot::GetIfValid(order->GetDestination().ToDepotID());
 				if (Engine::GetIfValid(order->GetCoupleBuyEngine()) == nullptr) {
 					ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),

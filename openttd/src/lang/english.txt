@@ -5002,13 +5002,14 @@ STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Only col
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vehicles: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vehicles: any
 STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}One number, and one of three ways to read it. With neither toggle down it couples a rake of exactly this many vehicles, 0 for any rake. "At least" takes a rake once it has grown to this many or more, so one still being built is left to grow. "At most" is a rake of up to this many, 0 for as many as fit on the platform. "Found a rake" - what to do when there is nothing here to couple to, wait or put wagons down anyway: couple nothing, and lay your own wagons down as the start of a rake instead; with "at most" the number is the greatest length, and it then waits until it can couple or found. The whole rake is always taken; leaving part of a rake standing is what a decoupling order at the same platform is for. OK confirms the number and the buttons together. Station waypoints are worth using here.
-STR_ORDER_COUPLE_BUY_OFF                                        :{BLACK}Wagon: any
+STR_ORDER_COUPLE_BUY_OFF                                        :{BLACK}Type: any
 STR_ORDER_COUPLE_BUY_ON                                         :{BLACK}Buy: {ENGINE}
-STR_ORDER_COUPLE_BUY_TOOLTIP                                    :{BLACK}Which wagon this order works with. Press it to pick one from the list: from then on the order couples that wagon and no other - a wagon does not carry just any road vehicle, and which one it is decides what can ride on it - and buys one whenever the depot is short, already fitted for the cargo the filter asks for. Press it again and the buying stops while the wagon goes on saying which ones to couple, which is what a yard wants once it has enough of them going round. Press it a third time to let go of the wagon and take whatever the filter allows
-STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(buy {ENGINE}{STRING})
-STR_ORDER_COUPLE_BUY_ONLY                                       :{BLACK}Wagon: {ENGINE}
-STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(wagon {ENGINE}{STRING})
-STR_ORDER_COUPLE_BUY_CARGO_PART                                 :{SPACE}{STRING}
+STR_ORDER_COUPLE_BUY_TOOLTIP                                    :{BLACK}At a station no buying can be set, only which type to couple. In a depot the first press sets buying of a type. Press it again and the buying stops, once there are enough wagons going round, while the type goes on saying which ones to couple. A third press lets the type go and every type is coupled according to the other filters - cargo, count, full/empty. A wagon does not carry just any road vehicle, a lorry is longer, so which one it is matters. Bought wagons are fitted for the cargo the filter asks for right away
+STR_ORDER_COUPLE_BUY_SUFFIX                                     :{SPACE}(buy {ENGINE})
+STR_ORDER_COUPLE_BUY_SUFFIX_CARGO                               :{SPACE}(buy {ENGINE} {STRING})
+STR_ORDER_COUPLE_BUY_ONLY                                       :{BLACK}Type: {ENGINE}
+STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(type {ENGINE})
+STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO                          :{SPACE}(type {ENGINE} {STRING})
 STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Which wagon to couple
 STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Couple this one
 STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Write this wagon into the order. The order buys one whenever the depot is short, fits it for the cargo the filter asks for, and couples it

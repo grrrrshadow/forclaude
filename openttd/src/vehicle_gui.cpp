@@ -3292,7 +3292,12 @@ public:
 			 * what in it does not apply to a rake is left out there. */
 			this->SetWidgetDisabledState(WID_VV_SHOW_DETAILS, false);
 			this->SetWidgetDisabledState(WID_VV_ORDER_LOCATION, v->current_order.GetLocation(v) == INVALID_TILE);
-			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany);
+			/* Sold, and the tow already coming for them: there is nothing left
+			 * to decide. Pressed once more this button would call the tow off,
+			 * and the wagons the player has already sold would stand there for
+			 * good with nobody coming. His own words: once it is sold he must
+			 * not be able to press anything. */
+			this->SetWidgetDisabledState(WID_VV_RESCUE_ENGINE, !is_localcompany || Train::From(v)->IsSoldForScrap());
 			this->SetWidgetLoweredState(WID_VV_RESCUE_ENGINE, IsWagonTowRequested(Train::From(v)));
 			/* Sold and waiting is not a thing to press twice; the tow is
 			 * already coming and the sale is already made. */
