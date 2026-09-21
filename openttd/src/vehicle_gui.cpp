@@ -3068,6 +3068,20 @@ static bool IsVehicleRefittable(const Vehicle *v)
 {
 	if (!v->IsStoppedInDepot()) return false;
 
+	/* Road vehicles (CT_ROLA) are in no set's refit mask, the cargo being ours
+	 * and not theirs, so IsEngineRefittable() says no for a rake of wagons that
+	 * carry one cargo each -- and the button that opens the refit window was
+	 * therefore grey in front of wagons that can perfectly well be fitted to
+	 * carry a lorry. Asked here and not in IsEngineRefittable(), because that
+	 * one is asked from everywhere: a lorry goes on in a depot and nowhere
+	 * else, and this is the depot's own question. See road_on_rail.h. */
+	if (v->type == VehicleType::Train && IsValidCargoType(_road_vehicle_cargo)) {
+		for (const Train *t = Train::From(v); t != nullptr; t = t->Next()) {
+			if (t->IsArticulatedPart() || RailVehInfo(t->engine_type)->railveh_type != RailVehicleType::Wagon) continue;
+			return true;
+		}
+	}
+
 	do {
 		if (IsEngineRefittable(v->engine_type)) return true;
 	} while (v->IsGroundVehicle() && (v = v->Next()) != nullptr);
