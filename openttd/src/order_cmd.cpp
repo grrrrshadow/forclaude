@@ -1748,6 +1748,13 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				EngineID chosen = static_cast<EngineID>(data);
 				order->SetCoupleBuyEngine(chosen);
 				order->SetBuyWagons(chosen != EngineID::Invalid());
+				/* And the cargo filter goes, for the reason given at
+				 * MOF_COUPLE_CARGO: naming one model says everything there is
+				 * to say about which wagons are wanted, and what that model
+				 * carries is the model's own business. The list the model was
+				 * picked from opened filtered to the cargo that was set, so
+				 * what has just been named can carry it anyway. */
+				if (chosen != EngineID::Invalid()) order->SetCoupleCargo(INVALID_CARGO);
 				break;
 			}
 
@@ -1859,6 +1866,16 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_COUPLE_CARGO:
 				order->SetCoupleCargo(CargoType(data));
+				/* The two ways of saying which wagons this order takes are one
+				 * or the other, never both -- the player's rule. Naming a cargo
+				 * means "every wagon carrying this", which is the opposite of
+				 * "this one model and no other", so it lets the model go. The
+				 * other half of the same rule is below, where naming a model
+				 * lets the cargo go. */
+				if (CargoType(data) != INVALID_CARGO) {
+					order->SetCoupleBuyEngine(EngineID::Invalid());
+					order->SetBuyWagons(false);
+				}
 				break;
 
 			case MOF_COUPLE_COUNT:

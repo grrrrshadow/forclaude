@@ -3772,6 +3772,19 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 	 * not a shelf of ready-made rakes to pick one off. Anything already spoken
 	 * for by this train is looked up the ordinary way below -- the rake was
 	 * made up when it was claimed and is not remade every tick. */
+	/* No number on the order -- "any rake of my wagon will do" -- and told to
+	 * buy. Buying still has to know how many, and with no number the answer is
+	 * one: enough that something of the right kind is standing there to be
+	 * collected. Without this the order could never buy at all, because buying
+	 * was only ever done on the way to making up a rake of a named size: the
+	 * train jumped to the order, found nothing it would take, and stood there.
+	 * The player's report, word for word: "poskoci to na ten prikaz ale
+	 * nejede". */
+	if (depot_order && v->couple_target == VehicleID::Invalid() && order.ShouldBuyWagons() &&
+			order.GetCoupleCount() == 0 && FreeDepotUnitsFor(v, order, depot_tile, nullptr, false) == 0) {
+		BuyWagonsIntoDepot(v, order, depot_tile, 1);
+	}
+
 	if (depot_order && order.GetCoupleCount() != 0 && v->couple_target == VehicleID::Invalid()) {
 		Train *made = AssembleDepotRake(v, order, depot_tile, order.GetCoupleCount());
 		if (made == nullptr) return nullptr;
