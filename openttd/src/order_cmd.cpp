@@ -2270,6 +2270,20 @@ void CheckOrders(const Vehicle *v)
 		if (o.ShouldGoToCouple() || o.ShouldWaitForCouple() || o.ShouldDecoupleOnDeparture() || o.ShouldBoardAtStation()) return;
 	}
 
+	/* Nor for a rescue engine, which has no orders on purpose. It waits in its
+	 * shed until something goes wrong and then drives to wherever that was;
+	 * where it goes is never written down in advance, because nobody knows it
+	 * in advance. The review saw an empty list and said the one thing it says
+	 * about empty lists -- "too few orders" -- at a train that is doing exactly
+	 * what it was told to do. The player's report: "vlak 3 je odtahovka,
+	 * odtahovka nema prikazy". Same for a train the player has sold: it is not
+	 * going anywhere by itself either, and there is nothing he could do about a
+	 * warning at it. */
+	if (v->type == VehicleType::Train) {
+		const Train *t = Train::From(v);
+		if (t->vehicle_flags.Test(VehicleFlag::RescueEngine) || t->IsSoldForScrap()) return;
+	}
+
 	/* Only check every 20 days, so that we don't flood the message log */
 	if (v->owner == _local_company && v->day_counter % 20 == 0) {
 		StringID message = INVALID_STRING_ID;
