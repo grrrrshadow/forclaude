@@ -5007,35 +5007,15 @@ static bool ConTestDirectionGaps(std::span<std::string_view> argv)
 	auto punit = ParseInteger(argv[1]);
 	if (!punit.has_value()) return false;
 
-	Train *wagon = nullptr;
+	Train *train = nullptr;
 	for (Train *t : Train::Iterate()) {
-		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
-		for (Train *u = t; u != nullptr; u = u->Next()) {
-			if (u->carrying != VehicleID::Invalid()) { wagon = u; break; }
-		}
-		break;
+		if (t->First() == t && t->unitnumber == (UnitID)*punit) { train = t; break; }
 	}
-	if (wagon == nullptr) {
-		IConsolePrint(CC_ERROR, "testsmery: vlak {} nenalezen, nebo na nem nic nestoji.", argv[1]);
-		return true;
-	}
-	RoadVehicle *car = RoadVehicle::GetIfValid(wagon->carrying);
-	if (car == nullptr) {
-		IConsolePrint(CC_ERROR, "testsmery: vagon veze neco, co uz neexistuje.");
+	if (train == nullptr) {
+		IConsolePrint(CC_ERROR, "testsmery: vlak {} nenalezen.", argv[1]);
 		return true;
 	}
 
-	/* Where the middle of a whole vehicle's picture lands across the screen:
-	 * the leftmost and the rightmost pixel any of its parts reaches, and the
-	 * middle between them.
-	 *
-	 * The parts matter. A lorry with a trailer is two vehicles, laid out one
-	 * behind the other along the wagon, and asking only the front one where it
-	 * is says the front one stands half a chain ahead of the middle -- which
-	 * is true and is not the question. Facing east or west that half chain is
-	 * straight across the screen, so the first reading of the player's own
-	 * train came out thirty-five pixels beside its wagon with nothing wrong at
-	 * all. */
 	auto span = [](const std::vector<const Vehicle *> &parts) {
 		int lo = INT_MAX;
 		int hi = INT_MIN;
@@ -5059,23 +5039,39 @@ static bool ConTestDirectionGaps(std::span<std::string_view> argv)
 	auto middle = [&span](const std::vector<const Vehicle *> &parts) { return span(parts).first; };
 	auto wheels = [&span](const std::vector<const Vehicle *> &parts) { return span(parts).second; };
 
-	/* The wagon's own parts and no more. A wagon's Next() walks on into the
-	 * rest of the train, which would take the whole consist's width; a road
-	 * vehicle's walks its own lorry and trailer and stops, which is right. */
-	std::vector<const Vehicle *> wagon_parts;
-	for (const Train *p = wagon; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
-		wagon_parts.push_back(p);
-	}
-	std::vector<const Vehicle *> car_parts;
-	for (const RoadVehicle *u = car; u != nullptr; u = u->Next()) car_parts.push_back(u);
-
 	static const std::string_view _names[] = { "S", "SV", "V", "JV", "J", "JZ", "Z", "SZ" };
-	const Direction d = wagon->direction;
 
-	int across = middle(car_parts) - middle(wagon_parts);
-	int above = wheels(wagon_parts) - wheels(car_parts);
-	IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto je {:+d} bodu vedle stredu vagonu a stoji {} bodu nad jeho koly",
-			to_underlying(d), _names[to_underlying(d)], across / (int)ZOOM_BASE, above / (int)ZOOM_BASE);
+	/* Every load on the train, not just the first. The player put a car of one
+	 * set on a wagon in among cars of another on purpose -- so that the deck is
+	 * not chosen to suit a single set's pictures. Two sets landing on the same
+	 * two numbers is the whole of the claim being made here. */
+	uint found = 0;
+	for (Train *wagon = train; wagon != nullptr; wagon = wagon->Next()) {
+		if (wagon->carrying == VehicleID::Invalid()) continue;
+		RoadVehicle *car = RoadVehicle::GetIfValid(wagon->carrying);
+		if (car == nullptr) continue;
+		found++;
+
+		/* The wagon's own pieces and no more. A wagon's Next() walks on into the
+		 * rest of the train, which would take the whole consist's width; a road
+		 * vehicle's walks its own lorry and trailer and stops, which is right. */
+		std::vector<const Vehicle *> wagon_parts;
+		for (const Train *p = wagon; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+			wagon_parts.push_back(p);
+		}
+		std::vector<const Vehicle *> car_parts;
+		for (const RoadVehicle *u = car; u != nullptr; u = u->Next()) car_parts.push_back(u);
+
+		const Direction d = wagon->direction;
+		int across = middle(car_parts) - middle(wagon_parts);
+		int above = wheels(wagon_parts) - wheels(car_parts);
+		IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto {} ({}) na vagonu {} je {:+d} bodu vedle jeho stredu a stoji {} bodu nad jeho koly",
+				to_underlying(d), _names[to_underlying(d)], car->unitnumber,
+				GetString(Engine::Get(car->engine_type)->info.string_id),
+				GetString(Engine::Get(wagon->engine_type)->info.string_id),
+				across / (int)ZOOM_BASE, above / (int)ZOOM_BASE);
+	}
+	if (found == 0) IConsolePrint(CC_ERROR, "testsmery: na vlaku {} nic nestoji.", argv[1]);
 	return true;
 }
 
