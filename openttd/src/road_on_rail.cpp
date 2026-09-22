@@ -27,40 +27,37 @@
 #include "console_func.h"
 #include "anomaly_log.h"
 #include "timer/timer_game_tick.h"
+#include "landscape.h"
+#include "spritecache.h"
 
 #include <map>
 
 #include "safeguards.h"
 
 /**
- * How far above the wagon's own position the road vehicle is drawn: the deck
- * of a flat wagon. The same for every wagon, since no wagon says how high its
- * deck is -- so it is a number chosen by eye against the wagons this is
- * actually used with, and 'testpaluba' moves it while the game runs, because
- * the eye that has to choose it is at the screen and not here.
+ * How high the deck of a wagon is: screen pixels above the line the wagon's
+ * own wheels stand on.
+ *
+ * Still chosen by eye, because no wagon says where its deck is -- 'testpaluba'
+ * moves it while the game runs, since the eye that has to choose it is at the
+ * screen and not here. What changed is what it is measured from. It used to be
+ * added to the wagon's height in the world, and the world's height is the same
+ * in every direction while the wagon's picture is not, so the deck came out
+ * right in one direction and wrong in the other seven -- the ring of eight
+ * different best numbers the player read off a circle of track. Measured from
+ * the wagon's own picture, one number does all eight.
  */
-int _carried_z_offset = 4;
+int _carried_z_offset = 6;
 
 /**
- * How far to the side of the wagon's own position the road vehicle is drawn,
- * to the right of the way the wagon faces; a minus puts it to the left.
+ * How far above the wagon the carried vehicle is lifted in the world.
  *
- * The height above the deck ('testpaluba') alone could never get it right,
- * and the reason is the view. Raising a vehicle moves its picture straight up
- * the screen and nothing else, while a wagon's deck is seen from the side as
- * well -- so a vehicle standing beside the middle of its wagon rather than on
- * it looks, on the screen, partly like a vehicle standing too low or too
- * high. Chasing that with the height gives a different best height for every
- * direction the train can face, which is the ring of numbers the player read
- * off a circle of track: eight directions, eight heights, and the ones facing
- * opposite ways agreeing with each other.
- *
- * Hence this. One step is a sixteenth of a tile, which the view turns into
- * four pixels sideways (two pixels across and one down on a diagonal) -- the
- * grid vehicles stand on, and as fine as moving one gets. Getting inside a
- * pixel is the sprites' own business, not this.
+ * Nothing to do with how high it looks -- that is the deck above, in pixels.
+ * This is for the sorting of what is drawn in front of what: two boxes at the
+ * same height are sorted by a rule of thumb, and the rule once put the wagon
+ * in front of the vehicle it was carrying.
  */
-int _carried_side_offset = 0;
+static const int CARRIED_WORLD_LIFT = 4;
 
 /**
  * How far behind the front of its drawn box a road vehicle's own position
@@ -176,6 +173,65 @@ static void SayRoad(const RoadVehicle *rv, std::string what)
 }
 
 /**
+ * Where a whole vehicle's picture lands on the screen: the middle of it across,
+ * and the line its wheels stand on.
+ *
+ * The wheels, not the middle of the picture. Vehicles are of all heights and
+ * the middle of a picture says nothing about where the thing touches the
+ * ground -- the player's own words. What a sprite does say is its lowest row,
+ * because a sprite is trimmed to what is actually painted, and the lowest
+ * painted row of a vehicle is where its wheels meet what it stands on. That
+ * line is the same thing on every vehicle in every set, which is what makes it
+ * worth measuring from.
+ *
+ * Across, the best this can do is the middle of the whole picture. The middle
+ * between the two wheels would be better still and cannot be had: the pictures
+ * are in the cache in the form the screen wants them, not as pixels to be
+ * looked through.
+ *
+ * Asked of the pictures that are about to be drawn, not of the positions. A
+ * picture sits against its vehicle's position by whatever its own bounding box
+ * says (UpdateDeltaXY(), which answers differently for each of the eight
+ * directions and differently again for a road vehicle than for a wagon) plus
+ * whatever the set baked into the sprite.
+ *
+ * @param first     the vehicle, its head
+ * @param rail_only whether to stop at the end of this rail vehicle's own
+ *                  pieces; a wagon's Next() walks on into the rest of the
+ *                  train and would take the whole consist's width, while a
+ *                  road vehicle's ends at its own trailer, which is right
+ * @param[out] middle_x the middle across, in the viewport's own units
+ * @param[out] wheels_y the line the wheels stand on, the same units
+ */
+static void DrawnPicture(const Vehicle *first, bool rail_only, int &middle_x, int &wheels_y)
+{
+	int lo = INT_MAX;
+	int hi = INT_MIN;
+	int bottom = INT_MIN;
+	for (const Vehicle *v = first; v != nullptr; ) {
+		Point pt = RemapCoords(v->x_pos + v->bounds.origin.x + v->bounds.offset.x,
+				v->y_pos + v->bounds.origin.y + v->bounds.offset.y,
+				v->z_pos + v->bounds.origin.z + v->bounds.offset.z);
+		VehicleSpriteSeq seq;
+		v->GetImage(v->direction, EngineImageType::OnMap, &seq);
+		Rect r;
+		seq.GetBounds(&r);
+		lo = std::min(lo, pt.x + r.left);
+		hi = std::max(hi, pt.x + r.right);
+		bottom = std::max(bottom, pt.y + r.bottom);
+
+		if (rail_only) {
+			const Train *t = Train::From(v);
+			v = t->HasArticulatedPart() ? t->GetNextArticulatedPart() : nullptr;
+		} else {
+			v = v->Next();
+		}
+	}
+	middle_x = (lo + hi) / 2;
+	wheels_y = bottom;
+}
+
+/**
  * Put the road vehicle on its wagon, nose to the wagon's nose. Called every
  * tick while it rides, so that it moves with the train and is drawn on it.
  *
@@ -285,30 +341,6 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		y = (wagon->y_pos + last->y_pos) / 2 - back.y * ahead_of_middle;
 	}
 
-	/* Off the middle of the wagon, across the rails (_carried_side_offset).
-	 * Which way is across follows from the way the wagon faces, so a train
-	 * going round a circle of track carries its load on the same side of
-	 * itself the whole way round -- and on a circle that is towards the middle
-	 * of it, or away from it, which is how the player reads the number off. */
-	int side_x = 0;
-	int side_y = 0;
-	if (_carried_side_offset != 0) {
-		/* One step in each of the eight directions, the way a vehicle moves. */
-		static const DirectionIndexArray<Point> _step{{{
-			{ -1, -1 }, // Direction::N
-			{ -1,  0 }, // Direction::NE
-			{ -1,  1 }, // Direction::E
-			{  0,  1 }, // Direction::SE
-			{  1,  1 }, // Direction::S
-			{  1,  0 }, // Direction::SW
-			{  1, -1 }, // Direction::W
-			{  0, -1 }, // Direction::NW
-		}}};
-		const Point &side = _step[ChangeDir(dir, DirDiff::Right90)];
-		side_x = side.x * _carried_side_offset;
-		side_y = side.y * _carried_side_offset;
-	}
-
 	const RoadVehicle *ahead = nullptr;
 	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 		if (ahead != nullptr) {
@@ -320,15 +352,52 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		 * it is on the tile next door, and what a carried vehicle's tile says
 		 * has already taken the game down once. */
 		u->tile = TileVirtXY(x, y);
-		u->x_pos = x + side_x;
-		u->y_pos = y + side_y;
-		u->z_pos = wagon->z_pos + _carried_z_offset;
+		u->x_pos = x;
+		u->y_pos = y;
+		u->z_pos = wagon->z_pos + CARRIED_WORLD_LIFT;
 		u->direction = dir;
+		/* Measured below, so it must not still carry the last tick's answer. */
+		u->draw_offs = {};
+		u->UpdateDeltaXY();
 		/* In a tunnel with the wagon, out of sight with it. */
 		u->vehstatus.Set(VehState::Hidden, wagon->vehstatus.Test(VehState::Hidden));
+		ahead = u;
+	}
+
+	/* And now across the screen, which the world's own grid cannot do.
+	 *
+	 * The two pictures are put side by side and the vehicle's is slid until
+	 * its middle is over the wagon's. It is not the same as standing at the
+	 * same place: a road vehicle's picture sits differently against its own
+	 * position than a wagon's does, by a different amount in each of the eight
+	 * directions, and the set decides how much. Chasing that with the height
+	 * is what gave the player eight different best heights round a circle of
+	 * track -- the ring of numbers that started this.
+	 *
+	 * Worked out rather than written down on purpose. Numbers read off one
+	 * set's wagons would be wrong for the next set and for the game's own
+	 * vehicles; this asks the pictures that are actually about to be drawn.
+	 *
+	 * Pixels, not steps of the world. Facing east or west, across the rails is
+	 * straight up and down the screen, so no move in the world can shift the
+	 * picture sideways at all there -- which is why it ends up in draw_offs and
+	 * not in the position. */
+	int wagon_middle, wagon_wheels;
+	int car_middle, car_wheels;
+	DrawnPicture(wagon, true, wagon_middle, wagon_wheels);
+	DrawnPicture(rv, false, car_middle, car_wheels);
+	/* On the deck, which is so many pixels above the line the wagon's own
+	 * wheels stand on (_carried_z_offset). Measured from the picture and not
+	 * from the wagon's height, and that is the whole point: the height is the
+	 * same in every direction while the picture is not, so a deck set against
+	 * the height needed a different number in each of the eight directions and
+	 * a deck set against the picture needs one. */
+	int want_wheels = wagon_wheels - _carried_z_offset * ZOOM_BASE;
+	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+		u->draw_offs.x = wagon_middle - car_middle;
+		u->draw_offs.y = want_wheels - car_wheels;
 		u->UpdatePosition();
 		u->UpdateViewport(true, true);
-		ahead = u;
 	}
 }
 

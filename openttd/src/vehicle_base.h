@@ -278,6 +278,16 @@ public:
 	 */
 	uint8_t spritenum = 0;
 	SpriteBounds bounds{}; ///< Bounding box of vehicle.
+	/**
+	 * Screen pixels to shift the picture by, on top of everything the position
+	 * and the bounding box already say. Nothing but a road vehicle riding on a
+	 * wagon uses it (road_on_rail.cpp), and there it is not a nicety: a vehicle
+	 * standing beside the middle of its wagon has to be moved across the
+	 * screen, and across the screen is a direction the map's own grid cannot
+	 * express at all when the wagon faces east or west. Not saved -- it is
+	 * worked out afresh every time the vehicle is put on its wagon.
+	 */
+	Point draw_offs{};
 	EngineID engine_type = EngineID::Invalid(); ///< The type of engine used for this vehicle.
 
 	TextEffectID fill_percent_te_id = INVALID_TE_ID; ///< a text-effect id to a loading indicator object

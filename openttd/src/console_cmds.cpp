@@ -4973,41 +4973,6 @@ static bool ConTestDeckHeight(std::span<std::string_view> argv)
 }
 
 /**
- * Move the carried road vehicles across the rails, to one side of the wagon's
- * middle or the other, while the game is running.
- *
- * The height on its own ('testpaluba') cannot get it right, and the circle of
- * track the player laid says why: he read off a best height for every one of
- * the eight directions a train can face, they all came out different, and the
- * ones facing opposite ways agreed with each other -- a ring of numbers, not
- * one number. That is what a vehicle standing beside the middle of its wagon
- * looks like in this view, where raising something moves its picture straight
- * up and a deck is seen from the side as well.
- *
- * Told on a circle, which is where it is easiest to see: one number holds for
- * the whole way round, because the side of the train the load stands on does
- * not change while the train turns. Hence the name -- towards the middle of
- * the circle, or away from it, depending on which way round the train goes.
- * One step is four pixels across; inside a pixel is the sprites' own business.
- * Usage: testkruh [kroky]
- * @copydoc IConsoleCmdProc
- */
-static bool ConTestCircleOffset(std::span<std::string_view> argv)
-{
-	extern int _carried_side_offset;
-	if (argv.size() >= 2) {
-		auto p = ParseInteger<int>(argv[1]);
-		if (!p.has_value()) return false;
-		_carried_side_offset = *p;
-		/* Same as the deck's height: a standing train would not move them
-		 * across on its own, and standing is when the player is looking. */
-		RestandCarriedRoadVehicles();
-	}
-	IConsolePrint(CC_DEFAULT, "testkruh: auta stoji {} kroku vedle stredu vagonu.", _carried_side_offset);
-	return true;
-}
-
-/**
  * Where a carried road vehicle's picture lands beside its wagon's, across the
  * screen, in each of the eight directions a train can face.
  *
@@ -5071,22 +5036,28 @@ static bool ConTestDirectionGaps(std::span<std::string_view> argv)
 	 * straight across the screen, so the first reading of the player's own
 	 * train came out thirty-five pixels beside its wagon with nothing wrong at
 	 * all. */
-	auto middle = [](const std::vector<const Vehicle *> &parts) {
+	auto span = [](const std::vector<const Vehicle *> &parts) {
 		int lo = INT_MAX;
 		int hi = INT_MIN;
+		int bottom = INT_MIN;
 		for (const Vehicle *v : parts) {
 			Point pt = RemapCoords(v->x_pos + v->bounds.origin.x + v->bounds.offset.x,
 					v->y_pos + v->bounds.origin.y + v->bounds.offset.y,
 					v->z_pos + v->bounds.origin.z + v->bounds.offset.z);
+			pt.x += v->draw_offs.x;
+			pt.y += v->draw_offs.y;
 			VehicleSpriteSeq seq;
 			v->GetImage(v->direction, EngineImageType::OnMap, &seq);
 			Rect r;
 			seq.GetBounds(&r);
 			lo = std::min(lo, pt.x + r.left);
 			hi = std::max(hi, pt.x + r.right);
+			bottom = std::max(bottom, pt.y + r.bottom);
 		}
-		return (lo + hi) / 2;
+		return std::make_pair((lo + hi) / 2, bottom);
 	};
+	auto middle = [&span](const std::vector<const Vehicle *> &parts) { return span(parts).first; };
+	auto wheels = [&span](const std::vector<const Vehicle *> &parts) { return span(parts).second; };
 
 	/* The wagon's own parts and no more. A wagon's Next() walks on into the
 	 * rest of the train, which would take the whole consist's width; a road
@@ -5101,19 +5072,10 @@ static bool ConTestDirectionGaps(std::span<std::string_view> argv)
 	static const std::string_view _names[] = { "S", "SV", "V", "JV", "J", "JZ", "Z", "SZ" };
 	const Direction d = wagon->direction;
 
-	/* One step of 'testkruh' is one step across the rails, and what that does
-	 * to the screen follows from the view: two pixels per step of the map's x
-	 * and two the other way for its y (RemapCoords). */
-	static const DirectionIndexArray<Point> _step{{{
-		{ -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 },
-	}}};
-	const Point &side = _step[ChangeDir(d, DirDiff::Right90)];
-	int per_step = (side.y - side.x) * 2 * ZOOM_BASE;
-
-	int gap = middle(car_parts) - middle(wagon_parts);
-	std::string advice = per_step == 0 ? "bokem nehne" : fmt::format("testkruh {:+.2f}", -(double)gap / per_step);
-	IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto je {:+d} bodu vedle vagonu, krok posune {} bodu, {}",
-			to_underlying(d), _names[to_underlying(d)], gap / (int)ZOOM_BASE, per_step / (int)ZOOM_BASE, advice);
+	int across = middle(car_parts) - middle(wagon_parts);
+	int above = wheels(wagon_parts) - wheels(car_parts);
+	IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto je {:+d} bodu vedle stredu vagonu a stoji {} bodu nad jeho koly",
+			to_underlying(d), _names[to_underlying(d)], across / (int)ZOOM_BASE, above / (int)ZOOM_BASE);
 	return true;
 }
 
@@ -10516,7 +10478,6 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
 	IConsole::CmdRegister("pozn",                    ConNote);
 	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
-	IConsole::CmdRegister("testkruh",                ConTestCircleOffset);
 	IConsole::CmdRegister("testsmery",               ConTestDirectionGaps);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);

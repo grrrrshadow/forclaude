@@ -1201,7 +1201,7 @@ static void DoDrawVehicle(const Vehicle *v)
 	for (uint i = 0; i < v->sprite_cache.sprite_seq.count; ++i) {
 		PaletteID pal2 = v->sprite_cache.sprite_seq.seq[i].pal;
 		if (!pal2 || v->vehstatus.Test(VehState::Crashed)) pal2 = pal;
-		AddSortableSpriteToDraw(v->sprite_cache.sprite_seq.seq[i].sprite, pal2, v->x_pos, v->y_pos, v->z_pos, v->bounds, shadowed);
+		AddSortableSpriteToDraw(v->sprite_cache.sprite_seq.seq[i].sprite, pal2, v->x_pos, v->y_pos, v->z_pos, v->bounds, shadowed, nullptr, v->draw_offs);
 	}
 	EndSpriteCombine();
 }
@@ -1872,6 +1872,11 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 
 	/* z-bounds are not used. */
 	Point pt = RemapCoords(this->x_pos + this->bounds.origin.x + this->bounds.offset.x, this->y_pos + this->bounds.origin.y + this->bounds.offset.y, this->z_pos);
+	/* Where the picture really lands, shift across the screen and all
+	 * (Vehicle::draw_offs) -- this box is what decides whether the vehicle is
+	 * drawn at all and what gets repainted when it moves. */
+	pt.x += this->draw_offs.x;
+	pt.y += this->draw_offs.y;
 	new_coord.left   += pt.x;
 	new_coord.top    += pt.y;
 	new_coord.right  += pt.x + 2 * ZOOM_BASE;

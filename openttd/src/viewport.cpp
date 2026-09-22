@@ -629,9 +629,11 @@ void OffsetGroundSprite(int x, int y)
  * @param z position z of the sprite.
  * @param sub Only draw a part of the sprite.
  */
-static void AddCombinedSprite(SpriteID image, PaletteID pal, int x, int y, int z, const SubSprite *sub)
+static void AddCombinedSprite(SpriteID image, PaletteID pal, int x, int y, int z, const SubSprite *sub, Point pixel_offset)
 {
 	Point pt = RemapCoords(x, y, z);
+	pt.x += pixel_offset.x;
+	pt.y += pixel_offset.y;
 	const Sprite *spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
 
 	if (pt.x + spr->x_offs >= _vd.dpi.left + _vd.dpi.width ||
@@ -664,7 +666,7 @@ static void AddCombinedSprite(SpriteID image, PaletteID pal, int x, int y, int z
  * @param transparent if true, switch the palette between the provided palette and the transparent palette,
  * @param sub Only draw a part of the sprite.
  */
-void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z, const SpriteBounds &bounds, bool transparent, const SubSprite *sub)
+void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z, const SpriteBounds &bounds, bool transparent, const SubSprite *sub, Point pixel_offset)
 {
 	int32_t left, right, top, bottom;
 
@@ -682,13 +684,19 @@ void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z,
 	}
 
 	if (_vd.combine_sprites == SpriteCombineMode::Active) {
-		AddCombinedSprite(image, pal, x + bounds.offset.x, y + bounds.offset.y, z + bounds.offset.z, sub);
+		AddCombinedSprite(image, pal, x + bounds.offset.x, y + bounds.offset.y, z + bounds.offset.z, sub, pixel_offset);
 		return;
 	}
 
 	_vd.last_child = LAST_CHILD_NONE;
 
 	Point pt = RemapCoords(x + bounds.offset.x, y + bounds.offset.y, z + bounds.offset.z);
+	/* Straight across the screen, where the grid the world is laid out on
+	 * cannot reach (Vehicle::draw_offs). The sorting box below is left where
+	 * the vehicle really is, so a load shifted across its wagon still sorts
+	 * against the wagon the way it did. */
+	pt.x += pixel_offset.x;
+	pt.y += pixel_offset.y;
 	int tmp_left, tmp_top, tmp_x = pt.x, tmp_y = pt.y;
 
 	/* Compute screen extents of sprite */
