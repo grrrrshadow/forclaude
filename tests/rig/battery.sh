@@ -325,6 +325,21 @@ run_scene prestavbacudlik "vlak123 on
 testspoj
 testza 200 testprestavba 2 0
 testza 400 testprestavba 2 1" 3000
+# What the refit offers a collecting order, which is now a question of the
+# order and not of the train: the wagons it is going to fetch, not the ones
+# behind the engine at that moment. A collecting engine arrives with nothing
+# behind it, so asked of the train the answer could only ever be "nothing".
+# Three readings in a row -- no type named, a type named, the type taken away
+# again -- and the last one is the point: the player saw a list that stayed
+# narrowed after he had removed the type, because it was being read off the
+# wagons he still had coupled.
+run_scene prestavbanabidka "vlak123 on
+testspoj depo
+testza 200 testprestavba 2 0
+testza 300 testkoupit 2 0
+testza 400 testprestavba 2 0
+testza 500 testmof 2 0 16 255
+testza 600 testprestavba 2 0" 3000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

@@ -775,6 +775,54 @@ struct RefitWindow : public Window {
 	/**
 	 * Collects all (cargo, subcargo) refit options of a vehicle chain.
 	 */
+	/**
+	 * Which cargoes a refit told to an order should offer: the ones the wagons
+	 * that order is going to collect can take.
+	 *
+	 * Asking the train is no good here and that is the whole point. A
+	 * collecting engine drives into the shed with nothing behind it -- the
+	 * wagons are in the shed and it has come for them -- so the chain it
+	 * arrives with can only ever answer "nothing can be refitted". What the
+	 * order does know is which model it collects, and from the model the
+	 * cargoes follow.
+	 *
+	 * Read from every collecting order back to the nearest one that puts
+	 * wagons down, not from the one before this one: the orders are a ring and
+	 * which one is "the one before" depends on where the train happens to be
+	 * standing, while what it is carrying by the time it gets here does not.
+	 * The player's own reading. Any of them naming no model at all means the
+	 * train takes whatever comes, so every cargo is offered -- his rule, "if a
+	 * type is missing even once, then every cargo".
+	 *
+	 * @param v          the train
+	 * @param index      the order the refit is being told to
+	 * @param[out] mask  the cargoes to offer
+	 * @return whether this order is one of ours to answer for at all
+	 */
+	static bool CoupleRefitCargoes(const Vehicle *v, VehicleOrderID index, CargoTypes &mask)
+	{
+		const Order *here = v->GetOrder(index);
+		if (here == nullptr || !here->ShouldGoToCouple() || !here->IsType(OT_GOTO_DEPOT)) return false;
+
+		mask = {};
+		uint count = v->GetNumOrders();
+		for (uint step = 0; step < count; step++) {
+			VehicleOrderID at = (VehicleOrderID)((index + count - step) % count);
+			const Order *o = v->GetOrder(at);
+			if (o == nullptr) continue;
+			/* Where the wagons were put down, the run of collecting ends. */
+			if (step != 0 && o->ShouldDecoupleOnDeparture()) break;
+			if (!o->ShouldGoToCouple()) continue;
+			const EngineID model = o->GetCoupleBuyEngine();
+			if (model == EngineID::Invalid()) {
+				mask.Set();
+				return true;
+			}
+			mask |= GetUnionOfArticulatedRefitMasks(model, false);
+		}
+		return true;
+	}
+
 	void BuildRefitList()
 	{
 		/* Store the currently selected RefitOption. */
@@ -784,6 +832,22 @@ struct RefitWindow : public Window {
 
 		this->refit_list.clear();
 		Vehicle *v = Vehicle::Get(this->window_number);
+
+		/* A refit told to a collecting order is about the wagons it collects,
+		 * not about what happens to be coupled at this moment. */
+		if (CargoTypes couple_mask; this->order != INVALID_VEH_ORDER_ID && v->type == VehicleType::Train &&
+				CoupleRefitCargoes(v, this->order, couple_mask)) {
+			for (const auto &cs : _sorted_cargo_specs) {
+				CargoType cargo_type = cs->Index();
+				if (!couple_mask.Test(cargo_type)) continue;
+				/* Road vehicles are fitted in a depot by hand and never by an
+				 * order, the same rule the ordinary list below follows. */
+				if (cargo_type == _road_vehicle_cargo) continue;
+				this->refit_list[cargo_type].emplace_back(cargo_type, UINT8_MAX, STR_EMPTY);
+			}
+			this->RestoreRefitSelection(current_refit_option);
+			return;
+		}
 
 		/* Check only the selected vehicles. */
 		VehicleSet vehicles_to_refit;
@@ -891,7 +955,12 @@ struct RefitWindow : public Window {
 			}
 		}
 
-		/* Restore the previously selected RefitOption. */
+		this->RestoreRefitSelection(current_refit_option);
+	}
+
+	/** Put the selection back on what it was on, now the list is made again. */
+	void RestoreRefitSelection(const std::optional<RefitOption> &current_refit_option)
+	{
 		if (current_refit_option.has_value()) {
 			for (const auto &pair : this->refit_list) {
 				for (const auto &refit : pair.second) {
@@ -1378,6 +1447,30 @@ static WindowDesc _vehicle_refit_desc(
  * @param parent the parent window of the refit window
  * @param auto_refit Choose cargo for auto-refitting
  */
+/**
+ * Which cargoes the refit window offers for an order, as a line for the rig.
+ *
+ * The one thing that could not be read from outside: the list is built inside
+ * the window and the window is a picture. What it holds is now a question of
+ * the order rather than of the train -- the wagons it collects, not the ones
+ * behind it at this moment -- and that is worth being able to ask.
+ *
+ * @param v     the vehicle
+ * @param order which of its orders
+ * @return the cargo names, comma separated
+ */
+std::string RefitOfferForOrder(const Vehicle *v, VehicleOrderID order)
+{
+	RefitWindow *w = new RefitWindow(_vehicle_refit_desc, v, order, false);
+	std::string names;
+	for (const auto &pair : w->refit_list) {
+		if (!names.empty()) names += ", ";
+		names += GetString(CargoSpec::Get(pair.first)->name);
+	}
+	w->Close();
+	return names.empty() ? "nic" : names;
+}
+
 void ShowVehicleRefitWindow(const Vehicle *v, VehicleOrderID order, Window *parent, bool auto_refit)
 {
 	CloseWindowById(WindowClass::VehicleRefit, v->index);

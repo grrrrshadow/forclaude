@@ -20,6 +20,7 @@
 #include "company_type.h"
 
 void ShowVehicleRefitWindow(const Vehicle *v, VehicleOrderID order, Window *parent, bool auto_refit = false);
+std::string RefitOfferForOrder(const Vehicle *v, VehicleOrderID order);
 
 /** The tabs in the train details window */
 enum TrainDetailsWindowTabs : uint8_t {

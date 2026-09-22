@@ -5964,6 +5964,9 @@ static bool ConTestRefitButton(std::span<std::string_view> argv)
 				o->IsType(OT_GOTO_DEPOT) ? "depo" : (o->IsType(OT_GOTO_STATION) ? "stanice" : "jine"));
 		say("prestavet v depu", WID_O_REFIT, o->IsType(OT_GOTO_DEPOT));
 		say("prestavet ve stanici", WID_O_REFIT_DROPDOWN, o->IsType(OT_GOTO_STATION));
+		if (o->IsType(OT_GOTO_DEPOT)) {
+			IConsolePrint(CC_INFO, "testprestavba:   nabizi naklady: {}", RefitOfferForOrder(t, (VehicleOrderID)*porder));
+		}
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testprestavba: vlak {} nenalezen.", argv[1]);
