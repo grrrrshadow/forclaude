@@ -5038,10 +5038,20 @@ static bool SetPerDirection(std::span<std::string_view> argv, DirectionIndexArra
 				fmt::format(fmt::runtime(sentence), SayFine(what[static_cast<Direction>(d)])));
 	};
 
+	/* One direction only, said the way the player says it: the number first and
+	 * the direction after it, "testpaluba 6,25 smer 4". The word may have the
+	 * number stuck to it -- "smer4" -- because that is how he typed it. */
 	if (argv.size() >= 3) {
-		auto pd = ParseInteger<int>(argv[1]);
 		int fine = 0;
-		if (!pd.has_value() || !ParseFine(argv[2], fine)) return false;
+		if (!ParseFine(argv[1], fine)) return false;
+		std::string_view rest = argv[2];
+		if (rest.starts_with("smer")) rest.remove_prefix(4);
+		if (rest.empty() && argv.size() >= 4) rest = argv[3];
+		auto pd = ParseInteger<int>(rest);
+		if (!pd.has_value()) {
+			IConsolePrint(CC_ERROR, "{}: napis treba '{} 6,25 smer 4'. Smer je 0 sever, 2 vychod, 4 jih, 6 zapad.", name, name);
+			return true;
+		}
 		if (*pd < 0 || *pd >= (int)to_underlying(Direction::End)) {
 			IConsolePrint(CC_ERROR, "{}: smer je 0 az 7.", name);
 			return true;
