@@ -245,6 +245,20 @@ run_scene vybervagonu "vlak123 on
 testspoj depo
 testpocet 2 0 3
 testvybervagonu 2 0" 3000
+# The same window with a cargo already on the order, which is the other way in
+# and the one that has to keep working: the list opens narrowed to that cargo
+# and the press writes both halves of the answer, the type and the cargo.
+#
+# Without a cargo the window stands on "every cargo" -- a number above the
+# cargoes, not a cargo -- and it used to send that to the order as though it
+# were one. The order refused it, the type had already gone in by then, and
+# what the player got was the type set and a refusal on the screen at the same
+# moment. Every counter here said the press had worked, so the probe now asks
+# outright whether a refusal popped up.
+run_scene vybervagonunaklad "vlak123 on
+testspoj depo
+testfiltr 0
+testvybervagonu 2 0" 3000
 # And the wagon named on the order is the only one it will couple: the shed
 # is given three wagons of one kind by the deliverer and the order asks for
 # another, so it leaves them alone and buys three of its own. A wagon does not

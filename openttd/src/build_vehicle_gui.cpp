@@ -1901,8 +1901,21 @@ struct BuildVehicleWindow : Window {
 					 * this wagon, fitted for that. The player's own line, "let
 					 * him pick from the purchase menu and let them be bought
 					 * for the cargo he sets". The wagon goes first, because the
-					 * cargo is checked against it. */
-					if (IsValidCargoType(this->cargo_filter_criteria)) {
+					 * cargo is checked against it.
+					 *
+					 * The filter has to be standing on a cargo and not on one of
+					 * the list's own choices -- "every cargo", "carries
+					 * nothing", "engines", "freight". Those are numbers above
+					 * the cargoes (CargoFilterCriteria) rather than cargoes,
+					 * and IsValidCargoType() says yes to every one of them, so
+					 * the window sent "every cargo" to the order as if it were
+					 * a cargo and the order rightly refused it. What the player
+					 * saw: the wagon was written in by the line above and the
+					 * refusal popped up straight after it, every time he named
+					 * a type without naming a cargo first. Nothing to send
+					 * then -- the order keeps the type and stays open to every
+					 * cargo, which is what the filter says. */
+					if (this->cargo_filter_criteria < NUM_CARGO) {
 						Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->pick_for_order->tile, this->pick_for_order->index,
 								this->pick_order_index, MOF_COUPLE_CARGO, this->cargo_filter_criteria);
 					}
@@ -2262,9 +2275,24 @@ void TestPickCoupleWagon(const Vehicle *v, VehicleOrderID index, TileIndex tile,
 	}
 
 	EngineID chosen = w->eng_list.front().engine_id;
+	CargoType stood_on = w->cargo_filter_criteria;
 	w->SelectEngine(chosen);
-	IConsolePrint(CC_INFO, "testvybervagonu: v okne je {} vagonu, mackam cudlik na {}", w->eng_list.size(), GetString(Engine::Get(chosen)->info.string_id));
+	IConsolePrint(CC_INFO, "testvybervagonu: v okne je {} vagonu, filtr stoji na {}, mackam cudlik na {}",
+			w->eng_list.size(), stood_on < NUM_CARGO ? fmt::format("{}", (int)stood_on) : "vsechny",
+			GetString(Engine::Get(chosen)->info.string_id));
+	CloseWindowByClass(WindowClass::ErrorMessage);
 	w->OnClick(Point{}, WID_BV_BUILD, 1);
+
+	/* The press sends two commands, the wagon and the cargo, and only the
+	 * first one is what the line below asks about. The second used to send the
+	 * filter's "every cargo" as though it were a cargo: the wagon went in, the
+	 * refusal popped up straight after it, and every counter here said the
+	 * press had worked. Whether the game put a refusal on the screen is
+	 * therefore asked outright. */
+	if (FindWindowById(WindowClass::ErrorMessage, 0) != nullptr) {
+		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - po stisku vyskocila chybova hlaska.");
+		CloseWindowByClass(WindowClass::ErrorMessage);
+	}
 
 	/* Said from the order, not from the window: what is being measured is
 	 * whether the press reached the order at all. */
@@ -2273,7 +2301,9 @@ void TestPickCoupleWagon(const Vehicle *v, VehicleOrderID index, TileIndex tile,
 		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - vyber se do rozkazu nezapsal.");
 		return;
 	}
-	IConsolePrint(CC_INFO, "testvybervagonu: do rozkazu {} zapsan vagon {}", index, GetString(Engine::Get(chosen)->info.string_id));
+	IConsolePrint(CC_INFO, "testvybervagonu: do rozkazu {} zapsan vagon {}, naklad {}", index,
+			GetString(Engine::Get(chosen)->info.string_id),
+			IsValidCargoType(o->GetCoupleCargo()) ? fmt::format("{}", (int)o->GetCoupleCargo()) : "zadny");
 }
 
 void ShowBuildVehicleWindow(TileIndex tile, VehicleType type)
