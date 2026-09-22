@@ -7547,7 +7547,13 @@ static bool ConUnpauseGame(std::span<std::string_view> argv)
 		Command<Commands::Pause>::Post(PauseMode::Normal, false);
 		if (!_networking) IConsolePrint(CC_DEFAULT, "Game unpaused.");
 	} else if (_pause_mode.Test(PauseMode::Error)) {
-		IConsolePrint(CC_DEFAULT, "Game is in error state and cannot be unpaused via console.");
+		/* What the player does with the mouse: the red box that says a train has
+		 * an invalid length is clicked away and the game is started again. It
+		 * comes up on nearly every load of a game with a set in it, his own
+		 * included, and there is no mouse here -- so the rig says yes to it, or
+		 * no save of his can ever be played in it. */
+		Command<Commands::Pause>::Post(PauseMode::Error, false);
+		IConsolePrint(CC_DEFAULT, "Game unpaused (chybove okno odklepnuto).");
 	} else if (_pause_mode.Any()) {
 		IConsolePrint(CC_DEFAULT, "Game cannot be unpaused manually; disable pause_on_join/min_active_clients.");
 	} else {
