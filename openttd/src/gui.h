@@ -30,6 +30,7 @@ void ShowGameOptions();
 
 /* train_gui.cpp */
 void ShowOrdersWindow(const Vehicle *v);
+bool TestSelectOrderInWindow(Window *w, int index);
 
 /* dock_gui.cpp */
 Window *ShowBuildDocksToolbar();

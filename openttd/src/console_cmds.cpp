@@ -5975,10 +5975,10 @@ static bool ConTestRefitButton(std::span<std::string_view> argv)
 		}
 		/* The window asks about the order the player has picked, and one that
 		 * has just opened has picked nothing. */
-		if (const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST); list != nullptr) {
-			w->OnClick(Point{(int)list->pos_x + 4, (int)list->pos_y + 4 + (int)*porder * 10}, WID_O_ORDER_LIST, 1);
+		if (!TestSelectOrderInWindow(w, (int)*porder)) {
+			IConsolePrint(CC_ERROR, "testprestavba: ODMITNUTO - rozkaz {} v okne nejde vybrat.", *porder);
+			return true;
 		}
-		w->OnInvalidateData();
 
 		/* The two refits sit in two different rows and only one row is shown
 		 * at a time, so the one belonging to the other kind of order keeps
@@ -6038,16 +6038,16 @@ static bool ConTestCoupleMode(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "testrezim: ODMITNUTO - okno rozkazu se neotevrelo.");
 			return true;
 		}
-		if (const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST); list != nullptr) {
-			w->OnClick(Point{(int)list->pos_x + 4, (int)list->pos_y + 4 + (int)*porder * 10}, WID_O_ORDER_LIST, 1);
+		if (!TestSelectOrderInWindow(w, (int)*porder)) {
+			IConsolePrint(CC_ERROR, "testrezim: ODMITNUTO - rozkaz {} v okne nejde vybrat.", *porder);
+			return true;
 		}
-		w->OnInvalidateData();
 		const NWidgetStacked *mid = w->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST_BTN);
 		const NWidgetStacked *right = w->GetWidget<NWidgetStacked>(WID_O_SEL_SELL_WAGONS);
 		bool shown = mid != nullptr && right != nullptr && mid->shown_plane == 2 && right->shown_plane == 2;
 		if (!shown) {
 			IConsolePrint(CC_INFO, "testrezim: vlak {} rozkaz {} - cudliky Najdi/Hledej nejsou videt (rozkaz {})", t->unitnumber, *porder,
-					o->ShouldGoToCouple() ? (o->IsType(OT_GOTO_DEPOT) ? "je depo" : "neni stanice") : "nepripojuje");
+					!o->ShouldGoToCouple() ? "nepripojuje" : (o->IsType(OT_GOTO_DEPOT) ? "je depo" : (o->IsType(OT_GOTO_STATION) ? "je stanice, a presto ne" : "neni stanice")));
 			return true;
 		}
 		IConsolePrint(CC_INFO, "testrezim: vlak {} rozkaz {} - Najdi radu {}, Hledej v rade {}, rozkaz rika {}", t->unitnumber, *porder,
@@ -6100,9 +6100,7 @@ static bool ConTestOrderWindowGrows(std::span<std::string_view> argv)
 	/* The window asks about the order the player has picked, and a window that
 	 * has just opened has picked nothing. Click the first line of the list, the
 	 * way he would. */
-	if (const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST); list != nullptr) {
-		w->OnClick(Point{(int)list->pos_x + 4, (int)list->pos_y + 4}, WID_O_ORDER_LIST, 1);
-	}
+	TestSelectOrderInWindow(w, 0);
 
 	/* Taller than its smallest, which is the window the player has: he has
 	 * dragged it out or it has grown with his orders. At its smallest the row

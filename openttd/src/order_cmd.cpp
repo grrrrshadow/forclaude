@@ -1820,8 +1820,12 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			}
 
 			case MOF_COUPLE_SEARCH:
+				/* Founding stays on beside it, on purpose: searching the rakes
+				 * and finding nothing is exactly when a founding order founds
+				 * one. Searching only changes which rake counts as one to
+				 * couple to; what to do when there is none is founding's
+				 * question, and it keeps its answer. */
 				order->SetSearchInRake(data != 0);
-				if (data != 0) order->SetFoundRake(false);
 				break;
 
 			case MOF_COUPLE_BUY_ON:
@@ -1848,9 +1852,6 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				 * implies, and a player who wants both may have both. */
 				order->SetFoundRake(data != 0);
 				if (data != 0) order->SetCoupleCountMinimum(false);
-				/* Founding is building, not finding: the two do not go
-				 * together, and one switches the other off. */
-				if (data != 0) order->SetSearchInRake(false);
 				break;
 
 			case MOF_COUPLE_MIN:

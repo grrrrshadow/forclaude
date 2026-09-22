@@ -3153,7 +3153,10 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 			}
 			found++;
 		}
-		if (!check_count || order.GetCoupleCount() == 0) return found >= 1;
+		/* Founding reads the number as the rake's final size, the same as
+		 * the whole-rake reading below does: a rake being built is not that
+		 * size yet, and one such wagon in it is enough to go on growing it. */
+		if (!check_count || order.GetCoupleCount() == 0 || order.ShouldFoundRake()) return found >= 1;
 		if (order.IsCoupleCountMinimum()) return found >= order.GetCoupleCount();
 		if (order.IsCoupleCountMaximum()) return found >= 1 && found <= order.GetCoupleCount();
 		return found == order.GetCoupleCount();

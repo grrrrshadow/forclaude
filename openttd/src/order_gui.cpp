@@ -1683,6 +1683,20 @@ public:
 		this->SetDirty();
 	}
 
+	/**
+	 * Put the selection on one order, for the rig: the probes used to click
+	 * into the list at a guessed height and the guess was a row short.
+	 * @param index the order to select
+	 * @return whether the order exists
+	 */
+	bool SelectOrderForTest(int index)
+	{
+		if (index < 0 || index >= this->vehicle->GetNumOrders()) return false;
+		this->selected_order = index;
+		this->OnInvalidateData();
+		return true;
+	}
+
 	void OnPaint() override
 	{
 		if (this->vehicle->owner != _local_company) {
@@ -3001,6 +3015,23 @@ static WindowDesc _other_orders_desc(
 	_nested_other_orders_widgets,
 	&OrdersWindow::hotkeys
 );
+
+/**
+ * Put an orders window's selection on one order, for the rig.
+ *
+ * The probes used to click into the list at a guessed height, and the guess
+ * was one row short: a probe asked about order 1 was answered about order 0,
+ * and said so in words that blamed the order. The window knows its own rows;
+ * this asks it directly.
+ * @param w     the orders window
+ * @param index the order to select
+ * @return whether the window was an orders window and the order exists
+ */
+bool TestSelectOrderInWindow(Window *w, int index)
+{
+	OrdersWindow *ow = dynamic_cast<OrdersWindow *>(w);
+	return ow != nullptr && ow->SelectOrderForTest(index);
+}
 
 void ShowOrdersWindow(const Vehicle *v)
 {

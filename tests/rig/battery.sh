@@ -364,6 +364,17 @@ testza 1300 testrezim 2 0
 testza 1400 testmof 2 0 29 1
 testza 1500 testfiltr zkouska
 testza 1500 testrezim 2 0" 10000
+# Founding with the search reading switched on, which the player asked to keep
+# together: "when it finds no rake, it founds one". The founding order is the
+# second order of the founder, a station one, and the switch is made on it
+# before anything moves. The numbers have to come out exactly as in zaloz --
+# the search reading changes which rakes count as something to couple to, and
+# in this scene every rake there is counts, so nothing may change.
+run_scene zalozhledej "vlak123 on
+testspoj zaloz 6
+testmof 2 1 29 1
+testza 300 testrezim 2 1
+testza 30000 testbrzda 3" 40000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000
