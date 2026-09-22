@@ -5008,6 +5008,96 @@ static bool ConTestCircleOffset(std::span<std::string_view> argv)
 }
 
 /**
+ * Where a carried road vehicle's picture lands beside its wagon's, across the
+ * screen, in each of the eight directions a train can face.
+ *
+ * The player read these eight numbers off a circle of track, tile by tile, by
+ * eye. They can be had without eyes and without a circle, because the game
+ * knows exactly where it puts both pictures: the vehicle's position, the
+ * offset its own bounding box carries (UpdateDeltaXY(), and a road vehicle's
+ * differs from a wagon's by direction), and the offset baked into the sprite
+ * the set draws it with. Put together, that is the pixel the picture starts
+ * at -- so the gap between the middle of the car and the middle of its wagon
+ * is arithmetic, not judgement.
+ *
+ * The train is turned to each direction in turn and turned back; nothing
+ * moves and no tick passes. Only the way across is worked out. How high the
+ * deck is cannot be had this way -- no wagon says where its deck is, which is
+ * why 'testpaluba' is chosen by eye in the first place.
+ * Usage: testsmery <cislo vlaku>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDirectionGaps(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Say how far the carried vehicle's picture sits beside its wagon's, in all eight directions. Usage: 'testsmery <cislo vlaku>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+
+	Train *wagon = nullptr;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		for (Train *u = t; u != nullptr; u = u->Next()) {
+			if (u->carrying != VehicleID::Invalid()) { wagon = u; break; }
+		}
+		break;
+	}
+	if (wagon == nullptr) {
+		IConsolePrint(CC_ERROR, "testsmery: vlak {} nenalezen, nebo na nem nic nestoji.", argv[1]);
+		return true;
+	}
+	RoadVehicle *car = RoadVehicle::GetIfValid(wagon->carrying);
+	if (car == nullptr) {
+		IConsolePrint(CC_ERROR, "testsmery: vagon veze neco, co uz neexistuje.");
+		return true;
+	}
+
+	/* Where the middle of a vehicle's picture lands across the screen. */
+	auto middle = [](const Vehicle *v) {
+		Point pt = RemapCoords(v->x_pos + v->bounds.origin.x + v->bounds.offset.x,
+				v->y_pos + v->bounds.origin.y + v->bounds.offset.y,
+				v->z_pos + v->bounds.origin.z + v->bounds.offset.z);
+		VehicleSpriteSeq seq;
+		v->GetImage(v->direction, EngineImageType::OnMap, &seq);
+		Rect r;
+		seq.GetBounds(&r);
+		return (pt.x + r.left + r.right) / 2;
+	};
+
+	const Direction was = wagon->direction;
+	static const std::string_view _names[] = { "S", "SV", "V", "JV", "J", "JZ", "Z", "SZ" };
+	for (uint i = 0; i < to_underlying(Direction::End); i++) {
+		Direction d = static_cast<Direction>(i);
+		wagon->direction = d;
+		wagon->UpdateDeltaXY();
+		RestandCarriedRoadVehicles();
+		car->UpdateDeltaXY();
+
+		/* One step of 'testkruh' is one step across the rails, and what that
+		 * does to the screen follows from the view: across is two pixels per
+		 * step of the map's x and two the other way for its y (RemapCoords). */
+		static const DirectionIndexArray<Point> _step{{{
+			{ -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 },
+		}}};
+		const Point &side = _step[ChangeDir(d, DirDiff::Right90)];
+		int per_step = (side.y - side.x) * 2 * ZOOM_BASE;
+
+		int gap = middle(car) - middle(wagon);
+		std::string advice = per_step == 0 ? "bokem nehne" : fmt::format("testkruh {:+.2f}", -(double)gap / per_step);
+		IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto je {:+d} bodu vedle vagonu, krok posune {} bodu, {}",
+				to_underlying(d), _names[i], gap / (int)ZOOM_BASE, per_step / (int)ZOOM_BASE, advice);
+	}
+
+	wagon->direction = was;
+	wagon->UpdateDeltaXY();
+	RestandCarriedRoadVehicles();
+	car->UpdateDeltaXY();
+	return true;
+}
+
+/**
  * Write a note of the player's own into the record, so that what he saw on the
  * screen stands in the log beside what the game wrote at that moment, with the
  * same tick on it. He has been typing his notes at the console and getting
@@ -10407,6 +10497,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("pozn",                    ConNote);
 	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
 	IConsole::CmdRegister("testkruh",                ConTestCircleOffset);
+	IConsole::CmdRegister("testsmery",               ConTestDirectionGaps);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);

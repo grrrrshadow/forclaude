@@ -928,3 +928,18 @@ testza 3015 testkruh -4
 testza 3020 testkresba 1
 testza 3025 testkruh 0
 testzatik 3100 testauta" 4000
+
+# Where the carried vehicle's picture lands beside its wagon's, across the
+# screen, in all eight directions -- worked out from the two bounding boxes and
+# the two sprites rather than looked at. The point of keeping it: it says in
+# black and white that a step across the rails moves the picture four pixels
+# sideways facing north or south, two on the slants, and NOTHING at all facing
+# east or west, where across the rails is straight up and down the screen. A
+# sideways knob that cannot move two of the eight directions is worth having
+# written down, and the numbers change the moment anything touches how either
+# of them is drawn.
+run_scene autosmery "vlak123 on
+testautovlak
+testza 2990 testbrzda 1
+testza 3000 testsmery 1
+testzatik 3100 testauta" 4000
