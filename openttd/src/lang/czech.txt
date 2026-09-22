@@ -5172,6 +5172,7 @@ STR_ORDER_COUPLE_BUY_SUFFIX_CARGO                               :{SPACE}(koupit 
 STR_ORDER_COUPLE_BUY_ONLY                                       :{BLACK}Typ: {ENGINE}
 STR_ORDER_COUPLE_BUY_ONLY_SUFFIX                                :{SPACE}(typ {ENGINE})
 STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO                          :{SPACE}(typ {ENGINE} {STRING})
+STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_ANY                            :{SPACE}(typ {ENGINE}, všechny náklady)
 STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Který vagon připojit
 STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Připojit tenhle
 STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Zapíše tenhle vagon do rozkazu. Rozkaz ho koupí vždycky, když v depu chybí, přestaví ho na náklad z filtru a připojí

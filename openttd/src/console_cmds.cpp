@@ -6134,7 +6134,7 @@ static bool ConTestLossWarning(std::span<std::string_view> argv)
 static bool ConTestExplainDepot(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Say what a depot couple order sees in its shed. Usage: 'testdepo <cislo vlaku> <rozkaz>'.");
+		IConsolePrint(CC_HELP, "Say what a depot couple order sees in its shed. Usage: 'testdepofiltr <cislo vlaku> <rozkaz>'.");
 		return true;
 	}
 	auto punit = ParseInteger(argv[1]);
@@ -6513,7 +6513,9 @@ static bool ConTestModifyOrder(std::span<std::string_view> argv)
 		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
 		AutoRestoreBackup cur_company(_current_company, t->owner);
 		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, (ModifyOrderFlags)*pmof, (uint16_t)*pval);
-		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testmof: vlak {} rozkaz {} mof {} = {} -> {}", *punit, *porder, *pmof, *pval, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
+		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testmof: vlak {} rozkaz {} mof {} = {} -> {}", *punit, *porder, *pmof, *pval,
+				r.Succeeded() ? std::string("nastaveno")
+						: fmt::format("ODMITNUTO{}", r.GetErrorMessage() == INVALID_STRING_ID ? "" : " - " + GetString(r.GetErrorMessage())));
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testmof: vlak {} nenalezen.", argv[1]);
@@ -10686,7 +10688,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
-	IConsole::CmdRegister("testdepo",                ConTestExplainDepot);
+	IConsole::CmdRegister("testdepofiltr",           ConTestExplainDepot);
 	IConsole::CmdRegister("testvarovani",            ConTestLossWarning);
 	IConsole::CmdRegister("testtypfiltr",            ConTestTypeFilter);
 	IConsole::CmdRegister("testpocet",               ConTestCoupleCount);

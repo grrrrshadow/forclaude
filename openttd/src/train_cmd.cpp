@@ -4156,26 +4156,26 @@ void ExplainDepotCoupling(Train *v, VehicleOrderID index)
 {
 	const Order *order = v->GetOrder(index);
 	if (order == nullptr) {
-		IConsolePrint(CC_ERROR, "testdepo: vlak {} nema rozkaz {}.", v->unitnumber, index);
+		IConsolePrint(CC_ERROR, "testdepofiltr: vlak {} nema rozkaz {}.", v->unitnumber, index);
 		return;
 	}
 	if (!order->ShouldGoToCouple()) {
-		IConsolePrint(CC_ERROR, "testdepo: rozkaz {} vlaku {} neni pripojit.", index, v->unitnumber);
+		IConsolePrint(CC_ERROR, "testdepofiltr: rozkaz {} vlaku {} neni pripojit.", index, v->unitnumber);
 		return;
 	}
 	if (!order->IsType(OT_GOTO_DEPOT)) {
-		IConsolePrint(CC_ERROR, "testdepo: rozkaz {} vlaku {} nevede do depa.", index, v->unitnumber);
+		IConsolePrint(CC_ERROR, "testdepofiltr: rozkaz {} vlaku {} nevede do depa.", index, v->unitnumber);
 		return;
 	}
 	const Depot *depot = Depot::GetIfValid(order->GetDestination().ToDepotID());
 	if (depot == nullptr) {
-		IConsolePrint(CC_ERROR, "testdepo: rozkaz {} vlaku {} jmenuje depo, ktere uz neni.", index, v->unitnumber);
+		IConsolePrint(CC_ERROR, "testdepofiltr: rozkaz {} vlaku {} jmenuje depo, ktere uz neni.", index, v->unitnumber);
 		return;
 	}
 	const TileIndex depot_tile = depot->xy;
 
 	const Engine *named = Engine::GetIfValid(order->GetCoupleBuyEngine());
-	IConsolePrint(CC_INFO, "testdepo: vlak {} rozkaz {} - depo ({},{}), typ {}, nakup {}, naklad {}, pocet {}, plnost {}",
+	IConsolePrint(CC_INFO, "testdepofiltr: vlak {} rozkaz {} - depo ({},{}), typ {}, nakup {}, naklad {}, pocet {}, plnost {}",
 			v->unitnumber, index, TileX(depot_tile), TileY(depot_tile),
 			named != nullptr ? GetString(named->info.string_id) : "zadny",
 			order->ShouldBuyWagons() ? "zapnuty" : "vypnuty",
@@ -4183,7 +4183,7 @@ void ExplainDepotCoupling(Train *v, VehicleOrderID index)
 			order->GetCoupleCount(), (int)order->GetCoupleLoad());
 
 	int room = _settings_game.vehicle.max_train_length * TILE_SIZE - (int)ChainLength(v);
-	IConsolePrint(CC_INFO, "testdepo: masinka je dlouha {}, povolena delka vlaku {} poli, zbyva {} na vagony",
+	IConsolePrint(CC_INFO, "testdepofiltr: masinka je dlouha {}, povolena delka vlaku {} poli, zbyva {} na vagony",
 			ChainLength(v), _settings_game.vehicle.max_train_length, room);
 
 	uint free_rakes = 0;
@@ -4217,17 +4217,17 @@ void ExplainDepotCoupling(Train *v, VehicleOrderID index)
 			taken++;
 			units += CountUnits(rake);
 		}
-		IConsolePrint(why.empty() ? CC_INFO : CC_WARNING, "testdepo:   rada {} - {} vozidel, dlouha {} - {}",
+		IConsolePrint(why.empty() ? CC_INFO : CC_WARNING, "testdepofiltr:   rada {} - {} vozidel, dlouha {} - {}",
 				rake->index.base(), CountUnits(rake), ChainLength(rake),
 				why.empty() ? "VZAL BY" : why);
 	}
 
 	uint want = order->GetCoupleCount();
 	if (want == 0) want = WantFullTrainFromDepot(v, *order, depot_tile);
-	IConsolePrint(CC_INFO, "testdepo: v depu stoji {} volnych rad, pouzitelnych {} ({} vozidel), rozkaz chce {}",
+	IConsolePrint(CC_INFO, "testdepofiltr: v depu stoji {} volnych rad, pouzitelnych {} ({} vozidel), rozkaz chce {}",
 			free_rakes, taken, units, want);
 	if (units < want) {
-		IConsolePrint(CC_WARNING, "testdepo: je jich malo, takze se nevezme nic a nic se nespoji");
+		IConsolePrint(CC_WARNING, "testdepofiltr: je jich malo, takze se nevezme nic a nic se nespoji");
 	}
 }
 

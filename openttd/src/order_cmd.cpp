@@ -1921,13 +1921,21 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 			case MOF_COUPLE_CARGO:
 				order->SetCoupleCargo(CargoType(data));
-				/* "Every cargo" is the way back out of the whole filter, and
-				 * the player's own words for it: it lets go of the named wagon
-				 * as well. That is one press rather than two, and it is what
-				 * puts the cargo list back to the whole of it -- the only
-				 * thing that ever narrowed the list was that wagon. A cargo
-				 * picked instead keeps the wagon: the two are said together. */
-				if (CargoType(data) == INVALID_CARGO) {
+				/* "Every cargo" means two different things, and which one
+				 * depends on whether anything is being bought.
+				 *
+				 * Buying: it cannot mean "any cargo will do", because something
+				 * is going to be bought and whatever is bought will have one.
+				 * So it reads as the way back out of the whole filter -- it
+				 * lets go of the named model too, one press instead of two, and
+				 * the cargo list goes back to the whole of it, the model being
+				 * the only thing that ever narrowed it. The player's own words.
+				 *
+				 * Not buying: then it means exactly what it says. "Couple Sgnss
+				 * carrying anything" is a sensible thing to want -- the train
+				 * takes them and drives into a shed to have them refitted -- so
+				 * the model stays and only the cargo goes. */
+				if (CargoType(data) == INVALID_CARGO && order->ShouldBuyWagons()) {
 					order->SetCoupleBuyEngine(EngineID::Invalid());
 					order->SetBuyWagons(false);
 				}

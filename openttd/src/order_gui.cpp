@@ -449,12 +449,13 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					 * an order set at a platform said everything about itself
 					 * except the one thing that had just been set. */
 					if (const Engine *buy = Engine::GetIfValid(order->GetCoupleBuyEngine()); buy != nullptr) {
-						bool own_cargo = !IsValidCargoType(order->GetCoupleCargo()) && IsValidCargoType(buy->GetDefaultCargoType());
-						StringID suffix = own_cargo ? STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX;
-						auto engine = PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList);
-						second += own_cargo
-								? GetString(suffix, engine, CargoSpec::Get(buy->GetDefaultCargoType())->name)
-								: GetString(suffix, engine);
+						/* A platform buys nothing, so no cargo said means every
+						 * cargo -- couple this model whatever it is carrying.
+						 * The model it comes out of the works with has nothing
+						 * to do with anything here. */
+						StringID suffix = IsValidCargoType(order->GetCoupleCargo())
+								? STR_ORDER_COUPLE_BUY_ONLY_SUFFIX : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_ANY;
+						second += GetString(suffix, PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList));
 					}
 				}
 
@@ -597,10 +598,17 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					 * something the string system can read back. Handed over that
 					 * way it printed "invalid parameter", which is exactly what the
 					 * player saw after the wagon type. */
-					bool own_cargo = !IsValidCargoType(order->GetCoupleCargo()) && IsValidCargoType(buy->GetDefaultCargoType());
+					bool own_cargo = order->ShouldBuyWagons() && !IsValidCargoType(order->GetCoupleCargo())
+							&& IsValidCargoType(buy->GetDefaultCargoType());
+					/* Not buying and no cargo said is not "the one it comes out
+					 * of the works with" -- nothing is coming out of any works.
+					 * It is every cargo, and the line says so: couple this
+					 * model whatever it happens to be carrying, and have them
+					 * refitted in a shed afterwards. */
+					bool any_cargo = !order->ShouldBuyWagons() && !IsValidCargoType(order->GetCoupleCargo());
 					StringID suffix = order->ShouldBuyWagons()
 							? (own_cargo ? STR_ORDER_COUPLE_BUY_SUFFIX_CARGO : STR_ORDER_COUPLE_BUY_SUFFIX)
-							: (own_cargo ? STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX);
+							: (any_cargo ? STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_ANY : STR_ORDER_COUPLE_BUY_ONLY_SUFFIX);
 					auto engine = PackEngineNameDParam(order->GetCoupleBuyEngine(), EngineNameContext::PurchaseList);
 					second += own_cargo
 							? GetString(suffix, engine, CargoSpec::Get(buy->GetDefaultCargoType())->name)
