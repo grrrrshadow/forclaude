@@ -1786,6 +1786,30 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 							: GetUnionOfArticulatedRefitMasks(chosen, true).Test(order->GetCoupleCargo()));
 					if (!carries) order->SetCoupleCargo(INVALID_CARGO);
 				}
+				/* A shed told to buy a model, with no cargo said: the cargo is
+				 * written in for him, and it is the one the model is bought
+				 * with -- its own first. The player's reason is that the button
+				 * was saying "every cargo" while the order underneath it was
+				 * going to buy one particular cargo, and the two read as
+				 * different things. Written in rather than only shown, because
+				 * a button that names a cargo it does not filter by is worse
+				 * than one that says nothing: switch the buying off and that
+				 * name would go on standing there meaning nothing at all.
+				 *
+				 * Only where something is bought. At a platform nothing is, so
+				 * there is no "the cargo it will be bought with" to write. */
+				if (chosen != EngineID::Invalid() && order->ShouldBuyWagons() && !IsValidCargoType(order->GetCoupleCargo())) {
+					const Engine *e = Engine::GetIfValid(chosen);
+					if (e != nullptr) {
+						CargoType first = e->GetDefaultCargoType();
+						if (IsValidCargoType(first)) order->SetCoupleCargo(first);
+					}
+				}
+				/* And letting the model go takes the cargo with it. The two are
+				 * one answer -- this model, carrying that -- which is the
+				 * player's own rule from the other side: "every cargo" clears
+				 * the model as well. */
+				if (chosen == EngineID::Invalid()) order->SetCoupleCargo(INVALID_CARGO);
 				break;
 			}
 
