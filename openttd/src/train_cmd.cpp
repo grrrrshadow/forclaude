@@ -3179,6 +3179,17 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 	 * go on collecting its own ones for the rest of the game. */
 	if (order.GetCoupleBuyEngine() != EngineID::Invalid()) {
 		for (const Train *u = rake; u != nullptr; u = u->Next()) {
+			/* The pieces a set builds one wagon out of are not asked. A wagon
+			 * of a set is several vehicles and every piece carries its own
+			 * model number -- CZTR's freight wagons are three, 1318 at the head
+			 * and 1393 in the middle -- so asking every piece whether it is the
+			 * model the order names threw out every wagon that had any pieces
+			 * at all. The order bought them, they stood in the shed and none was
+			 * ever collected, and no counter could say why. The game's own
+			 * wagons are single vehicles, which is why it only ever happened
+			 * with a set loaded: the player's own words, "without the grf it
+			 * couples". Only the heads are asked, which is what a model means. */
+			if (u->IsArticulatedPart()) continue;
 			if (u->engine_type != order.GetCoupleBuyEngine()) return false;
 		}
 	}
@@ -4104,6 +4115,120 @@ const Train *CoupleOrderWouldTake(const Train *v, const Order &order)
 {
 	if (!order.ShouldGoToCouple()) return nullptr;
 	return FindOrClaimCoupleTarget(const_cast<Train *>(v), order, nullptr, nullptr, false);
+}
+
+/**
+ * Would a collecting order naming this very model take this very rake? For the
+ * rig.
+ *
+ * Asked of the rake the model was read off, so the answer has to be yes. It
+ * was no for every wagon a set builds out of several pieces, because the
+ * filter asked each piece whether it was the named model and the pieces carry
+ * model numbers of their own. Nothing about it was visible from outside: the
+ * order bought wagons, they stood in the shed, none was collected.
+ *
+ * @param rake  the rake, its head
+ * @param model the model the order would name
+ * @return whether the filter would take it
+ */
+bool CoupleTypeFilterWouldTake(const Train *rake, EngineID model)
+{
+	Order o;
+	o.SetCoupleBuyEngine(model);
+	return MatchesCoupleFilter(o, rake, false);
+}
+
+/**
+ * Say, line by line, what a depot collecting order sees in the shed it names
+ * and why it takes it or leaves it. For the rig.
+ *
+ * The one question a counter cannot answer. An order that buys its wagons and
+ * then couples none of them looks, from outside, exactly like an order that is
+ * working: money leaves, wagons appear. What is missing is which of the
+ * filters turned them down, and there are five that can, so guessing costs a
+ * build each time. The player had precisely this and could change nothing that
+ * helped, because nothing he could change was the reason.
+ *
+ * @param v     the collecting engine
+ * @param index which of its orders
+ */
+void ExplainDepotCoupling(Train *v, VehicleOrderID index)
+{
+	const Order *order = v->GetOrder(index);
+	if (order == nullptr) {
+		IConsolePrint(CC_ERROR, "testdepo: vlak {} nema rozkaz {}.", v->unitnumber, index);
+		return;
+	}
+	if (!order->ShouldGoToCouple()) {
+		IConsolePrint(CC_ERROR, "testdepo: rozkaz {} vlaku {} neni pripojit.", index, v->unitnumber);
+		return;
+	}
+	if (!order->IsType(OT_GOTO_DEPOT)) {
+		IConsolePrint(CC_ERROR, "testdepo: rozkaz {} vlaku {} nevede do depa.", index, v->unitnumber);
+		return;
+	}
+	const Depot *depot = Depot::GetIfValid(order->GetDestination().ToDepotID());
+	if (depot == nullptr) {
+		IConsolePrint(CC_ERROR, "testdepo: rozkaz {} vlaku {} jmenuje depo, ktere uz neni.", index, v->unitnumber);
+		return;
+	}
+	const TileIndex depot_tile = depot->xy;
+
+	const Engine *named = Engine::GetIfValid(order->GetCoupleBuyEngine());
+	IConsolePrint(CC_INFO, "testdepo: vlak {} rozkaz {} - depo ({},{}), typ {}, nakup {}, naklad {}, pocet {}, plnost {}",
+			v->unitnumber, index, TileX(depot_tile), TileY(depot_tile),
+			named != nullptr ? GetString(named->info.string_id) : "zadny",
+			order->ShouldBuyWagons() ? "zapnuty" : "vypnuty",
+			IsValidCargoType(order->GetCoupleCargo()) ? fmt::format("{}", (int)order->GetCoupleCargo()) : "vsechny",
+			order->GetCoupleCount(), (int)order->GetCoupleLoad());
+
+	int room = _settings_game.vehicle.max_train_length * TILE_SIZE - (int)ChainLength(v);
+	IConsolePrint(CC_INFO, "testdepo: masinka je dlouha {}, povolena delka vlaku {} poli, zbyva {} na vagony",
+			ChainLength(v), _settings_game.vehicle.max_train_length, room);
+
+	uint free_rakes = 0;
+	uint taken = 0;
+	uint units = 0;
+	for (Train *rake : Train::Iterate()) {
+		if (rake == v) continue;
+		if (rake->owner != v->owner) continue;
+		if (!rake->IsFreeWagon()) continue;
+		if (rake->track != Track::Depot || rake->tile != depot_tile) continue;
+		free_rakes++;
+
+		std::string why;
+		if (rake->index == v->depot_dropped_rake) {
+			why = "tohle tu nechal sam a znovu si to nevezme";
+		} else if (!IsCoupleClaimStale(rake) && rake->couple_claim != VehicleID::Invalid()) {
+			why = fmt::format("uz si o nej rekl vlak {}", rake->couple_claim.base());
+		} else if (named != nullptr) {
+			for (const Train *u = rake; u != nullptr; u = u->Next()) {
+				if (u->engine_type == order->GetCoupleBuyEngine()) continue;
+				const Engine *other = Engine::GetIfValid(u->engine_type);
+				why = fmt::format("je v nem {} a rozkaz chce jen {}",
+						other != nullptr ? GetString(other->info.string_id) : "neco jineho",
+						GetString(named->info.string_id));
+				break;
+			}
+		}
+		if (why.empty() && !MatchesCoupleFilter(*order, rake, false)) why = "neprosel filtrem nakladu nebo plnosti";
+
+		if (why.empty()) {
+			taken++;
+			units += CountUnits(rake);
+		}
+		IConsolePrint(why.empty() ? CC_INFO : CC_WARNING, "testdepo:   rada {} - {} vozidel, dlouha {} - {}",
+				rake->index.base(), CountUnits(rake), ChainLength(rake),
+				why.empty() ? "VZAL BY" : why);
+	}
+
+	uint want = order->GetCoupleCount();
+	if (want == 0) want = WantFullTrainFromDepot(v, *order, depot_tile);
+	IConsolePrint(CC_INFO, "testdepo: v depu stoji {} volnych rad, pouzitelnych {} ({} vozidel), rozkaz chce {}",
+			free_rakes, taken, units, want);
+	if (units < want) {
+		IConsolePrint(CC_WARNING, "testdepo: je jich malo, takze se nevezme nic a nic se nespoji");
+	}
 }
 
 /**

@@ -124,6 +124,8 @@ uint WagonUnitsBehindEngine(const Train *v);
 bool CoupleOrderWouldFindSomething(const Train *v, const struct Order &order);
 const Train *CoupleOrderWouldTake(const Train *v, const struct Order &order);
 uint CoupleRakeFullness(const Train *rake, const struct Order &order);
+void ExplainDepotCoupling(Train *v, VehicleOrderID index);
+bool CoupleTypeFilterWouldTake(const Train *rake, EngineID model);
 bool IsTunnelBridgeOccupied(TileIndex tile);
 bool TunnelBridgeCanFollowIn(TileIndex entry);
 

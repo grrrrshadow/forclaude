@@ -5940,6 +5940,70 @@ static bool ConTestCoupleCount(std::span<std::string_view> argv)
  * it buys at all and how many.
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Say what a depot collecting order sees in its shed and why it takes it or
+ * leaves it. Usage: testdepo <cislo vlaku> <rozkaz>
+ *
+ * The player's own case: the order bought wagons, they piled up in the shed
+ * and none of them was ever coupled, and nothing he could change helped --
+ * because nothing he could change was the reason. Five filters can turn a rake
+ * down and no counter says which did.
+ * @copydoc IConsoleCmdProc
+ */
+/**
+ * Ask the type filter about every wagon of a train, naming that wagon's own
+ * model. The answer has to be yes; it was no for every wagon a set builds out
+ * of several pieces. Usage: testtypfiltr <cislo vlaku>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestTypeFilter(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Ask the type filter about each wagon, naming its own model. Usage: 'testtypfiltr <cislo vlaku>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		for (Train *u = t; u != nullptr; u = u->GetNextUnit()) {
+			if (u->IsEngine() || u->IsTender() || u->IsRearDualheaded()) continue;
+			uint pieces = 0;
+			for (const Train *p = u; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) pieces++;
+			bool ok = CoupleTypeFilterWouldTake(u, u->engine_type);
+			/* The filter is asked of a whole chain and a wagon in the middle of
+			 * a train drags everything behind it into the question, so only the
+			 * last one is a clean answer -- and it is the one that matters, a
+			 * single wagon of several pieces standing on its own. */
+			IConsolePrint(ok ? CC_INFO : CC_ERROR, "testtypfiltr: vagon {} ({}), model {}, kusu {} - filtr by radu od nej dozadu {}",
+					u->index.base(), GetString(Engine::Get(u->engine_type)->info.string_id),
+					u->engine_type.base(), pieces, ok ? "VZAL" : "NEVZAL");
+		}
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testtypfiltr: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+static bool ConTestExplainDepot(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Say what a depot couple order sees in its shed. Usage: 'testdepo <cislo vlaku> <rozkaz>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		ExplainDepotCoupling(t, (VehicleOrderID)*porder);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testdepo: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestBuyWagons(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
@@ -10476,6 +10540,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
+	IConsole::CmdRegister("testdepo",                ConTestExplainDepot);
+	IConsole::CmdRegister("testtypfiltr",            ConTestTypeFilter);
 	IConsole::CmdRegister("testpocet",               ConTestCoupleCount);
 	IConsole::CmdRegister("testvybervagonu",         ConTestPickWagon);
 	IConsole::CmdRegister("testzalozit",             ConTestFoundRake);
