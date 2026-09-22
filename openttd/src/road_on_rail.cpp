@@ -35,29 +35,23 @@
 #include "safeguards.h"
 
 /**
- * How high the deck of a wagon is: screen pixels above the line the wagon's
- * own wheels stand on.
+ * How far above the wagon's own position the road vehicle is drawn: the deck
+ * of a flat wagon. The same for every wagon, since no wagon says how high its
+ * deck is -- so it is a number chosen by eye against the wagons this is
+ * actually used with, and 'testpaluba' moves it while the game runs, because
+ * the eye that has to choose it is at the screen and not here.
  *
- * Still chosen by eye, because no wagon says where its deck is -- 'testpaluba'
- * moves it while the game runs, since the eye that has to choose it is at the
- * screen and not here. What changed is what it is measured from. It used to be
- * added to the wagon's height in the world, and the world's height is the same
- * in every direction while the wagon's picture is not, so the deck came out
- * right in one direction and wrong in the other seven -- the ring of eight
- * different best numbers the player read off a circle of track. Measured from
- * the wagon's own picture, one number does all eight.
+ * The height is in the world, not in pixels off the wagon's picture, and that
+ * was tried the other way round and is wrong. Keying it to the lowest painted
+ * row of the two pictures looked right until two sets of cars stood on the
+ * same train and split: one wanted lifting, the other dropping. What counts as
+ * the lowest painted row -- a shadow, a bumper, a mudguard -- is each set's own
+ * business. The player put his finger on it: on a road his cars and another
+ * set's both sit right, in all eight directions, and they do so because the
+ * offsets the set baked into the sprite already say where the vehicle meets
+ * the ground. That is worth keeping, not overruling.
  */
-int _carried_z_offset = 6;
-
-/**
- * How far above the wagon the carried vehicle is lifted in the world.
- *
- * Nothing to do with how high it looks -- that is the deck above, in pixels.
- * This is for the sorting of what is drawn in front of what: two boxes at the
- * same height are sorted by a rule of thumb, and the rule once put the wagon
- * in front of the vehicle it was carrying.
- */
-static const int CARRIED_WORLD_LIFT = 4;
+int _carried_z_offset = 4;
 
 /**
  * How far behind the front of its drawn box a road vehicle's own position
@@ -354,7 +348,7 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		u->tile = TileVirtXY(x, y);
 		u->x_pos = x;
 		u->y_pos = y;
-		u->z_pos = wagon->z_pos + CARRIED_WORLD_LIFT;
+		u->z_pos = wagon->z_pos + _carried_z_offset;
 		u->direction = dir;
 		/* Measured below, so it must not still carry the last tick's answer. */
 		u->draw_offs = {};
@@ -386,16 +380,17 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 	int car_middle, car_wheels;
 	DrawnPicture(wagon, true, wagon_middle, wagon_wheels);
 	DrawnPicture(rv, false, car_middle, car_wheels);
-	/* On the deck, which is so many pixels above the line the wagon's own
-	 * wheels stand on (_carried_z_offset). Measured from the picture and not
-	 * from the wagon's height, and that is the whole point: the height is the
-	 * same in every direction while the picture is not, so a deck set against
-	 * the height needed a different number in each of the eight directions and
-	 * a deck set against the picture needs one. */
-	int want_wheels = wagon_wheels - _carried_z_offset * ZOOM_BASE;
+	/* Across only. The height is the world's (_carried_z_offset), because the
+	 * offsets a set bakes into its sprites already say where a vehicle meets
+	 * the ground and they say it in every direction -- which is why cars of two
+	 * different sets both sit right on a road. Across is the one thing they
+	 * cannot say, because they were drawn to stand on a road and not on a
+	 * wagon. */
+	(void)wagon_wheels;
+	(void)car_wheels;
 	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 		u->draw_offs.x = wagon_middle - car_middle;
-		u->draw_offs.y = want_wheels - car_wheels;
+		u->draw_offs.y = 0;
 		u->UpdatePosition();
 		u->UpdateViewport(true, true);
 	}
