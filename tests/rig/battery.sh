@@ -314,6 +314,17 @@ testza 400 testfiltr zkouska" 12000
 run_scene oknorozkazu "vlak123 on
 testspoj depo
 testza 100 testoknorozkazu 1 0" 12000
+# Which refit button an order shows and whether it can be pressed. Greying is
+# invisible to every counter and this one has now been decided three different
+# ways: at a platform a train is never refitted, because what it hauls is
+# decided by what it couples and lets go of, and both happen at a platform; in
+# a shed it always can be, because the test that used to grey it asks the
+# engine whether anything behind it can be refitted and a collecting engine
+# arrives with nothing behind it at all.
+run_scene prestavbacudlik "vlak123 on
+testspoj
+testza 200 testprestavba 2 0
+testza 400 testprestavba 2 1" 3000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

@@ -1400,7 +1400,16 @@ public:
 
 					/* Can only do refitting when stopping at the destination and loading cargo.
 					 * Also enable the button if a refit is already set to allow clearing it. */
+					/* A train is never refitted at a platform. What it hauls is
+					 * decided by what it couples and lets go of, and both of
+					 * those happen at a platform too -- the rake that arrives
+					 * is not the rake that leaves, so a refit told to happen on
+					 * arrival is aimed at vehicles that may not be there any
+					 * more. The player's own line: at a station the refit is
+					 * greyed always, and the refitting is done in a shed. Other
+					 * kinds of vehicle keep the ordinary rule. */
 					this->SetWidgetDisabledState(WID_O_REFIT_DROPDOWN,
+							this->vehicle->type == VehicleType::Train ||
 							order->GetLoadType() == OrderLoadType::NoLoad || order->GetNonStopType().Test(OrderNonStopFlag::GoVia) ||
 							((!this->can_do_refit || !this->can_do_autorefit) && !order->IsRefit()));
 
@@ -1435,9 +1444,15 @@ public:
 					}
 					/* Disable refit button if the order is no 'always go' order.
 					 * However, keep the service button enabled for refit-orders to allow clearing refits (without knowing about ctrl). */
+					/* In a shed a train's refit is not greyed. The test that
+					 * used to grey it asks whether anything in the chain can be
+					 * refitted, and a collecting engine arrives with nothing
+					 * behind it -- the wagons it is going to fetch are in the
+					 * shed and are exactly what the refit is for. Asking the
+					 * engine about them beforehand can only ever answer no. */
 					this->SetWidgetDisabledState(WID_O_REFIT,
 							order->GetDepotOrderType().Test(OrderDepotTypeFlag::Service) || order->GetDepotActionType().Test(OrderDepotActionFlag::Halt) ||
-							(!this->can_do_refit && !order->IsRefit()));
+							(this->vehicle->type != VehicleType::Train && !this->can_do_refit && !order->IsRefit()));
 					break;
 
 				case OT_CONDITIONAL: {

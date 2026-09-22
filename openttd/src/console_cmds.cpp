@@ -5903,6 +5903,73 @@ static bool ConTestSellDecoupled(std::span<std::string_view> argv)
  * him a line of orders and moved everything above it up.
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Say whether the refit button of an order is there and whether it can be
+ * pressed. Usage: testprestavba <cislo vlaku> <rozkaz>
+ *
+ * Greying is a thing no counter can see, and this one has been changed twice
+ * on guesswork already. A shed's refit and a platform's are two different
+ * buttons in two different rows, so which of them is showing is worth saying
+ * as well.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRefitButton(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Say whether an order's refit button can be pressed. Usage: 'testprestavba <cislo vlaku> <rozkaz>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		const Order *o = t->GetOrder((VehicleOrderID)*porder);
+		if (o == nullptr) {
+			IConsolePrint(CC_ERROR, "testprestavba: rozkaz {} neexistuje.", *porder);
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		ShowOrdersWindow(t);
+		Window *w = FindWindowById(WindowClass::VehicleOrders, t->index);
+		if (w == nullptr) {
+			IConsolePrint(CC_ERROR, "testprestavba: ODMITNUTO - okno rozkazu se neotevrelo.");
+			return true;
+		}
+		/* The window asks about the order the player has picked, and one that
+		 * has just opened has picked nothing. */
+		if (const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST); list != nullptr) {
+			w->OnClick(Point{(int)list->pos_x + 4, (int)list->pos_y + 4 + (int)*porder * 10}, WID_O_ORDER_LIST, 1);
+		}
+		w->OnInvalidateData();
+
+		/* The two refits sit in two different rows and only one row is shown
+		 * at a time, so the one belonging to the other kind of order keeps
+		 * whatever state it was last left in and means nothing. Said outright,
+		 * because read without that it looks like an answer. */
+		auto say = [&](const char *name, WidgetID id, bool shown) {
+			const NWidgetCore *wid = w->GetWidget<NWidgetCore>(id);
+			if (wid == nullptr) {
+				IConsolePrint(CC_INFO, "testprestavba:   {} - v okne neni", name);
+				return;
+			}
+			if (!shown) {
+				IConsolePrint(CC_INFO, "testprestavba:   {} - u tohohle rozkazu neni videt", name);
+				return;
+			}
+			IConsolePrint(CC_INFO, "testprestavba:   {} - {}", name, w->IsWidgetDisabled(id) ? "ZATMAVENO" : "jde zmacknout");
+		};
+		IConsolePrint(CC_INFO, "testprestavba: vlak {} rozkaz {} ({})", t->unitnumber, *porder,
+				o->IsType(OT_GOTO_DEPOT) ? "depo" : (o->IsType(OT_GOTO_STATION) ? "stanice" : "jine"));
+		say("prestavet v depu", WID_O_REFIT, o->IsType(OT_GOTO_DEPOT));
+		say("prestavet ve stanici", WID_O_REFIT_DROPDOWN, o->IsType(OT_GOTO_STATION));
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testprestavba: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestOrderWindowGrows(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
@@ -10661,6 +10728,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprodat",              ConTestSell);
 	IConsole::CmdRegister("testikonaprodat",         ConTestSellIcon);
 	IConsole::CmdRegister("testoknorozkazu",         ConTestOrderWindowGrows);
+	IConsole::CmdRegister("testprestavba",           ConTestRefitButton);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
