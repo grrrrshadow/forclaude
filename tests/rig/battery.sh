@@ -412,6 +412,20 @@ run_scene odtahprodatporucha "vlak123 on
 testodtah prodatporucha" 16000
 run_scene okruh "vlak123 on
 testokruh" 16000
+# The player's reverse button on a tow standing on call in its shed. The tow
+# used to be put straight again every tick it stood at home, so the button
+# turned it round for one tick and no longer: a tow could not be sent out tail
+# first on purpose, which any other engine can. Turned three times, read after
+# each, and then left to fetch the casualty the way it now faces -- the
+# whole errand must still come off (odtazeno=1, as in odtahrovina).
+run_scene odtahcudlik "vlak123 on
+testodtah rovina
+testzatik 20 testotoc 2
+testzatik 30 testcouva 2 ano
+testzatik 40 testotoc 2
+testzatik 50 testcouva 2 ne
+testzatik 60 testotoc 2
+testzatik 70 testcouva 2 ano" 16000
 run_scene naklad "vlak123 on
 testnaklad
 testza 4000 testbrzda 1" 12000

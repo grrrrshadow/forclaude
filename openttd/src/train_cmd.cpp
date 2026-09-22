@@ -6733,9 +6733,18 @@ static void SendTowHome(Train *tow)
  * it waits for the next one. Inside a depot nothing moves, so this is
  * bookkeeping only, and the way out of the shed is the way the shed faces.
  *
+ * Once per homecoming, never while it stands there: it used to run every
+ * tick a tow spent on call at home, and that took the player's own reverse
+ * button back off him -- the tow turned round and was put straight again
+ * before the next tick, so a tow could not be sent out tail first on
+ * purpose, which an engine that is not a tow can be. Called where the job is
+ * put down (HandleRescueEngineInDepot()) and where the tow drives back in
+ * through its own door (VehicleEnterDepot()); what the player does with it
+ * after that is his.
+ *
  * @param tow the rescue engine, standing in a depot
  */
-static void StraightenTowInDepot(Train *tow)
+void StraightenTowInDepot(Train *tow)
 {
 	if (!tow->IsInDepot()) return;
 	Direction dir = DiagDirToDir(GetRailDepotDirection(tow->tile));
@@ -13058,12 +13067,11 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		if (consist->rescue_target != VehicleID::Invalid()) {
 			if (HandleRescueEngineInDepot(consist)) return true;
 		} else {
-			/* Home again after a job put down elsewhere: the go-home order
-			 * has done its work, back on call (and straightened out). Left as
-			 * a halted depot order, the engine would stand here braked and
-			 * read as parked for good. */
-			if (consist->tile == consist->rescue_home_depot) StraightenTowInDepot(consist);
-
+			/* Home again after a job put down elsewhere: the go-home order has
+			 * done its work and the engine is back on call. It was straightened
+			 * out as it drove in (VehicleEnterDepot()), once; not here, every
+			 * tick, which undid the player's reverse button -- see
+			 * StraightenTowInDepot(). */
 			TryDispatchRescueEngine(consist);
 
 			/* Nothing to go to, so it does not go. Being on call is standing

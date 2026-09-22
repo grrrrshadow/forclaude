@@ -1732,6 +1732,16 @@ void VehicleEnterDepot(Vehicle *v)
 			t->wait_counter = 0;
 			t->force_proceed = TFP_NONE;
 			t->flags.Reset(VehicleRailFlag::Reversed);
+			/* A rescue engine driving in through its own door with nothing in
+			 * tow is home from a job put down elsewhere, and it comes back the
+			 * way the job left it. Straightened out here, once, on arrival --
+			 * the on-call code used to do it every tick it stood at home, and
+			 * that undid the player's reverse button; see
+			 * StraightenTowInDepot(). One with a casualty behind it is
+			 * straightened when the casualty is put down. */
+			if (t->vehicle_flags.Test(VehicleFlag::RescueEngine) && t->rescue_target == VehicleID::Invalid() && t->tile == t->rescue_home_depot) {
+				StraightenTowInDepot(t);
+			}
 			t->ConsistChanged(CCF_ARRANGE);
 			break;
 		}

@@ -103,6 +103,7 @@ bool IsRescueTargetAttached(const Train *v);
 bool CarriesAnotherTrain(const Train *v);
 void LeaveHeadlessChainWaiting(Train *chain);
 bool HandleRescueEngineInDepot(Train *tow);
+void StraightenTowInDepot(Train *tow);
 void EndRescueErrand(Train *tow);
 bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
 bool IsRescueTargetOnTile(const Train *v, TileIndex tile);

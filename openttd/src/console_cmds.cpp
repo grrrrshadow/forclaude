@@ -6835,6 +6835,38 @@ static bool ConTestReverse(std::span<std::string_view> argv)
 }
 
 /**
+ * Say whether a train is driving backwards, and refuse when it is not the
+ * way the scene expects. The counters read spojeno, odtazeno and the rest;
+ * which way round a train stands is none of them, so a scene that turns a
+ * train and needs it to stay turned had no counter to fail on. It has this:
+ * a mismatch is written ODMITNUTO, which the battery counts.
+ * Usage: testcouva <unit number> <ano|ne>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDrivingBackwards(std::span<std::string_view> argv)
+{
+	if (argv.size() != 3 || (argv[2] != "ano" && argv[2] != "ne")) {
+		IConsolePrint(CC_HELP, "Check whether a train is driving backwards. Usage: 'testcouva <unit number> <ano|ne>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	bool expected = argv[2] == "ano";
+	for (const Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		bool backwards = t->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
+		if (backwards == expected) {
+			IConsolePrint(CC_DEFAULT, "testcouva: vlak {} couva {} - souhlasi.", t->unitnumber, backwards ? "ano" : "ne");
+		} else {
+			IConsolePrint(CC_ERROR, "testcouva: ODMITNUTO - vlak {} couva {}, cekano {}.", t->unitnumber, backwards ? "ano" : "ne", expected ? "ano" : "ne");
+		}
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testcouva: ODMITNUTO - vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
  * The running record of what the game had to work around: say where it is,
  * put a line of the player's own in it, or turn it off.
  *
@@ -10894,6 +10926,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testgrf",                  ConTestSavegameGrfs);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
+	IConsole::CmdRegister("testcouva",               ConTestDrivingBackwards);
 	IConsole::CmdRegister("testpreklop",             ConTestFlipInDepot);
 	IConsole::CmdRegister("testpresun",              ConTestMoveInDepot);
 	IConsole::CmdRegister("testmezera",              ConTestTearConsist);
