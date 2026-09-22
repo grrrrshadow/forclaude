@@ -54,6 +54,26 @@
 int _carried_z_offset = 4;
 
 /**
+ * The last word on where across its wagon the vehicle stands: pixels to the
+ * right of the way the wagon faces, a minus to the left. Zero leaves it where
+ * the two pictures say, which is where it belongs to within a pixel or two.
+ *
+ * The pictures are put middle over middle, and a middle is the middle of
+ * everything painted -- a mirror, a door left open, a load overhanging one
+ * side. Where a set draws such a thing off to one side the middle follows it,
+ * and the vehicle ends up a hair off the wagon. This is the hair, and
+ * 'testbok' moves it while the game runs.
+ *
+ * Pixels along the way across the rails as the screen sees it, which is not
+ * the same way in every direction: straight across facing north or south, two
+ * across and one down on a slant, and straight up and down facing east or
+ * west, where across the rails is all there is of up and down. A vehicle
+ * parked off the middle of an east-facing wagon really does look only higher
+ * or lower, so that is right and not a shortcoming.
+ */
+int _carried_side_trim = 0;
+
+/**
  * How far behind the front of its drawn box a road vehicle's own position
  * sits. A rail vehicle is drawn about its middle and a road vehicle from its
  * front -- "Unlike trains, road vehicles do not have their offsets moved to
@@ -388,9 +408,31 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 	 * wagon. */
 	(void)wagon_wheels;
 	(void)car_wheels;
+
+	/* And the player's own last word on top of it (_carried_side_trim), along
+	 * the way across the rails as the screen sees it. */
+	int trim_x = 0;
+	int trim_y = 0;
+	if (_carried_side_trim != 0) {
+		static const DirectionIndexArray<Point> _step{{{
+			{ -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 },
+		}}};
+		const Point &side = _step[ChangeDir(dir, DirDiff::Right90)];
+		double ax = (side.y - side.x) * 2.0;
+		double ay = (side.x + side.y);
+		double len = std::sqrt(ax * ax + ay * ay);
+		if (len > 0.0) {
+			/* The cast is not decoration: ZOOM_BASE is unsigned, so a minus
+			 * trim times it wrapped round to an enormous positive number and the
+			 * vehicle was flung off the map. */
+			trim_x = (int)std::lround(_carried_side_trim * (int)ZOOM_BASE * ax / len);
+			trim_y = (int)std::lround(_carried_side_trim * (int)ZOOM_BASE * ay / len);
+		}
+	}
+
 	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
-		u->draw_offs.x = wagon_middle - car_middle;
-		u->draw_offs.y = 0;
+		u->draw_offs.x = wagon_middle - car_middle + trim_x;
+		u->draw_offs.y = trim_y;
 		u->UpdatePosition();
 		u->UpdateViewport(true, true);
 	}

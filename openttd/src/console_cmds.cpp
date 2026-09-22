@@ -4973,6 +4973,31 @@ static bool ConTestDeckHeight(std::span<std::string_view> argv)
 }
 
 /**
+ * Trim where across its wagon a carried road vehicle stands, in pixels, while
+ * the game is running.
+ *
+ * The two pictures are already put middle over middle by themselves, and that
+ * lands within a pixel or two. This is the pixel or two: a middle is the middle
+ * of everything painted, so a mirror or an overhanging load pulls it off to one
+ * side. Told in pixels along the way across the rails as the screen sees it --
+ * see _carried_side_trim.
+ * Usage: testbok [pixels]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSideTrim(std::span<std::string_view> argv)
+{
+	extern int _carried_side_trim;
+	if (argv.size() >= 2) {
+		auto p = ParseInteger<int>(argv[1]);
+		if (!p.has_value()) return false;
+		_carried_side_trim = *p;
+		RestandCarriedRoadVehicles();
+	}
+	IConsolePrint(CC_DEFAULT, "testbok: auta jsou doladena o {} bodu napric vagonem.", _carried_side_trim);
+	return true;
+}
+
+/**
  * Where a carried road vehicle's picture lands beside its wagon's, across the
  * screen, in each of the eight directions a train can face.
  *
@@ -5065,11 +5090,12 @@ static bool ConTestDirectionGaps(std::span<std::string_view> argv)
 		const Direction d = wagon->direction;
 		int across = middle(car_parts) - middle(wagon_parts);
 		int above = wheels(wagon_parts) - wheels(car_parts);
-		IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto {} ({}) na vagonu {} je {:+d} bodu vedle jeho stredu a stoji {} bodu nad jeho koly",
+		IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto {} ({}) na vagonu {} je {:+d} bodu vedle jeho stredu, stoji {} bodu nad jeho koly, uhnuto o {:+d}",
 				to_underlying(d), _names[to_underlying(d)], car->unitnumber,
 				GetString(Engine::Get(car->engine_type)->info.string_id),
 				GetString(Engine::Get(wagon->engine_type)->info.string_id),
-				across / (int)ZOOM_BASE, above / (int)ZOOM_BASE);
+				across / (int)ZOOM_BASE, above / (int)ZOOM_BASE,
+				car->draw_offs.x / (int)ZOOM_BASE);
 	}
 	if (found == 0) IConsolePrint(CC_ERROR, "testsmery: na vlaku {} nic nestoji.", argv[1]);
 	return true;
@@ -10480,6 +10506,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
 	IConsole::CmdRegister("pozn",                    ConNote);
 	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
+	IConsole::CmdRegister("testbok",                 ConTestSideTrim);
 	IConsole::CmdRegister("testsmery",               ConTestDirectionGaps);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
 	IConsole::CmdRegister("testzbourat",             ConTestDemolishDepot);
