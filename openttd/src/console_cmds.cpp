@@ -5089,16 +5089,22 @@ static bool ConTestSpriteAnchor(std::span<std::string_view> argv)
 		auto p = ParseInteger<int>(argv[1]);
 		if (!p.has_value()) return false;
 		_show_sprite_anchor = *p != 0;
-		MarkWholeScreenDirty();
+	} else {
+		/* Said on its own it flips. Typed with the mouse on the game's own
+		 * keyboard, a "1" and a "0" are two more journeys across the screen for
+		 * nothing -- the player's point, and a switch with two states does not
+		 * need to be told which one to go to. */
+		_show_sprite_anchor = !_show_sprite_anchor;
 	}
-	IConsolePrint(CC_DEFAULT, "testkotva: oranzovy bod na kotve spritu je {}.", _show_sprite_anchor ? "zapnuty" : "vypnuty");
+	MarkWholeScreenDirty();
+	IConsolePrint(CC_DEFAULT, "kot: oranzovy bod na kotve spritu je {}.", _show_sprite_anchor ? "zapnuty" : "vypnuty");
 	return true;
 }
 
 static bool ConTestDeckHeight(std::span<std::string_view> argv)
 {
 	extern DirectionIndexArray<int> _carried_z_offset;
-	return SetPerDirection(argv, _carried_z_offset, "testpaluba", "auta stoji {} bodu nad vagonem");
+	return SetPerDirection(argv, _carried_z_offset, "pal", "auta stoji {} bodu nad vagonem");
 }
 
 /**
@@ -5116,7 +5122,7 @@ static bool ConTestDeckHeight(std::span<std::string_view> argv)
 static bool ConTestSideTrim(std::span<std::string_view> argv)
 {
 	extern DirectionIndexArray<int> _carried_side_trim;
-	return SetPerDirection(argv, _carried_side_trim, "testbok", "auta jsou doladena o {} bodu napric vagonem");
+	return SetPerDirection(argv, _carried_side_trim, "bok", "auta jsou doladena o {} bodu napric vagonem");
 }
 
 /**
@@ -10816,6 +10822,13 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("pozn",                    ConNote);
 	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
 	IConsole::CmdRegister("testkotva",               ConTestSpriteAnchor);
+	/* The same three under short names. They are typed by hand, with the mouse,
+	 * on the game's own keyboard, over and over while something is lined up by
+	 * eye -- so the names are as short as they can be without meaning anything
+	 * else. The long ones stay for whatever is written down already. */
+	IConsole::CmdRegister("pal",                     ConTestDeckHeight);
+	IConsole::CmdRegister("bok",                     ConTestSideTrim);
+	IConsole::CmdRegister("kot",                     ConTestSpriteAnchor);
 	IConsole::CmdRegister("testbok",                 ConTestSideTrim);
 	IConsole::CmdRegister("testsmery",               ConTestDirectionGaps);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);
