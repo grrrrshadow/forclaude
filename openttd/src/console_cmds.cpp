@@ -5020,10 +5020,16 @@ static bool ConTestCircleOffset(std::span<std::string_view> argv)
  * at -- so the gap between the middle of the car and the middle of its wagon
  * is arithmetic, not judgement.
  *
- * The train is turned to each direction in turn and turned back; nothing
- * moves and no tick passes. Only the way across is worked out. How high the
- * deck is cannot be had this way -- no wagon says where its deck is, which is
- * why 'testpaluba' is chosen by eye in the first place.
+ * Measured on the train as it stands, in whatever direction it faces at that
+ * moment -- so it is asked over and over while the train goes round a circle
+ * of track and every direction comes up by itself. Turning the train on the
+ * spot instead was tried and is worthless: a wagon of several pieces keeps
+ * its pieces strung out along the old direction while each is drawn facing
+ * the new one, and what comes out is a mixture of the two.
+ *
+ * Only the way across is worked out. How high the deck is cannot be had this
+ * way -- no wagon says where its deck is, which is why 'testpaluba' is chosen
+ * by eye in the first place.
  * Usage: testsmery <cislo vlaku>
  * @copydoc IConsoleCmdProc
  */
@@ -5054,46 +5060,60 @@ static bool ConTestDirectionGaps(std::span<std::string_view> argv)
 		return true;
 	}
 
-	/* Where the middle of a vehicle's picture lands across the screen. */
-	auto middle = [](const Vehicle *v) {
-		Point pt = RemapCoords(v->x_pos + v->bounds.origin.x + v->bounds.offset.x,
-				v->y_pos + v->bounds.origin.y + v->bounds.offset.y,
-				v->z_pos + v->bounds.origin.z + v->bounds.offset.z);
-		VehicleSpriteSeq seq;
-		v->GetImage(v->direction, EngineImageType::OnMap, &seq);
-		Rect r;
-		seq.GetBounds(&r);
-		return (pt.x + r.left + r.right) / 2;
+	/* Where the middle of a whole vehicle's picture lands across the screen:
+	 * the leftmost and the rightmost pixel any of its parts reaches, and the
+	 * middle between them.
+	 *
+	 * The parts matter. A lorry with a trailer is two vehicles, laid out one
+	 * behind the other along the wagon, and asking only the front one where it
+	 * is says the front one stands half a chain ahead of the middle -- which
+	 * is true and is not the question. Facing east or west that half chain is
+	 * straight across the screen, so the first reading of the player's own
+	 * train came out thirty-five pixels beside its wagon with nothing wrong at
+	 * all. */
+	auto middle = [](const std::vector<const Vehicle *> &parts) {
+		int lo = INT_MAX;
+		int hi = INT_MIN;
+		for (const Vehicle *v : parts) {
+			Point pt = RemapCoords(v->x_pos + v->bounds.origin.x + v->bounds.offset.x,
+					v->y_pos + v->bounds.origin.y + v->bounds.offset.y,
+					v->z_pos + v->bounds.origin.z + v->bounds.offset.z);
+			VehicleSpriteSeq seq;
+			v->GetImage(v->direction, EngineImageType::OnMap, &seq);
+			Rect r;
+			seq.GetBounds(&r);
+			lo = std::min(lo, pt.x + r.left);
+			hi = std::max(hi, pt.x + r.right);
+		}
+		return (lo + hi) / 2;
 	};
 
-	const Direction was = wagon->direction;
-	static const std::string_view _names[] = { "S", "SV", "V", "JV", "J", "JZ", "Z", "SZ" };
-	for (uint i = 0; i < to_underlying(Direction::End); i++) {
-		Direction d = static_cast<Direction>(i);
-		wagon->direction = d;
-		wagon->UpdateDeltaXY();
-		RestandCarriedRoadVehicles();
-		car->UpdateDeltaXY();
-
-		/* One step of 'testkruh' is one step across the rails, and what that
-		 * does to the screen follows from the view: across is two pixels per
-		 * step of the map's x and two the other way for its y (RemapCoords). */
-		static const DirectionIndexArray<Point> _step{{{
-			{ -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 },
-		}}};
-		const Point &side = _step[ChangeDir(d, DirDiff::Right90)];
-		int per_step = (side.y - side.x) * 2 * ZOOM_BASE;
-
-		int gap = middle(car) - middle(wagon);
-		std::string advice = per_step == 0 ? "bokem nehne" : fmt::format("testkruh {:+.2f}", -(double)gap / per_step);
-		IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto je {:+d} bodu vedle vagonu, krok posune {} bodu, {}",
-				to_underlying(d), _names[i], gap / (int)ZOOM_BASE, per_step / (int)ZOOM_BASE, advice);
+	/* The wagon's own parts and no more. A wagon's Next() walks on into the
+	 * rest of the train, which would take the whole consist's width; a road
+	 * vehicle's walks its own lorry and trailer and stops, which is right. */
+	std::vector<const Vehicle *> wagon_parts;
+	for (const Train *p = wagon; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+		wagon_parts.push_back(p);
 	}
+	std::vector<const Vehicle *> car_parts;
+	for (const RoadVehicle *u = car; u != nullptr; u = u->Next()) car_parts.push_back(u);
 
-	wagon->direction = was;
-	wagon->UpdateDeltaXY();
-	RestandCarriedRoadVehicles();
-	car->UpdateDeltaXY();
+	static const std::string_view _names[] = { "S", "SV", "V", "JV", "J", "JZ", "Z", "SZ" };
+	const Direction d = wagon->direction;
+
+	/* One step of 'testkruh' is one step across the rails, and what that does
+	 * to the screen follows from the view: two pixels per step of the map's x
+	 * and two the other way for its y (RemapCoords). */
+	static const DirectionIndexArray<Point> _step{{{
+		{ -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 },
+	}}};
+	const Point &side = _step[ChangeDir(d, DirDiff::Right90)];
+	int per_step = (side.y - side.x) * 2 * ZOOM_BASE;
+
+	int gap = middle(car_parts) - middle(wagon_parts);
+	std::string advice = per_step == 0 ? "bokem nehne" : fmt::format("testkruh {:+.2f}", -(double)gap / per_step);
+	IConsolePrint(CC_INFO, "testsmery: smer {} ({}) - auto je {:+d} bodu vedle vagonu, krok posune {} bodu, {}",
+			to_underlying(d), _names[to_underlying(d)], gap / (int)ZOOM_BASE, per_step / (int)ZOOM_BASE, advice);
 	return true;
 }
 
