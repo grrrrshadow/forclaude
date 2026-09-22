@@ -5072,6 +5072,29 @@ static bool SetPerDirection(std::span<std::string_view> argv, DirectionIndexArra
 	return true;
 }
 
+/**
+ * Put a bright dot on the point the game holds every vehicle's picture by, or
+ * take it away again. Usage: testkotva [0|1]
+ *
+ * The player's own request, and it is a good one: he lines his cars up against
+ * another set's, on a wagon and on a road, and cannot get them to agree in both
+ * places. What he cannot see is where each set hangs its picture from, because
+ * the picture is all there is. One dot says it.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSpriteAnchor(std::span<std::string_view> argv)
+{
+	extern bool _show_sprite_anchor;
+	if (argv.size() >= 2) {
+		auto p = ParseInteger<int>(argv[1]);
+		if (!p.has_value()) return false;
+		_show_sprite_anchor = *p != 0;
+		MarkWholeScreenDirty();
+	}
+	IConsolePrint(CC_DEFAULT, "testkotva: oranzovy bod na kotve spritu je {}.", _show_sprite_anchor ? "zapnuty" : "vypnuty");
+	return true;
+}
+
 static bool ConTestDeckHeight(std::span<std::string_view> argv)
 {
 	extern DirectionIndexArray<int> _carried_z_offset;
@@ -10792,6 +10815,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
 	IConsole::CmdRegister("pozn",                    ConNote);
 	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
+	IConsole::CmdRegister("testkotva",               ConTestSpriteAnchor);
 	IConsole::CmdRegister("testbok",                 ConTestSideTrim);
 	IConsole::CmdRegister("testsmery",               ConTestDirectionGaps);
 	IConsole::CmdRegister("testobraz",               ConTestSpriteOffsets);

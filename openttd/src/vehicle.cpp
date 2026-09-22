@@ -1182,6 +1182,20 @@ void CallVehicleTicks()
  * Add vehicle sprite for drawing to the screen.
  * @param v Vehicle to draw.
  */
+/**
+ * Whether to put a bright dot on the point the game holds each vehicle's
+ * picture by -- 'testkotva'.
+ *
+ * For aligning a set's own sprites. A sprite is drawn from an offset the set
+ * writes into it, and where that offset puts the picture is the one thing that
+ * cannot be seen: the picture is all there is to look at. The player is
+ * matching his cars against another set's on a wagon and cannot get them to
+ * agree both there and on a road, which is exactly the kind of thing one dot
+ * settles and a hundred guesses do not. Off by default and turned on from the
+ * console, so that it cannot be left in by accident.
+ */
+bool _show_sprite_anchor = false;
+
 static void DoDrawVehicle(const Vehicle *v)
 {
 	PaletteID pal = PAL_NONE;
@@ -1205,6 +1219,19 @@ static void DoDrawVehicle(const Vehicle *v)
 		AddSortableSpriteToDraw(v->sprite_cache.sprite_seq.seq[i].sprite, pal2, v->x_pos, v->y_pos, v->z_pos, v->bounds, shadowed, nullptr, v->draw_offs);
 	}
 	EndSpriteCombine();
+
+	/* The point the picture hangs from. A child sprite is placed against the
+	 * parent's top left corner, and the parent's top left corner is that point
+	 * plus the offset the set wrote into the sprite -- so taking that offset
+	 * off again lands on the point itself. The dot's own offset comes off as
+	 * well, because a dot drawn a pixel beside the thing it marks is worse than
+	 * no dot at all. */
+	if (_show_sprite_anchor && v->sprite_cache.sprite_seq.count != 0) {
+		const Sprite *spr = GetSprite(v->sprite_cache.sprite_seq.seq[0].sprite & SPRITE_MASK, SpriteType::Normal);
+		const Sprite *dot = GetSprite(SPR_WHITE_POINT & SPRITE_MASK, SpriteType::Normal);
+		AddChildSpriteScreen(SPR_WHITE_POINT, PALETTE_TO_ORANGE,
+				-spr->x_offs - dot->x_offs, -spr->y_offs - dot->y_offs, false, nullptr, false);
+	}
 }
 
 /**
