@@ -1445,6 +1445,14 @@ static const std::string_view _take_over_misc_keys[] = {
  */
 static const std::string_view _take_over_gui_keys[] = {
 	"starting_colour", "starting_colour_secondary",
+	/* Which warnings the player wants and how long a message stays up. His
+	 * reason: plenty of people have the news off and the "this vehicle is
+	 * losing money" and "these orders are the same" warnings off as well, and
+	 * having turned all that off once they should not have to do it again
+	 * here. See also the whole [news_display] group below -- the news switches
+	 * themselves live there, and these are the ones that sit outside it. */
+	"vehicle_income_warn", "order_review_system", "lost_vehicle_warn", "old_vehicle_warn",
+	"errmsg_duration", "news_message_timeout", "coloured_news_year",
 };
 
 /** Whole groups taken over as they stand. */
@@ -1455,6 +1463,7 @@ static const std::string_view _take_over_groups[] = {
 	"currency",    // only means anything if they made a currency of their own
 	"music",
 	"sound",
+	"news_display", // which kinds of news the player wants at all, and how
 };
 
 /**
