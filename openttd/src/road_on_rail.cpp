@@ -51,7 +51,18 @@
  * offsets the set baked into the sprite already say where the vehicle meets
  * the ground. That is worth keeping, not overruling.
  */
-int _carried_z_offset = 4;
+DirectionIndexArray<int> _carried_z_offset{{{ 4 * ZOOM_BASE, 4 * ZOOM_BASE, 4 * ZOOM_BASE, 4 * ZOOM_BASE,
+		4 * ZOOM_BASE, 4 * ZOOM_BASE, 4 * ZOOM_BASE, 4 * ZOOM_BASE }}};
+
+/**
+ * How far above the wagon the carried vehicle is lifted in the world.
+ *
+ * Nothing to do with how high it looks -- that is the deck above. This is for
+ * the sorting of what is drawn in front of what: two boxes at the same height
+ * are sorted by a rule of thumb, and the rule once put the wagon in front of
+ * the vehicle it was carrying.
+ */
+static const int CARRIED_WORLD_LIFT = 4;
 
 /**
  * Where across its wagon the carried vehicle stands: pixels to the right of the
@@ -68,7 +79,7 @@ int _carried_z_offset = 4;
  * the middle of an east-facing wagon really does look only higher or lower, so
  * that is right and not a shortcoming.
  */
-int _carried_side_trim = 0;
+DirectionIndexArray<int> _carried_side_trim{{{ 0, 0, 0, 0, 0, 0, 0, 0 }}};
 
 /**
  * How far behind the front of its drawn box a road vehicle's own position
@@ -325,7 +336,7 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		u->tile = TileVirtXY(x, y);
 		u->x_pos = x;
 		u->y_pos = y;
-		u->z_pos = wagon->z_pos + _carried_z_offset;
+		u->z_pos = wagon->z_pos + CARRIED_WORLD_LIFT;
 		u->direction = dir;
 		/* Measured below, so it must not still carry the last tick's answer. */
 		u->draw_offs = {};
@@ -355,7 +366,7 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 	 * the way across the rails as the screen sees it. */
 	int trim_x = 0;
 	int trim_y = 0;
-	if (_carried_side_trim != 0) {
+	if (_carried_side_trim[dir] != 0) {
 		static const DirectionIndexArray<Point> _step{{{
 			{ -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 },
 		}}};
@@ -364,13 +375,20 @@ static void FollowWagon(RoadVehicle *rv, const Train *wagon)
 		double ay = (side.x + side.y);
 		double len = std::sqrt(ax * ax + ay * ay);
 		if (len > 0.0) {
-			/* The cast is not decoration: ZOOM_BASE is unsigned, so a minus
-			 * trim times it wrapped round to an enormous positive number and the
-			 * vehicle was flung off the map. */
-			trim_x = (int)std::lround(_carried_side_trim * (int)ZOOM_BASE * ax / len);
-			trim_y = (int)std::lround(_carried_side_trim * (int)ZOOM_BASE * ay / len);
+			/* The trim is already told in the units the screen is drawn in,
+			 * quarters of a pixel, so it is only turned into a direction here
+			 * and not scaled again. Scaling it twice made every step four times
+			 * the size asked for. */
+			trim_x = (int)std::lround(_carried_side_trim[dir] * ax / len);
+			trim_y = (int)std::lround(_carried_side_trim[dir] * ay / len);
 		}
 	}
+
+	/* The deck, which is a move straight up the screen and nothing else -- the
+	 * same thing lifting it in the world did, only in quarters of a pixel
+	 * instead of whole ones, because whole ones were too coarse to settle it
+	 * by eye. */
+	trim_y -= _carried_z_offset[dir] - CARRIED_WORLD_LIFT * ZOOM_BASE;
 
 	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 		u->draw_offs.x = trim_x;

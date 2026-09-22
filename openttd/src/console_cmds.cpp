@@ -4956,20 +4956,116 @@ static bool MakeEngineOfPieces(Train *t, uint pieces)
  * Usage: testpaluba [pixels]
  * @copydoc IConsoleCmdProc
  */
-static bool ConTestDeckHeight(std::span<std::string_view> argv)
+/**
+ * Read a number that may have a decimal point in it, into quarters of a pixel.
+ *
+ * Whole pixels turned out to be too coarse a step to settle the two by-eye
+ * numbers with -- the player's own words, "the moves are too big for me" -- and
+ * a quarter of a pixel is a real step, not a pretend one: it is the grid the
+ * finest zoom is drawn on, so at the zoom he plays at it moves the picture.
+ * A comma and a full stop both do, since one of them is what he types.
+ *
+ * @param txt      what was typed
+ * @param[out] out the number, in quarters of a pixel
+ * @return whether it was a number at all
+ */
+static bool ParseFine(std::string_view txt, int &out)
 {
-	extern int _carried_z_offset;
-	if (argv.size() >= 2) {
-		auto p = ParseInteger(argv[1]);
-		if (!p.has_value()) return false;
-		_carried_z_offset = (int)*p;
-		/* A moving train would put them on the new deck by itself within the
-		 * tick; a standing one ticks nothing, and standing is when the player
-		 * is looking. */
+	size_t i = 0;
+	int sign = 1;
+	if (i < txt.size() && (txt[i] == '-' || txt[i] == '+')) {
+		if (txt[i] == '-') sign = -1;
+		i++;
+	}
+	int64_t whole = 0;
+	bool any = false;
+	for (; i < txt.size() && txt[i] >= '0' && txt[i] <= '9'; i++) {
+		whole = whole * 10 + (txt[i] - '0');
+		any = true;
+		if (whole > 10000) return false;
+	}
+	int64_t thousandths = whole * 1000;
+	if (i < txt.size() && (txt[i] == ',' || txt[i] == '.')) {
+		i++;
+		int64_t scale = 100;
+		for (; i < txt.size() && txt[i] >= '0' && txt[i] <= '9'; i++) {
+			thousandths += (txt[i] - '0') * scale;
+			scale /= 10;
+			any = true;
+			if (scale == 0) {
+				/* Anything finer than a thousandth is thrown away, not refused. */
+				while (i + 1 < txt.size() && txt[i + 1] >= '0' && txt[i + 1] <= '9') i++;
+				break;
+			}
+		}
+	}
+	if (!any || i != txt.size()) return false;
+	out = (int)(sign * ((thousandths * (int)ZOOM_BASE + 500) / 1000));
+	return true;
+}
+
+/** Say a number held in quarters of a pixel the way it was typed. */
+static std::string SayFine(int quarters)
+{
+	std::string text = fmt::format("{:.2f}", (double)quarters / (double)ZOOM_BASE);
+	for (char &c : text) {
+		if (c == '.') c = ',';
+	}
+	return text;
+}
+
+/**
+ * The two by-eye numbers for a carried road vehicle, both of them one per
+ * direction: with a number alone every direction is set at once, with a
+ * direction in front of it only that one.
+ *
+ * Eight and not one because the player asked for eight. Whether he needs eight
+ * is his eye's business and not this file's: if the placing is right, one
+ * number does all of them. The directions are numbered as the game numbers
+ * them -- 0 north, 2 east, 4 south, 6 west, the odd ones the slants.
+ *
+ * @param argv     what was typed
+ * @param what     the eight numbers to set, in quarters of a pixel
+ * @param name     the command's own name, for the lines it prints
+ * @param sentence what one number means, with a {} where the number goes
+ * @return whether the command was understood
+ */
+static bool SetPerDirection(std::span<std::string_view> argv, DirectionIndexArray<int> &what, const char *name, const char *sentence)
+{
+	static const std::string_view _names[] = { "S", "SV", "V", "JV", "J", "JZ", "Z", "SZ" };
+	auto say = [&](uint d) {
+		IConsolePrint(CC_DEFAULT, "{}: smer {} ({}) - {}", name, d, _names[d],
+				fmt::format(fmt::runtime(sentence), SayFine(what[static_cast<Direction>(d)])));
+	};
+
+	if (argv.size() >= 3) {
+		auto pd = ParseInteger<int>(argv[1]);
+		int fine = 0;
+		if (!pd.has_value() || !ParseFine(argv[2], fine)) return false;
+		if (*pd < 0 || *pd >= (int)to_underlying(Direction::End)) {
+			IConsolePrint(CC_ERROR, "{}: smer je 0 az 7.", name);
+			return true;
+		}
+		what[static_cast<Direction>(*pd)] = fine;
+		RestandCarriedRoadVehicles();
+		say((uint)*pd);
+		return true;
+	}
+
+	if (argv.size() == 2) {
+		int fine = 0;
+		if (!ParseFine(argv[1], fine)) return false;
+		for (uint d = 0; d < to_underlying(Direction::End); d++) what[static_cast<Direction>(d)] = fine;
 		RestandCarriedRoadVehicles();
 	}
-	IConsolePrint(CC_DEFAULT, "testpaluba: auta stoji {} bodu nad vagonem.", _carried_z_offset);
+	for (uint d = 0; d < to_underlying(Direction::End); d++) say(d);
 	return true;
+}
+
+static bool ConTestDeckHeight(std::span<std::string_view> argv)
+{
+	extern DirectionIndexArray<int> _carried_z_offset;
+	return SetPerDirection(argv, _carried_z_offset, "testpaluba", "auta stoji {} bodu nad vagonem");
 }
 
 /**
@@ -4986,15 +5082,8 @@ static bool ConTestDeckHeight(std::span<std::string_view> argv)
  */
 static bool ConTestSideTrim(std::span<std::string_view> argv)
 {
-	extern int _carried_side_trim;
-	if (argv.size() >= 2) {
-		auto p = ParseInteger<int>(argv[1]);
-		if (!p.has_value()) return false;
-		_carried_side_trim = *p;
-		RestandCarriedRoadVehicles();
-	}
-	IConsolePrint(CC_DEFAULT, "testbok: auta jsou doladena o {} bodu napric vagonem.", _carried_side_trim);
-	return true;
+	extern DirectionIndexArray<int> _carried_side_trim;
+	return SetPerDirection(argv, _carried_side_trim, "testbok", "auta jsou doladena o {} bodu napric vagonem");
 }
 
 /**
