@@ -252,6 +252,7 @@ enum ModifyOrderFlags : uint8_t {
 	MOF_SELL_DECOUPLED,  ///< Toggle whether the wagons this order puts down are sold instead of being left to be collected.
 	MOF_COUPLE_BUY,      ///< Passes the EngineID of the wagon this order works with, or EngineID::Invalid() to let go of it. Naming one switches the buying on; letting go of it switches it off.
 	MOF_COUPLE_BUY_ON,   ///< Toggle whether the order buys that wagon when the depot is short of them; with the buying off the wagon still says which ones the order will couple.
+	MOF_COUPLE_SEARCH,   ///< Toggle whether the couple filters are asked of each vehicle in the rake (1) or of the rake as a whole (0).
 	MOF_END
 };
 

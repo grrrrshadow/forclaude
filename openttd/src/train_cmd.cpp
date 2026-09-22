@@ -3117,6 +3117,48 @@ void MarkCoupleClaimChanged(const Train *rake)
  */
 static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool check_count = true)
 {
+	/* The other question: not "is this rake like that" but "is that in this
+	 * rake". Every filter describes one wagon -- this model, carrying this,
+	 * this full -- and the count says how many such wagons the rake has to
+	 * hold. What is found decides; the rest of the rake is not asked at all.
+	 * See Order::couple_search for where it came from. */
+	if (order.ShouldSearchInRake()) {
+		const bool cargo_named = IsValidCargoType(order.GetCoupleCargo());
+		/* The same courtesy the whole-rake reading extends: a rake the player
+		 * has called done (Skip on its own orders, see below) is full whatever
+		 * is in it, so its wagons are found as full ones. */
+		const bool called_done = rake->current_order.GetLoadType() == OrderLoadType::NoLoad;
+		uint found = 0;
+		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) {
+			if (order.GetCoupleBuyEngine() != EngineID::Invalid() && u->engine_type != order.GetCoupleBuyEngine()) continue;
+			/* One wagon is all its pieces; a set's long wagon carries in the
+			 * middle piece and not in the head. */
+			bool carries = false;
+			bool has_room = false;
+			bool has_load = false;
+			for (const Train *p = u; p != nullptr; p = p->HasArticulatedPart() ? p->GetNextArticulatedPart() : nullptr) {
+				if (p->cargo_cap == 0) continue;
+				if (cargo_named && p->cargo_type != order.GetCoupleCargo()) continue;
+				carries = true;
+				if (p->cargo.StoredCount() < p->cargo_cap) has_room = true;
+				if (p->cargo.StoredCount() != 0) has_load = true;
+			}
+			if (cargo_named && !carries) continue;
+			switch (order.GetCoupleLoad()) {
+				/* A wagon that carries nothing is neither full nor empty and
+				 * is not one of the ones being looked for. */
+				case OrderCoupleLoad::Full:  if (!carries || (has_room && !called_done)) continue; break;
+				case OrderCoupleLoad::Empty: if (!carries || has_load) continue; break;
+				default: break;
+			}
+			found++;
+		}
+		if (!check_count || order.GetCoupleCount() == 0) return found >= 1;
+		if (order.IsCoupleCountMinimum()) return found >= order.GetCoupleCount();
+		if (order.IsCoupleCountMaximum()) return found >= 1 && found <= order.GetCoupleCount();
+		return found == order.GetCoupleCount();
+	}
+
 	/* Name a cargo and the fullness question is asked of the wagons carrying
 	 * it and of nothing else. "Fetch the wagons for road vehicles once they
 	 * are full" is what the two settings together read as, and it is what the

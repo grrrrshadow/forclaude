@@ -4964,6 +4964,10 @@ STR_ORDER_DECOUPLE_WHOLE_BUTTON                                 :{BLACK}Decouple
 STR_ORDER_SELL_WAGONS                                           :{BLACK}Sell the dropped wagons
 STR_ORDER_SELL_WAGONS_TOOLTIP                                   :{BLACK}The wagons this order puts down are sold instead of being left to be collected. In a depot that happens on the spot; at a platform a rescue engine is called for them and they are sold when it brings them in, because a depot is where a vehicle is sold. The price is the ordinary one - what selling them by hand would pay. A part that comes apart with an engine at its head is a train and is never sold this way
 STR_ORDER_SELL_WAGONS_SUFFIX                                    :{SPACE}(and sell them)
+STR_ORDER_COUPLE_FIND                                           :{BLACK}Find a rake
+STR_ORDER_COUPLE_FIND_TOOLTIP                                   :{BLACK}Couple a rake like this. The filters ask the whole rake at once: full is a rake with room left nowhere, and five vehicles is five vehicles in the whole rake. A rake that answers no is left standing whole. It asks what the rake is like
+STR_ORDER_COUPLE_SEARCH                                         :{BLACK}Search the rake
+STR_ORDER_COUPLE_SEARCH_TOOLTIP                                 :{BLACK}Couple a rake with this in it. The filters ask wagon by wagon and it is enough that it is found: five loaded car carriers are found and the rake goes, even with an empty flat and a tanker behind them. What is found decides; the rest of the rake does not matter. It asks what is in the rake
 STR_ORDER_DECOUPLE_CARGO_DEST_NONE                              :{BLACK}Load the dropped wagons for: anywhere
 STR_ORDER_DECOUPLE_CARGO_DEST                                   :{BLACK}Load the dropped wagons for: {STATION}
 STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP                           :{BLACK}Says which station this rake is meant for. Road vehicles read it always: one whose order says "on wagons meant for my next stop" boards only a rake meant for where it is going. With cargo distribution switched on it counts for cargo as well - a station sorts what is waiting by where it goes next and hands a vehicle only what suits its route, and wagons left standing with no engine have no route, so without this they are handed nothing. It is not a journey and promises none: the wagons go wherever the engine that collects them goes, and cargo carried the wrong way is planned afresh at the next station
@@ -5041,6 +5045,10 @@ STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Founding a rake: has to arrive wagons first
 STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}An engine of unequal articulated parts cannot couple wagons at the front
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
+STR_ORDER_GOTO_COUPLE_SUFFIX_SEARCH                             :{SPACE}(couple, in the rake:)
+STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT_SUCH                       :{SPACE}({NUM} such)
+STR_ORDER_COUPLE_FILTER_SUFFIX_MIN_SUCH                         :{SPACE}(at least {NUM} such)
+STR_ORDER_COUPLE_FILTER_SUFFIX_MAX_SUCH                         :{SPACE}(at most {NUM} such)
 STR_ORDER_WAIT_COUPLE_SUFFIX                                    :{SPACE}(and wait for couple)
 STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_TO_NEXT                       :{SPACE}(by train, to the next stop)
 STR_ORDER_BOARD_MODE_SUFFIX_TRAIN_ANYWHERE                      :{SPACE}(by train, anywhere)

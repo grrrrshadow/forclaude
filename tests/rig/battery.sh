@@ -340,6 +340,30 @@ testza 300 testkoupit 2 0
 testza 400 testprestavba 2 0
 testza 500 testmof 2 0 16 255
 testza 600 testprestavba 2 0" 3000
+# The two ways a collecting order can read its filters: "find a rake like
+# this" asks the whole rake and "search the rake for this" asks wagon by wagon.
+# One rake of three at the platform, two of them loaded and one left empty,
+# and the order says empty + this cargo + at least one. Read of the whole rake
+# that is a no, the rake is not empty; read wagon by wagon it is a yes, one
+# empty wagon is in it. The player's own case, with his tanker and his one
+# empty flat: he wanted "five of them are loaded, so go", and nothing he could
+# set said it. The collector is held with "at least 99" until the rake is half
+# loaded, or it would take the empty rake before the question is asked at all.
+# spojeno=1 is the point: the switch is made on the waiting train, and a
+# waiting train reads its own copy of the order, which used to miss most of
+# the description.
+run_scene hledejvrade "vlak123 on
+testspoj
+testfiltr prazdne
+testfiltr 0
+testminimalne 2 0 99
+testza 1000 testnalozit rada 0 vagonkazdy2
+testza 1200 testminimalne 2 0 1
+testza 1300 testfiltr zkouska
+testza 1300 testrezim 2 0
+testza 1400 testmof 2 0 29 1
+testza 1500 testfiltr zkouska
+testza 1500 testrezim 2 0" 10000
 run_scene prodatvagonkydepo "vlak123 on
 testspoj depo
 testprodatvagonky 1 0 1" 12000

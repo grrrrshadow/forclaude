@@ -62,6 +62,8 @@ enum OrderWidgets : WidgetID {
 	WID_O_SELL_TRAIN,                ///< Sell this train to the scrapyard where it stands.
 	WID_O_SEL_SELL_WAGONS,           ///< #NWID_SELECTION widget for the right-hand place of that row: the sell-the-dropped-wagons button, or nothing while the selected order puts no wagons down.
 	WID_O_SELL_WAGONS,               ///< Sell the wagons this order puts down instead of leaving them to be collected.
+	WID_O_COUPLE_FIND,               ///< Ask the couple filters of the rake as a whole ("find a rake like this"); the middle place of the bottom row while a station order collects.
+	WID_O_COUPLE_SEARCH,             ///< Ask the couple filters of each vehicle in the rake ("search the rake for this"); the right-hand place of the bottom row while a station order collects.
 };
 
 #endif /* WIDGETS_ORDER_WIDGET_H */

@@ -267,6 +267,7 @@ public:
 		SLE_VAR(Order, board_mode, VarTypes::U8),
 		SLE_VAR(Order, load_on_wagons, VarTypes::BOOL),
 		SLE_VAR(Order, decouple_cargo_dest, VarTypes::U16),
+		SLE_VAR(Order, couple_search, VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 

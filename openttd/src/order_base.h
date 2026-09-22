@@ -264,6 +264,31 @@ private:
 	bool couple_found_rake = false;
 
 	/**
+	 * The filters are asked of each vehicle in the rake rather than of the
+	 * rake as a whole, and the count then says how many such vehicles the rake
+	 * has to have: "a rake with at least five full car carriers in it" instead
+	 * of "a full rake of at least five vehicles".
+	 *
+	 * The player's design, and it came out of a rake that would not go. His
+	 * had five loaded car carriers, a tanker and one empty flat, and the
+	 * order said full + road vehicles + at least five. Asked of the whole rake
+	 * that is a no -- the empty flat is a car carrier with room in it -- and
+	 * nothing he could set said what he meant, which was "five are loaded, so
+	 * go". Asked wagon by wagon it is a yes.
+	 *
+	 * Two questions, then, and a button for each: what the rake is like, and
+	 * what is in the rake. The rake is taken whole either way -- a rake at a
+	 * platform is one coupled thing -- so with this set the collector brings
+	 * along whatever else is in it. Which is why the sorting of rakes by what
+	 * they carry has to come before any filter on where they are bound.
+	 *
+	 * A platform's setting only. In a shed the store is drawn from a few
+	 * wagons at a time, so the two readings come to the same thing there, and
+	 * the buttons are not shown.
+	 */
+	bool couple_search = false;
+
+	/**
 	 * The wagon this order buys when the depot it collects from has not got
 	 * enough of them, and #couple_buy_wagons, which says whether it buys at
 	 * all.
@@ -493,6 +518,12 @@ public:
 	inline void SetBuyWagons(bool buy) { this->couple_buy_wagons = buy; }
 
 	/** Is the couple count a minimum -- any rake of at least that many vehicles will do -- rather than an exact size? */
+	/** Are the filters asked of each vehicle in the rake rather than of the rake as a whole? */
+	inline bool ShouldSearchInRake() const { return this->couple_search; }
+
+	/** Ask the filters of each vehicle in the rake rather than of the rake as a whole. */
+	inline void SetSearchInRake(bool search) { this->couple_search = search; }
+
 	inline bool IsCoupleCountMinimum() const { return this->couple_min; }
 
 	/** Set whether the couple count is a minimum. */

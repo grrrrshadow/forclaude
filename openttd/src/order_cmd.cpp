@@ -1312,7 +1312,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					mof != MOF_COUPLE_LOAD && mof != MOF_COUPLE_CARGO && mof != MOF_COUPLE_COUNT && mof != MOF_COUPLE_FOUND && mof != MOF_COUPLE_MIN &&
 					mof != MOF_COUPLE_MAX && mof != MOF_AUTO_DEPARTURE && mof != MOF_BOARD_MODE &&
 					mof != MOF_DECOUPLE_CARGO_DEST && mof != MOF_SELL_DECOUPLED &&
-					mof != MOF_COUPLE_BUY) return CMD_ERROR;
+					mof != MOF_COUPLE_BUY && mof != MOF_COUPLE_SEARCH) return CMD_ERROR;
 			break;
 
 		case OT_GOTO_DEPOT:
@@ -1524,6 +1524,12 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 		case MOF_COUPLE_FOUND:
 			/* Rakes are founded on platforms, in the open; a shed is a store. */
+			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
+			break;
+
+		case MOF_COUPLE_SEARCH:
+			/* A platform's question: in a shed the two readings come to the
+			 * same thing (Order::couple_search). */
 			if (v->type != VehicleType::Train || !order->IsType(OT_GOTO_STATION)) return CMD_ERROR;
 			break;
 
@@ -1813,6 +1819,11 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				break;
 			}
 
+			case MOF_COUPLE_SEARCH:
+				order->SetSearchInRake(data != 0);
+				if (data != 0) order->SetFoundRake(false);
+				break;
+
 			case MOF_COUPLE_BUY_ON:
 				/* Buying off, wagon kept: from here the wagon says which ones
 				 * this order will couple and nothing is bought -- the yard
@@ -1837,6 +1848,9 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				 * implies, and a player who wants both may have both. */
 				order->SetFoundRake(data != 0);
 				if (data != 0) order->SetCoupleCountMinimum(false);
+				/* Founding is building, not finding: the two do not go
+				 * together, and one switches the other off. */
+				if (data != 0) order->SetSearchInRake(false);
 				break;
 
 			case MOF_COUPLE_MIN:
@@ -1981,10 +1995,34 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				/* Whether the description of what to collect has changed. Asked
 				 * before anything is copied over, because the copy is what the
 				 * question is about. */
+				/* Every part of the description, not the first four of it. The
+				 * readings of the number, the founding, the model and the way
+				 * the filters are asked were left out of this copy, so a train
+				 * already waiting on the order went on reading the old ones:
+				 * told "at least one" instead of "at least ninety-nine" it
+				 * stood there wanting ninety-nine until the order came round
+				 * again, and a probe reading the order list said it would go. */
 				bool wanted_changed = u->current_order.ShouldGoToCouple() != order->ShouldGoToCouple() ||
 						u->current_order.GetCoupleLoad() != order->GetCoupleLoad() ||
 						u->current_order.GetCoupleCargo() != order->GetCoupleCargo() ||
-						u->current_order.GetCoupleCount() != order->GetCoupleCount();
+						u->current_order.GetCoupleCount() != order->GetCoupleCount() ||
+						u->current_order.IsCoupleCountMinimum() != order->IsCoupleCountMinimum() ||
+						u->current_order.IsCoupleCountMaximum() != order->IsCoupleCountMaximum() ||
+						u->current_order.ShouldFoundRake() != order->ShouldFoundRake() ||
+						u->current_order.GetCoupleBuyEngine() != order->GetCoupleBuyEngine() ||
+						u->current_order.ShouldBuyWagons() != order->ShouldBuyWagons() ||
+						u->current_order.ShouldSearchInRake() != order->ShouldSearchInRake();
+				auto copy_description = [&]() {
+					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
+					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
+					u->current_order.SetCoupleCount(order->GetCoupleCount());
+					u->current_order.SetCoupleCountMinimum(order->IsCoupleCountMinimum());
+					u->current_order.SetCoupleCountMaximum(order->IsCoupleCountMaximum());
+					u->current_order.SetFoundRake(order->ShouldFoundRake());
+					u->current_order.SetCoupleBuyEngine(order->GetCoupleBuyEngine());
+					u->current_order.SetBuyWagons(order->ShouldBuyWagons());
+					u->current_order.SetSearchInRake(order->ShouldSearchInRake());
+				};
 
 				if (u->current_order.IsType(OT_GOTO_DEPOT) && order->IsType(OT_GOTO_DEPOT)) {
 					u->current_order.SetTurnAroundInDepot(order->ShouldTurnAroundInDepot());
@@ -2000,9 +2038,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					u->current_order.SetDecouple(order->ShouldDecoupleOnDeparture());
 					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
 					u->current_order.SetGoToCouple(order->ShouldGoToCouple());
-					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
-					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
-					u->current_order.SetCoupleCount(order->GetCoupleCount());
+					copy_description();
 				} else if ((u->current_order.IsType(OT_GOTO_STATION) || u->current_order.IsType(OT_LOADING)) && order->IsType(OT_GOTO_STATION)) {
 					u->current_order.SetDecouple(order->ShouldDecoupleOnDeparture());
 					u->current_order.SetDecoupleCount(order->GetDecoupleCount());
@@ -2014,9 +2050,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 					 * the live copy has to follow or the trip already under way
 					 * still loads. */
 					u->current_order.SetUnloadType(order->GetUnloadType());
-					u->current_order.SetCoupleLoad(order->GetCoupleLoad());
-					u->current_order.SetCoupleCargo(order->GetCoupleCargo());
-					u->current_order.SetCoupleCount(order->GetCoupleCount());
+					copy_description();
 				}
 
 				/* A rake already spoken for was chosen against the old

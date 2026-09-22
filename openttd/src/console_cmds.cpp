@@ -4310,7 +4310,7 @@ static bool ConTestFacings(std::span<std::string_view>)
 static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number>' or 'testnalozit rada <cargo> [<cislo rady>|kazdy2|kazdy2od2]'.");
+		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number>' or 'testnalozit rada <cargo> [<cislo rady>|kazdy2|kazdy2od2|vagonkazdy2]'.");
 		return true;
 	}
 	/* 'rada <cargo>': fill the wagons of that cargo in every waiting rake, and
@@ -4325,7 +4325,12 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 		 * is equally empty. Without a number, all of them, as before. */
 		bool every_other = argv.size() >= 4 && (argv[3] == "kazdy2" || argv[3] == "kazdy2od2");
 		bool odd_first = argv.size() >= 4 && argv[3] == "kazdy2od2";
-		auto pwhich = (argv.size() >= 4 && !every_other) ? ParseInteger(argv[3]) : std::nullopt;
+		/* Every second wagon inside each rake, rather than every second rake:
+		 * a rake half full and half empty is the one thing the two readings of
+		 * the couple filter answer differently about, and with one rake at
+		 * the platform "every second rake" is all of it or none. */
+		bool every_other_wagon = argv.size() >= 4 && argv[3] == "vagonkazdy2";
+		auto pwhich = (argv.size() >= 4 && !every_other && !every_other_wagon) ? ParseInteger(argv[3]) : std::nullopt;
 		uint rakes = 0, put = 0, seen = 0;
 		for (Train *t : Train::Iterate()) {
 			if (t->First() != t || !t->IsFreeWagon()) continue;
@@ -4335,8 +4340,10 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 			 * the same. */
 			if (every_other && ((seen++ & 1) != 0) != odd_first) continue;
 			rakes++;
+			uint nth = 0;
 			for (Train *u = t; u != nullptr; u = u->Next()) {
 				if (u->cargo_type != want) continue;
+				if (every_other_wagon && (nth++ & 1) != 0) continue;
 				uint room = u->cargo_cap - u->cargo.StoredCount();
 				if (room == 0 || !CargoPacket::CanAllocateItem()) continue;
 				u->cargo.Append(CargoPacket::Create(t->last_station_visited, room, Source{}));
@@ -5999,6 +6006,57 @@ static bool ConTestRefitButton(std::span<std::string_view> argv)
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testprestavba: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
+/**
+ * Say which of the two ways of reading the couple filters an order's window
+ * shows pressed: find a rake like this, or search the rake for this.
+ * Usage: testrezim <cislo vlaku> <rozkaz>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCoupleMode(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Say which couple reading an order's window shows pressed. Usage: 'testrezim <cislo vlaku> <rozkaz>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	if (!punit.has_value() || !porder.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		const Order *o = t->GetOrder((VehicleOrderID)*porder);
+		if (o == nullptr) {
+			IConsolePrint(CC_ERROR, "testrezim: rozkaz {} neexistuje.", *porder);
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		ShowOrdersWindow(t);
+		Window *w = FindWindowById(WindowClass::VehicleOrders, t->index);
+		if (w == nullptr) {
+			IConsolePrint(CC_ERROR, "testrezim: ODMITNUTO - okno rozkazu se neotevrelo.");
+			return true;
+		}
+		if (const NWidgetBase *list = w->GetWidget<NWidgetBase>(WID_O_ORDER_LIST); list != nullptr) {
+			w->OnClick(Point{(int)list->pos_x + 4, (int)list->pos_y + 4 + (int)*porder * 10}, WID_O_ORDER_LIST, 1);
+		}
+		w->OnInvalidateData();
+		const NWidgetStacked *mid = w->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE_DEST_BTN);
+		const NWidgetStacked *right = w->GetWidget<NWidgetStacked>(WID_O_SEL_SELL_WAGONS);
+		bool shown = mid != nullptr && right != nullptr && mid->shown_plane == 2 && right->shown_plane == 2;
+		if (!shown) {
+			IConsolePrint(CC_INFO, "testrezim: vlak {} rozkaz {} - cudliky Najdi/Hledej nejsou videt (rozkaz {})", t->unitnumber, *porder,
+					o->ShouldGoToCouple() ? (o->IsType(OT_GOTO_DEPOT) ? "je depo" : "neni stanice") : "nepripojuje");
+			return true;
+		}
+		IConsolePrint(CC_INFO, "testrezim: vlak {} rozkaz {} - Najdi radu {}, Hledej v rade {}, rozkaz rika {}", t->unitnumber, *porder,
+				w->IsWidgetLowered(WID_O_COUPLE_FIND) ? "STISKNUTO" : "volne",
+				w->IsWidgetLowered(WID_O_COUPLE_SEARCH) ? "STISKNUTO" : "volne",
+				o->ShouldSearchInRake() ? "hledej" : "najdi");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testrezim: vlak {} nenalezen.", argv[1]);
 	return true;
 }
 
@@ -10761,6 +10819,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testikonaprodat",         ConTestSellIcon);
 	IConsole::CmdRegister("testoknorozkazu",         ConTestOrderWindowGrows);
 	IConsole::CmdRegister("testprestavba",           ConTestRefitButton);
+	IConsole::CmdRegister("testrezim",               ConTestCoupleMode);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);

@@ -418,7 +418,7 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * actually being a separate OrderType. See
 				 * FEATURE_DESIGN_COUPLING_TOW.md. */
 				if (v->type == VehicleType::Train && order->ShouldGoToCouple()) {
-					second += GetString(STR_ORDER_GOTO_COUPLE_SUFFIX);
+					second += GetString(order->ShouldSearchInRake() ? STR_ORDER_GOTO_COUPLE_SUFFIX_SEARCH : STR_ORDER_GOTO_COUPLE_SUFFIX);
 
 					/* And what it is going to accept, for each filter that has
 					 * been set. Read off the line, a whole list of orders says
@@ -439,9 +439,13 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 					if (order->ShouldFoundRake()) {
 						second += order->GetCoupleCount() != 0 ? GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND_COUNT, order->GetCoupleCount()) : GetString(STR_ORDER_COUPLE_FILTER_SUFFIX_FOUND);
 					} else if (order->GetCoupleCount() != 0) {
-						StringID reading = STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT;
-						if (order->IsCoupleCountMinimum()) reading = STR_ORDER_COUPLE_FILTER_SUFFIX_MIN;
-						if (order->IsCoupleCountMaximum()) reading = STR_ORDER_COUPLE_FILTER_SUFFIX_MAX;
+						/* Searching the rake counts the wagons found, not the
+						 * vehicles in the rake, and "vehicles" would read it the
+						 * old way: it says "such" instead. */
+						bool such = order->ShouldSearchInRake();
+						StringID reading = such ? STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT_SUCH : STR_ORDER_COUPLE_FILTER_SUFFIX_COUNT;
+						if (order->IsCoupleCountMinimum()) reading = such ? STR_ORDER_COUPLE_FILTER_SUFFIX_MIN_SUCH : STR_ORDER_COUPLE_FILTER_SUFFIX_MIN;
+						if (order->IsCoupleCountMaximum()) reading = such ? STR_ORDER_COUPLE_FILTER_SUFFIX_MAX_SUCH : STR_ORDER_COUPLE_FILTER_SUFFIX_MAX;
 						second += GetString(reading, order->GetCoupleCount());
 					}
 					/* And which type it couples, which a platform can be told as
@@ -1642,7 +1646,15 @@ public:
 		if (dest_sel != nullptr) {
 			bool dropping = this->vehicle->type == VehicleType::Train && order != nullptr &&
 					order->IsType(OT_GOTO_STATION) && order->ShouldDecoupleOnDeparture();
-			dest_sel->SetDisplayedPlane(dropping ? 0 : 1);
+			/* A station order collects or drops, never both, so the two
+			 * places are free for the collecting buttons exactly when the
+			 * dropping ones are not wanted. A shed's order can do both and
+			 * gets neither of the collecting buttons: there the two readings
+			 * come to the same thing (Order::couple_search). */
+			bool collecting = this->vehicle->type == VehicleType::Train && order != nullptr &&
+					order->IsType(OT_GOTO_STATION) && order->ShouldGoToCouple();
+			dest_sel->SetDisplayedPlane(dropping ? 0 : (collecting ? 2 : 1));
+			if (collecting) this->SetWidgetLoweredState(WID_O_COUPLE_FIND, !order->ShouldSearchInRake());
 			/* It used to be greyed out with cargo distribution off, because
 			 * without it a station hands every load to everybody and saying
 			 * where the wagons are bound bought nothing. It buys something
@@ -1661,8 +1673,11 @@ public:
 		if (sell_sel != nullptr) {
 			bool dropping_any = this->vehicle->type == VehicleType::Train && order != nullptr &&
 					(order->IsType(OT_GOTO_STATION) || order->IsType(OT_GOTO_DEPOT)) && order->ShouldDecoupleOnDeparture();
-			sell_sel->SetDisplayedPlane(dropping_any ? 0 : 1);
+			bool collecting_here = this->vehicle->type == VehicleType::Train && order != nullptr &&
+					order->IsType(OT_GOTO_STATION) && order->ShouldGoToCouple();
+			sell_sel->SetDisplayedPlane(dropping_any ? 0 : (collecting_here ? 2 : 1));
 			if (dropping_any) this->SetWidgetLoweredState(WID_O_SELL_WAGONS, order->ShouldSellDecoupled());
+			if (collecting_here) this->SetWidgetLoweredState(WID_O_COUPLE_SEARCH, order->ShouldSearchInRake());
 		}
 
 		this->SetDirty();
@@ -2293,6 +2308,15 @@ public:
 				break;
 			}
 
+			case WID_O_COUPLE_FIND:
+			case WID_O_COUPLE_SEARCH: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr || !order->ShouldGoToCouple()) break;
+				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+						this->OrderGetSel(), MOF_COUPLE_SEARCH, widget == WID_O_COUPLE_SEARCH ? 1 : 0);
+				break;
+			}
+
 			case WID_O_SELL_TRAIN:
 				/* Held open and doing nothing; the selling is done from the
 				 * vehicle's own window now. Dark, so that it is plain the
@@ -2841,12 +2865,24 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 														SetStringTip(STR_ORDER_DECOUPLE_CARGO_DEST_NONE, STR_ORDER_DECOUPLE_CARGO_DEST_TOOLTIP), SetResize(1, 0),
 				NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 				EndContainer(),
+				/* The two places stood empty while the selected order collected
+				 * rather than dropped, and they are the only room in the window
+				 * for the two ways a collecting order can read its filters. */
+				NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_COUPLE_FIND), SetMinimalSize(124, 12), SetFill(1, 0),
+														SetStringTip(STR_ORDER_COUPLE_FIND, STR_ORDER_COUPLE_FIND_TOOLTIP), SetResize(1, 0),
 			EndContainer(),
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_O_SEL_SELL_WAGONS),
 				NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_SELL_WAGONS), SetMinimalSize(124, 12), SetFill(1, 0),
 														SetStringTip(STR_ORDER_SELL_WAGONS, STR_ORDER_SELL_WAGONS_TOOLTIP), SetResize(1, 0),
 				NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(124, 12), SetFill(1, 0), SetResize(1, 0),
 				EndContainer(),
+				/* The third plane, beside the empty panel and not inside it: a
+				 * panel is a container and its EndContainer() is its own. Put
+				 * inside, the selection kept two planes and was told to show a
+				 * third, and the window brought the game down on its first
+				 * repaint. */
+				NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_COUPLE_SEARCH), SetMinimalSize(124, 12), SetFill(1, 0),
+														SetStringTip(STR_ORDER_COUPLE_SEARCH, STR_ORDER_COUPLE_SEARCH_TOOLTIP), SetResize(1, 0),
 			EndContainer(),
 		EndContainer(),
 	EndContainer(),
