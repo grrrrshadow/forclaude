@@ -1450,9 +1450,15 @@ static const std::string_view _take_over_gui_keys[] = {
 	 * losing money" and "these orders are the same" warnings off as well, and
 	 * having turned all that off once they should not have to do it again
 	 * here. See also the whole [news_display] group below -- the news switches
-	 * themselves live there, and these are the ones that sit outside it. */
-	"vehicle_income_warn", "order_review_system", "lost_vehicle_warn", "old_vehicle_warn",
-	"errmsg_duration", "news_message_timeout", "coloured_news_year",
+	 * themselves live there, and these are the ones that sit outside it.
+	 *
+	 * One is deliberately not among them: the warning that a vehicle is losing
+	 * money. This build has it off and keeps it off whatever the player had,
+	 * because we know quite well why it was turned off -- a yard engine does
+	 * not earn and is not meant to. Anyone who turns it back on gets it only
+	 * for trains that work two different towns (WorthWarningAboutLosses()). */
+	"order_review_system", "lost_vehicle_warn", "old_vehicle_warn",
+	"news_message_timeout", "coloured_news_year",
 };
 
 /** Whole groups taken over as they stand. */

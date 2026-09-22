@@ -30,6 +30,7 @@
 #include "autoreplace_func.h"
 #include "autoreplace_gui.h"
 #include "station_base.h"
+#include "depot_base.h"
 #include "ai/ai.hpp"
 #include "depot_func.h"
 #include "network/network.h"
@@ -3366,6 +3367,66 @@ void Vehicle::RemoveFromShared()
 	this->previous_shared = nullptr;
 }
 
+/**
+ * Does this train work more than one town?
+ *
+ * A yard engine does not earn anything and is not meant to: it shunts wagons
+ * about one place, back and forth, and its books are red for ever. The warning
+ * that a vehicle is losing money is then not news, it is a standing complaint,
+ * and it was answered by turning the warning off for the whole game -- which is
+ * a plaster over everything else the player does want told about.
+ *
+ * This is the player's own line instead: warn only about a train whose orders
+ * name two different towns. One that never leaves a single town is working a
+ * yard and is expected to cost money; one that goes from town to town is a
+ * carrier and is supposed to pay. "Coupling and decoupling will be in every
+ * train's orders, I hope" -- so the orders themselves cannot be the test, and
+ * where the train goes can.
+ *
+ * Only trains are asked. A bus going round one town is an ordinary line that
+ * ought to pay for itself, and its warning is left as it was.
+ *
+ * @param v the vehicle
+ * @return whether the warning should be shown for it
+ */
+bool WorthWarningAboutLosses(const Vehicle *v)
+{
+	if (v->type != VehicleType::Train) return true;
+
+	const Town *first = nullptr;
+	for (const Order &o : v->Orders()) {
+		const Town *town = nullptr;
+		switch (o.GetType()) {
+			case OT_GOTO_STATION:
+			case OT_GOTO_WAYPOINT: {
+				const BaseStation *st = BaseStation::GetIfValid(o.GetDestination().ToStationID());
+				if (st != nullptr) town = st->town;
+				break;
+			}
+
+			case OT_GOTO_DEPOT: {
+				/* "The nearest one" names no place, so it says nothing about
+				 * where the train works. */
+				if (o.GetDepotActionType().Test(OrderDepotActionFlag::NearestDepot)) break;
+				const Depot *dep = Depot::GetIfValid(o.GetDestination().ToDepotID());
+				if (dep != nullptr) town = dep->town;
+				break;
+			}
+
+			default: break;
+		}
+		/* Two stations of one town point at the same town, so the towns
+		 * themselves are the comparison and Town need not be a whole type here. */
+		if (town == nullptr) continue;
+		if (first == nullptr) {
+			first = town;
+		} else if (first != town) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /** Yearly callback for vehicles. Updates statistics and shows advices about unprofitable vehicles. */
 static const IntervalTimer<TimerGameEconomy> _economy_vehicles_yearly({TimerGameEconomy::Trigger::Year, TimerGameEconomy::Priority::Vehicle}, [](auto)
 {
@@ -3374,7 +3435,7 @@ static const IntervalTimer<TimerGameEconomy> _economy_vehicles_yearly({TimerGame
 			/* show warning if vehicle is not generating enough income last 2 years (corresponds to a red icon in the vehicle list) */
 			Money profit = v->GetDisplayProfitThisYear();
 			if (v->economy_age >= VEHICLE_PROFIT_MIN_AGE && profit < 0) {
-				if (_settings_client.gui.vehicle_income_warn && v->owner == _local_company) {
+				if (_settings_client.gui.vehicle_income_warn && v->owner == _local_company && WorthWarningAboutLosses(v)) {
 					AddVehicleAdviceNewsItem(AdviceType::VehicleUnprofitable,
 						GetEncodedString(TimerGameEconomy::UsingWallclockUnits() ? STR_NEWS_VEHICLE_UNPROFITABLE_PERIOD : STR_NEWS_VEHICLE_UNPROFITABLE_YEAR, v->index, profit),
 						v->index);

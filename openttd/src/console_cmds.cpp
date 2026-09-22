@@ -6084,6 +6084,53 @@ static bool ConTestTypeFilter(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Say whether a train would be told it is losing money, and which towns its
+ * orders name. Usage: testvarovani <cislo vlaku>
+ *
+ * The rule is the player's: a train that never leaves one town is working a
+ * yard and is meant to cost money, one that goes from town to town is a
+ * carrier and is meant to pay. Nothing in the game shows which of the two it
+ * thinks a train is, and the warning itself comes once a year.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestLossWarning(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Say whether a train would be warned about losses. Usage: 'testvarovani <cislo vlaku>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		std::string towns;
+		for (const Order &o : t->Orders()) {
+			const Town *town = nullptr;
+			if (o.IsType(OT_GOTO_STATION) || o.IsType(OT_GOTO_WAYPOINT)) {
+				const BaseStation *st = BaseStation::GetIfValid(o.GetDestination().ToStationID());
+				if (st != nullptr) town = st->town;
+			} else if (o.IsType(OT_GOTO_DEPOT) && !o.GetDepotActionType().Test(OrderDepotActionFlag::NearestDepot)) {
+				const Depot *dep = Depot::GetIfValid(o.GetDestination().ToDepotID());
+				if (dep != nullptr) town = dep->town;
+			}
+			if (town == nullptr) continue;
+			std::string name = GetString(STR_TOWN_NAME, town->index);
+			if (towns.find(name) == std::string::npos) {
+				if (!towns.empty()) towns += ", ";
+				towns += name;
+			}
+		}
+		bool warn = WorthWarningAboutLosses(t);
+		IConsolePrint(CC_INFO, "testvarovani: vlak {} - mesta v rozkazech: {} - {}", t->unitnumber,
+				towns.empty() ? "zadne" : towns,
+				warn ? "VAROVALO BY" : "mlci, dela v jednom meste");
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testvarovani: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestExplainDepot(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
@@ -10640,6 +10687,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
 	IConsole::CmdRegister("testdepo",                ConTestExplainDepot);
+	IConsole::CmdRegister("testvarovani",            ConTestLossWarning);
 	IConsole::CmdRegister("testtypfiltr",            ConTestTypeFilter);
 	IConsole::CmdRegister("testpocet",               ConTestCoupleCount);
 	IConsole::CmdRegister("testvybervagonu",         ConTestPickWagon);
