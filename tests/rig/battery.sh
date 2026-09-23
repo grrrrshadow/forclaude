@@ -150,6 +150,14 @@ testnedobrzdil cesta stopka 3 odtah" 9000
 run_scene nedobrzdilles "setting vehicle.train_signal_overrun on
 vlak123 on
 testnedobrzdil cesta stopka 3 odtah les" 9000
+# How far the driver sees from the cab (vehicle.train_driver_sight). With
+# "best" he sees the red in time and stops; cut to five tiles he starts
+# braking too late for a ten-wagon train and, with the setting on, runs past
+# the red into the engine at the platform (srazka=1).
+run_scene nedobrzdilvidet5 "setting vehicle.train_signal_overrun on
+setting vehicle.train_driver_sight 1
+vlak123 on
+testnedobrzdil blok vozu 10 odtah" 9000
 run_scene nedobrzdilvyp "vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # Setting on, nobody touches the stop: the train is driven. It learns that the

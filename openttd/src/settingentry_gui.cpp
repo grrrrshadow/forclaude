@@ -758,6 +758,7 @@ SettingsContainer &GetSettingsTree()
 				physics->Add(new SettingEntry("vehicle.train_slow_for_level_crossing"));
 				physics->Add(new SettingEntry("vehicle.train_signal_overrun"));
 				physics->Add(new SettingEntry("vehicle.train_stop_brake_weaker"));
+				physics->Add(new SettingEntry("vehicle.train_driver_sight"));
 				physics->Add(new SettingEntry("vehicle.train_slope_steepness"));
 				physics->Add(new SettingEntry("vehicle.wagon_speed_limits"));
 				physics->Add(new SettingEntry("vehicle.no_engine_cargo"));

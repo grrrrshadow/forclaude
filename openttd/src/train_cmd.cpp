@@ -544,7 +544,13 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 static int GentleLookAhead(const Train *v)
 {
 	int64_t gentle = GentleBrakeRate(v);
-	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, 48 * TILE_SIZE));
+	/* How far the driver can see from the cab, the player's setting: as far
+	 * as braking needs ("best", which is what the game always did), or a
+	 * fixed number of tiles. Seeing less than braking needs is the point of
+	 * the shorter ones: the train starts to brake later. */
+	static constexpr int SIGHT_TILES[] = {48, 5, 10, 15, 20};
+	int sight = SIGHT_TILES[std::min<uint>(_settings_game.vehicle.train_driver_sight, std::size(SIGHT_TILES) - 1)];
+	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, sight * TILE_SIZE));
 }
 
 /**
