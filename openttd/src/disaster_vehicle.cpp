@@ -732,6 +732,10 @@ static bool DisasterTick_Submarine(DisasterVehicle *v)
  *    in a savegame, so it is used for this one too)
  * 3: climb back up
  * 4: fly off the map the way it came, and go.
+ * 10-17: no open ground in the picture the papers print (SpawnRescueHelicopter())
+ *    -- it circles over the wreck instead, heading for the n-th of eight points
+ *    round it (dest_tile is then the wreck's tile), until the same moment as
+ *    in state 2, and then flies off as from state 4.
  * See SpawnRescueHelicopter().
  * @copydoc DisasterVehicleTickProc
  */
@@ -756,9 +760,45 @@ static bool DisasterTick_RescueHelicopter(DisasterVehicle *v)
 	int land_x = TileX(v->dest_tile) * TILE_SIZE + TILE_SIZE / 2;
 	int land_y = TileY(v->dest_tile) * TILE_SIZE + TILE_SIZE / 2;
 
+	/* Whether it still has something to wait for: the wreck, not yet taken by
+	 * the tow, and not gone some other way. */
+	auto wreck_waiting = [v]() {
+		const Train *wreck = Train::GetIfValid(v->big_ufo_destroyer_target);
+		return wreck != nullptr && wreck->IsWrecked() && wreck->First() == wreck;
+	};
+
+	if (v->state >= 10 && v->state < 18) {
+		if (!wreck_waiting()) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vrtulnik: prestal krouzit nad ({},{}), odlita", TileX(v->dest_tile), TileY(v->dest_tile));
+			}
+			v->state = 4;
+			return true;
+		}
+		/* Three tiles out, eight points round, as close to a circle as eight
+		 * straight legs make. */
+		static constexpr int RING[8][2] = {{3, 0}, {2, 2}, {0, 3}, {-2, 2}, {-3, 0}, {-2, -2}, {0, -3}, {2, -2}};
+		int i = v->state - 10;
+		int tx = land_x + RING[i][0] * (int)TILE_SIZE;
+		int ty = land_y + RING[i][1] * (int)TILE_SIZE;
+		if (fly_towards(tx, ty)) v->state = 10 + (i + 1) % 8;
+		return true;
+	}
+
 	switch (v->state) {
 		case 0:
 			if (fly_towards(land_x, land_y)) v->state = 1;
+			return true;
+
+		case 20:
+			/* On its way to circle: the circling starts once it is over the
+			 * wreck. */
+			if (fly_towards(land_x, land_y)) {
+				v->state = 10;
+				if (_show_train_orientation) {
+					IConsolePrint(CC_INFO, "Vrtulnik: krouzi nad vrakem na ({},{}) - v zaberu novin neni kde pristat", TileX(v->dest_tile), TileY(v->dest_tile));
+				}
+			}
 			return true;
 
 		case 1: {
@@ -775,9 +815,8 @@ static bool DisasterTick_RescueHelicopter(DisasterVehicle *v)
 		}
 
 		case 2: {
+			if (wreck_waiting()) return true;
 			const Train *wreck = Train::GetIfValid(v->big_ufo_destroyer_target);
-			bool waiting = wreck != nullptr && wreck->IsWrecked() && wreck->First() == wreck;
-			if (waiting) return true;
 			v->state = 3;
 			if (_show_train_orientation) {
 				IConsolePrint(CC_INFO, "Vrtulnik: odlita od ({},{}) - {}", TileX(v->dest_tile), TileY(v->dest_tile),
@@ -939,10 +978,20 @@ static void Disaster_Helicopter_Init()
 
 /**
  * Send a helicopter to a wreck made by a train failing to brake
- * (vehicle.train_signal_overrun). It flies in from the west edge of the map,
- * comes down on the nearest open grass by the wreck, stands there with its
- * rotor turning, and leaves once the tow has coupled the wreck up. Only for
- * the look of it: it touches nothing and nothing touches it.
+ * (vehicle.train_signal_overrun). It flies in from the west, comes down on
+ * open grass by the wreck, stands there with its rotor turning, and leaves
+ * once the tow has coupled the wreck up. Only for the look of it: it touches
+ * nothing and nothing touches it.
+ *
+ * Where it lands is the player's rule: in the picture the papers print. A
+ * crash makes the papers with a small view of the map centred on the crash
+ * (news_gui.cpp, 426 by 70 pixels at the news zoom), and the helicopter is
+ * meant to be in it. So it lands only on flat open ground whose place on
+ * screen, the helicopter standing on it, falls inside that view -- six tile
+ * widths across and four rows down, in the player's count -- and a row more
+ * up and down than the view strictly shows. Nothing of the kind there -- forest, houses, track --
+ * and it circles over the wreck instead.
+ *
  * @param crash_tile where the trains collided
  * @param wreck the train that failed to brake, which the helicopter waits by
  */
@@ -950,18 +999,36 @@ void SpawnRescueHelicopter(TileIndex crash_tile, VehicleID wreck)
 {
 	if (!Vehicle::CanAllocateItem(3)) return;
 
-	/* The nearest flat open ground, ring by ring out to six tiles; on the
-	 * crash tile itself if there is none. */
+	/* The news view, in screen pixels at the news zoom, from the crash tile's
+	 * centre -- less a margin across, and a row of tiles (16 pixels) more up
+	 * and down than the view strictly holds: the player's call, a helicopter
+	 * standing at the edge of the picture with part of it showing is still
+	 * in the papers, and the strict view left it too few places to sit. */
+	constexpr int ROW = 16;
+	constexpr int HALF_WIDTH = 426 / 2 - 24;
+	constexpr int UP = 70 / 2 - 26 + ROW;
+	constexpr int DOWN = 70 / 2 - 4 + ROW;
+	int cx = TileX(crash_tile) * TILE_SIZE + TILE_SIZE / 2;
+	int cy = TileY(crash_tile) * TILE_SIZE + TILE_SIZE / 2;
+	int cz = GetSlopePixelZ(cx, cy);
+
 	TileIndex land = crash_tile;
 	bool found = false;
-	for (int r = 1; r <= 6 && !found; r++) {
-		for (int dy = -r; dy <= r && !found; dy++) {
-			for (int dx = -r; dx <= r && !found; dx++) {
-				if (std::max(std::abs(dx), std::abs(dy)) != r) continue;
-				TileIndex t = TileAddWrap(crash_tile, dx, dy);
-				if (t == INVALID_TILE) continue;
-				if (!IsTileType(t, TileType::Clear) || GetTileSlope(t) != SLOPE_FLAT) continue;
-				if (HasVehicleOnTile(t, [](const Vehicle *) { return true; })) continue;
+	int best = INT32_MAX;
+	for (int dy = -7; dy <= 7; dy++) {
+		for (int dx = -7; dx <= 7; dx++) {
+			TileIndex t = TileAddWrap(crash_tile, dx, dy);
+			if (t == INVALID_TILE) continue;
+			if (!IsTileType(t, TileType::Clear) || GetTileSlope(t) != SLOPE_FLAT) continue;
+			if (HasVehicleOnTile(t, [](const Vehicle *) { return true; })) continue;
+			int x = TileX(t) * TILE_SIZE + TILE_SIZE / 2;
+			int y = TileY(t) * TILE_SIZE + TILE_SIZE / 2;
+			int sx = ((y - cy) - (x - cx)) * 2;
+			int sy = (x - cx) + (y - cy) - (GetSlopePixelZ(x, y) - cz);
+			if (std::abs(sx) > HALF_WIDTH || sy < -UP || sy > DOWN) continue;
+			int score = std::abs(sx) + 2 * std::abs(sy);
+			if (score < best) {
+				best = score;
 				land = t;
 				found = true;
 			}
@@ -974,7 +1041,8 @@ void SpawnRescueHelicopter(TileIndex crash_tile, VehicleID wreck)
 	int x = std::max(-16 * (int)TILE_SIZE, ((int)TileX(land) - 24) * (int)TILE_SIZE);
 	int y = TileY(land) * TILE_SIZE + TILE_SIZE / 2;
 	DisasterVehicle *v = DisasterVehicle::Create(x, y, Direction::SW, ST_RESCUE_HELICOPTER, wreck);
-	v->dest_tile = land;
+	v->dest_tile = found ? land : crash_tile;
+	v->state = found ? 0 : 20;
 	DisasterVehicle *u = DisasterVehicle::Create(x, y, Direction::SW, ST_RESCUE_HELICOPTER_SHADOW);
 	v->SetNext(u);
 	DisasterVehicle *w = DisasterVehicle::Create(x, y, Direction::SW, ST_RESCUE_HELICOPTER_ROTORS);
@@ -982,8 +1050,13 @@ void SpawnRescueHelicopter(TileIndex crash_tile, VehicleID wreck)
 
 	extern bool _show_train_orientation;
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "Vrtulnik: leti k vraku {} na ({},{}), pristane na ({},{})", wreck.base(),
-				TileX(crash_tile), TileY(crash_tile), TileX(land), TileY(land));
+		if (found) {
+			IConsolePrint(CC_INFO, "Vrtulnik: leti k vraku {} na ({},{}), pristane na ({},{})", wreck.base(),
+					TileX(crash_tile), TileY(crash_tile), TileX(land), TileY(land));
+		} else {
+			IConsolePrint(CC_INFO, "Vrtulnik: leti k vraku {} na ({},{}), v zaberu novin neni volna trava - bude krouzit", wreck.base(),
+					TileX(crash_tile), TileY(crash_tile));
+		}
 	}
 }
 

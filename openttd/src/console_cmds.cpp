@@ -58,6 +58,7 @@
 #include "articulated_vehicles.h"
 #include "cargopacket.h"
 #include "station_cmd.h"
+#include "tree_cmd.h"
 #include "order_cmd.h"
 #include "order_func.h"
 #include "timetable_cmd.h"
@@ -6873,21 +6874,27 @@ static struct {
  * "odtah" adds a rescue engine on call in the depot, so that the wreck is
  * fetched and the helicopter's leaving and the second news can be read.
  *
- * Usage: testnedobrzdil <blok|cesta> [stopka <tiles short of the red>] [vozu <wagons behind, 3 by default>] [odtah]
+ * "les" plants trees on every open tile around the platform, so the
+ * helicopter finds nowhere in the papers' picture to land and circles.
+ *
+ * Usage: testnedobrzdil <blok|cesta> [stopka <tiles short of the red>] [vozu <wagons behind, 3 by default>] [odtah] [les]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestOverrun(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2 || (argv[1] != "blok" && argv[1] != "cesta")) {
-		IConsolePrint(CC_HELP, "Build the fail-to-brake scene. Usage: 'testnedobrzdil <blok|cesta> [stopka <policek pred cervenou>] [vozu <pocet>] [odtah]'.");
+		IConsolePrint(CC_HELP, "Build the fail-to-brake scene. Usage: 'testnedobrzdil <blok|cesta> [stopka <policek pred cervenou>] [vozu <pocet>] [odtah] [les]'.");
 		return true;
 	}
 	bool block = argv[1] == "blok";
 	int stop_before = -1;
 	uint wagons = 3;
 	bool with_tow = false;
+	bool forest = false;
 	for (size_t i = 2; i < argv.size(); i++) {
-		if (argv[i] == "odtah") {
+		if (argv[i] == "les") {
+			forest = true;
+		} else if (argv[i] == "odtah") {
 			with_tow = true;
 		} else if (argv[i] == "stopka" || argv[i] == "vozu") {
 			if (i + 1 >= argv.size()) return false;
@@ -6969,6 +6976,18 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 		}
 	}
 	UpdateSignalsInBuffer();
+
+	if (forest) {
+		uint planted = 0;
+		for (uint y = (y0 > 9 ? y0 - 9 : 0); y <= y0 + 9 && y < Map::SizeY() - 1; y++) {
+			for (uint x = x0 + 22; x <= x0 + LEN + 2 && x < Map::SizeX() - 1; x++) {
+				TileIndex t = TileXY(x, y);
+				if (!IsTileType(t, TileType::Clear)) continue;
+				if (Command<Commands::PlantTree>::Do(DoCommandFlag::Execute, t, t, 0xFF, false).Succeeded()) planted++;
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "testnedobrzdil: les - vysazeno {} policek.", planted);
+	}
 
 	auto build = [&](uint wagons) -> Train * {
 		auto [cost, veh, a, b, c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_loco, true, INVALID_CARGO, ClientID::Invalid);

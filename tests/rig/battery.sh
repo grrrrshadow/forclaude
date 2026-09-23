@@ -145,6 +145,11 @@ vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # The same with the setting off, the game as it was: the stop is the game's
 # own brake and the train stands short of the red (srazka=0).
+# The same with forest planted all round: nowhere in the papers' picture to
+# land, so the helicopter circles over the wreck until the tow has it.
+run_scene nedobrzdilles "setting vehicle.train_signal_overrun on
+vlak123 on
+testnedobrzdil cesta stopka 3 odtah les" 9000
 run_scene nedobrzdilvyp "vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # Setting on, nobody touches the stop: the train is driven, and a path signal
