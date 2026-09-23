@@ -8,6 +8,7 @@
 /** @file station_cmd.cpp Handling of station tiles. */
 
 #include "stdafx.h"
+#include "landscape.h"
 #include "core/flatset_type.hpp"
 #include "aircraft.h"
 #include "bridge_map.h"
@@ -3202,7 +3203,7 @@ bool SplitGroundSpriteForOverlay(const TileInfo *ti, SpriteID *ground, RailTrack
 
 	if (ti != nullptr) {
 		/* Decide snow/desert from tile */
-		switch (_settings_game.game_creation.landscape) {
+		switch (SnowLandscape()) {
 			case LandscapeType::Arctic:
 				snow_desert = (uint)ti->z > GetSnowLine() * TILE_HEIGHT;
 				break;
@@ -3791,7 +3792,7 @@ static void TileLoop_Station(TileIndex tile)
 			break;
 
 		case StationType::RoadWaypoint: {
-			switch (_settings_game.game_creation.landscape) {
+			switch (SnowLandscape()) {
 				case LandscapeType::Arctic:
 					if (IsRoadWaypointOnSnowOrDesert(tile) != (GetTileZ(tile) > GetSnowLine())) {
 						ToggleRoadWaypointOnSnowOrDesert(tile);

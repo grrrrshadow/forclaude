@@ -1775,6 +1775,8 @@ STR_CONFIG_SETTING_OIL_REF_EDGE_DISTANCE_HELPTEXT               :Omezení, jak d
 STR_CONFIG_SETTING_SNOWLINE_HEIGHT                              :Výška sněhové čáry: {STRING}
 STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT                     :Vyberte výšku, ve které začíná sníh v subarktické krajině. Sníh také ovlivňuje generování průmyslu a požadavky na růst měst. Lze upravit pouze pomocí Scénářového editoru nebo je jinak vypočítáván podle "pokrytí sněhem"
 
+STR_CONFIG_SETTING_TEMPERATE_SNOW                               :Sníh v mírném klimatu: {STRING}
+STR_CONFIG_SETTING_TEMPERATE_SNOW_HELPTEXT                      :Dát mírnému klimatu sněhovou čáru jako má arktida. Nad ní jsou zem, koleje, silnice, stromy, tunely i stanice zasněžené jako v arktidě a města tam založená staví arktické domy; pod ní zůstává mírná zelená krajina. Sady (NewGRF) kreslí jako dřív. Výška čáry vychází z pokrytí sněhem
 STR_CONFIG_SETTING_SNOW_COVERAGE                                :Pokrytí sněhem: {STRING}
 STR_CONFIG_SETTING_SNOW_COVERAGE_HELPTEXT                       :Vyberte přibližné množství sněhu na subarktické krajině. Sníh také ovlivňuje generaci průmyslu a požadavky na růst měst. Používá se pouze během generování mapy. Úroveň moře a pobřežní dlaždice nikdy nemají sníh.
 STR_CONFIG_SETTING_SNOW_COVERAGE_VALUE                          :{NUM}%

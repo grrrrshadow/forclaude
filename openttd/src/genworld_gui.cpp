@@ -534,15 +534,17 @@ struct GenerateLandscapeWindow : public Window {
 					WID_GL_MAX_HEIGHT_PULLDOWN, WID_GL_WATER_PULLDOWN);
 		}
 
-		/* Disable snowline if not arctic */
-		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_TEXT, _settings_newgame.game_creation.landscape != LandscapeType::Arctic);
+		/* Disable snowline if not arctic -- nor the temperate climate with snow on. */
+		const bool snowy = _settings_newgame.game_creation.landscape == LandscapeType::Arctic ||
+				(_settings_newgame.game_creation.landscape == LandscapeType::Temperate && _settings_newgame.game_creation.temperate_snow);
+		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_TEXT, !snowy);
 		/* Disable desert if not tropic */
 		this->SetWidgetDisabledState(WID_GL_DESERT_COVERAGE_TEXT, _settings_newgame.game_creation.landscape != LandscapeType::Tropic);
 
 		/* Set snow/rainforest selections */
 		int climate_plane = 0;
 		switch (_settings_newgame.game_creation.landscape) {
-			case LandscapeType::Temperate: climate_plane = 2; break;
+			case LandscapeType::Temperate: climate_plane = snowy ? 0 : 2; break;
 			case LandscapeType::Arctic:    climate_plane = 0; break;
 			case LandscapeType::Tropic:    climate_plane = 1; break;
 			case LandscapeType::Toyland:   climate_plane = 2; break;
@@ -557,8 +559,8 @@ struct GenerateLandscapeWindow : public Window {
 		}
 		this->SetWidgetDisabledState(WID_GL_START_DATE_DOWN, _settings_newgame.game_creation.starting_year <= CalendarTime::MIN_YEAR);
 		this->SetWidgetDisabledState(WID_GL_START_DATE_UP,   _settings_newgame.game_creation.starting_year >= CalendarTime::MAX_YEAR);
-		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_DOWN, _settings_newgame.game_creation.snow_coverage <= 0 || _settings_newgame.game_creation.landscape != LandscapeType::Arctic);
-		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_UP,   _settings_newgame.game_creation.snow_coverage >= 100 || _settings_newgame.game_creation.landscape != LandscapeType::Arctic);
+		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_DOWN, _settings_newgame.game_creation.snow_coverage <= 0 || !snowy);
+		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_UP,   _settings_newgame.game_creation.snow_coverage >= 100 || !snowy);
 		this->SetWidgetDisabledState(WID_GL_DESERT_COVERAGE_DOWN, _settings_newgame.game_creation.desert_coverage <= 0 || _settings_newgame.game_creation.landscape != LandscapeType::Tropic);
 		this->SetWidgetDisabledState(WID_GL_DESERT_COVERAGE_UP,   _settings_newgame.game_creation.desert_coverage >= 100 || _settings_newgame.game_creation.landscape != LandscapeType::Tropic);
 

@@ -843,6 +843,7 @@ SettingsContainer &GetSettingsTree()
 			genworld->Add(new SettingEntry("game_creation.average_height"));
 			genworld->Add(new SettingEntry("game_creation.tgen_smoothness"));
 			genworld->Add(new SettingEntry("game_creation.variety"));
+			genworld->Add(new SettingEntry("game_creation.temperate_snow"));
 			genworld->Add(new SettingEntry("game_creation.snow_coverage"));
 			genworld->Add(new SettingEntry("game_creation.snow_line_height"));
 			genworld->Add(new SettingEntry("game_creation.desert_coverage"));

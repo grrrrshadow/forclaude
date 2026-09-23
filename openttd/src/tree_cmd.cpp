@@ -838,7 +838,7 @@ static void TileLoop_Trees(TileIndex tile)
 	if (GetTreeGround(tile) == TreeGround::Shore) {
 		TileLoop_Water(tile);
 	} else {
-		switch (_settings_game.game_creation.landscape) {
+		switch (SnowLandscape()) {
 			case LandscapeType::Tropic: TileLoopTreesDesert(tile); break;
 			case LandscapeType::Arctic: TileLoopTreesAlps(tile);   break;
 			default: break;

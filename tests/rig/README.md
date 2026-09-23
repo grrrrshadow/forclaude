@@ -65,7 +65,9 @@ reaching for the content server to fetch the set); `marsmesta` and
 `marsmestacz` turn them on through `SCENE_NEWGAME`, as `klimamesta` does the
 towns of the other climates' houses (`economy.temperate_towns` and the
 three like it), which need no set at all: the houses of all four climates are
-in the base graphics.
+in the base graphics. The two snow scenes (`snihtemperate`, `snihvyp`) start
+a hilly temperate map the same way and need nothing but the base graphics
+either: the snowy ground, rails and roads are in the temperate base file.
 
 ## Memory errors: the rig does not see them
 

@@ -20,6 +20,10 @@
 #include "town_cmd.h"
 #include "town_map.h"
 #include "house.h"
+#include "clear_map.h"
+#include "tree_map.h"
+#include "rail_map.h"
+#include "road_map.h"
 #include "mars_houses.h"
 #include "spritecache.h"
 #include "table/sprites.h"
@@ -1254,6 +1258,83 @@ static void MoveCalendarTo(TimerGameCalendar::Year year)
 		TimerGameEconomy::SetDate(moved_economy, TimerGameEconomy::date_fract);
 	}
 	CalendarEnginesMonthlyLoop();
+}
+
+static std::string CountHousesBySource(TownID town);
+
+/**
+ * Snow in the temperate climate (SnowLandscape()). Once the tile loops have
+ * been round the map, every clear and tree tile from a step below the snow
+ * line up is snowy and none lower down is, rails and roads above the line
+ * are on snow, and a town founded above the line has the arctic houses
+ * unless told otherwise. With no snow in the game, not one snowy tile: the
+ * temperate climate as it always was. Usage: testsnih
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSnow(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Check the snow of the temperate climate against the snow line. Usage: 'testsnih'.");
+		return true;
+	}
+	const int line = GetSnowLine();
+	uint high = 0, high_snow = 0, low = 0, low_snow = 0, rail_high = 0, rail_high_snow = 0, road_high = 0, road_high_snow = 0;
+	for (TileIndex tile : Map::Iterate()) {
+		int z = GetTileZ(tile);
+		switch (GetTileType(tile)) {
+			case TileType::Clear:
+			case TileType::Trees: {
+				bool snow = IsTileType(tile, TileType::Clear) ? IsSnowTile(tile) : (GetTreeGround(tile) == TreeGround::SnowOrDesert || GetTreeGround(tile) == TreeGround::RoughSnow);
+				if (z >= line - 1) {
+					high++;
+					if (snow) high_snow++;
+				} else {
+					low++;
+					if (snow) low_snow++;
+				}
+				break;
+			}
+			case TileType::Railway:
+				if (z > line + 1) {
+					rail_high++;
+					if (GetRailGroundType(tile) == RailGroundType::SnowOrDesert) rail_high_snow++;
+				}
+				break;
+			case TileType::Road:
+				if (GetTileMaxZ(tile) > line + 1 && !IsRoadDepot(tile)) {
+					road_high++;
+					if (IsOnSnowOrDesert(tile)) road_high_snow++;
+				}
+				break;
+			default: break;
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testsnih: snih {}, cara {}: nad ni {} policek zeme a stromu, z toho zasnezenych {}; pod ni {}, zasnezenych {}; koleje nad {}/{}, silnice nad {}/{}",
+			HasSnow() ? "je" : "neni", line, high, high_snow, low, low_snow, rail_high_snow, rail_high, road_high_snow, road_high);
+	if (HasSnow()) {
+		if (high_snow != high) IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - {} policek nad carou bez snehu.", high - high_snow);
+		if (low_snow != 0) IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - {} policek pod carou se snehem.", low_snow);
+		if (rail_high_snow != rail_high) IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - {} kolejovych policek nad carou bez snehu.", rail_high - rail_high_snow);
+		if (road_high_snow != road_high) IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - {} silnicnich policek nad carou bez snehu.", road_high - road_high_snow);
+	} else if (high_snow + low_snow != 0) {
+		IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - {} zasnezenych policek, a snih ve hre neni.", high_snow + low_snow);
+	}
+
+	uint32_t arctic = HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic);
+	for (const Town *t : Town::Iterate()) {
+		bool above = GetTileMaxZ(t->xy) > HighestSnowLine();
+		std::string sets;
+		for (uint i = 0; i < t->num_house_sets; i++) {
+			if (!sets.empty()) sets += " + ";
+			sets += HouseSourceName(t->house_sets[i]);
+		}
+		IConsolePrint(CC_DEFAULT, "testsnih: mesto {} '{}' {} carou, domy z [{}], stoji {}", t->index.base(), t->GetCachedName(), above ? "nad" : "pod", sets.empty() ? "vsech" : sets, CountHousesBySource(t->index));
+		if (HasSnow() && _settings_game.game_creation.landscape == LandscapeType::Temperate && above && !(t->num_house_sets == 1 && t->house_sets[0] == arctic)) {
+			IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - mesto {} nad carou nema arkticke domy.", t->index.base());
+		}
+		if (!HasSnow() && t->num_house_sets != 0) IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - mesto {} ma zvolene sady, a nikdo mu je nedal.", t->index.base());
+	}
+	return true;
 }
 
 /**
@@ -11671,6 +11752,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);
 	IConsole::CmdRegister("testmesta",               ConTestTowns);
 	IConsole::CmdRegister("testdomy",                ConTestHouseSets);
+	IConsole::CmdRegister("testsnih",                ConTestSnow);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);

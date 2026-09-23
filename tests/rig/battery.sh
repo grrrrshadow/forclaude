@@ -1275,3 +1275,16 @@ testdomy" 100
 SCENE_NEWGAME='setting_newgame economy.temperate_towns 2
 setting_newgame economy.tropic_towns 1
 setting_newgame economy.toyland_towns 3' run_scene klimamesta "testdomy mapa" 100
+
+# Snow in the temperate climate (game_creation.temperate_snow): a hilly
+# temperate map with the snow line at 40% coverage. After four rounds of the
+# tile loop every clear and tree tile from a step below the line up has to be
+# snowy and none lower down, and the towns founded above the line have to be
+# of the arctic houses. The second scene is the same map with snow off: not
+# one snowy tile, no town with a set -- the temperate climate as it always was.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame difficulty.terrain_type 3
+setting_newgame game_creation.temperate_snow 1
+setting_newgame game_creation.snow_coverage 40' run_scene snihtemperate "testza 1000 testsnih" 1200
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame difficulty.terrain_type 3' run_scene snihvyp "testza 1000 testsnih" 1200

@@ -8,6 +8,7 @@
 /** @file rail_cmd.cpp Handling of rail tiles. */
 
 #include "stdafx.h"
+#include "landscape.h"
 #include "viewport_func.h"
 #include "command_func.h"
 #include "depot_base.h"
@@ -2917,7 +2918,7 @@ static void TileLoop_Rail(TileIndex tile)
 		return;
 	}
 
-	switch (_settings_game.game_creation.landscape) {
+	switch (SnowLandscape()) {
 		case LandscapeType::Arctic: {
 			auto [slope, z] = GetTileSlopeZ(tile);
 			bool half = false;

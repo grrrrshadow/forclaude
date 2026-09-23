@@ -636,6 +636,31 @@ uint8_t GetSnowLine()
 }
 
 /**
+ * The climate as far as snow goes. The temperate climate with snow on
+ * (game_creation.temperate_snow) has snow above the snow line as the arctic
+ * has -- on the ground, on rails and roads, under trees, at tunnels and on
+ * stations -- and the temperate green below it; everything that decides
+ * whether a tile is snowy by the climate asks here instead. What a NewGRF is
+ * told about the terrain (GetTerrainType()) is not asked here: a set draws in
+ * the temperate climate as it always did.
+ * @return the arctic for the arctic and for the temperate climate with snow, the climate played otherwise
+ */
+LandscapeType SnowLandscape()
+{
+	if (_settings_game.game_creation.landscape == LandscapeType::Temperate && _settings_game.game_creation.temperate_snow) return LandscapeType::Arctic;
+	return _settings_game.game_creation.landscape;
+}
+
+/**
+ * Does this game have snow above a snow line?
+ * @return whether it does
+ */
+bool HasSnow()
+{
+	return SnowLandscape() == LandscapeType::Arctic;
+}
+
+/**
  * Get the highest possible snow line height, either variable or static.
  * @return the highest snow line height.
  * @ingroup SnowLineGroup
@@ -1715,7 +1740,7 @@ bool GenerateLandscape(uint8_t mode)
 	MarkWholeScreenDirty();
 	IncreaseGeneratingWorldProgress(GenWorldProgress::Landscape);
 
-	switch (_settings_game.game_creation.landscape) {
+	switch (SnowLandscape()) {
 		case LandscapeType::Arctic:
 			CalculateSnowLine();
 			break;

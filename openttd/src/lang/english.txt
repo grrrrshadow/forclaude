@@ -1688,6 +1688,8 @@ STR_CONFIG_SETTING_OIL_REF_EDGE_DISTANCE_HELPTEXT               :Limit for how f
 STR_CONFIG_SETTING_SNOWLINE_HEIGHT                              :Snow line height: {STRING2}
 STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT                     :Choose at what height snow starts in sub-arctic landscape. Snow also affects industry generation and town growth requirements. Can only be modified via Scenario Editor or is otherwise calculated via "snow coverage"
 
+STR_CONFIG_SETTING_TEMPERATE_SNOW                               :Snow in the temperate climate: {STRING2}
+STR_CONFIG_SETTING_TEMPERATE_SNOW_HELPTEXT                      :Give the temperate climate a snow line as the arctic has. Above it the ground, rails, roads, trees, tunnels and stations are snowy as in the arctic and towns founded there build the arctic houses; below it the land stays temperate green. Sets (NewGRFs) draw as they always did. The line's height comes from the snow coverage
 STR_CONFIG_SETTING_SNOW_COVERAGE                                :Snow coverage: {STRING2}
 STR_CONFIG_SETTING_SNOW_COVERAGE_HELPTEXT                       :Choose the approximate amount of snow on the sub-arctic landscape. Snow also affects industry generation and town growth requirements. Only used during map generation. Sea level and coast tiles never have snow
 STR_CONFIG_SETTING_SNOW_COVERAGE_VALUE                          :{NUM}%

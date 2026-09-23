@@ -8,6 +8,7 @@
 /** @file road_cmd.cpp Commands related to road tiles. */
 
 #include "stdafx.h"
+#include "landscape.h"
 #include "road.h"
 #include "road_internal.h"
 #include "viewport_func.h"
@@ -2017,7 +2018,7 @@ static_assert(lengthof(_town_road_types_2) == NUM_HOUSE_ZONES);
 /** @copydoc TileLoopProc */
 static void TileLoop_Road(TileIndex tile)
 {
-	switch (_settings_game.game_creation.landscape) {
+	switch (SnowLandscape()) {
 		case LandscapeType::Arctic: {
 			/* Roads use the snow level of their maximum height minus one, unless flat. */
 			int tile_z = (std::get<Slope>(GetFoundationSlope(tile)) == SLOPE_FLAT) ? GetTileMaxZ(tile) : GetTileMaxZ(tile) - 1;

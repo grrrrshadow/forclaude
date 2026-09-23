@@ -29,6 +29,8 @@ struct SnowLine {
 bool IsSnowLineSet();
 void SetSnowLine(std::unique_ptr<SnowLine> &&snow_line);
 uint8_t GetSnowLine();
+LandscapeType SnowLandscape();
+bool HasSnow();
 uint8_t HighestSnowLine();
 uint8_t LowestSnowLine();
 void ClearSnowLine();

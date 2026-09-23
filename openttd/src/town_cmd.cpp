@@ -2064,6 +2064,12 @@ static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSi
 	 * so that the first ones are of it too. */
 	t->num_house_sets = 0;
 	t->house_sets.fill(0);
+	/* A town founded above the temperate snow line (SnowLandscape()) is of
+	 * the arctic houses unless told otherwise -- snowy roofs on the snow; the
+	 * player changes it in the town window like any town's. */
+	if (house_set == 0 && _settings_game.game_creation.landscape == LandscapeType::Temperate && HasSnow() && GetTileMaxZ(tile) > HighestSnowLine()) {
+		house_set = HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic);
+	}
 	if (house_set != 0) t->house_sets[t->num_house_sets++] = house_set;
 
 	t->larger_town = city;
@@ -2886,6 +2892,13 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 	}
 	HouseZones zones = zone | climate_here;
 
+	/* Where the temperate climate has snow (SnowLandscape()), a spot above
+	 * the snow line is one for the snowy arctic houses, as far as the sets
+	 * a town chose go (ClimateHousesFor()); the climate played stays what it
+	 * is for the houses of every-house towns and of GRFs. */
+	HouseZones sets_here = climate_here;
+	if (_settings_game.game_creation.landscape == LandscapeType::Temperate && HasSnow() && maxz > HighestSnowLine()) sets_here.Set(HouseZone::ClimateSubarcticAboveSnow);
+
 	/* bits 0-4 are used
 	 * bits 11-15 are used
 	 * bits 5-10 are not used. */
@@ -2930,7 +2943,7 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 			 * (TownBuildsHouse()) -- an original house of another climate is
 			 * built here as it is there. */
 			if (!hs.building_availability.All(zone)) continue;
-			if (!TownBuildsHouse(t, hs, climate_here) || !HouseSetCanBuild(hs)) continue;
+			if (!TownBuildsHouse(t, hs, sets_here) || !HouseSetCanBuild(hs)) continue;
 			uint32_t source = HouseSourceOf(hs);
 			bool in_years = TimerGameCalendar::year >= hs.min_year && TimerGameCalendar::year <= hs.max_year;
 			if (in_years && std::find(dated_sets.begin(), dated_sets.begin() + num_dated_sets, source) == dated_sets.begin() + num_dated_sets) {
@@ -3298,7 +3311,11 @@ bool TownBuildsFrom(const Town *t, uint32_t source)
 bool TownBuildsHouse(const Town *t, const HouseSpec &hs, HouseZones here)
 {
 	if (hs.grf_prop.grffile != nullptr) {
-		return TownBuildsFrom(t, hs.grf_prop.grfid) && (here.None() || hs.building_availability.Any(here));
+		/* A GRF's house for the climate the game is in; snow above the
+		 * temperate snow line says nothing to a GRF (SnowLandscape()). */
+		HouseZones grf_here = here;
+		if (_settings_game.game_creation.landscape != LandscapeType::Arctic) grf_here.Reset(HouseZone::ClimateSubarcticAboveSnow);
+		return TownBuildsFrom(t, hs.grf_prop.grfid) && (grf_here.None() || hs.building_availability.Any(grf_here));
 	}
 	for (uint i = 0; i < t->num_house_sets; i++) {
 		if (t->house_sets[i] < HOUSE_SOURCE_CLIMATE) continue;

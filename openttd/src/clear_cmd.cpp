@@ -287,7 +287,7 @@ static void TileLoop_Clear(TileIndex tile)
 {
 	AmbientSoundEffect(tile);
 
-	switch (_settings_game.game_creation.landscape) {
+	switch (SnowLandscape()) {
 		case LandscapeType::Tropic: TileLoopClearDesert(tile); break;
 		case LandscapeType::Arctic: TileLoopClearAlps(tile);   break;
 		default: break;

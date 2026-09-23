@@ -11,6 +11,7 @@
  */
 
 #include "stdafx.h"
+#include "landscape.h"
 #include "viewport_func.h"
 #include "command_func.h"
 #include "town.h"
@@ -1834,7 +1835,7 @@ static void GetTileDesc_TunnelBridge(TileIndex tile, TileDesc &td)
 static void TileLoop_TunnelBridge(TileIndex tile)
 {
 	bool snow_or_desert = HasTunnelBridgeSnowOrDesert(tile);
-	switch (_settings_game.game_creation.landscape) {
+	switch (SnowLandscape()) {
 		case LandscapeType::Arctic: {
 			/* As long as we do not have a snow density, we want to use the density
 			 * from the entry edge. For tunnels this is the lowest point for bridges the highest point.
