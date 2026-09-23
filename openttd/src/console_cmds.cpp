@@ -10534,6 +10534,12 @@ static void ConDumpCargoTypes()
 				if (e->info.climates.Any()) carriers_buildable++;
 			}
 		}
+		/* How big a cargo icon is, at the zoom the game is drawn at: what an
+		 * icon of the cargo's own has to match. */
+		for (const CargoSpec *cs : CargoSpec::Iterate()) {
+			Dimension d = GetSpriteSize(cs->GetCargoIcon());
+			IConsolePrint(CC_DEFAULT, "  cargo icon {}: {} x {} px (sprite {})", GetString(cs->name), d.width, d.height, cs->GetCargoIcon());
+		}
 		IConsolePrint(CC_DEFAULT, "  Road vehicles on wagons (ROLA): slot {}, in cargo mask: {}, in the refit mask of {} of {} wagon types; car carriers {} ({} available in this climate)",
 				_road_vehicle_cargo, _cargo_mask.Test(_road_vehicle_cargo) ? "yes" : "NO", offering, wagons, carriers, carriers_buildable);
 		/* Which ones they are. A car carrier is meant to be one of ours; a
