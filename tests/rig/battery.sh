@@ -25,6 +25,12 @@ H=$S/ttdhome
 #
 # Changing any of these makes a different map and therefore different numbers
 # in the stable file: it is a re-baselining, not a regression.
+# The Mars towns are off for every scene but their own: they are made on top
+# of the other towns and would move everything after them on the map, and
+# with them off the game does not reach for the content server to fetch the
+# Mars houses either (FetchMarsHousesIfMissing()). A scene that wants them
+# says so in SCENE_NEWGAME, which run_scene puts in before the newgame line.
+#
 # The seed is handed to the newgame command itself, not left in the settings
 # below. That command carries a seed of its own, and when it is not given one
 # it puts a fresh random number into the setting before generating: the seed
@@ -45,6 +51,7 @@ setting_newgame difficulty.terrain_type 0
 setting_newgame difficulty.quantity_sea_lakes 0
 setting_newgame difficulty.number_towns 2
 setting_newgame difficulty.industry_density 4
+setting_newgame economy.mars_towns 0
 newgame 1'
 
 # This build keeps its config beside its own binary and under a name of its
@@ -83,7 +90,9 @@ run_scene() { # name scr-content ticks extra-args
   printf 'setting vehicle.rescue_wait_days 90\n%s\n' "$scr" > $H/.openttd/scripts/game_start.scr
   # A scene played from a save must not have autoexec start a new game over it;
   # that silently ran every save scene on a fresh map for weeks.
-  case "$*" in *-g*) : > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr ;; esac
+  local newgame=$NEWGAME
+  [ -n "$SCENE_NEWGAME" ] && newgame=${NEWGAME/$'\n'newgame 1/$'\n'$SCENE_NEWGAME$'\n'newgame 1}
+  case "$*" in *-g*) : > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$newgame" > $H/.openttd/scripts/autoexec.scr ;; esac
   HOME=$H timeout 300 $S/build/openttd -vnull:ticks=$ticks -snull -mnull "$@" > $S/reg_$name.log 2>&1
   cp "$CFG_KEEP" "$CFG"
   local spoj=$(grep -c 'spojeno' $S/reg_$name.log)
@@ -1231,3 +1240,13 @@ testdomy okno 0 klima
 testdomy rust 0 30
 testdomy rust 1 30
 testdomy" 100 -c $DOMY2_CFG
+
+# The Mars towns of a new map (economy.mars_towns, three by default in the
+# game): three small towns among the others built of the Mars houses alone,
+# named for Mars -- in Czech when the towns are named in Czech (the second
+# scene) -- and no Mars house in any other town. The Mars houses are put into
+# the new game by the game itself, from the home's newgrf/, no config needed.
+SCENE_NEWGAME='setting_newgame economy.mars_towns 3' run_scene marsmesta "testdomy
+testdomy mars" 100
+SCENE_NEWGAME='setting_newgame economy.mars_towns 3
+setting_newgame game_creation.town_name 15' run_scene marsmestacz "testdomy mars" 100

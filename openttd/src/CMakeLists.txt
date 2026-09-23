@@ -270,6 +270,8 @@ add_files(
     map.cpp
     map_func.h
     map_type.h
+    mars_houses.cpp
+    mars_houses.h
     misc.cpp
     misc_cmd.cpp
     misc_cmd.h

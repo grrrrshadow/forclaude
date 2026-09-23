@@ -676,6 +676,7 @@ struct EconomySettings {
 	uint8_t town_growth_rate; ///< town growth rate
 	uint8_t larger_towns; ///< the number of cities to build. These start off larger and grow twice as fast
 	uint8_t initial_city_size; ///< multiplier for the initial size of the cities compared to towns
+	uint8_t mars_towns; ///< how many small towns of the Mars houses a new map gets, see mars_houses.h
 	TownLayout town_layout; ///< select town layout, @see TownLayout
 	TownCargoGenMode town_cargogen_mode; ///< algorithm for generating cargo from houses, @see TownCargoGenMode
 	bool allow_town_roads; ///< towns are allowed to build roads (always allowed when generating world / in SE)

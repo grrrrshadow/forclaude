@@ -2288,6 +2288,8 @@ STR_CONFIG_SETTING_LARGER_TOWNS_VALUE                           :1 z {COMMA}
 STR_CONFIG_SETTING_LARGER_TOWNS_DISABLED                        :Žádné
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER                         :Činitel základní velikosti města: {STRING}
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Průměrná velikost větších měst v porovnání s ostatními městy na začátku hry
+STR_CONFIG_SETTING_MARS_TOWNS                                   :Marsovská města: {STRING}
+STR_CONFIG_SETTING_MARS_TOWNS_HELPTEXT                          :Kolik malých měst z marsovských domů dostane nová mapa mezi ostatní města. Domy jsou z OpenGFX Mars Houses, které si hra sama stáhne, když je nemá; bez nich se žádné marsovské město nezaloží. Marsovské domy se staví jen v marsovských městech -- kterékoli jiné město se na ně dá přepnout v okně města („Domy z“)
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE                            :Minimální vzdálenost mezi městy: {STRING}
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE_HELPTEXT                   :Nastav minimální vzdálenost mezi městy pro generování mapy a náhodné zakládání
 

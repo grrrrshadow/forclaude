@@ -34,6 +34,7 @@
 #include "tunnelbridge_map.h"
 #include "strings_func.h"
 #include "newgrf_config.h"
+#include "mars_houses.h"
 #include "window_func.h"
 #include "string_func.h"
 #include "newgrf_cargo.h"
@@ -2470,6 +2471,28 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 		if (CreateRandomTown(20, townnameparts, TownSize::Random, city, layout) != nullptr) current_number++; // If creation was successful, raise a flag.
 	} while (--total);
 
+	/* The Mars towns (economy.mars_towns): small towns of the Mars houses
+	 * among the others, on a new map and when the game has the Mars houses
+	 * (mars_houses.h). They are made after the others and on top of their
+	 * number, so the rest of the map is made as it would be without them.
+	 * The first three are named for Mars; any after that as any other town. */
+	std::vector<uint32_t> sources = AvailableHouseSources();
+	if (!number.has_value() && std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end()) {
+		for (uint i = 0; i < _settings_game.economy.mars_towns; i++) {
+			if (!GenerateTownName(_random, &townnameparts, &town_names)) continue;
+			Town *t = CreateRandomTown(20, townnameparts, TownSize::Small, false, layout, MARS_HOUSES_GRFID);
+			if (t == nullptr) continue;
+			current_number++;
+			std::optional<std::string> name = GetMarsTownName(town_names);
+			if (name.has_value()) {
+				t->name = *name;
+				t->cached_name.clear();
+				t->UpdateVirtCoord();
+				town_names.insert(*name);
+			}
+		}
+	}
+
 	town_names.clear();
 
 	/* Build the town k-d tree again to make sure it's well balanced */
@@ -2878,6 +2901,10 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 		if (!hs.building_availability.All(zones)) continue;
 		if (!by_sets) {
 			if (!hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID) continue;
+			/* The Mars houses are the game's to place, in its Mars towns and
+			 * in towns the player ticked them for; a town of every house
+			 * builds as if the game did not have them (mars_houses.h). */
+			if (hs.grf_prop.grffile != nullptr && hs.grf_prop.grfid == MARS_HOUSES_GRFID) continue;
 		} else {
 			uint32_t source = HouseSourceOf(hs);
 			if (!TownBuildsFrom(t, source) || !HouseSetCanBuild(hs)) continue;

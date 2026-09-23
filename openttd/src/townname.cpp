@@ -977,3 +977,25 @@ void GenerateTownNameString(StringBuilder &builder, size_t lang, uint32_t seed)
 	assert(lang < std::size(_town_name_generators));
 	return _town_name_generators[lang](builder, seed);
 }
+
+/**
+ * A name for a Mars town (economy.mars_towns) that no town has yet: in Czech
+ * when the game names its towns in Czech, in English otherwise. The game's
+ * setting decides, not the player's language, as the name is part of the
+ * game and the same for everyone in it. There are three of them; a Mars town
+ * after those is named as any other town.
+ * @param used the names the towns have already
+ * @return the name, or std::nullopt when all three are taken
+ */
+std::optional<std::string> GetMarsTownName(const TownNames &used)
+{
+	static const std::string_view ENGLISH[] = {"Elon Musk City", "SpaceX Metropole", "Falcon Village"};
+	static const std::string_view CZECH[] = {"Falconova Lhota", "Elonmuskov", "SpaceX město"};
+
+	uint8_t lang = _settings_game.game_creation.town_name;
+	bool czech = lang < std::size(_town_name_generators) && _town_name_generators[lang] == MakeCzechTownName;
+	for (std::string_view name : czech ? std::span<const std::string_view>(CZECH) : std::span<const std::string_view>(ENGLISH)) {
+		if (!used.contains(std::string{name})) return std::string{name};
+	}
+	return std::nullopt;
+}

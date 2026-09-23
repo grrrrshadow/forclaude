@@ -20,6 +20,7 @@
 #include "town_cmd.h"
 #include "town_map.h"
 #include "house.h"
+#include "mars_houses.h"
 #include "spritecache.h"
 #include "table/sprites.h"
 #include "core/string_consumer.hpp"
@@ -1319,6 +1320,9 @@ static std::string CountHousesBySource(TownID town)
  *
  * - testdomy: the sets there are to choose from, and every town's choice and
  *   houses by set;
+ * - testdomy mars: the Mars towns of a new map -- as many as the setting
+ *   says when the game has the Mars houses, each all Mars, and no Mars house
+ *   in any town of every house;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
  * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
@@ -1338,7 +1342,7 @@ static std::string CountHousesBySource(TownID town)
 static bool ConTestHouseSets(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Themed towns. Usage: 'testdomy', 'testdomy rok <rok>', 'testdomy okno <mesto> <sada>', 'testdomy rust <mesto> <kolikrat>', 'testdomy zaloz <x> <y> <sada>'.");
+		IConsolePrint(CC_HELP, "Themed towns. Usage: 'testdomy', 'testdomy mars', 'testdomy rok <rok>', 'testdomy okno <mesto> <sada>', 'testdomy rust <mesto> <kolikrat>', 'testdomy zaloz <x> <y> <sada>'.");
 		return true;
 	}
 	if (argv.size() == 1) {
@@ -1354,6 +1358,38 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "testdomy: mesto {} domy z [{}], stoji {}", t->index.base(), sets.empty() ? "vsech" : sets, CountHousesBySource(t->index));
 		}
+		return true;
+	}
+
+	if (argv[1] == "mars") {
+		/* The Mars towns of a new map (economy.mars_towns): as many as the
+		 * setting says when the game has the Mars houses, none when not; each
+		 * of them all Mars; and no Mars house in a town of every house. */
+		std::vector<uint32_t> sources = AvailableHouseSources();
+		bool have = std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end();
+		uint mars_towns = 0;
+		for (const Town *t : Town::Iterate()) {
+			bool mars_town = t->num_house_sets == 1 && t->house_sets[0] == MARS_HOUSES_GRFID;
+			uint mars = 0, other = 0;
+			for (TileIndex tile : Map::Iterate()) {
+				if (!IsTileType(tile, TileType::House) || GetTownIndex(tile) != t->index) continue;
+				if (HouseSourceOf(*HouseSpec::Get(GetHouseType(tile))) == MARS_HOUSES_GRFID) {
+					mars++;
+				} else {
+					other++;
+				}
+			}
+			if (mars_town) {
+				mars_towns++;
+				IConsolePrint(CC_DEFAULT, "testdomy: marsovske mesto {} '{}': {} policek marsovskych domu, {} jinych", t->index.base(), t->GetCachedName(), mars, other);
+				if (other > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - marsovske mesto ma domy odjinud.");
+			} else if (t->num_house_sets == 0 && mars > 0) {
+				IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mesto {} vsech domu postavilo {} policek marsovskych domu.", t->index.base(), mars);
+			}
+		}
+		uint want = have ? _settings_game.economy.mars_towns : 0;
+		IConsolePrint(CC_DEFAULT, "testdomy: marsovske domy {}, marsovskych mest {} z {}", have ? "ve hre" : "nejsou", mars_towns, want);
+		if (mars_towns != want) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - marsovskych mest ma byt {}.", want);
 		return true;
 	}
 

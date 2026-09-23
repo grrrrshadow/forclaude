@@ -22,6 +22,7 @@
 #include "textfile_gui.h"
 #include "thread.h"
 #include "newgrf_config.h"
+#include "mars_houses.h"
 #include "newgrf_text.h"
 
 #include "fileio_func.h"
@@ -411,12 +412,30 @@ void AppendToGRFConfigList(GRFConfigList &dst, std::unique_ptr<GRFConfig> &&el)
 
 
 /**
+ * Put the Mars houses into a new game's sets, when the game has them and the
+ * player has not put them there already: the game's own set, which its town
+ * window always offers (see mars_houses.h). A savegame keeps them like any
+ * other set; a game loaded from one has what it was saved with.
+ * @param dst the sets of the new game
+ */
+static void AppendMarsHouses(GRFConfigList &dst)
+{
+	const GRFConfig *mars = FindGRFConfig(MARS_HOUSES_GRFID, FindGRFConfigMode::NewestValid);
+	if (mars == nullptr) return;
+	for (const auto &c : dst) {
+		if (c->ident.grfid == MARS_HOUSES_GRFID) return;
+	}
+	AppendToGRFConfigList(dst, std::make_unique<GRFConfig>(*mars));
+}
+
+/**
  * Reset the current GRF Config to either blank or newgame settings.
  * @param defaults Whether configure to fully load the copied NewGRFs.
  */
 void ResetGRFConfig(bool defaults)
 {
 	CopyGRFConfigList(_grfconfig, _grfconfig_newgame, !defaults);
+	if (defaults) AppendMarsHouses(_grfconfig);
 	AppendStaticGRFConfigs(_grfconfig);
 }
 

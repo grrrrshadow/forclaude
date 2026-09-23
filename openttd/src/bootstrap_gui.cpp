@@ -19,6 +19,7 @@
 #include "error.h"
 #include "fontcache.h"
 #include "gfx_func.h"
+#include "mars_houses.h"
 #include "network/network.h"
 #include "network/network_content_gui.h"
 #include "openttd.h"
@@ -150,6 +151,8 @@ public:
 	{
 	}
 
+	uint completed_files = 0; ///< How many of #total_files are down.
+
 	void Close([[maybe_unused]] int data = 0) override
 	{
 		/* If we are not set to exit the game, it means the bootstrap failed. */
@@ -161,6 +164,12 @@ public:
 
 	void OnDownloadComplete(ContentID) override
 	{
+		/* The Mars houses may come down with the graphics (see
+		 * BootstrapAskForDownloadWindow::OnConnect()): everything asked for
+		 * is down before the game goes on. A download that is done is marked
+		 * so, and a retry takes only what is not, so each file ends here once. */
+		if (++this->completed_files < this->total_files) return;
+
 		/* We have completed downloading. We can trigger finding the right set now. */
 		BaseGraphics::FindSets();
 
@@ -269,12 +278,28 @@ public:
 			return;
 		}
 
+		/* The Mars houses come down with the graphics (mars_houses.h), the
+		 * player of a first start downloading once. Asked for first, so that
+		 * the answer is in -- and they are selected -- before the graphics'
+		 * answer starts the download. */
+		ContentVector cv;
+		auto mars = std::make_unique<ContentInfo>();
+		mars->type = ContentType::NewGRF;
+		mars->unique_id = std::byteswap(MARS_HOUSES_GRFID);
+		cv.push_back(std::move(mars));
+		_network_content_client.RequestContentList(&cv, false);
+
 		/* Once connected, request the metadata. */
 		_network_content_client.RequestContentList(ContentType::BaseGraphics);
 	}
 
 	void OnReceiveContentInfo(const ContentInfo &ci) override
 	{
+		if (ci.type == ContentType::NewGRF) {
+			if (ci.unique_id == std::byteswap(MARS_HOUSES_GRFID) && ci.state == ContentInfo::State::Unselected) _network_content_client.Select(ci.id);
+			return;
+		}
+
 		/* And once the meta data is received, start downloading it. */
 		_network_content_client.Select(ci.id);
 		new BootstrapContentDownloadStatusWindow();

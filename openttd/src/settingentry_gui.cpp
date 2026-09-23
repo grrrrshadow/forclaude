@@ -883,6 +883,7 @@ SettingsContainer &GetSettingsTree()
 				towns->Add(new SettingEntry("economy.initial_city_size"));
 				towns->Add(new SettingEntry("economy.town_min_distance"));
 				towns->Add(new SettingEntry("economy.town_cargogen_mode"));
+				towns->Add(new SettingEntry("economy.mars_towns"));
 			}
 
 			SettingsPage *industries = environment->Add(new SettingsPage(STR_CONFIG_SETTING_ENVIRONMENT_INDUSTRIES));

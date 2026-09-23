@@ -61,6 +61,7 @@
 #include "core/backup_type.hpp"
 #include "hotkeys.h"
 #include "newgrf.h"
+#include "mars_houses.h"
 #include "misc/getoptdata.h"
 #include "game/game.hpp"
 #include "game/game_config.hpp"
@@ -445,6 +446,12 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 		IConsoleInit();
 		InitializeGUI();
 		IConsoleCmdExec("exec scripts/autoexec.scr 0");
+
+		/* The Mars towns want the Mars houses; a first start of this build
+		 * fetches them (and any start after one that could not). After the
+		 * autoexec script, so that a script turning the Mars towns off is
+		 * heard -- the test rig does, to keep off the network. */
+		FetchMarsHousesIfMissing();
 
 		/* Make sure _settings is filled with _settings_newgame if we switch to a game directly */
 		if (_switch_mode != SwitchMode::None) MakeNewgameSettingsLive();

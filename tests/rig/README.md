@@ -56,6 +56,14 @@ content server itself (TCP 3978) is out of reach from a container, so the
 game cannot fetch them there on its own. Without them both scenes come out
 with odmitnuto above zero.
 
+The first of them is also the game's own Mars house set (mars_houses.h): with
+it in the home, the game puts it into every new game of every scene. Its
+houses stay out of every town not told to build from them, so the scenes'
+maps come out as without it. The Mars towns themselves are off in the
+battery's new games (`economy.mars_towns 0`, which also keeps the game from
+reaching for the content server to fetch the set); `marsmesta` and
+`marsmestacz` turn them on through `SCENE_NEWGAME`.
+
 ## Memory errors: the rig does not see them
 
 The battery measures behaviour, not memory. A write past the end of an

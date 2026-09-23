@@ -2201,6 +2201,8 @@ STR_CONFIG_SETTING_LARGER_TOWNS_VALUE                           :1 in {COMMA}
 STR_CONFIG_SETTING_LARGER_TOWNS_DISABLED                        :None
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER                         :Initial city size multiplier: {STRING2}
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Average size of cities relative to normal towns at start of the game
+STR_CONFIG_SETTING_MARS_TOWNS                                   :Mars towns: {STRING2}
+STR_CONFIG_SETTING_MARS_TOWNS_HELPTEXT                          :How many small towns of the Mars houses a new map gets among its other towns. Their houses come from OpenGFX Mars Houses, which the game downloads by itself when it does not have them; without them no Mars town is made. Mars houses go up only in Mars towns -- any other town can be made one in its town window ("Houses from")
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE                            :Minimum distance between towns: {STRING2}
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE_HELPTEXT                   :Set the minimum distance in tiles between towns for map generation and random founding
 
