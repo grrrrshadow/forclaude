@@ -514,69 +514,39 @@ static int DistanceToLevelCrossingAhead(const Train *moving_front, int max_tiles
 static int64_t GentleBrakeRate(const Train *v);
 
 /**
- * How far this train runs, in pixels along straight track, getting from a
- * stand to its top speed on the flat -- worked out from the same physics the
- * realistic model accelerates it with (GroundVehicle::GetAcceleration(): the
- * engines' power and pulling force against the train's weight, cargo and
- * all, the axles, rolling friction and air drag). Speed goes up by a/256 of a
- * unit a tick and the train covers speed/256 pixels, so the run is the sum of
- * speed/a over the speeds on the way up. Where the train cannot get any
- * faster the run ends there, at the speed it can reach.
+ * The braking curve of a train with "brake, fail to brake and crash" on: a
+ * train brakes as it pulls away -- the player's rule -- at every speed: it
+ * slows at a speed as fast as it gathers speed there on the flat. At low
+ * speed that is the engines' whole pulling force (tractive effort), at high
+ * speed only what the power gives, power over speed, less the drag. So a
+ * light engine shunting brakes on the spot and lazily from high speed, and a
+ * heavy train lazily all the way; a loaded train is heavier than an empty one
+ * and brakes longer, as it pulls away slower. The physics is the realistic
+ * model's own (GroundVehicle::GetAcceleration(): power and pulling force
+ * against weight, cargo and all, the axles, rolling friction and air drag).
  *
- * Up to nine tenths of top speed, not all of it: the last tenth is a long
- * tail where the pull barely beats the drag -- a ten-wagon train went from
- * 62 to 69 in sixteen tiles after getting to 62 in fourteen -- and brakes
- * have no such tail. Measured on the flat: three wagons 6 tiles worked out
- * against 7 driven, ten wagons 14 against 14 to nine tenths.
+ * Above nine tenths of top speed the train brakes as at nine tenths: the last
+ * tenth is a long tail where the pull barely beats the drag -- a ten-wagon
+ * train went from 62 to 69 in sixteen tiles after getting to 62 in fourteen
+ * -- and brakes have no such tail. The same where a train cannot get any
+ * faster: it brakes as at the fastest it can gather speed.
  *
- * @param v the train, front of its consist
- * @param[out] reached the speed the run ends at
- * @return the run in pixels
- */
-static int64_t AccelerationRunPixels(const Train *v, int64_t *reached)
-{
-	int64_t top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
-	int64_t mass = std::max<int64_t>(v->gcache.cached_weight, 1);
-	int64_t power = int64_t(v->gcache.cached_power) * 746;
-	int64_t max_te = v->gcache.cached_max_te;
-	bool maglev = v->GetAccelerationType() == VehicleAccelerationModel::Maglev;
-
-	constexpr int STEPS = 32;
-	int64_t upto = top * 9 / 10;
-	int64_t run = 0;
-	*reached = upto;
-	for (int i = 0; i < STEPS; i++) {
-		int64_t speed = (2 * i + 1) * upto / (2 * STEPS); // the middle of this step
-		int64_t force = maglev ? power / 25 : std::min<int64_t>(power * 18 / (std::max<int64_t>(speed, 1) * 5), max_te);
-		int64_t resistance = int64_t(14) * v->gcache.cached_air_drag * speed * speed / 1000; // 14: the open-air drag area, Train::GetAirDragArea()
-		if (!maglev) resistance += v->gcache.cached_axle_resistance + mass * (15 * (512 + speed) / 512);
-		int64_t accel = (force - resistance) / (mass * 4);
-		if (accel <= 0) {
-			*reached = std::max<int64_t>(i * upto / STEPS, 1);
-			break;
-		}
-		run += speed * std::max<int64_t>(upto / STEPS, 1) / accel;
-	}
-	return run;
-}
-
-/**
- * The braking rate of a train with "brake, fail to brake and crash" on: a
- * train brakes as it accelerates -- the player's rule, heavy long trains
- * twenty tiles either way, smoothly -- so the run it needs to stop from its
- * top speed is the run it needs to reach it (AccelerationRunPixels()). A
- * loaded train is heavier than an empty one and brakes longer, as it pulls
- * away slower. No figure of tiles is set on it -- the player's rule, it goes
- * by the physics and a train that cannot stop in time does not -- beyond two
- * tiles at the least, for the arithmetic, and half a large map at the most.
+ * Kept as the distance it takes to stop from each of STEPS speeds up to the
+ * top speed. The ceiling the driver drives to and the braking itself both
+ * read the one table, so the train slows exactly as fast as the ceiling
+ * comes down -- a rate read off the moment and not off the whole curve had
+ * the ceiling and the train chasing each other down the line once.
  *
  * Worked out when the train's weight, power or top speed changes and kept,
  * not every time it is asked: it is asked many times a tick.
- *
- * @param v the train, front of its consist
- * @return speed squared per pixel, as GentleBrakeRate()
  */
-static int64_t PhysicsBrakeRate(const Train *v)
+struct BrakeCurve {
+	static constexpr int STEPS = 64;
+	int64_t top = 1; ///< the speed the table reaches, the train's top speed
+	std::array<int64_t, STEPS + 1> dist{}; ///< 1/256ths of a pixel to a stand from speed i * top / STEPS
+};
+
+static const BrakeCurve &GetBrakeCurve(const Train *v)
 {
 	struct Key {
 		uint32_t weight;
@@ -586,21 +556,119 @@ static int64_t PhysicsBrakeRate(const Train *v)
 		bool operator==(const Key &) const = default;
 	};
 	Key key{v->gcache.cached_weight, v->gcache.cached_power, v->gcache.cached_max_te, v->vcache.cached_max_speed};
-	static std::map<VehicleID, std::pair<Key, int64_t>> cache;
+	static std::map<VehicleID, std::pair<Key, BrakeCurve>> cache;
 	auto it = cache.find(v->index);
 	if (it != cache.end() && it->second.first == key) return it->second.second;
-
-	int64_t reached = 1;
-	int64_t run = AccelerationRunPixels(v, &reached);
-	run = Clamp<int64_t>(run, 2 * TILE_SIZE, 128 * TILE_SIZE);
-	int64_t rate = std::max<int64_t>(reached * reached / (2 * run), 1);
-	cache[v->index] = {key, rate};
-	if (_show_train_orientation && v->IsFrontEngine()) {
-		IConsolePrint(CC_INFO, "Vlak {}: brzdna draha podle fyziky {} policek z rychlosti {} ({} t)", v->unitnumber,
-				(run + TILE_SIZE / 2) / TILE_SIZE, reached, v->gcache.cached_weight);
-	}
 	if (cache.size() > 4096) cache.clear();
-	return rate;
+
+	int64_t mass = std::max<int64_t>(v->gcache.cached_weight, 1);
+	int64_t power = int64_t(v->gcache.cached_power) * 746;
+	int64_t max_te = std::max<int64_t>(v->gcache.cached_max_te, 1);
+	bool maglev = v->GetAccelerationType() == VehicleAccelerationModel::Maglev;
+
+	BrakeCurve c;
+	c.top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
+
+	/* How fast the train gathers speed at the middle of each step, and the
+	 * run it takes to get to nine tenths of its top speed (or as fast as it
+	 * gets): speed goes up by accel/256 of a unit a tick and the train
+	 * covers speed/256 pixels, so a step takes speed * step / accel pixels. */
+	std::array<int64_t, BrakeCurve::STEPS> accel{};
+	std::array<int64_t, BrakeCurve::STEPS> speed{};
+	int64_t last = 1;
+	int64_t run_sub = 0;
+	int64_t reached = 0;
+	for (int i = 0; i < BrakeCurve::STEPS; i++) {
+		speed[i] = std::max<int64_t>((2 * i + 1) * c.top / (2 * BrakeCurve::STEPS), 1);
+		if (speed[i] * 10 <= c.top * 9) {
+			int64_t force = maglev ? power / 25 : std::min<int64_t>(power * 18 / (speed[i] * 5), max_te);
+			int64_t resistance = int64_t(14) * v->gcache.cached_air_drag * speed[i] * speed[i] / 1000; // 14: the open-air drag area, Train::GetAirDragArea()
+			if (!maglev) resistance += v->gcache.cached_axle_resistance + mass * (15 * (512 + speed[i]) / 512);
+			int64_t a = (force - resistance) / (mass * 4);
+			if (a > 0 && reached == int64_t(i) * c.top / BrakeCurve::STEPS) {
+				last = a;
+				run_sub += 256 * speed[i] * c.top / (BrakeCurve::STEPS * a);
+				reached = int64_t(i + 1) * c.top / BrakeCurve::STEPS;
+			}
+		}
+		accel[i] = last; // above nine tenths, or where it gets no faster: as at the fastest it does
+	}
+	/* The whole run evened out: the rate that stops the train from the speed
+	 * it got to in the run it took to get there. The train never brakes more
+	 * lazily than that -- at high speed, where it gathers speed slowest, it
+	 * brakes so; lower down it brakes as hard as it pulls away there. */
+	int64_t evened = std::max<int64_t>(reached * reached * 256 / (2 * std::max<int64_t>(run_sub, 1)), 1);
+
+	for (int i = 0; i < BrakeCurve::STEPS; i++) {
+		int64_t decel = std::max(accel[i], evened);
+		c.dist[i + 1] = c.dist[i] + std::max<int64_t>(256 * speed[i] * c.top / (BrakeCurve::STEPS * decel), 1);
+	}
+	/* Half a large map at the most, for the arithmetic: scaled, so that the
+	 * curve keeps its shape. */
+	constexpr int64_t MOST = 128 * TILE_SIZE * 256;
+	if (c.dist[BrakeCurve::STEPS] > MOST) {
+		int64_t whole = c.dist[BrakeCurve::STEPS];
+		for (int64_t &d : c.dist) d = d * MOST / whole;
+	}
+
+	it = cache.insert_or_assign(v->index, std::pair<Key, BrakeCurve>{key, c}).first;
+	if (_show_train_orientation && v->IsFrontEngine()) {
+		IConsolePrint(CC_INFO, "Vlak {}: brzdna draha podle krivky {} policek z rychlosti {}, {} z poloviny ({} t)", v->unitnumber,
+				(c.dist[BrakeCurve::STEPS] / 256 + TILE_SIZE / 2) / TILE_SIZE, c.top,
+				(c.dist[BrakeCurve::STEPS / 2] / 256 + TILE_SIZE / 2) / TILE_SIZE, v->gcache.cached_weight);
+	}
+	return it->second.second;
+}
+
+/** The step of the curve @p speed falls in, and how far into it, in 1/top parts of a step. */
+static std::pair<int, int64_t> BrakeCurveStep(const BrakeCurve &c, int64_t speed)
+{
+	int64_t scaled = speed * BrakeCurve::STEPS;
+	int i = static_cast<int>(std::min<int64_t>(scaled / c.top, BrakeCurve::STEPS - 1));
+	return {i, scaled - int64_t(i) * c.top};
+}
+
+/**
+ * How hard the train brakes at @p speed, by its curve: in 1/256ths of a speed
+ * unit a tick, what DoUpdateSpeed() takes. Above top speed (downhill) as at
+ * top speed.
+ */
+static int64_t BrakeCurveDecel(const BrakeCurve &c, int64_t speed)
+{
+	speed = std::min(std::max<int64_t>(speed, 1), c.top);
+	auto [i, part] = BrakeCurveStep(c, speed);
+	int64_t step_px = std::max<int64_t>(c.dist[i + 1] - c.dist[i], 1);
+	/* decel = speed * dv / dx over this step */
+	return std::max<int64_t>(256 * speed * c.top / (BrakeCurve::STEPS * step_px), 1);
+}
+
+/** How many pixels the train needs to come to a stand from @p speed, by its curve. */
+static int64_t BrakeCurveDistance(const BrakeCurve &c, int64_t speed)
+{
+	if (speed <= 0) return 0;
+	if (speed >= c.top) {
+		/* Faster than top speed, downhill: braking as at top speed. */
+		int64_t decel = BrakeCurveDecel(c, c.top);
+		return c.dist[BrakeCurve::STEPS] / 256 + (speed * speed - c.top * c.top) / (2 * decel);
+	}
+	auto [i, part] = BrakeCurveStep(c, speed);
+	return (c.dist[i] + (c.dist[i + 1] - c.dist[i]) * part / c.top) / 256;
+}
+
+/** The speed the train can come to a stand from in @p pixels, by its curve. */
+static int64_t BrakeCurveSpeedFor(const BrakeCurve &c, int64_t pixels)
+{
+	if (pixels <= 0) return 0;
+	const int64_t whole = c.dist[BrakeCurve::STEPS] / 256;
+	if (pixels >= whole) {
+		int64_t decel = BrakeCurveDecel(c, c.top);
+		return IntSqrt(static_cast<uint32_t>(std::min<int64_t>(c.top * c.top + 2 * decel * (pixels - whole), UINT32_MAX)));
+	}
+	int64_t sub = pixels * 256;
+	auto it = std::upper_bound(c.dist.begin(), c.dist.end(), sub);
+	int i = static_cast<int>(it - c.dist.begin()) - 1; // dist[i] <= sub < dist[i + 1]
+	int64_t step_sub = std::max<int64_t>(c.dist[i + 1] - c.dist[i], 1);
+	return (int64_t(i) * c.top + (sub - c.dist[i]) * c.top / step_sub) / BrakeCurve::STEPS;
 }
 
 /**
@@ -613,15 +681,30 @@ bool IsSignalOverrunOn()
 	return _settings_game.vehicle.train_braking != 0;
 }
 
+/**
+ * Does this game brake trains by their curve (GetBrakeCurve())? With "brake,
+ * fail to brake and crash" on and the realistic model; otherwise the gentle
+ * rate, the driver's eight tiles from top speed that the game has always
+ * used (GentleBrakeRate()).
+ */
+static bool BrakesByCurve()
+{
+	return IsSignalOverrunOn() && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic;
+}
+
+/**
+ * How hard this train brakes now, in 1/256ths of a speed unit a tick (what
+ * DoUpdateSpeed() takes): by its curve at the speed it is doing, or the
+ * gentle rate.
+ */
+static int64_t BrakeDecelNow(const Train *v)
+{
+	if (BrakesByCurve()) return BrakeCurveDecel(GetBrakeCurve(v), v->cur_speed);
+	return std::max<int64_t>(1, GentleBrakeRate(v));
+}
+
 static int64_t GentleBrakeRate(const Train *v)
 {
-	/* With "brake, fail to brake and crash" on, a train brakes as it pulls
-	 * away (PhysicsBrakeRate()); without, the driver's eight tiles from top
-	 * speed that the game has always used. */
-	if (IsSignalOverrunOn() &&
-			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
-		return PhysicsBrakeRate(v);
-	}
 	constexpr int64_t BRAKE_TILES = 8;
 	int64_t top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
 	return std::max<int64_t>(top * top / (2 * BRAKE_TILES * TILE_SIZE), 1);
@@ -639,6 +722,12 @@ static int64_t GentleBrakeRate(const Train *v)
 static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 {
 	if (pixels <= 0) return target_speed;
+	if (BrakesByCurve()) {
+		/* By the curve: the speed that stops in the distance it takes to stop
+		 * from the target plus these pixels. */
+		const BrakeCurve &c = GetBrakeCurve(v);
+		return static_cast<int>(std::min<int64_t>(BrakeCurveSpeedFor(c, BrakeCurveDistance(c, target_speed) + pixels), INT32_MAX));
+	}
 	int64_t allowed_sq = int64_t(target_speed) * target_speed + 2 * GentleBrakeRate(v) * pixels;
 	return static_cast<int>(IntSqrt(static_cast<uint32_t>(std::min<int64_t>(allowed_sq, UINT32_MAX))));
 }
@@ -650,6 +739,9 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
  */
 static int GentleStoppingReach(const Train *v)
 {
+	if (BrakesByCurve()) {
+		return static_cast<int>(std::min<int64_t>(BrakeCurveDistance(GetBrakeCurve(v), v->cur_speed) + 2 * TILE_SIZE, INT32_MAX / 2));
+	}
 	int64_t gentle = GentleBrakeRate(v);
 	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, INT32_MAX / 2));
 }
@@ -11929,20 +12021,18 @@ int Train::UpdateSpeed()
 		case AccelerationModel::Realistic: {
 			int accel = this->GetAcceleration();
 			/* On the player's stop, with the setting on, the train brakes the
-			 * way the player sees trains brake -- the driver's gentle braking,
-			 * eight tiles from top speed (GentleBrakeRate()) -- and weaker than
-			 * that by the player's choice, 30 % or 10 %. Not the game's own
+			 * way the player sees trains brake -- by its braking curve
+			 * (BrakeDecelNow()) -- and weaker than that by the player's
+			 * choice, 30 % or 10 %. Not the game's own
 			 * brake made weaker: that one is the engine's pulling force turned
 			 * round and stops even a heavy train inside a tile or two (measured:
 			 * 410 t from 100 km/h in one tile), so a train stopped by hand could
 			 * never run past anything and the setting would say nothing.
 			 *
-			 * The gentle rate is in speed squared per pixel; a train on straight
-			 * track covers speed/256 pixels a tick, so it loses rate/256 of a
-			 * speed unit a tick -- which is `rate` in the 1/256ths this takes. */
+			 * The rate is in the 1/256ths of a speed unit a tick this takes. */
 			if (this->GetAccelerationStatus() == AS_BRAKE && IsBrakingOnPlayersStop(this)) {
 				int keep = _settings_game.vehicle.train_stop_brake_weaker == 0 ? 70 : 90;
-				accel = -std::max<int>(1, static_cast<int>(GentleBrakeRate(this) * keep / 100));
+				accel = -std::max<int>(1, static_cast<int>(BrakeDecelNow(this) * keep / 100));
 			}
 			int max_speed = this->GetCurrentMaxSpeed();
 			int distance;
@@ -11955,12 +12045,12 @@ int Train::UpdateSpeed()
 				 * inside two tiles for anything that turns up in front of it --
 				 * the player's case, a branch taken away under a loaded train
 				 * at the last moment and a standing engine straight ahead. With
-				 * the setting a train brakes as a train brakes, the driver's
-				 * own eight tiles from top speed (GentleBrakeRate(), the rate
-				 * worked out as for the stop above), and what it cannot stop
+				 * the setting a train brakes as a train brakes, by its braking
+				 * curve at the speed it is doing (BrakeDecelNow(), as for the
+				 * stop above), and what it cannot stop
 				 * short of it reaches. Only for the driver's ceiling: a curve,
 				 * a bridge or a shed door slows a train as it always did. */
-				int rate = static_cast<int>(std::max<int64_t>(1, GentleBrakeRate(this)));
+				int rate = static_cast<int>(BrakeDecelNow(this));
 				distance = this->DoUpdateSpeed(-rate, std::min<int>(max_speed, this->cur_speed), this->cur_speed);
 			} else {
 				distance = this->DoUpdateSpeed(accel, this->GetAccelerationStatus() == AS_BRAKE ? 0 : 2, max_speed);
