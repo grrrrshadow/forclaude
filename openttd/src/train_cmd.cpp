@@ -5522,11 +5522,23 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
  */
 static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 {
+	/* Every refusal says why. A refusal is asked again every tick and ends,
+	 * after long enough, in the tow giving the case up -- and "it gave up" is
+	 * all anybody learns if the reason is not written down here. */
+	auto refuse = [tow](std::string_view why, TileIndex where = INVALID_TILE) {
+		if (_show_train_orientation) {
+			SayOnChange(tow, where == INVALID_TILE
+					? fmt::format("Vlak {}: nenarovnavam - {}", tow->unitnumber, why)
+					: fmt::format("Vlak {}: nenarovnavam - {} na ({},{})", tow->unitnumber, why, TileX(where), TileY(where)));
+		}
+		return false;
+	};
+
 	Train *mf = tow->GetMovingFront();
-	if (mf->track.Any({Track::Depot, Track::Wormhole})) return false;
+	if (mf->track.Any({Track::Depot, Track::Wormhole})) return refuse("odtahovka stoji v depu nebo v tunelu");
 
 	Trackdir cur_td = TrackDirectionToTrackdir(TrackBitsToTrack(mf->track), mf->GetMovingDirection());
-	if (!IsValidTrackdir(cur_td)) return false;
+	if (!IsValidTrackdir(cur_td)) return refuse("odtahovka nema platny smer na sve koleji", mf->tile);
 	TileIndex cur_tile = mf->tile;
 
 	/* The tiles ahead of the engine's nose, one after another, as far as the
@@ -5542,16 +5554,32 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 	 * carry the wreck, prefer the branch that leads on toward where the
 	 * casualty is lying (so it is dragged into line, not around the block). */
 	CFollowTrackRail ft(tow);
+	/* Which ways the bed has run so far. A bed never doubles back on itself:
+	 * "toward the casualty" pulls it back once it has passed the casualty's
+	 * head, and at a pair of curves that turn it round it was laid in a U.
+	 * The close-up walk cannot pull a train round a U -- a vehicle on the
+	 * curves covers a tile in half the steps of its neighbour on the
+	 * straight, runs two tiles ahead of it round the corner, and the
+	 * neighbour then has no track to its tile: the game went down that way
+	 * (rig scene protlacit, once breakdowns were moved nearer stations). So
+	 * a branch that heads back the way the bed came is not taken, and with no
+	 * other branch the laying refuses, like a tunnel or a stranger does. */
+	uint8_t bed_dirs = 0;
+	auto heads_back = [&bed_dirs](DiagDirection d) { return HasBit(bed_dirs, to_underlying(ReverseDiagDir(d))); };
 	auto step = [&]() -> bool {
-		if (!ft.Follow(cur_tile, cur_td)) return false;
-		if (IsTileType(ft.new_tile, TileType::TunnelBridge)) return false;
+		if (!ft.Follow(cur_tile, cur_td)) return refuse("kolej dal nevede", cur_tile);
+		if (IsTileType(ft.new_tile, TileType::TunnelBridge)) return refuse("tunel nebo most", ft.new_tile);
+		if (heads_back(ft.exitdir)) return refuse("luzko by se otocilo zpatky", ft.new_tile);
 		Trackdir pick = Trackdir::Invalid;
 		uint best = UINT_MAX;
 		for (Trackdir cand : ft.new_td_bits) {
+			if (heads_back(TrackdirToExitdir(cand))) continue;
 			uint d = DistanceManhattan(TileAddByDiagDir(ft.new_tile, TrackdirToExitdir(cand)), casualty->tile);
 			if (d < best) { best = d; pick = cand; }
 		}
-		if (pick == Trackdir::Invalid) return false;
+		if (pick == Trackdir::Invalid) return refuse("luzko by se otocilo zpatky", ft.new_tile);
+		SetBit(bed_dirs, to_underlying(ft.exitdir));
+		SetBit(bed_dirs, to_underlying(TrackdirToExitdir(pick)));
 		/* The track follower crosses a platform in one step and lands on its
 		 * far end. The bed is one vehicle per tile, so every tile of the
 		 * platform is a berth too -- taken in order from the near end. Left
@@ -5567,9 +5595,9 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 		ahead.push_back({ft.new_tile, TrackdirToTrack(pick), ft.exitdir});
 		for (auto it = ahead.end() - (ft.tiles_skipped + 1); it != ahead.end(); ++it) {
 			for (const Vehicle *o : VehiclesOnTile(it->tile)) {
-				if (o->type != VehicleType::Train) return false;
+				if (o->type != VehicleType::Train) return refuse("na luzku stoji neco, co neni vlak", it->tile);
 				const Train *of = Train::From(o)->First();
-				if (of != casualty && of != tow) return false;
+				if (of != casualty && of != tow) return refuse(fmt::format("na luzku stoji cizi vlak {}", of->unitnumber), it->tile);
 			}
 		}
 		cur_tile = ft.new_tile;
@@ -5610,7 +5638,7 @@ static bool LayCasualtyAlongTow(Train *tow, Train *casualty)
 		gp.x = TileX(it->tile) * TILE_SIZE;
 		gp.y = TileY(it->tile) * TILE_SIZE;
 		Direction dir = VehicleEnterTileCoordinates(gp, it->enterdir, it->track);
-		if (dir == Direction::Invalid) return false;
+		if (dir == Direction::Invalid) return refuse("vuz nejde na luzko postavit", it->tile);
 
 		u->tile = it->tile;
 		u->track = TrackBits{it->track};
@@ -8044,7 +8072,10 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 			Train *casualty = leading == tow ? trailing : leading;
 			/* One with a part in a shed cannot be laid anywhere: it is pushed
 			 * in as it lies, and the tow has to meet its outside end cleanly. */
-			if (IsAnyPartInsideDepot(casualty)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+			if (IsAnyPartInsideDepot(casualty)) {
+				if (_show_train_orientation) SayOnChange(tow, fmt::format("Vlak {}: nenarovnavam - porucha trci z depa", tow->unitnumber));
+				return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
+			}
 			if (!LayCasualtyAlongTow(tow, casualty)) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_GAP);
 		}
 

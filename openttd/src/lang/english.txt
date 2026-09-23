@@ -1441,12 +1441,12 @@ STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :How much weaker
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT                           :The driver sees from the cab: {STRING2}
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :How far ahead the driver sees signals and trains. "Best" is as far as the train needs to brake, and two tiles more - at most 128 tiles. That is how trains run with "Brake, fail to brake and crash" switched off too. A shorter view means the train starts braking later: with that setting off it brakes harder, with it on it may not make it. Realistic train acceleration only
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_BEST                      :best
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :How far ahead the driver sees signals and trains. "Best" is as far as the train needs to brake, and two tiles more - at most 128 tiles. That is how trains run with "Brake, fail to brake and crash" switched off too. A shorter view means the train starts braking later: with that setting off it brakes harder, with it on it may not make it. ETCS on the long sights marks an improved view. Realistic train acceleration only
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_BEST                      :best ETCS
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_5                         :5 tiles
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_10                        :10 tiles
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_15                        :15 tiles
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_20                        :20 tiles
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_15                        :15 tiles ETCS
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_20                        :20 tiles ETCS
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Road vehicle acceleration model: {STRING2}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Select the physics model for road vehicle acceleration. The "original" model penalises slopes equally for all vehicles. The "realistic" model penalises slopes depending on various properties of the engine, for example 'tractive effort'

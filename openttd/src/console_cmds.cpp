@@ -6307,6 +6307,29 @@ static bool ConTestExplainDepot(std::span<std::string_view> argv)
 }
 
 /**
+ * Set the reliability of every train's engine, so a scene about where trains
+ * break down has breakdowns to count. Usage: testspolehlivost <percent>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestReliability(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Set every train's reliability. Usage: 'testspolehlivost <procenta>'.");
+		return true;
+	}
+	auto pct = ParseInteger(argv[1]);
+	if (!pct.has_value()) return false;
+	uint n = 0;
+	for (Train *t : Train::Iterate()) {
+		if (!t->IsFrontEngine()) continue;
+		t->reliability = ClampTo<uint16_t>(std::min<uint>(*pct, 100) * 0xFFFF / 100);
+		n++;
+	}
+	IConsolePrint(CC_INFO, "testspolehlivost: {} vlaku na {}%", n, *pct);
+	return true;
+}
+
+/**
  * Fill the shed a depot order names with stored wagons, or empty some out of
  * it, the way the player's own hands in the depot window would -- so past the
  * limit orders are held to. For the full-shed scenes.
@@ -11256,6 +11279,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
 	IConsole::CmdRegister("testdepovagony",          ConTestDepotWagons);
+	IConsole::CmdRegister("testspolehlivost",        ConTestReliability);
 	IConsole::CmdRegister("testdepofiltr",           ConTestExplainDepot);
 	IConsole::CmdRegister("testvarovani",            ConTestLossWarning);
 	IConsole::CmdRegister("testtypfiltr",            ConTestTypeFilter);
