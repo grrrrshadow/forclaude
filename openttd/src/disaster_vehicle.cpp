@@ -46,6 +46,7 @@
 #include "core/random_func.hpp"
 #include "core/backup_type.hpp"
 #include "landscape_cmd.h"
+#include "console_func.h"
 #include "timer/timer.h"
 #include "timer/timer_game_economy.h"
 
@@ -106,6 +107,10 @@ static constexpr DirectionIndexArray<SpriteID> _disaster_images_8{SPR_AH_64A, SP
 /** Sprites for combat helicopter rotor */
 static constexpr DirectionIndexArray<SpriteID> _disaster_images_9{SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1, SPR_ROTOR_MOVING_1};
 
+/** Sprites for the rescue helicopter: the game's own passenger helicopter
+ * (the Tricario, image 9 in the aircraft sprite table), not the gunship. */
+static constexpr DirectionIndexArray<SpriteID> _disaster_images_10{0x0EE5, 0x0EE6, 0x0EE7, 0x0EE8, 0x0EE9, 0x0EEA, 0x0EEB, 0x0EEC};
+
 /** Sprites for each disaster vehicle. */
 static constexpr DirectionIndexArray<SpriteID> _disaster_images[] = {
 	_disaster_images_1, _disaster_images_1,                     ///< zeppeliner and zeppeliner shadow
@@ -115,6 +120,7 @@ static constexpr DirectionIndexArray<SpriteID> _disaster_images[] = {
 	_disaster_images_6, _disaster_images_6,                     ///< big ufo and shadow
 	_disaster_images_7, _disaster_images_7,                     ///< skyranger and shadow
 	_disaster_images_4, _disaster_images_5,                     ///< small and big submarine sprites
+	_disaster_images_10, _disaster_images_10, _disaster_images_9, ///< rescue helicopter, shadow and rotor
 };
 
 void DisasterVehicle::UpdateImage()
@@ -147,10 +153,12 @@ DisasterVehicle::DisasterVehicle(VehicleID index, int x, int y, Direction direct
 		case ST_HELICOPTER:
 		case ST_BIG_UFO:
 		case ST_BIG_UFO_DESTROYER:
+		case ST_RESCUE_HELICOPTER:
 			GetAircraftFlightLevelBounds(this, &this->z_pos, nullptr);
 			break;
 
 		case ST_HELICOPTER_ROTORS:
+		case ST_RESCUE_HELICOPTER_ROTORS:
 			GetAircraftFlightLevelBounds(this, &this->z_pos, nullptr);
 			this->z_pos += ROTOR_Z_OFFSET;
 			break;
@@ -166,6 +174,7 @@ DisasterVehicle::DisasterVehicle(VehicleID index, int x, int y, Direction direct
 		case ST_HELICOPTER_SHADOW:
 		case ST_BIG_UFO_SHADOW:
 		case ST_BIG_UFO_DESTROYER_SHADOW:
+		case ST_RESCUE_HELICOPTER_SHADOW:
 			this->z_pos = 0;
 			this->vehstatus.Set(VehState::Shadow);
 			break;
@@ -713,6 +722,91 @@ static bool DisasterTick_Submarine(DisasterVehicle *v)
 
 
 /** No-op vehicle tick. @copydoc DisasterVehicleTickProc */
+/**
+ * Rescue helicopter; v->state states:
+ * 0: fly in to the landing spot by the wreck (dest_tile)
+ * 1: come down onto the grass there
+ * 2: stand there, rotor turning, until the tow has the wreck coupled up --
+ *    or the wreck is gone some other way (big_ufo_destroyer_target is the
+ *    wreck; the field is the one vehicle reference a disaster vehicle keeps
+ *    in a savegame, so it is used for this one too)
+ * 3: climb back up
+ * 4: fly off the map the way it came, and go.
+ * See SpawnRescueHelicopter().
+ * @copydoc DisasterVehicleTickProc
+ */
+static bool DisasterTick_RescueHelicopter(DisasterVehicle *v)
+{
+	extern bool _show_train_orientation;
+	v->tick_counter++;
+
+	auto fly_towards = [v](int x, int y) {
+		/* Four steps a tick: a helicopter on its way to an accident does not
+		 * dawdle, and one step is the pace of a zeppelin. It has to be there
+		 * before the tow, or there is nothing for it to wait by. */
+		for (int step = 0; step < 4; step++) {
+			if (Delta(v->x_pos, x) + Delta(v->y_pos, y) < 2) return true;
+			v->direction = GetDirectionTowards(v, x, y);
+			GetNewVehiclePosResult gp = GetNewVehiclePos(v);
+			v->UpdatePosition(gp.x, gp.y, GetAircraftFlightLevel(v));
+		}
+		return Delta(v->x_pos, x) + Delta(v->y_pos, y) < 2;
+	};
+
+	int land_x = TileX(v->dest_tile) * TILE_SIZE + TILE_SIZE / 2;
+	int land_y = TileY(v->dest_tile) * TILE_SIZE + TILE_SIZE / 2;
+
+	switch (v->state) {
+		case 0:
+			if (fly_towards(land_x, land_y)) v->state = 1;
+			return true;
+
+		case 1: {
+			int ground = GetSlopePixelZ(Clamp(v->x_pos, 0, (int)Map::MaxX() * (int)TILE_SIZE), Clamp(v->y_pos, 0, (int)Map::MaxY() * (int)TILE_SIZE));
+			if (v->z_pos > ground) {
+				v->UpdatePosition(v->x_pos, v->y_pos, std::max(ground, v->z_pos - 2));
+				return true;
+			}
+			v->state = 2;
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vrtulnik: pristal u vraku na ({},{})", TileX(v->dest_tile), TileY(v->dest_tile));
+			}
+			return true;
+		}
+
+		case 2: {
+			const Train *wreck = Train::GetIfValid(v->big_ufo_destroyer_target);
+			bool waiting = wreck != nullptr && wreck->IsWrecked() && wreck->First() == wreck;
+			if (waiting) return true;
+			v->state = 3;
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "Vrtulnik: odlita od ({},{}) - {}", TileX(v->dest_tile), TileY(v->dest_tile),
+						wreck == nullptr ? "vrak zmizel" : (wreck->First() != wreck ? "odtahovka vrak pripojila" : "vrak uz neni vrak"));
+			}
+			return true;
+		}
+
+		case 3: {
+			int level = GetAircraftFlightLevel(v);
+			if (v->z_pos < level) {
+				v->UpdatePosition(v->x_pos, v->y_pos, std::min(level, v->z_pos + 2));
+				return true;
+			}
+			v->state = 4;
+			return true;
+		}
+
+		default:
+			/* Out west, off the map, the way it came in. */
+			if (fly_towards(-16 * (int)TILE_SIZE, v->y_pos)) {
+				if (_show_train_orientation) IConsolePrint(CC_INFO, "Vrtulnik: odletel z mapy");
+				delete v;
+				return false;
+			}
+			return true;
+	}
+}
+
 static bool DisasterTick_NULL([[maybe_unused]] DisasterVehicle *v)
 {
 	return true;
@@ -734,6 +828,7 @@ static DisasterVehicleTickProc * const _disastervehicle_tick_procs[] = {
 	DisasterTick_NULL,
 	DisasterTick_Submarine,
 	DisasterTick_Submarine,
+	DisasterTick_RescueHelicopter, DisasterTick_NULL, DisasterTick_Helicopter_Rotors,
 };
 
 
@@ -841,6 +936,56 @@ static void Disaster_Helicopter_Init()
 	u->SetNext(w);
 }
 
+
+/**
+ * Send a helicopter to a wreck made by a train failing to brake
+ * (vehicle.train_signal_overrun). It flies in from the west edge of the map,
+ * comes down on the nearest open grass by the wreck, stands there with its
+ * rotor turning, and leaves once the tow has coupled the wreck up. Only for
+ * the look of it: it touches nothing and nothing touches it.
+ * @param crash_tile where the trains collided
+ * @param wreck the train that failed to brake, which the helicopter waits by
+ */
+void SpawnRescueHelicopter(TileIndex crash_tile, VehicleID wreck)
+{
+	if (!Vehicle::CanAllocateItem(3)) return;
+
+	/* The nearest flat open ground, ring by ring out to six tiles; on the
+	 * crash tile itself if there is none. */
+	TileIndex land = crash_tile;
+	bool found = false;
+	for (int r = 1; r <= 6 && !found; r++) {
+		for (int dy = -r; dy <= r && !found; dy++) {
+			for (int dx = -r; dx <= r && !found; dx++) {
+				if (std::max(std::abs(dx), std::abs(dy)) != r) continue;
+				TileIndex t = TileAddWrap(crash_tile, dx, dy);
+				if (t == INVALID_TILE) continue;
+				if (!IsTileType(t, TileType::Clear) || GetTileSlope(t) != SLOPE_FLAT) continue;
+				if (HasVehicleOnTile(t, [](const Vehicle *) { return true; })) continue;
+				land = t;
+				found = true;
+			}
+		}
+	}
+
+	/* From the west, as if from a hospital not far off: two dozen tiles, or
+	 * off the map's edge if that is nearer. From the edge of a large map it
+	 * came long after the tow had been and gone. */
+	int x = std::max(-16 * (int)TILE_SIZE, ((int)TileX(land) - 24) * (int)TILE_SIZE);
+	int y = TileY(land) * TILE_SIZE + TILE_SIZE / 2;
+	DisasterVehicle *v = DisasterVehicle::Create(x, y, Direction::SW, ST_RESCUE_HELICOPTER, wreck);
+	v->dest_tile = land;
+	DisasterVehicle *u = DisasterVehicle::Create(x, y, Direction::SW, ST_RESCUE_HELICOPTER_SHADOW);
+	v->SetNext(u);
+	DisasterVehicle *w = DisasterVehicle::Create(x, y, Direction::SW, ST_RESCUE_HELICOPTER_ROTORS);
+	u->SetNext(w);
+
+	extern bool _show_train_orientation;
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "Vrtulnik: leti k vraku {} na ({},{}), pristane na ({},{})", wreck.base(),
+				TileX(crash_tile), TileY(crash_tile), TileX(land), TileY(land));
+	}
+}
 
 /** Big Ufo which lands on a piece of rail and will consequently be shot down by a combat airplane, destroying the surroundings. */
 static void Disaster_Big_Ufo_Init()

@@ -132,6 +132,33 @@ run_scene poruchaspoj "setting vehicle.rescue_wait_days 7
 vlak123 on
 testspoj
 testza 1000 testporucha 2" 10000
+# "Brake, fail to brake and crash" (vehicle.train_signal_overrun). A light
+# engine stands braked at a platform; a train comes up behind it towards the
+# path signal guarding that block, and the player's stop is pressed on it
+# three tiles short. With the setting on nobody drives a stopped train: it
+# brakes the gentle way, 30 % weaker, cannot stop, runs past the red and hits
+# the engine (srazka=1, and both are wrecks). A tow fetches the one that
+# failed to brake (spojeno=1 odtazeno=1); a helicopter lands by it and leaves
+# when the tow has it; the papers write it up twice.
+run_scene nedobrzdil "setting vehicle.train_signal_overrun on
+vlak123 on
+testnedobrzdil cesta stopka 3 odtah" 9000
+# The same with the setting off, the game as it was: the stop is the game's
+# own brake and the train stands short of the red (srazka=0).
+run_scene nedobrzdilvyp "vlak123 on
+testnedobrzdil cesta stopka 3 odtah" 9000
+# Setting on, nobody touches the stop: the train is driven, and a path signal
+# it could not book through stops it dead as always (srazka=0).
+run_scene nedobrzdilbez "setting vehicle.train_signal_overrun on
+vlak123 on
+testnedobrzdil cesta odtah" 9000
+# The player's three block signals in a row, the stop pressed eight tiles
+# short of the last one. The game's own cut to a crawl on the last tile
+# before a red is left out with the setting on, so the train runs past the
+# red -- and stops a tile short of the engine at the platform (srazka=0).
+run_scene nedobrzdilblok "setting vehicle.train_signal_overrun on
+vlak123 on
+testnedobrzdil blok stopka 8 odtah" 9000
 run_scene depo "vlak123 on
 testspoj depo" 8000
 run_scene depopocet "vlak123 on

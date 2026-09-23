@@ -906,6 +906,9 @@ public:
 		     SLE_VAR(Train, depot_decouple_sell,    VarTypes::BOOL),
 		     SLE_VAR(Train, depot_dropped_rake, VarTypes::U32),
 		     SLE_VAR(Train, carrying,          VarTypes::U32),
+		     SLE_VAR(Train, overran_red,       VarTypes::BOOL),
+		     SLE_VAR(Train, overran_on_stop,   VarTypes::BOOL),
+		     SLE_VAR(Train, stop_crash_news,   VarTypes::BOOL),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 

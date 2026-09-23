@@ -17,6 +17,7 @@
 #include "pathfinder/yapf/yapf.hpp"
 #include "pathfinder/follow_track.hpp"
 #include "news_func.h"
+#include "disaster_vehicle.h"
 #include "company_func.h"
 #include "newgrf_sound.h"
 #include "newgrf_text.h"
@@ -1056,6 +1057,79 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	return ceiling;
 }
 
+/**
+ * Is the player's stop button what is bringing this train to a stand, with
+ * "brake, fail to brake and crash" switched on (vehicle.train_signal_overrun)?
+ *
+ * Then nobody is driving it any more: the driver who reads the signals and the
+ * platform ahead and eases the train down for them (BrakingCeiling(), the
+ * station approach) has been told to stop, and the train simply brakes with
+ * what its brakes can do -- weaker than they can, by the player's setting.
+ * Whether that is enough before the next red is the player's lookout. Without
+ * the setting a stopped train is driven down exactly as before.
+ *
+ * Realistic acceleration only: the original model has no driver reading ahead
+ * at all, and every train in it relies on being stopped dead at a red.
+ *
+ * @param v the train, front of its consist
+ * @return true if the train is rolling to a stand on the player's stop
+ */
+static bool IsBrakingOnPlayersStop(const Train *v)
+{
+	return _settings_game.vehicle.train_signal_overrun &&
+			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic &&
+			v->vehstatus.Test(VehState::Stopped) && v->cur_speed > 0;
+}
+
+/**
+ * The speed at a red signal above which, with the setting on, a train is not
+ * stopped dead there but runs past. Just above what the driver brings a train
+ * down to for a stop (CEILING_FLOOR in BrakingCeiling(), 15): a train that
+ * braked for the red arrives at that crawl and the last metre is the dead stop
+ * as always; one still doing more has not braked for it. 25 is 40 km/h.
+ */
+static constexpr int OVERRUN_SPEED = 25;
+
+/**
+ * Does this train, arriving at a red signal, run past it?
+ *
+ * "Brake, fail to brake and crash": a red no longer stops a fast train on the
+ * spot. What stays is which reds count. A block signal is the block's own
+ * state and the driver brakes for it, so a train that reaches one still going
+ * fast has failed to brake -- whoever is driving. A path signal is red until
+ * somebody books a way through it, and the driver of a running train is
+ * deliberately not told to brake for those (see BrakingCeiling()), so for a
+ * running train its red is still the dead stop it always was; only a train
+ * the player has stopped, which is no longer booking anything, runs past one.
+ *
+ * Marks the train (overran_red, overran_on_stop) so that a crash that follows
+ * is known for what it is. The marks come off once the train stands.
+ *
+ * @param first the train, front of its consist
+ * @param path_signal whether the red is a path signal
+ * @param where the signal's tile, for the trace
+ * @param speed the speed it arrives at -- asked for, because a failed booking
+ *              has already stopped the train dead by the time this is asked
+ *              (MarkTrainAsStuck()), and the caller kept what it was doing
+ * @return true if the train runs on past the red
+ */
+static bool RunsPastRedSignal(Train *first, bool path_signal, TileIndex where, int speed)
+{
+	if (!_settings_game.vehicle.train_signal_overrun) return false;
+	if (_settings_game.vehicle.train_acceleration_model != AccelerationModel::Realistic) return false;
+	if (speed <= OVERRUN_SPEED) return false;
+	bool on_stop = first->vehstatus.Test(VehState::Stopped);
+	if (path_signal && !on_stop) return false;
+
+	first->overran_red = true;
+	first->overran_on_stop = on_stop;
+	if (_show_train_orientation) {
+		IConsolePrint(CC_WARNING, "Vlak {}: NEDOBRZDIL - projel cervenou na ({},{}) rychlosti {}{}", first->unitnumber,
+				TileX(where), TileY(where), speed, on_stop ? " (po stopce)" : "");
+	}
+	return true;
+}
+
 int Train::GetCurrentMaxSpeed() const
 {
 	const Train *moving_front = this->GetMovingFront();
@@ -1063,7 +1137,11 @@ int Train::GetCurrentMaxSpeed() const
 			this->gcache.cached_max_track_speed :
 			this->tcache.cached_max_curve_speed;
 
-	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && IsRailStationTile(moving_front->tile)) {
+	/* Nobody drives a train the player has stopped, with the setting on: no
+	 * easing down for the platform either. See IsBrakingOnPlayersStop(). */
+	bool driven = !IsBrakingOnPlayersStop(this);
+
+	if (driven && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && IsRailStationTile(moving_front->tile)) {
 		StationID sid = GetStationIndex(moving_front->tile);
 		/* A train sent to couple stops on its partner's platform and nowhere
 		 * else at that station; the other platforms are line to it (see the
@@ -1136,7 +1214,7 @@ int Train::GetCurrentMaxSpeed() const
 	/* Brake gently, from the right distance, for whatever fixed thing is next
 	 * on the road: see BrakingCeiling(). Realistic model only, like the
 	 * crossing ceiling above, which this is the run-up to. */
-	if (_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && this->cur_speed > 0) {
+	if (driven && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && this->cur_speed > 0) {
 		max_speed = std::min(max_speed, BrakingCeiling(this, moving_front));
 	}
 
@@ -6677,6 +6755,14 @@ static void TryDispatchRescueEngine(Train *tow)
 	tow->couple_target = nearest->index;
 	nearest->couple_claim = tow->index;
 
+	/* A wreck the player made with a late stop: the papers write it up a
+	 * second time as the tow sets out for it (NoteFailedToBrakeCrash()). */
+	if (nearest->stop_crash_news) {
+		nearest->stop_crash_news = false;
+		if (_show_train_orientation) IConsolePrint(CC_WARNING, "Vlak {}: noviny - odtahovka {} vyjizdi k vraku", nearest->unitnumber, tow->unitnumber);
+		AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_STOP_CRASH_TOW), NewsType::Accident, nearest->tile);
+	}
+
 	/* The papers used to be written here, the moment an engine was sent. They
 	 * are not any more: what they print is the price the train fetched, and
 	 * before the sale there is no such price -- an estimate would be a figure
@@ -11470,8 +11556,34 @@ int Train::UpdateSpeed()
 		case AccelerationModel::Original:
 			return this->DoUpdateSpeed(this->acceleration * (this->GetAccelerationStatus() == AS_BRAKE ? -4 : 2), 0, this->GetCurrentMaxSpeed());
 
-		case AccelerationModel::Realistic:
-			return this->DoUpdateSpeed(this->GetAcceleration(), this->GetAccelerationStatus() == AS_BRAKE ? 0 : 2, this->GetCurrentMaxSpeed());
+		case AccelerationModel::Realistic: {
+			int accel = this->GetAcceleration();
+			/* On the player's stop, with the setting on, the train brakes the
+			 * way the player sees trains brake -- the driver's gentle braking,
+			 * eight tiles from top speed (GentleBrakeRate()) -- and weaker than
+			 * that by the player's choice, 30 % or 10 %. Not the game's own
+			 * brake made weaker: that one is the engine's pulling force turned
+			 * round and stops even a heavy train inside a tile or two (measured:
+			 * 410 t from 100 km/h in one tile), so a train stopped by hand could
+			 * never run past anything and the setting would say nothing.
+			 *
+			 * The gentle rate is in speed squared per pixel; a train on straight
+			 * track covers speed/256 pixels a tick, so it loses rate/256 of a
+			 * speed unit a tick -- which is `rate` in the 1/256ths this takes. */
+			if (this->GetAccelerationStatus() == AS_BRAKE && IsBrakingOnPlayersStop(this)) {
+				int keep = _settings_game.vehicle.train_stop_brake_weaker == 0 ? 70 : 90;
+				accel = -std::max<int>(1, static_cast<int>(GentleBrakeRate(this) * keep / 100));
+			}
+			int distance = this->DoUpdateSpeed(accel, this->GetAccelerationStatus() == AS_BRAKE ? 0 : 2, this->GetCurrentMaxSpeed());
+			/* A train that ran past a red and has come to a stand without
+			 * hitting anything got away with it: whatever it does next is not
+			 * that overrun's doing. */
+			if (this->cur_speed == 0 && this->overran_red) {
+				this->overran_red = false;
+				this->overran_on_stop = false;
+			}
+			return distance;
+		}
 	}
 }
 
@@ -11828,6 +11940,36 @@ uint TrainCrashed(Train *v)
 }
 
 /**
+ * A train that ran past a red failing to brake has crashed into another:
+ * "brake, fail to brake and crash" (vehicle.train_signal_overrun).
+ *
+ * A helicopter comes to the wreck and waits by it until the tow has it. When
+ * it was the player's stop that failed to bring the train to a stand in time,
+ * the crash is the player's and the papers say so -- once now, and once more
+ * when a tow sets out for the wreck (see TryDispatchRescueEngine()).
+ *
+ * @param t the train that failed to brake, head of its consist, now a wreck
+ * @param where where it happened
+ */
+static void NoteFailedToBrakeCrash(Train *t, TileIndex where)
+{
+	bool on_stop = t->overran_on_stop;
+	t->overran_red = false;
+	t->overran_on_stop = false;
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_WARNING, "Vlak {}: nedobrzdil a naboural na ({},{}){}", t->unitnumber, TileX(where), TileY(where),
+				on_stop ? " - po stopce, noviny" : "");
+	}
+	SpawnRescueHelicopter(where, t->index);
+
+	if (on_stop) {
+		t->stop_crash_news = true;
+		AddTileNewsItem(GetEncodedString(STR_NEWS_TRAIN_STOP_CRASH, t->owner), NewsType::Accident, where);
+	}
+}
+
+/**
  * Collision test function.
  * @param v The %Train vehicle we may have collided with.
  * @param moving_front The %Train vehicle being examined.
@@ -11913,10 +12055,16 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 				other->unitnumber, tv->index, tv->x_pos, tv->y_pos, (int)tv->direction, (uint)tv->track.base());
 	}
 
+	/* One of the two ran past a red failing to brake: asked before the crash,
+	 * which brings both to a stand. See NoteFailedToBrakeCrash(). */
+	Train *overran = first->overran_red ? first : (other->overran_red ? other : nullptr);
+
 	/* Crash both trains. Two statements required to guarantee execution
 	 * order because RandomRange() is involved. */
 	uint num_victims = TrainCrashed(moving_front->First());
-	return num_victims + TrainCrashed(Train::From(v)->First());
+	num_victims += TrainCrashed(Train::From(v)->First());
+	if (overran != nullptr) NoteFailedToBrakeCrash(overran, moving_front->tile);
+	return num_victims;
 }
 
 /**
@@ -12075,6 +12223,10 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					/* Currently the locomotive is active. Determine which one of the
 					 * available tracks to choose */
 					bool was_stuck = first->flags.Test(VehicleRailFlag::Stuck);
+					bool overrun_here = false; // runs past a red on this tile; see RunsPastRedSignal()
+					/* What it was doing before a failed booking stops it dead. */
+					int speed_before = first->cur_speed;
+					uint8_t subspeed_before = first->subspeed;
 					chosen_track = ChooseTrainTrack(first, gp.new_tile, enterdir, bits, false, nullptr, true);
 					assert(chosen_track.Any(bits | GetReservedTrackbits(gp.new_tile)));
 					/* A tile entered with nothing booked on it. Ordinary between
@@ -12108,7 +12260,42 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * running into whatever holds the road. Held here, the
 					 * button did nothing at all -- the train sat in front of the
 					 * red revving and never moved. */
-					if (!was_stuck && first->flags.Test(VehicleRailFlag::Stuck) && first->force_proceed == TFP_NONE) {
+					/* "Brake, fail to brake and crash": a path signal that could
+					 * not be booked through is a red like any other, and a
+					 * train the player stopped that reaches it still going fast
+					 * runs past (RunsPastRedSignal()). Past it, one that has
+					 * already overrun and is still fast rolls on over whatever
+					 * track has no booking for it. Only where the tile leaves
+					 * one way on: the track handed back with a failed booking is
+					 * a placeholder, and at a junction it would be a way the
+					 * train never chose -- there the old dead stop stays. */
+					bool rolls_on = false;
+					if (!was_stuck && first->flags.Test(VehicleRailFlag::Stuck) && first->force_proceed == TFP_NONE &&
+							bits.Count() == 1 && _settings_game.vehicle.train_signal_overrun) {
+						Trackdir td_here = FindFirstTrackdir(trackdirbits);
+						/* The booking through it has just failed, which is what
+						 * red means to a path signal -- its own state is not
+						 * asked: at this moment it can still read green. */
+						bool red_path_signal = IsTileType(gp.new_tile, TileType::Railway) && HasSignalOnTrackdir(gp.new_tile, td_here) &&
+								IsPbsSignal(GetSignalType(gp.new_tile, TrackdirToTrack(td_here)));
+						if (_show_train_orientation) {
+							IConsolePrint(CC_INFO, "  krok: nezamluveno na ({},{}), cestne navestidlo {}, rychlost pred {}, stopka {}, projel uz {}",
+									TileX(gp.new_tile), TileY(gp.new_tile), red_path_signal ? "ano" : "ne", speed_before,
+									first->vehstatus.Test(VehState::Stopped) ? "ano" : "ne", first->overran_red ? "ano" : "ne");
+						}
+						if (red_path_signal) {
+							rolls_on = RunsPastRedSignal(first, true, gp.new_tile, speed_before);
+						} else if (first->overran_red && speed_before > OVERRUN_SPEED) {
+							rolls_on = true;
+						}
+						if (rolls_on) {
+							first->flags.Reset(VehicleRailFlag::Stuck);
+							first->cur_speed = speed_before;
+							first->subspeed = subspeed_before;
+							overrun_here = true;
+						}
+					}
+					if (!rolls_on && !was_stuck && first->flags.Test(VehicleRailFlag::Stuck) && first->force_proceed == TFP_NONE) {
 						first->cur_speed = 0;
 						first->subspeed = 0;
 						first->wait_counter = 0;
@@ -12204,8 +12391,22 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * drive through reds in general. */
 					bool rescue_on_booked_track = IsFetchingCasualty(first) && HasReservedTracks(gp.new_tile, chosen_track);
 
+					/* "Brake, fail to brake and crash": a train that reaches the
+					 * red still going fast runs past it instead of being stopped
+					 * dead. See RunsPastRedSignal(). */
+					if (!overrun_here && red_signals.Any(chosen_track) && first->force_proceed == TFP_NONE && !rescue_on_booked_track &&
+							!first->flags.Test(VehicleRailFlag::Stuck)) {
+						bool path_signal = IsTileType(gp.new_tile, TileType::Railway) &&
+								IsPbsSignal(GetSignalType(gp.new_tile, FindFirstTrack(chosen_track)));
+						overrun_here = RunsPastRedSignal(first, path_signal, gp.new_tile, first->cur_speed);
+						if (_show_train_orientation && _settings_game.vehicle.train_signal_overrun && !overrun_here && first->cur_speed > 5) {
+							IConsolePrint(CC_INFO, "  krok: cervena na ({},{}), {}, rychlost {} - zastavuje na miste", TileX(gp.new_tile), TileY(gp.new_tile),
+									path_signal ? "cestna" : "blokova", first->cur_speed);
+						}
+					}
+
 					/* Check if it's a red signal and that force proceed is not clicked. */
-					if (red_signals.Any(chosen_track) && first->force_proceed == TFP_NONE && !rescue_on_booked_track) {
+					if (!overrun_here && red_signals.Any(chosen_track) && first->force_proceed == TFP_NONE && !rescue_on_booked_track) {
 						/* In front of a red signal */
 						Trackdir i = FindFirstTrackdir(trackdirbits);
 
@@ -12823,6 +13024,19 @@ static bool TrainApproachingLineEnd(Train *moving_front, bool signal, bool rever
 		}
 		if (reverse) ReverseTrainDirection(consist, "konec koleje (dojezd)");
 		return false;
+	}
+
+	/* "Brake, fail to brake and crash": on the last tile before a red signal
+	 * the game has always cut the train's speed down a table, whatever it was
+	 * doing -- a brake nobody applied, which stops any train at any red. With
+	 * the setting on it is left out for a red signal: the train comes up to
+	 * it at what its own braking made of its speed, and what happens at the
+	 * signal is RunsPastRedSignal()'s to say. A driven train has braked for
+	 * the red long before this tile and arrives at a crawl either way. The end
+	 * of the line keeps it: there is nothing past that to run into. */
+	if (signal && _settings_game.vehicle.train_signal_overrun &&
+			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
+		return true;
 	}
 
 	/* slow down */

@@ -6834,6 +6834,221 @@ static bool ConTestReverse(std::span<std::string_view> argv)
 	return true;
 }
 
+/** State of the "brake, fail to brake and crash" scene; see ConTestOverrun(). */
+static struct {
+	bool active = false;
+	int phase = 0;
+	VehicleID ahead = VehicleID::Invalid(); ///< the train standing in the block past the red
+	VehicleID behind = VehicleID::Invalid(); ///< the train coming up to the red
+	TileIndex depot = INVALID_TILE; ///< where the one behind starts
+	uint red_x = 0; ///< x of the red signal the one behind comes up to
+	int stop_before = -1; ///< press the stop this many tiles short of the red; -1 never
+} _testnedobrzdil;
+
+/**
+ * Build the "brake, fail to brake and crash" scene.
+ *
+ * One straight line east from a depot, a platform far down it, and signals
+ * facing east. A light engine drives to the platform and stands there braked,
+ * so the block it stands in is taken; a second train then comes up from the
+ * depot behind it at line speed towards the red that guards that block. With
+ * "stopka" the player's stop is pressed on the second train a given number of
+ * tiles short of the red -- from then on nobody drives it, it only brakes, and
+ * whether it runs past the red into the train at the platform is what the
+ * scene reads (NEDOBRZDIL, Srazka).
+ *
+ * "blok": three one-way block signals two tiles apart before the platform, the
+ * player's "three signals in a row". "cesta": one one-way path signal. The
+ * setting vehicle.train_signal_overrun is the scene's to set.
+ *
+ * "odtah" adds a rescue engine on call in the depot, so that the wreck is
+ * fetched and the helicopter's leaving and the second news can be read.
+ *
+ * Usage: testnedobrzdil <blok|cesta> [stopka <tiles short of the red>] [vozu <wagons behind, 3 by default>] [odtah]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestOverrun(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2 || (argv[1] != "blok" && argv[1] != "cesta")) {
+		IConsolePrint(CC_HELP, "Build the fail-to-brake scene. Usage: 'testnedobrzdil <blok|cesta> [stopka <policek pred cervenou>] [vozu <pocet>] [odtah]'.");
+		return true;
+	}
+	bool block = argv[1] == "blok";
+	int stop_before = -1;
+	uint wagons = 3;
+	bool with_tow = false;
+	for (size_t i = 2; i < argv.size(); i++) {
+		if (argv[i] == "odtah") {
+			with_tow = true;
+		} else if (argv[i] == "stopka" || argv[i] == "vozu") {
+			if (i + 1 >= argv.size()) return false;
+			auto p = ParseInteger(argv[i + 1]);
+			if (!p.has_value()) return false;
+			if (argv[i] == "stopka") stop_before = (int)*p; else wagons = (uint)*p;
+			i++;
+		}
+	}
+	if (_game_mode != GameMode::Normal) return true;
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) return true;
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	EngineID eid_loco = EngineID::Invalid();
+	EngineID eid_wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			if (eid_wagon == EngineID::Invalid()) eid_wagon = e->index;
+		} else if (eid_loco == EngineID::Invalid()) {
+			eid_loco = e->index;
+		}
+	}
+	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid()) {
+		IConsolePrint(CC_ERROR, "testnedobrzdil: ODMITNUTO - no engine or wagon.");
+		return true;
+	}
+
+	static const uint LEN = 48;
+	TileIndex strip = INVALID_TILE;
+	for (uint y = 8; y < Map::SizeY() - 8 && strip == INVALID_TILE; y++) {
+		uint run = 0;
+		int z0 = 0;
+		for (uint x = 2; x < Map::SizeX() - 2; x++) {
+			TileIndex t = TileXY(x, y);
+			bool ok = (IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) && GetTileSlope(t) == SLOPE_FLAT;
+			int z = ok ? GetTileZ(t) : -1;
+			if (ok && (run == 0 || z == z0)) {
+				if (run == 0) z0 = z;
+				if (++run == LEN) {
+					strip = TileXY(x - LEN + 1, y);
+					break;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	if (strip == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testnedobrzdil: ODMITNUTO - no flat strip of {} tiles.", LEN);
+		return true;
+	}
+	uint x0 = TileX(strip);
+	uint y0 = TileY(strip);
+	TileIndex depot = TileXY(x0, y0);
+	if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW).Failed() ||
+			Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed() ||
+			Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, TileXY(x0 + 36, y0), RAILTYPE_RAIL, Axis::X, 1, 4, STAT_CLASS_DFLT, 0, StationID::Invalid(), false).Failed()) {
+		IConsolePrint(CC_ERROR, "testnedobrzdil: ODMITNUTO - track, depot or platform failed.");
+		return true;
+	}
+	StationID st = GetStationIndex(TileXY(x0 + 36, y0));
+
+	/* Facing east, the way both trains go. */
+	uint8_t east = SignalAlongTrackdir(Trackdir::X_SW);
+	std::vector<uint> signals = block ? std::vector<uint>{x0 + 10, x0 + 28, x0 + 30, x0 + 32} : std::vector<uint>{x0 + 10, x0 + 32};
+	SignalType kind = block ? SignalType::Block : SignalType::Path;
+	for (uint sx : signals) {
+		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, kind, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, east).Failed()) {
+			IConsolePrint(CC_ERROR, "testnedobrzdil: ODMITNUTO - signal at ({},{}) failed.", sx, y0);
+			return true;
+		}
+	}
+	UpdateSignalsInBuffer();
+
+	auto build = [&](uint wagons) -> Train * {
+		auto [cost, veh, a, b, c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) return nullptr;
+		for (uint i = 0; i < wagons; i++) {
+			auto [wc, wv, wa, wb, wd] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (wc.Succeeded()) Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, wv, veh, false);
+		}
+		Order o;
+		o.MakeGoToStation(st);
+		o.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, o);
+		return Train::Get(veh);
+	};
+	Train *ahead = build(0);
+	Train *behind = build(wagons);
+	if (ahead == nullptr || behind == nullptr) {
+		IConsolePrint(CC_ERROR, "testnedobrzdil: ODMITNUTO - trains failed.");
+		return true;
+	}
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, ahead->index, false);
+	if (with_tow) {
+		auto [cost_t, veh_t, ta, tb, tc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_t.Failed() || Command<Commands::SetRescueEngine>::Do(DoCommandFlag::Execute, veh_t, true).Failed()) {
+			IConsolePrint(CC_ERROR, "testnedobrzdil: ODMITNUTO - rescue engine failed.");
+		} else {
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_t, false);
+			IConsolePrint(CC_DEFAULT, "testnedobrzdil: odtahovka vlak {} v depu ({},{}).", Train::Get(veh_t)->unitnumber, x0, y0);
+		}
+	}
+
+	_testnedobrzdil.active = true;
+	_testnedobrzdil.phase = 0;
+	_testnedobrzdil.ahead = ahead->index;
+	_testnedobrzdil.behind = behind->index;
+	_testnedobrzdil.depot = depot;
+	_testnedobrzdil.red_x = x0 + 32;
+	_testnedobrzdil.stop_before = stop_before;
+	IConsolePrint(CC_DEFAULT, "testnedobrzdil: {} - vlak {} jede na nastupiste ({},{}), vlak {} ({} vozu, {} t) ho dojede, cervena na ({},{}){}; nastaveni {}.",
+			block ? "tri blokova navestidla" : "cestne navestidlo", ahead->unitnumber, x0 + 36, y0, behind->unitnumber,
+			CountVehiclesInChain(behind), behind->gcache.cached_weight,
+			x0 + 32, y0, stop_before < 0 ? "" : fmt::format(", stopka {} policek pred ni", stop_before),
+			_settings_game.vehicle.train_signal_overrun ? "ZAPNUTO" : "vypnuto");
+	return true;
+}
+
+/** Drive the fail-to-brake scene along, one tick at a time. */
+static const IntervalTimer<TimerGameTick> _testnedobrzdil_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	if (!_testnedobrzdil.active) return;
+	Train *ahead = Train::GetIfValid(_testnedobrzdil.ahead);
+	Train *behind = Train::GetIfValid(_testnedobrzdil.behind);
+	if (ahead == nullptr || behind == nullptr) {
+		_testnedobrzdil.active = false;
+		return;
+	}
+	AutoRestoreBackup cur_company(_current_company, behind->owner);
+	if (_testnedobrzdil.phase == 0) {
+		/* The one ahead has pulled up at the platform: braked there for good,
+		 * and the one behind sets off. */
+		if (ahead->current_order.IsType(OT_LOADING)) {
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, ahead->index, false);
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, behind->index, false);
+			IConsolePrint(CC_DEFAULT, "testnedobrzdil: vlak {} stoji na nastupisti zabrzdeny, vlak {} vyjizdi (tik {}).",
+					ahead->unitnumber, behind->unitnumber, TimerGameTick::counter);
+			_testnedobrzdil.phase = 1;
+		}
+		return;
+	}
+	if (_testnedobrzdil.phase == 1 && _testnedobrzdil.stop_before >= 0 && !behind->IsWrecked()) {
+		const Train *front = behind->GetMovingFront();
+		if (TileX(front->tile) + _testnedobrzdil.stop_before >= _testnedobrzdil.red_x) {
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, behind->index, false);
+			IConsolePrint(CC_DEFAULT, "testnedobrzdil: STOPKA na vlaku {} na ({},{}) rychlosti {} (tik {}).", behind->unitnumber,
+					TileX(front->tile), TileY(front->tile), behind->cur_speed, TimerGameTick::counter);
+			_testnedobrzdil.phase = 2;
+		}
+	}
+	if (_testnedobrzdil.phase >= 1 && behind->cur_speed == 0 && !behind->IsWrecked() && (_testnedobrzdil.stop_before < 0 || _testnedobrzdil.phase == 2) &&
+			TileX(behind->GetMovingFront()->tile) > TileX(_testnedobrzdil.depot) + 12) {
+		IConsolePrint(CC_DEFAULT, "testnedobrzdil: vlak {} zastavil na ({},{}), cervena na x {} (tik {}).", behind->unitnumber,
+				TileX(behind->GetMovingFront()->tile), TileY(behind->GetMovingFront()->tile), _testnedobrzdil.red_x, TimerGameTick::counter);
+		_testnedobrzdil.active = false;
+	}
+	if (behind->IsWrecked()) {
+		IConsolePrint(CC_DEFAULT, "testnedobrzdil: vlak {} je vrak (tik {}).", behind->unitnumber, TimerGameTick::counter);
+		_testnedobrzdil.active = false;
+	}
+});
+
 /**
  * Say whether a train is driving backwards, and refuse when it is not the
  * way the scene expects. The counters read spojeno, odtazeno and the rest;
@@ -10979,6 +11194,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testgrf",                  ConTestSavegameGrfs);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("testcouva",               ConTestDrivingBackwards);
+	IConsole::CmdRegister("testnedobrzdil",          ConTestOverrun);
 	IConsole::CmdRegister("testpreklop",             ConTestFlipInDepot);
 	IConsole::CmdRegister("testpresun",              ConTestMoveInDepot);
 	IConsole::CmdRegister("testmezera",              ConTestTearConsist);

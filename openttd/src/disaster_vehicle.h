@@ -30,6 +30,9 @@ enum DisasterSubType : uint8_t {
 	ST_BIG_UFO_DESTROYER_SHADOW, ///< Shadow of the aircraft.
 	ST_SMALL_SUBMARINE,          ///< Small submarine, pops up in the oceans but doesn't do anything
 	ST_BIG_SUBMARINE,            ///< Big submarine, pops up in the oceans but doesn't do anything
+	ST_RESCUE_HELICOPTER,        ///< Helicopter that lands by a wreck a train made failing to brake, and waits for the tow.
+	ST_RESCUE_HELICOPTER_SHADOW, ///< Shadow of the rescue helicopter.
+	ST_RESCUE_HELICOPTER_ROTORS, ///< Rotors of the rescue helicopter.
 };
 
 /**
@@ -55,5 +58,7 @@ struct DisasterVehicle final : public SpecializedVehicle<DisasterVehicle, Vehicl
 	void UpdateImage();
 	bool Tick() override;
 };
+
+void SpawnRescueHelicopter(TileIndex crash_tile, VehicleID wreck);
 
 #endif /* DISASTER_VEHICLE_H */
