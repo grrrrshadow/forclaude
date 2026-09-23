@@ -1405,6 +1405,33 @@ static const uint8_t _breakdown_chance[64] = {
 };
 
 /**
+ * Is this train on a railway station or within ten tiles of one?
+ *
+ * The player's rule for where breakdowns belong: at a station and around
+ * it, where the tow, the platforms and the other trains make a breakdown
+ * something to deal with, rather than out on the open line. Measured to
+ * the nearest tile of the station's rail part, the larger of the two
+ * distances across the map, so the ring round a station is a square.
+ * Any company's station counts; a waypoint is not a station.
+ */
+static bool IsTrainNearRailStation(const Vehicle *v)
+{
+	static constexpr int RADIUS = 10;
+	int x = TileX(v->tile);
+	int y = TileY(v->tile);
+	for (const Station *st : Station::Iterate()) {
+		const TileArea &a = st->train_station;
+		if (a.tile == INVALID_TILE) continue;
+		int ax = TileX(a.tile);
+		int ay = TileY(a.tile);
+		int dx = std::max({0, ax - x, x - (ax + a.w - 1)});
+		int dy = std::max({0, ay - y, y - (ay + a.h - 1)});
+		if (std::max(dx, dy) <= RADIUS) return true;
+	}
+	return false;
+}
+
+/**
  * Periodic check for a vehicle to maybe break down.
  * @param v The vehicle to consider breaking.
  */
@@ -1452,9 +1479,27 @@ void CheckVehicleBreakdown(Vehicle *v)
 	uint32_t r = Random();
 
 	/* Increase chance of failure. */
-	int chance = v->breakdown_chance + 1;
-	if (Chance16I(1, 25, r)) chance += 25;
-	v->breakdown_chance = ClampTo<uint8_t>(chance);
+	int grow = 1;
+	if (Chance16I(1, 25, r)) grow += 25;
+
+	/* Trains break down where the player wants them to: at a station and
+	 * within ten tiles of it (IsTrainNearRailStation()). There the chance
+	 * grows twice as fast; out on the open line it grows on one day in four
+	 * only. A breakdown that is due out there anyway happens one day in
+	 * sixteen, and on the other days it is put off with the chance kept, so
+	 * it is likely to come at the next station instead. What makes a train
+	 * prone to breaking down -- its reliability and the setting -- is the
+	 * same everywhere; the place is what changes. */
+	bool train_near_station = false;
+	if (v->type == VehicleType::Train) {
+		train_near_station = IsTrainNearRailStation(v);
+		if (train_near_station) {
+			grow *= 2;
+		} else if (!Chance16(1, 4)) {
+			grow = 0;
+		}
+	}
+	v->breakdown_chance = ClampTo<uint8_t>(v->breakdown_chance + grow);
 
 	/* Calculate reliability value to use in comparison. */
 	rel = v->reliability;
@@ -1465,6 +1510,12 @@ void CheckVehicleBreakdown(Vehicle *v)
 
 	/* Check the random chance and inform the vehicle of the result. */
 	if (_breakdown_chance[ClampTo<uint16_t>(rel) >> 10] <= v->breakdown_chance) {
+		if (v->type == VehicleType::Train && !train_near_station && !Chance16(1, 16)) return;
+		extern bool _show_train_orientation;
+		if (_show_train_orientation && v->type == VehicleType::Train) {
+			IConsolePrint(CC_INFO, "Vlak {}: porucha {} ({},{})", v->unitnumber,
+					train_near_station ? "u nadrazi" : "na trati", TileX(v->tile), TileY(v->tile));
+		}
 		v->breakdown_ctr    = GB(r, 16, 6) + 0x3F;
 		v->breakdown_delay  = GB(r, 24, 7) + 0x80;
 		v->breakdown_chance = 0;
@@ -1561,12 +1612,26 @@ bool Vehicle::HandleBreakdown()
 						 * taken away and broken up, and that call stands whatever
 						 * else stops being wrong with it. */
 						if (!head->IsSoldForScrap()) {
+							/* Waiting to be fetched, it gave up the road it had
+							 * booked ahead of itself and kept only the ground
+							 * under it (TrainAwaitsRescue()). */
+							bool gave_up_road = head->rescue_deadline != TimerGameEconomy::Date{};
 							head->rescue_deadline = TimerGameEconomy::Date{};
 							/* Going again under its own steam, so it is not waiting
 							 * for anybody to come and fetch it any more -- and it
 							 * goes back to what its order says, coupling
 							 * included. See RestoreCoupleErrandAfterBreakdown(). */
 							RestoreCoupleErrandAfterBreakdown(head);
+							/* And it books a road again before it moves, for the
+							 * order it has just gone back to. Without one it set
+							 * off with nothing booked ahead, asked its way at the
+							 * next points as if between block signals, and drove
+							 * onto a junction whose other branch another train
+							 * held: the rig saw the two collide (scene rigD1). A
+							 * road that cannot be booked leaves it stuck and
+							 * standing, and it asks again the way every stuck
+							 * train does. */
+							if (gave_up_road && head->IsFrontEngine()) TryPathReserve(head, true);
 						}
 					}
 					this->MarkDirty();
