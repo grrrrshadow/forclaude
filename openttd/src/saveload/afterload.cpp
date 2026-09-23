@@ -69,6 +69,7 @@
 #include "../timer/timer_game_tick.h"
 #include "../picker_func.h"
 
+#include "../road_on_rail.h"
 #include "saveload_internal.h"
 
 #include <signal.h>
@@ -3873,6 +3874,10 @@ bool AfterLoadGame()
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	_settings_game.difficulty.train_flip_reverse_allowed = TrainFlipReversingAllowed::None;
 	_settings_game.pf.reverse_at_signals = false;
+
+	/* Passenger ships once fitted for road vehicles get their passengers back
+	 * and take the cars beside them (road_on_rail.h). */
+	ConvertCarFerries();
 
 	/* Loading is over. Left at the last marker it passed, the whereabouts in a
 	 * crash report would go on claiming the load for the rest of the game and

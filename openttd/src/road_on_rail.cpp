@@ -178,6 +178,67 @@ bool CanCarryRoadVehicles(const Engine *e)
 }
 
 /**
+ * Does a ship of this engine take road vehicles beside its passengers? A
+ * passenger ship big enough to carry any does: the player's rule -- a car
+ * ferry that carries no passengers is silly, and a passenger ship takes cars
+ * on as well. It keeps its passengers and takes as many cars as its size
+ * gives (RoadVehiclesCarriedBy()), full and empty being about the
+ * passengers; it is not fitted for cars at all, so it is never offered the
+ * fitting (OfferRoadVehiclesToCarriers()). Other ships are fitted for cars or
+ * carry their cargo, as before. Aircraft too, for now: either people or a
+ * car.
+ * @param e the engine
+ * @return whether its ships take road vehicles beside passengers
+ */
+bool TakesRoadVehiclesBesidePassengers(const Engine *e)
+{
+	if (!IsValidCargoType(_road_vehicle_cargo) || e->type != VehicleType::Ship) return false;
+	if (!IsCargoInClass(e->GetDefaultCargoType(), CargoClass::Passengers)) return false;
+	return RoadVehiclesCarriedBy(e, nullptr) > 0;
+}
+
+/**
+ * How many road vehicles a ship or an aircraft has room for: a vessel fitted
+ * for them, its capacity; a passenger ship, what it takes beside its
+ * passengers (TakesRoadVehiclesBesidePassengers()) while it carries
+ * passengers; anything else none.
+ * @param v the ship or aircraft
+ * @return how many road vehicles fit
+ */
+uint RoadVehicleRoomIn(const Vehicle *v)
+{
+	if (!IsValidCargoType(_road_vehicle_cargo)) return 0;
+	if (v->cargo_type == _road_vehicle_cargo) return v->cargo_cap;
+	const Engine *e = v->GetEngine();
+	if (TakesRoadVehiclesBesidePassengers(e) && IsCargoInClass(v->cargo_type, CargoClass::Passengers)) return RoadVehiclesCarriedBy(e, v);
+	return 0;
+}
+
+/**
+ * Passenger ships fitted for road vehicles, from before they took road
+ * vehicles beside their passengers, get their passengers back: the ship is
+ * put back to its own cargo, and whatever road vehicles are aboard stay
+ * aboard -- they ride on who carries them, not on the cargo, whose units only
+ * said that they were there. Nothing else is touched; asked after every load
+ * and nothing to do once done.
+ */
+void ConvertCarFerries()
+{
+	if (!IsValidCargoType(_road_vehicle_cargo)) return;
+	for (Ship *s : Ship::Iterate()) {
+		if (s->cargo_type != _road_vehicle_cargo) continue;
+		const Engine *e = s->GetEngine();
+		if (!TakesRoadVehiclesBesidePassengers(e)) continue;
+		s->cargo.Truncate();
+		s->cargo_type = e->GetDefaultCargoType();
+		s->cargo_subtype = 0;
+		s->cargo_cap = e->DetermineCapacity(s);
+		s->refit_cap = s->cargo_cap;
+		LogAnomaly("Lod {}: prestavena na auta, dostala zpatky pasazery ({}) a auta veze k nim", s->unitnumber, s->cargo_cap);
+	}
+}
+
+/**
  * Say something about a road vehicle on the console, but only when it is news
  * -- the same discipline as SayOnChange() for trains: a vehicle that cannot
  * board goes on not being able to, every tick, for as long as it waits.
@@ -669,9 +730,10 @@ static Vehicle *FindVesselToBoard(const RoadVehicle *rv, StationID station, Stat
 		if (v->vehstatus.Test(VehState::Crashed) || v->vehstatus.Test(VehState::Stopped)) continue;
 		if (!v->current_order.IsType(OT_LOADING) || v->last_station_visited != station) continue;
 
-		if (v->cargo_type != _road_vehicle_cargo || v->cargo_cap == 0) {
+		const uint room = RoadVehicleRoomIn(v);
+		if (room == 0) {
 			why = type == VehicleType::Ship ?
-					fmt::format("lod {} stoji, ale neni prestavena na auta", v->unitnumber) :
+					fmt::format("lod {} stoji, ale auta nevozi", v->unitnumber) :
 					fmt::format("letadlo {} stoji, ale neni prestavene na auta", v->unitnumber);
 			continue;
 		}
@@ -704,10 +766,10 @@ static Vehicle *FindVesselToBoard(const RoadVehicle *rv, StationID station, Stat
 			continue;
 		}
 
-		if (RoadVehiclesAboard(v) - RoadVehiclesGettingOff(v, station) >= v->cargo_cap) {
+		if (RoadVehiclesAboard(v) - RoadVehiclesGettingOff(v, station) >= room) {
 			why = type == VehicleType::Ship ?
-					fmt::format("lod {} stoji, ale je plna aut ({})", v->unitnumber, v->cargo_cap) :
-					fmt::format("letadlo {} stoji, ale je plne ({})", v->unitnumber, v->cargo_cap);
+					fmt::format("lod {} stoji, ale je plna aut ({})", v->unitnumber, room) :
+					fmt::format("letadlo {} stoji, ale je plne ({})", v->unitnumber, room);
 			continue;
 		}
 
@@ -1296,8 +1358,8 @@ bool VesselHoldsForRoadVehicles(const Vehicle *v)
 				break;
 			}
 		}
-		if (!goes || v->cargo_type != _road_vehicle_cargo) continue;
-		if (RoadVehiclesAboard(v) - RoadVehiclesGettingOff(v, station) >= v->cargo_cap) continue;
+		if (!goes) continue;
+		if (RoadVehiclesAboard(v) - RoadVehiclesGettingOff(v, station) >= RoadVehicleRoomIn(v)) continue;
 		getting_on = true;
 	}
 

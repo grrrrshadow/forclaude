@@ -70,6 +70,9 @@ struct Vehicle;
 
 uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v);
 bool CanCarryRoadVehicles(const Engine *e);
+bool TakesRoadVehiclesBesidePassengers(const Engine *e);
+uint RoadVehicleRoomIn(const Vehicle *v);
+void ConvertCarFerries();
 
 bool TryBoardTrain(RoadVehicle *rv);
 bool VesselHoldsForRoadVehicles(const Vehicle *v);

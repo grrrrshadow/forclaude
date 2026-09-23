@@ -898,6 +898,9 @@ static void OfferRoadVehiclesToCarriers()
 	}
 	for (Engine *e : Engine::Iterate()) {
 		if (!CanCarryRoadVehicles(e)) continue;
+		/* A passenger ship takes cars beside its passengers and is not
+		 * fitted for them (TakesRoadVehiclesBesidePassengers()). */
+		if (TakesRoadVehiclesBesidePassengers(e)) continue;
 		e->info.refit_mask.Set(_road_vehicle_cargo);
 	}
 }

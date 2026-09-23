@@ -10889,7 +10889,10 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 	}
 
 	/* The ship, bought fitted for road vehicles, shuttling A - B. */
-	auto [cost_s, veh_s, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_ship, true, _road_vehicle_cargo, ClientID::Invalid);
+	/* A passenger ship takes cars beside its passengers and is bought as it
+	 * comes; any other is fitted for them. */
+	CargoType ship_cargo = TakesRoadVehiclesBesidePassengers(Engine::Get(eid_ship)) ? INVALID_CARGO : _road_vehicle_cargo;
+	auto [cost_s, veh_s, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid_ship, true, ship_cargo, ClientID::Invalid);
 	if (cost_s.Failed()) {
 		IConsolePrint(CC_ERROR, "testautolod: ship failed - {}", RefusalReason(cost_s));
 		return true;
@@ -10936,8 +10939,9 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 		built += fmt::format("{}{}", RoadVehicle::Get(veh_r)->unitnumber, back ? " zpet" : "");
 	}
 
-	IConsolePrint(CC_DEFAULT, "testautolod: lod {} (mista pro {} aut) vozi auta {} mezi stanicemi {} a {}.",
-			Ship::Get(veh_s)->unitnumber, Ship::Get(veh_s)->cargo_cap, built, id_a, id_b);
+	IConsolePrint(CC_DEFAULT, "testautolod: lod {} (mista pro {} aut, naklad {} {}) vozi auta {} mezi stanicemi {} a {}.",
+			Ship::Get(veh_s)->unitnumber, RoadVehicleRoomIn(Ship::Get(veh_s)), Ship::Get(veh_s)->cargo_cap,
+			GetString(CargoSpec::Get(Ship::Get(veh_s)->cargo_type)->name), built, id_a, id_b);
 	return true;
 }
 
