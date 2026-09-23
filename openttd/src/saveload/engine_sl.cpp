@@ -14,6 +14,7 @@
 
 #include "saveload_internal.h"
 #include "../engine_base.h"
+#include "../engine_func.h"
 #include "../string_func.h"
 
 #include "../safeguards.h"
@@ -123,6 +124,32 @@ void CopyTempEngineData()
 		e->company_avail       = se->company_avail;
 		e->company_hidden      = se->company_hidden;
 		e->name                = se->name;
+	}
+
+	/* A vehicle the savegame knows nothing of -- added to the original set
+	 * after the save was written, given its place by
+	 * EngineOverrideManager::AddMissingOriginalEngines() -- has no state
+	 * of its own to copy, and was left as the engine table made it: no
+	 * introduction date, available to nobody. The car carrier was exactly
+	 * that in every older save: in the game, never in the purchase list
+	 * (the player's "where is the wagon we made?"). It is started the way a
+	 * new game starts every vehicle; one whose date has come is available to
+	 * all at once. Seeded with nothing random, so that every client loading
+	 * the same save gets the same.
+	 *
+	 * And one a save carries in that state: a game loaded once by a build
+	 * that added the vehicle this way, and saved again, wrote the untouched
+	 * state into the save (the player's brzda.sav: introduced on day 0,
+	 * available to nobody). A vehicle that has been started has an
+	 * introduction date, or has come in; day 0 and never come in is one that
+	 * never was. */
+	TimerGameCalendar::YearMonthDay today = TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date);
+	for (Engine *e : Engine::Iterate()) {
+		bool unknown_to_save = e->index >= _temp_engine.size();
+		bool never_started = e->intro_date == TimerGameCalendar::Date{0} && !e->flags.Test(EngineFlag::Available);
+		if (!unknown_to_save && !never_started) continue;
+		StartupOneEngine(e, today, 0);
+		CalcEngineReliability(e, false);
 	}
 
 	ResetTempEngineData();

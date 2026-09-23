@@ -10543,9 +10543,12 @@ static void ConDumpCargoTypes()
 			if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
 			if (e->info.cargo_type != _road_vehicle_cargo) continue;
 			const GRFFile *grf = e->GetGRF();
-			IConsolePrint(CC_DEFAULT, "    carrier: engine {}, local id {}, GRF {:08X}, {}available, refits {}, '{}'", e->index,
+			IConsolePrint(CC_DEFAULT, "    carrier: engine {}, local id {}, GRF {:08X}, {}available, refits {}, '{}', intro {}, company avail {}, buildable {}, hidden {}", e->index,
 					e->grf_prop.local_id, grf == nullptr ? 0 : std::byteswap(grf->grfid), e->info.climates.Any() ? "" : "not ",
-					e->info.refit_mask.base(), GetString(e->info.string_id));
+					e->info.refit_mask.base(), GetString(e->info.string_id), e->intro_date,
+					e->company_avail.Test(_local_company) ? "yes" : "NO",
+					IsEngineBuildable(e->index, VehicleType::Train, _local_company) ? "yes" : "NO",
+					e->IsHidden(_local_company) ? "yes" : "no");
 		}
 		/* Vehicles as freight (the label VEHI): a car carrier could borrow the
 		 * picture a set drew for that, since it is a car transporter and the
