@@ -1563,8 +1563,10 @@ bool Vehicle::HandleBreakdown()
 						if (!head->IsSoldForScrap()) {
 							head->rescue_deadline = TimerGameEconomy::Date{};
 							/* Going again under its own steam, so it is not waiting
-							 * for anybody to come and fetch it any more. */
-							head->current_order.SetWaitForCouple(false);
+							 * for anybody to come and fetch it any more -- and it
+							 * goes back to what its order says, coupling
+							 * included. See RestoreCoupleErrandAfterBreakdown(). */
+							RestoreCoupleErrandAfterBreakdown(head);
 						}
 					}
 					this->MarkDirty();

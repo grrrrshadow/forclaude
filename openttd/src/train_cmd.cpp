@@ -6094,6 +6094,45 @@ bool TrainAwaitsRescue(Train *v)
 }
 
 /**
+ * Give a train whose breakdown has just mended itself its own errand back.
+ *
+ * Waiting to be fetched is written on the order the train carries with it:
+ * TrainAwaitsRescue() marks it waiting and takes "going to couple" off it,
+ * because a casualty is something to be collected, not a collector. When the
+ * breakdown ended on its own only the waiting was rubbed out again, and the
+ * going-to-couple stayed lost. The train then drove to the platform its order
+ * named as if the order were a plain stop -- booked its road to the station
+ * and not to the wagons standing there, stood against them, and never coupled;
+ * the order did not move on, because it was never told it had been worked.
+ * The player's report: after a breakdown it only goes to the stop.
+ *
+ * So both marks are put back the way the order in the list says them, as long
+ * as the carried order is still that one -- same kind, same place. A train
+ * sent somewhere else meanwhile (a depot for servicing, say) keeps what it
+ * carries, and only stops waiting. A train fetched by a tow instead has its
+ * carried order cleared in the depot and reads the list afresh, which comes
+ * to the same thing (HandleRescueEngineInDepot()).
+ *
+ * @param v the train, front of its consist
+ */
+void RestoreCoupleErrandAfterBreakdown(Train *v)
+{
+	v = v->First();
+	const Order *real = v->GetOrder(v->cur_real_order_index);
+	if (real != nullptr && v->current_order.GetType() == real->GetType() &&
+			(real->IsType(OT_GOTO_STATION) || real->IsType(OT_GOTO_DEPOT)) &&
+			v->current_order.GetDestination() == real->GetDestination()) {
+		v->current_order.SetGoToCouple(real->ShouldGoToCouple());
+		v->current_order.SetWaitForCouple(real->ShouldWaitForCouple());
+		if (_show_train_orientation && real->ShouldGoToCouple()) {
+			IConsolePrint(CC_INFO, "Vlak {}: porucha spravena - znovu jede pripojit (rozkaz c.{})", v->unitnumber, v->cur_real_order_index);
+		}
+	} else {
+		v->current_order.SetWaitForCouple(false);
+	}
+}
+
+/**
  * Let go of a call-out, from either end.
  *
  * An errand is written down twice -- the engine says what it is going for and

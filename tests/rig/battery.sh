@@ -122,6 +122,16 @@ testspoj
 testza 6000 testokna" 8000
 run_scene couvej "vlak123 on
 testspoj couvej" 8000
+# The collector breaks down on its way to the rake and nobody comes for it,
+# so the breakdown mends itself after the wait. It used to come back as a
+# plain stop: waiting to be fetched had taken "go to couple" off the order it
+# carries and mending gave back only half, so it booked its road to the
+# platform and not to the wagons, stood against them and never coupled.
+# spojeno=1 is the pass, the same as zakl.
+run_scene poruchaspoj "setting vehicle.rescue_wait_days 7
+vlak123 on
+testspoj
+testza 1000 testporucha 2" 10000
 run_scene depo "vlak123 on
 testspoj depo" 8000
 run_scene depopocet "vlak123 on
