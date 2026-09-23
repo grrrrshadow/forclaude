@@ -1435,7 +1435,8 @@ static std::string CountHousesBySource(TownID town)
  * - testdomy mapa (or mars): the themed towns of a new map -- of each other
  *   climate as many as its setting says, Mars towns as theirs when the game
  *   has the Mars houses, each all of its set, and no Mars house in any town
- *   of every house;
+ *   of every house; with the GRFs split, every ordinary town of one GRF and
+ *   the GRFs even;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
  * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
@@ -1513,6 +1514,33 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		for (size_t i = 0; i < want.size(); i++) {
 			IConsolePrint(CC_DEFAULT, "testdomy: mest z [{}]: {} z {}", HouseSourceName(want[i].first), found[i], want[i].second);
 			if (found[i] != want[i].second) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mest z [{}] ma byt {}.", HouseSourceName(want[i].first), want[i].second);
+		}
+
+		/* The GRFs split (economy.split_house_grfs): with any house GRF but
+		 * Mars in the game, no ordinary town is of every house, each is of
+		 * one GRF, and the GRFs have the towns evenly -- a difference of one
+		 * at most. */
+		if (_settings_game.economy.split_house_grfs) {
+			std::vector<std::pair<uint32_t, uint>> split;
+			for (uint32_t source : sources) {
+				if (source < HOUSE_SOURCE_CLIMATE && source != MARS_HOUSES_GRFID) split.emplace_back(source, 0);
+			}
+			uint plain = 0;
+			for (const Town *t : Town::Iterate()) {
+				if (t->num_house_sets == 0) plain++;
+				if (t->num_house_sets != 1) continue;
+				auto it = std::ranges::find(split, t->house_sets[0], &std::pair<uint32_t, uint>::first);
+				if (it != split.end()) it->second++;
+			}
+			uint lo = UINT32_MAX, hi = 0;
+			for (const auto &[source, n] : split) {
+				IConsolePrint(CC_DEFAULT, "testdomy: deleni: mest z [{}]: {}", HouseSourceName(source), n);
+				lo = std::min(lo, n);
+				hi = std::max(hi, n);
+			}
+			IConsolePrint(CC_DEFAULT, "testdomy: deleni: {} GRF, {} mest vsech domu", split.size(), plain);
+			if (!split.empty() && plain > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - GRF se deli, a {} mest stavi ze vsech domu.", plain);
+			if (!split.empty() && hi - lo > 1) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - GRF se deli nerovnomerne ({} az {}).", lo, hi);
 		}
 		return true;
 	}

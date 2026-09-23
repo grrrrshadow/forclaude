@@ -2213,6 +2213,8 @@ STR_CONFIG_SETTING_TOYLAND_TOWNS                                :Toyland towns: 
 STR_CONFIG_SETTING_TOYLAND_TOWNS_HELPTEXT                       :How many small towns of the toyland houses a new map gets among its other towns. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
 STR_CONFIG_SETTING_MARS_TOWNS                                   :Mars towns: {STRING2}
 STR_CONFIG_SETTING_MARS_TOWNS_HELPTEXT                          :How many small towns of the Mars houses a new map gets among its other towns. Their houses come from OpenGFX Mars Houses, which the game downloads by itself when it does not have them; without them no Mars town is made. Mars houses go up only in Mars towns -- any other town can be made one in its town window ("Houses from")
+STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS                             :Themed towns: one house set per town: {STRING2}
+STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS_HELPTEXT                    :With house sets (NewGRFs) loaded, every ordinary town of a new map builds from one of them only, the sets taking turns evenly: a map with two sets gets half its towns of each. The climate's own houses have no share -- tick them in a town window where wanted. The towns of the climate and Mars lines are made besides. Off, towns mix every house as usual
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE                            :Minimum distance between towns: {STRING2}
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE_HELPTEXT                   :Set the minimum distance in tiles between towns for map generation and random founding
 

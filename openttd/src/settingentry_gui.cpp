@@ -889,6 +889,7 @@ SettingsContainer &GetSettingsTree()
 				towns->Add(new SettingEntry("economy.tropic_towns"));
 				towns->Add(new SettingEntry("economy.toyland_towns"));
 				towns->Add(new SettingEntry("economy.mars_towns"));
+				towns->Add(new SettingEntry("economy.split_house_grfs"));
 			}
 
 			SettingsPage *industries = environment->Add(new SettingsPage(STR_CONFIG_SETTING_ENVIRONMENT_INDUSTRIES));

@@ -1288,3 +1288,10 @@ setting_newgame game_creation.temperate_snow 1
 setting_newgame game_creation.snow_coverage 40' run_scene snihtemperate "testza 1000 testsnih" 1200
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame difficulty.terrain_type 3' run_scene snihvyp "testza 1000 testsnih" 1200
+
+# The GRFs split (economy.split_house_grfs): with the older Mars set loaded
+# as an ordinary house GRF (the game's own Mars set does not count), every
+# ordinary town of the map has to be of it and none of every house. The rig
+# has one house GRF besides Mars, so the turns among several are not seen
+# here; the split with two is the same modulo.
+SCENE_NEWGAME='setting_newgame economy.split_house_grfs 1' run_scene delenigrf "testdomy mapa" 100 -c $DOMY2_CFG

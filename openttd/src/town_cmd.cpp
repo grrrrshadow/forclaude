@@ -2470,6 +2470,19 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 	 * may have 2 or 3 cities, instead of always 3. */
 	uint city_random_offset = _settings_game.economy.larger_towns == 0 ? 0 : (Random() % _settings_game.economy.larger_towns);
 
+	/* Themed towns, the GRFs split (economy.split_house_grfs): every ordinary
+	 * town of a new map is of one house GRF, and the GRFs take turns, so that
+	 * two of them get half the towns each. The climates' houses have no turn
+	 * -- a town window ticks them where wanted -- and neither have the Mars
+	 * houses, whose towns are the Mars line's (mars_houses.h). */
+	std::vector<uint32_t> split_sets;
+	if (!number.has_value() && _settings_game.economy.split_house_grfs) {
+		for (uint32_t source : AvailableHouseSources()) {
+			if (source < HOUSE_SOURCE_CLIMATE && source != MARS_HOUSES_GRFID) split_sets.push_back(source);
+		}
+	}
+	auto split_set = [&split_sets](uint nth) -> uint32_t { return split_sets.empty() ? 0 : split_sets[nth % split_sets.size()]; };
+
 	/* First attempt will be made at creating the suggested number of towns.
 	 * Note that this is really a suggested value, not a required one.
 	 * We would not like the system to lock up just because the user wanted 100 cities on a 64*64 map, would we? */
@@ -2479,7 +2492,7 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 		/* Get a unique name for the town. */
 		if (!GenerateTownName(_random, &townnameparts, &town_names)) continue;
 		/* try 20 times to create a random-sized town for the first loop. */
-		if (CreateRandomTown(20, townnameparts, TownSize::Random, city, layout) != nullptr) current_number++; // If creation was successful, raise a flag.
+		if (CreateRandomTown(20, townnameparts, TownSize::Random, city, layout, split_set(current_number)) != nullptr) current_number++; // If creation was successful, raise a flag.
 	} while (--total);
 
 	/* The themed towns: small towns of one set of houses among the others,
@@ -2528,7 +2541,7 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 	/* If current_number is still zero at this point, it means that not a single town has been created.
 	 * So give it a last try, but now more aggressive */
 	if (GenerateTownName(_random, &townnameparts) &&
-			CreateRandomTown(10000, townnameparts, TownSize::Random, _settings_game.economy.larger_towns != 0, layout) != nullptr) {
+			CreateRandomTown(10000, townnameparts, TownSize::Random, _settings_game.economy.larger_towns != 0, layout, split_set(0)) != nullptr) {
 		return true;
 	}
 

@@ -682,6 +682,7 @@ struct EconomySettings {
 	uint8_t tropic_towns; ///< how many small towns of the desert houses a new map gets (0 in the tropics itself)
 	uint8_t toyland_towns; ///< how many small towns of the toyland houses a new map gets (0 in toyland itself)
 	uint8_t mars_towns; ///< how many small towns of the Mars houses a new map gets, see mars_houses.h
+	bool split_house_grfs; ///< every ordinary town of a new map builds from one house GRF only, the GRFs taking turns
 	TownLayout town_layout; ///< select town layout, @see TownLayout
 	TownCargoGenMode town_cargogen_mode; ///< algorithm for generating cargo from houses, @see TownCargoGenMode
 	bool allow_town_roads; ///< towns are allowed to build roads (always allowed when generating world / in SE)
