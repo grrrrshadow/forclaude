@@ -6983,13 +6983,16 @@ static struct {
  * "les" plants trees on every open tile around the platform, so the
  * helicopter finds nowhere in the papers' picture to land and circles.
  *
- * Usage: testnedobrzdil <blok|cesta> [stopka <tiles short of the red>] [vozu <wagons behind, 3 by default>] [odtah] [les]
+ * "rozestup N": the signal before the red stands N tiles before it instead of
+ * two, with nothing between the first signal and it.
+ *
+ * Usage: testnedobrzdil <blok|cesta> [stopka <tiles short of the red>] [vozu <wagons behind, 3 by default>] [rozestup <tiles>] [odtah] [les]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestOverrun(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2 || (argv[1] != "blok" && argv[1] != "cesta")) {
-		IConsolePrint(CC_HELP, "Build the fail-to-brake scene. Usage: 'testnedobrzdil <blok|cesta> [stopka <policek pred cervenou>] [vozu <pocet>] [odtah] [les]'.");
+		IConsolePrint(CC_HELP, "Build the fail-to-brake scene. Usage: 'testnedobrzdil <blok|cesta> [stopka <policek pred cervenou>] [vozu <pocet>] [rozestup <policek>] [odtah] [les]'.");
 		return true;
 	}
 	bool block = argv[1] == "blok";
@@ -6997,18 +7000,29 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 	uint wagons = 3;
 	bool with_tow = false;
 	bool forest = false;
+	uint spacing = 0; // tiles between the last two signals before the red; 0 for the original three in a row
 	for (size_t i = 2; i < argv.size(); i++) {
 		if (argv[i] == "les") {
 			forest = true;
 		} else if (argv[i] == "odtah") {
 			with_tow = true;
-		} else if (argv[i] == "stopka" || argv[i] == "vozu") {
+		} else if (argv[i] == "stopka" || argv[i] == "vozu" || argv[i] == "rozestup") {
 			if (i + 1 >= argv.size()) return false;
 			auto p = ParseInteger(argv[i + 1]);
 			if (!p.has_value()) return false;
-			if (argv[i] == "stopka") stop_before = (int)*p; else wagons = (uint)*p;
+			if (argv[i] == "stopka") {
+				stop_before = (int)*p;
+			} else if (argv[i] == "vozu") {
+				wagons = (uint)*p;
+			} else {
+				spacing = (uint)*p;
+			}
 			i++;
 		}
+	}
+	if (spacing > 21) {
+		IConsolePrint(CC_ERROR, "testnedobrzdil: rozestup 1 az 21 policek.");
+		return true;
 	}
 	if (_game_mode != GameMode::Normal) return true;
 	if (Company::GetIfValid(_local_company) == nullptr) {
@@ -7074,6 +7088,10 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 	/* Facing east, the way both trains go. */
 	uint8_t east = SignalAlongTrackdir(Trackdir::X_SW);
 	std::vector<uint> signals = block ? std::vector<uint>{x0 + 10, x0 + 28, x0 + 30, x0 + 32} : std::vector<uint>{x0 + 10, x0 + 32};
+	/* "rozestup": one signal that far before the red and nothing else between
+	 * the first signal and it, so the warning it shows is seen that much
+	 * earlier -- signals close together and far apart. */
+	if (spacing != 0) signals = {x0 + 10, x0 + 32 - spacing, x0 + 32};
 	SignalType kind = block ? SignalType::Block : SignalType::Path;
 	for (uint sx : signals) {
 		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, kind, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, east).Failed()) {
@@ -7135,7 +7153,8 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 	IConsolePrint(CC_DEFAULT, "testnedobrzdil: {} - vlak {} jede na nastupiste ({},{}), vlak {} ({} vozu, {} t) ho dojede, cervena na ({},{}){}; nastaveni {}.",
 			block ? "tri blokova navestidla" : "cestne navestidlo", ahead->unitnumber, x0 + 36, y0, behind->unitnumber,
 			CountVehiclesInChain(behind), behind->gcache.cached_weight,
-			x0 + 32, y0, stop_before < 0 ? "" : fmt::format(", stopka {} policek pred ni", stop_before),
+			x0 + 32, y0, (stop_before < 0 ? "" : fmt::format(", stopka {} policek pred ni", stop_before)) +
+			(spacing == 0 ? "" : fmt::format(", navestidlo {} policek pred ni", spacing)),
 			IsSignalOverrunOn() ? "ZAPNUTO" : "vypnuto");
 	return true;
 }

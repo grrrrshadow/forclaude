@@ -57,6 +57,7 @@
 #include "crashlog.h"
 #include "anomaly_log.h"
 #include "road_on_rail.h"
+#include "signal_func.h"
 
 #include "safeguards.h"
 
@@ -967,6 +968,37 @@ static bool TrainHeldInBore(const Train *consist, const Train *moving_front)
 	return false;
 }
 
+/**
+ * Is the block behind a path signal taken -- booked by somebody, or with a
+ * train in it, on the way through or across it? A path signal is red until
+ * somebody books a way through it, so its red alone says nothing; this is what
+ * would keep it red when this train gets there.
+ *
+ * The block is read up to the next signal, the end of the line or a junction
+ * with nothing booked (where the way on is not settled), and no further than
+ * the warning looks (IsPathSignalWarning()).
+ *
+ * @param v the train asking, its head
+ * @param tile the signal's tile
+ * @param td the trackdir the signal faces along
+ */
+static bool PathBeyondSignalTaken(const Train *v, TileIndex tile, Trackdir td)
+{
+	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
+	for (int i = 0; i < 24; i++) {
+		if (!ft.Follow(tile, td)) return false;
+		TrackBits in_the_way = TrackdirBitsToTrackBits(ft.new_td_bits);
+		for (Track t : TrackdirBitsToTrackBits(ft.new_td_bits)) in_the_way |= TrackCrossesTracks(t);
+		if (GetReservedTrackbits(ft.new_tile).Any(in_the_way)) return true;
+		if (SpeedOfTrainOn(v, ft.new_tile, ft.exitdir, ft.new_td_bits) >= 0) return true;
+		if (ft.new_td_bits.Count() != 1) return false;
+		tile = ft.new_tile;
+		td = FindFirstTrackdir(ft.new_td_bits);
+		if (IsTileType(tile, TileType::Railway) && HasSignalOnTrackdir(tile, td)) return false;
+	}
+	return false;
+}
+
 static int BrakingCeiling(const Train *v, const Train *moving_front)
 {
 	if (moving_front->track == Track::Depot) return INT32_MAX;
@@ -1038,7 +1070,14 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	int entered_at = 0; // distance at which the tile the walk is on was entered
 	int last_signal_px = -1; // distance at which the last signal facing this train was passed
 	bool on_our_booking = true; // every tile so far is booked to this train
-	for (int step = 0; px < look_px && step < 160; step++) {
+	/* A signal within sight showed the warning aspect (IsPathSignalWarning()):
+	 * the next signal is at danger, and the driver knows it before he can see
+	 * it. The look goes on past his sight as far as that signal and no further.
+	 * Only with "brake, fail to brake and crash" on -- off, the driver already
+	 * sees as far as braking needs, and nothing there changes. */
+	bool warned = false;
+	const bool read_warning = IsSignalOverrunOn();
+	for (int step = 0; (px < look_px || warned) && step < 160; step++) {
 		if (!ft.Follow(tile, td)) {
 			/* End of line: a stop at the edge. */
 			ask(0, px);
@@ -1162,9 +1201,22 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 				ask(0, px);
 				break;
 			}
+			/* Warned of this one and it is a path signal: its red means
+			 * something only if the ground behind it really is taken, and that
+			 * the driver cannot see from here -- so what warned him is read as
+			 * that. Nobody behind it: it clears when he gets to it. */
+			if (warned && PathBeyondSignalTaken(v, ft.new_tile, next_td)) {
+				ask(0, px);
+				break;
+			}
 		}
 
-		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td)) last_signal_px = px;
+		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td)) {
+			last_signal_px = px;
+			/* The signal a warning was about is reached; a signal the driver can
+			 * see and that shows the warning itself starts a new one. */
+			warned = read_warning && px < look_px && IsPathSignalWarning(ft.new_tile, next_td);
+		}
 
 		entered_at = px;
 		px += IsDiagonalTrackdir(next_td) ? TILE_SIZE : TILE_SIZE / 2;
