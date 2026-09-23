@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 228;
+static const uint16_t OPENTTD_SPRITE_COUNT = 229;
 /** @} */
 
 /** @{
@@ -221,6 +221,9 @@ static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
  */
 static const SpriteID SPR_RAID_ROCKET_GREY           = SPR_OPENTTD_BASE + 212;
 static const SpriteID SPR_RAID_ROCKET_YELLOW         = SPR_OPENTTD_BASE + 220;
+/* The cargo icon for road vehicles on wagons, ships and aircraft (CT_ROLA): a
+ * car, artwork from icons8.com -- see CREDITS.md. */
+static const SpriteID SPR_CARGO_ROAD_VEHICLES_ICON   = SPR_OPENTTD_BASE + 228;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
@@ -1372,7 +1375,7 @@ static const SpriteID SPR_CARGO_SUGAR                 = 4316;
 static const SpriteID SPR_CARGO_TOYS                  = 4317;
 static const SpriteID SPR_CARGO_CANDYFLOSS            = 4318;
 static const SpriteID SPR_CARGO_FIZZY_DRINKS          = 4319;
-static const SpriteID SPR_CARGO_ROAD_VEHICLES         = 0; ///< No icon of its own yet (CT_ROLA); GetCargoIcon() draws the goods crate for 0.
+static const SpriteID SPR_CARGO_ROAD_VEHICLES         = SPR_CARGO_ROAD_VEHICLES_ICON; ///< A car (CT_ROLA), among this build's own sprites.
 static const SpriteID SPR_CARGO_TOFFEE                = 4320;
 static const SpriteID SPR_CARGO_BUBBLES               = 4321;
 static const SpriteID SPR_CARGO_PLASTIC               = 4322;
