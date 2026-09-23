@@ -6953,14 +6953,39 @@ static bool ConTestWreck(std::span<std::string_view> argv)
  * ordered to board the train at the first and get off at the second. See
  * road_on_rail.h.
  * Usage: testautovlak [how many road vehicles, 1 by default]
+ *        [posun|vlakem|tirak] [vagon=<part of a name>] [auto=<part of a name>]
  * @copydoc IConsoleCmdProc
  */
-static bool ConTestRoadOnRail(std::span<std::string_view> argv)
+static bool ConTestRoadOnRail(std::span<std::string_view> all_args)
 {
-	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem|tirak]'.");
+	if (all_args.empty()) {
+		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem|tirak] [vagon=<jmeno>] [auto=<jmeno>]'.");
 		return true;
 	}
+	/* "vagon=" and "auto=" pick the wagon and the road vehicle by a piece of
+	 * their name, wherever they stand on the line -- a set's own wagon and car
+	 * put side by side, which is what a set's author needs to see measured.
+	 * The rest of the arguments keep their places. */
+	std::string want_wagon_name;
+	std::string want_road_name;
+	std::vector<std::string_view> positional;
+	for (std::string_view a : all_args) {
+		if (a.starts_with("vagon=")) {
+			want_wagon_name = a.substr(6);
+		} else if (a.starts_with("auto=")) {
+			want_road_name = a.substr(5);
+		} else {
+			positional.push_back(a);
+		}
+	}
+	std::span<std::string_view> argv(positional);
+	auto name_has = [](EngineID e, std::string_view piece) {
+		std::string name = GetString(STR_ENGINE_NAME, e);
+		std::string lower_name = name, lower_piece{piece};
+		std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), [](unsigned char c) { return std::tolower(c); });
+		std::transform(lower_piece.begin(), lower_piece.end(), lower_piece.begin(), [](unsigned char c) { return std::tolower(c); });
+		return lower_name.find(lower_piece) != std::string::npos;
+	};
 	uint cars = 1;
 	if (argv.size() >= 2) {
 		auto pcars = ParseInteger(argv[1]);
@@ -7004,6 +7029,10 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
 		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			if (!want_wagon_name.empty()) {
+				if (eid_wagon == EngineID::Invalid() && name_has(e->index, want_wagon_name)) eid_wagon = e->index;
+				continue;
+			}
 			/* For a lorry and trailer, the longest wagon the game has: one
 			 * built out of several pieces, which is how a set builds a wagon
 			 * longer than the game's own can be. Nothing shorter can carry
@@ -7033,14 +7062,37 @@ static bool ConTestRoadOnRail(std::span<std::string_view> argv)
 	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (GetRoadTramType(e->VehInfo<RoadVehicleInfo>().roadtype) != RoadTramType::Road) continue;
+		if (!want_road_name.empty() && !name_has(e->index, want_road_name)) continue;
 		if (want_long && CountArticulatedParts(e->index) == 0) continue;
+		/* A name matched whole beats one that only contains the piece: a set
+		 * names its vans "van", "van with a garden", "van with a garden and a
+		 * crate", and asking for the van must not bring the garden. */
+		if (!want_road_name.empty() && eid_road != EngineID::Invalid() &&
+				GetString(STR_ENGINE_NAME, eid_road).size() <= GetString(STR_ENGINE_NAME, e->index).size()) continue;
 		eid_road = e->index;
-		break;
+		if (want_road_name.empty()) break;
+	}
+	if (!want_wagon_name.empty() && eid_wagon == EngineID::Invalid()) {
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (!e->company_avail.Test(_local_company) || RailVehInfo(e->index)->railveh_type != RailVehicleType::Wagon) continue;
+			IConsolePrint(CC_INFO, "testautovlak: k mani vagon '{}' ({} dilu)", GetString(STR_ENGINE_NAME, e->index), CountArticulatedParts(e->index) + 1);
+		}
+	}
+	if (!want_road_name.empty() && eid_road == EngineID::Invalid()) {
+		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+			if (!e->company_avail.Test(_local_company)) continue;
+			IConsolePrint(CC_INFO, "testautovlak: k mani auto '{}' ({} dilu)", GetString(STR_ENGINE_NAME, e->index), CountArticulatedParts(e->index) + 1);
+		}
 	}
 	if (eid_loco == EngineID::Invalid() || eid_wagon == EngineID::Invalid() || eid_road == EngineID::Invalid()) {
-		IConsolePrint(CC_ERROR, "testautovlak: no engine, wagon or road vehicle available.");
+		IConsolePrint(CC_ERROR, "testautovlak: ODMITNUTO - no engine, wagon or road vehicle available{}{}.",
+				want_wagon_name.empty() ? "" : fmt::format(" (vagon '{}' {})", want_wagon_name, eid_wagon == EngineID::Invalid() ? "nenalezen" : "ok"),
+				want_road_name.empty() ? "" : fmt::format(" (auto '{}' {})", want_road_name, eid_road == EngineID::Invalid() ? "nenalezeno" : "ok"));
 		return true;
 	}
+	IConsolePrint(CC_DEFAULT, "testautovlak: vagon '{}' ({} dilu), auto '{}' ({} dilu).",
+			GetString(STR_ENGINE_NAME, eid_wagon), CountArticulatedParts(eid_wagon) + 1,
+			GetString(STR_ENGINE_NAME, eid_road), CountArticulatedParts(eid_road) + 1);
 	bool bus = IsCargoInClass(Engine::Get(eid_road)->GetDefaultCargoType(), CargoClass::Passengers);
 	RoadStopType stop_type = bus ? RoadStopType::Bus : RoadStopType::Truck;
 
