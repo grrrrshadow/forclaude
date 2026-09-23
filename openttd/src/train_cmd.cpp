@@ -510,8 +510,107 @@ static int DistanceToLevelCrossingAhead(const Train *moving_front, int max_tiles
  * top speed is the player's measure of a train that sees a red in time; a
  * train doing less needs less, by the square.
  */
+static int64_t GentleBrakeRate(const Train *v);
+
+/**
+ * How far this train runs, in pixels along straight track, getting from a
+ * stand to its top speed on the flat -- worked out from the same physics the
+ * realistic model accelerates it with (GroundVehicle::GetAcceleration(): the
+ * engines' power and pulling force against the train's weight, cargo and
+ * all, the axles, rolling friction and air drag). Speed goes up by a/256 of a
+ * unit a tick and the train covers speed/256 pixels, so the run is the sum of
+ * speed/a over the speeds on the way up. Where the train cannot get any
+ * faster the run ends there, at the speed it can reach.
+ *
+ * Up to nine tenths of top speed, not all of it: the last tenth is a long
+ * tail where the pull barely beats the drag -- a ten-wagon train went from
+ * 62 to 69 in sixteen tiles after getting to 62 in fourteen -- and brakes
+ * have no such tail. Measured on the flat: three wagons 6 tiles worked out
+ * against 7 driven, ten wagons 14 against 14 to nine tenths.
+ *
+ * @param v the train, front of its consist
+ * @param[out] reached the speed the run ends at
+ * @return the run in pixels
+ */
+static int64_t AccelerationRunPixels(const Train *v, int64_t *reached)
+{
+	int64_t top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
+	int64_t mass = std::max<int64_t>(v->gcache.cached_weight, 1);
+	int64_t power = int64_t(v->gcache.cached_power) * 746;
+	int64_t max_te = v->gcache.cached_max_te;
+	bool maglev = v->GetAccelerationType() == VehicleAccelerationModel::Maglev;
+
+	constexpr int STEPS = 32;
+	int64_t upto = top * 9 / 10;
+	int64_t run = 0;
+	*reached = upto;
+	for (int i = 0; i < STEPS; i++) {
+		int64_t speed = (2 * i + 1) * upto / (2 * STEPS); // the middle of this step
+		int64_t force = maglev ? power / 25 : std::min<int64_t>(power * 18 / (std::max<int64_t>(speed, 1) * 5), max_te);
+		int64_t resistance = int64_t(14) * v->gcache.cached_air_drag * speed * speed / 1000; // 14: the open-air drag area, Train::GetAirDragArea()
+		if (!maglev) resistance += v->gcache.cached_axle_resistance + mass * (15 * (512 + speed) / 512);
+		int64_t accel = (force - resistance) / (mass * 4);
+		if (accel <= 0) {
+			*reached = std::max<int64_t>(i * upto / STEPS, 1);
+			break;
+		}
+		run += speed * std::max<int64_t>(upto / STEPS, 1) / accel;
+	}
+	return run;
+}
+
+/**
+ * The braking rate of a train with "brake, fail to brake and crash" on: a
+ * train brakes as it accelerates -- the player's rule, heavy long trains
+ * twenty tiles either way, smoothly -- so the run it needs to stop from its
+ * top speed is the run it needs to reach it (AccelerationRunPixels()). A
+ * loaded train is heavier than an empty one and brakes longer, as it pulls
+ * away slower. No figure of tiles is set on it -- the player's rule, it goes
+ * by the physics and a train that cannot stop in time does not -- beyond two
+ * tiles at the least, for the arithmetic, and half a large map at the most.
+ *
+ * Worked out when the train's weight, power or top speed changes and kept,
+ * not every time it is asked: it is asked many times a tick.
+ *
+ * @param v the train, front of its consist
+ * @return speed squared per pixel, as GentleBrakeRate()
+ */
+static int64_t PhysicsBrakeRate(const Train *v)
+{
+	struct Key {
+		uint32_t weight;
+		uint32_t power;
+		uint32_t max_te;
+		uint16_t top;
+		bool operator==(const Key &) const = default;
+	};
+	Key key{v->gcache.cached_weight, v->gcache.cached_power, v->gcache.cached_max_te, v->vcache.cached_max_speed};
+	static std::map<VehicleID, std::pair<Key, int64_t>> cache;
+	auto it = cache.find(v->index);
+	if (it != cache.end() && it->second.first == key) return it->second.second;
+
+	int64_t reached = 1;
+	int64_t run = AccelerationRunPixels(v, &reached);
+	run = Clamp<int64_t>(run, 2 * TILE_SIZE, 128 * TILE_SIZE);
+	int64_t rate = std::max<int64_t>(reached * reached / (2 * run), 1);
+	cache[v->index] = {key, rate};
+	if (_show_train_orientation && v->IsFrontEngine()) {
+		IConsolePrint(CC_INFO, "Vlak {}: brzdna draha podle fyziky {} policek z rychlosti {} ({} t)", v->unitnumber,
+				(run + TILE_SIZE / 2) / TILE_SIZE, reached, v->gcache.cached_weight);
+	}
+	if (cache.size() > 4096) cache.clear();
+	return rate;
+}
+
 static int64_t GentleBrakeRate(const Train *v)
 {
+	/* With "brake, fail to brake and crash" on, a train brakes as it pulls
+	 * away (PhysicsBrakeRate()); without, the driver's eight tiles from top
+	 * speed that the game has always used. */
+	if (_settings_game.vehicle.train_signal_overrun &&
+			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
+		return PhysicsBrakeRate(v);
+	}
 	constexpr int64_t BRAKE_TILES = 8;
 	int64_t top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
 	return std::max<int64_t>(top * top / (2 * BRAKE_TILES * TILE_SIZE), 1);
@@ -536,7 +635,9 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 /**
  * How far ahead, in pixels along the track, the speed this train is doing
  * now can ask anything of it: the gentle stopping distance from that speed,
- * plus two tiles of margin, and never more than a few dozen tiles. Shared by
+ * plus two tiles of margin, and never more than the driver can see (the
+ * player's setting; "best" reaches half a large map, as far as a heavy train
+ * braking by the physics can need). Shared by
  * the ceiling that brakes for what is on the road and the look-ahead that
  * extends the road, so that the road is extended before the ceiling has
  * reason to brake for its end.
@@ -548,7 +649,7 @@ static int GentleLookAhead(const Train *v)
 	 * as braking needs ("best", which is what the game always did), or a
 	 * fixed number of tiles. Seeing less than braking needs is the point of
 	 * the shorter ones: the train starts to brake later. */
-	static constexpr int SIGHT_TILES[] = {48, 5, 10, 15, 20};
+	static constexpr int SIGHT_TILES[] = {128, 5, 10, 15, 20};
 	int sight = SIGHT_TILES[std::min<uint>(_settings_game.vehicle.train_driver_sight, std::size(SIGHT_TILES) - 1)];
 	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, sight * TILE_SIZE));
 }
@@ -927,7 +1028,7 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	int entered_at = 0; // distance at which the tile the walk is on was entered
 	int last_signal_px = -1; // distance at which the last signal facing this train was passed
 	bool on_our_booking = true; // every tile so far is booked to this train
-	for (int step = 0; px < look_px && step < 64; step++) {
+	for (int step = 0; px < look_px && step < 160; step++) {
 		if (!ft.Follow(tile, td)) {
 			/* End of line: a stop at the edge. */
 			ask(0, px);

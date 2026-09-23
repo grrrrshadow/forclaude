@@ -160,18 +160,20 @@ vlak123 on
 testnedobrzdil blok vozu 10 odtah" 9000
 run_scene nedobrzdilvyp "vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
-# Setting on, nobody touches the stop: the train is driven. It learns that the
-# platform is taken only when it books up to the path signal, four tiles
-# short, brakes for it at a train's own rate -- no longer a tenth of its speed
-# a tick -- cannot stop and runs past (srazka=1). The player's own save does
-# the same (TEMATA_ODTAH 81.8).
+# Setting on, nobody touches the stop: the train is driven, ten wagons behind
+# it. It learns that the platform is taken only when it books up to the path
+# signal, four tiles short, and brakes by the physics -- seventeen tiles from
+# its top speed, as long as it takes to pull away, no longer a tenth of its
+# speed a tick -- cannot stop and runs past (srazka=1). The player's own
+# save does the same (TEMATA_ODTAH 81.8). Three wagons brake in four tiles
+# and would stop.
 run_scene nedobrzdilbez "setting vehicle.train_signal_overrun on
 vlak123 on
-testnedobrzdil cesta odtah" 9000
+testnedobrzdil cesta vozu 10 odtah" 9000
 # The player's three block signals in a row, the stop pressed eight tiles
 # short of the last one. The game's own cut to a crawl on the last tile
-# before a red is left out with the setting on, so the train runs past the
-# red -- and stops a tile short of the engine at the platform (srazka=0).
+# before a red is left out with the setting on; this light train brakes by
+# the physics in a few tiles and stands short of the red (srazka=0).
 run_scene nedobrzdilblok "setting vehicle.train_signal_overrun on
 vlak123 on
 testnedobrzdil blok stopka 8 odtah" 9000
