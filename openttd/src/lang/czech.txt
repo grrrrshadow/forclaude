@@ -1532,6 +1532,18 @@ STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :Vlak zastavený
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :O kolik slaběji vlak brzdí, když mu zmáčkneš stopku. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté (vidí 5 až 20 polí)
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS                         :Oranžových návěstidel před červenou: {STRING}
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_HELPTEXT                :Kolik návěstidel před červenou svítí oranžově. Se zapnutým „Brzdit, nedobrzdit a nabourat“ ví strojvedoucí o tolika návěstidlech před sebou, i když je ještě nevidí, a na červenou dobrzdí, když jsou návěstidla dost daleko od sebe. Víc oranžových nechá těžké vlaky dobrzdit i na hustých návěstidlech, ale vlaky za nimi brzdí dřív a jezdí dál od sebe
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_1                       :1
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_2                       :2
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_3                       :3
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY                          :Oranžovou zapomene: {STRING}
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :Jak dlouho si strojvedoucí pamatuje, co mu řeklo poslední návěstidlo, které projel. Potom ví jen to, co vidí, a červená daleko za oranžovou ho překvapí. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_NEVER                    :s ETCS nikdy
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_20                       :za 20 polí s ETCS
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_15                       :za 15 polí s ETCS
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_10                       :za 10 polí
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_5                        :za 5 polí
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Model zrychlování silničních vozidel: {STRING}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Zvolit fyzikální model pro zrychlení silničních vozidel. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů.

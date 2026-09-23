@@ -16,11 +16,15 @@
 #include "company_type.h"
 
 /**
- * Whether a green path signal is showing the warning aspect: the road booked
- * through it ends at or before the next signal. Read off the map, not stored.
- * Defined in rail_cmd.cpp next to the drawing that uses it.
+ * Whether a green signal is showing the warning aspect: one of the next
+ * signals along the line, as many as WarningSignalCount() says, is at danger.
+ * Read off the map, not stored. Defined in rail_cmd.cpp next to the drawing
+ * that uses it.
  */
 bool IsPathSignalWarning(TileIndex tile, Trackdir td);
+
+/** How many signals before a red show the warning aspect (vehicle.train_warning_signals, 1 to 3). */
+int WarningSignalCount();
 
 /**
  * Maps a trackdir to the bit that stores its status in the map arrays, in the

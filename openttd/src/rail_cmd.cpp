@@ -2028,6 +2028,11 @@ bool IsPathSignalWarning(TileIndex tile, Trackdir td)
 	 * somewhere: it runs every time the signal is drawn. */
 	constexpr int MAX_TILES = 24;
 
+	/* How many signals before a red show the warning: the player's setting
+	 * (vehicle.train_warning_signals). Each of them is looked for no further
+	 * than MAX_TILES from the one before. */
+	int signals_left = WarningSignalCount();
+
 	CFollowTrackRail ft(GetTileOwner(tile), GetRailTypeInfo(GetRailType(tile))->compatible_railtypes);
 	TileIndex cur = tile;
 	Trackdir cur_td = td;
@@ -2047,10 +2052,22 @@ bool IsPathSignalWarning(TileIndex tile, Trackdir td)
 		 * and bridges as well (measured -- the rig draws, so the battery
 		 * caught it on the station scenes). */
 		if (IsTileType(cur, TileType::Railway) && HasSignalOnTrackdir(cur, cur_td)) {
-			return GetSignalStateByTrackdir(cur, cur_td) == SignalState::Red;
+			if (GetSignalStateByTrackdir(cur, cur_td) == SignalState::Red) return true;
+			if (--signals_left == 0) return false;
+			i = -1; // the next signal is looked for from this one
 		}
 	}
 	return false;
+}
+
+/**
+ * How many signals before a red show the warning aspect, and so how many
+ * signals ahead a driver knows the state of: the player's setting
+ * (vehicle.train_warning_signals), 1 to 3.
+ */
+int WarningSignalCount()
+{
+	return Clamp<int>(_settings_game.vehicle.train_warning_signals, 1, 3);
 }
 
 /**

@@ -142,6 +142,7 @@ testza 1000 testporucha 2" 10000
 # failed to brake (spojeno=1 odtazeno=1); a helicopter lands by it and leaves
 # when the tow has it; the papers write it up twice.
 run_scene nedobrzdil "setting vehicle.train_braking 4
+setting vehicle.train_warning_memory 4
 vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # The same with the setting off, the game as it was: the stop is the game's
@@ -149,6 +150,7 @@ testnedobrzdil cesta stopka 3 odtah" 9000
 # The same with forest planted all round: nowhere in the papers' picture to
 # land, so the helicopter circles over the wreck until the tow has it.
 run_scene nedobrzdilles "setting vehicle.train_braking 4
+setting vehicle.train_warning_memory 4
 vlak123 on
 testnedobrzdil cesta stopka 3 odtah les" 9000
 # How far the driver sees from the cab, the same setting's "sees 5 tiles"
@@ -167,6 +169,7 @@ testnedobrzdil cesta stopka 3 odtah" 9000
 # save does the same (TEMATA_ODTAH 81.8). Three wagons brake in four tiles
 # and would stop.
 run_scene nedobrzdilbez "setting vehicle.train_braking 4
+setting vehicle.train_warning_memory 4
 vlak123 on
 testnedobrzdil cesta vozu 10 odtah" 9000
 # The player's three block signals in a row, the stop pressed eight tiles
@@ -176,6 +179,30 @@ testnedobrzdil cesta vozu 10 odtah" 9000
 run_scene nedobrzdilblok "setting vehicle.train_braking 4
 vlak123 on
 testnedobrzdil blok stopka 8 odtah" 9000
+# The warning aspect ("orange"): a signal tells the driver about the next one
+# even where he cannot see it (vehicle.train_warning_signals, how many; and
+# vehicle.train_warning_memory, how long he keeps it in mind). Ten wagons,
+# sees 5 tiles. The signal before the red 2 tiles short of it: he learns of
+# the red 7 tiles out and runs past (srazka=1). 20 tiles short: he knows of
+# the red from there and stands short of it (srazka=0). The same, but he
+# forgets after 5 tiles: runs past again (srazka=1). Two orange signals, 2
+# tiles apart: he knows of the red from the signal before those and stops.
+# The scenes above that are about running past a red set him to forget after
+# 5 tiles, or their signals, 22 tiles apart, would warn him in time.
+run_scene oranzblizko "setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 2 odtah" 9000
+run_scene oranzdaleko "setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+run_scene oranzzapomene "setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+run_scene oranzdve "setting vehicle.train_braking 1
+setting vehicle.train_warning_signals 2
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 2 odtah" 9000
 run_scene depo "vlak123 on
 testspoj depo" 8000
 run_scene depopocet "vlak123 on

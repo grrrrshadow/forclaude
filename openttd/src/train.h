@@ -245,6 +245,15 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	static constexpr uint8_t DEPOT_DECOUPLE_WHOLE = 0xFF; ///< #depot_decouple_pending value for "drop the whole coupled train" rather than a count.
 	bool depot_decouple_sell = false; ///< The wagons that #depot_decouple_pending is about are sold once they are down, not stored. Written and honoured at the same two moments, and saved for the same reason.
 	DepotHold depot_hold = DepotHold::None; ///< Why this train stands instead of buying into or putting wagons down in a shed. Saved, so a game loaded mid-wait does not announce the wait a second time.
+	/**
+	 * How many tiles the leading end has entered since it last passed a
+	 * signal facing it, UINT8_MAX for "long ago or never". With "brake, fail
+	 * to brake and crash" on, the driver forgets what that signal told him
+	 * after as many tiles as the player's setting says
+	 * (vehicle.train_warning_memory; see BrakingCeiling()). Saved, so a game
+	 * loaded between a signal and the red after it drives on the same.
+	 */
+	uint8_t tiles_past_signal = UINT8_MAX;
 
 	/**
 	 * The rake this train has just left standing in the shed it is in.

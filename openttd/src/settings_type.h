@@ -633,6 +633,8 @@ struct VehicleSettings {
 	uint16_t rescue_wait_days; ///< how many days a broken-down or crashed train waits to be fetched before it mends itself the vanilla way
 	uint8_t train_braking; ///< "brake, fail to brake and crash" and how far the driver sees: 0 = off, the driver sees as far as braking needs; 1..4 = on, he sees 5, 10, 15, 20 tiles
 	uint8_t train_stop_brake_weaker; ///< with train_braking on, how much weaker a train stopped by the player brakes: 0 = 30 %, 1 = 10 %
+	uint8_t train_warning_memory; ///< with train_braking on, after how many tiles past a signal the driver forgets what it told him: 0 = never (ETCS), 1..4 = 20, 15, 10, 5 tiles
+	uint8_t train_warning_signals; ///< how many signals before a red show the warning aspect, 1..3; with train_braking on, also how many signals ahead a driver knows of
 	AccelerationModel roadveh_acceleration_model; ///< realistic acceleration for road vehicles
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration

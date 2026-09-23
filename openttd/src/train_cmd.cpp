@@ -644,6 +644,17 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 }
 
 /**
+ * How far ahead, in pixels along the track, anything can ask something of
+ * this train at the speed it is doing now: the gentle stopping distance from
+ * that speed plus two tiles of margin, however far the driver sees.
+ */
+static int GentleStoppingReach(const Train *v)
+{
+	int64_t gentle = GentleBrakeRate(v);
+	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, INT32_MAX / 2));
+}
+
+/**
  * How far ahead, in pixels along the track, the speed this train is doing
  * now can ask anything of it: the gentle stopping distance from that speed,
  * plus two tiles of margin, and never more than the driver can see (the
@@ -655,14 +666,13 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
  */
 static int GentleLookAhead(const Train *v)
 {
-	int64_t gentle = GentleBrakeRate(v);
 	/* How far the driver can see from the cab, by the player's one setting
 	 * (vehicle.train_braking): off sees as far as braking needs; on is a
 	 * fixed number of tiles, and that distance is what makes a train fail
 	 * to brake -- it sees the signal late and brakes longer. */
 	static constexpr int SIGHT_TILES[] = {128, 5, 10, 15, 20};
 	int sight = SIGHT_TILES[std::min<uint>(_settings_game.vehicle.train_braking, std::size(SIGHT_TILES) - 1)];
-	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, sight * TILE_SIZE));
+	return std::min<int>(GentleStoppingReach(v), sight * TILE_SIZE);
 }
 
 /**
@@ -982,6 +992,23 @@ static bool TrainHeldInBore(const Train *consist, const Train *moving_front)
  * @param tile the signal's tile
  * @param td the trackdir the signal faces along
  */
+static bool PathBeyondSignalTaken(const Train *v, TileIndex tile, Trackdir td);
+
+/**
+ * Does the driver still have in mind what the last signal he passed told him?
+ * The player's setting (vehicle.train_warning_memory): "never forgets, with
+ * ETCS" always does; otherwise for so many tiles past the signal.
+ *
+ * @param v the train, front of its consist
+ */
+static bool DriverRemembersSignal(const Train *v)
+{
+	static constexpr uint MEMORY_TILES[] = {UINT8_MAX, 20, 15, 10, 5};
+	uint memory = std::min<uint>(_settings_game.vehicle.train_warning_memory, std::size(MEMORY_TILES) - 1);
+	if (memory == 0) return true;
+	return v->tiles_past_signal < MEMORY_TILES[memory];
+}
+
 static bool PathBeyondSignalTaken(const Train *v, TileIndex tile, Trackdir td)
 {
 	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
@@ -1070,14 +1097,22 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	int entered_at = 0; // distance at which the tile the walk is on was entered
 	int last_signal_px = -1; // distance at which the last signal facing this train was passed
 	bool on_our_booking = true; // every tile so far is booked to this train
-	/* A signal within sight showed the warning aspect (IsPathSignalWarning()):
-	 * the next signal is at danger, and the driver knows it before he can see
-	 * it. The look goes on past his sight as far as that signal and no further.
+	/* How many of the signals ahead the driver knows the state of without
+	 * seeing them. A signal tells him about as many signals after it as the
+	 * player's setting says show the warning before a red (vehicle.
+	 * train_warning_signals, IsPathSignalWarning()): the last one he passed
+	 * told him about those ahead of him now, and one he can see tells him
+	 * about those after it. A real driver keeps in mind the warning he has
+	 * passed; read this way it needs no memory -- only the line. The look
+	 * goes on past his sight as far as those signals, and no further than a
+	 * stop could ask anything of the train at all.
 	 * Only with "brake, fail to brake and crash" on -- off, the driver already
 	 * sees as far as braking needs, and nothing there changes. */
-	bool warned = false;
 	const bool read_warning = IsSignalOverrunOn();
-	for (int step = 0; (px < look_px || warned) && step < 160; step++) {
+	const int warning_signals = WarningSignalCount();
+	const int reach_px = read_warning ? GentleStoppingReach(v) : look_px;
+	int known = read_warning && DriverRemembersSignal(v) ? warning_signals : 0;
+	for (int step = 0; (px < look_px || (known > 0 && px < reach_px)) && step < 160; step++) {
 		if (!ft.Follow(tile, td)) {
 			/* End of line: a stop at the edge. */
 			ask(0, px);
@@ -1201,11 +1236,11 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 				ask(0, px);
 				break;
 			}
-			/* Warned of this one and it is a path signal: its red means
-			 * something only if the ground behind it really is taken, and that
-			 * the driver cannot see from here -- so what warned him is read as
+			/* Known to him and a path signal: its red means something only
+			 * if the ground behind it really is taken, and that the driver
+			 * cannot see from here -- so what the signals told him is read as
 			 * that. Nobody behind it: it clears when he gets to it. */
-			if (warned && PathBeyondSignalTaken(v, ft.new_tile, next_td)) {
+			if (known > 0 && PathBeyondSignalTaken(v, ft.new_tile, next_td)) {
 				ask(0, px);
 				break;
 			}
@@ -1213,9 +1248,9 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 
 		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td)) {
 			last_signal_px = px;
-			/* The signal a warning was about is reached; a signal the driver can
-			 * see and that shows the warning itself starts a new one. */
-			warned = read_warning && px < look_px && IsPathSignalWarning(ft.new_tile, next_td);
+			/* One he sees tells him about the ones after it; one he only knew
+			 * of is used up. */
+			if (read_warning) known = px < look_px ? warning_signals : known - 1;
 		}
 
 		entered_at = px;
@@ -13019,6 +13054,15 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 				if (v->IsMovingFront()) {
 					first->wait_counter = 0;
 
+					/* A signal facing the train on the tile it is entering is
+					 * passed; otherwise one more tile since the last one. */
+					Trackdir entered_td = v->GetVehicleTrackdir();
+					if (IsTileType(gp.new_tile, TileType::Railway) && entered_td != Trackdir::Invalid && HasSignalOnTrackdir(gp.new_tile, entered_td)) {
+						first->tiles_past_signal = 0;
+					} else if (first->tiles_past_signal != UINT8_MAX) {
+						first->tiles_past_signal++;
+					}
+
 					/* If we are approaching a crossing that is reserved, play the sound now. */
 					TileIndex crossing = TrainApproachingCrossingTile(v); // We know we are the moving front, so we can check v.
 					if (crossing != INVALID_TILE && HasCrossingReservation(crossing) && _settings_client.sound.ambient) SndPlayTileFx(SND_0E_LEVEL_CROSSING, crossing);
@@ -13036,6 +13080,14 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 			if (IsTileType(gp.new_tile, TileType::TunnelBridge) && VehicleEnterTile(v, gp.new_tile, gp.x, gp.y).Test(VehicleEnterTileState::EnteredWormhole)) {
 				/* Perform look-ahead on tunnel exit. */
 				if (v->IsMovingFront()) {
+					/* The bore is counted whole at its mouth, the tiles the
+					 * driver will go through without anything to read. A
+					 * signalled one carries its signal at the mouth. */
+					if (IsTunnelBridgeSignalled(gp.new_tile)) {
+						first->tiles_past_signal = 0;
+					} else {
+						first->tiles_past_signal = static_cast<uint8_t>(std::min<uint>(first->tiles_past_signal + GetTunnelBridgeLength(gp.new_tile, GetOtherTunnelBridgeEnd(gp.new_tile)) + 1, UINT8_MAX));
+					}
 					TryReserveRailTrack(gp.new_tile, DiagDirToDiagTrack(GetTunnelBridgeDirection(gp.new_tile)));
 					CheckNextTrainTile(first);
 				}
