@@ -1522,15 +1522,14 @@ STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} {P 0 de
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Vlak spomalí před silničním přejezdem: {STRING}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :Vlak na nebezpečném úseku spomalí, pod silničním nadjezdem jede normálně. Strojvedoucí předvídá, auta uvízlá na přejezdu spůsobí menší škody.
 STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN                         :Brzdit, nedobrzdit a nabourat: {STRING}
-STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :já to potřebuju. Jak vlaky brzdí a jak daleko strojvedoucí vidí před sebe na návěstidla a na vlaky. „Kouká na ETCS, nekouká na cestu“ je výchozí: vidí všechno, tak daleko, kolik vlak potřebuje na zabrzdění, a vlak na červenou vždycky dobrzdí včas. Ostatní volby zapínají nedobrzdění: vlak, který na červenou přijede moc rychle, ji projede a může nabourat do toho, co je za ní, a brzdí tak dlouho, jak se rozjíždí - těžký vlak dlouho. Když zmáčkneš stopku, vlak už nikdo neřídí, jen brzdí slaběji (o kolik, říká další nastavení), a pozdní stopka může skončit nárazem - to pak píšou noviny. K vraku přiletí vrtulník a počká, až ho odveze odtahovka. „Kouká na cestu, vidí všechno“ vidí tak daleko, kolik potřebuje. S 5, 10, 15 nebo 20 poli vidí jen tak daleko, začne brzdit později a nemusí to stihnout. Značka ETCS u dlouhých dohledů znamená vylepšený dohled. Jen s realistickým modelem zrychlení vlaků
+STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :já to potřebuju. Jak vlaky brzdí a jak daleko strojvedoucí vidí před sebe na návěstidla a na vlaky. Vypnuto je „kouká na ETCS, nekouká na cestu“ (výchozí): vidí všechno, tak daleko, kolik vlak potřebuje na zabrzdění, a na červenou vždycky dobrzdí včas. Zapnuto je „vidí 5 polí“, „vidí 10 polí“, „vidí 15 polí s ETCS“ nebo „vidí 20 polí s ETCS“: strojvedoucí uvidí návěstidlo jen na tu dálku, začne brzdit později a brzdí déle, tak dlouho, jak se vlak rozjíždí - těžký vlak dlouho. Vlak, který na červenou přijede moc rychle, ji projede a může nabourat do toho, co je za ní. Když zmáčkneš stopku, vlak už nikdo neřídí, jen brzdí slaběji (o kolik, říká další nastavení), a pozdní stopka může skončit nárazem - to pak píšou noviny. K vraku přiletí vrtulník a počká, až ho odveze odtahovka. ETCS u dlouhých dohledů znamená vylepšený dohled. Jen s realistickým modelem zrychlení vlaků
 STR_CONFIG_SETTING_TRAIN_BRAKING_ETCS                           :kouká na ETCS, nekouká na cestu
-STR_CONFIG_SETTING_TRAIN_BRAKING_ALL                            :kouká na cestu, vidí všechno
-STR_CONFIG_SETTING_TRAIN_BRAKING_5                              :5 polí
-STR_CONFIG_SETTING_TRAIN_BRAKING_10                             :10 polí
-STR_CONFIG_SETTING_TRAIN_BRAKING_15                             :15 polí ETCS
-STR_CONFIG_SETTING_TRAIN_BRAKING_20                             :20 polí ETCS
+STR_CONFIG_SETTING_TRAIN_BRAKING_5                              :vidí 5 polí
+STR_CONFIG_SETTING_TRAIN_BRAKING_10                             :vidí 10 polí
+STR_CONFIG_SETTING_TRAIN_BRAKING_15                             :vidí 15 polí s ETCS
+STR_CONFIG_SETTING_TRAIN_BRAKING_20                             :vidí 20 polí s ETCS
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :Vlak zastavený stopkou brzdí slaběji o: {STRING}
-STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :O kolik slaběji vlak brzdí, když mu zmáčkneš stopku. Platí u všech voleb „Brzdit, nedobrzdit a nabourat“ kromě „kouká na ETCS, nekouká na cestu“
+STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :O kolik slaběji vlak brzdí, když mu zmáčkneš stopku. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté (vidí 5 až 20 polí)
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
 

@@ -604,8 +604,8 @@ static int64_t PhysicsBrakeRate(const Train *v)
 
 /**
  * Is "brake, fail to brake and crash" switched on? It is every choice of the
- * player's one setting (vehicle.train_braking) but the first, which is the
- * driver who sees everything and always stops in time.
+ * player's one setting (vehicle.train_braking) but the first: off is the
+ * driver who sees everything and always stops in time, on is how far he sees.
  */
 bool IsSignalOverrunOn()
 {
@@ -656,11 +656,10 @@ static int GentleLookAhead(const Train *v)
 {
 	int64_t gentle = GentleBrakeRate(v);
 	/* How far the driver can see from the cab, by the player's one setting
-	 * (vehicle.train_braking): as far as braking needs for the first two
-	 * choices -- off, and on with the same sight -- or a fixed number of
-	 * tiles. Seeing less than braking needs is the point of the shorter
-	 * ones: the train starts to brake later. */
-	static constexpr int SIGHT_TILES[] = {128, 128, 5, 10, 15, 20};
+	 * (vehicle.train_braking): off sees as far as braking needs; on is a
+	 * fixed number of tiles, and that distance is what makes a train fail
+	 * to brake -- it sees the signal late and brakes longer. */
+	static constexpr int SIGHT_TILES[] = {128, 5, 10, 15, 20};
 	int sight = SIGHT_TILES[std::min<uint>(_settings_game.vehicle.train_braking, std::size(SIGHT_TILES) - 1)];
 	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, sight * TILE_SIZE));
 }
