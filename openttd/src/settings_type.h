@@ -631,9 +631,8 @@ struct VehicleSettings {
 	bool train_slow_for_level_crossing; ///< trains ease off before a level crossing
 	bool train_rescue_towing; ///< broken-down and crashed trains wait to be towed away instead of sorting themselves out
 	uint16_t rescue_wait_days; ///< how many days a broken-down or crashed train waits to be fetched before it mends itself the vanilla way
-	bool train_signal_overrun; ///< a train that reaches a red signal still going fast runs past it instead of being stopped dead there
-	uint8_t train_stop_brake_weaker; ///< with train_signal_overrun, how much weaker a train stopped by the player brakes: 0 = 30 %, 1 = 10 %
-	uint8_t train_driver_sight; ///< how far the driver sees ahead from the cab: 0 = as far as braking needs, 1..4 = 5, 10, 15, 20 tiles
+	uint8_t train_braking; ///< "brake, fail to brake and crash" and how far the driver sees: 0 = off, the driver sees as far as braking needs; 1 = on, the same sight; 2..5 = on, 5, 10, 15, 20 tiles
+	uint8_t train_stop_brake_weaker; ///< with train_braking on, how much weaker a train stopped by the player brakes: 0 = 30 %, 1 = 10 %
 	AccelerationModel roadveh_acceleration_model; ///< realistic acceleration for road vehicles
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration

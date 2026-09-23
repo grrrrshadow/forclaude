@@ -82,6 +82,7 @@ void NormalizeTrainVehInDepot(const Train *u);
 
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
+bool IsSignalOverrunOn();
 void RestoreCoupleErrandAfterBreakdown(Train *v);
 bool IsConsistStandingAtStation(const Train *consist, StationID station);
 bool IsWholeTrainInsideDepot(const Train *v);
@@ -217,7 +218,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	uint16_t couple_refuse_tries = 0; ///< NOSAVE: how many ticks in a row a coupling has been refused while standing against the partner. A rescue engine gives the case up when it runs out; see TrainLocoHandler().
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 
-	/* "Brake, fail to brake and crash" (vehicle.train_signal_overrun). Only
+	/* "Brake, fail to brake and crash" (vehicle.train_braking). Only
 	 * ever set on the head of a consist. */
 	bool overran_red = false; ///< Ran past a red signal too fast to be stopped at it, and has not come to a stand since; a crash meanwhile is that overrun's doing.
 	bool overran_on_stop = false; ///< ... and it was the player's stop button that was bringing it to a stand, so the crash is the player's.

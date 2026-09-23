@@ -978,7 +978,7 @@ static void Disaster_Helicopter_Init()
 
 /**
  * Send a helicopter to a wreck made by a train failing to brake
- * (vehicle.train_signal_overrun). It flies in from the west, comes down on
+ * (vehicle.train_braking). It flies in from the west, comes down on
  * open grass by the wreck, stands there with its rotor turning, and leaves
  * once the tow has coupled the wreck up. Only for the look of it: it touches
  * nothing and nothing touches it.

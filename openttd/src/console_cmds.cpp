@@ -6975,7 +6975,7 @@ static struct {
  *
  * "blok": three one-way block signals two tiles apart before the platform, the
  * player's "three signals in a row". "cesta": one one-way path signal. The
- * setting vehicle.train_signal_overrun is the scene's to set.
+ * setting vehicle.train_braking is the scene's to set.
  *
  * "odtah" adds a rescue engine on call in the depot, so that the wreck is
  * fetched and the helicopter's leaving and the second news can be read.
@@ -7136,7 +7136,7 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 			block ? "tri blokova navestidla" : "cestne navestidlo", ahead->unitnumber, x0 + 36, y0, behind->unitnumber,
 			CountVehiclesInChain(behind), behind->gcache.cached_weight,
 			x0 + 32, y0, stop_before < 0 ? "" : fmt::format(", stopka {} policek pred ni", stop_before),
-			_settings_game.vehicle.train_signal_overrun ? "ZAPNUTO" : "vypnuto");
+			IsSignalOverrunOn() ? "ZAPNUTO" : "vypnuto");
 	return true;
 }
 

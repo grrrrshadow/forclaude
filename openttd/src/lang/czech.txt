@@ -1522,18 +1522,17 @@ STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} {P 0 de
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Vlak spomalí před silničním přejezdem: {STRING}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :Vlak na nebezpečném úseku spomalí, pod silničním nadjezdem jede normálně. Strojvedoucí předvídá, auta uvízlá na přejezdu spůsobí menší škody.
 STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN                         :Brzdit, nedobrzdit a nabourat: {STRING}
-STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :já to potřebuju. Vlak, který na červenou přijede moc rychle, ji projede a může nabourat do toho, co je za ní. Strojvedoucí na červenou brzdí včas a zastaví. Když ale zmáčkneš stopku, vlak už nikdo neřídí, jen brzdí slaběji (o kolik, říká další nastavení), a pozdní stopka může skončit nárazem - to pak píšou noviny. K vraku přiletí vrtulník a počká, až ho odveze odtahovka. Jen s realistickým modelem zrychlení vlaků
+STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :já to potřebuju. Jak vlaky brzdí a jak daleko strojvedoucí vidí před sebe na návěstidla a na vlaky. „Kouká na ETCS, nekouká na cestu“ je výchozí: vidí všechno, tak daleko, kolik vlak potřebuje na zabrzdění, a vlak na červenou vždycky dobrzdí včas. Ostatní volby zapínají nedobrzdění: vlak, který na červenou přijede moc rychle, ji projede a může nabourat do toho, co je za ní, a brzdí tak dlouho, jak se rozjíždí - těžký vlak dlouho. Když zmáčkneš stopku, vlak už nikdo neřídí, jen brzdí slaběji (o kolik, říká další nastavení), a pozdní stopka může skončit nárazem - to pak píšou noviny. K vraku přiletí vrtulník a počká, až ho odveze odtahovka. „Kouká na cestu, vidí všechno“ vidí tak daleko, kolik potřebuje. S 5, 10, 15 nebo 20 poli vidí jen tak daleko, začne brzdit později a nemusí to stihnout. Značka ETCS u dlouhých dohledů znamená vylepšený dohled. Jen s realistickým modelem zrychlení vlaků
+STR_CONFIG_SETTING_TRAIN_BRAKING_ETCS                           :kouká na ETCS, nekouká na cestu
+STR_CONFIG_SETTING_TRAIN_BRAKING_ALL                            :kouká na cestu, vidí všechno
+STR_CONFIG_SETTING_TRAIN_BRAKING_5                              :5 polí
+STR_CONFIG_SETTING_TRAIN_BRAKING_10                             :10 polí
+STR_CONFIG_SETTING_TRAIN_BRAKING_15                             :15 polí ETCS
+STR_CONFIG_SETTING_TRAIN_BRAKING_20                             :20 polí ETCS
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :Vlak zastavený stopkou brzdí slaběji o: {STRING}
-STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :O kolik slaběji vlak brzdí, když mu zmáčkneš stopku. Platí jen se zapnutým „Brzdit, nedobrzdit a nabourat“
+STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :O kolik slaběji vlak brzdí, když mu zmáčkneš stopku. Platí u všech voleb „Brzdit, nedobrzdit a nabourat“ kromě „kouká na ETCS, nekouká na cestu“
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT                           :Strojvedoucí vidí z kabiny: {STRING}
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :Jak daleko strojvedoucí vidí před sebe na návěstidla a na vlaky. „Kouká na ETCS, nekouká na cestu“ je výchozí a vidí všechno: tak daleko, kolik vlak potřebuje na zabrzdění, a ještě dvě políčka navíc, nejvýš 128 políček. S vypnutým „Brzdit, nedobrzdit a nabourat“ tak vlak vždycky dobrzdí včas. Kratší pohled znamená, že vlak začne brzdit později: s vypnutým nastavením zabrzdí prudčeji, se zapnutým to nemusí stihnout. Značka ETCS u dlouhých dohledů znamená vylepšený dohled. Jen s realistickým modelem zrychlení vlaků
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_BEST                      :kouká na ETCS, nekouká na cestu
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_5                         :5 polí
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_10                        :10 polí
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_15                        :15 polí ETCS
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_20                        :20 polí ETCS
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Model zrychlování silničních vozidel: {STRING}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Zvolit fyzikální model pro zrychlení silničních vozidel. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů.

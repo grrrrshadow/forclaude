@@ -1435,18 +1435,17 @@ STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} day{P 0
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Trains slow down before a level crossing: {STRING2}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :A train eases off where the line is dangerous, and runs normally under a road bridge. The driver looks ahead, and a car caught on the crossing comes off more lightly
 STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN                         :Brake, fail to brake and crash: {STRING2}
-STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :I need this. A train that reaches a red signal too fast runs past it and may crash into whatever is beyond. The driver brakes for a red in time and stops. Press a train's stop button, though, and nobody drives it any more: it only brakes, weaker (by how much is the next setting), and a stop pressed too late can end in a crash - which then makes the papers. A helicopter comes to the wreck and waits until the tow takes it away. Realistic train acceleration only
+STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :I need this. How trains brake and how far ahead the driver sees signals and trains. "Watches ETCS, not the track" is the default: it sees everything, as far as the train needs to brake, and the train always stops in time for a red. The other choices switch failing to brake on: a train that reaches a red signal too fast runs past it and may crash into whatever is beyond, and it brakes as long as it takes to pull away - a heavy train long. Press a train's stop button and nobody drives it any more: it only brakes, weaker (by how much is the next setting), and a stop pressed too late can end in a crash - which then makes the papers. A helicopter comes to the wreck and waits until the tow takes it away. "Watches the track, sees everything" sees as far as it needs. With 5, 10, 15 or 20 tiles it sees only that far, starts braking later and may not make it. ETCS on the long sights marks an improved view. Realistic train acceleration only
+STR_CONFIG_SETTING_TRAIN_BRAKING_ETCS                           :watches ETCS, not the track
+STR_CONFIG_SETTING_TRAIN_BRAKING_ALL                            :watches the track, sees everything
+STR_CONFIG_SETTING_TRAIN_BRAKING_5                              :5 tiles
+STR_CONFIG_SETTING_TRAIN_BRAKING_10                             :10 tiles
+STR_CONFIG_SETTING_TRAIN_BRAKING_15                             :15 tiles ETCS
+STR_CONFIG_SETTING_TRAIN_BRAKING_20                             :20 tiles ETCS
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :A train stopped by hand brakes weaker by: {STRING2}
-STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :How much weaker a train brakes once you press its stop button. Only with "Brake, fail to brake and crash" switched on
+STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :How much weaker a train brakes once you press its stop button. Applies to every "Brake, fail to brake and crash" choice but "watches ETCS, not the track"
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT                           :The driver sees from the cab: {STRING2}
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :How far ahead the driver sees signals and trains. "Watches ETCS, not the track" is the default and sees everything: as far as the train needs to brake, and two tiles more, at most 128 tiles. With "Brake, fail to brake and crash" switched off the train then always stops in time. A shorter view means the train starts braking later: with that setting off it brakes harder, with it on it may not make it. ETCS on the long sights marks an improved view. Realistic train acceleration only
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_BEST                      :watches ETCS, not the track
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_5                         :5 tiles
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_10                        :10 tiles
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_15                        :15 tiles ETCS
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_20                        :20 tiles ETCS
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Road vehicle acceleration model: {STRING2}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Select the physics model for road vehicle acceleration. The "original" model penalises slopes equally for all vehicles. The "realistic" model penalises slopes depending on various properties of the engine, for example 'tractive effort'

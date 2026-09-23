@@ -132,7 +132,8 @@ run_scene poruchaspoj "setting vehicle.rescue_wait_days 7
 vlak123 on
 testspoj
 testza 1000 testporucha 2" 10000
-# "Brake, fail to brake and crash" (vehicle.train_signal_overrun). A light
+# "Brake, fail to brake and crash" (vehicle.train_braking, 1 = on, the driver
+# sees everything). A light
 # engine stands braked at a platform; a train comes up behind it towards the
 # path signal guarding that block, and the player's stop is pressed on it
 # three tiles short. With the setting on nobody drives a stopped train: it
@@ -140,22 +141,21 @@ testza 1000 testporucha 2" 10000
 # the engine (srazka=1, and both are wrecks). A tow fetches the one that
 # failed to brake (spojeno=1 odtazeno=1); a helicopter lands by it and leaves
 # when the tow has it; the papers write it up twice.
-run_scene nedobrzdil "setting vehicle.train_signal_overrun on
+run_scene nedobrzdil "setting vehicle.train_braking 1
 vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # The same with the setting off, the game as it was: the stop is the game's
 # own brake and the train stands short of the red (srazka=0).
 # The same with forest planted all round: nowhere in the papers' picture to
 # land, so the helicopter circles over the wreck until the tow has it.
-run_scene nedobrzdilles "setting vehicle.train_signal_overrun on
+run_scene nedobrzdilles "setting vehicle.train_braking 1
 vlak123 on
 testnedobrzdil cesta stopka 3 odtah les" 9000
-# How far the driver sees from the cab (vehicle.train_driver_sight). With
-# "best" he sees the red in time and stops; cut to five tiles he starts
-# braking too late for a ten-wagon train and, with the setting on, runs past
-# the red into the engine at the platform (srazka=1).
-run_scene nedobrzdilvidet5 "setting vehicle.train_signal_overrun on
-setting vehicle.train_driver_sight 1
+# How far the driver sees from the cab, the same setting's "5 tiles"
+# (vehicle.train_braking 2). Seeing everything he sees the red in time and
+# stops; cut to five tiles he starts braking too late for a ten-wagon train
+# and runs past the red into the engine at the platform (srazka=1).
+run_scene nedobrzdilvidet5 "setting vehicle.train_braking 2
 vlak123 on
 testnedobrzdil blok vozu 10 odtah" 9000
 run_scene nedobrzdilvyp "vlak123 on
@@ -167,14 +167,14 @@ testnedobrzdil cesta stopka 3 odtah" 9000
 # speed a tick -- cannot stop and runs past (srazka=1). The player's own
 # save does the same (TEMATA_ODTAH 81.8). Three wagons brake in four tiles
 # and would stop.
-run_scene nedobrzdilbez "setting vehicle.train_signal_overrun on
+run_scene nedobrzdilbez "setting vehicle.train_braking 1
 vlak123 on
 testnedobrzdil cesta vozu 10 odtah" 9000
 # The player's three block signals in a row, the stop pressed eight tiles
 # short of the last one. The game's own cut to a crawl on the last tile
 # before a red is left out with the setting on; this light train brakes by
 # the physics in a few tiles and stands short of the red (srazka=0).
-run_scene nedobrzdilblok "setting vehicle.train_signal_overrun on
+run_scene nedobrzdilblok "setting vehicle.train_braking 1
 vlak123 on
 testnedobrzdil blok stopka 8 odtah" 9000
 run_scene depo "vlak123 on
