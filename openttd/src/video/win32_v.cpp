@@ -617,7 +617,15 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			SetCapture(hwnd);
 			_right_button_down = true;
 			_right_button_clicked = true;
-			MouseDebugLog("zprava WM_RBUTTONDOWN");
+			/* Ctrl as the message says it was at the press, not as the last
+			 * frame's poll of the keyboard read it (InputLoop()): that poll
+			 * needs the window to have the focus and a system that answers,
+			 * and Ctrl with the right button saves the mouse record
+			 * (HandleMouseEvents()) -- pressed exactly when the right button
+			 * is stuck and nothing else can be trusted. The player pressed it
+			 * for days and no record was written. */
+			_ctrl_pressed = (wParam & MK_CONTROL) != 0;
+			MouseDebugLog(fmt::format("zprava WM_RBUTTONDOWN (ctrl={})", _ctrl_pressed ? 1 : 0));
 			HandleMouseEvents();
 			return 0;
 

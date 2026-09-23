@@ -479,7 +479,10 @@ bool VideoDriver_SDL_Base::PollEvent()
 				case SDL_BUTTON_RIGHT:
 					_right_button_down = true;
 					_right_button_clicked = true;
-					MouseDebugLog("udalost SDL_MOUSEBUTTONDOWN prave");
+					/* Ctrl as it is at the press, for the mouse record saved
+					 * with Ctrl and the right button; see the Windows driver. */
+					_ctrl_pressed = (SDL_GetModState() & KMOD_CTRL) != 0;
+					MouseDebugLog(fmt::format("udalost SDL_MOUSEBUTTONDOWN prave (ctrl={})", _ctrl_pressed ? 1 : 0));
 					break;
 
 				default: break;
