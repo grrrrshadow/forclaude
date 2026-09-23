@@ -1051,6 +1051,9 @@ STR_NEWS_VEHICLE_UNPROFITABLE_PERIOD                            :{WHITE}Zisk {VE
 STR_NEWS_AIRCRAFT_DEST_TOO_FAR                                  :{WHITE}{VEHICLE} se nemůže dostat do dalšího cíle, protože je mimo dosah
 
 STR_NEWS_ORDER_REFIT_FAILED                                     :{WHITE}{VEHICLE} stojí kvůli selhání příkazu na změnu nákladu
+STR_NEWS_TRAIN_DEPOT_FULL_NO_BUY                                :{WHITE}{VEHICLE} nekoupí vagony, depo je plné ({NUM} vagonů)
+STR_NEWS_TRAIN_DEPOT_FULL_NO_DECOUPLE                           :{WHITE}{VEHICLE} neodpojí, depo je plné ({NUM} vagonů)
+STR_NEWS_TRAIN_BUY_NEVER_FULL                                   :{WHITE}{VEHICLE} nekoupí vagony: rozkaz bere jen plné a koupený vagon je prázdný
 STR_NEWS_VEHICLE_AUTORENEW_FAILED                               :{WHITE}Obnovení selhalo pro {VEHICLE}{}{STRING}
 
 STR_NEWS_NEW_VEHICLE_NOW_AVAILABLE                              :{BIG_FONT}{BLACK}Nov{G ý á é í é é á} {STRING} k dispozici!
@@ -1525,7 +1528,7 @@ STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :O kolik slaběj
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT                           :Strojvedoucí vidí z kabiny: {STRING}
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :Jak daleko strojvedoucí vidí před sebe na návěstidla a na vlaky. „Nejlepší“ je tak daleko, kolik vlak potřebuje na zabrzdění, a ještě dvě políčka navíc - nejvýš 10 políček i v plné rychlosti. Tak se jezdí i s vypnutým „Brzdit, nedobrzdit a nabourat“. Kratší pohled znamená, že vlak začne brzdit později: s vypnutým nastavením zabrzdí prudčeji, se zapnutým to nemusí stihnout. Jen s realistickým modelem zrychlení vlaků
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :Jak daleko strojvedoucí vidí před sebe na návěstidla a na vlaky. „Nejlepší“ je tak daleko, kolik vlak potřebuje na zabrzdění, a ještě dvě políčka navíc - nejvýš 128 políček. Tak se jezdí i s vypnutým „Brzdit, nedobrzdit a nabourat“. Kratší pohled znamená, že vlak začne brzdit později: s vypnutým nastavením zabrzdí prudčeji, se zapnutým to nemusí stihnout. Jen s realistickým modelem zrychlení vlaků
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_BEST                      :nejlepší
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_5                         :5 polí
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_10                        :10 polí
@@ -5216,6 +5219,9 @@ STR_ORDER_COUPLE_FILTER_SUFFIX_MAX                              :{SPACE}(nejvý�
 STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Založit řadu: do {NUM}
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Založit řadu: podle nástupiště
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Čeká na vagony k odvozu
+STR_VEHICLE_STATUS_DEPOT_FULL_NO_BUY                            :{RED}Nekoupím, je tu plno
+STR_VEHICLE_STATUS_DEPOT_FULL_NO_DECOUPLE                       :{RED}Neodpojím, je tu plno
+STR_VEHICLE_STATUS_BUY_NEVER_FULL                               :{RED}Nekoupím, koupený vagon není plný
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Zakládá řadu: musí přijet vagony napřed
 STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}Kloubová mašinka s nestejnými články nepřipojí k předku vagonky
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(připojit)

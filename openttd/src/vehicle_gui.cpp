@@ -3616,6 +3616,18 @@ public:
 			return GetString(STR_VEHICLE_STATUS_RAKE_TIMETABLE_HOLD, (Train::From(v)->wait_counter + Ticks::DAY_TICKS - 1) / Ticks::DAY_TICKS);
 		}
 
+		/* Standing because a shed will not take what its order does there:
+		 * read back from the code that refused (SetDepotHold()), so the window
+		 * cannot say one thing while the game does another. */
+		if (v->type == VehicleType::Train) {
+			switch (Train::From(v)->depot_hold) {
+				case DepotHold::BuyFull: return GetString(STR_VEHICLE_STATUS_DEPOT_FULL_NO_BUY);
+				case DepotHold::DecoupleFull: return GetString(STR_VEHICLE_STATUS_DEPOT_FULL_NO_DECOUPLE);
+				case DepotHold::BuyNeverFull: return GetString(STR_VEHICLE_STATUS_BUY_NEVER_FULL);
+				default: break;
+			}
+		}
+
 		/* Vehicle is in a "normal" state, show current order. */
 		if (mouse_over_start_stop) {
 			if (v->vehstatus.Test(VehState::Stopped)) {

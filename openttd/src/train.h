@@ -173,6 +173,18 @@ enum class RescueHold : uint8_t {
 };
 
 /**
+ * Why a train is standing instead of buying wagons into a shed or putting
+ * wagons down in one. Written by the code that refuses, read back by the
+ * window, the same way as #RescueHold.
+ */
+enum class DepotHold : uint8_t {
+	None,         ///< Nothing holding it.
+	BuyFull,      ///< Its order would buy wagons, but the shed already stores as many as a shed takes.
+	DecoupleFull, ///< Its order puts wagons down here, but the shed would then store more than a shed takes.
+	BuyNeverFull, ///< Its order would buy wagons, but it only takes full ones, and a wagon is bought empty.
+};
+
+/**
  * 'Train' is either a loco or a wagon.
  */
 struct Train final : public GroundVehicle<Train, VehicleType::Train> {
@@ -231,6 +243,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	uint8_t depot_decouple_pending = 0;
 	static constexpr uint8_t DEPOT_DECOUPLE_WHOLE = 0xFF; ///< #depot_decouple_pending value for "drop the whole coupled train" rather than a count.
 	bool depot_decouple_sell = false; ///< The wagons that #depot_decouple_pending is about are sold once they are down, not stored. Written and honoured at the same two moments, and saved for the same reason.
+	DepotHold depot_hold = DepotHold::None; ///< Why this train stands instead of buying into or putting wagons down in a shed. Saved, so a game loaded mid-wait does not announce the wait a second time.
 
 	/**
 	 * The rake this train has just left standing in the shed it is in.

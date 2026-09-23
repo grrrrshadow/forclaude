@@ -3659,6 +3659,77 @@ static uint CountUnits(const Train *rake)
 }
 
 /**
+ * How many wagons a shed stores before orders may add no more to it. The
+ * player's number.
+ *
+ * Nothing else bounds it. The train limit counts trains, the train-length
+ * limit measures one train, and a stored wagon is neither; the only other
+ * ceiling is the number of vehicles the whole game can hold. An order left
+ * buying, or putting wagons down in the same shed lap after lap, fills a shed
+ * without end, and a forgotten switch is exactly how that happens.
+ *
+ * Only the two things orders do are held to it: buying wagons into the shed
+ * and putting wagons down in it. The player's own hands in the depot window
+ * are not, and neither is a tow bringing something in -- a tow that could be
+ * turned away would leave the line blocked.
+ */
+static constexpr uint DEPOT_WAGON_LIMIT = 420;
+
+/**
+ * How many wagons stand stored in a shed: every free chain in it, a wagon of a
+ * set counted once. Trains parked there are trains and are not counted.
+ */
+static uint StoredWagonsInDepot(TileIndex depot_tile)
+{
+	uint stored = 0;
+	for (const Train *t : Train::Iterate()) {
+		if (!t->IsFreeWagon()) continue;
+		if (t->track != Track::Depot || t->tile != depot_tile) continue;
+		stored += CountUnits(t);
+	}
+	return stored;
+}
+
+/**
+ * Write down why a train stands instead of buying into or putting wagons down
+ * in a shed, and tell the player once, when it starts. Written every time the
+ * refusal is decided and quiet while nothing changes, so a train held for a
+ * year is announced once and not every tick.
+ *
+ * @param v      the train, its head
+ * @param hold   why it stands, or #DepotHold::None when nothing holds it now
+ * @param stored how many wagons the shed stores, for the message
+ */
+static void SetDepotHold(Train *v, DepotHold hold, uint stored = 0)
+{
+	if (v->depot_hold == hold) return;
+	v->depot_hold = hold;
+	SetWindowWidgetDirty(WindowClass::VehicleView, v->index, WID_VV_START_STOP);
+	if (hold == DepotHold::None) return;
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_WARNING, "Vlak {}: {} (v depu {} vagonu, limit {})", v->unitnumber,
+				hold == DepotHold::BuyFull ? "nekoupi, depo je plne" :
+				hold == DepotHold::DecoupleFull ? "neodpoji, depo je plne" :
+				"nekoupi, rozkaz chce plne vagony a koupeny je prazdny",
+				stored, DEPOT_WAGON_LIMIT);
+	}
+	if (v->owner != _local_company) return;
+	switch (hold) {
+		case DepotHold::BuyFull:
+			AddVehicleAdviceNewsItem(AdviceType::Order, GetEncodedString(STR_NEWS_TRAIN_DEPOT_FULL_NO_BUY, v->index, stored), v->index);
+			break;
+		case DepotHold::DecoupleFull:
+			AddVehicleAdviceNewsItem(AdviceType::Order, GetEncodedString(STR_NEWS_TRAIN_DEPOT_FULL_NO_DECOUPLE, v->index, stored), v->index);
+			break;
+		case DepotHold::BuyNeverFull:
+			AddVehicleAdviceNewsItem(AdviceType::Order, GetEncodedString(STR_NEWS_TRAIN_BUY_NEVER_FULL, v->index), v->index);
+			break;
+		default: break;
+	}
+}
+
+/**
  * Put together, out of the wagons stored in a depot, exactly as many as the
  * order asked for, and hand back the result as one rake.
  *
@@ -3778,13 +3849,40 @@ static uint BuyWagonsIntoDepot(Train *v, const Order &order, TileIndex depot_til
 	if (e == nullptr || e->type != VehicleType::Train) return 0;
 	if (!e->company_avail.Test(v->owner)) return 0;
 
+	/* A train standing in a shed because it may not put its wagons down there
+	 * says so; nothing about buying is allowed to write over that. */
+	auto hold = [v](DepotHold h, uint stored = 0) {
+		if (v->depot_hold != DepotHold::DecoupleFull) SetDepotHold(v, h, stored);
+	};
+
+	/* A wagon is bought empty, and nothing loads it in a shed. An order that
+	 * takes only full wagons can never take one it bought, and it went on
+	 * buying regardless -- the whole shortfall again on every tick, for as long
+	 * as the money lasted: the new wagons stood in the shed, failed the filter,
+	 * and the order was exactly as short as before. The rig counted eight
+	 * thousand purchases in four thousand ticks. So nothing is bought, and the
+	 * train stands and says why. */
+	if (order.GetCoupleLoad() == OrderCoupleLoad::Full) {
+		hold(DepotHold::BuyNeverFull);
+		return 0;
+	}
+
 	/* Same trap as every other command run from a vehicle tick: it reads
 	 * whichever company happens to be current. */
 	AutoRestoreBackup cur_company(_current_company, v->owner);
 
 	CargoType cargo = IsValidCargoType(order.GetCoupleCargo()) ? order.GetCoupleCargo() : INVALID_CARGO;
+	uint stored = StoredWagonsInDepot(depot_tile);
+	bool full = false;
 	uint bought = 0;
 	for (uint i = 0; i < missing; i++) {
+		/* The shed takes no more (DEPOT_WAGON_LIMIT). What was bought up to
+		 * the limit stays bought; the order is short and waits, the same way
+		 * it waits when the money runs out. */
+		if (stored >= DEPOT_WAGON_LIMIT) {
+			full = true;
+			break;
+		}
 		auto [cost, new_id, refit_cap, mail_cap, caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute,
 				depot_tile, eid, true, cargo, ClientID::Invalid);
 		if (cost.Failed()) {
@@ -3800,7 +3898,9 @@ static uint BuyWagonsIntoDepot(Train *v, const Order &order, TileIndex depot_til
 		}
 		if (Train::GetIfValid(new_id) == nullptr) break;
 		bought++;
+		stored++;
 	}
+	hold(full ? DepotHold::BuyFull : DepotHold::None, stored);
 
 	if (bought != 0 && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: koupeno {} vagonku ({}) do depa ({},{}), chybelo {}", v->unitnumber, bought,
@@ -9086,6 +9186,33 @@ static void TryDecoupleAtDepot(Train *v, uint8_t keep_count, bool whole_train, b
 }
 
 /**
+ * How many wagons TryDecoupleAtDepot() would leave stored in the shed, found
+ * the same way it finds where to split. A part with an engine in it is put
+ * down as a parked train, not stored, and counts nothing.
+ *
+ * @param v          front of the consist standing in the shed
+ * @param keep_count how many vehicles the departing train keeps
+ * @param whole_train drop exactly what the train coupled instead
+ */
+static uint DepotDecoupleStoredUnits(Train *v, uint8_t keep_count, bool whole_train)
+{
+	Train *boundary = whole_train ? FindCoupledBoundary(v) : nullptr;
+	if (whole_train && boundary == nullptr) keep_count = 0;
+	Train *split_point = v->GetNextUnit();
+	for (uint8_t i = 0; i < keep_count && split_point != nullptr; i++) {
+		split_point = split_point->GetNextUnit();
+	}
+	if (boundary != nullptr) split_point = boundary;
+
+	uint units = 0;
+	for (const Train *u = split_point; u != nullptr; u = u->GetNextUnit()) {
+		if (u->IsEngine()) return 0;
+		units++;
+	}
+	return units;
+}
+
+/**
  * Couple an engine standing in a depot to the rake of stored wagons it came
  * for, and leave the result exactly as if the whole train had driven in and
  * been turned round -- which is the one depot formation the player already
@@ -13615,14 +13742,48 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		consist->depot_dropped_rake = VehicleID::Invalid();
 	}
 
+	/* A train that stood because it could not buy is no longer standing for
+	 * that once it has what it came for, or its order no longer buys: the
+	 * player switched the buying off, or the order is done. Its window then
+	 * says what it is doing now. The buying itself clears it when the shed
+	 * has room again (BuyWagonsIntoDepot()); the decoupling hold clears where
+	 * the split is made. */
+	if ((consist->depot_hold == DepotHold::BuyFull || consist->depot_hold == DepotHold::BuyNeverFull) &&
+			(consist->couple_target != VehicleID::Invalid() || !consist->current_order.IsType(OT_GOTO_DEPOT) ||
+			!consist->current_order.ShouldGoToCouple() || !consist->current_order.ShouldBuyWagons())) {
+		SetDepotHold(consist, DepotHold::None);
+	}
+	if (consist->depot_hold == DepotHold::DecoupleFull && consist->depot_decouple_pending == 0) {
+		SetDepotHold(consist, DepotHold::None);
+	}
+
 	if (consist->cur_speed == 0 && consist->IsFrontEngine() && IsWholeTrainInsideDepot(consist)) {
 		if (consist->depot_decouple_pending != 0) {
 			/* Held as wagons-to-keep plus one, because zero wagons is a real
 			 * answer now and zero is also how this field says "nothing to do". */
 			bool whole = consist->depot_decouple_pending == Train::DEPOT_DECOUPLE_WHOLE;
 			uint8_t keep = whole ? 0 : consist->depot_decouple_pending - 1;
-			consist->depot_decouple_pending = 0;
 			bool sell = consist->depot_decouple_sell;
+			/* A shed takes only so many (DEPOT_WAGON_LIMIT). Wagons that are
+			 * sold as they come off are not stored and are not asked about. One
+			 * that would overfill it keeps its wagons, stands in the shed with
+			 * the split still owed, and puts them down once there is room --
+			 * when something has taken wagons out, or the player has sold some.
+			 * Asked again every so often rather than every tick: counting the
+			 * shed walks every train in the game. */
+			if (!sell) {
+				if (consist->depot_hold == DepotHold::DecoupleFull && (TimerGameTick::counter + consist->index.base()) % 32 != 0) return true;
+				uint adding = DepotDecoupleStoredUnits(consist, keep, whole);
+				if (adding != 0) {
+					uint stored = StoredWagonsInDepot(consist->tile);
+					if (stored + adding > DEPOT_WAGON_LIMIT) {
+						SetDepotHold(consist, DepotHold::DecoupleFull, stored);
+						return true;
+					}
+				}
+			}
+			if (consist->depot_hold == DepotHold::DecoupleFull) SetDepotHold(consist, DepotHold::None);
+			consist->depot_decouple_pending = 0;
 			consist->depot_decouple_sell = false;
 			TryDecoupleAtDepot(consist, keep, whole, sell);
 			return true;

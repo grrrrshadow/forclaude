@@ -401,6 +401,28 @@ testza 600 testprestavba 2 0" 3000
 # stays -- the cargo does not reach into it), and the buying switched back on
 # from the list, which writes the wagon's first cargo into the filter, because
 # what is bought has a cargo. Each change prints what the order then holds.
+# A shed stores only so many wagons (DEPOT_WAGON_LIMIT, 420): past that an
+# order neither buys into it nor puts wagons down in it, and the train stands
+# and says why. The shed is filled by hand to 418 with wagons of another model,
+# so the collector buys two and stops at the limit, and the deliverer arriving
+# with three stands in the shed with its split owed. Ten are then sold by hand:
+# the collector buys the rest and leaves, the deliverer puts its three down.
+# The last line reads the shed: 410 + 4 bought - 6 taken + 3 put down = 411.
+run_scene depoplne "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0
+testdepovagony 2 0 418 jiny
+testza 3000 testdepovagony 2 0 -10
+testza 7000 testdepovagony 2 0 0" 8000
+# An order told to buy, that takes only full wagons. A wagon is bought empty
+# and nothing loads it in a shed, so it could never take one: it used to buy
+# the whole shortfall again on every tick. Now it buys nothing and says why.
+run_scene koupitplne "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0
+testmof 2 0 15 2" 4000
 run_scene rolovaktypu "vlak123 on
 testspoj depo
 testza 200 testkoupit 2 0

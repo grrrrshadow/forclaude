@@ -6306,6 +6306,89 @@ static bool ConTestExplainDepot(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Fill the shed a depot order names with stored wagons, or empty some out of
+ * it, the way the player's own hands in the depot window would -- so past the
+ * limit orders are held to. For the full-shed scenes.
+ * Usage: testdepovagony <unit number> <order> <count> [jiny]
+ * A positive count buys that many (the game strings them onto a chain of
+ * their own model, as it does for the player); "jiny" buys a
+ * model other than the one the order names, so the order will not take them.
+ * A negative count sells that many of the stored ones.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDepotWagons(std::span<std::string_view> argv)
+{
+	if (argv.size() < 4) {
+		IConsolePrint(CC_HELP, "Fill or empty the shed a depot order names. Usage: 'testdepovagony <cislo vlaku> <rozkaz> <pocet|-pocet> [jiny]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto porder = ParseInteger(argv[2]);
+	auto pcount = ParseInteger<int>(argv[3]);
+	if (!punit.has_value() || !porder.has_value() || !pcount.has_value()) return false;
+	bool other = argv.size() >= 5 && argv[4] == "jiny";
+
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != (UnitID)*punit) continue;
+		const Order *o = t->GetOrder((VehicleOrderID)*porder);
+		if (o == nullptr || !o->IsType(OT_GOTO_DEPOT)) {
+			IConsolePrint(CC_ERROR, "testdepovagony: rozkaz {} vlaku {} nevede do depa.", *porder, *punit);
+			return true;
+		}
+		const Depot *depot = Depot::GetIfValid(o->GetDestination().ToDepotID());
+		if (depot == nullptr) return true;
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+
+		int done = 0;
+		if (*pcount > 0) {
+			EngineID eid = EngineID::Invalid();
+			for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+				if (!e->company_avail.Test(t->owner)) continue;
+				if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+				if (other && e->index == o->GetCoupleBuyEngine()) continue;
+				eid = e->index;
+				break;
+			}
+			if (eid == EngineID::Invalid()) {
+				IConsolePrint(CC_ERROR, "testdepovagony: zadny vagon k dispozici.");
+				return true;
+			}
+			for (int i = 0; i < *pcount; i++) {
+				auto [cost, id, a, b, c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot->xy, eid, false, INVALID_CARGO, ClientID::Invalid);
+				if (cost.Failed()) break;
+				done++;
+			}
+		} else {
+			/* One wagon at a time, the head of a stored chain: the game strings
+			 * wagons bought into a shed onto a chain of their own model, so
+			 * selling whole chains would take far more than asked. */
+			for (int i = 0; i < -*pcount; i++) {
+				VehicleID id = VehicleID::Invalid();
+				for (const Train *rake : Train::Iterate()) {
+					if (!rake->IsFreeWagon() || rake->track != Track::Depot || rake->tile != depot->xy) continue;
+					id = rake->index;
+					break;
+				}
+				if (id == VehicleID::Invalid()) break;
+				if (Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, id, false, false, ClientID::Invalid).Failed()) break;
+				done--;
+			}
+		}
+
+		uint stored = 0;
+		for (const Train *rake : Train::Iterate()) {
+			if (!rake->IsFreeWagon() || rake->track != Track::Depot || rake->tile != depot->xy) continue;
+			for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) stored++;
+		}
+		IConsolePrint(CC_INFO, "testdepovagony: depo ({},{}) {} {} vagonu, stoji v nem {}", TileX(depot->xy), TileY(depot->xy),
+				done >= 0 ? "koupeno" : "prodano", done >= 0 ? done : -done, stored);
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testdepovagony: vlak {} nenalezen.", argv[1]);
+	return true;
+}
+
 static bool ConTestBuyWagons(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
@@ -11172,6 +11255,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
+	IConsole::CmdRegister("testdepovagony",          ConTestDepotWagons);
 	IConsole::CmdRegister("testdepofiltr",           ConTestExplainDepot);
 	IConsole::CmdRegister("testvarovani",            ConTestLossWarning);
 	IConsole::CmdRegister("testtypfiltr",            ConTestTypeFilter);

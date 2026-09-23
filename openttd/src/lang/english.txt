@@ -964,6 +964,9 @@ STR_NEWS_VEHICLE_UNPROFITABLE_PERIOD                            :{WHITE}{VEHICLE
 STR_NEWS_AIRCRAFT_DEST_TOO_FAR                                  :{WHITE}{VEHICLE} can't get to the next destination because it is out of range
 
 STR_NEWS_ORDER_REFIT_FAILED                                     :{WHITE}{VEHICLE} stopped because an ordered refit failed
+STR_NEWS_TRAIN_DEPOT_FULL_NO_BUY                                :{WHITE}{VEHICLE} won't buy wagons, the depot is full ({NUM} wagons)
+STR_NEWS_TRAIN_DEPOT_FULL_NO_DECOUPLE                           :{WHITE}{VEHICLE} won't decouple, the depot is full ({NUM} wagons)
+STR_NEWS_TRAIN_BUY_NEVER_FULL                                   :{WHITE}{VEHICLE} won't buy wagons: the order takes only full ones and a bought wagon is empty
 STR_NEWS_VEHICLE_AUTORENEW_FAILED                               :{WHITE}Autorenew failed on {VEHICLE}{}{STRING1}
 
 STR_NEWS_NEW_VEHICLE_NOW_AVAILABLE                              :{BIG_FONT}{BLACK}New {STRING} now available!
@@ -1438,7 +1441,7 @@ STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :How much weaker
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 %
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT                           :The driver sees from the cab: {STRING2}
-STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :How far ahead the driver sees signals and trains. "Best" is as far as the train needs to brake, and two tiles more - at most 10 tiles even at full speed. That is how trains run with "Brake, fail to brake and crash" switched off too. A shorter view means the train starts braking later: with that setting off it brakes harder, with it on it may not make it. Realistic train acceleration only
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_HELPTEXT                  :How far ahead the driver sees signals and trains. "Best" is as far as the train needs to brake, and two tiles more - at most 128 tiles. That is how trains run with "Brake, fail to brake and crash" switched off too. A shorter view means the train starts braking later: with that setting off it brakes harder, with it on it may not make it. Realistic train acceleration only
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_BEST                      :best
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_5                         :5 tiles
 STR_CONFIG_SETTING_TRAIN_DRIVER_SIGHT_10                        :10 tiles
@@ -5061,6 +5064,9 @@ STR_ORDER_COUPLE_FILTER_SUFFIX_MAX                              :{SPACE}(at most
 STR_ORDER_COUPLE_COUNT_FOUND                                    :{BLACK}Founding a rake: up to {NUM}
 STR_ORDER_COUPLE_COUNT_FOUND_ANY                                :{BLACK}Founding a rake: platform length
 STR_VEHICLE_STATUS_WAITING_FOR_WAGONS                           :{LTBLUE}Waiting for wagons to collect
+STR_VEHICLE_STATUS_DEPOT_FULL_NO_BUY                            :{RED}Won't buy, it's full here
+STR_VEHICLE_STATUS_DEPOT_FULL_NO_DECOUPLE                       :{RED}Won't decouple, it's full here
+STR_VEHICLE_STATUS_BUY_NEVER_FULL                               :{RED}Won't buy, a bought wagon is not full
 STR_VEHICLE_STATUS_FOUNDING_ENGINE_FIRST                        :{LTBLUE}Founding a rake: has to arrive wagons first
 STR_VEHICLE_STATUS_COUPLE_NOSE_FIRST                            :{LTBLUE}An engine of unequal articulated parts cannot couple wagons at the front
 STR_ORDER_GOTO_COUPLE_SUFFIX                                    :{SPACE}(couple)
