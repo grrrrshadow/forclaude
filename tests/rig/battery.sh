@@ -1253,17 +1253,17 @@ setting_newgame game_creation.town_name 15' run_scene marsmestacz "testdomy mars
 
 # The houses of the other climates as sets: their pictures are in the base
 # graphics whatever the climate played, so a toyland town ticked to the
-# temperate houses builds them, on toyland ground. The arctic set outside the
-# arctic builds its houses of below the snow line only -- the snowy ones are
-# for snow (odmitnuto counts one of them here). A town is founded of the
-# arctic houses through the found town window and grows.
+# temperate houses builds them, on toyland ground. The arctic set is not on
+# offer here at all -- arctic houses go up on snow only, and toyland has none
+# (testdomy lists the sets: no arktida among them). A town is founded of the
+# temperate houses through the found town window and grows.
 run_scene domyklima "setting economy.found_town 2
 testdomy
 testdomy okno 0 mirne
 testdomy rust 0 30
 testdomy okno 0 poust
 testdomy rust 0 20
-testdomy zaloz 150 200 arktida
+testdomy zaloz 150 200 mirne
 testdomy rust posledni 20
 testdomy" 100
 

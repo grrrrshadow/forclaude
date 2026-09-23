@@ -1486,7 +1486,6 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		const LandscapeType played = _settings_game.game_creation.landscape;
 		std::vector<std::pair<uint32_t, uint>> want;
 		if (played != LandscapeType::Temperate) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Temperate), _settings_game.economy.temperate_towns);
-		if (played != LandscapeType::Arctic) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic), _settings_game.economy.arctic_towns);
 		if (played != LandscapeType::Tropic) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Tropic), _settings_game.economy.tropic_towns);
 		if (played != LandscapeType::Toyland) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Toyland), _settings_game.economy.toyland_towns);
 		want.emplace_back(MARS_HOUSES_GRFID, have_mars ? _settings_game.economy.mars_towns : 0);

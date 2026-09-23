@@ -2507,7 +2507,10 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 		std::vector<std::pair<uint32_t, uint>> themed;
 		const LandscapeType played = _settings_game.game_creation.landscape;
 		if (played != LandscapeType::Temperate) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Temperate), _settings_game.economy.temperate_towns);
-		if (played != LandscapeType::Arctic) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic), _settings_game.economy.arctic_towns);
+		/* No arctic line: the arctic houses go up on snow only, and above
+		 * the temperate snow line every town is of them as it is founded
+		 * (DoCreateTown()) -- a count would say nothing. Its setting stays
+		 * for the help it carries and is greyed (SettingDesc::IsEditable()). */
 		if (played != LandscapeType::Tropic) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Tropic), _settings_game.economy.tropic_towns);
 		if (played != LandscapeType::Toyland) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Toyland), _settings_game.economy.toyland_towns);
 		std::vector<uint32_t> sources = AvailableHouseSources();
@@ -3284,8 +3287,11 @@ uint32_t HouseSourceOf(const HouseSpec &hs)
 /**
  * The original houses of a climate that go up on a spot: all of them, but for
  * the arctic ones, which are two kinds -- the snowy ones above the snow line
- * and the others below it. Where there is snow, the snowy ones; where there
- * is none (the other climates, until they have snow), the others.
+ * and the others below it. On snow, the snowy ones. Below the line, the
+ * others in the arctic itself and nothing anywhere else: the arctic houses
+ * are for the snow, and where there is none (the other climates, the
+ * temperate one without its snow on) a town told to build from them builds
+ * nothing rather than arctic houses on green -- the player's rule.
  * @param climate the climate whose houses
  * @param here the climate of the spot as TryBuildTownHouse() sees it, or
  *             nothing for anywhere at all
@@ -3294,7 +3300,8 @@ uint32_t HouseSourceOf(const HouseSpec &hs)
 static HouseZones ClimateHousesFor(LandscapeType climate, HouseZones here)
 {
 	if (climate != LandscapeType::Arctic || here.None()) return GetClimateMask(climate);
-	return here.Test(HouseZone::ClimateSubarcticAboveSnow) ? HouseZone::ClimateSubarcticAboveSnow : HouseZone::ClimateSubarcticBelowSnow;
+	if (here.Test(HouseZone::ClimateSubarcticAboveSnow)) return HouseZone::ClimateSubarcticAboveSnow;
+	return _settings_game.game_creation.landscape == LandscapeType::Arctic ? HouseZones{HouseZone::ClimateSubarcticBelowSnow} : HouseZones{};
 }
 
 /**
@@ -3358,7 +3365,11 @@ std::vector<uint32_t> AvailableHouseSources()
 	std::vector<uint32_t> sources;
 	sources.push_back(HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape));
 	for (LandscapeType c : {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) {
-		if (c != _settings_game.game_creation.landscape) sources.push_back(HOUSE_SOURCE_CLIMATE + to_underlying(c));
+		if (c == _settings_game.game_creation.landscape) continue;
+		/* The arctic houses are for the snow (ClimateHousesFor()): no snow in
+		 * the game, no arctic set to choose. */
+		if (c == LandscapeType::Arctic && !HasSnow()) continue;
+		sources.push_back(HOUSE_SOURCE_CLIMATE + to_underlying(c));
 	}
 	for (const auto &hs : HouseSpec::Specs()) {
 		if (!hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID || hs.grf_prop.grffile == nullptr) continue;

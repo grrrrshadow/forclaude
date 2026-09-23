@@ -933,6 +933,10 @@ bool SettingDesc::IsEditable(bool do_command) const
 	 * line is greyed rather than gone, so the four stay where they are. */
 	static const std::string_view CLIMATE_TOWNS[] = {"economy.temperate_towns", "economy.arctic_towns", "economy.tropic_towns", "economy.toyland_towns"};
 	if (this->GetName() == CLIMATE_TOWNS[to_underlying(GetGameSettings().game_creation.landscape)]) return false;
+	/* The arctic line is greyed everywhere: the arctic houses go up on snow
+	 * only, where every town is of them by itself; the line is there for
+	 * what its help says (GenerateTowns()). */
+	if (this->GetName() == "economy.arctic_towns") return false;
 
 	if (!do_command && !this->flags.Test(SettingFlag::NoNetworkSync) && _networking && !_network_server && !this->flags.Test(SettingFlag::PerCompany)) return false;
 	if (do_command && this->flags.Test(SettingFlag::NoNetworkSync)) return false;

@@ -2293,7 +2293,7 @@ STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Průměrná vel
 STR_CONFIG_SETTING_TEMPERATE_TOWNS                              :Mírná města: {STRING}
 STR_CONFIG_SETTING_TEMPERATE_TOWNS_HELPTEXT                     :Kolik malých měst z domů mírného klimatu dostane nová mapa mezi ostatní města. Řádek klimatu, ve kterém se hraje, je zašedlý -- to jsou obyčejná města. Kterékoli město se na tyto domy dá přepnout potom v okně města („Domy z“)
 STR_CONFIG_SETTING_ARCTIC_TOWNS                                 :Arktická města: {STRING}
-STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :Kolik malých měst z arktických domů dostane nová mapa mezi ostatní města; zasněžené domy jen tam, kde je sníh. Řádek klimatu, ve kterém se hraje, je zašedlý -- to jsou obyčejná města. Kterékoli město se na tyto domy dá přepnout potom v okně města („Domy z“)
+STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :Arktické domy se staví jen nad sněžnou čárou. V mírném klimatu musí být povolený sníh a sněžná čára dost nízko, aby se k arktickým domům dostala, jinak se nepostaví vůbec -- arktické domy bez sněhu nejsou žádné. Nad sněžnou čárou jsou všechna města arktická sama od sebe, takže tento počet neplatí; změnit to jde v okně města („Domy z“)
 STR_CONFIG_SETTING_TROPIC_TOWNS                                 :Pouštní města: {STRING}
 STR_CONFIG_SETTING_TROPIC_TOWNS_HELPTEXT                        :Kolik malých měst z pouštních domů dostane nová mapa mezi ostatní města. Řádek klimatu, ve kterém se hraje, je zašedlý -- to jsou obyčejná města. Kterékoli město se na tyto domy dá přepnout potom v okně města („Domy z“)
 STR_CONFIG_SETTING_TOYLAND_TOWNS                                :Toylandová města: {STRING}
