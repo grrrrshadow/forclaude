@@ -2782,6 +2782,10 @@ void Vehicle::HandleLoading(bool mode)
 			 * order names -- the same guard as the coupling above, for the same
 			 * reason: with non-stop off the flag rides along into every stop on
 			 * the way. See road_on_rail.h. */
+			/* A ship or an aircraft stays while road vehicles are getting off
+			 * and on: unload, a pause, load (VesselHoldsForRoadVehicles()). */
+			if ((this->type == VehicleType::Ship || this->type == VehicleType::Aircraft) && VesselHoldsForRoadVehicles(this)) return;
+
 			if (this->type == VehicleType::Road && this->current_order.ShouldBoardAtStation()) {
 				const Order *real_order = this->GetOrder(this->cur_real_order_index);
 				if (real_order != nullptr && real_order->IsType(OT_GOTO_STATION) &&

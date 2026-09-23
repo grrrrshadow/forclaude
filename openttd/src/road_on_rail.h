@@ -72,6 +72,7 @@ uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v);
 bool CanCarryRoadVehicles(const Engine *e);
 
 bool TryBoardTrain(RoadVehicle *rv);
+bool VesselHoldsForRoadVehicles(const Vehicle *v);
 bool CarriedRoadVehicleTick(RoadVehicle *rv);
 bool IsWaitingToBoardTrain(const RoadVehicle *rv);
 

@@ -10692,13 +10692,17 @@ static bool ConTestOrderWindows(std::span<std::string_view> argv)
  * corners of each dock's tile to make the slope, digs a canal along the row in
  * front, and builds the docks against it.
  *
- * Usage: testautolod [how many road vehicles, 1 by default]
+ * "protijedouci": as many cars again wait at the second station to sail to
+ * the first, so the ship that puts cars down takes others away -- the
+ * player's "it does not load when it unloads, in one step".
+ *
+ * Usage: testautolod [how many road vehicles, 1 by default] [protijedouci]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-in-a-ship scene. Usage: 'testautolod [pocet aut]'.");
+		IConsolePrint(CC_HELP, "Build the road-vehicle-in-a-ship scene. Usage: 'testautolod [pocet aut] [protijedouci]'.");
 		return true;
 	}
 	uint cars = 1;
@@ -10707,6 +10711,7 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 		if (!pcars.has_value() || *pcars < 1) return false;
 		cars = (uint)*pcars;
 	}
+	bool both_ways = argv.size() >= 3 && argv[2] == "protijedouci";
 	if (_game_mode != GameMode::Normal) {
 		IConsolePrint(CC_ERROR, "testautolod: only in a running game.");
 		return true;
@@ -10868,9 +10873,11 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 	}
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_s, false);
 
-	/* The cars: to the first station and aboard, off at the second. */
+	/* The cars: to the first station and aboard, off at the second -- and,
+	 * with "protijedouci", as many the other way. */
 	std::string built;
-	for (uint i = 0; i < cars; i++) {
+	for (uint i = 0; i < (both_ways ? 2 * cars : cars); i++) {
+		bool back = i >= cars;
 		auto [cost_r, veh_r, un_d, un_e, un_f] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
 		if (cost_r.Failed()) {
 			IConsolePrint(CC_ERROR, "testautolod: road vehicle failed - {}", RefusalReason(cost_r));
@@ -10882,8 +10889,8 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 		Order car_b{};
 		car_b.MakeGoToStation(id_b);
 		car_b.SetStopLocation(OrderStopLocation::FarEnd);
-		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
-		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, back ? car_b : car_a);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, back ? car_a : car_b);
 		CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_BOARD_MODE, to_underlying(OrderBoardMode::ShipToNext));
 		if (mod.Failed()) {
 			IConsolePrint(CC_ERROR, "testautolod: boarding order refused - {}", RefusalReason(mod));
@@ -10891,7 +10898,7 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
 		}
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
 		if (!built.empty()) built += ",";
-		built += fmt::format("{}", RoadVehicle::Get(veh_r)->unitnumber);
+		built += fmt::format("{}{}", RoadVehicle::Get(veh_r)->unitnumber, back ? " zpet" : "");
 	}
 
 	IConsolePrint(CC_DEFAULT, "testautolod: lod {} (mista pro {} aut) vozi auta {} mezi stanicemi {} a {}.",
@@ -10909,13 +10916,26 @@ static bool ConTestRoadOnWater(std::span<std::string_view> argv)
  * one road vehicle and only ever towards the vehicle's next stop, so there is
  * no choice of how to board to make here.
  *
- * Usage: testautoletadlo
+ * "tamizpet": the car boards at the second station as well, so it flies back
+ * -- the player's case, an aircraft that brought a car and took none away.
+ *
+ * "protijedouci": a second car waits at the second station to fly to the
+ * first, so the aircraft that brings one car in has another to take out --
+ * the player's "one gets off, the other does not make it on in that step".
+ *
+ * Usage: testautoletadlo [tamizpet] [protijedouci]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestRoadOnAir(std::span<std::string_view> argv)
 {
+	bool both_ways = false;
+	bool second_car = false;
+	for (size_t i = 1; i < argv.size(); i++) {
+		if (argv[i] == "tamizpet") both_ways = true;
+		if (argv[i] == "protijedouci") second_car = true;
+	}
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-in-an-aircraft scene. Usage: 'testautoletadlo'.");
+		IConsolePrint(CC_HELP, "Build the road-vehicle-in-an-aircraft scene. Usage: 'testautoletadlo [tamizpet] [protijedouci]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -11107,14 +11127,34 @@ static bool ConTestRoadOnAir(std::span<std::string_view> argv)
 	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 0, car_a);
 	Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_r, 1, car_b);
 	CommandCost mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 0, MOF_BOARD_MODE, to_underlying(OrderBoardMode::PlaneToNext));
+	if (mod.Succeeded() && both_ways) mod = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_r, 1, MOF_BOARD_MODE, to_underlying(OrderBoardMode::PlaneToNext));
 	if (mod.Failed()) {
 		IConsolePrint(CC_ERROR, "testautoletadlo: boarding order refused - {}", RefusalReason(mod));
 		return true;
 	}
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_r, false);
 
-	IConsolePrint(CC_DEFAULT, "testautoletadlo: letadlo {} vozi auto {} mezi stanicemi {} a {}.",
-			Aircraft::Get(veh_p)->unitnumber, RoadVehicle::Get(veh_r)->unitnumber, id_a, id_b);
+	if (second_car) {
+		/* The other way: to the second station by road, aboard there, off at
+		 * the first. */
+		auto [cost_2, veh_2, un_g, un_h, un_i] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, road_depot, eid_road, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_2.Failed()) {
+			IConsolePrint(CC_ERROR, "testautoletadlo: second road vehicle failed - {}", RefusalReason(cost_2));
+			return true;
+		}
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_2, 0, car_b);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_2, 1, car_a);
+		CommandCost mod2 = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, veh_2, 0, MOF_BOARD_MODE, to_underlying(OrderBoardMode::PlaneToNext));
+		if (mod2.Failed()) {
+			IConsolePrint(CC_ERROR, "testautoletadlo: second boarding order refused - {}", RefusalReason(mod2));
+			return true;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_2, false);
+		IConsolePrint(CC_DEFAULT, "testautoletadlo: auto {} ceka ve stanici {} na let do {}.", RoadVehicle::Get(veh_2)->unitnumber, id_b, id_a);
+	}
+
+	IConsolePrint(CC_DEFAULT, "testautoletadlo: letadlo {} vozi auto {} mezi stanicemi {} a {}{}.",
+			Aircraft::Get(veh_p)->unitnumber, RoadVehicle::Get(veh_r)->unitnumber, id_a, id_b, both_ways ? ", tam i zpet letadlem" : "");
 	return true;
 }
 

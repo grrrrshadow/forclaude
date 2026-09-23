@@ -592,6 +592,23 @@ static uint RoadVehiclesAboard(const Vehicle *carrier)
 }
 
 /**
+ * How many of the road vehicles riding in a ship or aircraft get off at
+ * @p station: their order names it.
+ * @param carrier the ship or aircraft
+ * @param station the station it is at
+ * @return how many are getting off there
+ */
+static uint RoadVehiclesGettingOff(const Vehicle *carrier, StationID station)
+{
+	uint off = 0;
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || rv->carried_by != carrier->index) continue;
+		if (rv->current_order.IsType(OT_GOTO_STATION) && rv->current_order.GetDestination() == station) off++;
+	}
+	return off;
+}
+
+/**
  * Say in a ship's or aircraft's cargo that one more road vehicle is riding on
  * it, the way MirrorRideAsCargo() does for a wagon: one unit of CT_ROLA per
  * vehicle, so that the vessel fills up and reads as full to everything that
@@ -633,6 +650,15 @@ static void RemoveRideMirror(Vehicle *carrier)
  * @param[out] why what to say when none is found
  * @return the ship or aircraft, or nullptr
  */
+/**
+ * How long a ship or an aircraft stands between putting its road vehicles
+ * down and taking new ones on, in ticks: about three seconds at normal speed.
+ * The player's rule -- unload, a pause, load -- because the two in the same
+ * instant was a blink: one car gone and the next one in before the eye saw
+ * either happen.
+ */
+static constexpr TimerGameTick::Ticks VESSEL_BOARDING_PAUSE = 3 * Ticks::TICKS_PER_SECOND;
+
 static Vehicle *FindVesselToBoard(const RoadVehicle *rv, StationID station, StationID next, VehicleType type, std::string &why)
 {
 	why = type == VehicleType::Ship ? "u pristavu nestoji zadna lod" : "na letisti nestoji zadne letadlo";
@@ -664,7 +690,21 @@ static Vehicle *FindVesselToBoard(const RoadVehicle *rv, StationID station, Stat
 			continue;
 		}
 
-		if (RoadVehiclesAboard(v) >= v->cargo_cap) {
+		/* Those getting off here take no room: they are getting off. And
+		 * counting them had the ship stuck for good -- the cars waiting to
+		 * get on stood in the stops the cars aboard needed to get off into,
+		 * and each waited for the other (measured: two cars each way, a ship
+		 * for two, and nothing moved again). */
+		/* Unload, a pause, load: nobody gets on until the vessel has stood
+		 * here a while (VESSEL_BOARDING_PAUSE). It waits for them. */
+		if (v->current_order_time < VESSEL_BOARDING_PAUSE) {
+			why = type == VehicleType::Ship ?
+					fmt::format("lod {} stoji, nakladat bude za chvili", v->unitnumber) :
+					fmt::format("letadlo {} stoji, nakladat bude za chvili", v->unitnumber);
+			continue;
+		}
+
+		if (RoadVehiclesAboard(v) - RoadVehiclesGettingOff(v, station) >= v->cargo_cap) {
 			why = type == VehicleType::Ship ?
 					fmt::format("lod {} stoji, ale je plna aut ({})", v->unitnumber, v->cargo_cap) :
 					fmt::format("letadlo {} stoji, ale je plne ({})", v->unitnumber, v->cargo_cap);
@@ -704,6 +744,44 @@ static void RideInside(RoadVehicle *rv, const Vehicle *carrier)
 }
 
 /**
+ * The station a road vehicle gets off at: the next station in its own orders
+ * after the one it is at, whatever that order says to do there.
+ *
+ * Not the game's "next stopping station" (Vehicle::GetNextStoppingStation()):
+ * that one skips every order that neither loads nor unloads, and an order to
+ * board is written as exactly that (MOF_BOARD_MODE). A car told to fly there
+ * and fly back -- both of its orders boarding -- had no next stop at all, and
+ * waited at the first one for ever saying it had no order where to get off:
+ * the player's aircraft that brought a car and took none away. With a third
+ * order it rode past the second station to the third.
+ *
+ * A "go via" order is not a stop and is passed over. A conditional order
+ * leaves which way the list goes to the moment, and there the game's own
+ * answer is taken, as before.
+ *
+ * @param rv the road vehicle, front of its chain, loading at its stop
+ * @return the station, or invalid if its orders name none
+ */
+static StationID NextStationToGetOff(const RoadVehicle *rv)
+{
+	auto orders = rv->Orders();
+	const size_t n = orders.size();
+	for (size_t hops = 1; hops <= n; hops++) {
+		const Order &o = orders[(rv->cur_real_order_index + hops) % n];
+		if (o.IsType(OT_CONDITIONAL)) {
+			std::vector<StationID> next;
+			rv->GetNextStoppingStation(next);
+			return next.empty() ? StationID::Invalid() : next.front();
+		}
+		if (!o.IsType(OT_GOTO_STATION)) continue;
+		if (o.GetNonStopType().Test(OrderNonStopFlag::GoVia)) continue;
+		if (o.GetDestination() == rv->last_station_visited) continue;
+		return o.GetDestination().ToStationID();
+	}
+	return StationID::Invalid();
+}
+
+/**
  * Board a train, if one is standing at the platform with room and going the
  * right way. Asked from the road vehicle's loading stop, once its loading is
  * done (see Vehicle::HandleLoading()).
@@ -721,9 +799,7 @@ bool TryBoardTrain(RoadVehicle *rv)
 {
 	if (!rv->current_order.IsType(OT_LOADING)) return false;
 
-	std::vector<StationID> next;
-	rv->GetNextStoppingStation(next);
-	StationID target = next.empty() ? StationID::Invalid() : next.front();
+	StationID target = NextStationToGetOff(rv);
 
 	/* Somewhere to get off first. A vehicle whose orders name no further
 	 * station has no ride to take: it used to get on anyway and then off
@@ -869,6 +945,37 @@ static bool IsTrainUnloadingEverything(const Train *t)
 }
 
 /**
+ * One road vehicle has just got off at @p station: those waiting there to be
+ * carried try to get on now, in the same tick, instead of on their own next
+ * turn.
+ *
+ * Their own turn can come too late. Every vehicle is moved in the order it
+ * was built; a car waiting at the stop that comes before the one getting off
+ * asks first, hears "full", and on the next tick the aircraft is moving
+ * before the car gets another turn -- it had nothing left to do at the
+ * station. Measured with one car flying each way: at one airport the car
+ * coming in got off and the one waiting got on in the same tick, at the other
+ * the waiting one was left standing every time, round after round (the
+ * player's "one gets off, the other does not make it on in that step").
+ *
+ * Only a car that is done at its stop, the same guard as its own turn
+ * (Vehicle::HandleLoading()).
+ *
+ * @param station where the vehicle got off
+ */
+static void LetWaitingBoard(StationID station)
+{
+	for (RoadVehicle *w : RoadVehicle::Iterate()) {
+		if (!w->IsFrontEngine() || w->last_station_visited != station) continue;
+		if (!IsWaitingToBoardTrain(w)) continue;
+		if (!w->vehicle_flags.Test(VehicleFlag::LoadingFinished)) continue;
+		TimerGameTick::Ticks wait_time = std::max(w->current_order.GetTimetabledWait() - w->lateness_counter, 0);
+		if (w->current_order_time < wait_time) continue;
+		TryBoardTrain(w);
+	}
+}
+
+/**
  * Get off at a station, onto one of its road stops, if the train is standing
  * at the station the vehicle's order names -- or wherever it stands, if the
  * train has been told to unload everything -- and a stop has room.
@@ -919,6 +1026,7 @@ static bool TryLeaveTrain(RoadVehicle *rv, Train *wagon)
 	InvalidateWindowData(WindowClass::VehicleView, rv->index);
 	InvalidateWindowData(WindowClass::VehicleView, t->index);
 	SetWindowDirty(WindowClass::VehicleDetails, t->index);
+	LetWaitingBoard(dest);
 	return true;
 }
 
@@ -969,6 +1077,7 @@ static bool TryLeaveVessel(RoadVehicle *rv, Vehicle *carrier)
 	InvalidateWindowData(WindowClass::VehicleView, rv->index);
 	InvalidateWindowData(WindowClass::VehicleView, carrier->index);
 	SetWindowDirty(WindowClass::VehicleDetails, carrier->index);
+	LetWaitingBoard(dest);
 	return true;
 }
 
@@ -1133,4 +1242,71 @@ void DestroyRoadVehiclesAboard(Vehicle *carrier)
 	}
 	RemoveRideMirror(carrier);
 	carrier->cargo.Truncate();
+}
+
+/**
+ * Does a ship or an aircraft standing at a station stay for its road
+ * vehicles? Unload, a pause, load -- the player's rule -- and the vessel waits
+ * for all three:
+ *
+ * - a car aboard that gets off here and has a stop to get off into;
+ * - the pause (VESSEL_BOARDING_PAUSE), if anybody is getting off or on here;
+ * - a car waiting at this station that would board it now.
+ *
+ * Without this a vessel with nothing of its own to load was gone a tick after
+ * it arrived, and whether the car waiting for it got on depended on which of
+ * the two vehicles the game happened to move first.
+ *
+ * Not for ever: a car that gets no further for a whole day is not worth
+ * holding the vessel for, and the record says so, since it means something
+ * above was not meant to happen.
+ *
+ * @param v the ship or aircraft, loading at its station
+ * @return whether it stays this tick
+ */
+bool VesselHoldsForRoadVehicles(const Vehicle *v)
+{
+	if (v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) return false;
+	if (!v->current_order.IsType(OT_LOADING)) return false;
+	StationID station = v->last_station_visited;
+	if (station == StationID::Invalid()) return false;
+
+	bool getting_off = false;
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || rv->carried_by != v->index) continue;
+		if (!rv->current_order.IsType(OT_GOTO_STATION) || rv->current_order.GetDestination() != station) continue;
+		TileIndex stop = INVALID_TILE;
+		Trackdir into = Trackdir::Invalid;
+		if (FindFreeStop(rv, station, &stop, &into)) getting_off = true;
+	}
+
+	bool getting_on = false;
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || rv->last_station_visited != station) continue;
+		if (!IsWaitingToBoardTrain(rv)) continue;
+		OrderBoardMode mode = rv->current_order.GetBoardMode();
+		if (mode != (v->type == VehicleType::Ship ? OrderBoardMode::ShipToNext : OrderBoardMode::PlaneToNext)) continue;
+		StationID target = NextStationToGetOff(rv);
+		if (target == StationID::Invalid()) continue;
+		/* Would it get on this one, the pause aside? */
+		bool goes = false;
+		for (const Order &o : v->Orders()) {
+			if (o.IsType(OT_GOTO_STATION) && o.GetDestination().ToStationID() == target) {
+				goes = true;
+				break;
+			}
+		}
+		if (!goes || v->cargo_type != _road_vehicle_cargo) continue;
+		if (RoadVehiclesAboard(v) - RoadVehiclesGettingOff(v, station) >= v->cargo_cap) continue;
+		getting_on = true;
+	}
+
+	if (!getting_off && !getting_on) return false;
+
+	if (v->current_order_time > VESSEL_BOARDING_PAUSE + Ticks::DAY_TICKS) {
+		LogAnomaly("{} {}: ceka na auta ve stanici {} uz den - odjizdi bez nich", v->type == VehicleType::Ship ? "Lod" : "Letadlo",
+				v->unitnumber, station);
+		return false;
+	}
+	return true;
 }

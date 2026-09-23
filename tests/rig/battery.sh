@@ -1091,6 +1091,27 @@ run_scene autoletadlo "vlak123 on
 testautoletadlo
 testzatik 2000 testrozkazokna
 testzatik 3000 testauta" 12000
+# The car flies there and back: both of its orders board the aircraft. An
+# order to board is written "no load, no unload", and the game's search for
+# the next stop skips such orders -- so the car found nowhere to get off and
+# waited at the first stop for ever (the player's "the aircraft brought a car
+# and took none away"). It gets off at its next station order now.
+run_scene autoletadlotam "vlak123 on
+testautoletadlo tamizpet
+testzatik 3000 testauta
+testzatik 9000 testauta" 12000
+# A car each way on the aircraft, two each way on a ship for two: unload, a
+# pause of about three seconds, load, and the vessel waits for all of it.
+# Before, a vessel with nothing of its own to load left a tick after the car
+# got off, and whether the car waiting got on depended on which of the two
+# the game moved first; and on the ship the cars waiting stood in the one
+# stop the cars aboard needed, each waiting for the other for ever.
+run_scene autoletadlodve "vlak123 on
+testautoletadlo protijedouci
+testzatik 9000 testauta" 12000
+run_scene autoloddve "vlak123 on
+testautolod 2 protijedouci
+testzatik 9000 testauta" 14000
 run_scene autolod "vlak123 on
 testautolod 2
 testzatik 2000 testrozkazokna
