@@ -1776,7 +1776,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				/* Naming one is the gesture that means "buy this one" -- in a
 				 * shed. At a platform there is nothing to buy into and no shed
 				 * to buy from, so the same gesture only says which type to
-				 * couple, and the button there has two states instead of three. */
+				 * couple, and the list there has no buying line. */
 				order->SetBuyWagons(chosen != EngineID::Invalid() && order->IsType(OT_GOTO_DEPOT));
 				/* And the cargo filter goes, for the reason given at
 				 * MOF_COUPLE_CARGO: the two say different things and are meant
@@ -1811,10 +1811,11 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 						if (IsValidCargoType(first)) order->SetCoupleCargo(first);
 					}
 				}
-				/* And letting the model go takes the cargo with it. The two are
-				 * one answer -- this model, carrying that -- which is the
-				 * player's own rule from the other side: "every cargo" clears
-				 * the model as well. */
+				/* And letting the model go takes the cargo with it: the cargo
+				 * may have been written in with the model (above), and one left
+				 * standing after the model is gone would filter by something
+				 * nobody picked. The other way round no longer holds: "every
+				 * cargo" leaves the type alone (MOF_COUPLE_CARGO). */
 				if (chosen == EngineID::Invalid()) order->SetCoupleCargo(INVALID_CARGO);
 				break;
 			}
@@ -1833,6 +1834,17 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				 * this order will couple and nothing is bought -- the yard
 				 * bought its wagons once and collects its own from now on. */
 				order->SetBuyWagons(data != 0);
+				/* And back on from the list, with "every cargo" standing: the
+				 * wagon's own first cargo is written in, as when the wagon is
+				 * named to be bought (MOF_COUPLE_BUY) -- whatever is bought has
+				 * a cargo, and the cargo list is the wagon's already. */
+				if (data != 0 && !IsValidCargoType(order->GetCoupleCargo())) {
+					const Engine *e = Engine::GetIfValid(order->GetCoupleBuyEngine());
+					if (e != nullptr) {
+						CargoType first = e->GetDefaultCargoType();
+						if (IsValidCargoType(first)) order->SetCoupleCargo(first);
+					}
+				}
 				break;
 
 			case MOF_SELL_DECOUPLED:

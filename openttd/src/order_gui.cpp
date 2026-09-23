@@ -1861,9 +1861,9 @@ public:
 			}
 
 			case WID_O_COUPLE_BUY: {
-				/* Three states on one button, in the order a yard goes through
-				 * them: no wagon of its own, then a wagon it buys, then the
-				 * same wagon as the only one it will couple. */
+				/* What the order holds: every type, a type it only couples,
+				 * or a type it buys (in a shed). The list under it is where
+				 * each of them is picked (OnClick). */
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) return GetString(STR_ORDER_COUPLE_BUY_OFF);
 				EngineID eid = order->GetCoupleBuyEngine();
@@ -2229,31 +2229,27 @@ public:
 			case WID_O_COUPLE_BUY: {
 				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
 				if (order == nullptr) break;
-				/* The press walks the states round. No type named: the list
-				 * opens to be asked which. Buying: the buying stops and the
-				 * type stays as the only one this order will couple. Couples
-				 * only: the type is let go of and the order is back to taking
-				 * whatever the other filters allow.
-				 *
-				 * At a platform there are two of those states and not three:
-				 * there is nothing to buy into and no shed to buy from, so
-				 * naming a type there only says which one to couple. The
-				 * middle state is skipped on the way round. */
+				/* A list, the player's layout: every type at the top, the
+				 * default; the named type as a filter only; the same type
+				 * bought, in a shed -- the one press that switches buying back
+				 * on, which the old walk-round button could only do by going
+				 * all the way round and picking the wagon again; and a way to
+				 * pick another type. At a platform nothing can be bought, so
+				 * the buying line is not there. */
 				if (!order->ShouldGoToCouple()) break;
 				if (!order->IsType(OT_GOTO_DEPOT) && !order->IsType(OT_GOTO_STATION)) break;
-				const Depot *depot = Depot::GetIfValid(order->GetDestination().ToDepotID());
-				if (Engine::GetIfValid(order->GetCoupleBuyEngine()) == nullptr) {
-					ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),
-							depot != nullptr ? depot->xy : INVALID_TILE, order->GetCoupleCargo());
-					break;
+				EngineID eid = order->GetCoupleBuyEngine();
+				bool named = Engine::GetIfValid(eid) != nullptr;
+				DropDownList list;
+				list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_TYPE_ALL, 0));
+				if (named) {
+					list.push_back(MakeDropDownListStringItem(GetString(STR_ORDER_COUPLE_TYPE_ONLY_ITEM, PackEngineNameDParam(eid, EngineNameContext::PurchaseList)), 1));
+					if (order->IsType(OT_GOTO_DEPOT)) {
+						list.push_back(MakeDropDownListStringItem(GetString(STR_ORDER_COUPLE_TYPE_BUY_ITEM, PackEngineNameDParam(eid, EngineNameContext::PurchaseList)), 2));
+					}
 				}
-				if (order->ShouldBuyWagons()) {
-					Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
-							this->OrderGetSel(), MOF_COUPLE_BUY_ON, 0);
-					break;
-				}
-				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
-						this->OrderGetSel(), MOF_COUPLE_BUY, EngineID::Invalid().base());
+				list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_TYPE_PICK, 3));
+				ShowDropDownList(this, std::move(list), !named ? 0 : (order->ShouldBuyWagons() ? 2 : 1), WID_O_COUPLE_BUY);
 				break;
 			}
 
@@ -2460,6 +2456,37 @@ public:
 			case WID_O_COUPLE_CARGO:
 				Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index, this->OrderGetSel(), MOF_COUPLE_CARGO, index);
 				break;
+
+			case WID_O_COUPLE_BUY: {
+				const Order *order = this->vehicle->GetOrder(this->OrderGetSel());
+				if (order == nullptr) break;
+				switch (index) {
+					case 0: // every type
+						Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+								this->OrderGetSel(), MOF_COUPLE_BUY, EngineID::Invalid().base());
+						break;
+					case 1: // the type, couple only
+						if (order->ShouldBuyWagons()) {
+							Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+									this->OrderGetSel(), MOF_COUPLE_BUY_ON, 0);
+						}
+						break;
+					case 2: // the type, bought
+						if (!order->ShouldBuyWagons()) {
+							Command<Commands::ModifyOrder>::Post(STR_ERROR_CAN_T_MODIFY_THIS_ORDER, this->vehicle->tile, this->vehicle->index,
+									this->OrderGetSel(), MOF_COUPLE_BUY_ON, 1);
+						}
+						break;
+					case 3: { // pick another
+						const Depot *depot = Depot::GetIfValid(order->GetDestination().ToDepotID());
+						ShowPickCoupleWagonWindow(this->vehicle, this->OrderGetSel(),
+								order->IsType(OT_GOTO_DEPOT) && depot != nullptr ? depot->xy : INVALID_TILE, order->GetCoupleCargo());
+						break;
+					}
+					default: break;
+				}
+				break;
+			}
 
 			case WID_O_REFIT_DROPDOWN:
 				this->OrderClick_Refit(index, true);
@@ -2854,7 +2881,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_orders_train_widgets
 													SetStringTip(STR_ORDER_COUPLE_COUNT_BUTTON, STR_ORDER_COUPLE_COUNT_TOOLTIP), SetResize(1, 0),
 			/* Three buttons of 124 re-laid as four of 93: the row is the same
 			 * 372 wide it was and the window does not grow by a point. */
-			NWidget(WWT_TEXTBTN, Colours::Grey, WID_O_COUPLE_BUY), SetMinimalSize(93, 12), SetFill(1, 0),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_O_COUPLE_BUY), SetMinimalSize(93, 12), SetFill(1, 0),
 													SetStringTip(STR_ORDER_COUPLE_BUY_OFF, STR_ORDER_COUPLE_BUY_TOOLTIP), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),

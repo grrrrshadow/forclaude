@@ -395,6 +395,19 @@ testza 300 testkoupit 2 0
 testza 400 testprestavba 2 0
 testza 500 testmof 2 0 16 255
 testza 600 testprestavba 2 0" 3000
+# The type list of a depot order, read line by line the way the player walks
+# it: the wagon named and bought, the buying switched off from the list (the
+# type stays and only filters), the cargo let go to "every cargo" (the type
+# stays -- the cargo does not reach into it), and the buying switched back on
+# from the list, which writes the wagon's first cargo into the filter, because
+# what is bought has a cargo. Each change prints what the order then holds.
+run_scene rolovaktypu "vlak123 on
+testspoj depo
+testza 200 testkoupit 2 0
+testza 300 testmof 2 0 28 0
+testza 400 testmof 2 0 16 255
+testza 500 testmof 2 0 28 1
+testza 600 testprestavba 2 0" 3000
 # The two ways a collecting order can read its filters: "find a rake like
 # this" asks the whole rake and "search the rake for this" asks wagon by wagon.
 # One rake of three at the platform, two of them loaded and one left empty,
