@@ -1451,12 +1451,13 @@ STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_1                       :1
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_2                       :2
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_3                       :3
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY                          :Forgets the orange: {STRING2}
-STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :How long the driver keeps in mind what the last signal he passed told him. Past that he knows only what he sees, and a red far behind an orange comes as a surprise. Applies when "Brake, fail to brake and crash" is on
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :How long the driver keeps in mind what the last signal he passed told him. Set to 5, Alzheimer: the driver remembers for only 5 tiles past the yellow signal that he has to brake. There has to be another signal there. Applies when "Brake, fail to brake and crash" is on
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_NEVER                    :never with ETCS
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_20                       :after 20 tiles with ETCS
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_15                       :after 15 tiles with ETCS
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_10                       :after 10 tiles
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_5                        :after 5 tiles
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_3                        :after 3 tiles
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Road vehicle acceleration model: {STRING2}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Select the physics model for road vehicle acceleration. The "original" model penalises slopes equally for all vehicles. The "realistic" model penalises slopes depending on various properties of the engine, for example 'tractive effort'

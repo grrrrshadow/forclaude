@@ -1538,12 +1538,13 @@ STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_1                       :1
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_2                       :2
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_3                       :3
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY                          :Oranžovou zapomene: {STRING}
-STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :Jak dlouho si strojvedoucí pamatuje, co mu řeklo poslední návěstidlo, které projel. Potom ví jen to, co vidí, a červená daleko za oranžovou ho překvapí. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :Jak dlouho si strojvedoucí pamatuje, co mu řeklo poslední návěstidlo, které projel. Při nastavení 5 alzhaimer si strojvedoucí pamatuje jen 5 poliček za žlutým semaforem že má brzdit. Musí tam mít další semaforek. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_NEVER                    :s ETCS nikdy
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_20                       :za 20 polí s ETCS
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_15                       :za 15 polí s ETCS
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_10                       :za 10 polí
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_5                        :za 5 polí
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_3                        :za 3 pole
 
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL              :Model zrychlování silničních vozidel: {STRING}
 STR_CONFIG_SETTING_ROAD_VEHICLE_ACCELERATION_MODEL_HELPTEXT     :Zvolit fyzikální model pro zrychlení silničních vozidel. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů.

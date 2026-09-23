@@ -1003,7 +1003,7 @@ static bool PathBeyondSignalTaken(const Train *v, TileIndex tile, Trackdir td);
  */
 static bool DriverRemembersSignal(const Train *v)
 {
-	static constexpr uint MEMORY_TILES[] = {UINT8_MAX, 20, 15, 10, 5};
+	static constexpr uint MEMORY_TILES[] = {UINT8_MAX, 20, 15, 10, 5, 3};
 	uint memory = std::min<uint>(_settings_game.vehicle.train_warning_memory, std::size(MEMORY_TILES) - 1);
 	if (memory == 0) return true;
 	return v->tiles_past_signal < MEMORY_TILES[memory];

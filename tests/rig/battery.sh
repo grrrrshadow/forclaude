@@ -185,7 +185,7 @@ testnedobrzdil blok stopka 8 odtah" 9000
 # sees 5 tiles. The signal before the red 2 tiles short of it: he learns of
 # the red 7 tiles out and runs past (srazka=1). 20 tiles short: he knows of
 # the red from there and stands short of it (srazka=0). The same, but he
-# forgets after 5 tiles: runs past again (srazka=1). Two orange signals, 2
+# forgets after 5 tiles, or after 3: runs past again (srazka=1). Two orange signals, 2
 # tiles apart: he knows of the red from the signal before those and stops.
 # The scenes above that are about running past a red set him to forget after
 # 5 tiles, or their signals, 22 tiles apart, would warn him in time.
@@ -197,6 +197,10 @@ vlak123 on
 testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
 run_scene oranzzapomene "setting vehicle.train_braking 1
 setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+run_scene oranzzapomene3 "setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 5
 vlak123 on
 testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
 run_scene oranzdve "setting vehicle.train_braking 1
