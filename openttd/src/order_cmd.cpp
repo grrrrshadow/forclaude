@@ -1767,17 +1767,16 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				break;
 
 			case MOF_COUPLE_BUY: {
-				/* Naming a wagon is the gesture that means "buy this one"; the
-				 * two are set together because that is what the player did.
-				 * Letting go of it leaves the order with no wagon of its own,
-				 * so there is nothing to buy and nothing to be picky about. */
+				/* Naming a wagon says which type this order couples, and
+				 * nothing more: buying it is a second choice, "Koupit" in the
+				 * list, switched on by the player (MOF_COUPLE_BUY_ON). The
+				 * player's rule -- he picks a type to say "couple this one",
+				 * and a pick that went on to buy it as well bought wagons he
+				 * never asked for. Letting go of it leaves the order with no
+				 * wagon of its own, so there is nothing to buy either. */
 				EngineID chosen = static_cast<EngineID>(data);
 				order->SetCoupleBuyEngine(chosen);
-				/* Naming one is the gesture that means "buy this one" -- in a
-				 * shed. At a platform there is nothing to buy into and no shed
-				 * to buy from, so the same gesture only says which type to
-				 * couple, and the list there has no buying line. */
-				order->SetBuyWagons(chosen != EngineID::Invalid() && order->IsType(OT_GOTO_DEPOT));
+				order->SetBuyWagons(false);
 				/* And the cargo filter goes, for the reason given at
 				 * MOF_COUPLE_CARGO: the two say different things and are meant
 				 * to be said together -- this model, carrying that cargo. What
@@ -1792,27 +1791,12 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 							: GetUnionOfArticulatedRefitMasks(chosen, true).Test(order->GetCoupleCargo()));
 					if (!carries) order->SetCoupleCargo(INVALID_CARGO);
 				}
-				/* A shed told to buy a model, with no cargo said: the cargo is
-				 * written in for him, and it is the one the model is bought
-				 * with -- its own first. The player's reason is that the button
-				 * was saying "every cargo" while the order underneath it was
-				 * going to buy one particular cargo, and the two read as
-				 * different things. Written in rather than only shown, because
-				 * a button that names a cargo it does not filter by is worse
-				 * than one that says nothing: switch the buying off and that
-				 * name would go on standing there meaning nothing at all.
+				/* The cargo a bought model is bought with is written in when
+				 * buying is switched on (MOF_COUPLE_BUY_ON), not here: a pick
+				 * buys nothing.
 				 *
-				 * Only where something is bought. At a platform nothing is, so
-				 * there is no "the cargo it will be bought with" to write. */
-				if (chosen != EngineID::Invalid() && order->ShouldBuyWagons() && !IsValidCargoType(order->GetCoupleCargo())) {
-					const Engine *e = Engine::GetIfValid(chosen);
-					if (e != nullptr) {
-						CargoType first = e->GetDefaultCargoType();
-						if (IsValidCargoType(first)) order->SetCoupleCargo(first);
-					}
-				}
-				/* And letting the model go takes the cargo with it: the cargo
-				 * may have been written in with the model (above), and one left
+				 * And letting the model go takes the cargo with it: the cargo
+				 * may have been written in for the model's buying, and one left
 				 * standing after the model is gone would filter by something
 				 * nobody picked. The other way round no longer holds: "every
 				 * cargo" leaves the type alone (MOF_COUPLE_CARGO). */

@@ -6188,7 +6188,11 @@ static bool ConTestCoupleCount(std::span<std::string_view> argv)
 /**
  * Tell a depot couple order which wagon to buy when the shed is short of them,
  * the way the button in the filter row does. Usage: testkoupit <unit number>
- * <order index> [<engine id>|vypnout]
+ * <order index> [<engine id>|vypnout|jentyp]
+ *
+ * Picking a type only names it; this probe then switches buying on, as the
+ * player does with "Koupit" in the list. "jentyp" stops after the pick and
+ * refuses (ODMITNUTO) if the pick alone switched buying on.
  *
  * With no engine given it takes the first wagon this company can buy, which is
  * what a scene wants: any wagon will do, the question being measured is whether
@@ -6415,7 +6419,7 @@ static bool ConTestDepotWagons(std::span<std::string_view> argv)
 static bool ConTestBuyWagons(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Tell a depot couple order which wagon to buy. Usage: 'testkoupit <cislo vlaku> <rozkaz> [<model>|vypnout]'.");
+		IConsolePrint(CC_HELP, "Tell a depot couple order which wagon to buy. Usage: 'testkoupit <cislo vlaku> <rozkaz> [<model>|vypnout|jentyp]'.");
 		return true;
 	}
 	auto punit = ParseInteger(argv[1]);
@@ -6427,9 +6431,12 @@ static bool ConTestBuyWagons(std::span<std::string_view> argv)
 		AutoRestoreBackup cur_company(_current_company, t->owner);
 
 		uint32_t data = EngineID::Invalid().base();
+		/* "jentyp": the player's pick in the window and nothing after it --
+		 * the type named, buying left off. */
+		bool type_only = argv.size() >= 4 && argv[3] == "jentyp";
 		if (argv.size() < 4 || argv[3] != "vypnout") {
 			EngineID eid = EngineID::Invalid();
-			if (argv.size() >= 4) {
+			if (argv.size() >= 4 && !type_only) {
 				auto pe = ParseInteger(argv[3]);
 				if (!pe.has_value()) return false;
 				eid = static_cast<EngineID>(*pe);
@@ -6461,6 +6468,19 @@ static bool ConTestBuyWagons(std::span<std::string_view> argv)
 		}
 
 		CommandCost r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_BUY, data);
+		/* Picking a type only names it; this probe is the player who then
+		 * switches "Koupit" on as well, in a shed, as its name says. */
+		const Order *picked = t->GetOrder((VehicleOrderID)*porder);
+		if (type_only) {
+			/* A pick buys nothing: buying is the player's second choice. */
+			bool buys = picked != nullptr && picked->ShouldBuyWagons();
+			IConsolePrint(buys ? CC_ERROR : CC_INFO, "testkoupit: vlak {} rozkaz {} -> jen typ {}, kupovat {}{}", *punit, *porder,
+					data, buys ? "ano" : "ne", buys ? " - ODMITNUTO, vyber typu zapnul nakup" : "");
+			return true;
+		}
+		if (r.Succeeded() && data != EngineID::Invalid().base() && picked != nullptr && picked->IsType(OT_GOTO_DEPOT)) {
+			r = Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, (VehicleOrderID)*porder, MOF_COUPLE_BUY_ON, 1);
+		}
 		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testkoupit: vlak {} rozkaz {} -> koupit model {} {}", *punit, *porder,
 				data, r.Succeeded() ? "nastaveno" : "ODMITNUTO");
 		return true;

@@ -453,6 +453,11 @@ testspoj depo
 testpocet 2 0 6
 testkoupit 2 0
 testmof 2 0 15 2" 4000
+# Picking a type in the window names it and buys nothing: "Koupit" is the
+# player's second choice in the list (odmitnuto=0).
+run_scene typbezkoupeni "vlak123 on
+testspoj depo
+testza 200 testkoupit 2 0 jentyp" 3000
 run_scene rolovaktypu "vlak123 on
 testspoj depo
 testza 200 testkoupit 2 0

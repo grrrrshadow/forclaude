@@ -5057,7 +5057,7 @@ STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO                          :{SPACE}(type {E
 STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_ANY                            :{SPACE}(type {ENGINE}, any cargo)
 STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Which wagon to couple
 STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Couple this one
-STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Write this wagon into the order. The order buys one whenever the depot is short, fits it for the cargo the filter asks for, and couples it
+STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Write this wagon into the order. The order will couple only this type. For it to buy one whenever the depot is short, switch the order to "Buy"
 STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}How many vehicles the rake to couple to has to have (0 - any)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})

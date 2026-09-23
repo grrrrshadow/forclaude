@@ -5212,7 +5212,7 @@ STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_CARGO                          :{SPACE}(typ {EN
 STR_ORDER_COUPLE_BUY_ONLY_SUFFIX_ANY                            :{SPACE}(typ {ENGINE}, všechny náklady)
 STR_COUPLE_BUY_PICK_CAPTION                                     :{WHITE}Který vagon připojit
 STR_COUPLE_BUY_PICK_BUTTON                                      :{BLACK}Připojit tenhle
-STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Zapíše tenhle vagon do rozkazu. Rozkaz ho koupí vždycky, když v depu chybí, přestaví ho na náklad z filtru a připojí
+STR_COUPLE_BUY_PICK_TOOLTIP                                     :{BLACK}Zapíše tenhle vagon do rozkazu. Rozkaz bude připojovat jen tenhle typ. Aby ho v depu kupoval, když chybí, přepni v rozkazu na „Koupit“
 STR_ORDER_COUPLE_COUNT_CAPT                                     :{WHITE}Zadej, kolik vozů má mít připojovaná řada (0 - libovolně)
 STR_ORDER_COUPLE_FILTER_SUFFIX                                  :{STRING} ({STRING})
 STR_ORDER_COUPLE_FILTER_SUFFIX_PART                             :{SPACE}({STRING})
