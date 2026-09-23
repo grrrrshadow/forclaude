@@ -1862,7 +1862,11 @@ struct BuildVehicleWindow : Window {
 				this->SetDirty();
 				if (_ctrl_pressed) {
 					this->OnClick(pt, WID_BV_SHOW_HIDE, 1);
-				} else if (click_count > 1 && (!this->listview_mode || this->pick_for_order != nullptr)) {
+				} else if (click_count > 1 && !this->listview_mode && this->pick_for_order == nullptr) {
+					/* Asked "which wagon" for an order, a double click only
+					 * picks it out: the answer is the button, next to the cargo
+					 * it is given with, so that the eye passes over the cargo on
+					 * the way (the player's rule). */
 					this->OnClick(pt, WID_BV_BUILD, 1);
 				}
 				break;
@@ -2228,6 +2232,12 @@ void ShowPickCoupleWagonWindow(const Vehicle *v, VehicleOrderID index, TileIndex
 	 * window the player got: he clicked a wagon and nothing happened. */
 	if (NWidgetStacked *sel = w->GetWidget<NWidgetStacked>(WID_BV_BUILD_SEL); sel != nullptr) sel->SetDisplayedPlane(0);
 	w->SetBuyVehicleText();
+	/* And the window laid out again with it. The tree was sized with the
+	 * button hidden, so switched back on it had no width at all, and the
+	 * cargo filter beside it took the whole row: the player's "the button
+	 * is gone and the cargo list sits in its place" -- for an order to a
+	 * station, which names no depot. */
+	w->ReInit();
 	/* The list was made in the constructor, before this window knew it was
 	 * being asked a question -- so it is the ordinary list, engines and all.
 	 * Made again now that it knows, rather than left for the first repaint:
@@ -2262,7 +2272,8 @@ void TestPickCoupleWagon(const Vehicle *v, VehicleOrderID index, TileIndex tile,
 	}
 
 	NWidgetStacked *sel = w->GetWidget<NWidgetStacked>(WID_BV_BUILD_SEL);
-	if (sel == nullptr || sel->shown_plane == SZSP_NONE) {
+	const NWidgetBase *button = w->GetWidget<NWidgetBase>(WID_BV_BUILD);
+	if (sel == nullptr || sel->shown_plane == SZSP_NONE || button == nullptr || button->current_x == 0) {
 		IConsolePrint(CC_ERROR, "testvybervagonu: ODMITNUTO - v okne vyberu neni cudlik, nema se cim odpovedet.");
 		w->Close();
 		return;

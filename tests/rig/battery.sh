@@ -375,6 +375,14 @@ testvybervagonu 2 0" 3000
 # what the player got was the type set and a refusal on the screen at the same
 # moment. Every counter here said the press had worked, so the probe now asks
 # outright whether a refusal popped up.
+# The same window from an order to a station, which names no depot. The
+# button was switched on after the window had been laid out without it, so
+# it had no width and the cargo filter beside it took the whole row -- the
+# probe asked only whether it was switched on, and it was. It asks whether
+# it has any width now (odmitnuto=0).
+run_scene vybervagonustanice "vlak123 on
+testspoj
+testvybervagonu 2 0" 3000
 run_scene vybervagonunaklad "vlak123 on
 testspoj depo
 testfiltr 0
