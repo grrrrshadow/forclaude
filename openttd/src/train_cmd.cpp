@@ -1274,9 +1274,28 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		}
 
 		if (ft.is_station) {
-			/* A platform is crossed in one step. Nothing on it to read: a
-			 * train standing there was caught above, and where this train is
-			 * to stop is the station code's own business. */
+			/* A platform is crossed in one step, and where this train is to
+			 * stop on it is the station code's own business. A train standing
+			 * on it is not: the step lands on the platform's far end, and only
+			 * that tile was asked above. With "brake, fail to brake and crash"
+			 * on, the driver reads every tile of it -- sent past a red with the
+			 * button in the train's window, a light engine did not see the
+			 * engine standing on the first tile of the platform four tiles
+			 * ahead, pulled away to 60 and hit it (measured). Off, as it was. */
+			if (read_warning && ft.tiles_skipped > 0) {
+				TileIndexDiff step = TileOffsByDiagDir(ft.exitdir);
+				TileIndex on = TileAdd(ft.new_tile, -step * ft.tiles_skipped);
+				bool stood = false;
+				for (int k = 0; k < ft.tiles_skipped; k++, on = TileAdd(on, step)) {
+					int other = SpeedOfTrainOn(v, on, ft.exitdir, ft.new_td_bits);
+					if (other < 0) continue;
+					int at = px + k * TILE_SIZE;
+					ask(other, (other > 0 || on_our_booking || last_signal_px < 0) ? at : last_signal_px);
+					stood = true;
+					break;
+				}
+				if (stood) break;
+			}
 			px += (ft.tiles_skipped + 1) * TILE_SIZE;
 			if (ft.new_td_bits.Count() != 1) break;
 			tile = ft.new_tile;
@@ -11369,9 +11388,26 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	Track best_track = Track::Invalid;
 	bool do_track_reservation = _settings_game.pf.reserve_paths || force_res;
 	bool changed_signal = false;
+	Trackdir changed_signal_td = Trackdir::Invalid; // the path signal on this tile turned green for the booking, when changed_signal
 	TileIndex final_dest = INVALID_TILE;
 
 	assert(tracks == (tracks & TRACK_BIT_ALL));
+
+	/* "Brake, fail to brake and crash": a path signal turned green here for a
+	 * booking that then came to nothing goes back to red. It was left green:
+	 * the booking is tried from a distance (CheckNextTrainTile()), the road
+	 * behind the signal was taken, nothing was booked through it, and the
+	 * signal went on showing green to a train that could not pass it. The
+	 * driver reads the signals (BrakingCeiling()), saw green, let the brake
+	 * off -- and was stopped dead at the signal from 62 (measured, ten wagons
+	 * at a path signal with a train on the platform behind it). With the
+	 * setting off everything stays as it always was: those signals work and
+	 * the player does not want them touched. */
+	auto signal_back_to_red = [&]() {
+		if (!changed_signal || !IsSignalOverrunOn() || changed_signal_td == Trackdir::Invalid) return;
+		SetSignalStateByTrackdir(tile, changed_signal_td, SignalState::Red);
+		MarkTileDirtyByTile(tile);
+	};
 
 	if (got_reservation != nullptr) *got_reservation = false;
 
@@ -11443,6 +11479,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		if (IsValidTrack(track) && HasPbsSignalOnTrackdir(tile, TrackEnterdirToTrackdir(track, enterdir))) {
 			do_track_reservation = true;
 			changed_signal = true;
+			changed_signal_td = TrackEnterdirToTrackdir(track, enterdir);
 			SetSignalStateByTrackdir(tile, TrackEnterdirToTrackdir(track, enterdir), SignalState::Green);
 		} else if (!do_track_reservation) {
 			return track;
@@ -11587,6 +11624,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	if (res_dest.tile != INVALID_TILE && !res_dest.okay) {
 		if (mark_stuck) MarkTrainAsStuck(consist);
 		FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
+		signal_back_to_red();
 		if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 		/* Use tracks_on_tile, not best_track and not the (by now
 		 * overwritten) `tracks`: best_track can still be Track::Invalid
@@ -11649,6 +11687,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 		FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 		if (speculative_reservation) FreeOrphanedReservation(consist, tile, enterdir);
 		if (mark_stuck) MarkTrainAsStuck(consist);
+		signal_back_to_red();
 		/* See the tracks_on_tile comments above. */
 		return FindFirstTrack(tracks_on_tile);
 	}
@@ -11677,6 +11716,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 				FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 				if (mark_stuck) MarkTrainAsStuck(consist);
 				if (got_reservation != nullptr) *got_reservation = false;
+				signal_back_to_red();
 				changed_signal = false;
 				break;
 			}
@@ -11686,6 +11726,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 			FreeTrainTrackReservation(consist, road_before.tile, road_before.trackdir);
 			if (mark_stuck) MarkTrainAsStuck(consist);
 			if (got_reservation != nullptr) *got_reservation = false;
+			signal_back_to_red();
 			changed_signal = false;
 		}
 		break;

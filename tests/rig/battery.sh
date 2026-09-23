@@ -175,6 +175,24 @@ run_scene nedobrzdilbez "setting vehicle.train_braking 4
 setting vehicle.train_warning_memory 4
 vlak123 on
 testnedobrzdil cesta vozu 10 odtah" 9000
+# A path signal with the platform behind it taken, ten wagons driven at it,
+# sight 5. The signal used to be left green by the booking tried from a
+# distance that came to nothing; the driver let the brake off and the game
+# stopped him dead at the signal from 62. Now it goes back to red, he brakes,
+# arrives at 60, runs past and hits the engine on the platform (srazka=1).
+run_scene nedobrzdilcesta "setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil cesta vozu 10 odtah" 9000
+# A light train stops short of that red; then the button in the train's
+# window sends it past. The signal stays red; the driver reads the engine
+# on the first tile of the platform -- the platform used to be read at its
+# far end only, he pulled away to 61 and hit it -- brakes, but sees it late
+# from a stand and still touches it (srazka=1, at 28).
+run_scene projetcervenou "setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil cesta odtah
+testzatik 4500 testprojet 2" 9000
 # The player's three block signals in a row, the stop pressed eight tiles
 # short of the last one. The game's own cut to a crawl on the last tile
 # before a red is left out with the setting on; this light train brakes by
