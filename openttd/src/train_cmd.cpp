@@ -1099,8 +1099,13 @@ static constexpr int OVERRUN_SPEED = 25;
  * fast has failed to brake -- whoever is driving. A path signal is red until
  * somebody books a way through it, and the driver of a running train is
  * deliberately not told to brake for those (see BrakingCeiling()), so for a
- * running train its red is still the dead stop it always was; only a train
- * the player has stopped, which is no longer booking anything, runs past one.
+ * running train its red is still the dead stop it always was -- unless the
+ * driver had seen something ahead to stop for and was braking for it, and
+ * braking at a train's own rate did not get him down in time: then he has
+ * failed to brake like anybody else (the player's case: a branch taken
+ * away under a loaded train at the last moment, an engine standing straight
+ * ahead). A train the player has stopped, which is no longer booking
+ * anything, runs past one as well.
  *
  * Marks the train (overran_red, overran_on_stop) so that a crash that follows
  * is known for what it is. The marks come off once the train stands.
@@ -1119,7 +1124,8 @@ static bool RunsPastRedSignal(Train *first, bool path_signal, TileIndex where, i
 	if (_settings_game.vehicle.train_acceleration_model != AccelerationModel::Realistic) return false;
 	if (speed <= OVERRUN_SPEED) return false;
 	bool on_stop = first->vehstatus.Test(VehState::Stopped);
-	if (path_signal && !on_stop) return false;
+	bool was_braking = first->driver_ceiling < speed;
+	if (path_signal && !on_stop && !was_braking) return false;
 
 	first->overran_red = true;
 	first->overran_on_stop = on_stop;
@@ -1140,6 +1146,7 @@ int Train::GetCurrentMaxSpeed() const
 	/* Nobody drives a train the player has stopped, with the setting on: no
 	 * easing down for the platform either. See IsBrakingOnPlayersStop(). */
 	bool driven = !IsBrakingOnPlayersStop(this);
+	this->driver_ceiling = INT32_MAX;
 
 	if (driven && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && IsRailStationTile(moving_front->tile)) {
 		StationID sid = GetStationIndex(moving_front->tile);
@@ -1215,7 +1222,8 @@ int Train::GetCurrentMaxSpeed() const
 	 * on the road: see BrakingCeiling(). Realistic model only, like the
 	 * crossing ceiling above, which this is the run-up to. */
 	if (driven && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && this->cur_speed > 0) {
-		max_speed = std::min(max_speed, BrakingCeiling(this, moving_front));
+		this->driver_ceiling = BrakingCeiling(this, moving_front);
+		max_speed = std::min(max_speed, this->driver_ceiling);
 	}
 
 	max_speed = std::min<int>(max_speed, this->current_order.GetMaxSpeed());
@@ -11574,7 +11582,27 @@ int Train::UpdateSpeed()
 				int keep = _settings_game.vehicle.train_stop_brake_weaker == 0 ? 70 : 90;
 				accel = -std::max<int>(1, static_cast<int>(GentleBrakeRate(this) * keep / 100));
 			}
-			int distance = this->DoUpdateSpeed(accel, this->GetAccelerationStatus() == AS_BRAKE ? 0 : 2, this->GetCurrentMaxSpeed());
+			int max_speed = this->GetCurrentMaxSpeed();
+			int distance;
+			if (_settings_game.vehicle.train_signal_overrun && this->cur_speed > max_speed &&
+					this->driver_ceiling <= max_speed && this->GetAccelerationStatus() != AS_BRAKE) {
+				/* "Brake, fail to brake and crash": the driver has something
+				 * ahead to stop for and is over the speed that stops him there
+				 * gently. The game's answer was to take a tenth of the speed
+				 * off every tick until he was not, which stops a heavy train
+				 * inside two tiles for anything that turns up in front of it --
+				 * the player's case, a branch taken away under a loaded train
+				 * at the last moment and a standing engine straight ahead. With
+				 * the setting a train brakes as a train brakes, the driver's
+				 * own eight tiles from top speed (GentleBrakeRate(), the rate
+				 * worked out as for the stop above), and what it cannot stop
+				 * short of it reaches. Only for the driver's ceiling: a curve,
+				 * a bridge or a shed door slows a train as it always did. */
+				int rate = static_cast<int>(std::max<int64_t>(1, GentleBrakeRate(this)));
+				distance = this->DoUpdateSpeed(-rate, std::min<int>(max_speed, this->cur_speed), this->cur_speed);
+			} else {
+				distance = this->DoUpdateSpeed(accel, this->GetAccelerationStatus() == AS_BRAKE ? 0 : 2, max_speed);
+			}
 			/* A train that ran past a red and has come to a stand without
 			 * hitting anything got away with it: whatever it does next is not
 			 * that overrun's doing. */

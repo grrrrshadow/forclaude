@@ -201,6 +201,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	VehicleID rescue_skip = VehicleID::Invalid(); ///< NOSAVE: a case this engine gave up on for now because no road to it could be booked; others come first.
 	StationID honk_waypoint = StationID::Invalid(); ///< NOSAVE: a station waypoint whose order was concluded short of it and asked for the horn; sounded when the train passes its tile.
 	uint8_t rescue_nopath_tries = 0; ///< NOSAVE: how many times in a row the road to the current case could not be booked.
+	mutable int driver_ceiling = INT32_MAX; ///< NOSAVE: the driver's own braking ceiling (BrakingCeiling()) as GetCurrentMaxSpeed() last found it, INT32_MAX when it did not ask.
 	uint16_t couple_refuse_tries = 0; ///< NOSAVE: how many ticks in a row a coupling has been refused while standing against the partner. A rescue engine gives the case up when it runs out; see TrainLocoHandler().
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
 

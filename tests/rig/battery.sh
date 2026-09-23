@@ -152,8 +152,11 @@ vlak123 on
 testnedobrzdil cesta stopka 3 odtah les" 9000
 run_scene nedobrzdilvyp "vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
-# Setting on, nobody touches the stop: the train is driven, and a path signal
-# it could not book through stops it dead as always (srazka=0).
+# Setting on, nobody touches the stop: the train is driven. It learns that the
+# platform is taken only when it books up to the path signal, four tiles
+# short, brakes for it at a train's own rate -- no longer a tenth of its speed
+# a tick -- cannot stop and runs past (srazka=1). The player's own save does
+# the same (TEMATA_ODTAH 81.8).
 run_scene nedobrzdilbez "setting vehicle.train_signal_overrun on
 vlak123 on
 testnedobrzdil cesta odtah" 9000
