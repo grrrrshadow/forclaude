@@ -1189,3 +1189,45 @@ testautovlak
 testza 2990 testbrzda 1
 testza 3000 testsmery 1
 testzatik 3100 testauta" 4000
+
+# Themed towns ("Domy z" in the town window and in the found town window).
+# Both scenes need a house set in the home's newgrf/ that the rig does not
+# otherwise play with (see README.md), handed to the game through a config of
+# their own, a copy of the kept one with the set put into [newgrf].
+#
+# domy: the Mars houses of BaNaNaS (524A450B), which leave the original houses
+# on and build nothing before 2030 by their own years. A town is ticked Mars,
+# then Mars and its climate, then only the climate, growing after each; then a
+# town is founded of Mars through the found town window, grows, and grows
+# again in 2035. Every house a themed town puts up has to be of its sets, and
+# the Mars town has to build Mars from 1950 -- a set that has nothing in its
+# years yet builds its houses from the start (TryBuildTownHouse()).
+#
+# domyvypnute: the older Mars set (4F474D05), which switches the original
+# houses off. A town ticked to its climate still builds the climate's houses
+# -- they are the game's own -- while a town of every house builds, as ever,
+# what the set leaves on.
+#
+# A missing set shows as odmitnuto: the click in the list changes nothing.
+DOMY_CFG=$S/domy_openttd.cfg
+sed '/^\[newgrf\]$/a ogfx-mars-houses-rehabs.grf = ' "$CFG_KEEP" > $DOMY_CFG
+run_scene domy "setting economy.found_town 2
+testdomy
+testdomy okno 0 524A450B
+testdomy rust 0 30
+testdomy okno 0 klima
+testdomy rust 0 30
+testdomy okno 0 524A450B
+testdomy rust 0 20
+testdomy zaloz 150 200 524A450B
+testdomy rust posledni 20
+testdomy rok 2035
+testdomy rust posledni 20
+testdomy" 100 -c $DOMY_CFG
+DOMY2_CFG=$S/domy2_openttd.cfg
+sed '/^\[newgrf\]$/a ogfx-mars-houses.grf = ' "$CFG_KEEP" > $DOMY2_CFG
+run_scene domyvypnute "testdomy
+testdomy okno 0 klima
+testdomy rust 0 30
+testdomy rust 1 30
+testdomy" 100 -c $DOMY2_CFG

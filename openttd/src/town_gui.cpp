@@ -39,6 +39,7 @@
 #include "fios.h"
 #include "stringfilter_type.h"
 #include "dropdown_func.h"
+#include "dropdown_common_type.h"
 #include "town_kdtree.h"
 #include "town_cmd.h"
 #include "timer/timer.h"
@@ -361,8 +362,11 @@ public:
 		NWidgetViewport *nvp = this->GetWidget<NWidgetViewport>(WID_TV_VIEWPORT);
 		nvp->InitializeViewport(this, this->town->xy, ScaleZoomGUI(ZoomLevel::Town));
 
-		/* disable renaming town in network games if you are not the server */
+		/* disable renaming town in network games if you are not the server --
+		 * and choosing its houses, for the same reason: it is the server's
+		 * town as much as its name is (CmdTownHouseSet()). */
 		this->SetWidgetDisabledState(WID_TV_CHANGE_NAME, _networking && !_network_server);
+		this->SetWidgetDisabledState(WID_TV_HOUSE_SETS, _networking && !_network_server);
 	}
 
 	void Close([[maybe_unused]] int data = 0) override
@@ -374,6 +378,21 @@ public:
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		if (widget == WID_TV_CAPTION) return GetString(this->town->larger_town ? STR_TOWN_VIEW_CITY_CAPTION : STR_TOWN_VIEW_TOWN_CAPTION, this->town->index);
+		if (widget == WID_TV_HOUSE_SETS) {
+			/* Nothing chosen is every house, as the game always had it; one
+			 * set by its name; more, their names while they fit and a count
+			 * when they would not. */
+			if (this->town->num_house_sets == 0) return GetString(STR_TOWN_VIEW_HOUSE_SETS, GetString(STR_TOWN_VIEW_HOUSE_SETS_ALL));
+			std::string names;
+			for (uint i = 0; i < this->town->num_house_sets; i++) {
+				if (!names.empty()) names += " + ";
+				names += HouseSourceName(this->town->house_sets[i]);
+			}
+			const NWidgetBase *nwid = this->GetWidget<NWidgetBase>(WID_TV_HOUSE_SETS);
+			std::string all = GetString(STR_TOWN_VIEW_HOUSE_SETS, names);
+			if (this->town->num_house_sets == 1 || nwid == nullptr || GetStringBoundingBox(all).width + WidgetDimensions::scaled.framerect.Horizontal() + 2 * GetCharacterHeight(FontSize::Normal) <= nwid->current_x) return all;
+			return GetString(STR_TOWN_VIEW_HOUSE_SETS, GetString(STR_TOWN_VIEW_HOUSE_SETS_COUNT, this->town->num_house_sets));
+		}
 
 		return this->Window::GetWidgetString(widget, stringid);
 	}
@@ -513,7 +532,32 @@ public:
 				ShowTownCargoGraph(this->window_number);
 				break;
 			}
+
+			case WID_TV_HOUSE_SETS:
+				ShowDropDownList(this, this->BuildHouseSetList(), -1, WID_TV_HOUSE_SETS, 0, DropDownOption::Persist);
+				break;
 		}
+	}
+
+	/**
+	 * The list under "Domy z": every set of houses there is here, ticked if
+	 * this town builds from it. It stays open, so that several can be ticked
+	 * one after another -- a town of three sets is three clicks.
+	 */
+	DropDownList BuildHouseSetList() const
+	{
+		DropDownList list;
+		for (uint32_t source : AvailableHouseSources()) {
+			list.push_back(std::make_unique<DropDownListCheckedItem>(0, TownBuildsFrom(this->town, source), HouseSourceName(source), static_cast<int>(source)));
+		}
+		return list;
+	}
+
+	void OnDropdownSelect(WidgetID widget, int index, int) override
+	{
+		if (widget != WID_TV_HOUSE_SETS) return;
+		uint32_t source = static_cast<uint32_t>(index);
+		Command<Commands::TownHouseSet>::Post(STR_ERROR_TOWN_CAN_T_CHANGE_HOUSE_SETS, static_cast<TownID>(this->window_number), source, !TownBuildsFrom(this->town, source));
 	}
 
 	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
@@ -592,6 +636,14 @@ public:
 	void OnInvalidateData([[maybe_unused]] int data = 0, [[maybe_unused]] bool gui_scope = true) override
 	{
 		if (!gui_scope) return;
+		/* The house sets changed (CmdTownHouseSet()): the ticks in the list,
+		 * if it is open, follow what the command did, not what was clicked --
+		 * in a network game the two are a moment apart. */
+		if (data == TOWN_VIEW_INVALIDATE_HOUSE_SETS) {
+			ReplaceDropDownList(this, this->BuildHouseSetList(), -1);
+			this->SetWidgetDirty(WID_TV_HOUSE_SETS);
+			return;
+		}
 		/* Called when setting station noise or required cargoes have changed, in order to resize the window */
 		this->SetDirty(); // refresh display for current size. This will allow to avoid glitches when downgrading
 		this->ResizeWindowAsNeeded();
@@ -632,6 +684,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_town_game_view_widge
 		NWidget(WWT_PUSHTXTBTN, Colours::Brown, WID_TV_GRAPH), SetFill(1, 0), SetResize(1, 0), SetStringTip(STR_TOWN_VIEW_CARGO_GRAPH, STR_TOWN_VIEW_CARGO_GRAPH_TOOLTIP),
 		NWidget(WWT_RESIZEBOX, Colours::Brown),
 	EndContainer(),
+	NWidget(WWT_DROPDOWN, Colours::Brown, WID_TV_HOUSE_SETS), SetFill(1, 0), SetResize(1, 0), SetToolTip(STR_TOWN_VIEW_HOUSE_SETS_TOOLTIP),
 };
 
 /** Window definition for the town view window. */
@@ -668,6 +721,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_town_editor_view_wid
 		NWidget(WWT_TEXTBTN, Colours::Brown, WID_TV_CATCHMENT), SetFill(1, 1), SetResize(1, 0), SetStringTip(STR_BUTTON_CATCHMENT, STR_TOOLTIP_CATCHMENT),
 		NWidget(WWT_RESIZEBOX, Colours::Brown),
 	EndContainer(),
+	NWidget(WWT_DROPDOWN, Colours::Brown, WID_TV_HOUSE_SETS), SetFill(1, 0), SetResize(1, 0), SetToolTip(STR_TOWN_VIEW_HOUSE_SETS_TOOLTIP),
 };
 
 /** Window definition for the town view window of the scenario edtior. */
@@ -1110,6 +1164,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_found_town_widgets =
 				EndContainer(),
 			EndContainer(),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_TF_CITY), SetStringTip(STR_FOUND_TOWN_CITY, STR_FOUND_TOWN_CITY_TOOLTIP), SetFill(1, 0),
+			NWidget(WWT_DROPDOWN, Colours::Grey, WID_TF_HOUSE_SET), SetToolTip(STR_FOUND_TOWN_HOUSE_SET_TOOLTIP), SetFill(1, 0),
 
 			/* Town roads selection. */
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_TF_ROAD_LAYOUT_SEL),
@@ -1150,6 +1205,7 @@ private:
 	TownSize town_size = TownSize::Medium; ///< Selected town size
 	TownLayout town_layout{}; ///< Selected town layout
 	bool city = false; ///< Are we building a city?
+	uint32_t house_set = 0; ///< The one set of houses the town is founded of; 0 for every house, as usual.
 	QueryString townname_editbox; ///< Townname editbox
 	bool townnamevalid = false; ///< Is generated town name valid?
 	uint32_t townnameparts = 0; ///< Generated town name
@@ -1233,8 +1289,12 @@ public:
 			if (original_name != this->townname_editbox.text.GetText()) name = this->townname_editbox.text.GetText();
 		}
 
+		/* A set that is gone since it was chosen (the game's GRFs changed) is
+		 * not asked for: the town is founded as usual. */
+		std::vector<uint32_t> sources = AvailableHouseSources();
+		uint32_t set = std::ranges::find(sources, this->house_set) != sources.end() ? this->house_set : 0;
 		bool success = Command<Commands::FoundTown>::Post(errstr, cc,
-				tile, this->town_size, this->city, this->town_layout, random, townnameparts, name);
+				tile, this->town_size, this->city, this->town_layout, random, townnameparts, name, set);
 
 		/* Rerandomise name, if success and no cost-estimation. */
 		if (success && !_shift_pressed) this->RandomTownName();
@@ -1282,6 +1342,18 @@ public:
 				this->SetDirty();
 				break;
 
+			case WID_TF_HOUSE_SET: {
+				/* One set, or every house as usual: a town founded of one kind.
+				 * Mixing is for the town window afterwards. */
+				DropDownList list;
+				list.push_back(MakeDropDownListStringItem(GetString(STR_TOWN_VIEW_HOUSE_SETS_ALL), 0));
+				for (uint32_t source : AvailableHouseSources()) {
+					list.push_back(MakeDropDownListStringItem(HouseSourceName(source), static_cast<int>(source)));
+				}
+				ShowDropDownList(this, std::move(list), static_cast<int>(this->house_set), WID_TF_HOUSE_SET);
+				break;
+			}
+
 			case WID_TF_EXPAND_BUILDINGS:
 				FoundTownWindow::expand_modes.Flip(TownExpandMode::Buildings);
 				this->UpdateButtons(false);
@@ -1303,6 +1375,21 @@ public:
 				this->UpdateButtons(false);
 				break;
 		}
+	}
+
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	{
+		if (widget == WID_TF_HOUSE_SET) {
+			return GetString(STR_TOWN_VIEW_HOUSE_SETS, this->house_set == 0 ? GetString(STR_TOWN_VIEW_HOUSE_SETS_ALL) : HouseSourceName(this->house_set));
+		}
+		return this->Window::GetWidgetString(widget, stringid);
+	}
+
+	void OnDropdownSelect(WidgetID widget, int index, int) override
+	{
+		if (widget != WID_TF_HOUSE_SET) return;
+		this->house_set = static_cast<uint32_t>(index);
+		this->SetWidgetDirty(WID_TF_HOUSE_SET);
 	}
 
 	void OnQueryTextFinished(std::optional<std::string> str) override

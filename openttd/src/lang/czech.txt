@@ -3374,6 +3374,7 @@ STR_FOUND_TOWN_SIZE_RANDOM                                      :{BLACK}Náhodn�
 STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Zvolte velikost města
 STR_FOUND_TOWN_CITY                                             :{BLACK}Velkoměsto
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Velkoměsta rostou rychleji než běžná města. V závislosti na nastavení jsou při založení větší
+STR_FOUND_TOWN_HOUSE_SET_TOOLTIP                                :{BLACK}Založit město z jedné sady domů: z domů některého klimatu nebo ze sady domů (GRF), jen z nich. Další sady se dají přimíchat potom v okně města
 
 STR_FOUND_TOWN_EXPAND_MODE                                      :{YELLOW}Rozšiřování města:
 STR_FOUND_TOWN_EXPAND_BUILDINGS                                 :Budovy
@@ -4028,6 +4029,14 @@ STR_TOWN_VIEW_LOCAL_AUTHORITY_TOOLTIP                           :{BLACK}Ukázat 
 STR_TOWN_VIEW_RENAME_TOOLTIP                                    :{BLACK}Přejmenovat město
 STR_TOWN_VIEW_CARGO_GRAPH                                       :Graf nákladu
 STR_TOWN_VIEW_CARGO_GRAPH_TOOLTIP                               :Zobraz graf historie nákladu města
+STR_TOWN_VIEW_HOUSE_SETS                                        :{BLACK}Domy z: {RAW_STRING}
+STR_TOWN_VIEW_HOUSE_SETS_TOOLTIP                                :{BLACK}Z jakých domů město staví: domy některého klimatu nebo sada domů (GRF). Zaškrtni víc a město je míchá. Nic zaškrtnuté, staví ze všech domů, které hra nabízí, jako obvykle. Domy, které už stojí, zůstanou; tohle platí pro další stavbu
+STR_TOWN_VIEW_HOUSE_SETS_ALL                                    :všech domů
+STR_TOWN_VIEW_HOUSE_SETS_COUNT                                  :{NUM} {P sada sady sad}
+STR_TOWN_HOUSE_SET_TEMPERATE                                    :Domy mírného klimatu
+STR_TOWN_HOUSE_SET_ARCTIC                                       :Arktické domy
+STR_TOWN_HOUSE_SET_TROPIC                                       :Pouštní domy
+STR_TOWN_HOUSE_SET_TOYLAND                                      :Toylandové domy
 
 STR_TOWN_VIEW_EXPAND_BUTTON                                     :{BLACK}Rozšířit
 STR_TOWN_VIEW_EXPAND_TOOLTIP                                    :{BLACK}Zvetšit velikost města
@@ -5598,6 +5607,8 @@ STR_ERROR_CAN_T_BUILD_COMPANY_HEADQUARTERS                      :{WHITE}Nelze po
 # Town related errors
 STR_ERROR_CAN_T_GENERATE_TOWN                                   :{WHITE}Nelze vybudovat žádná města...
 STR_ERROR_CAN_T_RENAME_TOWN                                     :{WHITE}Nelze přejmenovat město...
+STR_ERROR_TOWN_CAN_T_CHANGE_HOUSE_SETS                          :{WHITE}Nelze změnit, z jakých domů město staví...
+STR_ERROR_TOWN_HOUSE_SETS_FULL                                  :{WHITE}... město staví nejvýš z osmi sad
 STR_ERROR_CAN_T_FOUND_TOWN_HERE                                 :{WHITE}Zde nelze postavit město...
 STR_ERROR_CAN_T_EXPAND_TOWN                                     :{WHITE}Město nemůže být rozšířeno...
 STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN                             :{WHITE}... moc blízko k jinému městu

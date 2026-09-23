@@ -358,6 +358,9 @@ static const SaveLoad _town_desc[] = {
 
 	SLE_CONDVAR(Town, larger_town, VarTypes::BOOL, SaveLoadVersion::Cities, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(Town, layout, VarTypes::U8, SaveLoadVersion::RoadLayoutPerTown, SaveLoadVersion::MaxVersion),
+	/* The house sets the player chose in the town window; see Town::house_sets. */
+	SLE_ARR(Town, house_sets, VarTypes::U32, TOWN_HOUSE_SETS),
+	SLE_VAR(Town, num_house_sets, VarTypes::U8),
 	SLE_CONDVAR(Town, valid_history, VarTypes::U64, SaveLoadVersion::TownSupplyHistory, SaveLoadVersion::MaxVersion),
 
 	SLE_CONDREFVECTOR(Town, psa_list, SLRefType::Storage, SaveLoadVersion::PersistentStoragePool, SaveLoadVersion::MaxVersion),

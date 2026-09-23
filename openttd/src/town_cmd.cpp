@@ -33,6 +33,7 @@
 #include "autoslope.h"
 #include "tunnelbridge_map.h"
 #include "strings_func.h"
+#include "newgrf_config.h"
 #include "window_func.h"
 #include "string_func.h"
 #include "newgrf_cargo.h"
@@ -236,7 +237,7 @@ Money HouseSpec::GetRemovalCost() const
 }
 
 static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes);
-static Town *CreateRandomTown(uint attempts, uint32_t townnameparts, TownSize size, bool city, TownLayout layout);
+static Town *CreateRandomTown(uint attempts, uint32_t townnameparts, TownSize size, bool city, TownLayout layout, uint32_t house_set = 0);
 
 static void TownDrawHouseLift(const TileInfo *ti)
 {
@@ -2004,8 +2005,9 @@ static void UpdateTownGrowth(Town *t);
  * @param city Should we create a city?
  * @param layout The road layout of the town.
  * @param manual Was the town placed manually?
+ * @param house_set The one set of houses the town is founded of, or 0 for all of them.
  */
-static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSize size, bool city, TownLayout layout, bool manual)
+static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSize size, bool city, TownLayout layout, bool manual, uint32_t house_set = 0)
 {
 	AutoRestoreBackup backup(_generating_town, true);
 
@@ -2056,6 +2058,12 @@ static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSi
 	t->townnameparts = townnameparts;
 
 	t->InitializeLayout(layout);
+
+	/* Founded of one set of houses: told so before a single house goes up,
+	 * so that the first ones are of it too. */
+	t->num_house_sets = 0;
+	t->house_sets.fill(0);
+	if (house_set != 0) t->house_sets[t->num_house_sets++] = house_set;
 
 	t->larger_town = city;
 
@@ -2164,14 +2172,21 @@ static bool IsUniqueTownName(const std::string &name)
  * @param random_location Should we use a random location? (randomize \c tile )
  * @param townnameparts Town name parts.
  * @param text Custom name for the town. If empty, the town name parts will be used.
+ * @param house_set The one set of houses the town is founded of (see Town::house_sets), or 0 for all of them.
  * @return The cost of this operation or an error.
  */
-std::tuple<CommandCost, Money, TownID> CmdFoundTown(DoCommandFlags flags, TileIndex tile, TownSize size, bool city, TownLayout layout, bool random_location, uint32_t townnameparts, const std::string &text)
+std::tuple<CommandCost, Money, TownID> CmdFoundTown(DoCommandFlags flags, TileIndex tile, TownSize size, bool city, TownLayout layout, bool random_location, uint32_t townnameparts, const std::string &text, uint32_t house_set)
 {
 	TownNameParams par(_settings_game.game_creation.town_name);
 
 	if (size >= TownSize::End) return { CMD_ERROR, 0, TownID::Invalid() };
 	if (layout >= TownLayout::End) return { CMD_ERROR, 0, TownID::Invalid() };
+	/* A town founded of one set of houses (the found town window's "Domy z"):
+	 * one the game has, or none. */
+	if (house_set != 0) {
+		std::vector<uint32_t> sources = AvailableHouseSources();
+		if (std::ranges::find(sources, house_set) == sources.end()) return { CMD_ERROR, 0, TownID::Invalid() };
+	}
 
 	/* Some things are allowed only in the scenario editor and for game scripts. */
 	if (_game_mode != GameMode::Editor && _current_company != OWNER_DEITY) {
@@ -2222,10 +2237,10 @@ std::tuple<CommandCost, Money, TownID> CmdFoundTown(DoCommandFlags flags, TileIn
 		UpdateNearestTownForRoadTiles(true);
 		Town *t;
 		if (random_location) {
-			t = CreateRandomTown(20, townnameparts, size, city, layout);
+			t = CreateRandomTown(20, townnameparts, size, city, layout, house_set);
 		} else {
 			t = Town::Create(tile);
-			DoCreateTown(t, tile, townnameparts, size, city, layout, true);
+			DoCreateTown(t, tile, townnameparts, size, city, layout, true, house_set);
 		}
 
 		UpdateNearestTownForRoadTiles(false);
@@ -2352,9 +2367,10 @@ HouseZones GetClimateMaskForLandscape()
  * @param size The size preset of the town.
  * @param city Should we build a city?
  * @param layout The road layout to build.
+ * @param house_set The one set of houses the town is founded of, or 0 for all of them.
  * @return The town object, or nullptr if we failed to create a town anywhere.
  */
-static Town *CreateRandomTown(uint attempts, uint32_t townnameparts, TownSize size, bool city, TownLayout layout)
+static Town *CreateRandomTown(uint attempts, uint32_t townnameparts, TownSize size, bool city, TownLayout layout, uint32_t house_set)
 {
 	assert(_game_mode == GameMode::Editor || _generating_world); // These are the preconditions for Commands::DeleteTown
 
@@ -2374,7 +2390,7 @@ static Town *CreateRandomTown(uint attempts, uint32_t townnameparts, TownSize si
 		/* Allocate a town struct */
 		Town *t = Town::Create(tile);
 
-		DoCreateTown(t, tile, townnameparts, size, city, layout, false);
+		DoCreateTown(t, tile, townnameparts, size, city, layout, false, house_set);
 
 		/* if the population is still 0 at the point, then the
 		 * placement is so bad it couldn't grow at all */
@@ -2782,6 +2798,22 @@ static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *hs, HouseID
 }
 
 /**
+ * Can a town told to build from a set build this house of it at all? A house
+ * of a GRF, when the GRF has it on. An original house of the climate, even
+ * when a GRF has switched the originals off: that is for the towns that build
+ * from every house, and the climate's houses are the game's own -- a town told
+ * to build from them builds from them. Not an original a GRF has put a house
+ * of its own in place of, as that one would stand as the GRF's house.
+ * @param hs the house
+ * @return whether it can be built
+ */
+static bool HouseSetCanBuild(const HouseSpec &hs)
+{
+	if (hs.grf_prop.override_id != INVALID_HOUSE_ID) return false;
+	return hs.enabled || hs.grf_prop.grffile == nullptr;
+}
+
+/**
  * Tries to build a house at this tile.
  * @param t The town the house will belong to.
  * @param tile The tile to try building on.
@@ -2818,10 +2850,42 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 
 	uint probability_max = 0;
 
+	/* The sets of houses the player told this town to build from, if any
+	 * (Town::house_sets) -- and only those of them the game still has: a
+	 * town told to build from a GRF that is no longer loaded would never
+	 * build anything again, and says nothing about why. */
+	bool by_sets = false;
+	if (t->num_house_sets > 0) {
+		for (const auto &hs : HouseSpec::Specs()) {
+			if (HouseSetCanBuild(hs) && TownBuildsFrom(t, HouseSourceOf(hs))) {
+				by_sets = true;
+				break;
+			}
+		}
+	}
+
+	/* In a town of chosen sets, the years a set gives its houses say which of
+	 * them come first and which later -- they never keep the set out of the
+	 * town. A set that has nothing for this spot in its years yet (the Mars
+	 * houses start in 2030) builds its houses here from the start of the
+	 * game; one that has, builds by its years. These are the sets that have. */
+	std::array<uint32_t, TOWN_HOUSE_SETS> dated_sets{};
+	uint num_dated_sets = 0;
+
 	/* Generate a list of all possible houses that can be built. */
 	for (const auto &hs : HouseSpec::Specs()) {
 		/* Verify that the candidate house spec matches the current tile status */
-		if (!hs.building_availability.All(zones) || !hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID) continue;
+		if (!hs.building_availability.All(zones)) continue;
+		if (!by_sets) {
+			if (!hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID) continue;
+		} else {
+			uint32_t source = HouseSourceOf(hs);
+			if (!TownBuildsFrom(t, source) || !HouseSetCanBuild(hs)) continue;
+			bool in_years = TimerGameCalendar::year >= hs.min_year && TimerGameCalendar::year <= hs.max_year;
+			if (in_years && std::find(dated_sets.begin(), dated_sets.begin() + num_dated_sets, source) == dated_sets.begin() + num_dated_sets) {
+				dated_sets[num_dated_sets++] = source;
+			}
+		}
 
 		/* Don't let these counters overflow. Global counters are 32bit, there will never be that many houses. */
 		if (hs.class_id != HOUSE_NO_CLASS) {
@@ -2867,7 +2931,11 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 			continue;
 		}
 
-		if (TimerGameCalendar::year < hs->min_year || TimerGameCalendar::year > hs->max_year) continue;
+		if (TimerGameCalendar::year < hs->min_year || TimerGameCalendar::year > hs->max_year) {
+			if (!by_sets) continue;
+			uint32_t source = HouseSourceOf(*hs);
+			if (std::find(dated_sets.begin(), dated_sets.begin() + num_dated_sets, source) != dated_sets.begin() + num_dated_sets) continue;
+		}
 
 		/* Special houses that there can be only one of. */
 		TownFlags oneof{};
@@ -3111,6 +3179,109 @@ void ClearTownHouse(Town *t, TileIndex tile)
 	RemoveNearbyStations(t, tile, hs->building_flags);
 
 	UpdateTownRadius(t);
+}
+
+/**
+ * Which set of houses a house comes from: its GRF, or the original houses of
+ * the climate the game is played in.
+ * @param hs the house
+ * @return the set, as Town::house_sets holds it
+ */
+uint32_t HouseSourceOf(const HouseSpec &hs)
+{
+	if (hs.grf_prop.grffile != nullptr) return hs.grf_prop.grfid;
+	return HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape);
+}
+
+/**
+ * Is a set of houses one of those this town was told to build from?
+ * @param t the town
+ * @param source the set
+ * @return whether it is chosen
+ */
+bool TownBuildsFrom(const Town *t, uint32_t source)
+{
+	for (uint i = 0; i < t->num_house_sets; i++) {
+		if (t->house_sets[i] == source) return true;
+	}
+	return false;
+}
+
+/**
+ * The sets of houses there are to choose from in this game: the original
+ * houses of the climate, and every GRF that has a house a town here could
+ * build -- a set whose houses are all for another climate offers nothing.
+ *
+ * The climate's houses are the game's own and always on offer: a GRF that
+ * switches the original houses off does it for the towns that build from
+ * every house, not for a town told to build from the climate's (see
+ * HouseSetCanBuild()).
+ * @return the sets, the climate first and the GRFs in the order they load
+ */
+std::vector<uint32_t> AvailableHouseSources()
+{
+	HouseZones climate = GetClimateMaskForLandscape();
+	std::vector<uint32_t> sources;
+	sources.push_back(HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape));
+	for (const auto &hs : HouseSpec::Specs()) {
+		if (!hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID || hs.grf_prop.grffile == nullptr) continue;
+		if (!hs.building_availability.Any(climate)) continue;
+		uint32_t source = HouseSourceOf(hs);
+		if (std::ranges::find(sources, source) == sources.end()) sources.push_back(source);
+	}
+	return sources;
+}
+
+/**
+ * What a set of houses is called: the climate, or the GRF's own name.
+ * @param source the set
+ * @return its name
+ */
+std::string HouseSourceName(uint32_t source)
+{
+	if (source >= HOUSE_SOURCE_CLIMATE) {
+		static const StringID CLIMATES[] = {STR_TOWN_HOUSE_SET_TEMPERATE, STR_TOWN_HOUSE_SET_ARCTIC, STR_TOWN_HOUSE_SET_TROPIC, STR_TOWN_HOUSE_SET_TOYLAND};
+		uint climate = source - HOUSE_SOURCE_CLIMATE;
+		return GetString(climate < std::size(CLIMATES) ? CLIMATES[climate] : STR_TOWN_HOUSE_SET_TEMPERATE);
+	}
+	const GRFConfig *c = GetGRFConfig(source);
+	if (c != nullptr) return c->GetName();
+	return fmt::format("{:08X}", std::byteswap(source));
+}
+
+/**
+ * Tell a town to build from a set of houses, or no longer to. The player's
+ * choice in the town window ("Domy z"): nothing chosen, the town builds as it
+ * always did; several, it mixes them. Houses already standing stay; the
+ * choice is about what is built next.
+ * @param flags type of operation
+ * @param town_id the town
+ * @param source the set (a GRF id, or HOUSE_SOURCE_CLIMATE + a climate)
+ * @param on whether the town builds from it from now on
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdTownHouseSet(DoCommandFlags flags, TownID town_id, uint32_t source, bool on)
+{
+	Town *t = Town::GetIfValid(town_id);
+	if (t == nullptr) return CMD_ERROR;
+
+	if (on) {
+		if (TownBuildsFrom(t, source)) return CommandCost();
+		std::vector<uint32_t> sources = AvailableHouseSources();
+		if (std::ranges::find(sources, source) == sources.end()) return CMD_ERROR;
+		if (t->num_house_sets >= TOWN_HOUSE_SETS) return CommandCost(STR_ERROR_TOWN_HOUSE_SETS_FULL);
+		if (flags.Test(DoCommandFlag::Execute)) t->house_sets[t->num_house_sets++] = source;
+	} else if (flags.Test(DoCommandFlag::Execute)) {
+		for (uint i = 0; i < t->num_house_sets; i++) {
+			if (t->house_sets[i] != source) continue;
+			t->house_sets[i] = t->house_sets[--t->num_house_sets];
+			t->house_sets[t->num_house_sets] = 0;
+			break;
+		}
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) InvalidateWindowData(WindowClass::TownView, town_id, TOWN_VIEW_INVALIDATE_HOUSE_SETS);
+	return CommandCost();
 }
 
 /**

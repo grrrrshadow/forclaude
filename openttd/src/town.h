@@ -60,6 +60,15 @@ struct TownCache {
 	auto operator<=>(const TownCache &) const = default;
 };
 
+struct HouseSpec;
+
+/** How many sets of houses one town can be told to build from. */
+static constexpr uint TOWN_HOUSE_SETS = 8;
+/** InvalidateWindowData() for the town window: its house sets changed. */
+static constexpr int TOWN_VIEW_INVALIDATE_HOUSE_SETS = 7;
+/** A house set that is not a GRF: the original houses of a climate, + LandscapeType. */
+static constexpr uint32_t HOUSE_SOURCE_CLIMATE = 0xFFFFFF00;
+
 /** Town data structure. */
 struct Town : TownPool::PoolItem<&_town_pool> {
 	TileIndex xy = INVALID_TILE; ///< town center tile
@@ -199,6 +208,16 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	bool larger_town = false; ///< if this is a larger town and should grow more quickly
 	TownLayout layout{}; ///< town specific road layout
 
+	/**
+	 * Which sets of houses this town builds from, chosen by the player in the
+	 * town window ("Domy z"): a house GRF by its id, or the original houses of
+	 * a climate (HOUSE_SOURCE_CLIMATE + the climate). None chosen, the town
+	 * builds from every house the game offers here, as it always did. Several
+	 * chosen, it mixes them. See TownBuildsFrom().
+	 */
+	std::array<uint32_t, TOWN_HOUSE_SETS> house_sets{};
+	uint8_t num_house_sets = 0; ///< How many of #house_sets are chosen.
+
 	bool show_zone = false; ///< NOSAVE: mark town to show the local authority zone in the viewports
 
 	std::vector<PersistentStorage *> psa_list{};
@@ -320,6 +339,11 @@ void SetTownRatingTestMode(bool mode);
 TownActions GetMaskOfTownActions(CompanyID cid, const Town *t);
 uint GetDefaultTownsForMapSize();
 bool GenerateTowns(TownLayout layout, std::optional<uint> number = std::nullopt);
+
+uint32_t HouseSourceOf(const HouseSpec &hs);
+bool TownBuildsFrom(const Town *t, uint32_t source);
+std::vector<uint32_t> AvailableHouseSources();
+std::string HouseSourceName(uint32_t source);
 const CargoSpec *FindFirstCargoWithTownAcceptanceEffect(TownAcceptanceEffect effect);
 CargoArray GetAcceptedCargoOfHouse(const HouseSpec *hs);
 

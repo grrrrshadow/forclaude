@@ -17,6 +17,9 @@
 #include "roadveh.h"
 #include "industry.h"
 #include "town.h"
+#include "town_cmd.h"
+#include "town_map.h"
+#include "house.h"
 #include "spritecache.h"
 #include "table/sprites.h"
 #include "core/string_consumer.hpp"
@@ -100,6 +103,7 @@
 #include "widgets/vehicle_widget.h"
 #include "widgets/misc_widget.h"
 #include "widgets/order_widget.h"
+#include "widgets/town_widget.h"
 #include "station_base.h"
 #include "vehicle_cmd.h"
 #include "newgrf_engine.h"
@@ -1227,6 +1231,247 @@ static bool ConTestTowns(std::span<std::string_view> argv)
 				t->cache.population, t->cache.num_houses);
 	}
 	return true;
+}
+
+/**
+ * Move the calendar to a year the way the date cheat does -- set the date,
+ * then let the monthly round introduce whatever has been invented by then.
+ * For scenes that need what a later year has: aeroplanes big enough to carry
+ * a car, houses that are not built before 2030.
+ * @param year the year to move to
+ */
+static void MoveCalendarTo(TimerGameCalendar::Year year)
+{
+	extern void CalendarEnginesMonthlyLoop();
+	TimerGameCalendar::YearMonthDay ymd = TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date);
+	TimerGameCalendar::Date moved = TimerGameCalendar::ConvertYMDToDate(year, ymd.month, ymd.day);
+	TimerGameCalendar::SetDate(moved, TimerGameCalendar::date_fract);
+	if (!TimerGameEconomy::UsingWallclockUnits()) {
+		TimerGameEconomy::Date moved_economy{moved.base()};
+		for (Vehicle *v : Vehicle::Iterate()) v->ShiftDates(moved_economy - TimerGameEconomy::date);
+		LinkGraphSchedule::instance.ShiftDates(moved_economy - TimerGameEconomy::date);
+		TimerGameEconomy::SetDate(moved_economy, TimerGameEconomy::date_fract);
+	}
+	CalendarEnginesMonthlyLoop();
+}
+
+/**
+ * A set of houses as the rig names it: "klima" for the climate's own houses,
+ * "vse" for none chosen, or a GRF id the way the game prints it (4F474D05).
+ * @param arg the name
+ * @return the set, 0 for "vse", or nullopt when it names nothing
+ */
+static std::optional<uint32_t> ParseHouseSource(std::string_view arg)
+{
+	if (arg == "vse") return 0;
+	if (arg == "klima") return HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape);
+	auto id = ParseInteger<uint32_t>(arg, 16);
+	if (!id.has_value()) return std::nullopt;
+	return std::byteswap(*id);
+}
+
+/**
+ * A town as the rig names it: its number, or "posledni" for the newest one --
+ * the one a scene has just founded.
+ * @param arg the name
+ * @return the town, or nullopt when there is none such
+ */
+static std::optional<TownID> ParseRigTown(std::string_view arg)
+{
+	if (arg == "posledni") {
+		std::optional<TownID> newest;
+		for (const Town *t : Town::Iterate()) newest = t->index;
+		return newest;
+	}
+	auto id = ParseInteger(arg);
+	if (!id.has_value() || !Town::IsValidID(*id)) return std::nullopt;
+	return static_cast<TownID>(*id);
+}
+
+/**
+ * Tell which sets of houses a town's house tiles come from.
+ * @param town the town
+ * @return "set:tiles" for each set, in the order they are first met
+ */
+static std::string CountHousesBySource(TownID town)
+{
+	std::vector<std::pair<uint32_t, uint>> counts;
+	for (TileIndex tile : Map::Iterate()) {
+		if (!IsTileType(tile, TileType::House) || GetTownIndex(tile) != town) continue;
+		uint32_t source = HouseSourceOf(*HouseSpec::Get(GetHouseType(tile)));
+		auto it = std::ranges::find(counts, source, &std::pair<uint32_t, uint>::first);
+		if (it == counts.end()) {
+			counts.emplace_back(source, 1);
+		} else {
+			it->second++;
+		}
+	}
+	std::string out;
+	for (const auto &[source, n] : counts) {
+		if (!out.empty()) out += ", ";
+		out += fmt::format("{}:{}", HouseSourceName(source), n);
+	}
+	return out.empty() ? "zadne" : out;
+}
+
+/**
+ * The themed towns ("Domy z"), driven through the windows the player uses.
+ *
+ * - testdomy: the sets there are to choose from, and every town's choice and
+ *   houses by set;
+ * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
+ *   set whose houses are not built before some year;
+ * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
+ *   the set in the list, as the player ticks or unticks it;
+ * - testdomy rust <town> <n>: let the town grow n times, and check every house
+ *   it put up is of a set it was told to build from;
+ * - testdomy zaloz <x> <y> <set>: found a town of one set through the found
+ *   town window, and check its houses are all of it.
+ *
+ * A town is its number, or "posledni" for the newest. A set is "klima", "vse"
+ * or a GRF id (ParseHouseSource()).
+ *
+ * Anything that does not come out as the player was promised is written
+ * ODMITNUTO, which the battery counts.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestHouseSets(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Themed towns. Usage: 'testdomy', 'testdomy rok <rok>', 'testdomy okno <mesto> <sada>', 'testdomy rust <mesto> <kolikrat>', 'testdomy zaloz <x> <y> <sada>'.");
+		return true;
+	}
+	if (argv.size() == 1) {
+		for (uint32_t source : AvailableHouseSources()) {
+			std::string id = source >= HOUSE_SOURCE_CLIMATE ? std::string{"klima"} : fmt::format("{:08X}", std::byteswap(source));
+			IConsolePrint(CC_DEFAULT, "testdomy: sada {} {}", id, HouseSourceName(source));
+		}
+		for (const Town *t : Town::Iterate()) {
+			std::string sets;
+			for (uint i = 0; i < t->num_house_sets; i++) {
+				if (!sets.empty()) sets += " + ";
+				sets += HouseSourceName(t->house_sets[i]);
+			}
+			IConsolePrint(CC_DEFAULT, "testdomy: mesto {} domy z [{}], stoji {}", t->index.base(), sets.empty() ? "vsech" : sets, CountHousesBySource(t->index));
+		}
+		return true;
+	}
+
+	if (argv[1] == "rok" && argv.size() >= 3) {
+		auto pyear = ParseInteger(argv[2]);
+		if (!pyear.has_value()) return false;
+		MoveCalendarTo(TimerGameCalendar::Year{static_cast<int32_t>(*pyear)});
+		IConsolePrint(CC_DEFAULT, "testdomy: rok {}", TimerGameCalendar::year.base());
+		return true;
+	}
+
+	if (argv[1] == "okno" && argv.size() >= 4) {
+		auto ptown = ParseRigTown(argv[2]);
+		auto psource = ParseHouseSource(argv[3]);
+		if (!ptown.has_value() || !psource.has_value()) return false;
+		TownID town = *ptown;
+		ShowTownViewWindow(town);
+		Window *w = FindWindowById(WindowClass::TownView, town);
+		if (w == nullptr || w->GetWidget<NWidgetCore>(WID_TV_HOUSE_SETS) == nullptr) {
+			IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - okno mesta nema Domy z.");
+			return true;
+		}
+		if (w->IsWidgetDisabled(WID_TV_HOUSE_SETS)) {
+			IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - Domy z jsou zatmavene.");
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "testdomy: okno pred: {}", w->GetWidgetString(WID_TV_HOUSE_SETS, STR_NULL));
+		w->OnClick({}, WID_TV_HOUSE_SETS, 1);
+		if (w->FindChildWindow(WindowClass::DropdownMenu) == nullptr) {
+			IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - seznam sad se neotevrel.");
+			return true;
+		}
+		bool was = TownBuildsFrom(Town::Get(town), *psource);
+		w->OnDropdownSelect(WID_TV_HOUSE_SETS, static_cast<int>(*psource), -1);
+		bool now = TownBuildsFrom(Town::Get(town), *psource);
+		IConsolePrint(CC_DEFAULT, "testdomy: okno po: {}", w->GetWidgetString(WID_TV_HOUSE_SETS, STR_NULL));
+		if (was == now) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - kliknuti na sadu {} nic nezmenilo.", HouseSourceName(*psource));
+		/* The list stays open for the next tick; the rig closes it. */
+		CloseWindowByClass(WindowClass::DropdownMenu);
+		return true;
+	}
+
+	if (argv[1] == "rust" && argv.size() >= 4) {
+		auto ptown = ParseRigTown(argv[2]);
+		auto pn = ParseInteger(argv[3]);
+		if (!ptown.has_value() || !pn.has_value()) return false;
+		TownID town = *ptown;
+		std::vector<bool> before(Map::Size());
+		for (TileIndex tile : Map::Iterate()) before[tile.base()] = IsTileType(tile, TileType::House);
+		AutoRestoreBackup cur_company(_current_company, OWNER_DEITY);
+		Command<Commands::ExpandTown>::Do(DoCommandFlag::Execute, town, static_cast<uint32_t>(*pn), {TownExpandMode::Buildings, TownExpandMode::Roads});
+		const Town *t = Town::Get(town);
+		uint built = 0, wrong = 0;
+		for (TileIndex tile : Map::Iterate()) {
+			if (before[tile.base()] || !IsTileType(tile, TileType::House) || GetTownIndex(tile) != town) continue;
+			built++;
+			if (t->num_house_sets > 0 && !TownBuildsFrom(t, HouseSourceOf(*HouseSpec::Get(GetHouseType(tile))))) wrong++;
+		}
+		IConsolePrint(CC_DEFAULT, "testdomy: mesto {} postavilo {} policek domu, stoji {}", town.base(), built, CountHousesBySource(town));
+		if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} policek domu z jine sady, nez ma mesto zvolene.", wrong);
+		return true;
+	}
+
+	if (argv[1] == "zaloz" && argv.size() >= 5) {
+		auto px = ParseInteger(argv[2]);
+		auto py = ParseInteger(argv[3]);
+		auto psource = ParseHouseSource(argv[4]);
+		if (!px.has_value() || !py.has_value() || !psource.has_value()) return false;
+		/* The window is for a company that plays; a scene started without one
+		 * gets one, as the player always has. */
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) {
+				IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - neni firma, za kterou zakladat.");
+				return true;
+			}
+			SetLocalCompany(made->index);
+		}
+		{
+			/* Founding a town costs more than a new company has. */
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		}
+		ShowFoundTownWindow();
+		Window *w = FindWindowById(WindowClass::FoundTown, 0);
+		if (w == nullptr || w->GetWidget<NWidgetCore>(WID_TF_HOUSE_SET) == nullptr) {
+			IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - okno zakladani mest nema Domy z.");
+			return true;
+		}
+		w->OnDropdownSelect(WID_TF_HOUSE_SET, static_cast<int>(*psource), -1);
+		IConsolePrint(CC_DEFAULT, "testdomy: zakladam: {}", w->GetWidgetString(WID_TF_HOUSE_SET, STR_NULL));
+		uint towns = static_cast<uint>(Town::GetNumItems());
+		w->OnPlaceObject({}, TileXY(static_cast<uint>(*px), static_cast<uint>(*py)));
+		w->Close();
+		if (Town::GetNumItems() == towns) {
+			/* The window's refusal went to an error window nobody sees here;
+			 * ask the command the same question for its answer. */
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			auto [why, cost, id] = Command<Commands::FoundTown>::Do(DoCommandFlags{}, TileXY(static_cast<uint>(*px), static_cast<uint>(*py)),
+					TownSize::Medium, false, _settings_game.economy.town_layout, false, 0, "testdomy", *psource);
+			IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mesto se nezalozilo: {}", why.Failed() ? GetString(why.GetErrorMessage()) : std::string{"prikaz by prosel"});
+			return true;
+		}
+		const Town *t = nullptr;
+		for (const Town *c : Town::Iterate()) t = c; // the newest
+		uint wrong = 0;
+		for (TileIndex tile : Map::Iterate()) {
+			if (!IsTileType(tile, TileType::House) || GetTownIndex(tile) != t->index) continue;
+			if (*psource != 0 && HouseSourceOf(*HouseSpec::Get(GetHouseType(tile))) != *psource) wrong++;
+		}
+		IConsolePrint(CC_DEFAULT, "testdomy: zalozeno mesto {} s {} sadami, stoji {}", t->index.base(), t->num_house_sets, CountHousesBySource(t->index));
+		if (*psource != 0 && !TownBuildsFrom(t, *psource)) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mesto nema zvolenou sadu, ze ktere bylo zalozeno.");
+		if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} policek domu z jine sady, nez ze ktere bylo mesto zalozeno.", wrong);
+		return true;
+	}
+
+	return false;
 }
 
 /**
@@ -11004,22 +11249,8 @@ static bool ConTestRoadOnAir(std::span<std::string_view> argv)
 
 	/* The aeroplanes of the earliest years seat too few people to carry a car
 	 * (see RoadVehiclesCarriedBy()), which is the rule working as asked and a
-	 * scene that cannot be built. So the scene moves the calendar on the way
-	 * the date cheat does -- set the date, then let the monthly round introduce
-	 * whatever has been invented by then. */
-	extern void CalendarEnginesMonthlyLoop();
-	if (TimerGameCalendar::year < TimerGameCalendar::Year{1970}) {
-		TimerGameCalendar::YearMonthDay ymd = TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date);
-		TimerGameCalendar::Date moved = TimerGameCalendar::ConvertYMDToDate(TimerGameCalendar::Year{1970}, ymd.month, ymd.day);
-		TimerGameCalendar::SetDate(moved, TimerGameCalendar::date_fract);
-		if (!TimerGameEconomy::UsingWallclockUnits()) {
-			TimerGameEconomy::Date moved_economy{moved.base()};
-			for (Vehicle *v : Vehicle::Iterate()) v->ShiftDates(moved_economy - TimerGameEconomy::date);
-			LinkGraphSchedule::instance.ShiftDates(moved_economy - TimerGameEconomy::date);
-			TimerGameEconomy::SetDate(moved_economy, TimerGameEconomy::date_fract);
-		}
-		CalendarEnginesMonthlyLoop();
-	}
+	 * scene that cannot be built. So the scene moves the calendar on. */
+	if (TimerGameCalendar::year < TimerGameCalendar::Year{1970}) MoveCalendarTo(TimerGameCalendar::Year{1970});
 
 	/* An aeroplane that carries a road vehicle at all (60 seats, see
 	 * RoadVehiclesCarriedBy()) and can use a small airport, and any road
@@ -11357,6 +11588,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzamerit",             ConTestAimCrosshair);
 	IConsole::CmdRegister("teststavby",              ConTestIndustryHealth);
 	IConsole::CmdRegister("testmesta",               ConTestTowns);
+	IConsole::CmdRegister("testdomy",                ConTestHouseSets);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);

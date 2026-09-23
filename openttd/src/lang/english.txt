@@ -3287,6 +3287,7 @@ STR_FOUND_TOWN_SIZE_RANDOM                                      :{BLACK}Random
 STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Select town size
 STR_FOUND_TOWN_CITY                                             :{BLACK}City
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Cities grow faster than regular towns{}Depending on settings, they are bigger when founded
+STR_FOUND_TOWN_HOUSE_SET_TOOLTIP                                :{BLACK}Found the town of one set of houses: the houses of a climate or a house set (GRF), and only those. More sets can be mixed in afterwards in the town window
 
 STR_FOUND_TOWN_EXPAND_MODE                                      :{YELLOW}Town expansion:
 STR_FOUND_TOWN_EXPAND_BUILDINGS                                 :Buildings
@@ -3935,6 +3936,14 @@ STR_TOWN_VIEW_LOCAL_AUTHORITY_TOOLTIP                           :{BLACK}Show inf
 STR_TOWN_VIEW_RENAME_TOOLTIP                                    :{BLACK}Change town name
 STR_TOWN_VIEW_CARGO_GRAPH                                       :Cargo Graph
 STR_TOWN_VIEW_CARGO_GRAPH_TOOLTIP                               :Show graph of town's cargo history
+STR_TOWN_VIEW_HOUSE_SETS                                        :{BLACK}Houses from: {RAW_STRING}
+STR_TOWN_VIEW_HOUSE_SETS_TOOLTIP                                :{BLACK}Which sets of houses this town builds from: the houses of a climate, or a house set (GRF). Tick several and the town mixes them. Nothing ticked, it builds from every house the game offers, as usual. Houses already standing stay; this is about what is built next
+STR_TOWN_VIEW_HOUSE_SETS_ALL                                    :all houses
+STR_TOWN_VIEW_HOUSE_SETS_COUNT                                  :{NUM} set{P "" s}
+STR_TOWN_HOUSE_SET_TEMPERATE                                    :Temperate houses
+STR_TOWN_HOUSE_SET_ARCTIC                                       :Arctic houses
+STR_TOWN_HOUSE_SET_TROPIC                                       :Desert houses
+STR_TOWN_HOUSE_SET_TOYLAND                                      :Toyland houses
 
 STR_TOWN_VIEW_EXPAND_BUTTON                                     :{BLACK}Expand
 STR_TOWN_VIEW_EXPAND_TOOLTIP                                    :{BLACK}Increase size of town
@@ -5507,6 +5516,8 @@ STR_ERROR_CAN_T_BUILD_COMPANY_HEADQUARTERS                      :Can't build com
 # Town related errors
 STR_ERROR_CAN_T_GENERATE_TOWN                                   :Can't build any towns...
 STR_ERROR_CAN_T_RENAME_TOWN                                     :Can't rename town...
+STR_ERROR_TOWN_CAN_T_CHANGE_HOUSE_SETS                          :{WHITE}Can’t change which houses this town builds...
+STR_ERROR_TOWN_HOUSE_SETS_FULL                                  :{WHITE}... a town builds from at most eight sets
 STR_ERROR_CAN_T_FOUND_TOWN_HERE                                 :Can't found town here...
 STR_ERROR_CAN_T_EXPAND_TOWN                                     :Can't expand town...
 STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN                             :too close to another town

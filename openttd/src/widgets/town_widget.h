@@ -46,6 +46,7 @@ enum TownViewWidgets : WidgetID {
 	WID_TV_EXPAND_ROADS, ///< Expand roads of this town (scenario editor only).
 	WID_TV_DELETE,         ///< Delete this town (scenario editor only).
 	WID_TV_GRAPH,
+	WID_TV_HOUSE_SETS,     ///< Which sets of houses this town builds from.
 };
 
 /** Widgets of the #FoundTownWindow class. */
@@ -64,6 +65,7 @@ enum TownFoundingWidgets : WidgetID {
 	WID_TF_SIZE_LARGE,        ///< Selection for a large town.
 	WID_TF_SIZE_RANDOM,       ///< Selection for a randomly sized town.
 	WID_TF_CITY,              ///< Selection for the town's city state.
+	WID_TF_HOUSE_SET,          ///< Which set of houses the town is founded of.
 	WID_TF_ROAD_LAYOUT_SEL, ///< Container of town road layout buttons.
 	WID_TF_LAYOUT_ORIGINAL,   ///< Selection for the original town layout.
 	WID_TF_LAYOUT_BETTER,     ///< Selection for the better town layout.

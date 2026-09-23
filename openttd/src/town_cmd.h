@@ -18,8 +18,9 @@
 enum class TownAcceptanceEffect : uint8_t;
 using HouseID = uint16_t;
 
-std::tuple<CommandCost, Money, TownID> CmdFoundTown(DoCommandFlags flags, TileIndex tile, TownSize size, bool city, TownLayout layout, bool random_location, uint32_t townnameparts, const std::string &text);
+std::tuple<CommandCost, Money, TownID> CmdFoundTown(DoCommandFlags flags, TileIndex tile, TownSize size, bool city, TownLayout layout, bool random_location, uint32_t townnameparts, const std::string &text, uint32_t house_set);
 CommandCost CmdRenameTown(DoCommandFlags flags, TownID town_id, const std::string &text);
+CommandCost CmdTownHouseSet(DoCommandFlags flags, TownID town_id, uint32_t source, bool on);
 CommandCost CmdDoTownAction(DoCommandFlags flags, TownID town_id, TownAction action);
 CommandCost CmdTownGrowthRate(DoCommandFlags flags, TownID town_id, uint16_t growth_rate);
 CommandCost CmdTownRating(DoCommandFlags flags, TownID town_id, CompanyID company_id, int16_t rating);
@@ -32,6 +33,7 @@ CommandCost CmdPlaceHouseArea(DoCommandFlags flags, TileIndex tile, TileIndex st
 
 DEF_CMD_TRAIT(Commands::FoundTown, CmdFoundTown, CommandFlags({CommandFlag::Deity, CommandFlag::NoTest}), CommandType::LandscapeConstruction) // founding random town can fail only in exec run
 DEF_CMD_TRAIT(Commands::RenameTown, CmdRenameTown, CommandFlags({CommandFlag::Deity, CommandFlag::Server}), CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::TownHouseSet, CmdTownHouseSet, CommandFlags({CommandFlag::Deity, CommandFlag::Server}), CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::TownAction, CmdDoTownAction, CommandFlags({CommandFlag::Location}), CommandType::LandscapeConstruction)
 DEF_CMD_TRAIT(Commands::TownCargoGoal, CmdTownCargoGoal, CommandFlags({CommandFlag::Deity}), CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::TownGrowthRate, CmdTownGrowthRate, CommandFlags({CommandFlag::Deity}), CommandType::OtherManagement)

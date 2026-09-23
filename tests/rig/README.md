@@ -45,6 +45,17 @@ disabled, and the log says so: `NewGRF ... not found`. Count those lines
 before concluding anything about a save of his, and do not read "it works
 here" as "it works for him" when the question is about what a set does.
 
+The themed town scenes (`domy`, `domyvypnute`) need two house sets beside
+those, as plain `.grf` files in the same `newgrf/` of every home:
+`ogfx-mars-houses-rehabs.grf` ("(Fixed) OpenGFX Mars Houses", 524A450B, the
+one BaNaNaS offers for new games) and `ogfx-mars-houses.grf` (the older
+OpenGFX Mars Habitats, 4F474D05, which switches the original houses off).
+Both are built and kept in the repository github.com/Gadg8eer/OpenGFX-Mars-reHabs-Late-Start,
+under `MarsHabs-Late-Start/ogfx-mars-houses-rehabs/` and `MarsHouse/`. The
+content server itself (TCP 3978) is out of reach from a container, so the
+game cannot fetch them there on its own. Without them both scenes come out
+with odmitnuto above zero.
+
 ## Memory errors: the rig does not see them
 
 The battery measures behaviour, not memory. A write past the end of an

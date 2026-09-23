@@ -318,7 +318,7 @@
 		return false;
 	}
 
-	return ScriptObject::Command<Commands::FoundTown>::Do(tile, (::TownSize)size, city, (::TownLayout)layout, false, townnameparts, text);
+	return ScriptObject::Command<Commands::FoundTown>::Do(tile, (::TownSize)size, city, (::TownLayout)layout, false, townnameparts, text, 0);
 }
 
 /* static */ ScriptTown::TownRating ScriptTown::GetRating(TownID town_id, ScriptCompany::CompanyID company_id)

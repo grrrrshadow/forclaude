@@ -300,6 +300,7 @@ enum class Commands : uint8_t {
 
 	FoundTown, ///< found a town
 	RenameTown, ///< rename a town
+	TownHouseSet, ///< add or remove a set of houses a town builds from
 	TownAction, ///< do a action from the town detail window (like advertises or bribe)
 	TownCargoGoal, ///< set the goal of a cargo for a town
 	TownGrowthRate, ///< set the town growth rate
