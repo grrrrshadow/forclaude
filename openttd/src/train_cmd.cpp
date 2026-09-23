@@ -1189,22 +1189,31 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	int entered_at = 0; // distance at which the tile the walk is on was entered
 	int last_signal_px = -1; // distance at which the last signal facing this train was passed
 	bool on_our_booking = true; // every tile so far is booked to this train
-	/* How many of the signals ahead the driver knows the state of without
-	 * seeing them. A signal tells him about as many signals after it as the
-	 * player's setting says show the warning before a red (vehicle.
-	 * train_warning_signals, IsPathSignalWarning()): the last one he passed
-	 * told him about those ahead of him now, and one he can see tells him
-	 * about those after it. A real driver keeps in mind the warning he has
-	 * passed; read this way it needs no memory -- only the line. The look
-	 * goes on past his sight as far as those signals, and no further than a
-	 * stop could ask anything of the train at all.
+	/* Through how many signals the driver reads the line ahead: as many as
+	 * the player's setting says show the warning before a red (vehicle.
+	 * train_warning_signals, IsPathSignalWarning()), counted from the train.
+	 * The player's rule: one orange, he knows the next signal and no more;
+	 * two, the one after it as well; three, far. Past those he knows nothing,
+	 * however close together they stand and however far he sees -- a first
+	 * go let every signal he could see tell him about the ones after it, and
+	 * on closely spaced signals he braked for a red five signals off, with
+	 * two greens and two oranges still in front of him (the player's
+	 * screenshot).
+	 *
+	 * Those signals he knows even beyond his sight -- the last signal he
+	 * passed told him -- for as long as he remembers it (vehicle.
+	 * train_warning_memory, DriverRemembersSignal()); once he has forgotten,
+	 * only those he sees. Never further than a stop could ask anything of the
+	 * train at all.
+	 *
 	 * Only with "brake, fail to brake and crash" on -- off, the driver already
 	 * sees as far as braking needs, and nothing there changes. */
 	const bool read_warning = IsSignalOverrunOn();
 	const int warning_signals = WarningSignalCount();
 	const int reach_px = read_warning ? GentleStoppingReach(v) : look_px;
-	int known = read_warning && DriverRemembersSignal(v) ? warning_signals : 0;
-	for (int step = 0; (px < look_px || (known > 0 && px < reach_px)) && step < 160; step++) {
+	const bool remembers = read_warning && DriverRemembersSignal(v);
+	int signals_read = 0;
+	for (int step = 0; (px < look_px || (remembers && px < reach_px)) && step < 160; step++) {
 		if (!ft.Follow(tile, td)) {
 			/* End of line: a stop at the edge. */
 			ask(0, px);
@@ -1328,11 +1337,11 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 				ask(0, px);
 				break;
 			}
-			/* Known to him and a path signal: its red means something only
-			 * if the ground behind it really is taken, and that the driver
-			 * cannot see from here -- so what the signals told him is read as
-			 * that. Nobody behind it: it clears when he gets to it. */
-			if (known > 0 && PathBeyondSignalTaken(v, ft.new_tile, next_td)) {
+			/* Read by him and a path signal: its red means something only if
+			 * the ground behind it really is taken, and that the driver cannot
+			 * see from here -- so what the signals told him is read as that.
+			 * Nobody behind it: it clears when he gets to it. */
+			if (read_warning && PathBeyondSignalTaken(v, ft.new_tile, next_td)) {
 				ask(0, px);
 				break;
 			}
@@ -1340,9 +1349,8 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 
 		if (IsTileType(ft.new_tile, TileType::Railway) && HasSignalOnTrackdir(ft.new_tile, next_td)) {
 			last_signal_px = px;
-			/* One he sees tells him about the ones after it; one he only knew
-			 * of is used up. */
-			if (read_warning) known = px < look_px ? warning_signals : known - 1;
+			/* That many signals read, and no further. */
+			if (read_warning && ++signals_read >= warning_signals) break;
 		}
 
 		entered_at = px;

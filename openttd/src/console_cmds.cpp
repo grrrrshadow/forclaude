@@ -6979,6 +6979,7 @@ static struct {
 	TileIndex depot = INVALID_TILE; ///< where the one behind starts
 	uint red_x = 0; ///< x of the red signal the one behind comes up to
 	int stop_before = -1; ///< press the stop this many tiles short of the red; -1 never
+	uint last_x = 0; ///< the tile the one behind was last reported on
 } _testnedobrzdil;
 
 /**
@@ -7006,6 +7007,13 @@ static struct {
  * "rozestup N": the signal before the red stands N tiles before it instead of
  * two, with nothing between the first signal and it.
  *
+ * "husto": block signals every two tiles from the first to the red, the
+ * player's screenshot -- two greens, two oranges and a red, and the train
+ * already braking.
+ *
+ * The one behind is reported on every tile of the last sixteen before the
+ * red, with its speed, so where it starts braking can be read.
+ *
  * Usage: testnedobrzdil <blok|cesta> [stopka <tiles short of the red>] [vozu <wagons behind, 3 by default>] [rozestup <tiles>] [odtah] [les]
  * @copydoc IConsoleCmdProc
  */
@@ -7021,9 +7029,12 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 	bool with_tow = false;
 	bool forest = false;
 	uint spacing = 0; // tiles between the last two signals before the red; 0 for the original three in a row
+	bool dense = false;
 	for (size_t i = 2; i < argv.size(); i++) {
 		if (argv[i] == "les") {
 			forest = true;
+		} else if (argv[i] == "husto") {
+			dense = true;
 		} else if (argv[i] == "odtah") {
 			with_tow = true;
 		} else if (argv[i] == "stopka" || argv[i] == "vozu" || argv[i] == "rozestup") {
@@ -7112,6 +7123,10 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 	 * the first signal and it, so the warning it shows is seen that much
 	 * earlier -- signals close together and far apart. */
 	if (spacing != 0) signals = {x0 + 10, x0 + 32 - spacing, x0 + 32};
+	if (dense) {
+		signals.clear();
+		for (uint sx = x0 + 10; sx <= x0 + 32; sx += 2) signals.push_back(sx);
+	}
 	SignalType kind = block ? SignalType::Block : SignalType::Path;
 	for (uint sx : signals) {
 		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X, kind, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, east).Failed()) {
@@ -7170,6 +7185,7 @@ static bool ConTestOverrun(std::span<std::string_view> argv)
 	_testnedobrzdil.depot = depot;
 	_testnedobrzdil.red_x = x0 + 32;
 	_testnedobrzdil.stop_before = stop_before;
+	_testnedobrzdil.last_x = 0;
 	IConsolePrint(CC_DEFAULT, "testnedobrzdil: {} - vlak {} jede na nastupiste ({},{}), vlak {} ({} vozu, {} t) ho dojede, cervena na ({},{}){}; nastaveni {}.",
 			block ? "tri blokova navestidla" : "cestne navestidlo", ahead->unitnumber, x0 + 36, y0, behind->unitnumber,
 			CountVehiclesInChain(behind), behind->gcache.cached_weight,
@@ -7200,6 +7216,25 @@ static const IntervalTimer<TimerGameTick> _testnedobrzdil_timer({TimerGameTick::
 			_testnedobrzdil.phase = 1;
 		}
 		return;
+	}
+	if (_testnedobrzdil.phase >= 1 && !behind->IsWrecked()) {
+		const Train *front = behind->GetMovingFront();
+		uint x = TileX(front->tile);
+		if (x + 1 == _testnedobrzdil.red_x) {
+			/* The last tile before the red, tick by tick: what the driver
+			 * asks for and what the signal shows. */
+			TileIndex red = TileXY(_testnedobrzdil.red_x, TileY(front->tile));
+			bool green = IsTileType(red, TileType::Railway) && HasSignalOnTrackdir(red, Trackdir::X_SW) &&
+					GetSignalStateByTrackdir(red, Trackdir::X_SW) == SignalState::Green;
+			IConsolePrint(CC_DEFAULT, "testnedobrzdil: tik {} vlak {} poz {} rychlost {} strop {} navestidlo {}", TimerGameTick::counter,
+					behind->unitnumber, front->x_pos & 0xF, behind->cur_speed,
+					behind->driver_ceiling == INT32_MAX ? -1 : behind->driver_ceiling, green ? "ZELENE" : "cervene");
+		}
+		if (x != _testnedobrzdil.last_x && x + 16 >= _testnedobrzdil.red_x && x <= _testnedobrzdil.red_x + 2) {
+			_testnedobrzdil.last_x = x;
+			IConsolePrint(CC_DEFAULT, "testnedobrzdil: vlak {} na x {} ({} pred cervenou) rychlost {} strop {}", behind->unitnumber, x,
+					(int)_testnedobrzdil.red_x - (int)x, behind->cur_speed, behind->driver_ceiling == INT32_MAX ? -1 : behind->driver_ceiling);
+		}
 	}
 	if (_testnedobrzdil.phase == 1 && _testnedobrzdil.stop_before >= 0 && !behind->IsWrecked()) {
 		const Train *front = behind->GetMovingFront();

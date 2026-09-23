@@ -132,27 +132,29 @@ run_scene poruchaspoj "setting vehicle.rescue_wait_days 7
 vlak123 on
 testspoj
 testza 1000 testporucha 2" 10000
-# "Brake, fail to brake and crash" (vehicle.train_braking, on: 4 = the
-# driver sees 20 tiles with ETCS, the longest sight there is). A light
-# engine stands braked at a platform; a train comes up behind it towards the
-# path signal guarding that block, and the player's stop is pressed on it
-# three tiles short. With the setting on nobody drives a stopped train: it
-# brakes the gentle way, 30 % weaker, cannot stop, runs past the red and hits
-# the engine (srazka=1, and both are wrecks). A tow fetches the one that
-# failed to brake (spojeno=1 odtazeno=1); a helicopter lands by it and leaves
-# when the tow has it; the papers write it up twice.
-run_scene nedobrzdil "setting vehicle.train_braking 4
+# "Brake, fail to brake and crash" (vehicle.train_braking, on: 1 = the
+# driver sees 5 tiles). A light engine stands braked at a platform; a train
+# of ten wagons comes up behind it towards the path signal guarding that
+# block, and the player's stop is pressed on it three tiles short. With the
+# setting on nobody drives a stopped train: it brakes the gentle way, 30 %
+# weaker, cannot stop, runs past the red and hits the engine (srazka=1, and
+# both are wrecks). A tow fetches the one that failed to brake (spojeno=1
+# odtazeno=1); a helicopter lands by it and leaves when the tow has it; the
+# papers write it up twice. (Seeing 20 tiles, the driver now sees the red
+# path signal with the platform taken behind it and has braked long before
+# the stop is pressed -- see nedobrzdilbez.)
+run_scene nedobrzdil "setting vehicle.train_braking 1
 setting vehicle.train_warning_memory 4
 vlak123 on
-testnedobrzdil cesta stopka 3 odtah" 9000
+testnedobrzdil cesta vozu 10 stopka 3 odtah" 9000
 # The same with the setting off, the game as it was: the stop is the game's
 # own brake and the train stands short of the red (srazka=0).
 # The same with forest planted all round: nowhere in the papers' picture to
 # land, so the helicopter circles over the wreck until the tow has it.
-run_scene nedobrzdilles "setting vehicle.train_braking 4
+run_scene nedobrzdilles "setting vehicle.train_braking 1
 setting vehicle.train_warning_memory 4
 vlak123 on
-testnedobrzdil cesta stopka 3 odtah les" 9000
+testnedobrzdil cesta vozu 10 stopka 3 odtah les" 9000
 # How far the driver sees from the cab, the same setting's "sees 5 tiles"
 # (vehicle.train_braking 1). He starts braking too late for a ten-wagon train
 # and runs past the red into the engine at the platform (srazka=1).
@@ -162,12 +164,13 @@ testnedobrzdil blok vozu 10 odtah" 9000
 run_scene nedobrzdilvyp "vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # Setting on, nobody touches the stop: the train is driven, ten wagons behind
-# it. It learns that the platform is taken only when it books up to the path
-# signal, four tiles short, and brakes by the physics -- seventeen tiles from
-# its top speed, as long as it takes to pull away, no longer a tenth of its
-# speed a tick -- cannot stop and runs past (srazka=1). The player's own
-# save does the same (TEMATA_ODTAH 81.8). Three wagons brake in four tiles
-# and would stop.
+# it, and the driver sees 20 tiles. The path signal guarding the platform is
+# one of the signals he reads, it is red and the platform behind it is taken,
+# so he brakes from twenty tiles out and stands short of it (srazka=0; the
+# record says it stands there for good, which it does -- the engine at the
+# platform never moves). It used to run past: a path signal was not read at
+# all, and the driver learned of the platform only when he booked up to the
+# signal, four tiles short (TEMATA_ODTAH 81.8).
 run_scene nedobrzdilbez "setting vehicle.train_braking 4
 setting vehicle.train_warning_memory 4
 vlak123 on
@@ -203,6 +206,20 @@ run_scene oranzzapomene3 "setting vehicle.train_braking 1
 setting vehicle.train_warning_memory 5
 vlak123 on
 testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+# Signals every two tiles, the player's screenshot. The driver reads as many
+# signals ahead of the train as show orange before a red, and no more,
+# however many he can see: with two he rolls at full speed until the red is
+# the second signal ahead (four tiles), with one until it is the next (two),
+# and three wagons at 72 run past it either way (srazka=1). A first go let
+# every signal in sight tell him about the ones after it, and he braked with
+# two greens and two oranges still in front of him.
+run_scene oranzhusto2 "setting vehicle.train_braking 1
+setting vehicle.train_warning_signals 2
+vlak123 on
+testnedobrzdil blok vozu 3 husto odtah" 9000
+run_scene oranzhusto1 "setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 3 husto odtah" 9000
 run_scene oranzdve "setting vehicle.train_braking 1
 setting vehicle.train_warning_signals 2
 vlak123 on
