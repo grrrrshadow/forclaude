@@ -1619,7 +1619,7 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 
 		case MOF_COUPLE_CARGO: {
 			if (v->type != VehicleType::Train) return CMD_ERROR;
-			if (CargoType(data) == INVALID_CARGO) break; // "every cargo", which also lets the wagon go
+			if (CargoType(data) == INVALID_CARGO) break; // "every cargo"; the wagon stays as it is
 			if (CargoType(data) >= NUM_CARGO) return CMD_ERROR;
 			/* With a wagon named, the cargo is narrowed to what that wagon can
 			 * be fitted for -- the player's rule. The list the player picks
@@ -1935,25 +1935,14 @@ CommandCost CmdModifyOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 				break;
 
 			case MOF_COUPLE_CARGO:
+				/* The cargo is the cargo and nothing else: "every cargo" leaves
+				 * the named wagon exactly where it is, bought or not. It used to
+				 * let go of the wagon on a buying order, and the list said so
+				 * ("lets the wagon go") on every order with a wagon named -- the
+				 * player read that on a plain type filter, where it was not even
+				 * true. His rule since: the cargo does not reach into the type,
+				 * keep it simple. The type goes with the type button. */
 				order->SetCoupleCargo(CargoType(data));
-				/* "Every cargo" means two different things, and which one
-				 * depends on whether anything is being bought.
-				 *
-				 * Buying: it cannot mean "any cargo will do", because something
-				 * is going to be bought and whatever is bought will have one.
-				 * So it reads as the way back out of the whole filter -- it
-				 * lets go of the named model too, one press instead of two, and
-				 * the cargo list goes back to the whole of it, the model being
-				 * the only thing that ever narrowed it. The player's own words.
-				 *
-				 * Not buying: then it means exactly what it says. "Couple Sgnss
-				 * carrying anything" is a sensible thing to want -- the train
-				 * takes them and drives into a shed to have them refitted -- so
-				 * the model stays and only the cargo goes. */
-				if (CargoType(data) == INVALID_CARGO && order->ShouldBuyWagons()) {
-					order->SetCoupleBuyEngine(EngineID::Invalid());
-					order->SetBuyWagons(false);
-				}
 				break;
 
 			case MOF_COUPLE_COUNT:

@@ -6671,6 +6671,15 @@ static bool ConTestModifyOrder(std::span<std::string_view> argv)
 		IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testmof: vlak {} rozkaz {} mof {} = {} -> {}", *punit, *porder, *pmof, *pval,
 				r.Succeeded() ? std::string("nastaveno")
 						: fmt::format("ODMITNUTO{}", r.GetErrorMessage() == INVALID_STRING_ID ? "" : " - " + GetString(r.GetErrorMessage())));
+		/* What the couple filter holds afterwards: several fields move
+		 * together (a cargo can let the model go, a model can clear the
+		 * cargo), and which of them did is the question. */
+		if (const Order *o = t->GetOrder((VehicleOrderID)*porder); o != nullptr) {
+			IConsolePrint(CC_INFO, "testmof: filtr - naklad {}, typ {}, kupovat {}",
+					IsValidCargoType(o->GetCoupleCargo()) ? fmt::format("{}", o->GetCoupleCargo()) : std::string("vsechny"),
+					o->GetCoupleBuyEngine() == EngineID::Invalid() ? std::string("zadny") : fmt::format("{}", o->GetCoupleBuyEngine().base()),
+					o->ShouldBuyWagons() ? "ano" : "ne");
+		}
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testmof: vlak {} nenalezen.", argv[1]);

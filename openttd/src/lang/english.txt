@@ -1432,7 +1432,7 @@ STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} day{P 0
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Trains slow down before a level crossing: {STRING2}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :A train eases off where the line is dangerous, and runs normally under a road bridge. The driver looks ahead, and a car caught on the crossing comes off more lightly
 STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN                         :Brake, fail to brake and crash: {STRING2}
-STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :I need this
+STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :I need this. A train that reaches a red signal too fast runs past it and may crash into whatever is beyond. The driver brakes for a red in time and stops. Press a train's stop button, though, and nobody drives it any more: it only brakes, weaker (by how much is the next setting), and a stop pressed too late can end in a crash - which then makes the papers. A helicopter comes to the wreck and waits until the tow takes it away. Realistic train acceleration only
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :A train stopped by hand brakes weaker by: {STRING2}
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :How much weaker a train brakes once you press its stop button. Only with "Brake, fail to brake and crash" switched on
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 %
@@ -5015,9 +5015,9 @@ STR_ORDER_COUPLE_LOAD_SHORT_ANY_FULL_FIRST                      :full first
 STR_ORDER_COUPLE_LOAD_SHORT_ANY_EMPTY_FIRST                     :empty first
 STR_ORDER_COUPLE_LOAD_TOOLTIP                                   :{BLACK}Only collect wagons that are this full. Combines with the other two settings; each one narrows the choice further. With a cargo named, this asks only the wagons carrying it, so one empty wagon of something else standing in the same rake does not keep it from counting as full
 STR_ORDER_COUPLE_CARGO_ANY                                      :Cargo: any
-STR_ORDER_COUPLE_CARGO_ANY_DROPS_TYPE                           :Every cargo (also lets the wagon go)
+STR_ORDER_COUPLE_CARGO_EVERY                                    :Every cargo
 STR_ORDER_COUPLE_CARGO_TYPE                                     :Cargo: {STRING}
-STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Only collect wagons carrying this cargo. Combines with the other two settings; each one narrows the choice further. With a wagon named, only the cargoes that wagon can be fitted for are offered; picking "every cargo" lets the wagon go as well, which puts the whole list back
+STR_ORDER_COUPLE_CARGO_TOOLTIP                                  :{BLACK}Only collect wagons carrying this cargo. Combines with the other two settings; each one narrows the choice further. With a wagon named, only the cargoes that wagon can be fitted for are offered; picking "every cargo" leaves the wagon alone, it goes with the type button
 STR_ORDER_COUPLE_COUNT_BUTTON                                   :{BLACK}Vehicles: {NUM}
 STR_ORDER_COUPLE_COUNT_ANY                                      :{BLACK}Vehicles: any
 STR_ORDER_COUPLE_COUNT_TOOLTIP                                  :{BLACK}One number, and one of three ways to read it. With neither toggle down it couples a rake of exactly this many vehicles, 0 for any rake. "At least" takes a rake once it has grown to this many or more, so one still being built is left to grow. "At most" is a rake of up to this many, 0 for as many as fit on the platform. "Found a rake" - what to do when there is nothing here to couple to, wait or put wagons down anyway: couple nothing, and lay your own wagons down as the start of a rake instead; with "at most" the number is the greatest length, and it then waits until it can couple or found. The whole rake is always taken; leaving part of a rake standing is what a decoupling order at the same platform is for. OK confirms the number and the buttons together. Station waypoints are worth using here.

@@ -246,9 +246,11 @@ static int BoardModeToIndex(OrderBoardMode mode)
  * the named wagon cannot take would be offering an order that can never match
  * anything, and the list is where that is easiest to say.
  *
- * The first entry is the way back out. With a wagon named it lets go of the
- * wagon as well, which is what puts the whole list back -- one press, not two,
- * and the only thing that ever narrowed the list was that wagon.
+ * The first entry is "every cargo", and it is only that: the named wagon
+ * stays (MOF_COUPLE_CARGO in order_cmd.cpp), so the list stays narrowed to
+ * it. It used to say "also lets the wagon go", and on an order that only
+ * filters by type that was not even true -- the player read it and asked for
+ * the plain words.
  *
  * @param order the order the list is being opened for
  * @return the list to show
@@ -265,7 +267,7 @@ static DropDownList BuildCoupleCargoDropDown(const Order *order)
 	CargoTypes allowed = named != nullptr ? GetUnionOfArticulatedRefitMasks(order->GetCoupleBuyEngine(), true) : ALL_CARGOTYPES;
 
 	DropDownList list;
-	list.push_back(MakeDropDownListStringItem(named != nullptr ? STR_ORDER_COUPLE_CARGO_ANY_DROPS_TYPE : STR_ORDER_COUPLE_CARGO_ANY, INVALID_CARGO, false));
+	list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_CARGO_EVERY, INVALID_CARGO, false));
 	/* Wagons fitted for road vehicles, named here the way the purchase list
 	 * names them: their cargo is not a standard one -- it is of the special
 	 * class, and the sorted list of standard cargoes stops short of those --
