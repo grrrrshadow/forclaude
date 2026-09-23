@@ -929,6 +929,11 @@ bool SettingDesc::IsEditable(bool do_command) const
 	 * couple" order. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (this->GetName() == "difficulty.train_flip_reverse_allowed" || this->GetName() == "pf.reverse_at_signals") return false;
 
+	/* The themed towns of the climate that is played are just towns: that
+	 * line is greyed rather than gone, so the four stay where they are. */
+	static const std::string_view CLIMATE_TOWNS[] = {"economy.temperate_towns", "economy.arctic_towns", "economy.tropic_towns", "economy.toyland_towns"};
+	if (this->GetName() == CLIMATE_TOWNS[to_underlying(GetGameSettings().game_creation.landscape)]) return false;
+
 	if (!do_command && !this->flags.Test(SettingFlag::NoNetworkSync) && _networking && !_network_server && !this->flags.Test(SettingFlag::PerCompany)) return false;
 	if (do_command && this->flags.Test(SettingFlag::NoNetworkSync)) return false;
 	if (this->flags.Test(SettingFlag::NetworkOnly) && !_networking && _game_mode != GameMode::Menu) return false;

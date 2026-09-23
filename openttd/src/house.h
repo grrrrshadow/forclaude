@@ -13,6 +13,7 @@
 #include "cargo_type.h"
 #include "timer/timer_game_calendar.h"
 #include "house_type.h"
+#include "landscape_type.h"
 #include "newgrf_animation_type.h"
 #include "newgrf_badge_type.h"
 #include "newgrf_callbacks.h"
@@ -152,6 +153,7 @@ inline HouseID GetTranslatedHouseID(HouseID hid)
 }
 
 void ShowBuildHousePicker(struct Window *);
+HouseZones GetClimateMask(LandscapeType landscape);
 HouseZones GetClimateMaskForLandscape();
 
 #endif /* HOUSE_H */

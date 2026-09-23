@@ -1250,3 +1250,28 @@ SCENE_NEWGAME='setting_newgame economy.mars_towns 3' run_scene marsmesta "testdo
 testdomy mars" 100
 SCENE_NEWGAME='setting_newgame economy.mars_towns 3
 setting_newgame game_creation.town_name 15' run_scene marsmestacz "testdomy mars" 100
+
+# The houses of the other climates as sets: their pictures are in the base
+# graphics whatever the climate played, so a toyland town ticked to the
+# temperate houses builds them, on toyland ground. The arctic set outside the
+# arctic builds its houses of below the snow line only -- the snowy ones are
+# for snow (odmitnuto counts one of them here). A town is founded of the
+# arctic houses through the found town window and grows.
+run_scene domyklima "setting economy.found_town 2
+testdomy
+testdomy okno 0 mirne
+testdomy rust 0 30
+testdomy okno 0 poust
+testdomy rust 0 20
+testdomy zaloz 150 200 arktida
+testdomy rust posledni 20
+testdomy" 100
+
+# The themed towns of a new map by the settings: two of the temperate houses
+# and one of the desert houses on top of the ordinary towns, each all of its
+# set. The toyland line is set too and has to count for nothing: toyland is
+# the climate played here, and its towns are the ordinary ones (the line is
+# greyed in the settings window, SettingDesc::IsEditable()).
+SCENE_NEWGAME='setting_newgame economy.temperate_towns 2
+setting_newgame economy.tropic_towns 1
+setting_newgame economy.toyland_towns 3' run_scene klimamesta "testdomy mapa" 100

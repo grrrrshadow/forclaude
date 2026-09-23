@@ -2350,15 +2350,20 @@ static TileIndex FindNearestGoodCoastalTownSpot(TileIndex tile, TownLayout layou
  * Get the HouseZones climate mask for the current landscape type.
  * @return HouseZones climate mask.
  */
-HouseZones GetClimateMaskForLandscape()
+HouseZones GetClimateMask(LandscapeType landscape)
 {
-	switch (_settings_game.game_creation.landscape) {
+	switch (landscape) {
 		case LandscapeType::Temperate: return HouseZone::ClimateTemperate;
 		case LandscapeType::Arctic: return {HouseZone::ClimateSubarcticAboveSnow, HouseZone::ClimateSubarcticBelowSnow};
 		case LandscapeType::Tropic: return HouseZone::ClimateSubtropic;
 		case LandscapeType::Toyland: return HouseZone::ClimateToyland;
 		default: NOT_REACHED();
 	}
+}
+
+HouseZones GetClimateMaskForLandscape()
+{
+	return GetClimateMask(_settings_game.game_creation.landscape);
 }
 
 /**
@@ -2471,24 +2476,38 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 		if (CreateRandomTown(20, townnameparts, TownSize::Random, city, layout) != nullptr) current_number++; // If creation was successful, raise a flag.
 	} while (--total);
 
-	/* The Mars towns (economy.mars_towns): small towns of the Mars houses
-	 * among the others, on a new map and when the game has the Mars houses
+	/* The themed towns: small towns of one set of houses among the others,
+	 * on a new map. The houses of each other climate as the settings say
+	 * (the climate played is left out: its towns are the ordinary ones), and
+	 * the Mars houses (economy.mars_towns) when the game has them
 	 * (mars_houses.h). They are made after the others and on top of their
 	 * number, so the rest of the map is made as it would be without them.
-	 * The first three are named for Mars; any after that as any other town. */
-	std::vector<uint32_t> sources = AvailableHouseSources();
-	if (!number.has_value() && std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end()) {
-		for (uint i = 0; i < _settings_game.economy.mars_towns; i++) {
-			if (!GenerateTownName(_random, &townnameparts, &town_names)) continue;
-			Town *t = CreateRandomTown(20, townnameparts, TownSize::Small, false, layout, MARS_HOUSES_GRFID);
-			if (t == nullptr) continue;
-			current_number++;
-			std::optional<std::string> name = GetMarsTownName(town_names);
-			if (name.has_value()) {
-				t->name = *name;
-				t->cached_name.clear();
-				t->UpdateVirtCoord();
-				town_names.insert(*name);
+	 * The first three Mars towns are named for Mars; every other themed town
+	 * as any other town. */
+	if (!number.has_value()) {
+		std::vector<std::pair<uint32_t, uint>> themed;
+		const LandscapeType played = _settings_game.game_creation.landscape;
+		if (played != LandscapeType::Temperate) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Temperate), _settings_game.economy.temperate_towns);
+		if (played != LandscapeType::Arctic) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic), _settings_game.economy.arctic_towns);
+		if (played != LandscapeType::Tropic) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Tropic), _settings_game.economy.tropic_towns);
+		if (played != LandscapeType::Toyland) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Toyland), _settings_game.economy.toyland_towns);
+		std::vector<uint32_t> sources = AvailableHouseSources();
+		if (std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end()) themed.emplace_back(MARS_HOUSES_GRFID, _settings_game.economy.mars_towns);
+
+		for (const auto &[source, count] : themed) {
+			for (uint i = 0; i < count; i++) {
+				if (!GenerateTownName(_random, &townnameparts, &town_names)) continue;
+				Town *t = CreateRandomTown(20, townnameparts, TownSize::Small, false, layout, source);
+				if (t == nullptr) continue;
+				current_number++;
+				if (source != MARS_HOUSES_GRFID) continue;
+				std::optional<std::string> name = GetMarsTownName(town_names);
+				if (name.has_value()) {
+					t->name = *name;
+					t->cached_name.clear();
+					t->UpdateVirtCoord();
+					town_names.insert(*name);
+				}
 			}
 		}
 	}
@@ -2856,14 +2875,16 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 
 	/* Get the town zone type of the current tile, as well as the climate.
 	 * This will allow to easily compare with the specs of the new house to build */
-	HouseZones zones = GetTownRadiusGroup(t, tile);
+	HouseZones zone = GetTownRadiusGroup(t, tile);
 
+	HouseZones climate_here{};
 	switch (_settings_game.game_creation.landscape) {
-		case LandscapeType::Temperate: zones.Set(HouseZone::ClimateTemperate); break;
-		case LandscapeType::Arctic: zones.Set(maxz > HighestSnowLine() ? HouseZone::ClimateSubarcticAboveSnow : HouseZone::ClimateSubarcticBelowSnow); break;
-		case LandscapeType::Tropic: zones.Set(HouseZone::ClimateSubtropic); break;
-		case LandscapeType::Toyland: zones.Set(HouseZone::ClimateToyland); break;
+		case LandscapeType::Temperate: climate_here.Set(HouseZone::ClimateTemperate); break;
+		case LandscapeType::Arctic: climate_here.Set(maxz > HighestSnowLine() ? HouseZone::ClimateSubarcticAboveSnow : HouseZone::ClimateSubarcticBelowSnow); break;
+		case LandscapeType::Tropic: climate_here.Set(HouseZone::ClimateSubtropic); break;
+		case LandscapeType::Toyland: climate_here.Set(HouseZone::ClimateToyland); break;
 	}
+	HouseZones zones = zone | climate_here;
 
 	/* bits 0-4 are used
 	 * bits 11-15 are used
@@ -2880,7 +2901,7 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 	bool by_sets = false;
 	if (t->num_house_sets > 0) {
 		for (const auto &hs : HouseSpec::Specs()) {
-			if (HouseSetCanBuild(hs) && TownBuildsFrom(t, HouseSourceOf(hs))) {
+			if (HouseSetCanBuild(hs) && TownBuildsHouse(t, hs, {})) {
 				by_sets = true;
 				break;
 			}
@@ -2898,16 +2919,19 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 	/* Generate a list of all possible houses that can be built. */
 	for (const auto &hs : HouseSpec::Specs()) {
 		/* Verify that the candidate house spec matches the current tile status */
-		if (!hs.building_availability.All(zones)) continue;
 		if (!by_sets) {
-			if (!hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID) continue;
+			if (!hs.building_availability.All(zones) || !hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID) continue;
 			/* The Mars houses are the game's to place, in its Mars towns and
 			 * in towns the player ticked them for; a town of every house
 			 * builds as if the game did not have them (mars_houses.h). */
 			if (hs.grf_prop.grffile != nullptr && hs.grf_prop.grfid == MARS_HOUSES_GRFID) continue;
 		} else {
+			/* Its part of town as for any house; its climate as its set says
+			 * (TownBuildsHouse()) -- an original house of another climate is
+			 * built here as it is there. */
+			if (!hs.building_availability.All(zone)) continue;
+			if (!TownBuildsHouse(t, hs, climate_here) || !HouseSetCanBuild(hs)) continue;
 			uint32_t source = HouseSourceOf(hs);
-			if (!TownBuildsFrom(t, source) || !HouseSetCanBuild(hs)) continue;
 			bool in_years = TimerGameCalendar::year >= hs.min_year && TimerGameCalendar::year <= hs.max_year;
 			if (in_years && std::find(dated_sets.begin(), dated_sets.begin() + num_dated_sets, source) == dated_sets.begin() + num_dated_sets) {
 				dated_sets[num_dated_sets++] = source;
@@ -3210,14 +3234,41 @@ void ClearTownHouse(Town *t, TileIndex tile)
 
 /**
  * Which set of houses a house comes from: its GRF, or the original houses of
- * the climate the game is played in.
+ * a climate -- the climate the game is played in when the house is one of
+ * its, else the first climate the house is for (a few originals are for
+ * three).
  * @param hs the house
  * @return the set, as Town::house_sets holds it
  */
 uint32_t HouseSourceOf(const HouseSpec &hs)
 {
 	if (hs.grf_prop.grffile != nullptr) return hs.grf_prop.grfid;
-	return HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape);
+	LandscapeType climate = _settings_game.game_creation.landscape;
+	if (!hs.building_availability.Any(GetClimateMask(climate))) {
+		for (LandscapeType c : {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) {
+			if (hs.building_availability.Any(GetClimateMask(c))) {
+				climate = c;
+				break;
+			}
+		}
+	}
+	return HOUSE_SOURCE_CLIMATE + to_underlying(climate);
+}
+
+/**
+ * The original houses of a climate that go up on a spot: all of them, but for
+ * the arctic ones, which are two kinds -- the snowy ones above the snow line
+ * and the others below it. Where there is snow, the snowy ones; where there
+ * is none (the other climates, until they have snow), the others.
+ * @param climate the climate whose houses
+ * @param here the climate of the spot as TryBuildTownHouse() sees it, or
+ *             nothing for anywhere at all
+ * @return the houses of that climate for the spot, as their availability names them
+ */
+static HouseZones ClimateHousesFor(LandscapeType climate, HouseZones here)
+{
+	if (climate != LandscapeType::Arctic || here.None()) return GetClimateMask(climate);
+	return here.Test(HouseZone::ClimateSubarcticAboveSnow) ? HouseZone::ClimateSubarcticAboveSnow : HouseZone::ClimateSubarcticBelowSnow;
 }
 
 /**
@@ -3235,21 +3286,50 @@ bool TownBuildsFrom(const Town *t, uint32_t source)
 }
 
 /**
+ * Is a house one this town was told to build from? A GRF's house when its GRF
+ * is chosen and the GRF made it for the climate the game is in; an original
+ * house when a climate it is for is chosen -- and it is the right one of the
+ * two arctic kinds for the spot (ClimateHousesFor()).
+ * @param t the town
+ * @param hs the house
+ * @param here the climate of the spot, or nothing for anywhere at all
+ * @return whether the town builds it
+ */
+bool TownBuildsHouse(const Town *t, const HouseSpec &hs, HouseZones here)
+{
+	if (hs.grf_prop.grffile != nullptr) {
+		return TownBuildsFrom(t, hs.grf_prop.grfid) && (here.None() || hs.building_availability.Any(here));
+	}
+	for (uint i = 0; i < t->num_house_sets; i++) {
+		if (t->house_sets[i] < HOUSE_SOURCE_CLIMATE) continue;
+		LandscapeType climate = static_cast<LandscapeType>(t->house_sets[i] - HOUSE_SOURCE_CLIMATE);
+		if (climate > LandscapeType::Toyland) continue;
+		if (hs.building_availability.Any(ClimateHousesFor(climate, here))) return true;
+	}
+	return false;
+}
+
+/**
  * The sets of houses there are to choose from in this game: the original
- * houses of the climate, and every GRF that has a house a town here could
- * build -- a set whose houses are all for another climate offers nothing.
+ * houses of the four climates, and every GRF that has a house a town here
+ * could build -- a GRF whose houses are all for another climate offers
+ * nothing.
  *
- * The climate's houses are the game's own and always on offer: a GRF that
- * switches the original houses off does it for the towns that build from
- * every house, not for a town told to build from the climate's (see
- * HouseSetCanBuild()).
- * @return the sets, the climate first and the GRFs in the order they load
+ * The climates' houses are the game's own and always on offer, all four of
+ * them in every climate: their pictures are in the base graphics whatever the
+ * climate played. A GRF that switches the original houses off does it for the
+ * towns that build from every house, not for a town told to build from a
+ * climate's (see HouseSetCanBuild()).
+ * @return the sets: the climate played first, the other climates, the GRFs in the order they load
  */
 std::vector<uint32_t> AvailableHouseSources()
 {
 	HouseZones climate = GetClimateMaskForLandscape();
 	std::vector<uint32_t> sources;
 	sources.push_back(HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape));
+	for (LandscapeType c : {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) {
+		if (c != _settings_game.game_creation.landscape) sources.push_back(HOUSE_SOURCE_CLIMATE + to_underlying(c));
+	}
 	for (const auto &hs : HouseSpec::Specs()) {
 		if (!hs.enabled || hs.grf_prop.override_id != INVALID_HOUSE_ID || hs.grf_prop.grffile == nullptr) continue;
 		if (!hs.building_availability.Any(climate)) continue;

@@ -342,6 +342,7 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number = std::nullopt)
 
 uint32_t HouseSourceOf(const HouseSpec &hs);
 bool TownBuildsFrom(const Town *t, uint32_t source);
+bool TownBuildsHouse(const Town *t, const HouseSpec &hs, HouseZones here);
 std::vector<uint32_t> AvailableHouseSources();
 std::string HouseSourceName(uint32_t source);
 const CargoSpec *FindFirstCargoWithTownAcceptanceEffect(TownAcceptanceEffect effect);

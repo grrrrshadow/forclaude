@@ -1257,7 +1257,8 @@ static void MoveCalendarTo(TimerGameCalendar::Year year)
 }
 
 /**
- * A set of houses as the rig names it: "klima" for the climate's own houses,
+ * A set of houses as the rig names it: "klima" for the houses of the climate
+ * played, "mirne", "arktida", "poust" or "toyland" for a climate's houses,
  * "vse" for none chosen, or a GRF id the way the game prints it (4F474D05).
  * @param arg the name
  * @return the set, 0 for "vse", or nullopt when it names nothing
@@ -1266,6 +1267,10 @@ static std::optional<uint32_t> ParseHouseSource(std::string_view arg)
 {
 	if (arg == "vse") return 0;
 	if (arg == "klima") return HOUSE_SOURCE_CLIMATE + to_underlying(_settings_game.game_creation.landscape);
+	static const std::string_view CLIMATES[] = {"mirne", "arktida", "poust", "toyland"};
+	for (uint c = 0; c < std::size(CLIMATES); c++) {
+		if (arg == CLIMATES[c]) return HOUSE_SOURCE_CLIMATE + c;
+	}
 	auto id = ParseInteger<uint32_t>(arg, 16);
 	if (!id.has_value()) return std::nullopt;
 	return std::byteswap(*id);
@@ -1290,6 +1295,32 @@ static std::optional<TownID> ParseRigTown(std::string_view arg)
 }
 
 /**
+ * The house standing on a tile, by its north tile: the other tiles of a house
+ * of two or four have specs of their own that carry no climate, and would
+ * count as a house of nowhere.
+ * @param tile a house tile
+ * @return the spec of the whole house
+ */
+static const HouseSpec &HeadHouseSpec(TileIndex tile)
+{
+	HouseID house = GetHouseType(tile);
+	GetHouseNorthPart(house);
+	return *HouseSpec::Get(house);
+}
+
+/**
+ * Is this an original arctic house of the snowy kind, the one built above the
+ * snow line only? Outside the arctic there is no snow (yet), so none of these
+ * belongs there.
+ * @param hs the house
+ * @return whether it is one
+ */
+static bool IsSnowyOriginalHouse(const HouseSpec &hs)
+{
+	return hs.grf_prop.grffile == nullptr && hs.building_availability.Test(HouseZone::ClimateSubarcticAboveSnow) && !hs.building_availability.Test(HouseZone::ClimateSubarcticBelowSnow);
+}
+
+/**
  * Tell which sets of houses a town's house tiles come from.
  * @param town the town
  * @return "set:tiles" for each set, in the order they are first met
@@ -1299,7 +1330,7 @@ static std::string CountHousesBySource(TownID town)
 	std::vector<std::pair<uint32_t, uint>> counts;
 	for (TileIndex tile : Map::Iterate()) {
 		if (!IsTileType(tile, TileType::House) || GetTownIndex(tile) != town) continue;
-		uint32_t source = HouseSourceOf(*HouseSpec::Get(GetHouseType(tile)));
+		uint32_t source = HouseSourceOf(HeadHouseSpec(tile));
 		auto it = std::ranges::find(counts, source, &std::pair<uint32_t, uint>::first);
 		if (it == counts.end()) {
 			counts.emplace_back(source, 1);
@@ -1320,9 +1351,10 @@ static std::string CountHousesBySource(TownID town)
  *
  * - testdomy: the sets there are to choose from, and every town's choice and
  *   houses by set;
- * - testdomy mars: the Mars towns of a new map -- as many as the setting
- *   says when the game has the Mars houses, each all Mars, and no Mars house
- *   in any town of every house;
+ * - testdomy mapa (or mars): the themed towns of a new map -- of each other
+ *   climate as many as its setting says, Mars towns as theirs when the game
+ *   has the Mars houses, each all of its set, and no Mars house in any town
+ *   of every house;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
  * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
@@ -1342,12 +1374,13 @@ static std::string CountHousesBySource(TownID town)
 static bool ConTestHouseSets(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Themed towns. Usage: 'testdomy', 'testdomy mars', 'testdomy rok <rok>', 'testdomy okno <mesto> <sada>', 'testdomy rust <mesto> <kolikrat>', 'testdomy zaloz <x> <y> <sada>'.");
+		IConsolePrint(CC_HELP, "Themed towns. Usage: 'testdomy', 'testdomy mapa', 'testdomy rok <rok>', 'testdomy okno <mesto> <sada>', 'testdomy rust <mesto> <kolikrat>', 'testdomy zaloz <x> <y> <sada>'.");
 		return true;
 	}
 	if (argv.size() == 1) {
 		for (uint32_t source : AvailableHouseSources()) {
-			std::string id = source >= HOUSE_SOURCE_CLIMATE ? std::string{"klima"} : fmt::format("{:08X}", std::byteswap(source));
+			static const std::string_view CLIMATES[] = {"mirne", "arktida", "poust", "toyland"};
+			std::string id = source >= HOUSE_SOURCE_CLIMATE ? std::string{CLIMATES[std::min<uint>(source - HOUSE_SOURCE_CLIMATE, 3)]} : fmt::format("{:08X}", std::byteswap(source));
 			IConsolePrint(CC_DEFAULT, "testdomy: sada {} {}", id, HouseSourceName(source));
 		}
 		for (const Town *t : Town::Iterate()) {
@@ -1361,35 +1394,45 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		return true;
 	}
 
-	if (argv[1] == "mars") {
-		/* The Mars towns of a new map (economy.mars_towns): as many as the
-		 * setting says when the game has the Mars houses, none when not; each
-		 * of them all Mars; and no Mars house in a town of every house. */
+	if (argv[1] == "mars" || argv[1] == "mapa") {
+		/* The themed towns of a new map: of each other climate as many as its
+		 * setting says, and as many Mars towns as theirs when the game has the
+		 * Mars houses, none when not; each of them all of its set; and no Mars
+		 * house in a town of every house. */
 		std::vector<uint32_t> sources = AvailableHouseSources();
-		bool have = std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end();
-		uint mars_towns = 0;
+		bool have_mars = std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end();
+		const LandscapeType played = _settings_game.game_creation.landscape;
+		std::vector<std::pair<uint32_t, uint>> want;
+		if (played != LandscapeType::Temperate) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Temperate), _settings_game.economy.temperate_towns);
+		if (played != LandscapeType::Arctic) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic), _settings_game.economy.arctic_towns);
+		if (played != LandscapeType::Tropic) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Tropic), _settings_game.economy.tropic_towns);
+		if (played != LandscapeType::Toyland) want.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Toyland), _settings_game.economy.toyland_towns);
+		want.emplace_back(MARS_HOUSES_GRFID, have_mars ? _settings_game.economy.mars_towns : 0);
+
+		std::vector<uint> found(want.size(), 0);
 		for (const Town *t : Town::Iterate()) {
-			bool mars_town = t->num_house_sets == 1 && t->house_sets[0] == MARS_HOUSES_GRFID;
-			uint mars = 0, other = 0;
+			uint mars = 0, wrong = 0;
 			for (TileIndex tile : Map::Iterate()) {
 				if (!IsTileType(tile, TileType::House) || GetTownIndex(tile) != t->index) continue;
-				if (HouseSourceOf(*HouseSpec::Get(GetHouseType(tile))) == MARS_HOUSES_GRFID) {
-					mars++;
-				} else {
-					other++;
-				}
+				const HouseSpec &hs = HeadHouseSpec(tile);
+				if (HouseSourceOf(hs) == MARS_HOUSES_GRFID) mars++;
+				if (t->num_house_sets > 0 && !TownBuildsHouse(t, hs, {})) wrong++;
 			}
-			if (mars_town) {
-				mars_towns++;
-				IConsolePrint(CC_DEFAULT, "testdomy: marsovske mesto {} '{}': {} policek marsovskych domu, {} jinych", t->index.base(), t->GetCachedName(), mars, other);
-				if (other > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - marsovske mesto ma domy odjinud.");
+			if (t->num_house_sets == 1) {
+				for (size_t i = 0; i < want.size(); i++) {
+					if (want[i].first != t->house_sets[0]) continue;
+					found[i]++;
+					IConsolePrint(CC_DEFAULT, "testdomy: tematicke mesto {} '{}' z [{}]: stoji {}", t->index.base(), t->GetCachedName(), HouseSourceName(t->house_sets[0]), CountHousesBySource(t->index));
+					if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - tematicke mesto {} ma {} policek domu odjinud.", t->index.base(), wrong);
+				}
 			} else if (t->num_house_sets == 0 && mars > 0) {
 				IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mesto {} vsech domu postavilo {} policek marsovskych domu.", t->index.base(), mars);
 			}
 		}
-		uint want = have ? _settings_game.economy.mars_towns : 0;
-		IConsolePrint(CC_DEFAULT, "testdomy: marsovske domy {}, marsovskych mest {} z {}", have ? "ve hre" : "nejsou", mars_towns, want);
-		if (mars_towns != want) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - marsovskych mest ma byt {}.", want);
+		for (size_t i = 0; i < want.size(); i++) {
+			IConsolePrint(CC_DEFAULT, "testdomy: mest z [{}]: {} z {}", HouseSourceName(want[i].first), found[i], want[i].second);
+			if (found[i] != want[i].second) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mest z [{}] ma byt {}.", HouseSourceName(want[i].first), want[i].second);
+		}
 		return true;
 	}
 
@@ -1442,14 +1485,17 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		AutoRestoreBackup cur_company(_current_company, OWNER_DEITY);
 		Command<Commands::ExpandTown>::Do(DoCommandFlag::Execute, town, static_cast<uint32_t>(*pn), {TownExpandMode::Buildings, TownExpandMode::Roads});
 		const Town *t = Town::Get(town);
-		uint built = 0, wrong = 0;
+		uint built = 0, wrong = 0, snowy = 0;
 		for (TileIndex tile : Map::Iterate()) {
 			if (before[tile.base()] || !IsTileType(tile, TileType::House) || GetTownIndex(tile) != town) continue;
 			built++;
-			if (t->num_house_sets > 0 && !TownBuildsFrom(t, HouseSourceOf(*HouseSpec::Get(GetHouseType(tile))))) wrong++;
+			const HouseSpec &hs = HeadHouseSpec(tile);
+			if (t->num_house_sets > 0 && !TownBuildsHouse(t, hs, {})) wrong++;
+			if (IsSnowyOriginalHouse(hs)) snowy++;
 		}
 		IConsolePrint(CC_DEFAULT, "testdomy: mesto {} postavilo {} policek domu, stoji {}", town.base(), built, CountHousesBySource(town));
 		if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} policek domu z jine sady, nez ma mesto zvolene.", wrong);
+		if (snowy > 0 && _settings_game.game_creation.landscape != LandscapeType::Arctic) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} policek zasnezenych domu, a snih tu neni.", snowy);
 		return true;
 	}
 
@@ -1499,7 +1545,7 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		uint wrong = 0;
 		for (TileIndex tile : Map::Iterate()) {
 			if (!IsTileType(tile, TileType::House) || GetTownIndex(tile) != t->index) continue;
-			if (*psource != 0 && HouseSourceOf(*HouseSpec::Get(GetHouseType(tile))) != *psource) wrong++;
+			if (*psource != 0 && !TownBuildsHouse(t, HeadHouseSpec(tile), {})) wrong++;
 		}
 		IConsolePrint(CC_DEFAULT, "testdomy: zalozeno mesto {} s {} sadami, stoji {}", t->index.base(), t->num_house_sets, CountHousesBySource(t->index));
 		if (*psource != 0 && !TownBuildsFrom(t, *psource)) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - mesto nema zvolenou sadu, ze ktere bylo zalozeno.");

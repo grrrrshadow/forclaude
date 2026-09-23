@@ -62,7 +62,10 @@ houses stay out of every town not told to build from them, so the scenes'
 maps come out as without it. The Mars towns themselves are off in the
 battery's new games (`economy.mars_towns 0`, which also keeps the game from
 reaching for the content server to fetch the set); `marsmesta` and
-`marsmestacz` turn them on through `SCENE_NEWGAME`.
+`marsmestacz` turn them on through `SCENE_NEWGAME`, as `klimamesta` does the
+towns of the other climates' houses (`economy.temperate_towns` and the
+three like it), which need no set at all: the houses of all four climates are
+in the base graphics.
 
 ## Memory errors: the rig does not see them
 

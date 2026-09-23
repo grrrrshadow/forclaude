@@ -2201,6 +2201,14 @@ STR_CONFIG_SETTING_LARGER_TOWNS_VALUE                           :1 in {COMMA}
 STR_CONFIG_SETTING_LARGER_TOWNS_DISABLED                        :None
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER                         :Initial city size multiplier: {STRING2}
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Average size of cities relative to normal towns at start of the game
+STR_CONFIG_SETTING_TEMPERATE_TOWNS                              :Temperate towns: {STRING2}
+STR_CONFIG_SETTING_TEMPERATE_TOWNS_HELPTEXT                     :How many small towns of the temperate houses a new map gets among its other towns. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
+STR_CONFIG_SETTING_ARCTIC_TOWNS                                 :Arctic towns: {STRING2}
+STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :How many small towns of the arctic houses a new map gets among its other towns; the snowy ones only where there is snow. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
+STR_CONFIG_SETTING_TROPIC_TOWNS                                 :Desert towns: {STRING2}
+STR_CONFIG_SETTING_TROPIC_TOWNS_HELPTEXT                        :How many small towns of the desert houses a new map gets among its other towns. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
+STR_CONFIG_SETTING_TOYLAND_TOWNS                                :Toyland towns: {STRING2}
+STR_CONFIG_SETTING_TOYLAND_TOWNS_HELPTEXT                       :How many small towns of the toyland houses a new map gets among its other towns. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
 STR_CONFIG_SETTING_MARS_TOWNS                                   :Mars towns: {STRING2}
 STR_CONFIG_SETTING_MARS_TOWNS_HELPTEXT                          :How many small towns of the Mars houses a new map gets among its other towns. Their houses come from OpenGFX Mars Houses, which the game downloads by itself when it does not have them; without them no Mars town is made. Mars houses go up only in Mars towns -- any other town can be made one in its town window ("Houses from")
 STR_CONFIG_SETTING_TOWN_MIN_DISTANCE                            :Minimum distance between towns: {STRING2}
