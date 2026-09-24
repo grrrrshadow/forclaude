@@ -1,0 +1,81 @@
+/*
+ * One of two tiny cargo sets that the scene nakladysdilene plays together
+ * (see README.md). Each switches the game's cargoes off and brings three
+ * cargoes of its own under the ids 0, 1 and 2 -- the same ids, as every set
+ * numbers its cargoes from 0. This one: passengers, a cargo of its own (RIGB) and coal, the
+ * two shared ones under other ids than in the first set.
+ *
+ *     nmlc -c -l grf/lang --grf cargo_b.grf grf/cargo_b.nml
+ */
+grf {
+	grfid: "RIGb";
+	name: string(STR_B_NAME);
+	desc: string(STR_B_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+disable_item(FEAT_CARGOS);
+
+item(FEAT_CARGOS, b_pass, 0) {
+	property {
+		number: 0;
+		type_name: string(STR_B_PASS);
+		unit_name: string(STR_B_PASS);
+		type_abbreviation: string(STR_B_PASS);
+		units_of_cargo: string(STR_B_PASS);
+		items_of_cargo: string(STR_B_PASS);
+		weight: 1;
+		is_freight: 0;
+		cargo_classes: bitmask(CC_PASSENGERS);
+		cargo_label: "PASS";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}
+
+item(FEAT_CARGOS, b_rigb, 1) {
+	property {
+		number: 1;
+		type_name: string(STR_B_RIGB);
+		unit_name: string(STR_B_RIGB);
+		type_abbreviation: string(STR_B_RIGB);
+		units_of_cargo: string(STR_B_RIGB);
+		items_of_cargo: string(STR_B_RIGB);
+		weight: 1;
+		is_freight: 1;
+		cargo_classes: bitmask(CC_BULK);
+		cargo_label: "RIGB";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}
+
+item(FEAT_CARGOS, b_coal, 2) {
+	property {
+		number: 2;
+		type_name: string(STR_B_COAL);
+		unit_name: string(STR_B_COAL);
+		type_abbreviation: string(STR_B_COAL);
+		units_of_cargo: string(STR_B_COAL);
+		items_of_cargo: string(STR_B_COAL);
+		weight: 1;
+		is_freight: 1;
+		cargo_classes: bitmask(CC_BULK);
+		cargo_label: "COAL";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}

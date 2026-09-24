@@ -219,6 +219,43 @@ line (zaznam=1) is the game saying the set gave up. Without the second
 reading the count is 1, and before the ship was taught to check its cargo
 the scene ended in the assertion.
 
+## Two cargo sets that bring the same cargoes
+
+`grf/cargo_a.nml` and `grf/cargo_b.nml` (strings in `grf/lang/english.lng`)
+each switch the game's cargoes off and bring three cargoes under the ids 0,
+1 and 2: A passengers, coal and RIGA; B passengers, RIGB and coal. Every set
+numbers its cargoes from 0, so before the cargo slots of
+newgrf_act0_cargo.cpp the second set wrote over the first one's and its own
+cargo was gone -- the reason industry sets refuse one another.
+
+    nmlc -c -l grf/lang --grf cargo_a.grf grf/cargo_a.nml
+    nmlc -c -l grf/lang --grf cargo_b.grf grf/cargo_b.nml
+    cp cargo_a.grf cargo_b.grf <rig home>/.openttd/newgrf/
+
+for every home. The scenes `nakladysdilene` (A, then B) and
+`nakladysdilene2` (B, then A) ask `testnaklady` for 5 cargoes -- the shared
+passengers and coal, both sets' own and the road-vehicle cargo -- and for
+the names of the set that came last on the shared ones: a later set writes
+its properties over a cargo it shares, as sets always did, and ECS counts on
+it.
+
+## A set that refuses another
+
+`grf/refuses_a.nml` refuses cargo set A the way industry sets refuse one
+another -- an Action 9 on A's status, and a fatal error three sprites later
+-- and otherwise brings a cargo of its own, RIGR, under the id of A's
+passengers.
+
+    nmlc -c -l grf/lang --grf refuses_a.grf grf/refuses_a.nml
+    cp refuses_a.grf <rig home>/.openttd/newgrf/
+
+`grfodmita` plays A and this set with economy.newgrf_side_by_side on (the
+default): the game reads the sets again with A hidden from the set's check
+(LoadNewGRF()), and `testnaklady` asks for A's three cargoes, RIGR and the
+road-vehicle cargo; the record line (zaznam=1) says who refused whom.
+`grfodmitavyp` plays the same with the setting off: the set is switched off
+as ever and RIGR is not in the game.
+
 ## A lorry with a trailer, which needs the player's own sets
 
 The game's own road vehicles are all one piece, so nothing in a plain rig

@@ -273,11 +273,19 @@ struct CargoMapSpriteGroupHandler : MapSpriteGroupHandler {
 	{
 		if (local_id >= NUM_CARGO) {
 			GrfMsg(1, "CargoMapSpriteGroup: Cargo type {} out of range, skipping", local_id);
-		} else {
-			CargoSpec *cs = CargoSpec::Get(local_id);
-			cs->grffile = _cur_gps.grffile;
-			cs->group = group;
+			return;
 		}
+		/* The set's cargo id is its own, not the slot (PrepareCargoBlock()): a
+		 * cargo that went into another slot takes its graphics there, and a
+		 * cargo of another set the id does not lead to is left alone. */
+		CargoType slot = CargoSlotForSpriteGroup(local_id);
+		if (!IsValidCargoType(slot)) {
+			GrfMsg(2, "CargoMapSpriteGroup: Cargo type {} belongs to another set, skipping", local_id);
+			return;
+		}
+		CargoSpec *cs = CargoSpec::Get(slot);
+		cs->grffile = _cur_gps.grffile;
+		cs->group = group;
 	}
 };
 

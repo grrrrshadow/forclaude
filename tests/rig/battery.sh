@@ -1337,3 +1337,31 @@ run_scene naklady "testnaklady" 100
 QUITS_CFG=$S/quits_openttd.cfg
 sed '/^\[newgrf\]$/a quits_late.grf = ' "$CFG_KEEP" > $QUITS_CFG
 run_scene grfvzdalo "testnaklady 13" 100 -c $QUITS_CFG
+
+# Two cargo sets side by side (grf/cargo_a.nml, grf/cargo_b.nml, README.md):
+# each switches the game's cargoes off and brings three cargoes under the ids
+# 0, 1 and 2, passengers and coal among them. The second set shares the first
+# one's passengers and coal, writing its own properties over them as sets
+# always did (ECS counts on it), and its own cargo goes into a free slot (the
+# cargo slots of newgrf_act0_cargo.cpp): passengers, coal, both sets' own
+# cargo and the road-vehicle cargo, 5. Before, the second set wrote over the
+# first one's slots and the game had 4, the first set's own cargo gone. Played
+# in both orders, the names saying the shared cargoes are the later set's.
+SDIL_CFG=$S/sdilene_openttd.cfg
+sed -e '/^\[newgrf\]$/a cargo_a.grf = ' -e '/^\[newgrf\]$/a cargo_b.grf = ' "$CFG_KEEP" > $SDIL_CFG
+run_scene nakladysdilene "testnaklady 5 PassengersB CoalB RigCargoA RigCargoB !PassengersA !CoalA" 100 -c $SDIL_CFG
+SDIL2_CFG=$S/sdilene2_openttd.cfg
+sed -e '/^\[newgrf\]$/a cargo_b.grf = ' -e '/^\[newgrf\]$/a cargo_a.grf = ' "$CFG_KEEP" > $SDIL2_CFG
+run_scene nakladysdilene2 "testnaklady 5 PassengersA CoalA RigCargoA RigCargoB !PassengersB !CoalB" 100 -c $SDIL2_CFG
+
+# A set that refuses another the way industry sets do (grf/refuses_a.nml):
+# it asks whether cargo set A is there, stops with a fatal error if it is,
+# and otherwise brings a cargo of its own under A's passengers' id. With
+# economy.newgrf_side_by_side on (the default) the game reads the sets again
+# with A hidden from its check, and both run: A's three cargoes, RIGR in a
+# free slot and the road-vehicle cargo, 5; the record line says who refused
+# whom. Off, the set is switched off as ever: A's three and road vehicles, 4.
+ODMITA_CFG=$S/odmita_openttd.cfg
+sed -e '/^\[newgrf\]$/a cargo_a.grf = ' -e '/^\[newgrf\]$/a refuses_a.grf = ' "$CFG_KEEP" > $ODMITA_CFG
+run_scene grfodmita "testnaklady 5 PassengersA CoalA RigCargoA RigCargoR" 100 -c $ODMITA_CFG
+SCENE_NEWGAME='setting_newgame economy.newgrf_side_by_side false' run_scene grfodmitavyp "testnaklady 4 PassengersA CoalA RigCargoA !RigCargoR" 100 -c $ODMITA_CFG

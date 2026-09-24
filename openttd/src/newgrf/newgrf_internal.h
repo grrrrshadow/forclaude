@@ -240,4 +240,11 @@ void GRFUnsafe(ByteReader &);
 
 void InitializePatchFlags();
 
+void ResetCargoSlots();
+void ResetRefusals(const std::vector<std::pair<uint32_t, uint32_t>> &hidden);
+void NoteFatalError();
+const GRFConfig *RefusedBy(const GRFConfig *asker);
+void PrepareCargoBlock(uint first, uint numinfo, uint numprops, ByteReader buf);
+CargoType CargoSlotForSpriteGroup(uint local_id);
+
 #endif /* NEWGRF_INTERNAL_H */

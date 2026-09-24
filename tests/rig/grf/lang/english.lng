@@ -2,3 +2,17 @@
 STR_GRF_NAME                                                    :Rig: quits late
 STR_GRF_DESC                                                    :Switches every default cargo off and then gives up with a fatal error, the way a set does that checks for other sets only after it has changed things.
 STR_GIVES_UP                                                    :Gives up on purpose, after switching the cargoes off.
+STR_A_NAME                                                      :Rig: cargo set A
+STR_A_DESC                                                      :Switches the game's cargoes off and brings passengers, coal and RIGA under the ids 0, 1 and 2.
+STR_A_PASS                                                      :PassengersA
+STR_A_COAL                                                      :CoalA
+STR_A_RIGA                                                      :RigCargoA
+STR_B_NAME                                                      :Rig: cargo set B
+STR_B_DESC                                                      :Switches the game's cargoes off and brings passengers, RIGB and coal under the ids 0, 1 and 2.
+STR_B_PASS                                                      :PassengersB
+STR_B_RIGB                                                      :RigCargoB
+STR_B_COAL                                                      :CoalB
+STR_R_NAME                                                      :Rig: refuses set A
+STR_R_DESC                                                      :Stops with a fatal error when cargo set A is loaded, then brings RIGR under the id 0.
+STR_R_REFUSES                                                   :Refuses cargo set A on purpose.
+STR_R_RIGR                                                      :RigCargoR

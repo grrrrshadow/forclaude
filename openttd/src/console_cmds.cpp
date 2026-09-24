@@ -1458,13 +1458,16 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
  * scene plays with the dozen a climate has. Given a count, the game has to
  * have that many cargoes: the scene grfvzdalo plays a set that switches the
  * cargoes off and then gives up, and asks for the climate's dozen back.
- * Usage: testnaklady [pocet]
+ * Names after the count have to be in the list of cargoes, a name with a !
+ * in front must not be: the scene nakladysdilene plays two sets that bring
+ * the same cargoes, and the names say whose cargo each shared one is.
+ * Usage: testnaklady [pocet [jmeno|!jmeno ...]]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestCargoTypes(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Put the 128-cargo set through its paces. Usage: 'testnaklady [pocet]', refusing when the game has another number of cargoes.");
+		IConsolePrint(CC_HELP, "Put the 128-cargo set through its paces. Usage: 'testnaklady [pocet [jmeno|!jmeno ...]]', refusing when the game has another number of cargoes, or a name is missing from the list (or, with !, in it).");
 		return true;
 	}
 	bool ok = true;
@@ -1514,6 +1517,16 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 		}
 		if (present.Count() != *expected) fail(fmt::format("ve hre je {} nakladu, ceka se {}", present.Count(), *expected));
 	}
+	for (size_t i = 2; i < argv.size(); i++) {
+		std::string_view name = argv[i];
+		bool must_not = name.starts_with('!');
+		if (must_not) name.remove_prefix(1);
+		bool found = false;
+		for (const CargoSpec *cs : CargoSpec::Iterate()) {
+			if (GetString(cs->name) == name) found = true;
+		}
+		if (found == must_not) fail(must_not ? fmt::format("naklad {} ve hre je, nema byt", name) : fmt::format("naklad {} ve hre neni", name));
+	}
 	auto params = MakeParameters(present);
 	std::string encoded = GetEncodedStringWithArgs(STR_JUST_CARGO_LIST, params).GetDecodedString();
 	if (encoded != listed) fail(fmt::format("encoded string dal '{}'", encoded));
@@ -1527,6 +1540,16 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 	CargoMonitorID low = EncodeCargoIndustryMonitor(static_cast<CompanyID>(2), cargo(33), static_cast<IndustryID>(7));
 	uint32_t as_before = 7 | (1u << 16) | (33u << 19) | (2u << 25);
 	if (low != as_before || DecodeMonitorCargoType(low) != cargo(33) || DecodeMonitorIndustry(low) != static_cast<IndustryID>(7)) fail("cislo monitoru pro naklad 33 se zmenilo");
+
+	/* Whose industries stand on the map: with sets side by side, every set's. */
+	std::map<uint32_t, uint> by_set;
+	for (const Industry *ind : Industry::Iterate()) by_set[GetIndustrySpec(ind->type)->grf_prop.grfid]++;
+	std::string industries;
+	for (const auto &[grfid, count] : by_set) {
+		const GRFConfig *c = grfid == 0 ? nullptr : GetGRFConfig(grfid);
+		industries += fmt::format("{}{} {}", industries.empty() ? "" : ", ", c == nullptr ? std::string{"hra"} : c->GetName(), count);
+	}
+	IConsolePrint(CC_DEFAULT, "testnaklady: prumysly na mape: {}", industries.empty() ? std::string{"zadne"} : industries);
 
 	IConsolePrint(CC_DEFAULT, "testnaklady: NUM_CARGO {}, {}.", to_underlying(NUM_CARGO), ok ? "vse v poradku" : "s chybami");
 	return true;

@@ -42,6 +42,7 @@
 #include "error_func.h"
 #include "vehicle_base.h"
 #include "anomaly_log.h"
+#include "strings_func.h"
 #include "road.h"
 #include "newgrf_roadstop.h"
 #include "newgrf_signals.h"
@@ -493,6 +494,7 @@ void ResetNewGRFData()
 
 	/* Set up the default cargo types */
 	SetupCargoForClimate(_settings_game.game_creation.landscape);
+	ResetCargoSlots();
 
 	/* Reset misc GRF features and train list display variables */
 	_misc_grf_features = {};
@@ -2314,7 +2316,7 @@ static void AfterLoadGRFs()
  * @param load_index The offset for the first sprite to add.
  * @param num_baseset Number of NewGRFs at the front of the list to look up in the baseset dir instead of the newgrf dir.
  */
-bool LoadNewGRF(SpriteID load_index, uint num_baseset, std::vector<const GRFConfig *> &gave_up)
+bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds)
 {
 	/* In case of networking we need to "sync" the start values
 	 * so all NewGRFs are loaded equally. For this we use the
@@ -2349,10 +2351,12 @@ bool LoadNewGRF(SpriteID load_index, uint num_baseset, std::vector<const GRFConf
 	/* The reset below clears every set's errors, and a set that gave up in
 	 * an earlier round of this loading would lose the message saying why it
 	 * is off. */
+	const auto &gave_up = rounds.gave_up;
 	std::vector<std::pair<GRFConfig *, std::vector<GRFError>>> kept_errors;
 	for (const auto &c : _grfconfig) {
 		if (std::ranges::find(gave_up, c.get()) != gave_up.end()) kept_errors.emplace_back(c.get(), c->errors);
 	}
+	ResetRefusals(rounds.hidden);
 
 	ResetNewGRFData();
 
@@ -2497,14 +2501,47 @@ bool LoadNewGRF(SpriteID load_index, uint num_baseset, std::vector<const GRFConf
 	 * up, and beside XIS it left the game with no cargoes at all. Nothing
 	 * takes a set's changes back one by one, so the caller reads everything
 	 * again without it (GfxLoadSprites()). A set that was never read --
-	 * one too many for the game -- changed nothing and needs no new round. */
+	 * one too many for the game -- changed nothing and needs no new round.
+	 *
+	 * A set that gave up because another set is loaded -- it asked whether
+	 * that set is there and stopped with a fatal error a few sprites later,
+	 * the way every nml industry set refuses the others -- is read again
+	 * instead, with that set and the rest of its family hidden from its
+	 * checks (economy.newgrf_side_by_side). Industry sets refuse one another
+	 * because each wrote over the other's cargoes, and here they do not
+	 * (the cargo slots of newgrf_act0_cargo.cpp). Every such round hides a
+	 * family more from a set, and the families are finite, so it ends. */
 	bool again = false;
 	for (const auto &c : _grfconfig) {
 		if (c->status != GRFStatus::Disabled) continue;
 		if (std::ranges::find(off_before, c.get()) != off_before.end()) continue;
 		if (std::ranges::any_of(c->errors, [](const GRFError &e) { return e.message == STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED; })) continue;
-		LogAnomaly("Sada {} se vypnula az behem nacitani, kdyz uz mohla neco zmenit - sady se nacitaji znovu bez ni.", c->GetName());
-		gave_up.push_back(c.get());
+
+		const GRFConfig *refused = _settings_game.economy.newgrf_side_by_side ? RefusedBy(c.get()) : nullptr;
+		if (refused != nullptr) {
+			std::pair<uint32_t, uint32_t> hide{c->ident.grfid, refused->ident.grfid & GRFID_FAMILY_MASK};
+			if (std::ranges::find(rounds.hidden, hide) == rounds.hidden.end()) {
+				LogAnomaly("Sada {} odmitla sadu {} - pri dalsim cteni ji a sady z jeji rodiny ({:06X}xx) neuvidi.", c->GetName(), refused->GetName(), std::byteswap(refused->ident.grfid) >> 8);
+				rounds.hidden.push_back(hide);
+				again = true;
+				continue;
+			}
+		}
+
+		/* Why, in the words the NewGRF window uses, so the record says it too. */
+		std::string reason;
+		if (!c->errors.empty()) {
+			const GRFError &error = c->errors.back();
+			std::array<StringParameter, 3 + std::tuple_size_v<decltype(error.param_value)>> params{};
+			auto it = params.begin();
+			*it++ = error.custom_message;
+			*it++ = c->filename;
+			*it++ = error.data;
+			for (const uint32_t &value : error.param_value) *it++ = value;
+			reason = GetStringWithArgs(error.message != STR_NULL ? error.message : STR_JUST_RAW_STRING, {params.begin(), it});
+		}
+		LogAnomaly("Sada {} se vypnula az behem nacitani, kdyz uz mohla neco zmenit - sady se nacitaji znovu bez ni. Duvod: {}", c->GetName(), reason);
+		rounds.gave_up.push_back(c.get());
 		again = true;
 	}
 	return again;

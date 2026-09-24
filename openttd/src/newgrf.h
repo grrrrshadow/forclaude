@@ -313,7 +313,16 @@ inline bool HasGrfMiscBit(GrfMiscBit bit)
 extern GRFLoadedFeatures _loaded_newgrf_features;
 
 void LoadNewGRFFile(GRFConfig &config, GrfLoadingStage stage, Subdirectory subdir, bool temporary);
-bool LoadNewGRF(SpriteID load_index, uint num_baseset, std::vector<const GRFConfig *> &gave_up);
+/** What one reading of the NewGRFs hands the next one, when a set gave up during it (GfxLoadSprites()). */
+struct NewGRFLoadRounds {
+	std::vector<const GRFConfig *> gave_up; ///< Sets that gave up while being read, kept off.
+	std::vector<std::pair<uint32_t, uint32_t>> hidden; ///< Sets hidden from a set's checks: the set's GRF ID, and the first three bytes of the GRF IDs hidden from it (GRFID_FAMILY_MASK).
+};
+
+/** The part of a GRF ID (internal byte order) that its family shares: the first three bytes as the game shows it, the last one the set's number. */
+static constexpr uint32_t GRFID_FAMILY_MASK = 0x00FFFFFF;
+
+bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds);
 void ReloadNewGRFData(); // in saveload/afterload.cpp
 void ResetNewGRFData();
 void ResetPersistentNewGRFData();

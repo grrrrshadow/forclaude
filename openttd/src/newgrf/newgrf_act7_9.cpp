@@ -22,6 +22,76 @@
 #include "../safeguards.h"
 
 /**
+ * Sets that refuse one another (economy.newgrf_side_by_side, LoadNewGRF()).
+ *
+ * An industry set checks whether any of a list of other sets is there and
+ * stops with a fatal error if one is: nml writes it as an Action 9 on the
+ * other set's status and the error a few sprites after. The last such check
+ * that found the other set is remembered, and a fatal error that follows it
+ * closely is taken as the set refusing that one. The next reading hides the
+ * refused set and its family from the set's checks, from the pairs it is
+ * handed here.
+ */
+struct Refusals {
+	const std::vector<std::pair<uint32_t, uint32_t>> *hidden = nullptr; ///< Sets hidden from a set's checks, this reading.
+	const GRFConfig *asker = nullptr; ///< The set that made the last check that found another set.
+	const GRFConfig *found = nullptr; ///< The set that check found.
+	uint32_t nfo_line = 0; ///< The sprite of that check.
+	std::vector<std::pair<const GRFConfig *, const GRFConfig *>> refused; ///< This reading's refusals: the set, and the set it refused.
+};
+
+static Refusals _refusals;
+
+/** How many sprites after the check a fatal error still counts as its answer: nml puts two in between. */
+static constexpr uint32_t REFUSAL_REACH = 8;
+
+/**
+ * Start a reading of the NewGRFs.
+ * @param hidden Sets hidden from a set's checks: the set's GRF ID and the first three bytes of the hidden ones'.
+ */
+void ResetRefusals(const std::vector<std::pair<uint32_t, uint32_t>> &hidden)
+{
+	_refusals = {};
+	_refusals.hidden = &hidden;
+}
+
+/**
+ * Is a set hidden from another set's checks because it refused it before?
+ * @param asker The set checking.
+ * @param target The set checked for.
+ * @return Whether the target is to be reported absent.
+ */
+static bool IsHiddenByRefusal(GrfID asker, GrfID target)
+{
+	if (_refusals.hidden == nullptr) return false;
+	for (const auto &[set, family] : *_refusals.hidden) {
+		if (set == asker && (target & GRFID_FAMILY_MASK) == family) return true;
+	}
+	return false;
+}
+
+/** A fatal error of the current set: if it closely follows a check that found another set, the set refused that one. */
+void NoteFatalError()
+{
+	if (_refusals.asker != _cur_gps.grfconfig || _refusals.found == nullptr) return;
+	if (_cur_gps.nfo_line - _refusals.nfo_line > REFUSAL_REACH) return;
+	_refusals.refused.emplace_back(_cur_gps.grfconfig, _refusals.found);
+}
+
+/**
+ * The set a set refused in this reading.
+ * @param asker The set that gave up.
+ * @return The set it refused, or nullptr when it gave up for something else.
+ */
+const GRFConfig *RefusedBy(const GRFConfig *asker)
+{
+	for (const auto &[set, other] : _refusals.refused) {
+		if (set == asker) return other;
+	}
+	return nullptr;
+}
+
+/**
  * FIRS carries a hardcoded list of "incompatible" GRFs and disables itself with a
  * fatal E01 error when one of them is loaded; the CZTR Engines sets are on that
  * list because they define their own cargos. In this build the CZTR cargos are
@@ -36,6 +106,8 @@
  */
 static bool HideGrfFromIncompatibilityCheck(GrfID asker, GrfID target)
 {
+	if (IsHiddenByRefusal(asker, target)) return true;
+
 	/* Constants below are in the byte order shown in-game / on BaNaNaS. */
 	uint32_t asker_display = std::byteswap(asker);
 	if ((asker_display & 0xFFFFFF00) != 0xF1250000) return false; // FIRS, any version byte
@@ -296,6 +368,13 @@ static void SkipIf(ByteReader &buf)
 		if (condtype != 10 && c == nullptr) {
 			GrfMsg(7, "SkipIf: GRFID 0x{:08X} unknown, skipping test", std::byteswap(cond_val));
 			return;
+		}
+
+		/* Remember a check that found another set there, for NoteFatalError(). */
+		if (c != nullptr && c != _cur_gps.grfconfig && c->status != GRFStatus::Disabled && c->status != GRFStatus::NotFound) {
+			_refusals.asker = _cur_gps.grfconfig;
+			_refusals.found = c;
+			_refusals.nfo_line = _cur_gps.nfo_line;
 		}
 
 		switch (condtype) {

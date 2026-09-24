@@ -169,10 +169,10 @@ static std::unique_ptr<GRFConfig> GetBasesetExtraGRFConfig()
 
 /**
  * Actually load the sprite tables.
- * @param gave_up the NewGRFs that gave up in an earlier round of this loading, kept off; one that gives up in this round is added
- * @return whether a NewGRF gave up and everything has to be loaded again without it
+ * @param rounds what the earlier rounds of this loading found (LoadNewGRF())
+ * @return whether a NewGRF gave up and everything has to be loaded again
  */
-static bool LoadSpriteTables(std::vector<const GRFConfig *> &gave_up)
+static bool LoadSpriteTables(NewGRFLoadRounds &rounds)
 {
 	const GraphicsSet *used_set = BaseGraphics::GetUsedSet();
 
@@ -215,7 +215,7 @@ static bool LoadSpriteTables(std::vector<const GRFConfig *> &gave_up)
 	_grfconfig.insert(std::begin(_grfconfig), std::move(default_extra));
 	_grfconfig.insert(std::next(std::begin(_grfconfig)), std::move(baseset_extra));
 
-	bool again = LoadNewGRF(SPR_NEWGRFS_BASE, 2, gave_up);
+	bool again = LoadNewGRF(SPR_NEWGRFS_BASE, 2, rounds);
 
 	/* Only the extra sprites the game has upstream are a base set's to
 	 * supply. This build's own extra sprites -- its icons for coupling,
@@ -351,15 +351,18 @@ void GfxLoadSprites()
 	 * changed the game (LoadNewGRF()); everything is then read again from
 	 * the start without it, the base graphics too, the way a change to the
 	 * list of NewGRFs is -- a new round of the NewGRFs alone on top of the
-	 * last round's sprites broke the sprite memory with XIS. Every round but
-	 * the last puts one more NewGRF off, so it ends; with no NewGRF giving
-	 * up there is one round, as ever. */
-	std::vector<const GRFConfig *> gave_up;
+	 * last round's sprites broke the sprite memory with XIS. A NewGRF that
+	 * gave up only because another one is loaded is read again instead, with
+	 * the other hidden from its check (economy.newgrf_side_by_side). Every
+	 * round but the last puts one more NewGRF off or hides one more family
+	 * of them, so it ends; with no NewGRF giving up there is one round, as
+	 * ever. */
+	NewGRFLoadRounds rounds;
 	do {
 		VideoDriver::GetInstance()->ClearSystemSprites();
 		FontCache::ClearFontCaches(FONTSIZES_ALL);
 		GfxInitSpriteMem();
-	} while (LoadSpriteTables(gave_up));
+	} while (LoadSpriteTables(rounds));
 	GfxInitPalettes();
 
 	UpdateCursorSize();

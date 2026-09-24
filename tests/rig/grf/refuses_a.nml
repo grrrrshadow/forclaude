@@ -1,0 +1,43 @@
+/*
+ * A tiny set that refuses cargo set A (cargo_a.nml) the way industry sets
+ * refuse one another: it asks whether A is there and stops with a fatal
+ * error if it is. Then it brings a cargo of its own, RIGR, under the id 0 --
+ * the id of A's passengers. With economy.newgrf_side_by_side on the game
+ * reads the sets again with A hidden from this set's check (LoadNewGRF())
+ * and both run; off, this set is switched off. Scenes grfodmita and
+ * grfodmitavyp, see README.md.
+ *
+ *     nmlc -c -l grf/lang --grf refuses_a.grf grf/refuses_a.nml
+ */
+grf {
+	grfid: "RIGr";
+	name: string(STR_R_NAME);
+	desc: string(STR_R_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+if (grf_future_status("RIGa")) {
+	error(FATAL, string(STR_R_REFUSES));
+}
+
+item(FEAT_CARGOS, r_rigr, 0) {
+	property {
+		number: 0;
+		type_name: string(STR_R_RIGR);
+		unit_name: string(STR_R_RIGR);
+		type_abbreviation: string(STR_R_RIGR);
+		units_of_cargo: string(STR_R_RIGR);
+		items_of_cargo: string(STR_R_RIGR);
+		weight: 1;
+		is_freight: 1;
+		cargo_classes: bitmask(CC_BULK);
+		cargo_label: "RIGR";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}

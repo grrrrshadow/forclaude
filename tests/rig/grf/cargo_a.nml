@@ -1,0 +1,80 @@
+/*
+ * One of two tiny cargo sets that the scene nakladysdilene plays together
+ * (see README.md). Each switches the game's cargoes off and brings three
+ * cargoes of its own under the ids 0, 1 and 2 -- the same ids, as every set
+ * numbers its cargoes from 0. This one: passengers, coal and a cargo of its own (RIGA).
+ *
+ *     nmlc -c -l grf/lang --grf cargo_a.grf grf/cargo_a.nml
+ */
+grf {
+	grfid: "RIGa";
+	name: string(STR_A_NAME);
+	desc: string(STR_A_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+disable_item(FEAT_CARGOS);
+
+item(FEAT_CARGOS, a_pass, 0) {
+	property {
+		number: 0;
+		type_name: string(STR_A_PASS);
+		unit_name: string(STR_A_PASS);
+		type_abbreviation: string(STR_A_PASS);
+		units_of_cargo: string(STR_A_PASS);
+		items_of_cargo: string(STR_A_PASS);
+		weight: 1;
+		is_freight: 0;
+		cargo_classes: bitmask(CC_PASSENGERS);
+		cargo_label: "PASS";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}
+
+item(FEAT_CARGOS, a_coal, 1) {
+	property {
+		number: 1;
+		type_name: string(STR_A_COAL);
+		unit_name: string(STR_A_COAL);
+		type_abbreviation: string(STR_A_COAL);
+		units_of_cargo: string(STR_A_COAL);
+		items_of_cargo: string(STR_A_COAL);
+		weight: 1;
+		is_freight: 1;
+		cargo_classes: bitmask(CC_BULK);
+		cargo_label: "COAL";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}
+
+item(FEAT_CARGOS, a_riga, 2) {
+	property {
+		number: 2;
+		type_name: string(STR_A_RIGA);
+		unit_name: string(STR_A_RIGA);
+		type_abbreviation: string(STR_A_RIGA);
+		units_of_cargo: string(STR_A_RIGA);
+		items_of_cargo: string(STR_A_RIGA);
+		weight: 1;
+		is_freight: 1;
+		cargo_classes: bitmask(CC_BULK);
+		cargo_label: "RIGA";
+		price_factor: 100;
+		penalty_lowerbound: 10;
+		single_penalty_length: 100;
+		station_list_colour: 152;
+		cargo_payment_list_colour: 152;
+		capacity_multiplier: 1;
+	}
+}

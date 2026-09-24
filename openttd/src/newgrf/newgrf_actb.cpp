@@ -73,6 +73,7 @@ static void GRFLoadError(ByteReader &buf)
 	} else if (severity == 3) {
 		/* This is a fatal error, so make sure the GRF is deactivated and no
 		 * more of it gets loaded. */
+		NoteFatalError();
 		DisableGrf();
 	}
 

@@ -288,6 +288,10 @@ static void ReserveChangeInfo(ByteReader &buf)
 	uint8_t numinfo = buf.ReadByte();
 	uint16_t index = buf.ReadExtendedByte();
 
+	/* Which slot each of the cargoes goes into is decided for the whole block
+	 * before any of it is read: the label that decides it may come last. */
+	if (feature == GrfSpecFeature::Cargoes) PrepareCargoBlock(index, numinfo, numprops, buf);
+
 	while (numprops-- && buf.HasData()) {
 		uint8_t prop = buf.ReadByte();
 
