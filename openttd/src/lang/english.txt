@@ -3735,7 +3735,7 @@ STR_TOWN_DATA_ERROR_FAILED_TO_FOUND_TOWN                        :Could not find 
 # NewGRF settings
 STR_NEWGRF_SETTINGS_CAPTION                                     :{WHITE}NewGRF Settings
 STR_NEWGRF_SETTINGS_INFO_TITLE                                  :{WHITE}Detailed NewGRF information
-STR_NEWGRF_SETTINGS_ACTIVE_LIST                                 :{WHITE}Active NewGRF files
+STR_NEWGRF_SETTINGS_ACTIVE_LIST                                 :{WHITE}I handle every industry GRF at once, 128 cargoes
 STR_NEWGRF_SETTINGS_INACTIVE_LIST                               :{WHITE}Inactive NewGRF files
 STR_NEWGRF_SETTINGS_SELECT_PRESET                               :{ORANGE}Select preset:
 STR_NEWGRF_FILTER_TITLE                                         :{ORANGE}Filter:

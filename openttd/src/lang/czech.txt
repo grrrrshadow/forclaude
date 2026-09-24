@@ -3828,7 +3828,7 @@ STR_TOWN_DATA_ERROR_FAILED_TO_FOUND_TOWN                        :{WHITE} Nenalez
 # NewGRF settings
 STR_NEWGRF_SETTINGS_CAPTION                                     :{WHITE}Nastavení grafických souborů
 STR_NEWGRF_SETTINGS_INFO_TITLE                                  :{WHITE}Podrobné informace o grafikách
-STR_NEWGRF_SETTINGS_ACTIVE_LIST                                 :{WHITE}Aktivní grafiky
+STR_NEWGRF_SETTINGS_ACTIVE_LIST                                 :{WHITE}zvládnu všechny grf průmyslu najednou, 128 nákladů
 STR_NEWGRF_SETTINGS_INACTIVE_LIST                               :{WHITE}Neaktivní grafiky
 STR_NEWGRF_SETTINGS_SELECT_PRESET                               :{ORANGE}Vybrat předvolbu:
 STR_NEWGRF_FILTER_TITLE                                         :{ORANGE}Filtrovat podle:
