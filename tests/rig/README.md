@@ -208,6 +208,24 @@ puts its own houses in place of all the temperate ones, left the list of
 the temperate houses empty in the player's game. `testdomy picker <set>
 [year]` refuses an empty list and a house not of the set or the year.
 
+## A house set that puts a four-tile block in place of the statue
+
+`grf/house_over.nfo` (with `grf/gfx/blue_house.png`) is a house set of one
+house: a four-tile block made from the stadium, put in place of the statue
+(original house 9, one tile) -- what house sets do to the originals, here
+with a size that differs, which nml refuses to write and older sets do. The
+map reads a tile's house through that replacement (GetHouseType()), so a
+house placed by hand is placed as the replacement, its size and all
+(CmdPlaceHouse()); placed as the statue it stood on one tile with a
+four-tile spec, and the tile loop asserted on the tiles that were not there.
+
+    grfcodec -e -p1 -f house_over.grf      (in a directory holding sprites/house_over.nfo and sprites/gfx/blue_house.png)
+    cp house_over.grf <rig home>/.openttd/newgrf/
+
+The scene `domypostav` places the statue by hand twice (`testdomy postav <x>
+<y> <house>`), which has to put the block down on all four tiles, and runs
+the tile loop for 600 ticks.
+
 ## A set that gives up after it has changed things
 
 `grf/quits_late.nml` (strings in `grf/lang/english.lng`) is a NewGRF of three

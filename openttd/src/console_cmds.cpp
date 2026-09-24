@@ -1655,8 +1655,11 @@ static std::string CountHousesBySource(TownID town)
  *   has the Mars houses, each all of its set, and no Mars house in any town
  *   of every house; with the GRFs split, every ordinary town of one GRF and
  *   the GRFs even;
- * - testdomy picker <set> [year]: the house picker filtered to one set shows its
- *   houses and no others;
+ * - testdomy picker <set> [year [jmena]]: the house picker filtered to one set
+ *   shows its houses and no others; with "jmena", every house listed by id
+ *   and name, and the house a set put in its place;
+ * - testdomy postav <x> <y> <house>: place a house by hand, as the picker
+ *   does (Commands::PlaceHouse), and say what stands there;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
  * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
@@ -1778,6 +1781,14 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		}
 		auto [shown, wrong] = TestHousePickerSet(*psource, year);
 		IConsolePrint(CC_DEFAULT, "testdomy: picker [{}]{}: {} domu v seznamu, {} odjinud", *psource == 0 ? std::string{"vse"} : HouseSourceName(*psource), year == 0 ? std::string{} : fmt::format(" rok {}", year), shown, wrong);
+		if (argv.size() >= 5 && argv[4] == "jmena") {
+			for (HouseID id : ListedHousesInPicker()) {
+				const HouseSpec *hs = HouseSpec::Get(id);
+				HouseID placed = GetTranslatedHouseID(id);
+				const HouseSpec *ph = HouseSpec::Get(placed);
+				IConsolePrint(CC_DEFAULT, "testdomy:   {} {}{}", id, GetString(GetHouseName(hs)), placed == id ? std::string{} : fmt::format(" -> {} {} ({})", placed, GetString(GetHouseName(ph)), ph->grf_prop.HasGrfFile() ? HouseSourceName(ph->grf_prop.grfid) : std::string{"hra"}));
+			}
+		}
 		if (shown == 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - seznam domu je prazdny.");
 		if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} domu v seznamu neni z vybrane sady.", wrong);
 		return true;
@@ -1819,6 +1830,40 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		if (was == now) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - kliknuti na sadu {} nic nezmenilo.", HouseSourceName(*psource));
 		/* The list stays open for the next tick; the rig closes it. */
 		CloseWindowByClass(WindowClass::DropdownMenu);
+		return true;
+	}
+
+	if (argv[1] == "postav" && argv.size() >= 5) {
+		/* A house placed by hand: the map holds the house the set put in
+		 * place of an original (GetHouseType()), and every tile of that. */
+		auto px = ParseInteger(argv[2]);
+		auto py = ParseInteger(argv[3]);
+		auto ph = ParseInteger(argv[4]);
+		if (!px.has_value() || !py.has_value() || !ph.has_value()) return false;
+		TileIndex tile = TileXY(static_cast<uint>(*px), static_cast<uint>(*py));
+		AutoRestoreBackup cur_company(_current_company, OWNER_DEITY);
+		CommandCost ret = Command<Commands::PlaceHouse>::Do(DoCommandFlag::Execute, tile, static_cast<HouseID>(*ph), false, true);
+		if (ret.Failed()) {
+			IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - dum {} na {},{} nejde postavit: {}", *ph, *px, *py, ret.GetErrorMessage() == INVALID_STRING_ID ? std::string{"bez duvodu"} : GetString(ret.GetErrorMessage()));
+			return true;
+		}
+		HouseID standing = GetHouseType(tile);
+		const HouseSpec *hs = HouseSpec::Get(standing);
+		uint expected = 1 + (hs->building_flags.Any(BUILDING_2_TILES_X) ? 1 : 0) + (hs->building_flags.Any(BUILDING_2_TILES_Y) ? 1 : 0) + (hs->building_flags.Any(BUILDING_HAS_4_TILES) ? 1 : 0);
+		/* Every tile of the house: the ones around whose north part is this tile. */
+		uint have = 0;
+		for (int dx = 0; dx <= 1; dx++) {
+			for (int dy = 0; dy <= 1; dy++) {
+				TileIndex t = TileAddXY(tile, dx, dy);
+				if (!IsTileType(t, TileType::House)) continue;
+				HouseID part = GetHouseType(t);
+				if (t + GetHouseNorthPart(part) == tile) have++;
+			}
+		}
+		auto source_of = [](const HouseSpec *h) { return h->grf_prop.HasGrfFile() ? HouseSourceName(h->grf_prop.grfid) : std::string{"hra"}; };
+		const HouseSpec *asked = HouseSpec::Get(static_cast<HouseID>(*ph));
+		IConsolePrint(CC_DEFAULT, "testdomy: postaven dum {} '{}' ({}), na mape jako {} '{}' ({}), {} policek z {}", *ph, GetString(GetHouseName(asked)), source_of(asked), standing, GetString(GetHouseName(hs)), source_of(hs), have, expected);
+		if (have != expected) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - dum ma mit {} policek a stoji na {}.", expected, have);
 		return true;
 	}
 

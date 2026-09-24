@@ -1382,3 +1382,18 @@ testdomy picker vse
 testdomy picker mirne 1950
 testdomy picker mirne 2050
 testdomy picker vse 1950" 100 -c $DOMY2_CFG
+
+# A house placed by hand where a set put a house of its own in place of it
+# (grf/house_over.nfo, see README.md): the statue, with a four-tile block in
+# its place. The map reads the block off the tile (GetHouseType()), so the
+# block is what gets placed, all four tiles of it. Placed as the one-tile
+# statue it stood on one tile with a four-tile spec, and the tile loop walked
+# into an assertion on the three tiles that were not there -- the player's
+# crash on a house placed from the picker. The probe refuses a house standing
+# on fewer tiles than its spec says; the tile loop then runs 600 ticks.
+HOVER_CFG=$S/hover_openttd.cfg
+sed '/^\[newgrf\]$/a house_over.grf = ' "$CFG_KEEP" > $HOVER_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene domypostav "setting economy.place_houses 2
+testdomy postav 60 60 9
+testdomy postav 100 100 9
+testza 600 testdomy" 700 -c $HOVER_CFG

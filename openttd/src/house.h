@@ -154,6 +154,8 @@ inline HouseID GetTranslatedHouseID(HouseID hid)
 
 void ShowBuildHousePicker(struct Window *);
 std::pair<uint, uint> TestHousePickerSet(uint32_t set, TimerGameCalendar::Year year = TimerGameCalendar::Year{0});
+std::vector<HouseID> ListedHousesInPicker();
+StringID GetHouseName(const HouseSpec *hs);
 HouseZones GetClimateMask(LandscapeType landscape);
 HouseZones GetClimateMaskForLandscape();
 

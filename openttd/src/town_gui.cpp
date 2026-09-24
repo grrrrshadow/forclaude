@@ -1511,7 +1511,7 @@ void DrawHouseInGUI(int x, int y, HouseID house_id, int view)
  * @param hs HouseSpec of house.
  * @return StringID of name for house.
  */
-static StringID GetHouseName(const HouseSpec *hs)
+StringID GetHouseName(const HouseSpec *hs)
 {
 	std::array<int32_t, 1> regs100;
 	uint16_t callback_res = GetHouseCallback(CBID_HOUSE_CUSTOM_NAME, 1, 0, hs->Index(), nullptr, INVALID_TILE, regs100, true);
@@ -1698,8 +1698,12 @@ public:
 
 	void DrawType(int x, int y, int, int id) const override
 	{
-		DrawHouseInGUI(x, y, id, HousePickerCallbacks::sel_view);
+		/* An original a set put a house of its own in place of shows as that house: it is what gets placed (CmdPlaceHouse()). */
+		DrawHouseInGUI(x, y, GetTranslatedHouseID(static_cast<HouseID>(id)), HousePickerCallbacks::sel_view);
 	}
+
+	/** The house the picked entry places: the set's house in place of an overridden original (GetTranslatedHouseID()). */
+	static const HouseSpec *PickedHouse() { return HouseSpec::Get(GetTranslatedHouseID(static_cast<HouseID>(sel_type))); }
 
 	void FillUsedItems(std::set<PickerItem> &items) override
 	{
@@ -2023,12 +2027,12 @@ struct BuildHouseWindow : public PickerWindow {
 		this->PickerWindow::OnInvalidateData(data, gui_scope);
 		if (!gui_scope) return;
 
-		const HouseSpec *spec = HouseSpec::Get(HousePickerCallbacks::sel_type);
+		const HouseSpec *spec = HousePickerCallbacks::PickedHouse();
 
 		PickerInvalidations pi(data);
 		if (pi.Test(PickerInvalidation::Position)) {
 			UpdateSelectSize(spec);
-			this->house_info = HousePickerCallbacks::instance.InChosenSet(spec) ? GetHouseInformation(spec) : "";
+			this->house_info = HousePickerCallbacks::instance.InChosenSet(HouseSpec::Get(HousePickerCallbacks::sel_type)) ? GetHouseInformation(spec) : "";
 		}
 
 		/* If house spec already has the protected flag, handle it automatically and disable the buttons. */
@@ -2043,7 +2047,7 @@ struct BuildHouseWindow : public PickerWindow {
 
 	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
 	{
-		const HouseSpec *spec = HouseSpec::Get(HousePickerCallbacks::sel_type);
+		const HouseSpec *spec = HousePickerCallbacks::PickedHouse();
 
 		if (spec->building_flags.Test(BuildingFlag::Size1x1)) {
 			VpStartPlaceSizing(tile, VPM_X_AND_Y, DDSP_PLACE_HOUSE);
@@ -2063,7 +2067,7 @@ struct BuildHouseWindow : public PickerWindow {
 
 		assert(select_proc == DDSP_PLACE_HOUSE);
 
-		const HouseSpec *spec = HouseSpec::Get(HousePickerCallbacks::sel_type);
+		const HouseSpec *spec = HousePickerCallbacks::PickedHouse();
 		Command<Commands::PlaceHouseArea>::Post(STR_ERROR_CAN_T_BUILD_HOUSE, CcPlaySound_CONSTRUCTION_OTHER,
 			end_tile, start_tile, spec->Index(), BuildHouseWindow::house_protected, BuildHouseWindow::replace, _ctrl_pressed);
 	}
@@ -2123,6 +2127,24 @@ void ShowBuildHousePicker(Window *parent)
 {
 	if (BringWindowToFrontById(WindowClass::BuildHouse, 0)) return;
 	new BuildHouseWindow(_build_house_desc, parent);
+}
+
+/**
+ * The houses the picker lists as it stands, for the test rig: every entry of
+ * every zone, each house once.
+ * @return the houses, by id
+ */
+std::vector<HouseID> ListedHousesInPicker()
+{
+	std::vector<HouseID> listed;
+	const HousePickerCallbacks &cb = HousePickerCallbacks::instance;
+	for (int cls_id = 0; cls_id < cb.GetClassCount(); cls_id++) {
+		for (int id = 0; id < cb.GetTypeCount(cls_id); id++) {
+			if (cb.GetTypeName(cls_id, id) == INVALID_STRING_ID) continue;
+			listed.push_back(static_cast<HouseID>(id));
+		}
+	}
+	return listed;
 }
 
 /**

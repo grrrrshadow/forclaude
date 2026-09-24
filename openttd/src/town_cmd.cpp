@@ -2882,11 +2882,11 @@ bool HouseSetCanBuild(const HouseSpec &hs)
  * Can the player place this house by hand (the house picker)? The player
  * picks from that list themselves, and no set has a say in it: every
  * original house is there, switched off by a set or not, and even one a set
- * put a house of its own in place of -- placed by its own id it stands with
- * its own looks (a town builds the set's house for it, TryBuildTownHouse()).
- * Swedish Houses puts its own in place of all the temperate houses, and the
- * list of the temperate houses was empty for it. A set's house is there when
- * the set has it on.
+ * put a house of its own in place of -- that one is placed, shown and
+ * described as the set's house, which is what the map holds for it
+ * (GetHouseType()). A house set that puts its own in place of all the
+ * temperate houses left the list of the temperate houses empty. A set's
+ * house is there when the set has it on.
  * @param hs the house
  * @return whether it can be placed
  */
@@ -3094,6 +3094,12 @@ CommandCost CmdPlaceHouse(DoCommandFlags flags, TileIndex tile, HouseID house, b
 	if (Town::GetNumItems() == 0) return CommandCost(STR_ERROR_MUST_FOUND_TOWN_FIRST);
 
 	if (static_cast<size_t>(house) >= HouseSpec::Specs().size()) return CMD_ERROR;
+	/* An original house a set put a house of its own in place of is read off
+	 * the map as the set's house (GetHouseType()), so that is the house to
+	 * place, its size and all: placed as the original, a one-tile original
+	 * stood for a set's four-tile house, and the tile loop walked into an
+	 * assertion on the three tiles that were not there. */
+	house = GetTranslatedHouseID(house);
 	const HouseSpec *hs = HouseSpec::Get(house);
 	if (!HouseCanBePlacedByHand(*hs)) return CMD_ERROR;
 
@@ -3163,6 +3169,7 @@ CommandCost CmdPlaceHouseArea(DoCommandFlags flags, TileIndex tile, TileIndex st
 	if (Town::GetNumItems() == 0) return CommandCost(STR_ERROR_MUST_FOUND_TOWN_FIRST);
 
 	if (static_cast<size_t>(house) >= HouseSpec::Specs().size()) return CMD_ERROR;
+	house = GetTranslatedHouseID(house); // the set's house in place of an original, see CmdPlaceHouse()
 	const HouseSpec *hs = HouseSpec::Get(house);
 	if (!HouseCanBePlacedByHand(*hs)) return CMD_ERROR;
 
