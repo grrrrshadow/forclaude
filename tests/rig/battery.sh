@@ -1313,3 +1313,10 @@ SCENE_NEWGAME='setting_newgame economy.split_house_grfs 1' run_scene delenigrf "
 run_scene smerdepo "vlak123 on
 testspoj
 testzatik 100 testsmerdepo" 400
+
+# The house picker's "Houses from" (the player's way of building a themed
+# town by hand): filtered to the temperate houses in toyland, to the Mars set
+# and back to every house, the list shows that set's houses and no others.
+run_scene domypicker "testdomy picker mirne
+testdomy picker 524A450B
+testdomy picker vse" 100 -c $DOMY_CFG

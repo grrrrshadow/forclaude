@@ -1563,6 +1563,30 @@ public:
 	HouseZones climate_mask{};
 	uint8_t class_mask = 0; ///< Mask of available 'classes'.
 
+	/**
+	 * The set of houses the list shows (WID_BH_HOUSE_SET): 0 for every house
+	 * the climate offers, as it always was, or one set as Town::house_sets
+	 * names them -- a climate's original houses, whatever climate is played,
+	 * or one GRF's. The player's way of building a themed town by hand.
+	 */
+	static inline uint32_t house_set = 0;
+
+	/**
+	 * Is a house one the list shows, for the set chosen?
+	 * @param spec the house
+	 * @return whether it is
+	 */
+	bool InChosenSet(const HouseSpec *spec) const
+	{
+		if (house_set == 0) return spec->building_availability.Any(this->climate_mask);
+		if (house_set >= HOUSE_SOURCE_CLIMATE) {
+			if (spec->grf_prop.HasGrfFile()) return false;
+			uint climate = house_set - HOUSE_SOURCE_CLIMATE;
+			return climate <= to_underlying(LandscapeType::Toyland) && spec->building_availability.Any(GetClimateMask(static_cast<LandscapeType>(climate)));
+		}
+		return spec->grf_prop.HasGrfFile() && spec->grf_prop.grfid == house_set && spec->building_availability.Any(this->climate_mask);
+	}
+
 	static inline int sel_class; ///< Currently selected 'class'.
 	static inline int sel_type; ///< Currently selected HouseID.
 	static inline int sel_view; ///< Currently selected 'view'. This is not controllable as its based on random data.
@@ -1622,7 +1646,7 @@ public:
 		const HouseSpec *spec = HouseSpec::Get(id);
 		if (spec == nullptr) return INVALID_STRING_ID;
 		if (!spec->enabled) return INVALID_STRING_ID;
-		if (!spec->building_availability.Any(climate_mask)) return INVALID_STRING_ID;
+		if (!this->InChosenSet(spec)) return INVALID_STRING_ID;
 		if (!spec->building_availability.Test(GetHouseZoneFromClassId(cls_id))) return INVALID_STRING_ID;
 		for (int i = 0; i < cls_id; i++) {
 			/* Don't include if it's already included in an earlier zone. */
@@ -1637,7 +1661,7 @@ public:
 		const auto *spec = HouseSpec::Get(id);
 		if (spec == nullptr) return {};
 		if (!spec->enabled) return {};
-		if (!spec->building_availability.Any(climate_mask)) return {};
+		if (!this->InChosenSet(spec)) return {};
 		if (!spec->building_availability.Test(GetHouseZoneFromClassId(cls_id))) return {};
 		for (int i = 0; i < cls_id; i++) {
 			/* Don't include if it's already included in an earlier zone. */
@@ -1844,9 +1868,68 @@ struct BuildHouseWindow : public PickerWindow {
 		}
 	}
 
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	{
+		if (widget == WID_BH_HOUSE_SET) {
+			uint32_t set = HousePickerCallbacks::house_set;
+			return GetString(STR_TOWN_VIEW_HOUSE_SETS, set == 0 ? GetString(STR_TOWN_VIEW_HOUSE_SETS_ALL) : HouseSourceName(set));
+		}
+		return this->PickerWindow::GetWidgetString(widget, stringid);
+	}
+
+	/**
+	 * Show the houses of one set only (HousePickerCallbacks::house_set): the
+	 * list is filtered again, and a house no longer in it gives the selection
+	 * up to the first that is, so that the preview shows what can be picked.
+	 * @param set the set, 0 for every house
+	 */
+	void ChooseHouseSet(uint32_t set)
+	{
+		HousePickerCallbacks::house_set = set;
+		HousePickerCallbacks::instance.SetClimateMask();
+		const HousePickerCallbacks &cb = HousePickerCallbacks::instance;
+		if (cb.GetTypeName(HousePickerCallbacks::sel_class, HousePickerCallbacks::sel_type) == INVALID_STRING_ID) {
+			for (int cls_id = 0; cls_id < cb.GetClassCount(); cls_id++) {
+				bool found = false;
+				for (int id = 0; id < cb.GetTypeCount(cls_id); id++) {
+					if (cb.GetTypeName(cls_id, id) == INVALID_STRING_ID) continue;
+					HousePickerCallbacks::sel_class = cls_id;
+					HousePickerCallbacks::sel_type = id;
+					found = true;
+					break;
+				}
+				if (found) break;
+			}
+		}
+		this->InvalidateData(PICKER_INVALIDATION_ALL);
+		this->SetWidgetDirty(WID_BH_HOUSE_SET);
+	}
+
+	void OnDropdownSelect(WidgetID widget, int index, int click_result) override
+	{
+		if (widget != WID_BH_HOUSE_SET) {
+			this->PickerWindow::OnDropdownSelect(widget, index, click_result);
+			return;
+		}
+		this->ChooseHouseSet(static_cast<uint32_t>(index));
+	}
+
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		switch (widget) {
+			case WID_BH_HOUSE_SET: {
+				/* Every house as usual, or one set: a climate's houses whatever
+				 * the climate played, or one GRF's -- the town window's list,
+				 * with one choice at a time. */
+				DropDownList list;
+				list.push_back(MakeDropDownListStringItem(GetString(STR_TOWN_VIEW_HOUSE_SETS_ALL), 0));
+				for (uint32_t source : AvailableHouseSources()) {
+					list.push_back(MakeDropDownListStringItem(HouseSourceName(source), static_cast<int>(source)));
+				}
+				ShowDropDownList(this, std::move(list), static_cast<int>(HousePickerCallbacks::house_set), WID_BH_HOUSE_SET);
+				break;
+			}
+
 			case WID_BH_PROTECT_TOGGLE:
 				BuildHouseWindow::house_protected = !BuildHouseWindow::house_protected;
 				this->SetWidgetLoweredState(WID_BH_PROTECT_TOGGLE, BuildHouseWindow::house_protected);
@@ -1945,6 +2028,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_build_house_widgets 
 			NWidgetFunction(MakePickerClassWidgets),
 			NWidget(WWT_PANEL, Colours::DarkGreen),
 				NWidget(NWID_VERTICAL), SetPIP(0, WidgetDimensions::unscaled.vsep_picker, 0), SetPadding(WidgetDimensions::unscaled.picker),
+					NWidget(WWT_DROPDOWN, Colours::Grey, WID_BH_HOUSE_SET), SetFill(1, 0), SetToolTip(STR_HOUSE_PICKER_HOUSE_SET_TOOLTIP),
 					NWidget(WWT_EMPTY, Colours::Invalid, WID_BH_INFO), SetFill(1, 1), SetMinimalTextLines(10, 0),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_BH_PROTECT_TOGGLE), SetMinimalSize(60, 12), SetStringTip(STR_HOUSE_PICKER_PROTECT, STR_HOUSE_PICKER_PROTECT_TOOLTIP),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_BH_REPLACE_TOGGLE), SetMinimalSize(60, 12), SetStringTip(STR_HOUSE_PICKER_REPLACE, STR_HOUSE_PICKER_REPLACE_TOOLTIP),
@@ -1968,4 +2052,30 @@ void ShowBuildHousePicker(Window *parent)
 {
 	if (BringWindowToFrontById(WindowClass::BuildHouse, 0)) return;
 	new BuildHouseWindow(_build_house_desc, parent);
+}
+
+/**
+ * The house picker with one set chosen, for the test rig: opens it, chooses
+ * the set as the dropdown does, and counts what the list then shows.
+ * @param set the set (HousePickerCallbacks::house_set)
+ * @return how many houses the list shows, and how many of them are not of the set
+ */
+std::pair<uint, uint> TestHousePickerSet(uint32_t set)
+{
+	ShowBuildHousePicker(nullptr);
+	BuildHouseWindow *w = dynamic_cast<BuildHouseWindow *>(FindWindowById(WindowClass::BuildHouse, 0));
+	if (w == nullptr) return {0, 0};
+	w->ChooseHouseSet(set);
+	const HousePickerCallbacks &cb = HousePickerCallbacks::instance;
+	uint shown = 0, wrong = 0;
+	for (int cls_id = 0; cls_id < cb.GetClassCount(); cls_id++) {
+		for (int id = 0; id < cb.GetTypeCount(cls_id); id++) {
+			if (cb.GetTypeName(cls_id, id) == INVALID_STRING_ID) continue;
+			shown++;
+			const HouseSpec *hs = HouseSpec::Get(id);
+			bool ok = set == 0 ? true : (set >= HOUSE_SOURCE_CLIMATE ? !hs->grf_prop.HasGrfFile() && hs->building_availability.Any(GetClimateMask(static_cast<LandscapeType>(set - HOUSE_SOURCE_CLIMATE))) : hs->grf_prop.HasGrfFile() && hs->grf_prop.grfid == set);
+			if (!ok) wrong++;
+		}
+	}
+	return {shown, wrong};
 }

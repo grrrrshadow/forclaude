@@ -1545,6 +1545,8 @@ static std::string CountHousesBySource(TownID town)
  *   has the Mars houses, each all of its set, and no Mars house in any town
  *   of every house; with the GRFs split, every ordinary town of one GRF and
  *   the GRFs even;
+ * - testdomy picker <set>: the house picker filtered to one set shows its
+ *   houses and no others;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
  * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
@@ -1649,6 +1651,18 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 			if (!split.empty() && plain > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - GRF se deli, a {} mest stavi ze vsech domu.", plain);
 			if (!split.empty() && hi - lo > 1) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - GRF se deli nerovnomerne ({} az {}).", lo, hi);
 		}
+		return true;
+	}
+
+	if (argv[1] == "picker" && argv.size() >= 3) {
+		/* The house picker's "Houses from": the list shows the set's houses
+		 * and nothing else, and something at all. */
+		auto psource = ParseHouseSource(argv[2]);
+		if (!psource.has_value()) return false;
+		auto [shown, wrong] = TestHousePickerSet(*psource);
+		IConsolePrint(CC_DEFAULT, "testdomy: picker [{}]: {} domu v seznamu, {} odjinud", *psource == 0 ? std::string{"vse"} : HouseSourceName(*psource), shown, wrong);
+		if (shown == 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - seznam domu je prazdny.");
+		if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} domu v seznamu neni z vybrane sady.", wrong);
 		return true;
 	}
 

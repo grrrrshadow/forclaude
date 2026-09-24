@@ -153,6 +153,7 @@ inline HouseID GetTranslatedHouseID(HouseID hid)
 }
 
 void ShowBuildHousePicker(struct Window *);
+std::pair<uint, uint> TestHousePickerSet(uint32_t set);
 HouseZones GetClimateMask(LandscapeType landscape);
 HouseZones GetClimateMaskForLandscape();
 

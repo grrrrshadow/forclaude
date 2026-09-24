@@ -3030,6 +3030,7 @@ STR_HOUSE_PICKER_CLASS_ZONE4                                    :Inner Suburbs
 STR_HOUSE_PICKER_CLASS_ZONE5                                    :Town centre
 
 STR_HOUSE_PICKER_PROTECT                                        :Prevent upgrades
+STR_HOUSE_PICKER_HOUSE_SET_TOOLTIP                              :{BLACK}Which houses the list shows: every house the climate offers, the houses of one climate -- any climate, whatever is played -- or one house set (GRF). For building a themed town by hand
 STR_HOUSE_PICKER_PROTECT_TOOLTIP                                :Choose whether this house will be protected from replacement as the town grows
 
 STR_HOUSE_PICKER_REPLACE                                        :Replace existing
