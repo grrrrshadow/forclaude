@@ -1605,14 +1605,20 @@ static void FinaliseHouseArray()
 
 		/* We need to check all houses again to we are sure that multitile houses
 		 * did get consecutive IDs and none of the parts are missing. */
-		if (!IsHouseSpecValid(*hs, next1, next2, next3, std::string{})) {
+		if (!IsHouseSpecValid(*hs, next1, next2, next3, std::string{}) && i >= NEW_HOUSE_OFFSET) {
 			/* GetHouseNorthPart checks 3 houses that are directly before
 			 * it in the house pool. If any of those houses have multi-tile
 			 * flags set it assumes it's part of a multitile house. Since
 			 * we can have invalid houses in the pool marked as disabled, we
 			 * don't want to have them influencing valid tiles. As such set
 			 * building_flags to zero here to make sure any house following
-			 * this one in the pool is properly handled as 1x1 house. */
+			 * this one in the pool is properly handled as 1x1 house.
+			 *
+			 * Not for the game's own houses: their parts are always there,
+			 * whether a set switched them off or not, and a town of chosen
+			 * sets or the player builds a switched-off original as itself
+			 * (IsHouseKeptOriginal()) -- with its size. Cleared, the stadium
+			 * a set had switched off came out as one tile. */
 			hs->building_flags = {};
 		}
 

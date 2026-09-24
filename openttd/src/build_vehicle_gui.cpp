@@ -1774,12 +1774,14 @@ struct BuildVehicleWindow : Window {
 		 * because it is not a standard cargo; offered for every kind of
 		 * vehicle that can take the fitting, which is what the player looked
 		 * for in the ship and aircraft depots and did not find. */
+		Dimension d = GetLargestCargoIconSize();
 		if (IsValidCargoType(_road_vehicle_cargo) && this->vehicle_type != VehicleType::Road) {
-			list.push_back(MakeDropDownListStringItem(this->GetCargoFilterLabel(_road_vehicle_cargo), _road_vehicle_cargo));
+			/* With its icon, in line with the cargoes below; it stood out as the one line without. */
+			const CargoSpec *rola = CargoSpec::Get(_road_vehicle_cargo);
+			list.push_back(MakeDropDownListIconItem(d, rola->GetCargoIcon(), PAL_NONE, this->GetCargoFilterLabel(_road_vehicle_cargo), _road_vehicle_cargo));
 		}
 
 		/* Add cargos */
-		Dimension d = GetLargestCargoIconSize();
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 			list.push_back(MakeDropDownListIconItem(d, cs->GetCargoIcon(), PAL_NONE, cs->name, cs->Index()));
 		}

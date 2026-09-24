@@ -1551,6 +1551,15 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 	}
 	IConsolePrint(CC_DEFAULT, "testnaklady: prumysly na mape: {}", industries.empty() ? std::string{"zadne"} : industries);
 
+	/* The icon of the road-vehicle cargo, drawn before its name in every
+	 * cargo list: the sprite and its size, 0x0 when the base set lacks it. */
+	if (IsValidCargoType(_road_vehicle_cargo)) {
+		SpriteID icon = CargoSpec::Get(_road_vehicle_cargo)->GetCargoIcon();
+		Dimension size = GetSpriteSize(icon);
+		IConsolePrint(CC_DEFAULT, "testnaklady: ikona nakladu ROLA: sprite {} ({}x{})", icon, size.width, size.height);
+		if (size.width == 0 || size.height == 0) fail("ikona nakladu ROLA je prazdna");
+	}
+
 	IConsolePrint(CC_DEFAULT, "testnaklady: NUM_CARGO {}, {}.", to_underlying(NUM_CARGO), ok ? "vse v poradku" : "s chybami");
 	return true;
 }
@@ -1863,6 +1872,20 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		auto source_of = [](const HouseSpec *h) { return h->grf_prop.HasGrfFile() ? HouseSourceName(h->grf_prop.grfid) : std::string{"hra"}; };
 		const HouseSpec *asked = HouseSpec::Get(static_cast<HouseID>(*ph));
 		IConsolePrint(CC_DEFAULT, "testdomy: postaven dum {} '{}' ({}), na mape jako {} '{}' ({}), {} policek z {}", *ph, GetString(GetHouseName(asked)), source_of(asked), standing, GetString(GetHouseName(hs)), source_of(hs), have, expected);
+		if (have != expected) {
+			/* What stands on the four tiles instead. */
+			for (int dx = 0; dx <= 1; dx++) {
+				for (int dy = 0; dy <= 1; dy++) {
+					TileIndex t = TileAddXY(tile, dx, dy);
+					if (!IsTileType(t, TileType::House)) {
+						IConsolePrint(CC_DEFAULT, "testdomy:   policko +{},+{}: neni dum", dx, dy);
+						continue;
+					}
+					const HouseSpec *ts = HouseSpec::Get(GetHouseType(t));
+					IConsolePrint(CC_DEFAULT, "testdomy:   policko +{},+{}: dum {} (cisty {}, original {}) '{}' ({})", dx, dy, GetHouseType(t), GetCleanHouseType(t), IsHouseKeptOriginal(t) ? "ano" : "ne", GetString(GetHouseName(ts)), source_of(ts));
+				}
+			}
+		}
 		if (have != expected) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - dum ma mit {} policek a stoji na {}.", expected, have);
 		return true;
 	}

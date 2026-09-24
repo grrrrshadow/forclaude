@@ -213,7 +213,10 @@ the temperate houses empty in the player's game. `testdomy picker <set>
 `grf/house_over.nfo` (with `grf/gfx/blue_house.png`) is a house set of one
 house: a four-tile block made from the stadium, put in place of the statue
 (original house 9, one tile) -- what house sets do to the originals, here
-with a size that differs, which nml refuses to write and older sets do. The
+with a size that differs, which nml refuses to write and older sets do. It
+switches the stadium (houses 32 to 35) off as well, as sets switch originals
+off: the game used to clear the size of a switched-off original, and a
+stadium placed by hand came out as one tile. The
 map reads a tile's house through that replacement (GetHouseType()), so a
 house placed by hand used to be read back as the replacement: placed as the
 statue it stood on one tile with a four-tile spec, and the tile loop

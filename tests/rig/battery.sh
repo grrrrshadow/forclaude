@@ -1396,6 +1396,9 @@ testdomy picker vse 1950" 100 -c $DOMY2_CFG
 # assertion on the three tiles that were not there -- the player's crash on
 # a house placed from the picker. The probe says what stands there and
 # refuses a house on fewer tiles than its spec; the tile loop runs 600 ticks.
+# The set switches the stadium off too, as sets do to originals: placed by
+# hand it still has to stand on its four tiles -- the game used to clear the
+# size of a switched-off original, and the stadium came out as one tile.
 # Then a town ticked to the temperate houses grows: every house it puts up
 # has to be a temperate one, statues as themselves among them -- with a set
 # in place of every temperate house, such a town had nothing to build and
@@ -1405,6 +1408,7 @@ sed '/^\[newgrf\]$/a house_over.grf = ' "$CFG_KEEP" > $HOVER_CFG
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene domypostav "setting economy.place_houses 2
 testdomy postav 60 60 9
 testdomy postav 100 100 9
+testdomy postav 80 80 32
 testdomy okno 0 mirne
 testzatik 600 testdomy rust 0 40
 testzatik 650 testdomy" 700 -c $HOVER_CFG

@@ -267,7 +267,10 @@ static DropDownList BuildCoupleCargoDropDown(const Order *order)
 	CargoTypes allowed = named != nullptr ? GetUnionOfArticulatedRefitMasks(order->GetCoupleBuyEngine(), true) : ALL_CARGOTYPES;
 
 	DropDownList list;
-	list.push_back(MakeDropDownListStringItem(STR_ORDER_COUPLE_CARGO_EVERY, INVALID_CARGO, false));
+	/* Every cargo with its icon, as the purchase list shows them; the line
+	 * for every cargo takes a blank one so that the names stay in line. */
+	Dimension d = GetLargestCargoIconSize();
+	list.push_back(MakeDropDownListIconItem(d, SPR_EMPTY, PAL_NONE, STR_ORDER_COUPLE_CARGO_EVERY, INVALID_CARGO, false));
 	/* Wagons fitted for road vehicles, named here the way the purchase list
 	 * names them: their cargo is not a standard one -- it is of the special
 	 * class, and the sorted list of standard cargoes stops short of those --
@@ -279,11 +282,12 @@ static DropDownList BuildCoupleCargoDropDown(const Order *order)
 	 * than of a refit mask, for the same reason the purchase list asks it
 	 * there: the fitting is ours and no set knows about it. */
 	if (IsValidCargoType(_road_vehicle_cargo) && (named == nullptr || CanCarryRoadVehicles(named))) {
-		list.push_back(MakeDropDownListStringItem(CargoSpec::Get(_road_vehicle_cargo)->name, _road_vehicle_cargo, false));
+		const CargoSpec *rola = CargoSpec::Get(_road_vehicle_cargo);
+		list.push_back(MakeDropDownListIconItem(d, rola->GetCargoIcon(), PAL_NONE, rola->name, _road_vehicle_cargo, false));
 	}
 	for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 		if (!allowed.Test(cs->Index())) continue;
-		list.push_back(MakeDropDownListStringItem(cs->name, cs->Index(), false));
+		list.push_back(MakeDropDownListIconItem(d, cs->GetCargoIcon(), PAL_NONE, cs->name, cs->Index(), false));
 	}
 	return list;
 }
