@@ -1698,12 +1698,11 @@ public:
 
 	void DrawType(int x, int y, int, int id) const override
 	{
-		/* An original a set put a house of its own in place of shows as that house: it is what gets placed (CmdPlaceHouse()). */
-		DrawHouseInGUI(x, y, GetTranslatedHouseID(static_cast<HouseID>(id)), HousePickerCallbacks::sel_view);
+		DrawHouseInGUI(x, y, id, HousePickerCallbacks::sel_view);
 	}
 
-	/** The house the picked entry places: the set's house in place of an overridden original (GetTranslatedHouseID()). */
-	static const HouseSpec *PickedHouse() { return HouseSpec::Get(GetTranslatedHouseID(static_cast<HouseID>(sel_type))); }
+	/** The house the picked entry places: the entry's own, an original as itself (IsHouseKeptOriginal()). */
+	static const HouseSpec *PickedHouse() { return HouseSpec::Get(static_cast<HouseID>(sel_type)); }
 
 	void FillUsedItems(std::set<PickerItem> &items) override
 	{

@@ -215,16 +215,21 @@ house: a four-tile block made from the stadium, put in place of the statue
 (original house 9, one tile) -- what house sets do to the originals, here
 with a size that differs, which nml refuses to write and older sets do. The
 map reads a tile's house through that replacement (GetHouseType()), so a
-house placed by hand is placed as the replacement, its size and all
-(CmdPlaceHouse()); placed as the statue it stood on one tile with a
-four-tile spec, and the tile loop asserted on the tiles that were not there.
+house placed by hand used to be read back as the replacement: placed as the
+statue it stood on one tile with a four-tile spec, and the tile loop
+asserted on the tiles that were not there. Now the house the player picked,
+and every original a town of chosen sets builds, is kept as itself on its
+tile (IsHouseKeptOriginal(), a bit in m8 that old saves have clear), and the
+map reads it as such.
 
     grfcodec -e -p1 -f house_over.grf      (in a directory holding sprites/house_over.nfo and sprites/gfx/blue_house.png)
     cp house_over.grf <rig home>/.openttd/newgrf/
 
 The scene `domypostav` places the statue by hand twice (`testdomy postav <x>
-<y> <house>`), which has to put the block down on all four tiles, and runs
-the tile loop for 600 ticks.
+<y> <house>`), which has to leave a statue standing on its one tile, ticks a
+town to the temperate houses and grows it: every house it puts up has to be
+a temperate one. With a set in place of every temperate house such a town
+had nothing of them to build and mixed every house instead.
 
 ## A set that gives up after it has changed things
 

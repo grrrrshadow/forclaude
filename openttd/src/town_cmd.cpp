@@ -2589,13 +2589,13 @@ HouseZone GetTownRadiusGroup(const Town *t, TileIndex tile)
  * @param is_protected Whether the house is protected from the town upgrading it.
  * @pre The house can be built here.
  */
-static inline void ClearMakeHouseTile(TileIndex tile, Town *t, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool is_protected)
+static inline void ClearMakeHouseTile(TileIndex tile, Town *t, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool is_protected, bool keep_original)
 {
 	[[maybe_unused]] CommandCost cc = Command<Commands::LandscapeClear>::Do({DoCommandFlag::Execute, DoCommandFlag::Auto, DoCommandFlag::NoWater}, tile);
 	assert(cc.Succeeded());
 
 	IncreaseBuildingCount(t, type);
-	MakeHouseTile(tile, t->index, counter, stage, type, random_bits, is_protected);
+	MakeHouseTile(tile, t->index, counter, stage, type, random_bits, is_protected, keep_original);
 	if (HouseSpec::Get(type)->building_flags.Test(BuildingFlag::IsAnimated)) AddAnimatedTile(tile, false);
 
 	MarkTileDirtyByTile(tile);
@@ -2613,14 +2613,14 @@ static inline void ClearMakeHouseTile(TileIndex tile, Town *t, uint8_t counter, 
  * @param is_protected Whether the house is protected from the town upgrading it.
  * @pre The house can be built here.
  */
-static void MakeTownHouse(TileIndex tile, Town *t, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool is_protected)
+static void MakeTownHouse(TileIndex tile, Town *t, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool is_protected, bool keep_original)
 {
 	BuildingFlags size = HouseSpec::Get(type)->building_flags;
 
-	ClearMakeHouseTile(tile, t, counter, stage, type, random_bits, is_protected);
-	if (size.Any(BUILDING_2_TILES_Y))   ClearMakeHouseTile(tile + TileDiffXY(0, 1), t, counter, stage, ++type, random_bits, is_protected);
-	if (size.Any(BUILDING_2_TILES_X))   ClearMakeHouseTile(tile + TileDiffXY(1, 0), t, counter, stage, ++type, random_bits, is_protected);
-	if (size.Any(BUILDING_HAS_4_TILES)) ClearMakeHouseTile(tile + TileDiffXY(1, 1), t, counter, stage, ++type, random_bits, is_protected);
+	ClearMakeHouseTile(tile, t, counter, stage, type, random_bits, is_protected, keep_original);
+	if (size.Any(BUILDING_2_TILES_Y))   ClearMakeHouseTile(tile + TileDiffXY(0, 1), t, counter, stage, ++type, random_bits, is_protected, keep_original);
+	if (size.Any(BUILDING_2_TILES_X))   ClearMakeHouseTile(tile + TileDiffXY(1, 0), t, counter, stage, ++type, random_bits, is_protected, keep_original);
+	if (size.Any(BUILDING_HAS_4_TILES)) ClearMakeHouseTile(tile + TileDiffXY(1, 1), t, counter, stage, ++type, random_bits, is_protected, keep_original);
 
 	ForAllStationsAroundTiles(TileArea(tile, size.Any(BUILDING_2_TILES_X) ? 2 : 1, size.Any(BUILDING_2_TILES_Y) ? 2 : 1), [t](Station *st, TileIndex) {
 		t->stations_near.insert(st);
@@ -2829,7 +2829,11 @@ static bool CheckTownBuild2x2House(TileIndex *tile, Town *t, int maxz, bool nosl
  * @param house_completed Should the house be placed already complete, instead of under construction?
  * @param is_protected Whether the house is protected from the town upgrading it.
  */
-static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *hs, HouseID house, uint8_t random_bits, bool house_completed, bool is_protected)
+/**
+ * Build a house on its tiles.
+ * @param keep_original the house is the game's own, kept as itself where a set put a house of its own in place of it (IsHouseKeptOriginal())
+ */
+static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *hs, HouseID house, uint8_t random_bits, bool house_completed, bool is_protected, bool keep_original)
 {
 	/* build the house */
 	t->cache.num_houses++;
@@ -2850,7 +2854,7 @@ static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *hs, HouseID
 		}
 	}
 
-	MakeTownHouse(tile, t, construction_counter, construction_stage, house, random_bits, is_protected);
+	MakeTownHouse(tile, t, construction_counter, construction_stage, house, random_bits, is_protected, keep_original);
 	UpdateTownRadius(t);
 	UpdateTownGrowthRate(t);
 
@@ -2868,13 +2872,15 @@ static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *hs, HouseID
  * when a GRF has switched the originals off: that is for the towns that build
  * from every house, and the climate's houses are the game's own -- a town told
  * to build from them builds from them. Not an original a GRF has put a house
- * of its own in place of, as that one would stand as the GRF's house.
+ * of its own in place of, too: a town of chosen sets builds it as itself
+ * (IsHouseKeptOriginal()) -- with every temperate house replaced by a set's,
+ * a town told to build the temperate houses had nothing of them to build
+ * and built from every house instead.
  * @param hs the house
  * @return whether it can be built
  */
 bool HouseSetCanBuild(const HouseSpec &hs)
 {
-	if (hs.grf_prop.override_id != INVALID_HOUSE_ID) return false;
 	return hs.enabled || hs.grf_prop.grffile == nullptr;
 }
 
@@ -2882,10 +2888,9 @@ bool HouseSetCanBuild(const HouseSpec &hs)
  * Can the player place this house by hand (the house picker)? The player
  * picks from that list themselves, and no set has a say in it: every
  * original house is there, switched off by a set or not, and even one a set
- * put a house of its own in place of -- that one is placed, shown and
- * described as the set's house, which is what the map holds for it
- * (GetHouseType()). A house set that puts its own in place of all the
- * temperate houses left the list of the temperate houses empty. A set's
+ * put a house of its own in place of -- placed, it stands as itself
+ * (IsHouseKeptOriginal()). A house set that puts its own in place of all
+ * the temperate houses left the list of the temperate houses empty. A set's
  * house is there when the set has it on.
  * @param hs the house
  * @return whether it can be placed
@@ -3070,7 +3075,9 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 		/* Special houses that there can be only one of. */
 		t->flags.Set(oneof);
 
-		BuildTownHouse(t, tile, hs, house, random_bits, false, hs->extra_flags.Test(HouseExtraFlag::BuildingIsProtected));
+		/* A town of chosen sets builds a climate's house as itself, where a
+		 * set put a house of its own in place of it (IsHouseKeptOriginal()). */
+		BuildTownHouse(t, tile, hs, house, random_bits, false, hs->extra_flags.Test(HouseExtraFlag::BuildingIsProtected), by_sets && hs->grf_prop.grffile == nullptr);
 
 		return true;
 	}
@@ -3094,12 +3101,6 @@ CommandCost CmdPlaceHouse(DoCommandFlags flags, TileIndex tile, HouseID house, b
 	if (Town::GetNumItems() == 0) return CommandCost(STR_ERROR_MUST_FOUND_TOWN_FIRST);
 
 	if (static_cast<size_t>(house) >= HouseSpec::Specs().size()) return CMD_ERROR;
-	/* An original house a set put a house of its own in place of is read off
-	 * the map as the set's house (GetHouseType()), so that is the house to
-	 * place, its size and all: placed as the original, a one-tile original
-	 * stood for a set's four-tile house, and the tile loop walked into an
-	 * assertion on the three tiles that were not there. */
-	house = GetTranslatedHouseID(house);
 	const HouseSpec *hs = HouseSpec::Get(house);
 	if (!HouseCanBePlacedByHand(*hs)) return CMD_ERROR;
 
@@ -3143,7 +3144,12 @@ CommandCost CmdPlaceHouse(DoCommandFlags flags, TileIndex tile, HouseID house, b
 
 		Town *t = ClosestTownFromTile(tile, UINT_MAX);
 		bool house_completed = _settings_game.economy.place_houses == PlaceHouses::AllowedConstructed;
-		BuildTownHouse(t, tile, hs, house, Random(), house_completed, is_protected);
+		/* The player picked this house, so this house it is: the game's own
+		 * kept as itself where a set put a house of its own in place of it
+		 * (IsHouseKeptOriginal()). Placed as the original and read back as
+		 * the set's house, a one-tile house stood for a four-tile one and the
+		 * tile loop walked into an assertion on the tiles that were not there. */
+		BuildTownHouse(t, tile, hs, house, Random(), house_completed, is_protected, hs->grf_prop.grffile == nullptr);
 	}
 
 	return CommandCost();
@@ -3169,7 +3175,6 @@ CommandCost CmdPlaceHouseArea(DoCommandFlags flags, TileIndex tile, TileIndex st
 	if (Town::GetNumItems() == 0) return CommandCost(STR_ERROR_MUST_FOUND_TOWN_FIRST);
 
 	if (static_cast<size_t>(house) >= HouseSpec::Specs().size()) return CMD_ERROR;
-	house = GetTranslatedHouseID(house); // the set's house in place of an original, see CmdPlaceHouse()
 	const HouseSpec *hs = HouseSpec::Get(house);
 	if (!HouseCanBePlacedByHand(*hs)) return CMD_ERROR;
 

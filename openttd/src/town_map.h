@@ -52,6 +52,34 @@ inline HouseID GetCleanHouseType(Tile t)
 }
 
 /**
+ * Is the house on this tile the game's own, kept as itself where a set put a
+ * house of its own in place of it? A town told to build from a climate's
+ * houses builds them as themselves, and so does the player placing one by
+ * hand (the house picker); a town of every house builds the set's house for
+ * an original the set replaced, as it always did (GetTranslatedHouseID()).
+ * @param t the tile
+ * @pre IsTileType(t, TileType::House)
+ * @return whether the house is read as itself
+ */
+inline bool IsHouseKeptOriginal(Tile t)
+{
+	assert(IsTileType(t, TileType::House));
+	return HasBit(t.m8(), 12);
+}
+
+/**
+ * Mark the house on this tile as the game's own, kept as itself (IsHouseKeptOriginal()).
+ * @param t the tile
+ * @param kept whether it is kept as itself
+ * @pre IsTileType(t, TileType::House)
+ */
+inline void SetHouseKeptOriginal(Tile t, bool kept)
+{
+	assert(IsTileType(t, TileType::House));
+	AssignBit(t.m8(), 12, kept);
+}
+
+/**
  * Get the type of this house, which is an index into the house spec array
  * @param t the tile
  * @pre IsTileType(t, TileType::House)
@@ -59,7 +87,8 @@ inline HouseID GetCleanHouseType(Tile t)
  */
 inline HouseID GetHouseType(Tile t)
 {
-	return GetTranslatedHouseID(GetCleanHouseType(t));
+	HouseID house = GetCleanHouseType(t);
+	return IsHouseKeptOriginal(t) ? house : GetTranslatedHouseID(house);
 }
 
 /**
@@ -372,7 +401,7 @@ inline void DecHouseProcessingTime(Tile t)
  * @param house_protected Whether the house is protected from the town upgrading it.
  * @pre IsTileType(t, TileType::Clear)
  */
-inline void MakeHouseTile(Tile t, TownID tid, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool house_protected)
+inline void MakeHouseTile(Tile t, TownID tid, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool house_protected, bool keep_original = false)
 {
 	assert(IsTileType(t, TileType::Clear));
 
@@ -387,6 +416,7 @@ inline void MakeHouseTile(Tile t, TownID tid, uint8_t counter, uint8_t stage, Ho
 	SetAnimationFrame(t, 0);
 	SetHouseProcessingTime(t, HouseSpec::Get(type)->processing_time);
 	SB(t.m8(), 12, 4, 0);
+	SetHouseKeptOriginal(t, keep_original);
 }
 
 #endif /* TOWN_MAP_H */

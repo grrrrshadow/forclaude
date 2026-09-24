@@ -28,8 +28,11 @@ H=$S/ttdhome
 # The Mars towns are off for every scene but their own: they are made on top
 # of the other towns and would move everything after them on the map, and
 # with them off the game does not reach for the content server to fetch the
-# Mars houses either (FetchMarsHousesIfMissing()). A scene that wants them
-# says so in SCENE_NEWGAME, which run_scene puts in before the newgame line.
+# Mars houses either (FetchMarsHousesIfMissing()). The splitting of house
+# sets among towns is off for the same reason: it is on by default, and the
+# scenes with a house set loaded were written with towns of every house. A
+# scene that wants either says so in SCENE_NEWGAME, which run_scene puts in
+# before the newgame line.
 #
 # The seed is handed to the newgame command itself, not left in the settings
 # below. That command carries a seed of its own, and when it is not given one
@@ -52,6 +55,7 @@ setting_newgame difficulty.quantity_sea_lakes 0
 setting_newgame difficulty.number_towns 2
 setting_newgame difficulty.industry_density 4
 setting_newgame economy.mars_towns 0
+setting_newgame economy.split_house_grfs 0
 newgame 1'
 
 # This build keeps its config beside its own binary and under a name of its
@@ -1385,15 +1389,22 @@ testdomy picker vse 1950" 100 -c $DOMY2_CFG
 
 # A house placed by hand where a set put a house of its own in place of it
 # (grf/house_over.nfo, see README.md): the statue, with a four-tile block in
-# its place. The map reads the block off the tile (GetHouseType()), so the
-# block is what gets placed, all four tiles of it. Placed as the one-tile
-# statue it stood on one tile with a four-tile spec, and the tile loop walked
-# into an assertion on the three tiles that were not there -- the player's
-# crash on a house placed from the picker. The probe refuses a house standing
-# on fewer tiles than its spec says; the tile loop then runs 600 ticks.
+# its place. The player picked the statue, so the statue it is, kept as
+# itself on its tile (IsHouseKeptOriginal(), the bit in m8) where a town of
+# every house would build the block for it. Read back through the block it
+# stood on one tile with a four-tile spec, and the tile loop walked into an
+# assertion on the three tiles that were not there -- the player's crash on
+# a house placed from the picker. The probe says what stands there and
+# refuses a house on fewer tiles than its spec; the tile loop runs 600 ticks.
+# Then a town ticked to the temperate houses grows: every house it puts up
+# has to be a temperate one, statues as themselves among them -- with a set
+# in place of every temperate house, such a town had nothing to build and
+# mixed every house instead (the player's report).
 HOVER_CFG=$S/hover_openttd.cfg
 sed '/^\[newgrf\]$/a house_over.grf = ' "$CFG_KEEP" > $HOVER_CFG
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene domypostav "setting economy.place_houses 2
 testdomy postav 60 60 9
 testdomy postav 100 100 9
-testza 600 testdomy" 700 -c $HOVER_CFG
+testdomy okno 0 mirne
+testzatik 600 testdomy rust 0 40
+testzatik 650 testdomy" 700 -c $HOVER_CFG
