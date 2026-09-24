@@ -3119,6 +3119,12 @@ STR_HOUSE_PICKER_CLASS_ZONE4                                    :Vnitní předm�
 STR_HOUSE_PICKER_CLASS_ZONE5                                    :Centrum města
 
 STR_HOUSE_PICKER_PROTECT                                        :Zabránit vylepšení
+STR_HOUSE_PICKER_YEAR                                           :Domy roku {NUM}
+STR_HOUSE_PICKER_YEAR_ANY                                       :Domy všech let
+STR_HOUSE_PICKER_YEAR_TOOLTIP                                   :{BLACK}Rok, jehož domy seznam ukazuje -- domy se v čase mění. Kliknutím zadáte rok; prázdné = všechny domy
+STR_HOUSE_PICKER_YEAR_DOWN_TOOLTIP                              :{BLACK}O rok zpět
+STR_HOUSE_PICKER_YEAR_UP_TOOLTIP                                :{BLACK}O rok dál
+STR_HOUSE_PICKER_YEAR_QUERY_CAPT                                :{WHITE}Domy kterého roku (prázdné = všech)
 STR_HOUSE_PICKER_HOUSE_SET_TOOLTIP                              :{BLACK}Které domy seznam nabízí: všechny domy klimatu, domy jednoho klimatu -- kteréhokoli, ať se hraje cokoli -- nebo jednu sadu domů (GRF). Pro ruční stavbu tematického města
 STR_HOUSE_PICKER_PROTECT_TOOLTIP                                :Vyber, zdali bude tento dům chráněn před nahrazením, jak se bude město rozrůstat
 

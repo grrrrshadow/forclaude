@@ -1655,7 +1655,7 @@ static std::string CountHousesBySource(TownID town)
  *   has the Mars houses, each all of its set, and no Mars house in any town
  *   of every house; with the GRFs split, every ordinary town of one GRF and
  *   the GRFs even;
- * - testdomy picker <set>: the house picker filtered to one set shows its
+ * - testdomy picker <set> [year]: the house picker filtered to one set shows its
  *   houses and no others;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
@@ -1769,8 +1769,15 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		 * and nothing else, and something at all. */
 		auto psource = ParseHouseSource(argv[2]);
 		if (!psource.has_value()) return false;
-		auto [shown, wrong] = TestHousePickerSet(*psource);
-		IConsolePrint(CC_DEFAULT, "testdomy: picker [{}]: {} domu v seznamu, {} odjinud", *psource == 0 ? std::string{"vse"} : HouseSourceName(*psource), shown, wrong);
+		/* An optional year: the list shows the houses of that year only. */
+		TimerGameCalendar::Year year{0};
+		if (argv.size() >= 4) {
+			auto pyear = ParseInteger(argv[3]);
+			if (!pyear.has_value()) return false;
+			year = TimerGameCalendar::Year{static_cast<int32_t>(*pyear)};
+		}
+		auto [shown, wrong] = TestHousePickerSet(*psource, year);
+		IConsolePrint(CC_DEFAULT, "testdomy: picker [{}]{}: {} domu v seznamu, {} odjinud", *psource == 0 ? std::string{"vse"} : HouseSourceName(*psource), year == 0 ? std::string{} : fmt::format(" rok {}", year), shown, wrong);
 		if (shown == 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - seznam domu je prazdny.");
 		if (wrong > 0) IConsolePrint(CC_ERROR, "testdomy: ODMITNUTO - {} domu v seznamu neni z vybrane sady.", wrong);
 		return true;

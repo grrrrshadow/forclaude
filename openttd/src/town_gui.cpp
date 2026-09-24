@@ -1578,18 +1578,34 @@ public:
 	 */
 	bool InChosenSet(const HouseSpec *spec) const
 	{
-		/* The player picks from the list by hand: a GRF switching the original
-		 * houses off does not take them out of it (HouseSetCanBuild()). */
-		if (house_set == 0) return HouseSetCanBuild(*spec) && spec->building_availability.Any(this->climate_mask);
+		/* The player picks from the list by hand and no set narrows it
+		 * (HouseCanBePlacedByHand()); the year chosen does (InYear()). */
+		if (!HouseCanBePlacedByHand(*spec) || !this->InYear(spec)) return false;
+		if (house_set == 0) return spec->building_availability.Any(this->climate_mask);
 		if (house_set >= HOUSE_SOURCE_CLIMATE) {
-			/* The climate's houses by the towns' own rule: an original house is
-			 * the game's own even when a GRF has switched the originals off
-			 * (HouseSetCanBuild()), and a themed town builds it. */
-			if (spec->grf_prop.HasGrfFile() || !HouseSetCanBuild(*spec)) return false;
+			if (spec->grf_prop.HasGrfFile()) return false;
 			uint climate = house_set - HOUSE_SOURCE_CLIMATE;
 			return climate <= to_underlying(LandscapeType::Toyland) && spec->building_availability.Any(GetClimateMask(static_cast<LandscapeType>(climate)));
 		}
-		return spec->enabled && spec->grf_prop.HasGrfFile() && spec->grf_prop.grfid == house_set && spec->building_availability.Any(this->climate_mask);
+		return spec->grf_prop.HasGrfFile() && spec->grf_prop.grfid == house_set && spec->building_availability.Any(this->climate_mask);
+	}
+
+	/**
+	 * The year the list shows the houses of (WID_BH_YEAR_TEXT): houses come
+	 * and go with the years, and a player building a town of one year wants
+	 * the houses of that year. 0 shows every house whatever its years.
+	 */
+	static inline TimerGameCalendar::Year picker_year{0};
+
+	/**
+	 * Is a house built in the year chosen?
+	 * @param spec the house
+	 * @return whether it is, or every house when no year is chosen
+	 */
+	bool InYear(const HouseSpec *spec) const
+	{
+		if (picker_year == 0) return true;
+		return spec->min_year <= picker_year && picker_year <= spec->max_year;
 	}
 
 	static inline int sel_class; ///< Currently selected 'class'.
@@ -1877,6 +1893,10 @@ struct BuildHouseWindow : public PickerWindow {
 			uint32_t set = HousePickerCallbacks::house_set;
 			return GetString(STR_TOWN_VIEW_HOUSE_SETS, set == 0 ? GetString(STR_TOWN_VIEW_HOUSE_SETS_ALL) : HouseSourceName(set));
 		}
+		if (widget == WID_BH_YEAR_TEXT) {
+			TimerGameCalendar::Year year = HousePickerCallbacks::picker_year;
+			return year == 0 ? GetString(STR_HOUSE_PICKER_YEAR_ANY) : GetString(STR_HOUSE_PICKER_YEAR, year);
+		}
 		return this->PickerWindow::GetWidgetString(widget, stringid);
 	}
 
@@ -1908,6 +1928,36 @@ struct BuildHouseWindow : public PickerWindow {
 		this->SetWidgetDirty(WID_BH_HOUSE_SET);
 	}
 
+	/**
+	 * Show the houses of one year (HousePickerCallbacks::picker_year), the
+	 * list filtered again as when a set is chosen (ChooseHouseSet()).
+	 * @param year the year, 0 for every house whatever its years
+	 */
+	void ChooseYear(TimerGameCalendar::Year year)
+	{
+		HousePickerCallbacks::picker_year = year == 0 ? TimerGameCalendar::Year{0} : Clamp(year, CalendarTime::MIN_YEAR, CalendarTime::MAX_YEAR);
+		this->ChooseHouseSet(HousePickerCallbacks::house_set);
+		this->SetWidgetDirty(WID_BH_YEAR_TEXT);
+	}
+
+	void OnQueryTextFinished(std::optional<std::string> str) override
+	{
+		if (this->year_asked) {
+			this->year_asked = false;
+			if (!str.has_value()) return;
+			if (str->empty()) {
+				this->ChooseYear(TimerGameCalendar::Year{0});
+				return;
+			}
+			auto value = ParseInteger<int32_t>(*str, 10, true);
+			if (value.has_value()) this->ChooseYear(TimerGameCalendar::Year{*value});
+			return;
+		}
+		this->PickerWindow::OnQueryTextFinished(str);
+	}
+
+	bool year_asked = false; ///< The query string open is the year's, not a collection's name.
+
 	void OnDropdownSelect(WidgetID widget, int index, int click_result) override
 	{
 		if (widget != WID_BH_HOUSE_SET) {
@@ -1932,6 +1982,19 @@ struct BuildHouseWindow : public PickerWindow {
 				ShowDropDownList(this, std::move(list), static_cast<int>(HousePickerCallbacks::house_set), WID_BH_HOUSE_SET);
 				break;
 			}
+
+			case WID_BH_YEAR_DOWN:
+			case WID_BH_YEAR_UP: {
+				/* From no year, the game's year is the one to step from. */
+				TimerGameCalendar::Year year = HousePickerCallbacks::picker_year == 0 ? TimerGameCalendar::year : HousePickerCallbacks::picker_year;
+				this->ChooseYear(year + (widget == WID_BH_YEAR_UP ? 1 : -1));
+				break;
+			}
+
+			case WID_BH_YEAR_TEXT:
+				this->year_asked = true;
+				ShowQueryString(HousePickerCallbacks::picker_year == 0 ? std::string{} : GetString(STR_JUST_INT, HousePickerCallbacks::picker_year), STR_HOUSE_PICKER_YEAR_QUERY_CAPT, 8, this, CS_NUMERAL, QueryStringFlag::EnableDefault);
+				break;
 
 			case WID_BH_PROTECT_TOGGLE:
 				BuildHouseWindow::house_protected = !BuildHouseWindow::house_protected;
@@ -2032,6 +2095,11 @@ static constexpr std::initializer_list<NWidgetPart> _nested_build_house_widgets 
 			NWidget(WWT_PANEL, Colours::DarkGreen),
 				NWidget(NWID_VERTICAL), SetPIP(0, WidgetDimensions::unscaled.vsep_picker, 0), SetPadding(WidgetDimensions::unscaled.picker),
 					NWidget(WWT_DROPDOWN, Colours::Grey, WID_BH_HOUSE_SET), SetFill(1, 0), SetToolTip(STR_HOUSE_PICKER_HOUSE_SET_TOOLTIP),
+					NWidget(NWID_HORIZONTAL),
+						NWidget(WWT_IMGBTN, Colours::Grey, WID_BH_YEAR_DOWN), SetSpriteTip(SPR_ARROW_DOWN, STR_HOUSE_PICKER_YEAR_DOWN_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
+						NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_BH_YEAR_TEXT), SetToolTip(STR_HOUSE_PICKER_YEAR_TOOLTIP), SetFill(1, 1),
+						NWidget(WWT_IMGBTN, Colours::Grey, WID_BH_YEAR_UP), SetSpriteTip(SPR_ARROW_UP, STR_HOUSE_PICKER_YEAR_UP_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
+					EndContainer(),
 					NWidget(WWT_EMPTY, Colours::Invalid, WID_BH_INFO), SetFill(1, 1), SetMinimalTextLines(10, 0),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_BH_PROTECT_TOGGLE), SetMinimalSize(60, 12), SetStringTip(STR_HOUSE_PICKER_PROTECT, STR_HOUSE_PICKER_PROTECT_TOOLTIP),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_BH_REPLACE_TOGGLE), SetMinimalSize(60, 12), SetStringTip(STR_HOUSE_PICKER_REPLACE, STR_HOUSE_PICKER_REPLACE_TOOLTIP),
@@ -2061,13 +2129,15 @@ void ShowBuildHousePicker(Window *parent)
  * The house picker with one set chosen, for the test rig: opens it, chooses
  * the set as the dropdown does, and counts what the list then shows.
  * @param set the set (HousePickerCallbacks::house_set)
- * @return how many houses the list shows, and how many of them are not of the set
+ * @param year the year whose houses the list shows, 0 for every year (HousePickerCallbacks::picker_year)
+ * @return how many houses the list shows, and how many of them are not of the set or the year
  */
-std::pair<uint, uint> TestHousePickerSet(uint32_t set)
+std::pair<uint, uint> TestHousePickerSet(uint32_t set, TimerGameCalendar::Year year)
 {
 	ShowBuildHousePicker(nullptr);
 	BuildHouseWindow *w = dynamic_cast<BuildHouseWindow *>(FindWindowById(WindowClass::BuildHouse, 0));
 	if (w == nullptr) return {0, 0};
+	w->ChooseYear(year);
 	w->ChooseHouseSet(set);
 	const HousePickerCallbacks &cb = HousePickerCallbacks::instance;
 	uint shown = 0, wrong = 0;
@@ -2077,6 +2147,7 @@ std::pair<uint, uint> TestHousePickerSet(uint32_t set)
 			shown++;
 			const HouseSpec *hs = HouseSpec::Get(id);
 			bool ok = set == 0 ? true : (set >= HOUSE_SOURCE_CLIMATE ? !hs->grf_prop.HasGrfFile() && hs->building_availability.Any(GetClimateMask(static_cast<LandscapeType>(set - HOUSE_SOURCE_CLIMATE))) : hs->grf_prop.HasGrfFile() && hs->grf_prop.grfid == set);
+			if (year != 0 && (hs->min_year > year || hs->max_year < year)) ok = false;
 			if (!ok) wrong++;
 		}
 	}

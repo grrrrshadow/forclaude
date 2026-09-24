@@ -125,7 +125,7 @@ inline void SetIndustryConstructionStage(Tile tile, uint8_t value)
 inline IndustryGfx GetCleanIndustryGfx(Tile t)
 {
 	assert(IsTileType(t, TileType::Industry));
-	return t.m5() | (GB(t.m6(), 2, 1) << 8);
+	return t.m5() | (GB(t.m6(), 2, 1) << 8) | (GB(t.m6(), 6, 2) << 9);
 }
 
 /**
@@ -151,6 +151,9 @@ inline void SetIndustryGfx(Tile t, IndustryGfx gfx)
 	assert(IsTileType(t, TileType::Industry));
 	t.m5() = GB(gfx, 0, 8);
 	SB(t.m6(), 2, 1, GB(gfx, 8, 1));
+	/* Bits 9 and 10 in the two bits of m6 that were free; a saved game from
+	 * before has zeroes there, which is what its tiles below 512 need. */
+	SB(t.m6(), 6, 2, GB(gfx, 9, 2));
 }
 
 /**
@@ -286,7 +289,6 @@ inline void MakeIndustry(Tile t, IndustryID index, IndustryGfx gfx, uint8_t rand
 	SetIndustryGfx(t, gfx); // m5, part of m6
 	SetIndustryRandomTriggers(t, {}); // rest of m6
 	SetWaterClass(t, wc);
-	SB(t.m6(), 6, 2, 0);
 	t.m7() = 0;
 	t.m8() = 0;
 }

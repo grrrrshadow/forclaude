@@ -80,6 +80,9 @@ enum TownFoundingWidgets : WidgetID {
 /** Widgets of the #BuildHouseWindow class. */
 enum BuildHouseWidgets : WidgetID {
 	WID_BH_HOUSE_SET, ///< Which set of houses the list shows: every house, a climate's, a GRF's.
+	WID_BH_YEAR_DOWN, ///< A year back.
+	WID_BH_YEAR_TEXT, ///< The year the list shows the houses of; click to type one.
+	WID_BH_YEAR_UP, ///< A year on.
 	WID_BH_INFO, ///< Information panel of selected house.
 	WID_BH_PROTECT_TOGGLE, ///< Button to toggle protecting the next house built.
 	WID_BH_REPLACE_TOGGLE, ///< Button to toggle replacing existing houses.

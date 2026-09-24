@@ -53,7 +53,7 @@ static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maxim
 
 static const IndustryGfx  INDUSTRYTILE_NOANIM    = 0xFF;              ///< flag to mark industry tiles as having no animation
 static const IndustryGfx  NEW_INDUSTRYTILEOFFSET = 175;               ///< original number of tiles
-static const IndustryGfx  NUM_INDUSTRYTILES      = 512;               ///< total number of industry tiles, new and old
+static const IndustryGfx  NUM_INDUSTRYTILES      = 2048;              ///< total number of industry tiles, new and old: several industry sets side by side (ECS, FIRS, Caribbean...) want more than the 512 there were, and the map has the bits (industry_map.h, m6)
 static const IndustryGfx  INVALID_INDUSTRYTILE   = NUM_INDUSTRYTILES; ///< one above amount is considered invalid
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.

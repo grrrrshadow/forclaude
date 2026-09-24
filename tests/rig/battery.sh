@@ -1378,4 +1378,7 @@ run_scene domypickervypnute "testdomy picker mirne
 testdomy picker arktida
 testdomy picker poust
 testdomy picker toyland
-testdomy picker vse" 100 -c $DOMY2_CFG
+testdomy picker vse
+testdomy picker mirne 1950
+testdomy picker mirne 2050
+testdomy picker vse 1950" 100 -c $DOMY2_CFG

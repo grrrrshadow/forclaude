@@ -197,6 +197,17 @@ another slot after the NewGRFs had spoken never got the once-over that gives
 every cargo a town production effect, and the next thing that sorted cargoes
 walked into an assertion.
 
+## The house picker with a set that switches the original houses off
+
+The scene `domypickervypnute` opens the house picker with the older Mars set
+(4F474D05, `ogfx-mars-houses.grf`, which switches the original houses off)
+and counts what the list shows for each climate, for every house, and for
+the temperate houses of 1950 and 2050. The player picks from that list by
+hand and no set narrows it (HouseCanBePlacedByHand()): Swedish Houses, which
+puts its own houses in place of all the temperate ones, left the list of
+the temperate houses empty in the player's game. `testdomy picker <set>
+[year]` refuses an empty list and a house not of the set or the year.
+
 ## A set that gives up after it has changed things
 
 `grf/quits_late.nml` (strings in `grf/lang/english.lng`) is a NewGRF of three
