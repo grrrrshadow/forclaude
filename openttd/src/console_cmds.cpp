@@ -1344,6 +1344,108 @@ static bool ConTestSnow(std::span<std::string_view> argv)
 }
 
 /**
+ * The departure buttons of the orders window, "reverse out" and "leave by
+ * itself", order by order: a station order has them to use, and any other
+ * order of a train -- a depot's above all -- has them greyed and up. Written
+ * when the player found them lit and down on a "go to depot" order, left over
+ * from the station order before it. The train's first station order is set to
+ * reverse out first, so that there is something to be left over, and a depot
+ * order is added at the end when the train has none.
+ * Usage: testsmerdepo [unit number]  (the first train with orders when none)
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDepartureButtons(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Check the orders window's departure buttons on every order of a train. Usage: 'testsmerdepo [cislo vlaku]'.");
+		return true;
+	}
+	Train *t = nullptr;
+	std::optional<int> punit;
+	if (argv.size() >= 2) {
+		punit = ParseInteger(argv[1]);
+		if (!punit.has_value()) return false;
+	}
+	/* Named, that train; else the first with a plain station order -- one
+	 * that neither waits to be coupled nor decouples, so that reversing out
+	 * can be set on it and there is something to be left over. */
+	for (Train *c : Train::Iterate()) {
+		if (c->First() != c || c->GetNumOrders() == 0) continue;
+		if (punit.has_value()) {
+			if (c->unitnumber != (UnitID)*punit) continue;
+			t = c;
+			break;
+		}
+		for (const Order &o : c->Orders()) {
+			if (o.IsType(OT_GOTO_STATION) && !o.ShouldWaitForCouple() && !o.ShouldDecoupleOnDeparture()) {
+				t = c;
+				break;
+			}
+		}
+		if (t != nullptr) break;
+	}
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - zadny vlak s obycejnym stanicnim rozkazem.");
+		return true;
+	}
+	IConsolePrint(CC_DEFAULT, "testsmerdepo: vlak {}, {} rozkazu", t->unitnumber, t->GetNumOrders());
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+
+	bool has_depot = false;
+	for (const Order &o : t->Orders()) {
+		if (o.IsType(OT_GOTO_DEPOT)) has_depot = true;
+	}
+	if (!has_depot) {
+		const Depot *home = nullptr;
+		for (const Depot *d : Depot::Iterate()) {
+			if (IsRailDepotTile(d->xy) && GetTileOwner(d->xy) == t->owner) {
+				home = d;
+				break;
+			}
+		}
+		if (home == nullptr) {
+			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - zadne depo, kam poslat.");
+			return true;
+		}
+		Order o{};
+		o.MakeGoToDepot(DestinationID(home->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		CommandCost r = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, t->index, t->GetNumOrders(), o);
+		if (r.Failed()) {
+			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - rozkaz do depa se nevlozil: {}", GetString(r.GetErrorMessage()));
+			return true;
+		}
+	}
+	for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
+		const Order *o = t->GetOrder(i);
+		if (o->IsType(OT_GOTO_STATION) && !o->ShouldWaitForCouple() && !o->ShouldDecoupleOnDeparture()) {
+			Command<Commands::ModifyOrder>::Do(DoCommandFlag::Execute, t->index, i, MOF_REVERSE_OUT, 1);
+			break;
+		}
+	}
+
+	for (VehicleOrderID i = 0; i < t->GetNumOrders(); i++) {
+		const Order *o = t->GetOrder(i);
+		std::optional<OrderDirectionButtons> b = TestOrderDirectionButtons(t, i);
+		if (!b.has_value()) {
+			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - okno rozkazu se neotevrelo.");
+			return true;
+		}
+		bool station = o->IsType(OT_GOTO_STATION);
+		IConsolePrint(CC_DEFAULT, "testsmerdepo: rozkaz {} ({}): reversni chod {}{}, automaticky {}{}", i,
+				station ? "stanice" : o->IsType(OT_GOTO_DEPOT) ? "depo" : "jiny",
+				b->reverse_disabled ? "zasedly" : "aktivni", b->reverse_lowered ? " a zamackly" : "",
+				b->auto_disabled ? "zasedly" : "aktivni", b->auto_lowered ? " a zamackly" : "");
+		if (!station && (!b->reverse_disabled || b->reverse_lowered || !b->auto_disabled || b->auto_lowered)) {
+			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - rozkaz {} neni do stanice, a cudliky smeru nejsou zasedle a zvednute.", i);
+		}
+		if (station && !o->ShouldWaitForCouple() && !o->ShouldDecoupleOnDeparture() && (b->reverse_disabled || b->reverse_lowered != o->ShouldReverseOutOfStation())) {
+			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - rozkaz {} do stanice: cudlik reversniho chodu neodpovida rozkazu.", i);
+		}
+	}
+	return true;
+}
+
+/**
  * A set of houses as the rig names it: "klima" for the houses of the climate
  * played, "mirne", "arktida", "poust" or "toyland" for a climate's houses,
  * "vse" for none chosen, or a GRF id the way the game prints it (4F474D05).
@@ -11786,6 +11888,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testmesta",               ConTestTowns);
 	IConsole::CmdRegister("testdomy",                ConTestHouseSets);
 	IConsole::CmdRegister("testsnih",                ConTestSnow);
+	IConsole::CmdRegister("testsmerdepo",            ConTestDepartureButtons);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);

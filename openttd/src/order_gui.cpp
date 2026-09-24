@@ -1501,6 +1501,17 @@ public:
 		 * all. See FEATURE_DESIGN_COUPLING_TOW.md. */
 		NWidgetStacked *decouple_sel = this->GetWidget<NWidgetStacked>(WID_O_SEL_DECOUPLE);
 		if (decouple_sel != nullptr) {
+			/* Reversing out and leaving by itself are a station order's alone.
+			 * Every other order of a train -- a depot's, a waypoint's, the end
+			 * of the list -- has the two greyed and up. Left alone they kept
+			 * whatever the order before them had, and sat lit and down on a
+			 * "go to depot" order, whose train turns with the depot's own
+			 * button. The station branch below sets them for real. */
+			this->SetWidgetDisabledState(WID_O_REVERSE_OUT, true);
+			this->SetWidgetLoweredState(WID_O_REVERSE_OUT, false);
+			this->SetWidgetDisabledState(WID_O_AUTO_DEPARTURE, true);
+			this->SetWidgetLoweredState(WID_O_AUTO_DEPARTURE, false);
+
 			bool is_train = this->vehicle->type == VehicleType::Train && order != nullptr;
 			if (is_train && order->IsType(OT_GOTO_STATION)) {
 				decouple_sel->SetDisplayedPlane(DP_COUPLE_ROW_STATION);
@@ -3080,3 +3091,20 @@ void ShowOrdersWindow(const Vehicle *v)
 		new OrdersWindow(v->IsGroundVehicle() ? _orders_train_desc : _orders_desc, v);
 	}
 }
+
+/**
+ * What the orders window lets a train do on leaving an order -- the states of
+ * its "reverse out" and "leave by itself" buttons -- for the test rig. Opens
+ * the window and selects the order as a click on its row would.
+ * @param v the vehicle
+ * @param sel the order
+ * @return the two buttons' states, or nothing when there is no window
+ */
+std::optional<OrderDirectionButtons> TestOrderDirectionButtons(const Vehicle *v, VehicleOrderID sel)
+{
+	ShowOrdersWindow(v);
+	OrdersWindow *w = dynamic_cast<OrdersWindow *>(FindWindowById(WindowClass::VehicleOrders, v->index));
+	if (w == nullptr || !w->SelectOrderForTest(sel)) return std::nullopt;
+	return OrderDirectionButtons{w->IsWidgetDisabled(WID_O_REVERSE_OUT), w->IsWidgetLowered(WID_O_REVERSE_OUT), w->IsWidgetDisabled(WID_O_AUTO_DEPARTURE), w->IsWidgetLowered(WID_O_AUTO_DEPARTURE)};
+}
+

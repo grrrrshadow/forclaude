@@ -1304,3 +1304,12 @@ setting_newgame economy.arctic_towns_on_snow 0' run_scene snihbezarktidy "testza
 # has one house GRF besides Mars, so the turns among several are not seen
 # here; the split with two is the same modulo.
 SCENE_NEWGAME='setting_newgame economy.split_house_grfs 1' run_scene delenigrf "testdomy mapa" 100 -c $DOMY2_CFG
+
+# The orders window's departure buttons, "reverse out" and "leave by itself",
+# on a train with a station order set to reverse out and a depot order after
+# it: greyed and up on the depot order (the depot has a turn-around button of
+# its own), as on any order that is not a station's. They once stayed lit and
+# down there, left over from the station order before.
+run_scene smerdepo "vlak123 on
+testspoj
+testzatik 100 testsmerdepo" 400

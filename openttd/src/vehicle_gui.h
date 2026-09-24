@@ -61,6 +61,15 @@ void ShowBuildVehicleWindow(TileIndex tile, VehicleType type);
 void ShowPickCoupleWagonWindow(const Vehicle *v, VehicleOrderID index, TileIndex tile, CargoType cargo);
 void TestPickCoupleWagon(const Vehicle *v, VehicleOrderID index, TileIndex tile, CargoType cargo);
 
+/** The states of the orders window's two departure buttons, for the test rig (TestOrderDirectionButtons()). */
+struct OrderDirectionButtons {
+	bool reverse_disabled; ///< "Reverse out" greyed.
+	bool reverse_lowered; ///< "Reverse out" pressed.
+	bool auto_disabled; ///< "Leave by itself" greyed.
+	bool auto_lowered; ///< "Leave by itself" pressed.
+};
+std::optional<OrderDirectionButtons> TestOrderDirectionButtons(const Vehicle *v, VehicleOrderID sel);
+
 uint ShowRefitOptionsList(int left, int right, int y, EngineID engine);
 StringID GetCargoSubtypeText(const Vehicle *v);
 
