@@ -1686,7 +1686,7 @@ STR_CONFIG_SETTING_OIL_REF_EDGE_DISTANCE                        :Maximum distanc
 STR_CONFIG_SETTING_OIL_REF_EDGE_DISTANCE_HELPTEXT               :Limit for how far from the map border oil refineries and oil rigs can be constructed. On island maps this ensures they are near the coast. On maps larger than 256 tiles, this value is scaled up
 
 STR_CONFIG_SETTING_SNOWLINE_HEIGHT                              :Snow line height: {STRING2}
-STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT                     :Choose at what height snow starts in sub-arctic landscape. Snow also affects industry generation and town growth requirements. Can only be modified via Scenario Editor or is otherwise calculated via "snow coverage"
+STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT                     :Choose at what height snow starts. In the sub-arctic climate it is worked out from the snow coverage and can only be changed in the scenario editor; with snow in the temperate climate on it is set here or in the new game window. Snow also affects industry generation and town growth requirements
 
 STR_CONFIG_SETTING_TEMPERATE_SNOW                               :Snow in the temperate climate: {STRING2}
 STR_CONFIG_SETTING_TEMPERATE_SNOW_HELPTEXT                      :Give the temperate climate a snow line as the arctic has. Above it the ground, rails, roads, trees, tunnels and stations are snowy as in the arctic and towns founded there build the arctic houses; below it the land stays temperate green. Sets (NewGRFs) draw as they always did. The line's height comes from the snow coverage
@@ -2205,8 +2205,8 @@ STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER                         :Initial city si
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Average size of cities relative to normal towns at start of the game
 STR_CONFIG_SETTING_TEMPERATE_TOWNS                              :Temperate towns: {STRING2}
 STR_CONFIG_SETTING_TEMPERATE_TOWNS_HELPTEXT                     :How many small towns of the temperate houses a new map gets among its other towns. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
-STR_CONFIG_SETTING_ARCTIC_TOWNS                                 :Arctic towns: {STRING2}
-STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :Arctic houses are built above a snow line only. In the temperate climate, snow has to be on and the snow line low enough for them, otherwise they are not built at all -- arctic houses without snow are none. Above the snow line every town is arctic by itself, so this count does not apply; change a town in its town window ("Houses from")
+STR_CONFIG_SETTING_ARCTIC_TOWNS                                 :Arctic towns above the snow line: {STRING2}
+STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :On, every town founded above the snow line of the temperate climate -- by the map or by a player -- builds the arctic houses, snowy roofs on the snow; off, the towns above the line are ordinary. Arctic houses are built above a snow line only: snow in the temperate climate has to be on and the snow line low enough for them, otherwise they are not built at all -- arctic houses without snow are none. Any town is changed in its town window ("Houses from")
 STR_CONFIG_SETTING_TROPIC_TOWNS                                 :Desert towns: {STRING2}
 STR_CONFIG_SETTING_TROPIC_TOWNS_HELPTEXT                        :How many small towns of the desert houses a new map gets among its other towns. The line of the climate being played is greyed: those are the ordinary towns. Any town can be switched to these houses later in its town window ("Houses from")
 STR_CONFIG_SETTING_TOYLAND_TOWNS                                :Toyland towns: {STRING2}
@@ -3595,6 +3595,13 @@ STR_MAPGEN_HEIGHTMAP_HEIGHT                                     :{BLACK}Highest 
 STR_MAPGEN_HEIGHTMAP_HEIGHT_TOOLTIP                             :{BLACK}Choose the highest peak that the game will attempt to create, measured in elevation above sea level
 STR_MAPGEN_HEIGHTMAP_HEIGHT_UP_TOOLTIP                          :{BLACK}Increase the maximum height of highest peak on the map by one
 STR_MAPGEN_HEIGHTMAP_HEIGHT_DOWN_TOOLTIP                        :{BLACK}Decrease the maximum height of highest peak on the map by one
+STR_MAPGEN_TEMPERATE_SNOW                                       :{BLACK}Snow in the temperate climate:
+STR_MAPGEN_TEMPERATE_SNOW_TOOLTIP                               :{BLACK}Snow above a snow line in the temperate climate, as in the arctic; the height of the line beside it. Towns founded above the line build the arctic houses
+STR_MAPGEN_TEMPERATE_SNOW_ON                                    :{BLACK}On
+STR_MAPGEN_TEMPERATE_SNOW_OFF                                   :{BLACK}Off
+STR_MAPGEN_SNOW_LINE_TEXT                                       :{BLACK}{NUM}
+STR_MAPGEN_SNOW_LINE_UP_TOOLTIP                                 :{BLACK}Raise the snow line by one
+STR_MAPGEN_SNOW_LINE_DOWN_TOOLTIP                               :{BLACK}Lower the snow line by one
 STR_MAPGEN_SNOW_COVERAGE                                        :{BLACK}Snow coverage:
 STR_MAPGEN_SNOW_COVERAGE_UP_TOOLTIP                             :{BLACK}Increase snow coverage by ten percent
 STR_MAPGEN_SNOW_COVERAGE_DOWN_TOOLTIP                           :{BLACK}Decrease snow coverage by ten percent
@@ -3671,6 +3678,7 @@ STR_MAPGEN_HEIGHTMAP_SIZE                                       :{ORANGE}{NUM} x
 
 STR_MAPGEN_TERRAIN_TYPE_QUERY_CAPT                              :{WHITE}Target peak height
 STR_MAPGEN_HEIGHTMAP_HEIGHT_QUERY_CAPT                          :{WHITE}Highest peak
+STR_MAPGEN_SNOW_LINE_QUERY_CAPT                                 :{WHITE}Snow line height
 STR_MAPGEN_SNOW_COVERAGE_QUERY_CAPT                             :{WHITE}Snow coverage (in %)
 STR_MAPGEN_DESERT_COVERAGE_QUERY_CAPT                           :{WHITE}Desert coverage (in %)
 STR_MAPGEN_START_DATE_QUERY_CAPT                                :{WHITE}Change starting year

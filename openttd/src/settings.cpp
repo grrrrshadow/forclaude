@@ -931,12 +931,20 @@ bool SettingDesc::IsEditable(bool do_command) const
 
 	/* The themed towns of the climate that is played are just towns: that
 	 * line is greyed rather than gone, so the four stay where they are. */
-	static const std::string_view CLIMATE_TOWNS[] = {"economy.temperate_towns", "economy.arctic_towns", "economy.tropic_towns", "economy.toyland_towns"};
+	static const std::string_view CLIMATE_TOWNS[] = {"economy.temperate_towns", "economy.arctic_towns_on_snow", "economy.tropic_towns", "economy.toyland_towns"};
 	if (this->GetName() == CLIMATE_TOWNS[to_underlying(GetGameSettings().game_creation.landscape)]) return false;
-	/* The arctic line is greyed everywhere: the arctic houses go up on snow
-	 * only, where every town is of them by itself; the line is there for
-	 * what its help says (GenerateTowns()). */
-	if (this->GetName() == "economy.arctic_towns") return false;
+	/* The height of the snow line: the arctic works it out from its snow
+	 * coverage, so it is the scenario editor's alone there; the temperate
+	 * climate with snow on takes it as given, in the menu before a new game
+	 * as in the editor -- never in a running game, as the arctic never. */
+	if (this->GetName() == "game_creation.snow_line_height" && _game_mode != GameMode::Editor &&
+			!(_game_mode == GameMode::Menu && GetGameSettings().game_creation.landscape == LandscapeType::Temperate && GetGameSettings().game_creation.temperate_snow)) return false;
+
+	/* The arctic line is a switch for the towns above the temperate snow
+	 * line (DoCreateTown()): it has something to say only where that line
+	 * is, the temperate climate with its snow on. */
+	if (this->GetName() == "economy.arctic_towns_on_snow" &&
+			!(GetGameSettings().game_creation.landscape == LandscapeType::Temperate && GetGameSettings().game_creation.temperate_snow)) return false;
 
 	if (!do_command && !this->flags.Test(SettingFlag::NoNetworkSync) && _networking && !_network_server && !this->flags.Test(SettingFlag::PerCompany)) return false;
 	if (do_command && this->flags.Test(SettingFlag::NoNetworkSync)) return false;

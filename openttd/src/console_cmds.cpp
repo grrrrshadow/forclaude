@@ -1267,7 +1267,8 @@ static std::string CountHousesBySource(TownID town);
  * been round the map, every clear and tree tile from a step below the snow
  * line up is snowy and none lower down is, rails and roads above the line
  * are on snow, and a town founded above the line has the arctic houses
- * unless told otherwise. With no snow in the game, not one snowy tile: the
+ * unless told otherwise -- or none at all with the switch for that off. With
+ * no snow in the game, not one snowy tile: the
  * temperate climate as it always was. Usage: testsnih
  * @copydoc IConsoleCmdProc
  */
@@ -1329,8 +1330,13 @@ static bool ConTestSnow(std::span<std::string_view> argv)
 			sets += HouseSourceName(t->house_sets[i]);
 		}
 		IConsolePrint(CC_DEFAULT, "testsnih: mesto {} '{}' {} carou, domy z [{}], stoji {}", t->index.base(), t->GetCachedName(), above ? "nad" : "pod", sets.empty() ? "vsech" : sets, CountHousesBySource(t->index));
-		if (HasSnow() && _settings_game.game_creation.landscape == LandscapeType::Temperate && above && !(t->num_house_sets == 1 && t->house_sets[0] == arctic)) {
+		bool temperate_snow = HasSnow() && _settings_game.game_creation.landscape == LandscapeType::Temperate;
+		bool is_arctic = t->num_house_sets == 1 && t->house_sets[0] == arctic;
+		if (temperate_snow && above && _settings_game.economy.arctic_towns_on_snow && !is_arctic) {
 			IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - mesto {} nad carou nema arkticke domy.", t->index.base());
+		}
+		if (temperate_snow && above && !_settings_game.economy.arctic_towns_on_snow && t->num_house_sets != 0) {
+			IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - mesto {} nad carou ma sadu, a arkticka mesta nad carou jsou vypnuta.", t->index.base());
 		}
 		if (!HasSnow() && t->num_house_sets != 0) IConsolePrint(CC_ERROR, "testsnih: ODMITNUTO - mesto {} ma zvolene sady, a nikdo mu je nedal.", t->index.base());
 	}

@@ -678,7 +678,7 @@ struct EconomySettings {
 	uint8_t larger_towns; ///< the number of cities to build. These start off larger and grow twice as fast
 	uint8_t initial_city_size; ///< multiplier for the initial size of the cities compared to towns
 	uint8_t temperate_towns; ///< how many small towns of the temperate houses a new map gets (0 in temperate itself)
-	uint8_t arctic_towns; ///< how many small towns of the arctic houses a new map gets (0 in arctic itself)
+	bool arctic_towns_on_snow; ///< every town founded above the temperate snow line is of the arctic houses (SnowLandscape())
 	uint8_t tropic_towns; ///< how many small towns of the desert houses a new map gets (0 in the tropics itself)
 	uint8_t toyland_towns; ///< how many small towns of the toyland houses a new map gets (0 in toyland itself)
 	uint8_t mars_towns; ///< how many small towns of the Mars houses a new map gets, see mars_houses.h

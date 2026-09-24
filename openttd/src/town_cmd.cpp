@@ -2065,9 +2065,10 @@ static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSi
 	t->num_house_sets = 0;
 	t->house_sets.fill(0);
 	/* A town founded above the temperate snow line (SnowLandscape()) is of
-	 * the arctic houses unless told otherwise -- snowy roofs on the snow; the
+	 * the arctic houses unless told otherwise -- snowy roofs on the snow --
+	 * while the switch for it is on (economy.arctic_towns_on_snow); the
 	 * player changes it in the town window like any town's. */
-	if (house_set == 0 && _settings_game.game_creation.landscape == LandscapeType::Temperate && HasSnow() && GetTileMaxZ(tile) > HighestSnowLine()) {
+	if (house_set == 0 && _settings_game.game_creation.landscape == LandscapeType::Temperate && HasSnow() && _settings_game.economy.arctic_towns_on_snow && GetTileMaxZ(tile) > HighestSnowLine()) {
 		house_set = HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Arctic);
 	}
 	if (house_set != 0) t->house_sets[t->num_house_sets++] = house_set;
@@ -2507,10 +2508,10 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 		std::vector<std::pair<uint32_t, uint>> themed;
 		const LandscapeType played = _settings_game.game_creation.landscape;
 		if (played != LandscapeType::Temperate) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Temperate), _settings_game.economy.temperate_towns);
-		/* No arctic line: the arctic houses go up on snow only, and above
+		/* No arctic count: the arctic houses go up on snow only, and above
 		 * the temperate snow line every town is of them as it is founded
-		 * (DoCreateTown()) -- a count would say nothing. Its setting stays
-		 * for the help it carries and is greyed (SettingDesc::IsEditable()). */
+		 * (DoCreateTown()), with a switch for that instead of a count
+		 * (economy.arctic_towns_on_snow). */
 		if (played != LandscapeType::Tropic) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Tropic), _settings_game.economy.tropic_towns);
 		if (played != LandscapeType::Toyland) themed.emplace_back(HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Toyland), _settings_game.economy.toyland_towns);
 		std::vector<uint32_t> sources = AvailableHouseSources();

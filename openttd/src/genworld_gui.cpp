@@ -130,6 +130,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_generate_landscape_w
 							NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_SNOW_COVERAGE, STR_CONFIG_SETTING_SNOW_COVERAGE_HELPTEXT), SetFill(1, 1),
 							NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_DESERT_COVERAGE, STR_CONFIG_SETTING_DESERT_COVERAGE_HELPTEXT), SetFill(1, 1),
 							NWidget(NWID_SPACER), SetFill(1, 1),
+							NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_TEMPERATE_SNOW, STR_MAPGEN_TEMPERATE_SNOW_TOOLTIP), SetFill(1, 1),
 						EndContainer(),
 						NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_DATE, STR_MAPGEN_DATE_TOOLTIP), SetFill(1, 1),
 						NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_TOWN_NAME_LABEL, STR_MAPGEN_TOWN_NAME_DROPDOWN_TOOLTIP), SetFill(1, 1),
@@ -156,8 +157,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_generate_landscape_w
 								NWidget(WWT_TEXTBTN, Colours::Orange, WID_GL_DESERT_COVERAGE_TEXT), SetToolTip(STR_CONFIG_SETTING_DESERT_COVERAGE_HELPTEXT), SetFill(1, 1),
 								NWidget(WWT_IMGBTN, Colours::Orange, WID_GL_DESERT_COVERAGE_UP), SetSpriteTip(SPR_ARROW_UP, STR_MAPGEN_DESERT_COVERAGE_UP_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
 							EndContainer(),
-							/* Temperate/Toyland spacer. */
+							/* Toyland spacer. */
 							NWidget(NWID_SPACER), SetFill(1, 1),
+							/* Snow in the temperate climate: on or off, and the height of its snow line. */
+							NWidget(NWID_HORIZONTAL),
+								NWidget(WWT_TEXTBTN, Colours::Orange, WID_GL_TEMPERATE_SNOW), SetToolTip(STR_MAPGEN_TEMPERATE_SNOW_TOOLTIP), SetFill(1, 1),
+								NWidget(WWT_IMGBTN, Colours::Orange, WID_GL_SNOW_LINE_DOWN), SetSpriteTip(SPR_ARROW_DOWN, STR_MAPGEN_SNOW_LINE_DOWN_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
+								NWidget(WWT_TEXTBTN, Colours::Orange, WID_GL_SNOW_LINE_TEXT), SetToolTip(STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT), SetFill(1, 1),
+								NWidget(WWT_IMGBTN, Colours::Orange, WID_GL_SNOW_LINE_UP), SetSpriteTip(SPR_ARROW_UP, STR_MAPGEN_SNOW_LINE_UP_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
+							EndContainer(),
 						EndContainer(),
 						/* Starting date. */
 						NWidget(NWID_HORIZONTAL),
@@ -271,6 +279,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_heightmap_load_widge
 							NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_SNOW_COVERAGE, STR_CONFIG_SETTING_SNOW_COVERAGE_HELPTEXT), SetFill(1, 1),
 							NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_DESERT_COVERAGE, STR_CONFIG_SETTING_DESERT_COVERAGE_HELPTEXT), SetFill(1, 1),
 							NWidget(NWID_SPACER), SetFill(1, 1),
+							NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_TEMPERATE_SNOW, STR_MAPGEN_TEMPERATE_SNOW_TOOLTIP), SetFill(1, 1),
 						EndContainer(),
 						NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_DATE, STR_MAPGEN_DATE_TOOLTIP), SetFill(1, 1),
 						NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_MAPGEN_TOWN_NAME_LABEL, STR_MAPGEN_TOWN_NAME_DROPDOWN_TOOLTIP), SetFill(1, 1),
@@ -295,8 +304,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_heightmap_load_widge
 								NWidget(WWT_TEXTBTN, Colours::Orange, WID_GL_DESERT_COVERAGE_TEXT), SetToolTip(STR_CONFIG_SETTING_DESERT_COVERAGE_HELPTEXT), SetFill(1, 1),
 								NWidget(WWT_IMGBTN, Colours::Orange, WID_GL_DESERT_COVERAGE_UP), SetSpriteTip(SPR_ARROW_UP, STR_MAPGEN_DESERT_COVERAGE_UP_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
 							EndContainer(),
-							/* Temperate/Toyland spacer. */
+							/* Toyland spacer. */
 							NWidget(NWID_SPACER), SetFill(1, 1),
+							/* Snow in the temperate climate: on or off, and the height of its snow line. */
+							NWidget(NWID_HORIZONTAL),
+								NWidget(WWT_TEXTBTN, Colours::Orange, WID_GL_TEMPERATE_SNOW), SetToolTip(STR_MAPGEN_TEMPERATE_SNOW_TOOLTIP), SetFill(1, 1),
+								NWidget(WWT_IMGBTN, Colours::Orange, WID_GL_SNOW_LINE_DOWN), SetSpriteTip(SPR_ARROW_DOWN, STR_MAPGEN_SNOW_LINE_DOWN_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
+								NWidget(WWT_TEXTBTN, Colours::Orange, WID_GL_SNOW_LINE_TEXT), SetToolTip(STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT), SetFill(1, 1),
+								NWidget(WWT_IMGBTN, Colours::Orange, WID_GL_SNOW_LINE_UP), SetSpriteTip(SPR_ARROW_UP, STR_MAPGEN_SNOW_LINE_UP_TOOLTIP), SetFill(0, 1), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON),
+							EndContainer(),
 						EndContainer(),
 						/* Starting date. */
 						NWidget(NWID_HORIZONTAL),
@@ -440,6 +456,8 @@ struct GenerateLandscapeWindow : public Window {
 			case WID_GL_MAPSIZE_Y_PULLDOWN:   return GetString(STR_JUST_INT, 1LL << _settings_newgame.game_creation.map_y);
 			case WID_GL_HEIGHTMAP_HEIGHT_TEXT: return GetString(STR_JUST_INT, _settings_newgame.game_creation.heightmap_height);
 			case WID_GL_SNOW_COVERAGE_TEXT:   return GetString(STR_MAPGEN_SNOW_COVERAGE_TEXT, _settings_newgame.game_creation.snow_coverage);
+			case WID_GL_TEMPERATE_SNOW:       return GetString(_settings_newgame.game_creation.temperate_snow ? STR_MAPGEN_TEMPERATE_SNOW_ON : STR_MAPGEN_TEMPERATE_SNOW_OFF);
+			case WID_GL_SNOW_LINE_TEXT:       return GetString(STR_MAPGEN_SNOW_LINE_TEXT, _settings_newgame.game_creation.snow_line_height);
 			case WID_GL_DESERT_COVERAGE_TEXT: return GetString(STR_MAPGEN_DESERT_COVERAGE_TEXT, _settings_newgame.game_creation.desert_coverage);
 
 			case WID_GL_TOWN_PULLDOWN:
@@ -534,17 +552,21 @@ struct GenerateLandscapeWindow : public Window {
 					WID_GL_MAX_HEIGHT_PULLDOWN, WID_GL_WATER_PULLDOWN);
 		}
 
-		/* Disable snowline if not arctic -- nor the temperate climate with snow on. */
-		const bool snowy = _settings_newgame.game_creation.landscape == LandscapeType::Arctic ||
-				(_settings_newgame.game_creation.landscape == LandscapeType::Temperate && _settings_newgame.game_creation.temperate_snow);
-		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_TEXT, !snowy);
+		/* Disable snowline if not arctic */
+		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_TEXT, _settings_newgame.game_creation.landscape != LandscapeType::Arctic);
+		/* The temperate climate's snow: its line while its snow is on. */
+		const bool temperate_snow = _settings_newgame.game_creation.temperate_snow;
+		this->SetWidgetLoweredState(WID_GL_TEMPERATE_SNOW, temperate_snow);
+		this->SetWidgetDisabledState(WID_GL_SNOW_LINE_TEXT, !temperate_snow);
+		this->SetWidgetDisabledState(WID_GL_SNOW_LINE_DOWN, !temperate_snow || _settings_newgame.game_creation.snow_line_height <= MIN_SNOWLINE_HEIGHT);
+		this->SetWidgetDisabledState(WID_GL_SNOW_LINE_UP, !temperate_snow || _settings_newgame.game_creation.snow_line_height >= MAX_SNOWLINE_HEIGHT);
 		/* Disable desert if not tropic */
 		this->SetWidgetDisabledState(WID_GL_DESERT_COVERAGE_TEXT, _settings_newgame.game_creation.landscape != LandscapeType::Tropic);
 
 		/* Set snow/rainforest selections */
 		int climate_plane = 0;
 		switch (_settings_newgame.game_creation.landscape) {
-			case LandscapeType::Temperate: climate_plane = snowy ? 0 : 2; break;
+			case LandscapeType::Temperate: climate_plane = 3; break;
 			case LandscapeType::Arctic:    climate_plane = 0; break;
 			case LandscapeType::Tropic:    climate_plane = 1; break;
 			case LandscapeType::Toyland:   climate_plane = 2; break;
@@ -559,8 +581,8 @@ struct GenerateLandscapeWindow : public Window {
 		}
 		this->SetWidgetDisabledState(WID_GL_START_DATE_DOWN, _settings_newgame.game_creation.starting_year <= CalendarTime::MIN_YEAR);
 		this->SetWidgetDisabledState(WID_GL_START_DATE_UP,   _settings_newgame.game_creation.starting_year >= CalendarTime::MAX_YEAR);
-		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_DOWN, _settings_newgame.game_creation.snow_coverage <= 0 || !snowy);
-		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_UP,   _settings_newgame.game_creation.snow_coverage >= 100 || !snowy);
+		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_DOWN, _settings_newgame.game_creation.snow_coverage <= 0 || _settings_newgame.game_creation.landscape != LandscapeType::Arctic);
+		this->SetWidgetDisabledState(WID_GL_SNOW_COVERAGE_UP,   _settings_newgame.game_creation.snow_coverage >= 100 || _settings_newgame.game_creation.landscape != LandscapeType::Arctic);
 		this->SetWidgetDisabledState(WID_GL_DESERT_COVERAGE_DOWN, _settings_newgame.game_creation.desert_coverage <= 0 || _settings_newgame.game_creation.landscape != LandscapeType::Tropic);
 		this->SetWidgetDisabledState(WID_GL_DESERT_COVERAGE_UP,   _settings_newgame.game_creation.desert_coverage >= 100 || _settings_newgame.game_creation.landscape != LandscapeType::Tropic);
 
@@ -602,6 +624,14 @@ struct GenerateLandscapeWindow : public Window {
 
 			case WID_GL_SNOW_COVERAGE_TEXT:
 				d = GetStringBoundingBox(GetString(STR_MAPGEN_SNOW_COVERAGE_TEXT, GetParamMaxValue(MAX_TILE_HEIGHT)));
+				break;
+
+			case WID_GL_TEMPERATE_SNOW:
+				d = maxdim(GetStringBoundingBox(STR_MAPGEN_TEMPERATE_SNOW_ON), GetStringBoundingBox(STR_MAPGEN_TEMPERATE_SNOW_OFF));
+				break;
+
+			case WID_GL_SNOW_LINE_TEXT:
+				d = GetStringBoundingBox(GetString(STR_MAPGEN_SNOW_LINE_TEXT, GetParamMaxValue(MAX_TILE_HEIGHT)));
 				break;
 
 			case WID_GL_DESERT_COVERAGE_TEXT:
@@ -770,6 +800,30 @@ struct GenerateLandscapeWindow : public Window {
 				SndClickBeep();
 				break;
 
+			case WID_GL_TEMPERATE_SNOW: // Snow in the temperate climate on or off
+				_settings_newgame.game_creation.temperate_snow = !_settings_newgame.game_creation.temperate_snow;
+				this->InvalidateData();
+				SndClickBeep();
+				break;
+
+			case WID_GL_SNOW_LINE_DOWN:
+			case WID_GL_SNOW_LINE_UP: // Snow line height buttons
+				/* Don't allow too fast scrolling */
+				if (!this->flags.Test(WindowFlag::Timeout) || this->timeout_timer <= 1) {
+					this->HandleButtonClick(widget);
+
+					_settings_newgame.game_creation.snow_line_height = Clamp<int>(_settings_newgame.game_creation.snow_line_height + (widget - WID_GL_SNOW_LINE_TEXT), MIN_SNOWLINE_HEIGHT, MAX_SNOWLINE_HEIGHT);
+					this->InvalidateData();
+				}
+				_left_button_clicked = false;
+				break;
+
+			case WID_GL_SNOW_LINE_TEXT: // Snow line height text
+				this->widget_id = WID_GL_SNOW_LINE_TEXT;
+				ShowQueryString(GetString(STR_JUST_INT, _settings_newgame.game_creation.snow_line_height), STR_MAPGEN_SNOW_LINE_QUERY_CAPT, 4, this, CS_NUMERAL, QueryStringFlag::EnableDefault);
+				SndClickBeep();
+				break;
+
 			case WID_GL_DESERT_COVERAGE_DOWN:
 			case WID_GL_DESERT_COVERAGE_UP: // Desert coverage buttons
 				/* Don't allow too fast scrolling */
@@ -870,9 +924,9 @@ struct GenerateLandscapeWindow : public Window {
 	void OnTimeout() override
 	{
 		if (mode == GLWM_HEIGHTMAP) {
-			this->RaiseWidgetsWhenLowered(WID_GL_HEIGHTMAP_HEIGHT_DOWN, WID_GL_HEIGHTMAP_HEIGHT_UP, WID_GL_START_DATE_DOWN, WID_GL_START_DATE_UP, WID_GL_SNOW_COVERAGE_UP, WID_GL_SNOW_COVERAGE_DOWN, WID_GL_DESERT_COVERAGE_UP, WID_GL_DESERT_COVERAGE_DOWN);
+			this->RaiseWidgetsWhenLowered(WID_GL_HEIGHTMAP_HEIGHT_DOWN, WID_GL_HEIGHTMAP_HEIGHT_UP, WID_GL_START_DATE_DOWN, WID_GL_START_DATE_UP, WID_GL_SNOW_COVERAGE_UP, WID_GL_SNOW_COVERAGE_DOWN, WID_GL_SNOW_LINE_UP, WID_GL_SNOW_LINE_DOWN, WID_GL_DESERT_COVERAGE_UP, WID_GL_DESERT_COVERAGE_DOWN);
 		} else {
-			this->RaiseWidgetsWhenLowered(WID_GL_START_DATE_DOWN, WID_GL_START_DATE_UP, WID_GL_SNOW_COVERAGE_UP, WID_GL_SNOW_COVERAGE_DOWN, WID_GL_DESERT_COVERAGE_UP, WID_GL_DESERT_COVERAGE_DOWN);
+			this->RaiseWidgetsWhenLowered(WID_GL_START_DATE_DOWN, WID_GL_START_DATE_UP, WID_GL_SNOW_COVERAGE_UP, WID_GL_SNOW_COVERAGE_DOWN, WID_GL_SNOW_LINE_UP, WID_GL_SNOW_LINE_DOWN, WID_GL_DESERT_COVERAGE_UP, WID_GL_DESERT_COVERAGE_DOWN);
 		}
 	}
 
@@ -967,6 +1021,7 @@ struct GenerateLandscapeWindow : public Window {
 				case WID_GL_HEIGHTMAP_HEIGHT_TEXT: value = MAP_HEIGHT_LIMIT_AUTO_MINIMUM; break;
 				case WID_GL_START_DATE_TEXT: value = CalendarTime::DEF_START_YEAR.base(); break;
 				case WID_GL_SNOW_COVERAGE_TEXT: value = DEF_SNOW_COVERAGE; break;
+				case WID_GL_SNOW_LINE_TEXT: value = DEF_SNOWLINE_HEIGHT; break;
 				case WID_GL_DESERT_COVERAGE_TEXT: value = DEF_DESERT_COVERAGE; break;
 				case WID_GL_TOWN_PULLDOWN: value = 1; break;
 				case WID_GL_INDUSTRY_PULLDOWN: value = 1; break;
@@ -990,6 +1045,11 @@ struct GenerateLandscapeWindow : public Window {
 			case WID_GL_SNOW_COVERAGE_TEXT:
 				this->SetWidgetDirty(WID_GL_SNOW_COVERAGE_TEXT);
 				_settings_newgame.game_creation.snow_coverage = Clamp(value, 0, 100);
+				break;
+
+			case WID_GL_SNOW_LINE_TEXT:
+				this->SetWidgetDirty(WID_GL_SNOW_LINE_TEXT);
+				_settings_newgame.game_creation.snow_line_height = Clamp<int>(value, MIN_SNOWLINE_HEIGHT, MAX_SNOWLINE_HEIGHT);
 				break;
 
 			case WID_GL_DESERT_COVERAGE_TEXT:

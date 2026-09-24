@@ -885,7 +885,7 @@ SettingsContainer &GetSettingsTree()
 				towns->Add(new SettingEntry("economy.town_min_distance"));
 				towns->Add(new SettingEntry("economy.town_cargogen_mode"));
 				towns->Add(new SettingEntry("economy.temperate_towns"));
-				towns->Add(new SettingEntry("economy.arctic_towns"));
+				towns->Add(new SettingEntry("economy.arctic_towns_on_snow"));
 				towns->Add(new SettingEntry("economy.tropic_towns"));
 				towns->Add(new SettingEntry("economy.toyland_towns"));
 				towns->Add(new SettingEntry("economy.mars_towns"));

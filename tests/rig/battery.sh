@@ -1277,7 +1277,8 @@ setting_newgame economy.tropic_towns 1
 setting_newgame economy.toyland_towns 3' run_scene klimamesta "testdomy mapa" 100
 
 # Snow in the temperate climate (game_creation.temperate_snow): a hilly
-# temperate map with the snow line at 40% coverage. After four rounds of the
+# temperate map with the snow line given at height 8 -- the temperate line
+# is given, not worked out from a coverage as the arctic's is. After four rounds of the
 # tile loop every clear and tree tile from a step below the line up has to be
 # snowy and none lower down, and the towns founded above the line have to be
 # of the arctic houses. The second scene is the same map with snow off: not
@@ -1285,9 +1286,17 @@ setting_newgame economy.toyland_towns 3' run_scene klimamesta "testdomy mapa" 10
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame difficulty.terrain_type 3
 setting_newgame game_creation.temperate_snow 1
-setting_newgame game_creation.snow_coverage 40' run_scene snihtemperate "testza 1000 testsnih" 1200
+setting_newgame game_creation.snow_line_height 8' run_scene snihtemperate "testza 1000 testsnih" 1200
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame difficulty.terrain_type 3' run_scene snihvyp "testza 1000 testsnih" 1200
+# The same snowy map with the arctic towns above the line switched off
+# (economy.arctic_towns_on_snow): the snow as before, and the towns above the
+# line ordinary ones, of every house.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame difficulty.terrain_type 3
+setting_newgame game_creation.temperate_snow 1
+setting_newgame game_creation.snow_line_height 8
+setting_newgame economy.arctic_towns_on_snow 0' run_scene snihbezarktidy "testza 1000 testsnih" 1200
 
 # The GRFs split (economy.split_house_grfs): with the older Mars set loaded
 # as an ordinary house GRF (the game's own Mars set does not count), every

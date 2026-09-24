@@ -1773,7 +1773,7 @@ STR_CONFIG_SETTING_OIL_REF_EDGE_DISTANCE                        :Maximální vzd
 STR_CONFIG_SETTING_OIL_REF_EDGE_DISTANCE_HELPTEXT               :Omezení, jak daleko od okrajů mapy mohou být postaveny rafinerie a ropné vrty. Je-li při okraji mapy voda, toto omezení zajišťuje, že se rafinerie a ropné vrty vyskytují poblíž pobřeží. Na mapách větších než 256 polí je toto omezení úměrně přizpůsobeno.
 
 STR_CONFIG_SETTING_SNOWLINE_HEIGHT                              :Výška sněhové čáry: {STRING}
-STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT                     :Vyberte výšku, ve které začíná sníh v subarktické krajině. Sníh také ovlivňuje generování průmyslu a požadavky na růst měst. Lze upravit pouze pomocí Scénářového editoru nebo je jinak vypočítáván podle "pokrytí sněhem"
+STR_CONFIG_SETTING_SNOWLINE_HEIGHT_HELPTEXT                     :Výška, ve které začíná sníh. V subarktickém klimatu se počítá z pokrytí sněhem a jde změnit jen v editoru scénářů; se zapnutým sněhem v mírném klimatu se zadává tady nebo v okně nové hry. Sníh také ovlivňuje generování průmyslu a požadavky na růst měst
 
 STR_CONFIG_SETTING_TEMPERATE_SNOW                               :Sníh v mírném klimatu: {STRING}
 STR_CONFIG_SETTING_TEMPERATE_SNOW_HELPTEXT                      :Dát mírnému klimatu sněhovou čáru jako má arktida. Nad ní jsou zem, koleje, silnice, stromy, tunely i stanice zasněžené jako v arktidě a města tam založená staví arktické domy; pod ní zůstává mírná zelená krajina. Sady (NewGRF) kreslí jako dřív. Výška čáry vychází z pokrytí sněhem
@@ -2292,8 +2292,8 @@ STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER                         :Činitel zákla
 STR_CONFIG_SETTING_CITY_SIZE_MULTIPLIER_HELPTEXT                :Průměrná velikost větších měst v porovnání s ostatními městy na začátku hry
 STR_CONFIG_SETTING_TEMPERATE_TOWNS                              :Mírná města: {STRING}
 STR_CONFIG_SETTING_TEMPERATE_TOWNS_HELPTEXT                     :Kolik malých měst z domů mírného klimatu dostane nová mapa mezi ostatní města. Řádek klimatu, ve kterém se hraje, je zašedlý -- to jsou obyčejná města. Kterékoli město se na tyto domy dá přepnout potom v okně města („Domy z“)
-STR_CONFIG_SETTING_ARCTIC_TOWNS                                 :Arktická města: {STRING}
-STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :Arktické domy se staví jen nad sněžnou čárou. V mírném klimatu musí být povolený sníh a sněžná čára dost nízko, aby se k arktickým domům dostala, jinak se nepostaví vůbec -- arktické domy bez sněhu nejsou žádné. Nad sněžnou čárou jsou všechna města arktická sama od sebe, takže tento počet neplatí; změnit to jde v okně města („Domy z“)
+STR_CONFIG_SETTING_ARCTIC_TOWNS                                 :Arktická města nad sněžnou čárou: {STRING}
+STR_CONFIG_SETTING_ARCTIC_TOWNS_HELPTEXT                        :Zapnuté: každé město založené nad sněžnou čárou mírného klimatu -- mapou i hráčem -- staví arktické domy, zasněžené střechy na sněhu; vypnuté: města nad čárou jsou obyčejná. Arktické domy se staví jen nad sněžnou čárou: v mírném klimatu musí být povolený sníh a sněžná čára dost nízko, aby se k nim dostala, jinak se nepostaví vůbec -- arktické domy bez sněhu nejsou žádné. Kterékoli město jde změnit v okně města („Domy z“)
 STR_CONFIG_SETTING_TROPIC_TOWNS                                 :Pouštní města: {STRING}
 STR_CONFIG_SETTING_TROPIC_TOWNS_HELPTEXT                        :Kolik malých měst z pouštních domů dostane nová mapa mezi ostatní města. Řádek klimatu, ve kterém se hraje, je zašedlý -- to jsou obyčejná města. Kterékoli město se na tyto domy dá přepnout potom v okně města („Domy z“)
 STR_CONFIG_SETTING_TOYLAND_TOWNS                                :Toylandová města: {STRING}
@@ -3688,6 +3688,13 @@ STR_MAPGEN_HEIGHTMAP_HEIGHT                                     :{BLACK}Nejvyš�
 STR_MAPGEN_HEIGHTMAP_HEIGHT_TOOLTIP                             :{BLACK}Zvolte nadmořskou výšku nejvyšší hory, kterou se hra pokusí vytvořit
 STR_MAPGEN_HEIGHTMAP_HEIGHT_UP_TOOLTIP                          :{BLACK}Zvýšit maximální možnou výšku nejvyššího vrcholu na mapě o jednu úroveň
 STR_MAPGEN_HEIGHTMAP_HEIGHT_DOWN_TOOLTIP                        :{BLACK}Snížit maximální možnou výšku nejvyššího vrcholu na mapě o jednu úroveň
+STR_MAPGEN_TEMPERATE_SNOW                                       :{BLACK}Sníh v mírném klimatu:
+STR_MAPGEN_TEMPERATE_SNOW_TOOLTIP                               :{BLACK}Sníh nad sněžnou čárou v mírném klimatu jako v arktidě; výška čáry je vedle. Města založená nad čárou staví arktické domy
+STR_MAPGEN_TEMPERATE_SNOW_ON                                    :{BLACK}Zap
+STR_MAPGEN_TEMPERATE_SNOW_OFF                                   :{BLACK}Vyp
+STR_MAPGEN_SNOW_LINE_TEXT                                       :{BLACK}{NUM}
+STR_MAPGEN_SNOW_LINE_UP_TOOLTIP                                 :{BLACK}Zvýšit sněžnou čáru o jedna
+STR_MAPGEN_SNOW_LINE_DOWN_TOOLTIP                               :{BLACK}Snížit sněžnou čáru o jedna
 STR_MAPGEN_SNOW_COVERAGE                                        :{BLACK}Pokrytí sněhem:
 STR_MAPGEN_SNOW_COVERAGE_UP_TOOLTIP                             :{BLACK}Zvýšit pokrytí sněhem o deset procent
 STR_MAPGEN_SNOW_COVERAGE_DOWN_TOOLTIP                           :{BLACK}Snížit pokrytí sněhem o deset procent
@@ -3764,6 +3771,7 @@ STR_MAPGEN_HEIGHTMAP_SIZE                                       :{ORANGE}{NUM} x
 
 STR_MAPGEN_TERRAIN_TYPE_QUERY_CAPT                              :{WHITE}Cílová výška vrcholu
 STR_MAPGEN_HEIGHTMAP_HEIGHT_QUERY_CAPT                          :{WHITE}Nejvyšší vrchol
+STR_MAPGEN_SNOW_LINE_QUERY_CAPT                                 :{WHITE}Výška sněžné čáry
 STR_MAPGEN_SNOW_COVERAGE_QUERY_CAPT                             :{WHITE}Pokrytí sněhem (v %)
 STR_MAPGEN_DESERT_COVERAGE_QUERY_CAPT                           :{WHITE}Pokrytí pouštěmi (v %)
 STR_MAPGEN_START_DATE_QUERY_CAPT                                :{WHITE}Změnit počáteční rok

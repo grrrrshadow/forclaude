@@ -38,6 +38,11 @@ enum GenerateLandscapeWidgets : WidgetID {
 	WID_GL_SNOW_COVERAGE_TEXT,          ///< Snow coverage.
 	WID_GL_SNOW_COVERAGE_UP,            ///< Increase snow coverage.
 
+	WID_GL_TEMPERATE_SNOW,              ///< Snow in the temperate climate on or off.
+	WID_GL_SNOW_LINE_DOWN,              ///< Lower the temperate snow line.
+	WID_GL_SNOW_LINE_TEXT,              ///< Height of the temperate snow line.
+	WID_GL_SNOW_LINE_UP,                ///< Raise the temperate snow line.
+
 	WID_GL_DESERT_COVERAGE_DOWN,        ///< Decrease desert coverage.
 	WID_GL_DESERT_COVERAGE_TEXT,        ///< Desert coverage.
 	WID_GL_DESERT_COVERAGE_UP,          ///< Increase desert coverage.

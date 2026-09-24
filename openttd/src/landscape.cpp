@@ -1740,7 +1740,10 @@ bool GenerateLandscape(uint8_t mode)
 	MarkWholeScreenDirty();
 	IncreaseGeneratingWorldProgress(GenWorldProgress::Landscape);
 
-	switch (SnowLandscape()) {
+	/* The arctic's snow line is worked out from its snow coverage; the
+	 * temperate climate's, when it has snow, is the height given for it
+	 * (game_creation.snow_line_height) and stays as given. */
+	switch (_settings_game.game_creation.landscape) {
 		case LandscapeType::Arctic:
 			CalculateSnowLine();
 			break;
