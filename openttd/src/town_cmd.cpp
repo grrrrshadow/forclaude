@@ -2868,11 +2868,13 @@ static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *hs, HouseID
  * when a GRF has switched the originals off: that is for the towns that build
  * from every house, and the climate's houses are the game's own -- a town told
  * to build from them builds from them. Not an original a GRF has put a house
- * of its own in place of, as that one would stand as the GRF's house.
+ * of its own in place of, as that one would stand as the GRF's house. The
+ * house picker offers the climates' houses by the same rule, and placing
+ * one by hand takes them too.
  * @param hs the house
  * @return whether it can be built
  */
-static bool HouseSetCanBuild(const HouseSpec &hs)
+bool HouseSetCanBuild(const HouseSpec &hs)
 {
 	if (hs.grf_prop.override_id != INVALID_HOUSE_ID) return false;
 	return hs.enabled || hs.grf_prop.grffile == nullptr;
@@ -3078,7 +3080,9 @@ CommandCost CmdPlaceHouse(DoCommandFlags flags, TileIndex tile, HouseID house, b
 
 	if (static_cast<size_t>(house) >= HouseSpec::Specs().size()) return CMD_ERROR;
 	const HouseSpec *hs = HouseSpec::Get(house);
-	if (!hs->enabled) return CMD_ERROR;
+	/* An original house a GRF switched off is still the game's own, and the
+	 * picker offers it in a climate's set (HouseSetCanBuild()). */
+	if (!HouseSetCanBuild(*hs)) return CMD_ERROR;
 
 	int maxz = GetTileMaxZ(tile);
 
@@ -3147,7 +3151,9 @@ CommandCost CmdPlaceHouseArea(DoCommandFlags flags, TileIndex tile, TileIndex st
 
 	if (static_cast<size_t>(house) >= HouseSpec::Specs().size()) return CMD_ERROR;
 	const HouseSpec *hs = HouseSpec::Get(house);
-	if (!hs->enabled) return CMD_ERROR;
+	/* An original house a GRF switched off is still the game's own, and the
+	 * picker offers it in a climate's set (HouseSetCanBuild()). */
+	if (!HouseSetCanBuild(*hs)) return CMD_ERROR;
 
 	/* Only allow placing an area of 1x1 houses. */
 	if (!hs->building_flags.Test(BuildingFlag::Size1x1)) return CMD_ERROR;

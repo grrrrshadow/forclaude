@@ -1578,13 +1578,18 @@ public:
 	 */
 	bool InChosenSet(const HouseSpec *spec) const
 	{
-		if (house_set == 0) return spec->building_availability.Any(this->climate_mask);
+		/* The player picks from the list by hand: a GRF switching the original
+		 * houses off does not take them out of it (HouseSetCanBuild()). */
+		if (house_set == 0) return HouseSetCanBuild(*spec) && spec->building_availability.Any(this->climate_mask);
 		if (house_set >= HOUSE_SOURCE_CLIMATE) {
-			if (spec->grf_prop.HasGrfFile()) return false;
+			/* The climate's houses by the towns' own rule: an original house is
+			 * the game's own even when a GRF has switched the originals off
+			 * (HouseSetCanBuild()), and a themed town builds it. */
+			if (spec->grf_prop.HasGrfFile() || !HouseSetCanBuild(*spec)) return false;
 			uint climate = house_set - HOUSE_SOURCE_CLIMATE;
 			return climate <= to_underlying(LandscapeType::Toyland) && spec->building_availability.Any(GetClimateMask(static_cast<LandscapeType>(climate)));
 		}
-		return spec->grf_prop.HasGrfFile() && spec->grf_prop.grfid == house_set && spec->building_availability.Any(this->climate_mask);
+		return spec->enabled && spec->grf_prop.HasGrfFile() && spec->grf_prop.grfid == house_set && spec->building_availability.Any(this->climate_mask);
 	}
 
 	static inline int sel_class; ///< Currently selected 'class'.
@@ -1645,7 +1650,6 @@ public:
 	{
 		const HouseSpec *spec = HouseSpec::Get(id);
 		if (spec == nullptr) return INVALID_STRING_ID;
-		if (!spec->enabled) return INVALID_STRING_ID;
 		if (!this->InChosenSet(spec)) return INVALID_STRING_ID;
 		if (!spec->building_availability.Test(GetHouseZoneFromClassId(cls_id))) return INVALID_STRING_ID;
 		for (int i = 0; i < cls_id; i++) {
@@ -1660,7 +1664,6 @@ public:
 	{
 		const auto *spec = HouseSpec::Get(id);
 		if (spec == nullptr) return {};
-		if (!spec->enabled) return {};
 		if (!this->InChosenSet(spec)) return {};
 		if (!spec->building_availability.Test(GetHouseZoneFromClassId(cls_id))) return {};
 		for (int i = 0; i < cls_id; i++) {
@@ -1674,7 +1677,7 @@ public:
 	bool IsTypeAvailable(int, int id) const override
 	{
 		const HouseSpec *hs = HouseSpec::Get(id);
-		return hs->enabled;
+		return this->InChosenSet(hs);
 	}
 
 	void DrawType(int x, int y, int, int id) const override
@@ -1962,7 +1965,7 @@ struct BuildHouseWindow : public PickerWindow {
 		PickerInvalidations pi(data);
 		if (pi.Test(PickerInvalidation::Position)) {
 			UpdateSelectSize(spec);
-			this->house_info = spec->enabled ? GetHouseInformation(spec) : "";
+			this->house_info = HousePickerCallbacks::instance.InChosenSet(spec) ? GetHouseInformation(spec) : "";
 		}
 
 		/* If house spec already has the protected flag, handle it automatically and disable the buttons. */

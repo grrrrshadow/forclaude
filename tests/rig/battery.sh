@@ -1281,12 +1281,15 @@ setting_newgame economy.toyland_towns 3' run_scene klimamesta "testdomy mapa" 10
 # is given, not worked out from a coverage as the arctic's is. After four rounds of the
 # tile loop every clear and tree tile from a step below the line up has to be
 # snowy and none lower down, and the towns founded above the line have to be
-# of the arctic houses. The second scene is the same map with snow off: not
-# one snowy tile, no town with a set -- the temperate climate as it always was.
+# of the arctic houses -- switched on here, as it is off by default
+# (economy.arctic_towns_on_snow). The second scene is the same map with snow
+# off: not one snowy tile, no town with a set -- the temperate climate as it
+# always was.
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame difficulty.terrain_type 3
 setting_newgame game_creation.temperate_snow 1
-setting_newgame game_creation.snow_line_height 8' run_scene snihtemperate "testza 1000 testsnih" 1200
+setting_newgame game_creation.snow_line_height 8
+setting_newgame economy.arctic_towns_on_snow 1' run_scene snihtemperate "testza 1000 testsnih" 1200
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame difficulty.terrain_type 3' run_scene snihvyp "testza 1000 testsnih" 1200
 # The same snowy map with the arctic towns above the line switched off
@@ -1365,3 +1368,14 @@ ODMITA_CFG=$S/odmita_openttd.cfg
 sed -e '/^\[newgrf\]$/a cargo_a.grf = ' -e '/^\[newgrf\]$/a refuses_a.grf = ' "$CFG_KEEP" > $ODMITA_CFG
 run_scene grfodmita "testnaklady 5 PassengersA CoalA RigCargoA RigCargoR" 100 -c $ODMITA_CFG
 SCENE_NEWGAME='setting_newgame economy.newgrf_side_by_side false' run_scene grfodmitavyp "testnaklady 4 PassengersA CoalA RigCargoA !RigCargoR" 100 -c $ODMITA_CFG
+
+# The house picker with a set that switches the original houses off (the
+# older Mars set, 4F474D05): the list still has the original houses, every
+# house and each climate chosen -- the player picks from it by hand, and a
+# town told to build from a climate still builds them (HouseSetCanBuild()). It listed none with Swedish Houses in the player's
+# game; an empty list shows as odmitnuto.
+run_scene domypickervypnute "testdomy picker mirne
+testdomy picker arktida
+testdomy picker poust
+testdomy picker toyland
+testdomy picker vse" 100 -c $DOMY2_CFG
