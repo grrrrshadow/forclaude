@@ -313,7 +313,7 @@ inline bool HasGrfMiscBit(GrfMiscBit bit)
 extern GRFLoadedFeatures _loaded_newgrf_features;
 
 void LoadNewGRFFile(GRFConfig &config, GrfLoadingStage stage, Subdirectory subdir, bool temporary);
-void LoadNewGRF(SpriteID load_index, uint num_baseset);
+bool LoadNewGRF(SpriteID load_index, uint num_baseset, std::vector<const GRFConfig *> &gave_up);
 void ReloadNewGRFData(); // in saveload/afterload.cpp
 void ResetNewGRFData();
 void ResetPersistentNewGRFData();

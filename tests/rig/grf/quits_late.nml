@@ -1,0 +1,24 @@
+/*
+ * A set that changes the game and then gives up: it switches every default
+ * cargo off and dies with a fatal error two sprites later. That is the shape
+ * of Industries of the Caribbean next to another industry set (its header
+ * switches the game's cargoes and industries off before it checks for the
+ * other sets and refuses them), and a game that kept what it had done had no
+ * passengers -- and a passenger ship with no cargo of its own walked into an
+ * assertion (road_on_rail.cpp). The game now reads its sets again without a
+ * set that gave up (GfxLoadSprites()); the battery scene grfvzdalo plays this
+ * set and counts the cargoes it ends up with.
+ *
+ *     nmlc -c -l grf/lang --grf quits_late.grf grf/quits_late.nml
+ */
+grf {
+	grfid: "RIGQ";
+	name: string(STR_GRF_NAME);
+	desc: string(STR_GRF_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+disable_item(FEAT_CARGOS);
+
+error(FATAL, string(STR_GIVES_UP));

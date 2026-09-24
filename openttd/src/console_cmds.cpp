@@ -1455,13 +1455,16 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
  * cargo monitor number of a cargo above 64 read back, with the number of a
  * cargo below 64 unchanged from what it always was. Written with the move
  * from 64 to 128 cargoes, which the rest of the battery cannot see: every
- * scene plays with the dozen a climate has. Usage: testnaklady
+ * scene plays with the dozen a climate has. Given a count, the game has to
+ * have that many cargoes: the scene grfvzdalo plays a set that switches the
+ * cargoes off and then gives up, and asks for the climate's dozen back.
+ * Usage: testnaklady [pocet]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestCargoTypes(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Put the 128-cargo set through its paces. Usage: 'testnaklady'.");
+		IConsolePrint(CC_HELP, "Put the 128-cargo set through its paces. Usage: 'testnaklady [pocet]', refusing when the game has another number of cargoes.");
 		return true;
 	}
 	bool ok = true;
@@ -1503,6 +1506,14 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 	}
 	IConsolePrint(CC_DEFAULT, "testnaklady: {} nakladu ve hre: {}", present.Count(), listed);
 	if (named != present.Count()) fail(fmt::format("v seznamu je {} jmen z {}", named, present.Count()));
+	if (argv.size() >= 2) {
+		auto expected = ParseType<uint>(argv[1]);
+		if (!expected.has_value()) {
+			IConsolePrint(CC_ERROR, "testnaklady: '{}' is not a count.", argv[1]);
+			return true;
+		}
+		if (present.Count() != *expected) fail(fmt::format("ve hre je {} nakladu, ceka se {}", present.Count(), *expected));
+	}
 	auto params = MakeParameters(present);
 	std::string encoded = GetEncodedStringWithArgs(STR_JUST_CARGO_LIST, params).GetDecodedString();
 	if (encoded != listed) fail(fmt::format("encoded string dal '{}'", encoded));

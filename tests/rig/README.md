@@ -197,6 +197,28 @@ another slot after the NewGRFs had spoken never got the once-over that gives
 every cargo a town production effect, and the next thing that sorted cargoes
 walked into an assertion.
 
+## A set that gives up after it has changed things
+
+`grf/quits_late.nml` (strings in `grf/lang/english.lng`) is a NewGRF of three
+actions: it switches every default cargo off and then dies with a fatal
+error. That is what Industries of the Caribbean does next to another
+industry set -- its header switches the game's cargoes and industries off
+before the checks that refuse the other set -- and the player's game with
+XIS beside it had no cargoes left, no passengers among them; a passenger
+ship with no cargo of its own then stopped the game in an assertion
+(road_on_rail.cpp). The game now reads its sets again without a set that
+gave up (GfxLoadSprites()), which is what the player would otherwise have to do
+by hand on seeing the set marked disabled.
+
+    nmlc -c -l grf/lang --grf quits_late.grf grf/quits_late.nml
+    cp quits_late.grf <rig home>/.openttd/newgrf/
+
+for every home. The scene `grfvzdalo` plays it and asks `testnaklady 13`
+for the dozen cargoes of toyland plus the road-vehicle cargo; its one record
+line (zaznam=1) is the game saying the set gave up. Without the second
+reading the count is 1, and before the ship was taught to check its cargo
+the scene ended in the assertion.
+
 ## A lorry with a trailer, which needs the player's own sets
 
 The game's own road vehicles are all one piece, so nothing in a plain rig

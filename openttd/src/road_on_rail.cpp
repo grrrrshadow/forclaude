@@ -193,7 +193,12 @@ bool CanCarryRoadVehicles(const Engine *e)
 bool TakesRoadVehiclesBesidePassengers(const Engine *e)
 {
 	if (!IsValidCargoType(_road_vehicle_cargo) || e->type != VehicleType::Ship) return false;
-	if (!IsCargoInClass(e->GetDefaultCargoType(), CargoClass::Passengers)) return false;
+	/* A ship left with no cargo of its own -- a set switched its cargo off,
+	 * and CalculateRefitMasks() switched the ship off with it -- carries no
+	 * passengers either. Asking for the class of a cargo that is not there
+	 * is what a game whose sets had switched the passengers off died of. */
+	CargoType cargo = e->GetDefaultCargoType();
+	if (!IsValidCargoType(cargo) || !IsCargoInClass(cargo, CargoClass::Passengers)) return false;
 	return RoadVehiclesCarriedBy(e, nullptr) > 0;
 }
 

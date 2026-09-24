@@ -1326,3 +1326,14 @@ testdomy picker vse" 100 -c $DOMY_CFG
 # parameter and through an encoded string, the cargo monitor numbers. The
 # rest of the battery plays with a climate's dozen cargoes and cannot tell.
 run_scene naklady "testnaklady" 100
+
+# A set that switches every default cargo off and then gives up with a fatal
+# error (grf/quits_late.nml, see README.md): the shape of Industries of the
+# Caribbean next to XIS, which left the player's game with no cargoes and a
+# passenger ship with no cargo of its own in an assertion. The game reads its
+# sets again without a set that gave up (GfxLoadSprites()), so the game has its
+# dozen cargoes and the road-vehicle cargo (13), and the one record line is
+# the game saying which set gave up.
+QUITS_CFG=$S/quits_openttd.cfg
+sed '/^\[newgrf\]$/a quits_late.grf = ' "$CFG_KEEP" > $QUITS_CFG
+run_scene grfvzdalo "testnaklady 13" 100 -c $QUITS_CFG

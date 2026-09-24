@@ -2314,7 +2314,7 @@ static void AfterLoadGRFs()
  * @param load_index The offset for the first sprite to add.
  * @param num_baseset Number of NewGRFs at the front of the list to look up in the baseset dir instead of the newgrf dir.
  */
-void LoadNewGRF(SpriteID load_index, uint num_baseset)
+bool LoadNewGRF(SpriteID load_index, uint num_baseset, std::vector<const GRFConfig *> &gave_up)
 {
 	/* In case of networking we need to "sync" the start values
 	 * so all NewGRFs are loaded equally. For this we use the
@@ -2346,17 +2346,34 @@ void LoadNewGRF(SpriteID load_index, uint num_baseset)
 
 	InitializePatchFlags();
 
+	/* The reset below clears every set's errors, and a set that gave up in
+	 * an earlier round of this loading would lose the message saying why it
+	 * is off. */
+	std::vector<std::pair<GRFConfig *, std::vector<GRFError>>> kept_errors;
+	for (const auto &c : _grfconfig) {
+		if (std::ranges::find(gave_up, c.get()) != gave_up.end()) kept_errors.emplace_back(c.get(), c->errors);
+	}
+
 	ResetNewGRFData();
+
+	for (auto &[c, errors] : kept_errors) c->errors = std::move(errors);
 
 	/*
 	 * Reset the status of all files, so we can 'retry' to load them.
 	 * This is needed when one for example rearranges the NewGRFs in-game
 	 * and a previously disabled NewGRF becomes usable. If it would not
 	 * be reset, the NewGRF would remain disabled even though it should
-	 * have been enabled.
+	 * have been enabled. A set that gave up in an earlier round of this
+	 * loading stays off (GfxLoadSprites()).
 	 */
 	for (const auto &c : _grfconfig) {
-		if (c->status != GRFStatus::NotFound) c->status = GRFStatus::Unknown;
+		if (c->status == GRFStatus::NotFound) continue;
+		if (std::ranges::find(gave_up, c.get()) != gave_up.end()) {
+			c->status = GRFStatus::Disabled;
+			c->flags.Reset(GRFConfigFlag::Reserved);
+		} else {
+			c->status = GRFStatus::Unknown;
+		}
 	}
 
 	/* The other half of letting FIRS 5 run alongside the CZTR sets (see the
@@ -2386,6 +2403,13 @@ void LoadNewGRF(SpriteID load_index, uint num_baseset)
 				DisableGrf(STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5, c.get());
 			}
 		}
+	}
+
+	/* The sets off before the reading starts: any other set off after it
+	 * went off while it was being read. */
+	std::vector<const GRFConfig *> off_before;
+	for (const auto &c : _grfconfig) {
+		if (c->status == GRFStatus::Disabled) off_before.push_back(c.get());
 	}
 
 	_cur_gps.spriteid = load_index;
@@ -2465,6 +2489,25 @@ void LoadNewGRF(SpriteID load_index, uint num_baseset)
 
 	/* Call any functions that should be run after GRFs have been loaded. */
 	AfterLoadGRFs();
+
+	/* A set that went off while it was being read -- a fatal error of its
+	 * own, another set's Action E -- may have changed the game before it
+	 * did: Industries of the Caribbean switches the game's cargoes and
+	 * industries off before it checks for another industry set and gives
+	 * up, and beside XIS it left the game with no cargoes at all. Nothing
+	 * takes a set's changes back one by one, so the caller reads everything
+	 * again without it (GfxLoadSprites()). A set that was never read --
+	 * one too many for the game -- changed nothing and needs no new round. */
+	bool again = false;
+	for (const auto &c : _grfconfig) {
+		if (c->status != GRFStatus::Disabled) continue;
+		if (std::ranges::find(off_before, c.get()) != off_before.end()) continue;
+		if (std::ranges::any_of(c->errors, [](const GRFError &e) { return e.message == STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED; })) continue;
+		LogAnomaly("Sada {} se vypnula az behem nacitani, kdyz uz mohla neco zmenit - sady se nacitaji znovu bez ni.", c->GetName());
+		gave_up.push_back(c.get());
+		again = true;
+	}
+	return again;
 }
 
 /**

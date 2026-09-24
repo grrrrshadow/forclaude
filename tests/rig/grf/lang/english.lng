@@ -1,0 +1,4 @@
+##grflangid 0x01
+STR_GRF_NAME                                                    :Rig: quits late
+STR_GRF_DESC                                                    :Switches every default cargo off and then gives up with a fatal error, the way a set does that checks for other sets only after it has changed things.
+STR_GIVES_UP                                                    :Gives up on purpose, after switching the cargoes off.

@@ -167,8 +167,12 @@ static std::unique_ptr<GRFConfig> GetBasesetExtraGRFConfig()
 	return gc;
 }
 
-/** Actually load the sprite tables. */
-static void LoadSpriteTables()
+/**
+ * Actually load the sprite tables.
+ * @param gave_up the NewGRFs that gave up in an earlier round of this loading, kept off; one that gives up in this round is added
+ * @return whether a NewGRF gave up and everything has to be loaded again without it
+ */
+static bool LoadSpriteTables(std::vector<const GRFConfig *> &gave_up)
 {
 	const GraphicsSet *used_set = BaseGraphics::GetUsedSet();
 
@@ -211,7 +215,7 @@ static void LoadSpriteTables()
 	_grfconfig.insert(std::begin(_grfconfig), std::move(default_extra));
 	_grfconfig.insert(std::next(std::begin(_grfconfig)), std::move(baseset_extra));
 
-	LoadNewGRF(SPR_NEWGRFS_BASE, 2);
+	bool again = LoadNewGRF(SPR_NEWGRFS_BASE, 2, gave_up);
 
 	/* Only the extra sprites the game has upstream are a base set's to
 	 * supply. This build's own extra sprites -- its icons for coupling,
@@ -229,6 +233,7 @@ static void LoadSpriteTables()
 
 	/* Remove the default and baseset extra graphics from the config. */
 	_grfconfig.erase(std::begin(_grfconfig), std::next(std::begin(_grfconfig), 2));
+	return again;
 }
 
 
@@ -341,10 +346,20 @@ void GfxLoadSprites()
 	Debug(sprite, 2, "Loading sprite set {}", _settings_game.game_creation.landscape);
 
 	SwitchNewGRFBlitter();
-	VideoDriver::GetInstance()->ClearSystemSprites();
-	FontCache::ClearFontCaches(FONTSIZES_ALL);
-	GfxInitSpriteMem();
-	LoadSpriteTables();
+
+	/* A NewGRF that gives up while it is being read may already have
+	 * changed the game (LoadNewGRF()); everything is then read again from
+	 * the start without it, the base graphics too, the way a change to the
+	 * list of NewGRFs is -- a new round of the NewGRFs alone on top of the
+	 * last round's sprites broke the sprite memory with XIS. Every round but
+	 * the last puts one more NewGRF off, so it ends; with no NewGRF giving
+	 * up there is one round, as ever. */
+	std::vector<const GRFConfig *> gave_up;
+	do {
+		VideoDriver::GetInstance()->ClearSystemSprites();
+		FontCache::ClearFontCaches(FONTSIZES_ALL);
+		GfxInitSpriteMem();
+	} while (LoadSpriteTables(gave_up));
 	GfxInitPalettes();
 
 	UpdateCursorSize();
