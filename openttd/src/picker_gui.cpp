@@ -999,6 +999,12 @@ std::unique_ptr<NWidgetBase> MakePickerTypeWidgets()
 		NWidget(NWID_SELECTION, Colours::Invalid, WID_PW_TYPE_SEL),
 			NWidget(NWID_VERTICAL),
 				NWidget(NWID_HORIZONTAL),
+					/* Where the name filter was (left out, see MakePickerClassWidgets):
+					 * a bare panel, so that the row beside the badge button is drawn.
+					 * Without it that part of the window was never painted and showed
+					 * whatever had been drawn there before -- in the house picker,
+					 * whose left column is the taller, a good quarter of the window. */
+					NWidget(WWT_PANEL, Colours::DarkGreen), SetResize(1, 0), SetFill(1, 1), EndContainer(),
 					NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_PW_CONFIGURE_BADGES), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON), SetResize(0, 0), SetFill(0, 1), SetSpriteTip(SPR_EXTRA_MENU, STR_BADGE_CONFIG_MENU_TOOLTIP),
 				EndContainer(),
 				NWidget(NWID_VERTICAL, NWidContainerFlag{}, WID_PW_BADGE_FILTER),
