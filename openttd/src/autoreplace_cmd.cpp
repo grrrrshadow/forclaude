@@ -241,7 +241,7 @@ static CargoType GetNewCargoTypeForReplace(Vehicle *v, EngineID engine_type, boo
 
 	CargoType cargo_type;
 	CargoTypes cargo_mask = GetCargoTypesOfArticulatedVehicle(v, &cargo_type);
-	if (!HasAtMostOneBit(cargo_mask.base())) {
+	if (cargo_mask.Count() > 1) {
 		CargoTypes new_engine_default_cargoes = GetCargoTypesOfArticulatedParts(engine_type);
 		if ((cargo_mask & new_engine_default_cargoes) == cargo_mask) {
 			return CARGO_NO_REFIT; // engine_type is already a mixed cargo type which matches the incoming vehicle by default, no refit required

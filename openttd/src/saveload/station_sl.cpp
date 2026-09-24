@@ -420,7 +420,9 @@ public:
 		extern bool _sl_legacy_decouple_import;
 		if (_sl_legacy_decouple_import && IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return 32;
 		if (IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes)) return 32;
-		if (IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return NUM_CARGO;
+		/* Sixty-four before the list carried its length, and NUM_CARGO grew
+		 * past that only with CargoTypes128, which is later still. */
+		if (IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return 64;
 		/* Read from the savegame how long the list is. */
 		return SlGetStructListLength(NUM_CARGO);
 	}
@@ -489,7 +491,7 @@ public:
 		 * not match what is really in this station's record. */
 		extern bool _sl_legacy_decouple_import;
 		size_t num_cargo = (_sl_legacy_decouple_import && IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) ? 32 :
-				IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : NUM_CARGO;
+				IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : 64;
 		auto end = std::next(std::begin(st->goods), std::min(num_cargo, std::size(st->goods)));
 		for (auto it = std::begin(st->goods); it != end; ++it) {
 			GoodsEntry &ge = *it;
@@ -726,8 +728,9 @@ public:
 		    SLE_VAR(Station, had_vehicle_of_type,        VarTypes::U8),
 		    SLE_VAR(Station, gradual_load_differs,       VarTypes::U8),
 		SLE_REFLIST(Station, loading_vehicles,           SLRefType::Vehicle),
-		SLE_CONDVAR(Station, always_accepted, VarFileType::U32 | VarMemType::U64, SaveLoadVersion::TownAcceptance, SaveLoadVersion::ExtendCargotypes),
-		SLE_CONDVAR(Station, always_accepted, VarTypes::U64, SaveLoadVersion::ExtendCargotypes, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Station, always_accepted.bits[0], VarFileType::U32 | VarMemType::U64, SaveLoadVersion::TownAcceptance, SaveLoadVersion::ExtendCargotypes),
+		SLE_CONDVAR(Station, always_accepted.bits[0], VarTypes::U64, SaveLoadVersion::ExtendCargotypes, SaveLoadVersion::CargoTypes128),
+		SLE_CONDARR(Station, always_accepted.bits, VarTypes::U64, CargoTypes::WORDS, SaveLoadVersion::CargoTypes128, SaveLoadVersion::MaxVersion),
 		SLEG_CONDSTRUCTLIST("speclist", SlRoadStopTileData, SaveLoadVersion::NewGRFRoadStops, SaveLoadVersion::RoadStopTileData),
 		SLEG_STRUCTLIST("goods", SlStationGoods),
 	};

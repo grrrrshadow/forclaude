@@ -11,6 +11,8 @@
 #define STRINGS_INTERNAL_H
 
 #include "strings_func.h"
+
+class CargoTypes;
 #include "string_func.h"
 #include "core/string_builder.hpp"
 #include "core/string_consumer.hpp"
@@ -118,6 +120,8 @@ public:
 	 * will be read.
 	 * @return The next parameter's value.
 	 */
+	CargoTypes GetNextParameterCargoTypes();
+
 	std::string_view GetNextParameterString()
 	{
 		struct visitor {

@@ -170,7 +170,7 @@ struct ValuesInterval {
 
 struct BaseGraphWindow : Window {
 protected:
-	static const int GRAPH_MAX_DATASETS     =  64;
+	static const int GRAPH_MAX_DATASETS     = 128; ///< NUM_CARGO: one dataset per cargo in the payment graph.
 	static constexpr PixelColour GRAPH_BASE_COLOUR      =  GREY_SCALE(2);
 	static constexpr PixelColour GRAPH_GRID_COLOUR      =  GREY_SCALE(3);
 	static constexpr PixelColour GRAPH_AXIS_LINE_COLOUR =  GREY_SCALE(1);
@@ -214,7 +214,7 @@ protected:
 		{STR_GRAPH_LAST_24_YEARS, HISTORY_YEAR.total_division, ECONOMY_YEAR_MINUTES, &HISTORY_YEAR},
 	};
 
-	uint64_t excluded_data = 0; ///< bitmask of datasets hidden by the player.
+	CargoTypes excluded_data{}; ///< The datasets hidden by the player, one bit each: a set of cargoes, which has room for the companies too.
 	uint64_t excluded_range = 0; ///< bitmask of ranges hidden by the player.
 	uint64_t masked_range = 0; ///< bitmask of ranges that are not available for the current data.
 	uint8_t num_on_x_axis = 0;
@@ -293,7 +293,7 @@ protected:
 		current_interval.lowest  = INT64_MAX;
 
 		for (const DataSet &dataset : this->data) {
-			if (HasBit(this->excluded_data, dataset.exclude_bit)) continue;
+			if (this->excluded_data.Test(static_cast<CargoType>(dataset.exclude_bit))) continue;
 			if (HasBit(this->excluded_range, dataset.range_bit)) continue;
 
 			for (const OverflowSafeInt64 &datapoint : this->GetDataSetRange(dataset)) {
@@ -561,7 +561,7 @@ protected:
 		uint pointoffs2 = pointwidth - pointoffs1;
 
 		auto draw_dataset = [&](const DataSet &dataset, PixelColour colour) {
-			if (HasBit(this->excluded_data, dataset.exclude_bit)) return;
+			if (this->excluded_data.Test(static_cast<CargoType>(dataset.exclude_bit))) return;
 			if (HasBit(this->excluded_range, dataset.range_bit)) return;
 
 			/* Centre the dot between the grid lines. */
@@ -817,7 +817,7 @@ public:
 		uint8_t new_highlight_data = UINT8_MAX;
 		if (widget == WID_GRAPH_MATRIX) {
 			auto dataset_index = this->GetDatasetIndex(pt.y);
-			if (dataset_index.has_value() && !HasBit(this->excluded_data, *dataset_index)) new_highlight_data = *dataset_index;
+			if (dataset_index.has_value() && !this->excluded_data.Test(static_cast<CargoType>(*dataset_index))) new_highlight_data = *dataset_index;
 		}
 
 		if (this->highlight_data == new_highlight_data && this->highlight_range == new_highlight_range) return;
@@ -897,13 +897,13 @@ public:
 			mo += 12;
 		}
 
-		if (!initialize && this->excluded_data == excluded_companies.base() && this->num_on_x_axis == nums &&
+		if (!initialize && this->excluded_data == CargoTypes{static_cast<uint64_t>(excluded_companies.base())} && this->num_on_x_axis == nums &&
 				this->year == yr && this->month == mo) {
 			/* There's no reason to get new stats */
 			return;
 		}
 
-		this->excluded_data = excluded_companies.base();
+		this->excluded_data = CargoTypes{static_cast<uint64_t>(excluded_companies.base())};
 		this->num_on_x_axis = nums;
 		this->year = yr;
 		this->month = mo;
@@ -1316,7 +1316,7 @@ struct BaseCargoGraphWindow : BaseGraphWindow {
 			if (pos-- > 0) continue;
 			if (--max < 0) break;
 
-			bool lowered = !CargoTypes{this->excluded_data}.Test(cs->Index());
+			bool lowered = !this->excluded_data.Test(cs->Index());
 
 			/* Redraw frame if lowered */
 			if (lowered) DrawFrameRect(line, Colours::Brown, FrameFlag::Lowered);
@@ -1343,14 +1343,14 @@ struct BaseCargoGraphWindow : BaseGraphWindow {
 			case WID_GRAPH_ENABLE_CARGOES:
 				/* Remove all cargoes from the excluded lists. */
 				this->GetExcludedCargoTypes() = {};
-				this->excluded_data = this->GetExcludedCargoTypes().base();
+				this->excluded_data = this->GetExcludedCargoTypes();
 				this->SetDirty();
 				break;
 
 			case WID_GRAPH_DISABLE_CARGOES: {
 				/* Add all cargoes to the excluded lists. */
 				this->GetExcludedCargoTypes() = this->cargo_types;
-				this->excluded_data = this->GetExcludedCargoTypes().base();
+				this->excluded_data = this->GetExcludedCargoTypes();
 				this->SetDirty();
 				break;
 			}
@@ -1366,7 +1366,7 @@ struct BaseCargoGraphWindow : BaseGraphWindow {
 					if (row-- > 0) continue;
 
 					this->GetExcludedCargoTypes().Flip(cs->Index());
-					this->excluded_data = this->GetExcludedCargoTypes().base();
+					this->excluded_data = this->GetExcludedCargoTypes();
 					this->SetDirty();
 					break;
 				}
@@ -1438,7 +1438,7 @@ struct PaymentRatesGraphWindow : BaseCargoGraphWindow {
 	 */
 	void UpdatePaymentRates()
 	{
-		this->excluded_data = this->GetExcludedCargoTypes().base();
+		this->excluded_data = this->GetExcludedCargoTypes();
 
 		this->data.clear();
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
@@ -1794,12 +1794,12 @@ struct IndustryProductionGraphWindow : BaseCargoGraphWindow {
 			mo += 12;
 		}
 
-		if (!initialize && this->excluded_data == this->GetExcludedCargoTypes().base() && this->num_on_x_axis == this->num_vert_lines && this->year == yr && this->month == mo) {
+		if (!initialize && this->excluded_data == this->GetExcludedCargoTypes() && this->num_on_x_axis == this->num_vert_lines && this->year == yr && this->month == mo) {
 			/* There's no reason to get new stats */
 			return;
 		}
 
-		this->excluded_data = this->GetExcludedCargoTypes().base();
+		this->excluded_data = this->GetExcludedCargoTypes();
 		this->year = yr;
 		this->month = mo;
 
@@ -1965,12 +1965,12 @@ struct TownCargoGraphWindow : BaseCargoGraphWindow {
 			mo += 12;
 		}
 
-		if (!initialize && this->excluded_data == this->GetExcludedCargoTypes().base() && this->num_on_x_axis == this->num_vert_lines && this->year == yr && this->month == mo) {
+		if (!initialize && this->excluded_data == this->GetExcludedCargoTypes() && this->num_on_x_axis == this->num_vert_lines && this->year == yr && this->month == mo) {
 			/* There's no reason to get new stats */
 			return;
 		}
 
-		this->excluded_data = this->GetExcludedCargoTypes().base();
+		this->excluded_data = this->GetExcludedCargoTypes();
 		this->year = yr;
 		this->month = mo;
 

@@ -1492,7 +1492,7 @@ uint ShowRefitOptionsList(int left, int right, int y, EngineID engine)
 	CargoTypes present = GetUnionOfArticulatedRefitMasks(engine, false);
 
 	/* Draw nothing if the engine is not refittable */
-	if (HasAtMostOneBit(present.base())) return y;
+	if (present.Count() <= 1) return y;
 
 	std::string str;
 	if (present == _cargo_mask) {

@@ -131,7 +131,8 @@ public:
 	size_t GetNumCargo() const
 	{
 		if (IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes)) return 32;
-		if (IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return NUM_CARGO;
+		/* Sixty-four before the list carried its length (NUM_CARGO grew past that later, CargoTypes128). */
+		if (IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) return 64;
 		/* Read from the savegame how long the list is. */
 		return SlGetStructListLength(NUM_CARGO);
 	}

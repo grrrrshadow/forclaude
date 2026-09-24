@@ -426,7 +426,8 @@ uint32_t Station::GetNewGRFVariable(const ResolverObject &object, uint8_t variab
 {
 	switch (variable) {
 		case 0x48: { // Accepted cargo types
-			uint32_t value = GetAcceptanceMask(this).base();
+			/* A NewGRF's word holds the first cargoes only (CargoTypes::Low()). */
+			uint32_t value = static_cast<uint32_t>(GetAcceptanceMask(this).Low());
 			return value;
 		}
 

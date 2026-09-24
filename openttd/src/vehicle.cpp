@@ -272,7 +272,7 @@ bool Vehicle::NeedsServicing() const
 		if (union_mask.Any()) {
 			CargoType cargo_type;
 			CargoTypes cargo_mask = GetCargoTypesOfArticulatedVehicle(v, &cargo_type);
-			if (!HasAtMostOneBit(cargo_mask.base())) {
+			if (cargo_mask.Count() > 1) {
 				CargoTypes new_engine_default_cargoes = GetCargoTypesOfArticulatedParts(new_engine);
 				if ((cargo_mask & new_engine_default_cargoes) != cargo_mask) {
 					/* We cannot refit to mixed cargoes in an automated way */

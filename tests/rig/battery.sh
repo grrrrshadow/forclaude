@@ -1320,3 +1320,9 @@ testzatik 100 testsmerdepo" 400
 run_scene domypicker "testdomy picker mirne
 testdomy picker 524A450B
 testdomy picker vse" 100 -c $DOMY_CFG
+
+# The set of cargo types with its 128 slots (CargoTypes), put through its
+# paces by the probe: cargoes above 64, the words, the set as a string
+# parameter and through an encoded string, the cargo monitor numbers. The
+# rest of the battery plays with a climate's dozen cargoes and cannot tell.
+run_scene naklady "testnaklady" 100

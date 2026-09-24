@@ -69,6 +69,13 @@ in the base graphics. The two snow scenes (`snihtemperate`, `snihvyp`) start
 a hilly temperate map the same way and need nothing but the base graphics
 either: the snowy ground, rails and roads are in the temperate base file.
 
+The game holds 128 cargo types (`NUM_CARGO`, `CargoTypes` with two words).
+No scene can tell: each plays with a climate's dozen. The `naklady` scene
+runs the probe `testnaklady`, which exercises the set itself -- bits above
+64, the words, the set as a string parameter and through an encoded string,
+the cargo monitor numbers -- and is the one place that would notice the set
+breaking.
+
 ## Memory errors: the rig does not see them
 
 The battery measures behaviour, not memory. A write past the end of an

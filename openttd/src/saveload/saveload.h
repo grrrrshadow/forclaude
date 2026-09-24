@@ -419,6 +419,7 @@ enum class SaveLoadVersion : uint16_t {
 	DepotsUnderBridges, ///< Saveload version: 366, GitHub pull request: 15836\n Allow depots under bridges.
 
 	CompanyTotalDeliveredCargo, ///< Saveload version: 367\n Companies keep a running total of every cargo they have delivered.
+	CargoTypes128, ///< Saveload version: 368\n A game holds up to 128 cargo types; the masks and the per-cargo arrays grew with it.
 
 	MaxVersion, ///< Highest possible saveload version.
 };

@@ -43,8 +43,15 @@ constexpr uint8_t CCB_CARGO_TYPE_START = 19; ///< Start bit of the cargo type fi
 constexpr uint8_t CCB_CARGO_TYPE_LENGTH = 6; ///< Number of bits of the cargo type field.
 constexpr uint8_t CCB_COMPANY_START = 25; ///< Start bit of the company field.
 constexpr uint8_t CCB_COMPANY_LENGTH = 4; ///< Number of bits of the company field.
+/**
+ * The seventh bit of the cargo type, for a game of NUM_CARGO (128) cargoes.
+ * Apart from the six below, in a bit that was free, so that a number made
+ * for a cargo under 64 reads as it always did -- the numbers live in
+ * savegames of game scripts.
+ */
+constexpr uint8_t CCB_CARGO_TYPE_HIGH_BIT = 29;
 
-static_assert(NUM_CARGO     <= (1 << CCB_CARGO_TYPE_LENGTH));
+static_assert(NUM_CARGO     <= (2 << CCB_CARGO_TYPE_LENGTH));
 static_assert(MAX_COMPANIES <= (1 << CCB_COMPANY_LENGTH));
 
 
@@ -57,13 +64,14 @@ static_assert(MAX_COMPANIES <= (1 << CCB_COMPANY_LENGTH));
  */
 inline CargoMonitorID EncodeCargoIndustryMonitor(CompanyID company, CargoType ctype, IndustryID ind)
 {
-	assert(ctype < (1 << CCB_CARGO_TYPE_LENGTH));
+	assert(ctype < NUM_CARGO);
 	assert(company < (1 << CCB_COMPANY_LENGTH));
 
 	uint32_t ret = 0;
 	SB(ret, CCB_TOWN_IND_NUMBER_START, CCB_TOWN_IND_NUMBER_LENGTH, ind.base());
 	SetBit(ret, CCB_IS_INDUSTRY_BIT);
-	SB(ret, CCB_CARGO_TYPE_START, CCB_CARGO_TYPE_LENGTH, ctype);
+	SB(ret, CCB_CARGO_TYPE_START, CCB_CARGO_TYPE_LENGTH, ctype & ((1 << CCB_CARGO_TYPE_LENGTH) - 1));
+	if (HasBit(ctype, CCB_CARGO_TYPE_LENGTH)) SetBit(ret, CCB_CARGO_TYPE_HIGH_BIT);
 	SB(ret, CCB_COMPANY_START, CCB_COMPANY_LENGTH, company.base());
 	return ret;
 }
@@ -77,12 +85,13 @@ inline CargoMonitorID EncodeCargoIndustryMonitor(CompanyID company, CargoType ct
  */
 inline CargoMonitorID EncodeCargoTownMonitor(CompanyID company, CargoType ctype, TownID town)
 {
-	assert(ctype < (1 << CCB_CARGO_TYPE_LENGTH));
+	assert(ctype < NUM_CARGO);
 	assert(company < (1 << CCB_COMPANY_LENGTH));
 
 	uint32_t ret = 0;
 	SB(ret, CCB_TOWN_IND_NUMBER_START, CCB_TOWN_IND_NUMBER_LENGTH, town.base());
-	SB(ret, CCB_CARGO_TYPE_START, CCB_CARGO_TYPE_LENGTH, ctype);
+	SB(ret, CCB_CARGO_TYPE_START, CCB_CARGO_TYPE_LENGTH, ctype & ((1 << CCB_CARGO_TYPE_LENGTH) - 1));
+	if (HasBit(ctype, CCB_CARGO_TYPE_LENGTH)) SetBit(ret, CCB_CARGO_TYPE_HIGH_BIT);
 	SB(ret, CCB_COMPANY_START, CCB_COMPANY_LENGTH, company.base());
 	return ret;
 }
@@ -104,7 +113,7 @@ inline CompanyID DecodeMonitorCompany(CargoMonitorID num)
  */
 inline CargoType DecodeMonitorCargoType(CargoMonitorID num)
 {
-	return static_cast<CargoType>(GB(num, CCB_CARGO_TYPE_START, CCB_CARGO_TYPE_LENGTH));
+	return static_cast<CargoType>(GB(num, CCB_CARGO_TYPE_START, CCB_CARGO_TYPE_LENGTH) | (HasBit(num, CCB_CARGO_TYPE_HIGH_BIT) ? 1 << CCB_CARGO_TYPE_LENGTH : 0));
 }
 
 /**

@@ -36,7 +36,8 @@ struct CAPRChunkHandler : ChunkHandler {
 
 	void Load() const override
 	{
-		uint num_cargo = IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : NUM_CARGO;
+		/* A chunk of savegames before 126 only, which never held more than 64 cargoes. */
+		uint num_cargo = IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : 64;
 		VarFileType vt = IsSavegameVersionBefore(SaveLoadVersion::UnifyCurrency) ? VarFileType::I32 : VarFileType::I64;
 		SlCopy(nullptr, num_cargo, vt | VarMemType::Null);
 		SlCopy(nullptr, num_cargo, VarFileType::U16 | VarMemType::Null);

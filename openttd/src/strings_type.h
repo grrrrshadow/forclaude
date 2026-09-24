@@ -91,6 +91,9 @@ struct StringParameter {
 
 	inline StringParameter(const ConvertibleThroughBase auto &data) : data(static_cast<uint64_t>(data.base())), type(0) {}
 
+	/** A set of cargoes ({CARGO_LIST}): two words, so it travels as a string. Defined in strings.cpp. */
+	StringParameter(const class CargoTypes &cargoes);
+
 	/**
 	 * Create a StringParameter from a scoped enum.
 	 * @tparam T the type of the scoped enum.

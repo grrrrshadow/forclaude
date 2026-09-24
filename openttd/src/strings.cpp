@@ -246,6 +246,39 @@ uint64_t GetParamMaxValue(uint64_t max_value, uint min_count, FontSize size)
 static void StationGetSpecialString(StringBuilder &builder, StationFacilities x);
 static bool GetSpecialNameString(StringBuilder &builder, StringID string, StringParameters &args);
 
+/**
+ * Write a set of cargoes as a string parameter: its words as hexadecimal,
+ * high word first. A set has two words and a parameter one, so a set goes
+ * into the string half of the parameter, which an encoded string (a news
+ * item) carries as well as a number.
+ * @param cargoes the set
+ */
+StringParameter::StringParameter(const CargoTypes &cargoes) : data(fmt::format("{:016X}{:016X}", cargoes.High(), cargoes.Low())), type(0) {}
+
+/**
+ * Get the next parameter as a set of cargoes, the way StringParameter(const CargoTypes &) wrote it.
+ * A number is taken as the first word: a game script hands its cargo lists
+ * over as numbers, and knows no more than 64 cargoes.
+ * @return the set
+ */
+CargoTypes StringParameters::GetNextParameterCargoTypes()
+{
+	const StringParameter &param = this->GetNextParameterReference();
+	struct visitor {
+		CargoTypes operator()(const std::monostate &) { return {}; }
+		CargoTypes operator()(const uint64_t &word) { return CargoTypes{word}; }
+		CargoTypes operator()(const std::string &text)
+		{
+			if (text.size() != 32) return {};
+			auto high = ParseInteger<uint64_t>(std::string_view(text).substr(0, 16), 16);
+			auto low = ParseInteger<uint64_t>(std::string_view(text).substr(16, 16), 16);
+			if (!high.has_value() || !low.has_value()) return {};
+			return CargoTypes::FromWords(*low, *high);
+		}
+	};
+	return std::visit(visitor{}, param.data);
+}
+
 static void FormatString(StringBuilder &builder, std::string_view str, StringParameters &args, uint case_index = 0, bool game_script = false, bool dry_run = false);
 
 /**
@@ -1449,7 +1482,7 @@ static void FormatString(StringBuilder &builder, std::string_view str_arg, Strin
 				}
 
 				case SCC_CARGO_LIST: { // {CARGO_LIST}
-					CargoTypes cmask = args.GetNextParameter<CargoTypes>();
+					CargoTypes cmask = args.GetNextParameterCargoTypes();
 					bool first = true;
 
 					std::string_view list_separator = GetListSeparator();

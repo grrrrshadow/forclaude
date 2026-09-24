@@ -25,6 +25,8 @@
 #include "rail_map.h"
 #include "road_map.h"
 #include "mars_houses.h"
+#include "cargomonitor.h"
+#include "cargotype.h"
 #include "spritecache.h"
 #include "table/sprites.h"
 #include "core/string_consumer.hpp"
@@ -1442,6 +1444,80 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - rozkaz {} do stanice: cudlik reversniho chodu neodpovida rozkazu.", i);
 		}
 	}
+	return true;
+}
+
+/**
+ * The set of cargo types (CargoTypes) with its 128 slots put through its
+ * paces: cargoes above 64 set, tested, counted and walked; the two words;
+ * the set as a string parameter and back ({CARGO_LIST} with the game's own
+ * cargoes), through an encoded string too, as the news carry it; and the
+ * cargo monitor number of a cargo above 64 read back, with the number of a
+ * cargo below 64 unchanged from what it always was. Written with the move
+ * from 64 to 128 cargoes, which the rest of the battery cannot see: every
+ * scene plays with the dozen a climate has. Usage: testnaklady
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCargoTypes(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Put the 128-cargo set through its paces. Usage: 'testnaklady'.");
+		return true;
+	}
+	bool ok = true;
+	auto fail = [&ok](const std::string &what) {
+		IConsolePrint(CC_ERROR, "testnaklady: ODMITNUTO - {}", what);
+		ok = false;
+	};
+	auto cargo = [](uint n) { return static_cast<CargoType>(n); };
+
+	CargoTypes set;
+	set.Set(cargo(3)).Set(cargo(63)).Set(cargo(64)).Set(cargo(127));
+	if (set.Count() != 4) fail(fmt::format("Count po ctyrech bitech dal {}", set.Count()));
+	if (!set.Test(cargo(64)) || set.Test(cargo(65)) || !set.Test(cargo(127))) fail("Test bitu 64/65/127");
+	std::string walked;
+	for (CargoType c : set) walked += fmt::format("{} ", to_underlying(c));
+	if (walked != "3 63 64 127 ") fail(fmt::format("iterace dala '{}'", walked));
+	if (set.Low() != ((1ULL << 3) | (1ULL << 63)) || set.High() != (1ULL | (1ULL << 63))) fail("slova Low/High");
+	CargoTypes flipped = set;
+	flipped.Flip();
+	if (flipped.Count() != 124 || flipped.Any(set) || !(flipped | set).All()) fail("Flip a sjednoceni");
+	if (!ALL_CARGOTYPES.All() || ALL_CARGOTYPES.Count() != to_underlying(NUM_CARGO)) fail("ALL_CARGOTYPES");
+	if (set.GetNthSetBit(2) != cargo(64) || set.GetNthSetBit(4).has_value()) fail("GetNthSetBit");
+	CargoTypes invalid;
+	invalid.Set(INVALID_CARGO).Set(CargoFilterCriteria::CF_ANY);
+	if (invalid.Any() || invalid.Test(INVALID_CARGO)) fail("INVALID_CARGO se dostal do mnoziny");
+	CargoTypes reset = set;
+	reset.Reset(cargo(64)).Reset(CargoTypes{cargo(3)});
+	if (reset.Count() != 2 || reset.Test(cargo(64)) || reset.Test(cargo(3))) fail("Reset");
+	if (CargoTypes{(1ULL << 5) | (1ULL << 40)}.Count() != 2 || CargoTypes::FromWords(0, 1).GetNthSetBit(0) != cargo(64)) fail("konstrukce ze slov");
+
+	/* Through a string parameter: the cargoes the game has, named as the
+	 * station window names them, and the same through an encoded string. */
+	CargoTypes present;
+	for (const CargoSpec *cs : CargoSpec::Iterate()) present.Set(cs->Index());
+	std::string listed = GetString(STR_JUST_CARGO_LIST, present);
+	uint named = 0;
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		if (listed.find(GetString(cs->name)) != std::string::npos) named++;
+	}
+	IConsolePrint(CC_DEFAULT, "testnaklady: {} nakladu ve hre: {}", present.Count(), listed);
+	if (named != present.Count()) fail(fmt::format("v seznamu je {} jmen z {}", named, present.Count()));
+	auto params = MakeParameters(present);
+	std::string encoded = GetEncodedStringWithArgs(STR_JUST_CARGO_LIST, params).GetDecodedString();
+	if (encoded != listed) fail(fmt::format("encoded string dal '{}'", encoded));
+	CargoTypes high_only = CargoTypes{cargo(100)};
+	if (GetString(STR_JUST_CARGO_LIST, high_only) != GetString(STR_JUST_NOTHING)) fail("seznam pro nedefinovany naklad 100 neni 'nic'");
+
+	/* The cargo monitor: a cargo above 64 goes in and comes out, and the
+	 * number of a cargo below 64 is the number it always was. */
+	CargoMonitorID high = EncodeCargoTownMonitor(static_cast<CompanyID>(3), cargo(100), static_cast<TownID>(5));
+	if (DecodeMonitorCargoType(high) != cargo(100) || DecodeMonitorCompany(high) != static_cast<CompanyID>(3) || DecodeMonitorTown(high) != static_cast<TownID>(5)) fail("cargo monitor s nakladem 100");
+	CargoMonitorID low = EncodeCargoIndustryMonitor(static_cast<CompanyID>(2), cargo(33), static_cast<IndustryID>(7));
+	uint32_t as_before = 7 | (1u << 16) | (33u << 19) | (2u << 25);
+	if (low != as_before || DecodeMonitorCargoType(low) != cargo(33) || DecodeMonitorIndustry(low) != static_cast<IndustryID>(7)) fail("cislo monitoru pro naklad 33 se zmenilo");
+
+	IConsolePrint(CC_DEFAULT, "testnaklady: NUM_CARGO {}, {}.", to_underlying(NUM_CARGO), ok ? "vse v poradku" : "s chybami");
 	return true;
 }
 
@@ -11108,7 +11184,7 @@ static void ConDumpCargoTypes()
 			const GRFFile *grf = e->GetGRF();
 			IConsolePrint(CC_DEFAULT, "    carrier: engine {}, local id {}, GRF {:08X}, {}available, refits {}, '{}', intro {}, company avail {}, buildable {}, hidden {}", e->index,
 					e->grf_prop.local_id, grf == nullptr ? 0 : std::byteswap(grf->grfid), e->info.climates.Any() ? "" : "not ",
-					e->info.refit_mask.base(), GetString(e->info.string_id), e->intro_date,
+					e->info.refit_mask.Low(), GetString(e->info.string_id), e->intro_date,
 					e->company_avail.Test(_local_company) ? "yes" : "NO",
 					IsEngineBuildable(e->index, VehicleType::Train, _local_company) ? "yes" : "NO",
 					e->IsHidden(_local_company) ? "yes" : "no");
@@ -11903,6 +11979,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testdomy",                ConTestHouseSets);
 	IConsole::CmdRegister("testsnih",                ConTestSnow);
 	IConsole::CmdRegister("testsmerdepo",            ConTestDepartureButtons);
+	IConsole::CmdRegister("testnaklady",             ConTestCargoTypes);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);

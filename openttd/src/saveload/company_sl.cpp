@@ -384,7 +384,8 @@ public:
 
 		SLE_CONDVAR(CompanyEconomyEntry, delivered_cargo[NUM_CARGO - 1], VarTypes::I32, SaveLoadVersion::MinVersion, SaveLoadVersion::CountIndividualCargoes),
 		SLE_CONDARR(CompanyEconomyEntry, delivered_cargo, VarTypes::U32, 32, SaveLoadVersion::CountIndividualCargoes, SaveLoadVersion::ExtendCargotypes),
-		SLE_CONDARR(CompanyEconomyEntry, delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::ExtendCargotypes, SaveLoadVersion::MaxVersion),
+		SLE_CONDARR(CompanyEconomyEntry, delivered_cargo, VarTypes::U32, 64, SaveLoadVersion::ExtendCargotypes, SaveLoadVersion::CargoTypes128),
+		SLE_CONDARR(CompanyEconomyEntry, delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::CargoTypes128, SaveLoadVersion::MaxVersion),
 		    SLE_VAR(CompanyEconomyEntry, performance_history, VarTypes::I32),
 	};
 	static inline const SaveLoadCompatTable compat_description = _company_economy_compat;
@@ -569,7 +570,8 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDVAR(CompanyProperties, terraform_limit, VarTypes::U32, SaveLoadVersion::TerraformLimits, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(CompanyProperties, clear_limit, VarTypes::U32, SaveLoadVersion::TerraformLimits, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(CompanyProperties, tree_limit, VarTypes::U32, SaveLoadVersion::AutoreplaceWhenOldTreeLimit, SaveLoadVersion::MaxVersion),
-	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::CompanyTotalDeliveredCargo, SaveLoadVersion::MaxVersion),
+	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, 64, SaveLoadVersion::CompanyTotalDeliveredCargo, SaveLoadVersion::CargoTypes128),
+	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::CargoTypes128, SaveLoadVersion::MaxVersion),
 	SLEG_STRUCT("settings", SlCompanySettings),
 	SLEG_CONDSTRUCT("old_ai", SlCompanyOldAI, SaveLoadVersion::MinVersion, SaveLoadVersion::NoAI),
 	SLEG_STRUCT("cur_economy", SlCompanyEconomy),
