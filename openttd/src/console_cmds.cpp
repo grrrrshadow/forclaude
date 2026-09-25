@@ -1645,6 +1645,17 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			if (!e->info.refit_mask.Test(mari_cargo)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} vozi zbozi, ale marihuanu ne.", GetString(STR_ENGINE_NAME, e->index));
 		}
 		IConsolePrint(CC_DEFAULT, "testprumysl: lodi a letadel se zbozim (a marihuanou): {}", goods_carriers);
+		/* And nothing else is refitted to it: a set's coal lorry or coal
+		 * wagon takes bulk cargo by class and marijuana with it, and stood
+		 * above the game's own marijuana lorry in the list. */
+		uint others = 0;
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type == VehicleType::Ship || e->type == VehicleType::Aircraft) continue;
+			if (e->GetDefaultCargoType() == mari_cargo || !e->info.refit_mask.Test(mari_cargo)) continue;
+			others++;
+			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} ({}) jde prestavet na marihuanu, a neni na ni.", GetString(STR_ENGINE_NAME, e->index), e->index);
+		}
+		IConsolePrint(CC_DEFAULT, "testprumysl: jinych vozidel s prestavbou na marihuanu: {}", others);
 	}
 
 	if (!_settings_game.economy.extra_industries) {

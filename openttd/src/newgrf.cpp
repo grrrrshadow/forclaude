@@ -926,6 +926,14 @@ static void OfferRoadVehiclesToCarriers()
  * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
  * knows the cargo by name.
  *
+ * Nothing else is refitted to it. Marijuana is bulk cargo, and a set's
+ * vehicle takes cargo by class: every coal lorry and coal wagon of a set
+ * could be refitted to it, and stood in the list above the game's own
+ * marijuana lorry, which is a coal lorry made over. The player: the lorries
+ * for marijuana are there, the coal ones need not carry it. So it comes out
+ * of every mask but those of the vehicles built for it -- whose own cargo it
+ * is -- before the goods ships and aircraft are given it.
+ *
  * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
  * vessel's own choice of cargo is made first.
  */
@@ -933,6 +941,10 @@ static void OfferMarijuanaToShipsAndAircraft()
 {
 	CargoType marijuana = GetCargoTypeByLabel(CT_MARIJUANA);
 	if (!IsValidCargoType(marijuana)) return;
+
+	for (Engine *e : Engine::Iterate()) {
+		if (e->GetDefaultCargoType() != marijuana) e->info.refit_mask.Reset(marijuana);
+	}
 
 	auto is_goods = [](CargoType cargo) {
 		return IsValidCargoType(cargo) && CargoSpec::Get(cargo)->town_acceptance_effect == TownAcceptanceEffect::Goods;

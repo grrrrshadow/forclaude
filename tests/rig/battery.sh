@@ -112,7 +112,9 @@ run_scene() { # name scr-content ticks extra-args
   local srz=$(grep -c 'Srazka' $S/reg_$name.log)
   local ast=$(grep -ci 'assert' $S/reg_$name.log)
   local odt=$(grep -c 'odtah dokoncen' $S/reg_$name.log)
-  local exc=$(grep -ci 'terminate\|exception' $S/reg_$name.log)
+  # A crash counts as one too: a save that brought the game down while it was
+  # being read left every other counter at zero, which reads as a quiet scene.
+  local exc=$(grep -ci 'terminate\|exception\|crash log written' $S/reg_$name.log)
   local dep=$(grep -c 'vjel do depa' $S/reg_$name.log)
   # The anomaly record (anomaly_log.h): lines the game writes when it had to
   # work around something. Always on, so a scene that starts writing them is
@@ -751,6 +753,13 @@ testpauza
 testprojet 31
 testporucha 32
 testbrzda 32" 12000 -g $S/vlak31.sav
+# Player's save (domek128.sav, see README.md): made before the game had its own
+# industries, loaded and saved again by a build that had them, with marijuana
+# waiting at a station in cargo slot 126. Read again, it brought the game down
+# in CargoPacket::AfterLoad: the packets of a cargo in a slot past 64 were never
+# turned from numbers back into packets (SlStationGoods::FixPointers()). It has
+# to load and run: vyjimka is zero, and testprumysl refuses nothing.
+run_scene sklad128 "testprumysl" 200 -g $S/domek128.sav
 # Player's save: a breakdown bent across the points at a depot door; the tow
 # must not creep over it (that brought the game down), it stays home. A second
 # breakdown on the curve at (98,60) is then straightened and towed in; that

@@ -488,10 +488,19 @@ public:
 
 		/* Mirrors the same fork-specific count used in GetNumCargo() above --
 		 * fixing pointers on entries Load() never actually populated would
-		 * not match what is really in this station's record. */
+		 * not match what is really in this station's record.
+		 *
+		 * Since the list carries its length, every entry: those past the
+		 * length the file gave are empty and have nothing to fix. This was
+		 * still sixty-four after a game grew to 128 cargoes (CargoTypes128),
+		 * so the packets of a cargo in a slot past 64 kept the numbers they
+		 * were saved as instead of becoming packets, and the game came down
+		 * in CargoPacket::AfterLoad the first time it counted them -- the
+		 * player's save with marijuana waiting at a station, slot 126. */
 		extern bool _sl_legacy_decouple_import;
 		size_t num_cargo = (_sl_legacy_decouple_import && IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength)) ? 32 :
-				IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 : 64;
+				IsSavegameVersionBefore(SaveLoadVersion::NewGRFCargo) ? 12 : IsSavegameVersionBefore(SaveLoadVersion::ExtendCargotypes) ? 32 :
+				IsSavegameVersionBefore(SaveLoadVersion::SaveloadListLength) ? 64 : std::size(st->goods);
 		auto end = std::next(std::begin(st->goods), std::min(num_cargo, std::size(st->goods)));
 		for (auto it = std::begin(st->goods); it != end; ++it) {
 			GoodsEntry &ge = *it;

@@ -94,10 +94,10 @@ Generating `openttd.grf` needs `media/baseset/openttd/sprites/` from a
 working build directory copied in, and the baseset graphics beside the
 binary, or the build stops at GRFCodec.
 
-Four saves the battery asks for are the player's and are not in `saves/`:
+Five saves the battery asks for are the player's and are not in `saves/`:
 `s.sav` (scene `nakladsav`), `save91.sav` (`save91`, `save91rev`),
-`umak.sav` (`mess`) and `umins.sav` (`messodvoz`, `messodtah`). Those six
-scenes cannot run without them.
+`umak.sav` (`mess`), `umins.sav` (`messodvoz`, `messodtah`) and
+`domek128.sav` (`sklad128`). Those seven scenes cannot run without them.
 
 `battery.sh` — the regression battery. Prints one line per scene:
 `spojeno` (couplings), `odtazeno` (tows completed), `havaroval`, `srazka`,
@@ -124,8 +124,8 @@ compare a change to.
     RIG_DIR=... BATTERY_STABLE=run.stable ./battery.sh > run.out
     diff battery_baseline.stable run.stable
 
-Six of its scenes need saves that are not in the repository and come out all
-zeroes without them, so on a rig missing those the difference is those six
+Seven of its scenes need saves that are not in the repository and come out all
+zeroes without them, so on a rig missing those the difference is those seven
 lines and nothing else. Take the baseline again when a change is meant to
 move a counter, and say in the commit which counters moved and why.
 
