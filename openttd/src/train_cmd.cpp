@@ -1194,12 +1194,12 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	/* Through how many signals the driver reads the line ahead: as many as
 	 * the player's setting says show the warning before a red (vehicle.
 	 * train_warning_signals, IsPathSignalWarning()), counted from the train.
-	 * The player's rule: one orange, he knows the next signal and no more;
+	 * The player's rule: one yellow, he knows the next signal and no more;
 	 * two, the one after it as well; three, far. Past those he knows nothing,
 	 * however close together they stand and however far he sees -- a first
 	 * go let every signal he could see tell him about the ones after it, and
 	 * on closely spaced signals he braked for a red five signals off, with
-	 * two greens and two oranges still in front of him (the player's
+	 * two greens and two yellows still in front of him (the player's
 	 * screenshot).
 	 *
 	 * Those signals he knows even beyond his sight -- the last signal he

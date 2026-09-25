@@ -418,6 +418,14 @@ run_scene koupitjinytyp "vlak123 on
 testspoj depo
 testpocet 2 0 3
 testkoupit 2 0 28" 12000
+# And of its own kind it buys only what is missing: five of the named wagon
+# stand in the shed, the order wants six, one is bought (the trace says
+# "koupeno 1 vagonku ... chybelo 1") and the six are coupled.
+run_scene koupitdoplnit "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0
+testdepovagony 2 0 5" 12000
 # "Any number" on an order that buys its own wagons: a full train's worth, the
 # player having set his own limit to fifteen tiles and read any as fifteen
 # tiles. The limit is put down to five here so the number is small enough to

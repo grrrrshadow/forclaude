@@ -1519,7 +1519,7 @@ STR_CONFIG_SETTING_SMOKE_AMOUNT                                 :Množství kou�
 STR_CONFIG_SETTING_SMOKE_AMOUNT_HELPTEXT                        :Množství kouře či jisker emitovaných vozidly
 
 STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL                     :Model akcelerace vlaků: {STRING}
-STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Zvolit fyzikální model pro zrychlení vlaků. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů, například délky a tažné síly. Vlaky brzdí plynule: zpomalují s předstihem před příští červenou, přejezdem nebo řadou, ke které se připojují, místo aby zastavily skokem. Vhodné použít s návěstidly s oranžovými signálními světly
+STR_CONFIG_SETTING_TRAIN_ACCELERATION_MODEL_HELPTEXT            :Zvolit fyzikální model pro zrychlení vlaků. "Originální" model zpomaluje všechny vozidla na svahu stejně. Realistický model zpomaluje na svazích a v zatáčkách podle různých parametrů, například délky a tažné síly. Vlaky brzdí plynule: zpomalují s předstihem před příští červenou, přejezdem nebo řadou, ke které se připojují, místo aby zastavily skokem. Vhodné použít s návěstidly se žlutými signálními světly
 
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING                          :Vlaky čekají na odtah: {STRING}
 STR_CONFIG_SETTING_TRAIN_RESCUE_TOWING_HELPTEXT                 :Porouchaný nebo havarovaný vlak zůstane stát a čeká, až pro něj přijede odtahovka, místo aby se sám spravil nebo se na místě rozpadl. Vypnuto se porucha i havárie chovají jako v neupravené hře
@@ -1539,12 +1539,12 @@ STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :Záchranná brz
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :Stopka je záchranná brzda, jak za ni tahají cestující. O kolik slaběji vlak brzdí, když mu zmáčkneš stopku. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté (vidí 5 až 20 polí)
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :o 30 % slabší
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :o 10 % slabší
-STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS                         :Oranžových návěstidel před červenou: {STRING}
-STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_HELPTEXT                :Kolik návěstidel před červenou svítí oranžově. Se zapnutým „Brzdit, nedobrzdit a nabourat“ vidí strojvedoucí přes tolik návěstidel a přes víc nevidí, ani když jsou blízko. Na červenou dobrzdí, když jsou návěstidla dost daleko od sebe. Víc oranžových nechá těžké vlaky dobrzdit i na hustých návěstidlech, ale vlaky za nimi brzdí dřív a jezdí dál od sebe
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS                         :Žlutých návěstidel před červenou: {STRING}
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_HELPTEXT                :Kolik návěstidel před červenou svítí žlutě. Se zapnutým „Brzdit, nedobrzdit a nabourat“ vidí strojvedoucí přes tolik návěstidel a přes víc nevidí, ani když jsou blízko. Na červenou dobrzdí, když jsou návěstidla dost daleko od sebe. Víc žlutých nechá těžké vlaky dobrzdit i na hustých návěstidlech, ale vlaky za nimi brzdí dřív a jezdí dál od sebe
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_1                       :1
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_2                       :2
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_3                       :3
-STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY                          :Oranžovou zapomene: {STRING}
+STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY                          :Žlutou zapomene: {STRING}
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :Jak dlouho si strojvedoucí pamatuje, co mu řeklo poslední návěstidlo, které projel. Při nastavení 5 alzhaimer si strojvedoucí pamatuje jen 5 poliček za žlutým semaforem že má brzdit. Musí tam mít další semaforek. Platí, když je „Brzdit, nedobrzdit a nabourat“ zapnuté
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_NEVER                    :s ETCS nikdy
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_20                       :za 20 polí s ETCS
