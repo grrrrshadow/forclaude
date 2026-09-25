@@ -60,5 +60,7 @@ size_t GetGRFSpriteOffset(uint32_t id);
 bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id);
 bool SkipSpriteData(SpriteFile &file, uint8_t type, uint16_t num);
 void DupSprite(SpriteID old_spr, SpriteID new_spr);
+void SetGreenLoadSprite(SpriteID sprite, SpriteID full, SpriteID empty);
+std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 
 #endif /* SPRITECACHE_H */

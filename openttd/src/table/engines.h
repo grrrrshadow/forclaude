@@ -234,6 +234,14 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MW(  1827,  20,  20,  50, CT_ROLA        , LandscapeTypes({T,A,S,Y})), // 116 Car Carrier
 	MW(  1827,  20,  20,  50, CT_ROLA        , LandscapeTypes({T,A,S,Y})), // 117 Car Carrier (monorail)
 	MW(  1827,  20,  20,  50, CT_ROLA        , LandscapeTypes({T,A,S,Y})), // 118 Car Carrier (maglev)
+	/* The wagons for marijuana (CT_MARIJUANA), of the game's own marijuana
+	 * plantation: the coal truck of each railtype over again, carrying it from
+	 * the day they are bought, with the coal drawn green (see
+	 * cargo_recolour.h). In the game only while economy.extra_industries is on
+	 * (ApplyOriginalVehicleSettings()). */
+	MW(  1827,  20,  20,  50, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 119 Marijuana Truck
+	MW(  1827,  20,  20,  50, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 120 Marijuana Truck (monorail)
+	MW(  1827,  20,  20,  50, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 121 Marijuana Truck (maglev)
 	MR(  3378,  20,  12,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 119 MPS Regal Bus
 	MR( 16071,  20,  15,  30, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 117 Hereford Leopard Bus
 	MR( 24107,  20,  15,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 118 Foster Bus
@@ -322,6 +330,11 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MR(  5479,  20,  15,  55, CT_BUBBLES     , LandscapeTypes({      Y})), // 201 MightyMover Bubble Truck
 	MR( 20970,  20,  15,  55, CT_BUBBLES     , LandscapeTypes({      Y})), // 202 Powernaught Bubble Truck
 	MR( 33023,  20,  15,  85, CT_BUBBLES     , LandscapeTypes({      Y})), // 203 Wizzowow Bubble Truck
+	/* The lorries for marijuana: the three coal trucks over again, each from
+	 * its own year, like the marijuana wagons above. */
+	MR(  5479,  20,  15,  55, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 204 Balogh Marijuana Truck
+	MR( 20089,  20,  15,  55, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 205 Uhl Marijuana Truck
+	MR( 33969,  20,  15,  85, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 206 DW Marijuana Truck
 	MS(  2922,   5,  30,  50, CT_OIL         , LandscapeTypes({T,A,S  })), // 204 MPS Oil Tanker
 	MS( 17167,   5,  30,  90, CT_OIL         , LandscapeTypes({T,A,S  })), // 205 CS-Inc. Oil Tanker
 	MS(  2192,   5,  30,  55, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 206 MPS Passenger Ferry
@@ -558,6 +571,11 @@ static constexpr RailVehicleInfo _orig_rail_vehicle_info[] = {
 	RVI(42, W, 196,   0,       0,  18,     0, RC_W, 20, R, A), // 116 Car Carrier
 	RVI(69, W, 196,   0,       0,  18,     0, RC_W, 25, O, A), // 117 Car Carrier (monorail)
 	RVI(69, W, 196,   0,       0,  18,     0, RC_W, 27, L, A), // 118 Car Carrier (maglev)
+	/* Copies of the coal truck of each railtype (29, 59, 91), down to the
+	 * picture; loaded, the coal is drawn green (cargo_recolour.h). */
+	RVI(34, W, 176,   0,       0,  18,     0, RC_W, 30, R, A), // 119 Marijuana Truck
+	RVI(61, W, 176,   0,       0,  18,     0, RC_W, 35, O, A), // 120 Marijuana Truck (monorail)
+	RVI(61, W, 176,   0,       0,  18,     0, RC_W, 37, L, A), // 121 Marijuana Truck (maglev)
 };
 #undef RC_W
 #undef RC_E
@@ -787,6 +805,11 @@ static constexpr RoadVehicleInfo _orig_road_vehicle_info[] = {
 	ROV( 62, 117,  90, SND_40_DEPARTURE_TRUCK_TOYLAND_2,  96, 17,  38, 12), // 85 MightyMover Bubble Truck
 	ROV( 62, 147, 168, SND_3F_DEPARTURE_TRUCK_TOYLAND_1, 176, 19,  48, 22), // 86 Powernaught Bubble Truck
 	ROV( 62, 157, 240, SND_40_DEPARTURE_TRUCK_TOYLAND_2, 224, 22,  69, 45), // 87 Wizzowow Bubble Truck
+	/* Copies of the three coal trucks (7, 8, 9), down to the picture; loaded,
+	 * the coal is drawn green (cargo_recolour.h). */
+	ROV(  1, 108,  90, SND_19_DEPARTURE_OLD_RV_1,         96, 20,  38, 12), // 88 Balogh Marijuana Truck
+	ROV( 18, 128, 168, SND_19_DEPARTURE_OLD_RV_1,        176, 25,  48, 22), // 89 Uhl Marijuana Truck
+	ROV( 35, 138, 240, SND_19_DEPARTURE_OLD_RV_1,        224, 28,  69, 45), // 90 DW Marijuana Truck
 };
 #undef ROV
 

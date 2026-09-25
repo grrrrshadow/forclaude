@@ -339,6 +339,28 @@ when a house takes marijuana, and with fewer than `plantaze` plantations or
 or marijuana is there all the same. `marihuana` switches it on in the toyland
 map, `marihuanasada` in a temperate game with XIS.
 
+The game's own vehicles -- the car carriers, and the marijuana wagons and
+lorries, copies of the coal truck of each railtype and of the three coal
+lorries -- are mapped under a mark of their own
+(EngineOverrideManager::GAMES_OWN_GRFID), so no set reaches them by number to
+take them over or switch them off; the marijuana ones are in the game exactly
+while the industries are. Loaded, they draw their coal green: the loaded
+picture is made again from the base set's loaded and empty pictures, with the
+pixels the two do not share in the leaf greens (green_load.h). Ships and
+aircraft that carry goods carry marijuana too. `testprumysl` lists every one
+of the game's own vehicles -- under the mark or not, taken over by a set or
+not, in the game or not, what it carries -- every set vehicle numbered where
+one of them sits, every green loaded picture with how many of its pixels are
+green (refused when none or all are), and refuses a goods ship or aircraft
+that does not take marijuana. `vozidlahry` plays rig.sav, made before the mark:
+the car carriers are moved under it. `vozidlasada` plays `grf/claims_own.nml`
+(built into `claims_own.grf` in the home's `newgrf/`, as the other rig sets
+are), a wagon under the car carrier's number and a lorry under the first
+marijuana lorry's: they have to stand beside the game's own.
+
+    nmlc -c -l grf/lang --grf claims_own.grf grf/claims_own.nml
+    cp claims_own.grf <rig home>/.openttd/newgrf/
+
 `testdomy pole <x> <y> [r]` lists the houses within r tiles of a tile, by id
 and name, and how many tiles of each: for telling which house a player means
 by where it stands on a save of theirs.

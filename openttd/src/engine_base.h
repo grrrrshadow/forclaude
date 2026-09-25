@@ -274,6 +274,16 @@ struct EngineIDMappingKeyProjection {
  * Note: This is not part of Engine, as the data in the EngineOverrideManager and the engine pool get reset in different cases.
  */
 struct EngineOverrideManager {
+	/**
+	 * The mark the game's own vehicles -- the ones this build adds after the
+	 * original set, see IsGamesOwnEngine() -- are mapped under instead of the
+	 * plain number of an original vehicle (INVALID_GRFID). A set reaches an
+	 * original vehicle by that plain number, to take it over or switch it off;
+	 * under this mark no set finds these, and one that brings a vehicle of the
+	 * same number gets a vehicle of its own beside it.
+	 */
+	static constexpr GrfID GAMES_OWN_GRFID = 0xFFFFFFFE;
+
 	VehicleTypeIndexArray<std::vector<EngineIDMapping>> mappings;
 
 	void ResetToDefaultMapping();

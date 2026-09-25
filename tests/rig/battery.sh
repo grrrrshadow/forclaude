@@ -1460,3 +1460,17 @@ testnaklady 14 Marijuana" 100
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene marihuanasada "testprumysl 0 1 1
 testnaklady" 100 -c $XIS_CFG
+# The game's own vehicles -- the car carriers, the marijuana wagons and lorries
+# -- are mapped under a mark of their own, out of every set's reach. In a save
+# made before that (rig.sav) the car carriers are moved under the mark with the
+# numbers the save gave them, and the marijuana vehicles are added, out of the
+# game with the industries (off for saves, see run_scene).
+run_scene vozidlahry "testprumysl" 100 -g $S/rig.sav
+# A set numbering its vehicles where the game's own sit (grf/claims_own.nml,
+# claims_own.grf in the home's newgrf/, see README.md): a wagon under the car
+# carrier's number and a lorry under the first marijuana lorry's. Big sets get
+# there as a matter of course, and the car carrier used to become the set's.
+# The game's own have to stay the game's, the set's stand beside them.
+OWN_CFG=$S/claims_own_openttd.cfg
+sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

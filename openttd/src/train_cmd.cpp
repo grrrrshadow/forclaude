@@ -59,6 +59,8 @@
 #include "road_on_rail.h"
 #include "signal_func.h"
 
+#include "green_load.h"
+
 #include "safeguards.h"
 
 static Track ChooseTrainTrack(Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool force_res, bool *got_reservation, bool mark_stuck);
@@ -1758,9 +1760,29 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 	if (drawn->cargo_type != _road_vehicle_cargo && drawn->cargo.StoredCount() > 0 &&
 			drawn->cargo.StoredCount() >= drawn->cargo_cap / 2U) {
 		sprite += _wagon_full_adder[spritenum];
+		/* Marijuana in a coal truck's picture is drawn green (green_load.h). */
+		if (CargoSpec::Get(drawn->cargo_type)->label == CT_MARIJUANA) sprite = GreenLoadSprite(sprite);
 	}
 
 	result->Set(sprite);
+}
+
+/**
+ * The pictures of an original wagon, empty and loaded, one pair per picture
+ * of a direction, for the ones with a loaded picture at all (green_load.h).
+ * @param image_index the wagon's picture
+ * @return empty and loaded, pair by pair
+ */
+std::vector<std::pair<SpriteID, SpriteID>> WagonLoadPictures(uint8_t image_index)
+{
+	std::vector<std::pair<SpriteID, SpriteID>> pictures;
+	if (!IsValidImageIndex<VehicleType::Train>(image_index) || _wagon_full_adder[image_index] == 0) return pictures;
+	for (Direction dir : EnumRange(Direction::Begin, Direction::End)) {
+		SpriteID empty = GetDefaultTrainSprite(image_index, dir);
+		if (std::ranges::find(pictures, empty, &std::pair<SpriteID, SpriteID>::first) != std::end(pictures)) continue;
+		pictures.emplace_back(empty, empty + _wagon_full_adder[image_index]);
+	}
+	return pictures;
 }
 
 static void GetRailIcon(EngineID engine, bool rear_head, int &y, EngineImageType image_type, VehicleSpriteSeq *result)

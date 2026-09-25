@@ -16,3 +16,7 @@ STR_R_NAME                                                      :Rig: refuses se
 STR_R_DESC                                                      :Stops with a fatal error when cargo set A is loaded, then brings RIGR under the id 0.
 STR_R_REFUSES                                                   :Refuses cargo set A on purpose.
 STR_R_RIGR                                                      :RigCargoR
+STR_V_NAME                                                      :Rig: vehicles on the game's own numbers
+STR_V_DESC                                                      :A rail wagon under 116 and a lorry under 88, where the game's own car carrier and marijuana lorry sit.
+STR_V_WAGON                                                     :RigWagon116
+STR_V_LORRY                                                     :RigLorry88

@@ -216,6 +216,8 @@ add_files(
     gfxinit.cpp
     gfxinit.h
     goal.cpp
+    green_load.cpp
+    green_load.h
     goal_base.h
     goal_cmd.h
     goal_gui.cpp

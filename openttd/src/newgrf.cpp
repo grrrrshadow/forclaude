@@ -916,6 +916,38 @@ static void OfferRoadVehiclesToCarriers()
 	}
 }
 
+/**
+ * Let every ship and aircraft that carries goods carry marijuana too, when the
+ * game's own industries are in it (economy.extra_industries): the refit is
+ * put into its mask, and it carries as much of it as it would of anything,
+ * the way the game works out a refit's capacity. "Goods" is any cargo that
+ * is goods to a town -- goods, and the sweets of toyland -- in the default
+ * cargo or the mask. The lorries and wagons for marijuana are the game's own
+ * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
+ * knows the cargo by name.
+ *
+ * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
+ * vessel's own choice of cargo is made first.
+ */
+static void OfferMarijuanaToShipsAndAircraft()
+{
+	CargoType marijuana = GetCargoTypeByLabel(CT_MARIJUANA);
+	if (!IsValidCargoType(marijuana)) return;
+
+	auto is_goods = [](CargoType cargo) {
+		return IsValidCargoType(cargo) && CargoSpec::Get(cargo)->town_acceptance_effect == TownAcceptanceEffect::Goods;
+	};
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Ship && e->type != VehicleType::Aircraft) continue;
+		bool carries_goods = is_goods(e->GetDefaultCargoType());
+		for (CargoType cargo : e->info.refit_mask) {
+			if (carries_goods) break;
+			carries_goods = is_goods(cargo);
+		}
+		if (carries_goods) e->info.refit_mask.Set(marijuana);
+	}
+}
+
 /** Set to use the correct action0 properties for each canal feature */
 static void FinaliseCanals()
 {
@@ -1384,8 +1416,12 @@ static void FinaliseEngineArray()
 {
 	for (Engine *e : Engine::Iterate()) {
 		if (e->GetGRF() == nullptr) {
+			/* An engine no set brought is the game's: under the plain number of
+			 * an original vehicle, or under the mark of the game's own
+			 * (EngineOverrideManager::GAMES_OWN_GRFID). Anything else is a set's
+			 * vehicle whose set is gone. */
 			auto found = std::ranges::find(_engine_mngr.mappings[e->type], e->index, &EngineIDMapping::engine);
-			if (found == std::end(_engine_mngr.mappings[e->type]) || found->grfid != INVALID_GRFID || found->internal_id != found->substitute_id) {
+			if (found == std::end(_engine_mngr.mappings[e->type]) || (found->grfid != INVALID_GRFID && found->grfid != EngineOverrideManager::GAMES_OWN_GRFID) || found->internal_id != found->substitute_id) {
 				e->info.string_id = STR_NEWGRF_INVALID_ENGINE;
 			}
 		}
@@ -2203,6 +2239,7 @@ static void AfterLoadGRFs()
 
 	/* Every rail wagon may carry a road vehicle. */
 	OfferRoadVehiclesToCarriers();
+	OfferMarijuanaToShipsAndAircraft();
 
 	/* No NewGRF gets a say in how its trains turn round. */
 	IgnoreNewGRFReversingFlags();

@@ -1,0 +1,58 @@
+/*
+ * A vehicle set of two that number their vehicles where the game's own
+ * vehicles sit: a rail wagon under 116, the car carrier's number, and a lorry
+ * under 88, the first marijuana lorry's. Big sets number their vehicles past
+ * the original set's and reach these numbers as a matter of course. Played by
+ * the scene vozidlasada (see README.md): the game's own vehicles have to stay
+ * the game's, and the set's two vehicles stand beside them.
+ *
+ *     nmlc -c -l grf/lang --grf claims_own.grf grf/claims_own.nml
+ */
+grf {
+	grfid: "RIGv";
+	name: string(STR_V_NAME);
+	desc: string(STR_V_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+item(FEAT_TRAINS, v_wagon, 116) {
+	property {
+		name: string(STR_V_WAGON);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: 34;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: 1;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+	}
+}
+
+item(FEAT_ROADVEHS, v_lorry, 88) {
+	property {
+		name: string(STR_V_LORRY);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		sprite_id: 1;
+		speed: 50 km/h;
+		power: 100 hp;
+		weight: 5 ton;
+		cargo_capacity: 20;
+		default_cargo_type: 1;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 100;
+	}
+}

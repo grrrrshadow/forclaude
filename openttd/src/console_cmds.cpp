@@ -29,6 +29,7 @@
 #include "climate_industries.h"
 #include "cargotype.h"
 #include "spritecache.h"
+#include "green_load.h"
 #include "base_media_graphics.h"
 #include "table/sprites.h"
 #include "core/string_consumer.hpp"
@@ -1596,7 +1597,57 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			auto min = ParseType<uint>(argv[3]);
 			if (min.has_value() && shops < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} hulirn, ceka se aspon {}.", shops, *min);
 		}
-	} else {
+	}
+
+	/* The game's own vehicles: every one under its own mark in the engine
+	 * mapping, out of every set's reach and taken over by none; the ones for
+	 * marijuana in the game exactly while the industries are, carrying it,
+	 * with every loaded picture drawing some of itself green and not all. */
+	for (VehicleType type : EnumRange(VehicleType::CompanyEnd)) {
+		for (uint16_t internal_id = 0; internal_id < GetOriginalEngineCount(type); internal_id++) {
+			if (!IsGamesOwnEngine(type, internal_id)) continue;
+			EngineID id = _engine_mngr.GetID(type, internal_id, EngineOverrideManager::GAMES_OWN_GRFID);
+			if (id == EngineID::Invalid()) {
+				IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - vozidlo hry {}/{} neni pod znackou hry, sada ho muze prevzit.", to_underlying(type), internal_id);
+				continue;
+			}
+			const Engine *e = Engine::Get(id);
+			bool for_marijuana = IsMarijuanaEngineInfo(e->info);
+			IConsolePrint(CC_DEFAULT, "testprumysl: vozidlo hry {} '{}' {}, veze {}{}", e->index, GetString(STR_ENGINE_NAME, e->index), e->IsEnabled() ? "ve hre" : "mimo hru",
+					label_of(e->GetDefaultCargoType()), e->grf_prop.HasGrfFile() ? ", PREVZALA SADA" : "");
+			if (e->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - sada prevzala vozidlo hry {}.", e->index);
+			if (for_marijuana && e->IsEnabled() != _settings_game.economy.extra_industries) {
+				IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - vozidlo na marihuanu {} je {}, pridavny prumysl je {}.", e->index, e->IsEnabled() ? "ve hre" : "mimo hru", _settings_game.economy.extra_industries ? "zapnuty" : "vypnuty");
+			}
+			if (for_marijuana && e->IsEnabled() && e->GetDefaultCargoType() != mari_cargo) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - vozidlo na marihuanu {} nevozi marihuanu.", e->index);
+		}
+	}
+	/* A set's vehicle numbered where one of the game's own sits stands beside it. */
+	for (const Engine *e : Engine::Iterate()) {
+		if (!e->grf_prop.HasGrfFile() || !IsGamesOwnEngine(e->type, e->grf_prop.local_id)) continue;
+		IConsolePrint(CC_DEFAULT, "testprumysl: vedle stoji vozidlo sady {} '{}' s cislem {}", e->index, GetString(STR_ENGINE_NAME, e->index), e->grf_prop.local_id);
+	}
+	if (_settings_game.economy.extra_industries) {
+		for (const auto &[full, green] : GreenLoadSprites()) {
+			auto [drawn_green, drawn] = GreenLoadPixels(green);
+			IConsolePrint(CC_DEFAULT, "testprumysl: zeleny naklad {} z {}: zelenych {} z {}", green, full, drawn_green, drawn);
+			if (drawn_green == 0 || drawn_green >= drawn) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - plny obrazek {} nema zeleny naklad, nebo je zeleny cely.", green);
+		}
+		/* Ships and aircraft that carry goods carry marijuana too. */
+		uint goods_carriers = 0;
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Ship && e->type != VehicleType::Aircraft) continue;
+			bool goods = false;
+			for (CargoType c : e->info.refit_mask) goods |= CargoSpec::Get(c)->town_acceptance_effect == TownAcceptanceEffect::Goods;
+			if (IsValidCargoType(e->GetDefaultCargoType())) goods |= CargoSpec::Get(e->GetDefaultCargoType())->town_acceptance_effect == TownAcceptanceEffect::Goods;
+			if (!goods) continue;
+			goods_carriers++;
+			if (!e->info.refit_mask.Test(mari_cargo)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} vozi zbozi, ale marihuanu ne.", GetString(STR_ENGINE_NAME, e->index));
+		}
+		IConsolePrint(CC_DEFAULT, "testprumysl: lodi a letadel se zbozim (a marihuanou): {}", goods_carriers);
+	}
+
+	if (!_settings_game.economy.extra_industries) {
 		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny prumysl vypnuty, typy {} {} a {} {}", IT_MARIJUANA_PLANTATION, mari->enabled ? (mari->grf_prop.HasGrfFile() ? "ma sada" : "ZAPNUTY") : "volny",
 				IT_COFFEESHOP, shop->enabled ? (shop->grf_prop.HasGrfFile() ? "ma sada" : "ZAPNUTY") : "volny");
 		if (mari->enabled && !mari->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz je ve hre, i kdyz je pridavny prumysl vypnuty.");

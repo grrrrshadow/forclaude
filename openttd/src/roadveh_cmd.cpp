@@ -43,6 +43,8 @@
 
 #include "table/strings.h"
 
+#include "green_load.h"
+
 #include "safeguards.h"
 
 static const uint16_t _roadveh_images[] = {
@@ -137,9 +139,30 @@ void RoadVehicle::GetImage(Direction direction, EngineImageType image_type, Vehi
 	assert(IsValidImageIndex<VehicleType::Road>(spritenum));
 	SpriteID sprite = to_underlying(direction) + _roadveh_images[spritenum];
 
-	if (this->cargo.StoredCount() >= this->cargo_cap / 2U) sprite += _roadveh_full_adder[spritenum];
+	if (this->cargo.StoredCount() >= this->cargo_cap / 2U) {
+		sprite += _roadveh_full_adder[spritenum];
+		/* Marijuana in a coal lorry's picture is drawn green (green_load.h). */
+		if (IsValidCargoType(this->cargo_type) && CargoSpec::Get(this->cargo_type)->label == CT_MARIJUANA) sprite = GreenLoadSprite(sprite);
+	}
 
 	result->Set(sprite);
+}
+
+/**
+ * The pictures of an original lorry, empty and loaded, one pair per
+ * direction, for the ones with a loaded picture at all (green_load.h).
+ * @param image_index the lorry's picture
+ * @return empty and loaded, pair by pair
+ */
+std::vector<std::pair<SpriteID, SpriteID>> RoadVehicleLoadPictures(uint8_t image_index)
+{
+	std::vector<std::pair<SpriteID, SpriteID>> pictures;
+	if (!IsValidImageIndex<VehicleType::Road>(image_index) || _roadveh_full_adder[image_index] == 0) return pictures;
+	for (Direction dir : EnumRange(Direction::Begin, Direction::End)) {
+		SpriteID empty = to_underlying(dir) + _roadveh_images[image_index];
+		pictures.emplace_back(empty, empty + _roadveh_full_adder[image_index]);
+	}
+	return pictures;
 }
 
 /**

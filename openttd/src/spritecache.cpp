@@ -19,6 +19,7 @@
 #include "video/video_driver.hpp"
 #include "spritecache.h"
 #include "spritecache_internal.h"
+#include "palette_func.h"
 
 #include "table/sprites.h"
 #include "table/palette_convert.h"
@@ -442,6 +443,94 @@ static void *ReadRecolourSprite(SpriteFile &file, size_t file_pos, uint num, Spr
 	return dest;
 }
 
+/** A sprite as loaded, copied out of the loader's shared buffers. */
+struct LoadedSpriteCopy {
+	uint16_t width = 0;
+	uint16_t height = 0;
+	int16_t x_offs = 0;
+	int16_t y_offs = 0;
+	std::vector<SpriteLoader::CommonPixel> data;
+};
+
+/**
+ * Read the empty vehicle of a green-load sprite (SetGreenLoadSprite()) and
+ * copy it out, zoom level by zoom level: the loader reads into buffers shared
+ * by every sprite, which the loaded vehicle read next would write over.
+ * @param sc the empty vehicle's sprite
+ * @param sprite_type the type of the sprites
+ * @param encoder the encoder, for whether 32bpp sprites are wanted
+ * @return the copies, empty where the zoom level is not there
+ */
+static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc, SpriteType sprite_type, SpriteEncoder *encoder)
+{
+	SpriteCollMap<LoadedSpriteCopy> copies;
+	SpriteLoader::SpriteCollection empty;
+	ZoomLevels avail;
+	ZoomLevels avail_8bpp;
+	ZoomLevels avail_32bpp;
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	if (encoder->Is32BppSupported()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (avail.None()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, false, sc->control_flags, avail_8bpp, avail_32bpp);
+	for (ZoomLevel zoom : avail) {
+		const SpriteLoader::Sprite &s = empty[zoom];
+		LoadedSpriteCopy &copy = copies[zoom];
+		copy.width = s.width;
+		copy.height = s.height;
+		copy.x_offs = s.x_offs;
+		copy.y_offs = s.y_offs;
+		copy.data.assign(s.data, s.data + static_cast<size_t>(s.width) * s.height);
+	}
+	return copies;
+}
+
+/**
+ * Draw the load of a loaded vehicle green (SetGreenLoadSprite()): every pixel
+ * of the loaded picture that the empty one does not have the same.
+ * @param sprite the loaded vehicle, as read
+ * @param avail the zoom levels read
+ * @param empty the empty vehicle (ReadGreenLoadEmpty())
+ * @return how many pixels were drawn green, over all zoom levels
+ */
+static uint DrawLoadGreen(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, const SpriteCollMap<LoadedSpriteCopy> &empty)
+{
+	uint drawn = 0;
+	/* The leaf greens of the palette, dark to light. */
+	static constexpr uint8_t GREENS[] = {0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0xCF, 0xD0};
+	auto green_for = [](uint lightness) {
+		/* A step lighter than the load was: coal is nearly black, leaves are not. */
+		return GREENS[std::min<uint>(std::size(GREENS) - 1, 2 + lightness * 6 / 256)];
+	};
+
+	for (ZoomLevel zoom : avail) {
+		const LoadedSpriteCopy &e = empty[zoom];
+		if (e.data.empty()) continue;
+		SpriteLoader::Sprite &f = sprite[zoom];
+		for (int y = 0; y < f.height; y++) {
+			for (int x = 0; x < f.width; x++) {
+				SpriteLoader::CommonPixel &p = f.data[static_cast<size_t>(y) * f.width + x];
+				if (p.a == 0 && p.m == 0) continue;
+				int ex = x + f.x_offs - e.x_offs;
+				int ey = y + f.y_offs - e.y_offs;
+				if (ex >= 0 && ey >= 0 && ex < e.width && ey < e.height) {
+					const SpriteLoader::CommonPixel &q = e.data[static_cast<size_t>(ey) * e.width + ex];
+					if (q.m == p.m && q.r == p.r && q.g == p.g && q.b == p.b && q.a == p.a) continue;
+				}
+				const Colour c = p.m != 0 ? _cur_palette.palette[p.m] : Colour(p.r, p.g, p.b);
+				uint8_t green = green_for((c.r * 3 + c.g * 6 + c.b) / 10);
+				if (p.m != 0) p.m = green;
+				if (p.a != 0) {
+					const Colour g = _cur_palette.palette[green];
+					p.r = g.r;
+					p.g = g.g;
+					p.b = g.b;
+				}
+				drawn++;
+			}
+		}
+	}
+	return drawn;
+}
+
 /**
  * Read a sprite from disk.
  * @param sc          Location of sprite.
@@ -464,6 +553,11 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	assert(sc->type == sprite_type);
 
 	Debug(sprite, 9, "Load sprite {}", id);
+
+	/* A loaded vehicle with its load drawn green reads its empty self first,
+	 * since the loader's buffers are shared (SetGreenLoadSprite()). */
+	SpriteCollMap<LoadedSpriteCopy> green_load_empty;
+	if (sc->green_load_empty != 0) green_load_empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), sprite_type, encoder);
 
 	SpriteLoader::SpriteCollection sprite;
 	ZoomLevels sprite_avail;
@@ -518,6 +612,8 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 
 		return s;
 	}
+
+	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty);
 
 	if (!ResizeSprites(sprite, sprite_avail, encoder)) {
 		if (id == SPR_IMG_QUERY) UserError("Okay... something went horribly wrong. I couldn't resize the fallback sprite. What should I do?");
@@ -674,6 +770,7 @@ bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id)
 	sc->type = type;
 	sc->warned = false;
 	sc->control_flags = control_flags;
+	sc->green_load_empty = 0;
 
 	return true;
 }
@@ -691,6 +788,55 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr)
 	scnew->type = scold->type;
 	scnew->warned = false;
 	scnew->control_flags = scold->control_flags;
+	scnew->green_load_empty = 0;
+}
+
+/**
+ * Make a sprite the picture of a loaded vehicle with its load drawn green: the
+ * picture 'full' over again, where every pixel that differs from 'empty' --
+ * the same vehicle empty -- is drawn in the leaf greens of the palette, the
+ * light parts light and the dark dark. The coal of a coal truck so becomes
+ * marijuana, in any base set, while its black tyres, which the empty truck
+ * has too, stay black. Made when the sprite is read (ReadSprite()).
+ * @param sprite the sprite to make
+ * @param full the loaded vehicle
+ * @param empty the same vehicle empty
+ */
+void SetGreenLoadSprite(SpriteID sprite, SpriteID full, SpriteID empty)
+{
+	DupSprite(full, sprite);
+	GetSpriteCache(sprite)->green_load_empty = empty;
+}
+
+/**
+ * For the rig: read a green-load sprite (SetGreenLoadSprite()) the way the
+ * game does and count what it draws green, and what it draws at all.
+ * @param sprite the sprite
+ * @return pixels drawn green and pixels drawn, over all zoom levels read; nought for any other sprite
+ */
+std::pair<uint, uint> GreenLoadPixels(SpriteID sprite)
+{
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->green_load_empty == 0 || sc->file == nullptr) return {0, 0};
+	SpriteEncoder *encoder = BlitterFactory::GetCurrentBlitter();
+	SpriteCollMap<LoadedSpriteCopy> empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), SpriteType::Normal, encoder);
+
+	SpriteLoader::SpriteCollection full;
+	ZoomLevels avail;
+	ZoomLevels avail_8bpp;
+	ZoomLevels avail_32bpp;
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	if (encoder->Is32BppSupported()) avail = loader.LoadSprite(full, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (avail.None()) avail = loader.LoadSprite(full, *sc->file, sc->file_pos, SpriteType::Normal, false, sc->control_flags, avail_8bpp, avail_32bpp);
+
+	uint drawn = 0;
+	for (ZoomLevel zoom : avail) {
+		const SpriteLoader::Sprite &f = full[zoom];
+		for (size_t i = 0; i < static_cast<size_t>(f.width) * f.height; i++) {
+			if (f.data[i].a != 0 || f.data[i].m != 0) drawn++;
+		}
+	}
+	return {DrawLoadGreen(full, avail, empty), drawn};
 }
 
 /**

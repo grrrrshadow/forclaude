@@ -2316,7 +2316,7 @@ STR_CONFIG_SETTING_INDUSTRIES_TROPIC_HELPTEXT                   :Zapnuté: prům
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND                           :Průmysl toylandu: {STRING}
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND_HELPTEXT                  :Zapnuté: průmysl toylandu v každém klimatu, vedle toho, co tam je: hrané klima dostane ten, který nemá, i s náklady, které potřebuje, a žádná sada ho nevypne ani nenahradí svým -- průmysl sady stojí vedle něj. Vypnuté: hra je jako vždycky. Platí pro novou hru.
 STR_CONFIG_SETTING_EXTRA_INDUSTRIES                             :Přídavný průmysl: {STRING}
-STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :Zapnuté: do každého klimatu přibude průmysl, který hra přidává sama: marihuanová plantáž, která pěstuje marihuanu, a hulírna ve městech. Marihuanu bere dům s palmou – hulírna – a k tomu tabák, papír, turisty a alkohol, když je do hry přinese nějaká sada. Platí pro novou hru.
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :Zapnuté: do každého klimatu přibude průmysl, který hra přidává sama: marihuanová plantáž, která pěstuje marihuanu, a hulírna ve městech. Marihuanu bere dům s palmou – hulírna – a k tomu tabák, papír, turisty a alkohol, když je do hry přinese nějaká sada. Marihuanu vozí vlastní auta a vagony hry, které žádná sada nevypne, a lodě a letadla, které vozí zboží. Platí pro novou hru.
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE                          :Průmyslové sady vedle sebe: {STRING}
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE_HELPTEXT                 :Průmyslové sady (NewGRF) se navzájem odmítají: každá číslovala své náklady od nuly a přepisovala náklady té druhé. Tahle hra dává nákladům každé sady vlastní sloty a náklad se stejným kódem (labelem) sady sdílejí. Když se sada vzdá kvůli jiné nahrané sadě, hra načte sady znovu a tu druhou i celou její rodinu před její kontrolou schová, takže běží obě. Platí při založení nebo nahrání hry. Vypnuté: sada, která jinou odmítá, se vypne jako obvykle
 STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS                             :Tematická města: oddělit GRF: {STRING}
@@ -6330,7 +6330,7 @@ STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING}
 ############ end of savegame specific region!
 
 ##id 0x8000
-###length 119
+###length 122
 # Vehicle names
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM        :Kirby Paul Tank (parní)
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_MJS_250_DIESEL               :MJS 250 (dieselová)
@@ -6451,8 +6451,11 @@ STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_PLASTIC_TRUCK               :Vagon na plast
 STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_CAR_CARRIER                   :Vagon na auta
 STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_CAR_CARRIER               :Vagon na auta
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_CAR_CARRIER                 :Vagon na auta
+STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_MARIJUANA_TRUCK               :Vagon na marihuanu
+STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_MARIJUANA_TRUCK           :Vagon na marihuanu
+STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_MARIJUANA_TRUCK             :Vagon na marihuanu
 
-###length 88
+###length 91
 STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS                     :Autobus MPS Regal
 STR_VEHICLE_NAME_ROAD_VEHICLE_HEREFORD_LEOPARD_BUS              :Autobus Hereford Leopard
 STR_VEHICLE_NAME_ROAD_VEHICLE_FOSTER_BUS                        :Autobus Foster
@@ -6541,6 +6544,9 @@ STR_VEHICLE_NAME_ROAD_VEHICLE_WIZZOWOW_PLASTIC_TRUCK            :Vůz na plast W
 STR_VEHICLE_NAME_ROAD_VEHICLE_MIGHTYMOVER_BUBBLE_TRUCK          :Vůz na bubliny MightyMover
 STR_VEHICLE_NAME_ROAD_VEHICLE_POWERNAUGHT_BUBBLE_TRUCK          :Vůz na bubliny Powernaught
 STR_VEHICLE_NAME_ROAD_VEHICLE_WIZZOWOW_BUBBLE_TRUCK             :Vůz na bubliny Wizzowow
+STR_VEHICLE_NAME_ROAD_VEHICLE_BALOGH_MARIJUANA_TRUCK            :Vůz na marihuanu Balogh
+STR_VEHICLE_NAME_ROAD_VEHICLE_UHL_MARIJUANA_TRUCK               :Vůz na marihuanu Uhl
+STR_VEHICLE_NAME_ROAD_VEHICLE_DW_MARIJUANA_TRUCK                :Vůz na marihuanu DW
 
 ###length 11
 STR_VEHICLE_NAME_SHIP_MPS_OIL_TANKER                            :Ropný tanker MPS

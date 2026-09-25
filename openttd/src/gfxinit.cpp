@@ -25,6 +25,8 @@
 
 #include "table/sprites.h"
 
+#include "green_load.h"
+
 #include "safeguards.h"
 
 #include "table/landscape_sprite.h"
@@ -235,6 +237,8 @@ static bool LoadSpriteTables(NewGRFLoadRounds &rounds)
 	/* Every climate's own industry sprites, before the climate played puts its
 	 * own over the temperate ones. */
 	LoadClimateIndustrySprites(used_set);
+	/* The loaded marijuana wagons and lorries, from the base set's pictures. */
+	SetupGreenLoadSprites();
 
 	/*
 	 * Load additional sprites for climates other than temperate.

@@ -2226,7 +2226,7 @@ STR_CONFIG_SETTING_INDUSTRIES_TROPIC_HELPTEXT                   :On, the industr
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND                           :Toyland industries: {STRING2}
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND_HELPTEXT                  :On, the industries of the toyland in every climate, beside what is there: the climate played gets those it lacks, with the cargoes they need, and no industry set switches them off or puts its own in their place -- a set's industries stand beside them. Off, the game is as it always was. Taken when a new game is started.
 STR_CONFIG_SETTING_EXTRA_INDUSTRIES                             :Extra industries: {STRING2}
-STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :On, industries of the game's own join every climate: the marijuana plantation, which grows marijuana, and the coffeeshop in towns, a house with a palm tree, which takes it -- and tobacco, paper, tourists and alcohol too where a set brings them. Taken when a new game is started.
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :On, industries of the game's own join every climate: the marijuana plantation, which grows marijuana, and the coffeeshop in towns, a house with a palm tree, which takes it -- and tobacco, paper, tourists and alcohol too where a set brings them. The game's own lorries and wagons carry marijuana, which no set switches off, and so do ships and aircraft that carry goods. Taken when a new game is started.
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE                          :Industry sets side by side: {STRING2}
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE_HELPTEXT                 :Industry sets (NewGRFs) refuse one another: every set numbered its cargoes from zero and wrote over the other's. This game gives each set's cargoes slots of their own and lets sets share a cargo of the same label. When a set gives up because another set is loaded, the game loads again with that set, and every set of its family, hidden from its check, and both run. Taken when a game is started or loaded. Off, a set that refuses another is switched off, as usual
 STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS                             :Themed towns: one house set per town: {STRING2}
@@ -6112,7 +6112,7 @@ STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING2}
 ############ end of savegame specific region!
 
 ##id 0x8000
-###length 119
+###length 122
 # Vehicle names
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM        :Kirby Paul Tank (Steam)
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_MJS_250_DIESEL               :MJS 250 (Diesel)
@@ -6233,8 +6233,11 @@ STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_PLASTIC_TRUCK               :Plastic Truck
 STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_CAR_CARRIER                   :Car Carrier
 STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_CAR_CARRIER               :Car Carrier
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_CAR_CARRIER                 :Car Carrier
+STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_MARIJUANA_TRUCK               :Marijuana Truck
+STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_MARIJUANA_TRUCK           :Marijuana Truck
+STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_MARIJUANA_TRUCK             :Marijuana Truck
 
-###length 88
+###length 91
 STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS                     :MPS Regal Bus
 STR_VEHICLE_NAME_ROAD_VEHICLE_HEREFORD_LEOPARD_BUS              :Hereford Leopard Bus
 STR_VEHICLE_NAME_ROAD_VEHICLE_FOSTER_BUS                        :Foster Bus
@@ -6323,6 +6326,9 @@ STR_VEHICLE_NAME_ROAD_VEHICLE_WIZZOWOW_PLASTIC_TRUCK            :Wizzowow Plasti
 STR_VEHICLE_NAME_ROAD_VEHICLE_MIGHTYMOVER_BUBBLE_TRUCK          :MightyMover Bubble Truck
 STR_VEHICLE_NAME_ROAD_VEHICLE_POWERNAUGHT_BUBBLE_TRUCK          :Powernaught Bubble Truck
 STR_VEHICLE_NAME_ROAD_VEHICLE_WIZZOWOW_BUBBLE_TRUCK             :Wizzowow Bubble Truck
+STR_VEHICLE_NAME_ROAD_VEHICLE_BALOGH_MARIJUANA_TRUCK            :Balogh Marijuana Truck
+STR_VEHICLE_NAME_ROAD_VEHICLE_UHL_MARIJUANA_TRUCK               :Uhl Marijuana Truck
+STR_VEHICLE_NAME_ROAD_VEHICLE_DW_MARIJUANA_TRUCK                :DW Marijuana Truck
 
 ###length 11
 STR_VEHICLE_NAME_SHIP_MPS_OIL_TANKER                            :MPS Oil Tanker

@@ -39,6 +39,8 @@
 #include "table/strings.h"
 #include "table/engines.h"
 
+#include "green_load.h"
+
 #include "safeguards.h"
 
 EnginePool _engine_pool("Engine");
@@ -76,6 +78,48 @@ uint8_t GetOriginalEngineCount(VehicleType type)
  * @param type the vehicle type
  * @return the index offset for original engines of the given type
  */
+/**
+ * Is this the information of one of the game's own vehicles for marijuana?
+ * @param info the engine information
+ * @return whether its cargo is marijuana
+ */
+bool IsMarijuanaEngineInfo(const EngineInfo &info)
+{
+	return std::holds_alternative<CargoLabel>(info.cargo_label) && std::get<CargoLabel>(info.cargo_label) == CT_MARIJUANA;
+}
+
+/**
+ * The pictures of the game's own vehicles for marijuana (green_load.h), read
+ * from the original vehicle tables, so they are known before any engine is.
+ * @return the vehicle type and picture of each
+ */
+std::vector<std::pair<VehicleType, uint8_t>> MarijuanaEngineImages()
+{
+	std::vector<std::pair<VehicleType, uint8_t>> images;
+	for (uint i = 0; i < lengthof(_orig_rail_vehicle_info); i++) {
+		if (IsMarijuanaEngineInfo(_orig_engine_info[GetOriginalEngineOffset(VehicleType::Train) + i])) images.emplace_back(VehicleType::Train, _orig_rail_vehicle_info[i].image_index);
+	}
+	for (uint i = 0; i < lengthof(_orig_road_vehicle_info); i++) {
+		if (IsMarijuanaEngineInfo(_orig_engine_info[GetOriginalEngineOffset(VehicleType::Road) + i])) images.emplace_back(VehicleType::Road, _orig_road_vehicle_info[i].image_index);
+	}
+	return images;
+}
+
+/**
+ * Is this one of the game's own vehicles -- one this build adds after the
+ * original set (the car carriers, the marijuana wagons and lorries) -- which
+ * no NewGRF may take over or switch off (EngineOverrideManager::GAMES_OWN_GRFID)?
+ * @param type the vehicle type
+ * @param internal_id its number among the original vehicles of that type
+ * @return whether it is
+ */
+bool IsGamesOwnEngine(VehicleType type, uint16_t internal_id)
+{
+	/** How many vehicles of each type the original set has; the ones after them are the game's own. */
+	static constexpr VehicleTypeIndexArray<uint8_t> ORIGINAL_SET_COUNTS = {116, 88, 11, 41};
+	return internal_id >= ORIGINAL_SET_COUNTS[type] && internal_id < GetOriginalEngineCount(type);
+}
+
 uint8_t GetOriginalEngineOffset(VehicleType type)
 {
 	/** Offset of the first engine of each vehicle type in original engine data */
@@ -569,8 +613,10 @@ void EngineOverrideManager::ResetToDefaultMapping()
 	for (VehicleType type : EnumRange(VehicleType::CompanyEnd)) {
 		auto &map = this->mappings[type];
 		map.clear();
-		for (uint internal_id = 0; internal_id < GetOriginalEngineCount(type); internal_id++, ++id) {
-			map.emplace_back(INVALID_GRFID, internal_id, type, internal_id, id);
+		for (uint16_t internal_id = 0; internal_id < GetOriginalEngineCount(type); internal_id++, ++id) {
+			/* Through SetID(), which keeps the list in the order of its keys:
+			 * the game's own vehicles come under their own mark. */
+			this->SetID(type, internal_id, IsGamesOwnEngine(type, internal_id) ? GAMES_OWN_GRFID : INVALID_GRFID, static_cast<uint8_t>(internal_id), id);
 		}
 	}
 }
@@ -604,9 +650,26 @@ void EngineOverrideManager::AddMissingOriginalEngines()
 			 * its own mark and the two live side by side, so the question
 			 * cannot be about the number alone: asking that way found a set's
 			 * vehicle and left the original one out of the game altogether. */
-			if (this->GetID(type, internal_id, INVALID_GRFID) != EngineID::Invalid()) continue;
+			const GrfID mark = IsGamesOwnEngine(type, internal_id) ? GAMES_OWN_GRFID : INVALID_GRFID;
+			if (this->GetID(type, internal_id, mark) != EngineID::Invalid()) continue;
 
-			this->SetID(type, internal_id, INVALID_GRFID, static_cast<uint8_t>(internal_id), static_cast<EngineID>(next));
+			/* One of the game's own vehicles in a save from before they were
+			 * kept under their own mark: still under the plain number, and no
+			 * set took it, so it is moved under the mark with the number the
+			 * save gave it. */
+			if (mark != INVALID_GRFID) {
+				auto &map = this->mappings[type];
+				const auto key = EngineIDMapping::Key(INVALID_GRFID, internal_id);
+				auto it = std::ranges::lower_bound(map, key, std::less{}, EngineIDMappingKeyProjection{});
+				if (it != std::end(map) && it->Key() == key) {
+					EngineID engine = it->engine;
+					map.erase(it);
+					this->SetID(type, internal_id, mark, static_cast<uint8_t>(internal_id), engine);
+					continue;
+				}
+			}
+
+			this->SetID(type, internal_id, mark, static_cast<uint8_t>(internal_id), static_cast<EngineID>(next));
 			next++;
 		}
 	}
@@ -844,6 +907,15 @@ void ApplyOriginalVehicleSettings()
 
 			default:
 				break;
+		}
+
+		/* The wagons and lorries for marijuana are in the game exactly while the
+		 * game's own industries are (economy.extra_industries), in every climate,
+		 * whatever the setting for the original vehicles says: nothing else
+		 * carries the cargo, since no set knows it. */
+		const EngineInfo &orig = _orig_engine_info[GetOriginalEngineOffset(e->type) + e->grf_prop.local_id];
+		if (IsMarijuanaEngineInfo(orig)) {
+			e->info.climates = _settings_game.economy.extra_industries ? orig.climates : LandscapeTypes{};
 		}
 	}
 }
