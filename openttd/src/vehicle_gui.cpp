@@ -3515,9 +3515,12 @@ public:
 					default: return GetString(STR_VEHICLE_STATUS_ON_TRAIN, carrier->First()->unitnumber);
 				}
 			}
+			/* A train, a ship or an aircraft: the same wait, in words that fit
+			 * all three. It said "a train" while the car stood waiting for a
+			 * ship. */
 			if (IsWaitingToBoardTrain(rv)) {
 				text_colour = TextColour::Orange;
-				return GetString(STR_VEHICLE_STATUS_WAITING_FOR_TRAIN);
+				return GetString(STR_VEHICLE_STATUS_WAITING_FOR_RIDE);
 			}
 		}
 

@@ -4906,7 +4906,7 @@ STR_VEHICLE_STATUS_RESCUE_TOWING                                :{ORANGE}Odtahuj
 STR_VEHICLE_STATUS_ON_TRAIN                                     :{ORANGE}Veze se vlakem {COMMA}
 STR_VEHICLE_STATUS_ON_SHIP                                      :{ORANGE}Veze se lodí {COMMA}
 STR_VEHICLE_STATUS_ON_PLANE                                     :{ORANGE}Veze se letadlem {COMMA}
-STR_VEHICLE_STATUS_WAITING_FOR_TRAIN                            :{ORANGE}Čeká na vlak, na který se naloží
+STR_VEHICLE_STATUS_WAITING_FOR_RIDE                             :{ORANGE}Čekám na svezení
 STR_VEHICLE_STATUS_RESCUE_NO_DEPOT                              :{RED}Připojeno, ale žádné depo v dosahu
 STR_VEHICLE_STATUS_RESCUE_CANNOT_COUPLE                         :{RED}S vlakem, pro který jela, se nešlo spojit
 STR_VEHICLE_STATUS_SOLD                                         :{ORANGE}Prodáno

@@ -40,6 +40,7 @@
 #include "station_base.h"
 #include "waypoint_base.h"
 #include "economy_base.h"
+#include "road_on_rail.h"
 #include "core/pool_func.hpp"
 #include "core/backup_type.hpp"
 #include "core/container_func.hpp"
@@ -1346,6 +1347,14 @@ static uint GetLoadAmount(Vehicle *v)
 
 	/* Scale load amount the same as capacity */
 	if (e->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier) && !air_mail) load_amount = CeilDiv(load_amount * CargoSpec::Get(v->cargo_type)->multiplier, 0x100);
+
+	/* A ship that takes cars beside its passengers (road_on_rail.h) boards and
+	 * lands its passengers a fifth slower, the player's rule: the cars have to
+	 * get off, unload and get back on while it stands, and at the passengers'
+	 * pace the ship was gone before they had. */
+	if (v->type == VehicleType::Ship && IsCargoInClass(v->cargo_type, CargoClass::Passengers) && RoadVehicleRoomIn(v) > 0) {
+		load_amount = load_amount * 4 / 5;
+	}
 
 	/* Zero load amount breaks a lot of things. */
 	return std::max(1u, load_amount);
