@@ -21,6 +21,7 @@
 #include "base_media_func.h"
 #include "base_media_graphics.h"
 #include "base_media_sounds.h"
+#include "climate_industries.h"
 
 #include "table/sprites.h"
 
@@ -100,6 +101,51 @@ static void LoadGrfFileIndexed(const std::string &filename, std::span<const std:
 			[[maybe_unused]] bool b = LoadNextSprite(load_index, file, sprite_id);
 			assert(b);
 			sprite_id++;
+		}
+	}
+}
+
+/**
+ * Load every climate's own of the industry sprites the climate files put in
+ * place of the temperate ones (CLIMATE_INDUSTRY_SPRITE_RANGES) into their
+ * places after SPR_CLIMATE_INDUSTRY_BASE, one climate after the other, so an
+ * original industry of another climate than the one played is drawn as its
+ * own climate draws it (ClimateIndustrySprite()). Called once the temperate
+ * base file is loaded and before the file of the climate played puts its own
+ * over it.
+ * @param set the base graphics set
+ */
+static void LoadClimateIndustrySprites(const GraphicsSet *set)
+{
+	auto own = [](LandscapeType climate, int index) -> SpriteID {
+		return SPR_CLIMATE_INDUSTRY_BASE + to_underlying(climate) * CLIMATE_INDUSTRY_SPRITES_PER_CLIMATE + index;
+	};
+	const SpriteID through = SPR_CLIMATE_INDUSTRY_BASE + 4 * CLIMATE_INDUSTRY_SPRITES_PER_CLIMATE;
+
+	/* The temperate ones are the base file's, and every climate starts from them. */
+	for (const auto &[first, last] : CLIMATE_INDUSTRY_SPRITE_RANGES) {
+		for (SpriteID sprite = first; sprite <= last; sprite++) {
+			int index = ClimateIndustrySpriteIndex(sprite);
+			for (LandscapeType climate : {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) {
+				DupSprite(sprite, own(climate, index));
+			}
+		}
+	}
+
+	/* Each other climate's file, read through in the order of its table. */
+	for (LandscapeType climate : {LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) {
+		SpriteFile &file = OpenCachedSpriteFile(set->files[to_underlying(GraphicsFileType::Arctic) + to_underlying(climate) - 1].filename, Subdirectory::Baseset, PaletteType::DOS != set->palette);
+		uint8_t container_ver = file.GetContainerVersion();
+		if (container_ver == 0) continue;
+		ReadGRFSpriteOffsets(file);
+		if (container_ver >= 2 && file.ReadByte() != 0) continue;
+
+		uint file_sprite = 0;
+		for (const auto &[first, last] : _landscape_spriteindexes[to_underlying(climate) - 1]) {
+			for (SpriteID sprite = first; sprite <= last; sprite++) {
+				int index = ClimateIndustrySpriteIndex(sprite);
+				LoadNextSprite(index < 0 ? through : own(climate, index), file, file_sprite++);
+			}
 		}
 	}
 }
@@ -185,6 +231,10 @@ static bool LoadSpriteTables(NewGRFLoadRounds &rounds)
 	 * sprites as they are not shown anyway (logos in intro game).
 	 */
 	LoadGrfFile(used_set->files[to_underlying(GraphicsFileType::Logos)].filename, 4793, PaletteType::DOS != used_set->palette);
+
+	/* Every climate's own industry sprites, before the climate played puts its
+	 * own over the temperate ones. */
+	LoadClimateIndustrySprites(used_set);
 
 	/*
 	 * Load additional sprites for climates other than temperate.

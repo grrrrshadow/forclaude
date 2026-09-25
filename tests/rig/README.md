@@ -310,6 +310,16 @@ game with XIS, which switches the originals off and takes their places --
 `xis.grf` in every home's `newgrf/` (XIS 0.6.2 from BaNaNaS, the player's
 copy in the grrrrf release par4).
 
+Some sprites of the original industries are put in place by the file of the
+climate played (CLIMATE_INDUSTRY_SPRITE_RANGES in climate_industries.h): the
+forest and the cotton candy forest share theirs, and the farm, the oil wells
+and the ground of the water supply are the climate's own. Every climate's own
+of them is loaded into a block of its own, and an industry of another climate
+is drawn with its climate's. `testprumysl` lists each such sprite of an
+industry of another climate with the sprite drawn and the file it comes from,
+and refuses one drawn from the file of the climate played. `prumyslgrafika`
+plays a temperate map with the three other climates on.
+
 `economy.extra_industries` puts in the game's own marijuana plantation, in
 every climate: the last industry type, on a tile of its own (the last
 industry tile, which no set is given) drawn as the fruit plantation's, growing

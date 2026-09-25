@@ -1146,6 +1146,56 @@ static IndustryDrawTileProc * const _industry_draw_tile_procs[5] = {
 	IndustryDrawCoalPlantSparks,
 };
 
+/**
+ * A sprite of an original industry as the industry's own climate draws it,
+ * where the base graphics file of the climate played has put its own in its
+ * place (CLIMATE_INDUSTRY_SPRITE_RANGES): the cotton candy forest in the
+ * temperate climate, the desert farm in the arctic.
+ * @param image the sprite, with its flags
+ * @param climate the industry's own climate (IndustryHomeClimate())
+ * @return the sprite to draw, with the same flags
+ */
+SpriteID ClimateIndustrySprite(SpriteID image, LandscapeType climate)
+{
+	if (climate == _settings_game.game_creation.landscape) return image;
+	int index = ClimateIndustrySpriteIndex(GB(image, 0, SPRITE_WIDTH));
+	if (index < 0) return image;
+	SpriteID own = SPR_CLIMATE_INDUSTRY_BASE + to_underlying(climate) * CLIMATE_INDUSTRY_SPRITES_PER_CLIMATE + index;
+	SB(image, 0, SPRITE_WIDTH, own);
+	return image;
+}
+
+/**
+ * Every sprite among CLIMATE_INDUSTRY_SPRITE_RANGES that the original
+ * industries of this game draw, with the sprite drawn for it.
+ * @return one entry per industry and sprite
+ */
+std::vector<ClimateIndustrySpriteUse> ClimateIndustrySpriteUses()
+{
+	std::vector<ClimateIndustrySpriteUse> uses;
+	for (IndustryType type = 0; type < NEW_INDUSTRYOFFSET; type++) {
+		const IndustrySpec *spec = GetIndustrySpec(type);
+		if (!spec->enabled || spec->grf_prop.HasGrfFile()) continue;
+		LandscapeType climate = IndustryHomeClimate(type);
+		std::vector<SpriteID> seen;
+		for (const IndustryTileLayout &layout : spec->layouts) {
+			for (const IndustryTileLayoutTile &tile : layout) {
+				if (tile.gfx >= NEW_INDUSTRYTILEOFFSET) continue;
+				for (uint stage = 0; stage < 4; stage++) {
+					const DrawBuildingsTileStruct &dits = _industry_draw_tile_data[tile.gfx << 2 | stage];
+					for (SpriteID image : {dits.ground.sprite, dits.building.sprite}) {
+						SpriteID sprite = GB(image, 0, SPRITE_WIDTH);
+						if (ClimateIndustrySpriteIndex(sprite) < 0 || std::ranges::find(seen, sprite) != seen.end()) continue;
+						seen.push_back(sprite);
+						uses.push_back({type, climate, sprite, GB(ClimateIndustrySprite(sprite, climate), 0, SPRITE_WIDTH)});
+					}
+				}
+			}
+		}
+	}
+	return uses;
+}
+
 /** @copydoc DrawTileProc */
 static void DrawTile_Industry(TileInfo *ti)
 {
@@ -1176,7 +1226,11 @@ static void DrawTile_Industry(TileInfo *ti)
 			GetAnimationFrame(ti->tile) & INDUSTRY_COMPLETED :
 			GetIndustryConstructionStage(ti->tile))];
 
-	SpriteID image = dits->ground.sprite;
+	/* An original industry of another climate than the one played is drawn as
+	 * its own climate draws it. */
+	const LandscapeType climate = IndustryHomeClimate(ind->type);
+
+	SpriteID image = ClimateIndustrySprite(dits->ground.sprite, climate);
 
 	/* DrawFoundation() modifies ti->z and ti->tileh */
 	if (ti->tileh != SLOPE_FLAT) DrawFoundation(ti, Foundation::Leveled);
@@ -1193,7 +1247,7 @@ static void DrawTile_Industry(TileInfo *ti)
 	if (IsInvisibilitySet(TransparencyOption::Industries)) return;
 
 	/* Add industry on top of the ground? */
-	image = dits->building.sprite;
+	image = ClimateIndustrySprite(dits->building.sprite, climate);
 	if (image != 0) {
 		AddSortableSpriteToDraw(image, SpriteLayoutPaletteTransform(image, dits->building.pal, GetColourPalette(ind->random_colour)),
 			*ti, *dits, IsTransparencySet(TransparencyOption::Industries));

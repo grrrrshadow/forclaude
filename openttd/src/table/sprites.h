@@ -411,8 +411,19 @@ static const SpriteID SPR_BRIDGE_DECKS_MGLV = SPR_BRIDGE_DECKS_BASE + 12;
 static const SpriteID SPR_BRIDGE_DECKS_ROAD = SPR_BRIDGE_DECKS_BASE + 18;
 /** @} */
 
+/** @{
+ * The industry sprites a climate's own base graphics file puts in place of the
+ * temperate ones, as each climate has them, the four climates one after the
+ * other (CLIMATE_INDUSTRY_SPRITE_RANGES, climate_industries.h), and one more
+ * the files are read through. Drawn for an original industry of another
+ * climate than the one played. */
+static constexpr SpriteID SPR_CLIMATE_INDUSTRY_BASE = SPR_BRIDGE_DECKS_BASE + BRIDGE_DECKS_SPRITE_COUNT;
+static constexpr uint16_t CLIMATE_INDUSTRY_SPRITES_PER_CLIMATE = 26;
+static constexpr uint16_t CLIMATE_INDUSTRY_SPRITE_COUNT = 4 * CLIMATE_INDUSTRY_SPRITES_PER_CLIMATE + 1;
+/** @} */
+
 /** From where can we start putting NewGRFs. */
-static const SpriteID SPR_NEWGRFS_BASE = SPR_BRIDGE_DECKS_BASE + BRIDGE_DECKS_SPRITE_COUNT;
+static const SpriteID SPR_NEWGRFS_BASE = SPR_CLIMATE_INDUSTRY_BASE + CLIMATE_INDUSTRY_SPRITE_COUNT;
 
 /** Manager face sprites.
  * @{ */

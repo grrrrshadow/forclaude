@@ -33,6 +33,7 @@
 #include "industry_type.h"
 #include "house_type.h"
 #include "landscape_type.h"
+#include "gfx_type.h"
 
 LandscapeTypes IndustryClimatesOn();
 bool IsOriginalIndustryKept(IndustryType type);
@@ -45,6 +46,52 @@ void ResolveExtraIndustryHouses();
 HouseID HouseTakingMarijuana();
 std::span<const CargoLabel> PalmHouseCargoes();
 uint8_t OriginalIndustryChance(IndustryType type, bool creation);
+
+/**
+ * The sprites of the original industries that a climate's own base graphics
+ * file puts in place of the temperate ones, where each climate draws them its
+ * own way: the forest and the cotton candy forest (and the ground of the
+ * battery farm and the cola wells), the farm, the oil wells, and the desert
+ * ground of the water supply and the water tower. Ground a climate draws as
+ * its landscape -- bare land, grass, water -- is left out: an industry of
+ * another climate stands on the land of the one played.
+ *
+ * Each climate's own of these is loaded into SPR_CLIMATE_INDUSTRY_BASE, and
+ * an original industry of another climate is drawn with its own climate's
+ * (ClimateIndustrySprite()).
+ */
+static constexpr std::pair<SpriteID, SpriteID> CLIMATE_INDUSTRY_SPRITE_RANGES[] = {
+	{ 0x818,  0x81D},
+	{ 0x83A,  0x845},
+	{ 0x87D,  0x883},
+	{0x11C6, 0x11C6},
+};
+
+/**
+ * Where a sprite stands among CLIMATE_INDUSTRY_SPRITE_RANGES.
+ * @param sprite the sprite number, without flags
+ * @return its place, -1 when it is none of them
+ */
+inline int ClimateIndustrySpriteIndex(SpriteID sprite)
+{
+	int index = 0;
+	for (const auto &[first, last] : CLIMATE_INDUSTRY_SPRITE_RANGES) {
+		if (sprite >= first && sprite <= last) return index + static_cast<int>(sprite - first);
+		index += static_cast<int>(last - first + 1);
+	}
+	return -1;
+}
+
+SpriteID ClimateIndustrySprite(SpriteID image, LandscapeType climate);
+
+/** A sprite an original industry draws among CLIMATE_INDUSTRY_SPRITE_RANGES, for the rig. */
+struct ClimateIndustrySpriteUse {
+	IndustryType type; ///< the industry
+	LandscapeType climate; ///< its own climate (IndustryHomeClimate())
+	SpriteID sprite; ///< the sprite its drawing names
+	SpriteID drawn; ///< the sprite drawn for it (ClimateIndustrySprite())
+};
+std::vector<ClimateIndustrySpriteUse> ClimateIndustrySpriteUses();
 
 bool IsExtraClimateCargo(CargoType cargo);
 void PlaceClimateIndustryCargoes();

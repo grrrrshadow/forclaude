@@ -1429,6 +1429,15 @@ testzatik 650 testdomy" 700 -c $HOVER_CFG
 SCENE_NEWGAME='setting_newgame economy.industries_temperate 1
 setting_newgame economy.industries_arctic 1
 setting_newgame economy.industries_tropic 1' run_scene prumyslklimat "testprumysl 12" 100
+# The graphics of the industries of other climates (CLIMATE_INDUSTRY_SPRITE_RANGES):
+# on a temperate map with the three other climates on, every sprite the file
+# of a climate puts in place of the temperate one -- the cotton candy forest,
+# the desert farm, the ground of the water supply -- is drawn as the
+# industry's own climate draws it. prumyslklimat checks the same from toyland.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.industries_arctic 1
+setting_newgame economy.industries_tropic 1
+setting_newgame economy.industries_toyland 1' run_scene prumyslgrafika "testprumysl 12" 100
 # The temperate industries switched on beside an industry set that switches
 # them off and takes their places (XIS, xis.grf in the home's newgrf/, see
 # README.md): the originals have to stay, each in its own place, and the

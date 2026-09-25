@@ -29,6 +29,7 @@
 #include "climate_industries.h"
 #include "cargotype.h"
 #include "spritecache.h"
+#include "base_media_graphics.h"
 #include "table/sprites.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
@@ -1504,6 +1505,27 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 	}
 	IConsolePrint(CC_DEFAULT, "testprumysl: dosazene naklady: {}", extra.empty() ? std::string{"zadne"} : extra);
 	IConsolePrint(CC_DEFAULT, "testprumysl: prumyslu zapnutych klimat na mape: {}", on_map_of_on);
+
+	/* The sprites the climate played puts in place of another climate's
+	 * (CLIMATE_INDUSTRY_SPRITE_RANGES): an industry of another climate draws
+	 * its own climate's, from the base file for the temperate climate and
+	 * from the base file or its climate's own file for the others -- never
+	 * the file of the climate played. */
+	const GraphicsSet *set = BaseGraphics::GetUsedSet();
+	auto climate_file = [set](LandscapeType c) -> const std::string & {
+		return set->files[c == LandscapeType::Temperate ? to_underlying(GraphicsFileType::Base) : to_underlying(GraphicsFileType::Arctic) + to_underlying(c) - 1].filename;
+	};
+	uint own_drawn = 0;
+	for (const ClimateIndustrySpriteUse &use : ClimateIndustrySpriteUses()) {
+		if (use.climate == _settings_game.game_creation.landscape) continue;
+		own_drawn++;
+		const SpriteFile *origin = GetOriginFile(use.drawn);
+		std::string file = origin == nullptr ? std::string{"zadny"} : origin->GetFilename();
+		IConsolePrint(CC_DEFAULT, "testprumysl: grafika {} ({}): sprite {} kreslen jako {} ze {}", use.type, climate_names[to_underlying(use.climate)], use.sprite, use.drawn, file);
+		bool right = use.drawn != use.sprite && (file == climate_file(LandscapeType::Temperate) || (use.climate != LandscapeType::Temperate && file == climate_file(use.climate)));
+		if (!right) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - prumysl {} kresli sprite {} jinak nez jeho klima.", use.type, use.sprite);
+	}
+	IConsolePrint(CC_DEFAULT, "testprumysl: spritu kreslenych po klimatu prumyslu: {}", own_drawn);
 	if (argv.size() >= 2) {
 		auto min = ParseType<uint>(argv[1]);
 		if (min.has_value() && on_map_of_on < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} prumyslu zapnutych klimat, ceka se aspon {}.", on_map_of_on, *min);
