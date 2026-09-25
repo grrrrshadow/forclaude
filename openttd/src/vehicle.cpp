@@ -1617,6 +1617,7 @@ bool Vehicle::HandleBreakdown()
 							 * under it (TrainAwaitsRescue()). */
 							bool gave_up_road = head->rescue_deadline != TimerGameEconomy::Date{};
 							head->rescue_deadline = TimerGameEconomy::Date{};
+							head->flags.Reset(VehicleRailFlag::RescueGivenUp);
 							/* Going again under its own steam, so it is not waiting
 							 * for anybody to come and fetch it any more -- and it
 							 * goes back to what its order says, coupling

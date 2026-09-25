@@ -343,10 +343,22 @@ public:
 			}
 		};
 
+		/* The case a rescue engine is going for, so that what stands in its
+		 * way can be told apart from the case itself. Written into the
+		 * record by the engine when it has been turned back often enough
+		 * (see _rescue_road_failure), whether or not anybody is watching. */
+		const Train *fetching = Yapf().GetVehicle();
+		fetching = fetching != nullptr && IsFetchingCasualty(fetching->First()) ? fetching->First() : nullptr;
+		const Train *casualty = fetching != nullptr ? Train::GetIfValid(fetching->rescue_target) : nullptr;
+
 		/* Don't bother if the target is reserved. */
 		if (!IsWaitingPositionFree(Yapf().GetVehicle(), this->res_dest_tile, this->res_dest_td)) {
 			say(fmt::format("misto k zastaveni ({},{}) uz nekdo drzi",
 					TileX(this->res_dest_tile), TileY(this->res_dest_tile)));
+			if (fetching != nullptr) {
+				_rescue_road_failure = fmt::format("misto k zastaveni u pripadu ({},{}) drzi {}",
+						TileX(this->res_dest_tile), TileY(this->res_dest_tile), DescribeTrackHolder(this->res_dest_tile, casualty));
+			}
 			return false;
 		}
 
@@ -371,6 +383,10 @@ public:
 						TileX(this->res_fail_tile), TileY(this->res_fail_tile),
 						drzi != nullptr ? fmt::format("vlak {}", drzi->unitnumber) : "nikdo (jina prekazka)",
 						kudy()));
+				if (fetching != nullptr) {
+					_rescue_road_failure = fmt::format("cestou k pripadu nejde zamluvit ({},{}) - drzi {}",
+							TileX(this->res_fail_tile), TileY(this->res_fail_tile), DescribeTrackHolder(this->res_fail_tile, casualty));
+				}
 
 				/* Reservation failed, undo. */
 				Node *fail_node = this->res_dest_node;
@@ -666,6 +682,15 @@ public:
 			if (reserve_track && path_found) {
 				if (dest != nullptr) *dest = Yapf().GetBestNode()->GetLastTile();
 				this->TryReservePath(target, node->GetLastTile());
+			}
+		}
+
+		if (!path_found) {
+			const Train *me = Yapf().GetVehicle();
+			if (me != nullptr && IsFetchingCasualty(me->First())) {
+				Node *best = Yapf().GetBestNode();
+				_rescue_road_failure = best == nullptr ? std::string{"cestu k pripadu hledani nenaslo, nedostalo se nikam"} :
+						fmt::format("cestu k pripadu hledani nenaslo, doslo nejdal na ({},{})", TileX(best->GetLastTile()), TileY(best->GetLastTile()));
 			}
 		}
 

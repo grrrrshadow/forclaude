@@ -3076,6 +3076,53 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
 }
 
 /**
+ * Why the last road a rescue engine asked for could not be booked, in words:
+ * written by the pathfinder at the moment it gives up (CYapfReserveTrack),
+ * read by the engine asking, which is the one that writes it into the record.
+ * Empty when nothing was said.
+ */
+std::string _rescue_road_failure;
+
+/**
+ * Who is holding a piece of track, said so a person can go and look: what
+ * kind of train, which one, and where it stands. For the record of a rescue
+ * engine that could not get to its case -- "somebody holds it" was all it
+ * ever said, and which somebody is the whole answer.
+ * @param tile the tile that could not be had
+ * @param casualty the case the engine was going for, told apart from the rest
+ * @return the holder, in words
+ */
+std::string DescribeTrackHolder(TileIndex tile, const Train *casualty)
+{
+	/* Whoever stands on the tile first. The booking alone cannot say: on a
+	 * platform it runs the platform's length, and following it found the
+	 * casualty at the far end when the tile was a rake's, standing between. */
+	const Train *t = nullptr;
+	HasVehicleOnTile(tile, [&t, casualty](const Vehicle *u) {
+		if (u->type != VehicleType::Train) return false;
+		const Train *f = Train::From(u)->First();
+		if (t == nullptr || t == casualty) t = f;
+		return t != casualty;
+	});
+	if (t == nullptr) {
+		TrackBits held = GetReservedTrackbits(tile);
+		t = held.None() ? nullptr : GetTrainForReservation(tile, FindFirstTrack(held));
+	}
+	if (t == nullptr) return "nikdo (jina prekazka)";
+	t = t->First();
+	if (t == casualty) return "sam pripad";
+	std::string_view what = t->IsFreeWagon() ? "odpojene vagonky" :
+			t->IsWrecked() ? "vrak" :
+			t->breakdown_ctr == 1 ? "porouchany vlak" :
+			t->vehicle_flags.Test(VehicleFlag::RescueEngine) ? "odtahovka" :
+			t->IsSoldForScrap() ? "prodany vlak" :
+			t->cur_speed == 0 ? "stojici vlak" : "jedouci vlak";
+	/* A rake has no number of its own; its id is what the rig finds it by. */
+	return fmt::format("{}{} (id {}), stoji na ({},{})", what, t->unitnumber != 0 ? fmt::format(" {}", t->unitnumber) : std::string{},
+			t->index.base(), TileX(t->tile), TileY(t->tile));
+}
+
+/**
  * Is this train sitting somewhere on the line waiting for a rescue engine?
  *
  * Broken down or wrecked, still within the time it is prepared to wait, and
@@ -3087,6 +3134,14 @@ static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst
  */
 bool IsWaitingToBeRescued(const Train *v)
 {
+	/* An engine stood against it, was refused the coupling until it gave up,
+	 * and went home. Sent again, the next one was refused by the same rule --
+	 * a joined train longer than the game allows does not get shorter -- and
+	 * came home, and the one after that went out: two engines took turns at
+	 * one breakdown for as long as it lasted. It waits out its deadline as if
+	 * nobody were on call. */
+	if (v->flags.Test(VehicleRailFlag::RescueGivenUp)) return false;
+
 	/* Wagons the player has asked to have taken away: a rake standing out on
 	 * the line with a call written on it (see CmdRequestWagonTow()). The tow
 	 * fetches it like any other case -- it already waits to be coupled -- and
@@ -3139,6 +3194,8 @@ bool IsAnyRescueEngineAvailable(const Train *v)
 {
 	if (!_settings_game.vehicle.train_rescue_towing) return false;
 	if (Train::GetIfValid(v->couple_claim) != nullptr) return true;
+	/* Given up on: there are engines, but none is coming. */
+	if (v->flags.Test(VehicleRailFlag::RescueGivenUp)) return false;
 
 	for (const Train *tow : Train::Iterate()) {
 		if (tow->owner != v->owner) continue;
@@ -6232,7 +6289,7 @@ static void TransferTrainIdentity(Train *from, Train *to)
 		to->vehicle_flags.Set(f, from->vehicle_flags.Test(f));
 		from->vehicle_flags.Reset(f);
 	}
-	for (VehicleRailFlag f : {VehicleRailFlag::Stuck, VehicleRailFlag::Reversing, VehicleRailFlag::LeavingStation}) {
+	for (VehicleRailFlag f : {VehicleRailFlag::Stuck, VehicleRailFlag::Reversing, VehicleRailFlag::LeavingStation, VehicleRailFlag::RescueGivenUp}) {
 		to->flags.Set(f, from->flags.Test(f));
 		from->flags.Reset(f);
 	}
@@ -6596,6 +6653,8 @@ bool TrainAwaitsRescue(Train *v)
 
 	if (v->rescue_deadline == TimerGameEconomy::Date{}) {
 		v->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
+		/* A new case; whatever an engine gave up on was the last one. */
+		v->flags.Reset(VehicleRailFlag::RescueGivenUp);
 
 		/* From this moment the train is going nowhere until it is fetched, so
 		 * the path it had reserved ahead of itself is track it will never
@@ -6806,6 +6865,7 @@ CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool requ
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		v->rescue_deadline = request ? TimerGameEconomy::date + RescueDeadlineDays() : TimerGameEconomy::Date{};
+		v->flags.Reset(VehicleRailFlag::RescueGivenUp);
 		/* Whatever it was doing, from now on it is a rake waiting to be
 		 * fetched -- which is what lets the tow couple to it at all. */
 		if (request) v->current_order.SetWaitForCouple(true);
@@ -6999,6 +7059,7 @@ CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id)
 		 * is there to let a breakdown mend itself in the end, and nothing mends
 		 * a sold train back into an unsold one. */
 		v->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
+		v->flags.Reset(VehicleRailFlag::RescueGivenUp);
 		v->current_order.SetWaitForCouple(true);
 		v->current_order.SetGoToCouple(false);
 
@@ -9389,6 +9450,7 @@ bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderL
 		 * come is one named outright, which is the tow. */
 		if (sell) {
 			remainder->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
+			remainder->flags.Reset(VehicleRailFlag::RescueGivenUp);
 			remainder->current_order.SetWaitForCouple(true);
 			remainder->vehicle_flags.Set(VehicleFlag::SoldForScrap);
 			if (_show_train_orientation) {
@@ -10837,6 +10899,7 @@ static bool CheckTrainStayInDepot(Train *v)
 	 * few ticks for a road that a parked train was sitting on.
 	 *
 	 * The whole road or the shed. Those are the only two places it belongs. */
+	_rescue_road_failure.clear();
 	if ((seg_state == SigSegState::Path || IsFetchingCasualty(v)) && !TryPathReserve(v) && v->force_proceed == TFP_NONE) {
 		/* No path and no force proceed. */
 		if (on_call) {
@@ -10847,10 +10910,24 @@ static bool CheckTrainStayInDepot(Train *v)
 			 * standing opposite the door, told there was no tow within reach.
 			 * After a few refusals it lets this one go and the next look
 			 * puts the others first; this one is tried again when it is
-			 * alone, or once another case has been seen to. */
+			 * alone, or once another case has been seen to. So it waits at
+			 * home until the road comes free or the case is gone: it does
+			 * not go and clear what stands in the way, a tow fetches only
+			 * what it was sent for.
+			 *
+			 * The record says what stood in the way and where. "Could not
+			 * get there" was all it said, and a case the rig found -- an
+			 * engine broken down right behind the rake it had just left on
+			 * the platform, the rake standing on the one place the tow could
+			 * stop -- read from it as a tow that would not go. */
 			if (++v->rescue_nopath_tries >= 8) {
-				LogAnomaly("Vlak {}: odtah - k pripadu {} se osmkrat po sobe nedalo dostat, pousti ho",
-						v->unitnumber, v->rescue_target.base());
+				const Train *casualty = Train::GetIfValid(v->rescue_target);
+				LogAnomaly("Vlak {}: odtah - k pripadu {} ({}) na ({},{}) se osmkrat po sobe nedalo dostat, ceka doma, dokud se cesta neuvolni nebo pripad nezmizi. Duvod: {}",
+						v->unitnumber, v->rescue_target.base(),
+						casualty == nullptr ? "neexistuje" : casualty->IsFreeWagon() ? "vagonky" :
+								casualty->IsSoldForScrap() ? "prodany vlak" : casualty->IsWrecked() ? "vrak" : "porucha",
+						casualty == nullptr ? 0 : TileX(casualty->tile), casualty == nullptr ? 0 : TileY(casualty->tile),
+						_rescue_road_failure.empty() ? std::string("neznamy - hledani cesty nerekl proc") : _rescue_road_failure);
 				v->rescue_skip = v->rescue_target;
 				v->rescue_nopath_tries = 0;
 				EndRescueErrand(v);
@@ -10976,8 +11053,19 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 			SetRailStationPlatformReservation(tile, ReverseDiagDir(dir), false);
 		}
 	} else {
-		/* Any other tile */
-		UnreserveRailTrack(tile, TrackdirToTrack(track_dir));
+		/* Any other tile -- unless another train still stands on that track
+		 * of it, the same rule as for a platform and a bore above. Two trains
+		 * share a tile out on the line when one stood against the other: a
+		 * rescue engine against its casualty, giving the case up and driving
+		 * off. Its tail leaving the tile gave back the track the casualty's
+		 * last wagon stood on, and the casualty stood on the open line
+		 * holding all of itself but that (rig scene porouchanydlouhy). */
+		Track track = TrackdirToTrack(track_dir);
+		const Train *first = v->First();
+		bool other_stands_here = HasVehicleOnTile(tile, [first, track](const Vehicle *u) {
+			return u->type == VehicleType::Train && Train::From(u)->First() != first && Train::From(u)->track.Test(track);
+		});
+		if (!other_stands_here) UnreserveRailTrack(tile, track);
 	}
 }
 
@@ -12445,6 +12533,7 @@ uint Train::Crash(bool flooded)
 		 * the same moment for a wreck. */
 		if (!this->vehicle_flags.Test(VehicleFlag::RescueEngine) && this->rescue_deadline == TimerGameEconomy::Date{}) {
 			this->rescue_deadline = TimerGameEconomy::date + RescueDeadlineDays();
+			this->flags.Reset(VehicleRailFlag::RescueGivenUp);
 			this->current_order.SetWaitForCouple(true);
 			this->current_order.SetGoToCouple(false);
 		}
@@ -13933,6 +14022,13 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 					casualty->rescue_deadline = TimerGameEconomy::date;
 					LogAnomaly("Vlak {}: prodany vlak na ({},{}) zmizi - odtah ho nepripojil ze stejneho duvodu, ze ktereho ho nepripoji nikdo dalsi, a rozjet uz se neda. Zaplaceno nebude, protoze prodej se nikdy neuskutecnil",
 							casualty->unitnumber, TileX(casualty->tile), TileY(casualty->tile));
+				} else if (casualty != nullptr) {
+					/* Anything else waits out its deadline with nobody sent: a
+					 * breakdown mends itself then, a wreck clears itself away.
+					 * Sent again, the next engine drove out, was refused by the
+					 * same rule and came home -- two engines took turns at one
+					 * breakdown for as long as it lasted. */
+					casualty->flags.Set(VehicleRailFlag::RescueGivenUp);
 				}
 
 				consist->couple_refuse_tries = 0;

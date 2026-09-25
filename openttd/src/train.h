@@ -26,6 +26,7 @@ struct Train;
 enum class VehicleRailFlag : uint8_t {
 	Reversing = 0, ///< Train is slowing down to reverse.
 	Tender = 1, ///< (the tender only) The tender of a tender pair, whichever end of the list it is at. See MakeTenderRearHead().
+	RescueGivenUp = 2, ///< (head only) A rescue engine stood against this case and the coupling was refused until it gave up, so no engine is sent to it again; it waits out its deadline as if there were none. Cleared when a new case starts. See TrainLocoHandler().
 	PoweredWagon = 3, ///< Wagon is powered.
 	Flipped = 4, ///< Reverse the visible direction of the vehicle.
 	TenderPair = 5, ///< (both heads) A steam engine and its tender made into a two-headed engine at build time, so the list can be turned round with the tender first. The tender keeps its own engine type and picture, contributes nothing, and the engine is not halved the way a real dual head is. See MakeTenderRearHead().
@@ -626,6 +627,8 @@ extern bool _show_train_orientation;
  * train where it stands. See SayIfGroundUnderTrainGivenBack(). */
 extern const Train *_ground_freer;
 extern const char *_ground_freer_why;
+extern std::string _rescue_road_failure;
+std::string DescribeTrackHolder(TileIndex tile, const Train *casualty);
 uint TrainCrashed(Train *v);
 void ClearWreck(Train *t);
 

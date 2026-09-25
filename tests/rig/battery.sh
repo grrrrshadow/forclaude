@@ -600,10 +600,22 @@ testodtah prodatdlouhy" 24000
 # and the tow ran straight into it; and a tow that gave the case up drove on
 # the way it faced, into it again. The refusal puts both trains back as they
 # were, a tow giving up turns away from the train it stood at, and a tow never
-# wrecks a train that stands broken down or wrecked: it stops against it. Both
-# tows give up and go home, so zaznam is not zero; havaroval and srazka are.
+# wrecks a train that stands broken down or wrecked: it stops against it. The
+# first tow gives up and goes home, and the case is not taken again -- the two
+# tows used to go out for it by turns until it mended -- so zaznam is 3 (the
+# refusal, the giving up, the deadline) and havaroval and srazka are zero. No
+# "ZEM NEDRZI" either: the tow driving off the tile it shared with the
+# breakdown's last wagon gave back the track under that wagon.
 run_scene porouchanydlouhy "vlak123 on
 testodtah porouchanydlouhy dve" 30000
+# An engine leaves its wagon on the platform and breaks down one tile on, so
+# the wagon stands on the one place the tow could stop. The tow does not take
+# wagons of its own accord: it waits at home until the road comes free or the
+# breakdown mends, and the record says why, naming the rake and where it
+# stands.
+run_scene odtahzavagonky "vlak123 on
+testodtah vagony
+testporuchana 1 182 25" 12000
 # And the rule that keeps the two apart: nobody buys a breakdown. The scene
 # breaks the train down and tries to sell it a moment later, so odmitnuto=1 is
 # the pass here -- a zero would mean the scrapyard took it.

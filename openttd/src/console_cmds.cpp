@@ -3681,7 +3681,8 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "porucha {}: na ({},{}) {} - {}, jede pro ni {} (lhuta do {}, dnes {})",
 					t->unitnumber, TileX(t->tile), TileY(t->tile),
 					t->IsWrecked() ? "vrak" : "porouchany",
-					IsWaitingToBeRescued(t) ? "ceka na odtah" : "uz na odtah neceka (vyprsela lhuta)",
+					IsWaitingToBeRescued(t) ? "ceka na odtah" :
+							t->flags.Test(VehicleRailFlag::RescueGivenUp) ? "uz na odtah neceka (odtah to vzdal)" : "uz na odtah neceka (vyprsela lhuta)",
 					kdo == nullptr ? "nikdo" : fmt::format("odtahovka {}", kdo->unitnumber),
 					t->rescue_deadline.base(), TimerGameEconomy::date.base());
 		}
