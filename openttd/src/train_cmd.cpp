@@ -5622,6 +5622,30 @@ static bool AreConsistsTouching(const Train *a, const Train *b)
 }
 
 /**
+ * A rescue engine leaving a train it stood against -- it gave the case up,
+ * or the case is gone -- turns away from it first when that train is in front
+ * of it. Standing against it, it faces it; set going home as it stood, it
+ * drove straight on into it, since nothing on plain track stops a train that
+ * has no road booked. Turned, its way home is the way it came.
+ * @param tow the rescue engine
+ * @param other the train it stood against
+ */
+static void TurnTowAwayFrom(Train *tow, const Train *other)
+{
+	if (other == nullptr || !AreConsistsTouching(tow, other)) return;
+	const Train *front = tow->GetMovingFront();
+	TileIndexDiffC ahead = TileIndexDiffCByDir(front->GetMovingDirection());
+	for (const Train *w = other; w != nullptr; w = w->Next()) {
+		int x_diff = w->x_pos - front->x_pos;
+		int y_diff = w->y_pos - front->y_pos;
+		if (x_diff * x_diff + y_diff * y_diff > 16 * 16) continue;
+		if (ahead.x * x_diff + ahead.y * y_diff <= 0) continue;
+		ReverseTrainDirection(tow, "odtah - otaci se od vlaku, u ktereho stala");
+		return;
+	}
+}
+
+/**
  * Are the two meeting ends of a coupling joined by actual rail, close by?
  *
  * Being near each other on the map is not the same as being connected: at a
@@ -8251,6 +8275,10 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	/* What every piece of both trains looks like where it stands, before
 	 * anything is turned round; asked again after, see PictureKeptAfterJoin(). */
 	std::vector<PieceLook> looks;
+	/* Which of the two lists were turned round below, to be turned back if the
+	 * splice is refused after all -- see where it is tried. */
+	bool leading_turned = false;
+	bool trailing_turned = false;
 	if (flags.Test(DoCommandFlag::Execute)) {
 		looks = LookOfConsist(v->First());
 		std::vector<PieceLook> more = LookOfConsist(partner);
@@ -8329,16 +8357,37 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		 * usual case. */
 		if (DistanceSquaredBetweenVehicles(leading->First(), trailing) < DistanceSquaredBetweenVehicles(leading->Last(), trailing)) {
 			leading = ReverseConsistOrder(leading);
+			leading_turned = true;
 		}
 		if (DistanceSquaredBetweenVehicles(trailing->Last(), leading) < DistanceSquaredBetweenVehicles(trailing->First(), leading)) {
 			trailing = ReverseConsistOrder(trailing);
+			trailing_turned = true;
 		}
 	}
+
+	/* A splice refused after the lists were got ready for it -- a joined train
+	 * longer than the game allows is found out only by the splice itself --
+	 * leaves both trains as they stood: each list turned back the way it was,
+	 * and each standing on its own ground again. Left turned, a casualty was
+	 * a rake with a wagon at its head and its engine at the back: no longer the
+	 * tow's partner, so the collision check no longer let the two touch, and
+	 * the tow standing against it crashed into it on the next step. The player
+	 * lost two rescue engines that way, one after the other. */
+	auto put_back = [&]() {
+		if (!flags.Test(DoCommandFlag::Execute)) return;
+		if (trailing_turned) trailing = ReverseConsistOrder(trailing);
+		if (leading_turned) leading = ReverseConsistOrder(leading);
+		leading->ReserveTrackUnderConsist();
+		trailing->ReserveTrackUnderConsist();
+	};
 
 	Train *src = trailing->GetFirstEnginePart();
 	Train *dst = leading->Last()->GetLastEnginePart();
 
-	if (src->IsRearDualheaded()) return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
+	if (src->IsRearDualheaded()) {
+		put_back();
+		return CommandCost(STR_ERROR_REAR_ENGINE_FOLLOW_FRONT);
+	}
 
 	/* Every coupling done here is meant to come apart again, so whichever train
 	 * ends up travelling as the other one's wagons stays the train it was: it
@@ -8349,6 +8398,7 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	 * about. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	Train *new_head = leading;
 	ret = TryConsistSplice(flags, src, dst, true, true);
+	if (ret.Failed()) put_back();
 	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute)) return ret;
 
 	/* Remember where the two met. A "decouple the whole train" order later
@@ -12584,6 +12634,28 @@ static uint CheckTrainCollision(Vehicle *v, Train *moving_front)
 		return 0;
 	}
 
+	/* A rescue engine never makes a wreck of a train that has stopped for
+	 * good -- broken down, or a wreck already -- whether it is the one it was
+	 * sent for or not. Driving at one, it stops against it the way it stops
+	 * against its own casualty; pulling away from one is no collision at all.
+	 * The player lost two engines to one breakdown: the first gave the case
+	 * up while standing against it and drove on into it, and the second, sent
+	 * for the two wrecks, drove into the first. Any other train still crashes
+	 * into a breakdown it runs into. */
+	auto stopped_for_good = [](const Train *t) { return t->cur_speed == 0 && (t->breakdown_ctr == 1 || t->IsWrecked()); };
+	if (first->vehicle_flags.Test(VehicleFlag::RescueEngine) && stopped_for_good(other)) {
+		TileIndexDiffC ahead = TileIndexDiffCByDir(moving_front->GetMovingDirection());
+		if (ahead.x * x_diff + ahead.y * y_diff > 0) {
+			if (_show_train_orientation && first->cur_speed != 0) {
+				IConsolePrint(CC_INFO, "Vlak {}: odtahovka zastavila o {} {} - nebouracet", first->unitnumber,
+						other->IsWrecked() ? "vrak" : "poruchu", other->unitnumber);
+			}
+			first->cur_speed = 0;
+			first->subspeed = 0;
+		}
+		return 0;
+	}
+
 	/* The two halves of a coupling that has just come apart stand a
 	 * coupling's width apart -- and after a coupling that concluded a shade
 	 * too close, or one carried in an older save, closer than the distance
@@ -13456,6 +13528,22 @@ static void DeleteLastWagon(Train *v)
 }
 
 /**
+ * Clear a wreck off the line at once, wagon by wagon from the back, the way a
+ * wreck nobody fetches clears itself over time (HandleCrashedTrain()). For the
+ * rig, which stages a player's save from before a crash.
+ * @param t the wreck, head of its consist
+ */
+void ClearWreck(Train *t)
+{
+	assert(t->IsWrecked());
+	bool more;
+	do {
+		more = t->Next() != nullptr;
+		DeleteLastWagon(t);
+	} while (more);
+}
+
+/**
  * Rotate all vehicles of a (crashed) train chain randomly to animate the crash.
  * @param v First crashed vehicle.
  */
@@ -13851,6 +13939,7 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 				EndRescueErrand(consist);
 				consist->rescue_hold = RescueHold::CannotCouple;
 				FreeTrainTrackReservation(consist);
+				TurnTowAwayFrom(consist, partner);
 				consist->ReserveTrackUnderConsist();
 				SendTowHome(consist);
 				InvalidateWindowData(WindowClass::VehicleView, consist->index);

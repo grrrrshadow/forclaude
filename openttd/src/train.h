@@ -627,6 +627,7 @@ extern bool _show_train_orientation;
 extern const Train *_ground_freer;
 extern const char *_ground_freer_why;
 uint TrainCrashed(Train *v);
+void ClearWreck(Train *t);
 
 bool IsHoldingShortOfStationWaypoint(const Train *v);
 

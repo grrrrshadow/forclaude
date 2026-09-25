@@ -594,6 +594,16 @@ testodtah prodat" 16000
 # again. The record lines are the point of the scene, so zaznam is not zero.
 run_scene odtahprodatdlouhy "vlak123 on
 testodtah prodatdlouhy" 24000
+# The same too-long pair with a breakdown in place of the sold train, and two
+# tows. It used to leave two wrecks. The refused coupling had already turned
+# the broken train round -- a wagon at its head, no longer the tow's partner --
+# and the tow ran straight into it; and a tow that gave the case up drove on
+# the way it faced, into it again. The refusal puts both trains back as they
+# were, a tow giving up turns away from the train it stood at, and a tow never
+# wrecks a train that stands broken down or wrecked: it stops against it. Both
+# tows give up and go home, so zaznam is not zero; havaroval and srazka are.
+run_scene porouchanydlouhy "vlak123 on
+testodtah porouchanydlouhy dve" 30000
 # And the rule that keeps the two apart: nobody buys a breakdown. The scene
 # breaks the train down and tries to sell it a moment later, so odmitnuto=1 is
 # the pass here -- a zero would mean the scrapyard took it.

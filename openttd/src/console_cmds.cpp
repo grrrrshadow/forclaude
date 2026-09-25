@@ -3659,12 +3659,16 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 		if (t->First() != t || !t->IsFrontEngine()) continue;
 
 		if (t->vehicle_flags.Test(VehicleFlag::RescueEngine)) {
+			/* One line per RescueHold, in its order: a line missing moved every
+			 * later one up by one and the last off the end of the table, which
+			 * brought the rig down on a format error. */
 			static const char * const drzi[] = {"nic - jede nebo vyjizdi", "ma zatazenou brzdu", "ma vlastni rozkazy",
-					"nikdo necaka", "porucha se nepocita", "uz pro ni jede jina", "vyjezd z depa je blokovany",
-					"nenajde cestu k poruse", "nema kam s poruchou", "spojeni se porad odmita, vzdala to"};
+					"nikdo necaka", "porucha se nepocita", "uz pro ni jede jina", "bliz stoji jina",
+					"vyjezd z depa je blokovany", "nenajde cestu k poruse", "nema kam s poruchou", "spojeni se porad odmita, vzdala to"};
+			static_assert(std::size(drzi) == to_underlying(RescueHold::CannotCouple) + 1);
 			const Train *cil = Train::GetIfValid(t->rescue_target);
-			IConsolePrint(CC_DEFAULT, "odtahovka {}: {} cil {} {} - drzi ji: {}",
-					t->unitnumber,
+			IConsolePrint(CC_DEFAULT, "odtahovka {}{}: {} cil {} {} - drzi ji: {}",
+					t->unitnumber, t->IsWrecked() ? " (VRAK)" : (t->breakdown_ctr == 1 ? " (porouchana)" : ""),
 					t->IsInDepot() ? "v depu" : fmt::format("na ({},{})", TileX(t->tile), TileY(t->tile)),
 					cil == nullptr ? "zadny" : fmt::format("vlak {}", cil->unitnumber),
 					cil == nullptr ? "" : (IsFetchingCasualty(t) ? "(jede pro ni)" : "(uz ji veze)"),
@@ -4541,7 +4545,7 @@ static bool ConTestSell(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy] [signal cycle] [dve]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy] [signal cycle] [dve]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -4594,6 +4598,11 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * two-vehicle casualty the plain variant sells never bends at all. */
 	bool sell_long_variant = argv.size() >= 2 && argv[1] == "prodatdlouhy";
 	if (sell_long_variant) sell_variant = true;
+	/* 'porouchanydlouhy': the same long train, broken down instead of sold.
+	 * The tow cannot take it either and gives the case up -- and the casualty,
+	 * which nobody has been paid for, stays where it is, with the tow standing
+	 * right against it. The player's crash: the tow drove off through it. */
+	bool broken_long_variant = argv.size() >= 2 && argv[1] == "porouchanydlouhy";
 	/* 'depozpet' is 'depo' without the shed on the stub: pull the west depot
 	 * down once the tow is out (testzbourat depo) and the only depot left to
 	 * bring the casualty to is the one it is half inside of, behind the tow. */
@@ -4746,7 +4755,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "testodtah: casualty wagon failed.");
 		return true;
 	}
-	if (sell_long_variant) {
+	if (sell_long_variant || broken_long_variant) {
 		/* Long enough that its tail is still on the straight while its head is
 		 * round the curve, which is where the player's came apart. Twelve, so
 		 * the joined train would be over the length the game allows and the
@@ -4849,7 +4858,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	_testodtah_sell_broken = sell_broken_variant;
 	_testodtah_sell_after = 0;
 	_testodtah_break_tile = wagons_variant ? INVALID_TILE : half_in_depot ? TileXY(x0 + LEN - 2, y0) : faraway ? TileXY(x0 + LEN - 6, y0) :
-			((plain || oneway || sell_variant || sell_broken_variant) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
+			((plain || oneway || sell_variant || sell_broken_variant || broken_long_variant) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testodtah_depot_w = depot_w;
 	_testspoj_active = true;
@@ -7859,6 +7868,87 @@ static bool ConTestBreakdown(std::span<std::string_view> argv)
 }
 
 /**
+ * Give a train orders to go round stations, one after the other, and start it:
+ * for staging a player's save, where the train that was there is gone and one
+ * has to be sent the same way. Stops at the far end of each platform.
+ * Usage: testjed <unit number> <station id> [station id ...]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestGoRound(std::span<std::string_view> argv)
+{
+	if (argv.size() < 3) {
+		IConsolePrint(CC_HELP, "Send a train round stations. Usage: 'testjed <unit number> <station id> [station id ...]'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	Train *t = FindTrainByUnit(*punit);
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testjed: ODMITNUTO - vlak {} nenalezen.", argv[1]);
+		return true;
+	}
+	AutoRestoreBackup cur_company(_current_company, t->owner);
+	for (size_t i = 2; i < argv.size(); i++) {
+		auto pst = ParseInteger(argv[i]);
+		if (!pst.has_value() || !Station::IsValidID(static_cast<StationID>(*pst))) {
+			IConsolePrint(CC_ERROR, "testjed: ODMITNUTO - stanice {} neni.", argv[i]);
+			for (const Station *st : Station::Iterate()) {
+				IConsolePrint(CC_DEFAULT, "testjed:   stanice {} na ({},{}){}", st->index.base(), TileX(st->xy), TileY(st->xy), st->facilities.Test(StationFacility::Train) ? " vlaky" : "");
+			}
+			return true;
+		}
+		Order o{};
+		o.MakeGoToStation(static_cast<StationID>(*pst));
+		o.SetStopLocation(OrderStopLocation::FarEnd);
+		CommandCost res = Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, t->index, t->GetNumOrders(), o);
+		if (res.Failed()) IConsolePrint(CC_ERROR, "testjed: ODMITNUTO - rozkaz na stanici {} nejde: {}", *pst, GetString(res.GetErrorMessage()));
+	}
+	if (t->vehstatus.Test(VehState::Stopped)) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, t->index, false);
+	IConsolePrint(CC_DEFAULT, "testjed: vlak {} ma {} rozkazu a jede.", t->unitnumber, t->GetNumOrders());
+	return true;
+}
+
+/** The train to break down on reaching a tile (testporuchana), and the tile. */
+static UnitID _testporuchana_unit = 0;
+static TileIndex _testporuchana_tile = INVALID_TILE;
+
+/** Break the train named by testporuchana down the moment its head is on its tile. */
+static const IntervalTimer<TimerGameTick> _testporuchana_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	if (_testporuchana_unit == 0) return;
+	for (Train *t : Train::Iterate()) {
+		if (t->First() != t || t->unitnumber != _testporuchana_unit || !t->IsFrontEngine()) continue;
+		if (t->GetMovingFront()->tile != _testporuchana_tile) return;
+		t->breakdown_ctr = 1;
+		t->breakdown_delay = 255;
+		IConsolePrint(CC_DEFAULT, "testporuchana: vlak {} se porouchal na ({},{}), rychlost {}.", t->unitnumber, TileX(_testporuchana_tile), TileY(_testporuchana_tile), t->cur_speed);
+		_testporuchana_unit = 0;
+		return;
+	}
+});
+
+/**
+ * Break a train down as soon as it gets to a tile, the way the game's own
+ * breakdown catches a train wherever it happens to be.
+ * Usage: testporuchana <unit number> <x> <y>
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBreakdownAt(std::span<std::string_view> argv)
+{
+	if (argv.size() != 4) {
+		IConsolePrint(CC_HELP, "Break a train down on reaching a tile. Usage: 'testporuchana <unit number> <x> <y>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	auto px = ParseInteger(argv[2]);
+	auto py = ParseInteger(argv[3]);
+	if (!punit.has_value() || !px.has_value() || !py.has_value()) return false;
+	_testporuchana_unit = static_cast<UnitID>(*punit);
+	_testporuchana_tile = TileXY(static_cast<uint>(*px), static_cast<uint>(*py));
+	IConsolePrint(CC_DEFAULT, "testporuchana: vlak {} ma se porouchat na ({},{}).", *punit, *px, *py);
+	return true;
+}
+
+/**
  * Send a train past the signal in front of it, the same as the player's
  * "ignore signal" button. Usage: testprojet <unit number>
  * @copydoc IConsoleCmdProc
@@ -8356,6 +8446,30 @@ static bool ConTestWreck(std::span<std::string_view> argv)
 	AutoRestoreBackup cur_company(_current_company, t->owner);
 	TrainCrashed(t);
 	IConsolePrint(CC_DEFAULT, "testvrak: vlak {} je vrak na ({},{}).", t->unitnumber, TileX(t->tile), TileY(t->tile));
+	return true;
+}
+
+/**
+ * Clear a wreck off the line at once (ClearWreck()), to stage a player's save
+ * as it stood before a crash. Usage: 'testsmazat <unit number>'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestClearWreck(std::span<std::string_view> argv)
+{
+	if (argv.size() != 2) {
+		IConsolePrint(CC_HELP, "Clear a wreck off the line. Usage: 'testsmazat <unit number>'.");
+		return true;
+	}
+	auto punit = ParseInteger(argv[1]);
+	if (!punit.has_value()) return false;
+	Train *t = FindTrainByUnit(*punit);
+	if (t == nullptr || !t->IsWrecked()) {
+		IConsolePrint(CC_ERROR, "testsmazat: ODMITNUTO - vlak {} neni vrak.", argv[1]);
+		return true;
+	}
+	TileIndex tile = t->tile;
+	ClearWreck(t);
+	IConsolePrint(CC_DEFAULT, "testsmazat: vrak {} z ({},{}) odklizen.", *punit, TileX(tile), TileY(tile));
 	return true;
 }
 
@@ -12361,6 +12475,9 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprestavba",           ConTestRefitButton);
 	IConsole::CmdRegister("testrezim",               ConTestCoupleMode);
 	IConsole::CmdRegister("testvrak",                ConTestWreck);
+	IConsole::CmdRegister("testsmazat",              ConTestClearWreck);
+	IConsole::CmdRegister("testjed",                 ConTestGoRound);
+	IConsole::CmdRegister("testporuchana",           ConTestBreakdownAt);
 	IConsole::CmdRegister("testnapis",               ConTestNapis);
 	IConsole::CmdRegister("testautovlak",            ConTestRoadOnRail);
 	IConsole::CmdRegister("testautoletadlo",         ConTestRoadOnAir);
