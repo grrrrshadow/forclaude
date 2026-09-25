@@ -743,7 +743,10 @@ testbrzda 32" 12000 -g $S/vlak31.sav
 # must not creep over it (that brought the game down), it stays home. A second
 # breakdown on the curve at (98,60) is then straightened and towed in; that
 # used to tear the casualty (close-up ran out of steps, TEMATA 4.25) and is
-# expected snug now: odtazeno 1, no assert.
+# expected snug now: odtazeno 1, no assert. The tow sent for the first one
+# gives it up where it stands, too far to couple; it used to drive on into it
+# then (havaroval 2, srazka 1) and turns away from it now, as in
+# porouchanydlouhy -- havaroval and srazka are zero.
 run_scene poruchavrata "vlak123 on
 testpauza
 testbrzda 3
