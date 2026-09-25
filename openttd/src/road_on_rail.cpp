@@ -29,6 +29,7 @@
 #include "timer/timer_game_tick.h"
 #include "landscape.h"
 #include "spritecache.h"
+#include "strings_func.h"
 
 #include <map>
 
@@ -157,6 +158,44 @@ uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v)
 }
 
 /**
+ * Is this a wagon built for carrying road vehicles? The game's own car carrier,
+ * whose cargo they are, and in any set, whatever its version, a wagon of one of
+ * the kinds the player named: the flat wagons Pao, Pasy, Sgs and Smmp. Known by
+ * the name, which starts with the kind -- the letters a railway paints on the
+ * wagon, the same in every language -- written exactly so and followed by
+ * anything but another letter: a Paoj, which the player has not seen, is not a
+ * Pao, and an Sgnss or an Sgss is not an Sgs.
+ *
+ * Every wagon took the fitting before, on the grounds that which wagons should
+ * was the player's to find out first. He did: a lorry on a cattle wagon looks
+ * wrong, and this is a thing to show off.
+ *
+ * Asked once, when the sets are loaded (OfferRoadVehiclesToCarriers()); after
+ * that the refit mask is the answer (CanCarryRoadVehicles()).
+ *
+ * @param e the engine
+ * @return whether it is a car carrier
+ */
+bool IsCarCarrierWagon(const Engine *e)
+{
+	if (!IsValidCargoType(_road_vehicle_cargo)) return false;
+	if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return false;
+	if (e->GetDefaultCargoType() == _road_vehicle_cargo) return true;
+
+	auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); };
+	std::string name = GetString(e->info.string_id);
+	/* A set may open the name with a colour or a space. */
+	std::string_view rest = name;
+	while (!rest.empty() && !letter(rest.front())) rest.remove_prefix(1);
+	static const std::string_view KINDS[] = {"Pao", "Pasy", "Sgs", "Smmp"};
+	for (std::string_view kind : KINDS) {
+		if (!rest.starts_with(kind)) continue;
+		if (rest.size() == kind.size() || !letter(rest[kind.size()])) return true;
+	}
+	return false;
+}
+
+/**
  * May a vehicle of this engine be fitted for road vehicles at all?
  * @param e the engine
  * @return whether the fitting is offered for it
@@ -166,7 +205,9 @@ bool CanCarryRoadVehicles(const Engine *e)
 	if (!IsValidCargoType(_road_vehicle_cargo)) return false;
 	switch (e->type) {
 		case VehicleType::Train:
-			return e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
+			/* Given to the car carriers and their parts when the sets were
+			 * loaded (OfferRoadVehiclesToCarriers()). */
+			return e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon && e->info.refit_mask.Test(_road_vehicle_cargo);
 
 		case VehicleType::Ship:
 		case VehicleType::Aircraft:
@@ -647,7 +688,7 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
  * @param carrier the ship or aircraft
  * @return how many are aboard
  */
-static uint RoadVehiclesAboard(const Vehicle *carrier)
+uint RoadVehiclesAboard(const Vehicle *carrier)
 {
 	uint aboard = 0;
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {

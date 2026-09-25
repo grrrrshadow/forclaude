@@ -16,6 +16,7 @@
 #include "engine_func.h"
 #include "engine_base.h"
 #include "road_on_rail.h"
+#include "articulated_vehicles.h"
 #include "newgrf_spritegroup.h"
 #include "bridge.h"
 #include "town.h"
@@ -880,11 +881,12 @@ static void CalculateRefitMasks()
  * window, the buy window's filter and the refit command all find it by the
  * one road they already know, and no window has to know about it by name.
  *
- * Any wagon, whoever made it and whatever it declares; which wagons should
- * take a lorry is the player's to find out first, and a rule for it comes
- * after that. Engines never: a lorry rides on a wagon. Articulated parts of
- * a wagon get the bit too, so that a refit of the wagon carries them along
- * (RefitVehicle() refits a vehicle part by part, each by its own mask).
+ * The car carriers only: the game's own, and the flat wagons of any set the
+ * player named (IsCarCarrierWagon()). Engines never: a lorry rides on a
+ * wagon. The articulated parts of a car carrier get the bit too, so that a
+ * refit of the wagon carries them along (RefitVehicle() refits a vehicle part
+ * by part, each by its own mask) -- asked of the wagon, since a part has a
+ * name of its own or none.
  *
  * Ships and aircraft are offered it too, as far as they can carry anything
  * (CanCarryRoadVehicles()): the player asked that any of them be usable, not
@@ -907,7 +909,18 @@ static void OfferRoadVehiclesToCarriers()
 		LogAnomaly("Naklad na prepravu vozidel (ROLA) v teto hre neni - vagony nejde prestavet na auta. Slot {} obsadila jina sada?", NUM_CARGO - 1);
 		return;
 	}
+	/* Taken out of every wagon's mask first: a set's wagon that is refitted by
+	 * cargo class takes any special cargo, this one with it. */
+	for (Engine *e : Engine::IterateType(VehicleType::Train)) e->info.refit_mask.Reset(_road_vehicle_cargo);
 	for (Engine *e : Engine::Iterate()) {
+		if (e->type == VehicleType::Train) {
+			if (!IsCarCarrierWagon(e)) continue;
+			e->info.refit_mask.Set(_road_vehicle_cargo);
+			for (EngineID part : GetArticulatedPartEngines(e->index)) {
+				if (Engine *p = Engine::GetIfValid(part); p != nullptr) p->info.refit_mask.Set(_road_vehicle_cargo);
+			}
+			continue;
+		}
 		if (!CanCarryRoadVehicles(e)) continue;
 		/* A passenger ship takes cars beside its passengers and is not
 		 * fitted for them (TakesRoadVehiclesBesidePassengers()). */

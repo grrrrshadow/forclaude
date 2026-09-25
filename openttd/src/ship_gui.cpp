@@ -15,6 +15,8 @@
 #include "strings_func.h"
 #include "vehicle_func.h"
 #include "zoom_func.h"
+#include "cargotype.h"
+#include "road_on_rail.h"
 
 #include "table/strings.h"
 
@@ -67,11 +69,24 @@ void DrawShipDetails(const Vehicle *v, const Rect &r)
 	DrawString(r.left, r.right, y, GetString(STR_VEHICLE_INFO_BUILT_VALUE, PackEngineNameDParam(v->engine_type, EngineNameContext::VehicleDetails), v->build_year, v->value));
 	y += GetCharacterHeight(FontSize::Normal);
 
-	DrawString(r.left, r.right, y, GetString(STR_VEHICLE_INFO_CAPACITY, v->cargo_type, v->cargo_cap, GetCargoSubtypeText(v)));
+	/* A passenger ship takes cars beside its passengers (road_on_rail.h), and
+	 * the window said only the passengers: how many cars it takes goes after
+	 * them on the capacity line, and how many it has aboard after them on the
+	 * line below. */
+	uint car_room = (v->cargo_type != _road_vehicle_cargo) ? RoadVehicleRoomIn(v) : 0;
+
+	std::string capacity = GetString(STR_VEHICLE_INFO_CAPACITY, v->cargo_type, v->cargo_cap, GetCargoSubtypeText(v));
+	if (car_room > 0) capacity += GetString(STR_VEHICLE_DETAILS_ROAD_VEHICLES_BESIDE, _road_vehicle_cargo, car_room);
+	DrawString(r.left, r.right, y, capacity);
 	y += GetCharacterHeight(FontSize::Normal) + WidgetDimensions::scaled.vsep_normal;
 
+	uint cars = car_room > 0 ? RoadVehiclesAboard(v) : 0;
 	if (v->cargo.StoredCount() > 0) {
-		DrawString(r.left, r.right, y, GetString(STR_VEHICLE_DETAILS_CARGO_FROM, v->cargo_type, v->cargo.StoredCount(), v->cargo.GetFirstStation()));
+		std::string carried = GetString(STR_VEHICLE_DETAILS_CARGO_FROM, v->cargo_type, v->cargo.StoredCount(), v->cargo.GetFirstStation());
+		if (car_room > 0) carried += GetString(STR_VEHICLE_DETAILS_ROAD_VEHICLES_BESIDE, _road_vehicle_cargo, cars);
+		DrawString(r.left, r.right, y, carried);
+	} else if (cars > 0) {
+		DrawString(r.left, r.right, y, GetString(STR_VEHICLE_DETAILS_ROAD_VEHICLES_ONLY, _road_vehicle_cargo, cars));
 	} else {
 		DrawString(r.left, r.right, y, STR_VEHICLE_DETAILS_CARGO_EMPTY);
 	}

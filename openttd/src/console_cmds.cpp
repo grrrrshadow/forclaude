@@ -1788,6 +1788,33 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 		if (size.width == 0 || size.height == 0) fail("ikona nakladu MARI je prazdna");
 	}
 
+	/* Only the car carriers take road vehicles: the game's own and the flat
+	 * wagons the player named (IsCarCarrierWagon()), with their articulated
+	 * parts. Any other wagon offering the fitting is refused by name, and so
+	 * is a car carrier that does not. */
+	if (IsValidCargoType(_road_vehicle_cargo)) {
+		std::vector<EngineID> parts;
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (!IsCarCarrierWagon(e)) continue;
+			std::vector<EngineID> p = GetArticulatedPartEngines(e->index);
+			parts.insert(parts.end(), p.begin(), p.end());
+		}
+		uint carriers = 0;
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) continue;
+			bool offered = e->info.refit_mask.Test(_road_vehicle_cargo);
+			bool carrier = IsCarCarrierWagon(e);
+			bool part = std::ranges::find(parts, e->index) != parts.end();
+			if (carrier) {
+				carriers++;
+				IConsolePrint(CC_DEFAULT, "testnaklady: vagon na auta {} '{}'{}", e->index, GetString(e->info.string_id), e->info.climates.Any() ? "" : " (v tomto klimatu neni)");
+			}
+			if (offered && !carrier && !part) fail(fmt::format("vagon {} '{}' jde prestavet na auta, a neni vagon na auta", e->index, GetString(e->info.string_id)));
+			if (carrier && !offered) fail(fmt::format("vagon na auta {} '{}' nejde prestavet na auta", e->index, GetString(e->info.string_id)));
+		}
+		IConsolePrint(CC_DEFAULT, "testnaklady: vagonu na auta {}", carriers);
+	}
+
 	IConsolePrint(CC_DEFAULT, "testnaklady: NUM_CARGO {}, {}.", to_underlying(NUM_CARGO), ok ? "vse v poradku" : "s chybami");
 	return true;
 }

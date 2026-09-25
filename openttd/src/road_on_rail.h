@@ -45,8 +45,8 @@
  * no station takes. It is a real cargo so that a wagon fitted for it has a
  * capacity -- one vehicle -- and is full or empty like any other wagon, and so
  * that a wagon set can name it in its cargo table and draw its own loaded
- * sprites for it. Any rail wagon takes the refit (RefitVehicle()); a rule for
- * which wagons should comes when it is needed. While a vehicle rides, the
+ * sprites for it. Only the car carriers take the refit: the game's own and the
+ * flat wagons the player named (IsCarCarrierWagon()). While a vehicle rides, the
  * wagon holds one unit of the cargo (MirrorRideAsCargo()); the stations leave
  * that unit alone, so it pays nothing -- the vehicle on top earns with its own
  * cargo.
@@ -69,7 +69,9 @@ struct Train;
 struct Vehicle;
 
 uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v);
+bool IsCarCarrierWagon(const Engine *e);
 bool CanCarryRoadVehicles(const Engine *e);
+uint RoadVehiclesAboard(const Vehicle *carrier);
 bool TakesRoadVehiclesBesidePassengers(const Engine *e);
 uint RoadVehicleRoomIn(const Vehicle *v);
 void ConvertCarFerries();

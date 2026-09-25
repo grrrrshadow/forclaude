@@ -5011,6 +5011,8 @@ STR_VEHICLE_DETAILS_TRAIN_TOTAL_CAPACITY_MULT                   :{LTBLUE}- {CARG
 
 STR_VEHICLE_DETAILS_CARGO_EMPTY                                 :{LTBLUE}Prázdný
 STR_VEHICLE_DETAILS_CARGO_FROM                                  :{LTBLUE}{CARGO_LONG} z {STATION}
+STR_VEHICLE_DETAILS_ROAD_VEHICLES_BESIDE                        :{LTBLUE}, {CARGO_LONG}
+STR_VEHICLE_DETAILS_ROAD_VEHICLES_ONLY                          :{LTBLUE}{CARGO_LONG}
 STR_VEHICLE_DETAILS_CARGO_FROM_MULT                             :{LTBLUE}{CARGO_LONG} z {STATION} (x{NUM})
 
 STR_VEHICLE_DETAIL_TAB_CARGO                                    :{BLACK}Náklad

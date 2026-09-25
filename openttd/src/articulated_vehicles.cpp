@@ -89,6 +89,28 @@ uint CountArticulatedParts(EngineID engine_type)
 
 
 /**
+ * The engines the articulated parts of an engine are built from, in order.
+ * @param engine_type the front engine
+ * @return the parts' engines, empty for an engine that is not articulated
+ */
+std::vector<EngineID> GetArticulatedPartEngines(EngineID engine_type)
+{
+	std::vector<EngineID> parts;
+	if (!EngInfo(engine_type)->callback_mask.Test(VehicleCallbackMask::ArticEngine)) return parts;
+
+	Vehicle v(VehicleID::Invalid());
+	v.engine_type = engine_type;
+	v.owner = _current_company;
+
+	for (uint i = 1; i < MAX_ARTICULATED_PARTS; i++) {
+		EngineID part = GetNextArticulatedPart(i, engine_type, &v);
+		if (part == EngineID::Invalid()) break;
+		parts.push_back(part);
+	}
+	return parts;
+}
+
+/**
  * Returns the default (non-refitted) cargo and capacity of a specific EngineID.
  * @param engine the EngineID of interest
  * @return cargo and capacity
