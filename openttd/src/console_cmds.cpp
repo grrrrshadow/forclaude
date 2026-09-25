@@ -1455,13 +1455,16 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
  * the cargoes it produces and takes. Refuses an industry of a climate on that
  * the game has off or that a set replaced, and says which of the cargoes
  * were placed for these industries. Given a number, at least that many
- * industries of the climates on have to stand on the map. Usage: testprumysl [min]
+ * industries of the climates on have to stand on the map. And the game's
+ * marijuana plantation (economy.extra_industries), with the palm house that
+ * takes its cargo; given a second number, at least that many plantations
+ * have to stand on the map. Usage: testprumysl [min [plantaze]]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "List the original industries of the climates switched on. Usage: 'testprumysl [min]', refusing fewer than min of them on the map.");
+		IConsolePrint(CC_HELP, "List the original industries of the climates switched on, and the marijuana plantation. Usage: 'testprumysl [min [plantaze]]', refusing fewer than min of them, or fewer than plantaze plantations, on the map.");
 		return true;
 	}
 	LandscapeTypes on = IndustryClimatesOn();
@@ -1504,6 +1507,52 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 	if (argv.size() >= 2) {
 		auto min = ParseType<uint>(argv[1]);
 		if (min.has_value() && on_map_of_on < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} prumyslu zapnutych klimat, ceka se aspon {}.", on_map_of_on, *min);
+	}
+
+	/* The marijuana plantation (economy.extra_industries): in every climate
+	 * when on, growing marijuana on a tile of its own, and the house with the
+	 * palm tree taking all of it; nowhere when off, and the house as it was. */
+	const IndustrySpec *mari = GetIndustrySpec(IT_MARIJUANA_PLANTATION);
+	const HouseSpec *palm = HouseSpec::Get(HouseTakingMarijuana());
+	CargoType mari_cargo = GetCargoTypeByLabel(CT_MARIJUANA);
+	uint palm_takes = IsValidCargoType(mari_cargo) ? GetAcceptedCargoOfHouse(palm)[mari_cargo] : 0;
+	if (_settings_game.economy.extra_industries) {
+		std::string produced;
+		for (CargoType c : mari->produced_cargo) if (IsValidCargoType(c)) produced += label_of(c) + " ";
+		IndustryGfx gfx = mari->layouts.front().front().gfx;
+		const IndustryTileSpec *tile = GetIndustryTileSpec(gfx);
+		uint count = Industry::GetIndustryTypeCount(IT_MARIJUANA_PLANTATION);
+		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny {} {} {}{}, dlazdice {} kreslena jako {}, na mape {}, vyrabi {}",
+				IT_MARIJUANA_PLANTATION, GetString(mari->name), mari->enabled ? "zap" : "VYP", mari->grf_prop.HasGrfFile() ? " SADA" : "",
+				gfx, tile->grf_prop.subst_id, count, produced);
+		IConsolePrint(CC_DEFAULT, "testprumysl: dum s palmou {} '{}' bere MARI {}/8", HouseTakingMarijuana(), GetString(GetHouseName(palm)), palm_takes);
+		/* The other cargoes it takes where the game has them: all of each. */
+		CargoArray palm_acceptance = GetAcceptedCargoOfHouse(palm);
+		std::string also;
+		for (CargoLabel label : PalmHouseCargoes()) {
+			if (label == CT_MARIJUANA) continue;
+			CargoType c = GetCargoTypeByLabel(label);
+			if (!IsValidCargoType(c)) continue;
+			also += fmt::format("{} {}/8 ", label_of(c), palm_acceptance[c]);
+			if (palm_acceptance[c] != 8) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum s palmou nebere {} 8/8, i kdyz je ve hre.", label_of(c));
+		}
+		IConsolePrint(CC_DEFAULT, "testprumysl: dum s palmou bere taky: {}", also.empty() ? std::string{"nic dalsiho ve hre"} : also);
+		if (!mari->enabled || mari->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve hre, nebo ji zabrala sada.");
+		if (mari->climate_availability != LandscapeTypes{LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve vsech klimatech.");
+		if (produced != "MARI ") IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nevyrabi marihuanu.");
+		if (gfx != GFX_MARIJUANA_PLANTATION || tile->grf_prop.HasGrfFile() || tile->grf_prop.subst_id >= NEW_INDUSTRYTILEOFFSET) {
+			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nema svou dlazdici kreslenou jako puvodni dlazdice.");
+		}
+		if (palm_takes != 8) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum s palmou nebere marihuanu 8/8.");
+		if (argv.size() >= 3) {
+			auto min = ParseType<uint>(argv[2]);
+			if (min.has_value() && count < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} marihuanovych plantazi, ceka se aspon {}.", count, *min);
+		}
+	} else {
+		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny prumysl vypnuty, typ {} {}", IT_MARIJUANA_PLANTATION, mari->enabled ? (mari->grf_prop.HasGrfFile() ? "ma sada" : "ZAPNUTY") : "volny");
+		if (mari->enabled && !mari->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz je ve hre, i kdyz je pridavny prumysl vypnuty.");
+		if (IsValidCargoType(mari_cargo)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuana je ve hre, i kdyz je pridavny prumysl vypnuty.");
+		if (palm_takes != 0) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum s palmou bere marihuanu, i kdyz je pridavny prumysl vypnuty.");
 	}
 	return true;
 }
@@ -1620,6 +1669,13 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testnaklady: ikona nakladu ROLA: sprite {} ({}x{})", icon, size.width, size.height);
 		if (size.width == 0 || size.height == 0) fail("ikona nakladu ROLA je prazdna");
 	}
+	/* And of marijuana, when the game's plantation is in (economy.extra_industries). */
+	if (CargoType mari = GetCargoTypeByLabel(CT_MARIJUANA); IsValidCargoType(mari)) {
+		SpriteID icon = CargoSpec::Get(mari)->GetCargoIcon();
+		Dimension size = GetSpriteSize(icon);
+		IConsolePrint(CC_DEFAULT, "testnaklady: ikona nakladu MARI: sprite {} ({}x{})", icon, size.width, size.height);
+		if (size.width == 0 || size.height == 0) fail("ikona nakladu MARI je prazdna");
+	}
 
 	IConsolePrint(CC_DEFAULT, "testnaklady: NUM_CARGO {}, {}.", to_underlying(NUM_CARGO), ok ? "vse v poradku" : "s chybami");
 	return true;
@@ -1730,6 +1786,8 @@ static std::string CountHousesBySource(TownID town)
  *   and name, and the house a set put in its place;
  * - testdomy postav <x> <y> <house>: place a house by hand, as the picker
  *   does (Commands::PlaceHouse), and say what stands there;
+ * - testdomy pole <x> <y> [r]: the houses within r tiles of a tile, by id and
+ *   name, and how many tiles of each;
  * - testdomy rok <year>: move the calendar there (MoveCalendarTo()), for a
  *   set whose houses are not built before some year;
  * - testdomy okno <town> <set>: open the town window, press "Domy z" and click
@@ -1869,6 +1927,36 @@ static bool ConTestHouseSets(std::span<std::string_view> argv)
 		if (!pyear.has_value()) return false;
 		MoveCalendarTo(TimerGameCalendar::Year{static_cast<int32_t>(*pyear)});
 		IConsolePrint(CC_DEFAULT, "testdomy: rok {}", TimerGameCalendar::year.base());
+		return true;
+	}
+
+	if (argv[1] == "pole" && argv.size() >= 4) {
+		/* The houses on the map around a tile, within r tiles: each tile's
+		 * house by id and name, and how many tiles of each house there are --
+		 * for telling which house a player means by where it stands. */
+		auto px = ParseInteger(argv[2]);
+		auto py = ParseInteger(argv[3]);
+		if (!px.has_value() || !py.has_value()) return false;
+		int r = 0;
+		if (argv.size() >= 5) {
+			auto pr = ParseInteger(argv[4]);
+			if (!pr.has_value()) return false;
+			r = static_cast<int>(*pr);
+		}
+		std::map<HouseID, uint> seen;
+		for (int y = static_cast<int>(*py) - r; y <= static_cast<int>(*py) + r; y++) {
+			for (int x = static_cast<int>(*px) - r; x <= static_cast<int>(*px) + r; x++) {
+				if (x < 0 || y < 0 || x >= static_cast<int>(Map::SizeX()) || y >= static_cast<int>(Map::SizeY())) continue;
+				TileIndex t = TileXY(x, y);
+				if (!IsTileType(t, TileType::House)) continue;
+				HouseID h = GetHouseType(t);
+				const HouseSpec *hs = HouseSpec::Get(h);
+				seen[h]++;
+				IConsolePrint(CC_DEFAULT, "testdomy: pole {},{} (index {}): dum {} (cisty {}, original {}) '{}' ({})", x, y, t.base(), h, GetCleanHouseType(t), IsHouseKeptOriginal(t) ? "ano" : "ne",
+						GetString(GetHouseName(hs)), hs->grf_prop.HasGrfFile() ? fmt::format("{:08X}", std::byteswap(hs->grf_prop.grfid)) : std::string{"hra"});
+			}
+		}
+		for (const auto &[h, n] : seen) IConsolePrint(CC_DEFAULT, "testdomy: dum {} '{}': {} polic", h, GetString(GetHouseName(HouseSpec::Get(h))), n);
 		return true;
 	}
 

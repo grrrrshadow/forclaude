@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 229;
+static const uint16_t OPENTTD_SPRITE_COUNT = 230;
 /** @} */
 
 /** @{
@@ -224,6 +224,9 @@ static const SpriteID SPR_RAID_ROCKET_YELLOW         = SPR_OPENTTD_BASE + 220;
 /* The cargo icon for road vehicles on wagons, ships and aircraft (CT_ROLA): a
  * car, artwork from icons8.com -- see CREDITS.md. */
 static const SpriteID SPR_CARGO_ROAD_VEHICLES_ICON   = SPR_OPENTTD_BASE + 228;
+/* The cargo icon for marijuana (economy.extra_industries): a cannabis leaf,
+ * artwork from icons8.com -- see CREDITS.md. */
+static const SpriteID SPR_CARGO_MARIJUANA_ICON       = SPR_OPENTTD_BASE + 229;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
@@ -1376,6 +1379,7 @@ static const SpriteID SPR_CARGO_TOYS                  = 4317;
 static const SpriteID SPR_CARGO_CANDYFLOSS            = 4318;
 static const SpriteID SPR_CARGO_FIZZY_DRINKS          = 4319;
 static const SpriteID SPR_CARGO_ROAD_VEHICLES         = SPR_CARGO_ROAD_VEHICLES_ICON; ///< A car (CT_ROLA), among this build's own sprites.
+static const SpriteID SPR_CARGO_MARIJUANA             = SPR_CARGO_MARIJUANA_ICON; ///< A cannabis leaf (CT_MARIJUANA), among this build's own sprites.
 static const SpriteID SPR_CARGO_TOFFEE                = 4320;
 static const SpriteID SPR_CARGO_BUBBLES               = 4321;
 static const SpriteID SPR_CARGO_PLASTIC               = 4322;

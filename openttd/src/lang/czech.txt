@@ -130,6 +130,10 @@ STR_CARGO_PLURAL_ROAD_VEHICLES                                  :Silniční vozi
 STR_CARGO_PLURAL_FIZZY_DRINKS.gen                               :limonád
 STR_CARGO_PLURAL_FIZZY_DRINKS.acc                               :limonádu
 STR_CARGO_PLURAL_FIZZY_DRINKS.big                               :Limonáda
+STR_CARGO_PLURAL_MARIJUANA                                      :Marihuana
+STR_CARGO_PLURAL_MARIJUANA.gen                                  :Marihuany
+STR_CARGO_PLURAL_MARIJUANA.acc                                  :Marihuanu
+STR_CARGO_PLURAL_MARIJUANA.big                                  :Marihuana
 
 # Singular cargo name
 STR_CARGO_SINGULAR_NOTHING                                      :
@@ -167,6 +171,7 @@ STR_CARGO_SINGULAR_BATTERY                                      :baterií
 STR_CARGO_SINGULAR_PLASTIC                                      :plastu
 STR_CARGO_SINGULAR_FIZZY_DRINK                                  :limonád
 STR_CARGO_SINGULAR_ROAD_VEHICLE                                 :Silniční vozidlo
+STR_CARGO_SINGULAR_MARIJUANA                                    :marihuany
 
 # Quantity of cargo
 STR_QUANTITY_NOTHING                                            :
@@ -202,6 +207,7 @@ STR_QUANTITY_BATTERIES                                          :{COMMA} bateri{
 STR_QUANTITY_PLASTIC                                            :{VOLUME_LONG} plastu
 STR_QUANTITY_FIZZY_DRINKS                                       :{COMMA} limonád{P a y ""}
 STR_QUANTITY_ROAD_VEHICLES                                      :{COMMA}{NBSP}silniční vozidl{P o a a}
+STR_QUANTITY_MARIJUANA                                          :{WEIGHT_LONG} marihuany
 STR_QUANTITY_N_A                                                :N/A
 
 # Two letter abbreviation of cargo name
@@ -238,6 +244,7 @@ STR_ABBREV_BATTERIES                                            :BA
 STR_ABBREV_PLASTIC                                              :PL
 STR_ABBREV_FIZZY_DRINKS                                         :LI
 STR_ABBREV_ROAD_VEHICLES                                        :SV
+STR_ABBREV_MARIJUANA                                            :MA
 STR_ABBREV_ALL                                                  :VŠE
 
 # 'Mode' of transport for cargoes
@@ -2308,6 +2315,8 @@ STR_CONFIG_SETTING_INDUSTRIES_TROPIC                            :Průmysl poušt
 STR_CONFIG_SETTING_INDUSTRIES_TROPIC_HELPTEXT                   :Zapnuté: průmysl pouštního klimatu v každém klimatu, vedle toho, co tam je: hrané klima dostane ten, který nemá, i s náklady, které potřebuje, a žádná sada ho nevypne ani nenahradí svým -- průmysl sady stojí vedle něj. Vypnuté: hra je jako vždycky. Platí pro novou hru. Musí být dostupné domy toho klimatu aby bylo kam vozit vodu a jídlo. domy lze postavit ručně, zapnout v okně města nebo v nastavení hry prostředí města.
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND                           :Průmysl toylandu: {STRING}
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND_HELPTEXT                  :Zapnuté: průmysl toylandu v každém klimatu, vedle toho, co tam je: hrané klima dostane ten, který nemá, i s náklady, které potřebuje, a žádná sada ho nevypne ani nenahradí svým -- průmysl sady stojí vedle něj. Vypnuté: hra je jako vždycky. Platí pro novou hru.
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES                             :Přídavný průmysl: {STRING}
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :Zapnuté: do každého klimatu přibude průmysl, který hra přidává sama: marihuanová plantáž, která pěstuje marihuanu. Bere ji pouštní dům s palmou, a k tomu tabák, papír, turisty a alkohol, když je do hry přinese nějaká sada. Platí pro novou hru.
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE                          :Průmyslové sady vedle sebe: {STRING}
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE_HELPTEXT                 :Průmyslové sady (NewGRF) se navzájem odmítají: každá číslovala své náklady od nuly a přepisovala náklady té druhé. Tahle hra dává nákladům každé sady vlastní sloty a náklad se stejným kódem (labelem) sady sdílejí. Když se sada vzdá kvůli jiné nahrané sadě, hra načte sady znovu a tu druhou i celou její rodinu před její kontrolou schová, takže běží obě. Platí při založení nebo nahrání hry. Vypnuté: sada, která jinou odmítá, se vypne jako obvykle
 STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS                             :Tematická města: oddělit GRF: {STRING}
@@ -6267,6 +6276,10 @@ STR_INDUSTRY_NAME_SUGAR_MINE                                    :{G=m}Cukerný d
 STR_INDUSTRY_NAME_SUGAR_MINE.gen                                :cukerného dolu
 STR_INDUSTRY_NAME_SUGAR_MINE.loc                                :v cukerném dole
 STR_INDUSTRY_NAME_SUGAR_MINE.small                              :cukerný důl
+STR_INDUSTRY_NAME_MARIJUANA_PLANTATION                          :{G=f}Marihuanová plantáž
+STR_INDUSTRY_NAME_MARIJUANA_PLANTATION.gen                      :marihuanové plantáže
+STR_INDUSTRY_NAME_MARIJUANA_PLANTATION.loc                      :na marihuanové plantáži
+STR_INDUSTRY_NAME_MARIJUANA_PLANTATION.small                    :marihuanová plantáž
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

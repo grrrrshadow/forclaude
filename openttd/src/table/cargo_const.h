@@ -122,6 +122,12 @@ static const CargoSpec _default_cargo[] = {
 	 * class. Which vehicles take it is decided in code (RefitVehicle()) and by
 	 * a set naming the label outright. */
 	MK(  63, CT_ROLA,         194, 160, 0x100,    0,  0, 255,  true,       TownAcceptanceEffect::None, ROAD_VEHICLES, ROAD_VEHICLE,    STR_ROAD_VEHICLES_UNIT, CargoClasses({CargoClass::Special})),
+
+	/* Marijuana (CT_MARIJUANA), of the marijuana plantation the game adds when
+	 * economy.extra_industries is on: weighed, paid and carried like fruit,
+	 * which the plantation is made from. In none of the climate rows below;
+	 * PlaceClimateIndustryCargoes() puts it in a free slot from the top down. */
+	MK(  62, CT_MARIJUANA,     85, 16, 0x100, 4209,  0,  15,  true,       TownAcceptanceEffect::None,    MARIJUANA,    MARIJUANA,       STR_TONS, CargoClasses({CargoClass::Bulk, CargoClass::Refrigerated, CargoClass::Potable})),
 };
 
 

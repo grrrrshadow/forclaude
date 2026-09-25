@@ -907,6 +907,7 @@ SettingsContainer &GetSettingsTree()
 				industries->Add(new SettingEntry("economy.industries_arctic"));
 				industries->Add(new SettingEntry("economy.industries_tropic"));
 				industries->Add(new SettingEntry("economy.industries_toyland"));
+				industries->Add(new SettingEntry("economy.extra_industries"));
 			}
 
 			SettingsPage *cdist = environment->Add(new SettingsPage(STR_CONFIG_SETTING_ENVIRONMENT_CARGODIST));

@@ -688,6 +688,7 @@ struct EconomySettings {
 	bool industries_arctic; ///< The original industries of the arctic climate in every climate, kept whatever sets do.
 	bool industries_tropic; ///< The original industries of the desert climate in every climate, kept whatever sets do.
 	bool industries_toyland; ///< The original industries of toyland in every climate, kept whatever sets do.
+	bool extra_industries; ///< The industries the game adds of its own, in every climate: the marijuana plantation (climate_industries.h).
 	TownLayout town_layout; ///< select town layout, @see TownLayout
 	TownCargoGenMode town_cargogen_mode; ///< algorithm for generating cargo from houses, @see TownCargoGenMode
 	bool allow_town_roads; ///< towns are allowed to build roads (always allowed when generating world / in SE)

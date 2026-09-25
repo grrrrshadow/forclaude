@@ -57,6 +57,7 @@ STR_CARGO_PLURAL_BATTERIES                                      :Batteries
 STR_CARGO_PLURAL_PLASTIC                                        :Plastic
 STR_CARGO_PLURAL_FIZZY_DRINKS                                   :Fizzy Drinks
 STR_CARGO_PLURAL_ROAD_VEHICLES                                  :Road vehicles
+STR_CARGO_PLURAL_MARIJUANA                                      :Marijuana
 
 # Singular cargo name
 STR_CARGO_SINGULAR_NOTHING                                      :
@@ -92,6 +93,7 @@ STR_CARGO_SINGULAR_BATTERY                                      :Battery
 STR_CARGO_SINGULAR_PLASTIC                                      :Plastic
 STR_CARGO_SINGULAR_FIZZY_DRINK                                  :Fizzy Drink
 STR_CARGO_SINGULAR_ROAD_VEHICLE                                 :Road vehicle
+STR_CARGO_SINGULAR_MARIJUANA                                    :Marijuana
 
 # Quantity of cargo
 STR_QUANTITY_NOTHING                                            :
@@ -127,6 +129,7 @@ STR_QUANTITY_BATTERIES                                          :{COMMA} batter{
 STR_QUANTITY_PLASTIC                                            :{VOLUME_LONG} of plastic
 STR_QUANTITY_FIZZY_DRINKS                                       :{COMMA} fizzy drink{P "" s}
 STR_QUANTITY_ROAD_VEHICLES                                      :{COMMA}{NBSP}road vehicle{P "" s}
+STR_QUANTITY_MARIJUANA                                          :{WEIGHT_LONG} of marijuana
 STR_QUANTITY_N_A                                                :N/A
 
 # Two letter abbreviation of cargo name
@@ -163,6 +166,7 @@ STR_ABBREV_BATTERIES                                            :BA
 STR_ABBREV_PLASTIC                                              :PL
 STR_ABBREV_FIZZY_DRINKS                                         :FZ
 STR_ABBREV_ROAD_VEHICLES                                        :RV
+STR_ABBREV_MARIJUANA                                            :MJ
 STR_ABBREV_ALL                                                  :ALL
 
 # 'Mode' of transport for cargoes
@@ -2221,6 +2225,8 @@ STR_CONFIG_SETTING_INDUSTRIES_TROPIC                            :Desert industri
 STR_CONFIG_SETTING_INDUSTRIES_TROPIC_HELPTEXT                   :On, the industries of the desert climate in every climate, beside what is there: the climate played gets those it lacks, with the cargoes they need, and no industry set switches them off or puts its own in their place -- a set's industries stand beside them. Off, the game is as it always was. Taken when a new game is started. The houses of that climate have to be in the game for water and food to have somewhere to go: they can be built by hand, ticked in a town window or switched on in the game settings, Environment, Towns.
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND                           :Toyland industries: {STRING2}
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND_HELPTEXT                  :On, the industries of the toyland in every climate, beside what is there: the climate played gets those it lacks, with the cargoes they need, and no industry set switches them off or puts its own in their place -- a set's industries stand beside them. Off, the game is as it always was. Taken when a new game is started.
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES                             :Extra industries: {STRING2}
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :On, industries of the game's own join every climate: the marijuana plantation, which grows marijuana. The desert house with the palm tree takes it, and tobacco, paper, tourists and alcohol too where a set brings them. Taken when a new game is started.
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE                          :Industry sets side by side: {STRING2}
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE_HELPTEXT                 :Industry sets (NewGRFs) refuse one another: every set numbered its cargoes from zero and wrote over the other's. This game gives each set's cargoes slots of their own and lets sets share a cargo of the same label. When a set gives up because another set is loaded, the game loads again with that set, and every set of its family, hidden from its check, and both run. Taken when a game is started or loaded. Off, a set that refuses another is switched off, as usual
 STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS                             :Themed towns: one house set per town: {STRING2}
@@ -6058,6 +6064,7 @@ STR_INDUSTRY_NAME_FIZZY_DRINK_FACTORY                           :Fizzy Drink Fac
 STR_INDUSTRY_NAME_BUBBLE_GENERATOR                              :Bubble Generator
 STR_INDUSTRY_NAME_TOFFEE_QUARRY                                 :Toffee Quarry
 STR_INDUSTRY_NAME_SUGAR_MINE                                    :Sugar Mine
+STR_INDUSTRY_NAME_MARIJUANA_PLANTATION                          :Marijuana Plantation
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

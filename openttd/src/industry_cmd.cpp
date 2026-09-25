@@ -551,6 +551,42 @@ IndustryBuildData _industry_builder; ///< In-game manager of industries.
 static int WhoCanServiceIndustry(Industry *ind);
 
 /**
+ * Put the marijuana plantation (economy.extra_industries) and its tile in
+ * their places, the last industry type and the last industry tile: the fruit
+ * plantation of the base graphics, in every climate, growing marijuana. Its
+ * tile is drawn as the fruit plantation's (the substitute of a tile no set
+ * gives graphics to), so a set that puts its own tile in place of the fruit
+ * plantation's changes the fruit plantation only; and to a set asking about
+ * it the plantation is a fruit plantation.
+ */
+static void SetupMarijuanaPlantation()
+{
+	const IndustrySpec &fruit = _origin_industry_specs[IT_FRUIT_PLANTATION];
+	const IndustryGfx fruit_tile = fruit.layouts.front().front().gfx;
+
+	IndustryTileSpec &tile = _industry_tile_specs[GFX_MARIJUANA_PLANTATION];
+	tile = _origin_industry_tile_specs[fruit_tile];
+	tile.grf_prop.subst_id = fruit_tile;
+
+	IndustrySpec &spec = _industry_specs[IT_MARIJUANA_PLANTATION];
+	spec = fruit;
+	for (IndustryTileLayout &layout : spec.layouts) {
+		for (IndustryTileLayoutTile &t : layout) {
+			if (t.gfx == fruit_tile) t.gfx = GFX_MARIJUANA_PLANTATION;
+		}
+	}
+	spec.produced_cargo_label[0] = CT_MARIJUANA;
+	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
+	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
+	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), fruit.appear_ingame[to_underlying(LandscapeType::Tropic)]);
+	std::fill(std::begin(spec.appear_creation), std::end(spec.appear_creation), fruit.appear_creation[to_underlying(LandscapeType::Tropic)]);
+	spec.map_colour = PixelColour{0x54};
+	spec.name = STR_INDUSTRY_NAME_MARIJUANA_PLANTATION;
+	spec.grf_prop.subst_id = IT_FRUIT_PLANTATION;
+	spec.enabled = true;
+}
+
+/**
  * This function initialize the spec arrays of both
  * industry and industry tiles.
  * It adjusts the enabling of the industry too, based on climate availability.
@@ -568,6 +604,9 @@ void ResetIndustries()
 
 	auto industry_tile_insert = std::copy(std::begin(_origin_industry_tile_specs), std::end(_origin_industry_tile_specs), std::begin(_industry_tile_specs));
 	std::fill(industry_tile_insert, std::end(_industry_tile_specs), IndustryTileSpec{});
+
+	/* Before any set is read, so that the override manager passes its type by. */
+	if (_settings_game.economy.extra_industries) SetupMarijuanaPlantation();
 
 	/* Reset any overrides that have been set. */
 	_industile_mngr.ResetOverride();
@@ -705,12 +744,14 @@ static LandscapeTypes AcceptingClimates()
 /**
  * The cargoes the original industries of this game need that the climate
  * played may lack: what each produces in its home climate, what each takes
- * in every climate on. Nothing when no climate is switched on.
+ * in every climate on; and marijuana, when the game's marijuana plantation
+ * is in it (economy.extra_industries). Nothing when neither is.
  * @return the labels
  */
 std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 {
 	std::vector<CargoLabel> labels;
+	if (_settings_game.economy.extra_industries) labels.push_back(CT_MARIJUANA);
 	if (IndustryClimatesOn().None()) return labels;
 	auto add = [&labels](const std::vector<CargoLabel> &more) {
 		for (CargoLabel l : more) {
@@ -794,6 +835,64 @@ void ResolveOriginalIndustryCargoes()
 			}
 			if (first) tile.accepts_cargo[i] = INVALID_CARGO;
 		}
+	}
+}
+
+/**
+ * The desert house that takes marijuana: "Houses", the two-storey one inside
+ * a wall, with a palm tree in its garden where the base graphics draw one
+ * (house 0x4E of the original table). The other desert "Houses" of the same
+ * size and acceptance do not take it.
+ */
+static const HouseID HOUSE_WITH_THE_PALM = 0x4E;
+
+/**
+ * What the house with the palm tree takes besides its own three: marijuana,
+ * and the cargoes of sets that end at a house -- tobacco (Industries of the
+ * Caribbean), paper, tourists and alcohol (the sets name rum and alcohol
+ * alike). Taken where the game has them; a label no set brought is left out.
+ */
+static const std::array<CargoLabel, 5> PALM_HOUSE_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}};
+
+/**
+ * Which house takes the marijuana of the game's plantation.
+ * @return the house with the palm tree
+ */
+HouseID HouseTakingMarijuana()
+{
+	return HOUSE_WITH_THE_PALM;
+}
+
+/**
+ * The cargoes the house with the palm tree takes besides its own three, when
+ * the game has them.
+ * @return their labels
+ */
+std::span<const CargoLabel> PalmHouseCargoes()
+{
+	return PALM_HOUSE_CARGOES;
+}
+
+/**
+ * Let the house with the palm tree take marijuana, all of it (8/8), when the
+ * game's marijuana plantation is in it (economy.extra_industries), and so the
+ * rest of PALM_HOUSE_CARGOES that the game has: in the places of its
+ * acceptance list past the original three. Called once the cargoes are set
+ * (FinaliseHouseArray()).
+ */
+void ResolveExtraIndustryHouses()
+{
+	if (!_settings_game.economy.extra_industries) return;
+
+	HouseSpec *hs = HouseSpec::Get(HOUSE_WITH_THE_PALM);
+	size_t next = HOUSE_ORIGINAL_NUM_ACCEPTS;
+	for (CargoLabel label : PALM_HOUSE_CARGOES) {
+		CargoType cargo = GetCargoTypeByLabel(label);
+		if (!IsValidCargoType(cargo) || std::ranges::find(hs->accepts_cargo, cargo) != std::end(hs->accepts_cargo)) continue;
+		if (next >= std::size(hs->accepts_cargo)) break;
+		hs->accepts_cargo[next] = cargo;
+		hs->cargo_acceptance[next] = 8;
+		next++;
 	}
 }
 

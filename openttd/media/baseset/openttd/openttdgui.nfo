@@ -4,7 +4,7 @@
 // See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
 //
    -1 * 0	 0C "OpenTTD GUI graphics"
-   -1 * 3	 05 15 \b 229 // OPENTTD_SPRITE_COUNT
+   -1 * 3	 05 15 \b 230 // OPENTTD_SPRITE_COUNT
    -1 sprites/openttdgui.png 8bpp  66    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 146    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 226    8  64  31 -31   7 normal
@@ -234,4 +234,5 @@
    -1 sprites/openttdgui_rocket_1_6.png 8bpp   2    2  25   5 -12  -2 normal
    -1 sprites/openttdgui_rocket_1_7.png 8bpp   2    2  19  10  -8  -4 normal
    -1 sprites/openttdgui_cargo_rola.png 8bpp   2    2  10  10   0   0 normal
+   -1 sprites/openttdgui_cargo_marijuana.png 8bpp   2    2  10  10   0   0 normal
 

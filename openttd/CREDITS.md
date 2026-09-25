@@ -85,8 +85,9 @@ which stays theirs and is named here.
   Original at https://github.com/age77/openttd-15.3-blueprint
 - Icons8 (https://icons8.com) - The hammer-and-wrench artwork the rescue-engine
   button is drawn from, the crosshair the crosshair button and the red
-  crosshair mouse cursor are drawn from, and the car the cargo icon for road
-  vehicles carried on wagons, ships and aircraft is drawn from.
+  crosshair mouse cursor are drawn from, the car the cargo icon for road
+  vehicles carried on wagons, ships and aircraft is drawn from, and the
+  cannabis leaf the cargo icon for marijuana is drawn from.
 - Palo123, also known as Karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's

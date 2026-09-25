@@ -48,6 +48,13 @@ static const IndustryType NUM_INDUSTRYTYPES_PER_GRF = 128;            ///< maxim
 static const IndustryType NEW_INDUSTRYOFFSET     = 37;                ///< original number of industry types
 static const IndustryType NUM_INDUSTRYTYPES      = 240;               ///< total number of industry types, new and old; limited to 240 because we need some special ids like IT_INVALID, IT_AI_UNKNOWN, IT_AI_TOWN, ...
 static const IndustryType IT_INVALID             = 0xFF;
+/**
+ * The marijuana plantation the game adds to every climate when
+ * economy.extra_industries is on (climate_industries.h): the last industry
+ * type. A set is given it only when the plantation is off, since the override
+ * manager hands out only types that are not enabled.
+ */
+static const IndustryType IT_MARIJUANA_PLANTATION = NUM_INDUSTRYTYPES - 1;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -55,6 +62,13 @@ static const IndustryGfx  INDUSTRYTILE_NOANIM    = 0xFF;              ///< flag 
 static const IndustryGfx  NEW_INDUSTRYTILEOFFSET = 175;               ///< original number of tiles
 static const IndustryGfx  NUM_INDUSTRYTILES      = 2048;              ///< total number of industry tiles, new and old: several industry sets side by side (ECS, FIRS, Caribbean...) want more than the 512 there were, and the map has the bits (industry_map.h, m6)
 static const IndustryGfx  INVALID_INDUSTRYTILE   = NUM_INDUSTRYTILES; ///< one above amount is considered invalid
+/**
+ * The tile of the marijuana plantation (IT_MARIJUANA_PLANTATION): the last
+ * industry tile, which no set is ever given, drawn as the fruit plantation's
+ * tile is in the base graphics -- a set that puts its own tile in place of
+ * the fruit plantation's leaves this one as it is.
+ */
+static const IndustryGfx  GFX_MARIJUANA_PLANTATION = NUM_INDUSTRYTILES - 1;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

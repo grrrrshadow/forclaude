@@ -32,7 +32,9 @@ H=$S/ttdhome
 # sets among towns is off for the same reason: it is on by default, and the
 # scenes with a house set loaded were written with towns of every house. A
 # scene that wants either says so in SCENE_NEWGAME, which run_scene puts in
-# before the newgame line.
+# before the newgame line. So is the game's marijuana plantation
+# (economy.extra_industries), on by default: it would add an industry to every
+# generated map; the scenes marihuana and marihuanasada switch it on.
 #
 # The seed is handed to the newgame command itself, not left in the settings
 # below. That command carries a seed of its own, and when it is not given one
@@ -56,6 +58,7 @@ setting_newgame difficulty.number_towns 2
 setting_newgame difficulty.industry_density 4
 setting_newgame economy.mars_towns 0
 setting_newgame economy.split_house_grfs 0
+setting_newgame economy.extra_industries 0
 newgame 1'
 
 # This build keeps its config beside its own binary and under a name of its
@@ -96,7 +99,11 @@ run_scene() { # name scr-content ticks extra-args
   # that silently ran every save scene on a fresh map for weeks.
   local newgame=$NEWGAME
   [ -n "$SCENE_NEWGAME" ] && newgame=${NEWGAME/$'\n'newgame 1/$'\n'$SCENE_NEWGAME$'\n'newgame 1}
-  case "$*" in *-g*) : > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$newgame" > $H/.openttd/scripts/autoexec.scr ;; esac
+  # A save made before the game's marijuana plantation (economy.extra_industries)
+  # has no word on it and takes the new-game value, on by default: the plantation
+  # would come into the saved game and play it differently. Off for saves, as the
+  # scenes were written.
+  case "$*" in *-g*) printf 'setting_newgame economy.extra_industries 0\n' > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$newgame" > $H/.openttd/scripts/autoexec.scr ;; esac
   HOME=$H timeout 300 $S/build/openttd -vnull:ticks=$ticks -snull -mnull "$@" > $S/reg_$name.log 2>&1
   cp "$CFG_KEEP" "$CFG"
   local spoj=$(grep -c 'spojeno' $S/reg_$name.log)
@@ -1430,4 +1437,15 @@ XIS_CFG=$S/xis_battery_openttd.cfg
 sed '/^\[newgrf\]$/a xis.grf = 0 0 0 0 0 0 16 150 80 300' "$CFG_KEEP" > $XIS_CFG
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.industries_temperate 1' run_scene prumyslsada "testprumysl 8
+testnaklady" 100 -c $XIS_CFG
+# The game's marijuana plantation (economy.extra_industries): on the toyland
+# map it has to be in the game on a tile of its own drawn as the fruit
+# plantation's, growing marijuana, with at least one standing on the map,
+# marijuana among the cargoes, and the desert house with the palm tree taking
+# all of it. Beside XIS, which switches the temperate industries off and
+# brings its own, it has to stay as it is.
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene marihuana "testprumysl 0 1
+testnaklady 14 Marijuana" 100
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene marihuanasada "testprumysl 0 1
 testnaklady" 100 -c $XIS_CFG

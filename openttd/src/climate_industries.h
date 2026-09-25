@@ -19,6 +19,11 @@
  * the gold mine gold, the fruit plantation fruit -- and an industry that
  * takes one of the mixed cargoes (livestock or fruit; grain, wheat or maize;
  * valuables, gold or diamonds) takes the kinds of every climate on.
+ *
+ * economy.extra_industries puts in industries the game adds of its own, in
+ * every climate: the marijuana plantation (IT_MARIJUANA_PLANTATION), the
+ * fruit plantation of the base graphics growing marijuana (CT_MARIJUANA),
+ * which the desert house with the palm tree takes.
  */
 
 #ifndef CLIMATE_INDUSTRIES_H
@@ -26,6 +31,7 @@
 
 #include "cargo_type.h"
 #include "industry_type.h"
+#include "house_type.h"
 #include "landscape_type.h"
 
 LandscapeTypes IndustryClimatesOn();
@@ -35,6 +41,9 @@ LandscapeType IndustryHomeClimate(IndustryType type);
 CargoLabel MixedCargoLabelFor(MixedCargoType mixed, LandscapeType climate);
 std::vector<CargoLabel> CargoLabelsOfClimateIndustries();
 void ResolveOriginalIndustryCargoes();
+void ResolveExtraIndustryHouses();
+HouseID HouseTakingMarijuana();
+std::span<const CargoLabel> PalmHouseCargoes();
 uint8_t OriginalIndustryChance(IndustryType type, bool creation);
 
 bool IsExtraClimateCargo(CargoType cargo);

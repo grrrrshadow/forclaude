@@ -80,6 +80,14 @@ static constexpr CargoLabel CT_NONE = CT_PASSENGERS;
  */
 static constexpr CargoLabel CT_ROLA{'ROLA'};
 
+/**
+ * Marijuana, grown by the marijuana plantation the game adds to every climate
+ * when economy.extra_industries is on (climate_industries.h), and taken by
+ * the desert house with the palm tree. Placed like the cargoes of the
+ * climates switched on, from the top slots down.
+ */
+static constexpr CargoLabel CT_MARIJUANA{'MARI'};
+
 static constexpr CargoLabel CT_INVALID{UINT32_MAX}; ///< Invalid cargo type.
 
 static constexpr CargoType NUM_ORIGINAL_CARGO{12}; ///< Original number of cargo types.

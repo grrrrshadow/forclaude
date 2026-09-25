@@ -1639,6 +1639,7 @@ static void FinaliseHouseArray()
 			if (!IsValidCargoType(hs->accepts_cargo[i])) hs->cargo_acceptance[i] = 0;
 		}
 	}
+	ResolveExtraIndustryHouses();
 
 	HouseZones climate_mask = GetClimateMaskForLandscape();
 	for (HouseZone climate : climate_mask) {
