@@ -1412,3 +1412,22 @@ testdomy postav 80 80 32
 testdomy okno 0 mirne
 testzatik 600 testdomy rust 0 40
 testzatik 650 testdomy" 700 -c $HOVER_CFG
+
+# The original industries of other climates (economy.industries_temperate,
+# _arctic, _tropic; climate_industries.h): on the toyland map every industry
+# of the three climates on has to be switched on, none replaced by a set, and
+# at least a dozen of them have to stand on the map, with the cargoes they
+# need placed for them. testprumysl lists them with what each produces and
+# takes -- the gold mine gold, the factory every kind of grain on.
+SCENE_NEWGAME='setting_newgame economy.industries_temperate 1
+setting_newgame economy.industries_arctic 1
+setting_newgame economy.industries_tropic 1' run_scene prumyslklimat "testprumysl 12" 100
+# The temperate industries switched on beside an industry set that switches
+# them off and takes their places (XIS, xis.grf in the home's newgrf/, see
+# README.md): the originals have to stay, each in its own place, and the
+# set's industries beside them.
+XIS_CFG=$S/xis_battery_openttd.cfg
+sed '/^\[newgrf\]$/a xis.grf = 0 0 0 0 0 0 16 150 80 300' "$CFG_KEEP" > $XIS_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.industries_temperate 1' run_scene prumyslsada "testprumysl 8
+testnaklady" 100 -c $XIS_CFG

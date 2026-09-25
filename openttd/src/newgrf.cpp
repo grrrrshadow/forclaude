@@ -42,6 +42,7 @@
 #include "error_func.h"
 #include "vehicle_base.h"
 #include "anomaly_log.h"
+#include "climate_industries.h"
 #include "strings_func.h"
 #include "road.h"
 #include "newgrf_roadstop.h"
@@ -653,6 +654,14 @@ static CargoLabel GetActiveCargoLabel(const std::variant<CargoLabel, MixedCargoT
 		CargoLabel operator()(const CargoLabel &label) { return label; }
 		CargoLabel operator()(const MixedCargoType &mixed)
 		{
+			/* With the industries of other climates switched on, the kinds
+			 * of several climates are in the game at once, and the first of
+			 * them present is not necessarily the played climate's: that
+			 * one comes first (climate_industries.h). */
+			if (IndustryClimatesOn().Any()) {
+				CargoLabel own = MixedCargoLabelFor(mixed, _settings_game.game_creation.landscape);
+				if (own != CT_INVALID && IsValidCargoType(GetCargoTypeByLabel(own))) return own;
+			}
 			switch (mixed) {
 				case MCT_LIVESTOCK_FRUIT: return GetActiveCargoLabel({CT_LIVESTOCK, CT_FRUIT});
 				case MCT_GRAIN_WHEAT_MAIZE: return GetActiveCargoLabel({CT_GRAIN, CT_WHEAT, CT_MAIZE});
@@ -1463,6 +1472,7 @@ void FinaliseCargoArray()
 	 * like any other and wants what that loop hands out -- a town production
 	 * effect above all, which everything that sorts cargoes insists on. */
 	PlaceRoadVehicleCargo();
+	PlaceClimateIndustryCargoes();
 
 	for (CargoSpec &cs : CargoSpec::array) {
 		if (cs.town_production_effect == TownProductionEffect::Invalid) {
@@ -1690,6 +1700,9 @@ static void FinaliseIndustriesArray()
 			if (!IsValidCargoType(indtsp.accepts_cargo[i])) indtsp.accepts_cargo[i] = GetCargoTypeByLabel(GetActiveCargoLabel(indtsp.accepts_cargo_label[i]));
 		}
 	}
+
+	/* The original industries by their home climates, when climates are switched on. */
+	ResolveOriginalIndustryCargoes();
 }
 
 /**

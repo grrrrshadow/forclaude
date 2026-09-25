@@ -19,6 +19,8 @@
 #include "table/strings.h"
 #include "table/cargo_const.h"
 
+#include "climate_industries.h"
+
 #include "safeguards.h"
 
 CargoSpec CargoSpec::array[NUM_CARGO];
@@ -53,6 +55,8 @@ static std::array<CargoLabel, 12> _climate_dependent_cargo_labels;
  * map to CT_INVALID.
  */
 static std::array<CargoLabel, 32> _climate_independent_cargo_labels;
+
+extern CargoTypes _extra_climate_cargoes;
 
 /**
  * Set up the default cargo types for the given landscape type.
@@ -118,6 +122,55 @@ void SetupCargoForClimate(LandscapeType l)
 	 * NewGRF that brought no table of its own. */
 	BuildCargoLabelMap();
 	PlaceRoadVehicleCargo();
+
+	/* The cargoes of the industries of the climates switched on, placed now
+	 * rather than after the NewGRFs so that a set's cargo table finds them
+	 * by label and its vehicles can carry them. */
+	_extra_climate_cargoes.Reset();
+	PlaceClimateIndustryCargoes();
+}
+
+/**
+ * Put the cargoes the original industries of the climates switched on need
+ * (CargoLabelsOfClimateIndustries()) into free slots, from the top down
+ * below the road-vehicle cargo, where the sets that number their cargoes
+ * from the bottom up do not reach. A cargo already in the game -- the climate
+ * played's own, or a set's of the same label -- is left where it is.
+ *
+ * Called when the cargoes are set up and again once the NewGRFs have had
+ * their say (FinaliseCargoArray()), which puts back one a set blanked.
+ */
+void PlaceClimateIndustryCargoes()
+{
+	for (CargoLabel label : CargoLabelsOfClimateIndustries()) {
+		if (IsValidCargoType(GetCargoTypeByLabel(label))) continue;
+		auto found = std::ranges::find(_default_cargo, label, &CargoSpec::label);
+		if (found == std::end(_default_cargo)) continue;
+
+		for (uint i = NUM_CARGO; i-- > 0; ) {
+			CargoSpec *slot = CargoSpec::Get(i);
+			if (slot->IsValid()) continue;
+
+			*slot = *found;
+			_cargo_mask.Set(slot->Index());
+			_extra_climate_cargoes.Set(slot->Index());
+			BuildCargoLabelMap();
+			break;
+		}
+	}
+}
+
+/**
+ * Is this one of the cargoes placed for the industries of a climate switched
+ * on (PlaceClimateIndustryCargoes())? A set bringing a cargo of the same
+ * label takes it as its own where it is (the cargo slots of
+ * newgrf_act0_cargo.cpp).
+ * @param cargo the cargo
+ * @return whether it is
+ */
+bool IsExtraClimateCargo(CargoType cargo)
+{
+	return _extra_climate_cargoes.Test(cargo);
 }
 
 /**
@@ -237,6 +290,7 @@ SpriteID CargoSpec::GetCargoIcon() const
 
 std::array<uint8_t, NUM_CARGO> _sorted_cargo_types; ///< Sort order of cargoes by cargo type.
 CargoType _road_vehicle_cargo = INVALID_CARGO; ///< The slot CT_ROLA sits in this game.
+CargoTypes _extra_climate_cargoes; ///< The cargoes placed for the industries of the climates switched on (PlaceClimateIndustryCargoes()).
 std::vector<const CargoSpec *> _sorted_cargo_specs;   ///< Cargo specifications sorted alphabetically by name.
 std::span<const CargoSpec *> _sorted_standard_cargo_specs; ///< Standard cargo specifications sorted alphabetically by name.
 

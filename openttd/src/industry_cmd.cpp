@@ -47,6 +47,7 @@
 #include "string_func.h"
 #include "console_func.h"
 #include "industry_cmd.h"
+#include "climate_industries.h"
 #include "landscape_cmd.h"
 #include "terraform_cmd.h"
 #include "map_func.h"
@@ -560,9 +561,9 @@ void ResetIndustries()
 	auto industry_insert = std::copy(std::begin(_origin_industry_specs), std::end(_origin_industry_specs), std::begin(_industry_specs));
 	std::fill(industry_insert, std::end(_industry_specs), IndustrySpec{});
 
-	/* Enable only the current climate industries */
+	/* Enable only the current climate industries, and those of the climates switched on (IndustryClimatesOn()). */
 	for (auto it = std::begin(_industry_specs); it != industry_insert; ++it) {
-		it->enabled = it->climate_availability.Test(_settings_game.game_creation.landscape);
+		it->enabled = it->climate_availability.Test(_settings_game.game_creation.landscape) || it->climate_availability.Any(IndustryClimatesOn());
 	}
 
 	auto industry_tile_insert = std::copy(std::begin(_origin_industry_tile_specs), std::end(_origin_industry_tile_specs), std::begin(_industry_tile_specs));
@@ -571,6 +572,250 @@ void ResetIndustries()
 	/* Reset any overrides that have been set. */
 	_industile_mngr.ResetOverride();
 	_industry_mngr.ResetOverride();
+}
+
+/**
+ * The climates whose original industries are switched on in this game beside
+ * the played one's (economy.industries_temperate and the rest). See
+ * climate_industries.h.
+ * @return the climates, none when all are off
+ */
+LandscapeTypes IndustryClimatesOn()
+{
+	LandscapeTypes on{};
+	if (_settings_game.economy.industries_temperate) on.Set(LandscapeType::Temperate);
+	if (_settings_game.economy.industries_arctic) on.Set(LandscapeType::Arctic);
+	if (_settings_game.economy.industries_tropic) on.Set(LandscapeType::Tropic);
+	if (_settings_game.economy.industries_toyland) on.Set(LandscapeType::Toyland);
+	return on;
+}
+
+/**
+ * Is this an original industry of a climate switched on, one that no set
+ * switches off or puts its own in place of?
+ * @param type the industry type, as the original table numbers it
+ * @return whether it is kept
+ */
+bool IsOriginalIndustryKept(IndustryType type)
+{
+	return type < NEW_INDUSTRYOFFSET && _origin_industry_specs[type].climate_availability.Any(IndustryClimatesOn());
+}
+
+/**
+ * Is this an original industry tile one of the kept original industries is
+ * built of, so no set puts its own tile in place of it?
+ * @param gfx the tile, as the original table numbers it
+ * @return whether it is kept
+ */
+bool IsOriginalIndustryTileKept(IndustryGfx gfx)
+{
+	if (gfx >= NEW_INDUSTRYTILEOFFSET) return false;
+	for (IndustryType type = 0; type < NEW_INDUSTRYOFFSET; type++) {
+		if (!IsOriginalIndustryKept(type)) continue;
+		for (const IndustryTileLayout &layout : _origin_industry_specs[type].layouts) {
+			for (const IndustryTileLayoutTile &tile : layout) {
+				if (tile.gfx == gfx) return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * The climate an original industry is at home in, for the cargoes it
+ * produces: the climate played when the industry is of it, otherwise the
+ * first climate switched on that it is of.
+ * @param type the industry type, as the original table numbers it
+ * @return the climate
+ */
+LandscapeType IndustryHomeClimate(IndustryType type)
+{
+	LandscapeType played = _settings_game.game_creation.landscape;
+	if (type >= NEW_INDUSTRYOFFSET) return played;
+	LandscapeTypes availability = _origin_industry_specs[type].climate_availability;
+	if (availability.Test(played)) return played;
+	for (LandscapeType climate : {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) {
+		if (availability.Test(climate) && IndustryClimatesOn().Test(climate)) return climate;
+	}
+	return played;
+}
+
+/**
+ * Which cargo a mixed cargo is in one climate.
+ * @param mixed the mixed cargo
+ * @param climate the climate
+ * @return its label there, CT_INVALID where the climate has none of it (toyland)
+ */
+CargoLabel MixedCargoLabelFor(MixedCargoType mixed, LandscapeType climate)
+{
+	switch (mixed) {
+		case MCT_LIVESTOCK_FRUIT:
+			switch (climate) {
+				case LandscapeType::Temperate: case LandscapeType::Arctic: return CT_LIVESTOCK;
+				case LandscapeType::Tropic: return CT_FRUIT;
+				default: return CT_INVALID;
+			}
+		case MCT_GRAIN_WHEAT_MAIZE:
+			switch (climate) {
+				case LandscapeType::Temperate: return CT_GRAIN;
+				case LandscapeType::Arctic: return CT_WHEAT;
+				case LandscapeType::Tropic: return CT_MAIZE;
+				default: return CT_INVALID;
+			}
+		case MCT_VALUABLES_GOLD_DIAMONDS:
+			switch (climate) {
+				case LandscapeType::Temperate: return CT_VALUABLES;
+				case LandscapeType::Arctic: return CT_GOLD;
+				case LandscapeType::Tropic: return CT_DIAMONDS;
+				default: return CT_INVALID;
+			}
+		default: NOT_REACHED();
+	}
+}
+
+/**
+ * The labels an original cargo entry stands for: itself, or for a mixed
+ * cargo its kind in each of the climates given.
+ * @param label the entry
+ * @param climates the climates
+ * @return the labels, without duplicates and without CT_INVALID
+ */
+static std::vector<CargoLabel> CargoLabelsIn(const std::variant<CargoLabel, MixedCargoType> &label, LandscapeTypes climates)
+{
+	std::vector<CargoLabel> labels;
+	auto add = [&labels](CargoLabel l) {
+		if (l != CT_INVALID && std::ranges::find(labels, l) == labels.end()) labels.push_back(l);
+	};
+	if (std::holds_alternative<CargoLabel>(label)) {
+		add(std::get<CargoLabel>(label));
+	} else {
+		for (LandscapeType climate : climates) add(MixedCargoLabelFor(std::get<MixedCargoType>(label), climate));
+	}
+	return labels;
+}
+
+/** The climates whose kinds of a mixed cargo an original industry takes: the played one and those switched on. */
+static LandscapeTypes AcceptingClimates()
+{
+	LandscapeTypes climates = IndustryClimatesOn();
+	climates.Set(_settings_game.game_creation.landscape);
+	return climates;
+}
+
+/**
+ * The cargoes the original industries of this game need that the climate
+ * played may lack: what each produces in its home climate, what each takes
+ * in every climate on. Nothing when no climate is switched on.
+ * @return the labels
+ */
+std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
+{
+	std::vector<CargoLabel> labels;
+	if (IndustryClimatesOn().None()) return labels;
+	auto add = [&labels](const std::vector<CargoLabel> &more) {
+		for (CargoLabel l : more) {
+			if (std::ranges::find(labels, l) == labels.end()) labels.push_back(l);
+		}
+	};
+	LandscapeType played = _settings_game.game_creation.landscape;
+	for (IndustryType type = 0; type < NEW_INDUSTRYOFFSET; type++) {
+		const IndustrySpec &spec = _origin_industry_specs[type];
+		if (!spec.climate_availability.Test(played) && !IsOriginalIndustryKept(type)) continue;
+		for (const auto &label : spec.produced_cargo_label) add(CargoLabelsIn(label, IndustryHomeClimate(type)));
+		for (const auto &label : spec.accepts_cargo_label) add(CargoLabelsIn(label, AcceptingClimates()));
+		for (const IndustryTileLayout &layout : spec.layouts) {
+			for (const IndustryTileLayoutTile &tile : layout) {
+				if (tile.gfx >= NEW_INDUSTRYTILEOFFSET) continue;
+				for (const auto &label : _origin_industry_tile_specs[tile.gfx].accepts_cargo_label) add(CargoLabelsIn(label, AcceptingClimates()));
+			}
+		}
+	}
+	return labels;
+}
+
+/**
+ * Give the original industries and industry tiles their cargoes when a
+ * climate is switched on (climate_industries.h): an industry produces in its
+ * home climate (IndustryHomeClimate()), and where it or its tile takes a
+ * mixed cargo, it takes the kind of every climate on as well, in the free
+ * places of its list, with the same multiplier or acceptance. Called once
+ * the cargoes are set (FinaliseIndustriesArray()); with no climate switched
+ * on it does nothing, and the game resolves the cargoes as it always did.
+ */
+void ResolveOriginalIndustryCargoes()
+{
+	if (IndustryClimatesOn().None()) return;
+
+	for (IndustryType type = 0; type < NEW_INDUSTRYOFFSET; type++) {
+		IndustrySpec &spec = _industry_specs[type];
+		if (spec.grf_prop.HasGrfFile()) continue; // a set's industry in this place resolves its own
+
+		for (size_t i = 0; i < std::size(spec.produced_cargo_label); i++) {
+			std::vector<CargoLabel> labels = CargoLabelsIn(spec.produced_cargo_label[i], IndustryHomeClimate(type));
+			spec.produced_cargo[i] = labels.empty() ? INVALID_CARGO : GetCargoTypeByLabel(labels.front());
+		}
+
+		size_t next_free = std::size(spec.accepts_cargo_label);
+		for (size_t i = 0; i < std::size(spec.accepts_cargo_label); i++) {
+			bool first = true;
+			for (CargoLabel label : CargoLabelsIn(spec.accepts_cargo_label[i], AcceptingClimates())) {
+				CargoType cargo = GetCargoTypeByLabel(label);
+				if (!IsValidCargoType(cargo)) continue;
+				if (first) {
+					spec.accepts_cargo[i] = cargo;
+					first = false;
+				} else if (next_free < std::size(spec.accepts_cargo) && std::ranges::find(spec.accepts_cargo, cargo) == spec.accepts_cargo.end()) {
+					spec.accepts_cargo[next_free] = cargo;
+					std::copy(std::begin(spec.input_cargo_multiplier[i]), std::end(spec.input_cargo_multiplier[i]), std::begin(spec.input_cargo_multiplier[next_free]));
+					next_free++;
+				}
+			}
+			if (first) spec.accepts_cargo[i] = INVALID_CARGO;
+		}
+	}
+
+	for (IndustryGfx gfx = 0; gfx < NEW_INDUSTRYTILEOFFSET; gfx++) {
+		IndustryTileSpec &tile = _industry_tile_specs[gfx];
+		if (tile.grf_prop.HasGrfFile()) continue;
+		size_t next_free = std::size(tile.accepts_cargo_label);
+		for (size_t i = 0; i < std::size(tile.accepts_cargo_label); i++) {
+			bool first = true;
+			for (CargoLabel label : CargoLabelsIn(tile.accepts_cargo_label[i], AcceptingClimates())) {
+				CargoType cargo = GetCargoTypeByLabel(label);
+				if (!IsValidCargoType(cargo)) continue;
+				if (first) {
+					tile.accepts_cargo[i] = cargo;
+					first = false;
+				} else if (next_free < std::size(tile.accepts_cargo) && std::ranges::find(tile.accepts_cargo, cargo) == tile.accepts_cargo.end()) {
+					tile.accepts_cargo[next_free] = cargo;
+					tile.acceptance[next_free] = tile.acceptance[i];
+					next_free++;
+				}
+			}
+			if (first) tile.accepts_cargo[i] = INVALID_CARGO;
+		}
+	}
+}
+
+/**
+ * How likely an original industry is to appear, where the climate played
+ * gives it no chance because it is not of it: the chance of its own climate,
+ * the best of those switched on.
+ * @param type the industry type
+ * @param creation the chance at map creation, otherwise during the game
+ * @return the chance
+ */
+uint8_t OriginalIndustryChance(IndustryType type, bool creation)
+{
+	const IndustrySpec *spec = GetIndustrySpec(type);
+	LandscapeType played = _settings_game.game_creation.landscape;
+	uint8_t chance = creation ? spec->appear_creation[to_underlying(played)] : spec->appear_ingame[to_underlying(played)];
+	if (type >= NEW_INDUSTRYOFFSET || spec->grf_prop.HasGrfFile() || spec->climate_availability.Test(played)) return chance;
+	for (LandscapeType climate : IndustryClimatesOn()) {
+		if (!spec->climate_availability.Test(climate)) continue;
+		chance = std::max(chance, creation ? spec->appear_creation[to_underlying(climate)] : spec->appear_ingame[to_underlying(climate)]);
+	}
+	return chance;
 }
 
 /**
@@ -1842,6 +2087,10 @@ static CommandCost CheckNewIndustry_Plantation(TileIndex tile)
  */
 static CommandCost CheckNewIndustry_Water(TileIndex tile)
 {
+	/* Outside the desert climate there is no desert to ask for: a desert
+	 * industry switched on in another climate (climate_industries.h) stands
+	 * wherever the rest may. */
+	if (_settings_game.game_creation.landscape != LandscapeType::Tropic) return CommandCost();
 	if (GetTropicZone(tile) != TropicZone::Desert) {
 		return CommandCost(STR_ERROR_CAN_ONLY_BE_BUILT_IN_DESERT);
 	}
@@ -1855,6 +2104,8 @@ static CommandCost CheckNewIndustry_Water(TileIndex tile)
  */
 static CommandCost CheckNewIndustry_Lumbermill(TileIndex tile)
 {
+	/* No rainforest outside the desert climate either; see CheckNewIndustry_Water(). */
+	if (_settings_game.game_creation.landscape != LandscapeType::Tropic) return CommandCost();
 	if (GetTropicZone(tile) != TropicZone::Rainforest) {
 		return CommandCost(STR_ERROR_CAN_ONLY_BE_BUILT_IN_RAINFOREST);
 	}
@@ -2781,7 +3032,7 @@ static uint32_t GetScaledIndustryGenerationProbability(IndustryType it, std::opt
 	const IndustrySpec *ind_spc = GetIndustrySpec(it);
 	if (water.has_value() && ind_spc->behaviour.Test(IndustryBehaviour::BuiltOnWater) != *water) return 0;
 
-	uint32_t chance = ind_spc->appear_creation[to_underlying(_settings_game.game_creation.landscape)];
+	uint32_t chance = OriginalIndustryChance(it, true);
 	if (!ind_spc->enabled || ind_spc->layouts.empty() ||
 			(_game_mode != GameMode::Editor && _settings_game.difficulty.industry_density == IndustryDensity::FundedOnly) ||
 			(chance = GetIndustryProbabilityCallback(it, IndustryAvailabilityCallType::MapGeneration, chance)) == 0) {
@@ -2812,7 +3063,7 @@ static uint16_t GetIndustryGamePlayProbability(IndustryType it, uint8_t *min_num
 	}
 
 	const IndustrySpec *ind_spc = GetIndustrySpec(it);
-	uint8_t chance = ind_spc->appear_ingame[to_underlying(_settings_game.game_creation.landscape)];
+	uint8_t chance = OriginalIndustryChance(it, false);
 	if (!ind_spc->enabled || ind_spc->layouts.empty() ||
 			(ind_spc->behaviour.Test(IndustryBehaviour::Before1950) && TimerGameCalendar::year > 1950) ||
 			(ind_spc->behaviour.Test(IndustryBehaviour::After1960) && TimerGameCalendar::year < 1960) ||

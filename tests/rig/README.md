@@ -293,6 +293,23 @@ road-vehicle cargo; the record line (zaznam=1) says who refused whom.
 `grfodmitavyp` plays the same with the setting off: the set is switched off
 as ever and RIGR is not in the game.
 
+## The original industries of other climates
+
+`economy.industries_temperate`, `_arctic`, `_tropic` and `_toyland`
+(climate_industries.h) put the original industries of a climate into every
+game, beside what is there, with the cargoes they need, and no set switches
+them off or takes their places. `testprumysl [min]` lists every original
+industry the game has with its climates, whether it is on, whether a set
+took its place, how many stand on the map and what it produces and takes,
+and the cargoes placed for them; it refuses an industry of a climate on that
+is off or replaced, and fewer than min of them on the map.
+
+`prumyslklimat` switches the temperate, arctic and desert industries on in
+the toyland map. `prumyslsada` switches the temperate ones on in a temperate
+game with XIS, which switches the originals off and takes their places --
+`xis.grf` in every home's `newgrf/` (XIS 0.6.2 from BaNaNaS, the player's
+copy in the grrrrf release par4).
+
 ## A lorry with a trailer, which needs the player's own sets
 
 The game's own road vehicles are all one piece, so nothing in a plain rig

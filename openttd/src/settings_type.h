@@ -684,6 +684,10 @@ struct EconomySettings {
 	uint8_t mars_towns; ///< how many small towns of the Mars houses a new map gets, see mars_houses.h
 	bool split_house_grfs; ///< every ordinary town of a new map builds from one house GRF only, the GRFs taking turns
 	bool newgrf_side_by_side; ///< Load NewGRFs that refuse one another side by side, each hidden from the other's check (LoadNewGRF()).
+	bool industries_temperate; ///< The original industries of the temperate climate in every climate, kept whatever sets do (IndustryClimatesOn()).
+	bool industries_arctic; ///< The original industries of the arctic climate in every climate, kept whatever sets do.
+	bool industries_tropic; ///< The original industries of the desert climate in every climate, kept whatever sets do.
+	bool industries_toyland; ///< The original industries of toyland in every climate, kept whatever sets do.
 	TownLayout town_layout; ///< select town layout, @see TownLayout
 	TownCargoGenMode town_cargogen_mode; ///< algorithm for generating cargo from houses, @see TownCargoGenMode
 	bool allow_town_roads; ///< towns are allowed to build roads (always allowed when generating world / in SE)

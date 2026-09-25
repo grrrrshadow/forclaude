@@ -903,6 +903,10 @@ SettingsContainer &GetSettingsTree()
 				industries->Add(new SettingEntry("economy.type"));
 				industries->Add(new SettingEntry("economy.newgrf_side_by_side"));
 				industries->Add(new SettingEntry("station.serve_neutral_industries"));
+				industries->Add(new SettingEntry("economy.industries_temperate"));
+				industries->Add(new SettingEntry("economy.industries_arctic"));
+				industries->Add(new SettingEntry("economy.industries_tropic"));
+				industries->Add(new SettingEntry("economy.industries_toyland"));
 			}
 
 			SettingsPage *cdist = environment->Add(new SettingsPage(STR_CONFIG_SETTING_ENVIRONMENT_CARGODIST));

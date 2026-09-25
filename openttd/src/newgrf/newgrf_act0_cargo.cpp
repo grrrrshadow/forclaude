@@ -12,6 +12,7 @@
 #include "../newgrf_cargo.h"
 #include "newgrf_bytereader.h"
 #include "newgrf_internal.h"
+#include "../climate_industries.h"
 #include "newgrf_stringmapping.h"
 
 #include "../safeguards.h"
@@ -169,6 +170,13 @@ static CargoType DecideCargoSlot(uint local, std::optional<CargoLabel> label, st
 		if (cs->label != *label || owner[slot] == nullptr || owner[slot] == grf) continue;
 		placed[local] = slot;
 		return slot;
+	}
+
+	/* One of the cargoes the game placed for the industries of a climate
+	 * switched on (PlaceClimateIndustryCargoes()): the set takes it as its
+	 * own where it is, rather than bringing a second of the same label. */
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		if (cs->label == *label && owner[cs->Index()] == nullptr && IsExtraClimateCargo(cs->Index())) return claim(cs->Index());
 	}
 
 	if (natural_is_open()) return claim(natural);

@@ -16,6 +16,7 @@
 #include "../newgrf_industries.h"
 #include "newgrf_bytereader.h"
 #include "newgrf_internal.h"
+#include "../climate_industries.h"
 #include "newgrf_stringmapping.h"
 
 #include "table/strings.h"
@@ -130,6 +131,11 @@ static ChangeInfoResult IndustrytilesChangeInfo(uint first, uint last, int prop,
 					continue;
 				}
 
+				/* The tiles of an original industry of a climate switched on stay its own (climate_industries.h). */
+				if (IsOriginalIndustryTileKept(ovrid)) {
+					GrfMsg(2, "IndustryTilesChangeInfo: Industry tile {} is of a climate switched on, not overriding it with tile {}", ovrid, id);
+					break;
+				}
 				_industile_mngr.Add(id, _cur_gps.grffile->grfid, ovrid);
 				break;
 			}
@@ -362,7 +368,13 @@ static ChangeInfoResult IndustriesChangeInfo(uint first, uint last, int prop, By
 				uint8_t subs_id = buf.ReadByte();
 				if (subs_id == 0xFF) {
 					/* Instead of defining a new industry, a substitute industry id
-					 * of 0xFF disables the old industry with the current id. */
+					 * of 0xFF disables the old industry with the current id --
+					 * but not an original of a climate switched on, which stays
+					 * whatever sets do (climate_industries.h). */
+					if (IsOriginalIndustryKept(id)) {
+						GrfMsg(2, "IndustriesChangeInfo: Industry {} is of a climate switched on, not disabling it", id);
+						continue;
+					}
 					_industry_specs[id].enabled = false;
 					continue;
 				} else if (subs_id >= NEW_INDUSTRYOFFSET) {
@@ -395,6 +407,12 @@ static ChangeInfoResult IndustriesChangeInfo(uint first, uint last, int prop, By
 				if (ovrid >= NEW_INDUSTRYOFFSET) {
 					GrfMsg(2, "IndustriesChangeInfo: Attempt to override new industry {} with industry id {}. Ignoring.", ovrid, id);
 					continue;
+				}
+				/* An original of a climate switched on keeps its place, and the
+				 * set's industry gets one of its own beside it (climate_industries.h). */
+				if (IsOriginalIndustryKept(ovrid)) {
+					GrfMsg(2, "IndustriesChangeInfo: Industry {} is of a climate switched on, not overriding it with industry {}", ovrid, id);
+					break;
 				}
 				indsp->grf_prop.override_id = ovrid;
 				_industry_mngr.Add(id, _cur_gps.grffile->grfid, ovrid);

@@ -26,6 +26,7 @@
 #include "road_map.h"
 #include "mars_houses.h"
 #include "cargomonitor.h"
+#include "climate_industries.h"
 #include "cargotype.h"
 #include "spritecache.h"
 #include "table/sprites.h"
@@ -1443,6 +1444,66 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
 		if (station && !o->ShouldWaitForCouple() && !o->ShouldDecoupleOnDeparture() && (b->reverse_disabled || b->reverse_lowered != o->ShouldReverseOutOfStation())) {
 			IConsolePrint(CC_ERROR, "testsmerdepo: ODMITNUTO - rozkaz {} do stanice: cudlik reversniho chodu neodpovida rozkazu.", i);
 		}
+	}
+	return true;
+}
+
+/**
+ * The original industries of the climates switched on (climate_industries.h):
+ * for every original industry type its climates, whether the game has it on,
+ * whether a set's industry took its place, how many stand on the map, and
+ * the cargoes it produces and takes. Refuses an industry of a climate on that
+ * the game has off or that a set replaced, and says which of the cargoes
+ * were placed for these industries. Given a number, at least that many
+ * industries of the climates on have to stand on the map. Usage: testprumysl [min]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestClimateIndustries(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "List the original industries of the climates switched on. Usage: 'testprumysl [min]', refusing fewer than min of them on the map.");
+		return true;
+	}
+	LandscapeTypes on = IndustryClimatesOn();
+	static const std::array<std::string_view, 4> climate_names{"mirne", "arktida", "poust", "toyland"};
+	std::string on_names;
+	for (LandscapeType c : on) on_names += fmt::format("{} ", climate_names[to_underlying(c)]);
+	IConsolePrint(CC_DEFAULT, "testprumysl: klima {}, zapnuto: {}", climate_names[to_underlying(_settings_game.game_creation.landscape)], on_names.empty() ? std::string{"nic"} : on_names);
+
+	auto label_of = [](CargoType cargo) {
+		if (!IsValidCargoType(cargo)) return std::string{};
+		CargoLabel l = CargoSpec::Get(cargo)->label;
+		uint32_t v = l.base();
+		return fmt::format("{}{}{}{}", static_cast<char>(v >> 24), static_cast<char>(v >> 16), static_cast<char>(v >> 8), static_cast<char>(v));
+	};
+
+	uint on_map_of_on = 0;
+	for (IndustryType type = 0; type < NEW_INDUSTRYOFFSET; type++) {
+		const IndustrySpec *spec = GetIndustrySpec(type);
+		bool kept = IsOriginalIndustryKept(type);
+		bool played = spec->climate_availability.Test(_settings_game.game_creation.landscape);
+		if (!kept && !played) continue;
+		std::string climates;
+		for (LandscapeType c : spec->climate_availability) climates += fmt::format("{}{}", climates.empty() ? "" : "+", climate_names[to_underlying(c)]);
+		std::string produced, accepted;
+		for (CargoType c : spec->produced_cargo) if (IsValidCargoType(c)) produced += label_of(c) + " ";
+		for (CargoType c : spec->accepts_cargo) if (IsValidCargoType(c)) accepted += label_of(c) + " ";
+		uint count = Industry::GetIndustryTypeCount(type);
+		if (kept) on_map_of_on += count;
+		IConsolePrint(CC_DEFAULT, "testprumysl:   {} {} [{}] {}{}{} na mape {}, vyrabi {}, bere {}", type, GetString(spec->name), climates,
+				spec->enabled ? "zap" : "VYP", kept ? " drzeno" : "", spec->grf_prop.HasGrfFile() ? " SADA" : "", count, produced, accepted);
+		if (kept && !spec->enabled) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - prumysl {} zapnuteho klimatu je vypnuty.", type);
+		if (kept && spec->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - prumysl {} zapnuteho klimatu nahradila sada.", type);
+	}
+	std::string extra;
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		if (IsExtraClimateCargo(cs->Index())) extra += label_of(cs->Index()) + " ";
+	}
+	IConsolePrint(CC_DEFAULT, "testprumysl: dosazene naklady: {}", extra.empty() ? std::string{"zadne"} : extra);
+	IConsolePrint(CC_DEFAULT, "testprumysl: prumyslu zapnutych klimat na mape: {}", on_map_of_on);
+	if (argv.size() >= 2) {
+		auto min = ParseType<uint>(argv[1]);
+		if (min.has_value() && on_map_of_on < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} prumyslu zapnutych klimat, ceka se aspon {}.", on_map_of_on, *min);
 	}
 	return true;
 }
@@ -12089,6 +12150,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testsnih",                ConTestSnow);
 	IConsole::CmdRegister("testsmerdepo",            ConTestDepartureButtons);
 	IConsole::CmdRegister("testnaklady",             ConTestCargoTypes);
+	IConsole::CmdRegister("testprumysl",             ConTestClimateIndustries);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);
