@@ -361,6 +361,19 @@ marijuana lorry's: they have to stand beside the game's own.
     nmlc -c -l grf/lang --grf claims_own.grf grf/claims_own.nml
     cp claims_own.grf <rig home>/.openttd/newgrf/
 
+Only car carriers take road vehicles: the game's own and, in any set, the
+flat wagons named Pao, Pasy, Sgs or Smmp (IsCarCarrierWagon()); `testnaklady`
+lists them and refuses any other wagon offering the fitting. Of a set's coal
+wagons only the St takes marijuana (IsGreenLayerWagon()): it is drawn as its
+set draws it carrying coal, with the coal layer green. `testzelenest` builds
+one into the company's first rail depot and asks for its picture in every
+direction, full and empty -- the rig draws nothing, so nothing else would make
+the green layers -- and refuses a full one without green. Scene `zelenest`
+needs the player's CZTR wagon set and steam engines in the home's `newgrf/`
+(the two tars named under "A lorry with a trailer" below); the rig runs with
+the null blitter, and the set's pictures being 32bpp only, the green pixels are
+counted from the file.
+
 `testdomy pole <x> <y> [r]` lists the houses within r tiles of a tile, by id
 and name, and how many tiles of each: for telling which house a player means
 by where it stands on a save of theirs.

@@ -60,7 +60,10 @@ size_t GetGRFSpriteOffset(uint32_t id);
 bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id);
 bool SkipSpriteData(SpriteFile &file, uint8_t type, uint16_t num);
 void DupSprite(SpriteID old_spr, SpriteID new_spr);
+/** SpriteCache::green_load_empty of a load layer drawn green whole, which has no empty picture to compare with. */
+static constexpr SpriteID GREEN_LOAD_WHOLE = UINT32_MAX;
 void SetGreenLoadSprite(SpriteID sprite, SpriteID full, SpriteID empty);
+void SetGreenLayerSprite(SpriteID sprite, SpriteID layer);
 std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 
 #endif /* SPRITECACHE_H */

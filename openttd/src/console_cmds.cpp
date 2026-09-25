@@ -1652,6 +1652,18 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 		for (const Engine *e : Engine::Iterate()) {
 			if (e->type == VehicleType::Ship || e->type == VehicleType::Aircraft) continue;
 			if (e->GetDefaultCargoType() == mari_cargo || !e->info.refit_mask.Test(mari_cargo)) continue;
+			/* The St carries it as its coal drawn green, and so its parts. */
+			if (IsGreenLayerWagon(e)) {
+				IConsolePrint(CC_DEFAULT, "testprumysl: St {} '{}' vozi marihuanu jako zelene uhli", e->index, GetString(e->info.string_id));
+				continue;
+			}
+			bool st_part = false;
+			for (const Engine *st : Engine::IterateType(VehicleType::Train)) {
+				if (!IsGreenLayerWagon(st)) continue;
+				std::vector<EngineID> parts = GetArticulatedPartEngines(st->index);
+				if (std::ranges::find(parts, e->index) != parts.end()) st_part = true;
+			}
+			if (st_part) continue;
 			others++;
 			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} ({}) jde prestavet na marihuanu, a neni na ni.", GetString(STR_ENGINE_NAME, e->index), e->index);
 		}
@@ -1807,12 +1819,24 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 			bool part = std::ranges::find(parts, e->index) != parts.end();
 			if (carrier) {
 				carriers++;
-				IConsolePrint(CC_DEFAULT, "testnaklady: vagon na auta {} '{}'{}", e->index, GetString(e->info.string_id), e->info.climates.Any() ? "" : " (v tomto klimatu neni)");
+				IConsolePrint(CC_DEFAULT, "testnaklady: vagon na auta {} '{}' (v nabidce '{}'){}", e->index, GetString(e->info.string_id),
+						GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList)), e->info.climates.Any() ? "" : " (v tomto klimatu neni)");
 			}
 			if (offered && !carrier && !part) fail(fmt::format("vagon {} '{}' jde prestavet na auta, a neni vagon na auta", e->index, GetString(e->info.string_id)));
 			if (carrier && !offered) fail(fmt::format("vagon na auta {} '{}' nejde prestavet na auta", e->index, GetString(e->info.string_id)));
 		}
 		IConsolePrint(CC_DEFAULT, "testnaklady: vagonu na auta {}", carriers);
+		/* And the wagons whose names only look like it, so that a kind that
+		 * was missed can be told from one that was left out on purpose. */
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon || IsCarCarrierWagon(e)) continue;
+			std::string name = GetString(e->info.string_id);
+			std::string shown = GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList));
+			bool looks = [](const std::string &n) { return n.find("Pa") != std::string::npos || n.find("Sg") != std::string::npos || n.find("Smm") != std::string::npos; }(name) ||
+					shown.find("Sg") != std::string::npos || shown.find("Smm") != std::string::npos;
+			if (!looks) continue;
+			IConsolePrint(CC_DEFAULT, "testnaklady: neni vagon na auta {} '{}' (v nabidce '{}')", e->index, name, shown);
+		}
 	}
 
 	IConsolePrint(CC_DEFAULT, "testnaklady: NUM_CARGO {}, {}.", to_underlying(NUM_CARGO), ok ? "vse v poradku" : "s chybami");
@@ -8513,6 +8537,113 @@ static bool ConTestClearWreck(std::span<std::string_view> argv)
 }
 
 /**
+ * The St carrying marijuana (IsGreenLayerWagon()): build one into the first
+ * rail depot of the company, fitted for marijuana and full, and ask for its
+ * picture in every direction the way the screen would -- the rig has no
+ * screen, so nothing else would ever make the green layers. Says how many
+ * pictures each direction has and how many pixels of each layer came out
+ * green; refused (ODMITNUTO) when there is no St, it cannot be fitted, it has
+ * no layer over the wagon, or a layer has nothing green in it. Asked again
+ * empty, it has to draw no green layer.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestGreenSt(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build a St wagon carrying marijuana and draw it. Usage: 'testzelenest'.");
+		return true;
+	}
+	auto refuse = [](std::string_view why) { IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - {}", why); return true; };
+	CargoType mari = GetCargoTypeByLabel(CT_MARIJUANA);
+	if (!IsValidCargoType(mari)) return refuse("marihuana v teto hre neni");
+	if (Company::GetIfValid(_local_company) == nullptr) return refuse("zadna spolecnost");
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+
+	const Engine *st = nullptr;
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!IsGreenLayerWagon(e)) continue;
+		IConsolePrint(CC_DEFAULT, "testzelenest: St {} '{}', {}, marihuana v prestavbe {}", e->index, GetString(e->info.string_id),
+				e->company_avail.Test(_local_company) ? "k mani" : "neni k mani", e->info.refit_mask.Test(mari) ? "ano" : "NE");
+		if (!e->info.refit_mask.Test(mari)) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - St {} nejde prestavet na marihuanu", e->index);
+		if (st == nullptr && e->company_avail.Test(_local_company)) st = e;
+	}
+	if (st == nullptr) return refuse("zadny St k mani");
+
+	TileIndex depot = INVALID_TILE;
+	for (const Depot *d : Depot::Iterate()) {
+		if (IsRailDepotTile(d->xy) && GetTileOwner(d->xy) == _local_company) {
+			depot = d->xy;
+			break;
+		}
+	}
+	if (depot == INVALID_TILE) return refuse("zadne depo");
+
+	auto [cost, id, cap, mail, caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, mari, ClientID::Invalid);
+	Train *t = Train::GetIfValid(id);
+	if (cost.Failed() || t == nullptr) return refuse(fmt::format("St nejde koupit na marihuanu: {}", RefusalReason(cost)));
+
+	auto draw = [&](bool full) {
+		uint layers = 0;
+		uint green_total = 0;
+		for (Train *u = t; u != nullptr; u = u->Next()) {
+			u->cargo.Truncate();
+			if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+		}
+		for (Direction dir : EnumRange(Direction::Begin, Direction::End)) {
+			for (const Train *u = t; u != nullptr; u = u->Next()) {
+				VehicleSpriteSeq seq;
+				u->GetImage(dir, EngineImageType::OnMap, &seq);
+				std::string line = fmt::format("testzelenest: {} smer {} dil {} ({} {}/{}) obrazku {}:", full ? "plny" : "prazdny", to_underlying(dir), u->index,
+						IsValidCargoType(u->cargo_type) ? GetString(CargoSpec::Get(u->cargo_type)->name) : "nic", u->cargo.StoredCount(), u->cargo_cap, seq.count);
+				for (uint i = 0; i < seq.count; i++) {
+					SpriteID sprite = seq.seq[i].sprite;
+					auto [green, drawn] = GreenLoadPixels(sprite);
+					bool is_green = sprite >= SPR_GREEN_LAYER_BASE && sprite < SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT;
+					line += fmt::format(" {}{}", sprite, is_green ? fmt::format(" (zelena {}/{})", green, drawn) : "");
+					if (is_green) {
+						layers++;
+						green_total += green;
+						/* An empty wagon's layer draws nothing at all, which is right. */
+						if (drawn > 0 && green == 0) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - zelena vrstva {} nema nic zeleneho", sprite);
+						if (!full && drawn > 0) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - prazdny St kresli naklad ({} pixelu)", drawn);
+					}
+				}
+				IConsolePrint(CC_DEFAULT, "{}", line);
+			}
+		}
+		return std::pair<uint, uint>{layers, green_total};
+	};
+	/* The same St carrying coal, for comparison: how many pictures the set
+	 * itself draws a loaded one with. */
+	if (CargoType coal = GetCargoTypeByLabel(CT_COAL); IsValidCargoType(coal)) {
+		auto [c_cost, c_id, c_cap, c_mail, c_caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, coal, ClientID::Invalid);
+		if (Train *c = Train::GetIfValid(c_id); c_cost.Succeeded() && c != nullptr) {
+			for (Train *u = c; u != nullptr; u = u->Next()) {
+				if (u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+			}
+			for (const Train *u = c; u != nullptr; u = u->Next()) {
+				VehicleSpriteSeq seq;
+				u->GetImage(Direction::N, EngineImageType::OnMap, &seq);
+				std::string line = fmt::format("testzelenest: uhli dil {} ({}/{}) obrazku {}:", u->index, u->cargo.StoredCount(), u->cargo_cap, seq.count);
+				for (uint i = 0; i < seq.count; i++) line += fmt::format(" {}", seq.seq[i].sprite);
+				IConsolePrint(CC_DEFAULT, "{}", line);
+			}
+			Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, c->index, true, false, ClientID::Invalid);
+		}
+	}
+	auto [full_layers, full_green] = draw(true);
+	auto [empty_layers, empty_green] = draw(false);
+	for (const auto &[layer, green] : GreenLayerSprites()) {
+		Dimension d = GetSpriteSize(layer);
+		IConsolePrint(CC_DEFAULT, "testzelenest: vrstva sady {} ({}x{}) -> zelena {}", layer, d.width, d.height, green);
+	}
+	IConsolePrint(CC_DEFAULT, "testzelenest: plny {} zelenych vrstev ({} zelenych pixelu), prazdny {}", full_layers, full_green, empty_layers);
+	if (full_layers == 0 || full_green == 0) return refuse("plny St nema zelenou vrstvu");
+	Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, t->index, true, false, ClientID::Invalid);
+	return true;
+}
+
+/**
  * Build the road-on-rail scene: one straight line with a shed at each end and
  * two through platforms, a road alongside with a drive-through stop at each
  * platform belonging to the same station, a road shed, one train (engine and
@@ -8596,6 +8727,8 @@ static bool ConTestRoadOnRail(std::span<std::string_view> all_args)
 		if (!e->company_avail.Test(_local_company)) continue;
 		if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL)) continue;
 		if (RailVehInfo(e->index)->railveh_type == RailVehicleType::Wagon) {
+			/* Only a car carrier takes a car (IsCarCarrierWagon()). */
+			if (!CanCarryRoadVehicles(e)) continue;
 			if (!want_wagon_name.empty()) {
 				if (eid_wagon == EngineID::Invalid() && name_has(e->index, want_wagon_name)) eid_wagon = e->index;
 				continue;
@@ -12543,6 +12676,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testcelyvlak",            ConTestDecoupleWhole);
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
+	IConsole::CmdRegister("testzelenest",            ConTestGreenSt);
 	IConsole::CmdRegister("testdepovagony",          ConTestDepotWagons);
 	IConsole::CmdRegister("testspolehlivost",        ConTestReliability);
 	IConsole::CmdRegister("testdepofiltr",           ConTestExplainDepot);

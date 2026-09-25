@@ -491,7 +491,7 @@ static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc,
  * @param empty the empty vehicle (ReadGreenLoadEmpty())
  * @return how many pixels were drawn green, over all zoom levels
  */
-static uint DrawLoadGreen(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, const SpriteCollMap<LoadedSpriteCopy> &empty)
+static uint DrawLoadGreen(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, const SpriteCollMap<LoadedSpriteCopy> &empty, bool whole = false)
 {
 	uint drawn = 0;
 	/* The leaf greens of the palette, dark to light. */
@@ -503,7 +503,7 @@ static uint DrawLoadGreen(SpriteLoader::SpriteCollection &sprite, ZoomLevels ava
 
 	for (ZoomLevel zoom : avail) {
 		const LoadedSpriteCopy &e = empty[zoom];
-		if (e.data.empty()) continue;
+		if (e.data.empty() && !whole) continue;
 		SpriteLoader::Sprite &f = sprite[zoom];
 		for (int y = 0; y < f.height; y++) {
 			for (int x = 0; x < f.width; x++) {
@@ -511,7 +511,7 @@ static uint DrawLoadGreen(SpriteLoader::SpriteCollection &sprite, ZoomLevels ava
 				if (p.a == 0 && p.m == 0) continue;
 				int ex = x + f.x_offs - e.x_offs;
 				int ey = y + f.y_offs - e.y_offs;
-				if (ex >= 0 && ey >= 0 && ex < e.width && ey < e.height) {
+				if (!whole && ex >= 0 && ey >= 0 && ex < e.width && ey < e.height) {
 					const SpriteLoader::CommonPixel &q = e.data[static_cast<size_t>(ey) * e.width + ex];
 					if (q.m == p.m && q.r == p.r && q.g == p.g && q.b == p.b && q.a == p.a) continue;
 				}
@@ -557,7 +557,8 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	/* A loaded vehicle with its load drawn green reads its empty self first,
 	 * since the loader's buffers are shared (SetGreenLoadSprite()). */
 	SpriteCollMap<LoadedSpriteCopy> green_load_empty;
-	if (sc->green_load_empty != 0) green_load_empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), sprite_type, encoder);
+	bool green_whole = sc->green_load_empty == GREEN_LOAD_WHOLE;
+	if (sc->green_load_empty != 0 && !green_whole) green_load_empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), sprite_type, encoder);
 
 	SpriteLoader::SpriteCollection sprite;
 	ZoomLevels sprite_avail;
@@ -613,7 +614,7 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 		return s;
 	}
 
-	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty);
+	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty, green_whole);
 
 	if (!ResizeSprites(sprite, sprite_avail, encoder)) {
 		if (id == SPR_IMG_QUERY) UserError("Okay... something went horribly wrong. I couldn't resize the fallback sprite. What should I do?");
@@ -809,6 +810,20 @@ void SetGreenLoadSprite(SpriteID sprite, SpriteID full, SpriteID empty)
 }
 
 /**
+ * Make a sprite a set's load drawn on its own green: the picture 'layer' over
+ * again with every pixel of it in the leaf greens, the light parts light and
+ * the dark dark -- the rule of SetGreenLoadSprite() with nothing to leave out,
+ * since a load layer is load and nothing else (GreenLayerSprite()).
+ * @param sprite the sprite to make
+ * @param layer the load layer
+ */
+void SetGreenLayerSprite(SpriteID sprite, SpriteID layer)
+{
+	DupSprite(layer, sprite);
+	GetSpriteCache(sprite)->green_load_empty = GREEN_LOAD_WHOLE;
+}
+
+/**
  * For the rig: read a green-load sprite (SetGreenLoadSprite()) the way the
  * game does and count what it draws green, and what it draws at all.
  * @param sprite the sprite
@@ -819,14 +834,18 @@ std::pair<uint, uint> GreenLoadPixels(SpriteID sprite)
 	const SpriteCache *sc = GetSpriteCache(sprite);
 	if (sc->green_load_empty == 0 || sc->file == nullptr) return {0, 0};
 	SpriteEncoder *encoder = BlitterFactory::GetCurrentBlitter();
-	SpriteCollMap<LoadedSpriteCopy> empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), SpriteType::Normal, encoder);
+	bool whole = sc->green_load_empty == GREEN_LOAD_WHOLE;
+	SpriteCollMap<LoadedSpriteCopy> empty;
+	if (!whole) empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), SpriteType::Normal, encoder);
 
 	SpriteLoader::SpriteCollection full;
 	ZoomLevels avail;
 	ZoomLevels avail_8bpp;
 	ZoomLevels avail_32bpp;
 	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
-	if (encoder->Is32BppSupported()) avail = loader.LoadSprite(full, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	/* A set's load layer may be drawn in 32bpp only, and the rig runs with no
+	 * blitter that takes it: asked for whatever the file has, 32bpp first. */
+	if (encoder->Is32BppSupported() || whole) avail = loader.LoadSprite(full, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
 	if (avail.None()) avail = loader.LoadSprite(full, *sc->file, sc->file_pos, SpriteType::Normal, false, sc->control_flags, avail_8bpp, avail_32bpp);
 
 	uint drawn = 0;
@@ -836,7 +855,7 @@ std::pair<uint, uint> GreenLoadPixels(SpriteID sprite)
 			if (f.data[i].a != 0 || f.data[i].m != 0) drawn++;
 		}
 	}
-	return {DrawLoadGreen(full, avail, empty), drawn};
+	return {DrawLoadGreen(full, avail, empty, whole), drawn};
 }
 
 /**

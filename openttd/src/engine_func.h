@@ -24,6 +24,8 @@ uint8_t GetOriginalEngineCount(VehicleType type);
 uint8_t GetOriginalEngineOffset(VehicleType type);
 bool IsGamesOwnEngine(VehicleType type, uint16_t internal_id);
 bool IsMarijuanaEngineInfo(const EngineInfo &info);
+bool EngineNameIsKind(const Engine *e, std::string_view kind);
+bool IsGreenLayerWagon(const Engine *e);
 
 bool IsEngineBuildable(EngineID engine, VehicleType type, CompanyID company);
 bool IsEngineRefittable(EngineID engine);

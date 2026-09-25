@@ -430,8 +430,15 @@ static constexpr SpriteID SPR_GREEN_LOAD_BASE = SPR_CLIMATE_INDUSTRY_BASE + CLIM
 static constexpr uint16_t GREEN_LOAD_SPRITE_COUNT = 32;
 /** @} */
 
+/** @{
+ * A set's load layer drawn green, when a wagon of the set carries marijuana
+ * (GreenLayerSprite()): made as each is first drawn. */
+static constexpr SpriteID SPR_GREEN_LAYER_BASE = SPR_GREEN_LOAD_BASE + GREEN_LOAD_SPRITE_COUNT;
+static constexpr uint16_t GREEN_LAYER_SPRITE_COUNT = 512;
+/** @} */
+
 /** From where can we start putting NewGRFs. */
-static const SpriteID SPR_NEWGRFS_BASE = SPR_GREEN_LOAD_BASE + GREEN_LOAD_SPRITE_COUNT;
+static const SpriteID SPR_NEWGRFS_BASE = SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT;
 
 /** Manager face sprites.
  * @{ */

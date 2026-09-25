@@ -939,7 +939,7 @@ static void OfferRoadVehiclesToCarriers()
  * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
  * knows the cargo by name.
  *
- * Nothing else is refitted to it. Marijuana is bulk cargo, and a set's
+ * Nothing else is refitted to it but the St of CZTR Wagons. Marijuana is bulk cargo, and a set's
  * vehicle takes cargo by class: every coal lorry and coal wagon of a set
  * could be refitted to it, and stood in the list above the game's own
  * marijuana lorry, which is a coal lorry made over. The player: the lorries
@@ -957,6 +957,16 @@ static void OfferMarijuanaToShipsAndAircraft()
 
 	for (Engine *e : Engine::Iterate()) {
 		if (e->GetDefaultCargoType() != marijuana) e->info.refit_mask.Reset(marijuana);
+	}
+	/* Save the St, the one coal wagon of a set the player gave marijuana: it
+	 * carries it as its coal drawn green (IsGreenLayerWagon()), with its
+	 * articulated parts, as a car carrier takes road vehicles. */
+	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!IsGreenLayerWagon(e)) continue;
+		e->info.refit_mask.Set(marijuana);
+		for (EngineID part : GetArticulatedPartEngines(e->index)) {
+			if (Engine *p = Engine::GetIfValid(part); p != nullptr) p->info.refit_mask.Set(marijuana);
+		}
 	}
 
 	auto is_goods = [](CargoType cargo) {

@@ -60,6 +60,7 @@
 #include "signal_func.h"
 
 #include "green_load.h"
+#include "engine_func.h"
 
 #include "safeguards.h"
 
@@ -1678,6 +1679,43 @@ const Train *PieceDrawnAs(const Train *piece)
 }
 
 /**
+ * The picture of a St carrying marijuana (IsGreenLayerWagon()): the wagon as
+ * its set draws it carrying coal, and every picture over the wagon itself --
+ * the load, which the set draws as a picture of its own -- drawn green
+ * (GreenLayerSprite()). Coal because marijuana is a cargo the set never heard
+ * of: a set picks its pictures by the cargo the wagon carries, so for the
+ * length of the drawing the wagon is said to carry coal, the way the refit
+ * window says a wagon carries what it is about to be fitted for. In a game
+ * without coal the borrowed set is told the slot its translation table gives
+ * coal instead (_wagon_exception_forced_slot), where it drew one, and any
+ * other set draws whatever it draws an unknown cargo as.
+ * @param drawn the piece drawn
+ * @param direction the direction to draw it in
+ * @param image_type where it is drawn
+ * @param result the pictures
+ */
+static void GetGreenLayerWagonSprite(const Train *drawn, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)
+{
+	const Engine *e = drawn->GetEngine();
+	CargoType coal = GetCargoTypeByLabel(CT_COAL);
+	uint16_t coal_slot = UINT16_MAX;
+	if (!IsValidCargoType(coal) && e->has_drawn_cargoes && e->GetGRF() != nullptr) {
+		const std::vector<CargoLabel> &labels = e->GetGRF()->cargo_list;
+		auto it = std::ranges::find(labels, CT_COAL);
+		if (it != labels.end() && static_cast<size_t>(it - labels.begin()) < e->drawn_slots.size() && e->drawn_slots.test(it - labels.begin())) {
+			coal_slot = static_cast<uint16_t>(it - labels.begin());
+		}
+	}
+	{
+		Train *as_coal = const_cast<Train *>(drawn);
+		AutoRestoreBackup cargo(as_coal->cargo_type, IsValidCargoType(coal) ? coal : as_coal->cargo_type);
+		AutoRestoreBackup forced(_wagon_exception_forced_slot, coal_slot != UINT16_MAX ? coal_slot : _wagon_exception_forced_slot);
+		GetCustomVehicleSprite(drawn, direction, image_type, result);
+	}
+	for (uint i = 1; i < result->count; i++) result->seq[i].sprite = GreenLayerSprite(result->seq[i].sprite);
+}
+
+/**
  * Get the sprite to display the train.
  * @param direction Direction of view/travel.
  * @param image_type Visualisation context.
@@ -1694,6 +1732,11 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
 		if (spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) direction = ReverseDir(direction);
+		if (IsValidCargoType(drawn->cargo_type) && CargoSpec::Get(drawn->cargo_type)->label == CT_MARIJUANA &&
+				IsGreenLayerWagon(drawn->GetFirstEnginePart()->GetEngine())) {
+			GetGreenLayerWagonSprite(drawn, direction, image_type, result);
+			if (result->IsValid()) return;
+		}
 		GetCustomVehicleSprite(drawn, direction, image_type, result);
 		if (result->IsValid()) return;
 

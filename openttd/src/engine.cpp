@@ -89,6 +89,42 @@ bool IsMarijuanaEngineInfo(const EngineInfo &info)
 }
 
 /**
+ * Is this engine of a kind of wagon the player named? Known by the name, which
+ * starts with the kind -- the letters a railway paints on the wagon, the same
+ * in every language and in every set and version -- written exactly so and
+ * followed by anything but another letter: a Paoj is not a Pao, an Sgnss is
+ * not an Sgs, and a Sas is not an St.
+ * @param e the engine
+ * @param kind the kind, as the railway writes it
+ * @return whether its name says it is one
+ */
+bool EngineNameIsKind(const Engine *e, std::string_view kind)
+{
+	auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); };
+	std::string name = GetString(e->info.string_id);
+	/* A set may open the name with a colour or a space. */
+	std::string_view rest = name;
+	while (!rest.empty() && !letter(rest.front())) rest.remove_prefix(1);
+	if (!rest.starts_with(kind)) return false;
+	return rest.size() == kind.size() || !letter(rest[kind.size()]);
+}
+
+/**
+ * Is this a wagon that carries marijuana as its coal drawn green? The St of
+ * CZTR Wagons, in every release and whatever set names a wagon so: the player's
+ * choice of the one coal wagon of a set that takes marijuana. The set draws its
+ * load as a picture of its own over the wagon, and that picture is drawn green
+ * (GreenLayerSprite()); the game's own marijuana wagons stay as they are.
+ * @param e the engine
+ * @return whether it is one
+ */
+bool IsGreenLayerWagon(const Engine *e)
+{
+	if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return false;
+	return EngineNameIsKind(e, "St");
+}
+
+/**
  * The pictures of the game's own vehicles for marijuana (green_load.h), read
  * from the original vehicle tables, so they are known before any engine is.
  * @return the vehicle type and picture of each

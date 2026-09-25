@@ -29,7 +29,6 @@
 #include "timer/timer_game_tick.h"
 #include "landscape.h"
 #include "spritecache.h"
-#include "strings_func.h"
 
 #include <map>
 
@@ -160,11 +159,9 @@ uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v)
 /**
  * Is this a wagon built for carrying road vehicles? The game's own car carrier,
  * whose cargo they are, and in any set, whatever its version, a wagon of one of
- * the kinds the player named: the flat wagons Pao, Pasy, Sgs and Smmp. Known by
- * the name, which starts with the kind -- the letters a railway paints on the
- * wagon, the same in every language -- written exactly so and followed by
- * anything but another letter: a Paoj, which the player has not seen, is not a
- * Pao, and an Sgnss or an Sgss is not an Sgs.
+ * the kinds the player named: the flat wagons Pao, Pasy, Sgs and Smmp, known
+ * by the name (EngineNameIsKind()) -- a Paoj, which the player has not seen, is
+ * not a Pao, and an Sgnss or an Sgss is not an Sgs.
  *
  * Every wagon took the fitting before, on the grounds that which wagons should
  * was the player's to find out first. He did: a lorry on a cattle wagon looks
@@ -180,19 +177,13 @@ bool IsCarCarrierWagon(const Engine *e)
 {
 	if (!IsValidCargoType(_road_vehicle_cargo)) return false;
 	if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return false;
-	if (e->GetDefaultCargoType() == _road_vehicle_cargo) return true;
+	/* The game's own car carrier; a set's wagon is known by its name only --
+	 * the borrowed wagon set hands its invisible articulated pieces whatever
+	 * cargo is left, road vehicles included. */
+	if (e->GetDefaultCargoType() == _road_vehicle_cargo && e->GetGRF() == nullptr) return true;
 
-	auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); };
-	std::string name = GetString(e->info.string_id);
-	/* A set may open the name with a colour or a space. */
-	std::string_view rest = name;
-	while (!rest.empty() && !letter(rest.front())) rest.remove_prefix(1);
 	static const std::string_view KINDS[] = {"Pao", "Pasy", "Sgs", "Smmp"};
-	for (std::string_view kind : KINDS) {
-		if (!rest.starts_with(kind)) continue;
-		if (rest.size() == kind.size() || !letter(rest[kind.size()])) return true;
-	}
-	return false;
+	return std::ranges::any_of(KINDS, [e](std::string_view kind) { return EngineNameIsKind(e, kind); });
 }
 
 /**

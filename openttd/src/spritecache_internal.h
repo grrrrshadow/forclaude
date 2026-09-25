@@ -29,7 +29,7 @@ struct SpriteCache {
 	SpriteType type = SpriteType::Invalid; ///< In some cases a single sprite is misused by two NewGRFs. Once as real sprite and once as recolour sprite. If the recolour sprite gets into the cache it might be drawn as real sprite which causes enormous trouble.
 	bool warned = false; ///< True iff the user has been warned about incorrect use of this sprite
 	SpriteCacheCtrlFlags control_flags{}; ///< Control flags, see SpriteCacheCtrlFlags
-	SpriteID green_load_empty = 0; ///< For a loaded vehicle drawn with a green load (SetGreenLoadSprite()): the same vehicle empty, whose difference from this one is the load.
+	SpriteID green_load_empty = 0; ///< For a loaded vehicle drawn with a green load (SetGreenLoadSprite()): the same vehicle empty, whose difference from this one is the load; GREEN_LOAD_WHOLE for a set's load layer drawn green whole (SetGreenLayerSprite()).
 
 	void ClearSpriteData();
 };
