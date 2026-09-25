@@ -400,8 +400,15 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 				 * a train set it so (MOF_LOAD_ON_TRAIN); printing that is a bracket
 				 * which tells the reader nothing and costs the width the station
 				 * name needs. The line said it twice over and ran into the
-				 * end-of-list line beneath it. See road_on_rail.h. */
-				if (!order->GetNonStopType().Test(OrderNonStopFlag::GoVia) && !order->ShouldBoardAtStation()) {
+				 * end-of-list line beneath it. See road_on_rail.h.
+				 *
+				 * Anything else the player sets is said, boarding or not: the
+				 * vehicle loads and unloads by the buttons before it boards --
+				 * gets off a ship, unloads, loads full and is back on board in
+				 * time -- and a "load full" that was working but written
+				 * nowhere read as a button that did nothing. */
+				bool boarding_default = order->ShouldBoardAtStation() && load == OrderLoadType::NoLoad && unload == OrderUnloadType::NoUnload;
+				if (!order->GetNonStopType().Test(OrderNonStopFlag::GoVia) && !boarding_default) {
 					StringID str = _station_load_types[order->IsRefit()][to_underlying(unload)][to_underlying(load)];
 					if (str != INVALID_STRING_ID) {
 						if (order->IsRefit()) {
