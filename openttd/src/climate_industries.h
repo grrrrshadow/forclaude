@@ -23,7 +23,8 @@
  * economy.extra_industries puts in industries the game adds of its own, in
  * every climate: the marijuana plantation (IT_MARIJUANA_PLANTATION), the
  * fruit plantation of the base graphics growing marijuana (CT_MARIJUANA),
- * which the desert house with the palm tree takes.
+ * and the coffeeshop in towns (IT_COFFEESHOP), drawn as the desert house with
+ * the palm tree, which takes it.
  */
 
 #ifndef CLIMATE_INDUSTRIES_H
@@ -31,7 +32,6 @@
 
 #include "cargo_type.h"
 #include "industry_type.h"
-#include "house_type.h"
 #include "landscape_type.h"
 #include "gfx_type.h"
 
@@ -42,9 +42,8 @@ LandscapeType IndustryHomeClimate(IndustryType type);
 CargoLabel MixedCargoLabelFor(MixedCargoType mixed, LandscapeType climate);
 std::vector<CargoLabel> CargoLabelsOfClimateIndustries();
 void ResolveOriginalIndustryCargoes();
-void ResolveExtraIndustryHouses();
-HouseID HouseTakingMarijuana();
-std::span<const CargoLabel> PalmHouseCargoes();
+void ResolveExtraIndustryCargoes();
+std::span<const CargoLabel> CoffeeshopCargoes();
 uint8_t OriginalIndustryChance(IndustryType type, bool creation);
 
 /**

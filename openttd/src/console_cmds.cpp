@@ -1457,15 +1457,16 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
  * the game has off or that a set replaced, and says which of the cargoes
  * were placed for these industries. Given a number, at least that many
  * industries of the climates on have to stand on the map. And the game's
- * marijuana plantation (economy.extra_industries), with the palm house that
- * takes its cargo; given a second number, at least that many plantations
- * have to stand on the map. Usage: testprumysl [min [plantaze]]
+ * own industries (economy.extra_industries): the marijuana plantation and
+ * the coffeeshop that takes its cargo; given a second and a third number, at
+ * least that many plantations and coffeeshops have to stand on the map.
+ * Usage: testprumysl [min [plantaze [hulirny]]]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "List the original industries of the climates switched on, and the marijuana plantation. Usage: 'testprumysl [min [plantaze]]', refusing fewer than min of them, or fewer than plantaze plantations, on the map.");
+		IConsolePrint(CC_HELP, "List the original industries of the climates switched on, and the game's own. Usage: 'testprumysl [min [plantaze [hulirny]]]', refusing fewer than min of them, or fewer than plantaze plantations or hulirny coffeeshops, on the map.");
 		return true;
 	}
 	LandscapeTypes on = IndustryClimatesOn();
@@ -1531,13 +1532,21 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 		if (min.has_value() && on_map_of_on < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} prumyslu zapnutych klimat, ceka se aspon {}.", on_map_of_on, *min);
 	}
 
-	/* The marijuana plantation (economy.extra_industries): in every climate
-	 * when on, growing marijuana on a tile of its own, and the house with the
-	 * palm tree taking all of it; nowhere when off, and the house as it was. */
+	/* The game's own industries (economy.extra_industries): when on, the
+	 * marijuana plantation in every climate growing marijuana on a tile of its
+	 * own, and the coffeeshop taking all of it and of the other cargoes of its
+	 * list the game has; nowhere when off. No house takes marijuana either
+	 * way: the houses are as they always were. */
 	const IndustrySpec *mari = GetIndustrySpec(IT_MARIJUANA_PLANTATION);
-	const HouseSpec *palm = HouseSpec::Get(HouseTakingMarijuana());
+	const IndustrySpec *shop = GetIndustrySpec(IT_COFFEESHOP);
 	CargoType mari_cargo = GetCargoTypeByLabel(CT_MARIJUANA);
-	uint palm_takes = IsValidCargoType(mari_cargo) ? GetAcceptedCargoOfHouse(palm)[mari_cargo] : 0;
+	const LandscapeTypes every_climate{LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
+	if (IsValidCargoType(mari_cargo)) {
+		for (const HouseSpec &hs : HouseSpec::Specs()) {
+			if (std::ranges::find(hs.accepts_cargo, mari_cargo) == std::end(hs.accepts_cargo)) continue;
+			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum {} bere marihuanu, domy maji byt jak byly.", hs.Index());
+		}
+	}
 	if (_settings_game.economy.extra_industries) {
 		std::string produced;
 		for (CargoType c : mari->produced_cargo) if (IsValidCargoType(c)) produced += label_of(c) + " ";
@@ -1547,34 +1556,52 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny {} {} {}{}, dlazdice {} kreslena jako {}, na mape {}, vyrabi {}",
 				IT_MARIJUANA_PLANTATION, GetString(mari->name), mari->enabled ? "zap" : "VYP", mari->grf_prop.HasGrfFile() ? " SADA" : "",
 				gfx, tile->grf_prop.subst_id, count, produced);
-		IConsolePrint(CC_DEFAULT, "testprumysl: dum s palmou {} '{}' bere MARI {}/8", HouseTakingMarijuana(), GetString(GetHouseName(palm)), palm_takes);
-		/* The other cargoes it takes where the game has them: all of each. */
-		CargoArray palm_acceptance = GetAcceptedCargoOfHouse(palm);
-		std::string also;
-		for (CargoLabel label : PalmHouseCargoes()) {
-			if (label == CT_MARIJUANA) continue;
-			CargoType c = GetCargoTypeByLabel(label);
-			if (!IsValidCargoType(c)) continue;
-			also += fmt::format("{} {}/8 ", label_of(c), palm_acceptance[c]);
-			if (palm_acceptance[c] != 8) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum s palmou nebere {} 8/8, i kdyz je ve hre.", label_of(c));
-		}
-		IConsolePrint(CC_DEFAULT, "testprumysl: dum s palmou bere taky: {}", also.empty() ? std::string{"nic dalsiho ve hre"} : also);
 		if (!mari->enabled || mari->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve hre, nebo ji zabrala sada.");
-		if (mari->climate_availability != LandscapeTypes{LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland}) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve vsech klimatech.");
+		if (mari->climate_availability != every_climate) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve vsech klimatech.");
 		if (produced != "MARI ") IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nevyrabi marihuanu.");
 		if (gfx != GFX_MARIJUANA_PLANTATION || tile->grf_prop.HasGrfFile() || tile->grf_prop.subst_id >= NEW_INDUSTRYTILEOFFSET) {
 			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nema svou dlazdici kreslenou jako puvodni dlazdice.");
 		}
-		if (palm_takes != 8) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum s palmou nebere marihuanu 8/8.");
 		if (argv.size() >= 3) {
 			auto min = ParseType<uint>(argv[2]);
 			if (min.has_value() && count < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} marihuanovych plantazi, ceka se aspon {}.", count, *min);
 		}
+
+		/* The coffeeshop: in towns only, on a tile of its own, taking all of
+		 * each cargo of its list the game has, at the industry and its tile. */
+		IndustryGfx shop_gfx = shop->layouts.empty() ? INVALID_INDUSTRYTILE : shop->layouts.front().front().gfx;
+		const IndustryTileSpec *shop_tile = GetIndustryTileSpec(GFX_COFFEESHOP);
+		uint shops = Industry::GetIndustryTypeCount(IT_COFFEESHOP);
+		std::string takes;
+		for (CargoLabel label : CoffeeshopCargoes()) {
+			CargoType c = GetCargoTypeByLabel(label);
+			if (!IsValidCargoType(c)) continue;
+			auto at = std::ranges::find(shop_tile->accepts_cargo, c);
+			int level = at == std::end(shop_tile->accepts_cargo) ? 0 : shop_tile->acceptance[at - std::begin(shop_tile->accepts_cargo)];
+			bool industry_takes = std::ranges::find(shop->accepts_cargo, c) != std::end(shop->accepts_cargo);
+			takes += fmt::format("{} {}/8{} ", label_of(c), level, industry_takes ? "" : " (prumysl NE)");
+			if (level != 8 || !industry_takes) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna nebere {} 8/8, i kdyz je ve hre.", label_of(c));
+		}
+		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny {} {} {}{}, dlazdice {}, jen ve meste {}, na mape {}, bere {}",
+				IT_COFFEESHOP, GetString(shop->name), shop->enabled ? "zap" : "VYP", shop->grf_prop.HasGrfFile() ? " SADA" : "",
+				shop_gfx, shop->behaviour.Test(IndustryBehaviour::OnlyInTown) ? "ano" : "ne", shops, takes);
+		if (!shop->enabled || shop->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna neni ve hre, nebo ji zabrala sada.");
+		if (shop->climate_availability != every_climate) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna neni ve vsech klimatech.");
+		if (!shop->behaviour.Test(IndustryBehaviour::OnlyInTown)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna se muze stavet mimo mesto.");
+		if (shop_gfx != GFX_COFFEESHOP || shop_tile->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna nema svou dlazdici.");
+		for (CargoType c : shop->produced_cargo) {
+			if (IsValidCargoType(c)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna neco vyrabi ({}).", label_of(c));
+		}
+		if (argv.size() >= 4) {
+			auto min = ParseType<uint>(argv[3]);
+			if (min.has_value() && shops < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} hulirn, ceka se aspon {}.", shops, *min);
+		}
 	} else {
-		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny prumysl vypnuty, typ {} {}", IT_MARIJUANA_PLANTATION, mari->enabled ? (mari->grf_prop.HasGrfFile() ? "ma sada" : "ZAPNUTY") : "volny");
+		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny prumysl vypnuty, typy {} {} a {} {}", IT_MARIJUANA_PLANTATION, mari->enabled ? (mari->grf_prop.HasGrfFile() ? "ma sada" : "ZAPNUTY") : "volny",
+				IT_COFFEESHOP, shop->enabled ? (shop->grf_prop.HasGrfFile() ? "ma sada" : "ZAPNUTY") : "volny");
 		if (mari->enabled && !mari->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz je ve hre, i kdyz je pridavny prumysl vypnuty.");
+		if (shop->enabled && !shop->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna je ve hre, i kdyz je pridavny prumysl vypnuty.");
 		if (IsValidCargoType(mari_cargo)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuana je ve hre, i kdyz je pridavny prumysl vypnuty.");
-		if (palm_takes != 0) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - dum s palmou bere marihuanu, i kdyz je pridavny prumysl vypnuty.");
 	}
 	return true;
 }

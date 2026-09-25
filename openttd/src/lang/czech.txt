@@ -2316,7 +2316,7 @@ STR_CONFIG_SETTING_INDUSTRIES_TROPIC_HELPTEXT                   :Zapnuté: prům
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND                           :Průmysl toylandu: {STRING}
 STR_CONFIG_SETTING_INDUSTRIES_TOYLAND_HELPTEXT                  :Zapnuté: průmysl toylandu v každém klimatu, vedle toho, co tam je: hrané klima dostane ten, který nemá, i s náklady, které potřebuje, a žádná sada ho nevypne ani nenahradí svým -- průmysl sady stojí vedle něj. Vypnuté: hra je jako vždycky. Platí pro novou hru.
 STR_CONFIG_SETTING_EXTRA_INDUSTRIES                             :Přídavný průmysl: {STRING}
-STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :Zapnuté: do každého klimatu přibude průmysl, který hra přidává sama: marihuanová plantáž, která pěstuje marihuanu. Bere ji pouštní dům s palmou, a k tomu tabák, papír, turisty a alkohol, když je do hry přinese nějaká sada. Platí pro novou hru.
+STR_CONFIG_SETTING_EXTRA_INDUSTRIES_HELPTEXT                    :Zapnuté: do každého klimatu přibude průmysl, který hra přidává sama: marihuanová plantáž, která pěstuje marihuanu, a hulírna ve městech. Marihuanu bere dům s palmou – hulírna – a k tomu tabák, papír, turisty a alkohol, když je do hry přinese nějaká sada. Platí pro novou hru.
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE                          :Průmyslové sady vedle sebe: {STRING}
 STR_CONFIG_SETTING_NEWGRF_SIDE_BY_SIDE_HELPTEXT                 :Průmyslové sady (NewGRF) se navzájem odmítají: každá číslovala své náklady od nuly a přepisovala náklady té druhé. Tahle hra dává nákladům každé sady vlastní sloty a náklad se stejným kódem (labelem) sady sdílejí. Když se sada vzdá kvůli jiné nahrané sadě, hra načte sady znovu a tu druhou i celou její rodinu před její kontrolou schová, takže běží obě. Platí při založení nebo nahrání hry. Vypnuté: sada, která jinou odmítá, se vypne jako obvykle
 STR_CONFIG_SETTING_SPLIT_HOUSE_GRFS                             :Tematická města: oddělit GRF: {STRING}
@@ -6280,6 +6280,10 @@ STR_INDUSTRY_NAME_MARIJUANA_PLANTATION                          :{G=f}Marihuanov
 STR_INDUSTRY_NAME_MARIJUANA_PLANTATION.gen                      :marihuanové plantáže
 STR_INDUSTRY_NAME_MARIJUANA_PLANTATION.loc                      :na marihuanové plantáži
 STR_INDUSTRY_NAME_MARIJUANA_PLANTATION.small                    :marihuanová plantáž
+STR_INDUSTRY_NAME_COFFEESHOP                                    :{G=f}Hulírna
+STR_INDUSTRY_NAME_COFFEESHOP.gen                                :hulírny
+STR_INDUSTRY_NAME_COFFEESHOP.loc                                :v hulírně
+STR_INDUSTRY_NAME_COFFEESHOP.small                              :hulírna
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

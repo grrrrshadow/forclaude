@@ -587,6 +587,97 @@ static void SetupMarijuanaPlantation()
 }
 
 /**
+ * The coffeeshop's tile, stage by stage, as the desert house with the palm
+ * tree (house 0x4E) is drawn: foundations, the walls, the house.
+ */
+static const DrawBuildingsTileStruct _coffeeshop_draw_tile_data[] = {
+	{ {{0, 0, 0}, {16, 16, 40}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0x11EC, PAL_NONE }, 0 },
+	{ {{0, 0, 0}, {16, 16, 40}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0x11ED, PAL_NONE }, 0 },
+	{ {{0, 0, 0}, {16, 16, 40}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0x11ED, PAL_NONE }, 0 },
+	{ {{0, 0, 0}, {16, 16, 40}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0x11EE, PAL_NONE }, 0 },
+};
+static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
+
+/**
+ * What the coffeeshop takes, all of each (8/8): marijuana, and the cargoes of
+ * sets that end at it -- tobacco (Industries of the Caribbean), paper,
+ * tourists and alcohol (the sets name rum and alcohol alike). Taken where the
+ * game has them; a label no set brought is left out.
+ */
+static const std::array<CargoLabel, 5> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}};
+
+/**
+ * The cargoes the coffeeshop takes where the game has them.
+ * @return their labels
+ */
+std::span<const CargoLabel> CoffeeshopCargoes()
+{
+	return COFFEESHOP_CARGOES;
+}
+
+/**
+ * Put the coffeeshop (economy.extra_industries) and its tile in their places,
+ * the industry type and tile before the plantation's: the bank of the arctic
+ * and desert towns -- built only in a town, producing nothing -- on one tile
+ * drawn as the desert house with the palm tree, in every climate. What it
+ * takes is set once the cargoes are (ResolveExtraIndustryCargoes()). To a set
+ * asking about it the coffeeshop is that bank.
+ */
+static void SetupCoffeeshop()
+{
+	const IndustrySpec &bank = _origin_industry_specs[IT_BANK_TROPIC_ARCTIC];
+	const IndustryGfx bank_tile = bank.layouts.front().front().gfx;
+
+	IndustryTileSpec &tile = _industry_tile_specs[GFX_COFFEESHOP];
+	tile = _origin_industry_tile_specs[bank_tile];
+	tile.grf_prop.subst_id = bank_tile;
+	tile.accepts_cargo_label.fill(CT_INVALID);
+	tile.accepts_cargo.fill(INVALID_CARGO);
+	tile.acceptance.fill(0);
+
+	IndustrySpec &spec = _industry_specs[IT_COFFEESHOP];
+	spec = bank;
+	spec.layouts = {IndustryTileLayout{IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_COFFEESHOP}}};
+	spec.accepts_cargo_label.fill(CT_INVALID);
+	spec.produced_cargo_label.fill(CT_INVALID);
+	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
+	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
+	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), bank.appear_ingame[to_underlying(LandscapeType::Tropic)]);
+	std::fill(std::begin(spec.appear_creation), std::end(spec.appear_creation), bank.appear_creation[to_underlying(LandscapeType::Tropic)]);
+	spec.map_colour = PixelColour{0xCF};
+	spec.name = STR_INDUSTRY_NAME_COFFEESHOP;
+	spec.grf_prop.subst_id = IT_BANK_TROPIC_ARCTIC;
+	spec.enabled = true;
+}
+
+/**
+ * Let the coffeeshop take all of each of COFFEESHOP_CARGOES the game has: the
+ * industry, so that what is delivered is taken, and its tile, so that a
+ * station by it takes it. Called once the cargoes are set
+ * (FinaliseIndustriesArray()).
+ */
+void ResolveExtraIndustryCargoes()
+{
+	if (!_settings_game.economy.extra_industries) return;
+	IndustrySpec &spec = _industry_specs[IT_COFFEESHOP];
+	if (!spec.enabled || spec.grf_prop.HasGrfFile()) return;
+	IndustryTileSpec &tile = _industry_tile_specs[GFX_COFFEESHOP];
+
+	spec.accepts_cargo.fill(INVALID_CARGO);
+	tile.accepts_cargo.fill(INVALID_CARGO);
+	tile.acceptance.fill(0);
+	size_t next = 0;
+	for (CargoLabel label : COFFEESHOP_CARGOES) {
+		CargoType cargo = GetCargoTypeByLabel(label);
+		if (!IsValidCargoType(cargo)) continue;
+		spec.accepts_cargo[next] = cargo;
+		tile.accepts_cargo[next] = cargo;
+		tile.acceptance[next] = 8;
+		next++;
+	}
+}
+
+/**
  * This function initialize the spec arrays of both
  * industry and industry tiles.
  * It adjusts the enabling of the industry too, based on climate availability.
@@ -605,8 +696,11 @@ void ResetIndustries()
 	auto industry_tile_insert = std::copy(std::begin(_origin_industry_tile_specs), std::end(_origin_industry_tile_specs), std::begin(_industry_tile_specs));
 	std::fill(industry_tile_insert, std::end(_industry_tile_specs), IndustryTileSpec{});
 
-	/* Before any set is read, so that the override manager passes its type by. */
-	if (_settings_game.economy.extra_industries) SetupMarijuanaPlantation();
+	/* Before any set is read, so that the override manager passes their types by. */
+	if (_settings_game.economy.extra_industries) {
+		SetupMarijuanaPlantation();
+		SetupCoffeeshop();
+	}
 
 	/* Reset any overrides that have been set. */
 	_industile_mngr.ResetOverride();
@@ -835,64 +929,6 @@ void ResolveOriginalIndustryCargoes()
 			}
 			if (first) tile.accepts_cargo[i] = INVALID_CARGO;
 		}
-	}
-}
-
-/**
- * The desert house that takes marijuana: "Houses", the two-storey one inside
- * a wall, with a palm tree in its garden where the base graphics draw one
- * (house 0x4E of the original table). The other desert "Houses" of the same
- * size and acceptance do not take it.
- */
-static const HouseID HOUSE_WITH_THE_PALM = 0x4E;
-
-/**
- * What the house with the palm tree takes besides its own three: marijuana,
- * and the cargoes of sets that end at a house -- tobacco (Industries of the
- * Caribbean), paper, tourists and alcohol (the sets name rum and alcohol
- * alike). Taken where the game has them; a label no set brought is left out.
- */
-static const std::array<CargoLabel, 5> PALM_HOUSE_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}};
-
-/**
- * Which house takes the marijuana of the game's plantation.
- * @return the house with the palm tree
- */
-HouseID HouseTakingMarijuana()
-{
-	return HOUSE_WITH_THE_PALM;
-}
-
-/**
- * The cargoes the house with the palm tree takes besides its own three, when
- * the game has them.
- * @return their labels
- */
-std::span<const CargoLabel> PalmHouseCargoes()
-{
-	return PALM_HOUSE_CARGOES;
-}
-
-/**
- * Let the house with the palm tree take marijuana, all of it (8/8), when the
- * game's marijuana plantation is in it (economy.extra_industries), and so the
- * rest of PALM_HOUSE_CARGOES that the game has: in the places of its
- * acceptance list past the original three. Called once the cargoes are set
- * (FinaliseHouseArray()).
- */
-void ResolveExtraIndustryHouses()
-{
-	if (!_settings_game.economy.extra_industries) return;
-
-	HouseSpec *hs = HouseSpec::Get(HOUSE_WITH_THE_PALM);
-	size_t next = HOUSE_ORIGINAL_NUM_ACCEPTS;
-	for (CargoLabel label : PALM_HOUSE_CARGOES) {
-		CargoType cargo = GetCargoTypeByLabel(label);
-		if (!IsValidCargoType(cargo) || std::ranges::find(hs->accepts_cargo, cargo) != std::end(hs->accepts_cargo)) continue;
-		if (next >= std::size(hs->accepts_cargo)) break;
-		hs->accepts_cargo[next] = cargo;
-		hs->cargo_acceptance[next] = 8;
-		next++;
 	}
 }
 
@@ -1204,7 +1240,7 @@ static void DrawTile_Industry(TileInfo *ti)
 	const IndustryTileSpec *indts = GetIndustryTileSpec(gfx);
 
 	/* Retrieve pointer to the draw industry tile struct */
-	if (gfx >= NEW_INDUSTRYTILEOFFSET) {
+	if (gfx >= NEW_INDUSTRYTILEOFFSET && gfx != GFX_COFFEESHOP) {
 		/* Draw the tile using the specialized method of newgrf industrytile.
 		 * DrawNewIndustry will return false if ever the resolver could not
 		 * find any sprite to display.  So in this case, we will jump on the
@@ -1222,9 +1258,8 @@ static void DrawTile_Industry(TileInfo *ti)
 		}
 	}
 
-	const DrawBuildingsTileStruct *dits = &_industry_draw_tile_data[gfx << 2 | (indts->anim_state ?
-			GetAnimationFrame(ti->tile) & INDUSTRY_COMPLETED :
-			GetIndustryConstructionStage(ti->tile))];
+	const uint stage = indts->anim_state ? GetAnimationFrame(ti->tile) & INDUSTRY_COMPLETED : GetIndustryConstructionStage(ti->tile);
+	const DrawBuildingsTileStruct *dits = gfx == GFX_COFFEESHOP ? &_coffeeshop_draw_tile_data[stage] : &_industry_draw_tile_data[gfx << 2 | stage];
 
 	/* An original industry of another climate than the one played is drawn as
 	 * its own climate draws it. */

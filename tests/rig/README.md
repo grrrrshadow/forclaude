@@ -320,21 +320,24 @@ industry of another climate with the sprite drawn and the file it comes from,
 and refuses one drawn from the file of the climate played. `prumyslgrafika`
 plays a temperate map with the three other climates on.
 
-`economy.extra_industries` puts in the game's own marijuana plantation, in
-every climate: the last industry type, on a tile of its own (the last
-industry tile, which no set is given) drawn as the fruit plantation's, growing
-marijuana (MARI), which the desert house with the palm tree takes 8/8 --
-and tobacco, paper, tourists and alcohol too, 8/8 each, where a set brings
-them. It is
-on by default, so the rig's new game switches it off, as it does the Mars
-towns; so does every scene played from a save, which, made before the
-setting, would take the new-game value and have the plantation come into it. `testprumysl [min [plantaze]]` lists it too: refused when it is on and
-not in the game, not in every climate, not growing marijuana, not on its own
-tile, when the palm house does not take marijuana or one of the others the
-game has, and with fewer than
-`plantaze` on the map; refused when it is off and the plantation, marijuana
-or the palm house's taking it is there all the same. `marihuana` switches it
-on in the toyland map, `marihuanasada` in a temperate game with XIS.
+`economy.extra_industries` puts in the game's own industries, in every
+climate: the marijuana plantation -- the last industry type, on a tile of its
+own (the last industry tile, which no set is given) drawn as the fruit
+plantation's, growing marijuana (MARI) -- and the coffeeshop, built in towns
+only, on the tile before it, drawn as the desert house with the palm tree,
+taking marijuana 8/8 and tobacco, paper, tourists and alcohol 8/8 each where
+a set brings them. The houses stay as they always were. It is on by default,
+so the rig's new game switches it off, as it does the Mars towns; so does
+every scene played from a save, which, made before the setting, would take
+the new-game value and have the industries come into it. `testprumysl [min
+[plantaze [hulirny]]]` lists both: refused when it is on and either is not in
+the game or not in every climate, when the plantation grows anything but
+marijuana or is not on its own tile, when the coffeeshop may stand outside a
+town, produces anything or does not take one of its cargoes the game has,
+when a house takes marijuana, and with fewer than `plantaze` plantations or
+`hulirny` coffeeshops on the map; refused when it is off and either industry
+or marijuana is there all the same. `marihuana` switches it on in the toyland
+map, `marihuanasada` in a temperate game with XIS.
 
 `testdomy pole <x> <y> [r]` lists the houses within r tiles of a tile, by id
 and name, and how many tiles of each: for telling which house a player means
