@@ -7591,6 +7591,64 @@ void StraightenTowInDepot(Train *tow)
 }
 
 /**
+ * Take the engines out of a rake put down in a shed, so that each stands as a
+ * parked train of its own and the wagons as stored rakes.
+ *
+ * A rake with an engine riding inside it is a decouple gone wrong, and the
+ * player calls a tow for it to clear it away; brought in, it stood in the shed
+ * as it was, engine and all, for him to take apart by hand. It is taken apart
+ * here instead, at the only cut that is certainly right: an engine is a train
+ * and a wagon is a wagon. Which wagons were the engine's own is not to be
+ * read off the rake with any confidence -- the marks a coupling leaves
+ * (VehicleRailFlag::CoupledHere) sat on the engine and on a wagon behind it
+ * in the player's save -- so nothing is guessed, and the player puts together
+ * what he wants in the shed window.
+ *
+ * Every piece is parked. The player's rule for what the tow brings in on a
+ * call written by hand: nothing of it drives off.
+ *
+ * @param chain head of the rake, standing in a shed
+ */
+static void SplitStoredRakeAtEngines(Train *chain)
+{
+	if (!ChainHasEngine(chain)) return;
+	std::vector<Train *> heads;
+	/* Cut behind the head's unit if the head is an engine, and in front of
+	 * every engine after it; each cut leaves the rest as a chain of its own,
+	 * cut in turn. */
+	Train *piece = chain;
+	while (piece != nullptr) {
+		heads.push_back(piece);
+		Train *cut = nullptr;
+		if (piece->IsEngine()) {
+			cut = piece->GetNextUnit();
+		} else {
+			for (Train *u = piece->GetNextUnit(); u != nullptr; u = u->GetNextUnit()) {
+				if (u->IsEngine()) { cut = u; break; }
+			}
+		}
+		if (cut == nullptr) break;
+		if (TryConsistSplice(DoCommandFlag::Execute, cut, nullptr, true).Failed()) break;
+		piece = cut->First();
+	}
+	for (Train *h : heads) {
+		if (h->First() != h) continue;
+		h->current_order.Free();
+		h->SetDestTile(INVALID_TILE);
+		h->vehstatus.Set(VehState::Stopped);
+		h->cur_speed = 0;
+		h->subspeed = 0;
+		h->ConsistChanged(CCF_ARRANGE);
+		InvalidateWindowData(WindowClass::VehicleView, h->index);
+		if (_show_train_orientation) {
+			IConsolePrint(CC_INFO, "  z odlozene rady: {} {} ({} clanku) stoji zabrzdeny v depu", h->IsFrontEngine() ? "vlak" : "rada",
+					h->IsFrontEngine() ? h->unitnumber : 0, CountVehiclesInChain(h));
+		}
+	}
+	SetWindowDirty(WindowClass::VehicleDepot, chain->tile);
+}
+
+/**
  * Put a train that has just been taken off a rescue engine in a depot back
  * the way round it was when the engine coupled to it.
  *
@@ -7809,6 +7867,12 @@ bool HandleRescueEngineInDepot(Train *tow)
 					casualty->ConsistChanged(CCF_ARRANGE);
 				}
 				InvalidateWindowData(WindowClass::VehicleView, casualty->index);
+				/* Engines riding inside the rake -- the coupling that went wrong
+				 * -- are taken out of it here: each stands in the shed as a
+				 * parked train of its own, the wagons as stored rakes. The
+				 * player's rule for what the tow brings in by hand: nothing of
+				 * it drives off. */
+				SplitStoredRakeAtEngines(casualty);
 			}
 		} else if (wrecked || sold) {
 			/* A wreck brought into a depot is scrapped there and nothing is due

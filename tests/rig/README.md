@@ -387,6 +387,12 @@ picture, the case of CZTR 1.0.0, which the rig has not got:
 `testjmena <text>` lists the rail vehicles whose name, as the set gives it or
 as the purchase list shows it now, has the text in it.
 
+A rake fetched on the player's call with an engine riding inside it (a
+decouple gone wrong) is taken apart in the shed: each engine a parked train of
+its own, the wagons stored rakes (SplitStoredRakeAtEngines()); nothing of it
+drives off. A breakdown fetched by the tow is put right and leaves on its own
+orders as before.
+
 `testdelky` is the game's own spacing test (CheckTrainsLengths(), which
 reports a train as broken and pauses the game at every load) train by train
 and pair by pair: which two pieces stand how far apart and how far they should.

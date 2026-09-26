@@ -771,8 +771,11 @@ testbrzda 32" 12000 -g $S/vlak31.sav
 # train is spread to a length between every two pieces (CloseUpCoupledConsist)
 # -- the save loaded with two trains the game reports as broken and pauses for,
 # coupled a pixel too close by an older build; testdelky finds none at the end.
-# odtazeno 1; the one record line is the tow giving up its saved station order
-# before it is sent again.
+# In the shed the rake is taken apart at its engine (SplitStoredRakeAtEngines):
+# two stored rakes of three and the engine as a parked train of its own --
+# nothing the tow brings in on a call written by hand drives off, the player
+# puts it together. odtazeno 1; the one record line is the tow giving up its
+# saved station order before it is sent again.
 run_scene radasmasinkou "vlak123 on
 testpauza
 testza 12000 testdelky" 12200 -g $S/rada_masinka.sav

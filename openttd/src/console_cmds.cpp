@@ -6488,12 +6488,13 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 			 * in a shed from one out on the line at the same tile -- the
 			 * question every fault around a depot door comes down to. */
 			const char *kolej = u->track == Track::Depot ? "depo" : (u->track == Track::Wormhole ? "roura" : "trat");
-			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{} na ({},{}) {} {}px ({},{}) smer {} otoceny {} sprite {} nos {}", i, u->index.base(), u->engine_type.base(),
+			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{}{} na ({},{}) {} {}px ({},{}) smer {} otoceny {} sprite {} nos {}", i, u->index.base(), u->engine_type.base(),
 					u->IsEngine() ? "masinka" : (u->IsWagon() ? "vagon" : "cast"),
 					u->IsMultiheaded() ? (u->IsRearDualheaded() ? " (zadni hlava)" : " (predni hlava)") : "",
 					u->IsArticulatedPart() ? " (kloub)" : "",
 					u->IsFrontEngine() ? " CELO" : "",
 					u->IsFreeWagon() ? " VOLNY" : "",
+					u->flags.Test(VehicleRailFlag::CoupledHere) ? " SPOJ" : "",
 					TileX(u->tile), TileY(u->tile), kolej, u->vehstatus.Test(VehState::Hidden) ? "schovany " : "",
 					u->x_pos, u->y_pos, to_underlying(u->direction),
 					u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne", u->spritenum, to_underlying(nose));
