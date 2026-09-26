@@ -3776,7 +3776,12 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 		int n = 0;
 		for (const Order &o : t->Orders()) {
 			std::string extra;
-			if (o.ShouldGoToCouple()) extra += " SPOJIT";
+			if (o.ShouldGoToCouple()) {
+				static const char *const NAKLAD[] = {"jakekoli", "prazdne", "plne", "plne napred", "prazdne napred"};
+				extra += fmt::format(" SPOJIT:{}", to_underlying(o.GetCoupleLoad()) < std::size(NAKLAD) ? NAKLAD[to_underlying(o.GetCoupleLoad())] : "?");
+				if (IsValidCargoType(o.GetCoupleCargo())) extra += fmt::format(" naklad {}", GetString(CargoSpec::Get(o.GetCoupleCargo())->name));
+				if (o.GetCoupleCount() != 0) extra += fmt::format(" pocet {}", o.GetCoupleCount());
+			}
 			if (o.ShouldFoundRake()) extra += o.GetCoupleCount() != 0 ? fmt::format(" ZALOZIT:do {}", o.GetCoupleCount()) : " ZALOZIT";
 			if (o.ShouldHonk()) extra += " HOUKAT";
 			if (o.ShouldDepartAutomatically()) extra += " AUTO";
@@ -3791,6 +3796,7 @@ static bool ConTestOrders(std::span<std::string_view> argv)
 						to_underlying(o.GetConditionVariable()), to_underlying(o.GetConditionComparator()),
 						o.GetConditionValue(), o.GetConditionSkipToOrder());
 			}
+			if (o.IsType(OT_GOTO_STATION)) extra += fmt::format(" nakladat {} vykladat {}", to_underlying(o.GetLoadType()), to_underlying(o.GetUnloadType()));
 			IConsolePrint(CC_DEFAULT, "  [{}] typ {} cil {}{}", n++, to_underlying(o.GetType()), o.GetDestination().base(), extra);
 		}
 	}
@@ -6471,9 +6477,11 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 			continue;
 		}
 		found = true;
-		IConsolePrint(CC_DEFAULT, "vlak {}: {} couva {} rozkaz {} ceka-na-spojeni {} lhuta-odtahu {}", t->unitnumber, t->IsFrontEngine() ? "masinka v cele" : "bez cela",
+		IConsolePrint(CC_DEFAULT, "vlak {}: {} couva {} rozkaz {} (nakladat {} vykladat {}, c.{}/{}) ceka-na-spojeni {} lhuta-odtahu {}", t->unitnumber, t->IsFrontEngine() ? "masinka v cele" : "bez cela",
 				t->vehicle_flags.Test(VehicleFlag::DrivingBackwards) ? "ano" : "ne",
 				to_underlying(t->current_order.GetType()),
+				to_underlying(t->current_order.GetLoadType()), to_underlying(t->current_order.GetUnloadType()),
+				t->cur_real_order_index, t->GetNumOrders(),
 				t->current_order.ShouldWaitForCouple() ? "ano" : "ne",
 				t->rescue_deadline == TimerGameEconomy::Date{} ? "zadna" : "ano");
 		uint i = 0;
@@ -6488,7 +6496,7 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 			 * in a shed from one out on the line at the same tile -- the
 			 * question every fault around a depot door comes down to. */
 			const char *kolej = u->track == Track::Depot ? "depo" : (u->track == Track::Wormhole ? "roura" : "trat");
-			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{}{} na ({},{}) {} {}px ({},{}) smer {} otoceny {} sprite {} nos {}", i, u->index.base(), u->engine_type.base(),
+			IConsolePrint(CC_DEFAULT, "  [{}] id {} typ {} {}{}{}{}{}{} na ({},{}) {} {}px ({},{}) smer {} otoceny {} sprite {} nos {} naklad {}/{} {}", i, u->index.base(), u->engine_type.base(),
 					u->IsEngine() ? "masinka" : (u->IsWagon() ? "vagon" : "cast"),
 					u->IsMultiheaded() ? (u->IsRearDualheaded() ? " (zadni hlava)" : " (predni hlava)") : "",
 					u->IsArticulatedPart() ? " (kloub)" : "",
@@ -6497,7 +6505,8 @@ static bool ConTestListUnits(std::span<std::string_view> argv)
 					u->flags.Test(VehicleRailFlag::CoupledHere) ? " SPOJ" : "",
 					TileX(u->tile), TileY(u->tile), kolej, u->vehstatus.Test(VehState::Hidden) ? "schovany " : "",
 					u->x_pos, u->y_pos, to_underlying(u->direction),
-					u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne", u->spritenum, to_underlying(nose));
+					u->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne", u->spritenum, to_underlying(nose), u->cargo.StoredCount(), u->cargo_cap,
+					IsValidCargoType(u->cargo_type) ? GetString(CargoSpec::Get(u->cargo_type)->name) : "-");
 		}
 		if (!all_rakes) return true;
 	}

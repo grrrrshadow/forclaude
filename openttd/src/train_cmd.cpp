@@ -4745,8 +4745,12 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 
 	if (unclaimed != nullptr) {
 		if (_show_train_orientation && v->couple_target != unclaimed->index) {
-			IConsolePrint(CC_INFO, "Vlak {}: zabral cil spojeni {} na ({},{}) (drive {})", v->unitnumber,
-					unclaimed->index.base(), TileX(unclaimed->tile), TileY(unclaimed->tile), v->couple_target.base());
+			uint stored = 0;
+			uint cap = 0;
+			for (const Train *u = unclaimed; u != nullptr; u = u->Next()) { stored += u->cargo.StoredCount(); cap += u->cargo_cap; }
+			IConsolePrint(CC_INFO, "Vlak {}: zabral cil spojeni {} na ({},{}) (drive {}) - filtr naklad {} ({}), rada veze {}/{}", v->unitnumber,
+					unclaimed->index.base(), TileX(unclaimed->tile), TileY(unclaimed->tile), v->couple_target.base(),
+					to_underlying(order.GetCoupleLoad()), IsValidCargoType(order.GetCoupleCargo()) ? GetString(CargoSpec::Get(order.GetCoupleCargo())->name) : "-", stored, cap);
 		}
 		unclaimed->couple_claim = v->index;
 		v->couple_target = unclaimed->index;
