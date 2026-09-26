@@ -983,6 +983,25 @@ static void OfferMarijuanaToShipsAndAircraft()
 	}
 }
 
+/**
+ * Explosives (CT_EXPLOSIVES) are an armoured cargo, so every vehicle that takes
+ * armoured cargo is offered them -- the armoured lorries, which are what the
+ * player asked for, and the armoured vans of the railways with them. Not ships
+ * and aircraft: they take explosives only inside a car, and a car's explosives
+ * are what their raid drops (see DropRaidBombs()). A ship or aircraft of a set
+ * whose own cargo they are keeps them.
+ */
+static void OfferExplosivesToArmouredOnly()
+{
+	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
+	if (!IsValidCargoType(explosives)) return;
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Ship && e->type != VehicleType::Aircraft) continue;
+		if (e->GetDefaultCargoType() == explosives) continue;
+		e->info.refit_mask.Reset(explosives);
+	}
+}
+
 /** Set to use the correct action0 properties for each canal feature */
 static void FinaliseCanals()
 {
@@ -2275,6 +2294,7 @@ static void AfterLoadGRFs()
 	/* Every rail wagon may carry a road vehicle. */
 	OfferRoadVehiclesToCarriers();
 	OfferMarijuanaToShipsAndAircraft();
+	OfferExplosivesToArmouredOnly();
 
 	/* No NewGRF gets a say in how its trains turn round. */
 	IgnoreNewGRFReversingFlags();

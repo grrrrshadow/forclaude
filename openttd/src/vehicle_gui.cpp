@@ -3232,6 +3232,9 @@ static bool ShowsRaidButton(const Vehicle *v)
 	const Aircraft *a = Aircraft::From(v);
 	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return false;
 
+	/* Loaded with a car of explosives, it is loaded with the bomb: the
+	 * crosshair is on offer whatever else is aboard (CmdRaid()). */
+	if (CarriesExplosiveCar(a)) return true;
 	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
 		if (u->cargo.TotalCount() != 0) return false;
 	}
@@ -3458,6 +3461,14 @@ public:
 		const Window *mainwindow = GetMainWindow();
 		if (mainwindow->viewport->follow_vehicle == v->index) {
 			this->LowerWidget(WID_VV_LOCATION);
+		}
+
+		/* The crosshair is red on a ship or an aircraft with a car of
+		 * explosives aboard: its raid drops a bomb, not smoke -- the player's
+		 * sign that it is loaded. Asked at every painting, since cars get in
+		 * and out without telling the window of the vessel they ride in. */
+		if (v->type == VehicleType::Aircraft || v->type == VehicleType::Ship) {
+			this->GetWidget<NWidgetCore>(WID_VV_RAID)->SetSprite(CarriesExplosiveCar(v) ? SPR_IMG_CROSSHAIR_ARMED : SPR_IMG_CROSSHAIR);
 		}
 
 		this->DrawWidgets();

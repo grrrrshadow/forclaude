@@ -685,6 +685,56 @@ static Train *FindTrainToBoard(const RoadVehicle *rv, StationID station, Station
  * @param carrier the ship or aircraft
  * @return how many are aboard
  */
+/**
+ * The cars riding in a ship or an aircraft with explosives in them
+ * (CT_EXPLOSIVES): what its raid drops as a bomb, one for each (see
+ * DropRaidBomb()), instead of smoke.
+ * @param carrier the ship or aircraft
+ * @return the cars, their front parts
+ */
+std::vector<RoadVehicle *> ExplosiveCarsAboard(const Vehicle *carrier)
+{
+	std::vector<RoadVehicle *> cars;
+	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
+	if (!IsValidCargoType(explosives)) return cars;
+	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || rv->carried_by != carrier->index) continue;
+		for (const RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+			if (u->cargo_type == explosives && u->cargo.StoredCount() != 0) {
+				cars.push_back(rv);
+				break;
+			}
+		}
+	}
+	return cars;
+}
+
+/**
+ * Is a car with explosives riding in this ship or aircraft? Then its raid drops
+ * a bomb, and its crosshair is drawn red.
+ * @param carrier the ship or aircraft
+ * @return whether one is
+ */
+bool CarriesExplosiveCar(const Vehicle *carrier)
+{
+	return !ExplosiveCarsAboard(carrier).empty();
+}
+
+/**
+ * The bomb has gone: the car's explosives are gone with it. The car rides on
+ * empty, wherever it was going.
+ * @param rv the car, its front part
+ */
+void SpendExplosives(RoadVehicle *rv)
+{
+	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
+	for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+		if (u->cargo_type == explosives) u->cargo.Truncate();
+	}
+	SetWindowDirty(WindowClass::VehicleView, rv->index);
+	SetWindowDirty(WindowClass::VehicleDetails, rv->index);
+}
+
 uint RoadVehiclesAboard(const Vehicle *carrier)
 {
 	uint aboard = 0;

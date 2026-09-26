@@ -1545,9 +1545,11 @@ testnaklady" 100 -c $XIS_CFG
 # of its own, taking all of the marijuana and of the other cargoes of its list
 # the game has, with at least one of each standing on the map, marijuana among
 # the cargoes, and no house taking it. Beside XIS, which switches the temperate
-# industries off and brings its own, they have to stay as they are.
+# industries off and brings its own, they have to stay as they are. Sixteen
+# cargoes: toyland's twelve, marijuana, and the road vehicles, hemp fibre and
+# explosives of the game's own.
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene marihuana "testprumysl 0 1 1
-testnaklady 14 Marijuana" 100
+testnaklady 16 Marijuana" 100
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene marihuanasada "testprumysl 0 1 1
 testnaklady" 100 -c $XIS_CFG
@@ -1602,6 +1604,21 @@ testjmena Sgmmrs
 testjmena Ssla
 testautovlak
 testzelenest" 50 -c $GETS_CFG
+# The explosives chain (economy.extra_industries): the marijuana plantation
+# grows hemp fibre beside the marijuana, the oil refinery takes the fibre and
+# makes explosives beside goods, the banks take the explosives; the armoured
+# lorries and vans can be fitted for them, ships and aircraft cannot (they
+# carry them only inside a car). testvybusniny says so, and says fibre was
+# grown last month. odmitnuto is zero.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene vybusniny "testvybusniny
+testza 3000 testvybusniny" 3100
+# The bomb a car of explosives makes, let off by hand between the two trains
+# of the overrun scene: both within three tiles are wrecks at once
+# (havaroval=2), nothing is broken down, and the tow sets out for them.
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene atomovka "vlak123 on
+testnedobrzdil blok vozu 10 odtah
+testza 2500 testvybusniny shod 204 21" 5000
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

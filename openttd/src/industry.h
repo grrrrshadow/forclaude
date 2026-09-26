@@ -354,6 +354,10 @@ inline bool ShowIndustryHealth()
 
 /** Drop the smoke of a raid on a spot; see DropRaidSmoke() in industry_cmd.cpp. */
 void DropRaidSmoke(TileIndex tile, Direction facing, Owner who);
+/** Let a bomb go off; see DropRaidBomb() in industry_cmd.cpp. */
+void DropRaidBomb(TileIndex tile, Owner who);
+/** Drop an aircraft's bombs or its smoke; see DropRaidPayload() in industry_cmd.cpp. */
+void DropRaidPayload(Vehicle *carrier, TileIndex tile, Direction facing);
 
 /**
  * How much of an industry's building is still standing, as a percentage.

@@ -9,6 +9,8 @@
 
 #include "stdafx.h"
 #include "ship.h"
+#include "road_on_rail.h"
+#include "industry.h"
 #include "landscape.h"
 #include "timetable.h"
 #include "news_func.h"
@@ -734,13 +736,23 @@ static void ShipRaidFire(Ship *v)
 				DistanceManhattan(v->tile, target));
 	}
 	ShipRaidDone(v);
+	/* A car of explosives aboard makes the rocket a bomb -- one, the player's
+	 * rule for a ship, however many cars there are -- and that car's
+	 * explosives go with it. */
+	std::vector<RoadVehicle *> cars = ExplosiveCarsAboard(v);
+	bool armed = !cars.empty();
+	if (armed) SpendExplosives(cars.front());
 	/* The rocket carries the raid the rest of the way: it is what the player
 	 * sees leave the ship, and the smoke falls where it lands, not where the
 	 * ship is standing. If one cannot be made -- nothing left to make
 	 * vehicles out of -- the raid still happens, because the errand has been
 	 * spent either way. */
-	if (!FireRaidRocket(v->x_pos, v->y_pos, v->z_pos + 4, target, v->owner)) {
-		DropRaidSmoke(target, facing, v->owner);
+	if (!FireRaidRocket(v->x_pos, v->y_pos, v->z_pos + 4, target, v->owner, armed)) {
+		if (armed) {
+			DropRaidBomb(target, v->owner);
+		} else {
+			DropRaidSmoke(target, facing, v->owner);
+		}
 	}
 }
 

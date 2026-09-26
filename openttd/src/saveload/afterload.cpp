@@ -3879,6 +3879,11 @@ bool AfterLoadGame()
 	 * and take the cars beside them (road_on_rail.h). */
 	ConvertCarFerries();
 
+	/* Refineries, plantations and coffeeshops built before hemp fibre and
+	 * explosives were theirs take and make them now. */
+	extern void UpdateExtraIndustryCargoes();
+	UpdateExtraIndustryCargoes();
+
 	/* Loading is over. Left at the last marker it passed, the whereabouts in a
 	 * crash report would go on claiming the load for the rest of the game and
 	 * point every later crash at the wrong place entirely. */

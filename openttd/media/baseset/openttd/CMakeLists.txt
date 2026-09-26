@@ -51,6 +51,7 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_stwp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair_cursor.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_crosshair_armed.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_0.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_1.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_0_2.png

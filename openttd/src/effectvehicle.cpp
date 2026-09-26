@@ -703,7 +703,11 @@ static bool RaidRocketTick(EffectVehicle *v)
 		if (_show_train_orientation) {
 			IConsolePrint(CC_INFO, "raketa: dopadla na ({},{}), tik {}", v->x_pos, v->y_pos, TimerGameTick::counter);
 		}
-		DropRaidSmoke(v->dest_tile, v->direction, v->owner);
+		if ((v->animation_substate & 2) != 0) {
+			DropRaidBomb(v->dest_tile, v->owner);
+		} else {
+			DropRaidSmoke(v->dest_tile, v->direction, v->owner);
+		}
 		delete v;
 		return false;
 	}
@@ -810,14 +814,16 @@ EffectVehicle *CreateEffectVehicle(int x, int y, int z, EffectVehicleType type)
  * @param who    whose raid this is, for the papers
  * @return whether one could be made at all
  */
-bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who)
+bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who, bool armed)
 {
 	EffectVehicle *v = CreateEffectVehicle(x, y, z, EV_RAID_ROCKET);
 	if (v == nullptr) return false;
 
 	v->dest_tile = target;
 	v->owner = who;
-	v->animation_substate = GB(Random(), 0, 1);
+	/* Bit 0 the livery, bit 1 whether it carries a car's explosives: then it
+	 * is a bomb where it lands, not smoke (DropRaidBomb()). */
+	v->animation_substate = GB(Random(), 0, 1) | (armed ? 2 : 0);
 	v->direction = RaidRocketHeading(x, y, TileX(target) * TILE_SIZE + TILE_SIZE / 2,
 			TileY(target) * TILE_SIZE + TILE_SIZE / 2);
 	v->UpdateSpriteSeq();
@@ -871,7 +877,7 @@ bool EffectVehicle::Tick()
 void EffectVehicle::UpdateSpriteSeq()
 {
 	if (this->subtype != EV_RAID_ROCKET) return;
-	SpriteID base = this->animation_substate == 0 ? SPR_RAID_ROCKET_GREY : SPR_RAID_ROCKET_YELLOW;
+	SpriteID base = (this->animation_substate & 1) == 0 ? SPR_RAID_ROCKET_GREY : SPR_RAID_ROCKET_YELLOW;
 	this->sprite_cache.sprite_seq.Set(base + to_underlying(this->direction));
 }
 

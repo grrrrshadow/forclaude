@@ -1560,7 +1560,8 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 				gfx, tile->grf_prop.subst_id, count, produced);
 		if (!mari->enabled || mari->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve hre, nebo ji zabrala sada.");
 		if (mari->climate_availability != every_climate) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz neni ve vsech klimatech.");
-		if (produced != "MARI ") IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nevyrabi marihuanu.");
+		/* Marijuana, and hemp fibre from the same plants (the explosives chain). */
+		if (produced != "MARI FICR ") IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nevyrabi marihuanu a konopna vlakna.");
 		if (gfx != GFX_MARIJUANA_PLANTATION || tile->grf_prop.HasGrfFile() || tile->grf_prop.subst_id >= NEW_INDUSTRYTILEOFFSET) {
 			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - marihuanova plantaz nema svou dlazdici kreslenou jako puvodni dlazdice.");
 		}
@@ -2389,18 +2390,21 @@ static bool ConTestSmoke(std::span<std::string_view> argv)
 static bool ConIndustryHealth(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
-	if (argv.size() < 2 || argv[1] != "karla") {
+	/* "mm" is the same switch with less typing, back for the player's testing
+	 * of the bomb. Under that name there is no second word to step over. */
+	const size_t first = (argv[0] == "mm") ? 1 : 2;
+	if (first == 2 && (argv.size() < 2 || argv[1] != "karla")) {
 		IConsolePrint(CC_HELP, "Show how much of an industry's building is left, in its own window.");
 		IConsolePrint(CC_HELP, "Usage: 'miluju karla' to flip it, or 'miluju karla on' / 'miluju karla off'.");
+		IConsolePrint(CC_HELP, "'mm' is the short way of typing the same thing.");
 		return true;
 	}
 
-	/* The switch itself is the third word: the console took the first as the
-	 * command name and the second is the rest of the name. */
-	if (argv.size() > 2) {
-		if (argv[2] == "on" || argv[2] == "1") {
+	/* The switch itself follows the name: "miluju karla on", "mm on". */
+	if (argv.size() > first) {
+		if (argv[first] == "on" || argv[first] == "1") {
 			_show_industry_health = true;
-		} else if (argv[2] == "off" || argv[2] == "0") {
+		} else if (argv[first] == "off" || argv[first] == "0") {
 			_show_industry_health = false;
 		} else {
 			return false;
@@ -9359,6 +9363,68 @@ static bool ConTestWindows(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * The explosives chain as the game has it now: what the marijuana plantation
+ * makes, what the oil refinery and the banks take and make, which vehicles can
+ * be fitted for explosives (the armoured ones, and not ships or aircraft), and
+ * with "shod x y" a bomb let off on that tile (DropRaidBomb()).
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestExplosives(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	if (argv.size() >= 4 && argv[1] == "shod") {
+		auto px = ParseInteger(argv[2]);
+		auto py = ParseInteger(argv[3]);
+		if (!px.has_value() || !py.has_value()) return false;
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "testvybusniny: hra nema firmu.");
+			return true;
+		}
+		AutoRestoreBackup trace(_show_train_orientation, true);
+		DropRaidBomb(TileXY((uint)*px, (uint)*py), CompanyID::Begin());
+		return true;
+	}
+	auto name = [](CargoType c) { return IsValidCargoType(c) ? std::string(CargoSpec::Get(c)->label.base() == 0 ? "?" : GetString(CargoSpec::Get(c)->name)) : std::string("-"); };
+	CargoType fibre = GetCargoTypeByLabel(CT_HEMP_FIBRE);
+	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
+	auto in_chain = [&](const IndustrySpec *spec) {
+		for (CargoType c : spec->accepts_cargo) if (IsValidCargoType(c) && (c == fibre || c == explosives)) return true;
+		for (CargoType c : spec->produced_cargo) if (IsValidCargoType(c) && (c == fibre || c == explosives)) return true;
+		return false;
+	};
+	for (IndustryType type = 0; type < NUM_INDUSTRYTYPES; type++) {
+		const IndustrySpec *spec = GetIndustrySpec(type);
+		if (!spec->enabled || !in_chain(spec)) continue;
+		std::string in, out;
+		for (CargoType c : spec->accepts_cargo) if (IsValidCargoType(c)) in += " " + name(c);
+		for (CargoType c : spec->produced_cargo) if (IsValidCargoType(c)) out += " " + name(c);
+		IConsolePrint(CC_DEFAULT, "testvybusniny: {} bere:{} dela:{}", GetString(spec->name), in, out);
+	}
+	uint built = 0, fibre_made = 0, explosives_made = 0;
+	for (const Industry *i : Industry::Iterate()) {
+		if (!i->IsCargoProduced(fibre) && !i->IsCargoProduced(explosives)) continue;
+		built++;
+		for (const auto &p : i->produced) {
+			if (p.cargo == fibre) fibre_made += p.history[LAST_MONTH].production;
+			if (p.cargo == explosives) explosives_made += p.history[LAST_MONTH].production;
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testvybusniny: plantazi a rafinerii {}, minuly mesic vlaken {}, vybusnin {}", built, fibre_made, explosives_made);
+	if (IsValidCargoType(explosives)) {
+		std::map<VehicleType, uint> carriers;
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->info.refit_mask.Test(explosives) || e->GetDefaultCargoType() == explosives) carriers[e->type]++;
+		}
+		IConsolePrint(CC_DEFAULT, "testvybusniny: vybusniny vezou vlaky {}, auta {}, lode {}, letadla {}", carriers[VehicleType::Train],
+				carriers[VehicleType::Road], carriers[VehicleType::Ship], carriers[VehicleType::Aircraft]);
+		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+			if (e->info.refit_mask.Test(explosives) && e->IsEnabled()) IConsolePrint(CC_DEFAULT, "testvybusniny: auto {} '{}'", e->index, GetString(e->info.string_id));
+		}
+	}
+	return true;
+}
+
 static bool ConTestFollow(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -12806,6 +12872,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
 
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
+	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
 	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);
@@ -12820,6 +12887,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprumysl",             ConTestClimateIndustries);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
+	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);

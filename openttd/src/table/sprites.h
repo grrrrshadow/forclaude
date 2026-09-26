@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 230;
+static const uint16_t OPENTTD_SPRITE_COUNT = 231;
 /** @} */
 
 /** @{
@@ -227,6 +227,7 @@ static const SpriteID SPR_CARGO_ROAD_VEHICLES_ICON   = SPR_OPENTTD_BASE + 228;
 /* The cargo icon for marijuana (economy.extra_industries): a cannabis leaf,
  * artwork from icons8.com -- see CREDITS.md. */
 static const SpriteID SPR_CARGO_MARIJUANA_ICON       = SPR_OPENTTD_BASE + 229;
+static const SpriteID SPR_IMG_CROSSHAIR_ARMED        = SPR_OPENTTD_BASE + 230; ///< The crosshair in red: a ship or aircraft with a car of explosives aboard (DropRaidBombs()).
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;
@@ -1406,6 +1407,8 @@ static const SpriteID SPR_CARGO_CANDYFLOSS            = 4318;
 static const SpriteID SPR_CARGO_FIZZY_DRINKS          = 4319;
 static const SpriteID SPR_CARGO_ROAD_VEHICLES         = SPR_CARGO_ROAD_VEHICLES_ICON; ///< A car (CT_ROLA), among this build's own sprites.
 static const SpriteID SPR_CARGO_MARIJUANA             = SPR_CARGO_MARIJUANA_ICON; ///< A cannabis leaf (CT_MARIJUANA), among this build's own sprites.
+static const SpriteID SPR_CARGO_HEMP_FIBRE            = SPR_CARGO_MARIJUANA_ICON; ///< Hemp fibre (CT_HEMP_FIBRE): the cannabis leaf too, until it has an icon of its own.
+static const SpriteID SPR_CARGO_EXPLOSIVES            = 4323; ///< Explosives (CT_EXPLOSIVES): the battery of the base set, until they have an icon of their own.
 static const SpriteID SPR_CARGO_TOFFEE                = 4320;
 static const SpriteID SPR_CARGO_BUBBLES               = 4321;
 static const SpriteID SPR_CARGO_PLASTIC               = 4322;

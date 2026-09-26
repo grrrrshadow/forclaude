@@ -33,7 +33,7 @@ enum EffectVehicleType : uint8_t {
 EffectVehicle *CreateEffectVehicle(int x, int y, int z, EffectVehicleType type);
 
 /** Fire a raid rocket from a spot at a tile; see FireRaidRocket() in effectvehicle.cpp. */
-bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who);
+bool FireRaidRocket(int x, int y, int z, TileIndex target, Owner who, bool armed = false);
 EffectVehicle *CreateEffectVehicleAbove(int x, int y, int z, EffectVehicleType type);
 EffectVehicle *CreateEffectVehicleRel(const Vehicle *v, int x, int y, int z, EffectVehicleType type);
 

@@ -128,6 +128,18 @@ static const CargoSpec _default_cargo[] = {
 	 * which the plantation is made from. In none of the climate rows below;
 	 * PlaceClimateIndustryCargoes() puts it in a free slot from the top down. */
 	MK(  62, CT_MARIJUANA,     85, 16, 0x100, 4209,  0,  15,  true,       TownAcceptanceEffect::None,    MARIJUANA,    MARIJUANA,       STR_TONS, CargoClasses({CargoClass::Bulk, CargoClass::Refrigerated, CargoClass::Potable})),
+
+	/* Hemp fibre (CT_HEMP_FIBRE), the marijuana plantation's second cargo, and
+	 * explosives (CT_EXPLOSIVES), which the oil refinery makes of it and the
+	 * banks take -- both
+	 * with economy.extra_industries, placed the way marijuana is. The fibre
+	 * is bulk and wants a covered wagon, so the coal wagons and lorries of
+	 * the game and every set's covered and bulk wagons take it. Explosives
+	 * are armoured, the player's armoured lorry -- and the game's armoured
+	 * vans with it -- no load drawn; ships and aircraft do not take them
+	 * outright (OfferExplosivesToArmouredOnly()), only inside a car. */
+	MK(  60, CT_HEMP_FIBRE,    67, 16, 0x100, 4600,  2,  30,  true,       TownAcceptanceEffect::None,   HEMP_FIBRE,   HEMP_FIBRE,       STR_TONS, CargoClasses({CargoClass::Bulk, CargoClass::Covered})),
+	MK(  61, CT_EXPLOSIVES,   180,  8, 0x100, 7000,  1,  30,  true,       TownAcceptanceEffect::None,   EXPLOSIVES,   EXPLOSIVE,      STR_CRATES, CargoClasses({CargoClass::Armoured})),
 };
 
 

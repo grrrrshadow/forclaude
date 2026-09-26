@@ -34,6 +34,9 @@
 #include "animated_tile_func.h"
 #include "aircraft.h"
 #include "ship.h"
+#include "train.h"
+#include "roadveh.h"
+#include "road_on_rail.h"
 #include "airport.h"
 #include "effectvehicle_func.h"
 #include "effectvehicle_base.h"
@@ -404,6 +407,162 @@ void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 	}
 }
 
+/** How far the bomb reaches, in tiles each way: everything within is wreckage. */
+static const int RAID_BOMB_REACH = 3;
+
+/**
+ * Let a bomb go off: explosives from a car aboard a ship or an aircraft, the
+ * player's "atom bomb". The game's own big explosion, and within three tiles
+ * each way everything is gone at one go -- an industry with any of itself
+ * there is pulled down (a factory at one blow, the player's words), every
+ * house comes down with its people, and every vehicle standing or driving
+ * there is a wreck: trains, road vehicles and aircraft on the ground. Nothing
+ * is broken down -- a wreck is past that. Aircraft in the air fly on; ships
+ * have no wreck of their own in the game and sail on. The papers write it up
+ * as they write up a raid.
+ *
+ * @param tile where it goes off
+ * @param who  the company whose car it was, for the papers
+ */
+void DropRaidBomb(TileIndex tile, Owner who)
+{
+	const int cx = TileX(tile);
+	const int cy = TileY(tile);
+	auto within = [cx, cy](TileIndex t) {
+		return std::max(abs((int)TileX(t) - cx), abs((int)TileY(t) - cy)) <= RAID_BOMB_REACH;
+	};
+
+	/* The explosion: the big one in the middle and a ring of them round it. */
+	CreateEffectVehicleAbove(cx * TILE_SIZE + TILE_SIZE / 2, cy * TILE_SIZE + TILE_SIZE / 2, 0, EV_EXPLOSION_LARGE);
+	for (int i = 0; i < 12; i++) {
+		int dx = (int)RandomRange(2 * RAID_BOMB_REACH + 1) - RAID_BOMB_REACH;
+		int dy = (int)RandomRange(2 * RAID_BOMB_REACH + 1) - RAID_BOMB_REACH;
+		int x = Clamp(cx + dx, 0, (int)Map::MaxX());
+		int y = Clamp(cy + dy, 0, (int)Map::MaxY());
+		CreateEffectVehicleAbove(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, 0, EV_EXPLOSION_LARGE);
+	}
+	if (_settings_client.sound.disaster) SndPlayTileFx(SND_12_EXPLOSION, tile);
+
+	/* The vehicles, collected first: wrecking one changes what iterating the
+	 * rest would see. A train with any of itself within is wrecked whole. */
+	std::set<Vehicle *> hit;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		switch (v->type) {
+			case VehicleType::Train:
+			case VehicleType::Road:
+			case VehicleType::Aircraft:
+				break;
+			default:
+				continue;
+		}
+		if (!within(v->tile)) continue;
+		if (v->vehstatus.Any({VehState::Crashed, VehState::Hidden})) continue; // in a shed, aboard something, already gone
+		if (v->type == VehicleType::Aircraft && (!Aircraft::From(v)->IsNormalAircraft() || Aircraft::From(v)->state == FLYING)) continue;
+		hit.insert(v->First());
+	}
+	uint wrecked = 0;
+	for (Vehicle *v : hit) {
+		switch (v->type) {
+			case VehicleType::Train:
+				if (Train::From(v)->IsWrecked()) continue;
+				TrainCrashed(Train::From(v));
+				break;
+			case VehicleType::Road:
+				if (RoadVehicle::From(v)->IsCarried()) continue;
+				v->Crash();
+				break;
+			case VehicleType::Aircraft:
+				v->Crash();
+				for (Vehicle *u = v; u != nullptr; u = u->Next()) u->cargo.Truncate();
+				break;
+			default:
+				continue;
+		}
+		wrecked++;
+	}
+
+	/* Industries and houses under it, collected before anything is pulled
+	 * down under the walk. */
+	std::set<IndustryID> caught;
+	std::vector<TileIndex> houses;
+	for (int y = std::max(cy - RAID_BOMB_REACH, 0); y <= std::min(cy + RAID_BOMB_REACH, (int)Map::MaxY()); y++) {
+		for (int x = std::max(cx - RAID_BOMB_REACH, 0); x <= std::min(cx + RAID_BOMB_REACH, (int)Map::MaxX()); x++) {
+			TileIndex t = TileXY(x, y);
+			if (IsTileType(t, TileType::Industry)) caught.insert(GetIndustryIndex(t));
+			if (IsTileType(t, TileType::House)) houses.push_back(t);
+		}
+	}
+	for (IndustryID id : caught) {
+		Industry *i = Industry::GetIfValid(id);
+		if (i == nullptr) continue;
+		std::string name = i->GetCachedName();
+		TileIndex where = i->location.tile;
+		uint before = i->health;
+		uint raid = (100 - before) / RAID_HURT + 1;
+		DamageIndustry(i, 100);
+		RaidIndustryNews(who, name, where, raid, true);
+	}
+	std::map<TownID, std::pair<uint, uint>> town_losses; // people, houses
+	for (TileIndex t : houses) {
+		if (!IsTileType(t, TileType::House)) continue; // came down with a neighbour
+		Town *town = Town::GetByTile(t);
+		uint before_pop = town->cache.population;
+		ClearTownHouse(town, t);
+		if (IsTileType(t, TileType::Clear)) MakeClear(t, ClearGround::Rough, 3);
+		MarkTileDirtyByTile(t);
+		auto &loss = town_losses[town->index];
+		loss.first += before_pop - town->cache.population;
+		loss.second++;
+	}
+	if (Company::IsValidID(who)) {
+		for (const auto &[town_id, loss] : town_losses) {
+			AddTileNewsItem(GetEncodedString(STR_NEWS_RAID_TOWN, static_cast<CompanyID>(who), town_id, loss.first, loss.second),
+					NewsType::Accident, tile);
+		}
+	}
+
+	/* The errand is over, as after smoke (DropRaidSmoke()). */
+	_show_industry_health = false;
+	_industry_health_until = TimerGameEconomy::date + RAID_HEALTH_SHOWN_DAYS;
+	InvalidateWindowClassesData(WindowClass::IndustryView);
+	SetWindowClassesDirty(WindowClass::IndustryView);
+	InvalidateWindowClassesData(WindowClass::VehicleView);
+	SetWindowClassesDirty(WindowClass::VehicleView);
+
+	if (_show_train_orientation) {
+		IConsolePrint(CC_INFO, "atomovka: na ({},{}) - vraku {}, prumyslu zbourano {}, domu srovnano {}",
+				cx, cy, wrecked, (uint)caught.size(), (uint)houses.size());
+	}
+}
+
+/**
+ * Drop what an aircraft carries over its target: a bomb for every car of
+ * explosives aboard, one after another along its line of flight, two tiles
+ * apart -- the player's rule, as many bombs as cars -- and each car's
+ * explosives gone with its bomb; or, with none aboard, the smoke.
+ *
+ * @param carrier the aircraft
+ * @param tile    the target
+ * @param facing  which way it is flying
+ */
+void DropRaidPayload(Vehicle *carrier, TileIndex tile, Direction facing)
+{
+	std::vector<RoadVehicle *> cars = ExplosiveCarsAboard(carrier);
+	if (cars.empty()) {
+		DropRaidSmoke(tile, facing, carrier->owner);
+		return;
+	}
+	TileIndexDiffC step = TileIndexDiffCByDiagDir(DirToDiagDir(facing));
+	int x = TileX(tile);
+	int y = TileY(tile);
+	for (RoadVehicle *car : cars) {
+		SpendExplosives(car);
+		DropRaidBomb(TileXY(Clamp(x, 0, (int)Map::MaxX()), Clamp(y, 0, (int)Map::MaxY())), carrier->owner);
+		x += 2 * step.x;
+		y += 2 * step.y;
+	}
+}
+
 /**
  * Is anybody already out on an errand?
  *
@@ -507,10 +666,14 @@ CommandCost CmdRaid(DoCommandFlags flags, TileIndex tile, VehicleID veh_id)
 
 	/* The player's rule: an empty aircraft, and one that is on the ground.
 	 * Empty is asked of the whole aircraft, its mail compartment included --
-	 * a plane with something aboard is carrying it somewhere. */
+	 * a plane with something aboard is carrying it somewhere. Unless what it
+	 * carries is a car of explosives: then it is loaded with the bomb itself,
+	 * the player's word, and goes whatever else is aboard. */
 	if (a->state >= TAKEOFF && a->state <= HELIENDLANDING) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND);
-	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
-		if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
+	if (!CarriesExplosiveCar(a)) {
+		for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+			if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
+		}
 	}
 
 	if (!flags.Test(DoCommandFlag::Execute)) return CommandCost();
@@ -576,6 +739,11 @@ static void SetupMarijuanaPlantation()
 		}
 	}
 	spec.produced_cargo_label[0] = CT_MARIJUANA;
+	/* And hemp fibre from the same plants, as much again: the player's chain
+	 * to explosives starts here (the oil refinery takes it, see
+	 * ResolveExtraIndustryCargoes()). */
+	spec.produced_cargo_label[1] = CT_HEMP_FIBRE;
+	spec.production_rate[1] = spec.production_rate[0];
 	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
 	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
 	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), fruit.appear_ingame[to_underlying(LandscapeType::Tropic)]);
@@ -656,9 +824,112 @@ static void SetupCoffeeshop()
  * station by it takes it. Called once the cargoes are set
  * (FinaliseIndustriesArray()).
  */
+/**
+ * Give one of the game's own industries a cargo to take and, if asked, one to
+ * make of it (economy.extra_industries): what it is given of the new input
+ * comes out as the new output and nothing else, and its own inputs make what
+ * they always made. It takes the new cargo at every tile that takes its first
+ * own cargo, as much of it. An industry a set has put in its place is the
+ * set's to fit out.
+ * @param type the industry
+ * @param in   the cargo it is to take
+ * @param out  the cargo it is to make of it, or INVALID_CARGO for none
+ */
+static void AddExtraIndustryInput(IndustryType type, CargoType in, CargoType out)
+{
+	IndustrySpec &spec = _industry_specs[type];
+	if (!spec.enabled || spec.grf_prop.HasGrfFile() || !IsValidCargoType(in)) return;
+	if (std::ranges::find(spec.accepts_cargo, in) != spec.accepts_cargo.end()) return;
+	CargoType own = spec.accepts_cargo[0];
+
+	/* The first free places in the lists: the industry's own come first. */
+	auto in_free = std::ranges::find_if(spec.accepts_cargo, [](CargoType c) { return !IsValidCargoType(c); });
+	if (in_free == spec.accepts_cargo.end()) return;
+	size_t in_at = in_free - spec.accepts_cargo.begin();
+	*in_free = in;
+	std::fill(std::begin(spec.input_cargo_multiplier[in_at]), std::end(spec.input_cargo_multiplier[in_at]), 0);
+
+	if (IsValidCargoType(out)) {
+		auto out_free = std::ranges::find_if(spec.produced_cargo, [](CargoType c) { return !IsValidCargoType(c); });
+		if (out_free != spec.produced_cargo.end()) {
+			size_t out_at = out_free - spec.produced_cargo.begin();
+			*out_free = out;
+			spec.production_rate[out_at] = 0; // made only of what it is given
+			for (size_t i = 0; i < std::size(spec.accepts_cargo); i++) spec.input_cargo_multiplier[i][out_at] = 0;
+			spec.input_cargo_multiplier[in_at][out_at] = 256;
+		}
+	}
+
+	if (!IsValidCargoType(own)) return;
+	for (const IndustryTileLayout &layout : spec.layouts) {
+		for (const IndustryTileLayoutTile &t : layout) {
+			if (t.gfx >= NEW_INDUSTRYTILEOFFSET) continue;
+			IndustryTileSpec &tile = _industry_tile_specs[t.gfx];
+			if (tile.grf_prop.HasGrfFile()) continue;
+			auto takes_own = std::ranges::find(tile.accepts_cargo, own);
+			if (takes_own == tile.accepts_cargo.end()) continue;
+			if (std::ranges::find(tile.accepts_cargo, in) != tile.accepts_cargo.end()) continue;
+			auto free = std::ranges::find_if(tile.accepts_cargo, [](CargoType c) { return !IsValidCargoType(c); });
+			if (free == tile.accepts_cargo.end()) continue;
+			*free = in;
+			tile.acceptance[free - tile.accepts_cargo.begin()] = tile.acceptance[takes_own - tile.accepts_cargo.begin()];
+		}
+	}
+}
+
+/**
+ * The player's chain from the marijuana plantation to the bomb: the oil
+ * refinery makes explosives of hemp fibre, beside goods of oil, and the banks
+ * take the explosives -- not the coffeeshop, the player's word: explosives
+ * there would bring the police.
+ */
+static void ResolveExplosivesChain()
+{
+	CargoType fibre = GetCargoTypeByLabel(CT_HEMP_FIBRE);
+	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
+	if (!IsValidCargoType(fibre) || !IsValidCargoType(explosives)) return;
+	AddExtraIndustryInput(IT_OIL_REFINERY, fibre, explosives);
+	AddExtraIndustryInput(IT_BANK_TEMP, explosives, INVALID_CARGO);
+	AddExtraIndustryInput(IT_BANK_TROPIC_ARCTIC, explosives, INVALID_CARGO);
+}
+
+/**
+ * An industry built before the extra industries had the cargoes they have now
+ * -- the refinery before it took hemp fibre, the plantation before it grew
+ * it, a bank before it took explosives -- is given what its kind now
+ * takes and makes, at the places the kind has them, so the deliveries are
+ * counted against the right input and output. Nothing it had is moved or
+ * taken away. Called after a game is loaded.
+ */
+void UpdateExtraIndustryCargoes()
+{
+	if (!_settings_game.economy.extra_industries) return;
+	for (Industry *i : Industry::Iterate()) {
+		if (i->type != IT_OIL_REFINERY && i->type != IT_BANK_TEMP && i->type != IT_BANK_TROPIC_ARCTIC &&
+				i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP) continue;
+		const IndustrySpec *spec = GetIndustrySpec(i->type);
+		if (spec->grf_prop.HasGrfFile()) continue;
+		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
+			CargoType cargo = spec->accepts_cargo[index];
+			if (!IsValidCargoType(cargo) || index < i->accepted.size() || i->IsCargoAccepted(cargo)) continue;
+			while (i->accepted.size() < index) i->accepted.emplace_back().cargo = INVALID_CARGO;
+			i->accepted.emplace_back().cargo = cargo;
+		}
+		for (size_t index = 0; index < std::size(spec->produced_cargo); index++) {
+			CargoType cargo = spec->produced_cargo[index];
+			if (!IsValidCargoType(cargo) || index < i->produced.size() || i->IsCargoProduced(cargo)) continue;
+			while (i->produced.size() < index) i->produced.emplace_back().cargo = INVALID_CARGO;
+			Industry::ProducedCargo &p = i->produced.emplace_back();
+			p.cargo = cargo;
+			p.rate = spec->production_rate[index];
+		}
+	}
+}
+
 void ResolveExtraIndustryCargoes()
 {
 	if (!_settings_game.economy.extra_industries) return;
+	ResolveExplosivesChain();
 	IndustrySpec &spec = _industry_specs[IT_COFFEESHOP];
 	if (!spec.enabled || spec.grf_prop.HasGrfFile()) return;
 	IndustryTileSpec &tile = _industry_tile_specs[GFX_COFFEESHOP];
@@ -845,7 +1116,11 @@ static LandscapeTypes AcceptingClimates()
 std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 {
 	std::vector<CargoLabel> labels;
-	if (_settings_game.economy.extra_industries) labels.push_back(CT_MARIJUANA);
+	if (_settings_game.economy.extra_industries) {
+		labels.push_back(CT_MARIJUANA);
+		labels.push_back(CT_HEMP_FIBRE);
+		labels.push_back(CT_EXPLOSIVES);
+	}
 	if (IndustryClimatesOn().None()) return labels;
 	auto add = [&labels](const std::vector<CargoLabel> &more) {
 		for (CargoLabel l : more) {

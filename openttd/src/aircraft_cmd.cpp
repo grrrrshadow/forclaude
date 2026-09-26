@@ -892,7 +892,8 @@ static bool AircraftRaidController(Aircraft *v)
 		TileIndex target = v->raid_target;
 		Direction facing = v->direction;
 		v->raid_target = INVALID_TILE;
-		DropRaidSmoke(target, facing, v->owner);
+		/* Smoke, or a bomb for each car of explosives aboard. */
+		DropRaidPayload(v, target, facing);
 
 		/* And home to the shed, which is where the player sent it from and
 		 * where an aircraft with nothing else to do belongs. An aircraft with

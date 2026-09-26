@@ -18,14 +18,17 @@ drawn small: the crosshair is a thin ring, and a ring drawn at sixteen
 pixels comes with half its circle under the "opaque enough" line and breaks
 into dots. Scaled down from fifty pixels it stays a ring.
 
-Two sprites come out of it:
+Three sprites come out of it:
 
 * the button icon, 16x16, which is the size of every button icon in the
   vehicle window -- the orders button, the details button, the depot
   button and the rescue engine are all 16x16, and an icon of another size
   makes its row taller than the rest;
 * the mouse cursor, 32x32, in the palette's brightest red, which is what
-  the player asked for: a red crosshair.
+  the player asked for: a red crosshair;
+* the button icon again, 16x16, in that red: the crosshair of a ship or an
+  aircraft with a car of explosives aboard, so it can be seen at a glance
+  that its raid drops a bomb rather than smoke -- the player's word.
 
 Colour is not read off the drawing. The drawing is black, and asking the
 palette which red is closest to black gets the darkest red there is --
@@ -53,6 +56,7 @@ PALETTE_FROM = HERE / "openttdgui.png"
 SOURCE = HERE / "icons8-crosshair-50.png"
 BUTTON_OUTPUT = HERE / "openttdgui_crosshair.png"
 CURSOR_OUTPUT = HERE / "openttdgui_crosshair_cursor.png"
+ARMED_OUTPUT = HERE / "openttdgui_crosshair_armed.png"
 
 #: Button icons in the vehicle window are 16x16; the cursor is bigger so it
 #: reads as a crosshair on the map.
@@ -111,6 +115,9 @@ def main() -> None:
     # around it is a blob.
     convert(BUTTON_SIZE, BUTTON_OUTPUT, palette, BUTTON_COLOUR, None)
     convert(CURSOR_SIZE, CURSOR_OUTPUT, palette, CURSOR_COLOUR, OUTLINE)
+    # Armed: the button icon in the cursor's red, with no outline for the
+    # same reason as the black one.
+    convert(BUTTON_SIZE, ARMED_OUTPUT, palette, CURSOR_COLOUR, None)
 
 
 if __name__ == "__main__":
