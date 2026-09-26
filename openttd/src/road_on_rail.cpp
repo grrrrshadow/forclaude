@@ -92,14 +92,15 @@ DirectionIndexArray<int> _carried_side_trim{{{ 0, 0, 0, 0, 0, 0, 0, 0 }}};
 static const int ROAD_VEHICLE_NOSE = 3;
 
 /**
- * How much of a ship's own capacity one road vehicle takes up, and how much an
- * aircraft has to hold before it carries one at all. Two numbers chosen
- * against the game's own vehicles: at 40 the small ferry takes two cars and the
- * largest tanker eight, and at 60 the smallest aeroplanes are left out of the
- * fitting while everything from the second one up takes its single car.
+ * How much of a ship's own capacity one road vehicle takes up, and how many
+ * seats of an aircraft one takes. Two numbers chosen against the game's own
+ * vehicles: at 40 the small ferry takes two cars and the largest tanker eight;
+ * at 60 the smallest aeroplanes are left out of the fitting, the next ones
+ * take one car, and the big ones several -- the Darwin 300 five and the
+ * Dinger 200 six, the player's count: six cars of explosives, six bombs.
  */
 static const uint SHIP_CAPACITY_PER_ROAD_VEHICLE = 40;
-static const uint AIRCRAFT_CAPACITY_FOR_ONE_ROAD_VEHICLE = 60;
+static const uint AIRCRAFT_CAPACITY_PER_ROAD_VEHICLE = 60;
 
 /**
  * How long a wagon is, counting the pieces a set builds one wagon out of: a
@@ -127,9 +128,8 @@ static uint WagonUnitLength(const Train *wagon)
  * carries one for every 40 of whatever it otherwise holds, which puts the
  * game's own ships between two (a small ferry) and eight (the largest tanker)
  * and scales with a set's ships without knowing any of their names. An
- * aircraft carries exactly one, and only if it is big enough to be worth it --
- * the player asked for one car per aircraft, and a four-seater is not a car
- * ferry.
+ * aircraft carries one for every 60 seats -- a four-seater is not a car ferry,
+ * and a big one takes several, as the player asked.
  *
  * Whatever comes out as none is never offered the fitting at all
  * (CanCarryRoadVehicles()), so the purchase list never shows a ship that would
@@ -149,7 +149,7 @@ uint RoadVehiclesCarriedBy(const Engine *e, const Vehicle *v)
 			return GetEngineProperty(e->index, PROP_SHIP_CARGO_CAPACITY, e->VehInfo<ShipVehicleInfo>().capacity, v) / SHIP_CAPACITY_PER_ROAD_VEHICLE;
 
 		case VehicleType::Aircraft:
-			return GetEngineProperty(e->index, PROP_AIRCRAFT_PASSENGER_CAPACITY, e->VehInfo<AircraftVehicleInfo>().passenger_capacity, v) >= AIRCRAFT_CAPACITY_FOR_ONE_ROAD_VEHICLE ? 1 : 0;
+			return GetEngineProperty(e->index, PROP_AIRCRAFT_PASSENGER_CAPACITY, e->VehInfo<AircraftVehicleInfo>().passenger_capacity, v) / AIRCRAFT_CAPACITY_PER_ROAD_VEHICLE;
 
 		default:
 			return 0;
@@ -278,6 +278,15 @@ void ConvertCarFerries()
 		s->cargo_cap = e->DetermineCapacity(s);
 		s->refit_cap = s->cargo_cap;
 		LogAnomaly("Lod {}: prestavena na auta, dostala zpatky pasazery ({}) a auta veze k nim", s->unitnumber, s->cargo_cap);
+	}
+	/* Aircraft fitted for cars from when every one carried a single car take
+	 * as many as their seats give now (RoadVehiclesCarriedBy()). */
+	for (Aircraft *a : Aircraft::Iterate()) {
+		if (!a->IsNormalAircraft() || a->cargo_type != _road_vehicle_cargo) continue;
+		uint room = RoadVehiclesCarriedBy(a->GetEngine(), a);
+		if (room <= a->cargo_cap) continue;
+		a->cargo_cap = room;
+		a->refit_cap = room;
 	}
 }
 

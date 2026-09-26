@@ -772,7 +772,7 @@ static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
  * tourists and alcohol (the sets name rum and alcohol alike). Taken where the
  * game has them; a label no set brought is left out.
  */
-static const std::array<CargoLabel, 5> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}};
+static const std::array<CargoLabel, 6> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}, CT_EXPLOSIVES};
 
 /**
  * The cargoes the coffeeshop takes where the game has them.
@@ -879,9 +879,9 @@ static void AddExtraIndustryInput(IndustryType type, CargoType in, CargoType out
 
 /**
  * The player's chain from the marijuana plantation to the bomb: the oil
- * refinery makes explosives of hemp fibre, beside goods of oil, and the banks
- * take the explosives -- not the coffeeshop, the player's word: explosives
- * there would bring the police.
+ * refinery makes explosives of hemp fibre, beside goods of oil. The
+ * coffeeshop takes the explosives (COFFEESHOP_CARGOES) -- the player's last
+ * word, after banks and gangsters were thought about and put aside.
  */
 static void ResolveExplosivesChain()
 {
@@ -889,14 +889,12 @@ static void ResolveExplosivesChain()
 	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
 	if (!IsValidCargoType(fibre) || !IsValidCargoType(explosives)) return;
 	AddExtraIndustryInput(IT_OIL_REFINERY, fibre, explosives);
-	AddExtraIndustryInput(IT_BANK_TEMP, explosives, INVALID_CARGO);
-	AddExtraIndustryInput(IT_BANK_TROPIC_ARCTIC, explosives, INVALID_CARGO);
 }
 
 /**
  * An industry built before the extra industries had the cargoes they have now
  * -- the refinery before it took hemp fibre, the plantation before it grew
- * it, a bank before it took explosives -- is given what its kind now
+ * it, the coffeeshop before it took explosives -- is given what its kind now
  * takes and makes, at the places the kind has them, so the deliveries are
  * counted against the right input and output. Nothing it had is moved or
  * taken away. Called after a game is loaded.
@@ -905,8 +903,7 @@ void UpdateExtraIndustryCargoes()
 {
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
-		if (i->type != IT_OIL_REFINERY && i->type != IT_BANK_TEMP && i->type != IT_BANK_TROPIC_ARCTIC &&
-				i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP) continue;
+		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {

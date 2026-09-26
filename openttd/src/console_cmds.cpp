@@ -9422,6 +9422,15 @@ static bool ConTestExplosives(std::span<std::string_view> argv)
 			if (e->info.refit_mask.Test(explosives) && e->IsEnabled()) IConsolePrint(CC_DEFAULT, "testvybusniny: auto {} '{}'", e->index, GetString(e->info.string_id));
 		}
 	}
+	/* How many cars -- and so how many bombs -- each aeroplane takes: one for
+	 * every 60 seats (RoadVehiclesCarriedBy()). */
+	std::string aircraft;
+	for (const Engine *e : Engine::IterateType(VehicleType::Aircraft)) {
+		if (!e->IsEnabled()) continue;
+		uint cars = RoadVehiclesCarriedBy(e, nullptr);
+		if (cars != 0) aircraft += fmt::format(" {}:{}", e->VehInfo<AircraftVehicleInfo>().passenger_capacity, cars);
+	}
+	IConsolePrint(CC_DEFAULT, "testvybusniny: letadla mist:aut{}", aircraft);
 	return true;
 }
 

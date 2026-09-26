@@ -89,7 +89,7 @@ static constexpr CargoLabel CT_ROLA{'ROLA'};
 static constexpr CargoLabel CT_MARIJUANA{'MARI'};
 /** Hemp fibre, the marijuana plantation's second cargo, which the oil refinery makes into explosives; the label ECS and FIRS give fibre crops. */
 static constexpr CargoLabel CT_HEMP_FIBRE{'FICR'};
-/** Explosives, of the oil refinery from hemp fibre, taken by the banks and dropped as a bomb from a car aboard a ship or an aircraft; the label FIRS gives them. */
+/** Explosives, of the oil refinery from hemp fibre, taken by the coffeeshop and dropped as a bomb from a car aboard a ship or an aircraft; the label FIRS gives them. */
 static constexpr CargoLabel CT_EXPLOSIVES{'BOOM'};
 
 static constexpr CargoLabel CT_INVALID{UINT32_MAX}; ///< Invalid cargo type.

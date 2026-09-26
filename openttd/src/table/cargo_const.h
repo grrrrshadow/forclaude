@@ -131,7 +131,7 @@ static const CargoSpec _default_cargo[] = {
 
 	/* Hemp fibre (CT_HEMP_FIBRE), the marijuana plantation's second cargo, and
 	 * explosives (CT_EXPLOSIVES), which the oil refinery makes of it and the
-	 * banks take -- both
+	 * coffeeshop takes -- both
 	 * with economy.extra_industries, placed the way marijuana is. The fibre
 	 * is bulk and wants a covered wagon, so the coal wagons and lorries of
 	 * the game and every set's covered and bulk wagons take it. Explosives

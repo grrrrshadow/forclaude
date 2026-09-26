@@ -28,7 +28,7 @@
  * than on top: nothing of it is drawn, and the only sign of it is that the
  * vessel is that much fuller, which is what the player asked for. A ship holds
  * several -- one for every 40 of whatever it otherwise holds -- and an aircraft
- * exactly one, and only if it seats 60; the ones that come out at none are
+ * one for every 60 seats; the ones that come out at none are
  * never offered the fitting at all (RoadVehiclesCarriedBy(),
  * CanCarryRoadVehicles()). A vessel keeps no list of what it carries: the cars
  * say where they are, and counting them is asked only when one wants to get on.

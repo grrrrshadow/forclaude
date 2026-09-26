@@ -1606,7 +1606,7 @@ testautovlak
 testzelenest" 50 -c $GETS_CFG
 # The explosives chain (economy.extra_industries): the marijuana plantation
 # grows hemp fibre beside the marijuana, the oil refinery takes the fibre and
-# makes explosives beside goods, the banks take the explosives; the armoured
+# makes explosives beside goods, the coffeeshop takes the explosives; the armoured
 # lorries and vans can be fitted for them, ships and aircraft cannot (they
 # carry them only inside a car). testvybusniny says so, and says fibre was
 # grown last month. odmitnuto is zero.
