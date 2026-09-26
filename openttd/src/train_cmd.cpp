@@ -2696,6 +2696,7 @@ static void NormaliseTrainHead(Train *head)
 static CommandCost TryConsistSplice(DoCommandFlags flags, Train *src, Train *dst, bool move_chain, bool keep_absorbed_identity = false);
 static void TrainEnterStation(Train *consist, StationID station);
 static StationID StationUnderChain(const Train *chain);
+static bool RakeLiesOnPlatform(const Train *chain);
 static void AdvanceWagonsBeforeSwap(Train *moving_front);
 static void AdvanceWagonsAfterSwap(Train *moving_front);
 void ReverseTrainSwapVehicles(Train *v);
@@ -3371,11 +3372,14 @@ bool IsFetchingCasualty(const Train *v)
 {
 	if (!IsOnRescueRun(v)) return false;
 	const Train *casualty = Train::GetIfValid(v->rescue_target);
-	/* Wagons called for are fetched the way any collector fetches a rake --
-	 * an ordinary run on an ordinary reservation, stopping at signals like
-	 * everybody else. The rescue road rules are for a train that stopped on
-	 * the open line with the traffic piling up behind it. */
-	if (casualty != nullptr && casualty->First()->IsFreeWagon()) return false;
+	/* Wagons called for at a platform are fetched the way any collector
+	 * fetches a rake -- an ordinary run on an ordinary reservation, stopping
+	 * at signals like everybody else. The rescue road rules are for a train
+	 * that stopped on the open line with the traffic piling up behind it --
+	 * and for a rake that stands so, or hangs off its platform onto the
+	 * points (RakeLiesOnPlatform()): the player's save had one, and the tow
+	 * asked for a road to its station for the rest of the game. */
+	if (casualty != nullptr && casualty->First()->IsFreeWagon() && RakeLiesOnPlatform(casualty->First())) return false;
 	/* In hand means part of this very consist. */
 	return casualty == nullptr || casualty->First() != v;
 }
@@ -5883,6 +5887,37 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 }
 
 /**
+ * Do the two meeting ends stand on the very next pieces of rail along one
+ * track -- one step of the track follower from one lands on the other's tile
+ * and track? Curves included: two ends met so lie along one path, and the
+ * close-up walk pulls the one along it behind the other, the same as on a
+ * straight. What it rules out is what "not clean" was written for, two ends
+ * on one curved piece overlapping (AreCoupleEndsRailConnected() says yes to
+ * those, being within a few steps).
+ * @param a the vehicle at the meeting end of one consist
+ * @param b the vehicle at the meeting end of the other
+ * @return whether they stand on consecutive pieces of one track
+ */
+static bool AreCoupleEndsAdjacentOnRail(const Train *a, const Train *b)
+{
+	if (a->tile == b->tile) return false;
+	for (const auto &[from, to] : {std::pair{a, b}, std::pair{b, a}}) {
+		if (from->track.Any({Track::Depot, Track::Wormhole}) || to->track.Any({Track::Depot, Track::Wormhole})) return false;
+		Track target = TrackBitsToTrack(to->track);
+		for (Trackdir td : TRACKDIR_BIT_MASK) {
+			if (TrackdirToTrack(td) != TrackBitsToTrack(from->track)) continue;
+			CFollowTrackRail ft(from->First());
+			if (!ft.Follow(from->tile, td)) continue;
+			if (ft.new_tile != to->tile) continue;
+			for (Trackdir cand : ft.new_td_bits) {
+				if (TrackdirToTrack(cand) == target) return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
  * Lift a casualty off wherever it is lying and lay it down along the rails at
  * the rescue engine's coupling end, one vehicle per tile, so the two can be
  * coupled as if the engine had driven right up to it.
@@ -6205,10 +6240,15 @@ static void CloseUpCoupledConsist(Train *consist)
 			Train *next = u->GetMovingNext();
 			if (next == nullptr) break;
 
-			int x_diff = u->x_pos - next->x_pos;
-			int y_diff = u->y_pos - next->y_pos;
+			/* Measured the way the game measures a train's spacing
+			 * (CheckTrainsLengths()): the larger of the two differences. A
+			 * vehicle on a curve piece steps one pixel each way at a time,
+			 * so two of them a vehicle's length apart stand that far apart
+			 * in both x and y. Measured as the crow flies they were pulled
+			 * to within five of each other on every curve, and the game
+			 * reported the train as broken and paused at every load. */
 			int want = u->CalcNextVehicleOffset();
-			if (x_diff * x_diff + y_diff * y_diff > want * want) {
+			if (std::max(abs(u->x_pos - next->x_pos), abs(u->y_pos - next->y_pos)) > want) {
 				behind_gap = next;
 				break;
 			}
@@ -6224,18 +6264,47 @@ static void CloseUpCoupledConsist(Train *consist)
 		}
 	}
 
+	/* And the other way: two pieces closer than a vehicle's length, which is
+	 * how every coupling ended -- a train stops against its partner a pixel
+	 * inside it on the straight (the collision check stops it a pixel short
+	 * of the length), four inside it round a curve -- and stayed so, the
+	 * pieces overlapping for the rest of the game and the game reporting the
+	 * train as broken at every load. The part ahead of the pinch is driven
+	 * on a step at a time, the way a train leaving a shed is spread out
+	 * (AdvanceWagonsAfterSwap()), until the pinch is a length wide. Not
+	 * turned round at the end of the line: a refusal there ends it. */
+	for (uint spread = 0; spread < 4 * TILE_SIZE; spread++) {
+		Train *pinch = nullptr;
+		for (Train *u = consist->GetMovingFront(); u != nullptr; u = u->GetMovingNext()) {
+			Train *next = u->GetMovingNext();
+			if (next == nullptr) break;
+			if (u->track.Any({Track::Depot, Track::Wormhole}) || next->track.Any({Track::Depot, Track::Wormhole})) continue;
+			if (std::max(abs(u->x_pos - next->x_pos), abs(u->y_pos - next->y_pos)) < u->CalcNextVehicleOffset()) {
+				pinch = next;
+				break;
+			}
+		}
+		if (pinch == nullptr) break;
+		if (!TrainController(consist->GetMovingFront(), pinch, false)) {
+			if (_show_train_orientation) {
+				IConsolePrint(CC_ERROR, "Vlak {}: rozestup odmitnut pred clankem {} na ({},{}) po {} krocich", consist->unitnumber,
+						pinch->index.base(), TileX(pinch->tile), TileY(pinch->tile), spread);
+			}
+			break;
+		}
+	}
+
 	/* A hole left here is a crash later -- a follower that enters a tile after
 	 * the vehicle ahead has gone into a depot has no track to follow -- so a
 	 * consist that did not close says so, whatever the console is set to. */
 	for (const Train *u = consist->GetMovingFront(); u != nullptr; u = u->GetMovingNext()) {
 		const Train *next = u->GetMovingNext();
 		if (next == nullptr) break;
-		int x_diff = u->x_pos - next->x_pos;
-		int y_diff = u->y_pos - next->y_pos;
+		int gap = std::max(abs(u->x_pos - next->x_pos), abs(u->y_pos - next->y_pos));
 		int want = u->CalcNextVehicleOffset();
-		if (x_diff * x_diff + y_diff * y_diff > want * want) {
+		if (gap > want) {
 			IConsolePrint(CC_ERROR, "Vlak {}: souprava nedotazena - mezi clanky {} a {} zbyva {} px (chce {}), kroku {} z {}",
-					consist->unitnumber, u->index.base(), next->index.base(), (int)std::sqrt(x_diff * x_diff + y_diff * y_diff), want, step, max_steps);
+					consist->unitnumber, u->index.base(), next->index.base(), gap, want, step, max_steps);
 			break;
 		}
 	}
@@ -7410,9 +7479,10 @@ static void TryDispatchRescueEngine(Train *tow)
 		if (u->track != Track::Depot) { target_tile = u->tile; break; }
 	}
 	tow->SetDestTile(target_tile);
-	StationID rake_station = nearest->IsFreeWagon() ? StationUnderChain(nearest) : StationID::Invalid();
+	StationID rake_station = nearest->IsFreeWagon() && RakeLiesOnPlatform(nearest) ? StationUnderChain(nearest) : StationID::Invalid();
 	if (rake_station != StationID::Invalid()) {
-		/* Wagons standing at a platform: the tow goes for them the way any
+		/* Wagons standing at a platform -- the whole of them, see
+		 * RakeLiesOnPlatform(): the tow goes for them the way any
 		 * collector goes for a rake, on a station order to couple. That is
 		 * the one search that knows how to find a partner on a platform --
 		 * a platform is one step to the path search, and a bare tile as the
@@ -8383,6 +8453,13 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 	bool ends_clean = ends_rail_connected &&
 			(on_straight_rail(l_end) || l_end->track == Track::Depot) &&
 			(on_straight_rail(t_end) || t_end->track == Track::Depot);
+	/* A rescue met round a curve is clean enough when the two ends stand on
+	 * consecutive pieces of the one track (AreCoupleEndsAdjacentOnRail()):
+	 * the casualty already lies along the tow's road, and there may be no
+	 * room to lay it out afresh -- the player's rake hung off the end of a
+	 * dead-end platform onto the curve, with three tiles of platform for
+	 * seven wagons, and the tow stood against it refusing until it gave up. */
+	if (!ends_clean && tow != nullptr && ends_rail_connected && AreCoupleEndsAdjacentOnRail(l_end, t_end)) ends_clean = true;
 	if (!ends_clean && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: konce spoje nejsou ciste - navaznost {}, konec A ({},{}) kolej {:#x}, konec B ({},{}) kolej {:#x}",
 				(collector != nullptr ? collector : leading)->unitnumber, ends_rail_connected ? "ano" : "ne",
@@ -8755,6 +8832,28 @@ static StationID StationUnderChain(const Train *chain)
 		if (IsRailStationTile(u->tile)) return GetStationIndex(u->tile);
 	}
 	return StationID::Invalid();
+}
+
+/**
+ * Does the whole of a rake stand on the platforms of one station? A rake
+ * hanging off the end of its platform onto the points -- a decouple gone wrong
+ * left one so, with an engine riding inside it -- is not to be had by a
+ * station order: the collector's search looks for it along the platform, and
+ * the tile its tail stands on is the one tile the road in has to cross. Such
+ * a rake is fetched the way a breakdown is, by its tile along the track it
+ * stands on (IsFetchingCasualty()).
+ * @param chain head of the rake
+ * @return whether every piece of it stands on a platform of the same station
+ */
+static bool RakeLiesOnPlatform(const Train *chain)
+{
+	StationID station = StationID::Invalid();
+	for (const Train *u = chain; u != nullptr; u = u->Next()) {
+		if (!IsRailStationTile(u->tile)) return false;
+		if (station == StationID::Invalid()) station = GetStationIndex(u->tile);
+		if (GetStationIndex(u->tile) != station) return false;
+	}
+	return station != StationID::Invalid();
 }
 
 /**

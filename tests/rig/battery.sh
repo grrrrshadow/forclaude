@@ -761,6 +761,21 @@ testpauza
 testprojet 31
 testporucha 32
 testbrzda 32" 12000 -g $S/vlak31.sav
+# Player's save: a rake with an engine riding inside it (a decouple gone wrong)
+# hangs off the west end of a dead-end platform onto the curve, and the player
+# called a tow for it. The tow's station order never found it -- the search
+# looked along the platform, and the tile the rake's tail stands on is the one
+# the road in has to cross -- so it is fetched by its tile, as a breakdown is
+# (RakeLiesOnPlatform()); met round the curve with no room to lay it out, the
+# coupling is clean enough on consecutive pieces of one track; and the joined
+# train is spread to a length between every two pieces (CloseUpCoupledConsist)
+# -- the save loaded with two trains the game reports as broken and pauses for,
+# coupled a pixel too close by an older build; testdelky finds none at the end.
+# odtazeno 1; the one record line is the tow giving up its saved station order
+# before it is sent again.
+run_scene radasmasinkou "vlak123 on
+testpauza
+testza 12000 testdelky" 12200 -g $S/rada_masinka.sav
 # Player's save (domek128.sav, see README.md): made before the game had its own
 # industries, loaded and saved again by a build that had them, with marijuana
 # waiting at a station in cargo slot 126. Read again, it brought the game down

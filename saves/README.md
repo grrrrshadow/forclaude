@@ -51,6 +51,11 @@ přes `-g` a scény jsou v baterii.
   po spojení `testzatik 2450 testotoc 5`) a 4.25 (roztržená porucha:
   lože přes nástupiště, krátké dotažení). Scény `odtahotoc`,
   `odtahvyhybka`.
+- `rada_s_masinkou.sav` — řada vagonků s mašinkou 42 uvnitř (špatně
+  připojená lokomotiva, chyba hráče) visí ze západního konce slepého
+  nástupiště (32–34,67) na oblouk (31,67); hráč pro ni zavolal odtahovku 7
+  z depa (26,64). Dva vlaky hra při načtení hlásí jako „neplatnou délku“
+  (spojené o pixel blíž starším buildem). Scéna `radasmasinkou` (§109).
 - `rig.sav` — hráčův zkušební polygon (9. 9., druhé vydání): nádraží 1
   uprostřed (96–98,17–22) s výjezdy na obě strany, nádraží 2 na západě a 3
   na východě, dvoukolejný koridor po y=17/18. Depa: 0 (86,17) vlaky 1–8,

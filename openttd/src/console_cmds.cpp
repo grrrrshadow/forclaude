@@ -3734,7 +3734,7 @@ static bool ConTestCoupleState(std::span<std::string_view> argv)
 					t->unitnumber, t->IsWrecked() ? " (VRAK)" : (t->breakdown_ctr == 1 ? " (porouchana)" : ""),
 					t->IsInDepot() ? "v depu" : fmt::format("na ({},{})", TileX(t->tile), TileY(t->tile)),
 					cil == nullptr ? "zadny" : fmt::format("vlak {}", cil->unitnumber),
-					cil == nullptr ? "" : (IsFetchingCasualty(t) ? "(jede pro ni)" : "(uz ji veze)"),
+					cil == nullptr ? "" : (IsRescueTargetAttached(t) ? "(uz ji veze)" : "(jede pro ni)"),
 					drzi[to_underlying(t->rescue_hold)]);
 			continue;
 		}
@@ -8538,6 +8538,41 @@ static bool ConTestClearWreck(std::span<std::string_view> argv)
 }
 
 /**
+ * The game's own test of a train's spacing (CheckTrainsLengths()), train by
+ * train and pair by pair, said out loud: which train, which two pieces, how
+ * far apart they stand and how far they should. The game's own says only
+ * that a train is broken and pauses -- at every load, for a train coupled
+ * round a curve by an older build. Each such train is refused (ODMITNUTO),
+ * so a scene can count them.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestLengths(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "List every train whose pieces stand wrongly spaced. Usage: 'testdelky'.");
+		return true;
+	}
+	uint bad = 0;
+	uint trains = 0;
+	for (const Train *v : Train::Iterate()) {
+		if (v->First() != v || v->vehstatus.Test(VehState::Crashed)) continue;
+		trains++;
+		for (const Train *u = v->GetMovingFront(), *w = v->GetMovingNext(); w != nullptr; u = w, w = w->GetMovingNext()) {
+			if (u->track == Track::Depot || w->track == Track::Depot) continue;
+			int gap = std::max(abs(u->x_pos - w->x_pos), abs(u->y_pos - w->y_pos));
+			if (gap == u->CalcNextVehicleOffset()) continue;
+			IConsolePrint(CC_ERROR, "testdelky: ODMITNUTO - {} {} na ({},{}): clanky {} ({},{}) a {} ({},{}) stoji {} od sebe, maji {}",
+					v->IsFrontEngine() ? "vlak" : "rada", v->IsFrontEngine() ? v->unitnumber : 0, TileX(v->tile), TileY(v->tile),
+					u->index.base(), u->x_pos, u->y_pos, w->index.base(), w->x_pos, w->y_pos, gap, u->CalcNextVehicleOffset());
+			bad++;
+			break;
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testdelky: vlaku a rad {}, spatne rozestavenych {}", trains, bad);
+	return true;
+}
+
+/**
  * The rail vehicles whose name has a piece of text in it: the name the set
  * gives the vehicle and the name the purchase list shows, which a set may
  * change over the years (CZTR's Pasy shows as Sgs from 1980). For finding the
@@ -12706,6 +12741,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
 	IConsole::CmdRegister("testzelenest",            ConTestGreenSt);
 	IConsole::CmdRegister("testjmena",               ConTestNames);
+	IConsole::CmdRegister("testdelky",               ConTestLengths);
 	IConsole::CmdRegister("testdepovagony",          ConTestDepotWagons);
 	IConsole::CmdRegister("testspolehlivost",        ConTestReliability);
 	IConsole::CmdRegister("testdepofiltr",           ConTestExplainDepot);

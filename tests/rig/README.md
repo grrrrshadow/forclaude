@@ -21,7 +21,8 @@ Working directory layout, pointed to by `RIG_DIR`:
   `loko_obou_stran.sav` as `loko2.sav`, `new1.sav`, `obmena.sav`,
   `obmenaporucha.sav`, `odtah_peron.sav` as `back2.sav`, `porucha.sav`,
   `porucha_nastupiste.sav` as `porucha2.sav`, `porucha_za_vlakem.sav` as
-  `porucha3.sav`, `rig.sav`, `vlak31.sav`.
+  `porucha3.sav`, `rada_s_masinkou.sav` as `rada_masinka.sav`, `rig.sav`,
+  `vlak31.sav`.
 
 **Copy them before the first run.** A scene whose save is not there does not
 fail: the game says "Game load failed", the scene ends after six lines, and
@@ -385,6 +386,13 @@ picture, the case of CZTR 1.0.0, which the rig has not got:
 
 `testjmena <text>` lists the rail vehicles whose name, as the set gives it or
 as the purchase list shows it now, has the text in it.
+
+`testdelky` is the game's own spacing test (CheckTrainsLengths(), which
+reports a train as broken and pauses the game at every load) train by train
+and pair by pair: which two pieces stand how far apart and how far they should.
+Each such train is refused (ODMITNUTO). Couplings used to leave a pixel too
+little on the straight and four round a curve; a coupled train is spread to a
+length between every two pieces now, so a scene that couples ends with none.
 
 `testdomy pole <x> <y> [r]` lists the houses within r tiles of a tile, by id
 and name, and how many tiles of each: for telling which house a player means
