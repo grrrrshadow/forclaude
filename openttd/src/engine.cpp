@@ -91,7 +91,9 @@ bool IsMarijuanaEngineInfo(const EngineInfo &info)
 
 /**
  * Does a name start with a kind of wagon, written exactly so and followed by
- * anything but another letter?
+ * anything but another letter? Or, the way GETS names its wagons -- what the
+ * wagon is and then its kind in quotes, Open Wagon "Eaos" -- does the part in
+ * quotes?
  * @param name the name
  * @param kind the kind
  * @return whether it does
@@ -99,10 +101,15 @@ bool IsMarijuanaEngineInfo(const EngineInfo &info)
 static bool NameIsKind(std::string_view name, std::string_view kind)
 {
 	auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); };
-	/* A set may open the name with a colour or a space. */
-	while (!name.empty() && !letter(name.front())) name.remove_prefix(1);
-	if (!name.starts_with(kind)) return false;
-	return name.size() == kind.size() || !letter(name[kind.size()]);
+	auto starts_with_kind = [&](std::string_view text) {
+		/* A set may open the name with a colour or a space. */
+		while (!text.empty() && !letter(text.front())) text.remove_prefix(1);
+		if (!text.starts_with(kind)) return false;
+		return text.size() == kind.size() || !letter(text[kind.size()]);
+	};
+	if (starts_with_kind(name)) return true;
+	size_t quote = name.find('"');
+	return quote != std::string_view::npos && starts_with_kind(name.substr(quote + 1));
 }
 
 /**
@@ -148,7 +155,11 @@ bool EngineNameIsKind(const Engine *e, std::span<const std::string_view> kinds)
  * the U of CZTR Wagons, in every release and whatever set names a wagon so:
  * the player's choice of the coal wagons of a set that take marijuana -- the U
  * as well, since it is built from 1950 and the St of the older release only
- * from 1958. The set draws its
+ * from 1958. And from GETS the Eanos (the Eanos-x 059 with it) and the Eaos,
+ * every livery: the player asked for handsome wagons with plenty of coal and a
+ * light body, not a black one, so the green would not run into the wagon --
+ * big red four-axle wagons with the load the whole length, and GETS draws the
+ * load as a layer of its own, so only the load turns green. The set draws its
  * load as a picture of its own over the wagon, and that picture is drawn green
  * (GreenLayerSprite()); the game's own marijuana wagons stay as they are.
  * @param e the engine
@@ -157,7 +168,7 @@ bool EngineNameIsKind(const Engine *e, std::span<const std::string_view> kinds)
 bool IsGreenLayerWagon(const Engine *e)
 {
 	if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return false;
-	static const std::string_view KINDS[] = {"St", "U"};
+	static const std::string_view KINDS[] = {"St", "U", "Eanos", "Eaos"};
 	return EngineNameIsKind(e, KINDS);
 }
 

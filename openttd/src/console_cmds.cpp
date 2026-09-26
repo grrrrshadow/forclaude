@@ -8602,9 +8602,13 @@ static bool ConTestNames(std::span<std::string_view> argv)
 		std::string shown = GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList));
 		if (name.find(argv[1]) == std::string::npos && shown.find(argv[1]) == std::string::npos) continue;
 		const GRFFile *grf = e->GetGRF();
-		IConsolePrint(CC_DEFAULT, "testjmena: {} '{}' (v nabidce '{}'), {}, GRF {:08X} cislo {:#x}, uvedeni {}", e->index, name, shown,
+		/* What the player's name rules made of it: fitted for road vehicles
+		 * (IsCarCarrierWagon()), for marijuana drawn green (IsGreenLayerWagon()). */
+		CargoType marijuana = GetCargoTypeByLabel(CT_MARIJUANA);
+		IConsolePrint(CC_DEFAULT, "testjmena: {} '{}' (v nabidce '{}'), {}, GRF {:08X} cislo {:#x}, uvedeni {}, na auta {}, na travu {}", e->index, name, shown,
 				e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon ? "vagon" : "hnaci", grf == nullptr ? 0 : std::byteswap(grf->grfid),
-				e->grf_prop.local_id, e->intro_date);
+				e->grf_prop.local_id, e->intro_date, CanCarryRoadVehicles(e) ? "ano" : "ne",
+				IsValidCargoType(marijuana) && e->info.refit_mask.Test(marijuana) ? "ano" : "ne");
 	}
 	return true;
 }

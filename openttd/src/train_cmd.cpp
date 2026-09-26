@@ -1815,6 +1815,12 @@ static void GetGreenLayerWagonSprite(const Train *drawn, Direction direction, En
 		GetCustomVehicleSprite(drawn, direction, image_type, result);
 	}
 	if (result->count > 1) {
+		/* Only a wagon with something in it has a load to turn green. A set
+		 * may draw a layer over an empty wagon too -- GETS draws an empty
+		 * picture there, but a picture of anything else would have come out
+		 * green, the wagon itself included; the player's word was that the
+		 * green must not run into the wagon. */
+		if (drawn->cargo.StoredCount() == 0) return;
 		for (uint i = 1; i < result->count; i++) result->seq[i].sprite = GreenLayerSprite(result->seq[i].sprite);
 		return;
 	}
@@ -1852,7 +1858,8 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
 		if (spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) direction = ReverseDir(direction);
-		/* A set's wagon carrying marijuana is a St or a U -- no other takes it
+		/* A set's wagon carrying marijuana is one the player named -- the St
+		 * and U of CZTR, the Eanos and Eaos of GETS; no other takes it
 		 * (IsGreenLayerWagon(), asked when the sets were loaded) -- unless the
 		 * set knows the cargo itself and draws it. */
 		const GRFFile *grf = drawn->GetEngine()->GetGRF();

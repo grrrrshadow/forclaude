@@ -1,0 +1,202 @@
+/*
+ * Wagons named the way GETS names its own -- what the wagon is, and its kind
+ * in quotes -- for the name rule (IsGreenLayerWagon(), IsCarCarrierWagon()),
+ * and one of them drawing its coal the way GETS does: the wagon as one
+ * picture, the load as a second one over it (CB_FLAG_MORE_SPRITES), painted
+ * in the range GETS recolours by cargo. Played by the scene getsjmena (see
+ * README.md): the Eaos and its livery carry marijuana with only the load
+ * green, the chosen carriers take road vehicles, the Ssla Köln and the Eaoss
+ * take neither.
+ *
+ *     nmlc -c -l grf/lang --grf gets_like.grf grf/gets_like.nml
+ */
+grf {
+	grfid: "RIGg";
+	name: string(STR_G_NAME);
+	desc: string(STR_G_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+cargotable { COAL, GOOD }
+
+template tmpl_wagon(y) {
+	[  0, y, 20, 12, -10, -6]
+	[ 24, y, 20, 12, -10, -6]
+	[ 48, y, 20, 12, -10, -6]
+	[ 72, y, 20, 12, -10, -6]
+	[ 96, y, 20, 12, -10, -6]
+	[120, y, 20, 12, -10, -6]
+	[144, y, 20, 12, -10, -6]
+	[168, y, 20, 12, -10, -6]
+}
+
+spriteset(gets_body, "grf/gfx/gets_like.png") { tmpl_wagon(0) }
+spriteset(gets_load, "grf/gfx/gets_like.png") { tmpl_wagon(16) }
+/* Row 32 is empty: what GETS draws as the load of an empty wagon. */
+spriteset(gets_empty, "grf/gfx/gets_like.png") { tmpl_wagon(32) }
+
+spritegroup gets_load_group {
+	loaded: [gets_empty, gets_load];
+	loading: [gets_empty, gets_load];
+}
+
+/* Layer 0 the wagon, layer 1 the load -- GETS's loadstack, word for word. */
+switch (FEAT_TRAINS, SELF, gets_loadstack, [STORE_TEMP((getbits(extra_callback_info1, 8, 8) < 1 ? CB_FLAG_MORE_SPRITES : 0) | PALETTE_USE_DEFAULT, 0x100), getbits(extra_callback_info1, 8, 8)]) {
+	0: return gets_body;
+	1: gets_load_group;
+}
+
+switch (FEAT_TRAINS, SELF, gets_by_cargo, cargo_type_in_veh) {
+	COAL: gets_loadstack;
+	return gets_body;
+}
+
+item(FEAT_TRAINS, gets_eaos, 300) {
+	property {
+		name: string(STR_G_EAOS);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+		misc_flags: bitmask(TRAIN_FLAG_SPRITE_STACK);
+	}
+	graphics {
+		default: gets_by_cargo;
+	}
+}
+
+item(FEAT_TRAINS, gets_eaos_livery, 301) {
+	property {
+		name: string(STR_G_EAOS_LIVERY);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+		misc_flags: bitmask(TRAIN_FLAG_SPRITE_STACK);
+	}
+	graphics {
+		default: gets_by_cargo;
+	}
+}
+
+/* Not an Eaos: the rule wants the kind followed by anything but a letter. */
+item(FEAT_TRAINS, gets_eaoss, 302) {
+	property {
+		name: string(STR_G_EAOSS);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+		misc_flags: bitmask(TRAIN_FLAG_SPRITE_STACK);
+	}
+	graphics {
+		default: gets_by_cargo;
+	}
+}
+
+item(FEAT_TRAINS, gets_rnsz, 303) {
+	property {
+		name: string(STR_G_RNSZ);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: GOOD;
+		refittable_cargo_classes: bitmask(CC_PIECE_GOODS);
+		cost_factor: 100;
+		running_cost_factor: 0;
+	}
+	graphics {
+		default: gets_body;
+	}
+}
+
+item(FEAT_TRAINS, gets_sgmmrs, 304) {
+	property {
+		name: string(STR_G_SGMMRS);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: GOOD;
+		refittable_cargo_classes: bitmask(CC_PIECE_GOODS);
+		cost_factor: 100;
+		running_cost_factor: 0;
+	}
+	graphics {
+		default: gets_body;
+	}
+}
+
+/* The one the player looked at and said no to. */
+item(FEAT_TRAINS, gets_ssla, 305) {
+	property {
+		name: string(STR_G_SSLA);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: GOOD;
+		refittable_cargo_classes: bitmask(CC_PIECE_GOODS);
+		cost_factor: 100;
+		running_cost_factor: 0;
+	}
+	graphics {
+		default: gets_body;
+	}
+}

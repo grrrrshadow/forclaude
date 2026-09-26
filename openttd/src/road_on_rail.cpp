@@ -182,7 +182,13 @@ bool IsCarCarrierWagon(const Engine *e)
 	 * cargo is left, road vehicles included. */
 	if (e->GetDefaultCargoType() == _road_vehicle_cargo && e->GetGRF() == nullptr) return true;
 
-	static const std::string_view KINDS[] = {"Pao", "Pasy", "Sgs", "Smmp"};
+	/* CZTR's four, and the player's choice from GETS and the sets he plays it
+	 * with: the flatbed Rns-z 643, the container carriers Lgjs 579 and
+	 * Sggmrs (its liveries spelt Sgmmrs by the set), the short piggyback
+	 * wagon Rmmso and the KFNB 1850 Flat Car. Not the Ssla Köln -- he looked
+	 * at it and said no. */
+	static const std::string_view KINDS[] = {"Pao", "Pasy", "Sgs", "Smmp",
+			"Rns-z 643", "Lgjs 579", "Sggmrs", "Sgmmrs", "Rmmso", "KFNB 1850 Flat Car"};
 	return EngineNameIsKind(e, KINDS);
 }
 

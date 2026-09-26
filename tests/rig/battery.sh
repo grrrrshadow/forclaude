@@ -1585,6 +1585,23 @@ sed '/^\[newgrf\]$/a st_old.grf = ' "$CFG_KEEP" > $STO_CFG
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene zelenestjednovrstvy "testautovlak
 testzelenest" 50 -c $STO_CFG
+# Wagons named the way GETS names them -- what the wagon is and its kind in
+# quotes (grf/gets_like.nml, gets_like.grf in the home's newgrf/). The name
+# rules read the part in quotes: the Eaos and its livery take marijuana, the
+# Rns-z 643 and the Sgmmrs livery take road vehicles, the Eaoss and the Ssla
+# Köln -- the one the player said no to -- take neither (testjmena says so,
+# na auta / na travu). The Eaos draws its coal as a layer over the wagon, as
+# GETS does: full, only the layer is green; empty, nothing is. odmitnuto is
+# zero.
+GETS_CFG=$S/gets_like_openttd.cfg
+sed '/^\[newgrf\]$/a gets_like.grf = ' "$CFG_KEEP" > $GETS_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene getsjmena "testjmena Eao
+testjmena Rns
+testjmena Sgmmrs
+testjmena Ssla
+testautovlak
+testzelenest" 50 -c $GETS_CFG
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

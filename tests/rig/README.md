@@ -384,6 +384,13 @@ picture, the case of CZTR 1.0.0, which the rig has not got:
     nmlc -c -l grf/lang --grf st_old.grf grf/st_old.nml
     cp st_old.grf <rig home>/.openttd/newgrf/
 
+`getsjmena` plays `grf/gets_like.nml`, wagons named the way GETS names its
+own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
+as GETS does. Build it the same way and put it in the same place:
+
+    nmlc -c -l grf/lang --grf gets_like.grf grf/gets_like.nml
+    cp gets_like.grf <rig home>/.openttd/newgrf/
+
 `testjmena <text>` lists the rail vehicles whose name, as the set gives it or
 as the purchase list shows it now, has the text in it.
 

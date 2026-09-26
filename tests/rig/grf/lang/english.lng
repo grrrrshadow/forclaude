@@ -23,3 +23,11 @@ STR_V_LORRY                                                     :RigLorry88
 STR_S_NAME                                                      :Rig: an old St
 STR_S_DESC                                                      :A coal wagon named St that draws its coal into its own picture, as CZTR Wagons 1.0.0 does.
 STR_S_WAGON                                                     :St (rig)
+STR_G_NAME                                                      :Rig: wagons named as GETS names them
+STR_G_DESC                                                      :Wagons named what they are and then their kind in quotes, and one drawing its coal as a layer over the wagon, as GETS does.
+STR_G_EAOS                                                      :Open Wagon "Eaos"
+STR_G_EAOS_LIVERY                                               :Eaos DB Cargo livery
+STR_G_EAOSS                                                     :Open Wagon "Eaoss"
+STR_G_RNSZ                                                      :Flatbed "Rns-z 643"
+STR_G_SGMMRS                                                    :Sgmmrs DB livery
+STR_G_SSLA                                                      :Flatbed "Ssla Köln"
