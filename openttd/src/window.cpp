@@ -2189,6 +2189,7 @@ int GetMainViewBottom()
 }
 
 static bool _dragging_window; ///< A window is being dragged or resized.
+static Point _drag_start; ///< Where the mouse was when a caption was taken hold of; a release near it is a click, not a drag (Window::OnCaptionClick()).
 
 /**
  * Handle dragging/resizing of a window.
@@ -2208,6 +2209,9 @@ static EventState HandleWindowDragging()
 			/* Stop the dragging if the left mouse button was released */
 			if (!_left_button_down) {
 				w->flags.Reset(WindowFlag::Dragging);
+				/* Let go where it was taken hold of: the player clicked the
+				 * window's name rather than dragging the window. */
+				if (abs(_cursor.pos.x - _drag_start.x) + abs(_cursor.pos.y - _drag_start.y) <= ScaleGUITrad(2)) w->OnCaptionClick();
 				break;
 			}
 
@@ -2371,6 +2375,7 @@ static void StartWindowDrag(Window *w)
 	w->flags.Set(WindowFlag::Dragging);
 	w->flags.Reset(WindowFlag::Centred);
 	_dragging_window = true;
+	_drag_start = _cursor.pos;
 
 	_drag_delta.x = w->left - _cursor.pos.x;
 	_drag_delta.y = w->top  - _cursor.pos.y;

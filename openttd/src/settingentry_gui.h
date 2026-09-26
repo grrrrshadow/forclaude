@@ -11,6 +11,8 @@
 #define SETTINGENTRY_GUI_H
 
 #include "core/enum_type.hpp"
+#include "core/geometry_type.hpp"
+#include <array>
 #include "settings_internal.h"
 #include "stringfilter_type.h"
 
@@ -156,6 +158,37 @@ protected:
 
 private:
 	bool IsVisibleByRestrictionMode(RestrictionMode mode) const;
+};
+
+/**
+ * The braking table: two rows in the tree for eleven settings. The first row
+ * names the speeds, the second holds a small dropdown between each pair of
+ * them -- the player's layout, see GetBrakeCurve() (train_cmd.cpp) for what
+ * the numbers mean. Clicking a box opens its dropdown and shows the help the
+ * eleven share; the settings window tells the boxes apart by BandAt().
+ */
+struct BrakeTableEntry : BaseSettingEntry {
+	static constexpr uint BANDS = 11;
+	static constexpr int BAND_TOP[BANDS + 1] = {300, 250, 200, 160, 130, 100, 80, 60, 40, 20, 10, 0};
+	std::array<SettingEntry, BANDS> bands; ///< the eleven settings, one a band, top band first
+
+	BrakeTableEntry();
+
+	void Init(uint8_t level = 0) override;
+	void ResetAll() override;
+	uint Length() const override;
+	bool IsVisible(const BaseSettingEntry *item) const override;
+	BaseSettingEntry *FindEntry(uint row, uint *cur_row) override;
+	uint GetMaxHelpHeight(int maxw) override;
+	bool UpdateFilterState(SettingFilter &filter, bool force_visible) override;
+	uint Draw(GameSettings *settings_ptr, int left, int right, int y, uint first_row, uint max_row, BaseSettingEntry *selected, uint cur_row = 0, uint parent_last = 0) const override;
+
+	static uint BandAt(int x, int width);
+	static Rect BoxRect(int left, int right, int y, uint band);
+
+protected:
+	void DrawSetting(GameSettings *settings_ptr, int left, int right, int y, bool highlight) const override;
+	void DrawRow(GameSettings *settings_ptr, int left, int right, int y, uint row, bool highlight) const;
 };
 
 /** Containers for BaseSettingEntry */

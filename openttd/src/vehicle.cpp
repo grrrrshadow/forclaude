@@ -931,6 +931,7 @@ void Vehicle::PreDestructor()
 		CloseWindowById(WindowClass::VehicleOrders, this->index);
 		CloseWindowById(WindowClass::VehicleRefit, this->index);
 		CloseWindowById(WindowClass::VehicleDetails, this->index);
+		CloseWindowById(WindowClass::TrainDriver, this->index);
 		CloseWindowById(WindowClass::VehicleTimetable, this->index);
 		SetWindowDirty(WindowClass::Company, this->owner);
 		OrderBackup::ClearVehicle(this);

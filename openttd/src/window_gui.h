@@ -671,6 +671,14 @@ public:
 	virtual void OnClick([[maybe_unused]] Point pt, [[maybe_unused]] WidgetID widget, [[maybe_unused]] int click_count) {}
 
 	/**
+	 * The caption was taken hold of and let go without the window being
+	 * moved: a click on the window's name. Dragging the caption still moves
+	 * the window; a window that makes something of a plain click on its name
+	 * says so here. The train window opens its driver's settings.
+	 */
+	virtual void OnCaptionClick() {}
+
+	/**
 	 * A click with the right mouse button has been made on the window.
 	 * @param pt     the point inside the window that has been clicked.
 	 * @param widget the clicked widget.

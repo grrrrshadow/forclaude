@@ -560,6 +560,7 @@ add_files(
     train.h
     train_cmd.cpp
     train_cmd.h
+    train_driver_gui.cpp
     train_gui.cpp
     transparency.h
     transparency_gui.cpp

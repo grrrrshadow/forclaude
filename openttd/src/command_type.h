@@ -254,6 +254,7 @@ enum class Commands : uint8_t {
 	SetRescueEngine, ///< station a train in its depot as a rescue engine
 	RequestWagonTow, ///< have a rescue engine take a waiting rake of wagons to a depot
 	SellTrainForScrap, ///< sell a train to the scrapyard where it stands; a rescue engine fetches it and a depot breaks it up
+	SetTrainDriver, ///< set one of a train driver's own settings (the driver window)
 
 	ClearOrderBackup, ///< clear the order backup of a given user/tile
 	ModifyOrder, ///< modify an order (like set full-load)

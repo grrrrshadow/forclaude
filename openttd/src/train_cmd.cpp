@@ -517,31 +517,110 @@ static int DistanceToLevelCrossingAhead(const Train *moving_front, int max_tiles
 static int64_t GentleBrakeRate(const Train *v);
 
 /**
- * The braking curve of a train with "brake, fail to brake and crash" on: a
- * train brakes as it pulls away -- the player's rule -- at every speed: it
- * slows at a speed as fast as it gathers speed there on the flat. At low
- * speed that is the engines' whole pulling force (tractive effort), at high
- * speed only what the power gives, power over speed, less the drag. So a
- * light engine shunting brakes on the spot and lazily from high speed, and a
- * heavy train lazily all the way; a loaded train is heavier than an empty one
- * and brakes longer, as it pulls away slower. The physics is the realistic
- * model's own (GroundVehicle::GetAcceleration(): power and pulling force
- * against weight, cargo and all, the axles, rolling friction and air drag).
+ * The braking table: the player's own curve, read off the settings. Twelve
+ * speeds -- 300, 250, 200, 160, 130, 100, 80, 60, 40, 20, 10 and 0 -- and
+ * between each pair a number: how many km/h a train sheds on one tile while
+ * it is doing a speed in that band. The player's rule for reading it: a
+ * band's number holds in the middle of the band, the line between two bands
+ * brakes by the average of both numbers, and between those points it runs
+ * straight; at 300 and above the first number holds. Every train the same,
+ * whatever it weighs or pulls -- the physics the curve used to be worked out
+ * from (power and pulling force against weight) is gone from braking, by the
+ * player's word: real brakes do not care what the engine can pull.
+ */
+static constexpr int BRAKE_BANDS = 11;
+static constexpr int BRAKE_BAND_TOP[BRAKE_BANDS + 1] = {300, 250, 200, 160, 130, 100, 80, 60, 40, 20, 10, 0};
+
+/** The braking table as the settings hold it. */
+BrakeDropTable GameBrakeDropTable()
+{
+	const VehicleSettings &vs = _settings_game.vehicle;
+	return {vs.train_brake_drop_300, vs.train_brake_drop_250, vs.train_brake_drop_200, vs.train_brake_drop_160,
+			vs.train_brake_drop_130, vs.train_brake_drop_100, vs.train_brake_drop_80, vs.train_brake_drop_60,
+			vs.train_brake_drop_40, vs.train_brake_drop_20, vs.train_brake_drop_10};
+}
+
+/**
+ * The head of the consist this train is part of: the one that carries the
+ * driver's settings (Train::driver_sight and the rest). A train picked up and
+ * carried as wagons is driven by whoever picked it up.
+ */
+static const Train *DriverOf(const Train *v)
+{
+	return v->First();
+}
+
+/**
+ * The braking table as it applies to this train: the game's, with every band
+ * the player set on this train's driver standing in for the game's number.
+ */
+static BrakeDropTable TrainBrakeDropTable(const Train *v)
+{
+	BrakeDropTable drop = GameBrakeDropTable();
+	const Train *driver = DriverOf(v);
+	for (int k = 0; k < BRAKE_BANDS; k++) {
+		if (driver->driver_drop[k] != 0) drop[k] = driver->driver_drop[k];
+	}
+	return drop;
+}
+
+/**
+ * How many km/h the table sheds on one tile at @p speed, in 1/256ths. A
+ * train's speed unit is as near a km/h as makes no odds here.
+ */
+static int64_t BrakeDropAt(const BrakeDropTable &drop, int64_t speed)
+{
+	if (speed >= BRAKE_BAND_TOP[0]) return int64_t(drop[0]) * 256;
+	if (speed <= 0) return int64_t(drop[BRAKE_BANDS - 1]) * 256;
+	for (int k = 0; k < BRAKE_BANDS; k++) {
+		const int64_t hi = BRAKE_BAND_TOP[k];
+		const int64_t lo = BRAKE_BAND_TOP[k + 1];
+		if (speed < lo) continue;
+		/* The band's own number in its middle, the average with the
+		 * neighbour on each edge (the outer edges have no neighbour and keep
+		 * the band's own number), straight lines between. */
+		const int64_t own = int64_t(drop[k]) * 256;
+		const int64_t at_hi = k == 0 ? own : (int64_t(drop[k - 1]) + drop[k]) * 128;
+		const int64_t at_lo = k == BRAKE_BANDS - 1 ? own : (int64_t(drop[k]) + drop[k + 1]) * 128;
+		const int64_t mid2 = hi + lo; // twice the middle of the band
+		if (2 * speed >= mid2) return own + (at_hi - own) * (2 * speed - mid2) / (hi - lo);
+		return own + (at_lo - own) * (mid2 - 2 * speed) / (hi - lo);
+	}
+	NOT_REACHED();
+}
+
+/**
+ * 1/256ths of a pixel a train covers shedding one unit of speed, the one
+ * ending at @p speed: a tile is TILE_SIZE pixels and the table says how many
+ * units go on one tile.
+ */
+static int64_t BrakeUnitSub(const BrakeDropTable &drop, int64_t speed)
+{
+	return std::max<int64_t>(256 * 256 * TILE_SIZE / BrakeDropAt(drop, speed), 1);
+}
+
+/**
+ * How far, in 1/256ths of a pixel, a train needs to come to a stand from
+ * @p speed by the braking table -- the run added up unit by unit.
+ */
+static int64_t BrakeTableStopSub(const BrakeDropTable &drop, int64_t speed)
+{
+	int64_t sub = 0;
+	for (int64_t v = 1; v <= speed; v++) sub += BrakeUnitSub(drop, v);
+	return sub;
+}
+
+/**
+ * The braking curve of a train with "brake, fail to brake and crash" on: the
+ * braking table above, laid out for this train as the distance it takes to
+ * stop from each of STEPS speeds up to its top speed. The ceiling the driver
+ * drives to and the braking itself both read the one table, so the train
+ * slows exactly as fast as the ceiling comes down -- a rate read off the
+ * moment and not off the whole curve had the ceiling and the train chasing
+ * each other down the line once.
  *
- * Above nine tenths of top speed the train brakes as at nine tenths: the last
- * tenth is a long tail where the pull barely beats the drag -- a ten-wagon
- * train went from 62 to 69 in sixteen tiles after getting to 62 in fourteen
- * -- and brakes have no such tail. The same where a train cannot get any
- * faster: it brakes as at the fastest it can gather speed.
- *
- * Kept as the distance it takes to stop from each of STEPS speeds up to the
- * top speed. The ceiling the driver drives to and the braking itself both
- * read the one table, so the train slows exactly as fast as the ceiling
- * comes down -- a rate read off the moment and not off the whole curve had
- * the ceiling and the train chasing each other down the line once.
- *
- * Worked out when the train's weight, power or top speed changes and kept,
- * not every time it is asked: it is asked many times a tick.
+ * Worked out when the train's top speed or the table changes and kept, not
+ * every time it is asked: it is asked many times a tick.
  */
 struct BrakeCurve {
 	static constexpr int STEPS = 64;
@@ -552,66 +631,30 @@ struct BrakeCurve {
 static const BrakeCurve &GetBrakeCurve(const Train *v)
 {
 	struct Key {
-		uint32_t weight;
-		uint32_t power;
-		uint32_t max_te;
 		uint16_t top;
+		BrakeDropTable drop;
 		bool operator==(const Key &) const = default;
 	};
-	Key key{v->gcache.cached_weight, v->gcache.cached_power, v->gcache.cached_max_te, v->vcache.cached_max_speed};
+	Key key{v->vcache.cached_max_speed, TrainBrakeDropTable(v)};
 	static std::map<VehicleID, std::pair<Key, BrakeCurve>> cache;
 	auto it = cache.find(v->index);
 	if (it != cache.end() && it->second.first == key) return it->second.second;
 	if (cache.size() > 4096) cache.clear();
 
-	int64_t mass = std::max<int64_t>(v->gcache.cached_weight, 1);
-	int64_t power = int64_t(v->gcache.cached_power) * 746;
-	int64_t max_te = std::max<int64_t>(v->gcache.cached_max_te, 1);
-	bool maglev = v->GetAccelerationType() == VehicleAccelerationModel::Maglev;
-
 	BrakeCurve c;
 	c.top = std::max<int64_t>(v->vcache.cached_max_speed, 1);
 
-	/* How fast the train gathers speed at the middle of each step, and the
-	 * run it takes to get to nine tenths of its top speed (or as fast as it
-	 * gets): speed goes up by accel/256 of a unit a tick and the train
-	 * covers speed/256 pixels, so a step takes speed * step / accel pixels. */
-	std::array<int64_t, BrakeCurve::STEPS> accel{};
-	std::array<int64_t, BrakeCurve::STEPS> speed{};
-	int64_t last = 1;
-	int64_t run_sub = 0;
-	int64_t reached = 0;
-	for (int i = 0; i < BrakeCurve::STEPS; i++) {
-		speed[i] = std::max<int64_t>((2 * i + 1) * c.top / (2 * BrakeCurve::STEPS), 1);
-		if (speed[i] * 10 <= c.top * 9) {
-			int64_t force = maglev ? power / 25 : std::min<int64_t>(power * 18 / (speed[i] * 5), max_te);
-			int64_t resistance = int64_t(14) * v->gcache.cached_air_drag * speed[i] * speed[i] / 1000; // 14: the open-air drag area, Train::GetAirDragArea()
-			if (!maglev) resistance += v->gcache.cached_axle_resistance + mass * (15 * (512 + speed[i]) / 512);
-			int64_t a = (force - resistance) / (mass * 4);
-			if (a > 0 && reached == int64_t(i) * c.top / BrakeCurve::STEPS) {
-				last = a;
-				run_sub += 256 * speed[i] * c.top / (BrakeCurve::STEPS * a);
-				reached = int64_t(i + 1) * c.top / BrakeCurve::STEPS;
-			}
-		}
-		accel[i] = last; // above nine tenths, or where it gets no faster: as at the fastest it does
-	}
-	/* The whole run evened out: the rate that stops the train from the speed
-	 * it got to in the run it took to get there. The train never brakes more
-	 * lazily than that -- at high speed, where it gathers speed slowest, it
-	 * brakes so; lower down it brakes as hard as it pulls away there. */
-	int64_t evened = std::max<int64_t>(reached * reached * 256 / (2 * std::max<int64_t>(run_sub, 1)), 1);
-
-	for (int i = 0; i < BrakeCurve::STEPS; i++) {
-		int64_t decel = std::max(accel[i], evened);
-		c.dist[i + 1] = c.dist[i] + std::max<int64_t>(256 * speed[i] * c.top / (BrakeCurve::STEPS * decel), 1);
-	}
-	/* Half a large map at the most, for the arithmetic: scaled, so that the
-	 * curve keeps its shape. */
-	constexpr int64_t MOST = 128 * TILE_SIZE * 256;
-	if (c.dist[BrakeCurve::STEPS] > MOST) {
-		int64_t whole = c.dist[BrakeCurve::STEPS];
-		for (int64_t &d : c.dist) d = d * MOST / whole;
+	/* The run to a stand from every whole unit of speed up to the top, then
+	 * the table's steps read off it -- a step's speed need not be a whole
+	 * unit, so the unit it falls in is taken in proportion. */
+	std::vector<int64_t> to_stand(static_cast<size_t>(c.top) + 2, 0);
+	for (int64_t s = 1; s <= c.top + 1; s++) to_stand[s] = to_stand[s - 1] + BrakeUnitSub(key.drop, s);
+	for (int i = 1; i <= BrakeCurve::STEPS; i++) {
+		const int64_t num = int64_t(i) * c.top;
+		const int64_t whole = num / BrakeCurve::STEPS;
+		const int64_t rem = num % BrakeCurve::STEPS;
+		c.dist[i] = to_stand[whole] + rem * BrakeUnitSub(key.drop, whole + 1) / BrakeCurve::STEPS;
+		c.dist[i] = std::max(c.dist[i], c.dist[i - 1] + 1);
 	}
 
 	it = cache.insert_or_assign(v->index, std::pair<Key, BrakeCurve>{key, c}).first;
@@ -621,6 +664,17 @@ static const BrakeCurve &GetBrakeCurve(const Train *v)
 				(c.dist[BrakeCurve::STEPS / 2] / 256 + TILE_SIZE / 2) / TILE_SIZE, v->gcache.cached_weight);
 	}
 	return it->second.second;
+}
+
+/**
+ * The braking table read out for the console (the rig's testbrzdy): the km/h
+ * shed on one tile at @p speed, in 1/256ths, and the tiles it takes to stop
+ * from there, in tenths.
+ */
+std::pair<int, int> BrakeTableAt(int speed)
+{
+	BrakeDropTable drop = GameBrakeDropTable();
+	return {static_cast<int>(BrakeDropAt(drop, speed)), static_cast<int>(BrakeTableStopSub(drop, speed) * 10 / (256 * TILE_SIZE))};
 }
 
 /** The step of the curve @p speed falls in, and how far into it, in 1/top parts of a step. */
@@ -685,14 +739,56 @@ bool IsSignalOverrunOn()
 }
 
 /**
+ * vehicle.train_braking as it applies to this train: the driver's own where
+ * the player gave him one (Train::driver_sight), the game's otherwise. 0 is
+ * off (watches ETCS), 1 to 4 sees 5, 10, 15, 20 tiles.
+ */
+static uint8_t TrainBrakingSetting(const Train *v)
+{
+	uint8_t own = DriverOf(v)->driver_sight;
+	return own != 0 ? own - 1 : _settings_game.vehicle.train_braking;
+}
+
+/** Is "brake, fail to brake and crash" on for this train? Its driver's word, then the game's. */
+bool IsSignalOverrunOn(const Train *v)
+{
+	return TrainBrakingSetting(v) != 0;
+}
+
+/**
+ * Through how many signals this train's driver reads the line ahead: his own
+ * number (Train::driver_signals) or the game's (vehicle.train_driver_signals),
+ * 1 to 3. Split off how many signals show the warning aspect, by the player's
+ * word: the picture on the mast is one for everybody, what a driver makes of
+ * it is his.
+ */
+static int DriverSignalCount(const Train *v)
+{
+	uint8_t own = DriverOf(v)->driver_signals;
+	return Clamp<int>(own != 0 ? own : _settings_game.vehicle.train_driver_signals, 1, 3);
+}
+
+/**
+ * How much of the braking a train stopped by the player's button keeps, in
+ * percent: the emergency brake is weaker by the driver's own setting
+ * (Train::driver_stop_brake) or the game's (vehicle.train_stop_brake_weaker).
+ */
+static int DriverStopBrakeKeep(const Train *v)
+{
+	uint8_t own = DriverOf(v)->driver_stop_brake;
+	uint8_t weaker = own != 0 ? own - 1 : _settings_game.vehicle.train_stop_brake_weaker;
+	return weaker == 0 ? 70 : 90;
+}
+
+/**
  * Does this game brake trains by their curve (GetBrakeCurve())? With "brake,
  * fail to brake and crash" on and the realistic model; otherwise the gentle
  * rate, the driver's eight tiles from top speed that the game has always
  * used (GentleBrakeRate()).
  */
-static bool BrakesByCurve()
+static bool BrakesByCurve(const Train *v)
 {
-	return IsSignalOverrunOn() && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic;
+	return IsSignalOverrunOn(v) && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic;
 }
 
 /**
@@ -702,7 +798,7 @@ static bool BrakesByCurve()
  */
 static int64_t BrakeDecelNow(const Train *v)
 {
-	if (BrakesByCurve()) return BrakeCurveDecel(GetBrakeCurve(v), v->cur_speed);
+	if (BrakesByCurve(v)) return BrakeCurveDecel(GetBrakeCurve(v), v->cur_speed);
 	return std::max<int64_t>(1, GentleBrakeRate(v));
 }
 
@@ -725,7 +821,7 @@ static int64_t GentleBrakeRate(const Train *v)
 static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 {
 	if (pixels <= 0) return target_speed;
-	if (BrakesByCurve()) {
+	if (BrakesByCurve(v)) {
 		/* By the curve: the speed that stops in the distance it takes to stop
 		 * from the target plus these pixels. */
 		const BrakeCurve &c = GetBrakeCurve(v);
@@ -742,7 +838,7 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
  */
 static int GentleStoppingReach(const Train *v)
 {
-	if (BrakesByCurve()) {
+	if (BrakesByCurve(v)) {
 		return static_cast<int>(std::min<int64_t>(BrakeCurveDistance(GetBrakeCurve(v), v->cur_speed) + 2 * TILE_SIZE, INT32_MAX / 2));
 	}
 	int64_t gentle = GentleBrakeRate(v);
@@ -766,7 +862,7 @@ static int GentleLookAhead(const Train *v)
 	 * fixed number of tiles, and that distance is what makes a train fail
 	 * to brake -- it sees the signal late and brakes longer. */
 	static constexpr int SIGHT_TILES[] = {128, 5, 10, 15, 20};
-	int sight = SIGHT_TILES[std::min<uint>(_settings_game.vehicle.train_braking, std::size(SIGHT_TILES) - 1)];
+	int sight = SIGHT_TILES[std::min<uint>(TrainBrakingSetting(v), std::size(SIGHT_TILES) - 1)];
 	return std::min<int>(GentleStoppingReach(v), sight * TILE_SIZE);
 }
 
@@ -1099,7 +1195,9 @@ static bool PathBeyondSignalTaken(const Train *v, TileIndex tile, Trackdir td);
 static bool DriverRemembersSignal(const Train *v)
 {
 	static constexpr uint MEMORY_TILES[] = {UINT8_MAX, 20, 15, 10, 5, 3};
-	uint memory = std::min<uint>(_settings_game.vehicle.train_warning_memory, std::size(MEMORY_TILES) - 1);
+	/* The driver's own memory (Train::driver_memory) or the game's. */
+	uint8_t own = DriverOf(v)->driver_memory;
+	uint memory = std::min<uint>(own != 0 ? own - 1 : _settings_game.vehicle.train_warning_memory, std::size(MEMORY_TILES) - 1);
 	if (memory == 0) return true;
 	return v->tiles_past_signal < MEMORY_TILES[memory];
 }
@@ -1192,9 +1290,11 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	int entered_at = 0; // distance at which the tile the walk is on was entered
 	int last_signal_px = -1; // distance at which the last signal facing this train was passed
 	bool on_our_booking = true; // every tile so far is booked to this train
-	/* Through how many signals the driver reads the line ahead: as many as
-	 * the player's setting says show the warning before a red (vehicle.
-	 * train_warning_signals, IsPathSignalWarning()), counted from the train.
+	/* Through how many signals the driver reads the line ahead: his own
+	 * number or the player's setting (vehicle.train_driver_signals,
+	 * DriverSignalCount()), counted from the train. It used to be the number
+	 * of signals that show the warning before a red; the player split the two:
+	 * how many masts light up is the line's, how many the driver reads is his.
 	 * The player's rule: one yellow, he knows the next signal and no more;
 	 * two, the one after it as well; three, far. Past those he knows nothing,
 	 * however close together they stand and however far he sees -- a first
@@ -1211,8 +1311,8 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	 *
 	 * Only with "brake, fail to brake and crash" on -- off, the driver already
 	 * sees as far as braking needs, and nothing there changes. */
-	const bool read_warning = IsSignalOverrunOn();
-	const int warning_signals = WarningSignalCount();
+	const bool read_warning = IsSignalOverrunOn(v);
+	const int warning_signals = DriverSignalCount(v);
 	const int reach_px = read_warning ? GentleStoppingReach(v) : look_px;
 	const bool remembers = read_warning && DriverRemembersSignal(v);
 	int signals_read = 0;
@@ -1402,7 +1502,7 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
  */
 static bool IsBrakingOnPlayersStop(const Train *v)
 {
-	return IsSignalOverrunOn() &&
+	return IsSignalOverrunOn(v) &&
 			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic &&
 			v->vehstatus.Test(VehState::Stopped) && v->cur_speed > 0;
 }
@@ -1446,7 +1546,7 @@ static constexpr int OVERRUN_SPEED = 25;
  */
 static bool RunsPastRedSignal(Train *first, bool path_signal, TileIndex where, int speed)
 {
-	if (!IsSignalOverrunOn()) return false;
+	if (!IsSignalOverrunOn(first)) return false;
 	if (_settings_game.vehicle.train_acceleration_model != AccelerationModel::Realistic) return false;
 	if (speed <= OVERRUN_SPEED) return false;
 	bool on_stop = first->vehstatus.Test(VehState::Stopped);
@@ -7096,6 +7196,48 @@ static void ReportTrainSoldForScrap(Owner owner, TileIndex tile, Money paid)
  * @return the scrap price, paid to the player, or an error
  */
 /**
+ * Set one of a train driver's own settings -- the driver window
+ * (ShowTrainDriverWindow(), a click on the train's name in its window).
+ * @param veh_id the train, the head of its consist
+ * @param field  which setting (TrainDriverField)
+ * @param value  the value; 0 means "as the game setting says"
+ */
+CommandCost CmdSetTrainDriver(DoCommandFlags flags, VehicleID veh_id, TrainDriverField field, uint8_t value)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsFrontEngine()) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	uint8_t most;
+	switch (field) {
+		case TDF_SIGHT:      most = 5; break;
+		case TDF_SIGNALS:    most = 3; break;
+		case TDF_STOP_BRAKE: most = 2; break;
+		case TDF_MEMORY:     most = 6; break;
+		default:
+			if (field < TDF_BAND || field >= TDF_END) return CMD_ERROR;
+			most = 60;
+			break;
+	}
+	if (value > most) return CMD_ERROR;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		switch (field) {
+			case TDF_SIGHT:      v->driver_sight = value; break;
+			case TDF_SIGNALS:    v->driver_signals = value; break;
+			case TDF_STOP_BRAKE: v->driver_stop_brake = value; break;
+			case TDF_MEMORY:     v->driver_memory = value; break;
+			default:             v->driver_drop[field - TDF_BAND] = value; break;
+		}
+		InvalidateWindowData(WindowClass::TrainDriver, v->index);
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}
+
+/**
  * Why this train cannot be sold to the scrapyard, if it cannot.
  *
  * One place decides, and both the command and the button in the orders window
@@ -11798,7 +11940,7 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	 * setting off everything stays as it always was: those signals work and
 	 * the player does not want them touched. */
 	auto signal_back_to_red = [&]() {
-		if (!changed_signal || !IsSignalOverrunOn() || changed_signal_td == Trackdir::Invalid) return;
+		if (!changed_signal || !IsSignalOverrunOn(consist) || changed_signal_td == Trackdir::Invalid) return;
 		SetSignalStateByTrackdir(tile, changed_signal_td, SignalState::Red);
 		MarkTileDirtyByTile(tile);
 	};
@@ -12474,12 +12616,12 @@ int Train::UpdateSpeed()
 			 *
 			 * The rate is in the 1/256ths of a speed unit a tick this takes. */
 			if (this->GetAccelerationStatus() == AS_BRAKE && IsBrakingOnPlayersStop(this)) {
-				int keep = _settings_game.vehicle.train_stop_brake_weaker == 0 ? 70 : 90;
+				int keep = DriverStopBrakeKeep(this);
 				accel = -std::max<int>(1, static_cast<int>(BrakeDecelNow(this) * keep / 100));
 			}
 			int max_speed = this->GetCurrentMaxSpeed();
 			int distance;
-			if (IsSignalOverrunOn() && this->cur_speed > max_speed &&
+			if (IsSignalOverrunOn(this) && this->cur_speed > max_speed &&
 					this->driver_ceiling <= max_speed && this->GetAccelerationStatus() != AS_BRAKE) {
 				/* "Brake, fail to brake and crash": the driver has something
 				 * ahead to stop for and is over the speed that stops him there
@@ -13217,7 +13359,7 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * train never chose -- there the old dead stop stays. */
 					bool rolls_on = false;
 					if (!was_stuck && first->flags.Test(VehicleRailFlag::Stuck) && first->force_proceed == TFP_NONE &&
-							bits.Count() == 1 && IsSignalOverrunOn()) {
+							bits.Count() == 1 && IsSignalOverrunOn(first)) {
 						Trackdir td_here = FindFirstTrackdir(trackdirbits);
 						/* The booking through it has just failed, which is what
 						 * red means to a path signal -- its own state is not
@@ -13345,7 +13487,7 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						bool path_signal = IsTileType(gp.new_tile, TileType::Railway) &&
 								IsPbsSignal(GetSignalType(gp.new_tile, FindFirstTrack(chosen_track)));
 						overrun_here = RunsPastRedSignal(first, path_signal, gp.new_tile, first->cur_speed);
-						if (_show_train_orientation && IsSignalOverrunOn() && !overrun_here && first->cur_speed > 5) {
+						if (_show_train_orientation && IsSignalOverrunOn(first) && !overrun_here && first->cur_speed > 5) {
 							IConsolePrint(CC_INFO, "  krok: cervena na ({},{}), {}, rychlost {} - zastavuje na miste", TileX(gp.new_tile), TileY(gp.new_tile),
 									path_signal ? "cestna" : "blokova", first->cur_speed);
 						}
@@ -14013,7 +14155,7 @@ static bool TrainApproachingLineEnd(Train *moving_front, bool signal, bool rever
 	 * signal is RunsPastRedSignal()'s to say. A driven train has braked for
 	 * the red long before this tile and arrives at a crawl either way. The end
 	 * of the line keeps it: there is nothing past that to run into. */
-	if (signal && IsSignalOverrunOn() &&
+	if (signal && IsSignalOverrunOn(moving_front) &&
 			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
 		return true;
 	}

@@ -3787,6 +3787,20 @@ public:
 		DrawString(tr.left, tr.right, CentreBounds(tr.top, tr.bottom, GetCharacterHeight(FontSize::Normal)), str, text_colour, AlignmentH::Centre);
 	}
 
+	/**
+	 * The player clicked the train's name: its driver's settings open --
+	 * "brake, fail to brake and crash" and the braking table, for this one
+	 * engine. The player's place for it: the name is the one thing in the
+	 * window that did nothing when clicked, and dragging it still moves the
+	 * window. Trains of the player's own only; a rake of wagons has no driver.
+	 */
+	void OnCaptionClick() override
+	{
+		const Vehicle *v = Vehicle::Get(this->window_number);
+		if (v->type != VehicleType::Train || v->owner != _local_company || !Train::From(v)->IsFrontEngine()) return;
+		ShowTrainDriverWindow(v);
+	}
+
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		const Vehicle *v = Vehicle::Get(this->window_number);
@@ -3868,6 +3882,8 @@ public:
 				} else {
 					ShowVehicleDetailsWindow(v);
 				}
+				break;
+			case WID_VV_CAPTION: // a click on the train's name (see OnCaptionClick())
 				break;
 			case WID_VV_CLONE: // clone vehicle
 				/* Suppress the vehicle GUI when share-cloning.

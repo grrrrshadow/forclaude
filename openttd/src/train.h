@@ -10,6 +10,7 @@
 #ifndef TRAIN_H
 #define TRAIN_H
 
+#include <array>
 #include "core/enum_type.hpp"
 
 #include "newgrf_engine.h"
@@ -84,6 +85,13 @@ void NormalizeTrainVehInDepot(const Train *u);
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 bool TrainAwaitsRescue(Train *v);
 bool IsSignalOverrunOn();
+bool IsSignalOverrunOn(const Train *v);
+std::pair<int, int> BrakeTableAt(int speed);
+
+/** The braking table: km/h shed on one tile, one number a band of speed, top band first (see GetBrakeCurve()). */
+using BrakeDropTable = std::array<uint8_t, 11>;
+BrakeDropTable GameBrakeDropTable();
+
 void RestoreCoupleErrandAfterBreakdown(Train *v);
 bool IsConsistStandingAtStation(const Train *consist, StationID station);
 bool IsWholeTrainInsideDepot(const Train *v);
@@ -218,6 +226,29 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	mutable int driver_ceiling = INT32_MAX; ///< NOSAVE: the driver's own braking ceiling (BrakingCeiling()) as GetCurrentMaxSpeed() last found it, INT32_MAX when it did not ask.
 	uint16_t couple_refuse_tries = 0; ///< NOSAVE: how many ticks in a row a coupling has been refused while standing against the partner. A rescue engine gives the case up when it runs out; see TrainLocoHandler().
 	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
+
+	/* The driver of this train, as the player set him in the driver window
+	 * (ShowTrainDriverWindow(), opened by a click on the train's name in its
+	 * window). Each 0 means "as the game setting says"; anything else is the
+	 * train's own and stands in for the setting. Only the head of a consist
+	 * is asked (see DriverOf() in train_cmd.cpp), so a train picked up and
+	 * carried as wagons is driven by whoever picked it up. The player's
+	 * rule: every engine can have its own driver. */
+	uint8_t driver_sight = 0; ///< vehicle.train_braking for this train: 0 = as game, 1 = watches ETCS (off), 2..5 = sees 5, 10, 15, 20 tiles
+	uint8_t driver_signals = 0; ///< vehicle.train_driver_signals for this train: 0 = as game, 1..3 = reads the line through that many signals
+	uint8_t driver_stop_brake = 0; ///< vehicle.train_stop_brake_weaker for this train: 0 = as game, 1 = 30 % weaker, 2 = 10 % weaker
+	uint8_t driver_memory = 0; ///< vehicle.train_warning_memory for this train: 0 = as game, 1..6 = never forgets, 20, 15, 10, 5, 3 tiles
+	uint8_t driver_drop[11] = {}; ///< the braking table for this train, top band first: 0 = as game, else km/h shed on one tile
+
+	/** Take another train's driver over, as a clone or a replacement does. */
+	void CopyDriverFrom(const Train *other)
+	{
+		this->driver_sight = other->driver_sight;
+		this->driver_signals = other->driver_signals;
+		this->driver_stop_brake = other->driver_stop_brake;
+		this->driver_memory = other->driver_memory;
+		std::copy(std::begin(other->driver_drop), std::end(other->driver_drop), std::begin(this->driver_drop));
+	}
 
 	/* "Brake, fail to brake and crash" (vehicle.train_braking). Only
 	 * ever set on the head of a consist. */

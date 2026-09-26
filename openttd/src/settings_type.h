@@ -633,9 +633,25 @@ struct VehicleSettings {
 	bool train_rescue_towing; ///< broken-down and crashed trains wait to be towed away instead of sorting themselves out
 	uint16_t rescue_wait_days; ///< how many days a broken-down or crashed train waits to be fetched before it mends itself the vanilla way
 	uint8_t train_braking; ///< "brake, fail to brake and crash" and how far the driver sees: 0 = off, the driver sees as far as braking needs; 1..4 = on, he sees 5, 10, 15, 20 tiles
+	/* The braking table (see GetBrakeCurve()): how many km/h a train sheds on
+	 * one tile, one number for each band of speed. The name says the band's
+	 * top: 300 is 300 km/h and above down to 250, 250 is 250 down to 200, and
+	 * so on to 10, which is 10 down to a stand. */
+	uint8_t train_brake_drop_300; ///< km/h shed a tile at 300 km/h and above, down to 250
+	uint8_t train_brake_drop_250; ///< km/h shed a tile between 250 and 200 km/h
+	uint8_t train_brake_drop_200; ///< km/h shed a tile between 200 and 160 km/h
+	uint8_t train_brake_drop_160; ///< km/h shed a tile between 160 and 130 km/h
+	uint8_t train_brake_drop_130; ///< km/h shed a tile between 130 and 100 km/h
+	uint8_t train_brake_drop_100; ///< km/h shed a tile between 100 and 80 km/h
+	uint8_t train_brake_drop_80; ///< km/h shed a tile between 80 and 60 km/h
+	uint8_t train_brake_drop_60; ///< km/h shed a tile between 60 and 40 km/h
+	uint8_t train_brake_drop_40; ///< km/h shed a tile between 40 and 20 km/h
+	uint8_t train_brake_drop_20; ///< km/h shed a tile between 20 and 10 km/h
+	uint8_t train_brake_drop_10; ///< km/h shed a tile between 10 km/h and a stand
 	uint8_t train_stop_brake_weaker; ///< with train_braking on, how much weaker a train stopped by the player brakes: 0 = 30 %, 1 = 10 %
 	uint8_t train_warning_memory; ///< with train_braking on, after how many tiles past a signal the driver forgets what it told him: 0 = never (ETCS), 1..5 = 20, 15, 10, 5, 3 tiles
-	uint8_t train_warning_signals; ///< how many signals before a red show the warning aspect, 1..3; with train_braking on, also how many signals ahead a driver knows of
+	uint8_t train_warning_signals; ///< how many signals before a red show the warning aspect, 1..3
+	uint8_t train_driver_signals; ///< with train_braking on, through how many signals ahead a driver reads the line, 1..3; split off the yellow count by the player's word, and each train's driver may have his own (Train::driver_signals)
 	AccelerationModel roadveh_acceleration_model; ///< realistic acceleration for road vehicles
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration

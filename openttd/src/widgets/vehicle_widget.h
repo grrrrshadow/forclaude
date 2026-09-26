@@ -87,4 +87,19 @@ enum VehicleListWidgets : WidgetID {
 	WID_VL_START_ALL,                ///< Start all button.
 };
 
+/** Widgets of the #TrainDriverWindow class (train_driver_gui.cpp). */
+enum TrainDriverWidgets : WidgetID {
+	WID_DRV_CAPTION,    ///< Caption: the train's name.
+	WID_DRV_SIGHT,      ///< Dropdown: "brake, fail to brake and crash" for this train.
+	WID_DRV_SIGNALS,    ///< Dropdown: through how many signals the driver reads the line.
+	WID_DRV_STOP_BRAKE, ///< Dropdown: the emergency brake.
+	WID_DRV_MEMORY,     ///< Dropdown: how long the driver remembers a yellow.
+	WID_DRV_TABLE_HEAD, ///< The speeds over the braking table's boxes.
+	WID_DRV_HELP,       ///< What the table's numbers mean.
+	WID_DRV_RESET,      ///< Button: everything as the game says.
+	WID_DRV_APPLY,      ///< Button: keep the changes.
+	WID_DRV_BAND,       ///< Dropdown: the first band of the braking table; ten more follow (WID_DRV_BAND + 1 ...).
+	WID_DRV_BAND_END = WID_DRV_BAND + 11, ///< One past the last band.
+};
+
 #endif /* WIDGETS_VEHICLE_WIDGET_H */

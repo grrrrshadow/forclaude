@@ -1266,6 +1266,47 @@ struct GameOptionsWindow : Window {
 			return;
 		}
 
+		/* The braking table: its second row is eleven boxes, each a dropdown
+		 * of its own setting; the first row names the speeds and does nothing.
+		 * See BrakeTableEntry. */
+		BrakeTableEntry *table = dynamic_cast<BrakeTableEntry*>(clicked_entry);
+		if (table != nullptr) {
+			if (btn - cur_row != 1) return;
+			int entry_left = wid->pos_x + WidgetDimensions::scaled.frametext.left + (clicked_entry->level + 1) * WidgetDimensions::scaled.hsep_indent;
+			int entry_right = wid->pos_x + static_cast<int>(wid->current_x) - 1 - WidgetDimensions::scaled.frametext.right;
+			uint band = BrakeTableEntry::BandAt(pt.x - entry_left, entry_right - entry_left + 1);
+			SettingEntry *box = &table->bands[band];
+			this->SetDisplayedHelpText(box);
+			if (!box->setting->IsEditable()) return;
+
+			if (this->valuedropdown_entry == box) {
+				this->CloseChildWindows(WindowClass::DropdownMenu);
+				this->closing_dropdown = false;
+				this->valuedropdown_entry->SetButtons({});
+				this->valuedropdown_entry = nullptr;
+			} else {
+				if (this->valuedropdown_entry != nullptr) this->valuedropdown_entry->SetButtons({});
+				this->closing_dropdown = false;
+
+				int rel_y = (pt.y - wid->pos_y - WidgetDimensions::scaled.framerect.top) % wid->resize_y;
+				Rect wi_rect = BrakeTableEntry::BoxRect(entry_left, entry_right, pt.y - rel_y, band);
+				if (pt.y >= wi_rect.top && pt.y <= wi_rect.bottom) {
+					this->valuedropdown_entry = box;
+					this->valuedropdown_entry->SetButtons(SettingEntryFlag::LeftDepressed);
+
+					auto [min_val, max_val] = box->setting->GetRange();
+					int32_t value = box->setting->Read(ResolveObject(settings_ptr, box->setting));
+					DropDownList list;
+					for (int32_t i = min_val; i <= static_cast<int32_t>(max_val); i++) {
+						list.push_back(MakeDropDownListStringItem(GetString(STR_JUST_INT, i), i));
+					}
+					ShowDropDownListAt(this, std::move(list), value, WID_GO_SETTING_DROPDOWN, wi_rect, Colours::Orange);
+				}
+			}
+			this->SetDirty();
+			return;
+		}
+
 		SettingEntry *pe = dynamic_cast<SettingEntry*>(clicked_entry);
 		assert(pe != nullptr);
 		const IntSettingDesc *sd = pe->setting;
@@ -1520,7 +1561,8 @@ struct GameOptionsWindow : Window {
 				/* Deal with drop down boxes on the panel. */
 				assert(this->valuedropdown_entry != nullptr);
 				const IntSettingDesc *sd = this->valuedropdown_entry->setting;
-				assert(sd->flags.Test(SettingFlag::GuiDropdown));
+				/* A box of the braking table opens a dropdown of plain numbers
+				 * without the flag; the chosen entry is the value either way. */
 
 				SetSettingValue(sd, index);
 				this->SetDirty();

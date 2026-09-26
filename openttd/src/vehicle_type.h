@@ -112,4 +112,18 @@ enum class GroundVehicleFlag : uint8_t {
 /** Bitset of \c GroundVehicleFlag elements. */
 using GroundVehicleFlags = EnumBitSet<GroundVehicleFlag, uint16_t>;
 
+/**
+ * Which of a train driver's settings a command (Commands::SetTrainDriver) or
+ * the driver window means. The bands of the braking table follow the four
+ * single settings, top band first.
+ */
+enum TrainDriverField : uint8_t {
+	TDF_SIGHT,      ///< Train::driver_sight
+	TDF_SIGNALS,    ///< Train::driver_signals
+	TDF_STOP_BRAKE, ///< Train::driver_stop_brake
+	TDF_MEMORY,     ///< Train::driver_memory
+	TDF_BAND,       ///< Train::driver_drop[0], the next ten follow
+	TDF_END = TDF_BAND + 11,
+};
+
 #endif /* VEHICLE_TYPE_H */

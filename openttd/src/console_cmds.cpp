@@ -110,6 +110,7 @@
 #include "waypoint_base.h"
 #include "waypoint_func.h"
 #include "vehicle_gui.h"
+#include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
 #include "widgets/misc_widget.h"
 #include "widgets/order_widget.h"
@@ -6675,7 +6676,7 @@ static bool ConTestRefreshWindows(std::span<std::string_view> argv)
 		if (w->window_class != WindowClass::VehicleView) continue;
 		const Vehicle *v = Vehicle::GetIfValid(static_cast<VehicleID>(w->window_number));
 		if (v == nullptr) {
-			IConsolePrint(CC_DEFAULT, "testokna: okno vozidla {} - vozidlo uz neni", static_cast<int>(w->window_number));
+			IConsolePrint(CC_DEFAULT, "testridicokno: okno vozidla {} - vozidlo uz neni", static_cast<int>(w->window_number));
 			continue;
 		}
 		bool head = v == v->First();
@@ -6700,7 +6701,7 @@ static bool ConTestRefreshWindows(std::span<std::string_view> argv)
 	InvalidateWindowClassesData(WindowClass::VehicleView);
 	InvalidateWindowClassesData(WindowClass::VehicleDetails);
 	InvalidateWindowClassesData(WindowClass::VehicleOrders);
-	IConsolePrint(CC_DEFAULT, "testokna: okna vozidel obnovena.");
+	IConsolePrint(CC_DEFAULT, "testridicokno: okna vozidel obnovena.");
 	return true;
 }
 
@@ -9239,6 +9240,121 @@ static bool ConTestWhere(std::span<std::string_view> argv)
  * Usage: testsleduj <unit number> [ticks]
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Read the braking table out: at each speed of the table's header, and at
+ * any speed given, how many km/h a train sheds on one tile and how many
+ * tiles it takes to come to a stand. So the player can check the numbers he
+ * set against what the game makes of them without driving a train.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBrakes(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	auto say = [](int speed) {
+		auto [drop, tenths] = BrakeTableAt(speed);
+		IConsolePrint(CC_DEFAULT, "  {} km/h: ubere {}.{} km/h na policko, zastavi za {}.{} policek", speed, drop / 256, (drop % 256) * 10 / 256, tenths / 10, tenths % 10);
+	};
+	IConsolePrint(CC_DEFAULT, "tabulka brzdeni: 300+ {} 250 {} 200 {} 160 {} 130 {} 100 {} 80 {} 60 {} 40 {} 20 {} 10 {} 0",
+			_settings_game.vehicle.train_brake_drop_300, _settings_game.vehicle.train_brake_drop_250, _settings_game.vehicle.train_brake_drop_200,
+			_settings_game.vehicle.train_brake_drop_160, _settings_game.vehicle.train_brake_drop_130, _settings_game.vehicle.train_brake_drop_100,
+			_settings_game.vehicle.train_brake_drop_80, _settings_game.vehicle.train_brake_drop_60, _settings_game.vehicle.train_brake_drop_40,
+			_settings_game.vehicle.train_brake_drop_20, _settings_game.vehicle.train_brake_drop_10);
+	if (argv.size() >= 2) {
+		auto speed = ParseInteger<int>(argv[1]);
+		if (speed.has_value()) say(*speed);
+		return true;
+	}
+	for (int speed : {300, 250, 200, 160, 130, 100, 80, 60, 40, 20, 10}) say(speed);
+	return true;
+}
+
+/**
+ * Read or set a train's driver from the console -- what the driver window
+ * does by hand: testridic <vlak> [vidi|semafory|brzda|pamet|d300|d250|d200|
+ * d160|d130|d100|d80|d60|d40|d20|d10 <hodnota>], 0 for "as the game says".
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestDriver(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "testridic <vlak> [vidi|semafory|brzda|pamet|d300|d250|d200|d160|d130|d100|d80|d60|d40|d20|d10 <hodnota>]");
+		return true;
+	}
+	auto number = ParseInteger<uint>(argv[1]);
+	Train *t = nullptr;
+	for (Train *u : Train::Iterate()) {
+		if (number.has_value() && u->IsFrontEngine() && u->unitnumber == *number) t = u;
+	}
+	if (t == nullptr) {
+		IConsolePrint(CC_ERROR, "testridic: vlak {} nenalezen", argv[1]);
+		return true;
+	}
+	if (argv.size() >= 4) {
+		static const std::pair<std::string_view, TrainDriverField> FIELDS[] = {
+			{"vidi", TDF_SIGHT}, {"semafory", TDF_SIGNALS}, {"brzda", TDF_STOP_BRAKE}, {"pamet", TDF_MEMORY},
+			{"d300", TrainDriverField(TDF_BAND + 0)}, {"d250", TrainDriverField(TDF_BAND + 1)}, {"d200", TrainDriverField(TDF_BAND + 2)},
+			{"d160", TrainDriverField(TDF_BAND + 3)}, {"d130", TrainDriverField(TDF_BAND + 4)}, {"d100", TrainDriverField(TDF_BAND + 5)},
+			{"d80", TrainDriverField(TDF_BAND + 6)}, {"d60", TrainDriverField(TDF_BAND + 7)}, {"d40", TrainDriverField(TDF_BAND + 8)},
+			{"d20", TrainDriverField(TDF_BAND + 9)}, {"d10", TrainDriverField(TDF_BAND + 10)},
+		};
+		auto it = std::find_if(std::begin(FIELDS), std::end(FIELDS), [&](const auto &f) { return f.first == argv[2]; });
+		auto value = ParseInteger<uint>(argv[3]);
+		if (it == std::end(FIELDS) || !value.has_value()) {
+			IConsolePrint(CC_ERROR, "testridic: neznam pole {} nebo hodnotu {}", argv[2], argv[3]);
+			return true;
+		}
+		/* Run from a tick, the command reads whichever company is current,
+		 * and in a timer that is nobody; the train's owner sets him. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost res = Command<Commands::SetTrainDriver>::Do(DoCommandFlag::Execute, t->index, it->second, static_cast<uint8_t>(*value));
+		if (res.Failed()) IConsolePrint(CC_ERROR, "testridic: ODMITNUTO pole {} hodnota {}", argv[2], *value);
+	}
+	std::string table;
+	for (uint8_t d : t->driver_drop) table += fmt::format(" {}", d);
+	IConsolePrint(CC_DEFAULT, "ridic vlaku {}: vidi {} semafory {} brzda {} pamet {} tabulka{} (0 = podle hry)", t->unitnumber,
+			t->driver_sight, t->driver_signals, t->driver_stop_brake, t->driver_memory, table);
+	return true;
+}
+
+/**
+ * Open the windows the driver lives in, so the rig walks their layout and
+ * drawing once: the game settings (the braking table's row in the tree) and,
+ * for a train, its window, its driver's window by the click on its name, and
+ * the driver's two buttons. Nothing is measured; a crash in a window is what
+ * this is for, since nobody looks at a window in the rig.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestWindows(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	ShowGameOptions();
+	Window *options = FindWindowByClass(WindowClass::GameOptions);
+	if (options != nullptr) options->OnClick(Point{0, 0}, WID_GO_TAB_ADVANCED, 1);
+	if (argv.size() < 2) return true;
+	auto number = ParseInteger<uint>(argv[1]);
+	for (Train *t : Train::Iterate()) {
+		if (!number.has_value() || !t->IsFrontEngine() || t->unitnumber != *number) continue;
+		/* The buttons post commands as the player would, and a command posted
+		 * from a tick sees no company at all; the player's is set. */
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		ShowVehicleViewWindow(t);
+		Window *view = FindWindowById(WindowClass::VehicleView, t->index);
+		if (view != nullptr) view->OnCaptionClick();
+		Window *driver = FindWindowById(WindowClass::TrainDriver, t->index);
+		IConsolePrint(CC_DEFAULT, "testridicokno: vlak {} okno {} strojvedouci {}", t->unitnumber, view != nullptr ? "otevreno" : "NENI", driver != nullptr ? "otevren" : "NENI");
+		if (driver != nullptr) {
+			driver->OnDropdownSelect(WID_DRV_SIGHT, 3, 0);
+			driver->OnDropdownSelect(WID_DRV_BAND + 5, 7, 0);
+			driver->OnClick(Point{0, 0}, WID_DRV_APPLY, 1);
+			IConsolePrint(CC_DEFAULT, "testridicokno: po potvrzeni vidi {} tabulka[100] {}", t->driver_sight, t->driver_drop[5]);
+			driver->OnClick(Point{0, 0}, WID_DRV_RESET, 1);
+			driver->OnClick(Point{0, 0}, WID_DRV_APPLY, 1);
+			IConsolePrint(CC_DEFAULT, "testridicokno: po resetu vidi {} tabulka[100] {}", t->driver_sight, t->driver_drop[5]);
+		}
+	}
+	return true;
+}
+
 static bool ConTestFollow(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -12772,6 +12888,9 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testodvoz",               ConTestRequestTow);
 	IConsole::CmdRegister("testrada",                ConTestRakeWait);
 	IConsole::CmdRegister("testsleduj",              ConTestFollow);
+	IConsole::CmdRegister("testbrzdy",               ConTestBrakes);
+	IConsole::CmdRegister("testridic",               ConTestDriver);
+	IConsole::CmdRegister("testridicokno",           ConTestWindows);
 	IConsole::CmdRegister("testkde",                 ConTestWhere);
 	IConsole::CmdRegister("testpostav",              ConTestBuildEngine);
 	IConsole::CmdRegister("testprojet",              ConTestForceProceed);

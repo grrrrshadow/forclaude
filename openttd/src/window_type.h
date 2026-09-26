@@ -405,6 +405,12 @@ enum class WindowClass : uint16_t {
 	BuildHouse,
 
 	/**
+	 * A train's driver: his "brake, fail to brake and crash" and braking table; %Window numbers:
+	 *   - #VehicleID = #TrainDriverWidgets
+	 */
+	TrainDriver,
+
+	/**
 	 * Build vehicle; %Window numbers:
 	 *   - #VehicleType = #BuildVehicleWidgets
 	 *   - #TileIndex = #BuildVehicleWidgets

@@ -468,6 +468,10 @@ static CommandCost CopyHeadSpecificThings(Vehicle *old_head, Vehicle *new_head, 
 		 * arrived at the rake engine first. The player's rule for the tow
 		 * (RestoreCasualtyOrientation()) applied to the replacement. */
 		new_head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, old_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards));
+
+		/* The driver stays with the train through a replacement: he is the
+		 * player's setting for this train, not for a particular engine. */
+		if (old_head->type == VehicleType::Train) Train::From(new_head)->CopyDriverFrom(Train::From(old_head));
 		GroupStatistics::AddProfitLastYear(new_head);
 
 		/* Switch vehicle windows/news to the new vehicle, so they are not closed/deleted when the old vehicle is sold */

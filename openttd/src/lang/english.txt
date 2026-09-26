@@ -1439,21 +1439,26 @@ STR_CONFIG_SETTING_RESCUE_WAIT_DAYS_VALUE                       :{COMMA} day{P 0
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING                :Trains slow down before a level crossing: {STRING2}
 STR_CONFIG_SETTING_TRAIN_SLOW_FOR_LEVEL_CROSSING_HELPTEXT       :A train eases off where the line is dangerous, and runs normally under a road bridge. The driver looks ahead, and a car caught on the crossing comes off more lightly
 STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN                         :Brake, fail to brake and crash: {STRING2}
-STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :I need this. "Watches ETCS, not the track" switches off the limit on how far the driver sees a signal (the default; he always stops for a red in time). "Sees 5 tiles" really means he does not see a red further than five tiles off. "20 with ETCS" is for braking heavy trains: he sees 20 tiles far. He does not see past more signals than the setting for how many yellow signals warn before a red. A train brakes for as long as it takes to pull away - a heavy train long. A train that reaches a red signal too fast runs past it and may crash into whatever is beyond. Press a train's stop button and nobody drives it any more: it only brakes on the emergency brake, weaker (by how much is the Emergency brake setting), and a stop pressed too late can end in a crash - which then makes the papers. A helicopter comes to the wreck and waits until the tow takes it away. Realistic train acceleration only
+STR_CONFIG_SETTING_TRAIN_SIGNAL_OVERRUN_HELPTEXT                :I need this. "Watches ETCS, not the track" switches off the limit on how far the driver sees a signal (the default; he always stops for a red in time). "Sees 5 tiles" really means he does not see a red further than five tiles off. "20 with ETCS" is for braking heavy trains: he sees 20 tiles far. He does not see past more signals than the setting for how many yellow signals warn before a red. How hard a train brakes is the braking table under this setting. A train that reaches a red signal too fast runs past it and may crash into whatever is beyond. Press a train's stop button and nobody drives it any more: it only brakes on the emergency brake, weaker (by how much is the Emergency brake setting), and a stop pressed too late can end in a crash - which then makes the papers. A helicopter comes to the wreck and waits until the tow takes it away. Realistic train acceleration only
 STR_CONFIG_SETTING_TRAIN_BRAKING_ETCS                           :watches ETCS, not the track
 STR_CONFIG_SETTING_TRAIN_BRAKING_5                              :sees 5 tiles
 STR_CONFIG_SETTING_TRAIN_BRAKING_10                             :sees 10 tiles
 STR_CONFIG_SETTING_TRAIN_BRAKING_15                             :sees 15 tiles with ETCS
 STR_CONFIG_SETTING_TRAIN_BRAKING_20                             :sees 20 tiles with ETCS
+STR_CONFIG_SETTING_TRAIN_BRAKE_DROP                             :Braking table: km/h shed on one tile
+STR_CONFIG_SETTING_TRAIN_BRAKE_DROP_HELPTEXT                    :The braking table. Above it the speeds, between them a number for each band: how many km/h a train sheds on one tile while it is doing a speed in that band. On the line between two bands it brakes by the average of both numbers, at 300 and above by the first. Every train the same, whatever it weighs or pulls. Applies when "Brake, fail to brake and crash" is on
+STR_CONFIG_SETTING_TRAIN_BRAKE_DROP_VALUE                       :{COMMA} km/h a tile
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER                      :Emergency brake: {STRING2}
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_HELPTEXT             :The stop button is the emergency brake, the handle passengers pull. How much weaker a train brakes once you press its stop button. Applies when "Brake, fail to brake and crash" is on (sees 5 to 20 tiles)
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_30                   :30 % weaker
 STR_CONFIG_SETTING_TRAIN_STOP_BRAKE_WEAKER_10                   :10 % weaker
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS                         :Yellow signals warning before a red: {STRING2}
-STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_HELPTEXT                :How many signals before a red light yellow. With "Brake, fail to brake and crash" on, the driver sees past that many signals and no more, however close together they stand. He brakes for a red in time if the signals stand far enough apart. More yellow signals let heavy trains stop on closely spaced signals, but the trains behind brake earlier and run further apart
+STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_HELPTEXT                :How many signals before a red show yellow. Through how many of them a driver reads the line is its own setting, the next one down
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_1                       :1
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_2                       :2
 STR_CONFIG_SETTING_TRAIN_WARNING_SIGNALS_3                       :3
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGNALS                         :Driver reads the line through signals: {STRING2}
+STR_CONFIG_SETTING_TRAIN_DRIVER_SIGNALS_HELPTEXT                :Through how many signals ahead a driver reads the line; past those he knows nothing, however close they stand. He stops for a red when the signals are far enough apart. More lets heavy trains stop in time on closely spaced signals, but trains behind them brake earlier and run further apart. Applies when "Brake, fail to brake and crash" is on; every train can have its own driver (click the train's name in its window)
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY                          :Forgets the yellow: {STRING2}
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_HELPTEXT                 :How long the driver keeps in mind what the last signal he passed told him. Set to 5, Alzheimer: the driver remembers for only 5 tiles past the yellow signal that he has to brake. There has to be another signal there. Applies when "Brake, fail to brake and crash" is on
 STR_CONFIG_SETTING_TRAIN_WARNING_MEMORY_NEVER                    :never with ETCS
@@ -4758,6 +4763,24 @@ STR_VEHICLE_VIEW_TRAIN_COUPLE_TOOLTIP                           :{BLACK}Couple t
 STR_VEHICLE_VIEW_TRAIN_SELL_TOOLTIP                             :{BLACK}Sell this train. A rescue engine comes for it and sells it in the depot; the money arrives when it is actually sold there
 STR_VEHICLE_VIEW_WAGONS_SELL_TOOLTIP                            :{BLACK}Sell these wagons. A rescue engine comes for them and sells them in the depot; the money arrives when they are actually sold there
 STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Station this train in this depot as a rescue engine. It waits here and is sent out to fetch trains that break down or crash, and returns here afterwards
+STR_TRAIN_DRIVER_CAPTION                                        :{WHITE}Driver: {VEHICLE}
+STR_TRAIN_DRIVER_SIGHT                                          :{BLACK}Brake, fail to brake and crash
+STR_TRAIN_DRIVER_SIGHT_TOOLTIP                                  :{BLACK}How far this train's driver sees a signal. "As the game says" is the game setting of the same name
+STR_TRAIN_DRIVER_SIGNALS                                        :{BLACK}Reads the line through signals
+STR_TRAIN_DRIVER_SIGNALS_TOOLTIP                                :{BLACK}Through how many signals ahead this driver reads the line. How many masts light up yellow is the line's setting, not his
+STR_TRAIN_DRIVER_STOP_BRAKE                                     :{BLACK}Emergency brake
+STR_TRAIN_DRIVER_STOP_BRAKE_TOOLTIP                             :{BLACK}How much weaker this train brakes once its stop button is pressed
+STR_TRAIN_DRIVER_MEMORY                                         :{BLACK}Forgets a yellow
+STR_TRAIN_DRIVER_MEMORY_TOOLTIP                                 :{BLACK}How long this driver remembers what the last signal told him
+STR_TRAIN_DRIVER_AS_GAME                                        :as the game says: {RAW_STRING}
+STR_TRAIN_DRIVER_BAND_GAME                                      :{BLACK}{NUM}
+STR_TRAIN_DRIVER_BAND_OWN                                       :{WHITE}{NUM}
+STR_TRAIN_DRIVER_BAND_TOOLTIP                                   :{BLACK}How many km/h this train sheds on one tile at the speeds written above. A white number is this train's own, a black one the game's
+STR_TRAIN_DRIVER_HELP                                           :{BLACK}The braking table: how many km/h the train sheds on one tile at a speed between the two written above the box. A white number is this train's own, a black one the game's. Nothing changes until "Keep the changes"
+STR_TRAIN_DRIVER_RESET                                          :{BLACK}Reset
+STR_TRAIN_DRIVER_RESET_TOOLTIP                                  :{BLACK}Everything as the game says. "Keep the changes" then writes it to the train
+STR_TRAIN_DRIVER_APPLY                                          :{BLACK}Keep the changes
+STR_TRAIN_DRIVER_APPLY_TOOLTIP                                  :{BLACK}Write what the window shows to this train's driver
 STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP                             :{BLACK}Call a rescue engine to take these wagons to a depot. Click again to take the call back
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reverse direction of train
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Force vehicle to turn around

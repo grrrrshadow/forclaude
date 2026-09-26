@@ -25,6 +25,7 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id);
 CommandCost CmdSetRescueEngine(DoCommandFlags flags, VehicleID veh_id, bool rescue);
 CommandCost CmdRequestWagonTow(DoCommandFlags flags, VehicleID veh_id, bool request, bool sell);
 CommandCost CmdSellTrainForScrap(DoCommandFlags flags, VehicleID veh_id);
+CommandCost CmdSetTrainDriver(DoCommandFlags flags, VehicleID veh_id, TrainDriverField field, uint8_t value);
 
 DEF_CMD_TRAIT(Commands::MoveRailVehicle, CmdMoveRailVehicle, CommandFlag::Location, CommandType::VehicleConstruction)
 DEF_CMD_TRAIT(Commands::ForceTrainProceed, CmdForceTrainProceed, CommandFlag::Location, CommandType::VehicleManagement)
@@ -33,6 +34,7 @@ DEF_CMD_TRAIT(Commands::CoupleTrains, CmdCoupleTrains, CommandFlag::Location, Co
 DEF_CMD_TRAIT(Commands::SetRescueEngine, CmdSetRescueEngine, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::RequestWagonTow, CmdRequestWagonTow, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::SellTrainForScrap, CmdSellTrainForScrap, CommandFlag::Location, CommandType::VehicleManagement)
+DEF_CMD_TRAIT(Commands::SetTrainDriver, CmdSetTrainDriver, CommandFlag::Location, CommandType::VehicleManagement)
 
 void CcBuildWagon(Commands, const CommandCost &result, VehicleID new_veh_id, uint, uint16_t, CargoArray, TileIndex tile, EngineID, bool, CargoType, ClientID);
 

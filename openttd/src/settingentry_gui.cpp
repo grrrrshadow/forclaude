@@ -15,6 +15,7 @@
 #include "settings_internal.h"
 #include "stringfilter_type.h"
 #include "strings_func.h"
+#include "window_gui.h"
 
 #include "table/sprites.h"
 #include "table/strings.h"
@@ -309,6 +310,185 @@ void SettingEntry::DrawSetting(GameSettings *settings_ptr, int left, int right, 
 	}
 	auto [param1, param2] = sd->GetValueParams(value);
 	DrawString(text_left, text_right, y + (BaseSettingEntry::line_height - GetCharacterHeight(FontSize::Normal)) / 2, GetString(sd->GetTitle(), STR_CONFIG_SETTING_VALUE, param1, param2), highlight ? TextColour::White : TextColour::LightBlue);
+}
+
+/* == BrakeTableEntry methods == */
+
+BrakeTableEntry::BrakeTableEntry() : bands{{
+		SettingEntry("vehicle.train_brake_drop_300"), SettingEntry("vehicle.train_brake_drop_250"),
+		SettingEntry("vehicle.train_brake_drop_200"), SettingEntry("vehicle.train_brake_drop_160"),
+		SettingEntry("vehicle.train_brake_drop_130"), SettingEntry("vehicle.train_brake_drop_100"),
+		SettingEntry("vehicle.train_brake_drop_80"), SettingEntry("vehicle.train_brake_drop_60"),
+		SettingEntry("vehicle.train_brake_drop_40"), SettingEntry("vehicle.train_brake_drop_20"),
+		SettingEntry("vehicle.train_brake_drop_10")}}
+{
+}
+
+void BrakeTableEntry::Init(uint8_t level)
+{
+	BaseSettingEntry::Init(level);
+	for (SettingEntry &b : this->bands) b.Init(level);
+}
+
+void BrakeTableEntry::ResetAll()
+{
+	for (SettingEntry &b : this->bands) b.ResetAll();
+}
+
+/** Two rows: the speeds, and the boxes between them. */
+uint BrakeTableEntry::Length() const
+{
+	return this->IsFiltered() ? 0 : 2;
+}
+
+/** The entry answers for its boxes: the window remembers the box it opened, not the table. */
+bool BrakeTableEntry::IsVisible(const BaseSettingEntry *item) const
+{
+	if (this->IsFiltered()) return false;
+	if (item == this) return true;
+	for (const SettingEntry &b : this->bands) {
+		if (&b == item) return true;
+	}
+	return false;
+}
+
+/** Both rows are this entry; \a cur_row is left at the first, so the caller can tell which of the two was hit. */
+BaseSettingEntry *BrakeTableEntry::FindEntry(uint row_num, uint *cur_row)
+{
+	if (this->IsFiltered()) return nullptr;
+	if (row_num == *cur_row || row_num == *cur_row + 1) return this;
+	*cur_row += 2;
+	return nullptr;
+}
+
+uint BrakeTableEntry::GetMaxHelpHeight(int maxw)
+{
+	return this->bands[0].GetMaxHelpHeight(maxw);
+}
+
+/** The table shows while any of its boxes would: they share a title and a help text, so it is all or nothing in practice. */
+bool BrakeTableEntry::UpdateFilterState(SettingFilter &filter, bool force_visible)
+{
+	bool visible = false;
+	for (SettingEntry &b : this->bands) {
+		if (b.UpdateFilterState(filter, force_visible)) visible = true;
+	}
+	this->flags.Set(SettingEntryFlag::Filtered, !visible);
+	return visible;
+}
+
+/**
+ * Which box a click lands in.
+ * @param x     the click, from the entry's left edge
+ * @param width the entry's width
+ * @return the band, top band first
+ */
+uint BrakeTableEntry::BandAt(int x, int width)
+{
+	if (width <= 0 || x <= 0) return 0;
+	return std::min<uint>(static_cast<uint>(x) * BANDS / static_cast<uint>(width), BANDS - 1);
+}
+
+/**
+ * Where a band's box is drawn.
+ * @param left  the entry's left edge
+ * @param right the entry's right edge
+ * @param y     the top of the boxes' row
+ * @param band  the band, top band first
+ */
+Rect BrakeTableEntry::BoxRect(int left, int right, int y, uint band)
+{
+	const int width = right - left + 1;
+	const int top = y + (BaseSettingEntry::line_height - SETTING_BUTTON_HEIGHT) / 2;
+	return {left + static_cast<int>(band) * width / static_cast<int>(BANDS) + 1,
+			top,
+			left + static_cast<int>(band + 1) * width / static_cast<int>(BANDS) - 1,
+			top + SETTING_BUTTON_HEIGHT - 1};
+}
+
+uint BrakeTableEntry::Draw(GameSettings *settings_ptr, int left, int right, int y, uint first_row, uint max_row, BaseSettingEntry *selected, uint cur_row, uint parent_last) const
+{
+	if (this->IsFiltered()) return cur_row;
+
+	bool rtl = _current_text_dir == TD_RTL;
+	int offset = (rtl ? -static_cast<int>(BaseSettingEntry::circle_size.width) : static_cast<int>(BaseSettingEntry::circle_size.width)) / 2;
+	int level_width = rtl ? -WidgetDimensions::scaled.hsep_indent : WidgetDimensions::scaled.hsep_indent;
+	bool highlight = this->IsVisible(selected) && selected != nullptr;
+
+	for (uint row = 0; row < 2; row++, cur_row++) {
+		if (cur_row >= max_row) return cur_row;
+		if (cur_row < first_row) continue;
+
+		int x = rtl ? right : left;
+		int ry = y + (cur_row - first_row) * BaseSettingEntry::line_height;
+		PixelColour colour = GetColourGradient(Colours::Orange, Shade::Normal);
+
+		/* The same tree lines every entry draws (BaseSettingEntry::Draw()),
+		 * over two rows: the tick on the first, the line on down the second
+		 * unless this is the last entry of its page. */
+		for (uint lvl = 0; lvl < this->level; lvl++) {
+			if (!HasBit(parent_last, lvl)) GfxDrawLine(x + offset, ry, x + offset, ry + BaseSettingEntry::line_height - 1, colour);
+			x += level_width;
+		}
+		int halfway_y = ry + BaseSettingEntry::line_height / 2;
+		bool last = this->flags.Test(SettingEntryFlag::LastField);
+		if (row == 0) {
+			int bottom_y = last ? halfway_y : ry + BaseSettingEntry::line_height - 1;
+			GfxDrawLine(x + offset, ry, x + offset, bottom_y, colour);
+			GfxDrawLine(x + offset, halfway_y, x + level_width - (rtl ? -WidgetDimensions::scaled.hsep_normal : WidgetDimensions::scaled.hsep_normal), halfway_y, colour);
+		} else if (!last) {
+			GfxDrawLine(x + offset, ry, x + offset, ry + BaseSettingEntry::line_height - 1, colour);
+		}
+		x += level_width;
+
+		this->DrawRow(settings_ptr, rtl ? left : x, rtl ? x : right, ry, row, highlight);
+	}
+	return cur_row;
+}
+
+void BrakeTableEntry::DrawSetting(GameSettings *settings_ptr, int left, int right, int y, bool highlight) const
+{
+	this->DrawRow(settings_ptr, left, right, y, 0, highlight);
+}
+
+/**
+ * One of the two rows: the speeds over the boxes' edges, or the boxes with
+ * the numbers in them.
+ */
+void BrakeTableEntry::DrawRow(GameSettings *settings_ptr, int left, int right, int y, uint row, bool highlight) const
+{
+	const int width = right - left + 1;
+	const int text_y = y + (BaseSettingEntry::line_height - GetCharacterHeight(FontSize::Normal)) / 2;
+
+	if (row == 0) {
+		/* A speed over each edge between two boxes, the first and last over
+		 * the outer edges: 300 and above is the top of the first band. */
+		const TextColour tc = highlight ? TextColour::White : TextColour::LightBlue;
+		const int half = width / (2 * static_cast<int>(BANDS));
+		for (uint k = 0; k <= BANDS; k++) {
+			std::string label = k == 0 ? "300+" : fmt::format("{}", BAND_TOP[k]);
+			int cx = left + static_cast<int>(k) * width / static_cast<int>(BANDS);
+			if (k == 0) {
+				DrawString(left, left + 2 * half, text_y, label, tc, AlignmentH::ForceLeft);
+			} else if (k == BANDS) {
+				DrawString(right - 2 * half, right, text_y, label, tc, AlignmentH::ForceRight);
+			} else {
+				DrawString(cx - half, cx + half, text_y, label, tc, AlignmentH::Centre);
+			}
+		}
+		return;
+	}
+
+	for (uint k = 0; k < BANDS; k++) {
+		const SettingEntry &b = this->bands[k];
+		const IntSettingDesc *sd = b.setting;
+		const Rect box = BoxRect(left, right, y, k);
+		const bool pressed = (b.flags & SEF_BUTTONS_MASK).Any();
+		DrawFrameRect(box, Colours::Yellow, pressed ? FrameFlag::Lowered : FrameFlags{});
+		int32_t value = sd->Read(ResolveObject(settings_ptr, sd));
+		DrawString(box.left, box.right, text_y, GetString(STR_JUST_INT, value), TextColour::Black, AlignmentH::Centre);
+		if (!sd->IsEditable()) GfxFillRect(box.Shrink(WidgetDimensions::scaled.bevel), GetColourGradient(Colours::Yellow, Shade::Darker), FillRectMode::Checker);
+	}
 }
 
 /* == SettingsContainer methods == */
@@ -757,8 +937,10 @@ SettingsContainer &GetSettingsTree()
 				physics->Add(new SettingEntry("vehicle.train_rescue_towing"));
 				physics->Add(new SettingEntry("vehicle.train_slow_for_level_crossing"));
 				physics->Add(new SettingEntry("vehicle.train_braking"));
+				physics->Add(new BrakeTableEntry());
 				physics->Add(new SettingEntry("vehicle.train_stop_brake_weaker"));
 				physics->Add(new SettingEntry("vehicle.train_warning_signals"));
+				physics->Add(new SettingEntry("vehicle.train_driver_signals"));
 				physics->Add(new SettingEntry("vehicle.train_warning_memory"));
 				physics->Add(new SettingEntry("vehicle.train_slope_steepness"));
 				physics->Add(new SettingEntry("vehicle.wagon_speed_limits"));
