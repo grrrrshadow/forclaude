@@ -20,3 +20,6 @@ STR_V_NAME                                                      :Rig: vehicles o
 STR_V_DESC                                                      :A rail wagon under 116 and a lorry under 88, where the game's own car carrier and marijuana lorry sit.
 STR_V_WAGON                                                     :RigWagon116
 STR_V_LORRY                                                     :RigLorry88
+STR_S_NAME                                                      :Rig: an old St
+STR_S_DESC                                                      :A coal wagon named St that draws its coal into its own picture, as CZTR Wagons 1.0.0 does.
+STR_S_WAGON                                                     :St (rig)

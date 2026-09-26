@@ -1682,7 +1682,9 @@ const Train *PieceDrawnAs(const Train *piece)
  * The picture of a St carrying marijuana (IsGreenLayerWagon()): the wagon as
  * its set draws it carrying coal, and every picture over the wagon itself --
  * the load, which the set draws as a picture of its own -- drawn green
- * (GreenLayerSprite()). Coal because marijuana is a cargo the set never heard
+ * (GreenLayerSprite()); or, where the set draws the load into the wagon's own
+ * picture, what the loaded picture has and the empty one has not
+ * (GreenLoadedSprite()). Coal because marijuana is a cargo the set never heard
  * of: a set picks its pictures by the cargo the wagon carries, so for the
  * length of the drawing the wagon is said to carry coal, the way the refit
  * window says a wagon carries what it is about to be fitted for. In a game
@@ -1712,7 +1714,25 @@ static void GetGreenLayerWagonSprite(const Train *drawn, Direction direction, En
 		AutoRestoreBackup forced(_wagon_exception_forced_slot, coal_slot != UINT16_MAX ? coal_slot : _wagon_exception_forced_slot);
 		GetCustomVehicleSprite(drawn, direction, image_type, result);
 	}
-	for (uint i = 1; i < result->count; i++) result->seq[i].sprite = GreenLayerSprite(result->seq[i].sprite);
+	if (result->count > 1) {
+		for (uint i = 1; i < result->count; i++) result->seq[i].sprite = GreenLayerSprite(result->seq[i].sprite);
+		return;
+	}
+	/* One picture: the set draws the load into the wagon itself (CZTR Wagons
+	 * 1.0.0 does). The same wagon empty tells the load from the wagon, and
+	 * what differs is drawn green. */
+	if (result->count != 1 || drawn->cargo.StoredCount() == 0) return;
+	VehicleSpriteSeq empty;
+	{
+		Train *as_coal = const_cast<Train *>(drawn);
+		AutoRestoreBackup cargo(as_coal->cargo_type, IsValidCargoType(coal) ? coal : as_coal->cargo_type);
+		AutoRestoreBackup forced(_wagon_exception_forced_slot, coal_slot != UINT16_MAX ? coal_slot : _wagon_exception_forced_slot);
+		AutoRestoreBackup as_empty(_resolve_vehicle_as_empty, true);
+		GetCustomVehicleSprite(drawn, direction, image_type, &empty);
+	}
+	if (empty.count == 1 && empty.seq[0].sprite != result->seq[0].sprite) {
+		result->seq[0].sprite = GreenLoadedSprite(result->seq[0].sprite, empty.seq[0].sprite);
+	}
 }
 
 /**
@@ -1732,8 +1752,12 @@ void Train::GetImage(Direction direction, EngineImageType image_type, VehicleSpr
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
 		if (spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) direction = ReverseDir(direction);
-		if (IsValidCargoType(drawn->cargo_type) && CargoSpec::Get(drawn->cargo_type)->label == CT_MARIJUANA &&
-				IsGreenLayerWagon(drawn->GetFirstEnginePart()->GetEngine())) {
+		/* A set's wagon carrying marijuana is a St or a U -- no other takes it
+		 * (IsGreenLayerWagon(), asked when the sets were loaded) -- unless the
+		 * set knows the cargo itself and draws it. */
+		const GRFFile *grf = drawn->GetEngine()->GetGRF();
+		if (grf != nullptr && IsValidCargoType(drawn->cargo_type) && CargoSpec::Get(drawn->cargo_type)->label == CT_MARIJUANA &&
+				std::ranges::find(grf->cargo_list, CT_MARIJUANA) == grf->cargo_list.end()) {
 			GetGreenLayerWagonSprite(drawn, direction, image_type, result);
 			if (result->IsValid()) return;
 		}

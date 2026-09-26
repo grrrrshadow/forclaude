@@ -183,7 +183,7 @@ bool IsCarCarrierWagon(const Engine *e)
 	if (e->GetDefaultCargoType() == _road_vehicle_cargo && e->GetGRF() == nullptr) return true;
 
 	static const std::string_view KINDS[] = {"Pao", "Pasy", "Sgs", "Smmp"};
-	return std::ranges::any_of(KINDS, [e](std::string_view kind) { return EngineNameIsKind(e, kind); });
+	return EngineNameIsKind(e, KINDS);
 }
 
 /**

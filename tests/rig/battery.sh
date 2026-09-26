@@ -1513,7 +1513,7 @@ run_scene vozidlahry "testprumysl" 100 -g $S/rig.sav
 # carrier's number and a lorry under the first marijuana lorry's. Big sets get
 # there as a matter of course, and the car carrier used to become the set's.
 # The game's own have to stay the game's, the set's stand beside them.
-# The St of CZTR Wagons carrying marijuana (IsGreenLayerWagon()), with the
+# The St and the U of CZTR Wagons carrying marijuana (IsGreenLayerWagon()), with the
 # player's wagon set and steam engines in the home's newgrf/ (README.md): it
 # takes the refit, and full it is drawn as its set draws it carrying coal with
 # the coal layer green -- testzelenest builds one and asks for its picture in
@@ -1527,6 +1527,15 @@ setting_newgame economy.extra_industries 1' run_scene zelenest "testautovlak
 testzelenest
 testprumysl
 testnaklady" 50 -c $ST_CFG
+# A St that draws its coal into its own picture, as CZTR Wagons 1.0.0 does and
+# the rig's copy of CZTR does not (grf/st_old.nml, st_old.grf in the home's
+# newgrf/): carrying marijuana, the pixels its loaded picture does not share
+# with its empty one are drawn green. odmitnuto is zero.
+STO_CFG=$S/st_old_openttd.cfg
+sed '/^\[newgrf\]$/a st_old.grf = ' "$CFG_KEEP" > $STO_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene zelenestjednovrstvy "testautovlak
+testzelenest" 50 -c $STO_CFG
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

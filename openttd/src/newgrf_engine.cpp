@@ -864,8 +864,8 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case 0x39: return v->cargo_type;
 		case 0x3A: return v->cargo_cap;
 		case 0x3B: return GB(v->cargo_cap, 8, 8);
-		case 0x3C: return ClampTo<uint16_t>(v->cargo.StoredCount());
-		case 0x3D: return GB(ClampTo<uint16_t>(v->cargo.StoredCount()), 8, 8);
+		case 0x3C: return _resolve_vehicle_as_empty ? 0 : ClampTo<uint16_t>(v->cargo.StoredCount());
+		case 0x3D: return _resolve_vehicle_as_empty ? 0 : GB(ClampTo<uint16_t>(v->cargo.StoredCount()), 8, 8);
 		case 0x3E: return v->cargo.GetFirstStation().base();
 		case 0x3F: return ClampTo<uint8_t>(v->cargo.PeriodsInTransit());
 		case 0x40: return ClampTo<uint16_t>(v->age);
@@ -1068,7 +1068,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 
 	if (totalsets == 0) return nullptr;
 
-	uint set = (v->cargo.StoredCount() * totalsets) / std::max<uint16_t>(1u, v->cargo_cap);
+	uint set = ((_resolve_vehicle_as_empty ? 0 : v->cargo.StoredCount()) * totalsets) / std::max<uint16_t>(1u, v->cargo_cap);
 	set = std::min(set, totalsets - 1);
 
 	return in_motion ? group.loaded[set] : group.loading[set];
@@ -1144,6 +1144,13 @@ VehicleResolverObject::VehicleResolverObject(EngineID engine_type, const Vehicle
 }
 
 uint16_t _wagon_exception_forced_slot = UINT16_MAX;
+
+/**
+ * Resolve a vehicle's pictures as though it carried nothing, whatever it does
+ * carry: the empty half of a picture whose load is drawn green, which is what
+ * tells the load from the wagon (GetGreenLayerWagonSprite()).
+ */
+bool _resolve_vehicle_as_empty = false;
 
 static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)
 {

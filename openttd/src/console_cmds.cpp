@@ -1830,6 +1830,7 @@ static bool ConTestCargoTypes(std::span<std::string_view> argv)
 		 * was missed can be told from one that was left out on purpose. */
 		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 			if (e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon || IsCarCarrierWagon(e)) continue;
+			if (e->info.string_id == INVALID_STRING_ID) continue;
 			std::string name = GetString(e->info.string_id);
 			std::string shown = GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList));
 			bool looks = [](const std::string &n) { return n.find("Pa") != std::string::npos || n.find("Sg") != std::string::npos || n.find("Smm") != std::string::npos; }(name) ||
@@ -8537,6 +8538,32 @@ static bool ConTestClearWreck(std::span<std::string_view> argv)
 }
 
 /**
+ * The rail vehicles whose name has a piece of text in it: the name the set
+ * gives the vehicle and the name the purchase list shows, which a set may
+ * change over the years (CZTR's Pasy shows as Sgs from 1980). For finding the
+ * vehicle a player names by what he sees.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestNames(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "List rail vehicles whose name has a piece of text in it. Usage: 'testjmena <text>'.");
+		return true;
+	}
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (e->info.string_id == INVALID_STRING_ID) continue;
+		std::string name = GetString(e->info.string_id);
+		std::string shown = GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList));
+		if (name.find(argv[1]) == std::string::npos && shown.find(argv[1]) == std::string::npos) continue;
+		const GRFFile *grf = e->GetGRF();
+		IConsolePrint(CC_DEFAULT, "testjmena: {} '{}' (v nabidce '{}'), {}, GRF {:08X} cislo {:#x}, uvedeni {}", e->index, name, shown,
+				e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon ? "vagon" : "hnaci", grf == nullptr ? 0 : std::byteswap(grf->grfid),
+				e->grf_prop.local_id, e->intro_date);
+	}
+	return true;
+}
+
+/**
  * The St carrying marijuana (IsGreenLayerWagon()): build one into the first
  * rail depot of the company, fitted for marijuana and full, and ask for its
  * picture in every direction the way the screen would -- the rig has no
@@ -8550,7 +8577,7 @@ static bool ConTestClearWreck(std::span<std::string_view> argv)
 static bool ConTestGreenSt(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build a St wagon carrying marijuana and draw it. Usage: 'testzelenest'.");
+		IConsolePrint(CC_HELP, "Build every St and U wagon carrying marijuana and draw them. Usage: 'testzelenest'.");
 		return true;
 	}
 	auto refuse = [](std::string_view why) { IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - {}", why); return true; };
@@ -8559,15 +8586,15 @@ static bool ConTestGreenSt(std::span<std::string_view> argv)
 	if (Company::GetIfValid(_local_company) == nullptr) return refuse("zadna spolecnost");
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 
-	const Engine *st = nullptr;
+	std::vector<const Engine *> wagons;
 	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (!IsGreenLayerWagon(e)) continue;
-		IConsolePrint(CC_DEFAULT, "testzelenest: St {} '{}', {}, marihuana v prestavbe {}", e->index, GetString(e->info.string_id),
+		IConsolePrint(CC_DEFAULT, "testzelenest: {} '{}', {}, marihuana v prestavbe {}", e->index, GetString(e->info.string_id),
 				e->company_avail.Test(_local_company) ? "k mani" : "neni k mani", e->info.refit_mask.Test(mari) ? "ano" : "NE");
-		if (!e->info.refit_mask.Test(mari)) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - St {} nejde prestavet na marihuanu", e->index);
-		if (st == nullptr && e->company_avail.Test(_local_company)) st = e;
+		if (!e->info.refit_mask.Test(mari)) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - {} nejde prestavet na marihuanu", e->index);
+		if (e->company_avail.Test(_local_company)) wagons.push_back(e);
 	}
-	if (st == nullptr) return refuse("zadny St k mani");
+	if (wagons.empty()) return refuse("zadny St ani U k mani");
 
 	TileIndex depot = INVALID_TILE;
 	for (const Depot *d : Depot::Iterate()) {
@@ -8578,68 +8605,69 @@ static bool ConTestGreenSt(std::span<std::string_view> argv)
 	}
 	if (depot == INVALID_TILE) return refuse("zadne depo");
 
-	auto [cost, id, cap, mail, caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, mari, ClientID::Invalid);
-	Train *t = Train::GetIfValid(id);
-	if (cost.Failed() || t == nullptr) return refuse(fmt::format("St nejde koupit na marihuanu: {}", RefusalReason(cost)));
-
-	auto draw = [&](bool full) {
-		uint layers = 0;
-		uint green_total = 0;
-		for (Train *u = t; u != nullptr; u = u->Next()) {
-			u->cargo.Truncate();
-			if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+	for (const Engine *st : wagons) {
+		auto [cost, id, cap, mail, caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, mari, ClientID::Invalid);
+		Train *t = Train::GetIfValid(id);
+		if (cost.Failed() || t == nullptr) {
+			refuse(fmt::format("{} nejde koupit na marihuanu: {}", st->index, RefusalReason(cost)));
+			continue;
 		}
-		for (Direction dir : EnumRange(Direction::Begin, Direction::End)) {
-			for (const Train *u = t; u != nullptr; u = u->Next()) {
-				VehicleSpriteSeq seq;
-				u->GetImage(dir, EngineImageType::OnMap, &seq);
-				std::string line = fmt::format("testzelenest: {} smer {} dil {} ({} {}/{}) obrazku {}:", full ? "plny" : "prazdny", to_underlying(dir), u->index,
-						IsValidCargoType(u->cargo_type) ? GetString(CargoSpec::Get(u->cargo_type)->name) : "nic", u->cargo.StoredCount(), u->cargo_cap, seq.count);
-				for (uint i = 0; i < seq.count; i++) {
-					SpriteID sprite = seq.seq[i].sprite;
-					auto [green, drawn] = GreenLoadPixels(sprite);
-					bool is_green = sprite >= SPR_GREEN_LAYER_BASE && sprite < SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT;
-					line += fmt::format(" {}{}", sprite, is_green ? fmt::format(" (zelena {}/{})", green, drawn) : "");
-					if (is_green) {
-						layers++;
+		/* A green picture is one of the block the green ones are made in. */
+		auto is_green = [](SpriteID sprite) { return sprite >= SPR_GREEN_LAYER_BASE && sprite < SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT; };
+		auto draw = [&](bool full) {
+			uint greens = 0;
+			uint green_total = 0;
+			for (Train *u = t; u != nullptr; u = u->Next()) {
+				u->cargo.Truncate();
+				if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+			}
+			for (Direction dir : EnumRange(Direction::Begin, Direction::End)) {
+				for (const Train *u = t; u != nullptr; u = u->Next()) {
+					VehicleSpriteSeq seq;
+					u->GetImage(dir, EngineImageType::OnMap, &seq);
+					std::string line = fmt::format("testzelenest: {} {} smer {} dil {} ({}/{}) obrazku {}:", st->index, full ? "plny" : "prazdny", to_underlying(dir), u->index,
+							u->cargo.StoredCount(), u->cargo_cap, seq.count);
+					for (uint i = 0; i < seq.count; i++) {
+						SpriteID sprite = seq.seq[i].sprite;
+						auto [green, drawn] = GreenLoadPixels(sprite);
+						line += fmt::format(" {}{}", sprite, is_green(sprite) ? fmt::format(" (zelena {}/{})", green, drawn) : "");
+						if (!is_green(sprite)) continue;
+						greens++;
 						green_total += green;
 						/* An empty wagon's layer draws nothing at all, which is right. */
-						if (drawn > 0 && green == 0) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - zelena vrstva {} nema nic zeleneho", sprite);
-						if (!full && drawn > 0) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - prazdny St kresli naklad ({} pixelu)", drawn);
+						if (drawn > 0 && green == 0) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - zelena {} nema nic zeleneho", sprite);
+						if (!full && green > 0) IConsolePrint(CC_ERROR, "testzelenest: ODMITNUTO - prazdny {} kresli zeleny naklad ({} pixelu)", st->index, green);
 					}
+					IConsolePrint(CC_DEFAULT, "{}", line);
 				}
-				IConsolePrint(CC_DEFAULT, "{}", line);
 			}
-		}
-		return std::pair<uint, uint>{layers, green_total};
-	};
-	/* The same St carrying coal, for comparison: how many pictures the set
-	 * itself draws a loaded one with. */
-	if (CargoType coal = GetCargoTypeByLabel(CT_COAL); IsValidCargoType(coal)) {
-		auto [c_cost, c_id, c_cap, c_mail, c_caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, coal, ClientID::Invalid);
-		if (Train *c = Train::GetIfValid(c_id); c_cost.Succeeded() && c != nullptr) {
-			for (Train *u = c; u != nullptr; u = u->Next()) {
-				if (u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
-			}
-			for (const Train *u = c; u != nullptr; u = u->Next()) {
+			return std::pair<uint, uint>{greens, green_total};
+		};
+		/* The same wagon carrying coal, full, for comparison: the picture the
+		 * set itself draws a loaded one with. */
+		if (CargoType coal = GetCargoTypeByLabel(CT_COAL); IsValidCargoType(coal)) {
+			auto [c_cost, c_id, c_cap, c_mail, c_caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, coal, ClientID::Invalid);
+			if (Train *c = Train::GetIfValid(c_id); c_cost.Succeeded() && c != nullptr) {
+				for (Train *u = c; u != nullptr; u = u->Next()) {
+					if (u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+				}
 				VehicleSpriteSeq seq;
-				u->GetImage(Direction::N, EngineImageType::OnMap, &seq);
-				std::string line = fmt::format("testzelenest: uhli dil {} ({}/{}) obrazku {}:", u->index, u->cargo.StoredCount(), u->cargo_cap, seq.count);
+				c->GetImage(Direction::N, EngineImageType::OnMap, &seq);
+				std::string line = fmt::format("testzelenest: {} s uhlim ({}/{}) obrazku {}:", st->index, c->cargo.StoredCount(), c->cargo_cap, seq.count);
 				for (uint i = 0; i < seq.count; i++) line += fmt::format(" {}", seq.seq[i].sprite);
 				IConsolePrint(CC_DEFAULT, "{}", line);
+				Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, c->index, true, false, ClientID::Invalid);
 			}
-			Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, c->index, true, false, ClientID::Invalid);
 		}
+		auto [full_greens, full_green] = draw(true);
+		auto [empty_greens, empty_green] = draw(false);
+		IConsolePrint(CC_DEFAULT, "testzelenest: {} '{}' plny {} zelenych obrazku ({} zelenych pixelu), prazdny {}", st->index, GetString(st->info.string_id), full_greens, full_green, empty_greens);
+		if (full_greens == 0 || full_green == 0) refuse(fmt::format("plny {} nema zeleny naklad", st->index));
+		Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, t->index, true, false, ClientID::Invalid);
 	}
-	auto [full_layers, full_green] = draw(true);
-	auto [empty_layers, empty_green] = draw(false);
 	for (const auto &[layer, green] : GreenLayerSprites()) {
-		Dimension d = GetSpriteSize(layer);
-		IConsolePrint(CC_DEFAULT, "testzelenest: vrstva sady {} ({}x{}) -> zelena {}", layer, d.width, d.height, green);
+		IConsolePrint(CC_DEFAULT, "testzelenest: obrazek sady {} -> zeleny {}", layer, green);
 	}
-	IConsolePrint(CC_DEFAULT, "testzelenest: plny {} zelenych vrstev ({} zelenych pixelu), prazdny {}", full_layers, full_green, empty_layers);
-	if (full_layers == 0 || full_green == 0) return refuse("plny St nema zelenou vrstvu");
-	Command<Commands::SellVehicle>::Do(DoCommandFlag::Execute, t->index, true, false, ClientID::Invalid);
 	return true;
 }
 
@@ -12677,6 +12705,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testprodatvagonky",        ConTestSellDecoupled);
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
 	IConsole::CmdRegister("testzelenest",            ConTestGreenSt);
+	IConsole::CmdRegister("testjmena",               ConTestNames);
 	IConsole::CmdRegister("testdepovagony",          ConTestDepotWagons);
 	IConsole::CmdRegister("testspolehlivost",        ConTestReliability);
 	IConsole::CmdRegister("testdepofiltr",           ConTestExplainDepot);

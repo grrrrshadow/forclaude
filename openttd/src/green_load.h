@@ -27,6 +27,7 @@ void SetupGreenLoadSprites();
 SpriteID GreenLoadSprite(SpriteID full);
 std::vector<std::pair<SpriteID, SpriteID>> GreenLoadSprites();
 SpriteID GreenLayerSprite(SpriteID layer);
+SpriteID GreenLoadedSprite(SpriteID full, SpriteID empty);
 std::vector<std::pair<SpriteID, SpriteID>> GreenLayerSprites();
 
 /* Where the pictures come from, by the vehicle tables that know them. */

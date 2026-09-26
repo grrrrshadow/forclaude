@@ -1,0 +1,61 @@
+/*
+ * A coal wagon named St that draws its coal into the wagon's own picture, the
+ * way the St of CZTR Wagons 1.0.0 does (the release the rig has not got): one
+ * picture empty, one loaded, no layer over the wagon. Played by the scene
+ * zelenestjednovrstvy (see README.md): carrying marijuana it has to be drawn
+ * with its coal green, the load told from the wagon by the empty picture.
+ *
+ *     nmlc -c -l grf/lang --grf st_old.grf grf/st_old.nml
+ */
+grf {
+	grfid: "RIGs";
+	name: string(STR_S_NAME);
+	desc: string(STR_S_DESC);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+cargotable { COAL }
+
+template tmpl_wagon(y) {
+	[  0, y, 20, 12, -10, -6]
+	[ 24, y, 20, 12, -10, -6]
+	[ 48, y, 20, 12, -10, -6]
+	[ 72, y, 20, 12, -10, -6]
+	[ 96, y, 20, 12, -10, -6]
+	[120, y, 20, 12, -10, -6]
+	[144, y, 20, 12, -10, -6]
+	[168, y, 20, 12, -10, -6]
+}
+
+spriteset(st_old_empty, "grf/gfx/st_old.png") { tmpl_wagon(0) }
+spriteset(st_old_full, "grf/gfx/st_old.png") { tmpl_wagon(16) }
+
+spritegroup st_old_group {
+	loaded: [st_old_empty, st_old_full];
+	loading: [st_old_empty, st_old_full];
+}
+
+item(FEAT_TRAINS, st_old, 200) {
+	property {
+		name: string(STR_S_WAGON);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+	}
+	graphics {
+		default: st_old_group;
+	}
+}

@@ -364,15 +364,27 @@ marijuana lorry's: they have to stand beside the game's own.
 Only car carriers take road vehicles: the game's own and, in any set, the
 flat wagons named Pao, Pasy, Sgs or Smmp (IsCarCarrierWagon()); `testnaklady`
 lists them and refuses any other wagon offering the fitting. Of a set's coal
-wagons only the St takes marijuana (IsGreenLayerWagon()): it is drawn as its
-set draws it carrying coal, with the coal layer green. `testzelenest` builds
-one into the company's first rail depot and asks for its picture in every
-direction, full and empty -- the rig draws nothing, so nothing else would make
-the green layers -- and refuses a full one without green. Scene `zelenest`
-needs the player's CZTR wagon set and steam engines in the home's `newgrf/`
-(the two tars named under "A lorry with a trailer" below); the rig runs with
-the null blitter, and the set's pictures being 32bpp only, the green pixels are
-counted from the file.
+wagons only the St and the U take marijuana (IsGreenLayerWagon()). A wagon is
+known by any name the purchase list shows for it over the years -- CZTR's U
+is a Kᵉ until the set renames it. It is drawn as its set draws it carrying
+coal, with the coal green: the layer over the wagon where the set draws its
+load as one (CZTR 1.1.0), or what the loaded picture has and the empty one has
+not where the load is in the wagon's own picture (CZTR 1.0.0). `testzelenest`
+builds each into the company's first rail depot and asks for its picture in
+every direction, full and empty -- the rig draws nothing, so nothing else would
+make the green pictures -- and refuses a full one without green or an empty
+one with it. Scene `zelenest` needs the player's CZTR wagon set and steam
+engines in the home's `newgrf/` (the two tars named under "A lorry with a
+trailer" below); the rig runs with the null blitter, and the set's pictures
+being 32bpp only, the green pixels are counted from the file. Scene
+`zelenestjednovrstvy` plays `grf/st_old.nml`, a St with its coal in its own
+picture, the case of CZTR 1.0.0, which the rig has not got:
+
+    nmlc -c -l grf/lang --grf st_old.grf grf/st_old.nml
+    cp st_old.grf <rig home>/.openttd/newgrf/
+
+`testjmena <text>` lists the rail vehicles whose name, as the set gives it or
+as the purchase list shows it now, has the text in it.
 
 `testdomy pole <x> <y> [r]` lists the houses within r tiles of a tile, by id
 and name, and how many tiles of each: for telling which house a player means

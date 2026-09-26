@@ -91,6 +91,7 @@ void GetCustomVehicleSprite(const Vehicle *v, Direction direction, EngineImageTy
  * see ApplyWagonCargoException().
  */
 extern uint16_t _wagon_exception_forced_slot;
+extern bool _resolve_vehicle_as_empty;
 void GetCustomVehicleIcon(EngineID engine, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
 
 void GetCustomRotorSprite(const struct Aircraft *v, EngineImageType image_type, VehicleSpriteSeq *result);

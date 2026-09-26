@@ -35,6 +35,7 @@
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
 #include "timer/timer_game_calendar.h"
+#include "core/backup_type.hpp"
 
 #include "table/strings.h"
 #include "table/engines.h"
@@ -89,30 +90,65 @@ bool IsMarijuanaEngineInfo(const EngineInfo &info)
 }
 
 /**
+ * Does a name start with a kind of wagon, written exactly so and followed by
+ * anything but another letter?
+ * @param name the name
+ * @param kind the kind
+ * @return whether it does
+ */
+static bool NameIsKind(std::string_view name, std::string_view kind)
+{
+	auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); };
+	/* A set may open the name with a colour or a space. */
+	while (!name.empty() && !letter(name.front())) name.remove_prefix(1);
+	if (!name.starts_with(kind)) return false;
+	return name.size() == kind.size() || !letter(name[kind.size()]);
+}
+
+/**
  * Is this engine of a kind of wagon the player named? Known by the name, which
  * starts with the kind -- the letters a railway paints on the wagon, the same
  * in every language and in every set and version -- written exactly so and
  * followed by anything but another letter: a Paoj is not a Pao, an Sgnss is
- * not an Sgs, and a Sas is not an St.
+ * not an Sgs, a Sas is not an St, and a Uacs is not a U.
+ *
+ * The name the set gives the vehicle, and every name the purchase list shows
+ * for it over the years: a set renames a wagon as the railway did (CZTR's Pasy
+ * shows as Sgs from 1980, and its U is a Kᵉ of the old empire before that).
+ * The player names the wagon by what he sees, in any year, and the answer is
+ * wanted once, when the sets are loaded -- so the set is asked what it calls
+ * the wagon in every fifth year from 1850 to 2100.
  * @param e the engine
- * @param kind the kind, as the railway writes it
- * @return whether its name says it is one
+ * @param kinds the kinds, as the railway writes them
+ * @return whether its name says it is one of them
  */
-bool EngineNameIsKind(const Engine *e, std::string_view kind)
+bool EngineNameIsKind(const Engine *e, std::span<const std::string_view> kinds)
 {
-	auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); };
-	std::string name = GetString(e->info.string_id);
-	/* A set may open the name with a colour or a space. */
-	std::string_view rest = name;
-	while (!rest.empty() && !letter(rest.front())) rest.remove_prefix(1);
-	if (!rest.starts_with(kind)) return false;
-	return rest.size() == kind.size() || !letter(rest[kind.size()]);
+	auto is_kind = [&kinds](std::string_view name) {
+		return std::ranges::any_of(kinds, [name](std::string_view kind) { return NameIsKind(name, kind); });
+	};
+	/* A set may leave a vehicle with no name of its own (GETS does): asked for,
+	 * that brought the game down while the sets were being loaded. */
+	if (e->info.string_id == INVALID_STRING_ID || e->info.string_id == STR_NULL) return false;
+	if (is_kind(GetString(e->info.string_id))) return true;
+	if (!e->info.callback_mask.Test(VehicleCallbackMask::Name)) return false;
+
+	AutoRestoreBackup date(TimerGameCalendar::date, TimerGameCalendar::date);
+	AutoRestoreBackup year(TimerGameCalendar::year, TimerGameCalendar::year);
+	for (int32_t y = 1850; y <= 2100; y += 5) {
+		TimerGameCalendar::year = TimerGameCalendar::Year{y};
+		TimerGameCalendar::date = TimerGameCalendar::ConvertYMDToDate(TimerGameCalendar::Year{y}, 6, 1);
+		if (is_kind(GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList)))) return true;
+	}
+	return false;
 }
 
 /**
- * Is this a wagon that carries marijuana as its coal drawn green? The St of
- * CZTR Wagons, in every release and whatever set names a wagon so: the player's
- * choice of the one coal wagon of a set that takes marijuana. The set draws its
+ * Is this a wagon that carries marijuana as its coal drawn green? The St and
+ * the U of CZTR Wagons, in every release and whatever set names a wagon so:
+ * the player's choice of the coal wagons of a set that take marijuana -- the U
+ * as well, since it is built from 1950 and the St of the older release only
+ * from 1958. The set draws its
  * load as a picture of its own over the wagon, and that picture is drawn green
  * (GreenLayerSprite()); the game's own marijuana wagons stay as they are.
  * @param e the engine
@@ -121,7 +157,8 @@ bool EngineNameIsKind(const Engine *e, std::string_view kind)
 bool IsGreenLayerWagon(const Engine *e)
 {
 	if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return false;
-	return EngineNameIsKind(e, "St");
+	static const std::string_view KINDS[] = {"St", "U"};
+	return EngineNameIsKind(e, KINDS);
 }
 
 /**

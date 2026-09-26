@@ -21,6 +21,10 @@
 static std::vector<std::pair<SpriteID, SpriteID>> _green_loads;
 /** A set's load layers drawn green so far: the set's layer, and the green one made from it (GreenLayerSprite()). */
 static std::map<SpriteID, SpriteID> _green_layers;
+/** A set's loaded wagons drawn with the load green so far: loaded and empty picture, and the green one (GreenLoadedSprite()). */
+static std::map<std::pair<SpriteID, SpriteID>, SpriteID> _green_loaded;
+/** The next free sprite in the block after SPR_GREEN_LAYER_BASE, shared by the two above. */
+static SpriteID _green_layer_next = SPR_GREEN_LAYER_BASE;
 
 /**
  * Make the loaded pictures of the marijuana wagons and lorries, in the block
@@ -32,6 +36,8 @@ void SetupGreenLoadSprites()
 {
 	_green_loads.clear();
 	_green_layers.clear();
+	_green_loaded.clear();
+	_green_layer_next = SPR_GREEN_LAYER_BASE;
 	SpriteID next = SPR_GREEN_LOAD_BASE;
 	for (const auto &[type, image] : MarijuanaEngineImages()) {
 		for (const auto &[empty, full] : type == VehicleType::Train ? WagonLoadPictures(image) : RoadVehicleLoadPictures(image)) {
@@ -73,10 +79,31 @@ SpriteID GreenLayerSprite(SpriteID layer)
 {
 	auto it = _green_layers.find(layer);
 	if (it != _green_layers.end()) return it->second;
-	if (_green_layers.size() >= GREEN_LAYER_SPRITE_COUNT) return layer;
-	SpriteID green = SPR_GREEN_LAYER_BASE + static_cast<SpriteID>(_green_layers.size());
+	if (_green_layer_next >= SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT) return layer;
+	SpriteID green = _green_layer_next++;
 	SetGreenLayerSprite(green, layer);
 	_green_layers.emplace(layer, green);
+	return green;
+}
+
+/**
+ * The loaded picture of a set's wagon with its load drawn green, for a wagon
+ * whose set draws the load into the wagon's own picture rather than as a layer
+ * over it -- the St of CZTR Wagons 1.0.0. Every pixel the loaded picture does
+ * not share with the empty one is the load (SetGreenLoadSprite()), the rule
+ * the game's own marijuana wagons are drawn by.
+ * @param full the loaded picture
+ * @param empty the same wagon empty
+ * @return the loaded picture with the load green
+ */
+SpriteID GreenLoadedSprite(SpriteID full, SpriteID empty)
+{
+	auto it = _green_loaded.find({full, empty});
+	if (it != _green_loaded.end()) return it->second;
+	if (_green_layer_next >= SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT) return full;
+	SpriteID green = _green_layer_next++;
+	SetGreenLoadSprite(green, full, empty);
+	_green_loaded.emplace(std::pair<SpriteID, SpriteID>{full, empty}, green);
 	return green;
 }
 
@@ -86,7 +113,9 @@ SpriteID GreenLayerSprite(SpriteID layer)
  */
 std::vector<std::pair<SpriteID, SpriteID>> GreenLayerSprites()
 {
-	return {_green_layers.begin(), _green_layers.end()};
+	std::vector<std::pair<SpriteID, SpriteID>> made(_green_layers.begin(), _green_layers.end());
+	for (const auto &[pictures, green] : _green_loaded) made.emplace_back(pictures.first, green);
+	return made;
 }
 
 /**
