@@ -110,6 +110,9 @@
 #include "waypoint_base.h"
 #include "waypoint_func.h"
 #include "vehicle_gui.h"
+#include "widgets/cheat_widget.h"
+#include "cheat_func.h"
+#include "settings_gui.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
 #include "widgets/misc_widget.h"
@@ -9434,6 +9437,40 @@ static bool ConTestExplosives(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Open the sandbox options and press the right arrow of the maximum map height,
+ * the row the player wanted last in the window: the height has to go up by
+ * one, the year must not move. Nothing else in the rig opens that window.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSandbox(std::span<std::string_view> argv)
+{
+	if (argv.empty()) return true;
+	ShowCheatWindow();
+	Window *w = FindWindowByClass(WindowClass::Cheat);
+	if (w == nullptr) {
+		IConsolePrint(CC_ERROR, "testpiskoviste: ODMITNUTO - okno se neotevrelo");
+		return true;
+	}
+	const NWidgetBase *row = w->GetWidget<NWidgetBase>(WID_C_MAX_HL);
+	const NWidgetBase *panel = w->GetWidget<NWidgetBase>(WID_C_PANEL);
+	const NWidgetBase *settings = w->GetWidget<NWidgetBase>(WID_C_SETTINGS);
+	uint height = _settings_game.construction.map_height_limit;
+	auto year = TimerGameCalendar::year;
+	bool last = row->pos_y > settings->pos_y && row->pos_y > panel->pos_y;
+	/* The right half of the arrows, in the middle of the row. */
+	bool rtl = _current_text_dir == TD_RTL;
+	int x = rtl ? row->pos_x + (int)row->current_x - SETTING_BUTTON_WIDTH / 4 : row->pos_x + WidgetDimensions::scaled.framerect.left + SETTING_BUTTON_WIDTH * 3 / 4;
+	w->OnClick(Point{x, row->pos_y + (int)row->current_y / 2}, WID_C_MAX_HL, 1);
+	IConsolePrint(CC_DEFAULT, "testpiskoviste: vyska mapy {} -> {}, rok {} -> {}, radek je {}", height,
+			_settings_game.construction.map_height_limit, year.base(), TimerGameCalendar::year.base(), last ? "posledni" : "NENI posledni");
+	if (!last || _settings_game.construction.map_height_limit != height + 1 || TimerGameCalendar::year != year) {
+		IConsolePrint(CC_ERROR, "testpiskoviste: ODMITNUTO");
+	}
+	w->Close();
+	return true;
+}
+
 static bool ConTestFollow(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -12897,6 +12934,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
+	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);

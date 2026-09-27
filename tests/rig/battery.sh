@@ -1619,6 +1619,11 @@ testza 3000 testvybusniny" 3100
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene atomovka "vlak123 on
 testnedobrzdil blok vozu 10 odtah
 testza 2500 testvybusniny shod 204 21" 5000
+# The sandbox options: the maximum map height is the last row of the window,
+# below the sandbox settings -- the player's word, beside the year the two
+# were mixed up. Its right arrow raises the height by one and leaves the year
+# alone (testpiskoviste). odmitnuto is zero.
+run_scene piskoviste "testpiskoviste" 20
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

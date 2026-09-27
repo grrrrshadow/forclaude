@@ -177,8 +177,8 @@ enum CheatNumbers : uint8_t {
 	CHT_NO_JETCRASH,     ///< Disable jet-airplane crashes.
 	CHT_SETUP_PROD,      ///< Allow manually editing of industry production.
 	CHT_STATION_RATING,  ///< Fix station ratings at 100%.
-	CHT_EDIT_MAX_HL,     ///< Edit maximum allowed heightlevel
 	CHT_CHANGE_DATE,     ///< Do time traveling.
+	CHT_EDIT_MAX_HL,     ///< Edit maximum allowed heightlevel; drawn on its own row at the very bottom (WID_C_MAX_HL), not beside the year
 
 	CHT_NUM_CHEATS,      ///< Number of cheats.
 };
@@ -211,9 +211,16 @@ static const CheatEntry _cheats_ui[] = {
 	{ VarMemType::Bool, STR_CHEAT_NO_JETCRASH, &_cheats.no_jetcrash.value, &_cheats.no_jetcrash.been_used, nullptr },
 	{ VarMemType::Bool, STR_CHEAT_SETUP_PROD, &_cheats.setup_prod.value, &_cheats.setup_prod.been_used, &ClickSetProdCheat },
 	{ VarMemType::Bool, STR_CHEAT_STATION_RATING, &_cheats.station_rating.value, &_cheats.station_rating.been_used, nullptr },
-	{ VarMemType::U8, STR_CHEAT_EDIT_MAX_HL, &_settings_game.construction.map_height_limit, &_cheats.edit_max_hl.been_used, &ClickChangeMaxHlCheat },
 	{ VarMemType::I32, STR_CHEAT_CHANGE_DATE, &TimerGameCalendar::year, &_cheats.change_date.been_used, &ClickChangeDateCheat },
+	{ VarMemType::U8, STR_CHEAT_EDIT_MAX_HL, &_settings_game.construction.map_height_limit, &_cheats.edit_max_hl.been_used, &ClickChangeMaxHlCheat },
 };
+
+/**
+ * The cheats in the panel at the top: all but the maximum map height, which
+ * the player wanted as the last row of the window, below the sandbox
+ * settings -- beside the year, the two were easily mixed up.
+ */
+static constexpr uint CHEAT_PANEL_ROWS = CHT_EDIT_MAX_HL;
 
 static_assert(CHT_NUM_CHEATS == lengthof(_cheats_ui));
 
@@ -229,6 +236,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_cheat_widgets = {
 		NWidget(NWID_VERTICAL), SetPadding(WidgetDimensions::unscaled.framerect),
 			NWidget(WWT_EMPTY, Colours::Invalid, WID_C_PANEL),
 			NWidget(WWT_EMPTY, Colours::Invalid, WID_C_SETTINGS),
+			NWidget(WWT_EMPTY, Colours::Invalid, WID_C_MAX_HL),
 		EndContainer(),
 	EndContainer(),
 };
@@ -259,12 +267,19 @@ struct CheatWindow : Window {
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		switch (widget) {
-			case WID_C_PANEL: DrawCheatWidget(r); break;
+			case WID_C_PANEL: DrawCheatWidget(r, 0, CHEAT_PANEL_ROWS); break;
 			case WID_C_SETTINGS: DrawSettingsWidget(r); break;
+			case WID_C_MAX_HL: DrawCheatWidget(r, CHT_EDIT_MAX_HL, CHT_EDIT_MAX_HL + 1); break;
 		}
 	}
 
-	void DrawCheatWidget(const Rect &r) const
+	/**
+	 * Draw the cheats of one panel.
+	 * @param r     the panel
+	 * @param first the first cheat in it
+	 * @param last  one past the last
+	 */
+	void DrawCheatWidget(const Rect &r, uint first, uint last) const
 	{
 		const Rect ir = r;
 		int y = ir.top;
@@ -278,7 +293,7 @@ struct CheatWindow : Window {
 		int button_y_offset = (this->line_height - SETTING_BUTTON_HEIGHT) / 2;
 		int icon_y_offset = (this->line_height - this->icon.height) / 2;
 
-		for (int i = 0; i != lengthof(_cheats_ui); i++) {
+		for (int i = first; i != (int)last; i++) {
 			const CheatEntry *ce = &_cheats_ui[i];
 
 			std::string str;
@@ -372,6 +387,11 @@ struct CheatWindow : Window {
 		switch (widget) {
 			case WID_C_PANEL: UpdateCheatPanelSize(size); break;
 			case WID_C_SETTINGS: UpdateSettingsPanelSize(size); break;
+			case WID_C_MAX_HL:
+				/* As wide as the panel above it (worked out there, first), one row high. */
+				UpdateCheatPanelSize(size);
+				size.height = this->line_height;
+				break;
 		}
 	}
 
@@ -409,7 +429,7 @@ struct CheatWindow : Window {
 		this->line_height = std::max<uint>(this->line_height, GetCharacterHeight(FontSize::Normal)) + WidgetDimensions::scaled.framerect.Vertical();
 
 		size.width = width + WidgetDimensions::scaled.hsep_wide * 2 + SETTING_BUTTON_WIDTH;
-		size.height = this->line_height * lengthof(_cheats_ui);
+		size.height = this->line_height * CHEAT_PANEL_ROWS;
 	}
 
 	void UpdateSettingsPanelSize(Dimension &size)
@@ -429,20 +449,29 @@ struct CheatWindow : Window {
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		switch (widget) {
-			case WID_C_PANEL: CheatPanelClick(pt); break;
+			case WID_C_PANEL: CheatPanelClick(pt, WID_C_PANEL, 0, CHEAT_PANEL_ROWS); break;
 			case WID_C_SETTINGS: SettingsPanelClick(pt); break;
+			case WID_C_MAX_HL: CheatPanelClick(pt, WID_C_MAX_HL, CHT_EDIT_MAX_HL, CHT_EDIT_MAX_HL + 1); break;
 		}
 	}
 
-	void CheatPanelClick(Point pt)
+	/**
+	 * A click in a panel of cheats.
+	 * @param pt     where
+	 * @param widget the panel
+	 * @param first  the first cheat in it
+	 * @param last   one past the last
+	 */
+	void CheatPanelClick(Point pt, WidgetID widget, uint first, uint last)
 	{
-		Rect r = this->GetWidget<NWidgetBase>(WID_C_PANEL)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
-		uint btn = (pt.y - r.top) / this->line_height;
+		Rect r = this->GetWidget<NWidgetBase>(widget)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+		if (pt.y < r.top) return;
+		uint btn = first + (pt.y - r.top) / this->line_height;
 		int x = pt.x - r.left;
 		bool rtl = _current_text_dir == TD_RTL;
 		if (rtl) x = r.Width() - 1 - x;
 
-		if (btn >= lengthof(_cheats_ui)) return;
+		if (btn >= last) return;
 
 		const CheatEntry *ce = &_cheats_ui[btn];
 		int value = static_cast<int32_t>(ReadValue(ce->variable, ce->type));

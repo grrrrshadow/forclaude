@@ -15,6 +15,7 @@ enum CheatWidgets : WidgetID {
 	WID_C_NOTE,  ///< Note on top of panel for use of cheat.
 	WID_C_PANEL, ///< Panel where all cheats are shown in.
 	WID_C_SETTINGS, ///< Panel where sandbox settings are shown.
+	WID_C_MAX_HL, ///< The maximum map height, on a row of its own at the bottom.
 };
 
 #endif /* WIDGETS_CHEAT_WIDGET_H */
