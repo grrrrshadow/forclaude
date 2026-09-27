@@ -1624,6 +1624,17 @@ testza 2500 testvybusniny shod 204 21" 5000
 # were mixed up. Its right arrow raises the height by one and leaves the year
 # alone (testpiskoviste). odmitnuto is zero.
 run_scene piskoviste "testpiskoviste" 20
+# The player pressed it ten times while the game reloaded the sets for the
+# first press, and the game went down. After a change the row takes no clicks
+# for a moment, so ten presses in a row raise the height by one.
+run_scene piskovisteklik "testpiskoviste 10" 20
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG
+# Czech lines the language compiler throws away: a line that does not fit the
+# English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
+# is dropped without a word and the game shows the English. The driver's
+# window came out half English that way. nesedi has to be zero.
+NESEDI=$($S/build/src/strgen/strgen -s ../../openttd/src/lang -d $S/strgen_check -w ../../openttd/src/lang/czech.txt 2>&1 | grep -c "doesn't match")
+echo "cestina: nesedi=$NESEDI"
+echo "cestina: nesedi=$NESEDI" >> ${BATTERY_STABLE:-/dev/null}

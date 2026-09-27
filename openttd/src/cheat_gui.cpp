@@ -139,6 +139,32 @@ static int32_t ClickChangeDateCheat(int32_t new_value, int32_t)
 }
 
 /**
+ * Until when the maximum map height takes no more clicks. Changing it reloads
+ * every NewGRF, which on a phone with big sets takes long enough that the game
+ * stands still; a player who thinks nothing is happening clicks again, the
+ * clicks queue up and each one reloads the sets again once the last is done.
+ * Ten of them brought the player's game down without a word. So after each
+ * change the row is dark for a moment, and clicks that arrive meanwhile -- the
+ * ones queued up while the game stood still come in right after -- are
+ * thrown away.
+ */
+static std::chrono::steady_clock::time_point _max_hl_blocked_until{};
+/** How long the row stays dark after the sets have been reloaded. */
+static constexpr std::chrono::milliseconds MAX_HL_BLOCK{1500};
+
+/** For the rig: let the map height take clicks at once again, to press it the way the player did before it was held back. */
+void ResetMaxHlBlock()
+{
+	_max_hl_blocked_until = {};
+}
+
+/** Does the maximum map height take clicks now? */
+static bool MaxHlTakesClicks()
+{
+	return std::chrono::steady_clock::now() >= _max_hl_blocked_until;
+}
+
+/**
  * Allow (or disallow) a change of the maximum allowed heightlevel.
  * @param new_value new value
  * @return New value (or unchanged old value) of the maximum
@@ -161,6 +187,9 @@ static int32_t ClickChangeMaxHlCheat(int32_t new_value, int32_t)
 	/* Execute the change and reload GRF Data */
 	_settings_game.construction.map_height_limit = new_value;
 	ReloadNewGRFData();
+	/* Counted from when the reload is over, not from the click: the clicks
+	 * made while it ran arrive only now. */
+	_max_hl_blocked_until = std::chrono::steady_clock::now() + MAX_HL_BLOCK;
 
 	/* The smallmap uses an index from heightlevels to colours. Trigger rebuilding it. */
 	InvalidateWindowClassesData(WindowClass::SmallMap, 2);
@@ -245,6 +274,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_cheat_widgets = {
 struct CheatWindow : Window {
 	int clicked = 0;
 	int clicked_cheat = 0;
+	bool max_hl_live = true; ///< Whether the map height's arrows were last drawn taking clicks.
 	uint line_height = 0;
 	Dimension icon{}; ///< Dimension of company icon sprite
 
@@ -309,8 +339,10 @@ struct CheatWindow : Window {
 				default: {
 					int32_t val = static_cast<int32_t>(ReadValue(ce->variable, ce->type));
 
-					/* Draw [<][>] boxes for settings of an integer-type */
-					DrawArrowButtons(button_left, y + button_y_offset, Colours::Yellow, clicked - (i * 2), true, true);
+					/* Draw [<][>] boxes for settings of an integer-type; the
+					 * map height's are dark while it takes no clicks. */
+					bool live = i != CHT_EDIT_MAX_HL || MaxHlTakesClicks();
+					DrawArrowButtons(button_left, y + button_y_offset, Colours::Yellow, clicked - (i * 2), live, live);
 
 					switch (ce->str) {
 						/* Display date for change date cheat */
@@ -472,6 +504,8 @@ struct CheatWindow : Window {
 		if (rtl) x = r.Width() - 1 - x;
 
 		if (btn >= last) return;
+		/* The map height right after a change: thrown away (see _max_hl_blocked_until). */
+		if (btn == CHT_EDIT_MAX_HL && !MaxHlTakesClicks()) return;
 
 		const CheatEntry *ce = &_cheats_ui[btn];
 		int value = static_cast<int32_t>(ReadValue(ce->variable, ce->type));
@@ -624,6 +658,16 @@ struct CheatWindow : Window {
 		this->clicked_setting = nullptr;
 		this->clicked = 0;
 		this->SetDirty();
+	}
+
+	/** Light the map height's arrows again when it takes clicks again. */
+	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
+	{
+		bool live = MaxHlTakesClicks();
+		if (live != this->max_hl_live) {
+			this->max_hl_live = live;
+			this->SetWidgetDirty(WID_C_MAX_HL);
+		}
 	}
 
 	void OnQueryTextFinished(std::optional<std::string> str) override

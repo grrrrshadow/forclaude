@@ -4096,7 +4096,7 @@ STR_TOWN_VIEW_LOCAL_AUTHORITY_TOOLTIP                           :{BLACK}Ukázat 
 STR_TOWN_VIEW_RENAME_TOOLTIP                                    :{BLACK}Přejmenovat město
 STR_TOWN_VIEW_CARGO_GRAPH                                       :Graf nákladu
 STR_TOWN_VIEW_CARGO_GRAPH_TOOLTIP                               :Zobraz graf historie nákladu města
-STR_TOWN_VIEW_HOUSE_SETS                                        :{BLACK}Domy z: {RAW_STRING}
+STR_TOWN_VIEW_HOUSE_SETS                                        :{BLACK}Domy z: {STRING}
 STR_TOWN_VIEW_HOUSE_SETS_TOOLTIP                                :{BLACK}Z jakých domů město staví: domy některého klimatu nebo sada domů (GRF). Zaškrtni víc a město je míchá. Nic zaškrtnuté, staví ze všech domů, které hra nabízí, jako obvykle. Domy, které už stojí, zůstanou; tohle platí pro další stavbu
 STR_TOWN_VIEW_HOUSE_SETS_ALL                                    :všech domů
 STR_TOWN_VIEW_HOUSE_SETS_COUNT                                  :{NUM} {P sada sady sad}
@@ -4886,7 +4886,7 @@ STR_TRAIN_DRIVER_STOP_BRAKE                                     :{BLACK}Záchran
 STR_TRAIN_DRIVER_STOP_BRAKE_TOOLTIP                             :{BLACK}O kolik slaběji tahle mašinka brzdí, když jí zmáčkneš stopku
 STR_TRAIN_DRIVER_MEMORY                                         :{BLACK}Žlutou zapomene
 STR_TRAIN_DRIVER_MEMORY_TOOLTIP                                 :{BLACK}Jak dlouho si strojvedoucí pamatuje, co mu řekl poslední semaforek
-STR_TRAIN_DRIVER_AS_GAME                                        :podle hry: {RAW_STRING}
+STR_TRAIN_DRIVER_AS_GAME                                        :podle hry: {STRING}
 STR_TRAIN_DRIVER_BAND_GAME                                      :{BLACK}{NUM}
 STR_TRAIN_DRIVER_BAND_OWN                                       :{WHITE}{NUM}
 STR_TRAIN_DRIVER_BAND_TOOLTIP                                   :{BLACK}Kolik km/h tahle mašinka ubere na jednom políčku při rychlostech napsaných nahoře. Bílé číslo je její, černé je ze hry
