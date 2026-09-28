@@ -37,6 +37,7 @@ bool _fullscreen;
 Support8bpp _support8bpp; ///< State of the support for 8bpp graphics.
 CursorVars _cursor;
 bool _ctrl_pressed;   ///< Is Ctrl pressed?
+bool _alt_pressed;    ///< Is Alt pressed? Read only for saving the mouse log (Ctrl and Alt together).
 bool _shift_pressed;  ///< Is Shift pressed?
 uint16_t _game_speed = 100; ///< Current game-speed; 100 is 1x, 0 is infinite.
 bool _left_button_down;     ///< Is left mouse button pressed?

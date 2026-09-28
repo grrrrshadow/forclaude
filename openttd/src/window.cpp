@@ -3144,21 +3144,26 @@ void HandleMouseEvents()
 		double_click_time = std::chrono::steady_clock::now();
 		double_click_pos = _cursor.pos;
 		_left_button_clicked = true;
-	} else if (_right_button_clicked && _ctrl_pressed) {
-		/* Ctrl and the right button save the last few seconds of the mouse
-		 * beside the saved games, where the crash reports go. The click is
-		 * taken, so it neither starts a drag nor reaches a window. */
+	} else if (_right_button_clicked) {
 		_right_button_clicked = false;
+		click = MouseClick::Right;
+	}
+
+	/* Ctrl and Alt pressed together save the last few seconds of the mouse
+	 * beside the saved games, where the crash reports go -- once a press. It
+	 * used to be Ctrl and the right button, and the right button is the very
+	 * one that sticks: with it stuck, the log could not be asked for. */
+	static bool ctrl_alt_was = false;
+	bool ctrl_alt = _ctrl_pressed && _alt_pressed;
+	if (ctrl_alt && !ctrl_alt_was) {
 		std::string saved = MouseDebugSave();
 		if (saved.empty()) {
 			ShowErrorMessage(GetEncodedString(STR_MOUSE_DEBUG_FAILED), {}, WarningLevel::Error);
 		} else {
 			ShowErrorMessage(GetEncodedString(STR_MOUSE_DEBUG_SAVED, saved), {}, WarningLevel::Info);
 		}
-	} else if (_right_button_clicked) {
-		_right_button_clicked = false;
-		click = MouseClick::Right;
 	}
+	ctrl_alt_was = ctrl_alt;
 
 	int mousewheel = 0;
 	if (_cursor.wheel) {

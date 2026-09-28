@@ -205,12 +205,14 @@ run_scene nedobrzdilvyp "vlak123 on
 testnedobrzdil cesta stopka 3 odtah" 9000
 # Setting on, nobody touches the stop: the train is driven, ten wagons behind
 # it, and the driver sees 20 tiles. The path signal guarding the platform is
-# one of the signals he reads, it is red and the platform behind it is taken,
-# so he brakes from twenty tiles out and stands short of it (srazka=0; the
-# record says it stands there for good, which it does -- the engine at the
-# platform never moves). It used to run past: a path signal was not read at
-# all, and the driver learned of the platform only when he booked up to the
-# signal, four tiles short (TEMATA_ODTAH 81.8).
+# one of the signals he reads, it is red and the platform behind it is taken.
+# He sees it in time and brakes as he plans with the setting off -- the gentle
+# rate -- but this line's braking table is weak (LINE_BRZDY, 4 km/h a tile:
+# fifteen tiles from 72), so he fails to brake and runs into the engine at the
+# platform (srazka=1, havaroval=2; the tow takes the wrecks). The player's rule
+# (TEMATA_RUZNE §120): the table is only how hard a train brakes, never how
+# the driver plans -- planned by the table, a weak table ran the trains'
+# acceleration. Before that he stood short of it here.
 run_scene nedobrzdilbez "$LINE_BRZDY
 setting vehicle.train_braking 4
 setting vehicle.train_warning_memory 4
@@ -257,6 +259,9 @@ run_scene oranzblizko "$LINE_BRZDY
 setting vehicle.train_braking 1
 vlak123 on
 testnedobrzdil blok vozu 10 rozestup 2 odtah" 9000
+# The two below crash too since the table stopped planning (see
+# nedobrzdilbez): the driver reads the yellows as he did, brakes by the gentle
+# plan, and the weak table does not stop him.
 run_scene oranzdaleko "$LINE_BRZDY
 setting vehicle.train_braking 1
 vlak123 on
@@ -1671,6 +1676,22 @@ run_scene vlak6plne "vlak123 on
 testspojfiltr 6 35 60 zrus
 testpauza" 1500 -g $S/panicky_vlak6.sav
 echo "vlak6plne: $(grep -o 'radu na (35,60): [A-Za-z]*' $S/reg_vlak6plne.log) zaklada=$(grep -c 'Vlak 6: zaklada radu' $S/reg_vlak6plne.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The braking table does not run acceleration (TEMATA_RUZNE §120): the
+# player's junction save, the setting on (sight 20) and every band of the
+# table at 1 km/h a tile. Train 8 used to be held at 15 km/h for most of this
+# run -- a platform in sight and a table that could stop it from nothing more
+# -- and now pulls away as with the setting off. patnact is how many of its
+# readings are 15/15; it was 37.
+PK_TAB1="setting vehicle.train_braking 4"
+for k in 300 250 200 160 130 100 80 60 40 20 10; do PK_TAB1="$PK_TAB1
+setting vehicle.train_brake_drop_$k 1"; done
+PK_KDE=""; for t in $(seq 20 20 1200); do PK_KDE="$PK_KDE
+testzatik $t testkde"; done
+run_scene zrychleni "testpauza
+$PK_TAB1
+testrez uvolni 117 39
+testrez uvolni 118 39$PK_KDE" 1300 -g $S/panicky_krizovatka2.sav
+echo "zrychleni: patnact=$(grep 'kde 8:' $S/reg_zrychleni.log | grep -c 'rychlost 15/15')" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

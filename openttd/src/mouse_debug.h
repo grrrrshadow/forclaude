@@ -14,8 +14,8 @@
  * what the game remembered, and what the drag did, all on one timeline. Every
  * mouse message, every warp of the pointer, every reading of the buttons off
  * the system, every start and end of a drag is written here as it happens;
- * only the last twenty seconds are kept. Ctrl and the right button save them
- * beside the saved games, where the crash reports go.
+ * only the last twenty seconds are kept. Ctrl and Alt pressed together save
+ * them beside the saved games, where the crash reports go.
  */
 
 #ifndef MOUSE_DEBUG_H

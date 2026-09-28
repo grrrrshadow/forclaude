@@ -699,35 +699,6 @@ static int64_t BrakeCurveDecel(const BrakeCurve &c, int64_t speed)
 	return std::max<int64_t>(256 * speed * c.top / (BrakeCurve::STEPS * step_px), 1);
 }
 
-/** How many pixels the train needs to come to a stand from @p speed, by its curve. */
-static int64_t BrakeCurveDistance(const BrakeCurve &c, int64_t speed)
-{
-	if (speed <= 0) return 0;
-	if (speed >= c.top) {
-		/* Faster than top speed, downhill: braking as at top speed. */
-		int64_t decel = BrakeCurveDecel(c, c.top);
-		return c.dist[BrakeCurve::STEPS] / 256 + (speed * speed - c.top * c.top) / (2 * decel);
-	}
-	auto [i, part] = BrakeCurveStep(c, speed);
-	return (c.dist[i] + (c.dist[i + 1] - c.dist[i]) * part / c.top) / 256;
-}
-
-/** The speed the train can come to a stand from in @p pixels, by its curve. */
-static int64_t BrakeCurveSpeedFor(const BrakeCurve &c, int64_t pixels)
-{
-	if (pixels <= 0) return 0;
-	const int64_t whole = c.dist[BrakeCurve::STEPS] / 256;
-	if (pixels >= whole) {
-		int64_t decel = BrakeCurveDecel(c, c.top);
-		return IntSqrt(static_cast<uint32_t>(std::min<int64_t>(c.top * c.top + 2 * decel * (pixels - whole), UINT32_MAX)));
-	}
-	int64_t sub = pixels * 256;
-	auto it = std::upper_bound(c.dist.begin(), c.dist.end(), sub);
-	int i = static_cast<int>(it - c.dist.begin()) - 1; // dist[i] <= sub < dist[i + 1]
-	int64_t step_sub = std::max<int64_t>(c.dist[i + 1] - c.dist[i], 1);
-	return (int64_t(i) * c.top + (sub - c.dist[i]) * c.top / step_sub) / BrakeCurve::STEPS;
-}
-
 /**
  * Is "brake, fail to brake and crash" switched on? It is every choice of the
  * player's one setting (vehicle.train_braking) but the first: off is the
@@ -745,7 +716,13 @@ bool IsSignalOverrunOn()
  */
 static uint8_t TrainBrakingSetting(const Train *v)
 {
-	uint8_t own = DriverOf(v)->driver_sight;
+	const Train *driver = DriverOf(v);
+	/* A train on its way to couple drives as with the setting off, the
+	 * player's exception: it does not go by the signals but nose to nose up
+	 * to what it collects, and with a weak braking table it crept the whole
+	 * way there. Braking for it is the game's own, and it does not run past. */
+	if (driver->couple_target != VehicleID::Invalid() || driver->current_order.ShouldGoToCouple()) return 0;
+	uint8_t own = driver->driver_sight;
 	return own != 0 ? own - 1 : _settings_game.vehicle.train_braking;
 }
 
@@ -821,12 +798,15 @@ static int64_t GentleBrakeRate(const Train *v)
 static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
 {
 	if (pixels <= 0) return target_speed;
-	if (BrakesByCurve(v)) {
-		/* By the curve: the speed that stops in the distance it takes to stop
-		 * from the target plus these pixels. */
-		const BrakeCurve &c = GetBrakeCurve(v);
-		return static_cast<int>(std::min<int64_t>(BrakeCurveSpeedFor(c, BrakeCurveDistance(c, target_speed) + pixels), INT32_MAX));
-	}
+	/* Planned by the gentle rate whatever the braking table says, the setting
+	 * on or off: the driver plans as he always has, and the table is only how
+	 * hard the train then brakes (BrakeDecelNow()). Planned by the table, a
+	 * weak table held every train that saw a stop ahead down to what that
+	 * table could stop in the distance -- one leaving with a platform in
+	 * sight crept out at 15 km/h with the table at 1, and the table was running
+	 * the train's acceleration. The player's rule: the setting may not touch
+	 * acceleration; a table too weak for the plan is a train that fails to
+	 * brake and crashes, which is what the setting is for. */
 	int64_t allowed_sq = int64_t(target_speed) * target_speed + 2 * GentleBrakeRate(v) * pixels;
 	return static_cast<int>(IntSqrt(static_cast<uint32_t>(std::min<int64_t>(allowed_sq, UINT32_MAX))));
 }
@@ -838,9 +818,7 @@ static int SpeedAllowedFor(const Train *v, int target_speed, int pixels)
  */
 static int GentleStoppingReach(const Train *v)
 {
-	if (BrakesByCurve(v)) {
-		return static_cast<int>(std::min<int64_t>(BrakeCurveDistance(GetBrakeCurve(v), v->cur_speed) + 2 * TILE_SIZE, INT32_MAX / 2));
-	}
+	/* The gentle plan, never the table: see SpeedAllowedFor(). */
 	int64_t gentle = GentleBrakeRate(v);
 	return static_cast<int>(std::min<int64_t>(int64_t(v->cur_speed) * v->cur_speed / (2 * gentle) + 2 * TILE_SIZE, INT32_MAX / 2));
 }
