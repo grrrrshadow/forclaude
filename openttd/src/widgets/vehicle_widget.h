@@ -90,6 +90,7 @@ enum VehicleListWidgets : WidgetID {
 /** Widgets of the #TrainDriverWindow class (train_driver_gui.cpp). */
 enum TrainDriverWidgets : WidgetID {
 	WID_DRV_CAPTION,    ///< Caption: the train's name.
+	WID_DRV_NAME,       ///< Editbox: the driver's name.
 	WID_DRV_SIGHT,      ///< Dropdown: "brake, fail to brake and crash" for this train.
 	WID_DRV_SIGNALS,    ///< Dropdown: through how many signals the driver reads the line.
 	WID_DRV_STOP_BRAKE, ///< Dropdown: the emergency brake.

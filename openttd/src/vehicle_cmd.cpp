@@ -999,7 +999,7 @@ std::tuple<CommandCost, VehicleID> CmdCloneVehicle(DoCommandFlags flags, TileInd
 				w->SetServiceIntervalIsPercent(v->ServiceIntervalIsPercent());
 				/* The driver goes with the clone: he is the player's setting
 				 * for this engine, the same as its service interval. */
-				if (v->type == VehicleType::Train) Train::From(w)->CopyDriverFrom(Train::From(v));
+				if (v->type == VehicleType::Train) Train::From(w)->CopyDriverFrom(Train::From(v), false);
 			}
 			w_rear = w; // trains needs to know the last car in the train, so they can add more in next loop
 		}

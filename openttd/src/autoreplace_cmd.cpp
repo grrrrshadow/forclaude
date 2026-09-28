@@ -471,7 +471,7 @@ static CommandCost CopyHeadSpecificThings(Vehicle *old_head, Vehicle *new_head, 
 
 		/* The driver stays with the train through a replacement: he is the
 		 * player's setting for this train, not for a particular engine. */
-		if (old_head->type == VehicleType::Train) Train::From(new_head)->CopyDriverFrom(Train::From(old_head));
+		if (old_head->type == VehicleType::Train) Train::From(new_head)->CopyDriverFrom(Train::From(old_head), true);
 		GroupStatistics::AddProfitLastYear(new_head);
 
 		/* Switch vehicle windows/news to the new vehicle, so they are not closed/deleted when the old vehicle is sold */

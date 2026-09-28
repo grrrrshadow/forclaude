@@ -1649,6 +1649,18 @@ for k in krizovatka krizovatka2; do
   echo "$k: nikdo=$(grep 'testrez: (' $S/reg_$k.log | grep -v uvolnena | grep -c 'nikdo\.') zaseknuto=$(grep 'kde [389]:' $S/reg_$k.log | grep -c 'zasekly ano')"
   echo "$k: nikdo=$(grep 'testrez: (' $S/reg_$k.log | grep -v uvolnena | grep -c 'nikdo\.') zaseknuto=$(grep 'kde [389]:' $S/reg_$k.log | grep -c 'zasekly ano')" >> ${BATTERY_STABLE:-/dev/null}
 done
+# The driver's name, the first row of the driver window: typed in and kept
+# it reads after the train's name in the train's window (Train #1 "Pepa"),
+# "everything as the game says" leaves it alone, and it comes back with the
+# saved game; the other train has none.
+rm -f $H/.local/share/openttd/save/ridicjmeno.sav
+run_scene ridicjmeno "vlak123 on
+testspoj
+testza 200 testridicokno 1 Pepa
+testza 220 save ridicjmeno" 1000
+run_scene ridicjmenosav "testridic 1
+testridic 2" 20 -g $H/.local/share/openttd/save/ridicjmeno.sav
+echo "ridicjmeno: $(grep -o "okno vlaku '.*'" $S/reg_ridicjmeno.log) po nacteni: $(grep -o "vlaku [12]: jmeno '[^']*'" $S/reg_ridicjmenosav.log | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

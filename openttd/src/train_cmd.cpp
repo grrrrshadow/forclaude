@@ -7245,6 +7245,32 @@ CommandCost CmdSetTrainDriver(DoCommandFlags flags, VehicleID veh_id, TrainDrive
 }
 
 /**
+ * Give a train's driver a name, or take it away (empty text): the first row
+ * of the driver window. The train's window shows it after the train's name.
+ * @param flags type of operation
+ * @param veh_id the train, the head of its consist
+ * @param text the name, as long as a vehicle's name may be
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdSetTrainDriverName(DoCommandFlags flags, VehicleID veh_id, const std::string &text)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsFrontEngine()) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (Utf8StringLength(text) >= MAX_LENGTH_VEHICLE_NAME_CHARS) return CMD_ERROR;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		v->driver_name = text;
+		InvalidateWindowData(WindowClass::TrainDriver, v->index);
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}
+
+/**
  * Why this train cannot be sold to the scrapyard, if it cannot.
  *
  * One place decides, and both the command and the button in the orders window

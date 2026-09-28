@@ -4852,6 +4852,7 @@ STR_REPLACE_REMOVE_WAGON_GROUP_HELP                             :{STRING}. Ctrl+
 
 # Vehicle view
 STR_VEHICLE_VIEW_CAPTION                                        :{WHITE}{VEHICLE}
+STR_VEHICLE_VIEW_CAPTION_DRIVER                                 :{WHITE}{VEHICLE} „{STRING}“
 
 ###length VEHICLE_TYPES
 STR_VEHICLE_VIEW_TRAIN_CENTER_TOOLTIP                           :{BLACK}Vystředit pohled na vlak. Dvojklikem budeš následovat vlak v hlavním okně. Ctrl+Klik otevře nové okno náhledu
@@ -4878,6 +4879,9 @@ STR_VEHICLE_VIEW_TRAIN_SELL_TOOLTIP                             :{BLACK}Prodat t
 STR_VEHICLE_VIEW_WAGONS_SELL_TOOLTIP                            :{BLACK}Prodat tyhle vagonky. Přijede pro ně odtahovka a prodá je v depu; zaplaceno dostaneš, až se tam opravdu prodají
 STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Určit tento vlak jako odtahovku v tomto depu. Čeká tady, vyjíždí pro porouchané a havarované vlaky a potom se sem vrací
 STR_TRAIN_DRIVER_CAPTION                                        :{WHITE}Strojvedoucí: {VEHICLE}
+STR_TRAIN_DRIVER_NAME                                           :{BLACK}Jméno strojvedoucího
+STR_TRAIN_DRIVER_NAME_OSKTITLE                                  :{BLACK}Jméno strojvedoucího
+STR_TRAIN_DRIVER_NAME_TOOLTIP                                   :{BLACK}Jak se strojvedoucí téhle mašinky jmenuje. V okně vlaku je napsané za jménem vlaku. Zapíše se tlačítkem „Potvrdit změny“
 STR_TRAIN_DRIVER_SIGHT                                          :{BLACK}Brzdit, nedobrzdit a nabourat
 STR_TRAIN_DRIVER_SIGHT_TOOLTIP                                  :{BLACK}Jak daleko strojvedoucí téhle mašinky vidí na semaforek. „Podle hry“ je stejnojmenné nastavení hry
 STR_TRAIN_DRIVER_SIGNALS                                        :{BLACK}Skrz kolik semaforů vidí

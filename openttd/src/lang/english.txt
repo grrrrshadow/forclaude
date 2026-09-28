@@ -4747,6 +4747,7 @@ STR_REPLACE_REMOVE_WAGON_GROUP_HELP                             :{STRING}. Ctrl+
 
 # Vehicle view
 STR_VEHICLE_VIEW_CAPTION                                        :{WHITE}{VEHICLE}
+STR_VEHICLE_VIEW_CAPTION_DRIVER                                 :{WHITE}{VEHICLE} "{RAW_STRING}"
 
 ###length VEHICLE_TYPES
 STR_VEHICLE_VIEW_TRAIN_CENTER_TOOLTIP                           :{BLACK}Centre main view on train's location. Double click to follow train in main view. Ctrl+Click to open a new viewport on train's location
@@ -4772,6 +4773,9 @@ STR_VEHICLE_VIEW_TRAIN_SELL_TOOLTIP                             :{BLACK}Sell thi
 STR_VEHICLE_VIEW_WAGONS_SELL_TOOLTIP                            :{BLACK}Sell these wagons. A rescue engine comes for them and sells them in the depot; the money arrives when they are actually sold there
 STR_VEHICLE_VIEW_TRAIN_RESCUE_ENGINE_TOOLTIP                    :{BLACK}Station this train in this depot as a rescue engine. It waits here and is sent out to fetch trains that break down or crash, and returns here afterwards
 STR_TRAIN_DRIVER_CAPTION                                        :{WHITE}Driver: {VEHICLE}
+STR_TRAIN_DRIVER_NAME                                           :{BLACK}Driver's name
+STR_TRAIN_DRIVER_NAME_OSKTITLE                                  :{BLACK}Driver's name
+STR_TRAIN_DRIVER_NAME_TOOLTIP                                   :{BLACK}What the driver of this train is called. It is shown after the train's name in its window. Kept with "Keep the changes"
 STR_TRAIN_DRIVER_SIGHT                                          :{BLACK}Brake, fail to brake and crash
 STR_TRAIN_DRIVER_SIGHT_TOOLTIP                                  :{BLACK}How far this train's driver sees a signal. "As the game says" is the game setting of the same name
 STR_TRAIN_DRIVER_SIGNALS                                        :{BLACK}Reads the line through signals

@@ -22,6 +22,8 @@
 
 #include "stdafx.h"
 #include "command_func.h"
+#include "querystring_gui.h"
+#include "string_func.h"
 #include "dropdown_func.h"
 #include "dropdown_type.h"
 #include "settings_type.h"
@@ -49,11 +51,13 @@ struct DriverDraft {
 	uint8_t stop_brake = 0;
 	uint8_t memory = 0;
 	uint8_t drop[11] = {};
+	std::string name;
 
 	bool operator==(const DriverDraft &) const = default;
 
 	void ReadFrom(const Train *t)
 	{
+		this->name = t->driver_name;
 		this->sight = t->driver_sight;
 		this->signals = t->driver_signals;
 		this->stop_brake = t->driver_stop_brake;
@@ -87,14 +91,26 @@ struct DriverDraft {
 struct TrainDriverWindow : Window {
 	DriverDraft draft; ///< what the window shows
 	DriverDraft kept; ///< what the train has
+	QueryString name_editbox; ///< the driver's name, the first row
 
-	TrainDriverWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
+	TrainDriverWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc),
+			name_editbox(MAX_LENGTH_VEHICLE_NAME_CHARS * MAX_CHAR_LENGTH, MAX_LENGTH_VEHICLE_NAME_CHARS)
 	{
 		this->CreateNestedTree();
 		this->FinishInitNested(window_number);
+		this->querystrings[WID_DRV_NAME] = &this->name_editbox;
 		this->owner = Vehicle::Get(window_number)->owner;
 		this->kept.ReadFrom(Train::Get(window_number));
 		this->draft = this->kept;
+		this->name_editbox.text.Assign(this->draft.name);
+	}
+
+	/** The name as typed goes into the draft, and "keep the changes" lights up. */
+	void OnEditboxChanged(WidgetID widget) override
+	{
+		if (widget != WID_DRV_NAME) return;
+		this->draft.name = this->name_editbox.text.GetText();
+		this->SetWidgetDirty(WID_DRV_APPLY);
 	}
 
 	/* The texts the four dropdowns and their lists share: the game's own
@@ -243,12 +259,15 @@ struct TrainDriverWindow : Window {
 				break;
 			}
 
-			case WID_DRV_RESET:
+			case WID_DRV_RESET: {
 				/* Everything as the game says -- in the draft; keeping it is
-				 * the other button's. */
+				 * the other button's. The name is no game setting and stays. */
+				std::string name = std::move(this->draft.name);
 				this->draft = DriverDraft{};
+				this->draft.name = std::move(name);
 				this->SetDirty();
 				break;
+			}
 
 			case WID_DRV_APPLY: {
 				const Train *t = Train::Get(static_cast<VehicleID>(this->window_number));
@@ -257,6 +276,7 @@ struct TrainDriverWindow : Window {
 					if (this->draft.Get(field) == this->kept.Get(field)) continue;
 					Command<Commands::SetTrainDriver>::Post(t->tile, t->index, field, this->draft.Get(field));
 				}
+				if (this->draft.name != this->kept.name) Command<Commands::SetTrainDriverName>::Post(t->index, this->draft.name);
 				break;
 			}
 
@@ -301,7 +321,10 @@ struct TrainDriverWindow : Window {
 		}
 		bool following = this->draft == this->kept;
 		this->kept.ReadFrom(t);
-		if (following) this->draft = this->kept;
+		if (following) {
+			this->draft = this->kept;
+			this->name_editbox.text.Assign(this->draft.name);
+		}
 		this->SetDirty();
 	}
 };
@@ -315,6 +338,10 @@ static constexpr std::initializer_list<NWidgetPart> _nested_train_driver_widgets
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey),
 		NWidget(NWID_VERTICAL), SetPadding(WidgetDimensions::unscaled.framerect), SetPIP(0, WidgetDimensions::unscaled.vsep_normal, 0),
+			NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
+				NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_TRAIN_DRIVER_NAME), SetFill(1, 0),
+				NWidget(WWT_EDITBOX, Colours::Grey, WID_DRV_NAME), SetMinimalSize(170, 12), SetStringTip(STR_TRAIN_DRIVER_NAME_OSKTITLE, STR_TRAIN_DRIVER_NAME_TOOLTIP),
+			EndContainer(),
 			NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
 				NWidget(WWT_TEXT, Colours::Invalid), SetStringTip(STR_TRAIN_DRIVER_SIGHT), SetFill(1, 0),
 				NWidget(WWT_DROPDOWN, Colours::Grey, WID_DRV_SIGHT), SetMinimalSize(170, 12), SetToolTip(STR_TRAIN_DRIVER_SIGHT_TOOLTIP),

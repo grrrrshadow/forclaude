@@ -239,10 +239,17 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	uint8_t driver_stop_brake = 0; ///< vehicle.train_stop_brake_weaker for this train: 0 = as game, 1 = 30 % weaker, 2 = 10 % weaker
 	uint8_t driver_memory = 0; ///< vehicle.train_warning_memory for this train: 0 = as game, 1..6 = never forgets, 20, 15, 10, 5, 3 tiles
 	uint8_t driver_drop[11] = {}; ///< the braking table for this train, top band first: 0 = as game, else km/h shed on one tile
+	std::string driver_name; ///< the driver's name, as the player gave it in the driver window; empty when he has none. Shown after the train's name in its window.
 
-	/** Take another train's driver over, as a clone or a replacement does. */
-	void CopyDriverFrom(const Train *other)
+	/**
+	 * Take another train's driver over, as a clone or a replacement does.
+	 * @param with_name whether his name comes too: a replacement is the same
+	 *        train with the same man at the controls, a clone is another train
+	 *        and one man cannot drive two
+	 */
+	void CopyDriverFrom(const Train *other, bool with_name)
 	{
+		if (with_name) this->driver_name = other->driver_name;
 		this->driver_sight = other->driver_sight;
 		this->driver_signals = other->driver_signals;
 		this->driver_stop_brake = other->driver_stop_brake;

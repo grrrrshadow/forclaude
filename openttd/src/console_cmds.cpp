@@ -111,6 +111,7 @@
 #include "waypoint_func.h"
 #include "vehicle_gui.h"
 #include "widgets/cheat_widget.h"
+#include "querystring_gui.h"
 #include "cheat_func.h"
 #include "settings_gui.h"
 #include "widgets/settings_widget.h"
@@ -9340,8 +9341,8 @@ static bool ConTestDriver(std::span<std::string_view> argv)
 	}
 	std::string table;
 	for (uint8_t d : t->driver_drop) table += fmt::format(" {}", d);
-	IConsolePrint(CC_DEFAULT, "ridic vlaku {}: vidi {} semafory {} brzda {} pamet {} tabulka{} (0 = podle hry)", t->unitnumber,
-			t->driver_sight, t->driver_signals, t->driver_stop_brake, t->driver_memory, table);
+	IConsolePrint(CC_DEFAULT, "ridic vlaku {}: jmeno '{}' vidi {} semafory {} brzda {} pamet {} tabulka{} (0 = podle hry)", t->unitnumber,
+			t->driver_name, t->driver_sight, t->driver_signals, t->driver_stop_brake, t->driver_memory, table);
 	return true;
 }
 
@@ -9379,6 +9380,19 @@ static bool ConTestWindows(std::span<std::string_view> argv)
 			driver->OnClick(Point{0, 0}, WID_DRV_RESET, 1);
 			driver->OnClick(Point{0, 0}, WID_DRV_APPLY, 1);
 			IConsolePrint(CC_DEFAULT, "testridicokno: po resetu vidi {} tabulka[100] {}", t->driver_sight, t->driver_drop[5]);
+
+			/* The first row: a name typed in, kept, and read back in the
+			 * caption of the train's window. The reset above left it alone. */
+			if (argv.size() >= 3) {
+				QueryString *name = driver->GetQueryString(WID_DRV_NAME);
+				name->text.Assign(argv[2]);
+				driver->OnEditboxChanged(WID_DRV_NAME);
+				driver->OnClick(Point{0, 0}, WID_DRV_APPLY, 1);
+				driver->OnClick(Point{0, 0}, WID_DRV_RESET, 1);
+				driver->OnClick(Point{0, 0}, WID_DRV_APPLY, 1);
+				IConsolePrint(CC_DEFAULT, "testridicokno: jmeno '{}', okno vlaku '{}'", t->driver_name,
+						view != nullptr ? StrMakeValid(view->GetWidgetString(WID_VV_CAPTION, STR_NULL), {}) : std::string{"-"});
+			}
 		}
 	}
 	return true;

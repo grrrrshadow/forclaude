@@ -3482,6 +3482,11 @@ public:
 		/* A rake of wagons has no unit number to be called by -- that belongs
 		 * to the engine that left it here and went on without it. */
 		if (IsWaitingWagonChain(v)) return GetString(STR_VEHICLE_VIEW_WAGONS_CAPTION);
+		/* The driver's name after the train's, when the player gave him one
+		 * (the driver window, TrainDriverWindow). */
+		if (v->type == VehicleType::Train && Train::From(v)->IsFrontEngine() && !Train::From(v)->driver_name.empty()) {
+			return GetString(STR_VEHICLE_VIEW_CAPTION_DRIVER, v->index, Train::From(v)->driver_name);
+		}
 		return GetString(STR_VEHICLE_VIEW_CAPTION, v->index);
 	}
 

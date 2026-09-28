@@ -916,6 +916,7 @@ public:
 		     SLE_VAR(Train, driver_stop_brake, VarTypes::U8),
 		     SLE_VAR(Train, driver_memory,     VarTypes::U8),
 		     SLE_ARR(Train, driver_drop,       VarTypes::U8, 11),
+		     SLE_SSTR(Train, driver_name,      VarTypes::STR | StringValidationSetting::AllowControlCode),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
 
