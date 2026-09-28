@@ -1628,6 +1628,27 @@ run_scene piskoviste "testpiskoviste" 20
 # first press, and the game went down. After a change the row takes no clicks
 # for a moment, so ten presses in a row raise the height by one.
 run_scene piskovisteklik "testpiskoviste 10" 20
+# The player's junction (saves/panicky_krizovatka*.sav): two parallel
+# diagonal pieces on one tile. A train refused its road gives back what it
+# booked, and the give-back stopped at any train on the tile -- on the other
+# diagonal too -- leaving track booked to nobody, on which the next trains
+# waited for good. The saves carry that track already; it is given back by
+# hand (testrez uvolni) and then trains 3 and 8, and in the later save 3 and
+# 9, must all get away, and nothing may be booked to nobody afterwards
+# afterwards: nikdo=0 zaseknuto=0 on the lines below.
+run_scene krizovatka "unpause
+testrez uvolni 116 38
+testza 3000 testrez 106 30 122 53
+testza 3000 testkde" 3100 -g $S/panicky_krizovatka.sav
+run_scene krizovatka2 "unpause
+testrez uvolni 117 39
+testrez uvolni 118 39
+testza 3000 testrez 106 30 122 53
+testza 3000 testkde" 3100 -g $S/panicky_krizovatka2.sav
+for k in krizovatka krizovatka2; do
+  echo "$k: nikdo=$(grep 'testrez: (' $S/reg_$k.log | grep -v uvolnena | grep -c 'nikdo\.') zaseknuto=$(grep 'kde [389]:' $S/reg_$k.log | grep -c 'zasekly ano')"
+  echo "$k: nikdo=$(grep 'testrez: (' $S/reg_$k.log | grep -v uvolnena | grep -c 'nikdo\.') zaseknuto=$(grep 'kde [389]:' $S/reg_$k.log | grep -c 'zasekly ano')" >> ${BATTERY_STABLE:-/dev/null}
+done
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

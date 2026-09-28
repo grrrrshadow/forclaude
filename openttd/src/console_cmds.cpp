@@ -4142,6 +4142,19 @@ static bool ConTestReservations(std::span<std::string_view> argv)
 		IConsolePrint(CC_HELP, "List reserved tiles. Usage: 'testrez' (test scene) or 'testrez <x0> <y0> <x1> <y1>'.");
 		return true;
 	}
+	/* 'testrez uvolni <x> <y>': give back what on that tile is held by no
+	 * train, to see whether that is what a jam is waiting for. */
+	if (argv.size() >= 4 && argv[1] == "uvolni") {
+		auto px = ParseInteger(argv[2]), py = ParseInteger(argv[3]);
+		if (!px || !py) return false;
+		TileIndex t = TileXY(*px, *py);
+		for (Track track : GetReservedTrackbits(t)) {
+			if (GetTrainForReservation(t, track) != nullptr) continue;
+			UnreserveRailTrack(t, track);
+			IConsolePrint(CC_DEFAULT, "testrez: ({},{}) kolej {} uvolnena, nedrzel ji nikdo.", *px, *py, to_underlying(track));
+		}
+		return true;
+	}
 	/* A scene built here leaves its rectangle behind; a player's own saved game
 	 * does not, so the corners can be given instead. */
 	uint x0 = _testmapa_area[0], y0 = _testmapa_area[1], x1 = _testmapa_area[2], y1 = _testmapa_area[3];
@@ -4158,9 +4171,14 @@ static bool ConTestReservations(std::span<std::string_view> argv)
 			if (!IsTileType(t, TileType::Railway) && !IsRailStationTile(t)) continue;
 			TrackBits res = GetReservedTrackbits(t);
 			if (res.None()) continue;
-			const Train *who = GetTrainForReservation(t, FindFirstTrack(res));
-			IConsolePrint(CC_DEFAULT, "testrez: ({},{}) drzi {:#x} - vlak {}.", x, y, res.base(),
-					who != nullptr ? fmt::format("{}", who->unitnumber) : "nikdo");
+			/* Each reserved track on its own: two parallel pieces on one tile
+			 * can be held by two different trains, or one by nobody. */
+			std::string holders;
+			for (Track track : res) {
+				const Train *who = GetTrainForReservation(t, track);
+				holders += fmt::format(" kolej {} vlak {}", to_underlying(track), who != nullptr ? fmt::format("{}", who->unitnumber) : "nikdo");
+			}
+			IConsolePrint(CC_DEFAULT, "testrez: ({},{}) drzi {:#x} -{}.", x, y, res.base(), holders);
 			n++;
 		}
 	}

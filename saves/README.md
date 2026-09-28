@@ -74,3 +74,10 @@ přes `-g` a scény jsou v baterii.
   Scény `rigC2h`, `rigC1m`, `rigD0`…`rigD5`, matice `mx`…`mv`. Šest vlaků
   puštěných naráz se zamkne v křižovatce u dep C (PBS bez otáčení
   u návěstí) — pouštět s rozestupem.
+- `panicky_krizovatka.sav`, `panicky_krizovatka2.sav` (o minutu později) —
+  dvojitá úhlopříčka u stanice 6, na (116,38)–(118,40) dvě souběžné koleje
+  na jednom políčku. Vlak 3 stojí u (118,41), vlak 8 u (117,38), v druhém
+  savu vlak 3 u (117,38) a vlak 9 zeleně u (119,41): zamluvené koleje bez
+  vlaku (116,38), resp. (117,39)+(118,39), nechané úklidem nezdařené
+  rezervace, který se zastavil o vlak na souběžné koleji. Scény
+  `krizovatka`, `krizovatka2` (TEMATA_RUZNE §117).

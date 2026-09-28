@@ -11565,12 +11565,24 @@ void FreeTrainTrackReservation(const Train *consist, TileIndex from_tile, Trackd
 		 * just put its wagons down on the platform stood there for the rest
 		 * of the game, "waiting for a free path" to a shed with only parked
 		 * trains inside. */
+		/* Only a train on this piece of track, or on one crossing it: two
+		 * parallel pieces on one tile (the two diagonals of a double line)
+		 * are two roads. Asked of the whole tile, a train passing on the
+		 * other diagonal ended the walk, and what lay beyond stayed booked
+		 * to nobody: on the player's junction (Paničky Transport) each of two
+		 * trains, refused its road while the other stood alongside, left a
+		 * piece of it behind, and each then waited for track nobody held --
+		 * one at a green signal. A shed or a tunnel end is still asked
+		 * whole: its one bit is no piece of plain track. */
 		bool someone_else_here = false;
 		if (!IsRailDepotTile(tile)) {
 			for (const Vehicle *u : VehiclesOnTile(tile)) {
 				if (u->type != VehicleType::Train || Train::From(u)->First() == consist) continue;
-				someone_else_here = true;
-				break;
+				TrackBits on = Train::From(u)->track;
+				if (on.Any({Track::Wormhole, Track::Depot}) || TrackOverlapsTracks(on, TrackdirToTrack(td))) {
+					someone_else_here = true;
+					break;
+				}
 			}
 		}
 		if (someone_else_here) break;
