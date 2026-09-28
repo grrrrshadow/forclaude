@@ -81,3 +81,7 @@ přes `-g` a scény jsou v baterii.
   vlaku (116,38), resp. (117,39)+(118,39), nechané úklidem nezdařené
   rezervace, který se zastavil o vlak na souběžné koleji. Scény
   `krizovatka`, `krizovatka2` (TEMATA_RUZNE §117).
+- `panicky_vlak6.sav` — vlak 6 s „připojit plné, železná ruda, 9, založit“ na
+  cestě ke stanici 9, kde stojí prázdná řada (35,60) s „nenakládat“ (řada
+  vožená po kouscích k nakládce). Starý filtr ji bral za plnou („hotová“).
+  Scéna `vlak6plne` (TEMATA_RUZNE §119).

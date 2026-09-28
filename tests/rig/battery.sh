@@ -1661,6 +1661,16 @@ testza 220 save ridicjmeno" 1000
 run_scene ridicjmenosav "testridic 1
 testridic 2" 20 -g $H/.local/share/openttd/save/ridicjmeno.sav
 echo "ridicjmeno: $(grep -o "okno vlaku '.*'" $S/reg_ridicjmeno.log) po nacteni: $(grep -o "vlaku [12]: jmeno '[^']*'" $S/reg_ridicjmenosav.log | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Full is full (saves/panicky_vlak6.sav): train 6, told to take full iron ore
+# wagons and found a rake of nine at station 9, was on its way to the row of
+# empty wagons standing there with "no loading" -- a row moved up to the
+# loading in pieces -- because a rake that loads nothing counted as full.
+# Its old choice is forgotten (testspojfiltr ... zrus): the order must not take
+# the empty row, and train 6 founds a full rake of its own there.
+run_scene vlak6plne "vlak123 on
+testspojfiltr 6 35 60 zrus
+testpauza" 1500 -g $S/panicky_vlak6.sav
+echo "vlak6plne: $(grep -o 'radu na (35,60): [A-Za-z]*' $S/reg_vlak6plne.log) zaklada=$(grep -c 'Vlak 6: zaklada radu' $S/reg_vlak6plne.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

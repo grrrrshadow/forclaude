@@ -9521,6 +9521,44 @@ static bool ConTestSandbox(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Would a train's current collecting order take the rake standing on a tile,
+ * by its filters alone? Usage: 'testspojfiltr <train> <x> <y>'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestCoupleFilterTakes(std::span<std::string_view> argv)
+{
+	if (argv.size() < 4) {
+		IConsolePrint(CC_HELP, "Would a train's collect order take the rake on a tile. Usage: 'testspojfiltr <train> <x> <y>'.");
+		return true;
+	}
+	auto number = ParseInteger<uint>(argv[1]);
+	auto px = ParseInteger<uint>(argv[2]), py = ParseInteger<uint>(argv[3]);
+	if (!number || !px || !py) return false;
+	const Train *v = nullptr;
+	for (const Train *t : Train::Iterate()) if (t->IsFrontEngine() && t->unitnumber == *number) v = t;
+	const Train *rake = nullptr;
+	for (const Vehicle *u : VehiclesOnTile(TileXY(*px, *py))) {
+		if (u->type == VehicleType::Train) { rake = Train::From(u)->First(); break; }
+	}
+	if (v == nullptr || rake == nullptr) {
+		IConsolePrint(CC_ERROR, "testspojfiltr: vlak nebo rada nenalezena");
+		return true;
+	}
+	/* "zrus": forget what the train had already chosen, so it chooses again
+	 * by the filters as they are now -- a save caught on its way to a choice
+	 * made by older rules. */
+	if (argv.size() >= 5 && argv[4] == "zrus") {
+		Train::From(const_cast<Train *>(v))->couple_target = VehicleID::Invalid();
+		IConsolePrint(CC_DEFAULT, "testspojfiltr: vlak {} zapomnel, co si vybral", v->unitnumber);
+	}
+	extern bool CoupleOrderFilterTakes(const Train *v, const Train *rake);
+	IConsolePrint(CC_DEFAULT, "testspojfiltr: vlak {} rozkaz spojit {} radu na ({},{}): {}", v->unitnumber,
+			v->current_order.IsType(OT_GOTO_STATION) && v->current_order.ShouldGoToCouple() ? "ano" : "NE", *px, *py,
+			CoupleOrderFilterTakes(v, rake) ? "BERE" : "nebere");
+	return true;
+}
+
 static bool ConTestFollow(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -12985,6 +13023,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);
+	IConsole::CmdRegister("testspojfiltr",           ConTestCoupleFilterTakes);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);

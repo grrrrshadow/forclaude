@@ -22,7 +22,7 @@ Working directory layout, pointed to by `RIG_DIR`:
   `obmenaporucha.sav`, `odtah_peron.sav` as `back2.sav`, `porucha.sav`,
   `porucha_nastupiste.sav` as `porucha2.sav`, `porucha_za_vlakem.sav` as
   `porucha3.sav`, `rada_s_masinkou.sav` as `rada_masinka.sav`, `rig.sav`,
-  `vlak31.sav`, `panicky_krizovatka.sav`, `panicky_krizovatka2.sav`.
+  `vlak31.sav`, `panicky_krizovatka.sav`, `panicky_krizovatka2.sav`, `panicky_vlak6.sav`.
 
 **Copy them before the first run.** A scene whose save is not there does not
 fail: the game says "Game load failed", the scene ends after six lines, and

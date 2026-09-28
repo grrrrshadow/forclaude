@@ -3757,6 +3757,7 @@ void MarkCoupleClaimChanged(const Train *rake)
 	if (rake->track == Track::Depot) InvalidateWindowData(WindowClass::VehicleDepot, rake->tile);
 }
 
+
 /**
  * Does the rake @p rake answer the description the order @p order gives of
  * what it is going to collect?
@@ -3790,10 +3791,6 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 	 * See Order::couple_search for where it came from. */
 	if (order.ShouldSearchInRake()) {
 		const bool cargo_named = IsValidCargoType(order.GetCoupleCargo());
-		/* The same courtesy the whole-rake reading extends: a rake the player
-		 * has called done (Skip on its own orders, see below) is full whatever
-		 * is in it, so its wagons are found as full ones. */
-		const bool called_done = rake->current_order.GetLoadType() == OrderLoadType::NoLoad;
 		uint found = 0;
 		for (const Train *u = rake; u != nullptr; u = u->GetNextUnit()) {
 			if (order.GetCoupleBuyEngine() != EngineID::Invalid() && u->engine_type != order.GetCoupleBuyEngine()) continue;
@@ -3813,7 +3810,7 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 			switch (order.GetCoupleLoad()) {
 				/* A wagon that carries nothing is neither full nor empty and
 				 * is not one of the ones being looked for. */
-				case OrderCoupleLoad::Full:  if (!carries || (has_room && !called_done)) continue; break;
+				case OrderCoupleLoad::Full:  if (!carries || has_room) continue; break;
 				case OrderCoupleLoad::Empty: if (!carries || has_load) continue; break;
 				default: break;
 			}
@@ -3862,13 +3859,14 @@ static bool MatchesCoupleFilter(const Order &order, const Train *rake, bool chec
 			break;
 
 		case OrderCoupleLoad::Full:
-			/* A rake the player has called done counts as full whatever is in
-			 * it: it has finished what it was told to do here and nothing more
-			 * is going into it. The player says it with the ordinary Skip
-			 * button on the rake's own orders, which moves it from the job it
-			 * was left with to waiting to be collected. */
-			if (rake->current_order.GetLoadType() == OrderLoadType::NoLoad) break;
-			/* Otherwise, room left anywhere means it is not full. A vehicle that
+			/* Full is full: every wagon it is asked of has no room left. A rake
+			 * whose orders say "no loading" used to count as full whatever was
+			 * in it -- read as the player having called it done -- and a
+			 * collector told to take full wagons went for a row of empty ones
+			 * the player moves up to the loading in pieces, "no loading" on
+			 * purpose (Paničky Transport, train 6). The player's word: full is
+			 * full, and the filter asks the wagons. */
+			/* Room left anywhere means it is not full. A vehicle that
 			 * carries nothing at all -- a brake van, say -- has no room either,
 			 * so it neither makes a rake full nor stops it being full. */
 			for (const Train *u = rake; u != nullptr; u = u->Next()) {
@@ -4946,6 +4944,19 @@ const Train *CoupleOrderWouldTake(const Train *v, const Order &order)
  * @param model the model the order would name
  * @return whether the filter would take it
  */
+/**
+ * For the rig: would this train's current collecting order take this rake,
+ * by its filters (cargo, fullness, count, model)? Who has claimed what is not
+ * asked.
+ * @param v    the collecting train, its head
+ * @param rake the rake, its head
+ * @return whether the order's filters take it
+ */
+bool CoupleOrderFilterTakes(const Train *v, const Train *rake)
+{
+	return MatchesCoupleFilter(v->current_order, rake);
+}
+
 bool CoupleTypeFilterWouldTake(const Train *rake, EngineID model)
 {
 	Order o;
