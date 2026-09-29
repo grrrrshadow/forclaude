@@ -875,6 +875,19 @@ static void CalculateRefitMasks()
 }
 
 /**
+ * Does the set this engine comes from name a cargo in its own cargo table? Then
+ * it knows the cargo, and which of its vehicles carry it is the set's to say.
+ * @param e the engine
+ * @param label the cargo
+ * @return whether its set names it
+ */
+static bool GrfNamesCargo(const Engine *e, CargoLabel label)
+{
+	const GRFFile *grf = e->GetGRF();
+	return grf != nullptr && std::ranges::find(grf->cargo_list, label) != grf->cargo_list.end();
+}
+
+/**
  * Put the cargo for road vehicles on wagons (CT_ROLA, see road_on_rail.h) into
  * the refit mask of every rail wagon in the game, the way the wagon cargo
  * exception above widens its wagons: through the mask, so that the refit
@@ -910,8 +923,20 @@ static void OfferRoadVehiclesToCarriers()
 		return;
 	}
 	/* Taken out of every wagon's mask first: a set's wagon that is refitted by
-	 * cargo class takes any special cargo, this one with it. */
-	for (Engine *e : Engine::IterateType(VehicleType::Train)) e->info.refit_mask.Reset(_road_vehicle_cargo);
+	 * cargo class takes any special cargo, this one with it. Not out of the
+	 * wagons of a set that names the cargo in its own table: that set knows it,
+	 * and which of its wagons carry road vehicles is its to say -- the player's
+	 * way for a set of his, CZTR giving a wagon ROLA. Except the borrowed
+	 * wagon set, whose wagons are handed every cargo there is
+	 * (ApplyWagonCargoException()). */
+	extern bool IsWagonCargoExceptionGrf(const GRFConfig &config);
+	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (GrfNamesCargo(e, CT_ROLA)) {
+			const GRFConfig *config = GetGRFConfig(e->GetGRF()->grfid);
+			if (config == nullptr || !IsWagonCargoExceptionGrf(*config)) continue;
+		}
+		e->info.refit_mask.Reset(_road_vehicle_cargo);
+	}
 	for (Engine *e : Engine::Iterate()) {
 		if (e->type == VehicleType::Train) {
 			if (!IsCarCarrierWagon(e)) continue;
@@ -929,6 +954,7 @@ static void OfferRoadVehiclesToCarriers()
 	}
 }
 
+
 /**
  * Let every ship and aircraft that carries goods carry marijuana too, when the
  * game's own industries are in it (economy.extra_industries): the refit is
@@ -945,7 +971,10 @@ static void OfferRoadVehiclesToCarriers()
  * marijuana lorry, which is a coal lorry made over. The player: the lorries
  * for marijuana are there, the coal ones need not carry it. So it comes out
  * of every mask but those of the vehicles built for it -- whose own cargo it
- * is -- before the goods ships and aircraft are given it.
+ * is -- before the goods ships and aircraft are given it. A set that names the
+ * cargo in its own cargo table knows it, and its vehicles keep what the set
+ * made of it (the player's V3S of his own set, grrrrf): that is how a set says
+ * which of its vehicles carry it (GrfNamesCargo()).
  *
  * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
  * vessel's own choice of cargo is made first.
@@ -956,7 +985,8 @@ static void OfferMarijuanaToShipsAndAircraft()
 	if (!IsValidCargoType(marijuana)) return;
 
 	for (Engine *e : Engine::Iterate()) {
-		if (e->GetDefaultCargoType() != marijuana) e->info.refit_mask.Reset(marijuana);
+		if (e->GetDefaultCargoType() == marijuana || GrfNamesCargo(e, CT_MARIJUANA)) continue;
+		e->info.refit_mask.Reset(marijuana);
 	}
 	/* Save the St, the one coal wagon of a set the player gave marijuana: it
 	 * carries it as its coal drawn green (IsGreenLayerWagon()), with its
@@ -989,7 +1019,8 @@ static void OfferMarijuanaToShipsAndAircraft()
  * player asked for, and the armoured vans of the railways with them. Not ships
  * and aircraft: they take explosives only inside a car, and a car's explosives
  * are what their raid drops (see DropRaidBombs()). A ship or aircraft of a set
- * whose own cargo they are keeps them.
+ * whose own cargo they are, or whose set names them in its cargo table
+ * (GrfNamesCargo()), keeps them.
  */
 static void OfferExplosivesToArmouredOnly()
 {
@@ -997,7 +1028,7 @@ static void OfferExplosivesToArmouredOnly()
 	if (!IsValidCargoType(explosives)) return;
 	for (Engine *e : Engine::Iterate()) {
 		if (e->type != VehicleType::Ship && e->type != VehicleType::Aircraft) continue;
-		if (e->GetDefaultCargoType() == explosives) continue;
+		if (e->GetDefaultCargoType() == explosives || GrfNamesCargo(e, CT_EXPLOSIVES)) continue;
 		e->info.refit_mask.Reset(explosives);
 	}
 }
