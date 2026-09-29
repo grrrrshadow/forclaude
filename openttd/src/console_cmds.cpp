@@ -9584,9 +9584,9 @@ static bool ConTestPurchaseRefit(std::span<std::string_view> argv)
 /**
  * Cheat for looking at the loaded pictures: every road vehicle of the local
  * company is filled to the brim with whatever it is fitted for, so that each
- * cargo's full sprite can be seen on the road. The cargo comes from the
- * company's first station, or from nowhere if it has none; it pays when it is
- * delivered like any other. The player's "mmm". Usage: 'mmm'.
+ * cargo's full sprite can be seen on the road. The cargo is simply there: from
+ * no station -- the player's word -- and counted from where the vehicle stood
+ * when it was filled. The player's "mmm". Usage: 'mmm'.
  * @copydoc IConsoleCmdProc
  */
 static bool ConFillRoadVehicles(std::span<std::string_view> argv)
@@ -9599,10 +9599,6 @@ static bool ConFillRoadVehicles(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "mmm: no company to fill the vehicles of.");
 		return true;
 	}
-	const Station *from = nullptr;
-	for (const Station *st : Station::Iterate()) {
-		if (st->owner == _local_company) { from = st; break; }
-	}
 	uint vehicles = 0;
 	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (rv->owner != _local_company || !rv->IsFrontEngine() || rv->vehstatus.Test(VehState::Crashed)) continue;
@@ -9612,8 +9608,7 @@ static bool ConFillRoadVehicles(std::span<std::string_view> argv)
 			if (u->cargo_cap <= have) continue;
 			if (!CargoPacket::CanAllocateItem()) break;
 			uint16_t more = static_cast<uint16_t>(std::min<uint>(u->cargo_cap - have, UINT16_MAX));
-			u->cargo.Append(CargoPacket::Create(more, 0, from != nullptr ? from->index : StationID::Invalid(),
-					from != nullptr ? from->xy : u->tile, 0));
+			u->cargo.Append(CargoPacket::Create(more, 0, StationID::Invalid(), u->tile, 0));
 			filled = true;
 		}
 		if (!filled) continue;
