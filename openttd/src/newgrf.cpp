@@ -965,16 +965,10 @@ static void OfferRoadVehiclesToCarriers()
  * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
  * knows the cargo by name.
  *
- * Nothing else is refitted to it but the St of CZTR Wagons. Marijuana is bulk cargo, and a set's
- * vehicle takes cargo by class: every coal lorry and coal wagon of a set
- * could be refitted to it, and stood in the list above the game's own
- * marijuana lorry, which is a coal lorry made over. The player: the lorries
- * for marijuana are there, the coal ones need not carry it. So it comes out
- * of every mask but those of the vehicles built for it -- whose own cargo it
- * is -- before the goods ships and aircraft are given it. A set that names the
- * cargo in its own cargo table knows it, and its vehicles keep what the set
- * made of it (the player's V3S of his own set, grrrrf): that is how a set says
- * which of its vehicles carry it (GrfNamesCargo()).
+ * MARI is a cargo like any other: whatever a set's vehicle is refitted to by
+ * its label or its class, it keeps -- nothing is taken out of any mask. (The
+ * player: a set that gives a vehicle MARI carries it, a coal wagon that takes
+ * bulk takes it too; no set is blocked and none is singled out.)
  *
  * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
  * vessel's own choice of cargo is made first.
@@ -984,11 +978,7 @@ static void OfferMarijuanaToShipsAndAircraft()
 	CargoType marijuana = GetCargoTypeByLabel(CT_MARIJUANA);
 	if (!IsValidCargoType(marijuana)) return;
 
-	for (Engine *e : Engine::Iterate()) {
-		if (e->GetDefaultCargoType() == marijuana || GrfNamesCargo(e, CT_MARIJUANA)) continue;
-		e->info.refit_mask.Reset(marijuana);
-	}
-	/* Save the St, the one coal wagon of a set the player gave marijuana: it
+	/* The St, the one coal wagon of a set the player gave marijuana: it
 	 * carries it as its coal drawn green (IsGreenLayerWagon()), with its
 	 * articulated parts, as a car carrier takes road vehicles. */
 	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
