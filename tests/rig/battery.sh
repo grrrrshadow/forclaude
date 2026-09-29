@@ -1703,6 +1703,18 @@ setting_newgame economy.industries_arctic 1
 setting_newgame economy.industries_tropic 1
 setting_newgame economy.extra_industries 1' run_scene nakup "testnakup a" 20 -c $S/st_openttd.cfg
 echo "nakup: skoro_vse=$(grep -c 'Carries almost everything' $S/reg_nakup.log) krome=$(grep -c 'All but' $S/reg_nakup.log) krome_silnicni=$(grep 'All but' $S/reg_nakup.log | grep -c 'Road vehicles')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The player's cheat "mmm": every road vehicle of the company filled to the
+# brim, to look at the full sprites of all the cargoes. The car of the scene
+# is filled (30/30), a second "mmm" finds nothing to fill, and the car drives
+# on with the cargo and delivers it (vyjimka=0 -- the first cut made packets
+# without asking the pool and the game went down).
+printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
+run_scene mmm "vlak123 on
+testautovlak
+testzatik 50 mmm
+testzatik 51 testtvar auto 1
+testzatik 52 mmm" 6000
+echo "mmm: $(grep -o 'mmm: [0-9]* aut nalozeno' $S/reg_mmm.log | tr '\n' ' ')$(grep -o 'naklad [0-9]* [0-9]*/[0-9]*' $S/reg_mmm.log | head -1)" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

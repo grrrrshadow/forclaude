@@ -9581,6 +9581,51 @@ static bool ConTestPurchaseRefit(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Cheat for looking at the loaded pictures: every road vehicle of the local
+ * company is filled to the brim with whatever it is fitted for, so that each
+ * cargo's full sprite can be seen on the road. The cargo comes from the
+ * company's first station, or from nowhere if it has none; it pays when it is
+ * delivered like any other. The player's "mmm". Usage: 'mmm'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFillRoadVehicles(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Fill every road vehicle of your company with its cargo. Usage: 'mmm'.");
+		return true;
+	}
+	if (!Company::IsValidID(_local_company)) {
+		IConsolePrint(CC_ERROR, "mmm: no company to fill the vehicles of.");
+		return true;
+	}
+	const Station *from = nullptr;
+	for (const Station *st : Station::Iterate()) {
+		if (st->owner == _local_company) { from = st; break; }
+	}
+	uint vehicles = 0;
+	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (rv->owner != _local_company || !rv->IsFrontEngine() || rv->vehstatus.Test(VehState::Crashed)) continue;
+		bool filled = false;
+		for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+			uint have = u->cargo.StoredCount();
+			if (u->cargo_cap <= have) continue;
+			if (!CargoPacket::CanAllocateItem()) break;
+			uint16_t more = static_cast<uint16_t>(std::min<uint>(u->cargo_cap - have, UINT16_MAX));
+			u->cargo.Append(CargoPacket::Create(more, 0, from != nullptr ? from->index : StationID::Invalid(),
+					from != nullptr ? from->xy : u->tile, 0));
+			filled = true;
+		}
+		if (!filled) continue;
+		rv->MarkDirty();
+		SetWindowDirty(WindowClass::VehicleView, rv->index);
+		SetWindowDirty(WindowClass::VehicleDetails, rv->index);
+		vehicles++;
+	}
+	IConsolePrint(CC_DEFAULT, "mmm: {} aut nalozeno.", vehicles);
+	return true;
+}
+
 static bool ConTestFollow(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -13029,6 +13074,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("mm",                      ConIndustryHealth);
+	IConsole::CmdRegister("mmm",                     ConFillRoadVehicles);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
 	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);
