@@ -1629,9 +1629,10 @@ testza 2500 testvybusniny shod 204 21" 5000
 # were mixed up. Its right arrow raises the height by one and leaves the year
 # alone (testpiskoviste). odmitnuto is zero.
 run_scene piskoviste "testpiskoviste" 20
-# The player pressed it ten times while the game reloaded the sets for the
-# first press, and the game went down. After a change the row takes no clicks
-# for a moment, so ten presses in a row raise the height by one.
+# Ten presses in a row, each a reload of every set: the height goes up by ten.
+# The player's game went down doing this; a block that threw the presses
+# away was tried and taken out again at his word -- the other buttons are to
+# stay as they are, whatever happens here.
 run_scene piskovisteklik "testpiskoviste 10" 20
 # The player's junction (saves/panicky_krizovatka*.sav): two parallel
 # diagonal pieces on one tile. A train refused its road gives back what it

@@ -9478,18 +9478,14 @@ static bool ConTestExplosives(std::span<std::string_view> argv)
 static bool ConTestSandbox(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
-	/* "testpiskoviste [N] [nech] [bezblokace]": N presses in a row, leave the
-	 * window open afterwards, and let every press through as before the row was
-	 * held back after a change (ResetMaxHlBlock()). */
+	/* "testpiskoviste [N] [nech]": N presses in a row, and leave the window
+	 * open afterwards. */
 	uint presses = 1;
 	bool keep = false;
-	bool unblocked = false;
 	for (size_t a = 1; a < argv.size(); a++) {
 		if (argv[a] == "nech") keep = true;
-		else if (argv[a] == "bezblokace") unblocked = true;
 		else presses = std::max<uint>(1, ParseInteger<uint>(argv[a]).value_or(1));
 	}
-	extern void ResetMaxHlBlock();
 	ShowCheatWindow();
 	Window *w = FindWindowByClass(WindowClass::Cheat);
 	if (w == nullptr) {
@@ -9505,15 +9501,11 @@ static bool ConTestSandbox(std::span<std::string_view> argv)
 	/* The right half of the arrows, in the middle of the row. */
 	bool rtl = _current_text_dir == TD_RTL;
 	int x = rtl ? row->pos_x + (int)row->current_x - SETTING_BUTTON_WIDTH / 4 : row->pos_x + WidgetDimensions::scaled.framerect.left + SETTING_BUTTON_WIDTH * 3 / 4;
-	for (uint n = 0; n < presses; n++) {
-		if (unblocked) ResetMaxHlBlock();
-		w->OnClick(Point{x, row->pos_y + (int)row->current_y / 2}, WID_C_MAX_HL, 1);
-	}
-	IConsolePrint(CC_DEFAULT, "testpiskoviste: {}x{}, vyska mapy {} -> {}, rok {} -> {}, radek je {}", presses, unblocked ? " bez blokace" : "", height,
+	for (uint n = 0; n < presses; n++) w->OnClick(Point{x, row->pos_y + (int)row->current_y / 2}, WID_C_MAX_HL, 1);
+	IConsolePrint(CC_DEFAULT, "testpiskoviste: {}x, vyska mapy {} -> {}, rok {} -> {}, radek je {}", presses, height,
 			_settings_game.construction.map_height_limit, year.base(), TimerGameCalendar::year.base(), last ? "posledni" : "NENI posledni");
-	/* One press takes the height up by one; more pressed at once take it up by
-	 * one too while the row is held back after the first. */
-	uint expected = unblocked ? height + presses : height + 1;
+	/* Every press takes the height up by one. */
+	uint expected = height + presses;
 	if (!last || _settings_game.construction.map_height_limit != expected || TimerGameCalendar::year != year) {
 		IConsolePrint(CC_ERROR, "testpiskoviste: ODMITNUTO");
 	}
