@@ -9559,6 +9559,28 @@ static bool ConTestCoupleFilterTakes(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * The "refittable to" line the purchase list shows for a vehicle model, by its
+ * engine number, or for every model whose name has a piece of text in it.
+ * Usage: 'testnakup <engine>' or 'testnakup <text>'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestPurchaseRefit(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "The purchase list's 'refittable to' line. Usage: 'testnakup <engine>' or 'testnakup <text>'.");
+		return true;
+	}
+	extern std::string GetRefitOptionsString(EngineID engine);
+	auto id = ParseInteger<uint>(argv[1]);
+	for (const Engine *e : Engine::Iterate()) {
+		if (id.has_value() ? e->index != *id : GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList)).find(argv[1]) == std::string::npos) continue;
+		IConsolePrint(CC_DEFAULT, "testnakup: {} '{}': {}", e->index, GetString(STR_ENGINE_NAME, PackEngineNameDParam(e->index, EngineNameContext::PurchaseList)),
+				StrMakeValid(GetRefitOptionsString(e->index), {}));
+	}
+	return true;
+}
+
 static bool ConTestFollow(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -13024,6 +13046,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);
 	IConsole::CmdRegister("testspojfiltr",           ConTestCoupleFilterTakes);
+	IConsole::CmdRegister("testnakup",               ConTestPurchaseRefit);
 	IConsole::CmdRegister("testnoviny",              ConTestNews);
 	IConsole::CmdRegister("vlak123",                 ConShowTrainOrientation);
 	IConsole::CmdRegister("legacyimport",            ConLegacyDecoupleImport);

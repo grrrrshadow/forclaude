@@ -1479,6 +1479,55 @@ void ShowVehicleRefitWindow(const Vehicle *v, VehicleOrderID order, Window *pare
 }
 
 /**
+ * The "refittable to" line of an engine's purchase information, or nothing
+ * when it cannot be refitted.
+ * @param engine the engine
+ * @return the line, empty for none
+ */
+std::string GetRefitOptionsString(EngineID engine)
+{
+	/* List of cargo types of this engine */
+	CargoTypes present = GetUnionOfArticulatedRefitMasks(engine, false);
+
+	/* Draw nothing if the engine is not refittable */
+	if (present.Count() <= 1) return {};
+
+	/* More than this many cargoes and the list is not written out: "carries
+	 * almost everything" instead. With a hundred and more cargoes in a game the
+	 * list of a lorry that takes most of them filled the whole purchase window,
+	 * scrolled, and said nothing a player reads -- the player's word: write that
+	 * it carries almost everything, and that is it. */
+	static constexpr uint LISTED_AT_MOST = 7;
+
+	/* The cargo for road vehicles on wagons (CT_ROLA) is only for the car
+	 * carriers; a vehicle that is not one is not short of it, and "all but road
+	 * vehicles" told a player nothing. */
+	CargoTypes all = _cargo_mask;
+	extern CargoType _road_vehicle_cargo;
+	if (IsValidCargoType(_road_vehicle_cargo) && !present.Test(_road_vehicle_cargo)) all.Reset(_road_vehicle_cargo);
+
+	std::string str;
+	if (present == all) {
+		/* Engine can be refitted to all types in this climate */
+		str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_PURCHASE_INFO_ALL_TYPES, std::monostate{});
+	} else {
+		/* Check if we are able to refit to more cargo types and unable to. If
+		 * so, invert the cargo types to list those that we can't refit to. */
+		CargoTypes excluded = CargoTypes{present}.Flip(all);
+		uint num_excluded = excluded.Count();
+		if (num_excluded < present.Count() && num_excluded <= LISTED_AT_MOST) {
+			str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_PURCHASE_INFO_ALL_BUT, excluded);
+		} else if (present.Count() > LISTED_AT_MOST) {
+			str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_PURCHASE_INFO_CARRIES_EVERYTHING, std::monostate{});
+		} else {
+			str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_JUST_CARGO_LIST, present);
+		}
+	}
+
+	return str;
+}
+
+/**
  * Display list of cargo types of the engine, for the purchase information window.
  * @param left The left bound of the area to draw in.
  * @param right The right bound of the area to draw in.
@@ -1488,28 +1537,8 @@ void ShowVehicleRefitWindow(const Vehicle *v, VehicleOrderID order, Window *pare
  */
 uint ShowRefitOptionsList(int left, int right, int y, EngineID engine)
 {
-	/* List of cargo types of this engine */
-	CargoTypes present = GetUnionOfArticulatedRefitMasks(engine, false);
-
-	/* Draw nothing if the engine is not refittable */
-	if (present.Count() <= 1) return y;
-
-	std::string str;
-	if (present == _cargo_mask) {
-		/* Engine can be refitted to all types in this climate */
-		str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_PURCHASE_INFO_ALL_TYPES, std::monostate{});
-	} else {
-		/* Check if we are able to refit to more cargo types and unable to. If
-		 * so, invert the cargo types to list those that we can't refit to. */
-		CargoTypes excluded = CargoTypes{present}.Flip(_cargo_mask);
-		uint num_excluded = excluded.Count();
-		if (num_excluded < present.Count() && num_excluded <= 7) {
-			str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_PURCHASE_INFO_ALL_BUT, excluded);
-		} else {
-			str = GetString(STR_PURCHASE_INFO_REFITTABLE_TO, STR_JUST_CARGO_LIST, present);
-		}
-	}
-
+	std::string str = GetRefitOptionsString(engine);
+	if (str.empty()) return y;
 	return DrawStringMultiLine(left, right, y, INT32_MAX, str);
 }
 

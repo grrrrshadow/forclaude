@@ -4582,6 +4582,7 @@ STR_PURCHASE_INFO_AIRCRAFT_CAPACITY                             :{BLACK}Kapacita
 STR_PURCHASE_INFO_PWAGPOWER_PWAGWEIGHT                          :{BLACK}Poháněné vagony: {GOLD}+{POWER}{BLACK} Hmotnost: {GOLD}+{WEIGHT_SHORT}
 STR_PURCHASE_INFO_REFITTABLE_TO                                 :{BLACK}Lze přestavět na: {GOLD}{STRING}
 STR_PURCHASE_INFO_ALL_TYPES                                     :Všechny druhy nákladu
+STR_PURCHASE_INFO_CARRIES_EVERYTHING                            :Skoro všechno vozí
 STR_PURCHASE_INFO_NONE                                          :Žádné
 STR_PURCHASE_INFO_ENGINES_ONLY                                  :Pouze lokomotivy
 STR_PURCHASE_INFO_ALL_BUT                                       :Všechny kromě {CARGO_LIST}

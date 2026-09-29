@@ -1692,6 +1692,17 @@ $PK_TAB1
 testrez uvolni 117 39
 testrez uvolni 118 39$PK_KDE" 1300 -g $S/panicky_krizovatka2.sav
 echo "zrychleni: patnact=$(grep 'kde 8:' $S/reg_zrychleni.log | grep -c 'rychlost 15/15')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The purchase list's "refittable to" line (testnakup): a long list is not
+# written out -- "carries almost everything" instead, the player's words; a
+# short one and "all but" a few stay. CZTR's wagons in a game of 25 cargoes:
+# how many say which. The cargo for road vehicles is left out of "all but".
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame game_creation.starting_year 2030
+setting_newgame economy.industries_temperate 1
+setting_newgame economy.industries_arctic 1
+setting_newgame economy.industries_tropic 1
+setting_newgame economy.extra_industries 1' run_scene nakup "testnakup a" 20 -c $S/st_openttd.cfg
+echo "nakup: skoro_vse=$(grep -c 'Carries almost everything' $S/reg_nakup.log) krome=$(grep -c 'All but' $S/reg_nakup.log) krome_silnicni=$(grep 'All but' $S/reg_nakup.log | grep -c 'Road vehicles')" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG
