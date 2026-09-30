@@ -161,8 +161,9 @@ bool EngineNameIsKind(const Engine *e, std::span<const std::string_view> kinds)
  * big red four-axle wagons with the load the whole length, and GETS draws the
  * load as a layer of its own, so only the load turns green. Then the open
  * wagons of GETS the player picked by name, kind and town both (30. 9.): an Om
- * Breslau takes it, an Omm 55 or any other Om does not. GETS has an Om
- * Ludwigshafen twice, an open wagon and a mineral wagon, and both take it. The set draws its
+ * Breslau takes it, an Omm 55 or any other Om does not. Not the Om
+ * Ludwigshafen: GETS has it twice, an open wagon and a mineral wagon, and the
+ * player left both out rather than guess which one shows its load. The set draws its
  * load as a picture of its own over the wagon, and that picture is drawn green
  * (GreenLayerSprite()); the game's own marijuana wagons stay as they are.
  * @param e the engine
@@ -172,7 +173,7 @@ bool IsGreenLayerWagon(const Engine *e)
 {
 	if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) return false;
 	static const std::string_view KINDS[] = {"St", "U", "Eanos", "Eaos",
-			"Ocw M\u00fcnster", "Oc M\u00fcnster", "Om Ludwigshafen", "Om Breslau", "Om K\u00f6nigsberg", "Ommu Duisburg"};
+			"Ocw M\u00fcnster", "Oc M\u00fcnster", "Om Breslau", "Om K\u00f6nigsberg", "Ommu Duisburg"};
 	return EngineNameIsKind(e, KINDS);
 }
 

@@ -1599,7 +1599,8 @@ testzelenest" 50 -c $STO_CFG
 # Köln -- the one the player said no to -- take neither (testjmena says so,
 # na auta / na travu). Of the open wagons the player picked by kind and town
 # (30. 9.), the Om Breslau takes marijuana, the Omm 55 and the Om Schwerin
-# do not: a kind alone is not a pick. testprumysl says which wagons carry it
+# do not: a kind alone is not a pick. Nor the Om Ludwigshafen, which the
+# player left out. testprumysl says which wagons carry it
 # and that no other vehicle of the set can be fitted for it. The Eaos draws its coal as a layer over the wagon, as
 # GETS does: full, only the layer is green; empty, nothing is. odmitnuto is
 # zero.
