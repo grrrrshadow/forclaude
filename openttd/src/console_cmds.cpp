@@ -1651,13 +1651,16 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			if (!e->info.refit_mask.Test(mari_cargo)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} vozi zbozi, ale marihuanu ne.", GetString(STR_ENGINE_NAME, e->index));
 		}
 		IConsolePrint(CC_DEFAULT, "testprumysl: lodi a letadel se zbozim (a marihuanou): {}", goods_carriers);
-		/* And nothing else is refitted to it: a set's coal lorry or coal
-		 * wagon takes bulk cargo by class and marijuana with it, and stood
-		 * above the game's own marijuana lorry in the list. */
-		uint others = 0;
+		/* And no other vehicle of the game's own is refitted to it: the
+		 * original coal lorries and coal wagons take bulk cargo by class and
+		 * marijuana with it, and stood above the game's own marijuana lorry
+		 * in the list. A set's vehicle keeps whatever its set gave it
+		 * (OfferMarijuanaToShipsAndAircraft()) and is only counted. */
+		uint others = 0, of_sets = 0;
 		for (const Engine *e : Engine::Iterate()) {
 			if (e->type == VehicleType::Ship || e->type == VehicleType::Aircraft) continue;
 			if (e->GetDefaultCargoType() == mari_cargo || !e->info.refit_mask.Test(mari_cargo)) continue;
+			if (e->GetGRF() != nullptr) { of_sets++; continue; }
 			/* The St carries it as its coal drawn green, and so its parts. */
 			if (IsGreenLayerWagon(e)) {
 				IConsolePrint(CC_DEFAULT, "testprumysl: St {} '{}' vozi marihuanu jako zelene uhli", e->index, GetString(e->info.string_id));
@@ -1673,7 +1676,7 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			others++;
 			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} ({}) jde prestavet na marihuanu, a neni na ni.", GetString(STR_ENGINE_NAME, e->index), e->index);
 		}
-		IConsolePrint(CC_DEFAULT, "testprumysl: jinych vozidel s prestavbou na marihuanu: {}", others);
+		IConsolePrint(CC_DEFAULT, "testprumysl: jinych vozidel s prestavbou na marihuanu: {} (hry), {} (sad, ty si ji nechavaji)", others, of_sets);
 	}
 
 	if (!_settings_game.economy.extra_industries) {

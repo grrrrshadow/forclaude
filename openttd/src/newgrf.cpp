@@ -965,10 +965,14 @@ static void OfferRoadVehiclesToCarriers()
  * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
  * knows the cargo by name.
  *
- * MARI is a cargo like any other: whatever a set's vehicle is refitted to by
- * its label or its class, it keeps -- nothing is taken out of any mask. (The
- * player: a set that gives a vehicle MARI carries it, a coal wagon that takes
- * bulk takes it too; no set is blocked and none is singled out.)
+ * A set's vehicle is never touched: whatever a set gives a vehicle, by label
+ * or by class, it keeps. The player: "a set that names MARI carries it; no
+ * set is blocked and none is singled out" -- which of its vehicles carry it
+ * is the set's to say, and the game has no business taking it back. Only the
+ * game's own vehicles lose it: marijuana is bulk cargo, so every original coal
+ * lorry and coal wagon could be refitted to it and stood in the list above the
+ * game's own marijuana lorry, which is a coal lorry made over. The player: the
+ * lorries for marijuana are there, the coal ones need not carry it.
  *
  * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
  * vessel's own choice of cargo is made first.
@@ -978,6 +982,10 @@ static void OfferMarijuanaToShipsAndAircraft()
 	CargoType marijuana = GetCargoTypeByLabel(CT_MARIJUANA);
 	if (!IsValidCargoType(marijuana)) return;
 
+	for (Engine *e : Engine::Iterate()) {
+		if (e->GetGRF() != nullptr || e->GetDefaultCargoType() == marijuana) continue;
+		e->info.refit_mask.Reset(marijuana);
+	}
 	/* The St, the one coal wagon of a set the player gave marijuana: it
 	 * carries it as its coal drawn green (IsGreenLayerWagon()), with its
 	 * articulated parts, as a car carrier takes road vehicles. */
