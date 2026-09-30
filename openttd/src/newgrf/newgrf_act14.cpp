@@ -439,6 +439,11 @@ static const KnownFeature _known_features[] = {
 	{ "action0_signals_extra_aspects", 1 },
 	{ "action0_signals_style", 1 },
 	{ "action3_signals_custom_signal_sprites", 1 },
+	/* Our own. The first is only a lock: a set that needs 128 cargoes asks it
+	 * and refuses to load where nobody answers. The second switches the file
+	 * over to two-byte Action 2 IDs (newgrf_act2.cpp) from the moment it asks. */
+	{ "decouple_128_cargo", 1 },
+	{ "decouple_more_action2_ids", 1 },
 };
 
 /** @copydoc TextHandler */
@@ -651,6 +656,7 @@ static bool HandleFeatureTest(ByteReader &buf)
 		if (known.version < action.min_version || known.version > action.max_version) break;
 		GrfMsg(2, "StaticGRFInfo: feature '{}' asked for (version {}..{}) and answered with {}",
 				action.name, action.min_version, action.max_version, known.version);
+		if (action.name == "decouple_more_action2_ids") _cur_gps.grfconfig->wide_action2_ids = true;
 		AnswerNameMap(true);
 		return true;
 	}

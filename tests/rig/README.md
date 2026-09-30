@@ -623,3 +623,40 @@ The order in the ship scene matters: canal first, then the shore. The corners
 a tile shares with the water beside it cannot be raised once the water is
 there, and the pair that makes the tile fall towards the water is the pair it
 does not share.
+
+## Action 2 IDs above 255, and the lock of our own sets
+
+`grf/bloky_siroke.nfo` and `grf/bloky_zamek.nfo` are hand-written NewGRFs for
+the two names this game answers in an Action 14 feature test and no other game
+does (`newgrf_act14.cpp`):
+
+- `decouple_more_action2_ids` switches the file over to two-byte Action 2 IDs:
+  the ID of every Action 2 and the subroutine of variable 0x7E are then a word,
+  0 to 0x7FFD (0x7FFE and 0x7FFF are taken in references). A set with 128
+  cargoes and many liveries per vehicle runs out of the 255 IDs a byte gives.
+- `decouple_128_cargo` is only a lock: the set asks for it, tests the bit it
+  asked to have set on variable 0x9D, and stops itself with an Action B where
+  nobody answers.
+
+`bloky_siroke` asks both and builds blocks 7, 300, 600 and 1000 for the first
+road vehicle: 1000 calls 600 as a subroutine, gets 5 and goes on to 300, which
+answers 0x123 (a block without ranges answers the value it computed, not its
+default). `bloky_zamek` asks a name nobody answers, as any other game treats
+ours, and its lock switches it off.
+
+Two things the files had to learn, and a set of ours has to as well:
+
+- **The Action 14 comes before the Action 8.** A file is scanned only up to its
+  Action 8, and the feature tests are read in that scan and nowhere else.
+- **Bit 0 of 0x9D is no lock.** 0x9D is the platform variable, 1 in every
+  OpenTTD, so the lock tests bit 8.
+
+    grfcodec -e -p1 -f bloky_siroke.grf    (in a directory holding sprites/bloky_siroke.nfo)
+    grfcodec -e -p1 -f bloky_zamek.grf     (in a directory holding sprites/bloky_zamek.nfo)
+    cp bloky_siroke.grf bloky_zamek.grf <rig home>/.openttd/newgrf/
+
+The scene `bloky` starts a game with both and reads them with `testbloky`: the
+state of every set, whether it reads two-byte IDs, the bits on 0x9D, and the
+callback of every road vehicle a set took. It saves the game, and `blokysav`
+loads it and asks again: the answers of Action 14 used not to come with a set
+loaded from a savegame, and the set then switched itself off on its own lock.

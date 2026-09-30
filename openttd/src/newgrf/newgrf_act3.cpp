@@ -68,7 +68,7 @@ static CargoType TranslateCargo(GrfSpecFeature feature, uint8_t ctype)
 
 static bool IsValidGroupID(uint16_t groupid, std::string_view function)
 {
-	if (groupid > MAX_SPRITEGROUP || _cur_gps.spritegroups[groupid] == nullptr) {
+	if (_cur_gps.GetSpriteGroup(groupid) == nullptr) {
 		GrfMsg(1, "{}: Spritegroup 0x{:04X} out of range or empty, skipping.", function, groupid);
 		return false;
 	}
@@ -130,9 +130,9 @@ static void VehicleMapSpriteGroup(ByteReader &buf, GrfSpecFeature feature, uint8
 			GrfMsg(7, "VehicleMapSpriteGroup: [{}] Engine {}...", i, engine);
 
 			if (wagover) {
-				SetWagonOverrideSprites(engine, cargo_type, _cur_gps.spritegroups[groupid], last_engines);
+				SetWagonOverrideSprites(engine, cargo_type, _cur_gps.GetSpriteGroup(groupid), last_engines);
 			} else {
-				SetCustomEngineSprites(engine, cargo_type, _cur_gps.spritegroups[groupid]);
+				SetCustomEngineSprites(engine, cargo_type, _cur_gps.GetSpriteGroup(groupid));
 			}
 		}
 	}
@@ -146,9 +146,9 @@ static void VehicleMapSpriteGroup(ByteReader &buf, GrfSpecFeature feature, uint8
 		EngineID engine = engines[i];
 
 		if (wagover) {
-			SetWagonOverrideSprites(engine, CargoGRFFileProps::SG_DEFAULT, _cur_gps.spritegroups[groupid], last_engines);
+			SetWagonOverrideSprites(engine, CargoGRFFileProps::SG_DEFAULT, _cur_gps.GetSpriteGroup(groupid), last_engines);
 		} else {
-			SetCustomEngineSprites(engine, CargoGRFFileProps::SG_DEFAULT, _cur_gps.spritegroups[groupid]);
+			SetCustomEngineSprites(engine, CargoGRFFileProps::SG_DEFAULT, _cur_gps.GetSpriteGroup(groupid));
 			SetEngineGRF(engine, _cur_gps.grffile);
 		}
 	}
@@ -409,7 +409,7 @@ static void MapSpriteGroup(ByteReader &buf, uint8_t idcount, MapSpriteGroupHandl
 		uint16_t groupid = buf.ReadWord();
 		if (!IsValidGroupID(groupid, "MapSpriteGroup")) continue;
 		for (uint16_t local_id : local_ids) {
-			handler.MapSpecific(local_id, cid, _cur_gps.spritegroups[groupid]);
+			handler.MapSpecific(local_id, cid, _cur_gps.GetSpriteGroup(groupid));
 		}
 	}
 
@@ -417,7 +417,7 @@ static void MapSpriteGroup(ByteReader &buf, uint8_t idcount, MapSpriteGroupHandl
 	uint16_t groupid = buf.ReadWord();
 	if (!IsValidGroupID(groupid, "MapSpriteGroup")) return;
 	for (uint16_t local_id : local_ids) {
-		handler.MapDefault(local_id, _cur_gps.spritegroups[groupid]);
+		handler.MapDefault(local_id, _cur_gps.GetSpriteGroup(groupid));
 	}
 }
 
@@ -455,7 +455,7 @@ static void FeatureMapSpriteGroup(ByteReader &buf)
 
 		GrfMsg(6, "FeatureMapSpriteGroup: Adding generic feature callback for feature 0x{:02X}", feature);
 
-		AddGenericCallback(feature, _cur_gps.grffile, _cur_gps.spritegroups[groupid]);
+		AddGenericCallback(feature, _cur_gps.grffile, _cur_gps.GetSpriteGroup(groupid));
 		return;
 	}
 

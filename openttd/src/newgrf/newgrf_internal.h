@@ -83,7 +83,12 @@ struct GrfActionHandler {
 	static void Activation(ByteReader &buf);
 };
 
-static constexpr uint MAX_SPRITEGROUP = UINT8_MAX; ///< Maximum GRF-local ID for a spritegroup.
+/**
+ * Maximum GRF-local ID for a spritegroup. A file writes its IDs in one byte
+ * unless it asked for 'decouple_more_action2_ids' (newgrf_act14.cpp), then in
+ * two; references were always two bytes, and 0x7FFE and 0x7FFF are taken there.
+ */
+static constexpr uint MAX_SPRITEGROUP = 0x7FFD;
 
 /** Temporary data during loading of GRFs */
 struct GrfProcessingState {
@@ -112,7 +117,18 @@ public:
 	int skip_sprites;         ///< Number of pseudo sprites to skip before processing the next one. (-1 to skip to end of file)
 
 	/** Currently referenceable spritegroups. */
-	std::array<const SpriteGroup *, MAX_SPRITEGROUP + 1> spritegroups{};
+	std::vector<const SpriteGroup *> spritegroups{};
+
+	const SpriteGroup *GetSpriteGroup(uint id) const
+	{
+		return id < this->spritegroups.size() ? this->spritegroups[id] : nullptr;
+	}
+
+	void SetSpriteGroup(uint id, const SpriteGroup *group)
+	{
+		if (id >= this->spritegroups.size()) this->spritegroups.resize(id + 1);
+		this->spritegroups[id] = group;
+	}
 
 	/** Clear temporary data before processing the next file in the current loading stage */
 	void ClearDataForNextFile()
@@ -124,7 +140,7 @@ public:
 			s.clear();
 		}
 
-		this->spritegroups = {};
+		this->spritegroups.clear();
 	}
 
 	/**

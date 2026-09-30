@@ -195,6 +195,7 @@ struct GRFConfig {
 	uint32_t feature_test_var8d = 0; ///< NOSAVE
 	uint32_t feature_test_var9d = 0; ///< NOSAVE
 	std::vector<uint32_t> feature_test_var91{}; ///< NOSAVE
+	bool wide_action2_ids = false; ///< NOSAVE: Action 2 IDs are two bytes ('decouple_more_action2_ids').
 
 	bool IsCompatible(uint32_t old_version) const;
 	void SetParams(std::span<const uint32_t> pars);

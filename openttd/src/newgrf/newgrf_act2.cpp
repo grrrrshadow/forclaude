@@ -293,17 +293,16 @@ static const SpriteGroup *GetCallbackResultGroup(uint16_t value)
 
 /* Helper function to either create a callback or link to a previously
  * defined spritegroup. */
-static const SpriteGroup *GetGroupFromGroupID(uint8_t setid, uint8_t type, uint16_t groupid)
+static const SpriteGroup *GetGroupFromGroupID(uint16_t setid, uint8_t type, uint16_t groupid)
 {
 	if (HasBit(groupid, 15)) return GetCallbackResultGroup(groupid);
 	if (groupid == GROUPID_CALLBACK_FAILED) return nullptr;
 
-	if (groupid > MAX_SPRITEGROUP || _cur_gps.spritegroups[groupid] == nullptr) {
+	const SpriteGroup *group = _cur_gps.GetSpriteGroup(groupid);
+	if (group == nullptr) {
 		GrfMsg(1, "GetGroupFromGroupID(0x{:02X}:0x{:02X}): Groupid 0x{:04X} does not exist, leaving empty", setid, type, groupid);
-		return nullptr;
 	}
-
-	return _cur_gps.spritegroups[groupid];
+	return group;
 }
 
 /**
@@ -314,7 +313,7 @@ static const SpriteGroup *GetGroupFromGroupID(uint8_t setid, uint8_t type, uint1
  * @param spriteid Raw value from the GRF for the new spritegroup; describes either the return value or the referenced spritegroup.
  * @return Created spritegroup.
  */
-static const SpriteGroup *CreateGroupFromGroupID(GrfSpecFeature feature, uint8_t setid, uint8_t type, uint16_t spriteid)
+static const SpriteGroup *CreateGroupFromGroupID(GrfSpecFeature feature, uint16_t setid, uint8_t type, uint16_t spriteid)
 {
 	if (HasBit(spriteid, 15)) return GetCallbackResultGroup(spriteid);
 
@@ -354,8 +353,13 @@ static void NewSpriteGroup(ByteReader &buf)
 		return;
 	}
 
-	uint8_t setid   = buf.ReadByte();
+	const bool wide_ids = _cur_gps.grfconfig->wide_action2_ids;
+	uint16_t setid  = wide_ids ? buf.ReadWord() : buf.ReadByte();
 	uint8_t type    = buf.ReadByte();
+	if (setid > MAX_SPRITEGROUP) {
+		GrfMsg(1, "NewSpriteGroup: Set ID 0x{:04X} is above 0x{:04X}, skipping", setid, MAX_SPRITEGROUP);
+		return;
+	}
 
 	/* Sprite Groups are created here but they are allocated from a pool, so
 	 * we do not need to delete anything if there is an exception from the
@@ -396,7 +400,7 @@ static void NewSpriteGroup(ByteReader &buf)
 				adjust.variable  = buf.ReadByte();
 				if (adjust.variable == 0x7E) {
 					/* Link subroutine group */
-					adjust.subroutine = GetGroupFromGroupID(setid, type, buf.ReadByte());
+					adjust.subroutine = GetGroupFromGroupID(setid, type, wide_ids ? buf.ReadWord() : buf.ReadByte());
 				} else {
 					adjust.parameter = IsInsideMM(adjust.variable, 0x60, 0x80) ? buf.ReadByte() : 0;
 				}
@@ -733,7 +737,7 @@ static void NewSpriteGroup(ByteReader &buf)
 		}
 	}
 
-	_cur_gps.spritegroups[setid] = act_group;
+	_cur_gps.SetSpriteGroup(setid, act_group);
 }
 
 /** @copybrief GrfActionHandler::FileScan */

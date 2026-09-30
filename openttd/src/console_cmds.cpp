@@ -12919,6 +12919,40 @@ static bool ConTestRoadOnAir(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Rig probe for Action 2 IDs above 255 (tests/rig/grf/bloky_siroke.nfo and
+ * bloky_zamek.nfo). Every set in the game with its state, whether it reads
+ * two-byte IDs and what its feature tests set on 0x9D; then every road
+ * vehicle a set took, with the answer of a callback. The chain of blocks 1000,
+ * 600 and 300 of bloky_siroke answers 0x123.
+ * Usage: testbloky
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBlockIds(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: sets with Action 2 IDs above 255 - their state and the callback of their cars. Usage: 'testbloky'");
+		return true;
+	}
+
+	static const char * const STATES[] = {"neznamy", "vypnuty", "nenalezen", "nacteny", "zapnuty"};
+	for (const auto &c : _grfconfig) {
+		IConsolePrint(CC_DEFAULT, "testbloky: GRF {:08X} {} {}, siroka cisla {}, 0x9D {:08X}, chyb {}",
+				std::byteswap(c->ident.grfid), c->filename, STATES[to_underlying(c->status)],
+				c->wide_action2_ids ? "ano" : "ne", c->feature_test_var9d, c->errors.size());
+	}
+	uint cars = 0;
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		const GRFFile *f = e->GetGRF();
+		if (f == nullptr) continue;
+		uint16_t cb = GetVehicleCallback(CBID_VEHICLE_MODIFY_PROPERTY, 0, 0, e->index, nullptr);
+		IConsolePrint(CC_DEFAULT, "testbloky: auto {} z GRF {:08X} callback {:04X}", e->index, std::byteswap(f->grfid), cb);
+		cars++;
+	}
+	IConsolePrint(CC_DEFAULT, "testbloky: aut ze sad {}", cars);
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -13078,6 +13112,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testnaklady",             ConTestCargoTypes);
 	IConsole::CmdRegister("testprumysl",             ConTestClimateIndustries);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
+	IConsole::CmdRegister("testbloky",               ConTestBlockIds);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);

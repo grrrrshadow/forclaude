@@ -56,7 +56,8 @@ GRFConfig::GRFConfig(const GRFConfig &config) :
 	mapped_variables(config.mapped_variables),
 	feature_test_var8d(config.feature_test_var8d),
 	feature_test_var9d(config.feature_test_var9d),
-	feature_test_var91(config.feature_test_var91)
+	feature_test_var91(config.feature_test_var91),
+	wide_action2_ids(config.wide_action2_ids)
 {
 	this->flags.Reset(GRFConfigFlag::Copy);
 }
@@ -510,6 +511,15 @@ compatible_grf:
 				c->num_valid_params = f->num_valid_params;
 				c->param_info = f->param_info;
 				c->has_param_defaults = f->has_param_defaults;
+				/* Action 14 is read only while a file is scanned, so what it
+				 * said comes from the scan here too: without it a set loaded
+				 * from a savegame lost every feature test it had passed. */
+				c->action0_property_remaps = f->action0_property_remaps;
+				c->mapped_variables = f->mapped_variables;
+				c->feature_test_var8d = f->feature_test_var8d;
+				c->feature_test_var9d = f->feature_test_var9d;
+				c->feature_test_var91 = f->feature_test_var91;
+				c->wide_action2_ids = f->wide_action2_ids;
 			}
 		}
 	}

@@ -1719,6 +1719,25 @@ echo "mmm: $(grep -o 'mmm: [0-9]* aut nalozeno' $S/reg_mmm.log | tr '\n' ' ')$(g
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG
+# Action 2 IDs above 255 (grf/bloky_siroke.nfo, grf/bloky_zamek.nfo, see
+# README.md). A set that asks for 'decouple_more_action2_ids' writes its block
+# IDs in two bytes: bloky_siroke builds blocks 7, 300, 600 and 1000 for the
+# first road vehicle, 1000 calls 600 as a subroutine and goes on to 300, and
+# the callback answers 123. It asks for 'decouple_128_cargo' as well and loads
+# past its own lock. bloky_zamek asks a name nobody answers, the way any other
+# game treats our two, and its lock switches it off. The answers of Action 14
+# are read only while a file is scanned; a set loaded from a savegame used to
+# come without them, so the same is asked again of the saved game.
+BLOKY_CFG=$S/bloky_openttd.cfg
+sed -e '/^\[newgrf\]$/a bloky_siroke.grf = ' -e '/^\[newgrf\]$/a bloky_zamek.grf = ' "$CFG_KEEP" > $BLOKY_CFG
+# With -c the game saves next to that config file, in $S/save/.
+rm -f $S/save/bloky.sav
+run_scene bloky "testbloky
+testzatik 5 save bloky" 20 -c $BLOKY_CFG
+run_scene blokysav "testbloky" 20 -g $S/save/bloky.sav
+for k in bloky blokysav; do
+  echo "$k: siroke=$(grep -o 'bloky_siroke.grf [a-z]*, siroka cisla [a-z]*' $S/reg_$k.log) zamek=$(grep -o 'bloky_zamek.grf [a-z]*' $S/reg_$k.log) $(grep -o 'z GRF 52494762 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's
