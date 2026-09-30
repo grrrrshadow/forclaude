@@ -2498,29 +2498,20 @@ static void EndViewportScrollIfLetGo()
 {
 	if (_settings_client.gui.scroll_mode != ViewportScrollMode::RMBPinned) return;
 
-	/* A drag this ended, under a button that is still held, starts again the moment
-	 * the pointer moves.
-	 *
-	 * Without this the release below is a trap rather than a rescue. The drag is only
-	 * ever begun by the press itself, so once this has let go of one, the button has
-	 * to be lifted and pressed again before the map will move -- and the whole reason
-	 * the drag is being let go of is that the game is not being told when the button
-	 * is lifted. A player with a finger still on the button is simply stuck with a map
-	 * that has stopped answering.
-	 *
-	 * The cost is real and worth saying out loud: a button the game wrongly believes
-	 * is held will take the map back the same way. What the release still buys is that
-	 * it lets go every time the map is left alone for a moment, so nothing is held
-	 * hostage while the player is doing something else, and a press of the left button
-	 * still ends it outright. */
-	if (!_scrolling_viewport) {
-		if (!_right_button_down || _left_button_down) return;
-		if (_cursor.delta.x == 0 && _cursor.delta.y == 0) return;
-
-		_scrolling_viewport = true;
-		_cursor.fix_at = true;
-		MouseDebugLog("tazeni: znovu rozjeto pohybem, protoze si hra pamatuje prave dole");
-	}
+	/* A drag begins with a press of the right button on the map and nowhere
+	 * else. It used to start again by itself: a drag this had ended, under a
+	 * button still remembered down, took the map back the moment the pointer
+	 * moved -- and the pointer gets pinned with it. The player's records of the
+	 * stuck button (mouse*.log, September 2026) show what that does: the system
+	 * itself goes on answering "right button held" for two to twelve seconds
+	 * after the hand has let go, and every jitter of a pixel in that time set the
+	 * map going and nailed the pointer down again, over and over, until a fresh
+	 * press and release of the button put the system right. Once it even started
+	 * a drag off a right click that had gone to a window, not the map. So: no
+	 * restart. A stuck button can hold the map for the quiet time below and no
+	 * longer, and the pointer is free from then on. The price is that a hand
+	 * that really pauses on the button for longer than that presses again. */
+	if (!_scrolling_viewport) return;
 
 	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
 
