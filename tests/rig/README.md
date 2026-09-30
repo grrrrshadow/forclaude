@@ -660,3 +660,29 @@ state of every set, whether it reads two-byte IDs, the bits on 0x9D, and the
 callback of every road vehicle a set took. It saves the game, and `blokysav`
 loads it and asks again: the answers of Action 14 used not to come with a set
 loaded from a savegame, and the set then switched itself off on its own lock.
+
+## The game's own sets, in baseset/decouple/
+
+Every NewGRF in `baseset/decouple/` goes into every new game, whatever it is
+called and whatever its GRF ID (`AppendBuiltinGRFs()`): the sets that carry
+the 128 cargoes of the game's industry. The new-game list gets them when it is
+read from `openttd.cfg`, so the player sees them in the NewGRF window and may
+move them; the window refuses to remove one with a red message, and no set can
+switch one off with an Action E. A savegame keeps the sets it was saved with.
+
+`grf/vestaveny.nfo` is such a set: it takes the second road vehicle and its
+callback answers 0x77. `grf/vypinac.nfo` is an ordinary set that switches it
+off by its GRF ID and must not manage to.
+
+    grfcodec -e -p1 -f vestaveny.grf   (in a directory holding sprites/vestaveny.nfo)
+    grfcodec -e -p1 -f vypinac.grf     (in a directory holding sprites/vypinac.nfo)
+    cp vestaveny.grf <rig dir>/        (not into newgrf/: the scene puts it into baseset/decouple/)
+    cp vypinac.grf <rig home>/.openttd/newgrf/
+
+The scenes `vestaveny` and `vestavenysav` put `vestaveny.grf` into
+`baseset/decouple/` of the scene's config directory and take it out again
+after: anywhere the rig always looks it would be in every scene. The first
+starts a game with only `vypinac` in the config and saves it; the second loads
+the save. Both read with `testbloky` that the set is on and one of the game's
+own, that `vypinac` is on as well, and that the car the set took answers 0x77.
+The window's refusal is not played by the rig (no window there).

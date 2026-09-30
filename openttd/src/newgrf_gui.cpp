@@ -1025,6 +1025,11 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 
 			case WID_NS_REMOVE: { // Remove GRF
 				if (this->active_sel == nullptr || !this->editable) break;
+				if (this->active_sel->builtin) {
+					/* One of the game's own sets (AppendBuiltinGRFs()): it may be moved, never taken out. */
+					ShowErrorMessage(GetEncodedString(STR_NEWGRF_BUILTIN_NOT_REMOVABLE), {}, WarningLevel::Error);
+					break;
+				}
 				CloseWindowByClass(WindowClass::NewGRFParameters);
 				this->CloseChildWindows(WindowClass::Textfile);
 
@@ -1144,12 +1149,18 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 		if (widget != WID_NS_PRESET_LIST) return;
 		if (!this->editable) return;
 
+		/* A preset does not take out the game's own sets the list had. */
+		GRFConfigList builtins;
+		for (const auto &c : this->actives) {
+			if (c->builtin) builtins.push_back(std::make_unique<GRFConfig>(*c));
+		}
 		ClearGRFConfigList(this->actives);
 		this->preset = index;
 
 		if (index != -1) {
 			this->actives = LoadGRFPresetFromConfig(this->grf_presets[index]);
 		}
+		for (auto &c : builtins) AppendToGRFConfigList(this->actives, std::move(c));
 		this->avails.ForceRebuild();
 
 		ResetObjectToPlace();
@@ -1418,6 +1429,8 @@ private:
 		this->avails.clear();
 
 		for (const auto &c : _all_grfs) {
+			/* The game's own sets are in the list or belong to a savegame that never had them. */
+			if (c->builtin) continue;
 			if (std::ranges::any_of(this->actives, [&c](const auto &gc) { return gc->ident.HasGrfIdentifier(c->ident.grfid, &c->ident.md5sum); })) continue;
 
 			/* The one set the game has a named exception for is always offered, whatever the

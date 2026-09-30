@@ -12927,8 +12927,9 @@ static bool ConTestRoadOnAir(std::span<std::string_view> argv)
 
 /**
  * Rig probe for Action 2 IDs above 255 (tests/rig/grf/bloky_siroke.nfo and
- * bloky_zamek.nfo). Every set in the game with its state, whether it reads
- * two-byte IDs and what its feature tests set on 0x9D; then every road
+ * bloky_zamek.nfo) and for the game's own sets (vestaveny.nfo). Every set in
+ * the game with its state, whether it reads two-byte IDs, what its feature
+ * tests set on 0x9D and whether it is one of the game's own; then every road
  * vehicle a set took, with the answer of a callback. The chain of blocks 1000,
  * 600 and 300 of bloky_siroke answers 0x123.
  * Usage: testbloky
@@ -12943,9 +12944,9 @@ static bool ConTestBlockIds(std::span<std::string_view> argv)
 
 	static const char * const STATES[] = {"neznamy", "vypnuty", "nenalezen", "nacteny", "zapnuty"};
 	for (const auto &c : _grfconfig) {
-		IConsolePrint(CC_DEFAULT, "testbloky: GRF {:08X} {} {}, siroka cisla {}, 0x9D {:08X}, chyb {}",
+		IConsolePrint(CC_DEFAULT, "testbloky: GRF {:08X} {} {}, siroka cisla {}, 0x9D {:08X}, chyb {}, vestaveny {}",
 				std::byteswap(c->ident.grfid), c->filename, STATES[to_underlying(c->status)],
-				c->wide_action2_ids ? "ano" : "ne", c->feature_test_var9d, c->errors.size());
+				c->wide_action2_ids ? "ano" : "ne", c->feature_test_var9d, c->errors.size(), c->builtin ? "ano" : "ne");
 	}
 	uint cars = 0;
 	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {

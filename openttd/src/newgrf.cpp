@@ -2595,7 +2595,7 @@ bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds)
 			if (c->status == GRFStatus::Disabled || c->status == GRFStatus::NotFound) continue;
 			if (stage > GrfLoadingStage::Init && c->flags.Test(GRFConfigFlag::InitOnly)) continue;
 
-			Subdirectory subdir = num_grfs < num_baseset ? Subdirectory::Baseset : Subdirectory::NewGrf;
+			Subdirectory subdir = (num_grfs < num_baseset || c->builtin) ? Subdirectory::Baseset : Subdirectory::NewGrf;
 			if (!FioCheckFileExists(c->filename, subdir)) {
 				Debug(grf, 0, "NewGRF file is missing '{}'; disabling", c->filename);
 				c->status = GRFStatus::NotFound;

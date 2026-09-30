@@ -51,6 +51,13 @@ static void GRFInhibit(ByteReader &buf)
 		GrfID grfid = buf.ReadDWord();
 		GRFConfig *file = GetGRFConfig(grfid);
 
+		/* The game's own sets carry the cargoes of its industry and stay on
+		 * whatever another set says (AppendBuiltinGRFs()). */
+		if (file != nullptr && file->builtin && !_cur_gps.grfconfig->builtin) {
+			GrfMsg(1, "GRFInhibit: '{}' is one of the game's own sets, not deactivating it", file->filename);
+			continue;
+		}
+
 		/* Unset activation flag */
 		if (file != nullptr && file != _cur_gps.grfconfig) {
 			GrfMsg(2, "GRFInhibit: Deactivating file '{}'", file->filename);

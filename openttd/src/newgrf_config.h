@@ -34,6 +34,9 @@ enum class GRFConfigFlag : uint8_t {
 /** Bitset of \c GRFConfigFlag elements. */
 using GRFConfigFlags = EnumBitSet<GRFConfigFlag, uint8_t>;
 
+/** The game's own sets: every NewGRF in this directory of baseset/ goes into every new game (AppendBuiltinGRFs()). */
+static constexpr std::string_view BUILTIN_GRF_DIR = "decouple";
+
 /** Status of GRF */
 enum class GRFStatus : uint8_t {
 	Unknown, ///< The status of this grf file is unknown
@@ -196,6 +199,7 @@ struct GRFConfig {
 	uint32_t feature_test_var9d = 0; ///< NOSAVE
 	std::vector<uint32_t> feature_test_var91{}; ///< NOSAVE
 	bool wide_action2_ids = false; ///< NOSAVE: Action 2 IDs are two bytes ('decouple_more_action2_ids').
+	bool builtin = false; ///< NOSAVE: one of the game's own sets, from baseset/decouple/ (see AppendBuiltinGRFs()).
 
 	bool IsCompatible(uint32_t old_version) const;
 	void SetParams(std::span<const uint32_t> pars);
@@ -245,6 +249,8 @@ void ScanNewGRFFiles(NewGRFScanCallback *callback);
 const GRFConfig *FindGRFConfig(GrfID grfid, FindGRFConfigMode mode, const MD5Hash *md5sum = nullptr, uint32_t desired_version = 0);
 GRFConfig *GetGRFConfig(GrfID grfid, uint32_t mask = 0xFFFFFFFF);
 void CopyGRFConfigList(GRFConfigList &dst, const GRFConfigList &src, bool init_only);
+void AppendGRFConfigList(GRFConfigList &dst, const GRFConfigList &src, bool init_only);
+void AppendBuiltinGRFs(GRFConfigList &dst);
 void AppendStaticGRFConfigs(GRFConfigList &dst);
 void AppendToGRFConfigList(GRFConfigList &dst, std::unique_ptr<GRFConfig> &&el);
 void ClearGRFConfigList(GRFConfigList &config);

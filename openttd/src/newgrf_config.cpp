@@ -57,7 +57,8 @@ GRFConfig::GRFConfig(const GRFConfig &config) :
 	feature_test_var8d(config.feature_test_var8d),
 	feature_test_var9d(config.feature_test_var9d),
 	feature_test_var91(config.feature_test_var91),
-	wide_action2_ids(config.wide_action2_ids)
+	wide_action2_ids(config.wide_action2_ids),
+	builtin(config.builtin)
 {
 	this->flags.Reset(GRFConfigFlag::Copy);
 }
@@ -341,7 +342,7 @@ void ClearGRFConfigList(GRFConfigList &config)
  * @param src The source list
  * @param init_only the copied GRF will be processed up to GrfLoadingStage::Init
  */
-static void AppendGRFConfigList(GRFConfigList &dst, const GRFConfigList &src, bool init_only)
+void AppendGRFConfigList(GRFConfigList &dst, const GRFConfigList &src, bool init_only)
 {
 	for (const auto &s : src) {
 		auto &c = dst.emplace_back(std::make_unique<GRFConfig>(*s));
@@ -430,6 +431,24 @@ static void AppendMarsHouses(GRFConfigList &dst)
 }
 
 /**
+ * Put the game's own sets into a list of sets, those not in it already: every
+ * NewGRF in baseset/decouple/, whatever it is called and whatever its GRF ID.
+ * They are there so that something carries every cargo of the big industry the
+ * game makes, so the player cannot take them out (the NewGRF window refuses)
+ * but sees them and may move them, since the order of sets matters. A missing
+ * one goes last, after the sets whose cargoes it carries. The new-game list gets
+ * them when it is read from openttd.cfg, and a new game once more in case;
+ * a savegame keeps the sets it was saved with, as it keeps the Mars houses.
+ * @param dst the list of sets
+ */
+void AppendBuiltinGRFs(GRFConfigList &dst)
+{
+	for (const auto &c : _all_grfs) {
+		if (c->builtin) AppendToGRFConfigList(dst, std::make_unique<GRFConfig>(*c));
+	}
+}
+
+/**
  * Reset the current GRF Config to either blank or newgame settings.
  * @param defaults Whether configure to fully load the copied NewGRFs.
  */
@@ -437,6 +456,7 @@ void ResetGRFConfig(bool defaults)
 {
 	CopyGRFConfigList(_grfconfig, _grfconfig_newgame, !defaults);
 	if (defaults) AppendMarsHouses(_grfconfig);
+	if (defaults) AppendBuiltinGRFs(_grfconfig);
 	AppendStaticGRFConfigs(_grfconfig);
 }
 
@@ -520,6 +540,7 @@ compatible_grf:
 				c->feature_test_var9d = f->feature_test_var9d;
 				c->feature_test_var91 = f->feature_test_var91;
 				c->wide_action2_ids = f->wide_action2_ids;
+				c->builtin = f->builtin;
 			}
 		}
 	}
@@ -535,6 +556,7 @@ int _skip_all_newgrf_scanning = 0;
 class GRFFileScanner : FileScanner {
 	std::chrono::steady_clock::time_point next_update; ///< The next moment we do update the screen.
 	uint num_scanned; ///< The number of GRFs we have scanned.
+	bool builtin = false; ///< Scanning baseset/decouple/, the game's own sets.
 
 public:
 	GRFFileScanner() : num_scanned(0)
@@ -556,7 +578,16 @@ public:
 		}
 
 		GRFFileScanner fs;
-		int ret = fs.Scan(".grf", Subdirectory::NewGrf);
+		/* The game's own sets first: a file that is in newgrf/ as well is then
+		 * still the game's own, and not one the player may leave out. */
+		int ret = 0;
+		fs.builtin = true;
+		for (Searchpath sp : _valid_searchpaths) {
+			std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + std::string(BUILTIN_GRF_DIR) + PATHSEP;
+			if (FileExists(dir)) ret += fs.Scan(".grf", dir);
+		}
+		fs.builtin = false;
+		ret += fs.Scan(".grf", Subdirectory::NewGrf);
 		/* The number scanned and the number returned may not be the same;
 		 * duplicate NewGRFs and base sets are ignored in the return value. */
 		_settings_client.gui.last_newgrf_count = fs.num_scanned;
@@ -570,9 +601,12 @@ bool GRFFileScanner::AddFile(const std::string &filename, size_t basepath_length
 	if (_exit_game) return false;
 
 	bool added = false;
-	auto c = std::make_unique<GRFConfig>(filename.substr(basepath_length));
+	std::string name_in_dir = filename.substr(basepath_length);
+	if (this->builtin) name_in_dir = std::string(BUILTIN_GRF_DIR) + PATHSEP + name_in_dir;
+	auto c = std::make_unique<GRFConfig>(name_in_dir);
+	c->builtin = this->builtin;
 	GRFConfig *grfconfig = c.get();
-	if (FillGRFDetails(*c, false)) {
+	if (FillGRFDetails(*c, false, this->builtin ? Subdirectory::Baseset : Subdirectory::NewGrf)) {
 		if (std::ranges::none_of(_all_grfs, [&c](const auto &gc) { return c->ident.grfid == gc->ident.grfid && c->ident.md5sum == gc->ident.md5sum; })) {
 			_all_grfs.push_back(std::move(c));
 			added = true;

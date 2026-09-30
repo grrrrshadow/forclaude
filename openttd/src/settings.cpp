@@ -1180,7 +1180,7 @@ static GRFConfigList GRFLoadConfig(const IniFile &ini, std::string_view grpname,
 		}
 
 		/* Check if item is valid */
-		if (!FillGRFDetails(*c, is_static) || c->flags.Test(GRFConfigFlag::Invalid)) {
+		if (!FillGRFDetails(*c, is_static, c->builtin ? Subdirectory::Baseset : Subdirectory::NewGrf) || c->flags.Test(GRFConfigFlag::Invalid)) {
 			StringID reason;
 			if (c->status == GRFStatus::NotFound) {
 				reason = STR_CONFIG_ERROR_INVALID_GRF_NOT_FOUND;
@@ -1639,6 +1639,7 @@ void LoadFromConfig(bool startup)
 		}
 
 		_grfconfig_newgame = GRFLoadConfig(generic_ini, "newgrf", false);
+		AppendBuiltinGRFs(_grfconfig_newgame);
 		_grfconfig_static  = GRFLoadConfig(generic_ini, "newgrf-static", true);
 		AILoadConfig(generic_ini, "ai_players");
 		GameLoadConfig(generic_ini, "game_scripts");

@@ -78,6 +78,26 @@ foreach(BASESET_OTHER_SOURCE_FILE IN LISTS BASESET_OTHER_SOURCE_FILES)
     list(APPEND BASESET_BINARY_FILES ${BASESET_OTHER_BINARY_FILE})
 endforeach()
 
+# The game's own sets (AppendBuiltinGRFs() in src/newgrf_config.cpp): every
+# NewGRF in decouple/ goes into every new game, whatever it is called and
+# whatever its GRF ID, so a set put there needs no change here.
+file(GLOB BASESET_BUILTIN_GRF_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/*.grf)
+foreach(BUILTIN_GRF_FILE IN LISTS BASESET_BUILTIN_GRF_FILES)
+    get_filename_component(BUILTIN_GRF_NAME "${BUILTIN_GRF_FILE}" NAME)
+    set(BUILTIN_GRF_BINARY_FILE "${CMAKE_BINARY_DIR}/baseset/decouple/${BUILTIN_GRF_NAME}")
+
+    add_custom_command_timestamp(OUTPUT ${BUILTIN_GRF_BINARY_FILE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/baseset/decouple
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    ${BUILTIN_GRF_FILE}
+                    ${BUILTIN_GRF_BINARY_FILE}
+            MAIN_DEPENDENCY ${BUILTIN_GRF_FILE}
+            COMMENT "Copying ${BUILTIN_GRF_NAME}, one of the game's own sets"
+    )
+
+    list(APPEND BASESET_BINARY_FILES ${BUILTIN_GRF_BINARY_FILE})
+endforeach()
+
 # Create a new target which generates all baseset metadata files
 add_custom_target_timestamp(baseset_files
         DEPENDS

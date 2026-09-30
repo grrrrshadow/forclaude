@@ -1745,6 +1745,26 @@ run_scene blokysav "testbloky" 20 -g $S/save/bloky.sav
 for k in bloky blokysav; do
   echo "$k: siroke=$(grep -o 'bloky_siroke.grf [a-z]*, siroka cisla [a-z]*' $S/reg_$k.log) zamek=$(grep -o 'bloky_zamek.grf [a-z]*' $S/reg_$k.log) $(grep -o 'z GRF 52494762 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 done
+# The game's own sets (AppendBuiltinGRFs(), grf/vestaveny.nfo and
+# grf/vypinac.nfo, see README.md): every NewGRF in baseset/decouple/ goes into
+# every new game without a word in openttd.cfg, and the player cannot take it
+# out. vestaveny.grf is kept in the rig directory and put into baseset/decouple/
+# of the scene's config directory for these two scenes only -- anywhere else it
+# would be in every scene. vypinac, an ordinary set, switches it off by its GRF
+# ID (Action E) and must not manage to. The saved game loads it back from
+# baseset/.
+VEST_CFG=$S/vestaveny_openttd.cfg
+sed '/^\[newgrf\]$/a vypinac.grf = ' "$CFG_KEEP" > $VEST_CFG
+mkdir -p $S/baseset/decouple
+cp $S/vestaveny.grf $S/baseset/decouple/
+rm -f $S/save/vestaveny.sav
+run_scene vestaveny "testbloky
+testzatik 5 save vestaveny" 20 -c $VEST_CFG
+run_scene vestavenysav "testbloky" 20 -g $S/save/vestaveny.sav -c $VEST_CFG
+rm -rf $S/baseset/decouple
+for k in vestaveny vestavenysav; do
+  echo "$k: $(grep -o 'decouple/vestaveny.grf [a-z]*' $S/reg_$k.log) $(grep -o 'chyb [0-9]*, vestaveny ano' $S/reg_$k.log) vypinac=$(grep -o 'vypinac.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2) $(grep -o 'z GRF 52494776 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's

@@ -3909,6 +3909,7 @@ STR_NEWGRF_CONFIRMATION_TEXT                                    :{YELLOW}You are
 STR_NEWGRF_DUPLICATE_GRFID                                      :Can't add file: duplicate NewGRF ID
 STR_NEWGRF_COMPATIBLE_LOADED                                    :{ORANGE}Matching file not found (compatible NewGRF loaded)
 STR_NEWGRF_TOO_MANY_NEWGRFS                                     :Can't add file: NewGRF file limit reached
+STR_NEWGRF_BUILTIN_NOT_REMOVABLE                                :{WHITE}Can't remove: it carries all 128 cargoes
 
 STR_NEWGRF_COMPATIBLE_LOAD_WARNING                              :Compatible NewGRF(s) loaded for missing files
 STR_NEWGRF_DISABLED_WARNING                                     :Missing NewGRF file(s) have been disabled
