@@ -436,6 +436,13 @@ void RoadVehicle::UpdateDeltaXY()
 	/* Set common defaults. */
 	this->bounds = {{-1, -1, 0}, {3, 3, 6}, {}};
 
+	/* Sort every piece by the box of a whole vehicle, whatever its own length. A set may build a vehicle out of
+	 * short pieces and paint all of it on one of them (the VW T1 set's car is one eighth long, between two bumpers
+	 * of one eighth), and a box that short left two vehicles passing on a road along X with no rule for which is
+	 * in front: the one heading south-west in the far lane came out on top of the one in the near lane. The picture
+	 * stays where it was, origin plus offset is the same for every length. */
+	const int length = VEHICLE_LENGTH;
+
 	if (!IsDiagonalDirection(this->direction)) {
 		static const DiagDirectionIndexArray<Point> _sign_table{{{
 			/* x, y */
@@ -445,7 +452,7 @@ void RoadVehicle::UpdateDeltaXY()
 			{ 1, -1}, // Direction::W
 		}}};
 
-		int half_shorten = (VEHICLE_LENGTH - this->gcache.cached_veh_length) / 2;
+		int half_shorten = (VEHICLE_LENGTH - length) / 2;
 
 		/* For all straight directions, move the bound box to the centre of the vehicle, but keep the size. */
 		this->bounds.offset.x -= half_shorten * _sign_table[DirToDiagDir(this->direction)].x;
@@ -456,27 +463,27 @@ void RoadVehicle::UpdateDeltaXY()
 				/* Shorten southern corner of the bounding box according the vehicle length. */
 			case Direction::NE:
 				this->bounds.origin.x = -3;
-				this->bounds.extent.x = this->gcache.cached_veh_length;
+				this->bounds.extent.x = length;
 				this->bounds.offset.x = 1;
 				break;
 
 			case Direction::NW:
 				this->bounds.origin.y = -3;
-				this->bounds.extent.y = this->gcache.cached_veh_length;
+				this->bounds.extent.y = length;
 				this->bounds.offset.y = 1;
 				break;
 
 				/* Move northern corner of the bounding box down according to vehicle length. */
 			case Direction::SW:
-				this->bounds.origin.x = -3 + (VEHICLE_LENGTH - this->gcache.cached_veh_length);
-				this->bounds.extent.x = this->gcache.cached_veh_length;
-				this->bounds.offset.x = 1 - (VEHICLE_LENGTH - this->gcache.cached_veh_length);
+				this->bounds.origin.x = -3 + (VEHICLE_LENGTH - length);
+				this->bounds.extent.x = length;
+				this->bounds.offset.x = 1 - (VEHICLE_LENGTH - length);
 				break;
 
 			case Direction::SE:
-				this->bounds.origin.y = -3 + (VEHICLE_LENGTH - this->gcache.cached_veh_length);
-				this->bounds.extent.y = this->gcache.cached_veh_length;
-				this->bounds.offset.y = 1 - (VEHICLE_LENGTH - this->gcache.cached_veh_length);
+				this->bounds.origin.y = -3 + (VEHICLE_LENGTH - length);
+				this->bounds.extent.y = length;
+				this->bounds.offset.y = 1 - (VEHICLE_LENGTH - length);
 				break;
 
 			default:
@@ -1180,6 +1187,8 @@ void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir int
 	v->y_pos = TileY(tile) * TILE_SIZE + (rdp[v->frame].y & 0xF);
 
 	v->vehstatus.Reset(VehState::Hidden);
+	/* Off a wagon, a ship or an aircraft: the picture no longer sits on a deck (Vehicle::draw_offs). */
+	v->draw_offs = {};
 	RoadStop::GetByTile(tile, GetRoadStopType(tile))->Enter(v);
 
 	v->UpdatePosition();
@@ -1213,6 +1222,7 @@ void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir int
 		u->direction = v->direction;
 		u->overtaking = 0;
 		u->vehstatus.Reset(VehState::Hidden);
+		u->draw_offs = {};
 		if (back_tile == INVALID_TILE || !HasTileAnyRoadType(back_tile, v->compatible_roadtypes)) {
 			/* Folded into the piece ahead of it. */
 			u->tile = u->Previous()->tile;
