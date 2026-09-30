@@ -1651,16 +1651,22 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			if (!e->info.refit_mask.Test(mari_cargo)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} vozi zbozi, ale marihuanu ne.", GetString(STR_ENGINE_NAME, e->index));
 		}
 		IConsolePrint(CC_DEFAULT, "testprumysl: lodi a letadel se zbozim (a marihuanou): {}", goods_carriers);
-		/* And no other vehicle of the game's own is refitted to it: the
-		 * original coal lorries and coal wagons take bulk cargo by class and
-		 * marijuana with it, and stood above the game's own marijuana lorry
-		 * in the list. A set's vehicle keeps whatever its set gave it
-		 * (OfferMarijuanaToShipsAndAircraft()) and is only counted. */
+		/* And nothing else is refitted to it: a coal lorry or coal wagon
+		 * refitted by class takes bulk cargo and marijuana with it, and stood
+		 * above the game's own marijuana lorry in the list. Only the wagons
+		 * the player named (IsGreenLayerWagon()) and the vehicles of a set
+		 * that names the cargo in its own table keep it
+		 * (OfferMarijuanaToShipsAndAircraft()); the latter are named here. */
 		uint others = 0, of_sets = 0;
 		for (const Engine *e : Engine::Iterate()) {
 			if (e->type == VehicleType::Ship || e->type == VehicleType::Aircraft) continue;
 			if (e->GetDefaultCargoType() == mari_cargo || !e->info.refit_mask.Test(mari_cargo)) continue;
-			if (e->GetGRF() != nullptr) { of_sets++; continue; }
+			const GRFFile *grf = e->GetGRF();
+			if (grf != nullptr && std::ranges::find(grf->cargo_list, CT_MARIJUANA) != grf->cargo_list.end()) {
+				of_sets++;
+				IConsolePrint(CC_DEFAULT, "testprumysl: vozidlo sady s MARI v tabulce {} ({}) jde prestavet na marihuanu.", GetString(STR_ENGINE_NAME, e->index), e->index);
+				continue;
+			}
 			/* The St carries it as its coal drawn green, and so its parts. */
 			if (IsGreenLayerWagon(e)) {
 				IConsolePrint(CC_DEFAULT, "testprumysl: St {} '{}' vozi marihuanu jako zelene uhli", e->index, GetString(e->info.string_id));
@@ -1676,7 +1682,7 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			others++;
 			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - {} ({}) jde prestavet na marihuanu, a neni na ni.", GetString(STR_ENGINE_NAME, e->index), e->index);
 		}
-		IConsolePrint(CC_DEFAULT, "testprumysl: jinych vozidel s prestavbou na marihuanu: {} (hry), {} (sad, ty si ji nechavaji)", others, of_sets);
+		IConsolePrint(CC_DEFAULT, "testprumysl: jinych vozidel s prestavbou na marihuanu: {}, ze sad s MARI v tabulce: {}", others, of_sets);
 	}
 
 	if (!_settings_game.economy.extra_industries) {

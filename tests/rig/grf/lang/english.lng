@@ -31,3 +31,6 @@ STR_G_EAOSS                                                     :Open Wagon "Eao
 STR_G_RNSZ                                                      :Flatbed "Rns-z 643"
 STR_G_SGMMRS                                                    :Sgmmrs DB livery
 STR_G_SSLA                                                      :Flatbed "Ssla Köln"
+STR_G_OM_BRESLAU                                                :Open Wagon "Om Breslau"
+STR_G_OMM_55                                                    :Open Wagon "Omm 55"
+STR_G_OM_SCHWERIN                                               :Open Wagon "Om Schwerin"

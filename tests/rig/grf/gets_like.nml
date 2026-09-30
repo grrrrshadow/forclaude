@@ -6,7 +6,8 @@
  * in the range GETS recolours by cargo. Played by the scene getsjmena (see
  * README.md): the Eaos and its livery carry marijuana with only the load
  * green, the chosen carriers take road vehicles, the Ssla Köln and the Eaoss
- * take neither.
+ * take neither. Of the open wagons the player picked by kind and town, the Om
+ * Breslau takes marijuana; the Omm 55 and an Om of another town do not.
  *
  *     nmlc -c -l grf/lang --grf gets_like.grf grf/gets_like.nml
  */
@@ -198,5 +199,80 @@ item(FEAT_TRAINS, gets_ssla, 305) {
 	}
 	graphics {
 		default: gets_body;
+	}
+}
+
+item(FEAT_TRAINS, gets_om_breslau, 306) {
+	property {
+		name: string(STR_G_OM_BRESLAU);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+		misc_flags: bitmask(TRAIN_FLAG_SPRITE_STACK);
+	}
+	graphics {
+		default: gets_by_cargo;
+	}
+}
+
+item(FEAT_TRAINS, gets_omm_55, 307) {
+	property {
+		name: string(STR_G_OMM_55);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+		misc_flags: bitmask(TRAIN_FLAG_SPRITE_STACK);
+	}
+	graphics {
+		default: gets_by_cargo;
+	}
+}
+
+item(FEAT_TRAINS, gets_om_schwerin, 308) {
+	property {
+		name: string(STR_G_OM_SCHWERIN);
+		climates_available: ALL_CLIMATES;
+		introduction_date: date(1900, 1, 1);
+		model_life: VEHICLE_NEVER_EXPIRES;
+		vehicle_life: 30;
+		reliability_decay: 20;
+		track_type: RAIL;
+		sprite_id: SPRITE_ID_NEW_TRAIN;
+		speed: 100 km/h;
+		power: 0 kW;
+		weight: 10 ton;
+		cargo_capacity: 20;
+		default_cargo_type: COAL;
+		refittable_cargo_classes: bitmask(CC_BULK);
+		cost_factor: 100;
+		running_cost_factor: 0;
+		misc_flags: bitmask(TRAIN_FLAG_SPRITE_STACK);
+	}
+	graphics {
+		default: gets_by_cargo;
 	}
 }

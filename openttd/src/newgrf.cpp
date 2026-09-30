@@ -965,14 +965,20 @@ static void OfferRoadVehiclesToCarriers()
  * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
  * knows the cargo by name.
  *
- * A set's vehicle is never touched: whatever a set gives a vehicle, by label
- * or by class, it keeps. The player: "a set that names MARI carries it; no
- * set is blocked and none is singled out" -- which of its vehicles carry it
- * is the set's to say, and the game has no business taking it back. Only the
- * game's own vehicles lose it: marijuana is bulk cargo, so every original coal
- * lorry and coal wagon could be refitted to it and stood in the list above the
- * game's own marijuana lorry, which is a coal lorry made over. The player: the
- * lorries for marijuana are there, the coal ones need not carry it.
+ * Nothing else is refitted to it but the wagons the player named by name
+ * (IsGreenLayerWagon(), below) and the vehicles of a set that names the cargo
+ * in its own cargo table. Marijuana is bulk cargo, and a vehicle refitted by
+ * class takes it with the coal: every coal lorry and coal wagon of every set
+ * would carry it -- the closed hoppers with lids among them, where no load is
+ * ever seen -- and stood above the game's own marijuana lorry in the list. The
+ * player: the lorries for marijuana are there, the coal ones need not carry
+ * it, and a wagon whose load cannot be seen is not worth refitting. So it
+ * comes out of every mask but those of the vehicles built for it. A set that
+ * names the cargo in its cargo table knows it, and its vehicles keep what the
+ * set made of it (the player's own sets): that is how a set says which of its
+ * vehicles carry it (GrfNamesCargo()). Letting the class decide instead was
+ * tried on 30. 9. and handed it to eight coal wagons of GETS, four of them
+ * closed hoppers; the player said no.
  *
  * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
  * vessel's own choice of cargo is made first.
@@ -983,11 +989,12 @@ static void OfferMarijuanaToShipsAndAircraft()
 	if (!IsValidCargoType(marijuana)) return;
 
 	for (Engine *e : Engine::Iterate()) {
-		if (e->GetGRF() != nullptr || e->GetDefaultCargoType() == marijuana) continue;
+		if (e->GetDefaultCargoType() == marijuana || GrfNamesCargo(e, CT_MARIJUANA)) continue;
 		e->info.refit_mask.Reset(marijuana);
 	}
-	/* The St, the one coal wagon of a set the player gave marijuana: it
-	 * carries it as its coal drawn green (IsGreenLayerWagon()), with its
+	/* The wagons the player named -- the St and the U of CZTR, the Eanos and
+	 * the Eaos of GETS, by their exact names (EngineNameIsKind()): they carry
+	 * it as their coal drawn green (IsGreenLayerWagon()), with their
 	 * articulated parts, as a car carrier takes road vehicles. */
 	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
 		if (!IsGreenLayerWagon(e)) continue;

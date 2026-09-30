@@ -1597,18 +1597,24 @@ testzelenest" 50 -c $STO_CFG
 # rules read the part in quotes: the Eaos and its livery take marijuana, the
 # Rns-z 643 and the Sgmmrs livery take road vehicles, the Eaoss and the Ssla
 # Köln -- the one the player said no to -- take neither (testjmena says so,
-# na auta / na travu). The Eaos draws its coal as a layer over the wagon, as
+# na auta / na travu). Of the open wagons the player picked by kind and town
+# (30. 9.), the Om Breslau takes marijuana, the Omm 55 and the Om Schwerin
+# do not: a kind alone is not a pick. testprumysl says which wagons carry it
+# and that no other vehicle of the set can be fitted for it. The Eaos draws its coal as a layer over the wagon, as
 # GETS does: full, only the layer is green; empty, nothing is. odmitnuto is
 # zero.
 GETS_CFG=$S/gets_like_openttd.cfg
 sed '/^\[newgrf\]$/a gets_like.grf = ' "$CFG_KEEP" > $GETS_CFG
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
-setting_newgame economy.extra_industries 1' run_scene getsjmena "testjmena Eao
+setting_newgame economy.extra_industries 1' run_scene getsjmena "testprumysl
+testjmena Eao
+testjmena Om
 testjmena Rns
 testjmena Sgmmrs
 testjmena Ssla
 testautovlak
 testzelenest" 50 -c $GETS_CFG
+echo "getsjmena: marihuana $(grep -o "St [0-9]* '[^']*' vozi marihuanu" $S/reg_getsjmena.log | sed "s/^St [0-9]* //; s/ vozi marihuanu//" | tr '\n' ' ')$(grep -o 'jinych vozidel s prestavbou na marihuanu: [0-9]*' $S/reg_getsjmena.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 # The explosives chain (economy.extra_industries): the marijuana plantation
 # grows hemp fibre beside the marijuana, the oil refinery takes the fibre and
 # makes explosives beside goods, the coffeeshop takes the explosives; the armoured
