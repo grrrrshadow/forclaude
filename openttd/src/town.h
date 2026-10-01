@@ -349,6 +349,7 @@ std::vector<uint32_t> AvailableHouseSources();
 std::string HouseSourceName(uint32_t source);
 const CargoSpec *FindFirstCargoWithTownAcceptanceEffect(TownAcceptanceEffect effect);
 CargoArray GetAcceptedCargoOfHouse(const HouseSpec *hs);
+bool IsStudentHouse(const HouseSpec &hs);
 
 uint8_t GetTownActionCost(TownAction action);
 

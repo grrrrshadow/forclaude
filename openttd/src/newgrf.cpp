@@ -956,12 +956,33 @@ static void OfferRoadVehiclesToCarriers()
 
 
 /**
+ * Let a church or a park of the original town houses (IsStudentHouse()) take
+ * studentky (CT_STUDENTKY) in full, in a slot of its own after the cargoes it
+ * takes already, when the game has them; it makes them too (TileLoop_Town()).
+ * @param hs The house.
+ */
+static void AddStudentAcceptance(HouseSpec &hs)
+{
+	if (!IsStudentHouse(hs)) return;
+	CargoType cargo = GetCargoTypeByLabel(CT_STUDENTKY);
+	if (!IsValidCargoType(cargo)) return;
+
+	for (uint i = 0; i < lengthof(hs.accepts_cargo); ++i) {
+		if (hs.accepts_cargo[i] == cargo) return;
+		if (IsValidCargoType(hs.accepts_cargo[i]) && hs.cargo_acceptance[i] != 0) continue;
+		hs.accepts_cargo[i] = cargo;
+		hs.cargo_acceptance[i] = 8;
+		return;
+	}
+}
+
+/**
  * The students are studentky in this game, whatever the set that brings them
  * calls them -- the player's word -- and the coffeeshop takes them.
  */
 static void NameStudentCargo()
 {
-	CargoType cargo = GetCargoTypeByLabel(CargoLabel{'STUD'});
+	CargoType cargo = GetCargoTypeByLabel(CT_STUDENTKY);
 	if (!IsValidCargoType(cargo)) return;
 	CargoSpec *cs = CargoSpec::Get(cargo);
 	cs->name = STR_CARGO_PLURAL_STUDENTKY;
@@ -1779,6 +1800,7 @@ static void FinaliseHouseArray()
 			/* Disable acceptance if cargo type is invalid. */
 			if (!IsValidCargoType(hs->accepts_cargo[i])) hs->cargo_acceptance[i] = 0;
 		}
+		AddStudentAcceptance(*hs);
 	}
 
 	HouseZones climate_mask = GetClimateMaskForLandscape();

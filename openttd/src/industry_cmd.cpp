@@ -773,7 +773,7 @@ static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
  * students, called studentky in this game (NameStudentCargo()). Taken where
  * the game has them; a label no set brought is left out.
  */
-static const std::array<CargoLabel, 7> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}, CT_EXPLOSIVES, CargoLabel{'STUD'}};
+static const std::array<CargoLabel, 7> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}, CT_EXPLOSIVES, CT_STUDENTKY};
 
 /**
  * The cargoes the coffeeshop takes where the game has them.
@@ -1108,7 +1108,8 @@ static LandscapeTypes AcceptingClimates()
  * The cargoes the original industries of this game need that the climate
  * played may lack: what each produces in its home climate, what each takes
  * in every climate on; and marijuana, when the game's marijuana plantation
- * is in it (economy.extra_industries). Nothing when neither is.
+ * is in it (economy.extra_industries), with hemp fibre, explosives and the
+ * studentky of the churches and parks. Nothing when neither is.
  * @return the labels
  */
 std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
@@ -1118,6 +1119,7 @@ std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 		labels.push_back(CT_MARIJUANA);
 		labels.push_back(CT_HEMP_FIBRE);
 		labels.push_back(CT_EXPLOSIVES);
+		labels.push_back(CT_STUDENTKY);
 	}
 	if (IndustryClimatesOn().None()) return labels;
 	auto add = [&labels](const std::vector<CargoLabel> &more) {

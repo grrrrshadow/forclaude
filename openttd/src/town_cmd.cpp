@@ -541,6 +541,24 @@ static void TownGenerateCargo(Town *t, CargoType cargo, uint amount, StationFind
 }
 
 /**
+ * Generate one cargo for a house using the original algorithm.
+ * @param t The current town.
+ * @param cs The cargo.
+ * @param rate The house's product rate for this cargo.
+ * @param stations Available stations for this house.
+ */
+static void TownGenerateCargoOriginal(Town *t, const CargoSpec *cs, uint8_t rate, StationFinder &stations)
+{
+	uint32_t r = Random();
+	if (GB(r, 0, 8) < rate) {
+		CargoType cargo_type = cs->Index();
+		uint amt = (GB(r, 0, 8) * cs->town_production_multiplier / TOWN_PRODUCTION_DIVISOR) / 8 + 1;
+
+		TownGenerateCargo(t, cargo_type, amt, stations, true);
+	}
+}
+
+/**
  * Generate cargo for a house using the original algorithm.
  * @param t The current town.
  * @param tpe The town production effect.
@@ -550,14 +568,30 @@ static void TownGenerateCargo(Town *t, CargoType cargo, uint amount, StationFind
 static void TownGenerateCargoOriginal(Town *t, TownProductionEffect tpe, uint8_t rate, StationFinder &stations)
 {
 	for (const CargoSpec *cs : CargoSpec::town_production_cargoes[tpe]) {
-		uint32_t r = Random();
-		if (GB(r, 0, 8) < rate) {
-			CargoType cargo_type = cs->Index();
-			uint amt = (GB(r, 0, 8) * cs->town_production_multiplier / TOWN_PRODUCTION_DIVISOR) / 8 + 1;
-
-			TownGenerateCargo(t, cargo_type, amt, stations, true);
-		}
+		TownGenerateCargoOriginal(t, cs, rate, stations);
 	}
+}
+
+/**
+ * Generate one cargo for a house using the binomial algorithm.
+ * @param t The current town.
+ * @param cs The cargo.
+ * @param rate The house's product rate for this cargo.
+ * @param stations Available stations for this house.
+ */
+static void TownGenerateCargoBinomial(Town *t, const CargoSpec *cs, uint8_t rate, StationFinder &stations)
+{
+	CargoType cargo_type = cs->Index();
+	uint32_t r = Random();
+
+	/* Make a bitmask with up to 32 bits set, one for each potential pax. */
+	int genmax = (rate + 7) / 8;
+	uint32_t genmask = (genmax >= 32) ? 0xFFFFFFFF : ((1 << genmax) - 1);
+
+	/* Mask random value by potential pax and count number of actual pax. */
+	uint amt = CountBits(r & genmask) * cs->town_production_multiplier / TOWN_PRODUCTION_DIVISOR;
+
+	TownGenerateCargo(t, cargo_type, amt, stations, true);
 }
 
 /**
@@ -570,18 +604,25 @@ static void TownGenerateCargoOriginal(Town *t, TownProductionEffect tpe, uint8_t
 static void TownGenerateCargoBinomial(Town *t, TownProductionEffect tpe, uint8_t rate, StationFinder &stations)
 {
 	for (const CargoSpec *cs : CargoSpec::town_production_cargoes[tpe]) {
-		CargoType cargo_type = cs->Index();
-		uint32_t r = Random();
-
-		/* Make a bitmask with up to 32 bits set, one for each potential pax. */
-		int genmax = (rate + 7) / 8;
-		uint32_t genmask = (genmax >= 32) ? 0xFFFFFFFF : ((1 << genmax) - 1);
-
-		/* Mask random value by potential pax and count number of actual pax. */
-		uint amt = CountBits(r & genmask) * cs->town_production_multiplier / TOWN_PRODUCTION_DIVISOR;
-
-		TownGenerateCargo(t, cargo_type, amt, stations, true);
+		TownGenerateCargoBinomial(t, cs, rate, stations);
 	}
+}
+
+/** How many studentky a church or a park makes (IsStudentHouse()): as a house of thirty people makes passengers. */
+static const uint8_t STUDENT_HOUSE_RATE = 30;
+
+/**
+ * Does this house make and take studentky (CT_STUDENTKY)? The churches and
+ * parks of the original town houses do, in every climate that has them, on
+ * top of their passengers and mail. A set's house does not, even one made
+ * from a church: it says what it makes and takes itself.
+ * @param hs The house.
+ * @return true for an original church or park.
+ */
+bool IsStudentHouse(const HouseSpec &hs)
+{
+	if (hs.Index() >= NEW_HOUSE_OFFSET) return false;
+	return hs.building_name == STR_TOWN_BUILDING_NAME_CHURCH_1 || hs.building_name == STR_TOWN_BUILDING_NAME_PARK_1;
 }
 
 /** @copydoc TileLoopProc */
@@ -630,11 +671,15 @@ static void TileLoop_Town(TileIndex tile)
 			TownGenerateCargo(t, cargo, amt, stations, false);
 		}
 	} else {
+		/* Studentky of a church or a park, when the game has them. */
+		CargoType students = IsStudentHouse(*hs) ? GetCargoTypeByLabel(CT_STUDENTKY) : INVALID_CARGO;
+
 		switch (_settings_game.economy.town_cargogen_mode) {
 			case TownCargoGenMode::Original:
 				/* Original (quadratic) cargo generation algorithm */
 				TownGenerateCargoOriginal(t, TownProductionEffect::Passengers, hs->population, stations);
 				TownGenerateCargoOriginal(t, TownProductionEffect::Mail, hs->mail_generation, stations);
+				if (IsValidCargoType(students)) TownGenerateCargoOriginal(t, CargoSpec::Get(students), STUDENT_HOUSE_RATE, stations);
 				break;
 
 			case TownCargoGenMode::Bitcount:
@@ -644,6 +689,7 @@ static void TileLoop_Town(TileIndex tile)
 				if (GB(TimerGameTick::counter, 8, 2) == GB(tile.base(), 0, 2)) {
 					TownGenerateCargoBinomial(t, TownProductionEffect::Passengers, hs->population, stations);
 					TownGenerateCargoBinomial(t, TownProductionEffect::Mail, hs->mail_generation, stations);
+					if (IsValidCargoType(students)) TownGenerateCargoBinomial(t, CargoSpec::Get(students), STUDENT_HOUSE_RATE, stations);
 				}
 				break;
 

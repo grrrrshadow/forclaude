@@ -13020,6 +13020,56 @@ static bool ConTestBlockIds(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Rig probe for the studentky (CT_STUDENTKY) of the churches and parks: the
+ * cargo's slot and name, every original house that makes them
+ * (IsStudentHouse()) with its people and how much of them it takes, how many
+ * of their tiles are on the map, and how many studentky and passengers the
+ * towns made all told so far.
+ * Usage: teststudentky
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestStudents(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: studentky of the churches and parks - houses, acceptance, tiles, production. Usage: 'teststudentky'");
+		return true;
+	}
+
+	CargoType stud = GetCargoTypeByLabel(CT_STUDENTKY);
+	if (!IsValidCargoType(stud)) {
+		IConsolePrint(CC_DEFAULT, "teststudentky: naklad STUD neni ve hre");
+		return true;
+	}
+	IConsolePrint(CC_DEFAULT, "teststudentky: naklad STUD slot {} jmeno {}", stud, GetString(CargoSpec::Get(stud)->name));
+
+	for (const HouseSpec &hs : HouseSpec::Specs()) {
+		if (!IsStudentHouse(hs)) continue;
+		CargoArray acceptance = GetAcceptedCargoOfHouse(&hs);
+		IConsolePrint(CC_DEFAULT, "teststudentky: dum {} {} lidi {} bere STUD {}/8 klima {}", hs.Index(), GetString(hs.building_name),
+				hs.population, acceptance[stud], hs.building_availability.Any(GetClimateMaskForLandscape()) ? "ano" : "ne");
+	}
+
+	uint tiles = 0;
+	for (const auto tile : Map::Iterate()) {
+		if (IsTileType(tile, TileType::House) && IsStudentHouse(*HouseSpec::Get(GetHouseType(tile)))) tiles++;
+	}
+
+	CargoType pass = GetCargoTypeByLabel(CT_PASSENGERS);
+	uint64_t made_stud = 0;
+	uint64_t made_pass = 0;
+	for (const Town *t : Town::Iterate()) {
+		for (const auto &sc : t->supplied) {
+			for (const auto &h : sc.history) {
+				if (sc.cargo == stud) made_stud += h.production;
+				if (sc.cargo == pass) made_pass += h.production;
+			}
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "teststudentky: na mape {} dlazdic kostelu a parku, vyrobeno studentek {} cestujicich {}", tiles, made_stud, made_pass);
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -13181,6 +13231,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("prum",                    ConIndustryLog);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testbloky",               ConTestBlockIds);
+	IConsole::CmdRegister("teststudentky",           ConTestStudents);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);

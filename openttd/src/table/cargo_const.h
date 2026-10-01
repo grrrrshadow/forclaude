@@ -140,6 +140,15 @@ static const CargoSpec _default_cargo[] = {
 	 * outright (OfferExplosivesToArmouredOnly()), only inside a car. */
 	MK(  60, CT_HEMP_FIBRE,    67, 16, 0x100, 4600,  2,  30,  true,       TownAcceptanceEffect::None,   HEMP_FIBRE,   HEMP_FIBRE,       STR_TONS, CargoClasses({CargoClass::Bulk, CargoClass::Covered})),
 	MK(  61, CT_EXPLOSIVES,   180,  8, 0x100, 7000,  1,  30,  true,       TownAcceptanceEffect::None,   EXPLOSIVES,   EXPLOSIVE,      STR_CRATES, CargoClasses({CargoClass::Armoured})),
+
+	/* Studentky (CT_STUDENTKY), with economy.extra_industries, placed the way
+	 * marijuana is: made and taken by the churches and parks of the original
+	 * town houses on top of their passengers and mail (TileLoop_Town(),
+	 * AddStudentAcceptance()), and taken by the coffeeshop. Weighed, paid and
+	 * carried like passengers, in the passenger class so every bus, carriage,
+	 * ship and aircraft takes them; they do not count as passengers for the
+	 * town (TownAcceptanceEffect::None). */
+	MK(  59, CT_STUDENTKY,    152,  1, 0x400, 3185,  0,  24, false,       TownAcceptanceEffect::None,    STUDENTKY,    STUDENTKA, STR_QUANTITY_STUDENTKY, CargoClasses({CargoClass::Passengers})),
 };
 
 

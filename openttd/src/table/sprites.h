@@ -1409,6 +1409,7 @@ static const SpriteID SPR_CARGO_ROAD_VEHICLES         = SPR_CARGO_ROAD_VEHICLES_
 static const SpriteID SPR_CARGO_MARIJUANA             = SPR_CARGO_MARIJUANA_ICON; ///< A cannabis leaf (CT_MARIJUANA), among this build's own sprites.
 static const SpriteID SPR_CARGO_HEMP_FIBRE            = SPR_CARGO_MARIJUANA_ICON; ///< Hemp fibre (CT_HEMP_FIBRE): the cannabis leaf too, until it has an icon of its own.
 static const SpriteID SPR_CARGO_EXPLOSIVES            = 4323; ///< Explosives (CT_EXPLOSIVES): the battery of the base set, until they have an icon of their own.
+static const SpriteID SPR_CARGO_STUDENTKY             = SPR_CARGO_PASSENGERS; ///< Studentky (CT_STUDENTKY): the passenger of the base set, until they have an icon of their own.
 static const SpriteID SPR_CARGO_TOFFEE                = 4320;
 static const SpriteID SPR_CARGO_BUBBLES               = 4321;
 static const SpriteID SPR_CARGO_PLASTIC               = 4322;

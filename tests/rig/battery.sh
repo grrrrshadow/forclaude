@@ -1550,11 +1550,11 @@ testnaklady" 100 -c $XIS_CFG
 # of its own, taking all of the marijuana and of the other cargoes of its list
 # the game has, with at least one of each standing on the map, marijuana among
 # the cargoes, and no house taking it. Beside XIS, which switches the temperate
-# industries off and brings its own, they have to stay as they are. Sixteen
-# cargoes: toyland's twelve, marijuana, and the road vehicles, hemp fibre and
-# explosives of the game's own.
+# industries off and brings its own, they have to stay as they are. Seventeen
+# cargoes: toyland's twelve, marijuana, and the road vehicles, hemp fibre,
+# explosives and studentky of the game's own.
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene marihuana "testprumysl 0 1 1
-testnaklady 16 Marijuana" 100
+testnaklady 17 Marijuana" 100
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene marihuanasada "testprumysl 0 1 1
 testnaklady" 100 -c $XIS_CFG
@@ -1775,6 +1775,17 @@ SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene studentky "prum" 20 -c $STUD_CFG
 PRUM_FILE=$(ls -t $S/save/prumysl*.txt 2>/dev/null | head -1)
 echo "studentky: $(grep '| STUD |' "$PRUM_FILE" | cut -d'|' -f2-3) hulirna bere:$(grep '| Coffeeshop |' "$PRUM_FILE" | cut -d'|' -f4)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Studentky of the game's own (CT_STUDENTKY, with economy.extra_industries):
+# the churches and parks of the original houses take them 8/8 and make them
+# on top of their passengers, in every climate that has them (teststudentky).
+# Off, the cargo is not in the game at all.
+for kl in temperate arctic; do
+  SCENE_NEWGAME="setting_newgame game_creation.landscape $kl
+setting_newgame economy.extra_industries 1" run_scene kostely_$kl "testzatik 3000 teststudentky" 3100
+  echo "kostely_$kl: $(grep -o 'naklad STUD.*' $S/reg_kostely_$kl.log) | $(grep 'klima ano' $S/reg_kostely_$kl.log | grep -o 'dum.*' | tr '\n' ' ')| $(grep -o 'na mape.*' $S/reg_kostely_$kl.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene kostely_bez "testzatik 300 teststudentky" 400
+echo "kostely_bez: $(grep -o 'naklad STUD.*' $S/reg_kostely_bez.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's
