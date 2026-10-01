@@ -1502,7 +1502,7 @@ static bool ConIndustryLog(std::span<std::string_view> argv)
 	}
 
 	uint cargoes = 0;
-	fmt::print(*file, "NAKLADY\ncislo | kod | jmeno | GRF\n");
+	fmt::print(*file, "mapa {} x {}\n\nNAKLADY\ncislo | kod | jmeno | GRF\n", Map::SizeX(), Map::SizeY());
 	for (const CargoSpec *cs : CargoSpec::Iterate()) {
 		fmt::print(*file, "{} | {} | {} | {}\n", cs->Index(), label_of(cs->Index()), GetString(cs->name), set_of(cs->grffile));
 		cargoes++;
