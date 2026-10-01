@@ -55,6 +55,9 @@
 
 #include "table/strings.h"
 
+#include "timer/timer.h"
+#include "timer/timer_window.h"
+
 #include "safeguards.h"
 
 ClientSettings _settings_client;
@@ -1660,6 +1663,28 @@ void LoadFromConfig(bool startup)
 }
 
 /** Save the values to the configuration file */
+/** When the config files are next to be written after a change, if one is waiting. */
+static std::optional<std::chrono::steady_clock::time_point> _config_save_due;
+
+/**
+ * Write the config files a second after the last change rather than at every
+ * one. The original writes all four of them at every change; this build keeps
+ * them beside its binary, which under Winlator is slow storage, and a write per
+ * click held every arrow in the settings back to one step in two seconds. The
+ * game still writes them when it ends.
+ */
+static void ScheduleSaveToConfig()
+{
+	_config_save_due = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+}
+
+/** Write the config files once the changes have stopped (ScheduleSaveToConfig()). */
+static const IntervalTimer<TimerWindow> _config_save_interval(std::chrono::milliseconds(250), [](auto) {
+	if (!_config_save_due.has_value() || std::chrono::steady_clock::now() < *_config_save_due) return;
+	_config_save_due.reset();
+	SaveToConfig();
+});
+
 void SaveToConfig()
 {
 	ConfigIniFile generic_ini(_config_file);
@@ -1821,7 +1846,7 @@ void IntSettingDesc::ChangeValue(const void *object, int32_t newval) const
 	SetWindowClassesDirty(WindowClass::GameOptions);
 	if (this->flags.Test(SettingFlag::Sandbox)) SetWindowClassesDirty(WindowClass::Cheat);
 
-	if (_save_config) SaveToConfig();
+	if (_save_config) ScheduleSaveToConfig();
 }
 
 /**
@@ -2115,7 +2140,7 @@ void StringSettingDesc::ChangeValue(const void *object, std::string &&newval) co
 	this->Write(object, newval);
 	if (this->post_callback != nullptr) this->post_callback(newval);
 
-	if (_save_config) SaveToConfig();
+	if (_save_config) ScheduleSaveToConfig();
 }
 
 /* Those 2 functions need to be here, else we have to make some stuff non-static
