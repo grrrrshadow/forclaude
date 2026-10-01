@@ -1469,6 +1469,66 @@ static bool ConTestDepartureButtons(std::span<std::string_view> argv)
  * Usage: testprumysl [min [plantaze [hulirny]]]
  * @copydoc IConsoleCmdProc
  */
+/**
+ * Write the game's cargoes and industries to a file beside the saved games:
+ * every cargo with its number, label, name and set, and every industry the
+ * game can build with its set and the labels it takes and makes.
+ * Usage: prum
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConIndustryLog(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Write every cargo and every industry of the game to a file beside the saved games. Usage: 'prum'");
+		return true;
+	}
+
+	auto label_of = [](CargoType cargo) {
+		uint32_t v = CargoSpec::Get(cargo)->label.base();
+		return fmt::format("{}{}{}{}", static_cast<char>(v >> 24), static_cast<char>(v >> 16), static_cast<char>(v >> 8), static_cast<char>(v));
+	};
+	auto set_of = [](const GRFFile *file) -> std::string {
+		if (file == nullptr) return "hra";
+		const GRFConfig *config = GetGRFConfig(file->grfid);
+		if (config == nullptr) return fmt::format("{:08X}", std::byteswap(file->grfid));
+		return fmt::format("{} ({})", config->GetName(), config->filename);
+	};
+
+	std::string name = fmt::format("{}prumysl{:%Y%m%d%H%M%S}.txt", FioFindDirectory(Subdirectory::Save), fmt::gmtime(time(nullptr)));
+	auto file = FioFOpenFile(name, "w", Subdirectory::None);
+	if (!file.has_value()) {
+		IConsolePrint(CC_ERROR, "prum: soubor {} nejde zapsat.", name);
+		return true;
+	}
+
+	uint cargoes = 0;
+	fmt::print(*file, "NAKLADY\ncislo | kod | jmeno | GRF\n");
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		fmt::print(*file, "{} | {} | {} | {}\n", cs->Index(), label_of(cs->Index()), GetString(cs->name), set_of(cs->grffile));
+		cargoes++;
+	}
+
+	auto labels = [&label_of](const auto &list) {
+		std::string out;
+		for (CargoType c : list) {
+			if (IsValidCargoType(c)) out += (out.empty() ? "" : " ") + label_of(c);
+		}
+		return out.empty() ? std::string{"-"} : out;
+	};
+	uint industries = 0;
+	fmt::print(*file, "\nPRUMYSL\ncislo | jmeno | GRF | bere | vyrabi | na mape\n");
+	for (IndustryType type = 0; type < NUM_INDUSTRYTYPES; type++) {
+		const IndustrySpec *spec = GetIndustrySpec(type);
+		if (!spec->enabled) continue;
+		fmt::print(*file, "{} | {} | {} | {} | {} | {}\n", type, GetString(spec->name), set_of(spec->grf_prop.grffile),
+				labels(spec->accepts_cargo), labels(spec->produced_cargo), Industry::GetIndustryTypeCount(type));
+		industries++;
+	}
+
+	IConsolePrint(CC_DEFAULT, "prum: {} nakladu a {} prumyslu zapsano do {}", cargoes, industries, name);
+	return true;
+}
+
 static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
@@ -13118,6 +13178,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testsmerdepo",            ConTestDepartureButtons);
 	IConsole::CmdRegister("testnaklady",             ConTestCargoTypes);
 	IConsole::CmdRegister("testprumysl",             ConTestClimateIndustries);
+	IConsole::CmdRegister("prum",                    ConIndustryLog);
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testbloky",               ConTestBlockIds);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
