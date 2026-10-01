@@ -766,6 +766,47 @@ static const DrawBuildingsTileStruct _coffeeshop_draw_tile_data[] = {
 };
 static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
 
+/** A tile of the girls' grammar school or the vending machine: bare land while it is built, then the grass with the building sprite on it. */
+#define OWN_TILE(building, height) { \
+		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
+		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
+		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
+		{ {{0, 0, 0}, {16, 16, height}, {}}, { SPR_FLAT_GRASS_TILE, PAL_NONE }, { building, PAL_NONE }, 0 }, \
+	}
+
+/**
+ * The tiles of the girls' grammar school, north, west, east and south, and of
+ * the vending machine, in the order of their tile numbers from
+ * GFX_GYMNASIUM_NORTH down. The school is drawn in vertical strips, one per
+ * tile (openttd_gymnazium.py): the south tile, the front one, carries the
+ * middle of the building with what of the north tile stands behind it, so the
+ * north tile is grass only.
+ */
+static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLETED + 1] = {
+	OWN_TILE(0, 0),                     // GFX_GYMNASIUM_NORTH
+	OWN_TILE(SPR_GYMNASIUM_WEST, 20),   // GFX_GYMNASIUM_WEST
+	OWN_TILE(SPR_GYMNASIUM_EAST, 30),   // GFX_GYMNASIUM_EAST
+	OWN_TILE(SPR_GYMNASIUM_SOUTH, 50),  // GFX_GYMNASIUM_SOUTH
+	OWN_TILE(SPR_WEED_MACHINE, 20),     // GFX_WEED_MACHINE
+};
+#undef OWN_TILE
+static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_WEED_MACHINE + 1);
+
+/**
+ * How a tile of the game's own industries that is not drawn as an original
+ * tile is drawn: the coffeeshop, the girls' grammar school and the vending
+ * machine.
+ * @param gfx the tile
+ * @param stage its construction stage
+ * @return its drawing, or nullptr for any other tile
+ */
+static const DrawBuildingsTileStruct *GameOwnIndustryDrawTile(IndustryGfx gfx, uint stage)
+{
+	if (gfx == GFX_COFFEESHOP) return &_coffeeshop_draw_tile_data[stage];
+	if (gfx >= GFX_WEED_MACHINE && gfx <= GFX_GYMNASIUM_NORTH) return &_game_own_draw_tile_data[GFX_GYMNASIUM_NORTH - gfx][stage];
+	return nullptr;
+}
+
 /**
  * What the coffeeshop takes, all of each (8/8): marijuana, and the cargoes of
  * sets that end at it -- tobacco (Industries of the Caribbean), paper,
@@ -774,6 +815,19 @@ static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
  * the game has them; a label no set brought is left out.
  */
 static const std::array<CargoLabel, 7> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}, CT_EXPLOSIVES, CT_STUDENTKY};
+
+/**
+ * What the girls' grammar school takes, all of each: the studentky it makes
+ * as well, paper, and paints, under both labels the sets give them (DYES and
+ * COAT). Taken where the game has them; a label no set brought is left out.
+ */
+static const std::array<CargoLabel, 4> GYMNASIUM_CARGOES{CT_STUDENTKY, CT_PAPER, CargoLabel{'DYES'}, CargoLabel{'COAT'}};
+
+/** What the vending machine by the school takes: marijuana. */
+static const std::array<CargoLabel, 1> WEED_MACHINE_CARGOES{CT_MARIJUANA};
+
+/** How many studentky the girls' grammar school makes, as an industry's production rate. */
+static const uint8_t GYMNASIUM_PRODUCTION_RATE = 10;
 
 /**
  * The cargoes the coffeeshop takes where the game has them.
@@ -785,46 +839,79 @@ std::span<const CargoLabel> CoffeeshopCargoes()
 }
 
 /**
- * Put the coffeeshop (economy.extra_industries) and its tile in their places,
- * the industry type and tile before the plantation's: the bank of the arctic
- * and desert towns -- built only in a town, producing nothing -- on one tile
- * drawn as the desert house with the palm tree, in every climate. What it
- * takes is set once the cargoes are (ResolveExtraIndustryCargoes()). To a set
- * asking about it the coffeeshop is that bank.
+ * Put one of the game's industries that stand in towns
+ * (economy.extra_industries) and its tiles in their places: the bank of the
+ * arctic and desert towns -- built only in a town, producing nothing -- with
+ * the layout given, in every climate. What it takes is set once the cargoes
+ * are (ResolveExtraIndustryCargoes()). To a set asking about it the industry
+ * is that bank.
+ * @param type the industry
+ * @param layout its tiles
+ * @param name its name
+ * @param map_colour its colour on the map
  */
-static void SetupCoffeeshop()
+static void SetupTownIndustry(IndustryType type, const IndustryTileLayout &layout, StringID name, uint8_t map_colour)
 {
 	const IndustrySpec &bank = _origin_industry_specs[IT_BANK_TROPIC_ARCTIC];
 	const IndustryGfx bank_tile = bank.layouts.front().front().gfx;
 
-	IndustryTileSpec &tile = _industry_tile_specs[GFX_COFFEESHOP];
-	tile = _origin_industry_tile_specs[bank_tile];
-	tile.grf_prop.subst_id = bank_tile;
-	tile.accepts_cargo_label.fill(CT_INVALID);
-	tile.accepts_cargo.fill(INVALID_CARGO);
-	tile.acceptance.fill(0);
+	for (const IndustryTileLayoutTile &t : layout) {
+		IndustryTileSpec &tile = _industry_tile_specs[t.gfx];
+		tile = _origin_industry_tile_specs[bank_tile];
+		tile.grf_prop.subst_id = bank_tile;
+		tile.accepts_cargo_label.fill(CT_INVALID);
+		tile.accepts_cargo.fill(INVALID_CARGO);
+		tile.acceptance.fill(0);
+	}
 
-	IndustrySpec &spec = _industry_specs[IT_COFFEESHOP];
+	IndustrySpec &spec = _industry_specs[type];
 	spec = bank;
-	spec.layouts = {IndustryTileLayout{IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_COFFEESHOP}}};
+	spec.layouts = {layout};
 	spec.accepts_cargo_label.fill(CT_INVALID);
 	spec.produced_cargo_label.fill(CT_INVALID);
+	for (auto &multipliers : spec.input_cargo_multiplier) std::fill(std::begin(multipliers), std::end(multipliers), 0);
 	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
 	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
 	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), bank.appear_ingame[to_underlying(LandscapeType::Tropic)]);
 	std::fill(std::begin(spec.appear_creation), std::end(spec.appear_creation), bank.appear_creation[to_underlying(LandscapeType::Tropic)]);
-	spec.map_colour = PixelColour{0xCF};
-	spec.name = STR_INDUSTRY_NAME_COFFEESHOP;
+	spec.map_colour = PixelColour{map_colour};
+	spec.name = name;
 	spec.grf_prop.subst_id = IT_BANK_TROPIC_ARCTIC;
 	spec.enabled = true;
 }
 
 /**
- * Let the coffeeshop take all of each of COFFEESHOP_CARGOES the game has: the
- * industry, so that what is delivered is taken, and its tile, so that a
- * station by it takes it. Called once the cargoes are set
- * (FinaliseIndustriesArray()).
+ * Put the coffeeshop (economy.extra_industries) and its tile in their places,
+ * the industry type and tile before the plantation's, on one tile drawn as
+ * the desert house with the palm tree.
  */
+static void SetupCoffeeshop()
+{
+	SetupTownIndustry(IT_COFFEESHOP, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_COFFEESHOP}}, STR_INDUSTRY_NAME_COFFEESHOP, 0xCF);
+}
+
+/**
+ * Put the girls' grammar school and the vending machine by it
+ * (economy.extra_industries) in their places, drawn as the player drew them
+ * (SPR_GYMNASIUM_WEST and the rest). The school is 2x2 and makes studentky;
+ * the machine is one tile and stands at most two tiles from a school
+ * (IsNearGymnasium()).
+ */
+static void SetupGymnasium()
+{
+	SetupTownIndustry(IT_GYMNASIUM, {
+			IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_GYMNASIUM_NORTH},
+			IndustryTileLayoutTile{TileIndexDiffC{1, 0}, GFX_GYMNASIUM_WEST},
+			IndustryTileLayoutTile{TileIndexDiffC{0, 1}, GFX_GYMNASIUM_EAST},
+			IndustryTileLayoutTile{TileIndexDiffC{1, 1}, GFX_GYMNASIUM_SOUTH},
+		}, STR_INDUSTRY_NAME_GYMNASIUM, 0xAB);
+	IndustrySpec &spec = _industry_specs[IT_GYMNASIUM];
+	spec.produced_cargo_label[0] = CT_STUDENTKY;
+	spec.production_rate[0] = GYMNASIUM_PRODUCTION_RATE;
+
+	SetupTownIndustry(IT_WEED_MACHINE, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_WEED_MACHINE}}, STR_INDUSTRY_NAME_WEED_MACHINE, 0xCF);
+}
+
 /**
  * Give one of the game's own industries a cargo to take and, if asked, one to
  * make of it (economy.extra_industries): what it is given of the new input
@@ -904,7 +991,7 @@ void UpdateExtraIndustryCargoes()
 {
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
-		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP) continue;
+		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -924,26 +1011,45 @@ void UpdateExtraIndustryCargoes()
 	}
 }
 
+/**
+ * Let one of the game's industries in towns take all of each of the cargoes
+ * the game has of a list: the industry, so that what is delivered is taken,
+ * and every one of its tiles, so that a station by it takes it.
+ * @param type the industry
+ * @param labels the cargoes
+ */
+static void ResolveTownIndustryCargoes(IndustryType type, std::span<const CargoLabel> labels)
+{
+	IndustrySpec &spec = _industry_specs[type];
+	if (!spec.enabled || spec.grf_prop.HasGrfFile()) return;
+
+	spec.accepts_cargo.fill(INVALID_CARGO);
+	for (const IndustryTileLayoutTile &t : spec.layouts.front()) {
+		IndustryTileSpec &tile = _industry_tile_specs[t.gfx];
+		tile.accepts_cargo.fill(INVALID_CARGO);
+		tile.acceptance.fill(0);
+	}
+	size_t next = 0;
+	for (CargoLabel label : labels) {
+		CargoType cargo = GetCargoTypeByLabel(label);
+		if (!IsValidCargoType(cargo)) continue;
+		spec.accepts_cargo[next] = cargo;
+		for (const IndustryTileLayoutTile &t : spec.layouts.front()) {
+			IndustryTileSpec &tile = _industry_tile_specs[t.gfx];
+			tile.accepts_cargo[next] = cargo;
+			tile.acceptance[next] = 8;
+		}
+		next++;
+	}
+}
+
 void ResolveExtraIndustryCargoes()
 {
 	if (!_settings_game.economy.extra_industries) return;
 	ResolveExplosivesChain();
-	IndustrySpec &spec = _industry_specs[IT_COFFEESHOP];
-	if (!spec.enabled || spec.grf_prop.HasGrfFile()) return;
-	IndustryTileSpec &tile = _industry_tile_specs[GFX_COFFEESHOP];
-
-	spec.accepts_cargo.fill(INVALID_CARGO);
-	tile.accepts_cargo.fill(INVALID_CARGO);
-	tile.acceptance.fill(0);
-	size_t next = 0;
-	for (CargoLabel label : COFFEESHOP_CARGOES) {
-		CargoType cargo = GetCargoTypeByLabel(label);
-		if (!IsValidCargoType(cargo)) continue;
-		spec.accepts_cargo[next] = cargo;
-		tile.accepts_cargo[next] = cargo;
-		tile.acceptance[next] = 8;
-		next++;
-	}
+	ResolveTownIndustryCargoes(IT_COFFEESHOP, COFFEESHOP_CARGOES);
+	ResolveTownIndustryCargoes(IT_GYMNASIUM, GYMNASIUM_CARGOES);
+	ResolveTownIndustryCargoes(IT_WEED_MACHINE, WEED_MACHINE_CARGOES);
 }
 
 /**
@@ -969,6 +1075,7 @@ void ResetIndustries()
 	if (_settings_game.economy.extra_industries) {
 		SetupMarijuanaPlantation();
 		SetupCoffeeshop();
+		SetupGymnasium();
 	}
 
 	/* Reset any overrides that have been set. */
@@ -1515,7 +1622,7 @@ static void DrawTile_Industry(TileInfo *ti)
 	const IndustryTileSpec *indts = GetIndustryTileSpec(gfx);
 
 	/* Retrieve pointer to the draw industry tile struct */
-	if (gfx >= NEW_INDUSTRYTILEOFFSET && gfx != GFX_COFFEESHOP) {
+	if (gfx >= NEW_INDUSTRYTILEOFFSET && GameOwnIndustryDrawTile(gfx, 0) == nullptr) {
 		/* Draw the tile using the specialized method of newgrf industrytile.
 		 * DrawNewIndustry will return false if ever the resolver could not
 		 * find any sprite to display.  So in this case, we will jump on the
@@ -1534,7 +1641,8 @@ static void DrawTile_Industry(TileInfo *ti)
 	}
 
 	const uint stage = indts->anim_state ? GetAnimationFrame(ti->tile) & INDUSTRY_COMPLETED : GetIndustryConstructionStage(ti->tile);
-	const DrawBuildingsTileStruct *dits = gfx == GFX_COFFEESHOP ? &_coffeeshop_draw_tile_data[stage] : &_industry_draw_tile_data[gfx << 2 | stage];
+	const DrawBuildingsTileStruct *dits = GameOwnIndustryDrawTile(gfx, stage);
+	if (dits == nullptr) dits = &_industry_draw_tile_data[gfx << 2 | stage];
 
 	/* An original industry of another climate than the one played is drawn as
 	 * its own climate draws it. */
@@ -2761,8 +2869,80 @@ static CommandCost CheckIfIndustryTileSlopes(TileIndex tile, const IndustryTileL
  * @param t    Town authority that the industry belongs to.
  * @return Succeeded or failed command.
  */
+/** How far, at most, the vending machine stands from a girls' grammar school, in tiles: the player's word, so the girls do not have far. */
+static const uint WEED_MACHINE_MAX_DISTANCE = 2;
+/** How near, at least, the coffeeshop and a girls' grammar school stand to each other, in tiles: the coffeeshop does what the school and its machine do, so the two stay apart. */
+static const uint COFFEESHOP_GYMNASIUM_MIN_DISTANCE = 10;
+
+/**
+ * How many tiles an area is from the nearest industry of a type: the larger
+ * of the gaps along x and y between the nearest tiles, 0 for touching.
+ * @param area the area
+ * @param type the industry type
+ * @return the distance, or UINT_MAX when there is none of the type
+ */
+uint DistanceToIndustryType(const TileArea &area, IndustryType type)
+{
+	uint best = UINT_MAX;
+	uint ax0 = TileX(area.tile);
+	uint ay0 = TileY(area.tile);
+	uint ax1 = ax0 + area.w - 1;
+	uint ay1 = ay0 + area.h - 1;
+	for (IndustryID id : Industry::industries[type]) {
+		const TileArea &other = Industry::Get(id)->location;
+		uint bx0 = TileX(other.tile);
+		uint by0 = TileY(other.tile);
+		uint bx1 = bx0 + other.w - 1;
+		uint by1 = by0 + other.h - 1;
+		uint dx = ax1 < bx0 ? bx0 - ax1 : (bx1 < ax0 ? ax0 - bx1 : 0);
+		uint dy = ay1 < by0 ? by0 - ay1 : (by1 < ay0 ? ay0 - by1 : 0);
+		best = std::min(best, std::max(dx, dy));
+	}
+	return best;
+}
+
+/**
+ * Is a tile at most WEED_MACHINE_MAX_DISTANCE tiles from a girls' grammar
+ * school, counting from the nearest of its tiles?
+ * @param tile the tile
+ * @return whether a school is that near
+ */
+bool IsNearGymnasium(TileIndex tile)
+{
+	return DistanceToIndustryType(TileArea(tile, 1, 1), IT_GYMNASIUM) <= WEED_MACHINE_MAX_DISTANCE;
+}
+
+/**
+ * A tile where a vending machine may stand: at most
+ * WEED_MACHINE_MAX_DISTANCE tiles from a girls' grammar school picked at
+ * random. Random tiles of the whole map would almost never hit one.
+ * @return the tile, or INVALID_TILE when there is no school or it is off the map
+ */
+static TileIndex RandomTileNearGymnasium()
+{
+	const auto &schools = Industry::industries[IT_GYMNASIUM];
+	if (schools.empty()) return INVALID_TILE;
+	auto it = std::next(schools.begin(), RandomRange(static_cast<uint32_t>(schools.size())));
+	const TileArea &area = Industry::Get(*it)->location;
+	int span = WEED_MACHINE_MAX_DISTANCE * 2;
+	int x = static_cast<int>(TileX(area.tile)) - static_cast<int>(WEED_MACHINE_MAX_DISTANCE) + static_cast<int>(RandomRange(area.w + span));
+	int y = static_cast<int>(TileY(area.tile)) - static_cast<int>(WEED_MACHINE_MAX_DISTANCE) + static_cast<int>(RandomRange(area.h + span));
+	if (x < 1 || y < 1 || x >= static_cast<int>(Map::MaxX()) || y >= static_cast<int>(Map::MaxY())) return INVALID_TILE;
+	return TileXY(x, y);
+}
+
 static CommandCost CheckIfIndustryIsAllowed(TileIndex tile, IndustryType type, const Town *t)
 {
+	if (type == IT_WEED_MACHINE && !IsNearGymnasium(tile)) {
+		return CommandCost(STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM);
+	}
+	if (type == IT_COFFEESHOP && DistanceToIndustryType(TileArea(tile, 1, 1), IT_GYMNASIUM) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
+		return CommandCost(STR_ERROR_TOO_CLOSE_TO_GYMNASIUM);
+	}
+	if (type == IT_GYMNASIUM && DistanceToIndustryType(TileArea(tile, 2, 2), IT_COFFEESHOP) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
+		return CommandCost(STR_ERROR_TOO_CLOSE_TO_COFFEESHOP);
+	}
+
 	if (GetIndustrySpec(type)->behaviour.Test(IndustryBehaviour::Town1200More) && t->cache.population < 1200) {
 		return CommandCost(STR_ERROR_CAN_ONLY_BE_BUILT_IN_TOWNS_WITH_POPULATION_OF_1200);
 	}
@@ -3576,7 +3756,10 @@ static Industry *PlaceIndustry(IndustryType type, IndustryAvailabilityCallType c
 {
 	uint tries = try_hard ? 10000u : 2000u;
 	for (; tries > 0; tries--) {
-		Industry *ind = CreateNewIndustry(RandomTile(), type, creation_type);
+		if (type == IT_WEED_MACHINE && Industry::industries[IT_GYMNASIUM].empty()) return nullptr;
+		TileIndex tile = type == IT_WEED_MACHINE ? RandomTileNearGymnasium() : RandomTile();
+		if (tile == INVALID_TILE) continue;
+		Industry *ind = CreateNewIndustry(tile, type, creation_type);
 		if (ind != nullptr) return ind;
 	}
 	return nullptr;

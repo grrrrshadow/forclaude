@@ -70,6 +70,14 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_rocket_1_7.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_cargo_rola.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/openttdgui_cargo_marijuana.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gymnazium_w_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gymnazium_w_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gymnazium_s_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gymnazium_s_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gymnazium_e_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gymnazium_e_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/automat_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/automat_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_rocks.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_snowy_rocks_1.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/overlay_snowy_rocks_2.png

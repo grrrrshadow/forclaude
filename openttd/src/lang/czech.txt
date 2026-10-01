@@ -5733,6 +5733,9 @@ STR_ERROR_CAN_ONLY_BE_BUILT_IN_RAINFOREST                       :{WHITE}... mů�
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_DESERT                           :{WHITE}... může se postavit jedině v poušti
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_TOWNS                            :{WHITE}... může se postavit jedině ve městě (místo nějakých domů)
 STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_TOWN_CENTER                    :{WHITE}... může být postaveno pouze poblíž centra města
+STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM                      :{WHITE}... může stát nejvýš dvě políčka od dívčího gymnázia
+STR_ERROR_TOO_CLOSE_TO_GYMNASIUM                                :{WHITE}... musí stát aspoň deset políček od dívčího gymnázia
+STR_ERROR_TOO_CLOSE_TO_COFFEESHOP                               :{WHITE}... musí stát aspoň deset políček od hulírny
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :{WHITE}... může se postavit jen v nížinách
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :{WHITE}... může být umístěno pouze poblíž okrajů mapy
 STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :Les lze vysadit pouze nad sněžnou čárou
@@ -6336,6 +6339,14 @@ STR_INDUSTRY_NAME_COFFEESHOP                                    :{G=f}Hulírna
 STR_INDUSTRY_NAME_COFFEESHOP.gen                                :hulírny
 STR_INDUSTRY_NAME_COFFEESHOP.loc                                :v hulírně
 STR_INDUSTRY_NAME_COFFEESHOP.small                              :hulírna
+STR_INDUSTRY_NAME_GYMNASIUM                                     :{G=n}Dívčí gymnázium
+STR_INDUSTRY_NAME_GYMNASIUM.gen                                 :dívčího gymnázia
+STR_INDUSTRY_NAME_GYMNASIUM.loc                                 :na dívčím gymnáziu
+STR_INDUSTRY_NAME_GYMNASIUM.small                               :dívčí gymnázium
+STR_INDUSTRY_NAME_WEED_MACHINE                                  :{G=m}Automat na šméčko
+STR_INDUSTRY_NAME_WEED_MACHINE.gen                              :automatu na šméčko
+STR_INDUSTRY_NAME_WEED_MACHINE.loc                              :u automatu na šméčko
+STR_INDUSTRY_NAME_WEED_MACHINE.small                            :automat na šméčko
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

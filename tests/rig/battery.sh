@@ -1774,7 +1774,7 @@ rm -f $S/save/prumysl*.txt
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene studentky "prum" 20 -c $STUD_CFG
 PRUM_FILE=$(ls -t $S/save/prumysl*.txt 2>/dev/null | head -1)
-echo "studentky: $(grep '| STUD |' "$PRUM_FILE" | cut -d'|' -f2-3) hulirna bere:$(grep '| Coffeeshop |' "$PRUM_FILE" | cut -d'|' -f4)" | tee -a ${BATTERY_STABLE:-/dev/null}
+echo "studentky: $(grep -m1 '| STUD |' "$PRUM_FILE" | cut -d'|' -f2-3) hulirna bere:$(grep '| Coffeeshop |' "$PRUM_FILE" | cut -d'|' -f4)" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Studentky of the game's own (CT_STUDENTKY, with economy.extra_industries):
 # the churches and parks of the original houses take them 8/8 and make them
 # on top of their passengers, in every climate that has them (teststudentky).
@@ -1786,6 +1786,21 @@ setting_newgame economy.extra_industries 1" run_scene kostely_$kl "testzatik 300
 done
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene kostely_bez "testzatik 300 teststudentky" 400
 echo "kostely_bez: $(grep -o 'naklad STUD.*' $S/reg_kostely_bez.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The girls' grammar school and the vending machine (economy.extra_industries,
+# testgymnazium): what they take and make, their sprites, a school and a
+# machine funded in the biggest town, the machine refused far from a school
+# and the coffeeshop near one, and after 3000 ticks the studentky the schools
+# made and how far machines (at most 2) and coffeeshops (at least 10) stand.
+for kl in temperate arctic; do
+  SCENE_NEWGAME="setting_newgame game_creation.landscape $kl
+setting_newgame economy.extra_industries 1" run_scene gymnazium_$kl "testgymnazium postav
+testzatik 3000 testgymnazium" 3100
+  L=$S/reg_gymnazium_$kl.log
+  echo "gymnazium_$kl: $(grep -o 'testgymnazium: 23[67] .*' $L | sort -u | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -o 'testgymnazium: sprite .*' $L | sort -u | cut -d' ' -f3- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (.* (postaveno|slo by postavit) .*|automat daleko.*|hulirna u gymnazia.*)' $L | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (gymnazium [0-9]|automat [0-9]|hulirna [0-9]|na mape).*' $L | tail -n $(grep -oE 'testgymnazium: (gymnazium [0-9]|automat [0-9]|hulirna [0-9]|na mape).*' $L | awk 'END{print NR/2}') | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's

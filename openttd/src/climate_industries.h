@@ -24,7 +24,10 @@
  * every climate: the marijuana plantation (IT_MARIJUANA_PLANTATION), the
  * fruit plantation of the base graphics growing marijuana (CT_MARIJUANA),
  * and the coffeeshop in towns (IT_COFFEESHOP), drawn as the desert house with
- * the palm tree, which takes it.
+ * the palm tree, which takes it; the girls' grammar school in towns
+ * (IT_GYMNASIUM), 2x2, making and taking studentky (CT_STUDENTKY) and taking
+ * paper and paints, and the vending machine by it (IT_WEED_MACHINE), taking
+ * marijuana -- both drawn as the player drew them.
  */
 
 #ifndef CLIMATE_INDUSTRIES_H
@@ -34,6 +37,7 @@
 #include "industry_type.h"
 #include "landscape_type.h"
 #include "gfx_type.h"
+#include "tile_type.h"
 
 LandscapeTypes IndustryClimatesOn();
 bool IsOriginalIndustryKept(IndustryType type);
@@ -44,6 +48,8 @@ std::vector<CargoLabel> CargoLabelsOfClimateIndustries();
 void ResolveOriginalIndustryCargoes();
 void ResolveExtraIndustryCargoes();
 std::span<const CargoLabel> CoffeeshopCargoes();
+bool IsNearGymnasium(TileIndex tile);
+uint DistanceToIndustryType(const struct OrthogonalTileArea &area, IndustryType type);
 uint8_t OriginalIndustryChance(IndustryType type, bool creation);
 
 /**

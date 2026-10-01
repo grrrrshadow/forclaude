@@ -13070,6 +13070,106 @@ static bool ConTestStudents(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Rig probe for the girls' grammar school (IT_GYMNASIUM) and the vending
+ * machine by it (IT_WEED_MACHINE): what each takes and makes, their sprites,
+ * how many stand on the map and how far the machines and coffeeshops are
+ * from the nearest school. With 'postav' it also funds a school in the
+ * biggest town and a machine by it, then asks for a machine far from any
+ * school and a coffeeshop near one, which the game has to refuse.
+ * Usage: testgymnazium [postav]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestGymnasium(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: the girls' grammar school and the vending machine - cargoes, sprites, distances, building. Usage: 'testgymnazium [postav]'");
+		return true;
+	}
+
+	auto labels = [](std::span<const CargoType> cargoes) {
+		std::string out;
+		for (CargoType c : cargoes) {
+			if (!IsValidCargoType(c)) continue;
+			CargoLabel l = CargoSpec::Get(c)->label;
+			out += fmt::format(" {:c}{:c}{:c}{:c}", GB(l.base(), 24, 8), GB(l.base(), 16, 8), GB(l.base(), 8, 8), GB(l.base(), 0, 8));
+		}
+		return out.empty() ? std::string{" nic"} : out;
+	};
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE}) {
+		const IndustrySpec *spec = GetIndustrySpec(type);
+		IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} {}, dlazdic {}, bere:{} vyrabi:{}", type, GetString(spec->name), spec->enabled ? "zap" : "VYP",
+				spec->layouts.empty() ? 0 : spec->layouts.front().size(), labels(spec->accepts_cargo), labels(spec->produced_cargo));
+	}
+	for (SpriteID sprite : {SPR_IMG_CROSSHAIR_ARMED, SPR_GYMNASIUM_WEST, SPR_GYMNASIUM_SOUTH, SPR_GYMNASIUM_EAST, SPR_WEED_MACHINE}) {
+		const Sprite *spr = GetSprite(sprite, SpriteType::Normal);
+		IConsolePrint(CC_DEFAULT, "testgymnazium: sprite {} ({}x{} od {},{})", sprite, spr->width, spr->height, spr->x_offs, spr->y_offs);
+	}
+
+	if (argv.size() > 1 && argv[1] == "postav") {
+		AutoRestoreBackup deity(_current_company, OWNER_DEITY);
+		const Town *biggest = nullptr;
+		for (const Town *t : Town::Iterate()) {
+			if (biggest == nullptr || t->cache.population > biggest->cache.population) biggest = t;
+		}
+		auto fund = [](IndustryType type, TileIndex around, uint radius, bool execute) -> CommandCost {
+			CommandCost last(STR_ERROR_SITE_UNSUITABLE);
+			for (TileIndex tile : SpiralTileSequence(around, radius * 2 + 1)) {
+				last = Command<Commands::BuildIndustry>::Do(execute ? DoCommandFlags{DoCommandFlag::Execute} : DoCommandFlags{}, tile, type, 0, true, 0);
+				if (last.Succeeded()) {
+					IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} u ({},{})", GetString(GetIndustrySpec(type)->name), execute ? "postaveno" : "slo by postavit", TileX(tile), TileY(tile));
+					return last;
+				}
+			}
+			return last;
+		};
+		if (biggest != nullptr && Industry::GetIndustryTypeCount(IT_GYMNASIUM) == 0) {
+			CommandCost r = fund(IT_GYMNASIUM, biggest->xy, 12, true);
+			if (r.Failed()) IConsolePrint(CC_ERROR, "testgymnazium: ODMITNUTO - gymnazium nejde postavit: {}", GetString(r.GetErrorMessage()));
+		}
+		if (Industry::GetIndustryTypeCount(IT_GYMNASIUM) > 0) {
+			const Industry *school = Industry::Get(*Industry::industries[IT_GYMNASIUM].begin());
+			if (Industry::GetIndustryTypeCount(IT_WEED_MACHINE) == 0) {
+				CommandCost r = fund(IT_WEED_MACHINE, school->location.tile, 6, true);
+				if (r.Failed()) IConsolePrint(CC_DEFAULT, "testgymnazium: automat u gymnazia nejde postavit: {}", GetString(r.GetErrorMessage()));
+			}
+			/* Refusals: a machine far from every school, a coffeeshop near one. */
+			for (TileIndex tile : SpiralTileSequence(school->location.tile, 81)) {
+				if (DistanceToIndustryType(TileArea(tile, 1, 1), IT_GYMNASIUM) < 8 || !IsTileType(tile, TileType::House)) continue;
+				CommandCost r = Command<Commands::BuildIndustry>::Do(DoCommandFlags{}, tile, IT_WEED_MACHINE, 0, true, 0);
+				IConsolePrint(CC_DEFAULT, "testgymnazium: automat daleko od gymnazia: {}", r.Succeeded() ? "POSTAVIL BY SE" : GetString(r.GetErrorMessage()));
+				break;
+			}
+			for (TileIndex tile : SpiralTileSequence(school->location.tile, 13)) {
+				if (!IsTileType(tile, TileType::House)) continue;
+				CommandCost r = Command<Commands::BuildIndustry>::Do(DoCommandFlags{}, tile, IT_COFFEESHOP, 0, true, 0);
+				IConsolePrint(CC_DEFAULT, "testgymnazium: hulirna u gymnazia: {}", r.Succeeded() ? "POSTAVILA BY SE" : GetString(r.GetErrorMessage()));
+				break;
+			}
+		}
+	}
+
+	CargoType stud = GetCargoTypeByLabel(CT_STUDENTKY);
+	for (IndustryID id : Industry::industries[IT_GYMNASIUM]) {
+		const Industry *i = Industry::Get(id);
+		uint made = 0;
+		for (const auto &p : i->produced) {
+			if (p.cargo != stud) continue;
+			for (const auto &h : p.history) made += h.production;
+		}
+		IConsolePrint(CC_DEFAULT, "testgymnazium: gymnazium {} u ({},{}) {}x{}, vyrobeno studentek {}", id, TileX(i->location.tile), TileY(i->location.tile), i->location.w, i->location.h, made);
+	}
+	for (IndustryType type : {IT_WEED_MACHINE, IT_COFFEESHOP}) {
+		for (IndustryID id : Industry::industries[type]) {
+			const Industry *i = Industry::Get(id);
+			uint d = DistanceToIndustryType(i->location, IT_GYMNASIUM);
+			IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} od gymnazia {}", type == IT_WEED_MACHINE ? "automat" : "hulirna", id, d == UINT_MAX ? std::string{"zadne"} : fmt::format("{}", d));
+		}
+	}
+	IConsolePrint(CC_DEFAULT, "testgymnazium: na mape gymnazii {} automatu {} hulicen {}", Industry::GetIndustryTypeCount(IT_GYMNASIUM), Industry::GetIndustryTypeCount(IT_WEED_MACHINE), Industry::GetIndustryTypeCount(IT_COFFEESHOP));
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -13232,6 +13332,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testikony",               ConTestIconSizes);
 	IConsole::CmdRegister("testbloky",               ConTestBlockIds);
 	IConsole::CmdRegister("teststudentky",           ConTestStudents);
+	IConsole::CmdRegister("testgymnazium",           ConTestGymnasium);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);

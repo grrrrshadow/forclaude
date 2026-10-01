@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 231;
+static const uint16_t OPENTTD_SPRITE_COUNT = 235;
 /** @} */
 
 /** @{
@@ -228,6 +228,14 @@ static const SpriteID SPR_CARGO_ROAD_VEHICLES_ICON   = SPR_OPENTTD_BASE + 228;
  * artwork from icons8.com -- see CREDITS.md. */
 static const SpriteID SPR_CARGO_MARIJUANA_ICON       = SPR_OPENTTD_BASE + 229;
 static const SpriteID SPR_IMG_CROSSHAIR_ARMED        = SPR_OPENTTD_BASE + 230; ///< The crosshair in red: a ship or aircraft with a car of explosives aboard (DropRaidBombs()).
+/* The girls' grammar school (IT_GYMNASIUM), 2x2 tiles, and the vending
+ * machine by it (IT_WEED_MACHINE): the player's own artwork, 32bpp at 4x zoom
+ * with 8bpp at normal zoom beside it (openttd_gymnazium.py). The school is cut
+ * into its west, south and east tile; its north tile is grass only. */
+static const SpriteID SPR_GYMNASIUM_WEST             = SPR_OPENTTD_BASE + 231;
+static const SpriteID SPR_GYMNASIUM_SOUTH            = SPR_OPENTTD_BASE + 232;
+static const SpriteID SPR_GYMNASIUM_EAST             = SPR_OPENTTD_BASE + 233;
+static const SpriteID SPR_WEED_MACHINE               = SPR_OPENTTD_BASE + 234;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

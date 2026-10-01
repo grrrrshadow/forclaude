@@ -5630,6 +5630,9 @@ STR_ERROR_CAN_ONLY_BE_BUILT_IN_RAINFOREST                       :can only be bui
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_DESERT                           :can only be built in desert areas
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_TOWNS                            :can only be built in towns (replacing houses)
 STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_TOWN_CENTER                    :can only be built near the center of towns
+STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM                      :can only be built at most two tiles from a girls' grammar school
+STR_ERROR_TOO_CLOSE_TO_GYMNASIUM                                :must stand at least ten tiles from a girls' grammar school
+STR_ERROR_TOO_CLOSE_TO_COFFEESHOP                               :must stand at least ten tiles from a coffeeshop
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :can only be built in low areas
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :can only be positioned near edges of map
 STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :forest can only be planted above snow-line
@@ -6109,6 +6112,8 @@ STR_INDUSTRY_NAME_TOFFEE_QUARRY                                 :Toffee Quarry
 STR_INDUSTRY_NAME_SUGAR_MINE                                    :Sugar Mine
 STR_INDUSTRY_NAME_MARIJUANA_PLANTATION                          :Marijuana Plantation
 STR_INDUSTRY_NAME_COFFEESHOP                                    :Coffeeshop
+STR_INDUSTRY_NAME_GYMNASIUM                                     :Girls' Grammar School
+STR_INDUSTRY_NAME_WEED_MACHINE                                  :Weed Vending Machine
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

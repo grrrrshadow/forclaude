@@ -57,6 +57,10 @@ static const IndustryType IT_INVALID             = 0xFF;
 static const IndustryType IT_MARIJUANA_PLANTATION = NUM_INDUSTRYTYPES - 1;
 /** The coffeeshop, where the marijuana goes (economy.extra_industries): the type before the plantation's, kept the same way. */
 static const IndustryType IT_COFFEESHOP = NUM_INDUSTRYTYPES - 2;
+/** The girls' grammar school, 2x2 in a town (economy.extra_industries): makes and takes studentky. Before the vending machine, so that map generation has schools to put machines by. */
+static const IndustryType IT_GYMNASIUM = NUM_INDUSTRYTYPES - 4;
+/** The vending machine by a girls' grammar school, where marijuana is sold (economy.extra_industries). */
+static const IndustryType IT_WEED_MACHINE = NUM_INDUSTRYTYPES - 3;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -77,6 +81,14 @@ static const IndustryGfx  GFX_MARIJUANA_PLANTATION = NUM_INDUSTRYTILES - 1;
  * tree (house 0x4E) is.
  */
 static const IndustryGfx  GFX_COFFEESHOP = NUM_INDUSTRYTILES - 2;
+/** The tiles of the girls' grammar school (IT_GYMNASIUM), north, west, east and south, and of the vending machine (IT_WEED_MACHINE): before the coffeeshop's, which no set is ever given either. */
+static const IndustryGfx  GFX_GYMNASIUM_NORTH = NUM_INDUSTRYTILES - 3;
+static const IndustryGfx  GFX_GYMNASIUM_WEST = NUM_INDUSTRYTILES - 4;
+static const IndustryGfx  GFX_GYMNASIUM_EAST = NUM_INDUSTRYTILES - 5;
+static const IndustryGfx  GFX_GYMNASIUM_SOUTH = NUM_INDUSTRYTILES - 6;
+static const IndustryGfx  GFX_WEED_MACHINE = NUM_INDUSTRYTILES - 7;
+/** The first of the tiles of the game's own industries, which no set is given. */
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_WEED_MACHINE;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 
