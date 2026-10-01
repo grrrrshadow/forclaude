@@ -3301,6 +3301,49 @@ static bool DrawCustomStationFoundations(const StationSpec *statspec, BaseStatio
 	return true;
 }
 
+/**
+ * Are there girls at this bus stop? On a drive-through bus stop the game draws
+ * itself (not a NewGRF's), while studentky (CT_STUDENTKY) wait at its station.
+ * @param tile a station tile
+ * @return whether the girls are drawn there
+ */
+bool HasBusStopGirls(TileIndex tile)
+{
+	if (!IsDriveThroughStopTile(tile) || GetStationType(tile) != StationType::Bus || GetRoadStopSpec(tile) != nullptr) return false;
+	CargoType students = GetCargoTypeByLabel(CT_STUDENTKY);
+	if (!IsValidCargoType(students)) return false;
+	const GoodsEntry &ge = Station::GetByTile(tile)->goods[students];
+	return ge.HasData() && ge.GetData().cargo.AvailableCount() > 0;
+}
+
+/**
+ * Draw the two shelters of a drive-through bus stop with the girls standing
+ * by them (HasBusStopGirls()): one at the far shelter, and on a road along X
+ * a second, from behind, at the south corner by the near one. Each is a child
+ * of its shelter, placed from the origin of the shelter's bounding box, so it
+ * is drawn right after the shelter, whatever set draws that, and has no
+ * bounding box to argue with the shelters or the buses.
+ * @param ti the tile
+ * @param t its layout: the shelter along y 0 (far) and y 13 (near) on a road along X, x 13 (near) and x 0 (far) along Y
+ * @param total_offset as DrawRailTileSeq() takes it
+ * @param relocation as DrawRailTileSeq() takes it
+ * @param palette as DrawRailTileSeq() takes it
+ */
+static void DrawBusStopWithGirls(const TileInfo *ti, const DrawTileSprites *t, int32_t total_offset, uint32_t relocation, PaletteID palette)
+{
+	const bool along_x = GetDriveThroughStopAxis(ti->tile) == Axis::X;
+	const bool transparent = IsTransparencySet(TransparencyOption::Buildings);
+	auto seq = t->GetSequence();
+	for (size_t i = 0; i < seq.size(); i++) {
+		DrawTileSpriteSpan shelter(t->ground, seq.subspan(i, 1));
+		DrawRailTileSeq(ti, &shelter, TransparencyOption::Buildings, total_offset, relocation, palette);
+		SpriteID girl = 0;
+		if (along_x) girl = (i == 0) ? SPR_BUS_STOP_GIRL_X_FAR : SPR_BUS_STOP_GIRL_X_NEAR;
+		if (!along_x && i == 1) girl = SPR_BUS_STOP_GIRL_Y_FAR;
+		if (girl != 0) AddChildSpriteScreen(girl, PAL_NONE, 0, 0, transparent, nullptr, false, false);
+	}
+}
+
 /** @copydoc DrawTileProc */
 static void DrawTile_Station(TileInfo *ti)
 {
@@ -3548,7 +3591,11 @@ static void DrawTile_Station(TileInfo *ti)
 		total_offset = 0;
 	}
 
-	DrawRailTileSeq(ti, t, TransparencyOption::Buildings, total_offset, relocation, palette);
+	if (HasBusStopGirls(ti->tile) && t->GetSequence().size() == 2 && !IsInvisibilitySet(TransparencyOption::Buildings)) {
+		DrawBusStopWithGirls(ti, t, total_offset, relocation, palette);
+	} else {
+		DrawRailTileSeq(ti, t, TransparencyOption::Buildings, total_offset, relocation, palette);
+	}
 	DrawBridgeMiddle(ti, GetStationBlockedPillars(bridgeable_info, GetStationGfx(ti->tile)));
 }
 
@@ -3973,6 +4020,14 @@ static bool StationHandleBigTick(BaseStation *st)
 
 	if (Station::IsExpected(st)) {
 		TriggerWatchedCargoCallbacks(Station::From(st));
+
+		/* The girls come and go with the studentky waiting (HasBusStopGirls()). */
+		CargoType students = GetCargoTypeByLabel(CT_STUDENTKY);
+		if (IsValidCargoType(students) && Station::From(st)->goods[students].HasData()) {
+			for (const RoadStop *rs = Station::From(st)->bus_stops; rs != nullptr; rs = rs->next) {
+				if (IsDriveThroughStopTile(rs->xy)) MarkTileDirtyByTile(rs->xy);
+			}
+		}
 
 		for (GoodsEntry &ge : Station::From(st)->goods) {
 			ge.status.Reset(GoodsEntry::State::AcceptedBigtick);

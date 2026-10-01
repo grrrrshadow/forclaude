@@ -61,6 +61,8 @@ static const IndustryType IT_COFFEESHOP = NUM_INDUSTRYTYPES - 2;
 static const IndustryType IT_GYMNASIUM = NUM_INDUSTRYTYPES - 4;
 /** The vending machine by a girls' grammar school, where marijuana is sold (economy.extra_industries). */
 static const IndustryType IT_WEED_MACHINE = NUM_INDUSTRYTYPES - 3;
+/** The statue of Karel Macha, in a town or out of one (economy.extra_industries): takes studentky and tourists. */
+static const IndustryType IT_STATUE = NUM_INDUSTRYTYPES - 5;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -87,8 +89,10 @@ static const IndustryGfx  GFX_GYMNASIUM_WEST = NUM_INDUSTRYTILES - 4;
 static const IndustryGfx  GFX_GYMNASIUM_EAST = NUM_INDUSTRYTILES - 5;
 static const IndustryGfx  GFX_GYMNASIUM_SOUTH = NUM_INDUSTRYTILES - 6;
 static const IndustryGfx  GFX_WEED_MACHINE = NUM_INDUSTRYTILES - 7;
+/** The tile of the statue of Karel Macha (IT_STATUE). */
+static const IndustryGfx  GFX_STATUE = NUM_INDUSTRYTILES - 8;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_WEED_MACHINE;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_STATUE;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

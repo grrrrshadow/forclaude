@@ -788,14 +788,18 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE(SPR_GYMNASIUM_EAST, 30),   // GFX_GYMNASIUM_EAST
 	OWN_TILE(SPR_GYMNASIUM_SOUTH, 50),  // GFX_GYMNASIUM_SOUTH
 	OWN_TILE(SPR_WEED_MACHINE, 20),     // GFX_WEED_MACHINE
+	OWN_TILE(SPR_STATUE_STONE, 40),     // GFX_STATUE
 };
+static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
+
+/** A tile of the marijuana plantation; which of its twenty sprites, and which of their two sets, is GameOwnIndustrySprite()'s to say. */
+static const DrawBuildingsTileStruct _marijuana_plantation_draw_tile_data[] = OWN_TILE(SPR_MARIJUANA_FIELD_SMALL, 30);
 #undef OWN_TILE
-static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_WEED_MACHINE + 1);
 
 /**
  * How a tile of the game's own industries that is not drawn as an original
- * tile is drawn: the coffeeshop, the girls' grammar school and the vending
- * machine.
+ * tile is drawn: the coffeeshop, the girls' grammar school, the vending
+ * machine, the statue and the marijuana plantation.
  * @param gfx the tile
  * @param stage its construction stage
  * @return its drawing, or nullptr for any other tile
@@ -803,8 +807,97 @@ static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_W
 static const DrawBuildingsTileStruct *GameOwnIndustryDrawTile(IndustryGfx gfx, uint stage)
 {
 	if (gfx == GFX_COFFEESHOP) return &_coffeeshop_draw_tile_data[stage];
-	if (gfx >= GFX_WEED_MACHINE && gfx <= GFX_GYMNASIUM_NORTH) return &_game_own_draw_tile_data[GFX_GYMNASIUM_NORTH - gfx][stage];
+	if (gfx == GFX_MARIJUANA_PLANTATION) return &_marijuana_plantation_draw_tile_data[stage];
+	if (gfx >= GFX_GAME_OWN_FIRST && gfx <= GFX_GYMNASIUM_NORTH) return &_game_own_draw_tile_data[GFX_GYMNASIUM_NORTH - gfx][stage];
 	return nullptr;
+}
+
+/** For how many days after a delivery the girls are about the school, the machine or the statue: the player's word. */
+static const int GIRLS_DAYS = 30;
+
+/**
+ * Are there girls about a school, a vending machine or a statue? There are
+ * for GIRLS_DAYS after the last delivery of what brings them: studentky to
+ * the school and the statue, marijuana to the machine.
+ * @param ind the industry
+ * @return whether the picture with the girls is drawn
+ */
+bool HasGirls(const Industry *ind)
+{
+	CargoType cargo = GetCargoTypeByLabel(ind->type == IT_WEED_MACHINE ? CT_MARIJUANA : CT_STUDENTKY);
+	if (!IsValidCargoType(cargo)) return false;
+	auto it = ind->GetCargoAccepted(cargo);
+	if (it == std::end(ind->accepted) || it->last_accepted == TimerGameEconomy::Date{}) return false;
+	return TimerGameEconomy::date.base() - it->last_accepted.base() < GIRLS_DAYS;
+}
+
+/**
+ * Do the plants of the marijuana plantation stand fully grown? From May to
+ * October; from November to April they are small -- not bare, the player did
+ * not want an empty field -- in every climate.
+ * @return whether the grown picture is drawn
+ */
+bool IsMarijuanaGrown()
+{
+	return TimerGameCalendar::month >= 4 && TimerGameCalendar::month <= 9;
+}
+
+/**
+ * The building sprite a finished tile of one of the game's own industries is
+ * drawn with, of the pictures it has: the school, the machine and the statue
+ * with girls about them or without (HasGirls()), the statue of stone or
+ * bronze by the industry's random bits, the plantation's tile of its twenty
+ * in the season's picture (IsMarijuanaGrown()).
+ * @param ind the industry
+ * @param tile the tile
+ * @param gfx its tile type
+ * @param sprite what its drawing table gives
+ * @return the sprite to draw
+ */
+static SpriteID GameOwnIndustrySprite(const Industry *ind, TileIndex tile, IndustryGfx gfx, SpriteID sprite)
+{
+	switch (gfx) {
+		case GFX_GYMNASIUM_WEST: return HasGirls(ind) ? SPR_GYMNASIUM_GIRLS_WEST : sprite;
+		case GFX_GYMNASIUM_SOUTH: return HasGirls(ind) ? SPR_GYMNASIUM_GIRLS_SOUTH : sprite;
+		case GFX_WEED_MACHINE: return HasGirls(ind) ? SPR_WEED_MACHINE_GIRLS : sprite;
+		case GFX_STATUE:
+			if (HasBit(ind->random, 0)) return HasGirls(ind) ? SPR_STATUE_BRONZE_GIRLS : SPR_STATUE_BRONZE;
+			return HasGirls(ind) ? SPR_STATUE_STONE_GIRLS : SPR_STATUE_STONE;
+		case GFX_MARIJUANA_PLANTATION: {
+			uint x = TileX(tile) - TileX(ind->location.tile);
+			uint y = TileY(tile) - TileY(ind->location.tile);
+			if (x >= 5 || y >= 4) return sprite;
+			return (IsMarijuanaGrown() ? SPR_MARIJUANA_FIELD_BIG : SPR_MARIJUANA_FIELD_SMALL) + y * 5 + x;
+		}
+		default: return sprite;
+	}
+}
+
+/**
+ * The building sprite a tile of one of the game's own industries is drawn
+ * with now, for the rig to read.
+ * @param tile an industry tile
+ * @return the sprite, 0 when there is none or the tile is not one of these
+ */
+SpriteID GameOwnIndustryTileSprite(TileIndex tile)
+{
+	IndustryGfx gfx = GetIndustryGfx(tile);
+	const DrawBuildingsTileStruct *dits = GameOwnIndustryDrawTile(gfx, INDUSTRY_COMPLETED);
+	if (dits == nullptr || !IsIndustryCompleted(tile)) return 0;
+	return GameOwnIndustrySprite(Industry::GetByTile(tile), tile, gfx, dits->building.sprite);
+}
+
+/**
+ * Have the tiles of one of the game's own industries drawn anew, when a
+ * delivery may have brought the girls (HasGirls()).
+ * @param ind the industry
+ */
+void MarkGameOwnIndustryDirty(const Industry *ind)
+{
+	if (ind->type != IT_GYMNASIUM && ind->type != IT_WEED_MACHINE && ind->type != IT_STATUE) return;
+	for (TileIndex tile : ind->location) {
+		if (IsTileType(tile, TileType::Industry) && GetIndustryIndex(tile) == ind->index) MarkTileDirtyByTile(tile);
+	}
 }
 
 /**
@@ -825,6 +918,9 @@ static const std::array<CargoLabel, 4> GYMNASIUM_CARGOES{CT_STUDENTKY, CT_PAPER,
 
 /** What the vending machine by the school takes: marijuana. */
 static const std::array<CargoLabel, 1> WEED_MACHINE_CARGOES{CT_MARIJUANA};
+
+/** What the statue of Karel Macha takes: studentky and tourists. */
+static const std::array<CargoLabel, 2> STATUE_CARGOES{CT_STUDENTKY, CargoLabel{'TOUR'}};
 
 /** How many studentky the girls' grammar school makes, as an industry's production rate. */
 static const uint8_t GYMNASIUM_PRODUCTION_RATE = 10;
@@ -891,11 +987,12 @@ static void SetupCoffeeshop()
 }
 
 /**
- * Put the girls' grammar school and the vending machine by it
- * (economy.extra_industries) in their places, drawn as the player drew them
- * (SPR_GYMNASIUM_WEST and the rest). The school is 2x2 and makes studentky;
- * the machine is one tile and stands at most two tiles from a school
- * (IsNearGymnasium()).
+ * Put the girls' grammar school, the vending machine by it and the statue of
+ * Karel Macha (economy.extra_industries) in their places, drawn as the player
+ * drew them (SPR_GYMNASIUM_WEST and the rest). The school is 2x2 and makes
+ * studentky; the machine is one tile and stands at most two tiles from a
+ * school (IsNearGymnasium()); the statue is one tile, in a town or out of
+ * one, and takes studentky and tourists.
  */
 static void SetupGymnasium()
 {
@@ -910,6 +1007,10 @@ static void SetupGymnasium()
 	spec.production_rate[0] = GYMNASIUM_PRODUCTION_RATE;
 
 	SetupTownIndustry(IT_WEED_MACHINE, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_WEED_MACHINE}}, STR_INDUSTRY_NAME_WEED_MACHINE, 0xCF);
+
+	/* The statue stands in a town or out of one: on clear land, then. */
+	SetupTownIndustry(IT_STATUE, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_STATUE}}, STR_INDUSTRY_NAME_STATUE, 0x0F);
+	_industry_specs[IT_STATUE].behaviour.Reset(IndustryBehaviour::OnlyInTown);
 }
 
 /**
@@ -991,7 +1092,7 @@ void UpdateExtraIndustryCargoes()
 {
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
-		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE) continue;
+		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -1050,6 +1151,7 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_COFFEESHOP, COFFEESHOP_CARGOES);
 	ResolveTownIndustryCargoes(IT_GYMNASIUM, GYMNASIUM_CARGOES);
 	ResolveTownIndustryCargoes(IT_WEED_MACHINE, WEED_MACHINE_CARGOES);
+	ResolveTownIndustryCargoes(IT_STATUE, STATUE_CARGOES);
 }
 
 /**
@@ -1666,6 +1768,7 @@ static void DrawTile_Industry(TileInfo *ti)
 
 	/* Add industry on top of the ground? */
 	image = ClimateIndustrySprite(dits->building.sprite, climate);
+	if (stage == INDUSTRY_COMPLETED && image != 0) image = GameOwnIndustrySprite(ind, ti->tile, gfx, image);
 	if (image != 0) {
 		AddSortableSpriteToDraw(image, SpriteLayoutPaletteTransform(image, dits->building.pal, GetColourPalette(ind->random_colour)),
 			*ti, *dits, IsTransparencySet(TransparencyOption::Industries));
@@ -2140,6 +2243,10 @@ static void TileLoop_Industry(TileIndex tile)
 		MakeIndustryTileBigger(tile);
 		return;
 	}
+
+	/* The girls leave and the plants grow without anything telling the tile:
+	 * it is drawn anew every round (GameOwnIndustrySprite()). */
+	if (GameOwnIndustryDrawTile(GetIndustryGfx(tile), INDUSTRY_COMPLETED) != nullptr) MarkTileDirtyByTile(tile);
 
 	if (_game_mode == GameMode::Editor) return;
 
@@ -2871,7 +2978,7 @@ static CommandCost CheckIfIndustryTileSlopes(TileIndex tile, const IndustryTileL
  */
 /** How far, at most, the vending machine stands from a girls' grammar school, in tiles: the player's word, so the girls do not have far. */
 static const uint WEED_MACHINE_MAX_DISTANCE = 2;
-/** How near, at least, the coffeeshop and a girls' grammar school stand to each other, in tiles: the coffeeshop does what the school and its machine do, so the two stay apart. */
+/** How near, at least, the coffeeshop, a girls' grammar school and a statue of Karel Macha stand to one another, in tiles: they do the same thing, so they stay apart. */
 static const uint COFFEESHOP_GYMNASIUM_MIN_DISTANCE = 10;
 
 /**
@@ -2936,11 +3043,19 @@ static CommandCost CheckIfIndustryIsAllowed(TileIndex tile, IndustryType type, c
 	if (type == IT_WEED_MACHINE && !IsNearGymnasium(tile)) {
 		return CommandCost(STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM);
 	}
-	if (type == IT_COFFEESHOP && DistanceToIndustryType(TileArea(tile, 1, 1), IT_GYMNASIUM) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
-		return CommandCost(STR_ERROR_TOO_CLOSE_TO_GYMNASIUM);
-	}
-	if (type == IT_GYMNASIUM && DistanceToIndustryType(TileArea(tile, 2, 2), IT_COFFEESHOP) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
-		return CommandCost(STR_ERROR_TOO_CLOSE_TO_COFFEESHOP);
+	/* The coffeeshop, the school and the statue keep apart, each from the
+	 * other two: they do the same thing. */
+	const TileArea area(tile, type == IT_GYMNASIUM ? 2 : 1, type == IT_GYMNASIUM ? 2 : 1);
+	if (type == IT_COFFEESHOP || type == IT_GYMNASIUM || type == IT_STATUE) {
+		if (type != IT_GYMNASIUM && DistanceToIndustryType(area, IT_GYMNASIUM) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
+			return CommandCost(STR_ERROR_TOO_CLOSE_TO_GYMNASIUM);
+		}
+		if (type != IT_COFFEESHOP && DistanceToIndustryType(area, IT_COFFEESHOP) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
+			return CommandCost(STR_ERROR_TOO_CLOSE_TO_COFFEESHOP);
+		}
+		if (type != IT_STATUE && DistanceToIndustryType(area, IT_STATUE) < COFFEESHOP_GYMNASIUM_MIN_DISTANCE) {
+			return CommandCost(STR_ERROR_TOO_CLOSE_TO_STATUE);
+		}
 	}
 
 	if (GetIndustrySpec(type)->behaviour.Test(IndustryBehaviour::Town1200More) && t->cache.population < 1200) {

@@ -13071,19 +13071,23 @@ static bool ConTestStudents(std::span<std::string_view> argv)
 }
 
 /**
- * Rig probe for the girls' grammar school (IT_GYMNASIUM) and the vending
- * machine by it (IT_WEED_MACHINE): what each takes and makes, their sprites,
- * how many stand on the map and how far the machines and coffeeshops are
- * from the nearest school. With 'postav' it also funds a school in the
- * biggest town and a machine by it, then asks for a machine far from any
- * school and a coffeeshop near one, which the game has to refuse.
- * Usage: testgymnazium [postav]
+ * Rig probe for the girls' grammar school (IT_GYMNASIUM), the vending
+ * machine by it (IT_WEED_MACHINE) and the statue of Karel Macha (IT_STATUE):
+ * what each takes and makes, their sprites, how many stand on the map, how
+ * far the machines, coffeeshops and statues are from the nearest school,
+ * whether the girls are about each and which sprite it is drawn with, and
+ * the plantations' season. With 'postav' it also funds a school in the
+ * biggest town, a machine by it and a statue, then asks for a machine far
+ * from any school and a coffeeshop and a statue near one, which the game has
+ * to refuse. With 'holky' it counts a delivery to each of them today, as
+ * the girls come with one.
+ * Usage: testgymnazium [postav | holky]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestGymnasium(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Rig: the girls' grammar school and the vending machine - cargoes, sprites, distances, building. Usage: 'testgymnazium [postav]'");
+		IConsolePrint(CC_HELP, "Rig: the girls' grammar school, the vending machine and the statue - cargoes, sprites, distances, building, girls. Usage: 'testgymnazium [postav | holky]'");
 		return true;
 	}
 
@@ -13096,12 +13100,13 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 		}
 		return out.empty() ? std::string{" nic"} : out;
 	};
-	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE}) {
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE}) {
 		const IndustrySpec *spec = GetIndustrySpec(type);
 		IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} {}, dlazdic {}, bere:{} vyrabi:{}", type, GetString(spec->name), spec->enabled ? "zap" : "VYP",
 				spec->layouts.empty() ? 0 : spec->layouts.front().size(), labels(spec->accepts_cargo), labels(spec->produced_cargo));
 	}
-	for (SpriteID sprite : {SPR_IMG_CROSSHAIR_ARMED, SPR_GYMNASIUM_WEST, SPR_GYMNASIUM_SOUTH, SPR_GYMNASIUM_EAST, SPR_WEED_MACHINE}) {
+	for (SpriteID sprite : {SPR_IMG_CROSSHAIR_ARMED, SPR_GYMNASIUM_WEST, SPR_GYMNASIUM_SOUTH, SPR_GYMNASIUM_EAST, SPR_WEED_MACHINE, SPR_GYMNASIUM_GIRLS_SOUTH,
+			SPR_WEED_MACHINE_GIRLS, SPR_STATUE_STONE, SPR_STATUE_BRONZE_GIRLS, SPR_MARIJUANA_FIELD_SMALL, SPR_MARIJUANA_FIELD_BIG + 19}) {
 		const Sprite *spr = GetSprite(sprite, SpriteType::Normal);
 		IConsolePrint(CC_DEFAULT, "testgymnazium: sprite {} ({}x{} od {},{})", sprite, spr->width, spr->height, spr->x_offs, spr->y_offs);
 	}
@@ -13124,8 +13129,16 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 			return last;
 		};
 		if (biggest != nullptr && Industry::GetIndustryTypeCount(IT_GYMNASIUM) == 0) {
-			CommandCost r = fund(IT_GYMNASIUM, biggest->xy, 12, true);
-			if (r.Failed()) IConsolePrint(CC_ERROR, "testgymnazium: ODMITNUTO - gymnazium nejde postavit: {}", GetString(r.GetErrorMessage()));
+			/* In the biggest town first, then the others by size: a small
+			 * arctic town may have no block of 2x2 houses. */
+			std::vector<const Town *> towns(Town::Iterate().begin(), Town::Iterate().end());
+			std::ranges::sort(towns, std::greater{}, [](const Town *t) { return t->cache.population; });
+			CommandCost r(STR_ERROR_SITE_UNSUITABLE);
+			for (const Town *t : towns) {
+				r = fund(IT_GYMNASIUM, t->xy, 12, true);
+				if (r.Succeeded()) break;
+			}
+			if (r.Failed()) IConsolePrint(CC_ERROR, "testgymnazium: ODMITNUTO - gymnazium nejde postavit v zadnem meste: {}", GetString(r.GetErrorMessage()));
 		}
 		if (Industry::GetIndustryTypeCount(IT_GYMNASIUM) > 0) {
 			const Industry *school = Industry::Get(*Industry::industries[IT_GYMNASIUM].begin());
@@ -13146,7 +13159,48 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "testgymnazium: hulirna u gymnazia: {}", r.Succeeded() ? "POSTAVILA BY SE" : GetString(r.GetErrorMessage()));
 				break;
 			}
+			for (TileIndex tile : SpiralTileSequence(school->location.tile, 13)) {
+				if (!IsTileType(tile, TileType::Clear)) continue;
+				CommandCost r = Command<Commands::BuildIndustry>::Do(DoCommandFlags{}, tile, IT_STATUE, 0, true, 0);
+				IConsolePrint(CC_DEFAULT, "testgymnazium: socha u gymnazia: {}", r.Succeeded() ? "POSTAVILA BY SE" : GetString(r.GetErrorMessage()));
+				break;
+			}
+			if (Industry::GetIndustryTypeCount(IT_STATUE) == 0) {
+				CommandCost r = fund(IT_STATUE, school->location.tile, 30, true);
+				if (r.Failed()) IConsolePrint(CC_ERROR, "testgymnazium: ODMITNUTO - socha nejde postavit: {}", GetString(r.GetErrorMessage()));
+			}
 		}
+	}
+
+	if (argv.size() > 1 && argv[1] == "holky") {
+		for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE}) {
+			CargoType cargo = GetCargoTypeByLabel(type == IT_WEED_MACHINE ? CT_MARIJUANA : CT_STUDENTKY);
+			for (IndustryID id : Industry::industries[type]) {
+				Industry *i = Industry::Get(id);
+				auto it = i->GetCargoAccepted(cargo);
+				if (it == std::end(i->accepted)) continue;
+				it->last_accepted = TimerGameEconomy::date;
+				MarkGameOwnIndustryDirty(i);
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "testgymnazium: dodavka dnes");
+	}
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE}) {
+		for (IndustryID id : Industry::industries[type]) {
+			const Industry *i = Industry::Get(id);
+			std::string sprites;
+			for (TileIndex tile : i->location) {
+				if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != id) continue;
+				SpriteID sprite = GameOwnIndustryTileSprite(tile);
+				if (sprite != 0) sprites += fmt::format(" {}", sprite - SPR_OPENTTD_BASE);
+			}
+			IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} holky {}, sprity +{}", GetString(GetIndustrySpec(type)->name), id, HasGirls(i) ? "ano" : "ne", sprites);
+		}
+	}
+	for (IndustryID id : Industry::industries[IT_MARIJUANA_PLANTATION]) {
+		const Industry *i = Industry::Get(id);
+		IConsolePrint(CC_DEFAULT, "testgymnazium: plantaz {} mesic {} {}, sprity +{} az +{}", id, TimerGameCalendar::month + 1, IsMarijuanaGrown() ? "velke" : "male",
+				GameOwnIndustryTileSprite(i->location.tile) - SPR_OPENTTD_BASE, GameOwnIndustryTileSprite(TileAddXY(i->location.tile, 4, 3)) - SPR_OPENTTD_BASE);
 	}
 
 	CargoType stud = GetCargoTypeByLabel(CT_STUDENTKY);
@@ -13159,14 +13213,90 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_DEFAULT, "testgymnazium: gymnazium {} u ({},{}) {}x{}, vyrobeno studentek {}", id, TileX(i->location.tile), TileY(i->location.tile), i->location.w, i->location.h, made);
 	}
-	for (IndustryType type : {IT_WEED_MACHINE, IT_COFFEESHOP}) {
+	for (IndustryType type : {IT_WEED_MACHINE, IT_COFFEESHOP, IT_STATUE}) {
 		for (IndustryID id : Industry::industries[type]) {
 			const Industry *i = Industry::Get(id);
 			uint d = DistanceToIndustryType(i->location, IT_GYMNASIUM);
-			IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} od gymnazia {}", type == IT_WEED_MACHINE ? "automat" : "hulirna", id, d == UINT_MAX ? std::string{"zadne"} : fmt::format("{}", d));
+			IConsolePrint(CC_DEFAULT, "testgymnazium: {} {} od gymnazia {}", type == IT_WEED_MACHINE ? "automat" : (type == IT_COFFEESHOP ? "hulirna" : "socha"), id, d == UINT_MAX ? std::string{"zadne"} : fmt::format("{}", d));
 		}
 	}
-	IConsolePrint(CC_DEFAULT, "testgymnazium: na mape gymnazii {} automatu {} hulicen {}", Industry::GetIndustryTypeCount(IT_GYMNASIUM), Industry::GetIndustryTypeCount(IT_WEED_MACHINE), Industry::GetIndustryTypeCount(IT_COFFEESHOP));
+	IConsolePrint(CC_DEFAULT, "testgymnazium: na mape gymnazii {} automatu {} hulicen {} soch {}", Industry::GetIndustryTypeCount(IT_GYMNASIUM), Industry::GetIndustryTypeCount(IT_WEED_MACHINE),
+			Industry::GetIndustryTypeCount(IT_COFFEESHOP), Industry::GetIndustryTypeCount(IT_STATUE));
+	return true;
+}
+
+/**
+ * Rig probe for the girls at a drive-through bus stop (HasBusStopGirls()):
+ * builds a short road along X and one along Y on flat clear land, a
+ * drive-through bus stop on each, says whether the girls stand there, then
+ * puts studentky waiting at both stations and says it again. With a tile it
+ * builds next to that tile, so a picture can be taken there.
+ * Usage: testzastavka [<x> <y>]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestBusStopGirls(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: girls at drive-through bus stops while studentky wait. Usage: 'testzastavka [<x> <y>]'");
+		return true;
+	}
+
+	TileIndex around = TileXY(Map::SizeX() / 2, Map::SizeY() / 2);
+	if (argv.size() > 2) {
+		auto x = ParseInteger<uint>(argv[1]);
+		auto y = ParseInteger<uint>(argv[2]);
+		if (x.has_value() && y.has_value() && *x < Map::SizeX() && *y < Map::SizeY()) around = TileXY(*x, *y);
+	}
+	auto free = [](TileIndex t) { return IsTileType(t, TileType::Clear) && GetTileSlope(t) == SLOPE_FLAT; };
+	TileIndex spot = INVALID_TILE;
+	for (TileIndex t : SpiralTileSequence(around, 61)) {
+		if (TileX(t) + 6 >= Map::SizeX() || TileY(t) + 6 >= Map::SizeY()) continue;
+		bool ok = true;
+		for (uint d = 0; d < 3 && ok; d++) ok = free(TileAddXY(t, d, 0)) && free(TileAddXY(t, 4, 2 + d));
+		if (ok) { spot = t; break; }
+	}
+	if (spot == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "testzastavka: ODMITNUTO - zadne volne misto");
+		return true;
+	}
+	/* Roads and stops are built by a company; a scene started without one gets one. */
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testzastavka: ODMITNUTO - neni firma, ktera by stavela.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	/* Along X: (x..x+2, y), stop in the middle; along Y: (x+4, y+2..y+4). */
+	TileIndex stop_x = TileAddXY(spot, 1, 0);
+	TileIndex stop_y = TileAddXY(spot, 4, 3);
+	CommandCost r1 = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, spot, TileAddXY(spot, 2, 0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+	CommandCost r2 = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileAddXY(spot, 4, 2), TileAddXY(spot, 4, 4), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
+	CommandCost s1 = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, stop_x, 1, 1, RoadStopType::Bus, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
+	CommandCost s2 = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, stop_y, 1, 1, RoadStopType::Bus, true, DiagDirection::NW, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
+	if (r1.Failed() || r2.Failed() || s1.Failed() || s2.Failed() || !IsDriveThroughStopTile(stop_x) || !IsDriveThroughStopTile(stop_y)) {
+		IConsolePrint(CC_ERROR, "testzastavka: ODMITNUTO - silnice nebo zastavka nejde postavit: {} {} / {} {} / {} {} / {} {}, pruj. {} {}",
+				r1.Succeeded(), RefusalReason(r1), r2.Succeeded(), RefusalReason(r2), s1.Succeeded(), RefusalReason(s1), s2.Succeeded(), RefusalReason(s2), IsDriveThroughStopTile(stop_x), IsDriveThroughStopTile(stop_y));
+		return true;
+	}
+	IConsolePrint(CC_DEFAULT, "testzastavka: zastavka podel X u ({},{}), podel Y u ({},{})", TileX(stop_x), TileY(stop_x), TileX(stop_y), TileY(stop_y));
+	IConsolePrint(CC_DEFAULT, "testzastavka: bez studentek holky X {} Y {}", HasBusStopGirls(stop_x) ? "ano" : "ne", HasBusStopGirls(stop_y) ? "ano" : "ne");
+
+	CargoType students = GetCargoTypeByLabel(CT_STUDENTKY);
+	if (!IsValidCargoType(students)) {
+		IConsolePrint(CC_DEFAULT, "testzastavka: naklad STUD neni ve hre");
+		return true;
+	}
+	for (TileIndex t : {stop_x, stop_y}) {
+		Station *st = Station::GetByTile(t);
+		if (!CargoPacket::CanAllocateItem()) break;
+		st->goods[students].GetOrCreateData().cargo.Append(CargoPacket::Create(st->index, 20, Source{}), StationID::Invalid());
+		MarkTileDirtyByTile(t);
+	}
+	IConsolePrint(CC_DEFAULT, "testzastavka: se studentkami holky X {} Y {}", HasBusStopGirls(stop_x) ? "ano" : "ne", HasBusStopGirls(stop_y) ? "ano" : "ne");
 	return true;
 }
 
@@ -13333,6 +13463,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testbloky",               ConTestBlockIds);
 	IConsole::CmdRegister("teststudentky",           ConTestStudents);
 	IConsole::CmdRegister("testgymnazium",           ConTestGymnasium);
+	IConsole::CmdRegister("testzastavka",            ConTestBusStopGirls);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);

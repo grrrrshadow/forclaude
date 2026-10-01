@@ -1786,21 +1786,34 @@ setting_newgame economy.extra_industries 1" run_scene kostely_$kl "testzatik 300
 done
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene kostely_bez "testzatik 300 teststudentky" 400
 echo "kostely_bez: $(grep -o 'naklad STUD.*' $S/reg_kostely_bez.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
-# The girls' grammar school and the vending machine (economy.extra_industries,
-# testgymnazium): what they take and make, their sprites, a school and a
-# machine funded in the biggest town, the machine refused far from a school
-# and the coffeeshop near one, and after 3000 ticks the studentky the schools
-# made and how far machines (at most 2) and coffeeshops (at least 10) stand.
+# The girls' grammar school, the vending machine and the statue of Karel
+# Macha (economy.extra_industries, testgymnazium): what they take and make,
+# their sprites, a school, a machine and a statue funded, the machine refused
+# far from a school and the coffeeshop and the statue near one; then a
+# delivery to each, which brings the girls, and 3000 ticks on, when they have
+# gone again (30 days). One line per call of the probe: girls, the sprites
+# drawn, the plantations' season, the studentky made and the distances.
+gym_block() { awk -v n=$2 '{ end = ($0 ~ /testgymnazium: na mape/) } /testgymnazium: (.* holky |plantaz |gymnazium [0-9]|automat [0-9]|hulirna [0-9]|socha [0-9]|na mape)/ { sub(/.*testgymnazium: /, ""); line = line $0 "|" } end { if (++b == n) print line; line = "" }' $1; }
 for kl in temperate arctic; do
   SCENE_NEWGAME="setting_newgame game_creation.landscape $kl
 setting_newgame economy.extra_industries 1" run_scene gymnazium_$kl "testgymnazium postav
+testgymnazium holky
 testzatik 3000 testgymnazium" 3100
   L=$S/reg_gymnazium_$kl.log
-  echo "gymnazium_$kl: $(grep -o 'testgymnazium: 23[67] .*' $L | sort -u | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -o 'testgymnazium: 23[5-7] .*' $L | sort -u | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
   echo "gymnazium_$kl: $(grep -o 'testgymnazium: sprite .*' $L | sort -u | cut -d' ' -f3- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
-  echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (.* (postaveno|slo by postavit) .*|automat daleko.*|hulirna u gymnazia.*)' $L | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
-  echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (gymnazium [0-9]|automat [0-9]|hulirna [0-9]|na mape).*' $L | tail -n $(grep -oE 'testgymnazium: (gymnazium [0-9]|automat [0-9]|hulirna [0-9]|na mape).*' $L | awk 'END{print NR/2}') | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (.* (postaveno|slo by postavit) .*|automat daleko.*|hulirna u gymnazia.*|socha u gymnazia.*)' $L | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  for b in 1 2 3; do echo "gymnazium_$kl $b: $(gym_block $L $b)" | tee -a ${BATTERY_STABLE:-/dev/null}; done
 done
+# The plantation grown in summer: May to October (IsMarijuanaGrown()).
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene plantaz_leto "testzatik 9600 testgymnazium" 9700
+echo "plantaz_leto: $(grep -o 'testgymnazium: plantaz .*' $S/reg_plantaz_leto.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The girls at a drive-through bus stop while studentky wait there
+# (testzastavka): none without them, at both stops with them.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene zastavka "testzastavka" 30
+echo "zastavka: $(grep -o 'testzastavka: .*' $S/reg_zastavka.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's

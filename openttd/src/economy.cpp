@@ -12,6 +12,7 @@
 #include "company_func.h"
 #include "command_func.h"
 #include "industry.h"
+#include "climate_industries.h"
 #include "town.h"
 #include "news_func.h"
 #include "network/network.h"
@@ -1081,6 +1082,7 @@ static uint DeliverGoodsToIndustry(const Station *st, CargoType cargo_type, uint
 		it->waiting += amount;
 		it->GetOrCreateHistory()[THIS_MONTH].accepted += amount;
 		it->last_accepted = TimerGameEconomy::date;
+		MarkGameOwnIndustryDirty(ind);
 		num_pieces -= amount;
 		accepted += amount;
 

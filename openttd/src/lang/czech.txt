@@ -5736,6 +5736,7 @@ STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_TOWN_CENTER                    :{WHITE}... mů�
 STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM                      :{WHITE}... může stát nejvýš dvě políčka od dívčího gymnázia
 STR_ERROR_TOO_CLOSE_TO_GYMNASIUM                                :{WHITE}... musí stát aspoň deset políček od dívčího gymnázia
 STR_ERROR_TOO_CLOSE_TO_COFFEESHOP                               :{WHITE}... musí stát aspoň deset políček od hulírny
+STR_ERROR_TOO_CLOSE_TO_STATUE                                   :{WHITE}... musí stát aspoň deset políček od sochy Karla Máchy
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :{WHITE}... může se postavit jen v nížinách
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :{WHITE}... může být umístěno pouze poblíž okrajů mapy
 STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :Les lze vysadit pouze nad sněžnou čárou
@@ -6347,6 +6348,10 @@ STR_INDUSTRY_NAME_WEED_MACHINE                                  :{G=m}Automat na
 STR_INDUSTRY_NAME_WEED_MACHINE.gen                              :automatu na šméčko
 STR_INDUSTRY_NAME_WEED_MACHINE.loc                              :u automatu na šméčko
 STR_INDUSTRY_NAME_WEED_MACHINE.small                            :automat na šméčko
+STR_INDUSTRY_NAME_STATUE                                        :{G=f}Socha Karla Máchy
+STR_INDUSTRY_NAME_STATUE.gen                                    :sochy Karla Máchy
+STR_INDUSTRY_NAME_STATUE.loc                                    :u sochy Karla Máchy
+STR_INDUSTRY_NAME_STATUE.small                                  :socha Karla Máchy
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

@@ -66,4 +66,6 @@ Money AirportMaintenanceCost(Owner owner);
 
 bool StationLoadsInTurn(const Station *st);
 
+bool HasBusStopGirls(TileIndex tile);
+
 #endif /* STATION_FUNC_H */

@@ -88,6 +88,30 @@ which stays theirs and is named here.
   crosshair mouse cursor are drawn from, the car the cargo icon for road
   vehicles carried on wagons, ships and aircraft is drawn from, and the
   cannabis leaf the cargo icon for marijuana is drawn from.
+- Figures and plants in the pictures of the game's own industries and bus
+  stops - the girls' grammar school, the vending machine, the statue of Karel
+  Mácha, the marijuana plantation and the girls at a drive-through bus stop
+  are the player's own Blender models, rendered by the player's graphics
+  repository; the figures and plants in them are models from Sketchfab, all
+  licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/),
+  posed, scaled, recoloured where said, and rendered into the sprites:
+  - "Anime Girl" by demidrew
+    https://sketchfab.com/3d-models/anime-girl-3dc65ecd2fc04f16bea1ec3d7b4673f0
+  - "Character People Girl 001" by kiemtruongkts
+    https://sketchfab.com/3d-models/character-people-girl-001-35d1d9521b8c4e3a8b282045dd243017
+  - "College Girl" by Rotmill
+    https://sketchfab.com/3d-models/college-girl-5395dfd1871c41f29aa02e05c4e58eb7
+  - "Galaxia anime girl" by Tatenashi
+    https://sketchfab.com/3d-models/galaxia-anime-girl-485f95459fa747fdbe42c87203e1a156
+  - "Girl Bikini" by squalll_999 (at the statue)
+    https://sketchfab.com/3d-models/girl-bikini-e37d927aabc44044abfd22041eb1a1bd
+  - "Cannabis Plant" by streetpharmacy (at the statue and on the plantation)
+    https://sketchfab.com/3d-models/cannabis-plant-79fe78fd6c6a426b8584115e772a5818
+  - "Small Cannabis Plant" by streetpharmacy (on the plantation)
+    https://sketchfab.com/3d-models/small-cannabis-plant-73637ede37884a56bcb0f7e5d75b2ff8
+  - "Cannabis Sativa plant" by Zbrojmistrz (at the statue and on the
+    plantation; recoloured, the pot removed, reshaped into bushes)
+    https://sketchfab.com/3d-models/cannabis-sativa-plant-ea31a5768c06457ea2fd67c3eb3458b8
 - Palo123, also known as Karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's

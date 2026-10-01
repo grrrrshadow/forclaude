@@ -26,8 +26,12 @@
  * and the coffeeshop in towns (IT_COFFEESHOP), drawn as the desert house with
  * the palm tree, which takes it; the girls' grammar school in towns
  * (IT_GYMNASIUM), 2x2, making and taking studentky (CT_STUDENTKY) and taking
- * paper and paints, and the vending machine by it (IT_WEED_MACHINE), taking
- * marijuana -- both drawn as the player drew them.
+ * paper and paints, the vending machine by it (IT_WEED_MACHINE), taking
+ * marijuana, and the statue of Karel Macha (IT_STATUE), in a town or out of
+ * one, taking studentky and tourists -- all drawn as the player drew them,
+ * with girls about them for a while after a delivery (HasGirls()). The
+ * plantation is drawn as the player drew it too, small in winter and grown
+ * in summer (IsMarijuanaGrown()).
  */
 
 #ifndef CLIMATE_INDUSTRIES_H
@@ -49,6 +53,10 @@ void ResolveOriginalIndustryCargoes();
 void ResolveExtraIndustryCargoes();
 std::span<const CargoLabel> CoffeeshopCargoes();
 bool IsNearGymnasium(TileIndex tile);
+bool HasGirls(const struct Industry *ind);
+bool IsMarijuanaGrown();
+SpriteID GameOwnIndustryTileSprite(TileIndex tile);
+void MarkGameOwnIndustryDirty(const struct Industry *ind);
 uint DistanceToIndustryType(const struct OrthogonalTileArea &area, IndustryType type);
 uint8_t OriginalIndustryChance(IndustryType type, bool creation);
 

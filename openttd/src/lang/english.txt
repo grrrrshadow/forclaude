@@ -5633,6 +5633,7 @@ STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_TOWN_CENTER                    :can only be bui
 STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM                      :can only be built at most two tiles from a girls' grammar school
 STR_ERROR_TOO_CLOSE_TO_GYMNASIUM                                :must stand at least ten tiles from a girls' grammar school
 STR_ERROR_TOO_CLOSE_TO_COFFEESHOP                               :must stand at least ten tiles from a coffeeshop
+STR_ERROR_TOO_CLOSE_TO_STATUE                                   :must stand at least ten tiles from the statue of Karel Mácha
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :can only be built in low areas
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :can only be positioned near edges of map
 STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :forest can only be planted above snow-line
@@ -6114,6 +6115,7 @@ STR_INDUSTRY_NAME_MARIJUANA_PLANTATION                          :Marijuana Plant
 STR_INDUSTRY_NAME_COFFEESHOP                                    :Coffeeshop
 STR_INDUSTRY_NAME_GYMNASIUM                                     :Girls' Grammar School
 STR_INDUSTRY_NAME_WEED_MACHINE                                  :Weed Vending Machine
+STR_INDUSTRY_NAME_STATUE                                        :Statue of Karel Mácha
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!
