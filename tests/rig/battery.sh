@@ -1765,6 +1765,16 @@ rm -rf $S/baseset/decouple
 for k in vestaveny vestavenysav; do
   echo "$k: $(grep -o 'decouple/vestaveny.grf [a-z]*' $S/reg_$k.log) $(grep -o 'chyb [0-9]*, vestaveny ano' $S/reg_$k.log) vypinac=$(grep -o 'vypinac.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2) $(grep -o 'z GRF 52494776 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 done
+# Students (grf/studenti.nml, studenti.grf in the home's newgrf/, see
+# README.md): a set brings STUD as "Students"; the game calls the cargo
+# Studentky whatever the set says, and the coffeeshop takes it (prum).
+STUD_CFG=$S/studenti_openttd.cfg
+sed '/^\[newgrf\]$/a studenti.grf = ' "$CFG_KEEP" > $STUD_CFG
+rm -f $S/save/prumysl*.txt
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene studentky "prum" 20 -c $STUD_CFG
+PRUM_FILE=$(ls -t $S/save/prumysl*.txt 2>/dev/null | head -1)
+echo "studentky: $(grep '| STUD |' "$PRUM_FILE" | cut -d'|' -f2-3) hulirna bere:$(grep '| Coffeeshop |' "$PRUM_FILE" | cut -d'|' -f4)" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's

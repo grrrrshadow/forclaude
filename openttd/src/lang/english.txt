@@ -58,6 +58,7 @@ STR_CARGO_PLURAL_PLASTIC                                        :Plastic
 STR_CARGO_PLURAL_FIZZY_DRINKS                                   :Fizzy Drinks
 STR_CARGO_PLURAL_ROAD_VEHICLES                                  :Road vehicles
 STR_CARGO_PLURAL_MARIJUANA                                      :Marijuana
+STR_CARGO_PLURAL_STUDENTKY                                      :Studentky
 STR_CARGO_PLURAL_HEMP_FIBRE                                     :Hemp Fibre
 STR_CARGO_PLURAL_EXPLOSIVES                                     :Explosives
 
@@ -96,6 +97,7 @@ STR_CARGO_SINGULAR_PLASTIC                                      :Plastic
 STR_CARGO_SINGULAR_FIZZY_DRINK                                  :Fizzy Drink
 STR_CARGO_SINGULAR_ROAD_VEHICLE                                 :Road vehicle
 STR_CARGO_SINGULAR_MARIJUANA                                    :Marijuana
+STR_CARGO_SINGULAR_STUDENTKA                                    :Studentka
 STR_CARGO_SINGULAR_HEMP_FIBRE                                   :Hemp Fibre
 STR_CARGO_SINGULAR_EXPLOSIVE                                    :Explosive
 
@@ -134,6 +136,7 @@ STR_QUANTITY_PLASTIC                                            :{VOLUME_LONG} o
 STR_QUANTITY_FIZZY_DRINKS                                       :{COMMA} fizzy drink{P "" s}
 STR_QUANTITY_ROAD_VEHICLES                                      :{COMMA}{NBSP}road vehicle{P "" s}
 STR_QUANTITY_MARIJUANA                                          :{WEIGHT_LONG} of marijuana
+STR_QUANTITY_STUDENTKY                                          :{COMMA}{NBSP}studentk{P a y}
 STR_QUANTITY_HEMP_FIBRE                                         :{WEIGHT_LONG} of hemp fibre
 STR_QUANTITY_EXPLOSIVES                                         :{COMMA}{NBSP}crate{P "" s} of explosives
 STR_QUANTITY_N_A                                                :N/A
@@ -173,6 +176,7 @@ STR_ABBREV_PLASTIC                                              :PL
 STR_ABBREV_FIZZY_DRINKS                                         :FZ
 STR_ABBREV_ROAD_VEHICLES                                        :RV
 STR_ABBREV_MARIJUANA                                            :MJ
+STR_ABBREV_STUDENTKY                                            :SK
 STR_ABBREV_HEMP_FIBRE                                           :HF
 STR_ABBREV_EXPLOSIVES                                           :EX
 STR_ABBREV_ALL                                                  :ALL

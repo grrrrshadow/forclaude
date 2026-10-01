@@ -35,3 +35,6 @@ STR_G_OM_BRESLAU                                                :Open Wagon "Om 
 STR_G_OMM_55                                                    :Open Wagon "Omm 55"
 STR_G_OM_SCHWERIN                                               :Open Wagon "Om Schwerin"
 STR_G_OM_LUDWIGSHAFEN                                           :Mineral Wagon "Om Ludwigshafen"
+STR_STUD_NAME                                                   :Rig: students
+STR_STUD_DESC                                                   :Brings students (STUD) under the name a set gives them.
+STR_STUD_CARGO                                                  :Students

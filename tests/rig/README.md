@@ -686,3 +686,16 @@ starts a game with only `vypinac` in the config and saves it; the second loads
 the save. Both read with `testbloky` that the set is on and one of the game's
 own, that `vypinac` is on as well, and that the car the set took answers 0x77.
 The window's refusal is not played by the rig (no window there).
+
+## Students are studentky, and the coffeeshop takes them
+
+`grf/studenti.nml` brings the cargo STUD under the name "Students", as the
+industry sets do. The game renames it Studentky whatever the set says
+(`NameStudentCargo()`), in every language, and the coffeeshop takes it
+(`COFFEESHOP_CARGOES`).
+
+    nmlc -c -l grf/lang --grf studenti.grf grf/studenti.nml
+    cp studenti.grf <rig home>/.openttd/newgrf/
+
+The scene `studentky` writes the cargoes and industries with the console
+command `prum` and reads the cargo's name and what the coffeeshop takes.

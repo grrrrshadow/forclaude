@@ -956,6 +956,21 @@ static void OfferRoadVehiclesToCarriers()
 
 
 /**
+ * The students are studentky in this game, whatever the set that brings them
+ * calls them -- the player's word -- and the coffeeshop takes them.
+ */
+static void NameStudentCargo()
+{
+	CargoType cargo = GetCargoTypeByLabel(CargoLabel{'STUD'});
+	if (!IsValidCargoType(cargo)) return;
+	CargoSpec *cs = CargoSpec::Get(cargo);
+	cs->name = STR_CARGO_PLURAL_STUDENTKY;
+	cs->name_single = STR_CARGO_SINGULAR_STUDENTKA;
+	cs->quantifier = STR_QUANTITY_STUDENTKY;
+	cs->abbrev = STR_ABBREV_STUDENTKY;
+}
+
+/**
  * Let every ship and aircraft that carries goods carry marijuana too, when the
  * game's own industries are in it (economy.extra_industries): the refit is
  * put into its mask, and it carries as much of it as it would of anything,
@@ -2316,6 +2331,7 @@ static void AfterLoadGRFs()
 
 	/* Polish cargoes */
 	FinaliseCargoArray();
+	NameStudentCargo();
 
 	/* The one named exception has to widen its wagons' cargoes before the masks are
 	 * worked out, because working them out is what disables a wagon left without any. */

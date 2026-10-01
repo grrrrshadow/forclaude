@@ -769,10 +769,11 @@ static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
 /**
  * What the coffeeshop takes, all of each (8/8): marijuana, and the cargoes of
  * sets that end at it -- tobacco (Industries of the Caribbean), paper,
- * tourists and alcohol (the sets name rum and alcohol alike). Taken where the
- * game has them; a label no set brought is left out.
+ * tourists and alcohol (the sets name rum and alcohol alike) -- and the
+ * students, called studentky in this game (NameStudentCargo()). Taken where
+ * the game has them; a label no set brought is left out.
  */
-static const std::array<CargoLabel, 6> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}, CT_EXPLOSIVES};
+static const std::array<CargoLabel, 7> COFFEESHOP_CARGOES{CT_MARIJUANA, CargoLabel{'TBCO'}, CT_PAPER, CargoLabel{'TOUR'}, CargoLabel{'BEER'}, CT_EXPLOSIVES, CargoLabel{'STUD'}};
 
 /**
  * The cargoes the coffeeshop takes where the game has them.
