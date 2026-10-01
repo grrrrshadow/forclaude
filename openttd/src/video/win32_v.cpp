@@ -523,19 +523,6 @@ static void SetDarkModeForWindow(HWND hWnd, bool dark_mode)
 #endif /* defined(NTDDI_WIN10) */
 }
 
-/**
- * Is either mouse button held down, according to the system rather than to
- * anything this program has remembered?
- *
- * GetKeyState() answers in logical terms -- it already accounts for a player
- * who has swapped the buttons round -- and answers as of the message being
- * handled, which is exactly the moment being asked about.
- */
-static bool AnyMouseButtonHeld()
-{
-	return (GetKeyState(VK_LBUTTON) & 0x8000) != 0 || (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
-}
-
 LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	static uint32_t keycode = 0;
@@ -594,22 +581,10 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 
 		case WM_LBUTTONUP:
+			ReleaseCapture();
 			_left_button_down = false;
 			_left_button_clicked = false;
 			MouseDebugLog(fmt::format("zprava WM_LBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
-			/* Capture is a single thing, not one per button: releasing it while
-			 * the other button is still held throws away the grab that button
-			 * is relying on, and the message saying it was let go then goes to
-			 * whatever window the pointer has since wandered over. That button
-			 * stays down as far as this program is concerned, for good.
-			 *
-			 * Ask the system which buttons are down rather than reading what we
-			 * remember. What we remember is exactly what can be wrong here --
-			 * that is the whole reason the buttons are read afresh every frame
-			 * -- and a button we have wrongly written off as up is a button
-			 * whose grab we would throw away while it is still held, losing the
-			 * very message that would have put it right. */
-			if (!AnyMouseButtonHeld()) ReleaseCapture();
 			HandleMouseEvents();
 			return 0;
 
@@ -630,21 +605,10 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 
 		case WM_RBUTTONUP:
+			ReleaseCapture();
 			_right_button_down = false;
 			MouseDebugLog(fmt::format("zprava WM_RBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
-			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
-			return 0;
-
-		case WM_CAPTURECHANGED:
-			/* The grab has gone, so any message saying a button was let go can
-			 * no longer be counted on to arrive. Read the buttons back off the
-			 * system rather than believing what was last seen. */
-			_left_button_down = (GetKeyState(VK_LBUTTON) & 0x8000) != 0;
-			_right_button_down = (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
-			if (!_left_button_down) _left_button_clicked = false;
-			if (!_right_button_down) _right_button_clicked = false;
-			MouseDebugLog("zprava WM_CAPTURECHANGED - tlacitka prectena ze systemu");
 			return 0;
 
 		case WM_MOUSELEAVE:
@@ -1073,69 +1037,23 @@ void VideoDriver_Win32Base::InputLoop()
 		_dirkeys.Reset();
 	}
 
-	/* And the mouse buttons, for the same reason everything above is read
-	 * rather than remembered. A remembered state is only ever as good as the
-	 * stream of messages it was built from, and a release can go missing: let
-	 * go outside the window, let go while the grab on the window had been
-	 * dropped, pressed on one device and let go on another. Then the button is
-	 * held down as far as this program is concerned, for ever, with nothing in
-	 * the game able to put it right -- which is a map that goes on being
-	 * dragged about with nobody touching anything.
-	 *
-	 * Only ever let this take a button back up. Putting one down would invent a
-	 * press nobody made, and a press is what starts things.
-	 *
-	 * Which physical button is the logical left one depends on whether the
-	 * player has swapped them, and the message stream is already in logical
-	 * terms, so ask the same question the same way.
-	 *
-	 * And do not believe a source that has never shown itself able to see the
-	 * thing being asked about. Where the pointer is not a mouse -- a touch
-	 * screen, an on-screen button, a remote desktop -- a press can arrive as a
-	 * message without the system's own idea of the buttons ever changing. Asked
-	 * about such a button, this reads "not held" the whole time it is held, and
-	 * taking that at face value cancels the press the moment it is made. So a
-	 * button is only taken back up once this has seen it down at least once:
-	 * either the system knows about the button, in which case it can be trusted
-	 * to say when it is let go, or it does not, in which case it is left alone
-	 * entirely and the messages have it to themselves exactly as before. */
-	bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
-	static bool seen_left_down = false;
-	static bool seen_right_down = false;
-
-	bool left_held = this->has_focus && GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) < 0;
-	bool right_held = this->has_focus && GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) < 0;
-
-	/* What the system answers each frame, on the record: written whenever the
-	 * answer changes, and every quarter second for as long as either button is
-	 * remembered down, so a poll that has gone quiet can be seen to have. */
+	/* What the system says of the mouse buttons, for the mouse record only:
+	 * written whenever the answer changes, and every quarter second while a
+	 * button is remembered down. The buttons themselves are the messages'
+	 * business alone, as in the original game. */
 	{
+		bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+		bool left_held = this->has_focus && GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) < 0;
+		bool right_held = this->has_focus && GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) < 0;
 		static bool last_left = false, last_right = false, last_focus = false;
 		static auto last_sample = std::chrono::steady_clock::now();
 		auto now = std::chrono::steady_clock::now();
 		bool changed = left_held != last_left || right_held != last_right || this->has_focus != last_focus;
 		bool periodic = (_left_button_down || _right_button_down) && now - last_sample > std::chrono::milliseconds(250);
 		if (changed || periodic) {
-			MouseDebugLog(fmt::format("dotaz na system (GetAsyncKeyState): L={} R={} focus={} videl-R-dole={}{}", left_held, right_held, this->has_focus, seen_right_down, changed ? " (zmena)" : ""));
+			MouseDebugLog(fmt::format("dotaz na system (GetAsyncKeyState): L={} R={} focus={}{}", left_held, right_held, this->has_focus, changed ? " (zmena)" : ""));
 			last_left = left_held; last_right = right_held; last_focus = this->has_focus; last_sample = now;
 		}
-	}
-
-	if (!_left_button_down) seen_left_down = false;
-	if (left_held) seen_left_down = true;
-	if (_left_button_down && seen_left_down && !left_held) {
-		_left_button_down = false;
-		_left_button_clicked = false;
-		seen_left_down = false;
-	}
-
-	if (!_right_button_down) seen_right_down = false;
-	if (right_held) seen_right_down = true;
-	if (_right_button_down && seen_right_down && !right_held) {
-		_right_button_down = false;
-		_right_button_clicked = false;
-		seen_right_down = false;
-		MouseDebugLog("dotaz na system: prave pusteno podle systemu - pamet vynulovana");
 	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
