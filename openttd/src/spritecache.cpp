@@ -263,6 +263,48 @@ static void ResizeSpriteOut(SpriteLoader::SpriteCollection &sprite, ZoomLevel zo
 	const SpriteLoader::CommonPixel *src = src_sprite.data;
 	[[maybe_unused]] const SpriteLoader::CommonPixel *src_end = src + src_sprite.height * src_sprite.width;
 
+	/* The 4x level of a 32bpp sprite the set gave only at 8x: the mean of
+	 * each 2x2 block, weighted by alpha, instead of one pixel of it. Picking
+	 * one pixel of four (below, as the game does for every other level) makes
+	 * a 3D render look blocky at 4x, and 4x is the level most of the game is
+	 * played at. The recolour byte comes from the most opaque pixel of the
+	 * block, as it cannot be averaged. A set that has its own 4x is not
+	 * touched: this runs only for a level the set does not have. */
+	if (zoom == ZoomLevel::In4x && root_sprite.colours.Test(SpriteComponent::RGB)) {
+		for (uint y = 0; y < dest_sprite.height; y++) {
+			for (uint x = 0; x < dest_sprite.width; x++) {
+				uint sum_r = 0, sum_g = 0, sum_b = 0, sum_a = 0, count = 0;
+				const SpriteLoader::CommonPixel *best = nullptr;
+				for (uint dy = 0; dy < 2; dy++) {
+					uint sy = y * 2 + dy;
+					if (sy >= src_sprite.height) break;
+					for (uint dx = 0; dx < 2; dx++) {
+						uint sx = x * 2 + dx;
+						if (sx >= src_sprite.width) break;
+						const SpriteLoader::CommonPixel &p = src[sy * src_sprite.width + sx];
+						sum_r += p.r * p.a;
+						sum_g += p.g * p.a;
+						sum_b += p.b * p.a;
+						sum_a += p.a;
+						count++;
+						if (best == nullptr || p.a > best->a) best = &p;
+					}
+				}
+				if (sum_a == 0) {
+					*dst = SpriteLoader::CommonPixel{};
+				} else {
+					dst->r = static_cast<uint8_t>((sum_r + sum_a / 2) / sum_a);
+					dst->g = static_cast<uint8_t>((sum_g + sum_a / 2) / sum_a);
+					dst->b = static_cast<uint8_t>((sum_b + sum_a / 2) / sum_a);
+					dst->a = static_cast<uint8_t>((sum_a + count / 2) / count);
+					dst->m = best->m;
+				}
+				dst++;
+			}
+		}
+		return;
+	}
+
 	for (uint y = 0; y < dest_sprite.height; y++) {
 		const SpriteLoader::CommonPixel *src_ln = src + src_sprite.width;
 		assert(src_ln <= src_end);

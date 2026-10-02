@@ -38,10 +38,14 @@ code < 0 copies -(code >> 3) bytes (1..16) from ((code & 7) << 8 | next byte)
 bytes back (1..2047). The decoder must land exactly on the pixel count.
 
     python3 budovy_grf.py
+    python3 budovy_grf.py --bez-4x <cesta>   the same set without its 4x
+                                             sprites, to see the 4x the game
+                                             makes from 8x (ResizeSpriteOut())
 """
 
 import json
 import struct
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -195,6 +199,13 @@ def runs_with_8x(entries: list[dict]) -> list[tuple[int, list[dict]]]:
 
 
 def main() -> None:
+    out = OUT
+    with_4x = True
+    if len(sys.argv) == 3 and sys.argv[1] == "--bez-4x":
+        out = Path(sys.argv[2])
+        with_4x = False
+    elif len(sys.argv) != 1:
+        sys.exit(__doc__)
     entries = json.loads(MANIFEST.read_text())
     runs = runs_with_8x(entries)
     count = sum(len(run) for _, run in runs)
@@ -211,7 +222,8 @@ def main() -> None:
             sprite_id += 1
             data += real(sprite_id)
             sprites += sprite_entry(sprite_id, entry["pal"], ZOOM_NORMAL, palette=True)
-            sprites += sprite_entry(sprite_id, entry["x4"], ZOOM_4X, palette=False)
+            if with_4x:
+                sprites += sprite_entry(sprite_id, entry["x4"], ZOOM_4X, palette=False)
             sprites += sprite_entry(sprite_id, entry["x8"], ZOOM_8X, palette=False)
     data += struct.pack("<I", 0)
     sprites += struct.pack("<I", 0)
@@ -219,11 +231,11 @@ def main() -> None:
     header = b"\x00\x00GRF\x82\x0d\x0a\x1a\x0a"
     compression = b"\x00"
     grf = header + struct.pack("<I", len(compression) + len(data)) + compression + bytes(data) + bytes(sprites)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_bytes(grf)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(grf)
     where = ", ".join(f"{offset}..{offset + len(run) - 1}" for offset, run in runs)
-    print(f"{OUT.relative_to(HERE.parent.parent)}: {count} sprites (OpenTTD GUI {where}), "
-          f"each at normal (8bpp), 4x and 8x, {len(grf) / 1024 / 1024:.2f} MB")
+    print(f"{out}: {count} sprites (OpenTTD GUI {where}), "
+          f"each at normal (8bpp), {'4x and ' if with_4x else ''}8x, {len(grf) / 1024 / 1024:.2f} MB")
 
 
 if __name__ == "__main__":
