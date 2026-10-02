@@ -1152,7 +1152,7 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 		/* A preset does not take out the game's own sets the list had. */
 		GRFConfigList builtins;
 		for (const auto &c : this->actives) {
-			if (c->builtin) builtins.push_back(std::make_unique<GRFConfig>(*c));
+			if (c->builtin && !c->builtin_graphics) builtins.push_back(std::make_unique<GRFConfig>(*c));
 		}
 		ClearGRFConfigList(this->actives);
 		this->preset = index;

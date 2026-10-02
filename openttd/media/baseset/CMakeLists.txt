@@ -98,6 +98,27 @@ foreach(BUILTIN_GRF_FILE IN LISTS BASESET_BUILTIN_GRF_FILES)
     list(APPEND BASESET_BINARY_FILES ${BUILTIN_GRF_BINARY_FILE})
 endforeach()
 
+# Graphics of the game's own (AppendStaticGRFConfigs() in src/newgrf_config.cpp):
+# every NewGRF in decouple/grafika/ is static in every game, savegames included.
+# budovy.grf there is written by openttd/budovy_grf.py from the pieces
+# openttd/openttd_budovy.py cuts; it carries the 8x sprites grfcodec cannot.
+file(GLOB BASESET_BUILTIN_GRAPHICS_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/grafika/*.grf)
+foreach(BUILTIN_GRAPHICS_FILE IN LISTS BASESET_BUILTIN_GRAPHICS_FILES)
+    get_filename_component(BUILTIN_GRAPHICS_NAME "${BUILTIN_GRAPHICS_FILE}" NAME)
+    set(BUILTIN_GRAPHICS_BINARY_FILE "${CMAKE_BINARY_DIR}/baseset/decouple/grafika/${BUILTIN_GRAPHICS_NAME}")
+
+    add_custom_command_timestamp(OUTPUT ${BUILTIN_GRAPHICS_BINARY_FILE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/baseset/decouple/grafika
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    ${BUILTIN_GRAPHICS_FILE}
+                    ${BUILTIN_GRAPHICS_BINARY_FILE}
+            MAIN_DEPENDENCY ${BUILTIN_GRAPHICS_FILE}
+            COMMENT "Copying ${BUILTIN_GRAPHICS_NAME}, graphics of the game's own"
+    )
+
+    list(APPEND BASESET_BINARY_FILES ${BUILTIN_GRAPHICS_BINARY_FILE})
+endforeach()
+
 # Create a new target which generates all baseset metadata files
 add_custom_target_timestamp(baseset_files
         DEPENDS

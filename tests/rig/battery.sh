@@ -1763,7 +1763,10 @@ testzatik 5 save vestaveny" 20 -c $VEST_CFG
 run_scene vestavenysav "testbloky" 20 -g $S/save/vestaveny.sav -c $VEST_CFG
 rm -rf $S/baseset/decouple
 for k in vestaveny vestavenysav; do
-  echo "$k: $(grep -o 'decouple/vestaveny.grf [a-z]*' $S/reg_$k.log) $(grep -o 'chyb [0-9]*, vestaveny ano' $S/reg_$k.log) vypinac=$(grep -o 'vypinac.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2) $(grep -o 'z GRF 52494776 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+  # The game's own graphics (decouple/grafika/budovy.grf, AppendStaticGRFConfigs())
+  # count as the game's own too, so the state line is read from the set's own
+  # line; the graphics get a word of their own, in the saved game as well.
+  echo "$k: $(grep -o 'decouple/vestaveny.grf [a-z]*' $S/reg_$k.log) $(grep 'decouple/vestaveny.grf' $S/reg_$k.log | grep -o 'chyb [0-9]*, vestaveny ano') vypinac=$(grep -o 'vypinac.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2) $(grep -o 'z GRF 52494776 callback [0-9A-F]*' $S/reg_$k.log) grafika=$(grep -o 'grafika/budovy.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2)" | tee -a ${BATTERY_STABLE:-/dev/null}
 done
 # Students (grf/studenti.nml, studenti.grf in the home's newgrf/, see
 # README.md): a set brings STUD as "Students"; the game calls the cargo

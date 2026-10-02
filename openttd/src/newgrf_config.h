@@ -36,6 +36,8 @@ using GRFConfigFlags = EnumBitSet<GRFConfigFlag, uint8_t>;
 
 /** The game's own sets: every NewGRF in this directory of baseset/ goes into every new game (AppendBuiltinGRFs()). */
 static constexpr std::string_view BUILTIN_GRF_DIR = "decouple";
+/** Under BUILTIN_GRF_DIR: sets of graphics of the game's own, static in every game, savegames included (AppendStaticGRFConfigs()). */
+static constexpr std::string_view BUILTIN_GRAPHICS_GRF_DIR = "grafika";
 
 /** Status of GRF */
 enum class GRFStatus : uint8_t {
@@ -200,6 +202,7 @@ struct GRFConfig {
 	std::vector<uint32_t> feature_test_var91{}; ///< NOSAVE
 	bool wide_action2_ids = false; ///< NOSAVE: Action 2 IDs are two bytes ('decouple_more_action2_ids').
 	bool builtin = false; ///< NOSAVE: one of the game's own sets, from baseset/decouple/ (see AppendBuiltinGRFs()).
+	bool builtin_graphics = false; ///< NOSAVE: a set of graphics of the game's own, from baseset/decouple/grafika/: static in every game, never in the list of sets (see AppendStaticGRFConfigs()).
 
 	bool IsCompatible(uint32_t old_version) const;
 	void SetParams(std::span<const uint32_t> pars);

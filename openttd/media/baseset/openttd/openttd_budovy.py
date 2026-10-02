@@ -3,11 +3,13 @@
 
 The girls' grammar school, the vending machine, the statue of Karel Macha
 and the marijuana plantation are industries of the game's own
-(economy.extra_industries), drawn from the base set, since an industry of
-the game cannot reach a NewGRF's sprites. The artwork is the player's,
-rendered in Blender at 4x zoom (*_zin4.png; the scripts are in the player's
-graphics repository), each with a second picture: the school, the machine
-and the statue with girls about them, the plantation fully grown.
+(economy.extra_industries), and the girls at a bus stop go with them; all
+are drawn from the base set, since an industry of the game cannot reach a
+NewGRF's sprites. The artwork is the player's, rendered in Blender at 4x
+zoom (*_zin4.png) and, where there is one, at 8x (*_zin8.png, exactly twice
+the 4x picture; the scripts are in the player's graphics repository), each
+with a second picture: the school, the machine and the statue with girls
+about them, the plantation fully grown.
 
 How a picture is cut:
 
@@ -23,24 +25,30 @@ How a picture is cut:
   edges of the field to the back tile below it. Nothing is drawn twice, so
   the pieces meet without a seam whatever order they are drawn in.
 
-Every sprite comes twice: 32bpp at 4x zoom, as rendered, and 8bpp at normal
-zoom for a game without a 32bpp blitter, scaled down and put in the DOS
-palette, without the shadow (the palette has no see-through black).
+Every sprite comes as 8bpp at normal zoom for a game without a 32bpp
+blitter (scaled down and put in the DOS palette, without the shadow, since
+the palette has no see-through black), as 32bpp at 4x, and where the render
+exists as 32bpp at 8x. The 8bpp and 4x ones go into openttd.grf through
+openttdgui.nfo (the lines this script prints); grfcodec knows no 8x, so
+all three go into decouple/grafika/budovy.grf as well, which budovy_grf.py
+builds from the manifest this script writes (budovy_manifest.json), with
+the zoom code 6 of this game for the 8x level.
 
-A tile on the render is 256 x 128 pixels at 4x (2:1), the game's own grid:
-tiles lie TILE_PIXELS (32) apart at normal zoom. That a flat ground sprite
-is only 31 rows high does not change it -- its 32nd row is the side corners
-of the tiles beside it -- and the render is taken as it is. (Squeezed to 31
-rows once, by mistake: the buildings came out 3 % low and their front edges
-inside their tiles.) The offsets are from the north corner of the sprite's own tile, which on the
-render sits on a pixel boundary; in the game it sits between the first and
-second pixel of a flat tile's top row, hence the one pixel (four at 4x) to
-the right. Writes the PNGs and the lines for openttdgui.nfo (to standard
-output). Run from this directory; needs Pillow.
+A tile on the render is 256 x 128 pixels at 4x and 512 x 256 at 8x (2:1),
+the game's own grid: tiles lie TILE_PIXELS (32) apart at normal zoom. That
+a flat ground sprite is only 31 rows high does not change it -- its 32nd
+row is the side corners of the tiles beside it -- and the render is taken
+as it is. (Squeezed to 31 rows once, by mistake: the buildings came out
+3 % low and their front edges inside their tiles.) The offsets are from
+the north corner of the sprite's own tile, which on the render sits on a
+pixel boundary; in the game it sits between the first and second pixel of
+a flat tile's top row, hence the one pixel (four at 4x, eight at 8x) to the
+right. Run from this directory; needs Pillow.
 """
 
 from __future__ import annotations
 
+import json
 import math
 import pathlib
 
@@ -48,12 +56,8 @@ from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
 PALETTE_FROM = HERE / "openttdgui.png"
+MANIFEST = HERE / "budovy_manifest.json"
 
-#: The north corner of a flat tile lies this far right of a render's (4x).
-NORTH_SHIFT = 4
-#: Half a tile across and down at 4x.
-HALF_WIDTH = 128
-HALF_HEIGHT = 64
 #: Below this alpha a pixel is nothing at normal zoom (out of 255).
 OPAQUE_ENOUGH = 128
 #: The shadow: dark and see-through; left out of the 8bpp sprites.
@@ -64,10 +68,13 @@ SHADOW_DARK = 40
 USABLE = [i for i in range(1, 0xE3) if not 0xC6 <= i <= 0xCD]
 
 #: The pictures, in the order of openttdgui.nfo (and of SPR_GYMNASIUM_WEST
-#: and the rest in table/sprites.h): output name, source, how it is cut, the
-#: north corner of the picture's north tile on the render, and for strips the
-#: x ranges of the strips with the north corner of each strip's tile, for
-#: tiles the field's size in tiles (x, y).
+#: and the rest in table/sprites.h): output name, 4x source, how it is cut,
+#: the north corner of the picture's north tile on the 4x render, and for
+#: strips the x ranges of the strips with the north corner of each strip's
+#: tile, for tiles the field's size in tiles (x, y), for a girl where her
+#: feet stand from the origin of the shelter's bounding box, at 4x. The 8x
+#: source, when there is one, is the 4x name with zin8 for zin4, and all
+#: its measures are twice these.
 SCHOOL_STRIPS = [("w", (104, 232), (232, 296)), ("s", (232, 488), (360, 360)), ("e", (488, 616), (488, 296))]
 PICTURES = [
     ("gymnazium", "gymnazium_zin4.png", "strips", (360, 232), SCHOOL_STRIPS),
@@ -81,22 +88,43 @@ PICTURES = [
     ("pole_male", "pole_marihuany_faze1_zin4.png", "tiles", (672, 96), (5, 4)),
     ("pole_velke", "pole_marihuany_faze2_zin4.png", "tiles", (672, 96), (5, 4)),
     # The girls at a drive-through bus stop (SPR_BUS_STOP_GIRL_X_FAR and the
-    # rest), drawn as a child of a shelter: where the feet (80, 80 on the
-    # picture) stand, at 4x from the origin of that shelter's bounding box --
-    # the far shelter's is the tile's north corner, the near one's on a road
+    # rest), drawn as a child of a shelter: where the feet (the middle of the
+    # picture) stand, from the origin of that shelter's bounding box -- the
+    # far shelter's is the tile's north corner, the near one's on a road
     # along X lies 13/16 of a tile along y from it, (104, 52) at 4x.
     ("zastavka_x_vzadu", "zastavka_divka_s90_zin4.png", "girl", (-34.4, 34.8), None),
     ("zastavka_y_vzadu", "zastavka_divka_s0_zin4.png", "girl", (70.4, 52.8), None),
     ("zastavka_x_vpredu", "zastavka_divka_s260_zin4.png", "girl", (0 - 104, 120 - 52), None),
 ]
 
-#: Where a girl's feet are on her picture.
-GIRL_FEET = (80, 80)
+
+class Zoom:
+    """The measures of one zoom: 4x or 8x."""
+
+    def __init__(self, factor: int):
+        self.factor = factor
+        self.half_width = 32 * factor
+        self.half_height = 16 * factor
+        self.north_shift = factor
+        self.scale = factor / 4  # of the 4x measures
+
+    def of(self, value):
+        """A 4x measure (a number or a pair) at this zoom."""
+        if isinstance(value, (tuple, list)):
+            return tuple(v * self.scale for v in value)
+        return value * self.scale
 
 
-def load(source: str) -> Image.Image:
-    """The render, as RGBA."""
-    return Image.open(HERE / source).convert("RGBA")
+ZOOM4 = Zoom(4)
+ZOOM8 = Zoom(8)
+
+
+def load(source: str) -> Image.Image | None:
+    """The render, as RGBA, or None when there is none."""
+    path = HERE / source
+    if not path.exists():
+        return None
+    return Image.open(path).convert("RGBA")
 
 
 def palette_image() -> Image.Image:
@@ -148,54 +176,85 @@ def keep(image: Image.Image, mine) -> Image.Image:
     return out
 
 
-def tile_of(x: float, y: float, north: tuple[float, float], scale: float, size: tuple[int, int]) -> tuple[int, int]:
+def tile_of(x: float, y: float, north: tuple[float, float], half_width: float, half_height: float, size: tuple[int, int]) -> tuple[int, int]:
     """The tile of a field a pixel centre lies on, clamped to the field: above the back edges it is the back tile below."""
-    dx = (x - north[0]) / (HALF_WIDTH / scale)
-    dy = (y - north[1]) / (HALF_HEIGHT / scale)
+    dx = (x - north[0]) / half_width
+    dy = (y - north[1]) / half_height
     tx = math.floor((dy - dx) / 2)
     ty = math.floor((dy + dx) / 2)
     return min(max(tx, 0), size[0] - 1), min(max(ty, 0), size[1] - 1)
 
 
-def emit(lines: list[str], name: str, big: Image.Image, small: Image.Image, north: tuple[float, float]) -> None:
-    """Save a piece at both zooms and write its lines; north is its tile's north corner at 4x."""
-    box = big.getbbox()
+def piece(image: Image.Image, cut: str, extra, zoom: Zoom, north, which) -> Image.Image:
+    """One piece of a picture at the given zoom: which is the strip or the tile."""
+    if cut in ("whole", "girl"):
+        return image
+    if cut == "strips":
+        left, right = zoom.of(which[1])
+        return keep(image, lambda x, y: left <= x < right)
+    n = zoom.of(north)
+    return keep(image, lambda x, y: tile_of(x + 0.5, y + 0.5, n, zoom.half_width, zoom.half_height, extra) == which)
+
+
+def pal_piece(small: Image.Image, cut: str, extra, north, which) -> Image.Image:
+    """One piece of the 8bpp picture, cut after scaling so the pieces meet without a seam."""
+    if cut in ("whole", "girl"):
+        return small
+    if cut == "strips":
+        left, right = which[1]
+        return keep(small, lambda x, y: left // 4 <= x < right // 4)
+    n = (north[0] / 4, north[1] / 4)
+    return keep(small, lambda x, y: tile_of(x + 0.5, y + 0.5, n, 32, 16, extra) == which)
+
+
+def cropped(image: Image.Image, north: tuple[float, float], zoom: Zoom, name: str) -> dict:
+    """Save a piece cropped to its pixels and give its file and offsets from its tile's north corner."""
+    box = image.getbbox()
+    image.crop(box).save(HERE / name)
+    return {"file": name, "w": box[2] - box[0], "h": box[3] - box[1], "x": box[0] - round(north[0]) + zoom.north_shift, "y": box[1] - round(north[1])}
+
+
+def emit(lines: list[str], manifest: list[dict], name: str, big4: Image.Image, small: Image.Image, big8: Image.Image | None, north4) -> None:
+    """Save a sprite's pieces at every zoom and write its nfo lines and manifest entry; north4 is its tile's north corner at 4x."""
+    x4 = cropped(big4, north4, ZOOM4, f"{name}_32bpp.png")
     sbox = small.getbbox()
-    big.crop(box).save(HERE / f"{name}_32bpp.png")
     small.crop(sbox).save(HERE / f"{name}_8bpp.png")
-    bx = box[0] - round(north[0]) + NORTH_SHIFT
-    by = box[1] - round(north[1])
-    sx = sbox[0] - math.floor((north[0] - NORTH_SHIFT) / 4)
-    sy = sbox[1] - math.floor(north[1] / 4)
-    lines.append(f"   -1 sprites/{name}_8bpp.png 8bpp 0 0 {sbox[2] - sbox[0]} {sbox[3] - sbox[1]} {sx} {sy} normal")
-    lines.append(f"    | sprites/{name}_32bpp.png 32bpp 0 0 {box[2] - box[0]} {box[3] - box[1]} {bx} {by} zi4")
+    pal = {"file": f"{name}_8bpp.png", "w": sbox[2] - sbox[0], "h": sbox[3] - sbox[1],
+            "x": sbox[0] - math.floor((north4[0] - ZOOM4.north_shift) / 4), "y": sbox[1] - math.floor(north4[1] / 4)}
+    x8 = cropped(big8, ZOOM8.of(north4), ZOOM8, f"{name}_8x_32bpp.png") if big8 is not None else None
+    lines.append(f"   -1 sprites/{pal['file']} 8bpp 0 0 {pal['w']} {pal['h']} {pal['x']} {pal['y']} normal")
+    lines.append(f"    | sprites/{x4['file']} 32bpp 0 0 {x4['w']} {x4['h']} {x4['x']} {x4['y']} zi4")
+    manifest.append({"name": name, "pal": pal, "x4": x4, "x8": x8})
 
 
 def main() -> None:
     lines = []
+    manifest = []
     for name, source, cut, north, extra in PICTURES:
-        image = load(source)
-        small = to_8bpp(image)
+        image4 = load(source)
+        image8 = load(source.replace("zin4", "zin8"))
+        small = to_8bpp(image4)
         if cut == "girl":
             # emit() counts from a tile's north corner; put that where the
-            # feet land on the picture less the place they stand on.
-            corner = (GIRL_FEET[0] - north[0] + NORTH_SHIFT, GIRL_FEET[1] - north[1])
-            emit(lines, name, image, small, corner)
+            # feet land on the picture less the place they stand on. The feet
+            # are the middle of the picture at either zoom.
+            feet = (image4.width / 2, image4.height / 2)
+            corner = (feet[0] - north[0] + ZOOM4.north_shift, feet[1] - north[1])
+            emit(lines, manifest, name, image4, small, image8, corner)
         elif cut == "whole":
-            emit(lines, name, image, small, north)
+            emit(lines, manifest, name, image4, small, image8, north)
         elif cut == "strips":
-            for strip, (left, right), tile_north in extra:
-                big = keep(image, lambda x, y: left <= x < right)
-                piece = keep(small, lambda x, y: left // 4 <= x < right // 4)
-                emit(lines, f"{name}_{strip}", big, piece, tile_north)
+            for strip in extra:
+                emit(lines, manifest, f"{name}_{strip[0]}", piece(image4, cut, extra, ZOOM4, north, strip), pal_piece(small, cut, extra, north, strip),
+                     piece(image8, cut, extra, ZOOM8, north, strip) if image8 is not None else None, strip[2])
         else:
             size = extra
             for ty in range(size[1]):
                 for tx in range(size[0]):
-                    big = keep(image, lambda x, y: tile_of(x + 0.5, y + 0.5, north, 1, size) == (tx, ty))
-                    piece = keep(small, lambda x, y: tile_of(x + 0.5, y + 0.5, (north[0] / 4, north[1] / 4), 4, size) == (tx, ty))
-                    tile_north = (north[0] + (ty - tx) * HALF_WIDTH, north[1] + (tx + ty) * HALF_HEIGHT)
-                    emit(lines, f"{name}_{tx}_{ty}", big, piece, tile_north)
+                    tile_north = (north[0] + (ty - tx) * ZOOM4.half_width, north[1] + (tx + ty) * ZOOM4.half_height)
+                    emit(lines, manifest, f"{name}_{tx}_{ty}", piece(image4, cut, extra, ZOOM4, north, (tx, ty)), pal_piece(small, cut, extra, north, (tx, ty)),
+                         piece(image8, cut, extra, ZOOM8, north, (tx, ty)) if image8 is not None else None, tile_north)
+    MANIFEST.write_text(json.dumps(manifest, indent=1) + "\n")
     print("\n".join(lines))
 
 

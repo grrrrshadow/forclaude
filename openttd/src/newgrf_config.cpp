@@ -58,7 +58,8 @@ GRFConfig::GRFConfig(const GRFConfig &config) :
 	feature_test_var9d(config.feature_test_var9d),
 	feature_test_var91(config.feature_test_var91),
 	wide_action2_ids(config.wide_action2_ids),
-	builtin(config.builtin)
+	builtin(config.builtin),
+	builtin_graphics(config.builtin_graphics)
 {
 	this->flags.Reset(GRFConfigFlag::Copy);
 }
@@ -398,6 +399,17 @@ static void RemoveDuplicatesFromGRFConfigList(GRFConfigList &list)
 void AppendStaticGRFConfigs(GRFConfigList &dst)
 {
 	AppendGRFConfigList(dst, _grfconfig_static, false);
+	/* The graphics of the game's own (baseset/decouple/grafika/): the
+	 * buildings of its industries at 8x and the like, which grfcodec cannot
+	 * put into openttd.grf. Static, like a set the player lists under
+	 * [newgrf-static], so they are in every game, a savegame's too, change no
+	 * game state and are never written to the config or saved. */
+	for (const auto &c : _all_grfs) {
+		if (!c->builtin_graphics) continue;
+		auto copy = std::make_unique<GRFConfig>(*c);
+		copy->flags.Set(GRFConfigFlag::Static);
+		AppendToGRFConfigList(dst, std::move(copy));
+	}
 	RemoveDuplicatesFromGRFConfigList(dst);
 }
 
@@ -444,7 +456,7 @@ static void AppendMarsHouses(GRFConfigList &dst)
 void AppendBuiltinGRFs(GRFConfigList &dst)
 {
 	for (const auto &c : _all_grfs) {
-		if (c->builtin) AppendToGRFConfigList(dst, std::make_unique<GRFConfig>(*c));
+		if (c->builtin && !c->builtin_graphics) AppendToGRFConfigList(dst, std::make_unique<GRFConfig>(*c));
 	}
 }
 
@@ -602,11 +614,16 @@ bool GRFFileScanner::AddFile(const std::string &filename, size_t basepath_length
 
 	bool added = false;
 	std::string name_in_dir = filename.substr(basepath_length);
+	/* A set under decouple/grafika/ is graphics of the game's own, static in
+	 * every game: read as a static set, so that one that would change game
+	 * state is refused. */
+	bool graphics = this->builtin && name_in_dir.starts_with(std::string(BUILTIN_GRAPHICS_GRF_DIR) + PATHSEP);
 	if (this->builtin) name_in_dir = std::string(BUILTIN_GRF_DIR) + PATHSEP + name_in_dir;
 	auto c = std::make_unique<GRFConfig>(name_in_dir);
 	c->builtin = this->builtin;
+	c->builtin_graphics = graphics;
 	GRFConfig *grfconfig = c.get();
-	if (FillGRFDetails(*c, false, this->builtin ? Subdirectory::Baseset : Subdirectory::NewGrf)) {
+	if (FillGRFDetails(*c, graphics, this->builtin ? Subdirectory::Baseset : Subdirectory::NewGrf)) {
 		if (std::ranges::none_of(_all_grfs, [&c](const auto &gc) { return c->ident.grfid == gc->ident.grfid && c->ident.md5sum == gc->ident.md5sum; })) {
 			_all_grfs.push_back(std::move(c));
 			added = true;

@@ -13145,6 +13145,8 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 		}
 		if (Industry::GetIndustryTypeCount(IT_GYMNASIUM) > 0) {
 			const Industry *school = Industry::Get(*Industry::industries[IT_GYMNASIUM].begin());
+			/* The main view on the school, for a screenshot of it from the rig. */
+			ScrollMainWindowToTile(school->location.tile, true);
 			if (Industry::GetIndustryTypeCount(IT_WEED_MACHINE) == 0) {
 				CommandCost r = fund(IT_WEED_MACHINE, school->location.tile, 6, true);
 				if (r.Failed()) IConsolePrint(CC_DEFAULT, "testgymnazium: automat u gymnazia nejde postavit: {}", GetString(r.GetErrorMessage()));
@@ -13335,6 +13337,13 @@ static bool ConTestZoom8(std::span<std::string_view> argv)
 				UnScaleByZoom(TILE_PIXELS * ZOOM_BASE, vp.zoom));
 	}
 
+	/* The game's own graphics (baseset/decouple/grafika/), static in every game. */
+	for (const auto &c : _grfconfig) {
+		if (!c->builtin_graphics) continue;
+		IConsolePrint(CC_DEFAULT, "testzoom8: grafika hry {} ({:08X}) {} stav {}", c->filename, std::byteswap(c->ident.grfid),
+				c->flags.Test(GRFConfigFlag::Static) ? "staticky" : "NENI STATICKY", to_underlying(c->status));
+	}
+
 	for (SpriteID sprite : {SpriteID{SPR_FLAT_GRASS_TILE}, SpriteID{SPR_GYMNASIUM_SOUTH}, SpriteID{SPR_CURSOR_MOUSE}}) {
 		std::string sizes;
 		for (ZoomLevel zoom = ZoomLevel::Min; zoom <= ZoomLevel::Max; ++zoom) {
@@ -13342,7 +13351,8 @@ static bool ConTestZoom8(std::span<std::string_view> argv)
 			Dimension d = GetSpriteSize(sprite, &offset, zoom);
 			sizes += fmt::format(" {}:{}x{}({},{})", to_underlying(zoom), d.width, d.height, offset.x, offset.y);
 		}
-		IConsolePrint(CC_DEFAULT, "testzoom8: sprite {} velikosti{}", sprite, sizes);
+		const SpriteFile *origin = GetOriginFile(sprite);
+		IConsolePrint(CC_DEFAULT, "testzoom8: sprite {} z {} velikosti{}", sprite, origin != nullptr ? origin->GetSimplifiedFilename() : "?", sizes);
 	}
 
 	if (argv.size() > 1 && argv[1] == "nacti") {
