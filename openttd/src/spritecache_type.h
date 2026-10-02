@@ -27,6 +27,8 @@ enum class SpriteCacheCtrlFlag : uint8_t {
 	AllowZoomMin1x32bpp, ///< Allow use of sprite min zoom setting at 1x in 32bpp mode.
 	AllowZoomMin2xPal, ///< Allow use of sprite min zoom setting at 2x in palette mode.
 	AllowZoomMin2x32bpp, ///< Allow use of sprite min zoom setting at 2x in 32bpp mode.
+	AllowZoomMin4xPal, ///< Allow use of sprite min zoom setting at 4x in palette mode: the set has a level of 4x or coarser, so its 8x (this game's own) can be left out.
+	AllowZoomMin4x32bpp, ///< Allow use of sprite min zoom setting at 4x in 32bpp mode.
 };
 
 /** Bitset of \c SpriteCacheCtrlFlag elements. */

@@ -21,7 +21,8 @@ enum class ZoomLevel : int8_t {
 	/* Our possible zoom-levels */
 	Begin = 0, ///< Begin for iteration.
 	Min = Begin, ///< Minimum zoom level.
-	In4x = Begin, ///< Zoomed 4 times in.
+	In8x = Begin, ///< Zoomed 8 times in: this build's own level past the original 4x, reached only when gui.zoom_min allows it; every sprite is given it (ResizeSprites()), from its finest level, and only sets of this game's own can draw it (zoom code 6, LoadSpriteV2()).
+	In4x, ///< Zoomed 4 times in.
 	In2x, ///< Zoomed 2 times in.
 	Normal, ///< The normal zoom level.
 	Out2x, ///< Zoomed 2 times out.
@@ -50,6 +51,10 @@ DECLARE_ENUM_AS_SEQUENTIAL(ZoomLevel)
 /** Bitset of \c ZoomLevel elements. */
 using ZoomLevels = EnumBitSet<ZoomLevel, uint8_t>;
 
+/* The viewports count in pixels of the most zoomed-in level, so with In8x
+ * there are 8 of them to a pixel at normal zoom (the original had 4). A
+ * savegame or a config from before the level is brought up to it
+ * (SaveLoadVersion::ZoomIn8x, IFV_ZOOM_IN_8X). */
 static const uint ZOOM_BASE_SHIFT = to_underlying(ZoomLevel::Normal);
 static uint const ZOOM_BASE = 1U << ZOOM_BASE_SHIFT;
 

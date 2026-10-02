@@ -182,6 +182,7 @@ enum IniFileVersion : uint32_t {
 	IFV_RIGHT_CLICK_CLOSE,                                 ///< 6  PR#10204 Add alternative right click to close windows setting.
 	IFV_REMOVE_GENERATION_SEED,                            ///< 7  PR#11927 Remove "generation_seed" from configuration.
 	IFV_DEFAULT_RAIL_ROAD,                                 ///< 8  PR#15585 Update default rail type setting to support road and tram tiles
+	IFV_ZOOM_IN_8X,                                        ///< 9  This build: the zoom levels gained In8x in front of 4x, so zoom_min, zoom_max and sprite_zoom_min each name one level more.
 
 	IFV_MAX_VERSION,       ///< Highest possible ini-file version.
 };
@@ -1583,6 +1584,22 @@ void LoadFromConfig(bool startup)
 		HandleSettingDescs(generic_ini, generic_ini, generic_ini, IniLoadSettings, IniLoadSettingList, startup);
 	} else {
 		HandleSettingDescs(generic_ini, private_ini, secrets_ini, IniLoadSettings, IniLoadSettingList, startup);
+	}
+
+	/* The zoom levels gained In8x in front of the original 4x (ZoomLevel): a
+	 * config from before names each level one too low -- its 0 was 4x and is
+	 * 8x now. Only a level the config holds is moved; one it lacks took the
+	 * default, which is right already. The zoom settings are read in the
+	 * startup pass. The sprite level 0 keeps its meaning, "the finest there
+	 * is", so it stays. */
+	if (startup && generic_version < IFV_ZOOM_IN_8X) {
+		const IniGroup *gui = generic_ini.GetGroup("gui");
+		auto has = [gui](std::string_view name) { return gui != nullptr && gui->GetItem(name) != nullptr; };
+		if (has("zoom_min")) _settings_client.gui.zoom_min = std::min(_settings_client.gui.zoom_min + 1, ZoomLevel::Normal);
+		if (has("zoom_max")) _settings_client.gui.zoom_max = std::min(_settings_client.gui.zoom_max + 1, ZoomLevel::Max);
+		if (has("sprite_zoom_min") && _settings_client.gui.sprite_zoom_min != ZoomLevel::Min) {
+			_settings_client.gui.sprite_zoom_min = std::min(_settings_client.gui.sprite_zoom_min + 1, ZoomLevel::Normal);
+		}
 	}
 
 	/* Load basic settings only during bootstrap, load other settings not during bootstrap */

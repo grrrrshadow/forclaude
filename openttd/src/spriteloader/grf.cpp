@@ -255,7 +255,10 @@ static ZoomLevels LoadSpriteV1(SpriteLoader::SpriteCollection &sprite, SpriteFil
 
 static ZoomLevels LoadSpriteV2(SpriteLoader::SpriteCollection &sprite, SpriteFile &file, size_t file_pos, SpriteType sprite_type, bool load_32bpp, SpriteCacheCtrlFlags control_flags, ZoomLevels &avail_8bpp, ZoomLevels &avail_32bpp)
 {
-	static const ZoomLevel zoom_lvl_map[6] = {ZoomLevel::Normal, ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Out2x, ZoomLevel::Out4x, ZoomLevel::Out8x};
+	/* Codes 0 to 5 are the NewGRF ones. Code 6 is this game's own, 8x
+	 * (ZoomLevel::In8x), which yagl writes for renders made at 8x; any other
+	 * reader of the set skips a code it does not know. */
+	static const ZoomLevel zoom_lvl_map[7] = {ZoomLevel::Normal, ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Out2x, ZoomLevel::Out4x, ZoomLevel::Out8x, ZoomLevel::In8x};
 
 	/* Is the sprite not present/stripped in the GRF? */
 	if (file_pos == SIZE_MAX) return {};
@@ -291,6 +294,10 @@ static ZoomLevels LoadSpriteV2(SpriteLoader::SpriteCollection &sprite, SpriteFil
 
 				is_wanted_zoom_lvl = true;
 				ZoomLevel zoom_min = sprite_type == SpriteType::Font ? ZoomLevel::Min : _settings_client.gui.sprite_zoom_min;
+				if (zoom_min >= ZoomLevel::In4x &&
+						control_flags.Test(load_32bpp ? SpriteCacheCtrlFlag::AllowZoomMin4x32bpp : SpriteCacheCtrlFlag::AllowZoomMin4xPal) && zoom_lvl < ZoomLevel::In4x) {
+					is_wanted_zoom_lvl = false;
+				}
 				if (zoom_min >= ZoomLevel::In2x &&
 						control_flags.Test(load_32bpp ? SpriteCacheCtrlFlag::AllowZoomMin2x32bpp : SpriteCacheCtrlFlag::AllowZoomMin2xPal) && zoom_lvl < ZoomLevel::In2x) {
 					is_wanted_zoom_lvl = false;

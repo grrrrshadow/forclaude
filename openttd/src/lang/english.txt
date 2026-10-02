@@ -2190,10 +2190,11 @@ STR_CONFIG_SETTING_SOFT_LIMIT_VALUE                             :{COMMA}
 STR_CONFIG_SETTING_SOFT_LIMIT_DISABLED                          :Disabled
 
 STR_CONFIG_SETTING_ZOOM_MIN                                     :Maximum zoom in level: {STRING2}
-STR_CONFIG_SETTING_ZOOM_MIN_HELPTEXT                            :The maximum zoom-in level for viewports. Note that enabling higher zoom-in levels increases memory requirements
+STR_CONFIG_SETTING_ZOOM_MIN_HELPTEXT                            :The maximum zoom-in level for viewports. Note that enabling higher zoom-in levels increases memory requirements; 8x is this game's own level past the original 4x and keeps four times the sprite memory of 4x
 STR_CONFIG_SETTING_ZOOM_MAX                                     :Maximum zoom out level: {STRING2}
 STR_CONFIG_SETTING_ZOOM_MAX_HELPTEXT                            :The maximum zoom-out level for viewports. Higher zoom-out levels might cause lag when used
-###length 6
+###length 7
+STR_CONFIG_SETTING_ZOOM_LVL_IN_8X                               :8x
 STR_CONFIG_SETTING_ZOOM_LVL_MIN                                 :4x
 STR_CONFIG_SETTING_ZOOM_LVL_IN_2X                               :2x
 STR_CONFIG_SETTING_ZOOM_LVL_NORMAL                              :Normal
@@ -2203,7 +2204,8 @@ STR_CONFIG_SETTING_ZOOM_LVL_OUT_8X                              :8x
 
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN                              :Highest resolution sprites to use: {STRING2}
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Limit the maximum resolution to use for sprites. Limiting sprite resolution will avoid using high resolution graphics even when available. This can help keep the game appearance unified when using a mix of NewGRF files with and without high resolution graphics
-###length 3
+###length 4
+STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_8X                        :8x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_MIN                          :4x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_2X                        :2x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_NORMAL                       :1x

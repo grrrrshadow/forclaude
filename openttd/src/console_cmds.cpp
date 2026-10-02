@@ -8,6 +8,8 @@
 /** @file console_cmds.cpp Implementation of the console hooks. */
 
 #include "stdafx.h"
+
+#include <chrono>
 #include "train.h"
 #include "ship.h"
 #include "depot_base.h"
@@ -61,6 +63,7 @@
 #include "genworld.h"
 #include "strings_func.h"
 #include "viewport_func.h"
+#include "zoom_func.h"
 #include "window_func.h"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
@@ -13300,6 +13303,74 @@ static bool ConTestBusStopGirls(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * Rig probe for the 8x zoom (ZoomLevel::In8x): the zoom base and the zoom
+ * settings, the main view's zoom and virtual size, the size of a few sprites
+ * at every level, and the sprite cache's memory. With 'dovnitr' it zooms the
+ * main view in as far as the settings let it and says where it got; with
+ * 'nacti' it empties the sprite cache and loads the first thousands of
+ * sprites again, timed, so the cost of making the 8x level can be read.
+ * Usage: testzoom8 [dovnitr | nacti]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestZoom8(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory. Usage: 'testzoom8 [dovnitr | nacti]'");
+		return true;
+	}
+
+	IConsolePrint(CC_DEFAULT, "testzoom8: ZOOM_BASE {} In8x {} In4x {} Normal {} Max {} End {}", ZOOM_BASE, to_underlying(ZoomLevel::In8x), to_underlying(ZoomLevel::In4x),
+			to_underlying(ZoomLevel::Normal), to_underlying(ZoomLevel::Max), to_underlying(ZoomLevel::End));
+	IConsolePrint(CC_DEFAULT, "testzoom8: nastaveni zoom_min {} zoom_max {} sprite_zoom_min {} gui_zoom {}", to_underlying(_settings_client.gui.zoom_min), to_underlying(_settings_client.gui.zoom_max),
+			to_underlying(_settings_client.gui.sprite_zoom_min), to_underlying(_gui_zoom));
+
+	Window *w = FindWindowById(WindowClass::MainWindow, 0);
+	if (w != nullptr && w->viewport != nullptr) {
+		if (argv.size() > 1 && argv[1] == "dovnitr") {
+			while (DoZoomInOutWindow(ZOOM_IN, w)) {}
+		}
+		const Viewport &vp = *w->viewport;
+		IConsolePrint(CC_DEFAULT, "testzoom8: hlavni pohled zoom {} okno {}x{} virtualne {}x{} dlazdice {} px", to_underlying(vp.zoom), vp.width, vp.height, vp.virtual_width, vp.virtual_height,
+				UnScaleByZoom(TILE_PIXELS * ZOOM_BASE, vp.zoom));
+	}
+
+	for (SpriteID sprite : {SpriteID{SPR_FLAT_GRASS_TILE}, SpriteID{SPR_GYMNASIUM_SOUTH}, SpriteID{SPR_CURSOR_MOUSE}}) {
+		std::string sizes;
+		for (ZoomLevel zoom = ZoomLevel::Min; zoom <= ZoomLevel::Max; ++zoom) {
+			Point offset;
+			Dimension d = GetSpriteSize(sprite, &offset, zoom);
+			sizes += fmt::format(" {}:{}x{}({},{})", to_underlying(zoom), d.width, d.height, offset.x, offset.y);
+		}
+		IConsolePrint(CC_DEFAULT, "testzoom8: sprite {} velikosti{}", sprite, sizes);
+	}
+
+	if (argv.size() > 1 && argv[1] == "nacti") {
+		GfxClearSpriteCache();
+		auto start = std::chrono::steady_clock::now();
+		uint loaded = 0;
+		for (SpriteID sprite = 0; sprite < 4000 && sprite < GetMaxSpriteID(); sprite++) {
+			if (GetSpriteType(sprite) != SpriteType::Normal) continue;
+			GetSprite(sprite, SpriteType::Normal);
+			loaded++;
+		}
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+		IConsolePrint(CC_DEFAULT, "testzoom8: nacteno {} spritu za {} ms", loaded, ms);
+	}
+	/* The cache's own count (it leaves most of what it holds out, upstream);
+	 * and the process's resident memory, which does not. */
+	size_t resident_kb = 0;
+#ifdef __linux__
+	if (FILE *f = fopen("/proc/self/statm", "r"); f != nullptr) {
+		unsigned long size = 0, resident = 0;
+		if (fscanf(f, "%lu %lu", &size, &resident) == 2) resident_kb = resident * 4;
+		fclose(f);
+	}
+#endif
+	IConsolePrint(CC_DEFAULT, "testzoom8: cache spritu {} KB, proces {} MB", GetSpriteCacheBytesUsed() / 1024, resident_kb / 1024);
+	return true;
+}
+
 void IConsoleStdLibRegister()
 {
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
@@ -13464,6 +13535,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("teststudentky",           ConTestStudents);
 	IConsole::CmdRegister("testgymnazium",           ConTestGymnasium);
 	IConsole::CmdRegister("testzastavka",            ConTestBusStopGirls);
+	IConsole::CmdRegister("testzoom8",               ConTestZoom8);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);

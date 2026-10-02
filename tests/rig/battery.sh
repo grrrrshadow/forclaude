@@ -1814,6 +1814,14 @@ echo "plantaz_leto: $(grep -o 'testgymnazium: plantaz .*' $S/reg_plantaz_leto.lo
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene zastavka "testzastavka" 30
 echo "zastavka: $(grep -o 'testzastavka: .*' $S/reg_zastavka.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The 8x zoom (ZoomLevel::In8x, testzoom8): the base is 8 and the config of
+# before, naming 0 for its 4x, opens at 4x still (IFV_ZOOM_IN_8X); with
+# gui.zoom_min at 8x the main view zooms in to In8x, a tile 256 px wide, and
+# every sprite has a level there, twice its 4x one.
+run_scene zoom8 "testzoom8
+setting gui.zoom_min 0
+testzoom8 dovnitr" 30
+echo "zoom8: $(grep -o 'testzoom8: .*' $S/reg_zoom8.log | grep -v 'cache spritu' | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's

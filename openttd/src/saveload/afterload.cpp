@@ -3318,6 +3318,14 @@ bool AfterLoadGame()
 		_saved_scrollpos_zoom += ZOOM_BASE_SHIFT;
 		_saved_scrollpos_x *= ZOOM_BASE;
 		_saved_scrollpos_y *= ZOOM_BASE;
+	} else if (IsSavegameVersionBefore(SaveLoadVersion::ZoomIn8x) && _saved_scrollpos_zoom != ZoomLevel::End) {
+		/* Saved with 4x the most zoomed-in level (ZOOM_BASE 4); In8x went
+		 * in front of it, so the level is one further along and the
+		 * virtual coordinates twice as far. The block above brings the
+		 * oldest games all the way, since it counts in ZOOM_BASE. */
+		++_saved_scrollpos_zoom;
+		_saved_scrollpos_x *= 2;
+		_saved_scrollpos_y *= 2;
 	}
 
 	/* When any NewGRF has been changed the availability of some vehicles might

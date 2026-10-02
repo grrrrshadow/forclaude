@@ -32,6 +32,15 @@ uint _sprite_cache_size = 4;
 
 static std::vector<SpriteCache> _spritecache;
 static size_t _spritecache_bytes_used = 0;
+
+/**
+ * How much memory the sprite cache holds now, for the rig (testzoom8).
+ * @return the bytes in use
+ */
+size_t GetSpriteCacheBytesUsed()
+{
+	return _spritecache_bytes_used;
+}
 static uint32_t _sprite_lru_counter;
 static std::vector<std::unique_ptr<SpriteFile>> _sprite_files;
 
@@ -380,8 +389,9 @@ static bool ResizeSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels spr
 	/* Pad sprites to make sizes match. */
 	if (!PadSprites(sprite, sprite_avail, encoder)) return false;
 
-	/* Create other missing zoom levels */
-	for (ZoomLevel zoom : EnumRange(ZoomLevel::In2x, ZoomLevel::End)) {
+	/* Create other missing zoom levels, each from the one before it: from
+	 * the second level down, whatever the most zoomed-in one is called. */
+	for (ZoomLevel zoom : EnumRange(ZoomLevel::Min + 1, ZoomLevel::End)) {
 		if (sprite_avail.Test(zoom)) {
 			/* Check that size and offsets match the fully zoomed image. */
 			[[maybe_unused]] const auto &root_sprite = sprite[ZoomLevel::Min];
@@ -686,6 +696,9 @@ void ReadGRFSpriteOffsets(SpriteFile &file)
 					}
 					if (colour.Any() && zoom == 2) { // ZoomLevel::In2x (2x zoomed in)
 						offset.control_flags.Set((colour != SpriteComponent::Palette) ? SpriteCacheCtrlFlag::AllowZoomMin2x32bpp : SpriteCacheCtrlFlag::AllowZoomMin2xPal);
+					}
+					if (colour.Any() && (zoom == 0 || zoom == 1 || zoom == 2)) { // a level of 4x (ZoomLevel::In4x) or coarser: 8x can be left out
+						offset.control_flags.Set((colour != SpriteComponent::Palette) ? SpriteCacheCtrlFlag::AllowZoomMin4x32bpp : SpriteCacheCtrlFlag::AllowZoomMin4xPal);
 					}
 				}
 			}
