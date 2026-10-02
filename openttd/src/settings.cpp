@@ -1587,15 +1587,17 @@ void LoadFromConfig(bool startup)
 	}
 
 	/* The zoom levels gained In8x in front of the original 4x (ZoomLevel): a
-	 * config from before names each level one too low -- its 0 was 4x and is
-	 * 8x now. Only a level the config holds is moved; one it lacks took the
-	 * default, which is right already. The zoom settings are read in the
+	 * config from before names each level one too low. The zoom in goes to
+	 * 8x for everyone, whatever the config had -- the player's word, as a
+	 * new config gets 8x too; the zoom out is moved one level so it keeps
+	 * its meaning. Only a level the config holds is moved; one it lacks took
+	 * the default, which is right already. The zoom settings are read in the
 	 * startup pass. The sprite level 0 keeps its meaning, "the finest there
 	 * is", so it stays. */
 	if (startup && generic_version < IFV_ZOOM_IN_8X) {
 		const IniGroup *gui = generic_ini.GetGroup("gui");
 		auto has = [gui](std::string_view name) { return gui != nullptr && gui->GetItem(name) != nullptr; };
-		if (has("zoom_min")) _settings_client.gui.zoom_min = std::min(_settings_client.gui.zoom_min + 1, ZoomLevel::Normal);
+		_settings_client.gui.zoom_min = ZoomLevel::Min;
 		if (has("zoom_max")) _settings_client.gui.zoom_max = std::min(_settings_client.gui.zoom_max + 1, ZoomLevel::Max);
 		if (has("sprite_zoom_min") && _settings_client.gui.sprite_zoom_min != ZoomLevel::Min) {
 			_settings_client.gui.sprite_zoom_min = std::min(_settings_client.gui.sprite_zoom_min + 1, ZoomLevel::Normal);
