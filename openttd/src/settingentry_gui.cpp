@@ -167,10 +167,10 @@ std::string GetSettingHelpText(const IntSettingDesc *sd)
 
 	/* Cargo distribution plans a load's journey from station to station before
 	 * it boards anything, and this game is played with the load already sitting
-	 * in a wagon that a shunter moves. The two do not contradict each other,
-	 * but a player who switches distribution on expecting it to do the work
-	 * here is expecting the wrong thing, so the settings say so where the
-	 * choice is made. */
+	 * in a wagon that a shunter moves. So it is locked to "Manual", the
+	 * player's word (SettingDesc::IsEditable()), and the help text of each of
+	 * the four says why -- and, at its end, that symmetric and asymmetric may
+	 * come back for passengers. */
 	if (sd->GetName().starts_with("linkgraph.distribution_")) {
 		help_text += '\n';
 		help_text += GetString(STR_CONFIG_SETTING_DISTRIBUTION_DECOUPLE_HINT);

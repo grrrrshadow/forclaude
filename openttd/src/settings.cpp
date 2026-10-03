@@ -934,6 +934,11 @@ bool SettingDesc::IsEditable(bool do_command) const
 	 * couple" order. See FEATURE_DESIGN_COUPLING_TOW.md. */
 	if (this->GetName() == "difficulty.train_flip_reverse_allowed" || this->GetName() == "pf.reverse_at_signals") return false;
 
+	/* Cargo distribution: "Manual" only, greyed with the original choices
+	 * in place -- the player's word. Symmetric and asymmetric may come back
+	 * for passengers one day; the help text says so. */
+	if (this->GetName().starts_with("linkgraph.distribution_")) return false;
+
 	/* The themed towns of the climate that is played are just towns: that
 	 * line is greyed rather than gone, so the four stay where they are. */
 	static const std::string_view CLIMATE_TOWNS[] = {"economy.temperate_towns", "economy.arctic_towns_on_snow", "economy.tropic_towns", "economy.toyland_towns"};
@@ -1013,6 +1018,12 @@ static void ValidateSettings()
 	 * FEATURE_DESIGN_COUPLING_TOW.md. */
 	_settings_newgame.difficulty.train_flip_reverse_allowed = TrainFlipReversingAllowed::None;
 	_settings_newgame.pf.reverse_at_signals = false;
+
+	/* Cargo distribution is "Manual" only, whatever a config says. */
+	_settings_newgame.linkgraph.distribution_pax = DistributionType::Manual;
+	_settings_newgame.linkgraph.distribution_mail = DistributionType::Manual;
+	_settings_newgame.linkgraph.distribution_armoured = DistributionType::Manual;
+	_settings_newgame.linkgraph.distribution_default = DistributionType::Manual;
 }
 
 static void AILoadConfig(const IniFile &ini, std::string_view grpname)

@@ -3891,6 +3891,18 @@ bool AfterLoadGame()
 	_settings_game.difficulty.train_flip_reverse_allowed = TrainFlipReversingAllowed::None;
 	_settings_game.pf.reverse_at_signals = false;
 
+	/* Cargo distribution is "Manual" only in this game, the player's word:
+	 * a game saved with another mode -- on another build, or before the lock
+	 * -- is set back, as a player switching it to Manual in a running game
+	 * would; the link graph jobs then drop the flows they planned. */
+	Debug(sl, 1, "Cargo distribution in the save: passengers {}, mail {}, armoured {}, other {}; set to manual",
+			to_underlying(_settings_game.linkgraph.distribution_pax), to_underlying(_settings_game.linkgraph.distribution_mail),
+			to_underlying(_settings_game.linkgraph.distribution_armoured), to_underlying(_settings_game.linkgraph.distribution_default));
+	_settings_game.linkgraph.distribution_pax = DistributionType::Manual;
+	_settings_game.linkgraph.distribution_mail = DistributionType::Manual;
+	_settings_game.linkgraph.distribution_armoured = DistributionType::Manual;
+	_settings_game.linkgraph.distribution_default = DistributionType::Manual;
+
 	/* Passenger ships once fitted for road vehicles get their passengers back
 	 * and take the cars beside them (road_on_rail.h). */
 	ConvertCarFerries();
