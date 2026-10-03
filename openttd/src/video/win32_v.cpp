@@ -637,15 +637,14 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 
 		case WM_CAPTURECHANGED:
-			/* The grab has gone, so any message saying a button was let go can
-			 * no longer be counted on to arrive. Read the buttons back off the
-			 * system rather than believing what was last seen. */
-			_left_button_down = (GetKeyState(VK_LBUTTON) & 0x8000) != 0;
-			_right_button_down = (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
-			if (!_left_button_down) _left_button_clicked = false;
-			if (!_right_button_down) _right_button_clicked = false;
-			MouseDebugLog("zprava WM_CAPTURECHANGED - tlacitka prectena ze systemu");
-			return 0;
+			/* Written down, and nothing more. This used to read the buttons back
+			 * off the system and take a held one up when the system said so; under
+			 * Winlator the system drops a held button for a moment, and the game
+			 * then let go of the map under the player's hand. The player: the game
+			 * never lets go of a button that is held -- only the message saying it
+			 * was let go does. */
+			MouseDebugLog(fmt::format("zprava WM_CAPTURECHANGED (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
+			break;
 
 		case WM_MOUSELEAVE:
 			MouseDebugLog("zprava WM_MOUSELEAVE");
@@ -1121,22 +1120,14 @@ void VideoDriver_Win32Base::InputLoop()
 		}
 	}
 
+	/* What the system says is only written down: a button the player holds is
+	 * never taken up because the system has lost sight of it for a moment (the
+	 * player's word -- under Winlator it does, and the game let go of the map
+	 * under the hand). Only the message saying it was let go takes it up. */
 	if (!_left_button_down) seen_left_down = false;
 	if (left_held) seen_left_down = true;
-	if (_left_button_down && seen_left_down && !left_held) {
-		_left_button_down = false;
-		_left_button_clicked = false;
-		seen_left_down = false;
-	}
-
 	if (!_right_button_down) seen_right_down = false;
 	if (right_held) seen_right_down = true;
-	if (_right_button_down && seen_right_down && !right_held) {
-		_right_button_down = false;
-		_right_button_clicked = false;
-		seen_right_down = false;
-		MouseDebugLog("dotaz na system: prave pusteno podle systemu - pamet vynulovana");
-	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
 }

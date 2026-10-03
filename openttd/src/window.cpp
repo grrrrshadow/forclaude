@@ -2508,59 +2508,27 @@ static void EndViewportScrollIfLetGo()
 	 * map going and nailed the pointer down again, over and over, until a fresh
 	 * press and release of the button put the system right. Once it even started
 	 * a drag off a right click that had gone to a window, not the map. So: no
-	 * restart. A stuck button can hold the map for the quiet time below and no
-	 * longer, and the pointer is free from then on. The price is that a hand
-	 * that really pauses on the button for longer than that presses again. */
+	 * restart. A drag that has ended stays ended until the next press. */
 	if (!_scrolling_viewport) return;
 
 	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
 
-	/* A drag that has stopped moving the map is over.
-	 *
-	 * This asks the map rather than the button, which is the point of it. Every
-	 * other way of ending the drag has to believe what the game thinks the
-	 * button is doing, and what the game thinks the button is doing is the one
-	 * thing known to be wrong: it goes on reading as held when nobody is
-	 * holding it, and the drag outlives the hand. The map cannot lie in the
-	 * same way. While a drag is really under way the pointer is moving, because
-	 * that is what a drag is; when it stops, either the hand has let go or it
-	 * has paused, and in both cases nothing is being dragged at that moment.
-	 *
-	 * Ending it early therefore costs nothing that can be seen. Pressing again
-	 * starts a new one at once, and on the kind of pointer where this goes
-	 * wrong -- a button held under one finger while another drags -- the button
-	 * is still held, so the next movement simply carries on. What it buys is
-	 * that a stuck button can never hold the map for longer than this. */
-	static std::chrono::steady_clock::time_point last_movement;
-	static bool was_scrolling = false;
+	/* The drag goes on for as long as the right button is held, however still
+	 * the hand. It used to end after 350 ms without movement, and before that
+	 * after a second -- to cut short a button stuck down. The player: that is
+	 * no answer; the button drops out for a moment under Winlator, the drag was
+	 * ended under the hand, the pointer let go of drifted to the edge of the
+	 * screen, and the next press flung the map to its edge. The game never lets
+	 * go of a button that is held. So the drag ends when the button is let go,
+	 * or when the left one is pressed: two drags of the map cannot both be under
+	 * way, and the left button is also the way out if a release ever goes
+	 * missing. */
+	if (_right_button_down && !_left_button_down) return;
 
-	auto now = std::chrono::steady_clock::now();
-	/* The clock starts when the drag does, and is noticed here rather than
-	 * where the drag begins, so that no future way of starting one can forget
-	 * to start it. Left to a stale reading from some earlier drag, every new
-	 * one would end on the frame it began. */
-	if (!was_scrolling || _cursor.delta.x != 0 || _cursor.delta.y != 0) last_movement = now;
-	was_scrolling = true;
-
-	/* A second was long enough to prove the idea and too long to live with: a stuck
-	 * button holds the map for that whole second every time it sticks, and it sticks
-	 * when the hand is busy. A third of a second is still far longer than any gap
-	 * between two frames of a drag that is really happening, so a real drag does not
-	 * notice it, and a stuck one is let go of almost at once. */
-	constexpr auto STILL_LONG_ENOUGH = std::chrono::milliseconds(350);
-	bool gone_quiet = now - last_movement > STILL_LONG_ENOUGH;
-
-	/* And the left button ends it. Two drags of the map cannot both be under
-	 * way, and of the two the one just started wins. It is also the way out if
-	 * the game ever believes the right button is held that nobody is holding:
-	 * a press of the left one puts a stop to it. */
-	if (_right_button_down && !_left_button_down && !gone_quiet) return;
-
-	MouseDebugLog(fmt::format("tazeni: konec - {}", gone_quiet ? "350 ms bez pohybu" : (_left_button_down ? "stisk leveho" : "prave pusteno")));
+	MouseDebugLog(fmt::format("tazeni: konec - {}", _left_button_down ? "stisk leveho" : "prave pusteno"));
 	_cursor.fix_at = false;
 	_scrolling_viewport = false;
 	_last_scroll_window = nullptr;
-	was_scrolling = false;
 }
 
 /**

@@ -718,22 +718,12 @@ void VideoDriver_SDL_Base::InputLoop()
 			}
 		}
 
+		/* Only written down: a held button is never taken up on the system's
+		 * word, only by the event saying it was let go (the player's word). */
 		if (!_left_button_down) seen_left_down = false;
 		if (left_held) seen_left_down = true;
-		if (_left_button_down && seen_left_down && !left_held) {
-			_left_button_down = false;
-			_left_button_clicked = false;
-			seen_left_down = false;
-		}
-
 		if (!_right_button_down) seen_right_down = false;
 		if (right_held) seen_right_down = true;
-		if (_right_button_down && seen_right_down && !right_held) {
-			_right_button_down = false;
-			_right_button_clicked = false;
-			seen_right_down = false;
-			MouseDebugLog("dotaz na system: prave pusteno podle systemu - pamet vynulovana");
-		}
 	}
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
