@@ -26,6 +26,7 @@
 #include "timer/timer_game_tick.h"
 #include "tree_cmd.h"
 #include "landscape_cmd.h"
+#include "climate_industries.h"
 
 #include "table/strings.h"
 #include "table/tree_land.h"
@@ -63,8 +64,10 @@ static bool CanPlantTreesOnTile(TileIndex tile, bool allow_desert)
 			return !IsBridgeAbove(tile) && IsCoast(tile) && !IsSlopeWithOneCornerRaised(GetTileSlope(tile));
 
 		case TileType::Clear:
+			/* Not on the field road of a marijuana plantation either: the
+			 * tile is the player's, but the road is drawn over it. */
 			return !IsBridgeAbove(tile) && !IsClearGround(tile, ClearGround::Fields) && !IsClearGround(tile, ClearGround::Rocks) &&
-			       (allow_desert || !IsClearGround(tile, ClearGround::Desert));
+			       (allow_desert || !IsClearGround(tile, ClearGround::Desert)) && !IsMarijuanaPlantationRoad(tile);
 
 		default: return false;
 	}

@@ -30,8 +30,10 @@
  * marijuana, and the statue of Karel Macha (IT_STATUE), in a town or out of
  * one, taking studentky and tourists -- all drawn as the player drew them,
  * with girls about them for a while after a delivery (HasGirls()). The
- * plantation is drawn as the player drew it too, small in winter and grown
- * in summer (IsMarijuanaGrown()).
+ * plantation is laid from the player's tiles too, and lives by the girls:
+ * bare until studentky come, growing while they tend it, bare again and
+ * yielding nothing half a year after they stopped coming
+ * (MarijuanaPlantationStage()).
  */
 
 #ifndef CLIMATE_INDUSTRIES_H
@@ -61,7 +63,18 @@ enum class HutGirls : uint8_t {
 	Sitting, ///< Studentky came and marijuana too: they sit on the benches.
 };
 HutGirls HutGirlsAt(const struct Industry *ind);
-bool IsMarijuanaGrown();
+/** What stands on the marijuana plantation (MarijuanaPlantationStage()). */
+enum class PlantationStage : uint8_t {
+	Bare, ///< Soil only: no girls have tended it, or none for half a year. Nothing to harvest.
+	Small, ///< Young plants: the girls have been tending it for less than PLANTATION_GROWN_AFTER days.
+	Grown, ///< Grown plants.
+};
+PlantationStage MarijuanaPlantationStage(const struct Industry *ind);
+bool IsMarijuanaPlantationRoad(TileIndex tile);
+/** How many tiles the plantation has along x and along y, and which row along y is the field road's, left to the player. */
+static const uint PLANTATION_WIDTH = 5;
+static const uint PLANTATION_HEIGHT = 4;
+static const uint PLANTATION_ROAD_ROW = 2;
 SpriteID GameOwnIndustryTileSprite(TileIndex tile);
 void MarkGameOwnIndustryDirty(const struct Industry *ind);
 uint DistanceToIndustryType(const struct OrthogonalTileArea &area, IndustryType type);

@@ -5642,6 +5642,8 @@ STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM                      :can only be bui
 STR_ERROR_TOO_CLOSE_TO_GYMNASIUM                                :must stand at least ten tiles from a girls' grammar school
 STR_ERROR_TOO_CLOSE_TO_COFFEESHOP                               :must stand at least ten tiles from a coffeeshop
 STR_ERROR_TOO_CLOSE_TO_STATUE                                   :must stand at least ten tiles from the statue of Karel Mácha
+STR_ERROR_TOO_CLOSE_TO_WEED_MACHINE                             :must stand at least ten tiles from a weed vending machine
+STR_ERROR_TOO_CLOSE_TO_PLANTATION                               :must stand at least ten tiles from a marijuana plantation
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :can only be built in low areas
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :can only be positioned near edges of map
 STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :forest can only be planted above snow-line

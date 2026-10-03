@@ -5745,6 +5745,8 @@ STR_ERROR_CAN_ONLY_BE_BUILT_NEAR_GYMNASIUM                      :{WHITE}... mů�
 STR_ERROR_TOO_CLOSE_TO_GYMNASIUM                                :{WHITE}... musí stát aspoň deset políček od dívčího gymnázia
 STR_ERROR_TOO_CLOSE_TO_COFFEESHOP                               :{WHITE}... musí stát aspoň deset políček od hulírny
 STR_ERROR_TOO_CLOSE_TO_STATUE                                   :{WHITE}... musí stát aspoň deset políček od sochy Karla Máchy
+STR_ERROR_TOO_CLOSE_TO_WEED_MACHINE                             :{WHITE}... musí stát aspoň deset políček od automatu na trávu
+STR_ERROR_TOO_CLOSE_TO_PLANTATION                               :{WHITE}... musí stát aspoň deset políček od marihuanové plantáže
 STR_ERROR_CAN_ONLY_BE_BUILT_IN_LOW_AREAS                        :{WHITE}... může se postavit jen v nížinách
 STR_ERROR_CAN_ONLY_BE_POSITIONED                                :{WHITE}... může být umístěno pouze poblíž okrajů mapy
 STR_ERROR_FOREST_CAN_ONLY_BE_PLANTED                            :Les lze vysadit pouze nad sněžnou čárou

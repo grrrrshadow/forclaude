@@ -113,6 +113,17 @@ which stays theirs and is named here.
     plantation and at the coffeeshop's hut; recoloured, the pot removed,
     reshaped into bushes)
     https://sketchfab.com/3d-models/cannabis-sativa-plant-ea31a5768c06457ea2fd67c3eb3458b8
+  - The girls at work on the marijuana plantation, each posed kneeling or
+    sitting at a plant (the models' pages are listed in the player's
+    graphics repository, AUTORI-MODELU.md):
+    "Real Girl" by zalomskij (https://sketchfab.com/zalomskij)
+    "girl sitting" by planetrey.com (https://sketchfab.com/planetrey.com)
+    "Teenage Punk girl" by YØD (https://sketchfab.com/YOD3DD)
+    "pubg Girl Pose T" by iysif (https://sketchfab.com/iysif)
+    "character girl #16" by BELAZ (https://sketchfab.com/asset_for_games)
+    "Chill girl" by tr.onurdk1 (https://sketchfab.com/onurdk1)
+  - The plantation's soil, field road, shed and the girls by the road are
+    the player's own models.
 - The coffeeshop's hut: "A little happy hut" by Tigran Safaryan, licensed
   under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
   https://sketchfab.com/3d-models/a-little-happy-hut-045afe84e4c04400a34f0babab201378

@@ -264,724 +264,460 @@
   }
  },
  {
-  "name": "pole_male_0_0",
+  "name": "pole_mari_zaklad",
   "pal": {
-   "file": "pole_male_0_0_8bpp.png",
-   "w": 63,
-   "h": 33,
-   "x": -30,
-   "y": -1
-  },
-  "x4": {
-   "file": "pole_male_0_0_32bpp.png",
-   "w": 259,
-   "h": 134,
-   "x": -124,
-   "y": -6
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_1_0",
-  "pal": {
-   "file": "pole_male_1_0_8bpp.png",
-   "w": 63,
-   "h": 32,
-   "x": -31,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_1_0_32bpp.png",
-   "w": 258,
-   "h": 128,
-   "x": -127,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_2_0",
-  "pal": {
-   "file": "pole_male_2_0_8bpp.png",
+   "file": "pole_mari_zaklad_8bpp.png",
    "w": 62,
    "h": 32,
    "x": -30,
    "y": 0
   },
   "x4": {
-   "file": "pole_male_2_0_32bpp.png",
-   "w": 255,
-   "h": 129,
-   "x": -124,
-   "y": -1
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_3_0",
-  "pal": {
-   "file": "pole_male_3_0_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_3_0_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -124,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_4_0",
-  "pal": {
-   "file": "pole_male_4_0_8bpp.png",
-   "w": 61,
-   "h": 32,
-   "x": -29,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_4_0_32bpp.png",
-   "w": 252,
-   "h": 128,
-   "x": -121,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_0_1",
-  "pal": {
-   "file": "pole_male_0_1_8bpp.png",
-   "w": 70,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_0_1_32bpp.png",
-   "w": 285,
-   "h": 130,
-   "x": -123,
-   "y": -2
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_1_1",
-  "pal": {
-   "file": "pole_male_1_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_1_1_32bpp.png",
+   "file": "pole_mari_zaklad_32bpp.png",
    "w": 254,
    "h": 128,
    "x": -123,
    "y": 0
   },
-  "x8": null
+  "x8": {
+   "file": "pole_mari_zaklad_8x_32bpp.png",
+   "w": 510,
+   "h": 256,
+   "x": -247,
+   "y": 0
+  }
  },
  {
-  "name": "pole_male_2_1",
+  "name": "pole_cesta",
   "pal": {
-   "file": "pole_male_2_1_8bpp.png",
+   "file": "pole_cesta_8bpp.png",
    "w": 62,
    "h": 32,
    "x": -30,
    "y": 0
   },
   "x4": {
-   "file": "pole_male_2_1_32bpp.png",
+   "file": "pole_cesta_32bpp.png",
    "w": 254,
    "h": 128,
    "x": -123,
    "y": 0
   },
-  "x8": null
+  "x8": {
+   "file": "pole_cesta_8x_32bpp.png",
+   "w": 510,
+   "h": 256,
+   "x": -247,
+   "y": 0
+  }
  },
  {
-  "name": "pole_male_3_1",
+  "name": "pole_bouda",
   "pal": {
-   "file": "pole_male_3_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_bouda_8bpp.png",
+   "w": 23,
+   "h": 20,
+   "x": -18,
+   "y": -8
   },
   "x4": {
-   "file": "pole_male_3_1_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
+   "file": "pole_bouda_32bpp.png",
+   "w": 155,
+   "h": 133,
+   "x": -92,
+   "y": -34
   },
-  "x8": null
+  "x8": {
+   "file": "pole_bouda_8x_32bpp.png",
+   "w": 349,
+   "h": 292,
+   "x": -188,
+   "y": -67
+  }
  },
  {
-  "name": "pole_male_4_1",
+  "name": "pole_mari_male",
   "pal": {
-   "file": "pole_male_4_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_mari_male_8bpp.png",
+   "w": 41,
+   "h": 26,
+   "x": -16,
+   "y": 1
   },
   "x4": {
-   "file": "pole_male_4_1_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -124,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_0_2",
-  "pal": {
-   "file": "pole_male_0_2_8bpp.png",
-   "w": 65,
-   "h": 36,
-   "x": -30,
-   "y": -4
-  },
-  "x4": {
-   "file": "pole_male_0_2_32bpp.png",
-   "w": 266,
-   "h": 143,
-   "x": -123,
-   "y": -15
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_1_2",
-  "pal": {
-   "file": "pole_male_1_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_1_2_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_2_2",
-  "pal": {
-   "file": "pole_male_2_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_2_2_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_3_2",
-  "pal": {
-   "file": "pole_male_3_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_3_2_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_4_2",
-  "pal": {
-   "file": "pole_male_4_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_4_2_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_0_3",
-  "pal": {
-   "file": "pole_male_0_3_8bpp.png",
-   "w": 61,
-   "h": 33,
-   "x": -30,
-   "y": -1
-  },
-  "x4": {
-   "file": "pole_male_0_3_32bpp.png",
-   "w": 254,
+   "file": "pole_mari_male_32bpp.png",
+   "w": 253,
    "h": 133,
    "x": -123,
-   "y": -5
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_1_3",
-  "pal": {
-   "file": "pole_male_1_3_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_1_3_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_2_3",
-  "pal": {
-   "file": "pole_male_2_3_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_2_3_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_3_3",
-  "pal": {
-   "file": "pole_male_3_3_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_3_3_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_male_4_3",
-  "pal": {
-   "file": "pole_male_4_3_8bpp.png",
-   "w": 62,
-   "h": 31,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_male_4_3_32bpp.png",
-   "w": 257,
-   "h": 128,
-   "x": -125,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_0_0",
-  "pal": {
-   "file": "pole_velke_0_0_8bpp.png",
-   "w": 63,
-   "h": 36,
-   "x": -30,
-   "y": -4
-  },
-  "x4": {
-   "file": "pole_velke_0_0_32bpp.png",
-   "w": 269,
-   "h": 149,
-   "x": -136,
-   "y": -21
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_1_0",
-  "pal": {
-   "file": "pole_velke_1_0_8bpp.png",
-   "w": 63,
-   "h": 33,
-   "x": -31,
-   "y": -1
-  },
-  "x4": {
-   "file": "pole_velke_1_0_32bpp.png",
-   "w": 257,
-   "h": 134,
-   "x": -126,
    "y": -6
   },
-  "x8": null
+  "x8": {
+   "file": "pole_mari_male_8x_32bpp.png",
+   "w": 509,
+   "h": 267,
+   "x": -247,
+   "y": -11
+  }
  },
  {
-  "name": "pole_velke_2_0",
+  "name": "pole_mari_vzrostle",
   "pal": {
-   "file": "pole_velke_2_0_8bpp.png",
-   "w": 67,
-   "h": 32,
-   "x": -35,
-   "y": 0
+   "file": "pole_mari_vzrostle_8bpp.png",
+   "w": 54,
+   "h": 35,
+   "x": -26,
+   "y": -8
   },
   "x4": {
-   "file": "pole_velke_2_0_32bpp.png",
-   "w": 273,
-   "h": 130,
-   "x": -142,
-   "y": -2
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_3_0",
-  "pal": {
-   "file": "pole_velke_3_0_8bpp.png",
-   "w": 64,
-   "h": 34,
-   "x": -32,
-   "y": -2
-  },
-  "x4": {
-   "file": "pole_velke_3_0_32bpp.png",
-   "w": 259,
-   "h": 137,
-   "x": -128,
-   "y": -9
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_4_0",
-  "pal": {
-   "file": "pole_velke_4_0_8bpp.png",
-   "w": 61,
-   "h": 32,
-   "x": -29,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_4_0_32bpp.png",
+   "file": "pole_mari_vzrostle_32bpp.png",
    "w": 254,
-   "h": 130,
+   "h": 162,
    "x": -123,
-   "y": -2
+   "y": -34
   },
-  "x8": null
+  "x8": {
+   "file": "pole_mari_vzrostle_8x_32bpp.png",
+   "w": 510,
+   "h": 323,
+   "x": -247,
+   "y": -67
+  }
  },
  {
-  "name": "pole_velke_0_1",
+  "name": "pole_holky_sz",
   "pal": {
-   "file": "pole_velke_0_1_8bpp.png",
-   "w": 70,
-   "h": 34,
-   "x": -30,
+   "file": "pole_holky_sz_8bpp.png",
+   "w": 16,
+   "h": 13,
+   "x": -19,
    "y": -2
   },
   "x4": {
-   "file": "pole_velke_0_1_32bpp.png",
-   "w": 285,
-   "h": 140,
-   "x": -123,
-   "y": -12
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_1_1",
-  "pal": {
-   "file": "pole_velke_1_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_1_1_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_2_1",
-  "pal": {
-   "file": "pole_velke_2_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_2_1_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_3_1",
-  "pal": {
-   "file": "pole_velke_3_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_3_1_32bpp.png",
-   "w": 254,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_4_1",
-  "pal": {
-   "file": "pole_velke_4_1_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_4_1_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -124,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_0_2",
-  "pal": {
-   "file": "pole_velke_0_2_8bpp.png",
+   "file": "pole_holky_sz_32bpp.png",
    "w": 65,
-   "h": 36,
-   "x": -30,
-   "y": -4
+   "h": 66,
+   "x": -76,
+   "y": -11
   },
-  "x4": {
-   "file": "pole_velke_0_2_32bpp.png",
-   "w": 266,
-   "h": 143,
-   "x": -123,
-   "y": -15
-  },
-  "x8": null
+  "x8": {
+   "file": "pole_holky_sz_8x_32bpp.png",
+   "w": 128,
+   "h": 130,
+   "x": -151,
+   "y": -20
+  }
  },
  {
-  "name": "pole_velke_1_2",
+  "name": "pole_holky_jv",
   "pal": {
-   "file": "pole_velke_1_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_holky_jv_8bpp.png",
+   "w": 11,
+   "h": 11,
+   "x": 0,
+   "y": 15
   },
   "x4": {
-   "file": "pole_velke_1_2_32bpp.png",
+   "file": "pole_holky_jv_32bpp.png",
+   "w": 44,
+   "h": 52,
+   "x": 0,
+   "y": 60
+  },
+  "x8": {
+   "file": "pole_holky_jv_8x_32bpp.png",
+   "w": 88,
+   "h": 102,
+   "x": 0,
+   "y": 121
+  }
+ },
+ {
+  "name": "pole_prace_real_f2",
+  "pal": {
+   "file": "pole_prace_real_f2_8bpp.png",
+   "w": 4,
+   "h": 6,
+   "x": 3,
+   "y": 6
+  },
+  "x4": {
+   "file": "pole_prace_real_f2_32bpp.png",
+   "w": 233,
+   "h": 123,
+   "x": -113,
+   "y": 3
+  },
+  "x8": {
+   "file": "pole_prace_real_f2_8x_32bpp.png",
+   "w": 475,
+   "h": 249,
+   "x": -241,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_sedi_f2",
+  "pal": {
+   "file": "pole_prace_sedi_f2_8bpp.png",
+   "w": 3,
+   "h": 5,
+   "x": -3,
+   "y": 15
+  },
+  "x4": {
+   "file": "pole_prace_sedi_f2_32bpp.png",
+   "w": 233,
+   "h": 122,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_sedi_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_punk_f2",
+  "pal": {
+   "file": "pole_prace_punk_f2_8bpp.png",
+   "w": 4,
+   "h": 5,
+   "x": -14,
+   "y": 16
+  },
+  "x4": {
+   "file": "pole_prace_punk_f2_32bpp.png",
+   "w": 233,
+   "h": 122,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_punk_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_pubg_f2",
+  "pal": {
+   "file": "pole_prace_pubg_f2_8bpp.png",
+   "w": 5,
+   "h": 7,
+   "x": -13,
+   "y": 5
+  },
+  "x4": {
+   "file": "pole_prace_pubg_f2_32bpp.png",
+   "w": 235,
+   "h": 122,
+   "x": -115,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_pubg_f2_8x_32bpp.png",
+   "w": 479,
+   "h": 251,
+   "x": -240,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_char16_f2",
+  "pal": {
+   "file": "pole_prace_char16_f2_8bpp.png",
+   "w": 6,
+   "h": 5,
+   "x": 8,
+   "y": 14
+  },
+  "x4": {
+   "file": "pole_prace_char16_f2_32bpp.png",
+   "w": 233,
+   "h": 122,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_char16_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_chill_f2",
+  "pal": {
+   "file": "pole_prace_chill_f2_8bpp.png",
+   "w": 4,
+   "h": 6,
+   "x": -4,
+   "y": 17
+  },
+  "x4": {
+   "file": "pole_prace_chill_f2_32bpp.png",
+   "w": 233,
+   "h": 124,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_chill_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_real_f3",
+  "pal": {
+   "file": "pole_prace_real_f3_8bpp.png",
+   "w": 4,
+   "h": 6,
+   "x": 3,
+   "y": 6
+  },
+  "x4": {
+   "file": "pole_prace_real_f3_32bpp.png",
    "w": 254,
-   "h": 128,
+   "h": 124,
    "x": -123,
-   "y": 0
+   "y": 4
   },
-  "x8": null
+  "x8": {
+   "file": "pole_prace_real_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
  },
  {
-  "name": "pole_velke_2_2",
+  "name": "pole_prace_sedi_f3",
   "pal": {
-   "file": "pole_velke_2_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_prace_sedi_f3_8bpp.png",
+   "w": 2,
+   "h": 4,
+   "x": -3,
+   "y": 16
   },
   "x4": {
-   "file": "pole_velke_2_2_32bpp.png",
+   "file": "pole_prace_sedi_f3_32bpp.png",
    "w": 254,
-   "h": 128,
+   "h": 124,
    "x": -123,
-   "y": 0
+   "y": 4
   },
-  "x8": null
+  "x8": {
+   "file": "pole_prace_sedi_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
  },
  {
-  "name": "pole_velke_3_2",
+  "name": "pole_prace_punk_f3",
   "pal": {
-   "file": "pole_velke_3_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_prace_punk_f3_8bpp.png",
+   "w": 4,
+   "h": 5,
+   "x": -14,
+   "y": 16
   },
   "x4": {
-   "file": "pole_velke_3_2_32bpp.png",
+   "file": "pole_prace_punk_f3_32bpp.png",
    "w": 254,
-   "h": 128,
+   "h": 124,
    "x": -123,
-   "y": 0
+   "y": 4
   },
-  "x8": null
+  "x8": {
+   "file": "pole_prace_punk_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
  },
  {
-  "name": "pole_velke_4_2",
+  "name": "pole_prace_pubg_f3",
   "pal": {
-   "file": "pole_velke_4_2_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_prace_pubg_f3_8bpp.png",
+   "w": 3,
+   "h": 6,
+   "x": -13,
+   "y": 5
   },
   "x4": {
-   "file": "pole_velke_4_2_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -124,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_0_3",
-  "pal": {
-   "file": "pole_velke_0_3_8bpp.png",
-   "w": 61,
-   "h": 33,
-   "x": -30,
-   "y": -1
-  },
-  "x4": {
-   "file": "pole_velke_0_3_32bpp.png",
+   "file": "pole_prace_pubg_f3_32bpp.png",
    "w": 254,
-   "h": 134,
+   "h": 124,
    "x": -123,
-   "y": -6
+   "y": 4
   },
-  "x8": null
+  "x8": {
+   "file": "pole_prace_pubg_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
  },
  {
-  "name": "pole_velke_1_3",
+  "name": "pole_prace_char16_f3",
   "pal": {
-   "file": "pole_velke_1_3_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_prace_char16_f3_8bpp.png",
+   "w": 2,
+   "h": 3,
+   "x": 12,
+   "y": 14
   },
   "x4": {
-   "file": "pole_velke_1_3_32bpp.png",
-   "w": 255,
-   "h": 128,
+   "file": "pole_prace_char16_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
    "x": -123,
-   "y": 0
+   "y": 4
   },
-  "x8": null
+  "x8": {
+   "file": "pole_prace_char16_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
  },
  {
-  "name": "pole_velke_2_3",
+  "name": "pole_prace_chill_f3",
   "pal": {
-   "file": "pole_velke_2_3_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
+   "file": "pole_prace_chill_f3_8bpp.png",
+   "w": 2,
+   "h": 6,
+   "x": -4,
+   "y": 17
   },
   "x4": {
-   "file": "pole_velke_2_3_32bpp.png",
-   "w": 255,
-   "h": 128,
+   "file": "pole_prace_chill_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
    "x": -123,
-   "y": 0
+   "y": 4
   },
-  "x8": null
- },
- {
-  "name": "pole_velke_3_3",
-  "pal": {
-   "file": "pole_velke_3_3_8bpp.png",
-   "w": 62,
-   "h": 32,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_3_3_32bpp.png",
-   "w": 255,
-   "h": 128,
-   "x": -123,
-   "y": 0
-  },
-  "x8": null
- },
- {
-  "name": "pole_velke_4_3",
-  "pal": {
-   "file": "pole_velke_4_3_8bpp.png",
-   "w": 62,
-   "h": 31,
-   "x": -30,
-   "y": 0
-  },
-  "x4": {
-   "file": "pole_velke_4_3_32bpp.png",
-   "w": 257,
-   "h": 128,
-   "x": -125,
-   "y": 0
-  },
-  "x8": null
+  "x8": {
+   "file": "pole_prace_chill_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
  },
  {
   "name": "zastavka_x_vzadu",

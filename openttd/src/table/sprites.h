@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 289;
+static const uint16_t OPENTTD_SPRITE_COUNT = 268;
 /** @} */
 
 /** @{
@@ -233,9 +233,8 @@ static const SpriteID SPR_IMG_CROSSHAIR_ARMED        = SPR_OPENTTD_BASE + 230; /
  * statue of Karel Macha (IT_STATUE) and the marijuana plantation
  * (IT_MARIJUANA_PLANTATION), 5x4. The player's own artwork, 32bpp at 4x zoom
  * with 8bpp at normal zoom beside it (openttd_budovy.py). The school is cut
- * into its west, south and east tile, its north tile is grass only; the
- * plantation into its twenty tiles, row by row (y), tile by tile (x) along
- * each. Each has a second picture: with girls about it, or fully grown. */
+ * into its west, south and east tile, its north tile is grass only. Each has
+ * a second picture with girls about it. */
 static const SpriteID SPR_GYMNASIUM_WEST             = SPR_OPENTTD_BASE + 231;
 static const SpriteID SPR_GYMNASIUM_SOUTH            = SPR_OPENTTD_BASE + 232;
 static const SpriteID SPR_GYMNASIUM_EAST             = SPR_OPENTTD_BASE + 233;
@@ -247,24 +246,43 @@ static const SpriteID SPR_STATUE_STONE               = SPR_OPENTTD_BASE + 238;
 static const SpriteID SPR_STATUE_STONE_GIRLS         = SPR_OPENTTD_BASE + 239;
 static const SpriteID SPR_STATUE_BRONZE              = SPR_OPENTTD_BASE + 240;
 static const SpriteID SPR_STATUE_BRONZE_GIRLS        = SPR_OPENTTD_BASE + 241;
-static const SpriteID SPR_MARIJUANA_FIELD_SMALL      = SPR_OPENTTD_BASE + 242; ///< The plantation with small plants, its twenty tiles: + y * 5 + x.
-static const SpriteID SPR_MARIJUANA_FIELD_BIG        = SPR_OPENTTD_BASE + 262; ///< The plantation fully grown, its twenty tiles: + y * 5 + x.
+/* The marijuana plantation, laid tile by tile from pictures of one tile
+ * each, all on the same frame with the tile's north corner at the same
+ * place, so that they lie over one another exactly (industry_cmd.cpp,
+ * DrawMarijuanaPlantationTile()): the soil of a field tile, the plants on
+ * it small or grown as a child of the soil, a girl at work among them as a
+ * child after the plants -- six girls, each in a picture with the small
+ * plants and one with the grown ones, which cover her as they should. The
+ * field road along x lies on the row the industry leaves to the player
+ * (PLANTATION_ROAD_ROW), drawn from the field tile behind it a tile further
+ * on, with the shed at the road's end and the girls by its north-west and
+ * south-east edge as its children. */
+static const SpriteID SPR_MARIJUANA_SOIL             = SPR_OPENTTD_BASE + 242;
+static const SpriteID SPR_MARIJUANA_ROAD             = SPR_OPENTTD_BASE + 243;
+static const SpriteID SPR_MARIJUANA_SHED             = SPR_OPENTTD_BASE + 244;
+static const SpriteID SPR_MARIJUANA_PLANTS_SMALL     = SPR_OPENTTD_BASE + 245;
+static const SpriteID SPR_MARIJUANA_PLANTS_GROWN     = SPR_OPENTTD_BASE + 246;
+static const SpriteID SPR_MARIJUANA_ROAD_GIRLS_NW    = SPR_OPENTTD_BASE + 247;
+static const SpriteID SPR_MARIJUANA_ROAD_GIRLS_SE    = SPR_OPENTTD_BASE + 248;
+static const SpriteID SPR_MARIJUANA_WORKER_SMALL     = SPR_OPENTTD_BASE + 249; ///< The six girls at work among the small plants: + 0 to + 5.
+static const SpriteID SPR_MARIJUANA_WORKER_GROWN     = SPR_OPENTTD_BASE + 255; ///< The same six among the grown plants: + 0 to + 5.
+static const uint PLANTATION_WORKER_COUNT = 6;
 /* The girls at a drive-through bus stop while studentky wait there for a
  * road vehicle: a child of the far shelter on a road along X and on one
  * along Y, and a second one, from behind, of the near shelter along X. Their
  * offsets count from the origin of the shelter's bounding box, so they stand
  * in the same place whatever set draws the shelter. */
-static const SpriteID SPR_BUS_STOP_GIRL_X_FAR        = SPR_OPENTTD_BASE + 282;
-static const SpriteID SPR_BUS_STOP_GIRL_Y_FAR        = SPR_OPENTTD_BASE + 283;
-static const SpriteID SPR_BUS_STOP_GIRL_X_NEAR       = SPR_OPENTTD_BASE + 284;
+static const SpriteID SPR_BUS_STOP_GIRL_X_FAR        = SPR_OPENTTD_BASE + 261;
+static const SpriteID SPR_BUS_STOP_GIRL_Y_FAR        = SPR_OPENTTD_BASE + 262;
+static const SpriteID SPR_BUS_STOP_GIRL_X_NEAR       = SPR_OPENTTD_BASE + 263;
 /* The hut of the coffeeshop on its 2x1 tiles, in vertical strips like the
  * school (openttd_budovy.py): the front tile, the yard, carries the hut's
  * left half too. The girls are laid over the front tile as a child of it,
  * standing after studentky came, sitting when marijuana came to them too. */
-static const SpriteID SPR_HUT_FRONT                  = SPR_OPENTTD_BASE + 285;
-static const SpriteID SPR_HUT_BACK                   = SPR_OPENTTD_BASE + 286;
-static const SpriteID SPR_HUT_GIRLS_STANDING         = SPR_OPENTTD_BASE + 287;
-static const SpriteID SPR_HUT_GIRLS_SITTING          = SPR_OPENTTD_BASE + 288;
+static const SpriteID SPR_HUT_FRONT                  = SPR_OPENTTD_BASE + 264;
+static const SpriteID SPR_HUT_BACK                   = SPR_OPENTTD_BASE + 265;
+static const SpriteID SPR_HUT_GIRLS_STANDING         = SPR_OPENTTD_BASE + 266;
+static const SpriteID SPR_HUT_GIRLS_SITTING          = SPR_OPENTTD_BASE + 267;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

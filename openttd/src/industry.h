@@ -136,6 +136,9 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 
 	uint16_t random = 0; ///< Random value used for randomisation of all kinds of things
 
+	uint8_t plantation_care = 0; ///< The marijuana plantation: days the girls have tended the field, up to PLANTATION_CARE_MAX; 0 is a bare field with nothing to harvest.
+	uint8_t plantation_days_left = 0; ///< The marijuana plantation: days until an untended field is bare again, set to PLANTATION_WITHER_DAYS on every day with girls about.
+
 	PersistentStorage *psa = nullptr; ///< Persistent storage for NewGRF industries.
 
 	Industry(IndustryID index, TileIndex tile = INVALID_TILE) : IndustryPool::PoolItem<&_industry_pool>(index), location(tile, 0, 0) {}

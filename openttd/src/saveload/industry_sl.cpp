@@ -192,6 +192,8 @@ static const SaveLoad _industry_desc[] = {
 	SLE_CONDVAR(Industry, last_prod_year, VarTypes::I32, SaveLoadVersion::BigDates, SaveLoadVersion::MaxVersion),
 	    SLE_VAR(Industry, was_cargo_delivered,        VarTypes::U8),
 	SLE_CONDVAR(Industry, ctlflags, VarTypes::U8, SaveLoadVersion::GSIndustryControl, SaveLoadVersion::MaxVersion),
+	SLE_CONDVAR(Industry, plantation_care, VarTypes::U8, SaveLoadVersion::MarijuanaPlantationCare, SaveLoadVersion::MaxVersion),
+	SLE_CONDVAR(Industry, plantation_days_left, VarTypes::U8, SaveLoadVersion::MarijuanaPlantationCare, SaveLoadVersion::MaxVersion),
 
 	SLE_CONDVAR(Industry, founder, VarTypes::U8, SaveLoadVersion::CargoPaymentOverflow, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(Industry, construction_date, VarTypes::I32, SaveLoadVersion::CargoPaymentOverflow, SaveLoadVersion::MaxVersion),

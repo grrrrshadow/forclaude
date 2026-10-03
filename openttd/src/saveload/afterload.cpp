@@ -3912,6 +3912,13 @@ bool AfterLoadGame()
 	extern void UpdateExtraIndustryCargoes();
 	UpdateExtraIndustryCargoes();
 
+	/* Plantations from before the girls tended the field stand grown, and
+	 * stay so for the half year the girls have to start coming in. */
+	if (IsSavegameVersionBefore(SaveLoadVersion::MarijuanaPlantationCare)) {
+		extern void GrantPlantationsOfOldGames();
+		GrantPlantationsOfOldGames();
+	}
+
 	/* Loading is over. Left at the last marker it passed, the whereabouts in a
 	 * crash report would go on claiming the load for the rest of the game and
 	 * point every later crash at the wrong place entirely. */

@@ -1808,10 +1808,19 @@ testzatik 3000 testgymnazium" 3100
   echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (.* (postaveno|slo by postavit) .*|automat daleko.*|hulirna u gymnazia.*|socha u gymnazia.*)' $L | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
   for b in 1 2 3; do echo "gymnazium_$kl $b: $(gym_block $L $b)" | tee -a ${BATTERY_STABLE:-/dev/null}; done
 done
-# The plantation grown in summer: May to October (IsMarijuanaGrown()).
+# The plantation lives by the girls (MarijuanaPlantationStage()): bare until
+# studentky come; a delivery, and 13 days on the plants are small with the
+# girls about; 47 days on they are grown and the girls gone (30 days); 216
+# days on -- half a year without the girls -- the field is bare again. One
+# line per call of the probe; the road row is the player's, not the
+# industry's (cesta volna 5/5).
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
-setting_newgame economy.extra_industries 1' run_scene plantaz_leto "testzatik 9600 testgymnazium" 9700
-echo "plantaz_leto: $(grep -o 'testgymnazium: plantaz .*' $S/reg_plantaz_leto.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+setting_newgame economy.extra_industries 1' run_scene plantaz "testgymnazium
+testgymnazium plantaz
+testzatik 1000 testgymnazium
+testzatik 3500 testgymnazium
+testzatik 16000 testgymnazium" 16100
+echo "plantaz: $(grep -o 'testgymnazium: plantaz .*' $S/reg_plantaz.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # The girls at a drive-through bus stop while studentky wait there
 # (testzastavka): none without them, at both stops with them.
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate

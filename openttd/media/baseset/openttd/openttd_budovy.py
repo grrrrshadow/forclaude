@@ -9,7 +9,7 @@ NewGRF's sprites. The artwork is the player's, rendered in Blender at 4x
 zoom (*_zin4.png) and, where there is one, at 8x (*_zin8.png, exactly twice
 the 4x picture; the scripts are in the player's graphics repository), each
 with a second picture: the school, the machine and the statue with girls
-about them, the plantation fully grown.
+about them; the plantation comes as single tiles laid over one another.
 
 How a picture is cut:
 
@@ -22,10 +22,19 @@ How a picture is cut:
   back tile stands in it. The north tile has no sprite of its own. The hut
   of the coffeeshop on 2x1 tiles likewise: the front tile the column left
   of the back tile's north corner, the back tile the one right of it.
-- tiles: the plantation on 5x4 tiles, cut along the tiles' diamonds: a
-  pixel belongs to the tile whose diamond it lies in, and one above the back
-  edges of the field to the back tile below it. Nothing is drawn twice, so
-  the pieces meet without a seam whatever order they are drawn in.
+- tiles: a field on several tiles in one picture, cut along the tiles'
+  diamonds: a pixel belongs to the tile whose diamond it lies in, and one
+  above the back edges of the field to the back tile below it. Nothing is
+  drawn twice, so the pieces meet without a seam whatever order they are
+  drawn in. (The plantation was cut so once; it is laid from single tiles
+  now, see below, and nothing uses this cut at present.)
+- whole, on the tile frame: the marijuana plantation is laid from pictures
+  of one tile each, all in the same frame -- 264 x 200 at 4x, the tile's
+  north corner at (132, 64), 64 rows above it for the plants -- and laid
+  over one another in the game (industry_cmd.cpp): the soil, the plants on
+  it, a girl at work among them; and on the row of the field road, drawn
+  from the row behind it over a tile the player keeps, the road, the shed
+  at its end and the girls by its edge. Each is cut as a whole picture.
 
 Every sprite comes as 8bpp at normal zoom for a game without a 32bpp
 blitter (scaled down and put in the DOS palette, without the shadow, since
@@ -88,6 +97,8 @@ HUT_STRIPS = [("predni", (8, 264), (136, 184)), ("zadni", (264, 392), (264, 120)
 #: it would be lost. (The school with girls is cut in fewer strips than the
 #: school on purpose: its east column is the same with girls or without.)
 LAYERS = {"chatka_stoji", "chatka_sedi"}
+#: The girls at work on the plantation, in the order of their sprites.
+PLANTATION_WORKERS = ["real", "sedi", "punk", "pubg", "char16", "chill"]
 PICTURES = [
     ("gymnazium", "gymnazium_zin4.png", "strips", (360, 232), SCHOOL_STRIPS),
     ("automat", "automat_zin4.png", "whole", (192, 128), None),
@@ -97,8 +108,15 @@ PICTURES = [
     ("socha_kamen_holky", "socha_kamen_postavy_zin4.png", "whole", (192, 128), None),
     ("socha_bronz", "socha_bronz_zin4.png", "whole", (192, 128), None),
     ("socha_bronz_holky", "socha_bronz_postavy_zin4.png", "whole", (192, 128), None),
-    ("pole_male", "pole_marihuany_faze1_zin4.png", "tiles", (672, 96), (5, 4)),
-    ("pole_velke", "pole_marihuany_faze2_zin4.png", "tiles", (672, 96), (5, 4)),
+    # The marijuana plantation, tile by tile (SPR_MARIJUANA_SOIL and the
+    # rest), every picture on the one tile frame: the soil, the field road
+    # along x, the shed beside the road's end, the plants small and grown,
+    # the girls at the road's north-west and south-east edge, and six girls
+    # at work among the plants, each with the small plants and with the
+    # grown ones in front of her. Order as in table/sprites.h.
+    *[(f"pole_{name}", f"pole_{name}_zin4.png", "whole", (132, 64), None) for name in
+        ["mari_zaklad", "cesta", "bouda", "mari_male", "mari_vzrostle", "holky_sz", "holky_jv"]
+        + [f"prace_{girl}_f2" for girl in PLANTATION_WORKERS] + [f"prace_{girl}_f3" for girl in PLANTATION_WORKERS]],
     # The girls at a drive-through bus stop (SPR_BUS_STOP_GIRL_X_FAR and the
     # rest), drawn as a child of a shelter: where the feet (the middle of the
     # picture) stand, from the origin of that shelter's bounding box -- the

@@ -13114,7 +13114,8 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 				spec->layouts.empty() ? 0 : spec->layouts.front().size(), labels(spec->accepts_cargo), labels(spec->produced_cargo));
 	}
 	for (SpriteID sprite : {SPR_IMG_CROSSHAIR_ARMED, SPR_GYMNASIUM_WEST, SPR_GYMNASIUM_SOUTH, SPR_GYMNASIUM_EAST, SPR_WEED_MACHINE, SPR_GYMNASIUM_GIRLS_SOUTH,
-			SPR_WEED_MACHINE_GIRLS, SPR_STATUE_STONE, SPR_STATUE_BRONZE_GIRLS, SPR_MARIJUANA_FIELD_SMALL, SPR_MARIJUANA_FIELD_BIG + 19}) {
+			SPR_WEED_MACHINE_GIRLS, SPR_STATUE_STONE, SPR_STATUE_BRONZE_GIRLS, SPR_MARIJUANA_SOIL, SPR_MARIJUANA_ROAD, SPR_MARIJUANA_SHED,
+			SPR_MARIJUANA_PLANTS_SMALL, SPR_MARIJUANA_PLANTS_GROWN, SPR_MARIJUANA_ROAD_GIRLS_NW, SPR_MARIJUANA_WORKER_SMALL, SPR_MARIJUANA_WORKER_GROWN + 5}) {
 		const Sprite *spr = GetSprite(sprite, SpriteType::Normal);
 		IConsolePrint(CC_DEFAULT, "testgymnazium: sprite {} ({}x{} od {},{})", sprite, spr->width, spr->height, spr->x_offs, spr->y_offs);
 	}
@@ -13182,8 +13183,14 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 		}
 	}
 
-	if (argv.size() > 1 && argv[1] == "holky") {
-		for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE}) {
+	if (argv.size() > 1 && argv[1] == "plantaz" && !Industry::industries[IT_MARIJUANA_PLANTATION].empty()) {
+		/* The main view on the first plantation, for a screenshot of it from the rig. */
+		ScrollMainWindowToTile(TileAddXY(Industry::Get(*Industry::industries[IT_MARIJUANA_PLANTATION].begin())->location.tile, 2, 1), true);
+	}
+
+	if (argv.size() > 1 && (argv[1] == "holky" || argv[1] == "plantaz")) {
+		for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_MARIJUANA_PLANTATION}) {
+			if (argv[1] == "plantaz" && type != IT_MARIJUANA_PLANTATION) continue;
 			CargoType cargo = GetCargoTypeByLabel(type == IT_WEED_MACHINE ? CT_MARIJUANA : CT_STUDENTKY);
 			for (IndustryID id : Industry::industries[type]) {
 				Industry *i = Industry::Get(id);
@@ -13209,7 +13216,13 @@ static bool ConTestGymnasium(std::span<std::string_view> argv)
 	}
 	for (IndustryID id : Industry::industries[IT_MARIJUANA_PLANTATION]) {
 		const Industry *i = Industry::Get(id);
-		IConsolePrint(CC_DEFAULT, "testgymnazium: plantaz {} mesic {} {}, sprity +{} az +{}", id, TimerGameCalendar::month + 1, IsMarijuanaGrown() ? "velke" : "male",
+		static const char *const stages[] = {"hole", "male", "vzrostle"};
+		uint road_free = 0;
+		for (uint x = 0; x < PLANTATION_WIDTH; x++) {
+			if (!IsTileType(TileAddXY(i->location.tile, x, PLANTATION_ROAD_ROW), TileType::Industry)) road_free++;
+		}
+		IConsolePrint(CC_DEFAULT, "testgymnazium: plantaz {} pece {} dni, do zpustnuti {} dni, {}, holky {}, dlazdic {}x{}, cesta volna {}/{}, sprity +{} az +{}", id, i->plantation_care, i->plantation_days_left,
+				stages[to_underlying(MarijuanaPlantationStage(i))], HasGirls(i) ? "ano" : "ne", i->location.w, i->location.h, road_free, PLANTATION_WIDTH,
 				GameOwnIndustryTileSprite(i->location.tile) - SPR_OPENTTD_BASE, GameOwnIndustryTileSprite(TileAddXY(i->location.tile, 4, 3)) - SPR_OPENTTD_BASE);
 	}
 

@@ -4,7 +4,7 @@
 // See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
 //
    -1 * 0	 0C "OpenTTD GUI graphics"
-   -1 * 0	 05 15 FF \w289 // OPENTTD_SPRITE_COUNT, an extended byte: above 255
+   -1 * 0	 05 15 FF \w268 // OPENTTD_SPRITE_COUNT, an extended byte: above 255
    -1 sprites/openttdgui.png 8bpp  66    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 146    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 226    8  64  31 -31   7 normal
@@ -259,86 +259,44 @@
     | sprites/socha_bronz_32bpp.png 32bpp 0 0 255 229 -124 -100 zi4
    -1 sprites/socha_bronz_holky_8bpp.png 8bpp 0 0 60 53 -29 -22 normal
     | sprites/socha_bronz_holky_32bpp.png 32bpp 0 0 255 229 -124 -100 zi4
-   -1 sprites/pole_male_0_0_8bpp.png 8bpp 0 0 63 33 -30 -1 normal
-    | sprites/pole_male_0_0_32bpp.png 32bpp 0 0 259 134 -124 -6 zi4
-   -1 sprites/pole_male_1_0_8bpp.png 8bpp 0 0 63 32 -31 0 normal
-    | sprites/pole_male_1_0_32bpp.png 32bpp 0 0 258 128 -127 0 zi4
-   -1 sprites/pole_male_2_0_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_2_0_32bpp.png 32bpp 0 0 255 129 -124 -1 zi4
-   -1 sprites/pole_male_3_0_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_3_0_32bpp.png 32bpp 0 0 255 128 -124 0 zi4
-   -1 sprites/pole_male_4_0_8bpp.png 8bpp 0 0 61 32 -29 0 normal
-    | sprites/pole_male_4_0_32bpp.png 32bpp 0 0 252 128 -121 0 zi4
-   -1 sprites/pole_male_0_1_8bpp.png 8bpp 0 0 70 32 -30 0 normal
-    | sprites/pole_male_0_1_32bpp.png 32bpp 0 0 285 130 -123 -2 zi4
-   -1 sprites/pole_male_1_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_1_1_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_2_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_2_1_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_3_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_3_1_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_4_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_4_1_32bpp.png 32bpp 0 0 255 128 -124 0 zi4
-   -1 sprites/pole_male_0_2_8bpp.png 8bpp 0 0 65 36 -30 -4 normal
-    | sprites/pole_male_0_2_32bpp.png 32bpp 0 0 266 143 -123 -15 zi4
-   -1 sprites/pole_male_1_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_1_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_2_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_2_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_3_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_3_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_4_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_4_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_male_0_3_8bpp.png 8bpp 0 0 61 33 -30 -1 normal
-    | sprites/pole_male_0_3_32bpp.png 32bpp 0 0 254 133 -123 -5 zi4
-   -1 sprites/pole_male_1_3_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_1_3_32bpp.png 32bpp 0 0 255 128 -123 0 zi4
-   -1 sprites/pole_male_2_3_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_2_3_32bpp.png 32bpp 0 0 255 128 -123 0 zi4
-   -1 sprites/pole_male_3_3_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_male_3_3_32bpp.png 32bpp 0 0 255 128 -123 0 zi4
-   -1 sprites/pole_male_4_3_8bpp.png 8bpp 0 0 62 31 -30 0 normal
-    | sprites/pole_male_4_3_32bpp.png 32bpp 0 0 257 128 -125 0 zi4
-   -1 sprites/pole_velke_0_0_8bpp.png 8bpp 0 0 63 36 -30 -4 normal
-    | sprites/pole_velke_0_0_32bpp.png 32bpp 0 0 269 149 -136 -21 zi4
-   -1 sprites/pole_velke_1_0_8bpp.png 8bpp 0 0 63 33 -31 -1 normal
-    | sprites/pole_velke_1_0_32bpp.png 32bpp 0 0 257 134 -126 -6 zi4
-   -1 sprites/pole_velke_2_0_8bpp.png 8bpp 0 0 67 32 -35 0 normal
-    | sprites/pole_velke_2_0_32bpp.png 32bpp 0 0 273 130 -142 -2 zi4
-   -1 sprites/pole_velke_3_0_8bpp.png 8bpp 0 0 64 34 -32 -2 normal
-    | sprites/pole_velke_3_0_32bpp.png 32bpp 0 0 259 137 -128 -9 zi4
-   -1 sprites/pole_velke_4_0_8bpp.png 8bpp 0 0 61 32 -29 0 normal
-    | sprites/pole_velke_4_0_32bpp.png 32bpp 0 0 254 130 -123 -2 zi4
-   -1 sprites/pole_velke_0_1_8bpp.png 8bpp 0 0 70 34 -30 -2 normal
-    | sprites/pole_velke_0_1_32bpp.png 32bpp 0 0 285 140 -123 -12 zi4
-   -1 sprites/pole_velke_1_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_1_1_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_velke_2_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_2_1_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_velke_3_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_3_1_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_velke_4_1_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_4_1_32bpp.png 32bpp 0 0 255 128 -124 0 zi4
-   -1 sprites/pole_velke_0_2_8bpp.png 8bpp 0 0 65 36 -30 -4 normal
-    | sprites/pole_velke_0_2_32bpp.png 32bpp 0 0 266 143 -123 -15 zi4
-   -1 sprites/pole_velke_1_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_1_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_velke_2_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_2_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_velke_3_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_3_2_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_velke_4_2_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_4_2_32bpp.png 32bpp 0 0 255 128 -124 0 zi4
-   -1 sprites/pole_velke_0_3_8bpp.png 8bpp 0 0 61 33 -30 -1 normal
-    | sprites/pole_velke_0_3_32bpp.png 32bpp 0 0 254 134 -123 -6 zi4
-   -1 sprites/pole_velke_1_3_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_1_3_32bpp.png 32bpp 0 0 255 128 -123 0 zi4
-   -1 sprites/pole_velke_2_3_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_2_3_32bpp.png 32bpp 0 0 255 128 -123 0 zi4
-   -1 sprites/pole_velke_3_3_8bpp.png 8bpp 0 0 62 32 -30 0 normal
-    | sprites/pole_velke_3_3_32bpp.png 32bpp 0 0 255 128 -123 0 zi4
-   -1 sprites/pole_velke_4_3_8bpp.png 8bpp 0 0 62 31 -30 0 normal
-    | sprites/pole_velke_4_3_32bpp.png 32bpp 0 0 257 128 -125 0 zi4
+   -1 sprites/pole_mari_zaklad_8bpp.png 8bpp 0 0 62 32 -30 0 normal
+    | sprites/pole_mari_zaklad_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
+   -1 sprites/pole_cesta_8bpp.png 8bpp 0 0 62 32 -30 0 normal
+    | sprites/pole_cesta_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
+   -1 sprites/pole_bouda_8bpp.png 8bpp 0 0 23 20 -18 -8 normal
+    | sprites/pole_bouda_32bpp.png 32bpp 0 0 155 133 -92 -34 zi4
+   -1 sprites/pole_mari_male_8bpp.png 8bpp 0 0 41 26 -16 1 normal
+    | sprites/pole_mari_male_32bpp.png 32bpp 0 0 253 133 -123 -6 zi4
+   -1 sprites/pole_mari_vzrostle_8bpp.png 8bpp 0 0 54 35 -26 -8 normal
+    | sprites/pole_mari_vzrostle_32bpp.png 32bpp 0 0 254 162 -123 -34 zi4
+   -1 sprites/pole_holky_sz_8bpp.png 8bpp 0 0 16 13 -19 -2 normal
+    | sprites/pole_holky_sz_32bpp.png 32bpp 0 0 65 66 -76 -11 zi4
+   -1 sprites/pole_holky_jv_8bpp.png 8bpp 0 0 11 11 0 15 normal
+    | sprites/pole_holky_jv_32bpp.png 32bpp 0 0 44 52 0 60 zi4
+   -1 sprites/pole_prace_real_f2_8bpp.png 8bpp 0 0 4 6 3 6 normal
+    | sprites/pole_prace_real_f2_32bpp.png 32bpp 0 0 233 123 -113 3 zi4
+   -1 sprites/pole_prace_sedi_f2_8bpp.png 8bpp 0 0 3 5 -3 15 normal
+    | sprites/pole_prace_sedi_f2_32bpp.png 32bpp 0 0 233 122 -113 2 zi4
+   -1 sprites/pole_prace_punk_f2_8bpp.png 8bpp 0 0 4 5 -14 16 normal
+    | sprites/pole_prace_punk_f2_32bpp.png 32bpp 0 0 233 122 -113 2 zi4
+   -1 sprites/pole_prace_pubg_f2_8bpp.png 8bpp 0 0 5 7 -13 5 normal
+    | sprites/pole_prace_pubg_f2_32bpp.png 32bpp 0 0 235 122 -115 2 zi4
+   -1 sprites/pole_prace_char16_f2_8bpp.png 8bpp 0 0 6 5 8 14 normal
+    | sprites/pole_prace_char16_f2_32bpp.png 32bpp 0 0 233 122 -113 2 zi4
+   -1 sprites/pole_prace_chill_f2_8bpp.png 8bpp 0 0 4 6 -4 17 normal
+    | sprites/pole_prace_chill_f2_32bpp.png 32bpp 0 0 233 124 -113 2 zi4
+   -1 sprites/pole_prace_real_f3_8bpp.png 8bpp 0 0 4 6 3 6 normal
+    | sprites/pole_prace_real_f3_32bpp.png 32bpp 0 0 254 124 -123 4 zi4
+   -1 sprites/pole_prace_sedi_f3_8bpp.png 8bpp 0 0 2 4 -3 16 normal
+    | sprites/pole_prace_sedi_f3_32bpp.png 32bpp 0 0 254 124 -123 4 zi4
+   -1 sprites/pole_prace_punk_f3_8bpp.png 8bpp 0 0 4 5 -14 16 normal
+    | sprites/pole_prace_punk_f3_32bpp.png 32bpp 0 0 254 124 -123 4 zi4
+   -1 sprites/pole_prace_pubg_f3_8bpp.png 8bpp 0 0 3 6 -13 5 normal
+    | sprites/pole_prace_pubg_f3_32bpp.png 32bpp 0 0 254 124 -123 4 zi4
+   -1 sprites/pole_prace_char16_f3_8bpp.png 8bpp 0 0 2 3 12 14 normal
+    | sprites/pole_prace_char16_f3_32bpp.png 32bpp 0 0 254 124 -123 4 zi4
+   -1 sprites/pole_prace_chill_f3_8bpp.png 8bpp 0 0 2 6 -4 17 normal
+    | sprites/pole_prace_chill_f3_32bpp.png 32bpp 0 0 254 124 -123 4 zi4
    -1 sprites/zastavka_x_vzadu_8bpp.png 8bpp 0 0 2 10 -9 0 normal
     | sprites/zastavka_x_vzadu_32bpp.png 32bpp 0 0 116 71 -89 -2 zi4
    -1 sprites/zastavka_y_vzadu_8bpp.png 8bpp 0 0 2 6 17 6 normal

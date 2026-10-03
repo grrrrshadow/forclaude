@@ -19,8 +19,8 @@ jen obrázky. Je v každé hře včetně rozehraných savů, hráč ho v okně N
 nevidí, nikam se neukládá a nesmí měnit stav hry (hra ho čte jako statický GRF,
 stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
 
-- `budovy.grf`: budovy průmyslů hry (gymnázium, automat, socha, holky na
-  zastávce) v 8bpp, 4× a 8×. Píše ho `../openttd/budovy_grf.py` z kousků,
+- `budovy.grf`: budovy průmyslů hry (gymnázium, automat, socha, dlaždice
+  marihuanové plantáže, chatka hulírny, holky na zastávce) v 8bpp, 4× a 8×. Píše ho `../openttd/budovy_grf.py` z kousků,
   které nařeže `../openttd/openttd_budovy.py`; do `openttd.grf` je grfcodec
   dát neumí (nezná 8×). Přepisuje tytéž sprity OpenTTD GUI (Action 5, typ
   0x15 s posunem), takže i 4× a 8bpp verze jsou tu znova – sprite se přepisuje
