@@ -183,6 +183,7 @@ enum IniFileVersion : uint32_t {
 	IFV_REMOVE_GENERATION_SEED,                            ///< 7  PR#11927 Remove "generation_seed" from configuration.
 	IFV_DEFAULT_RAIL_ROAD,                                 ///< 8  PR#15585 Update default rail type setting to support road and tram tiles
 	IFV_ZOOM_IN_8X,                                        ///< 9  This build: the zoom levels gained In8x in front of 4x, so zoom_min, zoom_max and sprite_zoom_min each name one level more.
+	IFV_ZOOM_IN_16X,                                       ///< 10 This build: the zoom levels gained In16x in front of 8x, one level more again; the sprite memory moved from misc sprite_cache_size_px (megapixels) to gui.sprite_cache_size_mb.
 
 	IFV_MAX_VERSION,       ///< Highest possible ini-file version.
 };
@@ -1601,6 +1602,29 @@ void LoadFromConfig(bool startup)
 		if (has("zoom_max")) _settings_client.gui.zoom_max = std::min(_settings_client.gui.zoom_max + 1, ZoomLevel::Max);
 		if (has("sprite_zoom_min") && _settings_client.gui.sprite_zoom_min != ZoomLevel::Min) {
 			_settings_client.gui.sprite_zoom_min = std::min(_settings_client.gui.sprite_zoom_min + 1, ZoomLevel::Normal);
+		}
+	}
+
+	/* Then In16x went in front of In8x: one level more for each zoom
+	 * setting the config holds, and for the zoom in the block above set
+	 * (its 8x is this build's In8x, not the 16x that Min names now). A
+	 * config without zoom_min took the default, 8x, which is right. The
+	 * sprite memory moved from misc sprite_cache_size_px, in megapixels,
+	 * to gui.sprite_cache_size_mb: a value the config holds is carried
+	 * over at four bytes a pixel, what it meant with a 32bpp blitter. */
+	if (startup && generic_version < IFV_ZOOM_IN_16X) {
+		const IniGroup *gui = generic_ini.GetGroup("gui");
+		auto has = [gui](std::string_view name) { return gui != nullptr && gui->GetItem(name) != nullptr; };
+		if (has("zoom_min") || generic_version < IFV_ZOOM_IN_8X) _settings_client.gui.zoom_min = std::min(_settings_client.gui.zoom_min + 1, ZoomLevel::Normal);
+		if (has("zoom_max")) _settings_client.gui.zoom_max = std::min(_settings_client.gui.zoom_max + 1, ZoomLevel::Max);
+		if (has("sprite_zoom_min") && _settings_client.gui.sprite_zoom_min != ZoomLevel::Min) {
+			_settings_client.gui.sprite_zoom_min = std::min(_settings_client.gui.sprite_zoom_min + 1, ZoomLevel::Normal);
+		}
+		const IniGroup *misc = generic_ini.GetGroup("misc");
+		const IniItem *px = misc != nullptr ? misc->GetItem("sprite_cache_size_px") : nullptr;
+		if (px != nullptr && px->value.has_value()) {
+			auto value = ParseInteger<uint32_t>(*px->value);
+			if (value.has_value()) _settings_client.gui.sprite_cache_size_mb = Clamp<uint32_t>(*value * 4, 64, 16384);
 		}
 	}
 

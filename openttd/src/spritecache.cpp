@@ -26,8 +26,6 @@
 
 #include "safeguards.h"
 
-/** Default of 4MB spritecache. */
-uint _sprite_cache_size = 4;
 
 
 static std::vector<SpriteCache> _spritecache;
@@ -416,14 +414,24 @@ static bool PadSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels sprite
 
 static bool ResizeSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels sprite_avail, SpriteEncoder *encoder)
 {
+	/* The most zoomed-in level with pixels. It is ZoomLevel::Min (16x) only
+	 * when 16x is switched on or the blitter keeps nothing but that level;
+	 * otherwise the pixel chain starts at 8x, and 16x gets its size alone,
+	 * since the encoders read the root for its size and the levels from
+	 * gui.zoom_min on for their pixels. The 16x pixels of every sprite,
+	 * made and thrown away at each load, would cost four times the 8x
+	 * ones in time and memory for a level that is off. */
+	ZoomLevel root = ZoomLevel::Min;
+	if (_settings_client.gui.zoom_min > ZoomLevel::Min && !encoder->NeedsRootPixels()) root = ZoomLevel::In8x;
+
 	/* Create a fully zoomed image if it does not exist */
 	ZoomLevel first_avail = ZoomLevel::End;
 	for (ZoomLevel zoom = ZoomLevel::Min; zoom <= ZoomLevel::Max; ++zoom) {
 		if (!sprite_avail.Test(zoom)) continue;
 		first_avail = zoom;
-		if (zoom != ZoomLevel::Min) {
-			if (!ResizeSpriteIn(sprite, zoom, ZoomLevel::Min)) return false;
-			sprite_avail.Set(ZoomLevel::Min);
+		if (zoom > root) {
+			if (!ResizeSpriteIn(sprite, zoom, root)) return false;
+			sprite_avail.Set(root);
 		}
 		break;
 	}
@@ -431,9 +439,24 @@ static bool ResizeSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels spr
 	/* Pad sprites to make sizes match. */
 	if (!PadSprites(sprite, sprite_avail, encoder)) return false;
 
+	if (root != ZoomLevel::Min) {
+		/* The size of the 16x level, for the sprite's header and the checks
+		 * below; its pixels are not made. */
+		const auto &root_sprite = sprite[root];
+		auto &top = sprite[ZoomLevel::Min];
+		uint8_t scale = AdjustByZoom(1, root - ZoomLevel::Min);
+		if (root_sprite.width * scale > UINT16_MAX || root_sprite.height * scale > UINT16_MAX) return false;
+		top.width = root_sprite.width * scale;
+		top.height = root_sprite.height * scale;
+		top.x_offs = root_sprite.x_offs * scale;
+		top.y_offs = root_sprite.y_offs * scale;
+		top.colours = root_sprite.colours;
+		top.data = nullptr;
+	}
+
 	/* Create other missing zoom levels, each from the one before it: from
 	 * the second level down, whatever the most zoomed-in one is called. */
-	for (ZoomLevel zoom : EnumRange(ZoomLevel::Min + 1, ZoomLevel::End)) {
+	for (ZoomLevel zoom : EnumRange(root + 1, ZoomLevel::End)) {
 		if (sprite_avail.Test(zoom)) {
 			/* Check that size and offsets match the fully zoomed image. */
 			[[maybe_unused]] const auto &root_sprite = sprite[ZoomLevel::Min];
@@ -450,7 +473,7 @@ static bool ResizeSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels spr
 
 	/* Replace sprites with higher resolution than the desired maximum source resolution with scaled up sprites, if not already done. */
 	if (first_avail < _settings_client.gui.sprite_zoom_min) {
-		for (ZoomLevel zoom = std::min(ZoomLevel::Normal, _settings_client.gui.sprite_zoom_min); zoom > ZoomLevel::Min; --zoom) {
+		for (ZoomLevel zoom = std::min(ZoomLevel::Normal, _settings_client.gui.sprite_zoom_min); zoom > root; --zoom) {
 			ResizeSpriteIn(sprite, zoom, zoom - 1);
 		}
 	}
@@ -979,8 +1002,10 @@ static void DeleteEntriesFromSpriteCache(size_t to_remove)
 
 void IncreaseSpriteLRU()
 {
+	/* The player's sprite memory (gui.sprite_cache_size_mb) is given for a
+	 * 32bpp blitter; an 8bpp one keeps a byte per pixel, a quarter. */
 	int bpp = BlitterFactory::GetCurrentBlitter()->GetScreenDepth();
-	uint target_size = (bpp > 0 ? _sprite_cache_size * bpp / 8 : 1) * 1024 * 1024;
+	size_t target_size = (bpp > 0 ? static_cast<size_t>(_settings_client.gui.sprite_cache_size_mb) * bpp / 32 : 1) * 1024 * 1024;
 	if (_spritecache_bytes_used > target_size) {
 		DeleteEntriesFromSpriteCache(_spritecache_bytes_used - target_size + 512 * 1024);
 	}

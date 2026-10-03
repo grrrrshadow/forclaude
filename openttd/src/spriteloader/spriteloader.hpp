@@ -153,6 +153,18 @@ public:
 	virtual Sprite *Encode(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) = 0;
 
 	/**
+	 * Does the encoder read the pixels of the most zoomed-in level
+	 * (ZoomLevel::Min, 16x) whatever the zoom settings say? The simple
+	 * blitters keep only that level and scale it as they draw; the others
+	 * keep the levels between gui.zoom_min and gui.zoom_max and read the
+	 * root only for its size. For them the 16x pixels are not made unless
+	 * 16x is switched on (ResizeSprites()), as they take four times the
+	 * memory and time of the 8x ones.
+	 * @return \c true iff the pixels of ZoomLevel::Min are always needed.
+	 */
+	virtual bool NeedsRootPixels() const { return false; }
+
+	/**
 	 * Get the value which the height and width on a sprite have to be aligned by.
 	 * @return The needed alignment or 0 if any alignment is accepted.
 	 */

@@ -18,6 +18,7 @@ class Blitter_8bppSimple final : public Blitter_8bppBase {
 public:
 	void Draw(Blitter::BlitterParams *bp, BlitterMode mode, ZoomLevel zoom) override;
 	Sprite *Encode(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
+	bool NeedsRootPixels() const override { return true; }
 
 	std::string_view GetName() override { return "8bpp-simple"; }
 };

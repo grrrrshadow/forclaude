@@ -3327,6 +3327,14 @@ bool AfterLoadGame()
 		_saved_scrollpos_x *= 2;
 		_saved_scrollpos_y *= 2;
 	}
+	/* Then In16x went in front of In8x: one level and one doubling more, for
+	 * every game saved before it (the ZOOM_BASE block above already counts
+	 * the oldest ones in the current base, so they are left out here). */
+	if (IsSavegameVersionBefore(SaveLoadVersion::ZoomIn16x) && !IsSavegameVersionBefore(SaveLoadVersion::ScriptTownGrowth) && _saved_scrollpos_zoom != ZoomLevel::End) {
+		++_saved_scrollpos_zoom;
+		_saved_scrollpos_x *= 2;
+		_saved_scrollpos_y *= 2;
+	}
 
 	/* When any NewGRF has been changed the availability of some vehicles might
 	 * have been changed too. e->company_avail must be set to 0 in that case

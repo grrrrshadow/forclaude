@@ -248,7 +248,9 @@ static Viewport SetupScreenshotViewport(ScreenshotType t, uint32_t width = 0, ui
 			break;
 		}
 		default: {
-			vp.zoom = (t == SC_ZOOMEDIN) ? _settings_client.gui.zoom_min : ZoomLevel::Viewport;
+			/* The zoomed-in screenshot goes to 2x at the most: at 8x or 16x it
+			 * would be a file of hundreds of megapixels nobody looks at. */
+			vp.zoom = (t == SC_ZOOMEDIN) ? std::max(_settings_client.gui.zoom_min, ZoomLevel::In2x) : ZoomLevel::Viewport;
 
 			Window *w = GetMainWindow();
 			vp.virtual_left   = w->viewport->virtual_left;

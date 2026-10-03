@@ -13322,10 +13322,10 @@ static bool ConTestZoom8(std::span<std::string_view> argv)
 		return true;
 	}
 
-	IConsolePrint(CC_DEFAULT, "testzoom8: ZOOM_BASE {} In8x {} In4x {} Normal {} Max {} End {}", ZOOM_BASE, to_underlying(ZoomLevel::In8x), to_underlying(ZoomLevel::In4x),
+	IConsolePrint(CC_DEFAULT, "testzoom8: ZOOM_BASE {} In16x {} In8x {} In4x {} Normal {} Max {} End {}", ZOOM_BASE, to_underlying(ZoomLevel::In16x), to_underlying(ZoomLevel::In8x), to_underlying(ZoomLevel::In4x),
 			to_underlying(ZoomLevel::Normal), to_underlying(ZoomLevel::Max), to_underlying(ZoomLevel::End));
-	IConsolePrint(CC_DEFAULT, "testzoom8: nastaveni zoom_min {} zoom_max {} sprite_zoom_min {} gui_zoom {}", to_underlying(_settings_client.gui.zoom_min), to_underlying(_settings_client.gui.zoom_max),
-			to_underlying(_settings_client.gui.sprite_zoom_min), to_underlying(_gui_zoom));
+	IConsolePrint(CC_DEFAULT, "testzoom8: nastaveni zoom_min {} zoom_max {} sprite_zoom_min {} gui_zoom {} pamet spritu {} MB", to_underlying(_settings_client.gui.zoom_min), to_underlying(_settings_client.gui.zoom_max),
+			to_underlying(_settings_client.gui.sprite_zoom_min), to_underlying(_gui_zoom), _settings_client.gui.sprite_cache_size_mb);
 
 	Window *w = FindWindowById(WindowClass::MainWindow, 0);
 	if (w != nullptr && w->viewport != nullptr) {

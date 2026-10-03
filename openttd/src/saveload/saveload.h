@@ -421,6 +421,7 @@ enum class SaveLoadVersion : uint16_t {
 	CompanyTotalDeliveredCargo, ///< Saveload version: 367\n Companies keep a running total of every cargo they have delivered.
 	CargoTypes128, ///< Saveload version: 368\n A game holds up to 128 cargo types; the masks and the per-cargo arrays grew with it.
 	ZoomIn8x, ///< Saveload version: 369\n The zoom levels gained In8x in front of the original 4x: the saved view is one level further along and twice as far in virtual coordinates.
+	ZoomIn16x, ///< Saveload version: 370\n The zoom levels gained In16x in front of 8x: the saved view is one level further along and twice as far in virtual coordinates once more.
 
 	MaxVersion, ///< Highest possible saveload version.
 };

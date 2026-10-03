@@ -1169,6 +1169,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_sprite_aligner_widge
 					NWidget(NWID_VSCROLLBAR, Colours::Grey, WID_SA_SCROLLBAR),
 				EndContainer(),
 				NWidget(NWID_VERTICAL),
+					NWidget(WWT_TEXTBTN, Colours::Grey, WID_SA_ZOOM + to_underlying(ZoomLevel::In16x)), SetStringTip(STR_CONFIG_SETTING_ZOOM_LVL_IN_16X), SetFill(1, 0),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_SA_ZOOM + to_underlying(ZoomLevel::In8x)), SetStringTip(STR_CONFIG_SETTING_ZOOM_LVL_IN_8X), SetFill(1, 0),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_SA_ZOOM + to_underlying(ZoomLevel::In4x)), SetStringTip(STR_CONFIG_SETTING_ZOOM_LVL_MIN), SetFill(1, 0),
 					NWidget(WWT_TEXTBTN, Colours::Grey, WID_SA_ZOOM + to_underlying(ZoomLevel::In2x)), SetStringTip(STR_CONFIG_SETTING_ZOOM_LVL_IN_2X), SetFill(1, 0),

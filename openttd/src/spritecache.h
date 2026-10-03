@@ -14,8 +14,6 @@
 #include "spritecache_type.h"
 #include "spriteloader/spriteloader.hpp"
 
-extern uint _sprite_cache_size;
-
 /** SpriteAllocator that allocates memory via a unique_ptr array. */
 class UniquePtrSpriteAllocator : public SpriteAllocator {
 public:
