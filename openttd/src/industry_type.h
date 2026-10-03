@@ -91,8 +91,15 @@ static const IndustryGfx  GFX_GYMNASIUM_SOUTH = NUM_INDUSTRYTILES - 6;
 static const IndustryGfx  GFX_WEED_MACHINE = NUM_INDUSTRYTILES - 7;
 /** The tile of the statue of Karel Macha (IT_STATUE). */
 static const IndustryGfx  GFX_STATUE = NUM_INDUSTRYTILES - 8;
+/**
+ * The tiles of the coffeeshop's hut (IT_COFFEESHOP), 2x1 along x: the back
+ * one with the hut, the front one with the yard. A coffeeshop built before
+ * the hut keeps its one tile, GFX_COFFEESHOP, the desert house.
+ */
+static const IndustryGfx  GFX_HUT_BACK = NUM_INDUSTRYTILES - 9;
+static const IndustryGfx  GFX_HUT_FRONT = NUM_INDUSTRYTILES - 10;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_STATUE;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_HUT_FRONT;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

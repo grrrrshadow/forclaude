@@ -54,6 +54,13 @@ void ResolveExtraIndustryCargoes();
 std::span<const CargoLabel> CoffeeshopCargoes();
 bool IsNearGymnasium(TileIndex tile);
 bool HasGirls(const struct Industry *ind);
+/** Which girls are drawn at the coffeeshop's hut (HutGirlsAt()). */
+enum class HutGirls : uint8_t {
+	None, ///< No studentky came lately: the hut alone.
+	Standing, ///< Studentky came: they stand about the yard.
+	Sitting, ///< Studentky came and marijuana too: they sit on the benches.
+};
+HutGirls HutGirlsAt(const struct Industry *ind);
 bool IsMarijuanaGrown();
 SpriteID GameOwnIndustryTileSprite(TileIndex tile);
 void MarkGameOwnIndustryDirty(const struct Industry *ind);

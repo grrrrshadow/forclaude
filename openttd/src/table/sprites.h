@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 285;
+static const uint16_t OPENTTD_SPRITE_COUNT = 289;
 /** @} */
 
 /** @{
@@ -257,6 +257,14 @@ static const SpriteID SPR_MARIJUANA_FIELD_BIG        = SPR_OPENTTD_BASE + 262; /
 static const SpriteID SPR_BUS_STOP_GIRL_X_FAR        = SPR_OPENTTD_BASE + 282;
 static const SpriteID SPR_BUS_STOP_GIRL_Y_FAR        = SPR_OPENTTD_BASE + 283;
 static const SpriteID SPR_BUS_STOP_GIRL_X_NEAR       = SPR_OPENTTD_BASE + 284;
+/* The hut of the coffeeshop on its 2x1 tiles, in vertical strips like the
+ * school (openttd_budovy.py): the front tile, the yard, carries the hut's
+ * left half too. The girls are laid over the front tile as a child of it,
+ * standing after studentky came, sitting when marijuana came to them too. */
+static const SpriteID SPR_HUT_FRONT                  = SPR_OPENTTD_BASE + 285;
+static const SpriteID SPR_HUT_BACK                   = SPR_OPENTTD_BASE + 286;
+static const SpriteID SPR_HUT_GIRLS_STANDING         = SPR_OPENTTD_BASE + 287;
+static const SpriteID SPR_HUT_GIRLS_SITTING          = SPR_OPENTTD_BASE + 288;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

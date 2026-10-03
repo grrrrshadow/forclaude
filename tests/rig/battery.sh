@@ -1817,6 +1817,17 @@ echo "plantaz_leto: $(grep -o 'testgymnazium: plantaz .*' $S/reg_plantaz_leto.lo
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene zastavka "testzastavka" 30
 echo "zastavka: $(grep -o 'testzastavka: .*' $S/reg_zastavka.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The coffeeshop's hut on 2x1 tiles (testhulirna) and the girls laid over its
+# front tile, the player's word: none until studentky come, marijuana alone
+# changes nothing, standing after studentky, sitting when marijuana came to
+# them too, none again when both are long ago.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene hulirna "testhulirna postav
+testhulirna mari
+testhulirna nic stud
+testhulirna mari
+testhulirna nic" 30
+echo "hulirna: $(grep -o 'testhulirna: .*' $S/reg_hulirna.log | cut -d' ' -f2- | sed 's/postavena u ([0-9]*,[0-9]*)/postavena/' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # The 8x zoom (ZoomLevel::In8x, testzoom8): the base is 8 and the config of
 # before, naming 0 for the most zoomed in there was, keeps the most zoomed in,
 # 8x now (IFV_ZOOM_IN_8X); the main view zooms in to In8x, a tile 256 px wide,

@@ -109,9 +109,18 @@ which stays theirs and is named here.
     https://sketchfab.com/3d-models/cannabis-plant-79fe78fd6c6a426b8584115e772a5818
   - "Small Cannabis Plant" by streetpharmacy (on the plantation)
     https://sketchfab.com/3d-models/small-cannabis-plant-73637ede37884a56bcb0f7e5d75b2ff8
-  - "Cannabis Sativa plant" by Zbrojmistrz (at the statue and on the
-    plantation; recoloured, the pot removed, reshaped into bushes)
+  - "Cannabis Sativa plant" by Zbrojmistrz (at the statue, on the
+    plantation and at the coffeeshop's hut; recoloured, the pot removed,
+    reshaped into bushes)
     https://sketchfab.com/3d-models/cannabis-sativa-plant-ea31a5768c06457ea2fd67c3eb3458b8
+- The coffeeshop's hut: "A little happy hut" by Tigran Safaryan, licensed
+  under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  https://sketchfab.com/3d-models/a-little-happy-hut-045afe84e4c04400a34f0babab201378
+  The hut scaled and turned, a yard with benches, junk, plants and a fence
+  of plants added, the figures ("College Girl", "Character People Girl 001",
+  "Galaxia anime girl" above) posed standing and sitting and scaled, the
+  plants ("Cannabis Sativa plant", "Cannabis Plant" above) recoloured and
+  scaled, rendered into the sprites by the player's graphics repository.
 - Palo123, also known as Karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's

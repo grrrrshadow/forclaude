@@ -19,7 +19,9 @@ How a picture is cut:
   columns, one per tile: the west tile takes the column left of the north
   and south tiles, the east tile the one right of them, and the south tile
   -- the front one, drawn last -- the middle column with whatever of the
-  back tile stands in it. The north tile has no sprite of its own.
+  back tile stands in it. The north tile has no sprite of its own. The hut
+  of the coffeeshop on 2x1 tiles likewise: the front tile the column left
+  of the back tile's north corner, the back tile the one right of it.
 - tiles: the plantation on 5x4 tiles, cut along the tiles' diamonds: a
   pixel belongs to the tile whose diamond it lies in, and one above the back
   edges of the field to the back tile below it. Nothing is drawn twice, so
@@ -76,6 +78,16 @@ USABLE = [i for i in range(1, 0xE3) if not 0xC6 <= i <= 0xCD]
 #: source, when there is one, is the 4x name with zin8 for zin4, and all
 #: its measures are twice these.
 SCHOOL_STRIPS = [("w", (104, 232), (232, 296)), ("s", (232, 488), (360, 360)), ("e", (488, 616), (488, 296))]
+#: The hut (the coffeeshop) on 2x1 tiles, two along x: the front tile -- the
+#: yard, drawn last -- takes the column left of the back tile's north corner
+#: with what of the hut stands in it, the back tile the column right of it.
+#: The girls stand and sit in the front column only (checked by main()).
+HUT_STRIPS = [("predni", (8, 264), (136, 184)), ("zadni", (264, 392), (264, 120))]
+#: Pictures that hold only what is laid over another picture (the girls at
+#: the hut): every pixel of them must fall in the strips they are cut in, or
+#: it would be lost. (The school with girls is cut in fewer strips than the
+#: school on purpose: its east column is the same with girls or without.)
+LAYERS = {"chatka_stoji", "chatka_sedi"}
 PICTURES = [
     ("gymnazium", "gymnazium_zin4.png", "strips", (360, 232), SCHOOL_STRIPS),
     ("automat", "automat_zin4.png", "whole", (192, 128), None),
@@ -95,6 +107,12 @@ PICTURES = [
     ("zastavka_x_vzadu", "zastavka_divka_s90_zin4.png", "girl", (-34.4, 34.8), None),
     ("zastavka_y_vzadu", "zastavka_divka_s0_zin4.png", "girl", (70.4, 52.8), None),
     ("zastavka_x_vpredu", "zastavka_divka_s260_zin4.png", "girl", (0 - 104, 120 - 52), None),
+    # The hut of the coffeeshop (SPR_HUT_FRONT and the rest), and the girls
+    # laid over its front tile: standing after studentky came, sitting when
+    # marijuana came to them as well. A layer holds only the girls.
+    ("chatka", "chatka_zin4.png", "strips", (264, 120), HUT_STRIPS),
+    ("chatka_stoji", "chatka_stojici_zin4.png", "strips", (264, 120), HUT_STRIPS[:1]),
+    ("chatka_sedi", "chatka_sedici_zin4.png", "strips", (264, 120), HUT_STRIPS[:1]),
 ]
 
 
@@ -210,6 +228,8 @@ def pal_piece(small: Image.Image, cut: str, extra, north, which) -> Image.Image:
 def cropped(image: Image.Image, north: tuple[float, float], zoom: Zoom, name: str) -> dict:
     """Save a piece cropped to its pixels and give its file and offsets from its tile's north corner."""
     box = image.getbbox()
+    if box is None:
+        raise SystemExit(f"{name}: nothing in this piece")
     image.crop(box).save(HERE / name)
     return {"file": name, "w": box[2] - box[0], "h": box[3] - box[1], "x": box[0] - round(north[0]) + zoom.north_shift, "y": box[1] - round(north[1])}
 
@@ -244,6 +264,16 @@ def main() -> None:
         elif cut == "whole":
             emit(lines, manifest, name, image4, small, image8, north)
         elif cut == "strips":
+            # Nothing of a layer may be left outside the strips cut: a layer
+            # cut in fewer strips than its picture would lose what stands
+            # elsewhere.
+            for image, zoom in ((image4, ZOOM4), (image8, ZOOM8)):
+                if name not in LAYERS or image is None:
+                    continue
+                spans = [zoom.of(strip[1]) for strip in extra]
+                outside = keep(image, lambda x, y: not any(left <= x < right for left, right in spans)).getchannel("A").point(lambda a: 255 if a > 16 else 0).getbbox()
+                if outside is not None:
+                    raise SystemExit(f"{name}: pixels outside the strips at {zoom.factor}x: {outside}")
             for strip in extra:
                 emit(lines, manifest, f"{name}_{strip[0]}", piece(image4, cut, extra, ZOOM4, north, strip), pal_piece(small, cut, extra, north, strip),
                      piece(image8, cut, extra, ZOOM8, north, strip) if image8 is not None else None, strip[2])

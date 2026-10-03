@@ -789,6 +789,8 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE(SPR_GYMNASIUM_SOUTH, 50),  // GFX_GYMNASIUM_SOUTH
 	OWN_TILE(SPR_WEED_MACHINE, 20),     // GFX_WEED_MACHINE
 	OWN_TILE(SPR_STATUE_STONE, 40),     // GFX_STATUE
+	OWN_TILE(SPR_HUT_BACK, 40),         // GFX_HUT_BACK
+	OWN_TILE(SPR_HUT_FRONT, 40),        // GFX_HUT_FRONT
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
@@ -812,8 +814,10 @@ static const DrawBuildingsTileStruct *GameOwnIndustryDrawTile(IndustryGfx gfx, u
 	return nullptr;
 }
 
-/** For how many days after a delivery the girls are about the school, the machine or the statue: the player's word. */
+/** For how many days after a delivery the girls are about the school, the machine, the statue or the coffeeshop's hut: the player's word. */
 static const int GIRLS_DAYS = 30;
+
+static bool DeliveredLately(const Industry *ind, CargoLabel label);
 
 /**
  * Are there girls about a school, a vending machine or a statue? There are
@@ -824,11 +828,35 @@ static const int GIRLS_DAYS = 30;
  */
 bool HasGirls(const Industry *ind)
 {
-	CargoType cargo = GetCargoTypeByLabel(ind->type == IT_WEED_MACHINE ? CT_MARIJUANA : CT_STUDENTKY);
+	return DeliveredLately(ind, ind->type == IT_WEED_MACHINE ? CT_MARIJUANA : CT_STUDENTKY);
+}
+
+/**
+ * Did a cargo come to an industry in the last GIRLS_DAYS?
+ * @param ind the industry
+ * @param label the cargo
+ * @return whether it did
+ */
+static bool DeliveredLately(const Industry *ind, CargoLabel label)
+{
+	CargoType cargo = GetCargoTypeByLabel(label);
 	if (!IsValidCargoType(cargo)) return false;
 	auto it = ind->GetCargoAccepted(cargo);
 	if (it == std::end(ind->accepted) || it->last_accepted == TimerGameEconomy::Date{}) return false;
 	return TimerGameEconomy::date.base() - it->last_accepted.base() < GIRLS_DAYS;
+}
+
+/**
+ * The girls at the coffeeshop's hut, the player's word: none until studentky
+ * come; standing for GIRLS_DAYS after they came; sitting while marijuana came
+ * in those days too. Marijuana without studentky changes nothing.
+ * @param ind the coffeeshop
+ * @return which girls are drawn
+ */
+HutGirls HutGirlsAt(const Industry *ind)
+{
+	if (!DeliveredLately(ind, CT_STUDENTKY)) return HutGirls::None;
+	return DeliveredLately(ind, CT_MARIJUANA) ? HutGirls::Sitting : HutGirls::Standing;
 }
 
 /**
@@ -894,7 +922,7 @@ SpriteID GameOwnIndustryTileSprite(TileIndex tile)
  */
 void MarkGameOwnIndustryDirty(const Industry *ind)
 {
-	if (ind->type != IT_GYMNASIUM && ind->type != IT_WEED_MACHINE && ind->type != IT_STATUE) return;
+	if (ind->type != IT_GYMNASIUM && ind->type != IT_WEED_MACHINE && ind->type != IT_STATUE && ind->type != IT_COFFEESHOP) return;
 	for (TileIndex tile : ind->location) {
 		if (IsTileType(tile, TileType::Industry) && GetIndustryIndex(tile) == ind->index) MarkTileDirtyByTile(tile);
 	}
@@ -977,13 +1005,20 @@ static void SetupTownIndustry(IndustryType type, const IndustryTileLayout &layou
 }
 
 /**
- * Put the coffeeshop (economy.extra_industries) and its tile in their places,
- * the industry type and tile before the plantation's, on one tile drawn as
- * the desert house with the palm tree.
+ * Put the coffeeshop (economy.extra_industries) and its tiles in their
+ * places, the industry type before the plantation's: the player's hut on 2x1
+ * tiles along x, the back one with the hut, the front one with the yard
+ * (SPR_HUT_FRONT and the rest). A coffeeshop built before the hut keeps its
+ * one tile, GFX_COFFEESHOP, drawn as the desert house with the palm tree, and
+ * takes what the hut's tiles take (ResolveExtraIndustryCargoes()).
  */
 static void SetupCoffeeshop()
 {
-	SetupTownIndustry(IT_COFFEESHOP, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_COFFEESHOP}}, STR_INDUSTRY_NAME_COFFEESHOP, 0xCF);
+	SetupTownIndustry(IT_COFFEESHOP, {
+			IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_HUT_BACK},
+			IndustryTileLayoutTile{TileIndexDiffC{1, 0}, GFX_HUT_FRONT},
+		}, STR_INDUSTRY_NAME_COFFEESHOP, 0xCF);
+	_industry_tile_specs[GFX_COFFEESHOP] = _industry_tile_specs[GFX_HUT_BACK];
 }
 
 /**
@@ -1149,6 +1184,10 @@ void ResolveExtraIndustryCargoes()
 	if (!_settings_game.economy.extra_industries) return;
 	ResolveExplosivesChain();
 	ResolveTownIndustryCargoes(IT_COFFEESHOP, COFFEESHOP_CARGOES);
+	/* The desert house of a coffeeshop built before the hut takes the same. */
+	if (GetIndustrySpec(IT_COFFEESHOP)->enabled && !GetIndustrySpec(IT_COFFEESHOP)->grf_prop.HasGrfFile()) {
+		_industry_tile_specs[GFX_COFFEESHOP] = _industry_tile_specs[GFX_HUT_BACK];
+	}
 	ResolveTownIndustryCargoes(IT_GYMNASIUM, GYMNASIUM_CARGOES);
 	ResolveTownIndustryCargoes(IT_WEED_MACHINE, WEED_MACHINE_CARGOES);
 	ResolveTownIndustryCargoes(IT_STATUE, STATUE_CARGOES);
@@ -1772,6 +1811,16 @@ static void DrawTile_Industry(TileInfo *ti)
 	if (image != 0) {
 		AddSortableSpriteToDraw(image, SpriteLayoutPaletteTransform(image, dits->building.pal, GetColourPalette(ind->random_colour)),
 			*ti, *dits, IsTransparencySet(TransparencyOption::Industries));
+
+		/* The girls at the coffeeshop's hut, laid over its front tile. Their
+		 * offsets count from the tile's north corner, as the hut's do. */
+		if (stage == INDUSTRY_COMPLETED && gfx == GFX_HUT_FRONT) {
+			HutGirls girls = HutGirlsAt(ind);
+			if (girls != HutGirls::None) {
+				AddChildSpriteScreen(girls == HutGirls::Sitting ? SPR_HUT_GIRLS_SITTING : SPR_HUT_GIRLS_STANDING, PAL_NONE, 0, 0,
+						IsTransparencySet(TransparencyOption::Industries), nullptr, false, false);
+			}
+		}
 
 		if (IsTransparencySet(TransparencyOption::Industries)) return;
 	}

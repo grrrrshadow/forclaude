@@ -1054,5 +1054,101 @@
    "x": -325,
    "y": 66
   }
+ },
+ {
+  "name": "chatka_predni",
+  "pal": {
+   "file": "chatka_predni_8bpp.png",
+   "w": 60,
+   "h": 73,
+   "x": -27,
+   "y": -44
+  },
+  "x4": {
+   "file": "chatka_predni_32bpp.png",
+   "w": 256,
+   "h": 306,
+   "x": -124,
+   "y": -178
+  },
+  "x8": {
+   "file": "chatka_predni_8x_32bpp.png",
+   "w": 512,
+   "h": 611,
+   "x": -248,
+   "y": -355
+  }
+ },
+ {
+  "name": "chatka_zadni",
+  "pal": {
+   "file": "chatka_zadni_8bpp.png",
+   "w": 27,
+   "h": 56,
+   "x": 1,
+   "y": -27
+  },
+  "x4": {
+   "file": "chatka_zadni_32bpp.png",
+   "w": 128,
+   "h": 241,
+   "x": 4,
+   "y": -112
+  },
+  "x8": {
+   "file": "chatka_zadni_8x_32bpp.png",
+   "w": 256,
+   "h": 479,
+   "x": 8,
+   "y": -223
+  }
+ },
+ {
+  "name": "chatka_stoji_predni",
+  "pal": {
+   "file": "chatka_stoji_predni_8bpp.png",
+   "w": 33,
+   "h": 26,
+   "x": -5,
+   "y": -8
+  },
+  "x4": {
+   "file": "chatka_stoji_predni_32bpp.png",
+   "w": 135,
+   "h": 109,
+   "x": -22,
+   "y": -34
+  },
+  "x8": {
+   "file": "chatka_stoji_predni_8x_32bpp.png",
+   "w": 269,
+   "h": 216,
+   "x": -44,
+   "y": -66
+  }
+ },
+ {
+  "name": "chatka_sedi_predni",
+  "pal": {
+   "file": "chatka_sedi_predni_8bpp.png",
+   "w": 35,
+   "h": 11,
+   "x": -14,
+   "y": 3
+  },
+  "x4": {
+   "file": "chatka_sedi_predni_32bpp.png",
+   "w": 144,
+   "h": 47,
+   "x": -57,
+   "y": 10
+  },
+  "x8": {
+   "file": "chatka_sedi_predni_8x_32bpp.png",
+   "w": 285,
+   "h": 91,
+   "x": -113,
+   "y": 21
+  }
  }
 ]

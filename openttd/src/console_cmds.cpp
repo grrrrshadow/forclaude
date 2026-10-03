@@ -1637,10 +1637,15 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			if (min.has_value() && count < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} marihuanovych plantazi, ceka se aspon {}.", count, *min);
 		}
 
-		/* The coffeeshop: in towns only, on a tile of its own, taking all of
-		 * each cargo of its list the game has, at the industry and its tile. */
+		/* The coffeeshop: in towns only, on the hut's two tiles of its own,
+		 * taking all of each cargo of its list the game has, at the industry
+		 * and its tiles -- the desert house of one built before the hut too. */
 		IndustryGfx shop_gfx = shop->layouts.empty() ? INVALID_INDUSTRYTILE : shop->layouts.front().front().gfx;
-		const IndustryTileSpec *shop_tile = GetIndustryTileSpec(GFX_COFFEESHOP);
+		const IndustryTileSpec *shop_tile = GetIndustryTileSpec(GFX_HUT_BACK);
+		const IndustryTileSpec *old_tile = GetIndustryTileSpec(GFX_COFFEESHOP);
+		if (old_tile->accepts_cargo != shop_tile->accepts_cargo || old_tile->acceptance != shop_tile->acceptance) {
+			IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - stara hulirna (dum s palmou) nebere totez co chatka.");
+		}
 		uint shops = Industry::GetIndustryTypeCount(IT_COFFEESHOP);
 		std::string takes;
 		for (CargoLabel label : CoffeeshopCargoes()) {
@@ -1658,7 +1663,7 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 		if (!shop->enabled || shop->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna neni ve hre, nebo ji zabrala sada.");
 		if (shop->climate_availability != every_climate) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna neni ve vsech klimatech.");
 		if (!shop->behaviour.Test(IndustryBehaviour::OnlyInTown)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna se muze stavet mimo mesto.");
-		if (shop_gfx != GFX_COFFEESHOP || shop_tile->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna nema svou dlazdici.");
+		if (shop_gfx != GFX_HUT_BACK || shop->layouts.front().size() != 2 || shop_tile->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna nema svou chatku na dvou dlazdicich.");
 		for (CargoType c : shop->produced_cargo) {
 			if (IsValidCargoType(c)) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - hulirna neco vyrabi ({}).", label_of(c));
 		}
@@ -13306,6 +13311,77 @@ static bool ConTestBusStopGirls(std::span<std::string_view> argv)
 }
 
 /**
+ * Rig probe for the coffeeshop's hut on 2x1 tiles and the girls at it, the
+ * player's word: none until studentky come, standing after they came,
+ * sitting when marijuana came to them too, and marijuana alone changes
+ * nothing. 'postav' builds a coffeeshop in the biggest town that has room
+ * (ten tiles from a school and a statue) and turns the main view on it;
+ * 'stud' and 'mari' count a delivery of studentky or marijuana today,
+ * 'nic' takes both back to long ago. Then it says what each coffeeshop is
+ * drawn with.
+ * Usage: testhulirna [postav] [stud] [mari] [nic]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestHut(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: the coffeeshop's hut and its girls. Usage: 'testhulirna [postav] [stud] [mari] [nic]'");
+		return true;
+	}
+
+	for (size_t a = 1; a < argv.size(); a++) {
+		if (argv[a] == "postav" && Industry::GetIndustryTypeCount(IT_COFFEESHOP) == 0) {
+			AutoRestoreBackup deity(_current_company, OWNER_DEITY);
+			std::vector<const Town *> towns(Town::Iterate().begin(), Town::Iterate().end());
+			std::ranges::sort(towns, std::greater{}, [](const Town *t) { return t->cache.population; });
+			CommandCost r(STR_ERROR_SITE_UNSUITABLE);
+			for (const Town *t : towns) {
+				for (TileIndex tile : SpiralTileSequence(t->xy, 25)) {
+					r = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, IT_COFFEESHOP, 0, true, 0);
+					if (r.Succeeded()) {
+						IConsolePrint(CC_DEFAULT, "testhulirna: hulirna postavena u ({},{})", TileX(tile), TileY(tile));
+						break;
+					}
+				}
+				if (r.Succeeded()) break;
+			}
+			if (r.Failed()) IConsolePrint(CC_ERROR, "testhulirna: ODMITNUTO - hulirna nejde postavit v zadnem meste: {}", GetString(r.GetErrorMessage()));
+		}
+		for (CargoLabel label : {CT_STUDENTKY, CT_MARIJUANA}) {
+			bool today = (argv[a] == "stud" && label == CT_STUDENTKY) || (argv[a] == "mari" && label == CT_MARIJUANA);
+			if (!today && argv[a] != "nic") continue;
+			CargoType cargo = GetCargoTypeByLabel(label);
+			for (IndustryID id : Industry::industries[IT_COFFEESHOP]) {
+				Industry *i = Industry::Get(id);
+				auto it = i->GetCargoAccepted(cargo);
+				if (it == std::end(i->accepted)) continue;
+				it->last_accepted = today ? TimerGameEconomy::date : TimerGameEconomy::Date{};
+				MarkGameOwnIndustryDirty(i);
+			}
+		}
+	}
+
+	static const char * const GIRLS[] = {"zadne", "stoji", "sedi"};
+	for (IndustryID id : Industry::industries[IT_COFFEESHOP]) {
+		const Industry *i = Industry::Get(id);
+		std::string tiles;
+		for (TileIndex tile : i->location) {
+			if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != id) continue;
+			/* The hut's sprites count from SPR_OPENTTD_BASE; the desert house
+			 * of a coffeeshop from before the hut is an original sprite. */
+			SpriteID sprite = GameOwnIndustryTileSprite(tile);
+			tiles += fmt::format(" ({},{}) dlazdice {} sprite {}", TileX(tile) - TileX(i->location.tile), TileY(tile) - TileY(i->location.tile),
+					GetIndustryGfx(tile), sprite >= SPR_OPENTTD_BASE ? fmt::format("+{}", sprite - SPR_OPENTTD_BASE) : fmt::format("{:#x} (dum s palmou)", sprite));
+		}
+		HutGirls girls = HutGirlsAt(i);
+		IConsolePrint(CC_DEFAULT, "testhulirna: hulirna {} {}x{},{} holky {}{}", id, i->location.w, i->location.h, tiles, GIRLS[to_underlying(girls)],
+				girls == HutGirls::None ? "" : fmt::format(" (+{})", (girls == HutGirls::Sitting ? SPR_HUT_GIRLS_SITTING : SPR_HUT_GIRLS_STANDING) - SPR_OPENTTD_BASE));
+		ScrollMainWindowToTile(i->location.tile, true);
+	}
+	return true;
+}
+
+/**
  * Rig probe for the 8x zoom (ZoomLevel::In8x): the zoom base and the zoom
  * settings, the main view's zoom and virtual size, the size of a few sprites
  * at every level, and the sprite cache's memory. With 'dovnitr' it zooms the
@@ -13545,6 +13621,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("teststudentky",           ConTestStudents);
 	IConsole::CmdRegister("testgymnazium",           ConTestGymnasium);
 	IConsole::CmdRegister("testzastavka",            ConTestBusStopGirls);
+	IConsole::CmdRegister("testhulirna",             ConTestHut);
 	IConsole::CmdRegister("testzoom8",               ConTestZoom8);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);

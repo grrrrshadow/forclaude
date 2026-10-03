@@ -174,6 +174,14 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_kamen_holky_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_x_vpredu_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_x_vpredu_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_predni_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_predni_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_zadni_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_zadni_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_stoji_predni_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_stoji_predni_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_sedi_predni_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/chatka_sedi_predni_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_x_vzadu_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_x_vzadu_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_y_vzadu_32bpp.png
