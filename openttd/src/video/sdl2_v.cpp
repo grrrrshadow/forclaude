@@ -27,6 +27,7 @@
 #endif
 
 #include "../mouse_debug.h"
+#include "../map_drag.h"
 
 #include "../safeguards.h"
 
@@ -436,6 +437,11 @@ bool VideoDriver_SDL_Base::PollEvent()
 				}
 			}
 
+			/* The buttons as the event has them, for map_drag.cpp; not with
+			 * the right button emulated by Ctrl and the left, which the event
+			 * knows nothing about. */
+			if (!_rightclick_emulate) MapDragSystemButton((ev.motion.state & SDL_BUTTON_RMASK) != 0, "SDL_MOUSEMOTION");
+
 			bool warp = _cursor.UpdateCursorPosition(x, y);
 			MouseDebugLog(fmt::format("udalost SDL_MOUSEMOTION ({},{}){}", x, y, warp ? " -> ukazatel vracen (SDL_WarpMouseInWindow)" : ""));
 			if (warp) {
@@ -482,6 +488,7 @@ bool VideoDriver_SDL_Base::PollEvent()
 					/* Ctrl as it is at the press, for the mouse record saved
 					 * with Ctrl and the right button; see the Windows driver. */
 					_ctrl_pressed = (SDL_GetModState() & KMOD_CTRL) != 0;
+					MapDragSystemButton(true, "SDL_MOUSEBUTTONDOWN");
 					MouseDebugLog(fmt::format("udalost SDL_MOUSEBUTTONDOWN prave (ctrl={})", _ctrl_pressed ? 1 : 0));
 					break;
 
@@ -501,6 +508,7 @@ bool VideoDriver_SDL_Base::PollEvent()
 				MouseDebugLog("udalost SDL_MOUSEBUTTONUP leve");
 			} else if (ev.button.button == SDL_BUTTON_RIGHT) {
 				_right_button_down = false;
+				MapDragSystemButton(false, "SDL_MOUSEBUTTONUP");
 				MouseDebugLog("udalost SDL_MOUSEBUTTONUP prave");
 			}
 			HandleMouseEvents();

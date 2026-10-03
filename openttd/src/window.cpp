@@ -43,6 +43,7 @@
 #include "table/strings.h"
 
 #include "mouse_debug.h"
+#include "map_drag.h"
 
 #include "safeguards.h"
 
@@ -1125,6 +1126,7 @@ void Window::Close([[maybe_unused]] int data)
 
 	/* We can't scroll the window when it's closed. */
 	if (_last_scroll_window == this) _last_scroll_window = nullptr;
+	MapDragWindowClosed(this);
 
 	/* Make sure we don't try to access non-existing query strings. */
 	this->querystrings.clear();
@@ -1898,6 +1900,7 @@ void InitWindowSystem()
 	_mouseover_last_w = nullptr;
 	_last_scroll_window = nullptr;
 	_scrolling_viewport = false;
+	MapDragReset();
 	_mouse_hovering = false;
 
 	SetupWidgetDimensions();
@@ -2474,65 +2477,13 @@ static EventState HandleActiveWidget()
 }
 
 /**
- * End a map drag that has no button holding it up any more.
- *
- * The drag is kept alive by HandleViewportScroll(), which is last in a queue of
- * handlers, each of which may claim the event and return before it. Every one of
- * them is a left-button mode -- dragging a window, dragging in a list, laying
- * track -- so while any of those is live, nothing asks whether the map drag
- * should still be going, and it goes on for as long as the other mode lasts.
- * The map slides about under a button nobody is holding, and it only stops when
- * something else ends that other mode, which is why a stray click on the left
- * button appears to cure it.
- *
- * Ending a mode must not sit behind another mode's early return. Asked here,
- * first, before anything can claim the event. See FEATURE_DESIGN_COUPLING_TOW.md.
- *
- * Asked only for our own drag mode. The game's own four are left exactly as
- * they are, sticking button and all -- that is what they are in the list for,
- * and a setting labelled as the game's own has to behave like it. Ours is the
- * same drag with this one fault taken out, and that is the whole difference
- * between them.
- */
-static void EndViewportScrollIfLetGo()
-{
-	if (_settings_client.gui.scroll_mode != ViewportScrollMode::RMBPinned) return;
-
-	/* A drag begins with a press of the right button on the map and nowhere
-	 * else. It used to start again by itself: a drag this had ended, under a
-	 * button still remembered down, took the map back the moment the pointer
-	 * moved -- and the pointer gets pinned with it. The player's records of the
-	 * stuck button (mouse*.log, September 2026) show what that does: the system
-	 * itself goes on answering "right button held" for two to twelve seconds
-	 * after the hand has let go, and every jitter of a pixel in that time set the
-	 * map going and nailed the pointer down again, over and over, until a fresh
-	 * press and release of the button put the system right. Once it even started
-	 * a drag off a right click that had gone to a window, not the map. So: no
-	 * restart. A drag that has ended stays ended until the next press. */
-	if (!_scrolling_viewport) return;
-
-	if (_settings_client.gui.scrollwheel_scrolling == ScrollWheelScrolling::ScrollMap && _cursor.wheel_moved) return;
-
-	/* The drag goes on for as long as the right button is held, however still
-	 * the hand. It used to end after 350 ms without movement, and before that
-	 * after a second -- to cut short a button stuck down. The player: that is
-	 * no answer; the button drops out for a moment under Winlator, the drag was
-	 * ended under the hand, the pointer let go of drifted to the edge of the
-	 * screen, and the next press flung the map to its edge. The game never lets
-	 * go of a button that is held. So the drag ends when the button is let go,
-	 * or when the left one is pressed: two drags of the map cannot both be under
-	 * way, and the left button is also the way out if a release ever goes
-	 * missing. */
-	if (_right_button_down && !_left_button_down) return;
-
-	MouseDebugLog(fmt::format("tazeni: konec - {}", _left_button_down ? "stisk leveho" : "prave pusteno"));
-	_cursor.fix_at = false;
-	_scrolling_viewport = false;
-	_last_scroll_window = nullptr;
-}
-
-/**
  * Handle viewport scrolling with the mouse.
+ *
+ * The game's own drag, for the game's own four modes, and for the small map
+ * and the scroll wheel in every mode. The drag of this feature's own mode
+ * (ViewportScrollMode::RMBPinned) is a separate thing in map_drag.cpp and is
+ * asked first in MouseLoop(); nothing of it is here.
+ *
  * @return State of handling the event.
  */
 static EventState HandleViewportScroll()
@@ -2547,7 +2498,7 @@ static EventState HandleViewportScroll()
 	if (_last_scroll_window == nullptr) _last_scroll_window = FindWindowFromPt(_cursor.pos.x, _cursor.pos.y);
 
 	if (_last_scroll_window == nullptr || !((_settings_client.gui.scroll_mode != ViewportScrollMode::MapLMB && _right_button_down) || scrollwheel_scrolling || (_settings_client.gui.scroll_mode == ViewportScrollMode::MapLMB && _left_button_down))) {
-		MouseDebugLog(_last_scroll_window == nullptr ? "tazeni: konec - zadne okno pod ukazatelem" : "tazeni: konec - tlacitko uz neni dole");
+		MouseDebugLog(_last_scroll_window == nullptr ? "tazeni (hra): konec - zadne okno pod ukazatelem" : "tazeni (hra): konec - tlacitko uz neni dole");
 		_cursor.fix_at = false;
 		_scrolling_viewport = false;
 		_last_scroll_window = nullptr;
@@ -2604,7 +2555,7 @@ static EventState HandleViewportScroll()
  * @param w Window to bring relatively on-top
  * @return false if the window has an active modal child, true otherwise
  */
-static bool MaybeBringWindowToFront(Window *w)
+bool MaybeBringWindowToFront(Window *w)
 {
 	bool bring_to_front = false;
 
@@ -2974,7 +2925,11 @@ static void MouseLoop(MouseClick click, int mousewheel)
 	HandlePlacePresize();
 	UpdateTileSelection();
 
-	EndViewportScrollIfLetGo();
+	/* This feature's own map drag, first. Everything below may claim the event
+	 * and return before the next; a press of the right button over the map has
+	 * to reach the drag whatever else is going on, and a drag that is on has
+	 * the mouse to itself until the button is let go. See map_drag.h. */
+	if (MapDragMouse(click == MouseClick::Right, click == MouseClick::Left || click == MouseClick::DoubleLeft) == EventState::Handled) return;
 
 	if (VpHandlePlaceSizingDrag()  == EventState::Handled) return;
 	if (HandleMouseDragDrop()      == EventState::Handled) return;
@@ -3030,18 +2985,16 @@ static void MouseLoop(MouseClick click, int mousewheel)
 				break;
 
 			case MouseClick::Right:
-				if (!w->flags.Test(WindowFlag::DisableVpScroll) &&
+				/* The game's own drag begins here, for the game's own modes.
+				 * In this feature's own mode the press has already been to
+				 * map_drag.cpp, which took it if it was a drag; what gets here
+				 * was not one, and must not become one by the game's rules. */
+				if (!MapDragOurs() && !w->flags.Test(WindowFlag::DisableVpScroll) &&
 						_settings_client.gui.scroll_mode != ViewportScrollMode::MapLMB) {
 					_scrolling_viewport = true;
-					/* Ours locks the pointer, exactly as the game's own default
-					 * on Windows does: the drawn cursor stays where the drag
-					 * began and the pointer is put back to it every frame, which
-					 * is what makes it genuinely stay still. The only thing ours
-					 * changes is that the button cannot get stuck. */
-					_cursor.fix_at = (_settings_client.gui.scroll_mode == ViewportScrollMode::RMBPinned ||
-							_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed ||
+					_cursor.fix_at = (_settings_client.gui.scroll_mode == ViewportScrollMode::ViewportRMBFixed ||
 							_settings_client.gui.scroll_mode == ViewportScrollMode::MapRMBFixed);
-					MouseDebugLog("tazeni: zacatek stiskem praveho");
+					MouseDebugLog("tazeni (hra): zacatek stiskem praveho");
 					DispatchRightClickEvent(w, x - w->left, y - w->top);
 					return;
 				}

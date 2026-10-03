@@ -41,6 +41,7 @@
 #endif /* WITH_OPENGL */
 
 #include "../mouse_debug.h"
+#include "../map_drag.h"
 
 #include "../safeguards.h"
 
@@ -589,6 +590,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_LBUTTONDOWN:
 			SetCapture(hwnd);
 			_left_button_down = true;
+			MapDragSystemButton((wParam & MK_RBUTTON) != 0, "WM_LBUTTONDOWN");
 			MouseDebugLog("zprava WM_LBUTTONDOWN");
 			HandleMouseEvents();
 			return 0;
@@ -596,6 +598,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_LBUTTONUP:
 			_left_button_down = false;
 			_left_button_clicked = false;
+			MapDragSystemButton((wParam & MK_RBUTTON) != 0, "WM_LBUTTONUP");
 			MouseDebugLog(fmt::format("zprava WM_LBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
 			/* Capture is a single thing, not one per button: releasing it while
 			 * the other button is still held throws away the grab that button
@@ -625,12 +628,14 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * is stuck and nothing else can be trusted. The player pressed it
 			 * for days and no record was written. */
 			_ctrl_pressed = (wParam & MK_CONTROL) != 0;
+			MapDragSystemButton(true, "WM_RBUTTONDOWN");
 			MouseDebugLog(fmt::format("zprava WM_RBUTTONDOWN (ctrl={})", _ctrl_pressed ? 1 : 0));
 			HandleMouseEvents();
 			return 0;
 
 		case WM_RBUTTONUP:
 			_right_button_down = false;
+			MapDragSystemButton(false, "WM_RBUTTONUP");
 			MouseDebugLog(fmt::format("zprava WM_RBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
 			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
@@ -680,6 +685,11 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					y = (int16_t)HIWORD(m.lParam);
 				}
 			}
+
+			/* The message carries the buttons as the system had them when it
+			 * was made (MK_RBUTTON), unasked -- against which map_drag.cpp
+			 * holds what the game remembers. */
+			MapDragSystemButton((wParam & MK_RBUTTON) != 0, "WM_MOUSEMOVE");
 
 			bool warp = _cursor.UpdateCursorPosition(x, y);
 			MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}){}", x, y, warp ? " -> ukazatel vracen (SetCursorPos)" : ""));

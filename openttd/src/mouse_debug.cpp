@@ -12,6 +12,7 @@
 #include "gfx_func.h"
 #include "fileio_func.h"
 #include "settings_type.h"
+#include "map_drag.h"
 #include "core/enum_type.hpp"
 #include "3rdparty/fmt/chrono.h"
 
@@ -61,11 +62,12 @@ void MouseDebugLog(std::string_view what)
 	while (_mouse_debug.size() >= 60000) _mouse_debug.pop_front();
 
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - _mouse_debug_start).count();
-	_mouse_debug.push_back({now, fmt::format("{:>9} ms  L={} R={} Rclk={} pos=({},{}) delta=({},{}) pin={} drag={} mode={}  {}",
+	_mouse_debug.push_back({now, fmt::format("{:>9} ms  L={} R={} Rclk={} sys={} pos=({},{}) delta=({},{}) pin={} nase={} hra={} mode={}  {}",
 			ms,
 			_left_button_down ? 1 : 0, _right_button_down ? 1 : 0, _right_button_clicked ? 1 : 0,
+			_right_button_system.has_value() ? (*_right_button_system ? "1" : "0") : "?",
 			_cursor.pos.x, _cursor.pos.y, _cursor.delta.x, _cursor.delta.y,
-			_cursor.fix_at ? 1 : 0, _scrolling_viewport ? 1 : 0,
+			_cursor.fix_at ? 1 : 0, MapDragOn() ? 1 : 0, _scrolling_viewport ? 1 : 0,
 			to_underlying(_settings_client.gui.scroll_mode),
 			what)});
 }
@@ -82,7 +84,7 @@ std::string MouseDebugSave()
 	auto file = FioFOpenFile(name, "w", Subdirectory::None);
 	if (!file.has_value()) return {};
 
-	fmt::print(*file, "Mouse debug: last {} ms before the save. L/R = buttons as the game remembers them, Rclk = right click waiting to be handled, pin = pointer pinned, drag = map drag on, mode = scroll mode setting (0 = ours).\n", MOUSE_DEBUG_KEEP_MS);
+	fmt::print(*file, "Mouse debug: last {} ms before the save. L/R = buttons as the game remembers them, Rclk = right click waiting to be handled, sys = right button as the system's latest mouse message had it (? = no message yet), pin = pointer pinned, nase = our own map drag on (map_drag.cpp), hra = the game's own drag on, mode = scroll mode setting (0 = ours).\n", MOUSE_DEBUG_KEEP_MS);
 	for (const MouseDebugEntry &e : _mouse_debug) {
 		fmt::print(*file, "{}\n", e.line);
 	}

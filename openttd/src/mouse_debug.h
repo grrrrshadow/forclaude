@@ -15,7 +15,9 @@
  * mouse message, every warp of the pointer, every reading of the buttons off
  * the system, every start and end of a drag is written here as it happens;
  * only the last twenty seconds are kept. Ctrl and Alt pressed together save
- * them beside the saved games, where the crash reports go.
+ * them beside the saved games, where the crash reports go; and the map drag
+ * of this feature's own mode (map_drag.h) saves them by itself when the
+ * button and the map disagree.
  */
 
 #ifndef MOUSE_DEBUG_H

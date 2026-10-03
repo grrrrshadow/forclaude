@@ -1892,9 +1892,9 @@ STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREY_TO_RED                :Šedá až čer
 STR_CONFIG_SETTING_LINKGRAPH_COLOURS_GREYSCALE                  :Stupně šedi
 
 STR_CONFIG_SETTING_SCROLLMODE                                   :Posouvání mapy: {STRING}
-STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Jak se chová posouvání mapy. První volba je to, co má hra sama na Windows přednastavené, jen bez jedné chyby: tlačítko se nemůže zaseknout a držet tažení, které už nikdo nedrží, a když se to přesto stane, stisk levého tlačítka to ukončí. Ostatní jsou volby, které má hra sama, nechané přesně tak, jak jsou
+STR_CONFIG_SETTING_SCROLLMODE_HELPTEXT                          :Jak se chová posouvání mapy. První volba je vlastní tažení tohoto rozšíření, napsané znovu: začíná stiskem pravého tlačítka nad mapou a končí jen jeho puštěním nebo stiskem levého – hra nikdy sama nepouští tlačítko, které držíte. Když se tlačítko a mapa rozcházejí, debug myši se sám uloží vedle uložených her. Ostatní jsou volby, které má hra sama, nechané přesně tak, jak jsou
 ###length 4
-STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Pravým tlačítkem myši, poloha myši uzamčena, bez zasekávání tlačítka
+STR_CONFIG_SETTING_SCROLLMODE_PINNED                            :Pravým tlačítkem myši, poloha myši uzamčena (vlastní tlačítko rozšíření)
 STR_CONFIG_SETTING_SCROLLMODE_DEFAULT                           :Pohyb v pohledu pomocí pravého tlačítka myši, poloha myši uzamčena
 STR_CONFIG_SETTING_SCROLLMODE_RMB_LOCKED                        :Pohyb v mapě pomocí pravého tlačítka myši, poloha myši uzamčena
 STR_CONFIG_SETTING_SCROLLMODE_RMB                               :Pohyb v mapě pomocí pravého tlačítka myši
@@ -5248,6 +5248,7 @@ STR_ORDER_HONK_TOOLTIP                                          :{BLACK}Vlak př
 STR_ORDER_HONK_SUFFIX                                           :{SPACE}(zahoukat)
 STR_ORDER_NO_HONK_SUFFIX                                        :{SPACE}(nehoukat)
 STR_MOUSE_DEBUG_SAVED                                           :{WHITE}Debug myši uložen: {STRING}
+STR_MOUSE_DEBUG_SAVED_AUTO                                      :{WHITE}Debug myši se uložil sám: {STRING}
 STR_MOUSE_DEBUG_FAILED                                          :{WHITE}Debug myši se nepodařilo uložit
 STR_ORDER_REVERSE_OUT                                           :{BLACK}Reversní chod
 STR_ORDER_REVERSE_OUT_TOOLTIP                                   :{BLACK}Vrať se, kudy jsi přijel. Při odjezdu z této stanice jet reversním chodem, místo aby vlak pokračoval stejným směrem.

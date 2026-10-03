@@ -271,6 +271,8 @@ add_files(
     livery.h
     main_gui.cpp
     map.cpp
+    map_drag.cpp
+    map_drag.h
     map_func.h
     map_type.h
     mars_houses.cpp
