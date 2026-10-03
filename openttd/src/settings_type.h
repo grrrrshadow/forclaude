@@ -215,6 +215,10 @@ enum class ViewportAutoscrolling : uint8_t {
 };
 
 /** Settings related to the GUI and other stuff that is not saved in the savegame. */
+
+/** The default sprite memory in MB (gui.sprite_cache_size_mb): for the default zoom, 8x, four times the original game's 512 MB for 4x. */
+static constexpr uint32_t SPRITE_CACHE_DEFAULT_MB = 2048;
+
 struct GUISettings {
 	bool sg_full_load_any; ///< new full load calculation, any cargo must be full read from pre v93 savegames
 	bool lost_vehicle_warn; ///< if a vehicle can't find its destination, show a warning

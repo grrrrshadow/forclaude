@@ -2206,7 +2206,7 @@ STR_CONFIG_SETTING_ZOOM_LVL_OUT_8X                              :8x
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN                              :Highest resolution sprites to use: {STRING2}
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Limit the maximum resolution to use for sprites. Limiting sprite resolution will avoid using high resolution graphics even when available. This can help keep the game appearance unified when using a mix of NewGRF files with and without high resolution graphics
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE                            :Memory for sprites: {STRING2}
-STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :How much memory the game may keep sprites in, with a 32bpp blitter (a quarter of it with 8bpp). When it is full the game drops sprites and loads them again as the view moves, which shows as stutter. A game with many NewGRFs wants more; 8x zoom keeps four times the sprite memory of 4x and 16x four times that again. 512 MB is the original game's amount
+STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :How much memory the game may keep sprites in, with a 32bpp blitter (a quarter of it with 8bpp). When it is full the game drops sprites and loads them again as the view moves, which shows as stutter. A game with many NewGRFs wants more; 8x zoom keeps four times the sprite memory of 4x and 16x four times that again. The default, 2048 MB, is for this game's default zoom, 8x: four times the original game's 512 MB, which was meant for 4x. 16x wants about 8192 MB
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
 ###length 5
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_16X                       :16x

@@ -49,7 +49,6 @@ large_size = 0
 mono_size = 0
 global_aa = true
 prefer_sprite_font = false
-sprite_cache_size_px = 128
 transparency_options = 0
 transparency_locks = 0
 invisibility_options = 0

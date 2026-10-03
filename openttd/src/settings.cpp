@@ -184,6 +184,7 @@ enum IniFileVersion : uint32_t {
 	IFV_DEFAULT_RAIL_ROAD,                                 ///< 8  PR#15585 Update default rail type setting to support road and tram tiles
 	IFV_ZOOM_IN_8X,                                        ///< 9  This build: the zoom levels gained In8x in front of 4x, so zoom_min, zoom_max and sprite_zoom_min each name one level more.
 	IFV_ZOOM_IN_16X,                                       ///< 10 This build: the zoom levels gained In16x in front of 8x, one level more again; the sprite memory moved from misc sprite_cache_size_px (megapixels) to gui.sprite_cache_size_mb.
+	IFV_SPRITE_MEMORY_8X,                                  ///< 11 This build: the default sprite memory went from 512 MB (upstream's, for 4x) to SPRITE_CACHE_DEFAULT_MB for the default zoom, 8x.
 
 	IFV_MAX_VERSION,       ///< Highest possible ini-file version.
 };
@@ -1637,6 +1638,14 @@ void LoadFromConfig(bool startup)
 			auto value = ParseInteger<uint32_t>(*px->value);
 			if (value.has_value()) _settings_client.gui.sprite_cache_size_mb = Clamp<uint32_t>(*value * 4, 64, 16384);
 		}
+	}
+
+	/* Then the default sprite memory went from upstream's 512 MB, sized for
+	 * 4x, to one for the default zoom, 8x. A config holding exactly the old
+	 * default is given the new one; any other value is the player's own and
+	 * stays. */
+	if (startup && generic_version < IFV_SPRITE_MEMORY_8X && _settings_client.gui.sprite_cache_size_mb == 512) {
+		_settings_client.gui.sprite_cache_size_mb = SPRITE_CACHE_DEFAULT_MB;
 	}
 
 	/* Load basic settings only during bootstrap, load other settings not during bootstrap */

@@ -2305,7 +2305,7 @@ STR_CONFIG_SETTING_ZOOM_LVL_OUT_8X                              :8x
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN                              :Nejvyšší dovolené rozlišení spritů: {STRING}
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Omezte maximální rozlišení používané pro sprity. Omezení rozlišení spritů zabrání použití grafiky ve vysokém rozlišení, i když je k dispozici. To může pomoci udržet jednotný vzhled hry při použití kombinace souborů NewGRF s grafikou ve vysokém rozlišení a bez ní.
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE                            :Paměť pro sprity: {STRING}
-STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :Kolik paměti smí hra držet sprity, s 32bpp blitterem (s 8bpp čtvrtinu). Když je plná, hra sprity zahazuje a při posunu pohledu je načítá znova, což se projeví škubáním. Hra s mnoha NewGRF chce víc; přiblížení 8x drží čtyřikrát víc paměti spritů než 4x a 16x zase čtyřikrát víc. 512 MB je množství původní hry
+STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :Kolik paměti smí hra držet sprity, s 32bpp blitterem (s 8bpp čtvrtinu). Když je plná, hra sprity zahazuje a při posunu pohledu je načítá znova, což se projeví škubáním. Hra s mnoha NewGRF chce víc; přiblížení 8x drží čtyřikrát víc paměti spritů než 4x a 16x zase čtyřikrát víc. Výchozích 2048 MB je pro výchozí přiblížení této hry, 8x: čtyřikrát 512 MB původní hry, které bylo pro 4x. 16x chce asi 8192 MB
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
 ###length 5
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_16X                       :16x
