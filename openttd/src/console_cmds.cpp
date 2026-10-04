@@ -5782,8 +5782,8 @@ static bool ConTestDemolishDepot(std::span<std::string_view> argv)
  */
 static bool ConTestOpenWindow(std::span<std::string_view> argv)
 {
-	if (argv.size() != 2 && !(argv.size() == 3 && (argv[1] == "smer" || argv[1] == "letadlo" || argv[1] == "rozkazy"))) {
-		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|auto|<unit number>]' or 'testokno smer <waypoint index>'.");
+	if (argv.size() != 2 && !(argv.size() == 3 && (argv[1] == "smer" || argv[1] == "letadlo" || argv[1] == "rozkazy" || argv[1] == "vozidlo"))) {
+		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|auto|<unit number>]', 'testokno vozidlo <unit number>', 'testokno jetdo' or 'testokno smer <waypoint index>'.");
 		return true;
 	}
 	if (argv.size() == 3 && argv[1] == "smer") {
@@ -5800,6 +5800,26 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 		}
 		ShowWaypointWindow(wp);
 		IConsolePrint(CC_DEFAULT, "testokno: okno smerovani {} otevreno.", wp->index.base());
+		return true;
+	}
+	if (argv[1] == "vozidlo" && argv.size() > 2) {
+		/* Only the vehicle's window, for a real click on its buttons from the rig. */
+		auto unit = ParseInteger(argv[2]);
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (!unit.has_value() || v->First() != v || !v->IsPrimaryVehicle() || v->unitnumber != (UnitID)*unit) continue;
+			ShowVehicleViewWindow(v);
+			IConsolePrint(CC_DEFAULT, "testokno: okno vozidla {} otevreno", v->unitnumber);
+			break;
+		}
+		return true;
+	}
+	if (argv[1] == "jetdo") {
+		/* Which window, if any, has the pointer for placing right now (the
+		 * Go To of an orders window is one): read after a real click, which
+		 * the console cannot make. */
+		const Window *w = _thd.window_class == WindowClass::Invalid ? nullptr : FindWindowById(_thd.window_class, _thd.window_number);
+		IConsolePrint(CC_DEFAULT, "testokno: ukazatel pro umisteni ma okno tridy {} cislo {}{}, okno rozkazu otevreno {}", to_underlying(_thd.window_class), static_cast<int32_t>(_thd.window_number),
+				w == nullptr ? " (zadne)" : "", FindWindowByClass(WindowClass::VehicleOrders) != nullptr ? "ano" : "ne");
 		return true;
 	}
 	if (argv[1] == "letadlo" || argv[1] == "rozkazy") {
@@ -5835,7 +5855,13 @@ static bool ConTestOpenWindow(std::span<std::string_view> argv)
 			if (want != VehicleType::Invalid && v->type != want) continue;
 			if (punit2.has_value() && v->unitnumber != (UnitID)*punit2) continue;
 			ShowVehicleViewWindow(v);
-			if (argv[1] == "rozkazy") ShowOrdersWindow(v);
+			if (argv[1] == "rozkazy") {
+				ShowOrdersWindow(v);
+				/* Quick creation of orders (gui.quick_goto): whether the window came up with Go To on. */
+				uint stations = static_cast<uint>(std::ranges::count_if(v->Orders(), [](const Order &order) { return order.IsType(OT_GOTO_STATION); }));
+				IConsolePrint(CC_DEFAULT, "testokno: rozkazy vozidla {} (rozkazu do stanice {}), rychle zadavani {}, jet do {}", v->unitnumber, stations,
+						_settings_client.gui.quick_goto ? "zap" : "vyp", _thd.window_class == WindowClass::VehicleOrders && _thd.window_number == v->index ? "aktivni" : "neaktivni");
+			}
 			/* Whether the crosshair row is in the window right now, not
 			 * whether it would be there if the window were opened again: the
 			 * switch has to reach windows that are already open. */
