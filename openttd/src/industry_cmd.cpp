@@ -992,19 +992,44 @@ static const uint PLANTATION_ROAD_GIRLS_SE_X = 1;
  * Lay a finished tile of the marijuana plantation from its pictures, after
  * the ground: the soil, the plants on it as its child, a girl at work as the
  * next; and from the row behind the field road, the road over the player's
- * tile a tile further on, with the shed and the girls by it as its children.
+ * tile a tile further on, and on it the shed, the haystack and the girls by
+ * the road.
  *
- * The road is a sprite of its own, placed on the tile it covers, so that the
- * sorter puts the player's cars and stop there over it; the soil's children
- * follow the soil whatever else is drawn, so the plants never come apart
- * from their tile.
+ * Where each goes in the sorting is the colleague's working-out (grrrrf
+ * hra/zarovnani-budov/ODPOVED-PRO-HRU.md, 3 and 4 October), after the
+ * player saw cars vanish under the road and the girls under a stop:
+ *
+ * - the road is held by the field tile behind it, as ISR/DWE Objects II hold
+ *   their road-overlapping tile: a box over both tiles with no height
+ *   (zmax below zmin), which the sorter always puts behind whatever stands
+ *   on the road -- the player's cars, a stop -- while the picture is drawn a
+ *   tile on, where the road is. A box of height 1 on the road tile met the
+ *   cars' boxes and was sorted by the sum of its corners: a car going
+ *   south-west went under the road on entering the tile, and one going
+ *   north-east lost its tail to the road of the tile it was leaving;
+ * - the girls by the road stand where the player's stop may stand, so each
+ *   pair is a sprite of its own with a box of its own, the picture where the
+ *   road is: the north-west pair after the stop's far half (y 0 to 2) and
+ *   before the cars (y 4 on), the south-east pair after the stop's near half
+ *   (y 13 to 15) and the cars, before the field in front. As children of the
+ *   road they went under the stop;
+ * - the shed and the haystack at the road's end hide the halves of a stop
+ *   there (the player's wish), so they are drawn after them the same way:
+ *   the shed with the north-west box, the haystack with the south-east one.
+ *
+ * The soil's children follow the soil whatever else is drawn, so the plants
+ * never come apart from their tile.
  * @param ti the tile, after the ground was drawn
  * @param ind the plantation
  */
 static void DrawMarijuanaPlantationTile(const TileInfo *ti, const Industry *ind)
 {
 	static const SpriteBounds FIELD_BOUNDS{{0, 0, 0}, {TILE_SIZE, TILE_SIZE, 30}, {}};
-	static const SpriteBounds ROAD_BOUNDS{{0, 0, 0}, {TILE_SIZE, TILE_SIZE, 1}, {}};
+	/* From the field tile holding the road: over it and the road tile, no height, the picture a tile on. */
+	static const SpriteBounds ROAD_BOUNDS{{0, 0, 0}, {TILE_SIZE, 2 * TILE_SIZE, 0}, {0, TILE_SIZE, 0}};
+	/* From the road tile: a thin box by its north-west or south-east edge, the picture back at the tile's corner. */
+	static const SpriteBounds BY_NW_EDGE_BOUNDS{{0, 3, 0}, {TILE_SIZE, 1, 16}, {0, -3, 0}};
+	static const SpriteBounds BY_SE_EDGE_BOUNDS{{0, TILE_SIZE, 0}, {TILE_SIZE, 1, 16}, {0, -static_cast<int8_t>(TILE_SIZE), 0}};
 	bool transparent = IsTransparencySet(TransparencyOption::Industries);
 	uint x = TileX(ti->tile) - TileX(ind->location.tile);
 	uint y = TileY(ti->tile) - TileY(ind->location.tile);
@@ -1022,11 +1047,15 @@ static void DrawMarijuanaPlantationTile(const TileInfo *ti, const Industry *ind)
 	}
 
 	if (y + 1 == PLANTATION_ROAD_ROW && x < PLANTATION_WIDTH) {
-		TileIndex road_tile = TileAddXY(ti->tile, 0, 1);
-		AddSortableSpriteToDraw(SPR_MARIJUANA_ROAD, PAL_NONE, ti->x, ti->y + TILE_SIZE, GetTilePixelZ(road_tile), ROAD_BOUNDS, transparent);
-		if (x == 0) AddChildSpriteScreen(SPR_MARIJUANA_SHED, PAL_NONE, 0, 0, transparent, nullptr, false, false);
-		if (girls && x == PLANTATION_ROAD_GIRLS_NW_X) AddChildSpriteScreen(SPR_MARIJUANA_ROAD_GIRLS_NW, PAL_NONE, 0, 0, transparent, nullptr, false, false);
-		if (girls && x == PLANTATION_ROAD_GIRLS_SE_X) AddChildSpriteScreen(SPR_MARIJUANA_ROAD_GIRLS_SE, PAL_NONE, 0, 0, transparent, nullptr, false, false);
+		int road_z = GetTilePixelZ(TileAddXY(ti->tile, 0, 1));
+		int road_y = ti->y + TILE_SIZE;
+		AddSortableSpriteToDraw(SPR_MARIJUANA_ROAD, PAL_NONE, ti->x, ti->y, road_z, ROAD_BOUNDS, transparent);
+		if (x == 0) {
+			AddSortableSpriteToDraw(SPR_MARIJUANA_SHED, PAL_NONE, ti->x, road_y, road_z, BY_NW_EDGE_BOUNDS, transparent);
+			AddSortableSpriteToDraw(SPR_MARIJUANA_HAY, PAL_NONE, ti->x, road_y, road_z, BY_SE_EDGE_BOUNDS, transparent);
+		}
+		if (girls && x == PLANTATION_ROAD_GIRLS_NW_X) AddSortableSpriteToDraw(SPR_MARIJUANA_ROAD_GIRLS_NW, PAL_NONE, ti->x, road_y, road_z, BY_NW_EDGE_BOUNDS, transparent);
+		if (girls && x == PLANTATION_ROAD_GIRLS_SE_X) AddSortableSpriteToDraw(SPR_MARIJUANA_ROAD_GIRLS_SE, PAL_NONE, ti->x, road_y, road_z, BY_SE_EDGE_BOUNDS, transparent);
 	}
 }
 

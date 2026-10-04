@@ -122,6 +122,8 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/pole_prace_char16_f3_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/pole_prace_chill_f3_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/pole_prace_chill_f3_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/pole_seno_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/pole_seno_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_holky_32bpp.png

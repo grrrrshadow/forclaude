@@ -131,6 +131,10 @@ PICTURES = [
     ("chatka", "chatka_zin4.png", "strips", (264, 120), HUT_STRIPS),
     ("chatka_stoji", "chatka_stojici_zin4.png", "strips", (264, 120), HUT_STRIPS[:1]),
     ("chatka_sedi", "chatka_sedici_zin4.png", "strips", (264, 120), HUT_STRIPS[:1]),
+    # The haystack by the plantation's field road, across from the shed, on
+    # the tile frame (SPR_MARIJUANA_HAY): with the shed it hides the player's
+    # stop at the road's end.
+    ("pole_seno", "pole_seno_zin4.png", "whole", (132, 64), None),
 ]
 
 

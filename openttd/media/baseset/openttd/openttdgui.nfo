@@ -4,7 +4,7 @@
 // See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
 //
    -1 * 0	 0C "OpenTTD GUI graphics"
-   -1 * 0	 05 15 FF \w268 // OPENTTD_SPRITE_COUNT, an extended byte: above 255
+   -1 * 0	 05 15 FF \w269 // OPENTTD_SPRITE_COUNT, an extended byte: above 255
    -1 sprites/openttdgui.png 8bpp  66    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 146    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 226    8  64  31 -31   7 normal
@@ -263,16 +263,16 @@
     | sprites/pole_mari_zaklad_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
    -1 sprites/pole_cesta_8bpp.png 8bpp 0 0 62 32 -30 0 normal
     | sprites/pole_cesta_32bpp.png 32bpp 0 0 254 128 -123 0 zi4
-   -1 sprites/pole_bouda_8bpp.png 8bpp 0 0 23 20 -18 -8 normal
-    | sprites/pole_bouda_32bpp.png 32bpp 0 0 155 133 -92 -34 zi4
+   -1 sprites/pole_bouda_8bpp.png 8bpp 0 0 28 21 -31 -2 normal
+    | sprites/pole_bouda_32bpp.png 32bpp 0 0 174 132 -127 -10 zi4
    -1 sprites/pole_mari_male_8bpp.png 8bpp 0 0 41 26 -16 1 normal
     | sprites/pole_mari_male_32bpp.png 32bpp 0 0 253 133 -123 -6 zi4
    -1 sprites/pole_mari_vzrostle_8bpp.png 8bpp 0 0 54 35 -26 -8 normal
     | sprites/pole_mari_vzrostle_32bpp.png 32bpp 0 0 254 162 -123 -34 zi4
-   -1 sprites/pole_holky_sz_8bpp.png 8bpp 0 0 16 13 -19 -2 normal
-    | sprites/pole_holky_sz_32bpp.png 32bpp 0 0 65 66 -76 -11 zi4
-   -1 sprites/pole_holky_jv_8bpp.png 8bpp 0 0 11 11 0 15 normal
-    | sprites/pole_holky_jv_32bpp.png 32bpp 0 0 44 52 0 60 zi4
+   -1 sprites/pole_holky_sz_8bpp.png 8bpp 0 0 9 9 -10 -3 normal
+    | sprites/pole_holky_sz_32bpp.png 32bpp 0 0 36 50 -39 -14 zi4
+   -1 sprites/pole_holky_jv_8bpp.png 8bpp 0 0 11 10 3 16 normal
+    | sprites/pole_holky_jv_32bpp.png 32bpp 0 0 45 55 12 60 zi4
    -1 sprites/pole_prace_real_f2_8bpp.png 8bpp 0 0 4 6 3 6 normal
     | sprites/pole_prace_real_f2_32bpp.png 32bpp 0 0 233 123 -113 3 zi4
    -1 sprites/pole_prace_sedi_f2_8bpp.png 8bpp 0 0 3 5 -3 15 normal
@@ -311,4 +311,6 @@
     | sprites/chatka_stoji_predni_32bpp.png 32bpp 0 0 135 109 -22 -34 zi4
    -1 sprites/chatka_sedi_predni_8bpp.png 8bpp 0 0 35 11 -14 3 normal
     | sprites/chatka_sedi_predni_32bpp.png 32bpp 0 0 144 47 -57 10 zi4
+   -1 sprites/pole_seno_8bpp.png 8bpp 0 0 19 19 14 4 normal
+    | sprites/pole_seno_32bpp.png 32bpp 0 0 162 119 -30 2 zi4
 

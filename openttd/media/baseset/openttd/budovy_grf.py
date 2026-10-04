@@ -55,9 +55,20 @@ MANIFEST = HERE / "budovy_manifest.json"
 OUT = HERE.parent / "decouple" / "grafika" / "budovy.grf"
 
 GRFID = b"DCP8"
-NAME = "Decouple: budovy (gymnázium, automat, socha, pole, holky)"
-DESCRIPTION = ("Grafika budov hry: 8bpp, 4x a 8x. Vestavěný statický GRF hry, "
-               "sprity OpenTTD GUI od 231. Píše budovy_grf.py z obrázků kolegy.")
+NAME = "Decouple: budovy (gymnázium, automat, socha, plantáž, chatka, holky)"
+# What the set shows is what it has on top of the original game: 32bpp at
+# zin4 and zin8 (the player's word: "8bpp nikde nepíšeme, jen 32bpp", "všude
+# psát zin8"). The palette sprites for an 8bpp blitter are in it all the same.
+DESCRIPTION = ("Grafika budov hry: 32bpp zin4 a zin8. Vestavěný statický GRF hry "
+               "OpenTTD decouple by Karel Mácha, sprity OpenTTD GUI od 231. "
+               "Píše budovy_grf.py z obrázků kolegy.")
+#: The lock, as in the colleague's V3S: the set asks this game's own feature
+#: test and refuses to load where nobody answers it -- in plain OpenTTD the
+#: player could otherwise put it in a game as an ordinary set, where it means
+#: nothing (it replaces this game's own GUI sprites).
+LOCK_FEATURE = "decouple_128_cargo"
+LOCK_BIT = 8  # of global variable 0x9D, the bit the feature test sets
+LOCK_MESSAGE = "Tento GRF patří ke hře OpenTTD decouple by Karel Mácha a jinde nefunguje."
 FIRST_GUI_SPRITE = 231  # SPR_OPENTTD_BASE + 231: the first of the buildings in openttdgui.nfo
 
 ZOOM_NORMAL, ZOOM_4X, ZOOM_8X = 0, 1, 6
@@ -163,15 +174,41 @@ def real(sprite_id: int) -> bytes:
     return struct.pack("<IBI", 4, 0xFD, sprite_id)
 
 
-def action14_palette() -> bytes:
-    # Node ids are read as little-endian uint32 and compared to 'INFO' and
-    # 'PALS', so they stand reversed in the file. 'D': DOS palette, the one
-    # openttd_budovy.py quantises to.
-    return b"\x14" + b"C" + b"OFNI" + b"B" + b"SLAP" + struct.pack("<H", 1) + b"D" + b"\x00" + b"\x00"
+def grf_text(text: str) -> bytes:
+    """A GRF string: UTF-8 is marked by a leading thorn (C3 9E), else the game reads the bytes as Latin-1."""
+    return "\u00de".encode("utf-8") + text.encode("utf-8") + b"\x00"
+
+
+def action14() -> bytes:
+    """The palette, and the feature test the lock asks (before Action 8: the game reads Action 14 only up to it).
+
+    Node ids stand in the file as they read, "INFO", "PALS", "FTST" (the game
+    reads a little-endian uint32 and swaps it before comparing; they were
+    written reversed here once, and the palette was never read). 'D': DOS
+    palette, the one openttd_budovy.py quantises to. The test: the name,
+    version 1 at least, and the bit of 0x9D to set when the game knows it.
+    """
+    info = b"C" + b"INFO" + b"B" + b"PALS" + struct.pack("<H", 1) + b"D" + b"\x00"
+    test = (b"C" + b"FTST"
+            + b"T" + b"NAME" + b"\x7f" + LOCK_FEATURE.encode("ascii") + b"\x00"
+            + b"B" + b"MINV" + struct.pack("<HH", 2, 1)
+            + b"B" + b"SETP" + struct.pack("<HB", 1, LOCK_BIT)
+            + b"\x00")
+    return b"\x14" + info + test + b"\x00"
 
 
 def action8() -> bytes:
-    return b"\x08\x08" + GRFID + NAME.encode("utf-8") + b"\x00" + DESCRIPTION.encode("utf-8") + b"\x00"
+    return b"\x08\x08" + GRFID + grf_text(NAME) + grf_text(DESCRIPTION)
+
+
+def action7_lock() -> bytes:
+    """Skip the next sprite (the refusal) when the game answered the feature test: bit LOCK_BIT of 0x9D is set."""
+    return bytes([0x07, 0x9D, 0x01, 0x00, LOCK_BIT, 0x01])
+
+
+def actionb_lock() -> bytes:
+    """Refuse to load: fatal, any language, a message of our own."""
+    return bytes([0x0B, 0x03, 0x7F, 0xFF]) + grf_text(LOCK_MESSAGE) + b"\x00"
 
 
 def extended_byte(value: int) -> bytes:
@@ -212,9 +249,11 @@ def main() -> None:
 
     data = bytearray()
     sprites = bytearray()
-    data += pseudo(struct.pack("<I", 3 + len(runs) + count))  # sprite 0: how many sprites; the game skips it
-    data += pseudo(action14_palette())
+    data += pseudo(struct.pack("<I", 5 + len(runs) + count))  # sprite 0: how many sprites; the game skips it
+    data += pseudo(action14())
     data += pseudo(action8())
+    data += pseudo(action7_lock())
+    data += pseudo(actionb_lock())
     sprite_id = 0
     for offset, run in runs:
         data += pseudo(action5(len(run), offset))
@@ -235,7 +274,7 @@ def main() -> None:
     out.write_bytes(grf)
     where = ", ".join(f"{offset}..{offset + len(run) - 1}" for offset, run in runs)
     print(f"{out}: {count} sprites (OpenTTD GUI {where}), "
-          f"each at normal (8bpp), {'4x and ' if with_4x else ''}8x, {len(grf) / 1024 / 1024:.2f} MB")
+          f"32bpp {'zin4 and ' if with_4x else ''}zin8, {len(grf) / 1024 / 1024:.2f} MB")
 
 
 if __name__ == "__main__":

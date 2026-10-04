@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 268;
+static const uint16_t OPENTTD_SPRITE_COUNT = 269;
 /** @} */
 
 /** @{
@@ -255,8 +255,8 @@ static const SpriteID SPR_STATUE_BRONZE_GIRLS        = SPR_OPENTTD_BASE + 241;
  * plants and one with the grown ones, which cover her as they should. The
  * field road along x lies on the row the industry leaves to the player
  * (PLANTATION_ROAD_ROW), drawn from the field tile behind it a tile further
- * on, with the shed at the road's end and the girls by its north-west and
- * south-east edge as its children. */
+ * on, and the shed at the road's end and the girls by its north-west and
+ * south-east edge as sprites of their own over it. */
 static const SpriteID SPR_MARIJUANA_SOIL             = SPR_OPENTTD_BASE + 242;
 static const SpriteID SPR_MARIJUANA_ROAD             = SPR_OPENTTD_BASE + 243;
 static const SpriteID SPR_MARIJUANA_SHED             = SPR_OPENTTD_BASE + 244;
@@ -283,6 +283,10 @@ static const SpriteID SPR_HUT_FRONT                  = SPR_OPENTTD_BASE + 264;
 static const SpriteID SPR_HUT_BACK                   = SPR_OPENTTD_BASE + 265;
 static const SpriteID SPR_HUT_GIRLS_STANDING         = SPR_OPENTTD_BASE + 266;
 static const SpriteID SPR_HUT_GIRLS_SITTING          = SPR_OPENTTD_BASE + 267;
+/* The haystack by the plantation's field road, across from the shed at its
+ * end: with the shed it hides the player's stop there (see
+ * DrawMarijuanaPlantationTile()). */
+static const SpriteID SPR_MARIJUANA_HAY              = SPR_OPENTTD_BASE + 268;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

@@ -20,11 +20,13 @@ nevidí, nikam se neukládá a nesmí měnit stav hry (hra ho čte jako statick�
 stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
 
 - `budovy.grf`: budovy průmyslů hry (gymnázium, automat, socha, dlaždice
-  marihuanové plantáže, chatka hulírny, holky na zastávce) v 8bpp, 4× a 8×. Píše ho `../openttd/budovy_grf.py` z kousků,
+  marihuanové plantáže, chatka hulírny, holky na zastávce) ve 32bpp zin4 a zin8.
+  Zamčený na tuto hru (dotaz decouple_128_cargo jako u V3S): jinde se vypne
+  s hláškou. Píše ho `../openttd/budovy_grf.py` z kousků,
   které nařeže `../openttd/openttd_budovy.py`; do `openttd.grf` je grfcodec
   dát neumí (nezná 8×). Přepisuje tytéž sprity OpenTTD GUI (Action 5, typ
-  0x15 s posunem), takže i 4× a 8bpp verze jsou tu znova – sprite se přepisuje
-  celý se všemi úrovněmi.
+  0x15 s posunem), takže jsou tu znova všechny jeho úrovně, i zin4 – sprite se
+  přepisuje celý.
 - Nový obrázek od kolegy: PNG do `../openttd/`, pak
   `python3 openttd_budovy.py && python3 budovy_grf.py` tamtéž.
 
