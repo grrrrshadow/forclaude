@@ -35,6 +35,8 @@
 
 #include "table/strings.h"
 
+#include "../settings_func.h"
+
 #include "../safeguards.h"
 
 /* This file handles all the client-commands */
@@ -1313,6 +1315,14 @@ bool NetworkIsValidClientName(std::string_view client_name)
 bool NetworkValidateClientName(std::string &client_name)
 {
 	StrTrimInPlace(client_name);
+	/* A player the game is not for, found when the name is put to use --
+	 * joining or starting a game, or set -- and not while it is being
+	 * typed, where a longer name passes through a shorter one on the way
+	 * (IsShunnedPlayerName()). */
+	if (IsShunnedPlayerName(client_name)) {
+		_exit_game = true;
+		return false;
+	}
 	if (NetworkIsValidClientName(client_name)) return true;
 
 	ShowErrorMessage(GetEncodedString(STR_NETWORK_ERROR_BAD_PLAYER_NAME), {}, WarningLevel::Error);
@@ -1337,6 +1347,13 @@ bool NetworkValidateOurClientName()
  */
 void NetworkUpdateClientName(const std::string &client_name)
 {
+	/* Taking the name of a player the game is not for closes it, as it does
+	 * at the start (IsShunnedPlayerName()). */
+	if (IsShunnedPlayerName(client_name)) {
+		_exit_game = true;
+		return;
+	}
+
 	NetworkClientInfo *ci = NetworkClientInfo::GetByClientID(_network_own_client_id);
 	if (ci == nullptr) return;
 

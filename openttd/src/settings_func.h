@@ -23,6 +23,8 @@ void IConsoleGetSetting(std::string_view name, bool force_newgame = false);
 void IConsoleListSettings(std::string_view prefilter);
 
 void LoadFromConfig(bool minimal = false);
+bool IsShunnedPlayerName(std::string_view name);
+bool ConfigNamesShunnedPlayer();
 void SaveToConfig();
 
 void IniLoadWindowSettings(IniFile &ini, std::string_view grpname, WindowDesc *desc);

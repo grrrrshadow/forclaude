@@ -1574,6 +1574,48 @@ void TakeOverPlayersConfig(const std::string &theirs_dir, const std::string &our
 }
 
 /**
+ * The names of the players this game is not for, exactly as they sign
+ * themselves, small letters and all. The player's word: they run the game
+ * down and hid it; the game does not play for them -- no tricks, it simply
+ * parts company and closes before anything is shown.
+ */
+static constexpr std::string_view SHUNNED_PLAYER_NAMES[] = {"mmtunligit", "Emperor Jake", "ghebeek"};
+
+/**
+ * Is this the name of a player the game is not for (SHUNNED_PLAYER_NAMES)?
+ * Exactly, letter for letter and in the same case; spaces round the name
+ * do not count, as the game drops them from a player's name anyway.
+ * @param name the name a player goes by (network.client_name)
+ * @return whether the game closes for it
+ */
+bool IsShunnedPlayerName(std::string_view name)
+{
+	name = StrTrimView(name, StringConsumer::WHITESPACE_NO_NEWLINE);
+	return std::ranges::find(SHUNNED_PLAYER_NAMES, name) != std::end(SHUNNED_PLAYER_NAMES);
+}
+
+/**
+ * Does the configuration name a player the game is not for? Read straight
+ * from the config files, before anything else is loaded or shown, so the
+ * game can close at once (openttd_main()). The name is in the private file,
+ * or in the main one for a config from before the two were split; a vanilla
+ * player's name comes over into ours on the first start (TakeOverPlayersConfig()).
+ * @return whether the game closes
+ */
+bool ConfigNamesShunnedPlayer()
+{
+	for (const std::string *file : {&_private_file, &_config_file}) {
+		if (file->empty()) continue;
+		ConfigIniFile ini(*file);
+		const IniGroup *network = ini.GetGroup("network");
+		if (network == nullptr) continue;
+		const IniItem *name = network->GetItem("client_name");
+		if (name != nullptr && name->value.has_value() && IsShunnedPlayerName(*name->value)) return true;
+	}
+	return false;
+}
+
+/**
  * Load the values from the configuration files
  * @param startup Load the minimal amount of the configuration to "bootstrap" the blitter and such.
  */

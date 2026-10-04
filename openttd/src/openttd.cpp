@@ -699,6 +699,10 @@ int openttd_main(std::span<std::string_view> arguments)
 
 	LoadFromConfig(true);
 
+	/* A player the game is not for (IsShunnedPlayerName()): close before a
+	 * window is opened or a setting can be reached. */
+	if (ConfigNamesShunnedPlayer()) return 0;
+
 	if (resolution.width != 0) _cur_resolution = resolution;
 
 	/* Limit width times height times bytes per pixel to fit a 32 bit
