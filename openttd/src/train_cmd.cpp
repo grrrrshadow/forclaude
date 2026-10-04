@@ -5890,7 +5890,7 @@ static void TurnTowAwayFrom(Train *tow, const Train *other)
  * @return true if @p to stands on rail reachable from @p from within the gap
  *         a coupling is allowed to close
  */
-static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore);
+static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore = nullptr);
 
 static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 {
@@ -10807,7 +10807,7 @@ static bool WouldReverseIntoFreeWagons(const Train *consist)
 	Trackdir td = back->GetVehicleTrackdir();
 	if (td == Trackdir::Invalid) return false;
 
-	for (const TileIndex tile : {back->tile, TileAddByDiagDir(back->tile, TrackdirToExitdir(ReverseTrackdir(td)))}) {
+	for (TileIndex tile : {back->tile, TileAddByDiagDir(back->tile, TrackdirToExitdir(ReverseTrackdir(td)))}) {
 		for (const Vehicle *u : VehiclesOnTile(tile)) {
 			if (u->type != VehicleType::Train) continue;
 			const Train *t = Train::From(u)->First();
@@ -11390,7 +11390,6 @@ static bool CheckTrainStayInDepot(Train *v)
  * @param tile Tile with reservation to clear.
  * @param track_dir Track direction to clear.
  */
-static bool IsRailStationPlatformOccupied(TileIndex tile, const Train *ignore = nullptr);
 
 static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_dir)
 {

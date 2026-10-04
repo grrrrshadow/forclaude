@@ -124,6 +124,15 @@ which stays theirs and is named here.
     "Chill girl" by tr.onurdk1 (https://sketchfab.com/onurdk1)
   - The plantation's soil, field road, shed and the girls by the road are
     the player's own models.
+- Matylda at a drive-through bus stop is based on "Matilda" by nicolekeane
+  (https://sketchfab.com/3d-models/matilda-7ddedfb652bd4ea091bc3de27f98fc02),
+  licensed under CC BY-NC-SA 4.0
+  (https://creativecommons.org/licenses/by-nc-sa/4.0/). Rendered and modified
+  for the game; this sprite (zastavka_y_vpredu, from
+  zastavka_divka_matylda_s270_zin4/zin8.png) is available under the same
+  license. It applies to the pictures of Matylda only, not to the rest of the
+  game; the game is free, without donations, which the non-commercial term
+  asks.
 - The coffeeshop's hut: "A little happy hut" by Tigran Safaryan, licensed
   under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
   https://sketchfab.com/3d-models/a-little-happy-hut-045afe84e4c04400a34f0babab201378

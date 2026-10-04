@@ -3318,11 +3318,15 @@ bool HasBusStopGirls(TileIndex tile)
 
 /**
  * Draw the two shelters of a drive-through bus stop with the girls standing
- * by them (HasBusStopGirls()): one at the far shelter, and on a road along X
- * a second, from behind, at the south corner by the near one. Each is a child
- * of its shelter, placed from the origin of the shelter's bounding box, so it
- * is drawn right after the shelter, whatever set draws that, and has no
- * bounding box to argue with the shelters or the buses.
+ * by them (HasBusStopGirls()): one at the far shelter, and a second -- on a
+ * road along X from behind at the south corner by the near shelter, on a road
+ * along Y Matylda on the near pavement looking up the road for the bus, a
+ * child of the far shelter so that the near one is drawn after her (the
+ * original shelter hides her, CZTR's leaves her in view, as the player
+ * wanted). Each is a child of a shelter, placed from the origin of the
+ * shelter's bounding box, so it is drawn right after the shelter, whatever
+ * set draws that, and has no bounding box to argue with the shelters or the
+ * buses.
  * @param ti the tile
  * @param t its layout: the shelter along y 0 (far) and y 13 (near) on a road along X, x 13 (near) and x 0 (far) along Y
  * @param total_offset as DrawRailTileSeq() takes it
@@ -3341,6 +3345,7 @@ static void DrawBusStopWithGirls(const TileInfo *ti, const DrawTileSprites *t, i
 		if (along_x) girl = (i == 0) ? SPR_BUS_STOP_GIRL_X_FAR : SPR_BUS_STOP_GIRL_X_NEAR;
 		if (!along_x && i == 1) girl = SPR_BUS_STOP_GIRL_Y_FAR;
 		if (girl != 0) AddChildSpriteScreen(girl, PAL_NONE, 0, 0, transparent, nullptr, false, false);
+		if (!along_x && i == 1) AddChildSpriteScreen(SPR_BUS_STOP_GIRL_Y_NEAR, PAL_NONE, 0, 0, transparent, nullptr, false, false);
 	}
 }
 

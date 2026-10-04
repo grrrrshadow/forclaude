@@ -1065,12 +1065,11 @@ static void DrawMarijuanaPlantationTile(const TileInfo *ti, const Industry *ind)
  * with girls about them or without (HasGirls()), the statue of stone or
  * bronze by the industry's random bits.
  * @param ind the industry
- * @param tile the tile
  * @param gfx its tile type
  * @param sprite what its drawing table gives
  * @return the sprite to draw
  */
-static SpriteID GameOwnIndustrySprite(const Industry *ind, TileIndex tile, IndustryGfx gfx, SpriteID sprite)
+static SpriteID GameOwnIndustrySprite(const Industry *ind, IndustryGfx gfx, SpriteID sprite)
 {
 	switch (gfx) {
 		case GFX_GYMNASIUM_WEST: return HasGirls(ind) ? SPR_GYMNASIUM_GIRLS_WEST : sprite;
@@ -1095,7 +1094,7 @@ SpriteID GameOwnIndustryTileSprite(TileIndex tile)
 	const DrawBuildingsTileStruct *dits = GameOwnIndustryDrawTile(gfx, INDUSTRY_COMPLETED);
 	if (dits == nullptr || !IsIndustryCompleted(tile)) return 0;
 	if (gfx == GFX_MARIJUANA_PLANTATION) return MarijuanaPlantationSprite(Industry::GetByTile(tile));
-	return GameOwnIndustrySprite(Industry::GetByTile(tile), tile, gfx, dits->building.sprite);
+	return GameOwnIndustrySprite(Industry::GetByTile(tile), gfx, dits->building.sprite);
 }
 
 /**
@@ -2000,7 +1999,7 @@ static void DrawTile_Industry(TileInfo *ti)
 
 	/* Add industry on top of the ground? */
 	image = ClimateIndustrySprite(dits->building.sprite, climate);
-	if (stage == INDUSTRY_COMPLETED && image != 0) image = GameOwnIndustrySprite(ind, ti->tile, gfx, image);
+	if (stage == INDUSTRY_COMPLETED && image != 0) image = GameOwnIndustrySprite(ind, gfx, image);
 	if (image != 0) {
 		AddSortableSpriteToDraw(image, SpriteLayoutPaletteTransform(image, dits->building.pal, GetColourPalette(ind->random_colour)),
 			*ti, *dits, IsTransparencySet(TransparencyOption::Industries));

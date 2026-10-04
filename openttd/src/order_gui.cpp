@@ -2363,7 +2363,7 @@ public:
 		}
 	}
 
-	void OnQueryTextExtra(std::string_view text) override
+	void OnQueryTextExtra(std::string_view) override
 	{
 		VehicleOrderID sel = this->OrderGetSel();
 		/* The decouple count box's button: drop the whole coupled train. */

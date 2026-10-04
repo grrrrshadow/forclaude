@@ -475,15 +475,15 @@ void RoadVehicle::UpdateDeltaXY()
 
 				/* Move northern corner of the bounding box down according to vehicle length. */
 			case Direction::SW:
-				this->bounds.origin.x = -3 + (VEHICLE_LENGTH - length);
+				this->bounds.origin.x = -3 + (static_cast<int>(VEHICLE_LENGTH) - length);
 				this->bounds.extent.x = length;
-				this->bounds.offset.x = 1 - (VEHICLE_LENGTH - length);
+				this->bounds.offset.x = 1 - (static_cast<int>(VEHICLE_LENGTH) - length);
 				break;
 
 			case Direction::SE:
-				this->bounds.origin.y = -3 + (VEHICLE_LENGTH - length);
+				this->bounds.origin.y = -3 + (static_cast<int>(VEHICLE_LENGTH) - length);
 				this->bounds.extent.y = length;
-				this->bounds.offset.y = 1 - (VEHICLE_LENGTH - length);
+				this->bounds.offset.y = 1 - (static_cast<int>(VEHICLE_LENGTH) - length);
 				break;
 
 			default:

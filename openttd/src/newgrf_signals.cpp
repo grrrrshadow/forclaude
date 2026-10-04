@@ -65,7 +65,7 @@ uint GetSignalStyleInUse()
 	if (_signal_styles.empty()) return 0;
 
 	const RailTypeInfo *rti = GetRailTypeInfo(RAILTYPE_RAIL);
-	uint first_drawing = _signal_styles.size();
+	uint first_drawing = static_cast<uint>(_signal_styles.size());
 	for (uint i = 0; i < _signal_styles.size(); i++) {
 		SpriteID green = GetCustomSignalStyleSprite(i, rti, INVALID_TILE, SignalType::Path, SignalVariant::Electric, SignalAspect::Green, true);
 		if (green == 0) continue;

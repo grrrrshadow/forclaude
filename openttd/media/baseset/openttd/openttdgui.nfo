@@ -4,7 +4,7 @@
 // See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
 //
    -1 * 0	 0C "OpenTTD GUI graphics"
-   -1 * 0	 05 15 FF \w269 // OPENTTD_SPRITE_COUNT, an extended byte: above 255
+   -1 * 0	 05 15 FF \w270 // OPENTTD_SPRITE_COUNT, an extended byte: above 255
    -1 sprites/openttdgui.png 8bpp  66    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 146    8  64  31 -31   7 normal
    -1 sprites/openttdgui.png 8bpp 226    8  64  31 -31   7 normal
@@ -313,4 +313,6 @@
     | sprites/chatka_sedi_predni_32bpp.png 32bpp 0 0 144 47 -57 10 zi4
    -1 sprites/pole_seno_8bpp.png 8bpp 0 0 19 19 14 4 normal
     | sprites/pole_seno_32bpp.png 32bpp 0 0 162 119 -30 2 zi4
+   -1 sprites/zastavka_y_vpredu_8bpp.png 8bpp 0 0 4 9 -18 10 normal
+    | sprites/zastavka_y_vpredu_32bpp.png 32bpp 0 0 84 62 -106 39 zi4
 

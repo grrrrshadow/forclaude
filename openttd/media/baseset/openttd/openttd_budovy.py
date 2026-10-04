@@ -135,6 +135,13 @@ PICTURES = [
     # the tile frame (SPR_MARIJUANA_HAY): with the shed it hides the player's
     # stop at the road's end.
     ("pole_seno", "pole_seno_zin4.png", "whole", (132, 64), None),
+    # Matylda at a drive-through bus stop on a road along Y, by the near
+    # edge, looking up the road for the bus (SPR_BUS_STOP_GIRL_Y_NEAR): a
+    # child of the far shelter like the other girl along Y, whose box starts
+    # at the tile's north corner, so the near shelter is drawn after her --
+    # the original one hides her, CZTR's leaves her on the open pavement.
+    # Model "Matilda" by nicolekeane, CC BY-NC-SA 4.0 (see CREDITS.md).
+    ("zastavka_y_vpredu", "zastavka_divka_matylda_s270_zin4.png", "girl", (-67.2, 73.6), None),
 ]
 
 

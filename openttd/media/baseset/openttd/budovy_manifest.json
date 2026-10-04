@@ -910,5 +910,29 @@
    "x": -125,
    "y": 10
   }
+ },
+ {
+  "name": "zastavka_y_vpredu",
+  "pal": {
+   "file": "zastavka_y_vpredu_8bpp.png",
+   "w": 4,
+   "h": 9,
+   "x": -18,
+   "y": 10
+  },
+  "x4": {
+   "file": "zastavka_y_vpredu_32bpp.png",
+   "w": 84,
+   "h": 62,
+   "x": -106,
+   "y": 39
+  },
+  "x8": {
+   "file": "zastavka_y_vpredu_8x_32bpp.png",
+   "w": 185,
+   "h": 126,
+   "x": -226,
+   "y": 77
+  }
  }
 ]

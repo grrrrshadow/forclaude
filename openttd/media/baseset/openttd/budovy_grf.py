@@ -68,7 +68,7 @@ DESCRIPTION = ("Grafika budov hry: 32bpp zin4 a zin8. Vestavěný statický GRF 
 #: nothing (it replaces this game's own GUI sprites).
 LOCK_FEATURE = "decouple_128_cargo"
 LOCK_BIT = 8  # of global variable 0x9D, the bit the feature test sets
-LOCK_MESSAGE = "Tento GRF patří ke hře OpenTTD decouple by Karel Mácha a jinde nefunguje."
+LOCK_MESSAGE = "Tento GRF patří ke hře OpenTTD decouple by Karel Mácha a jinde nefunguje: obsahuje zin8 sprity."
 FIRST_GUI_SPRITE = 231  # SPR_OPENTTD_BASE + 231: the first of the buildings in openttdgui.nfo
 
 ZOOM_NORMAL, ZOOM_4X, ZOOM_8X = 0, 1, 6

@@ -3941,8 +3941,8 @@ static bool ConTestMap(std::span<std::string_view> argv)
 	}
 
 	IConsolePrint(CC_DEFAULT, "testmapa: otaceni u navesti (reverse_at_signals) = {}", _settings_game.pf.reverse_at_signals ? "zapnuto" : "vypnuto");
-	for (uint y = *py1; y <= (uint)*py2; y++) {
-		for (uint x = *px1; x <= (uint)*px2; x++) {
+	for (uint y = static_cast<uint>(*py1); y <= static_cast<uint>(*py2); y++) {
+		for (uint x = static_cast<uint>(*px1); x <= static_cast<uint>(*px2); x++) {
 			TileIndex tile = TileXY(x, y);
 			std::string desc;
 			TrackBits tracks{};
@@ -13320,6 +13320,8 @@ static bool ConTestBusStopGirls(std::span<std::string_view> argv)
 		MarkTileDirtyByTile(t);
 	}
 	IConsolePrint(CC_DEFAULT, "testzastavka: se studentkami holky X {} Y {}", HasBusStopGirls(stop_x) ? "ano" : "ne", HasBusStopGirls(stop_y) ? "ano" : "ne");
+	/* The main view between the two stops, for a screenshot of them from the rig. */
+	ScrollMainWindowToTile(TileAddXY(spot, 2, 2), true);
 	return true;
 }
 
