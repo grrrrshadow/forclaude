@@ -55,13 +55,20 @@ MANIFEST = HERE / "budovy_manifest.json"
 OUT = HERE.parent / "decouple" / "grafika" / "budovy.grf"
 
 GRFID = b"DCP8"
-NAME = "Decouple: budovy (gymnázium, automat, socha, plantáž, chatka, holky)"
-# What the set shows is what it has on top of the original game: 32bpp at
-# zin4 and zin8 (the player's word: "8bpp nikde nepíšeme, jen 32bpp", "všude
-# psát zin8"). The palette sprites for an 8bpp blitter are in it all the same.
-DESCRIPTION = ("Grafika budov hry: 32bpp zin4 a zin8. Vestavěný statický GRF hry "
-               "OpenTTD decouple by Karel Mácha, sprity OpenTTD GUI od 231. "
-               "Píše budovy_grf.py z obrázků kolegy.")
+#: Colour codes of a GRF string, in its UTF-8 form (the code + U+E000): the
+#: game turns them into its own colours (newgrf_text.cpp).
+GREEN, YELLOW, DARK_BLUE = "\ue08f", "\ue090", "\ue097"
+#: In the list of sets: "budovy" in yellow and whose game it is in green -- the
+#: player's word, as the colleague's sets name themselves.
+NAME = f"{YELLOW}budovy {GREEN}for Decouple by Karel Macha"
+#: The details of the set: what the game it belongs to has, in the player's
+#: words -- not how the file is made. It shows 32bpp at zin4 and zin8 ("8bpp
+#: nikde nepíšeme, jen 32bpp", "všude psát zin8"); the palette sprites for an
+#: 8bpp blitter are in it all the same.
+DESCRIPTION = (f"{GREEN}Decouple {DARK_BLUE}128 nákladů, 500 bloků v grf, posunování, "
+               "přeprava aut na vagonech. 16x zoom in a zin8 sprites")
+#: The Website button of the set's details: the game's page.
+URL = "https://karel-macha.itch.io/openttd-decouple-by-karel-macha"
 #: The lock, as in the colleague's V3S: the set asks this game's own feature
 #: test and refuses to load where nobody answers it -- in plain OpenTTD the
 #: player could otherwise put it in a game as an ordinary set, where it means
@@ -180,7 +187,7 @@ def grf_text(text: str) -> bytes:
 
 
 def action14() -> bytes:
-    """The palette, and the feature test the lock asks (before Action 8: the game reads Action 14 only up to it).
+    """The palette, the website, and the feature test the lock asks (before Action 8: the game reads Action 14 only up to it).
 
     Node ids stand in the file as they read, "INFO", "PALS", "FTST" (the game
     reads a little-endian uint32 and swaps it before comparing; they were
@@ -188,7 +195,10 @@ def action14() -> bytes:
     palette, the one openttd_budovy.py quantises to. The test: the name,
     version 1 at least, and the bit of 0x9D to set when the game knows it.
     """
-    info = b"C" + b"INFO" + b"B" + b"PALS" + struct.pack("<H", 1) + b"D" + b"\x00"
+    info = (b"C" + b"INFO"
+            + b"B" + b"PALS" + struct.pack("<H", 1) + b"D"
+            + b"T" + b"URL_" + b"\x7f" + grf_text(URL)
+            + b"\x00")
     test = (b"C" + b"FTST"
             + b"T" + b"NAME" + b"\x7f" + LOCK_FEATURE.encode("ascii") + b"\x00"
             + b"B" + b"MINV" + struct.pack("<HH", 2, 1)
