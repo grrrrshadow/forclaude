@@ -2189,7 +2189,7 @@ STR_CONFIG_SETTING_SOFT_LIMIT_VALUE                             :{COMMA}
 ###setting-zero-is-special
 STR_CONFIG_SETTING_SOFT_LIMIT_DISABLED                          :Disabled
 
-STR_CONFIG_SETTING_ZOOM_MIN                                     :Maximum zoom in level (raise the sprite memory first): {STRING2}
+STR_CONFIG_SETTING_ZOOM_MIN                                     :Maximum zoom in level: {STRING2} (set the sprite memory first)
 STR_CONFIG_SETTING_ZOOM_MIN_HELPTEXT                            :The maximum zoom-in level for viewports. Note that enabling higher zoom-in levels increases memory requirements; 8x is this game's own level past the original 4x and keeps four times the sprite memory of 4x; 16x draws the zin16 sprites of this game's sets and doubles the 8x pictures of every other, and keeps four times the sprite memory of 8x again, so give it sprite memory to match (the setting below); set 4x if the game runs short of memory; 16x is for NewGRF authors and special purposes
 STR_CONFIG_SETTING_ZOOM_MAX                                     :Maximum zoom out level: {STRING2}
 STR_CONFIG_SETTING_ZOOM_MAX_HELPTEXT                            :The maximum zoom-out level for viewports. Higher zoom-out levels might cause lag when used

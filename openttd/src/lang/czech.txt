@@ -2288,7 +2288,7 @@ STR_CONFIG_SETTING_SOFT_LIMIT_VALUE                             :{COMMA}
 ###setting-zero-is-special
 STR_CONFIG_SETTING_SOFT_LIMIT_DISABLED                          :vypnuto
 
-STR_CONFIG_SETTING_ZOOM_MIN                                     :Maximální úroveň přiblížení (nejdřív zvyš paměť spritů): {STRING}
+STR_CONFIG_SETTING_ZOOM_MIN                                     :Maximální úroveň přiblížení: {STRING} (nastav nejdřív paměť spritů)
 STR_CONFIG_SETTING_ZOOM_MIN_HELPTEXT                            :Maximální přiblížení pohledu. Nastavení většího přiblížení má větší nároky na paměť počítače; 8x je vlastní stupeň této hry nad původními 4x a drží čtyřikrát víc paměti spritů než 4x; 16x kreslí zin16 sprity sad této hry a obrázky 8x všech ostatních zdvojuje a drží zase čtyřikrát víc paměti spritů než 8x, tak mu dejte paměť spritů úměrně (nastavení níže); když hře dochází paměť, dejte 4x; 16x je pro tvůrce GRF a speciální účely
 STR_CONFIG_SETTING_ZOOM_MAX                                     :Maximální úroveň oddálení: {STRING}
 STR_CONFIG_SETTING_ZOOM_MAX_HELPTEXT                            :Maximální oddálení pohledu. Příliš velké nastavení může způsobovat velké odezvy
