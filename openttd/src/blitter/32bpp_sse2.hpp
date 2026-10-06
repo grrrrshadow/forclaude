@@ -93,6 +93,11 @@ public:
 	{
 		return Blitter_32bppSSE_Base::Encode(sprite_type, sprite, allocator);
 	}
+	/* As the optimised blitter: the SSE encoder keeps the levels from
+	 * gui.zoom_min on and reads the root only for its size, so the 16x
+	 * pixels are not wanted while 16x is off (the simple blitter this one
+	 * comes from keeps the root alone). */
+	bool NeedsRootPixels() const override { return false; }
 
 	std::string_view GetName() override { return "32bpp-sse2"; }
 };

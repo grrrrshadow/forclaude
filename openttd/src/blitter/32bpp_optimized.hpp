@@ -22,6 +22,12 @@ public:
 	};
 
 	void Draw(Blitter::BlitterParams *bp, BlitterMode mode, ZoomLevel zoom) override;
+	/* Encodes the levels from gui.zoom_min to gui.zoom_max (EncodeInternal())
+	 * and reads the root only for its size: unlike the simple blitter it
+	 * comes from, it has no use for the 16x pixels while 16x is off, and
+	 * ResizeSprites() need not make them. The anim and 40bpp blitters built
+	 * on this one encode the same way. */
+	bool NeedsRootPixels() const override { return false; }
 	Sprite *Encode(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
 
 	std::string_view GetName() override { return "32bpp-optimized"; }
