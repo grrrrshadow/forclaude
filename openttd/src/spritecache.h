@@ -65,5 +65,6 @@ void SetGreenLayerSprite(SpriteID sprite, SpriteID layer);
 std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 
 size_t GetSpriteCacheBytesUsed();
+std::string DescribeSpriteLevels(SpriteID sprite);
 
 #endif /* SPRITECACHE_H */

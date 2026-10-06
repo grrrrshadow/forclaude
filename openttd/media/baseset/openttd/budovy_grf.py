@@ -29,7 +29,7 @@ ReadGRFSpriteOffsets()):
                uint32 id of its sprite section entries; a uint32 0 ends it
     sprites    entries of uint32 id, uint32 size (from the colour byte on),
                uint8 colour (01 RGB, 02 alpha, 04 palette), uint8 zoom
-               (0 normal, 1 4x, 2 2x, 3..5 zoomed out, 6 8x), uint16 height,
+               (0 normal, 1 4x, 2 2x, 3..5 zoomed out, 6 8x, 7 16x), uint16 height,
                uint16 width, int16 x offset, int16 y offset, LZ77 data; one
                entry per level, the same id for all of them; a uint32 0 ends it
 
@@ -78,7 +78,9 @@ LOCK_BIT = 8  # of global variable 0x9D, the bit the feature test sets
 LOCK_MESSAGE = "Tento GRF patří ke hře OpenTTD decouple by Karel Mácha a jinde nefunguje: obsahuje zin8 sprity."
 FIRST_GUI_SPRITE = 231  # SPR_OPENTTD_BASE + 231: the first of the buildings in openttdgui.nfo
 
-ZOOM_NORMAL, ZOOM_4X, ZOOM_8X = 0, 1, 6
+#: The zoom byte of a level. 6 and 7 are this game's own, 8x and 16x
+#: (ZoomLevel::In8x, In16x; "zin8" and "zin16" in yagl); other games skip them.
+ZOOM_NORMAL, ZOOM_4X, ZOOM_8X, ZOOM_16X = 0, 1, 6, 7
 COLOUR_RGBA, COLOUR_PALETTE = 0x01 | 0x02, 0x04
 
 
@@ -274,6 +276,11 @@ def main() -> None:
             if with_4x:
                 sprites += sprite_entry(sprite_id, entry["x4"], ZOOM_4X, palette=False)
             sprites += sprite_entry(sprite_id, entry["x8"], ZOOM_8X, palette=False)
+            # A 16x piece, when the manifest has one (none of the renders is
+            # at 16x yet): the game draws it with 16x on and, with 16x off,
+            # reads it only where the sprite has no 8x (LoadSpriteV2()).
+            if entry.get("x16"):
+                sprites += sprite_entry(sprite_id, entry["x16"], ZOOM_16X, palette=False)
     data += struct.pack("<I", 0)
     sprites += struct.pack("<I", 0)
 

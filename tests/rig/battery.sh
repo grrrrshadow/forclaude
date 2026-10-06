@@ -1845,6 +1845,24 @@ run_scene zoom8 "testzoom8
 setting gui.zoom_min 0
 testzoom8 dovnitr" 30
 echo "zoom8: $(grep -o 'testzoom8: .*' $S/reg_zoom8.log | grep -v 'cache spritu' | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The 16x level of a set (zoom code 7, ZoomLevel::In16x; grf/zin16_grf.py,
+# see README.md): sprite 3981 has 4x, 8x and 16x, 3982 only 16x. With 16x off
+# (the default) the 8x of 3981 is the set's own and its 16x record stays
+# unread; the 8x of 3982 is made from its 16x, the mean of each 2x2 block.
+# With 16x on both draw their own 16x; with the sprite resolution held at 8x
+# the 16x of 3982 is its 8x doubled again. The set is written here, from the
+# standard library alone.
+ZIN16_CFG=$S/zin16_openttd.cfg
+python3 "$(dirname "${BASH_SOURCE[0]}")/grf/zin16_grf.py" $H/.openttd/newgrf/zin16_test.grf > /dev/null
+sed -e '/^\[newgrf\]$/a zin16_test.grf = ' "$CFG_KEEP" > $ZIN16_CFG
+run_scene zin16 "testzoom8 sprite 3981
+testzoom8 sprite 3982
+setting gui.zoom_min 0
+testzoom8 sprite 3981
+testzoom8 sprite 3982
+setting gui.sprite_zoom_min 1
+testzoom8 sprite 3982" 20 -c $ZIN16_CFG
+echo "zin16: $(grep -o 'testzoom8: sprite .*' $S/reg_zin16.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's

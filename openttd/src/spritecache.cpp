@@ -261,14 +261,16 @@ static void ResizeSpriteOut(SpriteLoader::SpriteCollection &sprite, ZoomLevel zo
 	const SpriteLoader::CommonPixel *src = src_sprite.data;
 	[[maybe_unused]] const SpriteLoader::CommonPixel *src_end = src + src_sprite.height * src_sprite.width;
 
-	/* The 4x level of a 32bpp sprite the set gave only at 8x: the mean of
-	 * each 2x2 block, weighted by alpha, instead of one pixel of it. Picking
-	 * one pixel of four (below, as the game does for every other level) makes
-	 * a 3D render look blocky at 4x, and 4x is the level most of the game is
-	 * played at. The recolour byte comes from the most opaque pixel of the
-	 * block, as it cannot be averaged. A set that has its own 4x is not
-	 * touched: this runs only for a level the set does not have. */
-	if (zoom == ZoomLevel::In4x && root_sprite.colours.Test(SpriteComponent::RGB)) {
+	/* The 4x level of a 32bpp sprite the set gave only at 8x, and the 8x of
+	 * one it gave only at 16x: the mean of each 2x2 block, weighted by
+	 * alpha, instead of one pixel of it. Picking one pixel of four (below,
+	 * as the game does for every other level) makes a 3D render look blocky,
+	 * and 4x and 8x are the levels the game is played at. The recolour byte
+	 * comes from the most opaque pixel of the block, as it cannot be
+	 * averaged. A set that has its own level is not touched: this runs only
+	 * for a level the set does not have. A level the game doubled itself
+	 * (16x from 8x, with 16x on) averages back to what it was doubled from. */
+	if ((zoom == ZoomLevel::In4x || zoom == ZoomLevel::In8x) && root_sprite.colours.Test(SpriteComponent::RGB)) {
 		for (uint y = 0; y < dest_sprite.height; y++) {
 			for (uint x = 0; x < dest_sprite.width; x++) {
 				uint sum_r = 0, sum_g = 0, sum_b = 0, sum_a = 0, count = 0;
@@ -429,11 +431,18 @@ static bool ResizeSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels spr
 	for (ZoomLevel zoom = ZoomLevel::Min; zoom <= ZoomLevel::Max; ++zoom) {
 		if (!sprite_avail.Test(zoom)) continue;
 		first_avail = zoom;
-		if (zoom > root) {
-			if (!ResizeSpriteIn(sprite, zoom, root)) return false;
-			sprite_avail.Set(root);
-		}
 		break;
+	}
+	if (first_avail == ZoomLevel::End) return false;
+	if (first_avail > root) {
+		if (!ResizeSpriteIn(sprite, first_avail, root)) return false;
+		sprite_avail.Set(root);
+	} else if (first_avail < root && !sprite_avail.Test(root)) {
+		/* The set has 16x (zoom code 7) and no 8x, and 16x is off: the 8x
+		 * is made from the 16x here, the mean of each 2x2 block, as every
+		 * coarser level is made below. The 16x pixels are not kept. */
+		ResizeSpriteOut(sprite, root);
+		sprite_avail.Set(root);
 	}
 
 	/* Pad sprites to make sizes match. */
@@ -702,6 +711,58 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	}
 
 	return encoder->Encode(sprite_type, sprite, allocator);
+}
+
+/**
+ * Rig probe (testzoom8 sprite): the levels a sprite has in its file and what
+ * the game makes of them -- the levels read, and for 16x, 8x and 4x the size
+ * and the middle pixel as the loader hands them to the encoder. It tells the
+ * 16x level of a set (zoom code 7, LoadSpriteV2()) from a doubled 8x one, and
+ * the 8x the game makes from a 16x alone from a doubled 4x. The sprite is
+ * read again from its file, as GetRawSprite() reads it; the cache is not
+ * touched.
+ * @param sprite the sprite
+ * @return the description, one line
+ */
+std::string DescribeSpriteLevels(SpriteID sprite)
+{
+	if (sprite >= _spritecache.size()) return "neni";
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->file == nullptr || sc->type != SpriteType::Normal) return "neni obrazek";
+
+	SpriteEncoder *encoder = BlitterFactory::GetCurrentBlitter();
+	SpriteLoader::SpriteCollection coll;
+	ZoomLevels avail;
+	ZoomLevels avail_8bpp;
+	ZoomLevels avail_32bpp;
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	if (encoder->Is32BppSupported()) avail = loader.LoadSprite(coll, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (avail.None()) {
+		avail = loader.LoadSprite(coll, *sc->file, sc->file_pos, SpriteType::Normal, false, sc->control_flags, avail_8bpp, avail_32bpp);
+		if (avail.None() && avail_32bpp.Any() && !encoder->Is32BppSupported()) {
+			SpriteLoaderMakeIndexed make_indexed(loader);
+			avail = make_indexed.LoadSprite(coll, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail, avail_32bpp);
+		}
+	}
+
+	auto levels = [](ZoomLevels set) {
+		std::string s;
+		for (ZoomLevel zoom : set) s += fmt::format("{}{}", s.empty() ? "" : ",", to_underlying(zoom));
+		return s.empty() ? std::string("-") : s;
+	};
+	std::string out = fmt::format("z {} v souboru 32bpp {} 8bpp {} nacteno {}", sc->file->GetSimplifiedFilename(), levels(avail_32bpp), levels(avail_8bpp), levels(avail));
+	if (avail.None() || !ResizeSprites(coll, avail, encoder)) return out + " nejde";
+	for (ZoomLevel zoom = ZoomLevel::Min; zoom <= ZoomLevel::In4x; ++zoom) {
+		const SpriteLoader::Sprite &s = coll[zoom];
+		out += fmt::format(" {}:{}x{}", to_underlying(zoom), s.width, s.height);
+		if (s.data == nullptr) {
+			out += " bez pixelu";
+		} else {
+			const SpriteLoader::CommonPixel &p = s.data[static_cast<size_t>(s.height / 2) * s.width + s.width / 2];
+			out += fmt::format(" stred {},{},{},{} m{}", p.r, p.g, p.b, p.a, p.m);
+		}
+	}
+	return out;
 }
 
 struct GrfSpriteOffset {

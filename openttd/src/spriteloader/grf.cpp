@@ -255,12 +255,15 @@ static ZoomLevels LoadSpriteV1(SpriteLoader::SpriteCollection &sprite, SpriteFil
 
 static ZoomLevels LoadSpriteV2(SpriteLoader::SpriteCollection &sprite, SpriteFile &file, size_t file_pos, SpriteType sprite_type, bool load_32bpp, SpriteCacheCtrlFlags control_flags, ZoomLevels &avail_8bpp, ZoomLevels &avail_32bpp)
 {
-	/* Codes 0 to 5 are the NewGRF ones. Code 6 is this game's own, 8x
-	 * (ZoomLevel::In8x), which yagl writes for renders made at 8x; 16x
-	 * (ZoomLevel::In16x) has no code, no set draws it, the game doubles
-	 * 8x for it; any other
-	 * reader of the set skips a code it does not know. */
-	static const ZoomLevel zoom_lvl_map[7] = {ZoomLevel::Normal, ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Out2x, ZoomLevel::Out4x, ZoomLevel::Out8x, ZoomLevel::In8x};
+	/* Codes 0 to 5 are the NewGRF ones. Codes 6 and 7 are this game's own:
+	 * 8x (ZoomLevel::In8x, "zin8" in yagl) and 16x (ZoomLevel::In16x,
+	 * "zin16"), the levels past the original 4x, each twice the size of the
+	 * one before; a set without them gets them doubled from its finest
+	 * level (ResizeSprites()). Any other reader of the set skips a code it
+	 * does not know. */
+	static const ZoomLevel zoom_lvl_map[8] = {ZoomLevel::Normal, ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Out2x, ZoomLevel::Out4x, ZoomLevel::Out8x, ZoomLevel::In8x, ZoomLevel::In16x};
+	static const uint8_t ZOOM_CODE_8X = 6;
+	static const uint8_t ZOOM_CODE_16X = 7;
 
 	/* Is the sprite not present/stripped in the GRF? */
 	if (file_pos == SIZE_MAX) return {};
@@ -269,6 +272,35 @@ static ZoomLevels LoadSpriteV2(SpriteLoader::SpriteCollection &sprite, SpriteFil
 	file.SeekTo(file_pos, SEEK_SET);
 
 	uint32_t id = file.ReadDword();
+
+	/* A 16x level is read when it is drawn (16x on, gui.zoom_min) and when
+	 * the set has no 8x of this colour depth to make the 8x from (the game
+	 * then makes it from 16x, ResizeSprites()). Otherwise it is left unread:
+	 * decoding four times the pixels of 8x for a level whose pixels are then
+	 * not kept would be paid at every load of the sprite. The record headers
+	 * are looked through first for an 8x; they are short and the file is in
+	 * memory. Fonts and the map generator's sprites read every level as
+	 * before. */
+	bool skip_16x = false;
+	if (sprite_type == SpriteType::Normal && (_settings_client.gui.zoom_min > ZoomLevel::In16x || _settings_client.gui.sprite_zoom_min > ZoomLevel::In16x)) {
+		size_t scan_pos = file.GetPos();
+		for (;;) {
+			int64_t num = file.ReadDword();
+			if (num < 2) break; // corrupt; the reading below says so
+			uint8_t type = file.ReadByte();
+			if (type == 0xFF) break;
+			SpriteComponents colour{type};
+			uint8_t zoom = file.ReadByte();
+			bool wanted_depth = colour.Any() && (load_32bpp ? colour != SpriteComponent::Palette : colour == SpriteComponent::Palette);
+			if (wanted_depth && zoom == ZOOM_CODE_8X) {
+				skip_16x = true;
+				break;
+			}
+			file.SkipBytes(num - 2);
+			if (file.ReadDword() != id) break;
+		}
+		file.SeekTo(scan_pos, SEEK_SET);
+	}
 
 	ZoomLevels loaded_sprites;
 	do {
@@ -308,6 +340,7 @@ static ZoomLevels LoadSpriteV2(SpriteLoader::SpriteCollection &sprite, SpriteFil
 						control_flags.Test(load_32bpp ? SpriteCacheCtrlFlag::AllowZoomMin1x32bpp : SpriteCacheCtrlFlag::AllowZoomMin1xPal) && zoom_lvl < ZoomLevel::Normal) {
 					is_wanted_zoom_lvl = false;
 				}
+				if (zoom == ZOOM_CODE_16X && skip_16x) is_wanted_zoom_lvl = false;
 			} else {
 				is_wanted_zoom_lvl = false;
 			}

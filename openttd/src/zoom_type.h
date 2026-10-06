@@ -21,8 +21,8 @@ enum class ZoomLevel : int8_t {
 	/* Our possible zoom-levels */
 	Begin = 0, ///< Begin for iteration.
 	Min = Begin, ///< Minimum zoom level.
-	In16x = Begin, ///< Zoomed 16 times in: this build's own level past 8x, off by default and switched on in gui.zoom_min; no set draws it, every sprite gets it doubled from its 8x (ResizeSprites()), and only when it is switched on, since it keeps four times the sprite memory of 8x.
-	In8x, ///< Zoomed 8 times in: this build's own level past the original 4x, on by default (gui.zoom_min); every sprite is given it (ResizeSprites()), from its finest level, and only sets of this game's own can draw it (zoom code 6, LoadSpriteV2()).
+	In16x = Begin, ///< Zoomed 16 times in: this build's own level past 8x, off by default and switched on in gui.zoom_min; only sets of this game's own draw it (zoom code 7, "zin16", LoadSpriteV2()), every other sprite gets it doubled from its 8x (ResizeSprites()), and only when it is switched on, since it keeps four times the sprite memory of 8x.
+	In8x, ///< Zoomed 8 times in: this build's own level past the original 4x, on by default (gui.zoom_min); every sprite is given it (ResizeSprites()), from its finest level -- the mean of each 2x2 block of a 16x the set has, doubled from a coarser one -- and only sets of this game's own can draw it (zoom code 6, "zin8", LoadSpriteV2()).
 	In4x, ///< Zoomed 4 times in.
 	In2x, ///< Zoomed 2 times in.
 	Normal, ///< The normal zoom level.

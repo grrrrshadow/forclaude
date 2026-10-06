@@ -687,6 +687,37 @@ the save. Both read with `testbloky` that the set is on and one of the game's
 own, that `vypinac` is on as well, and that the car the set took answers 0x77.
 The window's refusal is not played by the rig (no window there).
 
+## A set's 16x sprites (zin16, zoom code 7)
+
+`grf/zin16_grf.py` writes `zin16_test.grf`, a container version 2 set with
+the 16x level this game reads (zoom code 7, `ZoomLevel::In16x`,
+`LoadSpriteV2()` in `src/spriteloader/grf.cpp`; 8x is code 6, the NewGRF
+codes end at 5). It is written by hand from the standard library, as
+grfcodec knows no code past 5, and the battery writes it itself:
+
+    python3 grf/zin16_grf.py <rig home>/.openttd/newgrf/zin16_test.grf
+
+Two sprites are replaced (Action A, 3981 and 3982 of the base set), squares
+of one colour per level: 3981 has 4x red, 8x green and 16x blue; 3982 has 16x
+alone, red and blue pixels alternating. The scene `zin16` reads them with
+`testzoom8 sprite <id>` (`DescribeSpriteLevels()`), which reads the sprite
+from its file again and says which levels the file has, which were read, and
+the size and middle pixel of 16x, 8x and 4x as they go to the encoder:
+
+- 16x off (the default): 3981 reads 4x and 8x and leaves its 16x record
+  unread (the set has an 8x; `skip_16x`), its 8x is the set's green and 16x
+  has no pixels; 3982 reads its 16x and the game makes the 8x from it, the
+  mean of each 2x2 block, (128, 0, 128) (`ResizeSpriteOut()`), and the 4x
+  the same.
+- 16x on (`gui.zoom_min 0`): both read their 16x, blue and the red-blue
+  board, and 3982's 8x is still the mean.
+- 16x on with the sprite resolution held at 8x (`gui.sprite_zoom_min 1`):
+  3982's 16x is its 8x doubled again, (128, 0, 128).
+
+The rig runs the null blitter, so the sprites come through
+`SpriteLoaderMakeIndexed`: the middle pixel keeps its RGBA and gains the
+palette index `m`.
+
 ## Students are studentky, and the coffeeshop takes them
 
 `grf/studenti.nml` brings the cargo STUD under the name "Students", as the

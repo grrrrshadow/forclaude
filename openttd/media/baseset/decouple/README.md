@@ -26,7 +26,8 @@ stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
   které nařeže `../openttd/openttd_budovy.py`; do `openttd.grf` je grfcodec
   dát neumí (nezná 8×). Přepisuje tytéž sprity OpenTTD GUI (Action 5, typ
   0x15 s posunem), takže jsou tu znova všechny jeho úrovně, i zin4 – sprite se
-  přepisuje celý.
+  přepisuje celý. Kousek zin16 (kód zoomu 7, `ZoomLevel::In16x`) zapíše, když
+  ho manifest má (`x16`); zatím žádný render v 16× není.
 - Nový obrázek od kolegy: PNG do `../openttd/`, pak
   `python3 openttd_budovy.py && python3 budovy_grf.py` tamtéž.
 

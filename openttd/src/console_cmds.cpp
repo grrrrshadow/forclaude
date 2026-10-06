@@ -13428,14 +13428,27 @@ static bool ConTestHut(std::span<std::string_view> argv)
  * at every level, and the sprite cache's memory. With 'dovnitr' it zooms the
  * main view in as far as the settings let it and says where it got; with
  * 'nacti' it empties the sprite cache and loads the first thousands of
- * sprites again, timed, so the cost of making the 8x level can be read.
- * Usage: testzoom8 [dovnitr | nacti]
+ * sprites again, timed, so the cost of making the 8x level can be read. With
+ * 'sprite <id>' it says only what levels that sprite has in its file and what
+ * the game makes of them (DescribeSpriteLevels()): the 16x of a set (zoom
+ * code 7) against a doubled 8x, and the 8x made from a 16x alone.
+ * Usage: testzoom8 [dovnitr | nacti | sprite <id>]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestZoom8(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory. Usage: 'testzoom8 [dovnitr | nacti]'");
+		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory; 'sprite <id>' for the levels of one sprite. Usage: 'testzoom8 [dovnitr | nacti | sprite <id>]'");
+		return true;
+	}
+
+	if (argv.size() > 2 && argv[1] == "sprite") {
+		auto id = ParseInteger<uint32_t>(argv[2]);
+		if (!id.has_value()) {
+			IConsolePrint(CC_ERROR, "testzoom8: sprite needs a number.");
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "testzoom8: sprite {} zoom_min {} sprite_zoom_min {} {}", *id, to_underlying(_settings_client.gui.zoom_min), to_underlying(_settings_client.gui.sprite_zoom_min), DescribeSpriteLevels(*id));
 		return true;
 	}
 
