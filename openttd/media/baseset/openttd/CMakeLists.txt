@@ -146,6 +146,8 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_2_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_3_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_3_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/plakat_tatra148_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/plakat_tatra148_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_holky_32bpp.png

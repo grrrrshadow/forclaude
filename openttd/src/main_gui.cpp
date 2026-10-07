@@ -210,6 +210,104 @@ enum GlobalHotKeys : int32_t {
 	GHK_CLOSE_ERROR,
 };
 
+/**
+ * The poster that drives in at every start of the game, the player's word:
+ * the colleague's orange Tatra 148 with marijuana (SPR_START_POSTER) comes in
+ * from the right edge of the screen while the graphics are searched, drives
+ * south-west, stands, then backs out the way it came -- on under the menu
+ * when the search is over sooner. It is drawn on the main window, under
+ * every other window; the search window stands higher to make room for it
+ * (ScanProgressWindow). Real time, from the first paint of the main window.
+ */
+struct StartPoster {
+	static constexpr int IN_MS = 1800; ///< Driving in.
+	static constexpr int STAND_MS = 3500; ///< Standing.
+	static constexpr int OUT_MS = 1800; ///< Backing out.
+
+	std::optional<std::chrono::steady_clock::time_point> since{}; ///< When it set off; empty before the first paint.
+	Rect drawn{0, 0, -1, -1}; ///< Where it was drawn last, to be drawn over when it moves.
+	bool done = false; ///< It has gone.
+
+	/**
+	 * Where the poster is now, and at which zoom it is drawn: the level whose
+	 * height is nearest a little over half the screen's (it has 4x, 2x and
+	 * normal), standing a twentieth of the screen in from the bottom right.
+	 * It comes in along the screen's south-west slope (two across, one down)
+	 * from just off the right edge, slowing down, and backs out along it.
+	 * @param zoom set to the zoom it is drawn at
+	 * @return its rectangle, or nothing when it is not on the screen
+	 */
+	std::optional<Rect> Where(ZoomLevel &zoom)
+	{
+		if (this->done || _screen.width <= 0 || _screen.height <= 0) return std::nullopt;
+		if (!this->since.has_value()) this->since = std::chrono::steady_clock::now();
+		int ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *this->since).count());
+		if (ms >= IN_MS + STAND_MS + OUT_MS) {
+			this->done = true;
+			return std::nullopt;
+		}
+
+		int want = _screen.height * 55 / 100;
+		zoom = ZoomLevel::In4x;
+		int best = INT_MAX;
+		for (ZoomLevel z : {ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Normal}) {
+			int off = std::abs(static_cast<int>(GetSpriteSize(SPR_START_POSTER, nullptr, z).height) - want);
+			if (off < best) {
+				best = off;
+				zoom = z;
+			}
+		}
+		Dimension d = GetSpriteSize(SPR_START_POSTER, nullptr, zoom);
+		int w = static_cast<int>(d.width);
+		int h = static_cast<int>(d.height);
+
+		int stop_x = _screen.width - _screen.width / 20 - w;
+		int stop_y = _screen.height - _screen.height / 20 - h;
+		int start_x = _screen.width;
+		int start_y = stop_y - (start_x - stop_x) / 2;
+
+		/* How far along the way from the edge to the stop it is, 0 to 1. */
+		double along;
+		if (ms < IN_MS) {
+			double p = static_cast<double>(ms) / IN_MS;
+			along = 1.0 - (1.0 - p) * (1.0 - p);
+		} else if (ms < IN_MS + STAND_MS) {
+			along = 1.0;
+		} else {
+			double q = static_cast<double>(ms - IN_MS - STAND_MS) / OUT_MS;
+			along = 1.0 - q * q;
+		}
+		int x = start_x + static_cast<int>((stop_x - start_x) * along);
+		int y = start_y + static_cast<int>((stop_y - start_y) * along);
+		return Rect{x, y, x + w - 1, y + h - 1};
+	}
+
+	/** Draw it, if it is on the screen. */
+	void Draw()
+	{
+		ZoomLevel zoom;
+		std::optional<Rect> r = this->Where(zoom);
+		if (!r.has_value()) return;
+		DrawSprite(SPR_START_POSTER, PAL_NONE, r->left, r->top, nullptr, zoom);
+	}
+
+	/** Have the screen drawn anew where it was and where it is now, while it moves. */
+	void MarkDirty()
+	{
+		if (this->done && this->drawn.right < this->drawn.left) return;
+		ZoomLevel zoom;
+		std::optional<Rect> r = this->Where(zoom);
+		if (this->drawn.right >= this->drawn.left) AddDirtyBlock(this->drawn.left, this->drawn.top, this->drawn.right + 1, this->drawn.bottom + 1);
+		if (r.has_value()) {
+			AddDirtyBlock(r->left, r->top, r->right + 1, r->bottom + 1);
+			this->drawn = *r;
+		} else {
+			this->drawn = {0, 0, -1, -1};
+		}
+	}
+};
+static StartPoster _start_poster;
+
 struct MainWindow : Window
 {
 	MainWindow(WindowDesc &desc) : Window(desc)
@@ -279,7 +377,16 @@ struct MainWindow : Window
 
 			int text_y = this->height - GetCharacterHeight(FontSize::Normal) * 2;
 			DrawString(0, this->width - 1, text_y, STR_INTRO_VERSION, TextColour::White, {AlignmentH::Centre, AlignmentV::Middle});
+
+			/* The poster of the start of the game, over the title's map and
+			 * under every window. */
+			_start_poster.Draw();
 		}
+	}
+
+	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
+	{
+		if (_game_mode == GameMode::Menu) _start_poster.MarkDirty();
 	}
 
 	EventState OnHotkey(int hotkey) override

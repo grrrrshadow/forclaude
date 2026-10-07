@@ -152,6 +152,11 @@ PICTURES = [
     ("ohnostroj_start", "ohnostroj_start_zin4.png", "whole", (160, 472 - 64), None),
     *[(f"ohnostroj_{colour}_{phase}", f"ohnostroj_{colour}_{phase}_zin4.png", "whole", (160, 472 - 64), None)
         for colour in ("zelena", "modra", "cervena") for phase in (1, 2, 3)],
+    # The poster that drives in at every start of the game (SPR_START_POSTER,
+    # main_gui.cpp): the colleague's orange Tatra 148 with marijuana, its
+    # half-size render (1533 x 1043, the player's word: "vezmem ten menší")
+    # taken as the 4x level. Not a tile: its offsets are its top left corner.
+    ("plakat_tatra148", "plakat_tatra148_zin4.png", "poster", None, None),
 ]
 
 
@@ -322,6 +327,10 @@ def main() -> None:
             emit(lines, manifest, name, image4, small, image8, corner)
         elif cut == "whole":
             emit(lines, manifest, name, image4, small, image8, north)
+        elif cut == "poster":
+            # Offsets from the picture's top left corner: emit() adds the
+            # north corner's shift, so the corner given is that shift.
+            emit(lines, manifest, name, image4, small, image8, (ZOOM4.north_shift, 0))
         elif cut == "strips":
             # Nothing of a layer may be left outside the strips cut: a layer
             # cut in fewer strips than its picture would lose what stands

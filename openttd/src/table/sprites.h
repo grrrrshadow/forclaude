@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 280;
+static const uint16_t OPENTTD_SPRITE_COUNT = 281;
 /** @} */
 
 /** @{
@@ -297,6 +297,11 @@ static const SpriteID SPR_BUS_STOP_GIRL_Y_NEAR       = SPR_OPENTTD_BASE + 269;
  * phases each, SPR_FIREWORK_BALL + colour * 3 + phase. */
 static const SpriteID SPR_FIREWORK_START             = SPR_OPENTTD_BASE + 270;
 static const SpriteID SPR_FIREWORK_BALL              = SPR_OPENTTD_BASE + 271;
+/* The poster that drives in at every start of the game, over the search of
+ * the graphics and on under the menu (main_gui.cpp): the colleague's orange
+ * Tatra 148 with marijuana, front to the left. Its offsets are its top left
+ * corner; it has levels from 4x down. */
+static const SpriteID SPR_START_POSTER               = SPR_OPENTTD_BASE + 280;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

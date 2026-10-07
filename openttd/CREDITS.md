@@ -141,6 +141,17 @@ which stays theirs and is named here.
   "Galaxia anime girl" above) posed standing and sitting and scaled, the
   plants ("Cannabis Sativa plant", "Cannabis Plant" above) recoloured and
   scaled, rendered into the sprites by the player's graphics repository.
+- The poster that drives in at the start of the game (the orange Tatra 148
+  with marijuana): rendered by the player's graphics repository from the
+  Tatra 148 S1 and the flatbed of the Tatra 148 VVN by Stefan Lichvařík
+  (SketchUp, 3D Warehouse,
+  https://3dwarehouse.sketchup.com/model/87387c8b-fdfd-4acc-8759-4d9c91c296f6/Tatra-148-s1,
+  3D Warehouse General Model License: derived pictures may be shared, the
+  models themselves not), painted, with our white grille and lamps; in the
+  cab "College Girl" by Rotmill, "pubg Girl Pose T" by iysif and "Galaxia
+  anime girl" by Tatenashi, on the flatbed the cannabis plants above (all
+  CC BY 4.0). The poster itself: ottd Decouple by Karel Mácha, CC BY 4.0,
+  https://karel-macha.itch.io/openttd-decouple-by-karel-macha
 - Palo123, also known as Karn - The coupling and decoupling patch this repository's own version of
   the feature takes its shape from: what the player sees and what the orders
   can say. None of its code is used - it predates the rewrite of OpenTTD's

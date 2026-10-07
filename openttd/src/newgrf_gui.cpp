@@ -2173,6 +2173,15 @@ struct ScanProgressWindow : public Window {
 		this->InitNested(1);
 	}
 
+	/**
+	 * Higher than the middle of the screen, a tenth of it from the top: the
+	 * poster of the start of the game drives in under it (main_gui.cpp).
+	 */
+	Point OnInitialPosition([[maybe_unused]] int16_t sm_width, [[maybe_unused]] int16_t sm_height, [[maybe_unused]] int window_number) override
+	{
+		return {(_screen.width - sm_width) / 2, _screen.height / 10};
+	}
+
 	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
