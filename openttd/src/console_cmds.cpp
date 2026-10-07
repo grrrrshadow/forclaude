@@ -5476,6 +5476,22 @@ static bool ConTestFacings(std::span<std::string_view>)
 }
 
 /**
+ * Put cargo the console makes into a vehicle as if it was loaded where the
+ * vehicle stands. Cargo in a vehicle is counted from where it was loaded
+ * (CargoPacket::UpdateLoadingTile()) and paid for from there on delivery; an
+ * assert build stops on cargo it never saw loaded (CargoPacket::GetDistance(),
+ * "this->in_vehicle"), which a car filled from the console and then sent to
+ * unload did -- the player's crash.
+ * @param v the vehicle part
+ * @param cp the cargo
+ */
+static void AppendConsoleCargo(Vehicle *v, CargoPacket *cp)
+{
+	cp->UpdateLoadingTile(v->tile);
+	v->cargo.Append(cp);
+}
+
+/**
  * Fill a road vehicle with its own cargo, without a station or an industry.
  * A set draws a loaded vehicle differently from an empty one, and reading
  * which picture it draws needs a vehicle that has something in it; getting
@@ -5522,7 +5538,7 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 				if (every_other_wagon && (nth++ & 1) != 0) continue;
 				uint room = u->cargo_cap - u->cargo.StoredCount();
 				if (room == 0 || !CargoPacket::CanAllocateItem()) continue;
-				u->cargo.Append(CargoPacket::Create(t->last_station_visited, room, Source{}));
+				AppendConsoleCargo(u, CargoPacket::Create(t->last_station_visited, room, Source{}));
 				put += room;
 			}
 			t->MarkDirty();
@@ -5540,7 +5556,7 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 		for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 			uint room = u->cargo_cap - u->cargo.StoredCount();
 			if (room == 0 || !CargoPacket::CanAllocateItem()) continue;
-			u->cargo.Append(CargoPacket::Create(rv->last_station_visited, room, Source{}));
+			AppendConsoleCargo(u, CargoPacket::Create(rv->last_station_visited, room, Source{}));
 			put += room;
 		}
 		rv->MarkDirty();
@@ -8799,7 +8815,7 @@ static bool ConTestGreenSt(std::span<std::string_view> argv)
 			uint green_total = 0;
 			for (Train *u = t; u != nullptr; u = u->Next()) {
 				u->cargo.Truncate();
-				if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+				if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) AppendConsoleCargo(u, CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
 			}
 			for (Direction dir : EnumRange(Direction::Begin, Direction::End)) {
 				for (const Train *u = t; u != nullptr; u = u->Next()) {
@@ -8829,7 +8845,7 @@ static bool ConTestGreenSt(std::span<std::string_view> argv)
 			auto [c_cost, c_id, c_cap, c_mail, c_caps] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, st->index, true, coal, ClientID::Invalid);
 			if (Train *c = Train::GetIfValid(c_id); c_cost.Succeeded() && c != nullptr) {
 				for (Train *u = c; u != nullptr; u = u->Next()) {
-					if (u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) u->cargo.Append(CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
+					if (u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) AppendConsoleCargo(u, CargoPacket::Create(u->cargo_cap, 0, StationID::Invalid(), TileIndex{}, 0));
 				}
 				VehicleSpriteSeq seq;
 				c->GetImage(Direction::N, EngineImageType::OnMap, &seq);
@@ -9704,7 +9720,7 @@ static bool ConFillRoadVehicles(std::span<std::string_view> argv)
 			if (u->cargo_cap <= have) continue;
 			if (!CargoPacket::CanAllocateItem()) break;
 			uint16_t more = static_cast<uint16_t>(std::min<uint>(u->cargo_cap - have, UINT16_MAX));
-			u->cargo.Append(CargoPacket::Create(more, 0, StationID::Invalid(), u->tile, 0));
+			AppendConsoleCargo(u, CargoPacket::Create(more, 0, StationID::Invalid(), u->tile, 0));
 			filled = true;
 		}
 		if (!filled) continue;

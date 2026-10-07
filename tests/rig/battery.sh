@@ -1715,14 +1715,26 @@ echo "nakup: skoro_vse=$(grep -c 'Carries almost everything' $S/reg_nakup.log) k
 # brim, to look at the full sprites of all the cargoes. The car of the scene
 # is filled (30/30), a second "mmm" finds nothing to fill, and the car drives
 # on with the cargo and delivers it (vyjimka=0 -- the first cut made packets
-# without asking the pool and the game went down).
+# without asking the pool and the game went down). Office blocks by stop B take
+# the passengers, so the car really delivers them (30/30, then 0/30): the
+# player's game went down there, on cargo filled without its loading tile
+# (assert in_vehicle in CargoPacket::GetDistance()), and with no one to take
+# the cargo the scene never got that far.
 printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
-run_scene mmm "vlak123 on
+run_scene mmm "setting economy.place_houses 2
+vlak123 on
 testautovlak
+testdomy postav 196 19 0
+testdomy postav 197 19 0
+testdomy postav 198 19 0
+testdomy postav 196 23 0
+testdomy postav 197 23 0
+testdomy postav 198 23 0
 testzatik 50 mmm
 testzatik 51 testtvar auto 1
-testzatik 52 mmm" 6000
-echo "mmm: $(grep -o 'mmm: [0-9]* aut nalozeno' $S/reg_mmm.log | tr '\n' ' ')$(grep -o 'naklad [0-9]* [0-9]*/[0-9]*' $S/reg_mmm.log | head -1)" | tee -a ${BATTERY_STABLE:-/dev/null}
+testzatik 52 mmm
+testzatik 5900 testtvar auto 1" 6000
+echo "mmm: $(grep -o 'mmm: [0-9]* aut nalozeno' $S/reg_mmm.log | tr '\n' ' ')$(grep -o 'naklad [0-9]* [0-9]*/[0-9]*' $S/reg_mmm.log | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG
