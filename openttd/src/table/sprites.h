@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 270;
+static const uint16_t OPENTTD_SPRITE_COUNT = 280;
 /** @} */
 
 /** @{
@@ -291,6 +291,12 @@ static const SpriteID SPR_MARIJUANA_HAY              = SPR_OPENTTD_BASE + 268;
  * looking up the road for the bus: a second child of the far shelter, after
  * the girl there (see DrawBusStopWithGirls()). */
 static const SpriteID SPR_BUS_STOP_GIRL_Y_NEAR       = SPR_OPENTTD_BASE + 269;
+/* The fireworks over the coffeeshop's hut, laid over its front tile after the
+ * girls (HutFireworkSprite()): the yellow launch, then the ball of sparks in
+ * three phases, each in one of three colours -- green, blue and red, three
+ * phases each, SPR_FIREWORK_BALL + colour * 3 + phase. */
+static const SpriteID SPR_FIREWORK_START             = SPR_OPENTTD_BASE + 270;
+static const SpriteID SPR_FIREWORK_BALL              = SPR_OPENTTD_BASE + 271;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

@@ -29,6 +29,7 @@
 #include "mars_houses.h"
 #include "cargomonitor.h"
 #include "climate_industries.h"
+#include "animated_tile_map.h"
 #include "cargotype.h"
 #include "spritecache.h"
 #include "green_load.h"
@@ -13357,16 +13358,19 @@ static bool ConTestBusStopGirls(std::span<std::string_view> argv)
  * sitting when marijuana came to them too, and marijuana alone changes
  * nothing. 'postav' builds a coffeeshop in the biggest town that has room
  * (ten tiles from a school and a statue) and turns the main view on it;
- * 'stud' and 'mari' count a delivery of studentky or marijuana today,
- * 'nic' takes both back to long ago. Then it says what each coffeeshop is
- * drawn with.
- * Usage: testhulirna [postav] [stud] [mari] [nic]
+ * 'stud', 'mari' and 'boom' count a delivery of studentky, marijuana or
+ * explosives today, 'nic' takes all three back to long ago. Then it says
+ * what each coffeeshop is drawn with, whether its fireworks go off (only
+ * while the girls sit and explosives came), whether its yard tile is
+ * animated for them, and the colours of the three phases of six fireworks
+ * (z green, m blue, c red), which differ from firework to firework.
+ * Usage: testhulirna [postav] [stud] [mari] [boom] [nic]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestHut(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Rig: the coffeeshop's hut and its girls. Usage: 'testhulirna [postav] [stud] [mari] [nic]'");
+		IConsolePrint(CC_HELP, "Rig: the coffeeshop's hut and its girls. Usage: 'testhulirna [postav] [stud] [mari] [boom] [nic]'");
 		return true;
 	}
 
@@ -13388,8 +13392,8 @@ static bool ConTestHut(std::span<std::string_view> argv)
 			}
 			if (r.Failed()) IConsolePrint(CC_ERROR, "testhulirna: ODMITNUTO - hulirna nejde postavit v zadnem meste: {}", GetString(r.GetErrorMessage()));
 		}
-		for (CargoLabel label : {CT_STUDENTKY, CT_MARIJUANA}) {
-			bool today = (argv[a] == "stud" && label == CT_STUDENTKY) || (argv[a] == "mari" && label == CT_MARIJUANA);
+		for (CargoLabel label : {CT_STUDENTKY, CT_MARIJUANA, CT_EXPLOSIVES}) {
+			bool today = (argv[a] == "stud" && label == CT_STUDENTKY) || (argv[a] == "mari" && label == CT_MARIJUANA) || (argv[a] == "boom" && label == CT_EXPLOSIVES);
 			if (!today && argv[a] != "nic") continue;
 			CargoType cargo = GetCargoTypeByLabel(label);
 			for (IndustryID id : Industry::industries[IT_COFFEESHOP]) {
@@ -13415,8 +13419,34 @@ static bool ConTestHut(std::span<std::string_view> argv)
 					GetIndustryGfx(tile), sprite >= SPR_OPENTTD_BASE ? fmt::format("+{}", sprite - SPR_OPENTTD_BASE) : fmt::format("{:#x} (dum s palmou)", sprite));
 		}
 		HutGirls girls = HutGirlsAt(i);
-		IConsolePrint(CC_DEFAULT, "testhulirna: hulirna {} {}x{},{} holky {}{}", id, i->location.w, i->location.h, tiles, GIRLS[to_underlying(girls)],
-				girls == HutGirls::None ? "" : fmt::format(" (+{})", (girls == HutGirls::Sitting ? SPR_HUT_GIRLS_SITTING : SPR_HUT_GIRLS_STANDING) - SPR_OPENTTD_BASE));
+		/* The fireworks: whether they go off, whether the yard tile is
+		 * animated for them, and the colours of the next five, read from a
+		 * fixed tick so the line is the same at every run. */
+		TileIndex front = TileAddXY(i->location.tile, 1, 0);
+		std::string fireworks = IsTileType(front, TileType::Industry) && GetAnimatedTileState(front) == AnimatedTileState::Animated ? "ne, animace ano" : "ne";
+		if (HutHasFireworks(i)) {
+			fireworks = fmt::format("ano, animace {}, barvy", GetAnimatedTileState(front) == AnimatedTileState::Animated ? "ano" : "ne");
+			/* Walk the ticks and write the colour of each phase as it comes,
+			 * a space at each launch; the first launch only starts the list. */
+			static const char COLOURS[] = {'z', 'm', 'c'};
+			std::string seen;
+			SpriteID last = 0;
+			uint launches = 0;
+			for (uint64_t t = 0; launches < 7; t++) {
+				SpriteID sprite = HutFireworkSprite(front, t);
+				if (sprite == last) continue;
+				last = sprite;
+				if (sprite == SPR_FIREWORK_START) {
+					launches++;
+					if (launches > 1 && launches < 7) seen += ' ';
+				} else if (sprite != 0 && launches >= 1 && launches < 7) {
+					seen += COLOURS[(sprite - SPR_FIREWORK_BALL) / 3];
+				}
+			}
+			fireworks += " " + seen;
+		}
+		IConsolePrint(CC_DEFAULT, "testhulirna: hulirna {} {}x{},{} holky {}{} ohnostroj {}", id, i->location.w, i->location.h, tiles, GIRLS[to_underlying(girls)],
+				girls == HutGirls::None ? "" : fmt::format(" (+{})", (girls == HutGirls::Sitting ? SPR_HUT_GIRLS_SITTING : SPR_HUT_GIRLS_STANDING) - SPR_OPENTTD_BASE), fireworks);
 		ScrollMainWindowToTile(i->location.tile, true);
 	}
 	return true;

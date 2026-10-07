@@ -126,6 +126,26 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/pole_seno_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_y_vpredu_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/zastavka_y_vpredu_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_start_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_start_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_zelena_1_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_zelena_1_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_zelena_2_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_zelena_2_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_zelena_3_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_zelena_3_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_modra_1_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_modra_1_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_modra_2_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_modra_2_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_modra_3_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_modra_3_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_1_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_1_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_2_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_2_8bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_3_32bpp.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/ohnostroj_cervena_3_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_32bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_8bpp.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/socha_bronz_holky_32bpp.png

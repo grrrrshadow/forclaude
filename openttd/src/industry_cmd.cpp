@@ -872,6 +872,53 @@ HutGirls HutGirlsAt(const Industry *ind)
 }
 
 /**
+ * Are there fireworks over the coffeeshop's hut? The player's word: explosives
+ * light them, but only while the girls sit on the benches -- studentky and
+ * marijuana came as well. They go on for GIRLS_DAYS after the explosives, as
+ * the girls do after theirs.
+ * @param ind the coffeeshop
+ * @return whether the fireworks go off
+ */
+bool HutHasFireworks(const Industry *ind)
+{
+	return HutGirlsAt(ind) == HutGirls::Sitting && DeliveredLately(ind, CT_EXPLOSIVES);
+}
+
+/** How long each part of one firework lasts, in ticks: the launch, the three phases of the ball, and the dark sky before the next. */
+static const uint FIREWORK_TICKS[] = {24, 10, 14, 20, 32};
+/** How long one firework lasts, in ticks. */
+static const uint FIREWORK_CYCLE = 24 + 10 + 14 + 20 + 32;
+
+/**
+ * What of the fireworks is in the sky over a hut at a tick. One firework
+ * after another: the yellow launch, the ball in three phases, a dark pause.
+ * The colour of each phase -- green, blue or red -- is picked anew for every
+ * phase of every firework, the player's word, so no two are alike. Only the
+ * picture depends on it, never the game: the pick is a hash of the tile, the
+ * firework's number and the phase, not the game's random numbers, and every
+ * hut has its fireworks at its own time.
+ * @param tile the hut's front tile
+ * @param tick the tick
+ * @return the sprite, or 0 for the dark sky between two fireworks
+ */
+SpriteID HutFireworkSprite(TileIndex tile, uint64_t tick)
+{
+	uint64_t t = tick + tile.base() * 37ULL;
+	uint64_t firework = t / FIREWORK_CYCLE;
+	uint at = static_cast<uint>(t % FIREWORK_CYCLE);
+	uint part = 0;
+	while (at >= FIREWORK_TICKS[part]) at -= FIREWORK_TICKS[part++];
+	if (part == 0) return SPR_FIREWORK_START;
+	if (part == 4) return 0;
+	uint32_t h = static_cast<uint32_t>(tile.base()) * 2654435761U ^ static_cast<uint32_t>(firework) * 40503U ^ part * 0x9E3779B9U ^ static_cast<uint32_t>(firework >> 32);
+	h ^= h >> 15;
+	h *= 0x2C1B3C6DU;
+	h ^= h >> 12;
+	uint colour = h % 3;
+	return SPR_FIREWORK_BALL + colour * 3 + (part - 1);
+}
+
+/**
  * How many days the girls have to tend the plantation before the plants
  * stand grown: a little under the GIRLS_DAYS one delivery keeps them about,
  * so that one delivery sees the field through to grown.
@@ -2012,6 +2059,12 @@ static void DrawTile_Industry(TileInfo *ti)
 				AddChildSpriteScreen(girls == HutGirls::Sitting ? SPR_HUT_GIRLS_SITTING : SPR_HUT_GIRLS_STANDING, PAL_NONE, 0, 0,
 						IsTransparencySet(TransparencyOption::Industries), nullptr, false, false);
 			}
+			/* The fireworks over the yard, after the girls; the tile is
+			 * animated while they go on (AnimateTile_Industry()). */
+			if (HutHasFireworks(ind)) {
+				SpriteID firework = HutFireworkSprite(ti->tile, TimerGameTick::counter);
+				if (firework != 0) AddChildSpriteScreen(firework, PAL_NONE, 0, 0, IsTransparencySet(TransparencyOption::Industries), nullptr, false, false);
+			}
 		}
 
 		if (IsTransparencySet(TransparencyOption::Industries)) return;
@@ -2335,6 +2388,17 @@ static void AnimateTile_Industry(TileIndex tile)
 	}
 
 	switch (gfx) {
+	case GFX_HUT_FRONT:
+		/* The fireworks over the coffeeshop's hut: drawn anew when the
+		 * picture in the sky changes, and the animation stops with them. */
+		if (!HutHasFireworks(Industry::GetByTile(tile))) {
+			MarkTileDirtyByTile(tile);
+			DeleteAnimatedTile(tile);
+		} else if (HutFireworkSprite(tile, TimerGameTick::counter) != HutFireworkSprite(tile, TimerGameTick::counter - 1)) {
+			MarkTileDirtyByTile(tile);
+		}
+		break;
+
 	case GFX_SUGAR_MINE_SIEVE:
 		if ((TimerGameTick::counter & 1) == 0) AnimateSugarSieve(tile);
 		break;
@@ -2488,6 +2552,10 @@ static void TileLoop_Industry(TileIndex tile)
 	/* The girls leave and the plants grow without anything telling the tile:
 	 * it is drawn anew every round (GameOwnIndustrySprite()). */
 	if (GameOwnIndustryDrawTile(GetIndustryGfx(tile), INDUSTRY_COMPLETED) != nullptr) MarkTileDirtyByTile(tile);
+	/* The fireworks over the coffeeshop's hut start here, at most a tile
+	 * loop after the delivery that lights them; AnimateTile_Industry() stops
+	 * them when they are over. */
+	if (GetIndustryGfx(tile) == GFX_HUT_FRONT && HutHasFireworks(Industry::GetByTile(tile))) AddAnimatedTile(tile, false);
 
 	if (_game_mode == GameMode::Editor) return;
 

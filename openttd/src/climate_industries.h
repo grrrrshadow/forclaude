@@ -63,6 +63,8 @@ enum class HutGirls : uint8_t {
 	Sitting, ///< Studentky came and marijuana too: they sit on the benches.
 };
 HutGirls HutGirlsAt(const struct Industry *ind);
+bool HutHasFireworks(const struct Industry *ind);
+SpriteID HutFireworkSprite(TileIndex tile, uint64_t tick);
 /** What stands on the marijuana plantation (MarijuanaPlantationStage()). */
 enum class PlantationStage : uint8_t {
 	Bare, ///< Soil only: no girls have tended it, or none for half a year. Nothing to harvest.

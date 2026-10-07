@@ -142,6 +142,16 @@ PICTURES = [
     # the original one hides her, CZTR's leaves her on the open pavement.
     # Model "Matilda" by nicolekeane, CC BY-NC-SA 4.0 (see CREDITS.md).
     ("zastavka_y_vpredu", "zastavka_divka_matylda_s270_zin4.png", "girl", (-67.2, 73.6), None),
+    # The fireworks over the coffeeshop's hut (SPR_FIREWORK_START and the
+    # rest), laid over its front tile like the girls: the yellow launch, then
+    # the ball of sparks in three phases, each in green, blue and red. The
+    # colleague drew them at 8x only (FIREWORK_ONLY_8X), every one on the
+    # same 640 x 960 frame with the launch point on the ground at (320, 944);
+    # it stands in the middle of the hut's yard, half a tile (64 px at 4x)
+    # below the front tile's north corner.
+    ("ohnostroj_start", "ohnostroj_start_zin4.png", "whole", (160, 472 - 64), None),
+    *[(f"ohnostroj_{colour}_{phase}", f"ohnostroj_{colour}_{phase}_zin4.png", "whole", (160, 472 - 64), None)
+        for colour in ("zelena", "modra", "cervena") for phase in (1, 2, 3)],
 ]
 
 
@@ -172,6 +182,22 @@ def load(source: str) -> Image.Image | None:
     if not path.exists():
         return None
     return Image.open(path).convert("RGBA")
+
+
+def half_of(image: Image.Image) -> Image.Image:
+    """An 8x render at 4x: the mean of each 2x2 block, weighted by alpha, as the game makes a missing 4x (ResizeSpriteOut())."""
+    w, h = image.width // 2, image.height // 2
+    src = image.load()
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    dst = out.load()
+    for y in range(h):
+        for x in range(w):
+            block = [src[2 * x + dx, 2 * y + dy] for dy in (0, 1) for dx in (0, 1)]
+            sa = sum(p[3] for p in block)
+            if sa == 0:
+                continue
+            dst[x, y] = tuple((sum(p[c] * p[3] for p in block) + sa // 2) // sa for c in range(3)) + ((sa + 2) // 4,)
+    return out
 
 
 def palette_image() -> Image.Image:
@@ -282,6 +308,10 @@ def main() -> None:
     for name, source, cut, north, extra in PICTURES:
         image4 = load(source)
         image8 = load(source.replace("zin4", "zin8"))
+        if image4 is None and image8 is not None:
+            # Drawn at 8x only (the fireworks): the 4x and the 8bpp
+            # sprites are made from it here.
+            image4 = half_of(image8)
         small = to_8bpp(image4)
         if cut == "girl":
             # emit() counts from a tile's north corner; put that where the

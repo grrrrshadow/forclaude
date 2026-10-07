@@ -1837,6 +1837,18 @@ testhulirna nic stud
 testhulirna mari
 testhulirna nic" 30
 echo "hulirna: $(grep -o 'testhulirna: .*' $S/reg_hulirna.log | cut -d' ' -f2- | sed 's/postavena u ([0-9]*,[0-9]*)/postavena/' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The fireworks over the hut (HutHasFireworks(), HutFireworkSprite()), the
+# player's word: explosives light them, but only while the girls sit --
+# explosives to standing girls light nothing. Each phase of each firework
+# picks its colour anew, so the six listed differ; the yard tile is animated
+# after a tile loop, and stops when the fireworks are over.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene ohnostroj "testhulirna postav stud boom
+testhulirna mari
+testzatik 300 testhulirna
+testzatik 320 testhulirna nic
+testzatik 600 testhulirna" 700
+echo "ohnostroj: $(grep -o 'testhulirna: .*' $S/reg_ohnostroj.log | cut -d' ' -f2- | sed 's/postavena u ([0-9]*,[0-9]*)/postavena/' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # The 8x zoom (ZoomLevel::In8x, testzoom8): the base is 8 and the config of
 # before, naming 0 for the most zoomed in there was, keeps the most zoomed in,
 # 8x now (IFV_ZOOM_IN_8X); the main view zooms in to In8x, a tile 256 px wide,
