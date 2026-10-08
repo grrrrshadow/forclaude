@@ -11,7 +11,8 @@ A base-set sprite is 8bpp in the DOS palette with index 0 standing for
 rest takes the darkest grey of the palette's grey ramp: a black glyph, as it
 was drawn, with no half-lit fringe that the game would draw solid.
 
-The sprite is 10x10 at (2, 2), matching the line in openttdgui.nfo. Run from
+The sprite is 10x10 at (2, 2), matching its row in GUI_ICONS of
+openttd_yagl.py, which puts it into openttd.grf with yagl. Run from
 this directory; needs Pillow.
 """
 
@@ -23,7 +24,7 @@ from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
 SOURCE = HERE / "icons8-car-10.png"
-PALETTE_FROM = HERE / "openttdgui.png"
+PALETTE_FROM = HERE / "openttd-8bpp-normal-0.png"  # the DOS palette of the game's own sprites
 OUTPUT = HERE / "openttdgui_cargo_rola.png"
 
 MARGIN = 2

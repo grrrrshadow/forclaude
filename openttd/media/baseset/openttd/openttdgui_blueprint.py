@@ -2,8 +2,9 @@
 """Generate openttdgui_blueprint.png: the 16 Blueprint toolbar icons.
 
 The sprites are 20x20 pixels, 8bpp, using the DOS palette taken from
-openttdgui.png (palette index 0 = transparent). Sprite i sits at
-(i * 24 + 2, 2), matching the lines appended to openttdgui.nfo.
+openttd-8bpp-normal-0.png (palette index 0 = transparent). Sprite i sits at
+(i * 24 + 2, 2), matching its row in GUI_ICONS of openttd_yagl.py, which
+puts the sheet into openttd.grf with the colleague's yagl.
 
 Sprite order:
   0 copy, 1 paste, 2 rotate ccw, 3 rotate cw, 4 reflect NW-SE,
@@ -294,7 +295,7 @@ def make_transform(reflected, rotation, lookup):
 
 
 def main():
-    source = Image.open(os.path.join(DIR, 'openttdgui.png'))
+    source = Image.open(os.path.join(DIR, 'openttd-8bpp-normal-0.png'))  # for its DOS palette
     palette = source.getpalette()
     lookup = build_palette_lookup(palette)
 

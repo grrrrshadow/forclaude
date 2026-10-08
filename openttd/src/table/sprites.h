@@ -209,7 +209,8 @@ static const SpriteID SPR_IMG_WAYPOINT_STATION       = SPR_OPENTTD_BASE + 209; /
 
 /* Crosshair, artwork from icons8.com -- see CREDITS.md. The button icon is
  * grey like every other button; the cursor is red and carries its hotspot in
- * the middle, written as the offset on its line in openttdgui.nfo. */
+ * the middle, written as the sprite's offset (GUI_ICONS in
+ * media/baseset/openttd/openttd_yagl.py). */
 static const SpriteID SPR_IMG_CROSSHAIR              = SPR_OPENTTD_BASE + 210;
 static const CursorID SPR_CURSOR_CROSSHAIR           = SPR_OPENTTD_BASE + 211;
 /**

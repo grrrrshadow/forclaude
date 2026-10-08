@@ -139,6 +139,33 @@ run_scene() { # name scr-content ticks extra-args
   echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut odmitnuto=$odm" >> ${BATTERY_STABLE:-/dev/null}
 }
 : > ${BATTERY_STABLE:-/dev/null}
+# The rig's own sets (grf/*.yagl, see README.md) are built here, every run,
+# with the colleague's yagl -- the one tool this game's sets are made with (the
+# player's rule: no grfcodec, no nml, no GRF written by hand). The battery
+# plays what the sources say, and every run puts yagl through every set: the
+# player's word is that yagl is to be exercised and grow. yagl is looked for
+# at $YAGL, then on the path; it is built from the colleague's copy (grrrrf,
+# yagl/yagl-main, his yagl/POSTUP.md). Without it the sets already in the home
+# are played as they are, and a line says so.
+RIG_GRF=$(cd "$(dirname "${BASH_SOURCE[0]}")/grf" && pwd)
+YAGL=${YAGL:-$(command -v yagl)}
+if [ -n "$YAGL" ] && [ -x "$YAGL" ]; then
+  mkdir -p $S/rig_grf
+  for src in $RIG_GRF/*.yagl; do
+    n=$(basename "$src" .yagl)
+    rm -f $S/rig_grf/$n.grf $S/rig_grf/$n.grf.bak
+    "$YAGL" -e $S/rig_grf/$n.grf "$RIG_GRF" > $S/rig_grf/$n.log 2>&1 || echo "yagl: $n.grf did not build, see $S/rig_grf/$n.log"
+  done
+  # The sets the scenes play from the home's newgrf/; vestaveny is kept in the
+  # rig directory and put in baseset/decouple/ by its own two scenes; the two
+  # slot63 sets are played by hand (README.md) and only built.
+  for n in bloky_siroke bloky_zamek cargo_a cargo_b claims_own cztr_old firs5_like gets_like house_over konfig quits_late refuses_a st_old studenti vypinac zin16_test; do
+    [ -f $S/rig_grf/$n.grf ] && cp $S/rig_grf/$n.grf $H/.openttd/newgrf/
+  done
+  [ -f $S/rig_grf/vestaveny.grf ] && cp $S/rig_grf/vestaveny.grf $S/
+else
+  echo "yagl not found (set YAGL): the rig's sets are played as they are in the home"
+fi
 printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
 run_scene zakl "vlak123 on
 testspoj
@@ -1439,7 +1466,7 @@ testdomy picker vse" 100 -c $DOMY_CFG
 run_scene naklady "testnaklady" 100
 
 # A set that switches every default cargo off and then gives up with a fatal
-# error (grf/quits_late.nml, see README.md): the shape of Industries of the
+# error (grf/quits_late.yagl, see README.md): the shape of Industries of the
 # Caribbean next to XIS, which left the player's game with no cargoes and a
 # passenger ship with no cargo of its own in an assertion. The game reads its
 # sets again without a set that gave up (GfxLoadSprites()), so the game has its
@@ -1449,7 +1476,7 @@ QUITS_CFG=$S/quits_openttd.cfg
 sed '/^\[newgrf\]$/a quits_late.grf = ' "$CFG_KEEP" > $QUITS_CFG
 run_scene grfvzdalo "testnaklady 13" 100 -c $QUITS_CFG
 
-# Two cargo sets side by side (grf/cargo_a.nml, grf/cargo_b.nml, README.md):
+# Two cargo sets side by side (grf/cargo_a.yagl, grf/cargo_b.yagl, README.md):
 # each switches the game's cargoes off and brings three cargoes under the ids
 # 0, 1 and 2, passengers and coal among them. The second set shares the first
 # one's passengers and coal, writing its own properties over them as sets
@@ -1465,7 +1492,7 @@ SDIL2_CFG=$S/sdilene2_openttd.cfg
 sed -e '/^\[newgrf\]$/a cargo_b.grf = ' -e '/^\[newgrf\]$/a cargo_a.grf = ' "$CFG_KEEP" > $SDIL2_CFG
 run_scene nakladysdilene2 "testnaklady 5 PassengersA CoalA RigCargoA RigCargoB !PassengersB !CoalB" 100 -c $SDIL2_CFG
 
-# A set that refuses another the way industry sets do (grf/refuses_a.nml):
+# A set that refuses another the way industry sets do (grf/refuses_a.yagl):
 # it asks whether cargo set A is there, stops with a fatal error if it is,
 # and otherwise brings a cargo of its own under A's passengers' id. With
 # economy.newgrf_side_by_side on (the default) the game reads the sets again
@@ -1492,7 +1519,7 @@ testdomy picker mirne 2050
 testdomy picker vse 1950" 100 -c $DOMY2_CFG
 
 # A house placed by hand where a set put a house of its own in place of it
-# (grf/house_over.nfo, see README.md): the statue, with a four-tile block in
+# (grf/house_over.yagl, see README.md): the statue, with a four-tile block in
 # its place. The player picked the statue, so the statue it is, kept as
 # itself on its tile (IsHouseKeptOriginal(), the bit in m8) where a town of
 # every house would build the block for it. Read back through the block it
@@ -1564,7 +1591,7 @@ testnaklady" 100 -c $XIS_CFG
 # numbers the save gave them, and the marijuana vehicles are added, out of the
 # game with the industries (off for saves, see run_scene).
 run_scene vozidlahry "testprumysl" 100 -g $S/rig.sav
-# A set numbering its vehicles where the game's own sit (grf/claims_own.nml,
+# A set numbering its vehicles where the game's own sit (grf/claims_own.yagl,
 # claims_own.grf in the home's newgrf/, see README.md): a wagon under the car
 # carrier's number and a lorry under the first marijuana lorry's. Big sets get
 # there as a matter of course, and the car carrier used to become the set's.
@@ -1584,7 +1611,7 @@ testzelenest
 testprumysl
 testnaklady" 50 -c $ST_CFG
 # A St that draws its coal into its own picture, as CZTR Wagons 1.0.0 does and
-# the rig's copy of CZTR does not (grf/st_old.nml, st_old.grf in the home's
+# the rig's copy of CZTR does not (grf/st_old.yagl, st_old.grf in the home's
 # newgrf/): carrying marijuana, the pixels its loaded picture does not share
 # with its empty one are drawn green. odmitnuto is zero.
 STO_CFG=$S/st_old_openttd.cfg
@@ -1593,9 +1620,9 @@ SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene zelenestjednovrstvy "testautovlak
 testzelenest" 50 -c $STO_CFG
 # CZTR Wagons-Cargo 1.0.0 in another release's place (SwapInCztrWagonsForFirs5()):
-# a game with FIRS 5 -- its id alone, grf/firs5_like.nml, firs5_like.grf in
+# a game with FIRS 5 -- its id alone, grf/firs5_like.yagl, firs5_like.grf in
 # the home's newgrf/ -- and the player's 1.1.0 plays the rig's stand-in for
-# 1.0.0 (grf/cztr_old.nml, cztr_old.grf there too: the set's id and that
+# 1.0.0 (grf/cztr_old.yagl, cztr_old.grf there too: the set's id and that
 # release's name) in 1.1.0's place, and says so with the grf debug on
 # (vymena=1). testgrf hra lists what the game plays: 4D490213 is the stand-in,
 # active. The player's word: everything works with 1.0.0, so the game is not
@@ -1609,7 +1636,7 @@ sed '/^\[newgrf\]$/a 4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.
 run_scene cztrbezfirs "testgrf hra" 20 -c $BEZ_CFG -d grf=1
 echo "cztrbezfirs: vymena=$(grep -c 'plays in place of' $S/reg_cztrbezfirs.log) $(grep 'testgrf: hra 4D490213' $S/reg_cztrbezfirs.log | sed 's/.*testgrf: hra //' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # The configurator (vehicle_config.h, docs/decouple_vehicle_config.md): the
-# rig's set grf/konfig_yagl.py (konfig.grf in the home's newgrf/, built with
+# rig's set grf/konfig.yagl (konfig.grf in the home's newgrf/, built with
 # the colleague's yagl, the one tool our sets are made with) names two details
 # on a road vehicle -- a crew of three, a cart of two -- and draws another
 # picture for any choice but the first. testkonfig reads the details as the
@@ -1623,7 +1650,7 @@ sed '/^\[newgrf\]$/a konfig.grf = ' "$CFG_KEEP" > $KONF_CFG
 run_scene konfig "testkonfig" 30 -c $KONF_CFG
 echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testkonfig: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Wagons named the way GETS names them -- what the wagon is and its kind in
-# quotes (grf/gets_like.nml, gets_like.grf in the home's newgrf/). The name
+# quotes (grf/gets_like.yagl, gets_like.grf in the home's newgrf/). The name
 # rules read the part in quotes: the Eaos and its livery take marijuana, the
 # Rns-z 643 and the Sgmmrs livery take road vehicles, the Eaoss and the Ssla
 # Köln -- the one the player said no to -- take neither (testjmena says so,
@@ -1777,7 +1804,7 @@ echo "mmm: $(grep -o 'mmm: nalozeno [^.]*' $S/reg_mmm.log | tr '\n' ' ')$(grep -
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG
-# Action 2 IDs above 255 (grf/bloky_siroke.nfo, grf/bloky_zamek.nfo, see
+# Action 2 IDs above 255 (grf/bloky_siroke.yagl, grf/bloky_zamek.yagl, see
 # README.md). A set that asks for 'decouple_more_action2_ids' writes its block
 # IDs in two bytes: bloky_siroke builds blocks 7, 300, 600 and 1000 for the
 # first road vehicle, 1000 calls 600 as a subroutine and goes on to 300, and
@@ -1796,8 +1823,8 @@ run_scene blokysav "testbloky" 20 -g $S/save/bloky.sav
 for k in bloky blokysav; do
   echo "$k: siroke=$(grep -o 'bloky_siroke.grf [a-z]*, siroka cisla [a-z]*' $S/reg_$k.log) zamek=$(grep -o 'bloky_zamek.grf [a-z]*' $S/reg_$k.log) $(grep -o 'z GRF 52494762 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 done
-# The game's own sets (AppendBuiltinGRFs(), grf/vestaveny.nfo and
-# grf/vypinac.nfo, see README.md): every NewGRF in baseset/decouple/ goes into
+# The game's own sets (AppendBuiltinGRFs(), grf/vestaveny.yagl and
+# grf/vypinac.yagl, see README.md): every NewGRF in baseset/decouple/ goes into
 # every new game without a word in openttd.cfg, and the player cannot take it
 # out. vestaveny.grf is kept in the rig directory and put into baseset/decouple/
 # of the scene's config directory for these two scenes only -- anywhere else it
@@ -1819,7 +1846,7 @@ for k in vestaveny vestavenysav; do
   # openttd.grf, but anything put there would be listed as the game's own too.
   echo "$k: $(grep -o 'decouple/vestaveny.grf [a-z]*' $S/reg_$k.log) $(grep 'decouple/vestaveny.grf' $S/reg_$k.log | grep -o 'chyb [0-9]*, vestaveny ano') vypinac=$(grep -o 'vypinac.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2) $(grep -o 'z GRF 52494776 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
 done
-# Students (grf/studenti.nml, studenti.grf in the home's newgrf/, see
+# Students (grf/studenti.yagl, studenti.grf in the home's newgrf/, see
 # README.md): a set brings STUD as "Students"; the game calls the cargo
 # Studentky whatever the set says, and the coffeeshop takes it (prum).
 STUD_CFG=$S/studenti_openttd.cfg
@@ -1908,15 +1935,14 @@ run_scene zoom8 "testzoom8
 setting gui.zoom_min 0
 testzoom8 dovnitr" 30
 echo "zoom8: $(grep -o 'testzoom8: .*' $S/reg_zoom8.log | grep -v 'cache spritu' | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
-# The 16x level of a set (zoom code 7, ZoomLevel::In16x; grf/zin16_grf.py,
+# The 16x level of a set (zoom code 7, ZoomLevel::In16x; grf/zin16_test.yagl,
 # see README.md): sprite 3981 has 4x, 8x and 16x, 3982 only 16x. With 16x off
 # (the default) the 8x of 3981 is the set's own and its 16x record stays
 # unread; the 8x of 3982 is made from its 16x, the mean of each 2x2 block.
 # With 16x on both draw their own 16x; with the sprite resolution held at 8x
-# the 16x of 3982 is its 8x doubled again. The set is written here, from the
-# standard library alone.
+# the 16x of 3982 is its 8x doubled again. Built with the rig's other sets at
+# the top of the run.
 ZIN16_CFG=$S/zin16_openttd.cfg
-python3 "$(dirname "${BASH_SOURCE[0]}")/grf/zin16_grf.py" $H/.openttd/newgrf/zin16_test.grf > /dev/null
 sed -e '/^\[newgrf\]$/a zin16_test.grf = ' "$CFG_KEEP" > $ZIN16_CFG
 run_scene zin16 "testzoom8 sprite 3981
 testzoom8 sprite 3982

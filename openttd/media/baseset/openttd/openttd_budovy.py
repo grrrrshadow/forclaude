@@ -36,15 +36,13 @@ How a picture is cut:
   from the row behind it over a tile the player keeps, the road, the shed
   at its end and the girls by its edge. Each is cut as a whole picture.
 
-Every sprite comes as 8bpp at normal zoom for a game without a 32bpp
-blitter (scaled down and put in the DOS palette, without the shadow, since
-the palette has no see-through black), as 32bpp at 4x, and where the render
-exists as 32bpp at 8x. They go into openttd.grf through openttd.yagl, which
-openttd_yagl.py writes from the manifest this script writes
-(budovy_manifest.json) and builds with the colleague's yagl: the palette
-piece at normal zoom and the finest render there is, 8x where it exists --
-never a render scaled down. The nfo lines this script still prints are the
-old road and only for reading.
+Every sprite is cut as 32bpp at 4x and, where the render exists, at 8x;
+no palette piece -- the player's word is that our pictures carry none, and
+the game draws 32bpp pictures with any blitter. They go into openttd.grf
+through openttd.yagl, which openttd_yagl.py writes from the manifest this
+script writes (budovy_manifest.json) and builds with the colleague's yagl:
+the finest render there is, 8x where it exists -- never a render scaled
+down.
 
 A tile on the render is 256 x 128 pixels at 4x and 512 x 256 at 8x (2:1),
 the game's own grid: tiles lie TILE_PIXELS (32) apart at normal zoom. That
@@ -67,19 +65,9 @@ import pathlib
 from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
-PALETTE_FROM = HERE / "openttdgui.png"
 MANIFEST = HERE / "budovy_manifest.json"
 
-#: Below this alpha a pixel is nothing at normal zoom (out of 255).
-OPAQUE_ENOUGH = 128
-#: The shadow: dark and see-through; left out of the 8bpp sprites.
-SHADOW_ALPHA = 200
-SHADOW_DARK = 40
-#: Palette indices the 8bpp sprites may use: not 0 (nothing), not the company
-#: colours, not the animated ones at the top.
-USABLE = [i for i in range(1, 0xE3) if not 0xC6 <= i <= 0xCD]
-
-#: The pictures, in the order of openttdgui.nfo (and of SPR_GYMNASIUM_WEST
+#: The pictures, in the order of their sprites in openttd.yagl (and of SPR_GYMNASIUM_WEST
 #: and the rest in table/sprites.h): output name, 4x source, how it is cut,
 #: the north corner of the picture's north tile on the 4x render, and for
 #: strips the x ranges of the strips with the north corner of each strip's
@@ -206,42 +194,6 @@ def half_of(image: Image.Image) -> Image.Image:
     return out
 
 
-def palette_image() -> Image.Image:
-    """A palette image holding only the usable DOS colours, for quantising."""
-    dos = Image.open(PALETTE_FROM).getpalette()
-    pal = []
-    for i in USABLE:
-        pal += dos[i * 3:i * 3 + 3]
-    pal += pal[:3] * (256 - len(USABLE))
-    image = Image.new("P", (1, 1))
-    image.putpalette(pal)
-    return image
-
-
-def to_8bpp(image: Image.Image) -> Image.Image:
-    """Scale a 4x RGBA image to normal zoom and put it in the DOS palette."""
-    image = image.copy()
-    pixels = image.load()
-    for y in range(image.height):
-        for x in range(image.width):
-            r, g, b, a = pixels[x, y]
-            if a < SHADOW_ALPHA and max(r, g, b) < SHADOW_DARK:
-                pixels[x, y] = (0, 0, 0, 0)
-    small = image.resize((image.width // 4, image.height // 4), Image.LANCZOS)
-    alpha = small.getchannel("A")
-    rgb = Image.new("RGB", small.size, (0, 0, 0))
-    rgb.paste(small.convert("RGB"), mask=alpha)
-    quantised = rgb.quantize(palette=palette_image(), dither=Image.Dither.NONE)
-    out = Image.new("P", small.size, 0)
-    out.putpalette(Image.open(PALETTE_FROM).getpalette())
-    q, a, o = quantised.load(), alpha.load(), out.load()
-    for y in range(small.height):
-        for x in range(small.width):
-            if a[x, y] >= OPAQUE_ENOUGH:
-                o[x, y] = USABLE[q[x, y]] if q[x, y] < len(USABLE) else USABLE[0]
-    return out
-
-
 def keep(image: Image.Image, mine) -> Image.Image:
     """The image with only the pixels mine(x, y) says belong to the piece."""
     out = Image.new(image.mode, image.size, 0 if image.mode == "P" else (0, 0, 0, 0))
@@ -275,17 +227,6 @@ def piece(image: Image.Image, cut: str, extra, zoom: Zoom, north, which) -> Imag
     return keep(image, lambda x, y: tile_of(x + 0.5, y + 0.5, n, zoom.half_width, zoom.half_height, extra) == which)
 
 
-def pal_piece(small: Image.Image, cut: str, extra, north, which) -> Image.Image:
-    """One piece of the 8bpp picture, cut after scaling so the pieces meet without a seam."""
-    if cut in ("whole", "girl"):
-        return small
-    if cut == "strips":
-        left, right = which[1]
-        return keep(small, lambda x, y: left // 4 <= x < right // 4)
-    n = (north[0] / 4, north[1] / 4)
-    return keep(small, lambda x, y: tile_of(x + 0.5, y + 0.5, n, 32, 16, extra) == which)
-
-
 def cropped(image: Image.Image, north: tuple[float, float], zoom: Zoom, name: str) -> dict:
     """Save a piece cropped to its pixels and give its file and offsets from its tile's north corner."""
     box = image.getbbox()
@@ -295,43 +236,34 @@ def cropped(image: Image.Image, north: tuple[float, float], zoom: Zoom, name: st
     return {"file": name, "w": box[2] - box[0], "h": box[3] - box[1], "x": box[0] - round(north[0]) + zoom.north_shift, "y": box[1] - round(north[1])}
 
 
-def emit(lines: list[str], manifest: list[dict], name: str, big4: Image.Image, small: Image.Image, big8: Image.Image | None, north4) -> None:
-    """Save a sprite's pieces at every zoom and write its nfo lines and manifest entry; north4 is its tile's north corner at 4x."""
+def emit(manifest: list[dict], name: str, big4: Image.Image, big8: Image.Image | None, north4) -> None:
+    """Save a sprite's pieces at 4x and 8x and write its manifest entry; north4 is its tile's north corner at 4x."""
     x4 = cropped(big4, north4, ZOOM4, f"{name}_32bpp.png")
-    sbox = small.getbbox()
-    small.crop(sbox).save(HERE / f"{name}_8bpp.png")
-    pal = {"file": f"{name}_8bpp.png", "w": sbox[2] - sbox[0], "h": sbox[3] - sbox[1],
-            "x": sbox[0] - math.floor((north4[0] - ZOOM4.north_shift) / 4), "y": sbox[1] - math.floor(north4[1] / 4)}
     x8 = cropped(big8, ZOOM8.of(north4), ZOOM8, f"{name}_8x_32bpp.png") if big8 is not None else None
-    lines.append(f"   -1 sprites/{pal['file']} 8bpp 0 0 {pal['w']} {pal['h']} {pal['x']} {pal['y']} normal")
-    lines.append(f"    | sprites/{x4['file']} 32bpp 0 0 {x4['w']} {x4['h']} {x4['x']} {x4['y']} zi4")
-    manifest.append({"name": name, "pal": pal, "x4": x4, "x8": x8})
+    manifest.append({"name": name, "x4": x4, "x8": x8})
 
 
 def main() -> None:
-    lines = []
     manifest = []
     for name, source, cut, north, extra in PICTURES:
         image4 = load(source)
         image8 = load(source.replace("zin4", "zin8"))
         if image4 is None and image8 is not None:
-            # Drawn at 8x only (the fireworks): the 4x and the 8bpp
-            # sprites are made from it here.
+            # Drawn at 8x only (the fireworks): the 4x is made from it here.
             image4 = half_of(image8)
-        small = to_8bpp(image4)
         if cut == "girl":
             # emit() counts from a tile's north corner; put that where the
             # feet land on the picture less the place they stand on. The feet
             # are the middle of the picture at either zoom.
             feet = (image4.width / 2, image4.height / 2)
             corner = (feet[0] - north[0] + ZOOM4.north_shift, feet[1] - north[1])
-            emit(lines, manifest, name, image4, small, image8, corner)
+            emit(manifest, name, image4, image8, corner)
         elif cut == "whole":
-            emit(lines, manifest, name, image4, small, image8, north)
+            emit(manifest, name, image4, image8, north)
         elif cut == "poster":
             # Offsets from the picture's top left corner: emit() adds the
             # north corner's shift, so the corner given is that shift.
-            emit(lines, manifest, name, image4, small, image8, (ZOOM4.north_shift, 0))
+            emit(manifest, name, image4, image8, (ZOOM4.north_shift, 0))
         elif cut == "strips":
             # Nothing of a layer may be left outside the strips cut: a layer
             # cut in fewer strips than its picture would lose what stands
@@ -344,17 +276,17 @@ def main() -> None:
                 if outside is not None:
                     raise SystemExit(f"{name}: pixels outside the strips at {zoom.factor}x: {outside}")
             for strip in extra:
-                emit(lines, manifest, f"{name}_{strip[0]}", piece(image4, cut, extra, ZOOM4, north, strip), pal_piece(small, cut, extra, north, strip),
+                emit(manifest, f"{name}_{strip[0]}", piece(image4, cut, extra, ZOOM4, north, strip),
                      piece(image8, cut, extra, ZOOM8, north, strip) if image8 is not None else None, strip[2])
         else:
             size = extra
             for ty in range(size[1]):
                 for tx in range(size[0]):
                     tile_north = (north[0] + (ty - tx) * ZOOM4.half_width, north[1] + (tx + ty) * ZOOM4.half_height)
-                    emit(lines, manifest, f"{name}_{tx}_{ty}", piece(image4, cut, extra, ZOOM4, north, (tx, ty)), pal_piece(small, cut, extra, north, (tx, ty)),
+                    emit(manifest, f"{name}_{tx}_{ty}", piece(image4, cut, extra, ZOOM4, north, (tx, ty)),
                          piece(image8, cut, extra, ZOOM8, north, (tx, ty)) if image8 is not None else None, tile_north)
     MANIFEST.write_text(json.dumps(manifest, indent=1) + "\n")
-    print("\n".join(lines))
+    print(f"{len(manifest)} sprites cut, {MANIFEST.name} written; then python3 openttd_yagl.py")
 
 
 if __name__ == "__main__":

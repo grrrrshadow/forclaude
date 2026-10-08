@@ -8911,87 +8911,87 @@ replace_sprites<OpenTTDGUI, 0x0000> // <new_feature_type, offset>  Action05
     // Replace OpenTTDGUI sprite 0x00C0
     sprite_id<0x000006AB>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [216, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C1
     sprite_id<0x000006AC>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [246, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [26, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C2
     sprite_id<0x000006AD>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [276, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [50, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C3
     sprite_id<0x000006AE>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [306, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [74, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C4
     sprite_id<0x000006AF>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [336, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [98, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C5
     sprite_id<0x000006B0>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [366, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [122, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C6
     sprite_id<0x000006B1>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [396, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [146, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C7
     sprite_id<0x000006B2>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [426, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [170, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C8
     sprite_id<0x000006B3>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [456, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [194, 2];
     }
     // Replace OpenTTDGUI sprite 0x00C9
     sprite_id<0x000006B4>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [486, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [218, 2];
     }
     // Replace OpenTTDGUI sprite 0x00CA
     sprite_id<0x000006B5>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [516, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [242, 2];
     }
     // Replace OpenTTDGUI sprite 0x00CB
     sprite_id<0x000006B6>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [546, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [266, 2];
     }
     // Replace OpenTTDGUI sprite 0x00CC
     sprite_id<0x000006B7>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [576, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [290, 2];
     }
     // Replace OpenTTDGUI sprite 0x00CD
     sprite_id<0x000006B8>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [606, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [314, 2];
     }
     // Replace OpenTTDGUI sprite 0x00CE
     sprite_id<0x000006B9>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [636, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [338, 2];
     }
     // Replace OpenTTDGUI sprite 0x00CF
     sprite_id<0x000006BA>
     {
-        [20, 20, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [666, 4121];
+        [20, 20, 0, 0], normal, c8bpp, "openttdgui_blueprint.png", [362, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D0
     sprite_id<0x000006BB>
     {
-        [16, 16, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [696, 4121];
+        [16, 16, 0, 0], normal, c8bpp, "openttdgui_rescue.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D1
     sprite_id<0x000006BC>
@@ -9001,107 +9001,107 @@ replace_sprites<OpenTTDGUI, 0x0000> // <new_feature_type, offset>  Action05
     // Replace OpenTTDGUI sprite 0x00D2
     sprite_id<0x000006BD>
     {
-        [16, 16, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [752, 4121];
+        [16, 16, 0, 0], normal, c8bpp, "openttdgui_crosshair.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D3
     sprite_id<0x000006BE>
     {
-        [32, 32, -16, -16], normal, c8bpp, "openttd-8bpp-normal-0.png", [10, 4163];
+        [32, 32, -16, -16], normal, c8bpp, "openttdgui_crosshair_cursor.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D4
     sprite_id<0x000006BF>
     {
-        [7, 13, -3, -6], normal, c8bpp, "openttd-8bpp-normal-0.png", [52, 4163];
+        [7, 13, -3, -6], normal, c8bpp, "openttdgui_rocket_0_0.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D5
     sprite_id<0x000006C0>
     {
-        [19, 10, -10, -4], normal, c8bpp, "openttd-8bpp-normal-0.png", [69, 4163];
+        [19, 10, -10, -4], normal, c8bpp, "openttdgui_rocket_0_1.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D6
     sprite_id<0x000006C1>
     {
-        [25, 5, -12, -2], normal, c8bpp, "openttd-8bpp-normal-0.png", [98, 4163];
+        [25, 5, -12, -2], normal, c8bpp, "openttdgui_rocket_0_2.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D7
     sprite_id<0x000006C2>
     {
-        [19, 10, -10, -5], normal, c8bpp, "openttd-8bpp-normal-0.png", [133, 4163];
+        [19, 10, -10, -5], normal, c8bpp, "openttdgui_rocket_0_3.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D8
     sprite_id<0x000006C3>
     {
-        [7, 13, -3, -6], normal, c8bpp, "openttd-8bpp-normal-0.png", [162, 4163];
+        [7, 13, -3, -6], normal, c8bpp, "openttdgui_rocket_0_4.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00D9
     sprite_id<0x000006C4>
     {
-        [19, 10, -8, -5], normal, c8bpp, "openttd-8bpp-normal-0.png", [179, 4163];
+        [19, 10, -8, -5], normal, c8bpp, "openttdgui_rocket_0_5.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00DA
     sprite_id<0x000006C5>
     {
-        [25, 5, -12, -2], normal, c8bpp, "openttd-8bpp-normal-0.png", [208, 4163];
+        [25, 5, -12, -2], normal, c8bpp, "openttdgui_rocket_0_6.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00DB
     sprite_id<0x000006C6>
     {
-        [19, 10, -8, -4], normal, c8bpp, "openttd-8bpp-normal-0.png", [243, 4163];
+        [19, 10, -8, -4], normal, c8bpp, "openttdgui_rocket_0_7.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00DC
     sprite_id<0x000006C7>
     {
-        [7, 13, -3, -6], normal, c8bpp, "openttd-8bpp-normal-0.png", [272, 4163];
+        [7, 13, -3, -6], normal, c8bpp, "openttdgui_rocket_1_0.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00DD
     sprite_id<0x000006C8>
     {
-        [19, 10, -10, -4], normal, c8bpp, "openttd-8bpp-normal-0.png", [289, 4163];
+        [19, 10, -10, -4], normal, c8bpp, "openttdgui_rocket_1_1.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00DE
     sprite_id<0x000006C9>
     {
-        [25, 5, -12, -2], normal, c8bpp, "openttd-8bpp-normal-0.png", [318, 4163];
+        [25, 5, -12, -2], normal, c8bpp, "openttdgui_rocket_1_2.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00DF
     sprite_id<0x000006CA>
     {
-        [19, 10, -10, -5], normal, c8bpp, "openttd-8bpp-normal-0.png", [353, 4163];
+        [19, 10, -10, -5], normal, c8bpp, "openttdgui_rocket_1_3.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E0
     sprite_id<0x000006CB>
     {
-        [7, 13, -3, -6], normal, c8bpp, "openttd-8bpp-normal-0.png", [382, 4163];
+        [7, 13, -3, -6], normal, c8bpp, "openttdgui_rocket_1_4.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E1
     sprite_id<0x000006CC>
     {
-        [19, 10, -8, -5], normal, c8bpp, "openttd-8bpp-normal-0.png", [399, 4163];
+        [19, 10, -8, -5], normal, c8bpp, "openttdgui_rocket_1_5.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E2
     sprite_id<0x000006CD>
     {
-        [25, 5, -12, -2], normal, c8bpp, "openttd-8bpp-normal-0.png", [428, 4163];
+        [25, 5, -12, -2], normal, c8bpp, "openttdgui_rocket_1_6.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E3
     sprite_id<0x000006CE>
     {
-        [19, 10, -8, -4], normal, c8bpp, "openttd-8bpp-normal-0.png", [463, 4163];
+        [19, 10, -8, -4], normal, c8bpp, "openttdgui_rocket_1_7.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E4
     sprite_id<0x000006CF>
     {
-        [10, 10, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [492, 4163];
+        [10, 10, 0, 0], normal, c8bpp, "openttdgui_cargo_rola.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E5
     sprite_id<0x000006D0>
     {
-        [11, 11, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [512, 4163];
+        [11, 11, 0, 0], normal, c8bpp, "openttdgui_cargo_marijuana.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E6
     sprite_id<0x000006D1>
     {
-        [16, 16, 0, 0], normal, c8bpp, "openttd-8bpp-normal-0.png", [533, 4163];
+        [16, 16, 0, 0], normal, c8bpp, "openttdgui_crosshair_armed.png", [2, 2];
     }
     // Replace OpenTTDGUI sprite 0x00E7
     sprite_id<0x000006D2>

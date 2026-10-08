@@ -37,7 +37,7 @@ is painted one flat colour and outlined in near-black instead, so it reads
 at a glance on grass, on rails and on a town.
 
 The cursor's hotspot is not in the picture. It is the offset written on the
-sprite's line in openttdgui.nfo, and for a crosshair it is the middle:
+sprite's row in GUI_ICONS of openttd_yagl.py, and for a crosshair it is the middle:
 half the width and half the height, negated.
 
 Run from this directory; needs Pillow.
@@ -50,7 +50,7 @@ import pathlib
 from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
-PALETTE_FROM = HERE / "openttdgui.png"
+PALETTE_FROM = HERE / "openttd-8bpp-normal-0.png"  # the DOS palette of the game's own sprites
 
 #: The drawing both sprites are scaled down from.
 SOURCE = HERE / "icons8-crosshair-50.png"

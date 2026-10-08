@@ -29,7 +29,7 @@ it is got wrong.
   stays the colour it was drawn.
 
 Run from this directory; needs Pillow. It writes the sixteen sprites and
-prints the lines to put in openttdgui.nfo, offsets and all.
+prints their rows for GUI_ICONS in openttd_yagl.py, offsets and all.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ import pathlib
 from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
-PALETTE_FROM = HERE / "openttdgui.png"
+PALETTE_FROM = HERE / "openttd-8bpp-normal-0.png"  # the DOS palette of the game's own sprites
 
 #: The liveries, in the order the game numbers them: set 0 and set 1.
 LIVERIES = ("grey", "yellow")
@@ -153,12 +153,11 @@ def main() -> None:
             source = HERE / SOURCE.format(livery=livery, heading=heading)
             output = HERE / OUTPUT.format(set=number, heading=heading)
             width, height, x_off, y_off = convert(source, output, palette, args.scale)
-            lines.append(f"   -1 sprites/{output.name} 8bpp   {MARGIN}    {MARGIN}"
-                         f" {width:3d} {height:3d} {x_off:3d} {y_off:3d} normal")
+            lines.append(f'    ("{output.name}", {MARGIN}, {MARGIN}, {width}, {height}, {x_off}, {y_off}),')
             print(f"wrote {output.name} ({width}x{height} at {x_off},{y_off})")
 
     print()
-    print("lines for openttdgui.nfo:")
+    print("rows for GUI_ICONS in openttd_yagl.py (file, x, y, width, height, x offset, y offset):")
     for line in lines:
         print(line)
 

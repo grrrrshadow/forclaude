@@ -1,0 +1,85 @@
+// A tiny set that refuses cargo set A (cargo_a.yagl) the way industry sets refuse
+// one another: it asks whether A is there and stops with a fatal error if it is.
+// Then it brings a cargo of its own, RIGR, under the id 0 -- the id of A's
+// passengers. With economy.newgrf_side_by_side on the game reads the sets again
+// with A hidden from this set's check (LoadNewGRF()) and both run; off, this set
+// is switched off. Scenes grfodmita and grfodmitavyp, see README.md.
+//     yagl -e <out>/refuses_a.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x41 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGr";
+    version: GRF8;
+    name: "Rig: refuses set A";
+    description: "Stops with a fatal error when cargo set A is loaded, then brings RIGR under the id 0.";
+}
+strings<Cargos, default, 0xDC00*> // <feature, language, first_id> Action04, Default
+{
+    /* 0xDC00 */ "RigCargoR";
+}
+set_parameter // Action0D
+{
+    target: 0x7F;
+    operation: 0x00;
+    source1: 0xFF;
+    source2: 0x00;
+    data_value: 0x00000000;
+}
+if_act9 (is_grf_disabled("RIGa", 0xFFFFFFFF)) // Action09
+{
+    skip_sprites: 0x01;
+    // Or skip to the next label (Action10) with this value - search wraps at end of GRF.
+    // 0x00 means skip to end of GRF file - may disable the GRF.
+}
+set_parameter // Action0D
+{
+    target: 0x7F;
+    operation: 0x00;
+    source1: 0xFF;
+    source2: 0x00;
+    data_value: 0x00000001;
+}
+if_act9 (is_equal(param[0x7F] & 0xFFFFFFFF, 0x00000000)) // Action09
+{
+    skip_sprites: 0x01;
+    // Or skip to the next label (Action10) with this value - search wraps at end of GRF.
+    // 0x00 means skip to end of GRF file - may disable the GRF.
+}
+error_message<Fatal, default, 0xFF> // Action0B <severity, language, message>
+{
+    message: "Refuses cargo set A on purpose.";
+}
+properties<Cargos, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        bit_number: 0x00;
+        cargo_type_name_id: 0xDC00;
+        single_unit_name_id: 0xDC00;
+        cargo_type_abbrev_id: 0xDC00;
+        cargo_units_id: 0xDC00;
+        cargo_amount_id: 0xDC00;
+        single_unit_weight: 0x10;
+        is_freight: true;
+        cargo_classes: 0x0010;
+        cargo_label: "RIGR";
+        base_price: 0x00001010;
+        penalty_time_1: 0x0A;
+        penalty_time_2: 0x64;
+        station_list_colour: 0x98;
+        payment_list_colour: 0x98;
+        capacity_multiplier: 0x0100;
+    }
+}

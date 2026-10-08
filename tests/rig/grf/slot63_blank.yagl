@@ -1,0 +1,20 @@
+// Test GRF: blanks cargo slot 63, the slot CT_ROLA is put in (road_on_rail.h).
+// One of two tiny sets that fight over that slot (slot63_taken.yagl, README.md):
+// the player's set does one of the two, and with these it reproduces in one run.
+//     yagl -e <out>/slot63_blank.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+grf // Action08
+{
+    grf_id: "ROL1";
+    version: GRF8;
+    name: "Slot63";
+    description: "T";
+}
+properties<Cargos, 0x003F> // Action00
+{
+    // instance_id: 0x003F
+    {
+        bit_number: 0xFF;
+    }
+}

@@ -15,7 +15,8 @@ palette has no green as bright as the glyph's, so the leaf takes the
 brightest plain green there is, and its half-lit edge a darker one, which
 keeps the fingers of the leaf apart at this size.
 
-The sprite is 11x11 at (2, 2), matching the line in openttdgui.nfo. Run from
+The sprite is 11x11 at (2, 2), matching its row in GUI_ICONS of
+openttd_yagl.py, which puts it into openttd.grf with yagl. Run from
 this directory; needs Pillow.
 """
 
@@ -27,7 +28,7 @@ from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
 SOURCE = HERE / "icons8-cannabis-67.png"
-PALETTE_FROM = HERE / "openttdgui.png"
+PALETTE_FROM = HERE / "openttd-8bpp-normal-0.png"  # the DOS palette of the game's own sprites
 OUTPUT = HERE / "openttdgui_cargo_marijuana.png"
 
 MARGIN = 2

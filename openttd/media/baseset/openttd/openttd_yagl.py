@@ -8,14 +8,16 @@ openttd-8bpp-normal-0.png and the pictures of our own -- the school, the
 automat, the statue, the plantation, the bus-stop girls, the hut, the
 fireworks, the poster -- on sheets of our own, openttd-nase-*.png, laid out
 here from the pieces openttd_budovy.py cuts from the colleague's renders
-(budovy_manifest.json).
+(budovy_manifest.json). Our GUI icons -- the blueprint toolbar, the rescue
+engine, the crosshairs, the raid rocket, the cargo icons of the road
+vehicles on wagons and of marijuana -- are palette sprites among the
+original ones, each drawn by its own script (openttdgui_*.py) into a
+picture of its own; their blocks read those pictures (GUI_ICONS below), so
+an icon drawn again goes into the set as it is.
 
 This script lays the pieces out on those sheets, each cut down to the
-pixels it has (the see-through margin of a render costs sprite memory in
-the game at every zoom; grfcodec used to cut it off, so does this), 8 px
-apart as the colleague's packers do (yagl looks at the band around every
-sprite and reads past the edge of a picture a sprite fills), and writes
-them into
+pixels it has (rows and columns with no alpha at all), 8 px apart as the
+colleague's packers do, and writes them into
 openttd.yagl: for every entry of the manifest, the block of the OpenTTD GUI
 sprite it stands for (SPR_OPENTTD_BASE + 231 and on, the order of the
 manifest) is made anew from the finest render there is -- the 16x piece
@@ -55,6 +57,22 @@ SHEET_WIDTH = 2048
 LEVELS = (("x16", "openttd-nase-zin16.png", "zin16", "c32bpp | chunked"),
           ("x8", "openttd-nase-zin8.png", "zin8", "c32bpp | chunked"),
           ("x4", "openttd-nase-zin4.png", "zin4", "c32bpp | chunked"))
+
+#: Our GUI icons, palette sprites drawn by the openttdgui_*.py scripts: the
+#: OpenTTD GUI sprite, then the picture, where the sprite sits on it, its size
+#: and its offsets (openttdgui_rocket.py prints its own rows).
+GUI_ICONS = (
+    *[(0x00C0 + i, "openttdgui_blueprint.png", i * 24 + 2, 2, 20, 20, 0, 0) for i in range(16)],
+    (0x00D0, "openttdgui_rescue.png", 2, 2, 16, 16, 0, 0),
+    (0x00D2, "openttdgui_crosshair.png", 2, 2, 16, 16, 0, 0),
+    (0x00D3, "openttdgui_crosshair_cursor.png", 2, 2, 32, 32, -16, -16),
+    *[(0x00D4 + 8 * s + h, f"openttdgui_rocket_{s}_{h}.png", 2, 2, *size)
+      for s in range(2) for h, size in enumerate([(7, 13, -3, -6), (19, 10, -10, -4), (25, 5, -12, -2), (19, 10, -10, -5),
+                                                  (7, 13, -3, -6), (19, 10, -8, -5), (25, 5, -12, -2), (19, 10, -8, -4)])],
+    (0x00E4, "openttdgui_cargo_rola.png", 2, 2, 10, 10, 0, 0),
+    (0x00E5, "openttdgui_cargo_marijuana.png", 2, 2, 11, 11, 0, 0),
+    (0x00E6, "openttdgui_crosshair_armed.png", 2, 2, 16, 16, 0, 0),
+)
 
 
 def wanted(entry: dict) -> list[str]:
@@ -144,11 +162,29 @@ def rewrite(text: str, manifest: list[dict], where: dict) -> str:
     return out
 
 
+def rewrite_icons(text: str) -> str:
+    """Point the block of each of our GUI icons at the picture its script draws."""
+    out = text
+    for number, picture, x, y, w, h, xo, yo in GUI_ICONS:
+        head = f"    // Replace OpenTTDGUI sprite 0x{number:04X}\n"
+        at = out.find(head)
+        if at < 0:
+            sys.exit(f"openttd.yagl has no OpenTTD GUI sprite 0x{number:04X} for {picture}")
+        line_at = out.index("        [", at)
+        line_end = out.index("\n", line_at)
+        line = out[line_at:line_end]
+        expected = f"        [{w}, {h}, {xo}, {yo}], normal, c8bpp, "
+        if not line.startswith(expected):
+            sys.exit(f"0x{number:04X}: the block says {line.strip()!r}, the icon {picture} is {w}x{h} at {xo},{yo}")
+        out = out[:line_at] + f'{expected}"{picture}", [{x}, {y}];' + out[line_end:]
+    return out
+
+
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     where = make_sheets(manifest)
     text = YAGL_FILE.read_text()
-    new = rewrite(text, manifest, where)
+    new = rewrite_icons(rewrite(text, manifest, where))
     if new != text:
         YAGL_FILE.write_text(new)
         print(f"openttd.yagl: {len(manifest)} sprites of our own written in")

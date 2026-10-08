@@ -127,7 +127,11 @@ the colleague's yagl (grrrrf, yagl/yagl-main), the one tool this game's sets
 are made with -- never grfcodec. They are kept built in media/baseset with
 their hashes; media/baseset/openttd/openttd_yagl.py and
 media/baseset/orig_extra/orig_extra_yagl.py rebuild them from the .yagl
-sources beside them. The build itself needs neither tool.
+sources beside them. The build itself needs neither tool. A picture of our
+own goes in through its script first: openttd_budovy.py cuts the
+colleague's renders, the openttdgui_*.py scripts draw the GUI icons; then
+openttd_yagl.py builds the set. The rig's own sets are yagl scripts too
+(tests/rig/grf/*.yagl), built by its battery.
 
 ## Developers settings
 

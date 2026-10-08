@@ -8196,7 +8196,7 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
 }
 
 /**
- * The configurator (vehicle_config.h) on the rig's set grf/konfig_yagl.py: a road
+ * The configurator (vehicle_config.h) on the rig's set grf/konfig.yagl: a road
  * vehicle whose set names two details -- a crew of three and a cart of two --
  * and draws one picture for the first choice of both, another for anything
  * else. Builds a depot and the vehicle, lists the details as the game reads
@@ -8211,7 +8211,7 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
 static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Rig: the configurator on the set grf/konfig_yagl.py writes. Usage: 'testkonfig'.");
+		IConsolePrint(CC_HELP, "Rig: the configurator on the set grf/konfig.yagl. Usage: 'testkonfig'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -13259,8 +13259,8 @@ static bool ConTestRoadOnAir(std::span<std::string_view> argv)
 }
 
 /**
- * Rig probe for Action 2 IDs above 255 (tests/rig/grf/bloky_siroke.nfo and
- * bloky_zamek.nfo) and for the game's own sets (vestaveny.nfo). Every set in
+ * Rig probe for Action 2 IDs above 255 (tests/rig/grf/bloky_siroke.yagl and
+ * bloky_zamek.yagl) and for the game's own sets (vestaveny.yagl). Every set in
  * the game with its state, whether it reads two-byte IDs, what its feature
  * tests set on 0x9D and whether it is one of the game's own; then every road
  * vehicle a set took, with the answer of a callback. The chain of blocks 1000,

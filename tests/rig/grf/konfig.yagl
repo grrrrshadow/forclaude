@@ -1,0 +1,206 @@
+// The rig's set for the game's configurator (vehicle_config.h). A road vehicle
+// whose set names two details for the player to choose -- a crew of three and a
+// cart of two -- through callback 1C0, and draws one picture for the first
+// choice of both and another for anything else, by variable 5C. The set asks
+// for the feature 'decouple_vehicle_config' first and gives up with an error
+// where nobody answers, as the colleague's sets do (special/pack_special.py in
+// grrrrf), and its pictures are zin8 only, as his are; the game works the
+// smaller zooms out. Written in the colleague's yagl dialect on purpose, so that
+// the test is the same recipe his sets use (docs/decouple_vehicle_config.md).
+//     yagl -e <out>/konfig.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14: the feature test, answered on bit 9 of 0x9D
+{
+    FTST: 
+    {
+        NAME: default, "decouple_vehicle_config";
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x09 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGk";
+    version: GRF8;
+    name: "Rig: konfig";
+    description: "Details for the configurator: crew and cart";
+}
+if_act7 (is_bit_set(global_var[0x9D] & 0xFF, 1 << 9)) // Action07: the game answered, skip the error
+{
+    skip_sprites: 0x01;
+}
+error_message<Fatal, default, 0xFF> // Action0B
+{
+    message: "Tento GRF patri ke hre OpenTTD decouple by Karel Macha a jinde nefunguje.";
+}
+properties<RoadVehicles, 0x0058> // Action00
+{
+    {
+        long_introduction_date: date(1920/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        cargo_type: 0x00;
+        cargo_capacity: 0x10;
+        loading_speed: 0x02;
+        sprite_id: 0xFF;
+        speed_2_kmh: 0x30;
+        power_10_hp: 0x01;
+        weight_quarter_tons: 0x04;
+        cost_factor: 0x08;
+        running_cost_factor: 0x04;
+        running_cost_base: 0x00004C48;
+        callback_flags_mask: 0x00;
+    }
+}
+strings<RoadVehicles, default, 0x0058> // Action04: the vehicle's name
+{
+    /* 0x0058 */ "Rig: konfig vuz";
+}
+strings<RoadVehicles, default, 0xD000*> // Action04: the configurator's texts, D000..D006
+{
+    /* 0xD000 */ "Posadka";
+    /* 0xD001 */ "College Girl";
+    /* 0xD002 */ "Female Girl";
+    /* 0xD003 */ "Ufon";
+    /* 0xD004 */ "Vozik";
+    /* 0xD005 */ "tahnout";
+    /* 0xD006 */ "tlacit";
+}
+sprite_sets<RoadVehicles, 0x0000> // Action01: set 0 the first choices, set 1 anything else
+{
+    sprite_set // 0x0000
+    {
+        sprite_id<0x00000001>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000002>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000003>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000004>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000005>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000006>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000007>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000008>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [8, 8];
+        }
+    }
+    sprite_set // 0x0001
+    {
+        sprite_id<0x00000009>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x0000000A>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x0000000B>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x0000000C>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x0000000D>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x0000000E>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x0000000F>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+        sprite_id<0x00000010>
+        {
+            [32, 32, -16, -16], zin8, c32bpp | chunked, "konfig-zin8.png", [48, 8];
+        }
+    }
+}
+sprite_groups<RoadVehicles, 0x00> // Action02 basic: set 0
+{
+    primary_spritesets: [ 0x0000 ];
+    secondary_spritesets: [ 0x0000 ];
+}
+sprite_groups<RoadVehicles, 0x01> // Action02 basic: set 1
+{
+    primary_spritesets: [ 0x0001 ];
+    secondary_spritesets: [ 0x0001 ];
+}
+switch<RoadVehicles, 0x02, PrimaryDWord> // the picture by the player's choices (variable 5C)
+{
+    expression:
+    {
+        value1 = variable[0x5C] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x00000000: 0x0000;
+    };
+    default: 0x0001;
+}
+switch<RoadVehicles, 0x03, PrimaryDWord> // the texts of the configurator (callback 1C0, variable 10)
+{
+    expression:
+    {
+        value1 = variable[0x10] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000000FF: 0x8000;
+        0x00000000: 0x8001;
+        0x00000001: 0x8002;
+        0x00000002: 0x8003;
+        0x000001FF: 0x8004;
+        0x00000100: 0x8005;
+        0x00000101: 0x8006;
+    };
+    default: 0x8400;
+}
+switch<RoadVehicles, 0x04, PrimaryDWord> // the callbacks
+{
+    expression:
+    {
+        value1 = variable[0x0C] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000001C0: 0x0003;
+    };
+    default: 0x0002;
+}
+feature_graphics<RoadVehicles> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x0004;
+    feature_ids: [ 0x0058 ];
+    cargo_types:
+    {
+        0xFF: 0x0004;
+    };
+}

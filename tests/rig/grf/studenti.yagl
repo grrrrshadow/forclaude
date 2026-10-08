@@ -1,0 +1,51 @@
+// A set that brings students (STUD) under its own name, as the industry sets do.
+// The game calls them studentky whatever the set says, and the coffeeshop takes
+// them (NameStudentCargo(), COFFEESHOP_CARGOES). Played by the scene studentky
+// (see README.md).
+//     yagl -e <out>/studenti.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x41 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGs";
+    version: GRF8;
+    name: "Rig: students";
+    description: "Brings students (STUD) under the name a set gives them.";
+}
+strings<Cargos, default, 0xDC00*> // <feature, language, first_id> Action04, Default
+{
+    /* 0xDC00 */ "Students";
+}
+properties<Cargos, 0x0028> // Action00
+{
+    // instance_id: 0x0028
+    {
+        bit_number: 0x28;
+        cargo_type_name_id: 0xDC00;
+        single_unit_name_id: 0xDC00;
+        cargo_type_abbrev_id: 0xDC00;
+        cargo_units_id: 0xDC00;
+        cargo_amount_id: 0xDC00;
+        single_unit_weight: 0x10;
+        is_freight: false;
+        cargo_classes: 0x0001;
+        cargo_label: "STUD";
+        base_price: 0x00001010;
+        penalty_time_1: 0x0A;
+        penalty_time_2: 0x64;
+        station_list_colour: 0x98;
+        payment_list_colour: 0x98;
+        capacity_multiplier: 0x0100;
+    }
+}

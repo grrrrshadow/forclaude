@@ -18,8 +18,9 @@ standing for "nothing here", so this script does three things to it:
   button icon in the game has one. Without it the tools disappear into the
   grey of the button they sit on.
 
-The sprite is 16x16 at (2, 2), matching the line appended to
-openttdgui.nfo. Run from this directory; needs Pillow.
+The sprite is 16x16 at (2, 2), matching its row in GUI_ICONS of
+openttd_yagl.py, which puts it into openttd.grf with yagl. Run from this
+directory; needs Pillow.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from PIL import Image
 
 HERE = pathlib.Path(__file__).parent
 SOURCE = HERE / "icons8-hammer-and-wrench-16.png"
-PALETTE_FROM = HERE / "openttdgui.png"
+PALETTE_FROM = HERE / "openttd-8bpp-normal-0.png"  # the DOS palette of the game's own sprites
 OUTPUT = HERE / "openttdgui_rescue.png"
 
 MARGIN = 2

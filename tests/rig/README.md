@@ -175,18 +175,44 @@ put down crossed go on to their next stop and home.
 Scenes are to be re-run once the engine–wagons–engine depots (A/B) are
 worked on again.
 
+## The rig's own sets, in yagl
+
+Every NewGRF the rig makes for itself is a yagl script in `grf/` -- `grf/<set>.yagl`,
+with its sprite sheets beside it (`<set>-*.png`) -- written in the colleague's
+yagl, the one tool this game's sets are made with. The player's rule: no
+grfcodec, no nml and no GRF written by hand; what yagl lacks is reported to
+the colleague and added to yagl. Each script starts with a comment that says
+what the set is for and which scene plays it.
+
+The battery builds every one of them at the start of every run, so the
+scenes play what the scripts say and yagl goes through every set each time:
+
+    yagl -e $RIG_DIR/rig_grf/<set>.grf tests/rig/grf
+
+and copies them into the home's `newgrf/` (`vestaveny.grf` into the rig
+directory, see its section). yagl is looked for at `$YAGL`, then on the path;
+build it from the colleague's copy (`grrrrf`, `yagl/yagl-main`, his
+`yagl/POSTUP.md`: `cmake -G Ninja .. && ninja`). Without it the battery says
+so and plays the sets already in the home.
+
+The scripts came from the sets the rig had (nfo for grfcodec, nml, two written
+by hand in Python), decoded with `yagl -d`; built again they are the same sets
+for the game -- every pseudo-sprite, every sprite's size, offsets and pixels --
+except where yagl writes the same thing another way the game reads alike: an
+id as an extended byte, the bit of an Action 7 bit test as one byte, a house
+layout of one building sprite at height 0 in the short form, a quote in a text
+as yagl's code {dq}.
+
 ## Two tiny NewGRFs that fight over our cargo slot
 
-`grf/slot63_blank.nfo` and `grf/slot63_taken.nfo` are complete NewGRFs of two
-or three pseudo-sprites each. One blanks cargo slot 63 and the other puts a
+`grf/slot63_blank.yagl` and `grf/slot63_taken.yagl` are complete NewGRFs of two
+records each. One blanks cargo slot 63 and the other puts a
 cargo of its own there -- the slot the cargo for road vehicles on wagons is
 put in (road_on_rail.h). They exist because the player's set does one of those
 two things and nothing here reproduced it: with them, it reproduces in one
-run.
+run. The battery builds them and plays neither:
 
-    cd <dir with sprites/slot63_taken.nfo>
-    grfcodec -e -p1 slot63_taken.grf
-    cp slot63_taken.grf <rig home>/.local/share/openttd/newgrf/
+    cp $RIG_DIR/rig_grf/slot63_taken.grf <rig home>/.openttd/newgrf/
 
 then add a line `slot63_taken.grf =` under `[newgrf]` in that home's
 `openttd.cfg`, start a game and read the last line of `dump_info cargotypes`.
@@ -211,7 +237,7 @@ the temperate houses empty in the player's game. `testdomy picker <set>
 
 ## A house set that puts a four-tile block in place of the statue
 
-`grf/house_over.nfo` (with `grf/gfx/blue_house.png`) is a house set of one
+`grf/house_over.yagl` (with `grf/house_over-8bpp-normal-0.png`) is a house set of one
 house: a four-tile block made from the stadium, put in place of the statue
 (original house 9, one tile) -- what house sets do to the originals, here
 with a size that differs, which nml refuses to write and older sets do. It
@@ -226,9 +252,6 @@ and every original a town of chosen sets builds, is kept as itself on its
 tile (IsHouseKeptOriginal(), a bit in m8 that old saves have clear), and the
 map reads it as such.
 
-    grfcodec -e -p1 -f house_over.grf      (in a directory holding sprites/house_over.nfo and sprites/gfx/blue_house.png)
-    cp house_over.grf <rig home>/.openttd/newgrf/
-
 The scene `domypostav` places the statue by hand twice (`testdomy postav <x>
 <y> <house>`), which has to leave a statue standing on its one tile, ticks a
 town to the temperate houses and grows it: every house it puts up has to be
@@ -237,7 +260,7 @@ had nothing of them to build and mixed every house instead.
 
 ## A set that gives up after it has changed things
 
-`grf/quits_late.nml` (strings in `grf/lang/english.lng`) is a NewGRF of three
+`grf/quits_late.yagl` is a NewGRF of three
 actions: it switches every default cargo off and then dies with a fatal
 error. That is what Industries of the Caribbean does next to another
 industry set -- its header switches the game's cargoes and industries off
@@ -248,10 +271,7 @@ ship with no cargo of its own then stopped the game in an assertion
 gave up (GfxLoadSprites()), which is what the player would otherwise have to do
 by hand on seeing the set marked disabled.
 
-    nmlc -c -l grf/lang --grf quits_late.grf grf/quits_late.nml
-    cp quits_late.grf <rig home>/.openttd/newgrf/
-
-for every home. The scene `grfvzdalo` plays it and asks `testnaklady 13`
+The scene `grfvzdalo` plays it and asks `testnaklady 13`
 for the dozen cargoes of toyland plus the road-vehicle cargo; its one record
 line (zaznam=1) is the game saying the set gave up. Without the second
 reading the count is 1, and before the ship was taught to check its cargo
@@ -259,18 +279,13 @@ the scene ended in the assertion.
 
 ## Two cargo sets that bring the same cargoes
 
-`grf/cargo_a.nml` and `grf/cargo_b.nml` (strings in `grf/lang/english.lng`)
-each switch the game's cargoes off and bring three cargoes under the ids 0,
+`grf/cargo_a.yagl` and `grf/cargo_b.yagl` each switch the game's cargoes off and bring three cargoes under the ids 0,
 1 and 2: A passengers, coal and RIGA; B passengers, RIGB and coal. Every set
 numbers its cargoes from 0, so before the cargo slots of
 newgrf_act0_cargo.cpp the second set wrote over the first one's and its own
 cargo was gone -- the reason industry sets refuse one another.
 
-    nmlc -c -l grf/lang --grf cargo_a.grf grf/cargo_a.nml
-    nmlc -c -l grf/lang --grf cargo_b.grf grf/cargo_b.nml
-    cp cargo_a.grf cargo_b.grf <rig home>/.openttd/newgrf/
-
-for every home. The scenes `nakladysdilene` (A, then B) and
+The scenes `nakladysdilene` (A, then B) and
 `nakladysdilene2` (B, then A) ask `testnaklady` for 5 cargoes -- the shared
 passengers and coal, both sets' own and the road-vehicle cargo -- and for
 the names of the set that came last on the shared ones: a later set writes
@@ -279,13 +294,10 @@ it.
 
 ## A set that refuses another
 
-`grf/refuses_a.nml` refuses cargo set A the way industry sets refuse one
+`grf/refuses_a.yagl` refuses cargo set A the way industry sets refuse one
 another -- an Action 9 on A's status, and a fatal error three sprites later
 -- and otherwise brings a cargo of its own, RIGR, under the id of A's
 passengers.
-
-    nmlc -c -l grf/lang --grf refuses_a.grf grf/refuses_a.nml
-    cp refuses_a.grf <rig home>/.openttd/newgrf/
 
 `grfodmita` plays A and this set with economy.newgrf_side_by_side on (the
 default): the game reads the sets again with A hidden from the set's check
@@ -354,13 +366,10 @@ not, in the game or not, what it carries -- every set vehicle numbered where
 one of them sits, every green loaded picture with how many of its pixels are
 green (refused when none or all are), and refuses a goods ship or aircraft
 that does not take marijuana. `vozidlahry` plays rig.sav, made before the mark:
-the car carriers are moved under it. `vozidlasada` plays `grf/claims_own.nml`
+the car carriers are moved under it. `vozidlasada` plays `grf/claims_own.yagl`
 (built into `claims_own.grf` in the home's `newgrf/`, as the other rig sets
 are), a wagon under the car carrier's number and a lorry under the first
 marijuana lorry's: they have to stand beside the game's own.
-
-    nmlc -c -l grf/lang --grf claims_own.grf grf/claims_own.nml
-    cp claims_own.grf <rig home>/.openttd/newgrf/
 
 Only car carriers take road vehicles: the game's own and, in any set, the
 flat wagons named Pao, Pasy, Sgs or Smmp (IsCarCarrierWagon()); `testnaklady`
@@ -378,44 +387,27 @@ one with it. Scene `zelenest` needs the player's CZTR wagon set and steam
 engines in the home's `newgrf/` (the two tars named under "A lorry with a
 trailer" below); the rig runs with the null blitter, and the set's pictures
 being 32bpp only, the green pixels are counted from the file. Scene
-`zelenestjednovrstvy` plays `grf/st_old.nml`, a St with its coal in its own
-picture, the case of CZTR 1.0.0, which the rig has not got:
+`zelenestjednovrstvy` plays `grf/st_old.yagl`, a St with its coal in its own
+picture, the case of CZTR 1.0.0, which the rig has not got.
 
-    nmlc -c -l grf/lang --grf st_old.grf grf/st_old.nml
-    cp st_old.grf <rig home>/.openttd/newgrf/
-
-`cztrvymena` plays `grf/firs5_like.nml`, a set with FIRS 5's id and nothing
+`cztrvymena` plays `grf/firs5_like.yagl`, a set with FIRS 5's id and nothing
 else, together with the player's CZTR Wagons-Cargo 1.1.0 from the tar above
-and `grf/cztr_old.nml`, a stand-in for CZTR Wagons-Cargo 1.0.0 -- the set's id
+and `grf/cztr_old.yagl`, a stand-in for CZTR Wagons-Cargo 1.0.0 -- the set's id
 and that release's name on the one-layer St. The game plays the stand-in in
 1.1.0's place (`testgrf hra` says what it plays); `cztrbezfirs` is the same
-without FIRS 5, where 1.1.0 plays as it is. Build them the same way and put
-them in the same place:
+without FIRS 5, where 1.1.0 plays as it is.
 
-    nmlc -c -l grf/lang --grf cztr_old.grf grf/cztr_old.nml
-    nmlc -c -l grf/lang --grf firs5_like.grf grf/firs5_like.nml
-    cp cztr_old.grf firs5_like.grf <rig home>/.openttd/newgrf/
+`konfig` plays `grf/konfig.yagl`, the set for the game's configurator
+(`docs/decouple_vehicle_config.md`): a road vehicle whose set names two
+details for the player to choose -- a crew of three and a cart of two --
+through callback 1C0, and draws another picture for any choice but the
+first, by variable 5C. Written the way the colleague writes his sets, so that
+the test runs the very recipe his sets use; its pictures are zin8 only, as
+his are.
 
-`konfig` plays the set `grf/konfig_yagl.py` writes, the one for the game's
-configurator (`docs/decouple_vehicle_config.md`): a road vehicle whose set
-names two details for the player to choose -- a crew of three and a cart of
-two -- through callback 1C0, and draws another picture for any choice but
-the first, by variable 5C. It is written in yagl, the colleague's dialect and
-the one tool our sets are made with (no grfcodec, no nml: the player's rule),
-so that the test runs the very recipe his sets use; its pictures are zin8
-only, as his are. Build yagl from the colleague's copy (`grrrrf`,
-`yagl/yagl-main`, see his `yagl/POSTUP.md`), then:
-
-    python3 grf/konfig_yagl.py <out>
-    cd <out> && yagl -e konfig.grf          (it reads sprites/konfig.yagl)
-    cp konfig.grf <rig home>/.openttd/newgrf/
-
-`getsjmena` plays `grf/gets_like.nml`, wagons named the way GETS names its
+`getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
-as GETS does. Build it the same way and put it in the same place:
-
-    nmlc -c -l grf/lang --grf gets_like.grf grf/gets_like.nml
-    cp gets_like.grf <rig home>/.openttd/newgrf/
+as GETS does.
 
 `testjmena <text>` lists the rail vehicles whose name, as the set gives it or
 as the purchase list shows it now, has the text in it.
@@ -652,7 +644,7 @@ does not share.
 
 ## Action 2 IDs above 255, and the lock of our own sets
 
-`grf/bloky_siroke.nfo` and `grf/bloky_zamek.nfo` are hand-written NewGRFs for
+`grf/bloky_siroke.yagl` and `grf/bloky_zamek.yagl` are NewGRFs for
 the two names this game answers in an Action 14 feature test and no other game
 does (`newgrf_act14.cpp`):
 
@@ -675,11 +667,9 @@ Two things the files had to learn, and a set of ours has to as well:
 - **The Action 14 comes before the Action 8.** A file is scanned only up to its
   Action 8, and the feature tests are read in that scan and nowhere else.
 - **Bit 0 of 0x9D is no lock.** 0x9D is the platform variable, 1 in every
-  OpenTTD, so the lock tests bit 8.
-
-    grfcodec -e -p1 -f bloky_siroke.grf    (in a directory holding sprites/bloky_siroke.nfo)
-    grfcodec -e -p1 -f bloky_zamek.grf     (in a directory holding sprites/bloky_zamek.nfo)
-    cp bloky_siroke.grf bloky_zamek.grf <rig home>/.openttd/newgrf/
+  OpenTTD, so the lock tests bit 8. (yagl writes that test with
+  `global_var[0x9D] & 0xFF` and `1 << 8`; for a bit test the game takes the
+  bit as a byte and masks nothing, so bit 8 is tested all the same.)
 
 The scene `bloky` starts a game with both and reads them with `testbloky`: the
 state of every set, whether it reads two-byte IDs, the bits on 0x9D, and the
@@ -696,14 +686,11 @@ read from `openttd.cfg`, so the player sees them in the NewGRF window and may
 move them; the window refuses to remove one with a red message, and no set can
 switch one off with an Action E. A savegame keeps the sets it was saved with.
 
-`grf/vestaveny.nfo` is such a set: it takes the second road vehicle and its
-callback answers 0x77. `grf/vypinac.nfo` is an ordinary set that switches it
-off by its GRF ID and must not manage to.
-
-    grfcodec -e -p1 -f vestaveny.grf   (in a directory holding sprites/vestaveny.nfo)
-    grfcodec -e -p1 -f vypinac.grf     (in a directory holding sprites/vypinac.nfo)
-    cp vestaveny.grf <rig dir>/        (not into newgrf/: the scene puts it into baseset/decouple/)
-    cp vypinac.grf <rig home>/.openttd/newgrf/
+`grf/vestaveny.yagl` is such a set: it takes the second road vehicle and its
+callback answers 0x77. `grf/vypinac.yagl` is an ordinary set that switches it
+off by its GRF ID and must not manage to. The battery puts `vestaveny.grf` in
+the rig directory, not in the home's `newgrf/`: the scene puts it into
+`baseset/decouple/`.
 
 The scenes `vestaveny` and `vestavenysav` put `vestaveny.grf` into
 `baseset/decouple/` of the scene's config directory and take it out again
@@ -715,13 +702,11 @@ The window's refusal is not played by the rig (no window there).
 
 ## A set's 16x sprites (zin16, zoom code 7)
 
-`grf/zin16_grf.py` writes `zin16_test.grf`, a container version 2 set with
-the 16x level this game reads (zoom code 7, `ZoomLevel::In16x`,
-`LoadSpriteV2()` in `src/spriteloader/grf.cpp`; 8x is code 6, the NewGRF
-codes end at 5). It is written by hand from the standard library, as
-grfcodec knows no code past 5, and the battery writes it itself:
-
-    python3 grf/zin16_grf.py <rig home>/.openttd/newgrf/zin16_test.grf
+`grf/zin16_test.yagl` is a container version 2 set with the 16x level this
+game reads (zoom code 7, `ZoomLevel::In16x`, `LoadSpriteV2()` in
+`src/spriteloader/grf.cpp`; 8x is code 6, the NewGRF codes end at 5). yagl
+names them zin8 and zin16 (grfcodec knows no code past 5); its three sheets
+hold the levels.
 
 Two sprites are replaced (Action A, 3981 and 3982 of the base set), squares
 of one colour per level: 3981 has 4x red, 8x green and 16x blue; 3982 has 16x
@@ -746,13 +731,10 @@ palette index `m`.
 
 ## Students are studentky, and the coffeeshop takes them
 
-`grf/studenti.nml` brings the cargo STUD under the name "Students", as the
+`grf/studenti.yagl` brings the cargo STUD under the name "Students", as the
 industry sets do. The game renames it Studentky whatever the set says
 (`NameStudentCargo()`), in every language, and the coffeeshop takes it
 (`COFFEESHOP_CARGOES`).
-
-    nmlc -c -l grf/lang --grf studenti.grf grf/studenti.nml
-    cp studenti.grf <rig home>/.openttd/newgrf/
 
 The scene `studentky` writes the cargoes and industries with the console
 command `prum` and reads the cargo's name and what the coffeeshop takes.

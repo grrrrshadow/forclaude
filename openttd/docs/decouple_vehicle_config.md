@@ -2,7 +2,7 @@
 
 *OpenTTD Decouple by Karel Mácha. The player's word: "konfigurátor". Game side
 in `src/vehicle_config.h`, `vehicle_config.cpp`, `vehicle_config_gui.cpp`;
-test set in `tests/rig/grf/konfig_yagl.py`, written in yagl.*
+test set `tests/rig/grf/konfig.yagl`, written in yagl.*
 
 A set may offer, on a vehicle, up to four **details** the player chooses in
 the game, each with up to 32 named **options**: who pulls the hand cart (College
