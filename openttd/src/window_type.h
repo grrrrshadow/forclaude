@@ -411,6 +411,12 @@ enum class WindowClass : uint16_t {
 	TrainDriver,
 
 	/**
+	 * The configurator: the details a vehicle's set lets the player choose (vehicle_config.h); %Window numbers:
+	 *   - #VehicleID = #VehicleConfigWidgets
+	 */
+	VehicleConfig,
+
+	/**
 	 * Build vehicle; %Window numbers:
 	 *   - #VehicleType = #BuildVehicleWidgets
 	 *   - #TileIndex = #BuildVehicleWidgets

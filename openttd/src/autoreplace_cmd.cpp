@@ -8,6 +8,7 @@
 /** @file autoreplace_cmd.cpp Deals with autoreplace execution but not the setup. */
 
 #include "stdafx.h"
+#include "vehicle_config.h"
 #include "company_func.h"
 #include "train.h"
 #include "road_on_rail.h"
@@ -376,6 +377,14 @@ static CommandCost BuildReplacementVehicle(Vehicle *old_veh, Vehicle **new_vehic
 
 		cost.AddCost(ExtractCommandCost(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, new_veh->index, refit_cargo, subtype, false, false, 0)));
 		assert(cost.Succeeded()); // This should be ensured by GetNewCargoTypeForReplace()
+	}
+
+	/* A vehicle renewed with the same model keeps the details the player
+	 * chose on it (vehicle_config.h); another model has details of its own
+	 * and starts with the first option of each. */
+	if (new_veh->engine_type == old_veh->engine_type) {
+		new_veh->config_options = old_veh->First()->config_options;
+		ApplyVehicleConfig(new_veh);
 	}
 
 	/* Where a coupling joined the old vehicle's part to the train, the new

@@ -4807,6 +4807,17 @@ STR_TRAIN_DRIVER_RESET                                          :{BLACK}Reset
 STR_TRAIN_DRIVER_RESET_TOOLTIP                                  :{BLACK}Everything as the game says. "Keep the changes" then writes it to the train
 STR_TRAIN_DRIVER_APPLY                                          :{BLACK}Keep the changes
 STR_TRAIN_DRIVER_APPLY_TOOLTIP                                  :{BLACK}Write what the window shows to this train's driver
+
+STR_REFIT_DETAILS_BUTTON                                        :{BLACK}Configurator
+STR_REFIT_DETAILS_TOOLTIP                                       :{BLACK}Choose the details this vehicle's set offers: who pulls the hand cart, pushed or pulled, stripes, colours. The cargo stays as refitted
+STR_VEHICLE_CONFIG_CAPTION                                      :{WHITE}{VEHICLE}: configurator
+STR_VEHICLE_CONFIG_NONE                                         :{BLACK}This vehicle's set offers no details to choose.
+STR_VEHICLE_CONFIG_CARGO                                        :{BLACK}Cargo (the refit changes it): {GOLD}{RAW_STRING}
+STR_VEHICLE_CONFIG_NO_CARGO                                     :none
+STR_VEHICLE_CONFIG_OPTION_TOOLTIP                               :{BLACK}Choose one of the options the set offers for this detail. Only on a vehicle stopped in a depot
+STR_VEHICLE_CONFIG_OPTION_UNKNOWN                               :option {NUM}
+STR_PURCHASE_INFO_CONFIG_ASPECTS                                :{BLACK}Configurator: {GOLD}{RAW_STRING}
+STR_ERROR_CAN_T_CONFIGURE_VEHICLE                               :{WHITE}Can't change the vehicle's details...
 STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP                             :{BLACK}Call a rescue engine to take these wagons to a depot. Click again to take the call back
 STR_VEHICLE_VIEW_TRAIN_REVERSE_TOOLTIP                          :{BLACK}Reverse direction of train
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Force vehicle to turn around

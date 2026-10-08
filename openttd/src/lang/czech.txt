@@ -4916,6 +4916,17 @@ STR_TRAIN_DRIVER_RESET                                          :{BLACK}Resetova
 STR_TRAIN_DRIVER_RESET_TOOLTIP                                  :{BLACK}Všechno podle hry. „Potvrdit změny“ to pak mašince zapíše
 STR_TRAIN_DRIVER_APPLY                                          :{BLACK}Potvrdit změny
 STR_TRAIN_DRIVER_APPLY_TOOLTIP                                  :{BLACK}Zapsat strojvedoucímu téhle mašinky, co okno ukazuje
+
+STR_REFIT_DETAILS_BUTTON                                        :{BLACK}Konfigurátor
+STR_REFIT_DETAILS_TOOLTIP                                       :{BLACK}Vybrat podrobnosti, které sada tohoto vozidla nabízí: kdo táhne dvoukolák, tlačený nebo tažený, pruhy, barvy. Náklad zůstává, jak je přestavěný
+STR_VEHICLE_CONFIG_CAPTION                                      :{WHITE}{VEHICLE}: konfigurátor
+STR_VEHICLE_CONFIG_NONE                                         :{BLACK}Sada tohoto vozidla nenabízí žádné podrobnosti k výběru.
+STR_VEHICLE_CONFIG_CARGO                                        :{BLACK}Náklad (mění ho přestavba): {GOLD}{STRING}
+STR_VEHICLE_CONFIG_NO_CARGO                                     :žádný
+STR_VEHICLE_CONFIG_OPTION_TOOLTIP                               :{BLACK}Vybrat jednu z voleb, které sada pro tuhle podrobnost nabízí. Jen u vozidla stojícího v depu
+STR_VEHICLE_CONFIG_OPTION_UNKNOWN                               :volba {NUM}
+STR_PURCHASE_INFO_CONFIG_ASPECTS                                :{BLACK}Konfigurátor: {GOLD}{STRING}
+STR_ERROR_CAN_T_CONFIGURE_VEHICLE                               :{WHITE}Podrobnosti vozidla nejde změnit...
 STR_VEHICLE_VIEW_TOW_WAGONS_TOOLTIP                             :{BLACK}Zavolat odtahovku, ať tyto vagony odtáhne do depa. Druhým kliknutím se volání zruší
 STR_VEHICLE_VIEW_ROAD_VEHICLE_REVERSE_TOOLTIP                   :{BLACK}Otoč vozidlo
 STR_VEHICLE_VIEW_ORDER_LOCATION_TOOLTIP                         :{BLACK}Vycentrovat hlavní zobrazení na cíl objednávky. Ctrl+Klik pro otevření nového zobrazení na umístění cíle pokynu.

@@ -8,6 +8,7 @@
 /** @file console_cmds.cpp Implementation of the console hooks. */
 
 #include "stdafx.h"
+#include "vehicle_config.h"
 
 #include <chrono>
 #include "train.h"
@@ -8195,6 +8196,159 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
 }
 
 /**
+ * The configurator (vehicle_config.h) on the rig's set grf/konfig_yagl.py: a road
+ * vehicle whose set names two details -- a crew of three and a cart of two --
+ * and draws one picture for the first choice of both, another for anything
+ * else. Builds a depot and the vehicle, lists the details as the game reads
+ * them, changes a choice by command (the picture and variable 5C change),
+ * asks for choices that do not exist and for one on a vehicle that is not
+ * stopped in a depot (refused), chooses through the window, and looks at the
+ * refit window's configurator button on this vehicle (on) and on a vehicle of
+ * a set without details (off). Anything that does not come out as promised is
+ * written ODMITNUTO, which the battery counts. Usage: 'testkonfig'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestVehicleConfig(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: the configurator on the set grf/konfig_yagl.py writes. Usage: 'testkonfig'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testkonfig: only in a running game.");
+		return true;
+	}
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testkonfig: ODMITNUTO - neni firma, ktera by stavela.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	auto refuse = [](const std::string &why) { IConsolePrint(CC_ERROR, "testkonfig: ODMITNUTO - {}", why); };
+
+	/* The set's vehicle, and one of a set without details for the control. */
+	EngineID eid = EngineID::Invalid(), plain = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (GetRoadTramType(e->VehInfo<RoadVehicleInfo>().roadtype) != RoadTramType::Road) continue;
+		if (GetString(STR_ENGINE_NAME, e->index).find("konfig") != std::string::npos) {
+			eid = e->index;
+		} else if (plain == EngineID::Invalid()) {
+			plain = e->index;
+		}
+	}
+	if (eid == EngineID::Invalid() || plain == EngineID::Invalid()) {
+		refuse(fmt::format("vozidlo 'konfig' {} ve hre, jine {} (konfig.grf v newgrf/)", eid == EngineID::Invalid() ? "neni" : "je", plain == EngineID::Invalid() ? "neni" : "je"));
+		return true;
+	}
+
+	/* A road along X with a depot off its middle tile, on flat clear land. */
+	auto free = [](TileIndex t) { return IsTileType(t, TileType::Clear) && GetTileSlope(t) == SLOPE_FLAT; };
+	TileIndex spot = INVALID_TILE;
+	for (TileIndex t : SpiralTileSequence(TileXY(Map::SizeX() / 2, Map::SizeY() / 2), 61)) {
+		if (TileX(t) + 4 >= Map::SizeX() || TileY(t) + 3 >= Map::SizeY()) continue;
+		if (free(t) && free(TileAddXY(t, 1, 0)) && free(TileAddXY(t, 2, 0)) && free(TileAddXY(t, 1, 1))) {
+			spot = t;
+			break;
+		}
+	}
+	if (spot == INVALID_TILE) {
+		refuse("zadne volne misto");
+		return true;
+	}
+	TileIndex depot = TileAddXY(spot, 1, 1);
+	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, spot, TileAddXY(spot, 2, 0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+	CommandCost shed = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot, ROADTYPE_ROAD, DiagDirection::NW);
+	CommandCost link = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileAddXY(spot, 1, 0), RoadBits{RoadBit::SE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+	if (road.Failed() || shed.Failed() || link.Failed()) {
+		refuse(fmt::format("silnice nebo depo: {} / {} / {}", RefusalReason(road), RefusalReason(shed), RefusalReason(link)));
+		return true;
+	}
+	auto [cost, veh, u1, u2, u3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid, true, INVALID_CARGO, ClientID::Invalid);
+	auto [cost_p, veh_p, u4, u5, u6] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, plain, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost.Failed() || cost_p.Failed()) {
+		refuse(fmt::format("vozidlo: {} / {}", RefusalReason(cost), RefusalReason(cost_p)));
+		return true;
+	}
+	Vehicle *v = Vehicle::Get(veh);
+	Vehicle *pv = Vehicle::Get(veh_p);
+
+	/* The details as the game reads them from the set. */
+	std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(eid);
+	IConsolePrint(CC_DEFAULT, "testkonfig: '{}' podrobnosti {}", GetString(STR_ENGINE_NAME, eid), aspects.size());
+	uint options = 0;
+	for (uint i = 0; i < aspects.size(); i++) {
+		std::string names;
+		for (const std::string &o : aspects[i].options) names += (names.empty() ? "" : ", ") + o;
+		IConsolePrint(CC_DEFAULT, "testkonfig:   {} '{}': {} voleb ({})", i, aspects[i].name, aspects[i].options.size(), names);
+		options += static_cast<uint>(aspects[i].options.size());
+	}
+	if (aspects.size() != 2 || options != 5) refuse(fmt::format("cekany 2 podrobnosti a 5 voleb, je {} a {}", aspects.size(), options));
+	size_t plain_aspects = GetVehicleConfigAspects(plain).size();
+	if (plain_aspects != 0) refuse(fmt::format("vozidlo bez sady ma {} podrobnosti", plain_aspects));
+
+	/* A choice by command: the picture and the variable follow it. */
+	RoadVehicle::From(v)->UpdateViewport(true, true);
+	SpriteID before = v->sprite_cache.sprite_seq.seq[0].sprite;
+	uint32_t var_before = GetVehicleConfigVariable(v);
+	CommandCost r1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 1);
+	SpriteID after = v->sprite_cache.sprite_seq.seq[0].sprite;
+	uint32_t var_after = GetVehicleConfigVariable(v);
+	IConsolePrint(CC_DEFAULT, "testkonfig: volba 0=1 {}, obrazek {} -> {}, promenna 5C {:#x} -> {:#x}", r1.Succeeded() ? "prosla" : "ODMITNUTA", before, after, var_before, var_after);
+	if (r1.Failed()) refuse(fmt::format("volba 0=1 odmitnuta: {}", RefusalReason(r1)));
+	if (before == after) refuse("obrazek se po volbe nezmenil");
+	if (var_after != 1) refuse(fmt::format("promenna 5C ma byt 1, je {:#x}", var_after));
+
+	/* Choices that do not exist, and a choice on a vehicle under way. */
+	CommandCost r2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 99);
+	CommandCost r3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 7, 0);
+	if (r2.Succeeded() || r3.Succeeded()) refuse("volba mimo rozsah prosla");
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false);
+	CommandCost r4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 1, 1);
+	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false);
+	IConsolePrint(CC_DEFAULT, "testkonfig: mimo rozsah {} / {}, v jizde {}", r2.Succeeded() ? "prosla" : "odmitnuta", r3.Succeeded() ? "prosla" : "odmitnuta", r4.Succeeded() ? "prosla" : "odmitnuta");
+	if (r4.Succeeded()) refuse("volba na vozidle v jizde prosla");
+	if (!v->IsStoppedInDepot()) refuse("vozidlo po zastaveni nestoji v depu");
+
+	/* Through the window, as the player does it. */
+	ShowVehicleConfigWindow(v);
+	Window *w = FindWindowById(WindowClass::VehicleConfig, v->index);
+	if (w == nullptr) {
+		refuse("okno konfiguratoru se neotevrelo");
+	} else {
+		IConsolePrint(CC_DEFAULT, "testkonfig: okno: '{}' = '{}', '{}' = '{}'", w->GetWidgetString(WID_VC_LABEL + 0, STR_NULL), w->GetWidgetString(WID_VC_DROPDOWN + 0, STR_NULL),
+				w->GetWidgetString(WID_VC_LABEL + 1, STR_NULL), w->GetWidgetString(WID_VC_DROPDOWN + 1, STR_NULL));
+		w->OnDropdownSelect(WID_VC_DROPDOWN + 1, 1, -1);
+		IConsolePrint(CC_DEFAULT, "testkonfig: oknem volba 1=1: vozidlo ma {}, okno rika '{}'", v->config_options[1], w->GetWidgetString(WID_VC_DROPDOWN + 1, STR_NULL));
+		if (v->config_options[1] != 1) refuse("volba oknem se nezapsala");
+		if (GetVehicleConfigVariable(v) != 0x0101) refuse(fmt::format("promenna 5C ma byt 0x101, je {:#x}", GetVehicleConfigVariable(v)));
+		w->Close();
+	}
+
+	/* The refit window's button: on for the set's vehicle, off for the other. */
+	ShowVehicleRefitWindow(v, INVALID_VEH_ORDER_ID, nullptr);
+	ShowVehicleRefitWindow(pv, INVALID_VEH_ORDER_ID, nullptr);
+	Window *rw = FindWindowById(WindowClass::VehicleRefit, v->index);
+	Window *rpw = FindWindowById(WindowClass::VehicleRefit, pv->index);
+	bool button = rw != nullptr && !rw->IsWidgetDisabled(WID_VR_DETAILS);
+	bool plain_button = rpw != nullptr && !rpw->IsWidgetDisabled(WID_VR_DETAILS);
+	IConsolePrint(CC_DEFAULT, "testkonfig: cudlik Konfigurator v prestavbe: u sady {}, bez sady {}", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly");
+	if (!button) refuse("cudlik u vozidla se sadou neni aktivni");
+	if (plain_button) refuse("cudlik u vozidla bez sady je aktivni");
+	if (rw != nullptr) rw->Close();
+	if (rpw != nullptr) rpw->Close();
+
+	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{}", aspects.size(), options,
+			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly");
+	return true;
+}
+
+/**
  * Say what the game makes of a savegame's NewGRFs, and fetch what it will not
  * take a substitute for.
  *
@@ -13901,6 +14055,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzrus",                ConTestScrapRakesInDepot);
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testgrf",                  ConTestSavegameGrfs);
+	IConsole::CmdRegister("testkonfig",               ConTestVehicleConfig);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("testcouva",               ConTestDrivingBackwards);
 	IConsole::CmdRegister("testnedobrzdil",          ConTestOverrun);

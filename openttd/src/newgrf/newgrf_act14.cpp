@@ -444,6 +444,9 @@ static const KnownFeature _known_features[] = {
 	 * over to two-byte Action 2 IDs (newgrf_act2.cpp) from the moment it asks. */
 	{ "decouple_128_cargo", 1 },
 	{ "decouple_more_action2_ids", 1 },
+	/* The configurator (vehicle_config.h): the set's vehicles may name details
+	 * for the player to choose (callback 1C0) and read the choice (variable 5C). */
+	{ "decouple_vehicle_config", 1 },
 };
 
 /** @copydoc TextHandler */
@@ -657,6 +660,7 @@ static bool HandleFeatureTest(ByteReader &buf)
 		GrfMsg(2, "StaticGRFInfo: feature '{}' asked for (version {}..{}) and answered with {}",
 				action.name, action.min_version, action.max_version, known.version);
 		if (action.name == "decouple_more_action2_ids") _cur_gps.grfconfig->wide_action2_ids = true;
+		if (action.name == "decouple_vehicle_config") _cur_gps.grfconfig->vehicle_config = true;
 		AnswerNameMap(true);
 		return true;
 	}

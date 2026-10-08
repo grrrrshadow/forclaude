@@ -47,6 +47,7 @@ enum VehicleRefitWidgets : WidgetID {
 	WID_VR_SCROLLBAR,             ///< Scrollbar for the refit options.
 	WID_VR_INFO,                  ///< Information about the currently selected refit option.
 	WID_VR_REFIT,                 ///< Perform the refit.
+	WID_VR_DETAILS,               ///< Open the configurator: the details the vehicle's set offers (vehicle_config.h).
 };
 
 /** Widgets of the #VehicleDetailsWindow class. */
@@ -101,6 +102,20 @@ enum TrainDriverWidgets : WidgetID {
 	WID_DRV_APPLY,      ///< Button: keep the changes.
 	WID_DRV_BAND,       ///< Dropdown: the first band of the braking table; ten more follow (WID_DRV_BAND + 1 ...).
 	WID_DRV_BAND_END = WID_DRV_BAND + 11, ///< One past the last band.
+};
+
+/** Widgets of the #VehicleConfigWindow class (vehicle_config_gui.cpp), the configurator. */
+enum VehicleConfigWidgets : WidgetID {
+	WID_VC_CAPTION,  ///< Caption: the vehicle's name.
+	WID_VC_NONE_SEL, ///< Selection: the line below, when the set offers nothing.
+	WID_VC_NONE,     ///< Text: the set offers no details.
+	WID_VC_CARGO,    ///< Text: the cargo, which the refit window changes.
+	WID_VC_ROW,      ///< Selection: the first detail's row; three more follow (WID_VC_ROW + 1 ...).
+	WID_VC_ROW_END = WID_VC_ROW + 4, ///< One past the last row.
+	WID_VC_LABEL = WID_VC_ROW_END,   ///< Text: the first detail's name; three more follow.
+	WID_VC_LABEL_END = WID_VC_LABEL + 4, ///< One past the last name.
+	WID_VC_DROPDOWN = WID_VC_LABEL_END,  ///< Dropdown: the first detail's options; three more follow.
+	WID_VC_DROPDOWN_END = WID_VC_DROPDOWN + 4, ///< One past the last dropdown.
 };
 
 #endif /* WIDGETS_VEHICLE_WIDGET_H */

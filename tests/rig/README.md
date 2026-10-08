@@ -396,6 +396,20 @@ them in the same place:
     nmlc -c -l grf/lang --grf firs5_like.grf grf/firs5_like.nml
     cp cztr_old.grf firs5_like.grf <rig home>/.openttd/newgrf/
 
+`konfig` plays the set `grf/konfig_yagl.py` writes, the one for the game's
+configurator (`docs/decouple_vehicle_config.md`): a road vehicle whose set
+names two details for the player to choose -- a crew of three and a cart of
+two -- through callback 1C0, and draws another picture for any choice but
+the first, by variable 5C. It is written in yagl, the colleague's dialect and
+the one tool our sets are made with (no grfcodec, no nml: the player's rule),
+so that the test runs the very recipe his sets use; its pictures are zin8
+only, as his are. Build yagl from the colleague's copy (`grrrrf`,
+`yagl/yagl-main`, see his `yagl/POSTUP.md`), then:
+
+    python3 grf/konfig_yagl.py <out>
+    cd <out> && yagl -e konfig.grf          (it reads sprites/konfig.yagl)
+    cp konfig.grf <rig home>/.openttd/newgrf/
+
 `getsjmena` plays `grf/gets_like.nml`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
 as GETS does. Build it the same way and put it in the same place:

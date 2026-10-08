@@ -8,6 +8,7 @@
 /** @file newgrf_engine.cpp NewGRF handling of engines. */
 
 #include "stdafx.h"
+#include "vehicle_config.h"
 #include "debug.h"
 #include "train.h"
 #include "roadveh.h"
@@ -626,6 +627,9 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			return v->grf_cache.position_in_vehicle;
 
 		/* Variables which use the parameter */
+		case 0x5C: // The details the player chose on this vehicle (vehicle_config.h); ours
+			return GetVehicleConfigVariable(v);
+
 		case 0x60: // Count consist's engine ID occurrence
 			if (v->type != VehicleType::Train) return v->GetEngine()->grf_prop.local_id == parameter ? 1 : 0;
 
@@ -1030,6 +1034,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			case 0x48: return Engine::Get(this->self_type)->flags.base(); // Vehicle Type Info
 			case 0x49: return TimerGameCalendar::year.base(); // 'Long' format build year
 			case 0x4B: return TimerGameCalendar::date.base(); // Long date of last service
+			case 0x5C: return 0; // The details the player chose (vehicle_config.h): none yet, this is the purchase list
 
 			case 0x7A: return GetBadgeVariableResult(*this->ro.grffile, Engine::Get(this->self_type)->badges, parameter);
 

@@ -8,6 +8,7 @@
 /** @file vehicle_gui.cpp The base GUI for all vehicles. */
 
 #include "stdafx.h"
+#include "vehicle_config.h"
 #include "debug.h"
 #include "company_func.h"
 #include "gui.h"
@@ -771,6 +772,7 @@ struct RefitWindow : public Window {
 	VehicleID selected_vehicle{}; ///< First vehicle in the current selection.
 	uint8_t num_vehicles = 0; ///< Number of selected vehicles.
 	bool auto_refit = false; ///< Select cargo for auto-refitting.
+	bool has_config = false; ///< The vehicle's set offers details for the configurator (vehicle_config.h).
 
 	/**
 	 * Collects all (cargo, subcargo) refit options of a vehicle chain.
@@ -1027,6 +1029,7 @@ struct RefitWindow : public Window {
 	{
 		this->auto_refit = auto_refit;
 		this->order = order;
+		this->has_config = !GetVehicleConfigAspects(v->engine_type).empty();
 		this->CreateNestedTree();
 
 		this->vscroll = this->GetScrollbar(WID_VR_SCROLLBAR);
@@ -1039,6 +1042,7 @@ struct RefitWindow : public Window {
 		this->GetWidget<NWidgetCore>(WID_VR_VEHICLE_PANEL_DISPLAY)->SetToolTip((v->type == VehicleType::Train) ? STR_REFIT_SELECT_VEHICLES_TOOLTIP : STR_NULL);
 
 		this->FinishInitNested(v->index);
+		this->SetWidgetDisabledState(WID_VR_DETAILS, this->order != INVALID_VEH_ORDER_ID || !this->has_config);
 		this->owner = v->owner;
 
 		this->SetWidgetDisabledState(WID_VR_REFIT, this->selected_refit == nullptr);
@@ -1052,6 +1056,10 @@ struct RefitWindow : public Window {
 
 	void OnPaint() override
 	{
+		/* The configurator is for a vehicle, not for an order, and only where
+		 * its set offers something to choose. */
+		this->SetWidgetDisabledState(WID_VR_DETAILS, this->order != INVALID_VEH_ORDER_ID || !this->has_config);
+
 		/* Determine amount of items for scroller. */
 		if (this->hscroll != nullptr) this->hscroll->SetCount(this->vehicle_width);
 
@@ -1357,6 +1365,10 @@ struct RefitWindow : public Window {
 				[[fallthrough]];
 			}
 
+			case WID_VR_DETAILS: // the configurator
+				ShowVehicleConfigWindow(Vehicle::Get(this->window_number));
+				break;
+
 			case WID_VR_REFIT: // refit button
 				if (this->selected_refit != nullptr) {
 					const Vehicle *v = Vehicle::Get(this->window_number);
@@ -1427,6 +1439,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_refit_widget
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey, WID_VR_INFO), SetMinimalTextLines(2, WidgetDimensions::unscaled.framerect.Vertical()), SetResize(1, 0), EndContainer(),
 	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_VR_DETAILS), SetFill(1, 0), SetResize(1, 0), SetStringTip(STR_REFIT_DETAILS_BUTTON, STR_REFIT_DETAILS_TOOLTIP),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_VR_REFIT), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),

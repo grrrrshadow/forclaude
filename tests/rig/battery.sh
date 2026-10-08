@@ -1608,6 +1608,20 @@ BEZ_CFG=$S/cztr_bezfirs_openttd.cfg
 sed '/^\[newgrf\]$/a 4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.0/cztr_wagons_cargo.grf = ' "$CFG_KEEP" > $BEZ_CFG
 run_scene cztrbezfirs "testgrf hra" 20 -c $BEZ_CFG -d grf=1
 echo "cztrbezfirs: vymena=$(grep -c 'plays in place of' $S/reg_cztrbezfirs.log) $(grep 'testgrf: hra 4D490213' $S/reg_cztrbezfirs.log | sed 's/.*testgrf: hra //' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The configurator (vehicle_config.h, docs/decouple_vehicle_config.md): the
+# rig's set grf/konfig_yagl.py (konfig.grf in the home's newgrf/, built with
+# the colleague's yagl, the one tool our sets are made with) names two details
+# on a road vehicle -- a crew of three, a cart of two -- and draws another
+# picture for any choice but the first. testkonfig reads the details as the
+# game does (2 details, 5 options), changes a choice by command (the picture
+# and variable 5C follow), asks for choices that do not exist and for one on
+# a vehicle under way (refused), chooses through the window, and looks at the
+# refit window's Configurator button (on for the set's vehicle, off for a
+# vehicle without details). odmitnuto is zero.
+KONF_CFG=$S/konfig_openttd.cfg
+sed '/^\[newgrf\]$/a konfig.grf = ' "$CFG_KEEP" > $KONF_CFG
+run_scene konfig "testkonfig" 30 -c $KONF_CFG
+echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testkonfig: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Wagons named the way GETS names them -- what the wagon is and its kind in
 # quotes (grf/gets_like.nml, gets_like.grf in the home's newgrf/). The name
 # rules read the part in quotes: the Eaos and its livery take marijuana, the

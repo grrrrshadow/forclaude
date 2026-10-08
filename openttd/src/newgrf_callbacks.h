@@ -293,6 +293,17 @@ enum CallbackID : uint16_t {
 	 * for each defined cargo after all NewGRFs are loaded.
 	 */
 	CBID_VEHICLE_CUSTOM_REFIT            = 0x0163, // 15 bit callback
+
+	/**
+	 * The configurator (vehicle_config.h), ours: the names of the details a
+	 * vehicle's set lets the player choose and of their options. Var 10 holds
+	 * the detail in bits 8..15 and the option in bits 0..7, 0xFF asking for the
+	 * detail's own name. The result is a text (0xD000 + result, or 0x40F with
+	 * the text in register 100), or 0x400 for "no such detail" or "no such
+	 * option", which ends the list. Asked only of a set that asked for the
+	 * feature 'decouple_vehicle_config'.
+	 */
+	CBID_VEHICLE_DECOUPLE_CONFIG_TEXT    = 0x01C0, // 15 bit callback
 };
 
 /**

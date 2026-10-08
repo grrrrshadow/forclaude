@@ -8,6 +8,7 @@
 /** @file build_vehicle_gui.cpp GUI for building vehicles. */
 
 #include "stdafx.h"
+#include "vehicle_config.h"
 #include "road_on_rail.h"
 #include "engine_base.h"
 #include "engine_func.h"
@@ -872,6 +873,25 @@ static uint ShowAdditionalText(int left, int right, int y, EngineID engine)
 	return DrawStringMultiLine(left, right, y, INT32_MAX, *text, TextColour::Black);
 }
 
+/**
+ * The details the vehicle's set lets the player choose (vehicle_config.h), by
+ * name, so that the purchase list says there is a configurator for it.
+ * @param left,right,y where to draw
+ * @param engine the engine
+ * @return y after drawing
+ */
+static uint ShowConfigAspects(int left, int right, int y, EngineID engine)
+{
+	std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(engine);
+	if (aspects.empty()) return y;
+	std::string names;
+	for (const VehicleConfigAspect &aspect : aspects) {
+		if (!names.empty()) names += ", ";
+		names += aspect.name;
+	}
+	return DrawStringMultiLine(left, right, y, INT32_MAX, GetString(STR_PURCHASE_INFO_CONFIG_ASPECTS, names), TextColour::Black);
+}
+
 void TestedEngineDetails::FillDefaultCapacities(const Engine *e)
 {
 	this->cargo = e->GetDefaultCargoType();
@@ -959,6 +979,7 @@ int DrawVehiclePurchaseInfo(int left, int right, int y, EngineID engine_number, 
 
 	/* Additional text from NewGRF */
 	y = ShowAdditionalText(left, right, y, engine_number);
+	y = ShowConfigAspects(left, right, y, engine_number);
 
 	/* The NewGRF's name which the vehicle comes from */
 	const GRFConfig *config = GetGRFConfig(e->GetGRFID());

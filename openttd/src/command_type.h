@@ -244,6 +244,7 @@ enum class Commands : uint8_t {
 	BuildVehicle, ///< build a vehicle
 	SellVehicle, ///< sell a vehicle
 	RefitVehicle, ///< refit the cargo space of a vehicle
+	ConfigureVehicle, ///< choose one of the details a vehicle's set offers -- who pulls the hand cart, pushed or pulled, a stripe, a colour (vehicle_config.h)
 	SendVehicleToDepot, ///< send a vehicle to a depot
 	SetVehicleVisibility, ///< hide or unhide a vehicle in the build vehicle and autoreplace GUIs
 

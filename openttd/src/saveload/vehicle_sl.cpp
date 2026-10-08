@@ -726,6 +726,7 @@ public:
 
 		    SLE_VAR(Vehicle, cargo_type,            VarTypes::U8),
 		SLE_CONDVAR(Vehicle, cargo_subtype, VarTypes::U8, SaveLoadVersion::LiveryRefit, SaveLoadVersion::MaxVersion),
+		SLE_CONDARR(Vehicle, config_options, VarTypes::U8, 4, SaveLoadVersion::VehicleConfigOptions, SaveLoadVersion::MaxVersion),
 		SLEG_CONDVAR("cargo_days", _cargo_periods, VarTypes::U8, SaveLoadVersion::MinVersion, SaveLoadVersion::CargoPackets),
 		SLEG_CONDVAR("cargo_source", _cargo_source, VarFileType::U8 | VarMemType::U16, SaveLoadVersion::MinVersion, SaveLoadVersion::LargerCargoSource),
 		SLEG_CONDVAR("cargo_source", _cargo_source, VarTypes::U16, SaveLoadVersion::LargerCargoSource, SaveLoadVersion::CargoPackets),
