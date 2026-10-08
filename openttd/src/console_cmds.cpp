@@ -13700,13 +13700,13 @@ static bool ConTestHut(std::span<std::string_view> argv)
  * 'sprite <id>' it says only what levels that sprite has in its file and what
  * the game makes of them (DescribeSpriteLevels()): the 16x of a set (zoom
  * code 7) against a doubled 8x, and the 8x made from a 16x alone.
- * Usage: testzoom8 [dovnitr | nacti | sprite <id>]
+ * Usage: testzoom8 [dovnitr | nacti [vse] | sprite <id>]
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestZoom8(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory; 'sprite <id>' for the levels of one sprite. Usage: 'testzoom8 [dovnitr | nacti | sprite <id>]'");
+		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory; 'sprite <id>' for the levels of one sprite. Usage: 'testzoom8 [dovnitr | nacti [vse] | sprite <id>]'");
 		return true;
 	}
 
@@ -13754,10 +13754,14 @@ static bool ConTestZoom8(std::span<std::string_view> argv)
 	}
 
 	if (argv.size() > 1 && argv[1] == "nacti") {
+		/* 'nacti vse' loads every sprite of the game, the sets' too: what the
+		 * cache would hold with all of it drawn once at every zoom the
+		 * settings allow. */
+		const SpriteID last = (argv.size() > 2 && argv[2] == "vse") ? GetMaxSpriteID() : std::min<SpriteID>(4000, GetMaxSpriteID());
 		GfxClearSpriteCache();
 		auto start = std::chrono::steady_clock::now();
 		uint loaded = 0;
-		for (SpriteID sprite = 0; sprite < 4000 && sprite < GetMaxSpriteID(); sprite++) {
+		for (SpriteID sprite = 0; sprite < last; sprite++) {
 			if (GetSpriteType(sprite) != SpriteType::Normal) continue;
 			GetSprite(sprite, SpriteType::Normal);
 			loaded++;
