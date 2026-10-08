@@ -1,6 +1,3 @@
-add_subdirectory(openttd)
-add_subdirectory(orig_extra)
-
 set(BASESET_SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/orig_dos.obg
         ${CMAKE_CURRENT_SOURCE_DIR}/orig_dos_de.obg
@@ -24,14 +21,10 @@ set(BASESET_OTHER_SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/OpenTTD-Mono.ttf
 )
 
-# Done by the subdirectories, if nforenum / grfcodec is installed
-if(GRFCODEC_FOUND)
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/openttd.grf PROPERTIES GENERATED TRUE)
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/orig_extra.grf PROPERTIES GENERATED TRUE)
-
-    list(APPEND BASESET_BINARY_FILES openttd.grf)
-    list(APPEND BASESET_BINARY_FILES orig_extra.grf)
-endif()
+# openttd.grf and orig_extra.grf are built with yagl, the colleague's, the one
+# tool this game's sets are made with (the player's rule: no grfcodec), from
+# openttd/openttd.yagl and orig_extra/orig_extra.yagl by openttd/openttd_yagl.py
+# and orig_extra/orig_extra_yagl.py, and kept here built, with their hashes.
 
 set(BASESET_EXTRAGRF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/orig_extra.grf)
 
@@ -100,8 +93,8 @@ endforeach()
 
 # Graphics of the game's own (AppendStaticGRFConfigs() in src/newgrf_config.cpp):
 # every NewGRF in decouple/grafika/ is static in every game, savegames included.
-# budovy.grf there is written by openttd/budovy_grf.py from the pieces
-# openttd/openttd_budovy.py cuts; it carries the 8x sprites grfcodec cannot.
+# Empty now: the 8x pictures it carried while openttd.grf could not (grfcodec
+# knew no 8x) are in openttd.grf itself since it is built with yagl.
 file(GLOB BASESET_BUILTIN_GRAPHICS_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/grafika/*.grf)
 foreach(BUILTIN_GRAPHICS_FILE IN LISTS BASESET_BUILTIN_GRAPHICS_FILES)
     get_filename_component(BUILTIN_GRAPHICS_NAME "${BUILTIN_GRAPHICS_FILE}" NAME)

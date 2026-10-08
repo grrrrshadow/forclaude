@@ -122,18 +122,12 @@ to see if it supports your compiler.
 
 ## Compilation of base sets
 
-To recompile the extra graphics needed to play with the original Transport
-Tycoon Deluxe graphics you need GRFCodec (which includes NFORenum) as well.
-GRFCodec can be found at
-https://www.openttd.org/downloads/grfcodec-releases/latest.html.
-
-Having GRFCodec installed can cause regeneration of the `.grf` files, which
-are written in the source directory. This can leave your repository in a
-modified state, as different GRFCodec versions can cause binary differences
-in the resulting `.grf` files. Also translations might have been added for
-the base sets which are not yet included in the base set information files.
-To avoid this behaviour, disable GRFCodec (and NFORenum) in CMake cache
-(`GRFCODEC_EXECUTABLE` and `NFORENUM_EXECUTABLE`).
+Tycoon Deluxe graphics (openttd.grf and orig_extra.grf) are built with yagl,
+the colleague's yagl (grrrrf, yagl/yagl-main), the one tool this game's sets
+are made with -- never grfcodec. They are kept built in media/baseset with
+their hashes; media/baseset/openttd/openttd_yagl.py and
+media/baseset/orig_extra/orig_extra_yagl.py rebuild them from the .yagl
+sources beside them. The build itself needs neither tool.
 
 ## Developers settings
 

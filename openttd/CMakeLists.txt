@@ -178,7 +178,6 @@ endif()
 
 find_package(SSE)
 
-find_package(Grfcodec)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT IPO_FOUND)

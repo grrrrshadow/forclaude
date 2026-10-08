@@ -39,11 +39,12 @@ How a picture is cut:
 Every sprite comes as 8bpp at normal zoom for a game without a 32bpp
 blitter (scaled down and put in the DOS palette, without the shadow, since
 the palette has no see-through black), as 32bpp at 4x, and where the render
-exists as 32bpp at 8x. The 8bpp and 4x ones go into openttd.grf through
-openttdgui.nfo (the lines this script prints); grfcodec knows no 8x, so
-all three go into decouple/grafika/budovy.grf as well, which budovy_grf.py
-builds from the manifest this script writes (budovy_manifest.json), with
-the zoom code 6 of this game for the 8x level.
+exists as 32bpp at 8x. They go into openttd.grf through openttd.yagl, which
+openttd_yagl.py writes from the manifest this script writes
+(budovy_manifest.json) and builds with the colleague's yagl: the palette
+piece at normal zoom and the finest render there is, 8x where it exists --
+never a render scaled down. The nfo lines this script still prints are the
+old road and only for reading.
 
 A tile on the render is 256 x 128 pixels at 4x and 512 x 256 at 8x (2:1),
 the game's own grid: tiles lie TILE_PIXELS (32) apart at normal zoom. That
