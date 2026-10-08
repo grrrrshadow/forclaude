@@ -19,17 +19,15 @@ jen obrázky. Je v každé hře včetně rozehraných savů, hráč ho v okně N
 nevidí, nikam se neukládá a nesmí měnit stav hry (hra ho čte jako statický GRF,
 stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
 
-- `budovy.grf`: budovy průmyslů hry (gymnázium, automat, socha, dlaždice
-  marihuanové plantáže, chatka hulírny, holky na zastávce) ve 32bpp zin4 a zin8.
-  Zamčený na tuto hru (dotaz decouple_128_cargo jako u V3S): jinde se vypne
-  s hláškou. Píše ho `../openttd/budovy_grf.py` z kousků,
-  které nařeže `../openttd/openttd_budovy.py`; do `openttd.grf` je grfcodec
-  dát neumí (nezná 8×). Přepisuje tytéž sprity OpenTTD GUI (Action 5, typ
-  0x15 s posunem), takže jsou tu znova všechny jeho úrovně, i zin4 – sprite se
-  přepisuje celý. Kousek zin16 (kód zoomu 7, `ZoomLevel::In16x`) zapíše, když
-  ho manifest má (`x16`); zatím žádný render v 16× není.
+- Teď je prázdná. Obrázky hry (gymnázium, automat, socha, dlaždice
+  marihuanové plantáže, chatka hulírny, holky na zastávce, ohňostroj, plakát)
+  jsou od 8. 10. 2026 rovnou v `openttd.grf` jako 32bpp zin8 (zin16, až budou
+  rendery), protože se staví kolegovým yaglem, který 8× i 16× zná
+  (`../openttd/openttd_yagl.py`, zdroj `openttd.yagl` a listy). `budovy.grf`,
+  který tytéž obrázky nesl jako statický GRF, tím zanikl.
 - Nový obrázek od kolegy: PNG do `../openttd/`, pak
-  `python3 openttd_budovy.py && python3 budovy_grf.py` tamtéž.
+  `python3 openttd_budovy.py && python3 openttd_yagl.py` tamtéž
+  (viz `COMPILING.md`).
 
 Kód: `AppendStaticGRFConfigs()` v `src/newgrf_config.cpp`.
 

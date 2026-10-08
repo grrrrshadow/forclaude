@@ -91,9 +91,9 @@ the sanitizers and run a scene or two through that build:
 
 in a build directory of its own (it is slow and the binary is huge, so not
 the one the battery uses), then run it with `ASAN_OPTIONS=detect_leaks=0`.
-Generating `openttd.grf` needs `media/baseset/openttd/sprites/` from a
-working build directory copied in, and the baseset graphics beside the
-binary, or the build stops at GRFCodec.
+`openttd.grf` is kept built in `media/baseset/` (the colleague's yagl makes
+it, see `COMPILING.md`); a build only copies it beside the binary with the
+rest of the baseset graphics.
 
 Five saves the battery asks for are the player's and are not in `saves/`:
 `s.sav` (scene `nakladsav`), `save91.sav` (`save91`, `save91rev`),

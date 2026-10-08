@@ -400,11 +400,12 @@ static void RemoveDuplicatesFromGRFConfigList(GRFConfigList &list)
 void AppendStaticGRFConfigs(GRFConfigList &dst)
 {
 	AppendGRFConfigList(dst, _grfconfig_static, false);
-	/* The graphics of the game's own (baseset/decouple/grafika/): the
-	 * buildings of its industries at 8x and the like, which grfcodec cannot
-	 * put into openttd.grf. Static, like a set the player lists under
-	 * [newgrf-static], so they are in every game, a savegame's too, change no
-	 * game state and are never written to the config or saved. */
+	/* The graphics of the game's own (baseset/decouple/grafika/): pictures
+	 * laid over openttd.grf without rebuilding it. Empty since the game's own
+	 * pictures went into openttd.grf itself, built with yagl; the mechanism
+	 * stays. Static, like a set the player lists under [newgrf-static], so
+	 * they are in every game, a savegame's too, change no game state and are
+	 * never written to the config or saved. */
 	for (const auto &c : _all_grfs) {
 		if (!c->builtin_graphics) continue;
 		auto copy = std::make_unique<GRFConfig>(*c);

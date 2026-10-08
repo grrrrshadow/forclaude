@@ -3,8 +3,9 @@
 Writes zin16_test.grf, the rig's set for the 16x level of a sprite (zoom code 7,
 ZoomLevel::In16x, LoadSpriteV2() in src/spriteloader/grf.cpp), read by the
 scene zin16 with 'testzoom8 sprite <id>'. Container version 2, written here
-by hand as budovy_grf.py writes the game's own set, since grfcodec knows no
-zoom code past 5; only the standard library, so the battery can run it.
+by hand, the way the game's own 8x set was written before the colleague's
+yagl could build openttd.grf (grfcodec knows no zoom code past 5); only the
+standard library, so the battery can run it.
 
 Two sprites, replaced with Action A (SPR_FLAT_GRASS_TILE and the one after
 it, 3981 and 3982 of the base set), each a square with a plain colour per
