@@ -492,7 +492,7 @@ STR_GOTO_ORDER_VIEW_TOOLTIP                                     :{BLACK}Otevří
 # Tooltips for the main toolbar
 ###length 31
 STR_TOOLBAR_TOOLTIP_PAUSE_GAME                                  :{BLACK}Pauza
-STR_TOOLBAR_TOOLTIP_FORWARD                                     :{BLACK}Zrychlit běh hry
+STR_TOOLBAR_TOOLTIP_FORWARD                                     :{BLACK}Zrychlit běh hry. Dvojklik: zpomalit
 STR_TOOLBAR_TOOLTIP_OPTIONS                                     :{BLACK}Možnosti a nastavení
 STR_TOOLBAR_TOOLTIP_SAVE_GAME_ABANDON_GAME                      :{BLACK}Uložit, nahrát, opustit hru, ukončit
 STR_TOOLBAR_TOOLTIP_DISPLAY_MAP                                 :{BLACK}Zobrazit mapu, další okno, tok zboží nebo seznam cedulí
@@ -2022,6 +2022,9 @@ STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_HELPTEXT            :Omez jak rychle
 STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_VAL                 :{NUM}% normální rychlosti hry
 ###setting-zero-is-special
 STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_ZERO                :Bez omezení (tak rychle, jak jen tvůj počítač dovolí)
+STR_CONFIG_SETTING_SLOW_MOTION_SPEED                            :Zpomalený běh hry: {STRING}
+STR_CONFIG_SETTING_SLOW_MOTION_SPEED_HELPTEXT                   :Jak rychle běží hra zpomaleně, aby šlo vozidla sledovat zblízka. Zapne ho dvojklik na tlačítko Zrychlit běh hry, jedno kliknutí vrátí normální rychlost.
+STR_CONFIG_SETTING_SLOW_MOTION_SPEED_VAL                        :{NUM}% normální rychlosti hry
 
 STR_CONFIG_SETTING_SOUND_TICKER                                 :Noviny - shrnutí: {STRING}
 STR_CONFIG_SETTING_SOUND_TICKER_HELPTEXT                        :Přehrávat zvuk při zobrazení shrnutí zprávy

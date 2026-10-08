@@ -252,6 +252,7 @@ console_backlog_timeout = 100
 console_backlog_length = 100
 refresh_rate = 60
 fast_forward_speed_limit = 2500
+slow_motion_speed = 30
 network_chat_box_width_pct = 40
 network_chat_box_height = 25
 network_chat_timeout = 20

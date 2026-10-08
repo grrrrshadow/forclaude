@@ -729,6 +729,26 @@ The rig runs the null blitter, so the sprites come through
 `SpriteLoaderMakeIndexed`: the middle pixel keeps its RGBA and gains the
 palette index `m`.
 
+## Fast forward and slow motion on one button
+
+The player's word: one click on the fast forward button runs the game fast,
+two clicks slow, so that vehicles can be watched closely; how slow is a
+setting of its own, `gui.slow_motion_speed` (Environment > Time, 30 % of the
+normal speed by default, 10 to 90). A double click comes as a click and then
+a second one: had the first set the game going fast at once, the game would
+run days ahead in the moment between them. So a click at normal speed waits
+out the time for a double click (`TIME_BETWEEN_DOUBLE_CLICK`, half a second)
+before it goes fast, a second click within it goes slow instead, and a click
+while the game runs fast or slow goes back to normal at once
+(`FastForwardButtonClick()`, `UpdateFastForwardClick()` in toolbar_gui.cpp).
+The hotkey and holding Tab stay as they were. The button is lowered in slow
+motion as in fast; an icon of its own is to come.
+
+The scene `zrychleni` plays `testzrychleni`, which clicks the main toolbar's
+button through its `OnClick` with the click count, as the mouse does, waits
+the double-click time where a step needs it, and refuses any step that ends
+at another speed than it should.
+
 ## Students are studentky, and the coffeeshop takes them
 
 `grf/studenti.yagl` brings the cargo STUD under the name "Students", as the

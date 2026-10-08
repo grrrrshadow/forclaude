@@ -308,6 +308,7 @@ struct GUISettings {
 	bool demolish_station_confirm; ///< ask for confirmation before the demolish tool clears a rail station
 	uint16_t refresh_rate; ///< How often we refresh the screen (time between draw-ticks).
 	uint16_t fast_forward_speed_limit; ///< Game speed to use when fast-forward is enabled.
+	uint16_t slow_motion_speed; ///< Game speed of slow motion, a share of the normal speed in %: a double click on the fast forward button.
 
 	uint16_t console_backlog_timeout; ///< the minimum amount of time items should be in the console backlog before they will be removed in ~3 seconds granularity.
 	uint16_t console_backlog_length; ///< the minimum amount of items in the console backlog before items will be removed.

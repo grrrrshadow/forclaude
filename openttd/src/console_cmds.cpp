@@ -140,6 +140,10 @@
 #include "anomaly_log.h"
 #include "road_on_rail.h"
 
+#include "toolbar_gui.h"
+#include "widgets/toolbar_widget.h"
+#include <thread>
+
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -13691,6 +13695,78 @@ static bool ConTestHut(std::span<std::string_view> argv)
 }
 
 /**
+ * Rig probe for the fast forward button and its slow motion (the player's
+ * word: one click fast, two clicks slow, gui.slow_motion_speed): clicks the
+ * main toolbar's button the way the mouse does (OnClick with the click
+ * count) and says the game speed after each step. A click at normal speed
+ * waits out the time for a double click before it goes fast, so the probe
+ * waits that long too before it looks. Refuses any step that ends at
+ * another speed than it should, and leaves the game at normal speed. With
+ * 'stav' it only says the game speed now (for a click made by hand).
+ * Usage: testzrychleni [stav]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestZrychleni(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: the fast forward button - a click fast, a double click slow motion. Usage: 'testzrychleni [stav]'");
+		return true;
+	}
+	if (argv.size() > 1 && argv[1] == "stav") {
+		IConsolePrint(CC_DEFAULT, "testzrychleni: stav rychlost {}", _game_speed);
+		return true;
+	}
+	Window *w = FindWindowById(WindowClass::MainToolbar, 0);
+	if (w == nullptr) {
+		IConsolePrint(CC_ERROR, "testzrychleni: ODMITNUTO - no main toolbar.");
+		return true;
+	}
+	ChangeGameSpeed(false);
+	const uint16_t fast = _settings_client.gui.fast_forward_speed_limit;
+	const uint16_t slow = _settings_client.gui.slow_motion_speed;
+	std::string out;
+	uint refused = 0;
+	auto step = [&](std::string_view name, uint16_t expected) {
+		out += fmt::format(" | {} {}", name, _game_speed);
+		if (_game_speed != expected) {
+			IConsolePrint(CC_ERROR, "testzrychleni: ODMITNUTO - {}: speed {}, should be {}.", name, _game_speed, expected);
+			refused++;
+		}
+	};
+	auto wait_double_click = [&]() {
+		std::this_thread::sleep_for(TIME_BETWEEN_DOUBLE_CLICK + std::chrono::milliseconds(50));
+		UpdateFastForwardClick();
+	};
+	/* A click: nothing yet, then fast once no second click came. */
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 1);
+	step("klik hned", 100);
+	wait_double_click();
+	step("klik po case", fast);
+	/* A click while fast: normal at once. */
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 1);
+	step("klik z rychleho", 100);
+	/* A double click from normal: slow, and the first click never went fast. */
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 1);
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 2);
+	step("dvojklik", slow);
+	wait_double_click();
+	step("dvojklik po case", slow);
+	/* A click while slow: normal at once, and it stays so. */
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 1);
+	step("klik z pomaleho", 100);
+	wait_double_click();
+	step("klik z pomaleho po case", 100);
+	/* A double click while fast: slow. */
+	ChangeGameSpeed(true);
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 1);
+	w->OnClick({0, 0}, WID_TN_FAST_FORWARD, 2);
+	step("dvojklik z rychleho", slow);
+	ChangeGameSpeed(false);
+	IConsolePrint(CC_DEFAULT, "testzrychleni: zrychleni {} zpomaleni {}{} | odmitnuto {}", fast, slow, out, refused);
+	return true;
+}
+
+/**
  * Rig probe for the 8x zoom (ZoomLevel::In8x): the zoom base and the zoom
  * settings, the main view's zoom and virtual size, the size of a few sprites
  * at every level, and the sprite cache's memory. With 'dovnitr' it zooms the
@@ -13949,6 +14025,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testzastavka",            ConTestBusStopGirls);
 	IConsole::CmdRegister("testhulirna",             ConTestHut);
 	IConsole::CmdRegister("testzoom8",               ConTestZoom8);
+	IConsole::CmdRegister("testzrychleni",           ConTestZrychleni);
 	IConsole::CmdRegister("testdym",                 ConTestSmoke);
 	IConsole::CmdRegister("testvybusniny",           ConTestExplosives);
 	IConsole::CmdRegister("testpiskoviste",          ConTestSandbox);

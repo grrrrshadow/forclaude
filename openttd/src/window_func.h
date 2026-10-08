@@ -10,6 +10,8 @@
 #ifndef WINDOW_FUNC_H
 #define WINDOW_FUNC_H
 
+#include <chrono>
+
 #include "window_type.h"
 #include "company_type.h"
 #include "core/geometry_type.hpp"
@@ -71,5 +73,7 @@ void CloseWindowByClass(WindowClass cls, int data = 0);
 bool EditBoxInGlobalFocus();
 bool FocusedWindowIsConsole();
 Point GetCaretPosition();
+
+extern const std::chrono::milliseconds TIME_BETWEEN_DOUBLE_CLICK;
 
 #endif /* WINDOW_FUNC_H */

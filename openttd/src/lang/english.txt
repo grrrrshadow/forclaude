@@ -405,7 +405,7 @@ STR_GOTO_ORDER_VIEW_TOOLTIP                                     :{BLACK}Open the
 # Tooltips for the main toolbar
 ###length 31
 STR_TOOLBAR_TOOLTIP_PAUSE_GAME                                  :{BLACK}Pause game
-STR_TOOLBAR_TOOLTIP_FORWARD                                     :{BLACK}Fast forward the game
+STR_TOOLBAR_TOOLTIP_FORWARD                                     :{BLACK}Fast forward the game. Double click: slow motion
 STR_TOOLBAR_TOOLTIP_OPTIONS                                     :{BLACK}Options and settings
 STR_TOOLBAR_TOOLTIP_SAVE_GAME_ABANDON_GAME                      :{BLACK}Save, load or abandon game, exit program
 STR_TOOLBAR_TOOLTIP_DISPLAY_MAP                                 :{BLACK}Open map, extra viewport, cargo flow or list of signs
@@ -1923,6 +1923,9 @@ STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_HELPTEXT            :Limit on how fa
 STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_VAL                 :{NUM}% normal game speed
 ###setting-zero-is-special
 STR_CONFIG_SETTING_FAST_FORWARD_SPEED_LIMIT_ZERO                :No limit (as fast as your computer allows)
+STR_CONFIG_SETTING_SLOW_MOTION_SPEED                            :Slow motion speed: {STRING2}
+STR_CONFIG_SETTING_SLOW_MOTION_SPEED_HELPTEXT                   :How fast the game goes in slow motion, so that vehicles can be watched closely. A double click on the fast forward button switches it on, a single click goes back to normal speed
+STR_CONFIG_SETTING_SLOW_MOTION_SPEED_VAL                        :{NUM}% of normal game speed
 
 STR_CONFIG_SETTING_SOUND_TICKER                                 :News ticker: {STRING2}
 STR_CONFIG_SETTING_SOUND_TICKER_HELPTEXT                        :Play sound for summarised news messages

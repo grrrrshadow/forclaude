@@ -242,6 +242,55 @@ static CallBackFunction ToolbarFastForwardClick(Window *)
 }
 
 /**
+ * When a single click on the fast forward button, made at normal speed, is
+ * to set the game going fast: once the time for a double click is over.
+ */
+static std::optional<std::chrono::steady_clock::time_point> _fast_forward_click_due;
+
+/**
+ * The fast forward button with the mouse (the player's word: one click
+ * fast, two clicks slow). A double click comes as a single click and then a
+ * second one: had the first set the game going fast at once, a game the
+ * player wants to watch slowly would run days ahead in the moment between
+ * the two. So a click at normal speed waits out the time for a double click
+ * (UpdateFastForwardClick()), and a second click within it goes to slow
+ * motion instead (gui.slow_motion_speed). A click while the game runs fast
+ * or slow goes back to normal at once. The hotkey stays a plain toggle.
+ * @param click_count 1 for a click, 2 for the second click of a double click
+ */
+static void FastForwardButtonClick(int click_count)
+{
+	if (_networking) return; // no fast forward in network game
+
+	if (click_count > 1) {
+		_fast_forward_click_due.reset();
+		_game_speed = _settings_client.gui.slow_motion_speed;
+	} else if (_game_speed != 100) {
+		_fast_forward_click_due.reset();
+		ChangeGameSpeed(false);
+	} else {
+		_fast_forward_click_due = std::chrono::steady_clock::now() + TIME_BETWEEN_DOUBLE_CLICK;
+	}
+	SndClickBeep();
+}
+
+/**
+ * A single click on the fast forward button at normal speed goes fast once
+ * no second click has come for a double click. Called by the toolbars every
+ * few milliseconds.
+ */
+void UpdateFastForwardClick()
+{
+	if (!_fast_forward_click_due.has_value()) return;
+	const auto now = std::chrono::steady_clock::now();
+	if (now < *_fast_forward_click_due) return;
+	/* A click left over from a game that has since closed goes nowhere. */
+	const bool timely = now < *_fast_forward_click_due + std::chrono::seconds(1);
+	_fast_forward_click_due.reset();
+	if (timely && !_networking && _game_mode != GameMode::Menu && _game_speed == 100) ChangeGameSpeed(true);
+}
+
+/**
  * Game Option button menu entries.
  */
 enum class OptionMenuEntries : uint8_t {
@@ -2044,7 +2093,12 @@ struct MainToolbarWindow : Window {
 
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
-		if (_game_mode != GameMode::Menu && !this->IsWidgetDisabled(widget)) _toolbar_button_procs[widget](this);
+		if (_game_mode == GameMode::Menu || this->IsWidgetDisabled(widget)) return;
+		if (widget == WID_TN_FAST_FORWARD) {
+			FastForwardButtonClick(click_count);
+			return;
+		}
+		_toolbar_button_procs[widget](this);
 	}
 
 	void OnDropdownSelect(WidgetID widget, int index, int) override
@@ -2125,6 +2179,7 @@ struct MainToolbarWindow : Window {
 
 	/** Refresh the state of pause / game-speed on a regular interval.*/
 	const IntervalTimer<TimerWindow> refresh_interval = {std::chrono::milliseconds(30), [this](auto) {
+		UpdateFastForwardClick();
 		if (this->IsWidgetLowered(WID_TN_PAUSE) != _pause_mode.Any()) {
 			this->ToggleWidgetLoweredState(WID_TN_PAUSE);
 			this->SetWidgetDirty(WID_TN_PAUSE);
@@ -2434,6 +2489,10 @@ struct ScenarioEditorToolbarWindow : Window {
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		if (_game_mode == GameMode::Menu) return;
+		if (widget == WID_TE_FAST_FORWARD) {
+			FastForwardButtonClick(click_count);
+			return;
+		}
 		CallBackFunction cbf = _scen_toolbar_button_procs[widget](this);
 		if (cbf != CallBackFunction::None) _last_started_action = cbf;
 	}
@@ -2502,6 +2561,7 @@ struct ScenarioEditorToolbarWindow : Window {
 
 	/** Refresh the state of pause / game-speed on a regular interval.*/
 	const IntervalTimer<TimerWindow> refresh_interval = {std::chrono::milliseconds(30), [this](auto) {
+		UpdateFastForwardClick();
 		if (this->IsWidgetLowered(WID_TE_PAUSE) != _pause_mode.Any()) {
 			this->ToggleWidgetLoweredState(WID_TE_PAUSE);
 			this->SetDirty();

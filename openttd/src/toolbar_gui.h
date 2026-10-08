@@ -60,6 +60,7 @@ void AllocateToolbar();
 void ToggleBoundingBoxes();
 void ToggleDirtyBlocks();
 void ToggleWidgetOutlines();
+void UpdateFastForwardClick();
 
 extern uint _toolbar_width;
 

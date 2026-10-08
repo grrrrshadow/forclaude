@@ -1952,6 +1952,14 @@ testzoom8 sprite 3982
 setting gui.sprite_zoom_min 1
 testzoom8 sprite 3982" 20 -c $ZIN16_CFG
 echo "zin16: $(grep -o 'testzoom8: sprite .*' $S/reg_zin16.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The fast forward button (the player's word: one click fast, two clicks
+# slow; gui.slow_motion_speed, 30 % by default, see README.md): testzrychleni
+# clicks the main toolbar's button the way the mouse does and reads the game
+# speed after each step. A click at normal speed goes fast only once the time
+# for a double click is over, so a double click never runs the game ahead
+# before it slows down.
+run_scene zrychleni "testzrychleni" 20
+echo "zrychleni: $(grep -o 'testzrychleni: .*' $S/reg_zrychleni.log | cut -d' ' -f2-)" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Czech lines the language compiler throws away: a line that does not fit the
 # English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
 # is dropped without a word and the game shows the English. The driver's
