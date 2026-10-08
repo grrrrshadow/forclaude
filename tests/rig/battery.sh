@@ -1592,6 +1592,22 @@ sed '/^\[newgrf\]$/a st_old.grf = ' "$CFG_KEEP" > $STO_CFG
 SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
 setting_newgame economy.extra_industries 1' run_scene zelenestjednovrstvy "testautovlak
 testzelenest" 50 -c $STO_CFG
+# CZTR Wagons-Cargo 1.0.0 in another release's place (SwapInCztrWagonsForFirs5()):
+# a game with FIRS 5 -- its id alone, grf/firs5_like.nml, firs5_like.grf in
+# the home's newgrf/ -- and the player's 1.1.0 plays the rig's stand-in for
+# 1.0.0 (grf/cztr_old.nml, cztr_old.grf there too: the set's id and that
+# release's name) in 1.1.0's place, and says so with the grf debug on
+# (vymena=1). testgrf hra lists what the game plays: 4D490213 is the stand-in,
+# active. The player's word: everything works with 1.0.0, so the game is not
+# to stop over 1.1.0. Without FIRS 5 (cztrbezfirs) 1.1.0 plays as it is.
+VYM_CFG=$S/cztr_vymena_openttd.cfg
+sed '/^\[newgrf\]$/a firs5_like.grf = \n4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.0/cztr_wagons_cargo.grf = ' "$CFG_KEEP" > $VYM_CFG
+run_scene cztrvymena "testgrf hra" 20 -c $VYM_CFG -d grf=1
+echo "cztrvymena: vymena=$(grep -c 'plays in place of' $S/reg_cztrvymena.log) $(grep 'testgrf: hra 4D490213' $S/reg_cztrvymena.log | sed 's/.*testgrf: hra //' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+BEZ_CFG=$S/cztr_bezfirs_openttd.cfg
+sed '/^\[newgrf\]$/a 4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.0/cztr_wagons_cargo.grf = ' "$CFG_KEEP" > $BEZ_CFG
+run_scene cztrbezfirs "testgrf hra" 20 -c $BEZ_CFG -d grf=1
+echo "cztrbezfirs: vymena=$(grep -c 'plays in place of' $S/reg_cztrbezfirs.log) $(grep 'testgrf: hra 4D490213' $S/reg_cztrbezfirs.log | sed 's/.*testgrf: hra //' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Wagons named the way GETS names them -- what the wagon is and its kind in
 # quotes (grf/gets_like.nml, gets_like.grf in the home's newgrf/). The name
 # rules read the part in quotes: the Eaos and its livery take marijuana, the
@@ -1711,19 +1727,24 @@ setting_newgame economy.industries_arctic 1
 setting_newgame economy.industries_tropic 1
 setting_newgame economy.extra_industries 1' run_scene nakup "testnakup a" 20 -c $S/st_openttd.cfg
 echo "nakup: skoro_vse=$(grep -c 'Carries almost everything' $S/reg_nakup.log) krome=$(grep -c 'All but' $S/reg_nakup.log) krome_silnicni=$(grep 'All but' $S/reg_nakup.log | grep -c 'Road vehicles')" | tee -a ${BATTERY_STABLE:-/dev/null}
-# The player's cheat "mmm": every road vehicle of the company filled to the
-# brim, to look at the full sprites of all the cargoes. The car of the scene
-# is filled (30/30), a second "mmm" finds nothing to fill, and the car drives
-# on with the cargo and delivers it (vyjimka=0 -- the first cut made packets
-# without asking the pool and the game went down). Office blocks by stop B take
-# the passengers, so the car really delivers them (30/30, then 0/30): the
-# player's game went down there, on cargo filled without its loading tile
-# (assert in_vehicle in CargoPacket::GetDistance()), and with no one to take
-# the cargo the scene never got that far.
+# The player's cheat "mmm": every vehicle of the company filled to the brim,
+# to look at the full sprites of all the cargoes. The car of the scene is
+# filled (30/30), the train's coach too (osobni), a second "mmm" finds nothing
+# to fill, and both drive on with the cargo and deliver it (vyjimka=0 -- the
+# first cut made packets without asking the pool and the game went down).
+# Office blocks by stop B take the passengers, so the car and the train
+# really deliver them: the player's game went down there, on cargo filled
+# without its loading tile (assert in_vehicle in CargoPacket::GetDistance()),
+# and with no one to take the cargo the scene never got that far. The cargo
+# is from the station the vehicle last called at, or the nearest, as the
+# player asked. Both reach B at tick 2258 and unload there (car 30/30 to
+# 0/30, coach 40/40 down), and the offices then fill them again with B's own
+# passengers -- so the two snapshots are taken as they unload, ticks 2380 and
+# 2480; the car is empty at the second, the coach on its way down.
 printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
 run_scene mmm "setting economy.place_houses 2
 vlak123 on
-testautovlak
+testautovlak osobni
 testdomy postav 196 19 0
 testdomy postav 197 19 0
 testdomy postav 198 19 0
@@ -1732,9 +1753,13 @@ testdomy postav 197 23 0
 testdomy postav 198 23 0
 testzatik 50 mmm
 testzatik 51 testtvar auto 1
+testzatik 51 testvozy 1
 testzatik 52 mmm
-testzatik 5900 testtvar auto 1" 6000
-echo "mmm: $(grep -o 'mmm: [0-9]* aut nalozeno' $S/reg_mmm.log | tr '\n' ' ')$(grep -o 'naklad [0-9]* [0-9]*/[0-9]*' $S/reg_mmm.log | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+testzatik 2380 testtvar auto 1
+testzatik 2380 testvozy 1
+testzatik 2480 testtvar auto 1
+testzatik 2480 testvozy 1" 6000
+echo "mmm: $(grep -o 'mmm: nalozeno [^.]*' $S/reg_mmm.log | tr '\n' ' ')$(grep -o 'naklad [0-9]* [0-9]*/[0-9]*' $S/reg_mmm.log | tr '\n' ' ')vagon=$(grep -o 'naklad [0-9]*/[0-9]* [A-Za-z]*' $S/reg_mmm.log | grep -v 'naklad 0/0' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
 OWN_CFG=$S/claims_own_openttd.cfg
 sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
 SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG

@@ -263,6 +263,11 @@ GRFListCompatibility IsGoodGRFConfigList(GRFConfigList &grfconfig);
 /* Implemented in newgrf.cpp, where the sets these are about are named. */
 bool MustMatchSavegameRelease(const GRFConfigList &list, const GRFConfig &config);
 std::vector<GRFIdentifier> GetSavegameReleasesToFetch(const GRFConfigList &list);
+bool CztrWagonsForFirs5Wanted(const GRFConfigList &list);
+bool CztrWagonsForFirs5Missing(const GRFConfigList &list);
+bool SwapInCztrWagonsForFirs5(GRFConfigList &list);
+GRFIdentifier CztrWagonsForFirs5Identifier();
+bool IsCztrWagonsForFirs5(GrfID grfid, const MD5Hash &md5sum);
 bool FillGRFDetails(GRFConfig &config, bool is_static, Subdirectory subdir = Subdirectory::NewGrf);
 std::string GRFBuildParamList(const GRFConfig &c);
 

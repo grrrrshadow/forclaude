@@ -8,6 +8,7 @@
 /** @file newgrf.cpp Base of all NewGRF support. */
 
 #include "stdafx.h"
+#include "cztr_wagons.h"
 #include "core/backup_type.hpp"
 #include "core/container_func.hpp"
 #include "company_manager_face.h"
@@ -1192,6 +1193,97 @@ std::vector<GRFIdentifier> GetSavegameReleasesToFetch(const GRFConfigList &list)
 		wanted.push_back(c->ident);
 	}
 	return wanted;
+}
+
+/**
+ * The checksum of CZTR Wagons-Cargo 1.0.0 as far as the content service knows
+ * it: the service keeps the first four bytes of a release's checksum and no
+ * more, and matches what it is asked for on those. The rest is nought.
+ */
+static constexpr std::array<uint8_t, 4> CZTR_WAGONS_FOR_FIRS5_MD5_START = {0x9a, 0xe0, 0x3f, 0x3f};
+
+/**
+ * What to ask the content service for to get CZTR Wagons-Cargo 1.0.0: the set's
+ * id and as much of the release's checksum as the service knows.
+ */
+GRFIdentifier CztrWagonsForFirs5Identifier()
+{
+	GRFIdentifier id{};
+	id.grfid = std::byteswap(WAGON_CARGO_EXCEPTION_GRFID);
+	std::ranges::copy(CZTR_WAGONS_FOR_FIRS5_MD5_START, id.md5sum.begin());
+	return id;
+}
+
+/**
+ * Is this CZTR Wagons-Cargo 1.0.0, as the content service describes a release?
+ * @param grfid the set's id, the way it is kept in memory
+ * @param md5sum the release's checksum, of which the service knows the first four bytes
+ */
+bool IsCztrWagonsForFirs5(GrfID grfid, const MD5Hash &md5sum)
+{
+	return std::byteswap(grfid) == WAGON_CARGO_EXCEPTION_GRFID && std::equal(CZTR_WAGONS_FOR_FIRS5_MD5_START.begin(), CZTR_WAGONS_FOR_FIRS5_MD5_START.end(), md5sum.begin());
+}
+
+/**
+ * CZTR Wagons-Cargo 1.0.0 on the disk, if it is there.
+ * @return its configuration among the scanned sets, or nullptr
+ */
+static const GRFConfig *FindCztrWagonsForFirs5OnDisk()
+{
+	for (const auto &c : _all_grfs) {
+		if (c->flags.Test(GRFConfigFlag::Invalid)) continue;
+		if (IsWagonCargoExceptionGrf(*c)) return c.get();
+	}
+	return nullptr;
+}
+
+/**
+ * Does this list of sets want CZTR Wagons-Cargo 1.0.0 in another release's
+ * place: FIRS 5 and another release of the set in it? A release a savegame
+ * names and the disk has not got counts -- 1.0.0 stands in for that too.
+ * @param list the sets of a game, a savegame, or the next game
+ */
+bool CztrWagonsForFirs5Wanted(const GRFConfigList &list)
+{
+	if (!HasFirs5(list)) return false;
+	for (const auto &c : list) {
+		if (std::byteswap(c->ident.grfid) == WAGON_CARGO_EXCEPTION_GRFID && !IsWagonCargoExceptionGrf(*c)) return true;
+	}
+	return false;
+}
+
+/**
+ * Does this list of sets want CZTR Wagons-Cargo 1.0.0 and the disk not have it?
+ * @param list the sets of a game, a savegame, or the next game
+ */
+bool CztrWagonsForFirs5Missing(const GRFConfigList &list)
+{
+	return CztrWagonsForFirs5Wanted(list) && FindCztrWagonsForFirs5OnDisk() == nullptr;
+}
+
+/**
+ * Put CZTR Wagons-Cargo 1.0.0 from the disk in the place of every other
+ * release of the set in a list that plays FIRS 5, keeping the release's place
+ * in the list and its parameters. The player's word: everything works with
+ * 1.0.0, so a game is not to stop over the other release.
+ * @param list the sets of a game or of the next game
+ * @return whether anything was put in place
+ */
+bool SwapInCztrWagonsForFirs5(GRFConfigList &list)
+{
+	if (!CztrWagonsForFirs5Wanted(list)) return false;
+	const GRFConfig *disk = FindCztrWagonsForFirs5OnDisk();
+	if (disk == nullptr) return false;
+	bool swapped = false;
+	for (auto &c : list) {
+		if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID || IsWagonCargoExceptionGrf(*c)) continue;
+		auto fresh = std::make_unique<GRFConfig>(*disk);
+		fresh->CopyParams(*c);
+		Debug(grf, 1, "CZTR Wagons-Cargo: '{}' plays in place of '{}' alongside FIRS 5", fresh->GetName(), c->GetName());
+		c = std::move(fresh);
+		swapped = true;
+	}
+	return swapped;
 }
 
 /**
@@ -2571,27 +2663,21 @@ bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds)
 	 * combination work are exactly one release, CZTR Wagons-Cargo 1.0.0 --
 	 * the one whose cargoes this game feeds from FIRS through the wagon-cargo
 	 * exception above. Any other release of that set is not prepared for
-	 * FIRS 5 and the exception deliberately leaves it alone, so running it
-	 * alongside FIRS 5 is refused outright, with a message saying which
-	 * release to use instead. FIRS's own authors refuse combinations they
-	 * did not prepare for; this does the same for ours. Without FIRS 5 in
-	 * the game, nothing here does anything. */
-	{
-		bool firs5 = false;
+	 * FIRS 5 and the exception deliberately leaves it alone. The first cut
+	 * refused to run it alongside FIRS 5, with a message saying which release
+	 * to use instead; the player took that back -- "everything works with
+	 * 1.0.0, all cargoes, nothing to wait for" -- so a game that has 1.0.0 on
+	 * the disk plays it in the other release's place, parameters and all
+	 * (SwapInCztrWagonsForFirs5()), and one that has not fetches it
+	 * (cztr_wagons.cpp) and meanwhile says so on the release it switches off.
+	 * Without FIRS 5 in the game, nothing here does anything. */
+	if (HasFirs5(_grfconfig)) {
+		SwapInCztrWagonsForFirs5(_grfconfig);
 		for (const auto &c : _grfconfig) {
 			if (c->status == GRFStatus::NotFound) continue;
-			if (std::byteswap(c->ident.grfid) == FIRS_5_GRFID) {
-				firs5 = true;
-				break;
-			}
-		}
-		if (firs5) {
-			for (const auto &c : _grfconfig) {
-				if (c->status == GRFStatus::NotFound) continue;
-				if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) continue;
-				if (IsWagonCargoExceptionGrf(*c)) continue; // 1.0.0 is the release that works
-				DisableGrf(STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5, c.get());
-			}
+			if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) continue;
+			if (IsWagonCargoExceptionGrf(*c)) continue; // 1.0.0 is the release that works
+			DisableGrf(IsFetchingCztrWagonsForFirs5() ? STR_NEWGRF_ERROR_CZTR_WAGONS_FETCHING_FOR_FIRS5 : STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5, c.get());
 		}
 	}
 

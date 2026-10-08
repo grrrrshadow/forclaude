@@ -8210,7 +8210,19 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
 static bool ConTestSavegameGrfs(std::span<std::string_view> argv)
 {
 	if (argv.size() != 2 && argv.size() != 3) {
-		IConsolePrint(CC_HELP, "Say what a savegame's NewGRFs come to. Usage: 'testgrf <soubor> [stahni]'.");
+		IConsolePrint(CC_HELP, "Say what a savegame's NewGRFs come to, or the game's own. Usage: 'testgrf <soubor> [stahni]' or 'testgrf hra'.");
+		return true;
+	}
+
+	static const char * const stav[] = {"neznamo", "vypnuto", "nenalezeno", "pripraveno", "aktivni"};
+	if (argv[1] == "hra") {
+		/* The sets of the game being played, as they came out of loading: which
+		 * release of a set it is really playing (CZTR Wagons-Cargo 1.0.0 put
+		 * in another release's place, SwapInCztrWagonsForFirs5()). */
+		for (const auto &c : _grfconfig) {
+			IConsolePrint(CC_DEFAULT, "testgrf: hra {:08X} ({}) '{}' stav {}", std::byteswap(c->ident.grfid), c->filename, c->GetName(),
+					to_underlying(c->status) < lengthof(stav) ? stav[to_underlying(c->status)] : "?");
+		}
 		return true;
 	}
 
@@ -8220,7 +8232,6 @@ static bool ConTestSavegameGrfs(std::span<std::string_view> argv)
 		return true;
 	}
 
-	static const char * const stav[] = {"neznamo", "vypnuto", "nenalezeno", "pripraveno", "aktivni"};
 	for (const auto &c : _load_check_data.grfconfig) {
 		const char *jak = c->status == GRFStatus::NotFound ? "CHYBI" :
 				(c->flags.Test(GRFConfigFlag::Compatible) ? "nahrazeno jinym vydanim" : "presne to, ktere sav jmenuje");
@@ -8881,18 +8892,23 @@ static bool ConTestGreenSt(std::span<std::string_view> argv)
 static bool ConTestRoadOnRail(std::span<std::string_view> all_args)
 {
 	if (all_args.empty()) {
-		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem|tirak] [vagon=<jmeno>] [auto=<jmeno>]'.");
+		IConsolePrint(CC_HELP, "Build the road-vehicle-on-train scene. Usage: 'testautovlak [pocet aut] [posun|vlakem|tirak] [vagon=<jmeno>] [auto=<jmeno>] [osobni]'.");
 		return true;
 	}
 	/* "vagon=" and "auto=" pick the wagon and the road vehicle by a piece of
 	 * their name, wherever they stand on the line -- a set's own wagon and car
 	 * put side by side, which is what a set's author needs to see measured.
+	 * "osobni" puts a passenger coach behind the car carrier, for a train
+	 * that has cargo of its own to carry (the player's "mmm" fills trains).
 	 * The rest of the arguments keep their places. */
 	std::string want_wagon_name;
 	std::string want_road_name;
+	bool with_coach = false;
 	std::vector<std::string_view> positional;
 	for (std::string_view a : all_args) {
-		if (a.starts_with("vagon=")) {
+		if (a == "osobni") {
+			with_coach = true;
+		} else if (a.starts_with("vagon=")) {
 			want_wagon_name = a.substr(6);
 		} else if (a.starts_with("auto=")) {
 			want_road_name = a.substr(5);
@@ -9115,6 +9131,27 @@ static bool ConTestRoadOnRail(std::span<std::string_view> all_args)
 		return true;
 	}
 	Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_w, veh_l, false);
+	if (with_coach) {
+		EngineID eid_coach = EngineID::Invalid();
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (!e->company_avail.Test(_local_company) || RailVehInfo(e->index)->railveh_type != RailVehicleType::Wagon) continue;
+			if (!RailVehInfo(e->index)->railtypes.Test(RAILTYPE_RAIL) || CanCarryRoadVehicles(e)) continue;
+			if (!IsCargoInClass(e->GetDefaultCargoType(), CargoClass::Passengers)) continue;
+			eid_coach = e->index;
+			break;
+		}
+		if (eid_coach == EngineID::Invalid()) {
+			IConsolePrint(CC_ERROR, "testautovlak: ODMITNUTO - osobni vagon: zadny ve hre.");
+			return true;
+		}
+		auto [cost_c, veh_c, un_c1, un_c2, un_c3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_w, eid_coach, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_c.Failed()) {
+			IConsolePrint(CC_ERROR, "testautovlak: ODMITNUTO - osobni vagon: {}", RefusalReason(cost_c));
+			return true;
+		}
+		Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_c, veh_w, false);
+		IConsolePrint(CC_DEFAULT, "testautovlak: osobni vagon '{}' za vozem pro auta.", GetString(STR_ENGINE_NAME, eid_coach));
+	}
 	Order to_a{};
 	to_a.MakeGoToStation(id_a);
 	to_a.SetNonStopType(OrderNonStopFlags{OrderNonStopFlag::NonStop});
@@ -9694,42 +9731,73 @@ static bool ConTestPurchaseRefit(std::span<std::string_view> argv)
 }
 
 /**
- * Cheat for looking at the loaded pictures: every road vehicle of the local
- * company is filled to the brim with whatever it is fitted for, so that each
- * cargo's full sprite can be seen on the road. The cargo is simply there: from
- * no station -- the player's word -- and counted from where the vehicle stood
- * when it was filled. The player's "mmm". Usage: 'mmm'.
+ * Cheat for looking at the loaded pictures: every vehicle of the local company
+ * -- car, train, ship and aircraft -- is filled to the brim with whatever it is
+ * fitted for, so that each cargo's full sprite can be seen on the move. The
+ * cargo is from a station, as all cargo is: the one the vehicle last called
+ * at, or its company's nearest when it has not called anywhere yet. The first
+ * cut made it from no station, which the player took back: cargo from nowhere
+ * is not a thing the game has. It is counted from where the vehicle stood when
+ * it was filled. A wagon fitted for road vehicles is left alone: what it
+ * carries is a car, not cargo (road_on_rail.h). The player's "mmm". Usage:
+ * 'mmm'.
  * @copydoc IConsoleCmdProc
  */
-static bool ConFillRoadVehicles(std::span<std::string_view> argv)
+static bool ConFillVehicles(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Fill every road vehicle of your company with its cargo. Usage: 'mmm'.");
+		IConsolePrint(CC_HELP, "Fill every vehicle of your company with its cargo, from the station it last called at. Usage: 'mmm'.");
 		return true;
 	}
 	if (!Company::IsValidID(_local_company)) {
 		IConsolePrint(CC_ERROR, "mmm: no company to fill the vehicles of.");
 		return true;
 	}
-	uint vehicles = 0;
-	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
-		if (rv->owner != _local_company || !rv->IsFrontEngine() || rv->vehstatus.Test(VehState::Crashed)) continue;
+	/* The station the cargo is from: the last one called at, or the nearest. */
+	auto station_for = [](const Vehicle *v) -> const Station * {
+		const Station *st = Station::GetIfValid(v->last_station_visited);
+		if (st != nullptr) return st;
+		const Station *best = nullptr;
+		uint best_distance = UINT_MAX;
+		for (const Station *s : Station::Iterate()) {
+			if (s->owner != v->owner) continue;
+			uint distance = DistanceManhattan(s->xy, v->tile);
+			if (distance < best_distance) {
+				best_distance = distance;
+				best = s;
+			}
+		}
+		return best;
+	};
+	uint filled_of[4] = {};
+	uint without_station = 0;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) continue;
+		/* Whole vehicles, and the rakes standing about without an engine. */
+		if (!v->IsPrimaryVehicle() && !(v->type == VehicleType::Train && Train::From(v)->IsFreeWagon())) continue;
+		const Station *from = station_for(v);
+		if (from == nullptr) {
+			without_station++;
+			continue;
+		}
 		bool filled = false;
-		for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
+		for (Vehicle *u = v; u != nullptr; u = u->Next()) {
+			if (u->cargo_type == _road_vehicle_cargo) continue;
 			uint have = u->cargo.StoredCount();
 			if (u->cargo_cap <= have) continue;
 			if (!CargoPacket::CanAllocateItem()) break;
 			uint16_t more = static_cast<uint16_t>(std::min<uint>(u->cargo_cap - have, UINT16_MAX));
-			AppendConsoleCargo(u, CargoPacket::Create(more, 0, StationID::Invalid(), u->tile, 0));
+			AppendConsoleCargo(u, CargoPacket::Create(more, 0, from->index, from->xy, 0));
 			filled = true;
 		}
 		if (!filled) continue;
-		rv->MarkDirty();
-		SetWindowDirty(WindowClass::VehicleView, rv->index);
-		SetWindowDirty(WindowClass::VehicleDetails, rv->index);
-		vehicles++;
+		v->MarkDirty();
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+		SetWindowDirty(WindowClass::VehicleDetails, v->index);
+		filled_of[to_underlying(v->type)]++;
 	}
-	IConsolePrint(CC_DEFAULT, "mmm: {} aut nalozeno.", vehicles);
+	IConsolePrint(CC_DEFAULT, "mmm: nalozeno {} aut, {} vlaku, {} lodi, {} letadel{}.", filled_of[to_underlying(VehicleType::Road)], filled_of[to_underlying(VehicleType::Train)], filled_of[to_underlying(VehicleType::Ship)], filled_of[to_underlying(VehicleType::Aircraft)],
+			without_station == 0 ? "" : fmt::format("; {} bez stanice, odkud by naklad byl", without_station));
 	return true;
 }
 
@@ -13702,7 +13770,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("mm",                      ConIndustryHealth);
-	IConsole::CmdRegister("mmm",                     ConFillRoadVehicles);
+	IConsole::CmdRegister("mmm",                     ConFillVehicles);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
 	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);

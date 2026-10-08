@@ -384,6 +384,18 @@ picture, the case of CZTR 1.0.0, which the rig has not got:
     nmlc -c -l grf/lang --grf st_old.grf grf/st_old.nml
     cp st_old.grf <rig home>/.openttd/newgrf/
 
+`cztrvymena` plays `grf/firs5_like.nml`, a set with FIRS 5's id and nothing
+else, together with the player's CZTR Wagons-Cargo 1.1.0 from the tar above
+and `grf/cztr_old.nml`, a stand-in for CZTR Wagons-Cargo 1.0.0 -- the set's id
+and that release's name on the one-layer St. The game plays the stand-in in
+1.1.0's place (`testgrf hra` says what it plays); `cztrbezfirs` is the same
+without FIRS 5, where 1.1.0 plays as it is. Build them the same way and put
+them in the same place:
+
+    nmlc -c -l grf/lang --grf cztr_old.grf grf/cztr_old.nml
+    nmlc -c -l grf/lang --grf firs5_like.grf grf/firs5_like.nml
+    cp cztr_old.grf firs5_like.grf <rig home>/.openttd/newgrf/
+
 `getsjmena` plays `grf/gets_like.nml`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
 as GETS does. Build it the same way and put it in the same place:

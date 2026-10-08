@@ -217,14 +217,23 @@ enum GlobalHotKeys : int32_t {
  * south-west, stands, then backs out the way it came -- on under the menu
  * when the search is over sooner. It is drawn on the main window, under
  * every other window; the search window stands higher to make room for it
- * (ScanProgressWindow). Real time, from the first paint of the main window.
+ * (ScanProgressWindow). It moves only while it is being drawn: its clock is
+ * the time between one paint of it and the next, and a long gap counts as a
+ * frame. While the search window is up it drives in and stands, and goes on
+ * standing until the search is over, so that it is still there under the menu.
+ * The first cut ran on real time from the first paint: with the player's sets
+ * the search and the loading of every sprite after it, during which nothing is
+ * drawn, took longer than the whole ride, and the poster never showed.
  */
 struct StartPoster {
 	static constexpr int IN_MS = 1800; ///< Driving in.
 	static constexpr int STAND_MS = 3500; ///< Standing.
 	static constexpr int OUT_MS = 1800; ///< Backing out.
 
-	std::optional<std::chrono::steady_clock::time_point> since{}; ///< When it set off; empty before the first paint.
+	static constexpr uint MAX_STEP_MS = 100; ///< The most one paint moves it on, however long since the last.
+
+	uint elapsed_ms = 0; ///< How long it has been on its way, in time it was drawn.
+	std::optional<std::chrono::steady_clock::time_point> last_paint{}; ///< When it was last drawn.
 	Rect drawn{0, 0, -1, -1}; ///< Where it was drawn last, to be drawn over when it moves.
 	bool done = false; ///< It has gone.
 
@@ -240,8 +249,7 @@ struct StartPoster {
 	std::optional<Rect> Where(ZoomLevel &zoom)
 	{
 		if (this->done || _screen.width <= 0 || _screen.height <= 0) return std::nullopt;
-		if (!this->since.has_value()) this->since = std::chrono::steady_clock::now();
-		int ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *this->since).count());
+		int ms = static_cast<int>(this->elapsed_ms);
 		if (ms >= IN_MS + STAND_MS + OUT_MS) {
 			this->done = true;
 			return std::nullopt;
@@ -282,9 +290,21 @@ struct StartPoster {
 		return Rect{x, y, x + w - 1, y + h - 1};
 	}
 
-	/** Draw it, if it is on the screen. */
+	/** Draw it, if it is on the screen, and move it on by the time since it was last drawn. */
 	void Draw()
 	{
+		if (this->done) return;
+		auto now = std::chrono::steady_clock::now();
+		if (this->last_paint.has_value()) {
+			uint step = static_cast<uint>(std::min<int64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - *this->last_paint).count(), MAX_STEP_MS));
+			if (HasModalProgress()) {
+				/* The graphics are being searched: drive in and stand. */
+				this->elapsed_ms = std::min<uint>(this->elapsed_ms + step, IN_MS);
+			} else {
+				this->elapsed_ms += step;
+			}
+		}
+		this->last_paint = now;
 		ZoomLevel zoom;
 		std::optional<Rect> r = this->Where(zoom);
 		if (!r.has_value()) return;

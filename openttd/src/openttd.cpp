@@ -62,6 +62,7 @@
 #include "hotkeys.h"
 #include "newgrf.h"
 #include "mars_houses.h"
+#include "cztr_wagons.h"
 #include "misc/getoptdata.h"
 #include "game/game.hpp"
 #include "game/game_config.hpp"
@@ -452,6 +453,9 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 		 * autoexec script, so that a script turning the Mars towns off is
 		 * heard -- the test rig does, to keep off the network. */
 		FetchMarsHousesIfMissing();
+		/* And the wagons that make FIRS 5 work with the CZTR sets, when the
+		 * player's sets ask for them (cztr_wagons.cpp). */
+		FetchCztrWagonsForFirs5IfMissing();
 
 		/* Make sure _settings is filled with _settings_newgame if we switch to a game directly */
 		if (_switch_mode != SwitchMode::None) MakeNewgameSettingsLive();
@@ -1151,6 +1155,7 @@ void SwitchToMode(SwitchMode new_mode)
 
 			MakeNewGame(false, new_mode == SwitchMode::NewGame);
 			GenerateSavegameId();
+			FetchCztrWagonsForFirs5IfMissing();
 
 			UpdateSocialIntegration(GameMode::Normal);
 			break;
@@ -1159,6 +1164,7 @@ void SwitchToMode(SwitchMode new_mode)
 		case SwitchMode::NewGame: // New Game --> 'Random game'
 			MakeNewGame(false, new_mode == SwitchMode::NewGame);
 			GenerateSavegameId();
+			FetchCztrWagonsForFirs5IfMissing();
 
 			UpdateSocialIntegration(GameMode::Normal);
 			break;
@@ -1178,6 +1184,8 @@ void SwitchToMode(SwitchMode new_mode)
 				/* Decrease pause counter (was increased from opening load dialog) */
 				Command<Commands::Pause>::Post(PauseMode::SaveLoad, false);
 			}
+			/* A savegame that plays FIRS 5 with the wrong CZTR wagons: fetch the right ones (cztr_wagons.cpp). */
+			FetchCztrWagonsForFirs5IfMissing();
 
 			UpdateSocialIntegration(GameMode::Normal);
 			break;

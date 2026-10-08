@@ -144,6 +144,8 @@ add_files(
     currency.cpp
     currency_func.h
     currency_type.h
+    cztr_wagons.cpp
+    cztr_wagons.h
     date_gui.cpp
     date_gui.h
     debug.cpp
