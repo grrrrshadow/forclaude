@@ -238,9 +238,11 @@ struct StartPoster {
 	bool done = false; ///< It has gone.
 
 	/**
-	 * Where the poster is now, and at which zoom it is drawn: the level whose
-	 * height is nearest a little over half the screen's (it has 4x, 2x and
-	 * normal), standing a twentieth of the screen in from the bottom right.
+	 * Where the poster is now, and at which zoom it is drawn: always its own
+	 * 4x level, the picture as the colleague made it, pixel for pixel and at
+	 * no other size (the player: "the poster is shown once, one size"),
+	 * standing a twentieth of the screen in from the bottom right -- or with
+	 * its top at the screen's top where the screen is lower than the poster.
 	 * It comes in along the screen's south-west slope (two across, one down)
 	 * from just off the right edge, slowing down, and backs out along it.
 	 * @param zoom set to the zoom it is drawn at
@@ -255,22 +257,13 @@ struct StartPoster {
 			return std::nullopt;
 		}
 
-		int want = _screen.height * 55 / 100;
 		zoom = ZoomLevel::In4x;
-		int best = INT_MAX;
-		for (ZoomLevel z : {ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Normal}) {
-			int off = std::abs(static_cast<int>(GetSpriteSize(SPR_START_POSTER, nullptr, z).height) - want);
-			if (off < best) {
-				best = off;
-				zoom = z;
-			}
-		}
 		Dimension d = GetSpriteSize(SPR_START_POSTER, nullptr, zoom);
 		int w = static_cast<int>(d.width);
 		int h = static_cast<int>(d.height);
 
 		int stop_x = _screen.width - _screen.width / 20 - w;
-		int stop_y = _screen.height - _screen.height / 20 - h;
+		int stop_y = std::max(0, _screen.height - _screen.height / 20 - h);
 		int start_x = _screen.width;
 		int start_y = stop_y - (start_x - stop_x) / 2;
 

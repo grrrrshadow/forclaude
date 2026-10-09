@@ -264,19 +264,6 @@ def main() -> None:
             # Offsets from the picture's top left corner: emit() adds the
             # north corner's shift, so the corner given is that shift.
             emit(manifest, name, image4, image8, (ZOOM4.north_shift, 0))
-            # The 2x and the normal level too, each the mean of the 2x2 blocks
-            # of the level above, weighted by alpha (half_of(), as the
-            # colleague's packers make a level): the game makes a missing
-            # level below 4x by taking one pixel of four, and on a screen
-            # that draws the poster at 2x it came out blocky (the player:
-            # "koukam na horsi kostickovany obrazek").
-            smaller = image4
-            for key in ("x2", "x1"):
-                smaller = half_of(smaller)
-                box = smaller.getbbox()
-                file = f"{name}_{key}_32bpp.png"
-                smaller.crop(box).save(HERE / file)
-                manifest[-1][key] = {"file": file, "w": box[2] - box[0], "h": box[3] - box[1], "x": box[0], "y": box[1]}
         elif cut == "strips":
             # Nothing of a layer may be left outside the strips cut: a layer
             # cut in fewer strips than its picture would lose what stands
