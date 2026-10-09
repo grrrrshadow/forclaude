@@ -226,9 +226,9 @@ enum GlobalHotKeys : int32_t {
  * drawn, took longer than the whole ride, and the poster never showed.
  */
 struct StartPoster {
-	static constexpr int IN_MS = 1800; ///< Driving in.
+	static constexpr int IN_MS = 6000; ///< Driving in: the player, "30 % of today's speed", of the 1800 ms it was.
 	static constexpr int STAND_MS = 3500; ///< Standing.
-	static constexpr int OUT_MS = 1800; ///< Backing out.
+	static constexpr int OUT_MS = 6000; ///< Backing out, as slow.
 
 	static constexpr uint MAX_STEP_MS = 100; ///< The most one paint moves it on, however long since the last.
 
