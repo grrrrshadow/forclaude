@@ -21,6 +21,7 @@
 #include "true_colour.h"
 #include "palette_func.h"
 #include "debug.h"
+#include "timer/timer_game_calendar.h"
 #include "window_func.h"
 
 #include "safeguards.h"
@@ -164,9 +165,11 @@ void CopyVehicleConfig(const Vehicle *from_front, Vehicle *to_front)
  * numbers of its lightening (SetTrueColourLight()), nought for the usual.
  * Then the option chosen: 40F, with the colour as 0x00RRGGBB in register 100
  * and, if the colour lightens otherwise than its detail, the three numbers in
- * register 101. A detail the set answers nothing for is no colour; an option
- * it answers nothing for leaves the pixels as drawn, the company colour
- * where the mask is the company colour's.
+ * register 101. A paint that fades with age gives the colour it fades to in
+ * register 102 (0x00RRGGBB), over how many years in 103 and in steps of how
+ * many years in 104 (AgeTrueColour()). A detail the set answers nothing for
+ * is no colour; an option it answers nothing for leaves the pixels as drawn,
+ * the company colour where the mask is the company colour's.
  * @param engine the engine
  * @param aspect which detail
  * @param option the option chosen for it
@@ -192,71 +195,123 @@ static std::optional<TrueColourRange> VehicleConfigColour(EngineID engine, uint 
 	range.g = GB(regs100[0], 8, 8);
 	range.b = GB(regs100[0], 0, 8);
 	if (regs100[1] != 0) SetTrueColourLight(range, static_cast<uint32_t>(regs100[1]));
+	if (regs100[3] > 0) {
+		range.aged_r = GB(regs100[2], 16, 8);
+		range.aged_g = GB(regs100[2], 8, 8);
+		range.aged_b = GB(regs100[2], 0, 8);
+		range.age_years = static_cast<uint8_t>(std::min<int32_t>(regs100[3], 255));
+		range.age_step = static_cast<uint8_t>(Clamp<int32_t>(regs100[4], 1, 255));
+	}
 	return range;
 }
 
-/** The colours of an engine in the options chosen, asked of the set once: the engine and the options, to the colours. */
-static std::map<std::pair<EngineID, VehicleConfigOptions>, uint16_t> _engine_true_colours;
-/** GetTrueColourEpoch() when _engine_true_colours was last good. */
-static uint16_t _engine_true_colours_epoch = 0;
+/** The colours of an engine in the options chosen as the set gives them, fading and all, asked of the set once: the engine and the options, to the colours. */
+static std::map<std::pair<EngineID, VehicleConfigOptions>, TrueColourSet> _engine_colour_ranges;
+/** GetTrueColourEpoch() when _engine_colour_ranges was last good. */
+static uint16_t _engine_colour_ranges_epoch = 0;
 
 /**
- * The colours an engine of a set is drawn in, with the options chosen: every
- * detail of its set that is a colour, in the colour of the option chosen.
+ * The colours of an engine of a set in the options chosen, as the set gives
+ * them: every detail of its set that is a colour, in the colour of the
+ * option chosen, with the fading the set gave it.
  * @param engine the engine
- * @param options the option chosen for each detail; all nought in the purchase list
- * @return the colours (InternTrueColourSet()); 0 for none
+ * @param options the option chosen for each detail
+ * @return the colours; empty for none
  */
-uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options)
+static const TrueColourSet &EngineColourRanges(EngineID engine, const VehicleConfigOptions &options)
 {
+	static const TrueColourSet none;
 	const Engine *e = Engine::GetIfValid(engine);
-	if (e == nullptr || e->GetGRF() == nullptr || !e->GetGRF()->vehicle_config) return 0;
+	if (e == nullptr || e->GetGRF() == nullptr || !e->GetGRF()->vehicle_config) return none;
 
-	if (_engine_true_colours_epoch != GetTrueColourEpoch()) {
-		_engine_true_colours.clear();
-		_engine_true_colours_epoch = GetTrueColourEpoch();
+	if (_engine_colour_ranges_epoch != GetTrueColourEpoch()) {
+		_engine_colour_ranges.clear();
+		_engine_colour_ranges_epoch = GetTrueColourEpoch();
 	}
-	auto it = _engine_true_colours.find({engine, options});
-	if (it != _engine_true_colours.end()) return it->second;
+	auto it = _engine_colour_ranges.find({engine, options});
+	if (it != _engine_colour_ranges.end()) return it->second;
 
 	TrueColourSet colours;
 	for (uint a = 0; a < VEHICLE_CONFIG_MAX_ASPECTS; a++) {
 		std::optional<TrueColourRange> range = VehicleConfigColour(engine, a, options[a]);
 		if (range.has_value()) colours.push_back(*range);
 	}
-	uint16_t id = InternTrueColourSet(colours);
-	_engine_true_colours.emplace(std::pair{engine, options}, id);
-	return id;
+	return _engine_colour_ranges.emplace(std::pair{engine, options}, std::move(colours)).first->second;
+}
+
+/**
+ * The colours an engine of a set is drawn in, with the options chosen and at
+ * an age: every detail of its set that is a colour, in the colour of the
+ * option chosen, faded as far as the age takes it (AgeTrueColour()).
+ * @param engine the engine
+ * @param options the option chosen for each detail; all nought in the purchase list
+ * @param age_years the vehicle's age in whole years; 0 in the purchase list
+ * @return the colours (InternTrueColourSet()); 0 for none
+ */
+uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years)
+{
+	const TrueColourSet &ranges = EngineColourRanges(engine, options);
+	if (ranges.empty()) return 0;
+	TrueColourSet colours;
+	for (const TrueColourRange &range : ranges) colours.push_back(AgeTrueColour(range, age_years));
+	return InternTrueColourSet(colours);
+}
+
+/**
+ * A vehicle's age in whole years, for the fading of its paint: the age of
+ * the part that carries the choices, so a wagon's parts fade together.
+ * @param v the part
+ */
+static uint VehicleAgeYears(const Vehicle *v)
+{
+	return static_cast<uint>(std::min<int64_t>(255, VehicleConfigHead(v)->age.base() / CalendarTime::DAYS_IN_YEAR));
 }
 
 /**
  * The colours a part of a vehicle is drawn in: its engine's in the options
- * chosen on the part that carries them (VehicleConfigHead()). Kept on the
- * part until the player chooses anew (ApplyVehicleConfig()) or the sets are
- * read anew.
+ * chosen on the part that carries them (VehicleConfigHead()), at the
+ * vehicle's age. Kept on the part until the player chooses anew
+ * (ApplyVehicleConfig()), the sets are read anew, or another year has gone.
  * @param v the part
  * @return the colours (InternTrueColourSet()); 0 for none
  */
 uint16_t GetVehicleTrueColours(const Vehicle *v)
 {
-	if (v->true_colours_epoch == GetTrueColourEpoch()) return v->true_colours;
-	v->true_colours = GetEngineTrueColours(v->engine_type, VehicleConfigHead(v)->config_options);
+	const uint years = VehicleAgeYears(v);
+	if (v->true_colours_epoch == GetTrueColourEpoch() && v->true_colours_age_years == years) return v->true_colours;
+	v->true_colours = GetEngineTrueColours(v->engine_type, VehicleConfigHead(v)->config_options, years);
 	v->true_colours_epoch = GetTrueColourEpoch();
+	v->true_colours_age_years = static_cast<uint8_t>(years);
 	return v->true_colours;
 }
 
 /**
- * For the rig: the colours of an engine in the options chosen, detail by
- * detail, as the set gives them.
- * @param engine the engine
- * @param options the options chosen
+ * For the rig: the colours of a vehicle as it is drawn now, its engine's in
+ * its options at its age (DescribeEngineTrueColours()).
+ * @param v the vehicle
  * @return the description, one line
  */
-std::string DescribeEngineTrueColours(EngineID engine, const VehicleConfigOptions &options)
+std::string DescribeVehicleTrueColours(const Vehicle *v)
 {
-	uint16_t id = GetEngineTrueColours(engine, options);
+	return DescribeEngineTrueColours(v->engine_type, VehicleConfigHead(v)->config_options, VehicleAgeYears(v));
+}
+
+/**
+ * For the rig: the colours of an engine in the options chosen at an age,
+ * detail by detail, as the set gives them and as they are at that age.
+ * @param engine the engine
+ * @param options the options chosen
+ * @param age_years the age in whole years
+ * @return the description, one line
+ */
+std::string DescribeEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years)
+{
+	uint16_t id = GetEngineTrueColours(engine, options, age_years);
 	if (id == 0) return "bez barev";
 	std::string out = fmt::format("sada {}", id);
+	for (const TrueColourRange &range : EngineColourRanges(engine, options)) {
+		if (range.age_years != 0) out += fmt::format(" [bledne k #{:02X}{:02X}{:02X} za {} let po {}]", range.aged_r, range.aged_g, range.aged_b, range.age_years, range.age_step);
+	}
 	for (const TrueColourRange &range : GetTrueColourSet(id)) {
 		out += fmt::format(" [maska 0x{:02X}-0x{:02X} #{:02X}{:02X}{:02X} svetla {}/{}/{}]", range.first, range.first + TRUE_COLOUR_RANGE_SIZE - 1,
 				range.r, range.g, range.b, range.light_start, range.light_stop, range.light_max);

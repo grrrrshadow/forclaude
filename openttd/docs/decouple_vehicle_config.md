@@ -184,7 +184,7 @@ texts) with variable 0x10 as for 1C0:
 | bits 8..15 | bits 0..7 | asks for | answer |
 |---|---|---|---|
 | detail *a* | **0xFF** | is detail *a* a colour, and where | the **first of its eight mask indices** (`0x8000 \| index`); register 0x100 its lightening (below), 0 for the usual. Any other answer, or none: the detail is no colour. |
-| detail *a* | option *o* | the colour of option *o* | **`0x40F`** (`0x840F`) with the colour in register **0x100** as `0x00RRGGBB`; register **0x101** a lightening of this colour's own, 0 for the detail's. Any other answer: this option is no colour, the pixels stay as drawn (in the company colour where the mask is the company colour's). |
+| detail *a* | option *o* | the colour of option *o* | **`0x40F`** (`0x840F`) with the colour in register **0x100** as `0x00RRGGBB`; register **0x101** a lightening of this colour's own, 0 for the detail's; registers **0x102** to **0x104** a fading with age (below), 0x103 = 0 for none. Any other answer: this option is no colour, the pixels stay as drawn (in the company colour where the mask is the company colour's). |
 
 The game asks with the option the player chose, the first option in the
 purchase list; so the **first option is the vehicle's default colour** -- for
@@ -251,6 +251,17 @@ So a pixel of lightness *L* above the start is the colour moved toward white
 by `(min(L, stop) - start) / (255 - start) * most / 255` of the way. Nothing
 given (0) is **start 128, stop 255, most 128**: exact at 128, half way to white
 at 255. Render the grey so that a plain flat panel is at the start.
+
+**Paint that fades with age.** A colour may fade as the vehicle ages -- the
+player: "the Eas lightens, to brick red at most, from the purchase over twenty
+years, then the lightening stops; every one or three years". With the colour
+the set gives in register **0x102** the colour it fades to (`0x00RRGGBB`), in
+**0x103** over how many years (0 = no fading) and in **0x104** in steps of how
+many years (1 or 3; 0 counts as 1). The game moves the colour from the one to
+the other by the whole steps gone of the years, straight between the two, and
+leaves it at the faded one from then on; a vehicle renewed with the same
+model is new again. The age is the wagon's or the vehicle's own, so each wagon
+fades on its own. At most years / step + 1 pictures come of one colour.
 
 **How the game draws it.** The picture is made again with the painted pixels in
 their colours when it is read, once for each set of colours some vehicle is in,

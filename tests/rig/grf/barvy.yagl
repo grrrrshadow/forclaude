@@ -9,6 +9,8 @@
 // lightening in register 100 (start 100, stop 200, 255 at the lightest were
 // there no stop); the radiator paints 0x68-0x6F, its black option lightens
 // otherwise (register 101). The cab's last option and the crew are no colour:
+// The cab's Tatra orange fades with age to brick red over two years in steps
+// of one (registers 102 to 104), the rig's short span of the player's twenty.
 // the cab is then the company colour, as drawn. The beacon is detail 4, read
 // in variable 5D. The pictures are grey 32bpp with a mask, zin8 only:
 // flat areas at the lightness where each colour is exactly itself, a row at
@@ -211,12 +213,24 @@ switch<RoadVehicles, 0x03, PrimaryDWord> // the texts of the configurator (callb
     };
     default: 0x8400;
 }
-switch<RoadVehicles, 0x10, PrimaryDWord> // cab: Tatra orange (register 100)
+switch<RoadVehicles, 0x10, PrimaryDWord> // cab: Tatra orange (register 100), fading to brick red (register 102) over 2 years (103) in steps of 1 (104)
 {
     expression:
     {
         value1 = variable[0x1A] & 0x00E8641E;
         value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00B4503C;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000102;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000002;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000103;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000001;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000104;
         value1 = TempStore(value1, value2);
     };
     ranges:

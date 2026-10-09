@@ -45,6 +45,11 @@ struct TrueColourRange {
 	uint8_t light_start = 128; ///< The lightness of the grey where the colour is exactly itself and starts toward white; darker grey darkens it toward black.
 	uint8_t light_stop = 255; ///< The lightness of the grey where it stops toward white: lighter grey stays as light as here.
 	uint8_t light_max = 128; ///< How near white it would get at the lightest grey, 255, were there no stop: 0 not at all, 255 white.
+	uint8_t aged_r = 0; ///< Red of the colour the paint fades to with age (the player: the Eas lightens to brick red).
+	uint8_t aged_g = 0; ///< Green of it.
+	uint8_t aged_b = 0; ///< Blue of it.
+	uint8_t age_years = 0; ///< Over how many years from new it fades to that; 0 for a paint that does not fade.
+	uint8_t age_step = 1; ///< In steps of how many years it moves (1, or 3: "every one or three years").
 
 	bool operator==(const TrueColourRange &) const = default;
 };
@@ -56,6 +61,7 @@ using TrueColourSet = std::vector<TrueColourRange>;
 static constexpr uint32_t TRUE_COLOUR_LIGHT_DEFAULT = 128 | 255 << 8 | 128 << 16;
 
 void SetTrueColourLight(TrueColourRange &range, uint32_t light);
+TrueColourRange AgeTrueColour(const TrueColourRange &range, uint years);
 Colour ShadeTrueColour(const TrueColourRange &range, uint8_t lightness);
 uint8_t TrueColourLightness(const TrueColourRange &range, uint8_t m, uint8_t r, uint8_t g, uint8_t b, bool rgb);
 

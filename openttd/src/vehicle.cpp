@@ -1668,6 +1668,11 @@ void AgeVehicle(Vehicle *v)
 {
 	if (v->age < CalendarTime::MAX_DATE) v->age++;
 
+	/* A paint that fades with age moves on by whole years (true_colour.h); a
+	 * vehicle standing still is not asked for its picture again until it
+	 * turns, so once a year it is made to look anew. */
+	if (v->age.base() % CalendarTime::DAYS_IN_YEAR == 0) v->sprite_cache.last_direction = Direction::Invalid;
+
 	if (!v->IsPrimaryVehicle() && (v->type != VehicleType::Train || !Train::From(v)->IsEngine())) return;
 
 	/* Past its years a vehicle loses reliability twice as fast for each year it

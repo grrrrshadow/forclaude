@@ -48,6 +48,36 @@ void SetTrueColourLight(TrueColourRange &range, uint32_t light)
 }
 
 /**
+ * The colour of a paint that fades with age, at a vehicle's age: moved from
+ * the colour toward the faded one by the years gone of the years it takes,
+ * in the steps the set gave, and the faded one from then on. The player: "the
+ * Eas lightens, to brick red at most, from the purchase over twenty years,
+ * then the lightening stops; every one or three years". The result is a
+ * colour of its own with no fading left in it, so every vehicle at the same
+ * step shares one set of colours and one picture.
+ * @param range the colour as the set gave it
+ * @param years the vehicle's age in whole years
+ * @return the colour at that age
+ */
+TrueColourRange AgeTrueColour(const TrueColourRange &range, uint years)
+{
+	TrueColourRange aged = range;
+	aged.aged_r = aged.aged_g = aged.aged_b = 0;
+	aged.age_years = 0;
+	aged.age_step = 1;
+	if (range.age_years == 0) return aged;
+	const uint step = std::max<uint>(1, range.age_step);
+	const uint gone = std::min<uint>(years, range.age_years) / step * step;
+	auto toward = [&](uint8_t from, uint8_t to) {
+		return static_cast<uint8_t>(from + (static_cast<int>(to) - static_cast<int>(from)) * static_cast<int>(gone) / static_cast<int>(range.age_years));
+	};
+	aged.r = toward(range.r, range.aged_r);
+	aged.g = toward(range.g, range.aged_g);
+	aged.b = toward(range.b, range.aged_b);
+	return aged;
+}
+
+/**
  * The colour of one pixel of a detail: the colour itself where the grey
  * picture is as light as the colour's place (light_start), toward black as
  * the grey darkens, toward white as it lightens -- steadily, so that at the

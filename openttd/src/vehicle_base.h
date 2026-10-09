@@ -312,6 +312,7 @@ public:
 	std::array<uint8_t, 16> config_options{}; ///< The option the player chose for each detail the vehicle's set offers (vehicle_config.h); kept on the vehicle configured as one (VehicleConfigHead()): the tractor, the wagon.
 	mutable uint16_t true_colours = 0; ///< The colours of its set this part is drawn in (true_colour.h), made from its head's config_options when asked (GetVehicleTrueColours()); not saved.
 	mutable uint16_t true_colours_epoch = 0; ///< true_colours is good while this is GetTrueColourEpoch(); 0 after the player chose anew.
+	mutable uint8_t true_colours_age_years = 0; ///< The age in years true_colours was made for: a paint that fades with age is made anew each year.
 	uint16_t cargo_cap = 0; ///< total capacity
 	uint16_t refit_cap = 0; ///< Capacity left over from before last refit.
 	uint16_t cargo_age_counter = 0; ///< Ticks till cargo is aged next.

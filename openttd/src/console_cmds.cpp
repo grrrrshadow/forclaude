@@ -8469,7 +8469,9 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
  * and says what the game makes of it: the details, the colours of each
  * detail as the set gives them (callback 1C1), the picture painted in them
  * (its painted pixels and their commonest colours, read in 32bpp), in the
- * purchase list and on the vehicle; then chooses other colours, a detail that
+ * purchase list and on the vehicle; ages the vehicle by hand and watches the
+ * cab's orange fade to brick red year by year and come back new; then
+ * chooses other colours, a detail that
  * is no colour (the company colour) and the beacon of variable 5D, reads the
  * picture through the blitter the game runs with, and opens the configurator
  * from the refit window: eight rows, the set's five shown, closing with the
@@ -8570,6 +8572,30 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	if (first_colours != bought) refuse("postavene vozidlo ma jine barvy nez nakup");
 	if (DescribeTrueColourSprite(first) == "bez barev") refuse("obrazek postaveneho vozidla neni v barvach");
 
+	/* The cab's orange fades to brick red over two years in steps of one: at
+	 * a year half way (#CE5A2D), at two years and from then on brick red
+	 * (#B4503C), each a picture of its own; new again, the orange. The age is
+	 * set on the vehicle by hand, the game counts it in days. */
+	auto aged = [&](int years) {
+		for (Vehicle *u = v; u != nullptr; u = u->Next()) {
+			u->age = TimerGameCalendar::Date{years * CalendarTime::DAYS_IN_YEAR};
+			/* As the new year does it (AgeVehicle()): the picture asked for anew. */
+			u->sprite_cache.last_direction = Direction::Invalid;
+		}
+		SpriteID pic = picture();
+		return std::make_pair(DescribeVehicleTrueColours(v), pic);
+	};
+	auto [year1, pic_year1] = aged(1);
+	auto [year2, pic_year2] = aged(2);
+	auto [year5, pic_year5] = aged(5);
+	auto [year0, pic_year0] = aged(0);
+	IConsolePrint(CC_DEFAULT, "testbarvy: stari 1 rok: {} obrazek {}", year1, pic_year1);
+	IConsolePrint(CC_DEFAULT, "testbarvy: stari 2 roky: {} obrazek {}", year2, pic_year2);
+	IConsolePrint(CC_DEFAULT, "testbarvy: stari 5 let: {} obrazek {}", year5, pic_year5);
+	bool fades = year1.find("#CE5A2D") != std::string::npos && year2.find("#B4503C") != std::string::npos && year5 == year2 && year0 == first_colours
+			&& pic_year1 != first && pic_year2 != pic_year1 && pic_year5 == pic_year2 && pic_year0 == first;
+	if (!fades) refuse("oranzova kabina nebledne stari, jak ma: po roce #CE5A2D, po dvou #B4503C a dal stejna, nova zase oranzova");
+
 	/* Other colours: white cab, blue body, the black radiator, the beacon on. */
 	CommandCost c0 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 1);
 	CommandCost c1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 1, 1);
@@ -8622,9 +8648,9 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 		}
 	}
 
-	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} sad={} obrazku={}", aspects.size(),
+	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} sad={} obrazku={}", aspects.size(),
 			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
-			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", GetTrueColourSetCount(), GetTrueColourSpriteCount());
+			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
 	return true;
 }
 

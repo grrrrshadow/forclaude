@@ -421,7 +421,10 @@ of an option -- and a beacon drawn by detail 4, in variable 5D. Its pictures
 at the lightness where each colour is exactly itself, a row at 254 and one
 darker, so `testbarvy` can read the painted colours back: the commonest is
 the colour itself, the light row of the body #F7C8AF in the default orange
-(lightening stopped at 200, 100/155 of the way to white at most 255).
+(lightening stopped at 200, 100/155 of the way to white at most 255). The
+cab's orange fades to brick red over two years in steps of one (registers 102
+to 104; the player's sets will take twenty): the probe sets the vehicle's age
+and reads #CE5A2D at a year, #B4503C at two and after, orange again at none.
 
 `getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
