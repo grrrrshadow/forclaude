@@ -20,7 +20,7 @@
 std::tuple<CommandCost, VehicleID, uint, uint16_t, CargoArray> CmdBuildVehicle(DoCommandFlags flags, TileIndex tile, EngineID eid, bool use_free_vehicles, CargoType cargo, ClientID client_id);
 CommandCost CmdSellVehicle(DoCommandFlags flags, VehicleID v_id, bool sell_chain, bool backup_order, ClientID client_id);
 std::tuple<CommandCost, uint, uint16_t, CargoArray> CmdRefitVehicle(DoCommandFlags flags, VehicleID veh_id, CargoType new_cargo_type, uint8_t new_subtype, bool auto_refit, bool only_this, uint8_t num_vehicles);
-CommandCost CmdConfigureVehicle(DoCommandFlags flags, VehicleID veh_id, uint8_t aspect, uint8_t option);
+CommandCost CmdConfigureVehicle(DoCommandFlags flags, VehicleID veh_id, uint8_t num_vehicles, uint8_t aspect, uint8_t option);
 CommandCost CmdSendVehicleToDepot(DoCommandFlags flags, VehicleID veh_id, DepotCommandFlags depot_cmd, const VehicleListIdentifier &vli);
 CommandCost CmdChangeServiceInt(DoCommandFlags flags, VehicleID veh_id, uint16_t serv_int, bool is_custom, bool is_percent);
 CommandCost CmdRenameVehicle(DoCommandFlags flags, VehicleID veh_id, const std::string &text);

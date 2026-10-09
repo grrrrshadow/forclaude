@@ -18,6 +18,7 @@
 #include "dropdown_type.h"
 #include "dropdown_func.h"
 #include "cargotype.h"
+#include "vehicle_func.h"
 #include "widgets/vehicle_widget.h"
 
 #include "table/strings.h"
@@ -35,32 +36,84 @@
  */
 struct VehicleConfigWindow : Window {
 	std::vector<VehicleConfigAspect> aspects; ///< The details the set offers, read from it.
+	VehicleID selected{}; ///< The first vehicle of the refit window's selection: the choices go to the selection, as a refit does.
+	uint8_t num_vehicles = UINT8_MAX; ///< How many vehicles the selection has, as the refit counts them; UINT8_MAX for the whole.
+	VehicleID head{}; ///< The vehicle whose details and choices the rows show: the first of the selection that carries choices and has details.
 
-	VehicleConfigWindow(WindowDesc &desc, WindowNumber window_number, Window *parent) : Window(desc)
+	VehicleConfigWindow(WindowDesc &desc, WindowNumber window_number, Window *parent, VehicleID selected, uint8_t num_vehicles) : Window(desc)
 	{
 		/* Opened from the refit window it goes with it: the player, "let the
 		 * configurator close with the refit window". */
 		this->parent = parent;
+		/* The selection is read against the vehicle before the window is
+		 * finished, so the number is needed now. */
+		this->window_number = window_number;
 		this->CreateNestedTree();
-		this->ReadAspects(static_cast<VehicleID>(window_number));
+		this->SetSelection(selected, num_vehicles);
 		this->FinishInitNested(window_number);
 		this->owner = Vehicle::Get(static_cast<VehicleID>(window_number))->owner;
 	}
 
-	/** Which details the set offers: a row for each, the other rows away. */
-	void ReadAspects(VehicleID index)
+	/** The refit window's selection changed: the rows show the first of it that has details. */
+	void SetSelection(VehicleID selected, uint8_t num_vehicles)
 	{
-		this->aspects = GetVehicleConfigAspects(Vehicle::Get(index)->engine_type);
+		this->selected = selected;
+		this->num_vehicles = num_vehicles;
+		this->ReadAspects();
+	}
+
+	/**
+	 * The vehicles of the selection that carry choices of their own
+	 * (VehicleConfigHead()): of a train the selection, of anything else the
+	 * whole, which is configured as one.
+	 */
+	std::vector<const Vehicle *> Heads() const
+	{
+		std::vector<const Vehicle *> heads;
+		const Vehicle *front = Vehicle::Get(static_cast<VehicleID>(this->window_number));
+		const Vehicle *first = Vehicle::GetIfValid(this->selected);
+		if (first == nullptr || first->First() != front) first = front;
+		if (front->type == VehicleType::Train) {
+			VehicleSet set;
+			GetVehicleSet(set, const_cast<Vehicle *>(first), this->num_vehicles);
+			for (const Vehicle *u = front; u != nullptr; u = u->Next()) {
+				if (VehicleConfigHead(u) == u && std::ranges::find(set, u->index) != set.end()) heads.push_back(u);
+			}
+		} else {
+			heads.push_back(front);
+		}
+		return heads;
+	}
+
+	/** Which details the set offers: a row for each, the other rows away. */
+	void ReadAspects()
+	{
+		this->head = static_cast<VehicleID>(this->window_number);
+		this->aspects.clear();
+		for (const Vehicle *u : this->Heads()) {
+			std::vector<VehicleConfigAspect> found = GetVehicleConfigAspects(u->engine_type);
+			if (found.empty()) continue;
+			this->head = u->index;
+			this->aspects = std::move(found);
+			break;
+		}
 		for (uint i = 0; i < VEHICLE_CONFIG_MAX_ASPECTS; i++) {
 			this->GetWidget<NWidgetStacked>(WID_VC_ROW + i)->SetDisplayedPlane(i < this->aspects.size() ? 0 : SZSP_NONE);
 		}
 		this->GetWidget<NWidgetStacked>(WID_VC_NONE_SEL)->SetDisplayedPlane(this->aspects.empty() ? 0 : SZSP_NONE);
 	}
 
-	/** The cargo the vehicle carries, from the first part that carries any. */
+	/** The option chosen for a detail on the vehicle the rows show. */
+	uint8_t Chosen(uint aspect) const
+	{
+		return Vehicle::Get(this->head)->config_options[aspect];
+	}
+
+	/** The cargo the vehicle the rows show carries, from the first of its parts that carries any. */
 	std::string CargoName() const
 	{
-		for (const Vehicle *u = Vehicle::Get(static_cast<VehicleID>(this->window_number)); u != nullptr; u = u->Next()) {
+		for (const Vehicle *u = Vehicle::Get(this->head); u != nullptr; u = u->Next()) {
+			if (u != Vehicle::Get(this->head) && !u->IsArticulatedPart()) break;
 			if (u->cargo_cap == 0 || !IsValidCargoType(u->cargo_type)) continue;
 			return GetString(CargoSpec::Get(u->cargo_type)->name);
 		}
@@ -89,7 +142,7 @@ struct VehicleConfigWindow : Window {
 		}
 		if (IsInsideMM(widget, WID_VC_DROPDOWN, WID_VC_DROPDOWN_END)) {
 			uint i = widget - WID_VC_DROPDOWN;
-			return this->OptionName(i, Vehicle::Get(static_cast<VehicleID>(this->window_number))->config_options[i]);
+			return this->OptionName(i, this->Chosen(i));
 		}
 		return this->Window::GetWidgetString(widget, stringid);
 	}
@@ -124,14 +177,16 @@ struct VehicleConfigWindow : Window {
 		for (uint o = 0; o < this->aspects[i].options.size(); o++) {
 			list.push_back(MakeDropDownListStringItem(std::string{this->aspects[i].options[o]}, o));
 		}
-		ShowDropDownList(this, std::move(list), Vehicle::Get(static_cast<VehicleID>(this->window_number))->config_options[i], widget);
+		ShowDropDownList(this, std::move(list), this->Chosen(i), widget);
 	}
 
 	void OnDropdownSelect(WidgetID widget, int index, int) override
 	{
 		if (!IsInsideMM(widget, WID_VC_DROPDOWN, WID_VC_DROPDOWN_END)) return;
 		const Vehicle *v = Vehicle::Get(static_cast<VehicleID>(this->window_number));
-		Command<Commands::ConfigureVehicle>::Post(STR_ERROR_CAN_T_CONFIGURE_VEHICLE, v->tile, v->index, static_cast<uint8_t>(widget - WID_VC_DROPDOWN), static_cast<uint8_t>(index));
+		const Vehicle *first = Vehicle::GetIfValid(this->selected);
+		if (first == nullptr || first->First() != v) first = v;
+		Command<Commands::ConfigureVehicle>::Post(STR_ERROR_CAN_T_CONFIGURE_VEHICLE, v->tile, first->index, this->num_vehicles, static_cast<uint8_t>(widget - WID_VC_DROPDOWN), static_cast<uint8_t>(index));
 	}
 
 	/** The vehicle changed (a choice went through, or it was sold): read it again. */
@@ -143,7 +198,7 @@ struct VehicleConfigWindow : Window {
 			this->Close();
 			return;
 		}
-		this->ReadAspects(v->index);
+		this->ReadAspects();
 		this->ReInit();
 	}
 };
@@ -201,15 +256,34 @@ static WindowDesc _vehicle_config_desc(
 );
 
 /**
- * Open the configurator of a vehicle, or bring it to the front.
+ * Open the configurator of a vehicle, or bring it to the front, for the
+ * vehicles selected in the refit window.
  * @param v the vehicle, its front
  * @param parent the window it is opened from, which it closes with; the refit window
- * Nothing opens for a vehicle whose set offers no details.
+ * @param selected the first vehicle of the refit window's selection
+ * @param num_vehicles how many vehicles the selection has, as the refit counts them; UINT8_MAX for the whole
+ * Nothing opens for a vehicle no part of which has details.
  */
-void ShowVehicleConfigWindow(const Vehicle *v, Window *parent)
+void ShowVehicleConfigWindow(const Vehicle *v, Window *parent, VehicleID selected, uint8_t num_vehicles)
 {
 	if (v != v->First()) return;
 	/* Only a vehicle whose set offers details has a configurator. */
-	if (GetVehicleConfigAspects(v->engine_type).empty()) return;
-	AllocateWindowDescFront<VehicleConfigWindow>(_vehicle_config_desc, v->index, parent);
+	if (!VehicleHasConfig(v)) return;
+	VehicleConfigWindow *w = AllocateWindowDescFront<VehicleConfigWindow>(_vehicle_config_desc, v->index, parent, selected, num_vehicles);
+	if (w == nullptr) UpdateVehicleConfigWindowSelection(v->index, selected, num_vehicles);
+}
+
+/**
+ * The refit window's selection changed: the configurator open for the
+ * vehicle, if there is one, shows the selection's details now.
+ * @param front the vehicle, its front
+ * @param selected the first vehicle of the selection
+ * @param num_vehicles how many vehicles the selection has; UINT8_MAX for the whole
+ */
+void UpdateVehicleConfigWindowSelection(VehicleID front, VehicleID selected, uint8_t num_vehicles)
+{
+	VehicleConfigWindow *w = dynamic_cast<VehicleConfigWindow *>(FindWindowById(WindowClass::VehicleConfig, front));
+	if (w == nullptr) return;
+	w->SetSelection(selected, num_vehicles);
+	w->ReInit();
 }

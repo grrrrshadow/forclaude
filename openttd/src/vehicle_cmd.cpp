@@ -355,32 +355,55 @@ static CommandCost GetRefitCost(const Vehicle *v, EngineID engine_type, CargoTyp
 
 /**
  * Choose one of the details a vehicle's set offers on it (vehicle_config.h):
- * who pulls the hand cart, pushed or pulled, a stripe on a tanker, a colour.
- * The player's configurator. The cargo is the refit's business and stays;
- * like a refit this is for a vehicle stopped in a depot.
+ * who pulls the hand cart, pushed or pulled, a stripe on a tanker, a colour,
+ * the graffiti on a wagon. The player's configurator. The cargo is the
+ * refit's business and stays; like a refit this is for a vehicle stopped in
+ * a depot, and like a refit it takes the vehicles selected in the refit
+ * window: the choice goes to every one of them that carries choices of its
+ * own (VehicleConfigHead()) and whose set has the detail and the option.
  * @param flags type of operation
- * @param veh_id the vehicle, its front
+ * @param veh_id the first vehicle of the selection
+ * @param num_vehicles how many vehicles of the consist from it, as the refit counts them; UINT8_MAX for all
  * @param aspect which detail (0..)
  * @param option which of its options (0..)
  * @return the cost of this operation or an error
  */
-CommandCost CmdConfigureVehicle(DoCommandFlags flags, VehicleID veh_id, uint8_t aspect, uint8_t option)
+CommandCost CmdConfigureVehicle(DoCommandFlags flags, VehicleID veh_id, uint8_t num_vehicles, uint8_t aspect, uint8_t option)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
-	if (v == nullptr || !IsCompanyBuildableVehicleType(v) || v != v->First()) return CMD_ERROR;
+	if (v == nullptr || !IsCompanyBuildableVehicleType(v)) return CMD_ERROR;
+	Vehicle *front = v->First();
 
-	CommandCost ret = CheckOwnership(v->owner);
+	CommandCost ret = CheckOwnership(front->owner);
 	if (ret.Failed()) return ret;
 
-	if (v->vehstatus.Test(VehState::Crashed)) return CommandCost(STR_ERROR_VEHICLE_IS_DESTROYED);
-	if (!v->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAIN_MUST_BE_STOPPED_INSIDE_DEPOT + to_underlying(v->type));
+	if (front->vehstatus.Test(VehState::Crashed)) return CommandCost(STR_ERROR_VEHICLE_IS_DESTROYED);
+	if (!front->IsStoppedInDepot()) return CommandCost(STR_ERROR_TRAIN_MUST_BE_STOPPED_INSIDE_DEPOT + to_underlying(front->type));
 
-	std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(v->engine_type);
-	if (aspect >= aspects.size() || option >= aspects[aspect].options.size()) return CMD_ERROR;
+	/* The vehicles the choice is for: of a train the selection, of anything
+	 * else the whole, which is configured as one. */
+	std::vector<Vehicle *> heads;
+	if (front->type == VehicleType::Train) {
+		VehicleSet set;
+		GetVehicleSet(set, v, num_vehicles);
+		for (VehicleID id : set) {
+			Vehicle *u = Vehicle::Get(id);
+			if (VehicleConfigHead(u) == u) heads.push_back(u);
+		}
+	} else {
+		heads.push_back(front);
+	}
+
+	std::vector<Vehicle *> chosen;
+	for (Vehicle *u : heads) {
+		std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(u->engine_type);
+		if (aspect < aspects.size() && option < aspects[aspect].options.size()) chosen.push_back(u);
+	}
+	if (chosen.empty()) return CMD_ERROR;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		v->config_options[aspect] = option;
-		ApplyVehicleConfig(v);
+		for (Vehicle *u : chosen) u->config_options[aspect] = option;
+		ApplyVehicleConfig(front);
 	}
 	return CommandCost();
 }
@@ -1050,11 +1073,9 @@ std::tuple<CommandCost, VehicleID> CmdCloneVehicle(DoCommandFlags flags, TileInd
 
 
 	/* The details the player chose on the original -- who pulls the hand
-	 * cart, pushed or pulled -- go with the copy (vehicle_config.h). */
-	if (flags.Test(DoCommandFlag::Execute)) {
-		w_front->config_options = v_front->config_options;
-		ApplyVehicleConfig(w_front);
-	}
+	 * cart, pushed or pulled, the graffiti on each wagon -- go with the copy
+	 * (vehicle_config.h). */
+	if (flags.Test(DoCommandFlag::Execute)) CopyVehicleConfig(v_front, w_front);
 
 	/* Take care of refitting. */
 	w = w_front;

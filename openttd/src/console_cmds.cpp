@@ -8210,8 +8210,13 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
  * asks for choices that do not exist and for one on a vehicle that is not
  * stopped in a depot (refused), chooses through the window, and looks at the
  * refit window's configurator button on this vehicle (on) and on a vehicle of
- * a set without details (off). Anything that does not come out as promised is
- * written ODMITNUTO, which the battery counts. Usage: 'testkonfig'.
+ * a set without details (off). Then a train of the set's wagons in a rail
+ * depot: a choice made with one wagon selected goes to that wagon alone, its
+ * picture differs from the other's, a ninth detail reads in variable 5E, a
+ * choice on the whole train goes to every wagon, the train's configurator
+ * shows the wagon selected in the refit window, and a wagon uncoupled into a
+ * rake of its own keeps its choice. Anything that does not come out as
+ * promised is written ODMITNUTO, which the battery counts. Usage: 'testkonfig'.
  * @copydoc IConsoleCmdProc
  */
 static bool ConTestVehicleConfig(std::span<std::string_view> argv)
@@ -8302,7 +8307,7 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	RoadVehicle::From(v)->UpdateViewport(true, true);
 	SpriteID before = v->sprite_cache.sprite_seq.seq[0].sprite;
 	uint32_t var_before = GetVehicleConfigVariable(v, 0);
-	CommandCost r1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 1);
+	CommandCost r1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 1);
 	SpriteID after = v->sprite_cache.sprite_seq.seq[0].sprite;
 	uint32_t var_after = GetVehicleConfigVariable(v, 0);
 	IConsolePrint(CC_DEFAULT, "testkonfig: volba 0=1 {}, obrazek {} -> {}, promenna 5C {:#x} -> {:#x}", r1.Succeeded() ? "prosla" : "ODMITNUTA", before, after, var_before, var_after);
@@ -8311,18 +8316,18 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	if (var_after != 1) refuse(fmt::format("promenna 5C ma byt 1, je {:#x}", var_after));
 
 	/* Choices that do not exist, and a choice on a vehicle under way. */
-	CommandCost r2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 99);
-	CommandCost r3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 7, 0);
+	CommandCost r2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 99);
+	CommandCost r3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 7, 0);
 	if (r2.Succeeded() || r3.Succeeded()) refuse("volba mimo rozsah prosla");
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false);
-	CommandCost r4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 1, 1);
+	CommandCost r4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 1, 1);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false);
 	IConsolePrint(CC_DEFAULT, "testkonfig: mimo rozsah {} / {}, v jizde {}", r2.Succeeded() ? "prosla" : "odmitnuta", r3.Succeeded() ? "prosla" : "odmitnuta", r4.Succeeded() ? "prosla" : "odmitnuta");
 	if (r4.Succeeded()) refuse("volba na vozidle v jizde prosla");
 	if (!v->IsStoppedInDepot()) refuse("vozidlo po zastaveni nestoji v depu");
 
 	/* Through the window, as the player does it. */
-	ShowVehicleConfigWindow(v);
+	ShowVehicleConfigWindow(v, nullptr, v->index, UINT8_MAX);
 	Window *w = FindWindowById(WindowClass::VehicleConfig, v->index);
 	if (w == nullptr) {
 		refuse("okno konfiguratoru se neotevrelo");
@@ -8354,7 +8359,7 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	 * offers no details. */
 	if (rw != nullptr) rw->OnClick({0, 0}, WID_VR_MATRIX, 2);
 	if (rpw != nullptr) rpw->OnClick({0, 0}, WID_VR_MATRIX, 2);
-	ShowVehicleConfigWindow(pv);
+	ShowVehicleConfigWindow(pv, nullptr, pv->index, UINT8_MAX);
 	bool double_click = FindWindowById(WindowClass::VehicleConfig, v->index) != nullptr || FindWindowById(WindowClass::VehicleConfig, pv->index) != nullptr;
 	IConsolePrint(CC_DEFAULT, "testkonfig: dvojklik v seznamu prestavby a konfigurator bez sady: okno {}", double_click ? "SE OTEVRELO" : "zadne");
 	if (double_click) refuse("dvojklik v prestavbe nebo vozidlo bez sady otevrel konfigurator");
@@ -8363,9 +8368,97 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	if (rw != nullptr) rw->Close();
 	if (rpw != nullptr) rpw->Close();
 
-	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{} dvojklik={}", aspects.size(), options,
+	/* A wagon carries its own choices (VehicleConfigHead()): an engine and two
+	 * wagons of the set in a rail depot. Chosen on the second wagon alone, as
+	 * the refit window's selection would (that wagon, one vehicle), the
+	 * graffiti is on it and not on the first, which draws another picture;
+	 * chosen on the whole train it is on both; a ninth detail is read in
+	 * variable 5E. Uncoupled into a rake of its own the wagon keeps it, and the
+	 * configurator for the train shows whichever wagon is selected. */
+	EngineID loco = EngineID::Invalid(), wagon = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		const RailVehicleInfo &rvi = e->VehInfo<RailVehicleInfo>();
+		if (!rvi.railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (GetString(STR_ENGINE_NAME, e->index).find("konfig vagon") != std::string::npos) {
+			wagon = e->index;
+		} else if (loco == EngineID::Invalid() && rvi.railveh_type != RailVehicleType::Wagon) {
+			loco = e->index;
+		}
+	}
+	TileIndex rail_shed = INVALID_TILE;
+	for (TileIndex t : SpiralTileSequence(TileXY(Map::SizeX() / 2, Map::SizeY() / 2), 61)) {
+		if (TileX(t) + 2 >= Map::SizeX() || TileY(t) + 2 >= Map::SizeY() || !free(t)) continue;
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, t, RAILTYPE_RAIL, DiagDirection::NE).Succeeded()) {
+			rail_shed = t;
+			break;
+		}
+	}
+	uint32_t w1_var = 0, w2_var = 0, w2_var9 = 0, w1_both = 0, loose = 0;
+	bool wagon_pictures_differ = false, window_follows = false;
+	if (loco == EngineID::Invalid() || wagon == EngineID::Invalid() || rail_shed == INVALID_TILE) {
+		refuse(fmt::format("vlak: masinka {}, vagon 'konfig' {}, depo {}", loco == EngineID::Invalid() ? "neni" : "je", wagon == EngineID::Invalid() ? "neni" : "je", rail_shed == INVALID_TILE ? "nepostaveno" : "stoji"));
+	} else {
+		auto [c_loco, veh_loco, l1, l2, l3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, rail_shed, loco, true, INVALID_CARGO, ClientID::Invalid);
+		auto [c_w1, veh_w1, m1, m2, m3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, rail_shed, wagon, true, INVALID_CARGO, ClientID::Invalid);
+		auto [c_w2, veh_w2, n1, n2, n3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, rail_shed, wagon, true, INVALID_CARGO, ClientID::Invalid);
+		if (c_loco.Failed() || c_w1.Failed() || c_w2.Failed()) {
+			refuse(fmt::format("vlak: {} / {} / {}", RefusalReason(c_loco), RefusalReason(c_w1), RefusalReason(c_w2)));
+		} else {
+			Train *t = Train::Get(veh_loco);
+			Train *w1 = Train::Get(veh_w1);
+			Train *w2 = Train::Get(veh_w2);
+			CommandCost joined = Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, w1->index, t->Last()->index, true);
+			if (joined.Failed() || w2->First() != t) refuse(fmt::format("vagony se nepripojily: {}", RefusalReason(joined)));
+
+			/* The second wagon alone: the selection of one vehicle from it. */
+			CommandCost one = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, w2->index, 1, 0, 1);
+			w1_var = GetVehicleConfigVariable(w1, 0);
+			w2_var = GetVehicleConfigVariable(w2, 0);
+			SpriteID pic1 = w1->sprite_cache.sprite_seq.seq[0].sprite;
+			SpriteID pic2 = w2->sprite_cache.sprite_seq.seq[0].sprite;
+			wagon_pictures_differ = pic1 != pic2;
+			IConsolePrint(CC_DEFAULT, "testkonfig: vlak: grafiti na druhem vagonu {}: promenna 5C vagon 1 {:#x}, vagon 2 {:#x}, masinka {:#x}; obrazky {} a {}",
+					one.Succeeded() ? "prosla" : "ODMITNUTA", w1_var, w2_var, GetVehicleConfigVariable(t, 0), pic1, pic2);
+			if (one.Failed()) refuse(fmt::format("volba na vagonu odmitnuta: {}", RefusalReason(one)));
+			if (w2_var != 1 || w1_var != 0 || t->config_options[0] != 0) refuse("volba na druhem vagonu neni jen na nem");
+			if (!wagon_pictures_differ) refuse("vagony s jinou volbou maji stejny obrazek");
+
+			/* A ninth detail, read in variable 5E; and the whole train at once. */
+			CommandCost ninth = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, w2->index, 1, 8, 1);
+			w2_var9 = GetVehicleConfigVariable(w2, 8);
+			CommandCost both = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, t->index, UINT8_MAX, 0, 1);
+			w1_both = GetVehicleConfigVariable(w1, 0);
+			IConsolePrint(CC_DEFAULT, "testkonfig: vlak: devata podrobnost {}, promenna 5E vagon 2 {:#x}; cely vlak {}, vagon 1 {:#x}",
+					ninth.Succeeded() ? "prosla" : "ODMITNUTA", w2_var9, both.Succeeded() ? "prosel" : "ODMITNUT", w1_both);
+			if (ninth.Failed() || w2_var9 != 1) refuse("devata podrobnost se necte v promenne 5E");
+			if (both.Failed() || w1_both != 1) refuse("volba na celem vlaku nedosla na prvni vagon");
+
+			/* The configurator of the train follows the selection. */
+			ShowVehicleRefitWindow(t, INVALID_VEH_ORDER_ID, nullptr);
+			Window *trw = FindWindowById(WindowClass::VehicleRefit, t->index);
+			Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, w1->index, 1, 0, 0);
+			ShowVehicleConfigWindow(t, trw, w2->index, 1);
+			Window *tw = FindWindowById(WindowClass::VehicleConfig, t->index);
+			std::string on_w2 = tw != nullptr ? tw->GetWidgetString(WID_VC_DROPDOWN + 0, STR_NULL) : "ZADNE OKNO";
+			UpdateVehicleConfigWindowSelection(t->index, w1->index, 1);
+			std::string on_w1 = tw != nullptr ? tw->GetWidgetString(WID_VC_DROPDOWN + 0, STR_NULL) : "ZADNE OKNO";
+			window_follows = on_w2 == "Cmaranice" && on_w1 == "bez";
+			IConsolePrint(CC_DEFAULT, "testkonfig: vlak: okno u vagonu 2 '{}', u vagonu 1 '{}'", on_w2, on_w1);
+			if (!window_follows) refuse("konfigurator vlaku nesleduje vybrany vagon");
+			if (trw != nullptr) trw->Close();
+
+			/* Uncoupled into a rake of its own, the wagon keeps its graffiti. */
+			CommandCost apart = Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, w2->index, VehicleID::Invalid(), false);
+			loose = GetVehicleConfigVariable(w2, 0);
+			IConsolePrint(CC_DEFAULT, "testkonfig: vlak: vagon 2 odpojen {}, sam {}, promenna 5C {:#x}", apart.Succeeded() ? "ano" : "NE", w2->First() == w2 ? "ano" : "ne", loose);
+			if (apart.Failed() || w2->First() != w2 || loose != 1) refuse("odpojeny vagon neudrzel svou volbu");
+		}
+	}
+
+	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{} dvojklik={} vagony={}/{}/{} devata={} vlak={} okno={} odpojeny={}", aspects.size(), options,
 			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v, 0), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly",
-			double_click ? "konfigurator" : "prestavba");
+			double_click ? "konfigurator" : "prestavba", w1_var, w2_var, wagon_pictures_differ ? "ruzne" : "stejne", w2_var9, w1_both, window_follows ? "sleduje" : "ne", loose);
 	return true;
 }
 
@@ -8478,10 +8571,10 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	if (DescribeTrueColourSprite(first) == "bez barev") refuse("obrazek postaveneho vozidla neni v barvach");
 
 	/* Other colours: white cab, blue body, the black radiator, the beacon on. */
-	CommandCost c0 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 1);
-	CommandCost c1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 1, 1);
-	CommandCost c2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 2, 0);
-	CommandCost c4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 4, 1);
+	CommandCost c0 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 1);
+	CommandCost c1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 1, 1);
+	CommandCost c2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 2, 0);
+	CommandCost c4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 4, 1);
 	if (c0.Failed() || c1.Failed() || c2.Failed() || c4.Failed()) refuse("volba barvy odmitnuta");
 	SpriteID second = picture();
 	std::string second_colours = DescribeEngineTrueColours(v->engine_type, v->config_options);
@@ -8492,7 +8585,7 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	if (second == first || second_colours == first_colours) refuse("obrazek nebo barvy se po volbe nezmenily");
 
 	/* The cab in the company colour: an option the set gives no colour for. */
-	CommandCost c3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 3);
+	CommandCost c3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 3);
 	SpriteID third = picture();
 	std::string third_colours = DescribeEngineTrueColours(v->engine_type, v->config_options);
 	IConsolePrint(CC_DEFAULT, "testbarvy: kabina firemni: {}", third_colours);
@@ -8507,7 +8600,7 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	/* The configurator from the refit window: eight rows, five shown, gone with the refit window. */
 	ShowVehicleRefitWindow(v, INVALID_VEH_ORDER_ID, nullptr);
 	Window *rw = FindWindowById(WindowClass::VehicleRefit, v->index);
-	ShowVehicleConfigWindow(v, rw);
+	ShowVehicleConfigWindow(v, rw, v->index, UINT8_MAX);
 	Window *w = FindWindowById(WindowClass::VehicleConfig, v->index);
 	uint shown = 0;
 	bool closed = false;

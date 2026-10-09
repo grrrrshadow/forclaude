@@ -401,9 +401,14 @@ without FIRS 5, where 1.1.0 plays as it is.
 (`docs/decouple_vehicle_config.md`): a road vehicle whose set names two
 details for the player to choose -- a crew of three and a cart of two --
 through callback 1C0, and draws another picture for any choice but the
-first, by variable 5C. Written the way the colleague writes his sets, so that
-the test runs the very recipe his sets use; its pictures are zin8 only, as
-his are.
+first, by variable 5C. And a wagon with nine details -- graffiti of two
+options, seven of one, a ninth of two read in variable 5E -- since a wagon
+carries its own choices and keeps them through uncoupling (the set's
+`VehicleConfigHead()`); `testkonfig` chooses on one wagon of a train, on the
+whole train, uncouples the wagon and watches the train's configurator follow
+the refit window's selection. Written the way the colleague writes his sets,
+so that the test runs the very recipe his sets use; its pictures are zin8
+only, as his are.
 
 `barvy` plays `grf/barvy.yagl`, the set for the colours of the configurator
 (`docs/decouple_vehicle_config.md`, `src/true_colour.h`): a road vehicle with

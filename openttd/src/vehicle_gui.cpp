@@ -1029,7 +1029,7 @@ struct RefitWindow : public Window {
 	{
 		this->auto_refit = auto_refit;
 		this->order = order;
-		this->has_config = !GetVehicleConfigAspects(v->engine_type).empty();
+		this->has_config = VehicleHasConfig(v);
 		this->CreateNestedTree();
 
 		this->vscroll = this->GetScrollbar(WID_VR_SCROLLBAR);
@@ -1240,6 +1240,9 @@ struct RefitWindow : public Window {
 				Vehicle *v = Vehicle::Get(this->window_number);
 				this->selected_vehicle = v->index;
 				this->num_vehicles = UINT8_MAX;
+				/* Other wagons, other details to choose (vehicle_config.h). */
+				this->has_config = VehicleHasConfig(v);
+				if (gui_scope) UpdateVehicleConfigWindowSelection(this->window_number, this->selected_vehicle, this->num_vehicles);
 				[[fallthrough]];
 			}
 
@@ -1346,6 +1349,7 @@ struct RefitWindow : public Window {
 				NWidgetBase *nwi = this->GetWidget<NWidgetBase>(WID_VR_VEHICLE_PANEL_DISPLAY);
 				this->click_x = GetClickPosition(pt.x - nwi->pos_x);
 				this->SetSelectedVehicles(pt.x - nwi->pos_x);
+				UpdateVehicleConfigWindowSelection(this->window_number, this->selected_vehicle, this->num_vehicles);
 				this->SetWidgetDirty(WID_VR_VEHICLE_PANEL_DISPLAY);
 				if (!_ctrl_pressed) {
 					SetObjectToPlaceWnd(SPR_CURSOR_MOUSE, PAL_NONE, HT_DRAG, this);
@@ -1356,8 +1360,8 @@ struct RefitWindow : public Window {
 				break;
 			}
 
-			case WID_VR_DETAILS: // the configurator
-				ShowVehicleConfigWindow(Vehicle::Get(this->window_number), this);
+			case WID_VR_DETAILS: // the configurator, for the vehicles selected
+				ShowVehicleConfigWindow(Vehicle::Get(this->window_number), this, this->selected_vehicle, this->num_vehicles);
 				break;
 
 			case WID_VR_MATRIX: { // listbox
@@ -1391,6 +1395,7 @@ struct RefitWindow : public Window {
 				if (this->order != INVALID_VEH_ORDER_ID) break;
 				NWidgetBase *nwi = this->GetWidget<NWidgetBase>(WID_VR_VEHICLE_PANEL_DISPLAY);
 				this->SetSelectedVehicles(pt.x - nwi->pos_x);
+				UpdateVehicleConfigWindowSelection(this->window_number, this->selected_vehicle, this->num_vehicles);
 				this->SetWidgetDirty(WID_VR_VEHICLE_PANEL_DISPLAY);
 				break;
 			}
@@ -1404,6 +1409,7 @@ struct RefitWindow : public Window {
 				if (this->order != INVALID_VEH_ORDER_ID) break;
 				NWidgetBase *nwi = this->GetWidget<NWidgetBase>(WID_VR_VEHICLE_PANEL_DISPLAY);
 				this->SetSelectedVehicles(pt.x - nwi->pos_x);
+				UpdateVehicleConfigWindowSelection(this->window_number, this->selected_vehicle, this->num_vehicles);
 				this->InvalidateData(2);
 				break;
 			}

@@ -309,8 +309,8 @@ public:
 	VehicleCargoList cargo{}; ///< The cargo this vehicle is carrying
 	CargoType cargo_type{}; ///< type of cargo this vehicle is carrying
 	uint8_t cargo_subtype = 0; ///< Used for livery refits (NewGRF variations)
-	std::array<uint8_t, 8> config_options{}; ///< The option the player chose for each detail the vehicle's set offers (vehicle_config.h); kept on the front.
-	mutable uint16_t true_colours = 0; ///< The colours of its set this part is drawn in (true_colour.h), made from the front's config_options when asked (GetVehicleTrueColours()); not saved.
+	std::array<uint8_t, 16> config_options{}; ///< The option the player chose for each detail the vehicle's set offers (vehicle_config.h); kept on the vehicle configured as one (VehicleConfigHead()): the tractor, the wagon.
+	mutable uint16_t true_colours = 0; ///< The colours of its set this part is drawn in (true_colour.h), made from its head's config_options when asked (GetVehicleTrueColours()); not saved.
 	mutable uint16_t true_colours_epoch = 0; ///< true_colours is good while this is GetTrueColourEpoch(); 0 after the player chose anew.
 	uint16_t cargo_cap = 0; ///< total capacity
 	uint16_t refit_cap = 0; ///< Capacity left over from before last refit.

@@ -383,7 +383,7 @@ static CommandCost BuildReplacementVehicle(Vehicle *old_veh, Vehicle **new_vehic
 	 * chose on it (vehicle_config.h); another model has details of its own
 	 * and starts with the first option of each. */
 	if (new_veh->engine_type == old_veh->engine_type) {
-		new_veh->config_options = old_veh->First()->config_options;
+		new_veh->config_options = VehicleConfigHead(old_veh)->config_options;
 		ApplyVehicleConfig(new_veh);
 	}
 

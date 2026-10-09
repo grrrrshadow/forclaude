@@ -1644,7 +1644,9 @@ echo "cztrbezfirs: vymena=$(grep -c 'plays in place of' $S/reg_cztrbezfirs.log) 
 # and variable 5C follow), asks for choices that do not exist and for one on
 # a vehicle under way (refused), chooses through the window, and looks at the
 # refit window's Configurator button (on for the set's vehicle, off for a
-# vehicle without details). odmitnuto is zero.
+# vehicle without details); then on a train of the set's wagons: the choice
+# goes to the wagon selected and stays on it uncoupled, a ninth detail reads
+# in variable 5E, the configurator follows the selection. odmitnuto is zero.
 KONF_CFG=$S/konfig_openttd.cfg
 sed '/^\[newgrf\]$/a konfig.grf = ' "$CFG_KEEP" > $KONF_CFG
 run_scene konfig "testkonfig" 30 -c $KONF_CFG

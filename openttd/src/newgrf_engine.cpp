@@ -629,9 +629,11 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 
 		/* Variables which use the parameter */
 		case 0x5C: // The details the player chose on this vehicle, 0 to 3 (vehicle_config.h); ours
-		case 0x5D: // and 4 to 7
+		case 0x5D: // 4 to 7
+		case 0x5E: // 8 to 11
+		case 0x5F: // 12 to 15
 			if (!object->ro.grffile->vehicle_config) break;
-			return GetVehicleConfigVariable(v, variable == 0x5D ? 4 : 0);
+			return GetVehicleConfigVariable(v, (variable - 0x5C) * 4);
 
 		case 0x60: // Count consist's engine ID occurrence
 			if (v->type != VehicleType::Train) return v->GetEngine()->grf_prop.local_id == parameter ? 1 : 0;
@@ -1039,6 +1041,8 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			case 0x4B: return TimerGameCalendar::date.base(); // Long date of last service
 			case 0x5C: // The details the player chose (vehicle_config.h): none yet, this is the purchase list
 			case 0x5D:
+			case 0x5E:
+			case 0x5F:
 				if (!this->ro.grffile->vehicle_config) break;
 				return 0;
 

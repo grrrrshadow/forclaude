@@ -425,6 +425,7 @@ enum class SaveLoadVersion : uint16_t {
 	MarijuanaPlantationCare, ///< Saveload version: 371\n The marijuana plantation remembers how long the girls have tended it and how long until it is bare again (Industry::plantation_care, plantation_days_left).
 	VehicleConfigOptions, ///< Saveload version: 372\n The option the player chose for each detail a vehicle's set offers (Vehicle::config_options, the configurator).
 	VehicleConfigEight, ///< Saveload version: 373\n Eight details a set may offer on a vehicle instead of four, room for the colours of cab, body and radiator (Vehicle::config_options).
+	VehicleConfigPerWagon, ///< Saveload version: 374\n Sixteen details, and a wagon of a train carries its own choices instead of reading its engine's (Vehicle::config_options, VehicleConfigHead()).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

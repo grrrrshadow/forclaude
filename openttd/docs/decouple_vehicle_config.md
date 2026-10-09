@@ -5,7 +5,7 @@ in `src/vehicle_config.h`, `vehicle_config.cpp`, `vehicle_config_gui.cpp`, the
 colours in `src/true_colour.h`, `true_colour.cpp`; test sets
 `tests/rig/grf/konfig.yagl` and `tests/rig/grf/barvy.yagl`, written in yagl.*
 
-A set may offer, on a vehicle, up to eight **details** the player chooses in
+A set may offer, on a vehicle, up to sixteen **details** the player chooses in
 the game, each with up to 32 named **options**: who pulls the hand cart (College
 Girl, Female Girl, an alien), whether the cart is pushed or pulled, the paint of
 the cab, of the body, of the radiator. The game knows nothing of what a
@@ -29,11 +29,21 @@ as refitted. The details are an addition to the refit, not a replacement.
   (`Commands::ConfigureVehicle`); each choice goes to the vehicle at once and
   the vehicle is drawn anew. No picture of the vehicle in the window. The
   configurator closes with the refit window it was opened from.
-- A cloned vehicle takes the original's choices; a vehicle renewed with the
-  same model keeps them; a replacement by another model starts with the first
-  options.
+- **Who carries the choices.** A road vehicle is configured as one: the
+  tractor carries the choices, the trailer (an articulated part) follows it.
+  A train's wagon carries its own, and so does its engine: a wagon changes
+  engines and keeps its paint and its graffiti through every shunt, uncoupling
+  and coupling (the player: "a wagon has another engine every minute"). The
+  configurator opened from a train's refit window sets the wagons **selected
+  there**, as a refit does: the whole train when nothing is selected, else the
+  selection, and shows the details of the first selected that has any. A
+  choice goes to every selected wagon whose set has that detail and option.
+- A cloned vehicle takes the original's choices, wagon by wagon; a vehicle
+  renewed with the same model keeps them; a replacement by another model
+  starts with the first options.
 - The choices are saved with the vehicle (`Vehicle::config_options`: four
-  from savegame version 372, eight from 373).
+  from savegame version 372, eight from 373, sixteen and per wagon from 374;
+  the wagons of an older game take their engine's).
 
 ## In the set
 
@@ -70,7 +80,7 @@ vehicle's engine (no vehicle, as in the purchase list) with **variable 0x10**:
 
 | bits 8..15 | bits 0..7 | asks for |
 |---|---|---|
-| detail *a* (0..7) | **0xFF** | the name of detail *a* |
+| detail *a* (0..15) | **0xFF** | the name of detail *a* |
 | detail *a* | option *o* (0..31) | the name of option *o* of detail *a* |
 
 The result is a **text**: result `n` (`0x8000 | n` in the Action 2) is text
@@ -111,15 +121,16 @@ switch<RoadVehicles, 0x04, PrimaryDWord> // callbacks
 Names are in the player's language if the set has them (Action 4 with a
 language), as any other text.
 
-### 3. Read the choice: variables 0x5C and 0x5D
+### 3. Read the choice: variables 0x5C to 0x5F
 
 In any Action 2 of the vehicle -- graphics, other callbacks -- variable
 **0x5C** (dword) holds the player's choices for details 0 to 3: **byte *a* is
-the option chosen for detail *a*** (0 = the first option). Variable **0x5D**
-holds details 4 to 7 the same way: its byte 0 is detail 4, byte 3 detail 7. In
-the purchase list both are 0. They are read from the vehicle's front for every
-part of the vehicle, so an articulated vehicle's parts all see the same
-choices.
+the option chosen for detail *a*** (0 = the first option). Variables **0x5D**,
+**0x5E** and **0x5F** hold details 4 to 7, 8 to 11 and 12 to 15 the same way:
+0x5D's byte 0 is detail 4, 0x5E's byte 0 detail 8, 0x5F's byte 3 detail 15. In
+the purchase list all are 0. A part reads the choices of the vehicle that
+carries them: a wagon or an engine its own, an articulated part its head's, a
+road vehicle's trailer the tractor's.
 
 ```
 switch<RoadVehicles, 0x02, PrimaryDWord> // the picture by the crew and the cart
@@ -251,14 +262,14 @@ colour of the palette.
 
 ## Limits and rules
 
-- At most 8 details, 32 options each. More are not read.
+- At most 16 details, 32 options each. More are not read.
 - A detail's options are a list in the set's order; the player's choice is
   the index. A release of the set that reorders or removes options changes
   what saved vehicles show; add new options at the end.
 - The names are asked whenever the game needs them (purchase list, refit
   window, configurator); keep the callback cheap and without side effects.
-- The choice is kept on the vehicle's front; the set's graphics for every part
-  read the same value.
+- The choice is kept on the wagon, the engine or the tractor; the set's
+  graphics for its articulated parts and the trailer read the same value.
 - A colour detail paints eight mask indices in a row from the one the set
   gives, never the animated colours of the palette (0xE3 and up).
 - The colours are asked once for each engine and choice and kept until the

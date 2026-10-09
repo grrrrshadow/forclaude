@@ -27,6 +27,7 @@
 #include "../roadveh.h"
 #include "../roadveh_cmd.h"
 #include "../train.h"
+#include "../vehicle_config.h"
 #include "../station_base.h"
 #include "../waypoint_base.h"
 #include "../roadstop_base.h"
@@ -3917,6 +3918,15 @@ bool AfterLoadGame()
 	if (IsSavegameVersionBefore(SaveLoadVersion::MarijuanaPlantationCare)) {
 		extern void GrantPlantationsOfOldGames();
 		GrantPlantationsOfOldGames();
+	}
+
+	/* The choices of the configurator were kept on a train's engine and read
+	 * by every wagon; now each wagon has its own (vehicle_config.h). The
+	 * wagons of an old game take their engine's, so that they look as they did. */
+	if (IsSavegameVersionBefore(SaveLoadVersion::VehicleConfigPerWagon)) {
+		for (Train *t : Train::Iterate()) {
+			if (t->IsFrontEngine()) CopyVehicleConfig(t, t);
+		}
 	}
 
 	/* Loading is over. Left at the last marker it passed, the whereabouts in a

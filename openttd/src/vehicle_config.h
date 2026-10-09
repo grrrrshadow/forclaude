@@ -17,9 +17,15 @@
  * (CBID_VEHICLE_DECOUPLE_CONFIG_TEXT), the player picks one option per
  * detail in the configurator window (vehicle_config_gui.cpp) and the game
  * keeps the choice on the vehicle (Vehicle::config_options) and reads it
- * back to the set in variables 5C (details 0 to 3) and 5D (4 to 7), a byte
- * per detail. What the set draws or does with that is the set's own:
- * docs/decouple_vehicle_config.md.
+ * back to the set in variables 5C (details 0 to 3), 5D (4 to 7), 5E (8 to
+ * 11) and 5F (12 to 15), a byte per detail. What the set draws or does with
+ * that is the set's own: docs/decouple_vehicle_config.md.
+ *
+ * The choices are kept on the vehicle that is configured as one
+ * (VehicleConfigHead()): a road vehicle with its trailer on the tractor, a
+ * wagon of a train on the wagon itself, since a wagon changes engines and
+ * keeps its paint and its graffiti (the player: "a wagon has another engine
+ * every minute"); articulated parts follow their head.
  *
  * A detail may be a colour: the paint of the cab, of the body, of the
  * radiator. The set then says through callback 1C1
@@ -35,8 +41,8 @@
 #include "vehicle_type.h"
 #include "window_type.h"
 
-/** How many details a set may offer on one vehicle: a byte each in variables 5C and 5D. */
-static constexpr uint VEHICLE_CONFIG_MAX_ASPECTS = 8;
+/** How many details a set may offer on one vehicle: a byte each in variables 5C, 5D, 5E and 5F. */
+static constexpr uint VEHICLE_CONFIG_MAX_ASPECTS = 16;
 /** How many options a detail may have. */
 static constexpr uint VEHICLE_CONFIG_MAX_OPTIONS = 32;
 
@@ -50,9 +56,14 @@ struct VehicleConfigAspect {
 using VehicleConfigOptions = std::array<uint8_t, VEHICLE_CONFIG_MAX_ASPECTS>;
 
 std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine);
+const struct Vehicle *VehicleConfigHead(const struct Vehicle *v);
+struct Vehicle *VehicleConfigHead(struct Vehicle *v);
+bool VehicleHasConfig(const struct Vehicle *front);
 uint32_t GetVehicleConfigVariable(const struct Vehicle *v, uint first);
-void ApplyVehicleConfig(struct Vehicle *front);
-void ShowVehicleConfigWindow(const struct Vehicle *v, struct Window *parent = nullptr);
+void ApplyVehicleConfig(struct Vehicle *head);
+void CopyVehicleConfig(const struct Vehicle *from_front, struct Vehicle *to_front);
+void ShowVehicleConfigWindow(const struct Vehicle *v, struct Window *parent, VehicleID selected, uint8_t num_vehicles);
+void UpdateVehicleConfigWindowSelection(VehicleID front, VehicleID selected, uint8_t num_vehicles);
 
 uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options);
 uint16_t GetVehicleTrueColours(const struct Vehicle *v);

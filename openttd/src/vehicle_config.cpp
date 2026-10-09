@@ -83,20 +83,75 @@ std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine)
 }
 
 /**
- * What the set reads in variable 5C or 5D: byte i is the option the player
- * chose for detail first + i. Kept on the vehicle's front, since the whole
- * vehicle is configured as one, and read from there for every part.
+ * The vehicle that carries the choices for a part: the one configured as
+ * one. A train's wagon or engine carries its own, since a wagon changes
+ * engines and keeps its paint and its graffiti (the player: "a wagon has
+ * another engine every minute"); its articulated parts follow it. A road
+ * vehicle's trailer follows the tractor, a ship and an aircraft are one.
+ * @param v any part of a vehicle
+ * @return the part that carries the choices
+ */
+const Vehicle *VehicleConfigHead(const Vehicle *v)
+{
+	if (v->type == VehicleType::Train) {
+		const Train *t = Train::From(v);
+		if (t->IsRearDualheaded()) t = t->other_multiheaded_part;
+		return t->GetFirstEnginePart();
+	}
+	return v->First();
+}
+
+Vehicle *VehicleConfigHead(Vehicle *v)
+{
+	return const_cast<Vehicle *>(VehicleConfigHead(static_cast<const Vehicle *>(v)));
+}
+
+/**
+ * Does any part of a vehicle have details to choose: the refit window's
+ * Configurator button is lit for it.
+ * @param front the vehicle's front
+ */
+bool VehicleHasConfig(const Vehicle *front)
+{
+	for (const Vehicle *u = front; u != nullptr; u = u->Next()) {
+		if (VehicleConfigHead(u) != u) continue;
+		if (!GetVehicleConfigAspects(u->engine_type).empty()) return true;
+	}
+	return false;
+}
+
+/**
+ * What the set reads in variable 5C, 5D, 5E or 5F: byte i is the option the
+ * player chose for detail first + i. Read from the part that carries the
+ * choices (VehicleConfigHead()), the same for every part of it.
  * @param v any part of the vehicle
- * @param first the first of the four details: 0 for variable 5C, 4 for 5D
+ * @param first the first of the four details: 0 for variable 5C, 4 for 5D, 8 for 5E, 12 for 5F
  */
 uint32_t GetVehicleConfigVariable(const Vehicle *v, uint first)
 {
-	const Vehicle *front = v->First();
+	const Vehicle *head = VehicleConfigHead(v);
 	uint32_t result = 0;
 	for (uint i = 0; i < 4; i++) {
-		result |= static_cast<uint32_t>(front->config_options[first + i]) << (8 * i);
+		result |= static_cast<uint32_t>(head->config_options[first + i]) << (8 * i);
 	}
 	return result;
+}
+
+/**
+ * Give a vehicle the choices of another, part by part: a clone takes the
+ * original's, a wagon of an old game its engine's (AfterLoadGame()). The two
+ * are walked together; where one is shorter the rest keeps what it has.
+ * @param from_front the vehicle to take the choices from, its front
+ * @param to_front the vehicle to give them to, its front
+ */
+void CopyVehicleConfig(const Vehicle *from_front, Vehicle *to_front)
+{
+	const Vehicle *from = from_front;
+	for (Vehicle *to = to_front; to != nullptr && from != nullptr; to = to->Next(), from = from->Next()) {
+		if (VehicleConfigHead(to) != to) continue;
+		to->config_options = VehicleConfigHead(from)->config_options;
+	}
+	ApplyVehicleConfig(to_front);
 }
 
 /**
@@ -176,15 +231,16 @@ uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &optio
 
 /**
  * The colours a part of a vehicle is drawn in: its engine's in the options
- * chosen on the vehicle's front. Kept on the part until the player chooses
- * anew (ApplyVehicleConfig()) or the sets are read anew.
+ * chosen on the part that carries them (VehicleConfigHead()). Kept on the
+ * part until the player chooses anew (ApplyVehicleConfig()) or the sets are
+ * read anew.
  * @param v the part
  * @return the colours (InternTrueColourSet()); 0 for none
  */
 uint16_t GetVehicleTrueColours(const Vehicle *v)
 {
 	if (v->true_colours_epoch == GetTrueColourEpoch()) return v->true_colours;
-	v->true_colours = GetEngineTrueColours(v->engine_type, v->First()->config_options);
+	v->true_colours = GetEngineTrueColours(v->engine_type, VehicleConfigHead(v)->config_options);
 	v->true_colours_epoch = GetTrueColourEpoch();
 	return v->true_colours;
 }
@@ -211,11 +267,14 @@ std::string DescribeEngineTrueColours(EngineID engine, const VehicleConfigOption
 /**
  * The details changed: the set is to draw the vehicle anew. A vehicle
  * standing in a depot is not asked for its pictures again until it moves, so
- * every part is asked here, and the windows showing it redrawn.
- * @param front the vehicle's front
+ * every part is asked here, and the windows showing it redrawn. The whole
+ * consist is done over, whichever part changed: a wagon's choice may be read
+ * by its neighbours too.
+ * @param v any part of the vehicle
  */
-void ApplyVehicleConfig(Vehicle *front)
+void ApplyVehicleConfig(Vehicle *v)
 {
+	Vehicle *front = v->First();
 	for (Vehicle *u = front; u != nullptr; u = u->Next()) {
 		u->InvalidateNewGRFCache();
 		u->true_colours_epoch = 0;
