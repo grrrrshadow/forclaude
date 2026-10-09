@@ -50,6 +50,10 @@ struct TrueColourRange {
 	uint8_t aged_b = 0; ///< Blue of it.
 	uint8_t age_years = 0; ///< Over how many years from new it fades to that; 0 for a paint that does not fade.
 	uint8_t age_step = 1; ///< In steps of how many years it moves (1, or 3: "every one or three years").
+	bool hue = false; ///< The detail is not painted but turned: its pixels keep their own hues, moved round by hue_turn, their saturation and value scaled (ShiftTrueColourHue()). A heap of marijuana to hay.
+	int8_t hue_turn = 0; ///< How far round the hues go, in 256ths of a turn (-50 is -70 degrees).
+	uint8_t hue_sat = 128; ///< Saturation, in 128ths (96 is three quarters).
+	uint8_t hue_val = 128; ///< Value, in 128ths (192 is half as much again).
 
 	bool operator==(const TrueColourRange &) const = default;
 };
@@ -62,6 +66,7 @@ static constexpr uint32_t TRUE_COLOUR_LIGHT_DEFAULT = 128 | 255 << 8 | 128 << 16
 
 void SetTrueColourLight(TrueColourRange &range, uint32_t light);
 TrueColourRange AgeTrueColour(const TrueColourRange &range, uint years);
+Colour ShiftTrueColourHue(const TrueColourRange &range, Colour colour);
 Colour ShadeTrueColour(const TrueColourRange &range, uint8_t lightness);
 uint8_t TrueColourLightness(const TrueColourRange &range, uint8_t m, uint8_t r, uint8_t g, uint8_t b, bool rgb);
 

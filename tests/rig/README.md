@@ -426,6 +426,10 @@ the colour itself, the light row of the body #F7C8AF in the default orange
 cab's orange fades to brick red over two years in steps of one (registers 102
 to 104; the player's sets will take twenty): the probe sets the vehicle's age
 and reads #CE5A2D at a year, #B4503C at two and after, orange again at none.
+A sixth detail, unnamed in 1C0, is a green patch on the body (mask 0x70-0x77)
+the set turns rather than paints (register 101 = 1) and colours itself by the
+cargo (option FE, asked with the vehicle): carrying passengers it is hay,
+#F0EF69, refitted to mail it is green as drawn, #28A03C.
 
 `getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,

@@ -77,9 +77,9 @@ void CopyVehicleConfig(const struct Vehicle *from_front, struct Vehicle *to_fron
 void ShowVehicleConfigWindow(const struct Vehicle *v, struct Window *parent, VehicleID selected, uint8_t num_vehicles);
 void UpdateVehicleConfigWindowSelection(VehicleID front, VehicleID selected, uint8_t num_vehicles);
 
-uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years = 0);
+uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years = 0, const struct Vehicle *v = nullptr);
 uint16_t GetVehicleTrueColours(const struct Vehicle *v);
-std::string DescribeEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years = 0);
+std::string DescribeEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years = 0, const struct Vehicle *v = nullptr);
 std::string DescribeVehicleTrueColours(const struct Vehicle *v);
 
 #endif /* VEHICLE_CONFIG_H */

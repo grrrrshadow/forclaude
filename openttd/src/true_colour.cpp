@@ -65,7 +65,8 @@ TrueColourRange AgeTrueColour(const TrueColourRange &range, uint years)
 	aged.aged_r = aged.aged_g = aged.aged_b = 0;
 	aged.age_years = 0;
 	aged.age_step = 1;
-	if (range.age_years == 0) return aged;
+	/* A turned detail does not fade: there is no one colour to fade. */
+	if (range.age_years == 0 || range.hue) return aged;
 	const uint step = std::max<uint>(1, range.age_step);
 	const uint gone = std::min<uint>(years, range.age_years) / step * step;
 	auto toward = [&](uint8_t from, uint8_t to) {
@@ -75,6 +76,55 @@ TrueColourRange AgeTrueColour(const TrueColourRange &range, uint years)
 	aged.g = toward(range.g, range.aged_g);
 	aged.b = toward(range.b, range.aged_b);
 	return aged;
+}
+
+/**
+ * A pixel of a turned detail (TrueColourRange::hue): the pixel's own colour
+ * with its hue moved round by the detail's turn, its saturation and value
+ * scaled -- the colleague's way of making hay of a heap of marijuana (the
+ * greens toward straw, less saturated, lighter), kept pixel by pixel so the
+ * leaves, the flowers and the stalks stay their own shades. The player: "a
+ * shift of hue; the shades inside the heap stay".
+ * @param range the detail
+ * @param colour the pixel's colour
+ * @return the pixel's colour turned
+ */
+Colour ShiftTrueColourHue(const TrueColourRange &range, Colour colour)
+{
+	const double r = colour.r / 255.0, g = colour.g / 255.0, b = colour.b / 255.0;
+	const double mx = std::max({r, g, b}), mn = std::min({r, g, b}), d = mx - mn;
+	double h = 0.0;
+	if (d > 1e-9) {
+		if (mx == r) {
+			h = std::fmod((g - b) / d, 6.0);
+			if (h < 0) h += 6.0;
+		} else if (mx == g) {
+			h = (b - r) / d + 2.0;
+		} else {
+			h = (r - g) / d + 4.0;
+		}
+	}
+	double s = mx > 0 ? d / mx : 0.0;
+	double v = mx;
+
+	h = std::fmod(h + range.hue_turn * 6.0 / 256.0 + 6.0, 6.0);
+	s = std::min(1.0, s * range.hue_sat / 128.0);
+	v = std::min(1.0, v * range.hue_val / 128.0);
+
+	const double c = v * s;
+	const double x = c * (1.0 - std::abs(std::fmod(h, 2.0) - 1.0));
+	const double m = v - c;
+	double rr = 0, gg = 0, bb = 0;
+	switch (static_cast<int>(h)) {
+		case 0: rr = c; gg = x; break;
+		case 1: rr = x; gg = c; break;
+		case 2: gg = c; bb = x; break;
+		case 3: gg = x; bb = c; break;
+		case 4: rr = x; bb = c; break;
+		default: rr = c; bb = x; break;
+	}
+	auto byte = [&](double f) { return static_cast<uint8_t>(Clamp<int>(static_cast<int>((f + m) * 255.0 + 0.5), 0, 255)); };
+	return Colour(byte(rr), byte(gg), byte(bb), colour.a);
 }
 
 /**

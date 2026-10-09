@@ -8493,7 +8493,9 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
  * and says what the game makes of it: the details, the colours of each
  * detail as the set gives them (callback 1C1), the picture painted in them
  * (its painted pixels and their commonest colours, read in 32bpp), in the
- * purchase list and on the vehicle; ages the vehicle by hand and watches the
+ * purchase list and on the vehicle; refits it from passengers to mail and
+ * back and watches the heap the set turns to hay by the cargo (option FE) go
+ * green again; ages the vehicle by hand and watches the
  * cab's orange fade to brick red year by year and come back new; then
  * chooses other colours, a detail that
  * is no colour (the company colour) and the beacon of variable 5D, reads the
@@ -8596,6 +8598,26 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	if (first_colours != bought) refuse("postavene vozidlo ma jine barvy nez nakup");
 	if (DescribeTrueColourSprite(first) == "bez barev") refuse("obrazek postaveneho vozidla neni v barvach");
 
+	/* The heap on the body, a sixth detail the set turns rather than paints,
+	 * and colours itself by the cargo (option FE, asked with the vehicle):
+	 * carrying passengers it is hay, the green patch turned to straw; refitted
+	 * to mail it is as the option says, unturned, green as drawn. */
+	std::string heap_pax = DescribeVehicleTrueColours(v);
+	std::string heap_pax_pic = DescribeTrueColourSprite(picture());
+	CommandCost to_mail = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, v->index, GetCargoTypeByLabel(CT_MAIL), 0, false, false, 0));
+	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
+	std::string heap_mail = DescribeVehicleTrueColours(v);
+	std::string heap_mail_pic = DescribeTrueColourSprite(picture());
+	CommandCost back = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, v->index, GetCargoTypeByLabel(CT_PASSENGERS), 0, false, false, 0));
+	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi: {}", heap_pax);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi obrazek: {}", heap_pax_pic);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s postou ({}): {}", to_mail.Succeeded() ? "prestaveno" : "PRESTAVBA ODMITNUTA", heap_mail);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s postou obrazek: {}", heap_mail_pic);
+	bool heap_ok = to_mail.Succeeded() && back.Succeeded() && heap_pax.find("otoceni -50 sytost 96/128 jas 192/128") != std::string::npos
+			&& heap_mail.find("otoceni 0 sytost 128/128 jas 128/128") != std::string::npos && heap_pax_pic.find("#28A03C") == std::string::npos && heap_mail_pic.find("#28A03C") != std::string::npos;
+	if (!heap_ok) refuse("kupa podle nakladu: s cestujicimi ma byt otocena na seno (-50, 96, 192) a bez #28A03C, s postou neotocena a zelena #28A03C");
+
 	/* The cab's orange fades to brick red over two years in steps of one: at
 	 * a year half way (#CE5A2D), at two years and from then on brick red
 	 * (#B4503C), each a picture of its own; new again, the orange. The age is
@@ -8672,9 +8694,9 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 		}
 	}
 
-	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} sad={} obrazku={}", aspects.size(),
+	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} sad={} obrazku={}", aspects.size(),
 			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
-			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
+			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
 	return true;
 }
 

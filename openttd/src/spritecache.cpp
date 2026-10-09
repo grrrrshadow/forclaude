@@ -552,7 +552,8 @@ static uint PaintTrueColours(SpriteLoader::SpriteCollection &sprite, ZoomLevels 
 			if (p->m == 0) continue;
 			for (const TrueColourRange &range : colours) {
 				if (p->m < range.first || p->m >= range.first + TRUE_COLOUR_RANGE_SIZE) continue;
-				const Colour c = ShadeTrueColour(range, TrueColourLightness(range, p->m, p->r, p->g, p->b, rgb));
+				if (range.hue && !rgb) break; // a palette picture has no hues of its own to turn
+				const Colour c = range.hue ? ShiftTrueColourHue(range, Colour(p->r, p->g, p->b)) : ShadeTrueColour(range, TrueColourLightness(range, p->m, p->r, p->g, p->b, rgb));
 				if (indexed) {
 					p->m = GetNearestColourIndex(c.r, c.g, c.b);
 				} else {

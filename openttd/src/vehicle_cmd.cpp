@@ -656,6 +656,9 @@ std::tuple<CommandCost, uint, uint16_t, CargoArray> CmdRefitVehicle(DoCommandFla
 
 			default: NOT_REACHED();
 		}
+		/* A colour the set picks by the cargo (vehicle_config.h): the picture
+		 * asked for anew, since a standing vehicle is not asked until it turns. */
+		for (Vehicle *u = front; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
 		front->MarkDirty();
 
 		if (!free_wagon) {

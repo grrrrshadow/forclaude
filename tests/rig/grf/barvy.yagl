@@ -11,6 +11,10 @@
 // otherwise (register 101). The cab's last option and the crew are no colour:
 // The cab's Tatra orange fades with age to brick red over two years in steps
 // of one (registers 102 to 104), the rig's short span of the player's twenty.
+// A sixth detail, unnamed in 1C0, is a heap on the body (mask 0x70-0x77, a
+// green patch) that is turned rather than painted (register 101 = 1): the
+// set itself makes it hay when the vehicle carries passengers (option FE by
+// variable 47), and leaves it as the option says, unturned, for other cargo.
 // the cab is then the company colour, as drawn. The beacon is detail 4, read
 // in variable 5D. The pictures are grey 32bpp with a mask, zin8 only:
 // flat areas at the lightness where each colour is exactly itself, a row at
@@ -52,6 +56,7 @@ properties<RoadVehicles, 0x0058> // Action00
         reliability_decay_speed: 20;
         climate_availability: Temperate | Arctic | Tropical | Toyland;
         cargo_type: 0x00;
+        refittable_cargo_classes: 0x0003;
         cargo_capacity: 0x10;
         loading_speed: 0x02;
         sprite_id: 0xFF;
@@ -355,7 +360,61 @@ switch<RoadVehicles, 0x18, PrimaryDWord> // body: paints mask 0x60-0x67, lighten
     };
     default: 0x8060;
 }
-switch<RoadVehicles, 0x19, PrimaryDWord> // the colours (callback 1C1, variable 10): the mask of a detail (option FF), the colour of an option
+switch<RoadVehicles, 0x1A, PrimaryDWord> // heap: paints 0x70-0x77 turned, not painted (register 101 = 1)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00000001;
+        value2 = variable[0x1A] & 0x00000101;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x8070;
+    };
+    default: 0x8070;
+}
+switch<RoadVehicles, 0x1B, PrimaryDWord> // heap option 0: no turn (turn 0, saturation 128, value 128 in register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00008080;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x1C, PrimaryDWord> // heap carrying passengers: hay -- hues turned by -50 (-70 degrees), saturation 96/128, value 192/128
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00CE60C0;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x1D, PrimaryDWord> // the heap's colour by the cargo (option FE, asked with the vehicle): passengers (class bit 0) hay, anything else as the option says
+{
+    expression:
+    {
+        value1 = variable[0x47] & 0x00FF0000;
+    };
+    ranges:
+    {
+        0x00010000: 0x001C;
+    };
+    default: 0x8400;
+}
+switch<RoadVehicles, 0x19, PrimaryDWord> // the colours (callback 1C1, variable 10): the mask of a detail (option FF), the colour of an option, the set's own by the cargo (option FE)
 {
     expression:
     {
@@ -363,6 +422,9 @@ switch<RoadVehicles, 0x19, PrimaryDWord> // the colours (callback 1C1, variable 
     };
     ranges:
     {
+        0x000005FF: 0x001A;
+        0x00000500: 0x001B;
+        0x000005FE: 0x001D;
         0x000000FF: 0x80C6;
         0x000001FF: 0x0018;
         0x000002FF: 0x8068;
