@@ -30,6 +30,7 @@ struct SpriteCache {
 	bool warned = false; ///< True iff the user has been warned about incorrect use of this sprite
 	SpriteCacheCtrlFlags control_flags{}; ///< Control flags, see SpriteCacheCtrlFlags
 	SpriteID green_load_empty = 0; ///< For a loaded vehicle drawn with a green load (SetGreenLoadSprite()): the same vehicle empty, whose difference from this one is the load; GREEN_LOAD_WHOLE for a set's load layer drawn green whole (SetGreenLayerSprite()).
+	uint16_t true_colours = 0; ///< For a vehicle drawn in the colours of its set (SetTrueColourSprite()): the colours, a set of true_colour.h; 0 for a picture as it is.
 
 	void ClearSpriteData();
 };

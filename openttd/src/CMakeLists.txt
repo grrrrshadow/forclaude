@@ -574,6 +574,8 @@ add_files(
     tree_cmd.h
     tree_gui.cpp
     tree_map.h
+    true_colour.cpp
+    true_colour.h
     tunnel_map.cpp
     tunnel_map.h
     tunnelbridge.h

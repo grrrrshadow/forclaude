@@ -1,0 +1,388 @@
+// The rig's set for the colours of the game's configurator (vehicle_config.h,
+// true_colour.h). A road vehicle whose set names five details -- the cab, the
+// body and the radiator are colours, the crew and a beacon are not -- through
+// callback 1C0, and gives the colours through callback 1C1: for each colour
+// detail the first of the eight mask indices it paints (option 0xFF), and for
+// each option its colour as 0x00RRGGBB in register 100 (result 40F). The cab
+// paints the company colour's indices 0xC6-0xCD and lightens as usual; the
+// body paints 0x60-0x67 and gives the player's three numbers of its
+// lightening in register 100 (start 100, stop 200, 255 at the lightest were
+// there no stop); the radiator paints 0x68-0x6F, its black option lightens
+// otherwise (register 101). The cab's last option and the crew are no colour:
+// the cab is then the company colour, as drawn. The beacon is detail 4, read
+// in variable 5D. The pictures are grey 32bpp with a mask, zin8 only:
+// flat areas at the lightness where each colour is exactly itself, a row at
+// 254 and one darker, so the rig can read the colours back.
+// Written in the colleague's yagl dialect, as konfig.yagl.
+//     yagl -e <out>/barvy.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14: the feature test, answered on bit 9 of 0x9D
+{
+    FTST: 
+    {
+        NAME: default, "decouple_vehicle_config";
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x09 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGb";
+    version: GRF8;
+    name: "Rig: barvy";
+    description: "Colours for the configurator: cab, body, radiator";
+}
+if_act7 (is_bit_set(global_var[0x9D] & 0xFF, 1 << 9)) // Action07: the game answered, skip the error
+{
+    skip_sprites: 0x01;
+}
+error_message<Fatal, default, 0xFF> // Action0B
+{
+    message: "Tento GRF patri ke hre OpenTTD decouple by Karel Macha a jinde nefunguje.";
+}
+properties<RoadVehicles, 0x0058> // Action00
+{
+    {
+        long_introduction_date: date(1920/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        cargo_type: 0x00;
+        cargo_capacity: 0x10;
+        loading_speed: 0x02;
+        sprite_id: 0xFF;
+        speed_2_kmh: 0x30;
+        power_10_hp: 0x01;
+        weight_quarter_tons: 0x04;
+        cost_factor: 0x08;
+        running_cost_factor: 0x04;
+        running_cost_base: 0x00004C48;
+        callback_flags_mask: 0x00;
+    }
+}
+strings<RoadVehicles, default, 0x0058> // Action04: the vehicle's name
+{
+    /* 0x0058 */ "Rig: barvy vuz";
+}
+strings<RoadVehicles, default, 0xD000*> // Action04: the configurator's texts, D000..D011
+{
+    /* 0xD000 */ "Kabina";
+    /* 0xD001 */ "Tatra oranzova";
+    /* 0xD002 */ "Bila";
+    /* 0xD003 */ "Cervena";
+    /* 0xD004 */ "Firemni";
+    /* 0xD005 */ "Nastavba";
+    /* 0xD006 */ "Tatra oranzova";
+    /* 0xD007 */ "Modra";
+    /* 0xD008 */ "Zelena";
+    /* 0xD009 */ "Chladic";
+    /* 0xD00A */ "Cerny";
+    /* 0xD00B */ "Chrom";
+    /* 0xD00C */ "Posadka";
+    /* 0xD00D */ "Jeden";
+    /* 0xD00E */ "Dva";
+    /* 0xD00F */ "Majak";
+    /* 0xD010 */ "bez majaku";
+    /* 0xD011 */ "s majakem";
+}
+sprite_sets<RoadVehicles, 0x0000> // Action01: set 0 without the beacon, set 1 with it
+{
+    sprite_set // 0x0000
+    {
+        sprite_id<0x00000001>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000002>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000003>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000004>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000005>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000006>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000007>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+        sprite_id<0x00000008>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [8, 8], "barvy-mask-zin8.png", [8, 8];
+        }
+    }
+    sprite_set // 0x0001
+    {
+        sprite_id<0x00000009>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x0000000A>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x0000000B>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x0000000C>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x0000000D>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x0000000E>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x0000000F>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+        sprite_id<0x00000010>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
+        }
+    }
+}
+sprite_groups<RoadVehicles, 0x00> // Action02 basic: set 0
+{
+    primary_spritesets: [ 0x0000 ];
+    secondary_spritesets: [ 0x0000 ];
+}
+sprite_groups<RoadVehicles, 0x01> // Action02 basic: set 1
+{
+    primary_spritesets: [ 0x0001 ];
+    secondary_spritesets: [ 0x0001 ];
+}
+switch<RoadVehicles, 0x02, PrimaryDWord> // the picture by the beacon, detail 4 (variable 5D, its first byte)
+{
+    expression:
+    {
+        value1 = variable[0x5D] & 0x000000FF;
+    };
+    ranges:
+    {
+        0x00000000: 0x0000;
+    };
+    default: 0x0001;
+}
+switch<RoadVehicles, 0x03, PrimaryDWord> // the texts of the configurator (callback 1C0, variable 10)
+{
+    expression:
+    {
+        value1 = variable[0x10] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000000FF: 0x8000;
+        0x00000000: 0x8001;
+        0x00000001: 0x8002;
+        0x00000002: 0x8003;
+        0x00000003: 0x8004;
+        0x000001FF: 0x8005;
+        0x00000100: 0x8006;
+        0x00000101: 0x8007;
+        0x00000102: 0x8008;
+        0x000002FF: 0x8009;
+        0x00000200: 0x800A;
+        0x00000201: 0x800B;
+        0x000003FF: 0x800C;
+        0x00000300: 0x800D;
+        0x00000301: 0x800E;
+        0x000004FF: 0x800F;
+        0x00000400: 0x8010;
+        0x00000401: 0x8011;
+    };
+    default: 0x8400;
+}
+switch<RoadVehicles, 0x10, PrimaryDWord> // cab: Tatra orange (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00E8641E;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x11, PrimaryDWord> // cab: white (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00F0F0F0;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x12, PrimaryDWord> // cab: red (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00C81E1E;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x13, PrimaryDWord> // body: Tatra orange (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00E8641E;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x14, PrimaryDWord> // body: blue (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x001E50C8;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x15, PrimaryDWord> // body: green (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x002D8C3C;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x16, PrimaryDWord> // radiator: black, lightening of its own in register 101: start 128, stop 255, 200 at the lightest (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00141414;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00C8FF80;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000101;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x17, PrimaryDWord> // radiator: chrome (register 100)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00C0C0C8;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x18, PrimaryDWord> // body: paints mask 0x60-0x67, lightening in register 100: start 100, stop 200, 255 at the lightest were there no stop
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00FFC864;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x8060;
+    };
+    default: 0x8060;
+}
+switch<RoadVehicles, 0x19, PrimaryDWord> // the colours (callback 1C1, variable 10): the mask of a detail (option FF), the colour of an option
+{
+    expression:
+    {
+        value1 = variable[0x10] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000000FF: 0x80C6;
+        0x000001FF: 0x0018;
+        0x000002FF: 0x8068;
+        0x00000000: 0x0010;
+        0x00000001: 0x0011;
+        0x00000002: 0x0012;
+        0x00000100: 0x0013;
+        0x00000101: 0x0014;
+        0x00000102: 0x0015;
+        0x00000200: 0x0016;
+        0x00000201: 0x0017;
+    };
+    default: 0x8400;
+}
+switch<RoadVehicles, 0x04, PrimaryDWord> // the callbacks
+{
+    expression:
+    {
+        value1 = variable[0x0C] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000001C0: 0x0003;
+        0x000001C1: 0x0019;
+    };
+    default: 0x0002;
+}
+feature_graphics<RoadVehicles> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x0004;
+    feature_ids: [ 0x0058 ];
+    cargo_types:
+    {
+        0xFF: 0x0004;
+    };
+}

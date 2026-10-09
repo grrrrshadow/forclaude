@@ -424,6 +424,7 @@ enum class SaveLoadVersion : uint16_t {
 	ZoomIn16x, ///< Saveload version: 370\n The zoom levels gained In16x in front of 8x: the saved view is one level further along and twice as far in virtual coordinates once more.
 	MarijuanaPlantationCare, ///< Saveload version: 371\n The marijuana plantation remembers how long the girls have tended it and how long until it is bare again (Industry::plantation_care, plantation_days_left).
 	VehicleConfigOptions, ///< Saveload version: 372\n The option the player chose for each detail a vehicle's set offers (Vehicle::config_options, the configurator).
+	VehicleConfigEight, ///< Saveload version: 373\n Eight details a set may offer on a vehicle instead of four, room for the colours of cab, body and radiator (Vehicle::config_options).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

@@ -12,13 +12,20 @@
  * trailer. The cargo is the refit's business and stays whatever is chosen here.
  *
  * The game knows nothing of what a detail means. A set that asked for the
- * feature 'decouple_vehicle_config' (newgrf_act14.cpp) names up to four
+ * feature 'decouple_vehicle_config' (newgrf_act14.cpp) names up to eight
  * details on a vehicle and the options of each through callback 1C0
  * (CBID_VEHICLE_DECOUPLE_CONFIG_TEXT), the player picks one option per
  * detail in the configurator window (vehicle_config_gui.cpp) and the game
  * keeps the choice on the vehicle (Vehicle::config_options) and reads it
- * back to the set in variable 5C, a byte per detail. What the set draws or
- * does with that is the set's own: docs/decouple_vehicle_config.md.
+ * back to the set in variables 5C (details 0 to 3) and 5D (4 to 7), a byte
+ * per detail. What the set draws or does with that is the set's own:
+ * docs/decouple_vehicle_config.md.
+ *
+ * A detail may be a colour: the paint of the cab, of the body, of the
+ * radiator. The set then says through callback 1C1
+ * (CBID_VEHICLE_DECOUPLE_CONFIG_COLOUR) which mask indices of its pictures
+ * the detail paints and the colour of each option, exact, and the game draws
+ * the vehicle in the colours chosen (true_colour.h).
  */
 
 #ifndef VEHICLE_CONFIG_H
@@ -26,9 +33,10 @@
 
 #include "engine_type.h"
 #include "vehicle_type.h"
+#include "window_type.h"
 
-/** How many details a set may offer on one vehicle: a byte each in variable 5C. */
-static constexpr uint VEHICLE_CONFIG_MAX_ASPECTS = 4;
+/** How many details a set may offer on one vehicle: a byte each in variables 5C and 5D. */
+static constexpr uint VEHICLE_CONFIG_MAX_ASPECTS = 8;
 /** How many options a detail may have. */
 static constexpr uint VEHICLE_CONFIG_MAX_OPTIONS = 32;
 
@@ -38,9 +46,16 @@ struct VehicleConfigAspect {
 	std::vector<std::string> options; ///< Its options in the set's order ("College Girl", "Female Girl"); a new vehicle has the first.
 };
 
+/** The options chosen, detail by detail (Vehicle::config_options). */
+using VehicleConfigOptions = std::array<uint8_t, VEHICLE_CONFIG_MAX_ASPECTS>;
+
 std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine);
-uint32_t GetVehicleConfigVariable(const struct Vehicle *v);
+uint32_t GetVehicleConfigVariable(const struct Vehicle *v, uint first);
 void ApplyVehicleConfig(struct Vehicle *front);
-void ShowVehicleConfigWindow(const struct Vehicle *v);
+void ShowVehicleConfigWindow(const struct Vehicle *v, struct Window *parent = nullptr);
+
+uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options);
+uint16_t GetVehicleTrueColours(const struct Vehicle *v);
+std::string DescribeEngineTrueColours(EngineID engine, const VehicleConfigOptions &options);
 
 #endif /* VEHICLE_CONFIG_H */

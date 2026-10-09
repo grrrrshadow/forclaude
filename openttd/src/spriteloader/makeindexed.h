@@ -12,6 +12,8 @@
 
 #include "spriteloader.hpp"
 
+void Convert32bppTo8bpp(SpriteLoader::Sprite &sprite);
+
 /** Sprite loader for converting graphics coming from another source. */
 class SpriteLoaderMakeIndexed : public SpriteLoader {
 	SpriteLoader &baseloader;

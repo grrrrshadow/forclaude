@@ -405,6 +405,19 @@ first, by variable 5C. Written the way the colleague writes his sets, so that
 the test runs the very recipe his sets use; its pictures are zin8 only, as
 his are.
 
+`barvy` plays `grf/barvy.yagl`, the set for the colours of the configurator
+(`docs/decouple_vehicle_config.md`, `src/true_colour.h`): a road vehicle with
+five details, of which the cab, the body and the radiator are colours given
+through callback 1C1 -- the first of the eight mask indices each paints
+(0xC6, 0x60, 0x68), the colour of each option as 0x00RRGGBB in register 100,
+the player's three numbers of lightening in register 100 of a detail or 101
+of an option -- and a beacon drawn by detail 4, in variable 5D. Its pictures
+(`barvy-zin8.png` and the mask `barvy-mask-zin8.png`) are grey with flat areas
+at the lightness where each colour is exactly itself, a row at 254 and one
+darker, so `testbarvy` can read the painted colours back: the commonest is
+the colour itself, the light row of the body #F7C8AF in the default orange
+(lightening stopped at 200, 100/155 of the way to white at most 255).
+
 `getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
 as GETS does.

@@ -19,7 +19,7 @@
  * Convert in place a 32bpp sprite to 8bpp.
  * @param sprite Sprite to convert.
  */
-static void Convert32bppTo8bpp(SpriteLoader::Sprite &sprite)
+void Convert32bppTo8bpp(SpriteLoader::Sprite &sprite)
 {
 	const auto *pixel_end = sprite.data + sprite.width * sprite.height;
 	for (auto *pixel = sprite.data; pixel != pixel_end; ++pixel) {

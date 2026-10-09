@@ -1366,7 +1366,7 @@ struct RefitWindow : public Window {
 			}
 
 			case WID_VR_DETAILS: // the configurator
-				ShowVehicleConfigWindow(Vehicle::Get(this->window_number));
+				ShowVehicleConfigWindow(Vehicle::Get(this->window_number), this);
 				break;
 
 			case WID_VR_REFIT: // refit button

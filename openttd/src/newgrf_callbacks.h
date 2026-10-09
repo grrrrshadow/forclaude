@@ -304,6 +304,9 @@ enum CallbackID : uint16_t {
 	 * feature 'decouple_vehicle_config'.
 	 */
 	CBID_VEHICLE_DECOUPLE_CONFIG_TEXT    = 0x01C0, // 15 bit callback
+
+	/** The colours of the configurator (vehicle_config.h, ours): which mask indices a detail paints, and the colour of each of its options, exact, in register 0x100. */
+	CBID_VEHICLE_DECOUPLE_CONFIG_COLOUR  = 0x01C1, // 15 bit callback
 };
 
 /**

@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "vehicle_config.h"
+#include "true_colour.h"
 #include "debug.h"
 #include "train.h"
 #include "roadveh.h"
@@ -627,8 +628,10 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			return v->grf_cache.position_in_vehicle;
 
 		/* Variables which use the parameter */
-		case 0x5C: // The details the player chose on this vehicle (vehicle_config.h); ours
-			return GetVehicleConfigVariable(v);
+		case 0x5C: // The details the player chose on this vehicle, 0 to 3 (vehicle_config.h); ours
+		case 0x5D: // and 4 to 7
+			if (!object->ro.grffile->vehicle_config) break;
+			return GetVehicleConfigVariable(v, variable == 0x5D ? 4 : 0);
 
 		case 0x60: // Count consist's engine ID occurrence
 			if (v->type != VehicleType::Train) return v->GetEngine()->grf_prop.local_id == parameter ? 1 : 0;
@@ -1034,7 +1037,10 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			case 0x48: return Engine::Get(this->self_type)->flags.base(); // Vehicle Type Info
 			case 0x49: return TimerGameCalendar::year.base(); // 'Long' format build year
 			case 0x4B: return TimerGameCalendar::date.base(); // Long date of last service
-			case 0x5C: return 0; // The details the player chose (vehicle_config.h): none yet, this is the purchase list
+			case 0x5C: // The details the player chose (vehicle_config.h): none yet, this is the purchase list
+			case 0x5D:
+				if (!this->ro.grffile->vehicle_config) break;
+				return 0;
 
 			case 0x7A: return GetBadgeVariableResult(*this->ro.grffile, Engine::Get(this->self_type)->badges, parameter);
 
@@ -1174,6 +1180,13 @@ static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction d
 			result->count++;
 		}
 		if (!HasBit(reg100, 31)) break;
+	}
+
+	/* In the colours the player chose (vehicle_config.h), the default ones in
+	 * the purchase list; asked only now, the registers above all read. */
+	uint16_t colours = v != nullptr ? GetVehicleTrueColours(v) : GetEngineTrueColours(engine, {});
+	for (uint i = 0; colours != 0 && i < result->count; i++) {
+		result->seq[i].sprite = TrueColourSprite(result->seq[i].sprite, colours);
 	}
 }
 

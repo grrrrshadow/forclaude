@@ -62,6 +62,8 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr);
 static constexpr SpriteID GREEN_LOAD_WHOLE = UINT32_MAX;
 void SetGreenLoadSprite(SpriteID sprite, SpriteID full, SpriteID empty);
 void SetGreenLayerSprite(SpriteID sprite, SpriteID layer);
+bool SetTrueColourSprite(SpriteID sprite, SpriteID original, uint16_t colours);
+std::string DescribeTrueColourSprite(SpriteID sprite);
 std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 
 size_t GetSpriteCacheBytesUsed();

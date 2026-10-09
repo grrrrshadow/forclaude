@@ -110,12 +110,12 @@ enum VehicleConfigWidgets : WidgetID {
 	WID_VC_NONE_SEL, ///< Selection: the line below, when the set offers nothing.
 	WID_VC_NONE,     ///< Text: the set offers no details.
 	WID_VC_CARGO,    ///< Text: the cargo, which the refit window changes.
-	WID_VC_ROW,      ///< Selection: the first detail's row; three more follow (WID_VC_ROW + 1 ...).
-	WID_VC_ROW_END = WID_VC_ROW + 4, ///< One past the last row.
-	WID_VC_LABEL = WID_VC_ROW_END,   ///< Text: the first detail's name; three more follow.
-	WID_VC_LABEL_END = WID_VC_LABEL + 4, ///< One past the last name.
-	WID_VC_DROPDOWN = WID_VC_LABEL_END,  ///< Dropdown: the first detail's options; three more follow.
-	WID_VC_DROPDOWN_END = WID_VC_DROPDOWN + 4, ///< One past the last dropdown.
+	WID_VC_ROW,      ///< Selection: the first detail's row; seven more follow (WID_VC_ROW + 1 ...), VEHICLE_CONFIG_MAX_ASPECTS in all.
+	WID_VC_ROW_END = WID_VC_ROW + 8, ///< One past the last row.
+	WID_VC_LABEL = WID_VC_ROW_END,   ///< Text: the first detail's name; seven more follow.
+	WID_VC_LABEL_END = WID_VC_LABEL + 8, ///< One past the last name.
+	WID_VC_DROPDOWN = WID_VC_LABEL_END,  ///< Dropdown: the first detail's options; seven more follow.
+	WID_VC_DROPDOWN_END = WID_VC_DROPDOWN + 8, ///< One past the last dropdown.
 };
 
 #endif /* WIDGETS_VEHICLE_WIDGET_H */

@@ -20,6 +20,7 @@
 #include "spritecache.h"
 #include "spritecache_internal.h"
 #include "palette_func.h"
+#include "true_colour.h"
 
 #include "table/sprites.h"
 #include "table/palette_convert.h"
@@ -527,6 +528,47 @@ static void *ReadRecolourSprite(SpriteFile &file, size_t file_pos, uint num, Spr
 	return dest;
 }
 
+/**
+ * Paint a vehicle's picture in the colours of its set (SetTrueColourSprite()):
+ * every pixel whose mask index is one of a detail's, in the detail's colour,
+ * as light or dark as the grey picture is there (ShadeTrueColour()). The
+ * pixel is then its colour and no longer a mask index, so no blitter and no
+ * company colour changes it again.
+ * @param sprite the picture, as read
+ * @param avail the zoom levels read
+ * @param colours the colours
+ * @param rgb whether the picture was read in 32bpp, its pixels lit by their red, green and blue (TrueColourLightness())
+ * @param indexed whether the picture stays 8 bits: the pixel is then the nearest colour of the palette
+ * @return how many pixels were painted, over all zoom levels
+ */
+static uint PaintTrueColours(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, const TrueColourSet &colours, bool rgb, bool indexed)
+{
+	uint painted = 0;
+	for (ZoomLevel zoom : avail) {
+		SpriteLoader::Sprite &s = sprite[zoom];
+		if (s.data == nullptr) continue;
+		SpriteLoader::CommonPixel *end = s.data + static_cast<size_t>(s.width) * s.height;
+		for (SpriteLoader::CommonPixel *p = s.data; p != end; ++p) {
+			if (p->m == 0) continue;
+			for (const TrueColourRange &range : colours) {
+				if (p->m < range.first || p->m >= range.first + TRUE_COLOUR_RANGE_SIZE) continue;
+				const Colour c = ShadeTrueColour(range, TrueColourLightness(range, p->m, p->r, p->g, p->b, rgb));
+				if (indexed) {
+					p->m = GetNearestColourIndex(c.r, c.g, c.b);
+				} else {
+					p->r = c.r;
+					p->g = c.g;
+					p->b = c.b;
+					p->m = 0;
+				}
+				painted++;
+				break;
+			}
+		}
+	}
+	return painted;
+}
+
 /** A sprite as loaded, copied out of the loader's shared buffers. */
 struct LoadedSpriteCopy {
 	uint16_t width = 0;
@@ -545,7 +587,7 @@ struct LoadedSpriteCopy {
  * @param encoder the encoder, for whether 32bpp sprites are wanted
  * @return the copies, empty where the zoom level is not there
  */
-static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc, SpriteType sprite_type, SpriteEncoder *encoder)
+static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc, SpriteType sprite_type, SpriteEncoder *encoder, const TrueColourSet *colours = nullptr)
 {
 	SpriteCollMap<LoadedSpriteCopy> copies;
 	SpriteLoader::SpriteCollection empty;
@@ -554,7 +596,10 @@ static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc,
 	ZoomLevels avail_32bpp;
 	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
 	if (encoder->Is32BppSupported()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	const bool rgb = avail.Any();
 	if (avail.None()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, false, sc->control_flags, avail_8bpp, avail_32bpp);
+	/* In the same colours as the loaded vehicle, or every painted pixel would differ and be load. */
+	if (colours != nullptr) PaintTrueColours(empty, avail, *colours, rgb, !encoder->Is32BppSupported());
 	for (ZoomLevel zoom : avail) {
 		const SpriteLoader::Sprite &s = empty[zoom];
 		LoadedSpriteCopy &copy = copies[zoom];
@@ -638,28 +683,42 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 
 	Debug(sprite, 9, "Load sprite {}", id);
 
+	/* A vehicle in the colours of its set (SetTrueColourSprite()). */
+	const TrueColourSet *colours = sc->true_colours != 0 ? &GetTrueColourSet(sc->true_colours) : nullptr;
+
 	/* A loaded vehicle with its load drawn green reads its empty self first,
 	 * since the loader's buffers are shared (SetGreenLoadSprite()). */
 	SpriteCollMap<LoadedSpriteCopy> green_load_empty;
 	bool green_whole = sc->green_load_empty == GREEN_LOAD_WHOLE;
-	if (sc->green_load_empty != 0 && !green_whole) green_load_empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), sprite_type, encoder);
+	if (sc->green_load_empty != 0 && !green_whole) green_load_empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), sprite_type, encoder, colours);
 
 	SpriteLoader::SpriteCollection sprite;
 	ZoomLevels sprite_avail;
 	ZoomLevels avail_8bpp;
 	ZoomLevels avail_32bpp;
+	bool painted = false;
 
 	SpriteLoaderGrf sprite_loader(file.GetContainerVersion());
 	if (sprite_type != SpriteType::MapGen && encoder->Is32BppSupported()) {
 		/* Try for 32bpp sprites first. */
 		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
 	}
+	const bool read_32bpp = sprite_avail.Any();
 	if (sprite_avail.None()) {
 		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, false, sc->control_flags, avail_8bpp, avail_32bpp);
 		if (sprite_type == SpriteType::Normal && avail_32bpp.Any() && !encoder->Is32BppSupported() && sprite_avail.None()) {
-			/* No 8bpp available, try converting from 32bpp. */
-			SpriteLoaderMakeIndexed make_indexed(sprite_loader);
-			sprite_avail = make_indexed.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->control_flags, sprite_avail, avail_32bpp);
+			if (colours != nullptr) {
+				/* Painted in 32bpp, from the grey's lightness, and only then
+				 * made 8bpp: the palette's nearest to each painted pixel. */
+				sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
+				PaintTrueColours(sprite, sprite_avail, *colours, true, false);
+				for (ZoomLevel zoom : sprite_avail) Convert32bppTo8bpp(sprite[zoom]);
+				painted = true;
+			} else {
+				/* No 8bpp available, try converting from 32bpp. */
+				SpriteLoaderMakeIndexed make_indexed(sprite_loader);
+				sprite_avail = make_indexed.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->control_flags, sprite_avail, avail_32bpp);
+			}
 		}
 	}
 
@@ -698,6 +757,9 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 		return s;
 	}
 
+	/* The colours first, the green load over them: a load layer is green
+	 * whole, and the empty vehicle it is told from is painted alike. */
+	if (colours != nullptr && !painted) PaintTrueColours(sprite, sprite_avail, *colours, read_32bpp, !encoder->Is32BppSupported());
 	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty, green_whole);
 
 	if (!ResizeSprites(sprite, sprite_avail, encoder)) {
@@ -911,6 +973,7 @@ bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id)
 	sc->warned = false;
 	sc->control_flags = control_flags;
 	sc->green_load_empty = 0;
+	sc->true_colours = 0;
 
 	return true;
 }
@@ -929,6 +992,31 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr)
 	scnew->warned = false;
 	scnew->control_flags = scold->control_flags;
 	scnew->green_load_empty = 0;
+	scnew->true_colours = scold->true_colours;
+}
+
+/**
+ * Make a sprite a vehicle's picture in the colours of its set: the picture
+ * 'original' over again, with the pixels of each detail the colours paint in
+ * its colour (PaintTrueColours()), made when the sprite is read
+ * (ReadSprite()). A loaded vehicle with its load drawn green stays one.
+ * @param sprite the sprite to make
+ * @param original the picture as the set draws it
+ * @param colours the colours (InternTrueColourSet())
+ * @return whether it was made: only a picture read from a file can be
+ */
+bool SetTrueColourSprite(SpriteID sprite, SpriteID original, uint16_t colours)
+{
+	if (original >= _spritecache.size()) return false;
+	const SpriteCache *sco = GetSpriteCache(original);
+	if (sco->file == nullptr || sco->type != SpriteType::Normal) return false;
+	const SpriteID green_load_empty = sco->green_load_empty;
+
+	DupSprite(original, sprite);
+	SpriteCache *sc = GetSpriteCache(sprite);
+	sc->green_load_empty = green_load_empty;
+	sc->true_colours = colours;
+	return true;
 }
 
 /**
@@ -995,6 +1083,54 @@ std::pair<uint, uint> GreenLoadPixels(SpriteID sprite)
 		}
 	}
 	return {DrawLoadGreen(full, avail, empty, whole), drawn};
+}
+
+/**
+ * For the rig: read a vehicle's picture in colours (SetTrueColourSprite())
+ * the way the game does, in 32bpp whatever the blitter, and tell what it
+ * paints: the picture it is made from, the pixels painted at the largest zoom
+ * level, and the colours they come out in, the commonest first.
+ * @param sprite the sprite
+ * @return the description, one line
+ */
+std::string DescribeTrueColourSprite(SpriteID sprite)
+{
+	if (sprite >= _spritecache.size()) return "neni";
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->true_colours == 0 || sc->file == nullptr) return "bez barev";
+
+	SpriteLoader::SpriteCollection coll;
+	ZoomLevels avail;
+	ZoomLevels avail_8bpp;
+	ZoomLevels avail_32bpp;
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	avail = loader.LoadSprite(coll, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	bool bpp32 = avail.Any();
+	if (!bpp32) avail = loader.LoadSprite(coll, *sc->file, sc->file_pos, SpriteType::Normal, false, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (avail.None()) return "nejde precist";
+
+	ZoomLevel top = ZoomLevel::Min;
+	while (!avail.Test(top)) ++top;
+	ZoomLevels one{top};
+	const SpriteLoader::Sprite &s = coll[top];
+	const size_t n = static_cast<size_t>(s.width) * s.height;
+	/* A painted pixel is its colour and no longer a mask index. */
+	std::vector<uint8_t> masked(n);
+	for (size_t i = 0; i < n; i++) masked[i] = s.data[i].m;
+	uint painted = PaintTrueColours(coll, one, GetTrueColourSet(sc->true_colours), bpp32, false);
+
+	std::map<uint32_t, uint> counts;
+	for (size_t i = 0; i < n; i++) {
+		const SpriteLoader::CommonPixel &p = s.data[i];
+		if (masked[i] != 0 && p.m == 0) counts[p.r << 16 | p.g << 8 | p.b]++;
+	}
+	std::vector<std::pair<uint, uint32_t>> order;
+	for (const auto &[rgb, n] : counts) order.emplace_back(n, rgb);
+	std::ranges::sort(order, std::greater{});
+
+	std::string out = fmt::format("z {} zoom {} {} natreno {} px", sc->id, to_underlying(top), bpp32 ? "32bpp" : "8bpp", painted);
+	for (size_t i = 0; i < std::min<size_t>(3, order.size()); i++) out += fmt::format(" #{:06X}:{}", order[i].second, order[i].first);
+	return out;
 }
 
 /**
@@ -1206,6 +1342,9 @@ void GfxInitSpriteMem()
 
 	_sprite_files.clear();
 	_spritecache_bytes_used = 0;
+
+	/* The pictures made in colours were made from sprites now gone. */
+	ResetTrueColourSprites();
 }
 
 /**

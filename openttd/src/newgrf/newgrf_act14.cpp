@@ -445,7 +445,8 @@ static const KnownFeature _known_features[] = {
 	{ "decouple_128_cargo", 1 },
 	{ "decouple_more_action2_ids", 1 },
 	/* The configurator (vehicle_config.h): the set's vehicles may name details
-	 * for the player to choose (callback 1C0) and read the choice (variable 5C). */
+	 * for the player to choose (callback 1C0), give the colours of those that
+	 * are colours (callback 1C1) and read the choice (variables 5C and 5D). */
 	{ "decouple_vehicle_config", 1 },
 };
 

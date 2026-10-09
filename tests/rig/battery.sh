@@ -159,7 +159,7 @@ if [ -n "$YAGL" ] && [ -x "$YAGL" ]; then
   # The sets the scenes play from the home's newgrf/; vestaveny is kept in the
   # rig directory and put in baseset/decouple/ by its own two scenes; the two
   # slot63 sets are played by hand (README.md) and only built.
-  for n in bloky_siroke bloky_zamek cargo_a cargo_b claims_own cztr_old firs5_like gets_like house_over konfig quits_late refuses_a st_old studenti vypinac zin16_test; do
+  for n in barvy bloky_siroke bloky_zamek cargo_a cargo_b claims_own cztr_old firs5_like gets_like house_over konfig quits_late refuses_a st_old studenti vypinac zin16_test; do
     [ -f $S/rig_grf/$n.grf ] && cp $S/rig_grf/$n.grf $H/.openttd/newgrf/
   done
   [ -f $S/rig_grf/vestaveny.grf ] && cp $S/rig_grf/vestaveny.grf $S/
@@ -1649,6 +1649,23 @@ KONF_CFG=$S/konfig_openttd.cfg
 sed '/^\[newgrf\]$/a konfig.grf = ' "$CFG_KEEP" > $KONF_CFG
 run_scene konfig "testkonfig" 30 -c $KONF_CFG
 echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testkonfig: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The colours of the configurator (true_colour.h): the rig's set
+# grf/barvy.yagl (barvy.grf in the home's newgrf/) offers five details on a
+# road vehicle, of which the cab, the body and the radiator are colours
+# (callback 1C1: the mask indices each paints, the colour of each option as
+# 0x00RRGGBB in register 100, the player's three numbers of lightening in
+# register 100 of the detail or 101 of the option), and draws a beacon by
+# detail 4 in variable 5D. testbarvy reads the colours of the purchase list
+# and of the vehicle built (the same), the picture painted in them (pixels
+# and the commonest colours, read in 32bpp), chooses other colours and the
+# beacon (picture and colours change, 5D is 1), the cab in the company
+# colour (no colour of the set for it), reads the picture through the rig's
+# blitter, and opens the configurator from the refit window: five rows of
+# eight shown, closed with the refit window. odmitnuto is zero.
+BARVY_CFG=$S/barvy_openttd.cfg
+sed '/^\[newgrf\]$/a barvy.grf = ' "$CFG_KEEP" > $BARVY_CFG
+run_scene barvy "testbarvy" 30 -c $BARVY_CFG
+echo "barvy: $(grep -o 'testbarvy: SOUHRN.*' $S/reg_barvy.log | sed 's/testbarvy: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Wagons named the way GETS names them -- what the wagon is and its kind in
 # quotes (grf/gets_like.yagl, gets_like.grf in the home's newgrf/). The name
 # rules read the part in quotes: the Eaos and its livery take marijuana, the

@@ -29,14 +29,18 @@
  * set offers -- the detail's name and a dropdown of its options -- and under
  * them the cargo, which is the refit window's to change and is only said
  * here. No picture of the vehicle: the player wants none here. Opened from
- * the refit window; like a refit it works on a vehicle stopped in a depot,
- * and every choice goes to the vehicle at once (Commands::ConfigureVehicle).
+ * the refit window and closed with it; like a refit it works on a vehicle
+ * stopped in a depot, and every choice goes to the vehicle at once
+ * (Commands::ConfigureVehicle).
  */
 struct VehicleConfigWindow : Window {
 	std::vector<VehicleConfigAspect> aspects; ///< The details the set offers, read from it.
 
-	VehicleConfigWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
+	VehicleConfigWindow(WindowDesc &desc, WindowNumber window_number, Window *parent) : Window(desc)
 	{
+		/* Opened from the refit window it goes with it: the player, "let the
+		 * configurator close with the refit window". */
+		this->parent = parent;
 		this->CreateNestedTree();
 		this->ReadAspects(static_cast<VehicleID>(window_number));
 		this->FinishInitNested(window_number);
@@ -144,6 +148,33 @@ struct VehicleConfigWindow : Window {
 	}
 };
 
+/**
+ * The rows of the details, one for each the set may offer
+ * (VEHICLE_CONFIG_MAX_ASPECTS): its name and the dropdown of its options,
+ * the rows the set does not use away (VehicleConfigWindow::ReadAspects()).
+ * @return the rows
+ */
+static std::unique_ptr<NWidgetBase> MakeVehicleConfigRows()
+{
+	static_assert(WID_VC_ROW_END - WID_VC_ROW == VEHICLE_CONFIG_MAX_ASPECTS);
+	auto rows = std::make_unique<NWidgetVertical>();
+	rows->SetPIP(0, WidgetDimensions::unscaled.vsep_normal, 0);
+	for (uint i = 0; i < VEHICLE_CONFIG_MAX_ASPECTS; i++) {
+		auto label = std::make_unique<NWidgetLeaf>(WWT_TEXT, Colours::Invalid, WID_VC_LABEL + i, WidgetData{}, STR_NULL);
+		label->SetFill(1, 0);
+		auto dropdown = std::make_unique<NWidgetLeaf>(WWT_DROPDOWN, Colours::Grey, WID_VC_DROPDOWN + i, WidgetData{}, STR_VEHICLE_CONFIG_OPTION_TOOLTIP);
+		dropdown->SetMinimalSize(170, 12);
+		auto line = std::make_unique<NWidgetHorizontal>();
+		line->SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0);
+		line->Add(std::move(label));
+		line->Add(std::move(dropdown));
+		auto row = std::make_unique<NWidgetStacked>(WID_VC_ROW + i);
+		row->Add(std::move(line));
+		rows->Add(std::move(row));
+	}
+	return rows;
+}
+
 static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_config_widgets = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, Colours::Grey),
@@ -156,30 +187,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_config_widge
 			NWidget(NWID_SELECTION, Colours::Invalid, WID_VC_NONE_SEL),
 				NWidget(WWT_TEXT, Colours::Invalid, WID_VC_NONE), SetStringTip(STR_VEHICLE_CONFIG_NONE), SetFill(1, 0),
 			EndContainer(),
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VC_ROW + 0),
-				NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
-					NWidget(WWT_TEXT, Colours::Invalid, WID_VC_LABEL + 0), SetFill(1, 0),
-					NWidget(WWT_DROPDOWN, Colours::Grey, WID_VC_DROPDOWN + 0), SetMinimalSize(170, 12), SetToolTip(STR_VEHICLE_CONFIG_OPTION_TOOLTIP),
-				EndContainer(),
-			EndContainer(),
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VC_ROW + 1),
-				NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
-					NWidget(WWT_TEXT, Colours::Invalid, WID_VC_LABEL + 1), SetFill(1, 0),
-					NWidget(WWT_DROPDOWN, Colours::Grey, WID_VC_DROPDOWN + 1), SetMinimalSize(170, 12), SetToolTip(STR_VEHICLE_CONFIG_OPTION_TOOLTIP),
-				EndContainer(),
-			EndContainer(),
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VC_ROW + 2),
-				NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
-					NWidget(WWT_TEXT, Colours::Invalid, WID_VC_LABEL + 2), SetFill(1, 0),
-					NWidget(WWT_DROPDOWN, Colours::Grey, WID_VC_DROPDOWN + 2), SetMinimalSize(170, 12), SetToolTip(STR_VEHICLE_CONFIG_OPTION_TOOLTIP),
-				EndContainer(),
-			EndContainer(),
-			NWidget(NWID_SELECTION, Colours::Invalid, WID_VC_ROW + 3),
-				NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
-					NWidget(WWT_TEXT, Colours::Invalid, WID_VC_LABEL + 3), SetFill(1, 0),
-					NWidget(WWT_DROPDOWN, Colours::Grey, WID_VC_DROPDOWN + 3), SetMinimalSize(170, 12), SetToolTip(STR_VEHICLE_CONFIG_OPTION_TOOLTIP),
-				EndContainer(),
-			EndContainer(),
+			NWidgetFunction(MakeVehicleConfigRows),
 			NWidget(WWT_TEXT, Colours::Invalid, WID_VC_CARGO), SetFill(1, 0),
 		EndContainer(),
 	EndContainer(),
@@ -195,9 +203,10 @@ static WindowDesc _vehicle_config_desc(
 /**
  * Open the configurator of a vehicle, or bring it to the front.
  * @param v the vehicle, its front
+ * @param parent the window it is opened from, which it closes with; the refit window
  */
-void ShowVehicleConfigWindow(const Vehicle *v)
+void ShowVehicleConfigWindow(const Vehicle *v, Window *parent)
 {
 	if (v != v->First()) return;
-	AllocateWindowDescFront<VehicleConfigWindow>(_vehicle_config_desc, v->index);
+	AllocateWindowDescFront<VehicleConfigWindow>(_vehicle_config_desc, v->index, parent);
 }

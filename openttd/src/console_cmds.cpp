@@ -33,6 +33,8 @@
 #include "animated_tile_map.h"
 #include "cargotype.h"
 #include "spritecache.h"
+#include "true_colour.h"
+#include "blitter/factory.hpp"
 #include "green_load.h"
 #include "base_media_graphics.h"
 #include "table/sprites.h"
@@ -8299,10 +8301,10 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	/* A choice by command: the picture and the variable follow it. */
 	RoadVehicle::From(v)->UpdateViewport(true, true);
 	SpriteID before = v->sprite_cache.sprite_seq.seq[0].sprite;
-	uint32_t var_before = GetVehicleConfigVariable(v);
+	uint32_t var_before = GetVehicleConfigVariable(v, 0);
 	CommandCost r1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 1);
 	SpriteID after = v->sprite_cache.sprite_seq.seq[0].sprite;
-	uint32_t var_after = GetVehicleConfigVariable(v);
+	uint32_t var_after = GetVehicleConfigVariable(v, 0);
 	IConsolePrint(CC_DEFAULT, "testkonfig: volba 0=1 {}, obrazek {} -> {}, promenna 5C {:#x} -> {:#x}", r1.Succeeded() ? "prosla" : "ODMITNUTA", before, after, var_before, var_after);
 	if (r1.Failed()) refuse(fmt::format("volba 0=1 odmitnuta: {}", RefusalReason(r1)));
 	if (before == after) refuse("obrazek se po volbe nezmenil");
@@ -8330,7 +8332,7 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 		w->OnDropdownSelect(WID_VC_DROPDOWN + 1, 1, -1);
 		IConsolePrint(CC_DEFAULT, "testkonfig: oknem volba 1=1: vozidlo ma {}, okno rika '{}'", v->config_options[1], w->GetWidgetString(WID_VC_DROPDOWN + 1, STR_NULL));
 		if (v->config_options[1] != 1) refuse("volba oknem se nezapsala");
-		if (GetVehicleConfigVariable(v) != 0x0101) refuse(fmt::format("promenna 5C ma byt 0x101, je {:#x}", GetVehicleConfigVariable(v)));
+		if (GetVehicleConfigVariable(v, 0) != 0x0101) refuse(fmt::format("promenna 5C ma byt 0x101, je {:#x}", GetVehicleConfigVariable(v, 0)));
 		w->Close();
 	}
 
@@ -8348,7 +8350,173 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	if (rpw != nullptr) rpw->Close();
 
 	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{}", aspects.size(), options,
-			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly");
+			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v, 0), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly");
+	return true;
+}
+
+/**
+ * Rig probe: the colours of the configurator (true_colour.h) on the set
+ * grf/barvy.yagl -- a road vehicle whose cab, body and radiator are colours
+ * the player chooses, and two details that are not. Builds one in a depot
+ * and says what the game makes of it: the details, the colours of each
+ * detail as the set gives them (callback 1C1), the picture painted in them
+ * (its painted pixels and their commonest colours, read in 32bpp), in the
+ * purchase list and on the vehicle; then chooses other colours, a detail that
+ * is no colour (the company colour) and the beacon of variable 5D, reads the
+ * picture through the blitter the game runs with, and opens the configurator
+ * from the refit window: eight rows, the set's five shown, closing with the
+ * refit window. Anything wrong is written ODMITNUTO. Usage: 'testbarvy'.
+ */
+static bool ConTestVehicleColours(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Rig: the colours of the configurator on the set grf/barvy.yagl. Usage: 'testbarvy'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "testbarvy: only in a running game.");
+		return true;
+	}
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testbarvy: ODMITNUTO - neni firma, ktera by stavela.");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	auto refuse = [](const std::string &why) { IConsolePrint(CC_ERROR, "testbarvy: ODMITNUTO - {}", why); };
+
+	EngineID eid = EngineID::Invalid(), plain = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (!e->company_avail.Test(_local_company)) continue;
+		if (GetRoadTramType(e->VehInfo<RoadVehicleInfo>().roadtype) != RoadTramType::Road) continue;
+		if (GetString(STR_ENGINE_NAME, e->index).find("barvy") != std::string::npos) {
+			eid = e->index;
+		} else if (plain == EngineID::Invalid()) {
+			plain = e->index;
+		}
+	}
+	if (eid == EngineID::Invalid() || plain == EngineID::Invalid()) {
+		refuse(fmt::format("vozidlo 'barvy' {} ve hre, jine {} (barvy.grf v newgrf/)", eid == EngineID::Invalid() ? "neni" : "je", plain == EngineID::Invalid() ? "neni" : "je"));
+		return true;
+	}
+
+	/* A road along X with a depot off its middle tile, as testkonfig builds it. */
+	auto free = [](TileIndex t) { return IsTileType(t, TileType::Clear) && GetTileSlope(t) == SLOPE_FLAT; };
+	TileIndex spot = INVALID_TILE;
+	for (TileIndex t : SpiralTileSequence(TileXY(Map::SizeX() / 2, Map::SizeY() / 2), 61)) {
+		if (TileX(t) + 4 >= Map::SizeX() || TileY(t) + 3 >= Map::SizeY()) continue;
+		if (free(t) && free(TileAddXY(t, 1, 0)) && free(TileAddXY(t, 2, 0)) && free(TileAddXY(t, 1, 1))) {
+			spot = t;
+			break;
+		}
+	}
+	if (spot == INVALID_TILE) {
+		refuse("zadne volne misto");
+		return true;
+	}
+	TileIndex depot = TileAddXY(spot, 1, 1);
+	CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, spot, TileAddXY(spot, 2, 0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+	CommandCost shed = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot, ROADTYPE_ROAD, DiagDirection::NW);
+	CommandCost link = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileAddXY(spot, 1, 0), RoadBits{RoadBit::SE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+	if (road.Failed() || shed.Failed() || link.Failed()) {
+		refuse(fmt::format("silnice nebo depo: {} / {} / {}", RefusalReason(road), RefusalReason(shed), RefusalReason(link)));
+		return true;
+	}
+	auto [cost, veh, u1, u2, u3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost.Failed()) {
+		refuse(fmt::format("vozidlo: {}", RefusalReason(cost)));
+		return true;
+	}
+	Vehicle *v = Vehicle::Get(veh);
+
+	std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(eid);
+	std::string names;
+	for (const VehicleConfigAspect &a : aspects) names += fmt::format("{}'{}' {}", names.empty() ? "" : ", ", a.name, a.options.size());
+	IConsolePrint(CC_DEFAULT, "testbarvy: '{}' podrobnosti {} ({})", GetString(STR_ENGINE_NAME, eid), aspects.size(), names);
+	if (aspects.size() != 5) refuse(fmt::format("cekano 5 podrobnosti, je {}", aspects.size()));
+
+	/* The purchase list: the default colours, the first option of each. */
+	std::string bought = DescribeEngineTrueColours(eid, {});
+	VehicleSpriteSeq icon;
+	GetCustomVehicleIcon(eid, Direction::W, EngineImageType::Purchase, &icon);
+	IConsolePrint(CC_DEFAULT, "testbarvy: nakup: {}", bought);
+	IConsolePrint(CC_DEFAULT, "testbarvy: nakup obrazek: {}", icon.count > 0 ? DescribeTrueColourSprite(icon.seq[0].sprite) : std::string("zadny"));
+	std::string plain_colours = DescribeEngineTrueColours(plain, {});
+	IConsolePrint(CC_DEFAULT, "testbarvy: vozidlo bez sady: {}", plain_colours);
+	if (plain_colours != "bez barev") refuse("vozidlo bez sady ma barvy");
+
+	/* The vehicle as built: the same colours as in the purchase list. */
+	auto picture = [&]() {
+		RoadVehicle::From(v)->UpdateViewport(true, true);
+		return v->sprite_cache.sprite_seq.seq[0].sprite;
+	};
+	SpriteID first = picture();
+	std::string first_colours = DescribeEngineTrueColours(v->engine_type, v->config_options);
+	IConsolePrint(CC_DEFAULT, "testbarvy: postavene: {}", first_colours);
+	IConsolePrint(CC_DEFAULT, "testbarvy: postavene obrazek {}: {}", first, DescribeTrueColourSprite(first));
+	if (first_colours != bought) refuse("postavene vozidlo ma jine barvy nez nakup");
+	if (DescribeTrueColourSprite(first) == "bez barev") refuse("obrazek postaveneho vozidla neni v barvach");
+
+	/* Other colours: white cab, blue body, the black radiator, the beacon on. */
+	CommandCost c0 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 1);
+	CommandCost c1 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 1, 1);
+	CommandCost c2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 2, 0);
+	CommandCost c4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 4, 1);
+	if (c0.Failed() || c1.Failed() || c2.Failed() || c4.Failed()) refuse("volba barvy odmitnuta");
+	SpriteID second = picture();
+	std::string second_colours = DescribeEngineTrueColours(v->engine_type, v->config_options);
+	IConsolePrint(CC_DEFAULT, "testbarvy: bila/modra/cerny/majak: promenna 5C {:#x} 5D {:#x}", GetVehicleConfigVariable(v, 0), GetVehicleConfigVariable(v, 4));
+	IConsolePrint(CC_DEFAULT, "testbarvy: bila/modra/cerny/majak: {}", second_colours);
+	IConsolePrint(CC_DEFAULT, "testbarvy: bila/modra/cerny/majak obrazek {}: {}", second, DescribeTrueColourSprite(second));
+	if (GetVehicleConfigVariable(v, 4) != 1) refuse(fmt::format("promenna 5D ma byt 1, je {:#x}", GetVehicleConfigVariable(v, 4)));
+	if (second == first || second_colours == first_colours) refuse("obrazek nebo barvy se po volbe nezmenily");
+
+	/* The cab in the company colour: an option the set gives no colour for. */
+	CommandCost c3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, 0, 3);
+	SpriteID third = picture();
+	std::string third_colours = DescribeEngineTrueColours(v->engine_type, v->config_options);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kabina firemni: {}", third_colours);
+	if (c3.Failed() || third_colours.find("0xC6") != std::string::npos) refuse("kabina firemni barvou ma porad barvu ze sady");
+
+	/* Read through the blitter the game runs with: the rig's is 8bpp. */
+	const Sprite *drawn = GetSprite(third, SpriteType::Normal);
+	IConsolePrint(CC_DEFAULT, "testbarvy: blitter '{}' cte obrazek {}: {}", BlitterFactory::GetCurrentBlitter()->GetName(), third,
+			drawn != nullptr ? fmt::format("{}x{}", drawn->width, drawn->height) : std::string("NIC"));
+	if (drawn == nullptr) refuse("obrazek v barvach nejde precist");
+
+	/* The configurator from the refit window: eight rows, five shown, gone with the refit window. */
+	ShowVehicleRefitWindow(v, INVALID_VEH_ORDER_ID, nullptr);
+	Window *rw = FindWindowById(WindowClass::VehicleRefit, v->index);
+	ShowVehicleConfigWindow(v, rw);
+	Window *w = FindWindowById(WindowClass::VehicleConfig, v->index);
+	uint shown = 0;
+	bool closed = false;
+	if (w == nullptr || rw == nullptr) {
+		refuse("okno prestavby nebo konfiguratoru se neotevrelo");
+	} else {
+		for (uint i = 0; i < VEHICLE_CONFIG_MAX_ASPECTS; i++) {
+			if (w->GetWidget<NWidgetStacked>(WID_VC_ROW + i)->shown_plane == 0) shown++;
+		}
+		IConsolePrint(CC_DEFAULT, "testbarvy: okno: radku {} z {}, posledni '{}' = '{}'", shown, VEHICLE_CONFIG_MAX_ASPECTS,
+				w->GetWidgetString(WID_VC_LABEL + 4, STR_NULL), w->GetWidgetString(WID_VC_DROPDOWN + 4, STR_NULL));
+		rw->Close();
+		closed = FindWindowById(WindowClass::VehicleConfig, v->index) == nullptr;
+		IConsolePrint(CC_DEFAULT, "testbarvy: okno prestavby zavreno, konfigurator {}", closed ? "zavren s nim" : "ZUSTAL");
+		if (shown != 5) refuse(fmt::format("v okne ma byt 5 radku, je {}", shown));
+		if (!closed) {
+			refuse("konfigurator se nezavrel s oknem prestavby");
+			w->Close();
+		}
+	}
+
+	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} sad={} obrazku={}", aspects.size(),
+			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
+			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", GetTrueColourSetCount(), GetTrueColourSpriteCount());
 	return true;
 }
 
@@ -14137,6 +14305,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testvagony",              ConTestStoreRake);
 	IConsole::CmdRegister("testgrf",                  ConTestSavegameGrfs);
 	IConsole::CmdRegister("testkonfig",               ConTestVehicleConfig);
+	IConsole::CmdRegister("testbarvy",                ConTestVehicleColours);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("testcouva",               ConTestDrivingBackwards);
 	IConsole::CmdRegister("testnedobrzdil",          ConTestOverrun);
