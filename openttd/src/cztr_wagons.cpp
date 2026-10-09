@@ -38,9 +38,8 @@ static void ActivateCztrWagonsForFirs5()
  * another release of the wagons is not to stop and show a message -- it
  * fetches 1.0.0 and plays it in the other release's place. That release is a
  * superseded one, kept by the content service for savegames only, so it is
- * asked for by checksum, the way a savegame asks for what it names
- * (SavegameContentFetchWindow); the service knows the first four bytes of the
- * checksum (CztrWagonsForFirs5Identifier()).
+ * asked for by its whole checksum, the way a savegame asks for what it names
+ * (SavegameContentFetchWindow, CztrWagonsForFirs5Identifier()).
  *
  * No window: the game is in its menu or already playing, and the player said
  * he would not be looking. Once the set is down the disk is scanned again and

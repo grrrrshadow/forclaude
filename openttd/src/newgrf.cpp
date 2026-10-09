@@ -1197,32 +1197,37 @@ std::vector<GRFIdentifier> GetSavegameReleasesToFetch(const GRFConfigList &list)
 }
 
 /**
- * The checksum of CZTR Wagons-Cargo 1.0.0 as far as the content service knows
- * it: the service keeps the first four bytes of a release's checksum and no
- * more, and matches what it is asked for on those. The rest is nought.
+ * The checksum of CZTR Wagons-Cargo 1.0.0, whole, as the game reckons it (of
+ * the data section, CalcGRFMD5Sum()): reckoned from the release itself, which
+ * is in the forclaude release 'newgrf' (newgrf.zip, CZTR_Wagons_cargo.grf,
+ * 174 480 569 bytes). The content service shows only its first four bytes,
+ * 9ae03f3f, but finds a release by the whole checksum and does not answer
+ * a question with the rest nought -- which is why the fetch never got it.
  */
-static constexpr std::array<uint8_t, 4> CZTR_WAGONS_FOR_FIRS5_MD5_START = {0x9a, 0xe0, 0x3f, 0x3f};
+static constexpr std::array<uint8_t, MD5_HASH_BYTES> CZTR_WAGONS_FOR_FIRS5_MD5 = {
+	0x9a, 0xe0, 0x3f, 0x3f, 0xf3, 0xfe, 0x1a, 0x6a, 0x86, 0x63, 0xf2, 0xff, 0x9d, 0xf2, 0x5d, 0xa5,
+};
 
 /**
  * What to ask the content service for to get CZTR Wagons-Cargo 1.0.0: the set's
- * id and as much of the release's checksum as the service knows.
+ * id and the release's whole checksum, the way a savegame asks for what it names.
  */
 GRFIdentifier CztrWagonsForFirs5Identifier()
 {
 	GRFIdentifier id{};
 	id.grfid = std::byteswap(WAGON_CARGO_EXCEPTION_GRFID);
-	std::ranges::copy(CZTR_WAGONS_FOR_FIRS5_MD5_START, id.md5sum.begin());
+	std::ranges::copy(CZTR_WAGONS_FOR_FIRS5_MD5, id.md5sum.begin());
 	return id;
 }
 
 /**
  * Is this CZTR Wagons-Cargo 1.0.0, as the content service describes a release?
  * @param grfid the set's id, the way it is kept in memory
- * @param md5sum the release's checksum, of which the service knows the first four bytes
+ * @param md5sum the release's checksum
  */
 bool IsCztrWagonsForFirs5(GrfID grfid, const MD5Hash &md5sum)
 {
-	return std::byteswap(grfid) == WAGON_CARGO_EXCEPTION_GRFID && std::equal(CZTR_WAGONS_FOR_FIRS5_MD5_START.begin(), CZTR_WAGONS_FOR_FIRS5_MD5_START.end(), md5sum.begin());
+	return std::byteswap(grfid) == WAGON_CARGO_EXCEPTION_GRFID && std::ranges::equal(md5sum, CZTR_WAGONS_FOR_FIRS5_MD5);
 }
 
 /**

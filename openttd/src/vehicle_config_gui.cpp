@@ -204,9 +204,12 @@ static WindowDesc _vehicle_config_desc(
  * Open the configurator of a vehicle, or bring it to the front.
  * @param v the vehicle, its front
  * @param parent the window it is opened from, which it closes with; the refit window
+ * Nothing opens for a vehicle whose set offers no details.
  */
 void ShowVehicleConfigWindow(const Vehicle *v, Window *parent)
 {
 	if (v != v->First()) return;
+	/* Only a vehicle whose set offers details has a configurator. */
+	if (GetVehicleConfigAspects(v->engine_type).empty()) return;
 	AllocateWindowDescFront<VehicleConfigWindow>(_vehicle_config_desc, v->index, parent);
 }

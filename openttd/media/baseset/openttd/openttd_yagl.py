@@ -26,7 +26,10 @@ manifest) is made anew from the finest render there is -- the 16x piece
 no palette pictures, as the colleague's sets have none. The levels not in
 the file the game works out by scaling (ResizeSprites() in
 src/spritecache.cpp), 4x from 8x among them: the renders go in as they are,
-never scaled down here. Then it runs yagl and writes openttd.grf.hash, the
+never scaled down here. The one exception is the poster, which the game
+draws at 2x or normal on most screens and would scale by taking one pixel
+of four: its 2x and normal levels are made by openttd_budovy.py, the mean
+of 2x2 blocks, and go in beside the 4x. Then it runs yagl and writes openttd.grf.hash, the
 checksum the game lists the set by, as Baseset.cmake reads it.
 
     python3 openttd_yagl.py              sheets, openttd.yagl, openttd.grf and its hash
@@ -56,7 +59,9 @@ SHEET_WIDTH = 2048
 #: The levels a manifest entry may hold, the sheet each goes on and how yagl names the level.
 LEVELS = (("x16", "openttd-nase-zin16.png", "zin16", "c32bpp | chunked"),
           ("x8", "openttd-nase-zin8.png", "zin8", "c32bpp | chunked"),
-          ("x4", "openttd-nase-zin4.png", "zin4", "c32bpp | chunked"))
+          ("x4", "openttd-nase-zin4.png", "zin4", "c32bpp | chunked"),
+          ("x2", "openttd-nase-zin2.png", "zin2", "c32bpp | chunked"),
+          ("x1", "openttd-nase-normal.png", "normal", "c32bpp | chunked"))
 
 #: Our GUI icons, palette sprites drawn by the openttdgui_*.py scripts: the
 #: OpenTTD GUI sprite, then the picture, where the sprite sits on it, its size
@@ -76,9 +81,10 @@ GUI_ICONS = (
 
 
 def wanted(entry: dict) -> list[str]:
-    """Which of an entry's levels go into the set: the finest render there is, and nothing else."""
+    """Which of an entry's levels go into the set: the finest render there is, and the 2x and
+    normal levels where the manifest has them made (the poster, openttd_budovy.py), nothing else."""
     for key in ("x16", "x8", "x4"):
-        if entry.get(key): return [key]
+        if entry.get(key): return [key] + [k for k in ("x2", "x1") if entry.get(k)]
     return []
 
 

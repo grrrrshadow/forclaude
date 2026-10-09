@@ -8346,11 +8346,26 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	IConsolePrint(CC_DEFAULT, "testkonfig: cudlik Konfigurator v prestavbe: u sady {}, bez sady {}", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly");
 	if (!button) refuse("cudlik u vozidla se sadou neni aktivni");
 	if (plain_button) refuse("cudlik u vozidla bez sady je aktivni");
+
+	/* A double click on the refit list refits, as ever: it once fell through
+	 * to the configurator and opened it for any vehicle (the colleague's
+	 * find). Clicked above the list, so that nothing is chosen and nothing
+	 * refitted; and asked for straight, nothing opens for a vehicle whose set
+	 * offers no details. */
+	if (rw != nullptr) rw->OnClick({0, 0}, WID_VR_MATRIX, 2);
+	if (rpw != nullptr) rpw->OnClick({0, 0}, WID_VR_MATRIX, 2);
+	ShowVehicleConfigWindow(pv);
+	bool double_click = FindWindowById(WindowClass::VehicleConfig, v->index) != nullptr || FindWindowById(WindowClass::VehicleConfig, pv->index) != nullptr;
+	IConsolePrint(CC_DEFAULT, "testkonfig: dvojklik v seznamu prestavby a konfigurator bez sady: okno {}", double_click ? "SE OTEVRELO" : "zadne");
+	if (double_click) refuse("dvojklik v prestavbe nebo vozidlo bez sady otevrel konfigurator");
+	CloseWindowById(WindowClass::VehicleConfig, v->index);
+	CloseWindowById(WindowClass::VehicleConfig, pv->index);
 	if (rw != nullptr) rw->Close();
 	if (rpw != nullptr) rpw->Close();
 
-	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{}", aspects.size(), options,
-			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v, 0), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly");
+	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{} dvojklik={}", aspects.size(), options,
+			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v, 0), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly",
+			double_click ? "konfigurator" : "prestavba");
 	return true;
 }
 

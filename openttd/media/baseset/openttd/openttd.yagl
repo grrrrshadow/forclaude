@@ -9352,6 +9352,8 @@ replace_sprites<OpenTTDGUI, 0x0000> // <new_feature_type, offset>  Action05
     sprite_id<0x00000703>
     {
         [1529, 1038, 2, 3], zin4, c32bpp | chunked, "openttd-nase-zin4.png", [8, 8];
+        [765, 520, 1, 1], zin2, c32bpp | chunked, "openttd-nase-zin2.png", [8, 8];
+        [383, 259, 0, 1], normal, c32bpp | chunked, "openttd-nase-normal.png", [8, 8];
     }
 }
 // Record #56

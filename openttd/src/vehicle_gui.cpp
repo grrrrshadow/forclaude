@@ -1356,6 +1356,10 @@ struct RefitWindow : public Window {
 				break;
 			}
 
+			case WID_VR_DETAILS: // the configurator
+				ShowVehicleConfigWindow(Vehicle::Get(this->window_number), this);
+				break;
+
 			case WID_VR_MATRIX: { // listbox
 				this->SetSelection(this->vscroll->GetScrolledRowFromWidget(pt.y, this, WID_VR_MATRIX));
 				this->SetWidgetDisabledState(WID_VR_REFIT, this->selected_refit == nullptr);
@@ -1364,10 +1368,6 @@ struct RefitWindow : public Window {
 				if (click_count == 1) break;
 				[[fallthrough]];
 			}
-
-			case WID_VR_DETAILS: // the configurator
-				ShowVehicleConfigWindow(Vehicle::Get(this->window_number), this);
-				break;
 
 			case WID_VR_REFIT: // refit button
 				if (this->selected_refit != nullptr) {
