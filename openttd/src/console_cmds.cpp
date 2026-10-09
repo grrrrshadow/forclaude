@@ -8208,7 +8208,9 @@ static bool ConTestForceProceed(std::span<std::string_view> argv)
  * else. Builds a depot and the vehicle, lists the details as the game reads
  * them, changes a choice by command (the picture and variable 5C change),
  * asks for choices that do not exist and for one on a vehicle that is not
- * stopped in a depot (refused), chooses through the window, and looks at the
+ * stopped in a depot (refused), tries the alien the set hides unless the cart
+ * is pushed (hidden and refused on a pulled cart, offered and taken on a
+ * pushed one), chooses through the window, and looks at the
  * refit window's configurator button on this vehicle (on) and on a vehicle of
  * a set without details (off). Then a train of the set's wagons in a rail
  * depot: a choice made with one wagon selected goes to that wagon alone, its
@@ -8289,17 +8291,23 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	Vehicle *v = Vehicle::Get(veh);
 	Vehicle *pv = Vehicle::Get(veh_p);
 
-	/* The details as the game reads them from the set. */
+	/* The details as the game reads them from the set: in the purchase list,
+	 * without a vehicle, where the alien of the crew is hidden (the set hides
+	 * it unless the cart is pushed, which no vehicle is yet). */
 	std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(eid);
 	IConsolePrint(CC_DEFAULT, "testkonfig: '{}' podrobnosti {}", GetString(STR_ENGINE_NAME, eid), aspects.size());
-	uint options = 0;
+	uint options = 0, hidden = 0;
 	for (uint i = 0; i < aspects.size(); i++) {
 		std::string names;
-		for (const std::string &o : aspects[i].options) names += (names.empty() ? "" : ", ") + o;
+		for (const VehicleConfigOption &o : aspects[i].options) {
+			names += (names.empty() ? "" : ", ") + o.name + (o.hidden ? " (skryta)" : "");
+			if (o.hidden) hidden++;
+		}
 		IConsolePrint(CC_DEFAULT, "testkonfig:   {} '{}': {} voleb ({})", i, aspects[i].name, aspects[i].options.size(), names);
 		options += static_cast<uint>(aspects[i].options.size());
 	}
 	if (aspects.size() != 2 || options != 5) refuse(fmt::format("cekany 2 podrobnosti a 5 voleb, je {} a {}", aspects.size(), options));
+	if (hidden != 1 || !aspects[0].options[2].hidden) refuse("v nakupu ma byt skryty jen ufon");
 	size_t plain_aspects = GetVehicleConfigAspects(plain).size();
 	if (plain_aspects != 0) refuse(fmt::format("vozidlo bez sady ma {} podrobnosti", plain_aspects));
 
@@ -8319,6 +8327,22 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 	CommandCost r2 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 99);
 	CommandCost r3 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 7, 0);
 	if (r2.Succeeded() || r3.Succeeded()) refuse("volba mimo rozsah prosla");
+
+	/* The alien, hidden unless the cart is pushed: asked with the vehicle, the
+	 * set hides him on a pulled cart and offers him on a pushed one, and the
+	 * game refuses him while he is hidden. The cart is pulled now. */
+	bool alien_hidden_pulled = GetVehicleConfigAspects(eid, v)[0].options[2].hidden;
+	CommandCost alien_refused = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 2);
+	Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 1, 1);
+	bool alien_hidden_pushed = GetVehicleConfigAspects(eid, v)[0].options[2].hidden;
+	CommandCost alien_taken = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 2);
+	IConsolePrint(CC_DEFAULT, "testkonfig: ufon: tazeny vozik {} a volba {}, tlaceny {} a volba {}", alien_hidden_pulled ? "skryty" : "VIDET", alien_refused.Succeeded() ? "PROSLA" : "odmitnuta",
+			alien_hidden_pushed ? "SKRYTY" : "videt", alien_taken.Succeeded() ? "prosla" : "ODMITNUTA");
+	bool alien_ok = alien_hidden_pulled && alien_refused.Failed() && !alien_hidden_pushed && alien_taken.Succeeded() && v->config_options[0] == 2;
+	if (!alien_ok) refuse("skryta volba (ufon) se nechova podle vozidla");
+	/* Back to the crew and the cart the rest of the probe counts on. */
+	Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 0, 1);
+	Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 1, 0);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false);
 	CommandCost r4 = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, v->index, UINT8_MAX, 1, 1);
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false);
@@ -8456,9 +8480,9 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 		}
 	}
 
-	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{} dvojklik={} vagony={}/{}/{} devata={} vlak={} okno={} odpojeny={}", aspects.size(), options,
+	IConsolePrint(CC_DEFAULT, "testkonfig: SOUHRN podrobnosti={} volby={} obrazek={} promenna={} oknem={} cudlik={}/{} dvojklik={} ufon={} vagony={}/{}/{} devata={} vlak={} okno={} odpojeny={}", aspects.size(), options,
 			before != after ? "zmenen" : "stejny", GetVehicleConfigVariable(v, 0), v->config_options[1] == 1 ? "ano" : "ne", button ? "aktivni" : "zasedly", plain_button ? "aktivni" : "zasedly",
-			double_click ? "konfigurator" : "prestavba", w1_var, w2_var, wagon_pictures_differ ? "ruzne" : "stejne", w2_var9, w1_both, window_follows ? "sleduje" : "ne", loose);
+			double_click ? "konfigurator" : "prestavba", alien_ok ? "podle voziku" : "NE", w1_var, w2_var, wagon_pictures_differ ? "ruzne" : "stejne", w2_var9, w1_both, window_follows ? "sleduje" : "ne", loose);
 	return true;
 }
 

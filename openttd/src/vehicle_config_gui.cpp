@@ -85,22 +85,25 @@ struct VehicleConfigWindow : Window {
 		return heads;
 	}
 
-	/** Which details the set offers: a row for each, the other rows away. */
+	/** Which details the set offers on the vehicle as it is now: a row for each, the hidden ones and the other rows away. */
 	void ReadAspects()
 	{
 		this->head = static_cast<VehicleID>(this->window_number);
 		this->aspects.clear();
 		for (const Vehicle *u : this->Heads()) {
-			std::vector<VehicleConfigAspect> found = GetVehicleConfigAspects(u->engine_type);
+			std::vector<VehicleConfigAspect> found = GetVehicleConfigAspects(u->engine_type, u);
 			if (found.empty()) continue;
 			this->head = u->index;
 			this->aspects = std::move(found);
 			break;
 		}
+		bool any = false;
 		for (uint i = 0; i < VEHICLE_CONFIG_MAX_ASPECTS; i++) {
-			this->GetWidget<NWidgetStacked>(WID_VC_ROW + i)->SetDisplayedPlane(i < this->aspects.size() ? 0 : SZSP_NONE);
+			bool shown = i < this->aspects.size() && !this->aspects[i].hidden;
+			any |= shown;
+			this->GetWidget<NWidgetStacked>(WID_VC_ROW + i)->SetDisplayedPlane(shown ? 0 : SZSP_NONE);
 		}
-		this->GetWidget<NWidgetStacked>(WID_VC_NONE_SEL)->SetDisplayedPlane(this->aspects.empty() ? 0 : SZSP_NONE);
+		this->GetWidget<NWidgetStacked>(WID_VC_NONE_SEL)->SetDisplayedPlane(any ? SZSP_NONE : 0);
 	}
 
 	/** The option chosen for a detail on the vehicle the rows show. */
@@ -127,9 +130,9 @@ struct VehicleConfigWindow : Window {
 	std::string OptionName(uint aspect, uint option) const
 	{
 		if (aspect >= this->aspects.size()) return {};
-		const std::vector<std::string> &options = this->aspects[aspect].options;
+		const std::vector<VehicleConfigOption> &options = this->aspects[aspect].options;
 		if (option >= options.size()) return GetString(STR_VEHICLE_CONFIG_OPTION_UNKNOWN, option);
-		return options[option];
+		return options[option].name;
 	}
 
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
@@ -154,8 +157,8 @@ struct VehicleConfigWindow : Window {
 		if (IsInsideMM(widget, WID_VC_DROPDOWN, WID_VC_DROPDOWN_END)) {
 			uint i = widget - WID_VC_DROPDOWN;
 			if (i >= this->aspects.size()) return;
-			for (const std::string &option : this->aspects[i].options) {
-				size.width = std::max<uint>(size.width, GetStringBoundingBox(option).width + NWidgetLeaf::dropdown_dimension.width + WidgetDimensions::scaled.dropdowntext.Horizontal());
+			for (const VehicleConfigOption &option : this->aspects[i].options) {
+				size.width = std::max<uint>(size.width, GetStringBoundingBox(option.name).width + NWidgetLeaf::dropdown_dimension.width + WidgetDimensions::scaled.dropdowntext.Horizontal());
 			}
 		}
 	}
@@ -173,9 +176,11 @@ struct VehicleConfigWindow : Window {
 		if (!IsInsideMM(widget, WID_VC_DROPDOWN, WID_VC_DROPDOWN_END)) return;
 		uint i = widget - WID_VC_DROPDOWN;
 		if (i >= this->aspects.size()) return;
+		/* The options the set offers now; one it hides is not on the list. */
 		DropDownList list;
 		for (uint o = 0; o < this->aspects[i].options.size(); o++) {
-			list.push_back(MakeDropDownListStringItem(std::string{this->aspects[i].options[o]}, o));
+			if (this->aspects[i].options[o].hidden) continue;
+			list.push_back(MakeDropDownListStringItem(std::string{this->aspects[i].options[o].name}, o));
 		}
 		ShowDropDownList(this, std::move(list), this->Chosen(i), widget);
 	}

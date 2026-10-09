@@ -401,7 +401,8 @@ without FIRS 5, where 1.1.0 plays as it is.
 (`docs/decouple_vehicle_config.md`): a road vehicle whose set names two
 details for the player to choose -- a crew of three and a cart of two --
 through callback 1C0, and draws another picture for any choice but the
-first, by variable 5C. And a wagon with nine details -- graffiti of two
+first, by variable 5C; the alien of the crew is hidden (result 401) unless
+the cart is pushed, which the set reads off the vehicle it is asked about. And a wagon with nine details -- graffiti of two
 options, seven of one, a ninth of two read in variable 5E -- since a wagon
 carries its own choices and keeps them through uncoupling (the set's
 `VehicleConfigHead()`); `testkonfig` chooses on one wagon of a train, on the

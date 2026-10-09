@@ -26,54 +26,70 @@
 
 #include "safeguards.h"
 
+/** A text of the configurator as the set gives it, and whether it is hidden now. */
+struct VehicleConfigTextResult {
+	std::string text;
+	bool hidden = false;
+};
+
 /**
  * One text from the set (CBID_VEHICLE_DECOUPLE_CONFIG_TEXT): a detail's name
- * or one of its options.
+ * or one of its options. Asked with the vehicle when there is one, so the
+ * set may answer by what it carries, has chosen or how old it is; result 401
+ * is a detail or an option that is there but hidden on this vehicle now --
+ * not offered, its place kept, the ones after it still theirs.
  * @param engine the vehicle's engine
+ * @param v the vehicle, or nullptr in the purchase list
  * @param aspect which detail
  * @param option which of its options, or 0xFF for the detail's own name
  * @return the text, or nothing when the set has no such detail or option
  */
-static std::optional<std::string> VehicleConfigText(EngineID engine, uint aspect, uint option)
+static std::optional<VehicleConfigTextResult> VehicleConfigText(EngineID engine, const Vehicle *v, uint aspect, uint option)
 {
 	std::array<int32_t, 16> regs100;
-	uint16_t cb = GetVehicleCallback(CBID_VEHICLE_DECOUPLE_CONFIG_TEXT, (aspect << 8) | option, 0, engine, nullptr, regs100);
+	uint16_t cb = GetVehicleCallback(CBID_VEHICLE_DECOUPLE_CONFIG_TEXT, (aspect << 8) | option, 0, engine, v, regs100);
 	if (cb == CALLBACK_FAILED || cb == 0x400) return std::nullopt;
+	if (cb == 0x401) return VehicleConfigTextResult{{}, true};
 	const GRFFile *grffile = Engine::Get(engine)->GetGRF();
 	if (grffile == nullptr) return std::nullopt;
-	if (cb == 0x40F) return GetGRFStringWithTextStack(grffile, static_cast<GRFStringID>(regs100[0]), std::span{regs100}.subspan(1));
+	if (cb == 0x40F) return VehicleConfigTextResult{GetGRFStringWithTextStack(grffile, static_cast<GRFStringID>(regs100[0]), std::span{regs100}.subspan(1))};
 	if (cb > 0x400) {
 		ErrorUnknownCallbackResult(grffile->grfid, CBID_VEHICLE_DECOUPLE_CONFIG_TEXT, cb);
 		return std::nullopt;
 	}
-	return GetGRFStringWithTextStack(grffile, GRFSTR_MISC_GRF_TEXT + cb, regs100);
+	return VehicleConfigTextResult{GetGRFStringWithTextStack(grffile, GRFSTR_MISC_GRF_TEXT + cb, regs100)};
 }
 
 /**
  * The details a vehicle's set offers on it, with their options, as the set
  * names them. Only a set that asked for 'decouple_vehicle_config' is asked
  * at all; the details end where the set has no name for the next one, the
- * options of each where it has no name for the next option.
+ * options of each where it has no name for the next option. A detail or an
+ * option the set hides on this vehicle now is there with its place, marked
+ * hidden (VehicleConfigAspect::hidden, VehicleConfigOption::hidden).
  * @param engine the vehicle's engine
+ * @param v the vehicle the set is asked about: the part that carries the choices; nullptr in the purchase list
  * @return the details, in the set's order; empty when there are none
  */
-std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine)
+std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine, const Vehicle *v)
 {
 	std::vector<VehicleConfigAspect> aspects;
 	const Engine *e = Engine::GetIfValid(engine);
 	if (e == nullptr || e->GetGRF() == nullptr) return aspects;
 	const GRFConfig *config = GetGRFConfig(e->GetGRFID());
 	if (config == nullptr || !config->vehicle_config) return aspects;
+	if (v != nullptr) v = VehicleConfigHead(v);
 
 	for (uint a = 0; a < VEHICLE_CONFIG_MAX_ASPECTS; a++) {
-		std::optional<std::string> name = VehicleConfigText(engine, a, 0xFF);
+		std::optional<VehicleConfigTextResult> name = VehicleConfigText(engine, v, a, 0xFF);
 		if (!name.has_value()) break;
 		VehicleConfigAspect aspect;
-		aspect.name = std::move(*name);
+		aspect.name = std::move(name->text);
+		aspect.hidden = name->hidden;
 		for (uint o = 0; o < VEHICLE_CONFIG_MAX_OPTIONS; o++) {
-			std::optional<std::string> option = VehicleConfigText(engine, a, o);
+			std::optional<VehicleConfigTextResult> option = VehicleConfigText(engine, v, a, o);
 			if (!option.has_value()) break;
-			aspect.options.push_back(std::move(*option));
+			aspect.options.push_back({std::move(option->text), option->hidden});
 		}
 		/* A detail with nothing to choose ends the list: the ones after it
 		 * would move up a place and no longer be the byte the set reads. */
@@ -116,7 +132,7 @@ bool VehicleHasConfig(const Vehicle *front)
 {
 	for (const Vehicle *u = front; u != nullptr; u = u->Next()) {
 		if (VehicleConfigHead(u) != u) continue;
-		if (!GetVehicleConfigAspects(u->engine_type).empty()) return true;
+		if (!GetVehicleConfigAspects(u->engine_type, u).empty()) return true;
 	}
 	return false;
 }

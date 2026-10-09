@@ -394,10 +394,12 @@ CommandCost CmdConfigureVehicle(DoCommandFlags flags, VehicleID veh_id, uint8_t 
 		heads.push_back(front);
 	}
 
+	/* Only where the set has the detail and the option, and hides neither on
+	 * the vehicle as it is now. */
 	std::vector<Vehicle *> chosen;
 	for (Vehicle *u : heads) {
-		std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(u->engine_type);
-		if (aspect < aspects.size() && option < aspects[aspect].options.size()) chosen.push_back(u);
+		std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(u->engine_type, u);
+		if (aspect < aspects.size() && !aspects[aspect].hidden && aspects[aspect].Offers(option)) chosen.push_back(u);
 	}
 	if (chosen.empty()) return CMD_ERROR;
 

@@ -883,12 +883,13 @@ static uint ShowAdditionalText(int left, int right, int y, EngineID engine)
 static uint ShowConfigAspects(int left, int right, int y, EngineID engine)
 {
 	std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(engine);
-	if (aspects.empty()) return y;
 	std::string names;
 	for (const VehicleConfigAspect &aspect : aspects) {
+		if (aspect.hidden) continue;
 		if (!names.empty()) names += ", ";
 		names += aspect.name;
 	}
+	if (names.empty()) return y;
 	return DrawStringMultiLine(left, right, y, INT32_MAX, GetString(STR_PURCHASE_INFO_CONFIG_ASPECTS, names), TextColour::Black);
 }
 

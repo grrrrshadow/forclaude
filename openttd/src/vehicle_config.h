@@ -12,9 +12,11 @@
  * trailer. The cargo is the refit's business and stays whatever is chosen here.
  *
  * The game knows nothing of what a detail means. A set that asked for the
- * feature 'decouple_vehicle_config' (newgrf_act14.cpp) names up to eight
+ * feature 'decouple_vehicle_config' (newgrf_act14.cpp) names up to sixteen
  * details on a vehicle and the options of each through callback 1C0
- * (CBID_VEHICLE_DECOUPLE_CONFIG_TEXT), the player picks one option per
+ * (CBID_VEHICLE_DECOUPLE_CONFIG_TEXT) -- asked with the vehicle, so that a
+ * set may hide a detail or an option by what the vehicle carries, has chosen
+ * or how old it is (result 401) -- the player picks one option per
  * detail in the configurator window (vehicle_config_gui.cpp) and the game
  * keeps the choice on the vehicle (Vehicle::config_options) and reads it
  * back to the set in variables 5C (details 0 to 3), 5D (4 to 7), 5E (8 to
@@ -46,16 +48,26 @@ static constexpr uint VEHICLE_CONFIG_MAX_ASPECTS = 16;
 /** How many options a detail may have. */
 static constexpr uint VEHICLE_CONFIG_MAX_OPTIONS = 32;
 
+/** One option of a detail, as the set names it. */
+struct VehicleConfigOption {
+	std::string name; ///< The option's name ("College Girl").
+	bool hidden = false; ///< The set hides it on this vehicle as it is now (result 401 of callback 1C0): not offered, its place kept.
+};
+
 /** One detail a set offers on a vehicle, and its options, as the set names them. */
 struct VehicleConfigAspect {
 	std::string name; ///< The detail's name ("Crew", "Cart").
-	std::vector<std::string> options; ///< Its options in the set's order ("College Girl", "Female Girl"); a new vehicle has the first.
+	std::vector<VehicleConfigOption> options; ///< Its options in the set's order ("College Girl", "Female Girl"); a new vehicle has the first.
+	bool hidden = false; ///< The set hides the whole detail on this vehicle as it is now (result 401): no row for it, its place kept.
+
+	/** Whether the option may be chosen now: there, and not hidden. */
+	bool Offers(uint option) const { return option < this->options.size() && !this->options[option].hidden; }
 };
 
 /** The options chosen, detail by detail (Vehicle::config_options). */
 using VehicleConfigOptions = std::array<uint8_t, VEHICLE_CONFIG_MAX_ASPECTS>;
 
-std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine);
+std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine, const struct Vehicle *v = nullptr);
 const struct Vehicle *VehicleConfigHead(const struct Vehicle *v);
 struct Vehicle *VehicleConfigHead(struct Vehicle *v);
 bool VehicleHasConfig(const struct Vehicle *front);

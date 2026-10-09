@@ -76,7 +76,10 @@ its own error (Action B) where the bit is set, as the colleague's sets do.
 ### 2. Name the details and their options: callback 0x1C0
 
 The game calls callback **0x1C0** (`CBID_VEHICLE_DECOUPLE_CONFIG_TEXT`) on the
-vehicle's engine (no vehicle, as in the purchase list) with **variable 0x10**:
+vehicle's engine with **variable 0x10** -- **with the vehicle** when there is
+one (the refit window, the configurator, a choice being made: the wagon or
+the tractor that carries the choices), without it in the purchase list, where
+the vehicle variables read as they do there (0x5C to 0x5F are 0):
 
 | bits 8..15 | bits 0..7 | asks for |
 |---|---|---|
@@ -90,6 +93,16 @@ such option*, and ends the list: details are read from 0 up to the first one
 without a name, the options of each from 0 up to the first without a name. A
 detail without options ends the details too (it would move the ones after it
 up a place, and they would no longer be the byte the set reads).
+
+Result **`0x401`** (`0x8401`) means *there, but hidden on this vehicle now*:
+the detail has no row in the configurator, or the option is not on its list,
+and neither may be chosen -- but its place is kept, the ones after it are
+still theirs, and a choice already made on it stays and is still read in the
+variables. Since the set is asked with the vehicle, it may hide by what the
+vehicle carries (variable 0x47), has chosen (0x5C to 0x5F) or how old it is:
+the colour of the radiator only with a radiator on, the helper of the hand
+cart only with a load, graffiti only on the Eas. The texts are one list for
+the whole GRF (`0xD000` and on), whatever the feature.
 
 Hook it on the callback switch of the vehicle (variable 0x0C), as other
 callbacks:
@@ -278,7 +291,8 @@ colour of the palette.
   the index. A release of the set that reorders or removes options changes
   what saved vehicles show; add new options at the end.
 - The names are asked whenever the game needs them (purchase list, refit
-  window, configurator); keep the callback cheap and without side effects.
+  window, configurator, a choice), with the vehicle where there is one; keep
+  the callback cheap and without side effects.
 - The choice is kept on the wagon, the engine or the tractor; the set's
   graphics for its articulated parts and the trailer read the same value.
 - A colour detail paints eight mask indices in a row from the one the set

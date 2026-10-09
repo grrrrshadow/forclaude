@@ -1642,7 +1642,9 @@ echo "cztrbezfirs: vymena=$(grep -c 'plays in place of' $S/reg_cztrbezfirs.log) 
 # picture for any choice but the first. testkonfig reads the details as the
 # game does (2 details, 5 options), changes a choice by command (the picture
 # and variable 5C follow), asks for choices that do not exist and for one on
-# a vehicle under way (refused), chooses through the window, and looks at the
+# a vehicle under way (refused), tries the alien the set hides unless the cart
+# is pushed (result 401: hidden and refused on a pulled cart, offered on a
+# pushed one), chooses through the window, and looks at the
 # refit window's Configurator button (on for the set's vehicle, off for a
 # vehicle without details); then on a train of the set's wagons: the choice
 # goes to the wagon selected and stays on it uncoupled, a ninth detail reads

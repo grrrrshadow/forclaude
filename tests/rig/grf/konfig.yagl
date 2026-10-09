@@ -1,7 +1,9 @@
 // The rig's set for the game's configurator (vehicle_config.h). A road vehicle
 // whose set names two details for the player to choose -- a crew of three and a
 // cart of two -- through callback 1C0, and draws one picture for the first
-// choice of both and another for anything else, by variable 5C. And a wagon
+// choice of both and another for anything else, by variable 5C; the alien
+// of the crew is hidden (result 401) unless the cart is pushed, which the
+// set reads off the vehicle it is asked about. And a wagon
 // with nine details -- graffiti of two options, seven of one, a ninth of two
 // read in variable 5E -- drawn by its own choices, since a wagon carries them
 // itself (VehicleConfigHead()). The set asks
@@ -167,6 +169,18 @@ switch<RoadVehicles, 0x02, PrimaryDWord> // the picture by the player's choices 
     };
     default: 0x0001;
 }
+switch<RoadVehicles, 0x05, PrimaryDWord> // the alien: hidden (401) unless the cart is pushed (variable 5C, byte 1), so only on a vehicle
+{
+    expression:
+    {
+        value1 = variable[0x5C] & 0x0000FF00;
+    };
+    ranges:
+    {
+        0x00000100: 0x8003;
+    };
+    default: 0x8401;
+}
 switch<RoadVehicles, 0x03, PrimaryDWord> // the texts of the configurator (callback 1C0, variable 10)
 {
     expression:
@@ -178,7 +192,7 @@ switch<RoadVehicles, 0x03, PrimaryDWord> // the texts of the configurator (callb
         0x000000FF: 0x8000;
         0x00000000: 0x8001;
         0x00000001: 0x8002;
-        0x00000002: 0x8003;
+        0x00000002: 0x0005;
         0x000001FF: 0x8004;
         0x00000100: 0x8005;
         0x00000101: 0x8006;
