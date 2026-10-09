@@ -1669,7 +1669,12 @@ echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testko
 # beacon (picture and colours change, 5D is 1), the cab in the company
 # colour (no colour of the set for it), reads the picture through the rig's
 # blitter, and opens the configurator from the refit window: five rows of
-# eight shown, closed with the refit window. odmitnuto is zero.
+# eight shown, closed with the refit window. The vehicle is a sprite stack of
+# three layers, the second a stencil (bit 30 of register 100, a start of 3,5
+# in 101 and 102) cut out of the third, a texture of greens in blocks
+# (cargo_cutout.h): the probe reads two layers, the second cut from the
+# texture, the texture's greens at half under the stencil's grey, and the
+# same cut turned to hay with passengers. odmitnuto is zero.
 BARVY_CFG=$S/barvy_openttd.cfg
 sed '/^\[newgrf\]$/a barvy.grf = ' "$CFG_KEEP" > $BARVY_CFG
 run_scene barvy "testbarvy" 30 -c $BARVY_CFG

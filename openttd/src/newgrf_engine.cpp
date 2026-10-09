@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "vehicle_config.h"
 #include "true_colour.h"
+#include "cargo_cutout.h"
 #include "debug.h"
 #include "train.h"
 #include "roadveh.h"
@@ -1174,14 +1175,30 @@ static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction d
 
 	bool sprite_stack = EngInfo(engine)->misc_flags.Test(EngineMiscFlag::SpriteStack);
 	uint max_stack = sprite_stack ? static_cast<uint>(std::size(result->seq)) : 1;
+	/* A layer with bit 30 of register 100 is the stencil of a load cut out of
+	 * the layer after it, the texture, from where registers 101 and 102 say
+	 * (cargo_cutout.h): the two become one sprite in the stencil's place. */
+	bool stencil = false;
+	int16_t cut_x = 0, cut_y = 0;
 	for (uint stack = 0; stack < max_stack; ++stack) {
 		object.callback_param1 = to_underlying(image_type) | (stack << 8);
 		const auto *group = object.Resolve<ResultSpriteGroup>();
 		int32_t reg100 = sprite_stack ? object.GetRegister(0x100) : 0;
 		if (group != nullptr && group->num_sprites != 0) {
-			result->seq[result->count].sprite = group->sprite + (to_underlying(direction) % group->num_sprites);
-			result->seq[result->count].pal    = GB(reg100, 0, 16); // zero means default recolouring
-			result->count++;
+			SpriteID sprite = group->sprite + (to_underlying(direction) % group->num_sprites);
+			if (stencil) {
+				result->seq[result->count - 1].sprite = CutoutSprite(result->seq[result->count - 1].sprite, sprite, cut_x, cut_y);
+				stencil = false;
+			} else {
+				result->seq[result->count].sprite = sprite;
+				result->seq[result->count].pal    = GB(reg100, 0, 16); // zero means default recolouring
+				result->count++;
+				if (sprite_stack && HasBit(reg100, 30)) {
+					stencil = true;
+					cut_x = static_cast<int16_t>(object.GetRegister(0x101));
+					cut_y = static_cast<int16_t>(object.GetRegister(0x102));
+				}
+			}
 		}
 		if (!HasBit(reg100, 31)) break;
 	}

@@ -111,6 +111,8 @@ add_files(
     cargopacket.h
     cargotype.cpp
     cargotype.h
+    cargo_cutout.cpp
+    cargo_cutout.h
     climate_industries.h
     cheat.cpp
     cheat_func.h

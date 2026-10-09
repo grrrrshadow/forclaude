@@ -15,6 +15,11 @@
 // green patch) that is turned rather than painted (register 101 = 1): the
 // set itself makes it hay when the vehicle carries passengers (option FE by
 // variable 47), and leaves it as the option says, unturned, for other cargo.
+// The vehicle is a sprite stack of three layers: the vehicle, a stencil (an
+// ellipse, white above and grey below, mask 0x70-0x77) with bit 30 of
+// register 100 and a start of 3,5 in registers 101 and 102, and the texture
+// of the cargo (greens in blocks) the stencil is cut from; the game makes
+// one load of the two, turned to hay like the patch.
 // the cab is then the company colour, as drawn. The beacon is detail 4, read
 // in variable 5D. The pictures are grey 32bpp with a mask, zin8 only:
 // flat areas at the lightness where each colour is exactly itself, a row at
@@ -67,6 +72,7 @@ properties<RoadVehicles, 0x0058> // Action00
         running_cost_factor: 0x04;
         running_cost_base: 0x00004C48;
         callback_flags_mask: 0x00;
+        miscellaneous_flags: 0x80;
     }
 }
 strings<RoadVehicles, default, 0x0058> // Action04: the vehicle's name
@@ -166,6 +172,76 @@ sprite_sets<RoadVehicles, 0x0000> // Action01: set 0 without the beacon, set 1 w
             [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [56, 8], "barvy-mask-zin8.png", [56, 8];
         }
     }
+    sprite_set // 0x0002
+    {
+        sprite_id<0x00000011>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000012>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000013>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000014>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000015>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000016>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000017>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+        sprite_id<0x00000018>
+        {
+            [40, 24, -20, -12], zin8, c32bpp | mask | chunked, "barvy-zin8.png", [112, 8], "barvy-mask-zin8.png", [112, 8];
+        }
+    }
+    sprite_set // 0x0003
+    {
+        sprite_id<0x00000019>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x0000001A>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x0000001B>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x0000001C>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x0000001D>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x0000001E>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x0000001F>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+        sprite_id<0x00000020>
+        {
+            [32, 32, 0, 0], zin8, c32bpp | chunked, "barvy-zin8.png", [160, 8];
+        }
+    }
 }
 sprite_groups<RoadVehicles, 0x00> // Action02 basic: set 0
 {
@@ -176,6 +252,16 @@ sprite_groups<RoadVehicles, 0x01> // Action02 basic: set 1
 {
     primary_spritesets: [ 0x0001 ];
     secondary_spritesets: [ 0x0001 ];
+}
+sprite_groups<RoadVehicles, 0x05> // Action02 basic: set 2, the stencil of the heap
+{
+    primary_spritesets: [ 0x0002 ];
+    secondary_spritesets: [ 0x0002 ];
+}
+sprite_groups<RoadVehicles, 0x06> // Action02 basic: set 3, the texture of the cargo
+{
+    primary_spritesets: [ 0x0003 ];
+    secondary_spritesets: [ 0x0003 ];
 }
 switch<RoadVehicles, 0x02, PrimaryDWord> // the picture by the beacon, detail 4 (variable 5D, its first byte)
 {
@@ -188,6 +274,56 @@ switch<RoadVehicles, 0x02, PrimaryDWord> // the picture by the beacon, detail 4 
         0x00000000: 0x0000;
     };
     default: 0x0001;
+}
+switch<RoadVehicles, 0x1F, PrimaryDWord> // layer 0, the vehicle: more layers follow (register 100 bit 31)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x80000000;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x0002;
+    };
+    default: 0x0002;
+}
+switch<RoadVehicles, 0x20, PrimaryDWord> // layer 1, the stencil: cut out of the next layer (bit 30), more follow (bit 31), from 3,5 in the texture (registers 101, 102)
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0xC0000000;
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000003;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000101;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000005;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000102;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x0005;
+    };
+    default: 0x0005;
+}
+switch<RoadVehicles, 0x21, PrimaryDWord> // the layers of the sprite stack (variable 10, bits 8-15): vehicle, stencil, texture
+{
+    expression:
+    {
+        value1 = variable[0x10] & 0x0000FF00;
+    };
+    ranges:
+    {
+        0x00000000: 0x001F;
+        0x00000100: 0x0020;
+        0x00000200: 0x0006;
+    };
+    default: 0x0006;
 }
 switch<RoadVehicles, 0x03, PrimaryDWord> // the texts of the configurator (callback 1C0, variable 10)
 {
@@ -450,7 +586,7 @@ switch<RoadVehicles, 0x04, PrimaryDWord> // the callbacks
         0x000001C0: 0x0003;
         0x000001C1: 0x0019;
     };
-    default: 0x0002;
+    default: 0x0021;
 }
 feature_graphics<RoadVehicles> // Action03
 {

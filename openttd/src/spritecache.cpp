@@ -21,6 +21,7 @@
 #include "spritecache_internal.h"
 #include "palette_func.h"
 #include "true_colour.h"
+#include "cargo_cutout.h"
 
 #include "table/sprites.h"
 #include "table/palette_convert.h"
@@ -586,9 +587,12 @@ struct LoadedSpriteCopy {
  * @param sc the empty vehicle's sprite
  * @param sprite_type the type of the sprites
  * @param encoder the encoder, for whether 32bpp sprites are wanted
+ * @param colours the colours the loaded vehicle is painted in, if any
+ * @param want_32bpp read the 32bpp picture whatever the encoder draws: a
+ *                   texture is cut in 32bpp before the picture is made 8bpp
  * @return the copies, empty where the zoom level is not there
  */
-static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc, SpriteType sprite_type, SpriteEncoder *encoder, const TrueColourSet *colours = nullptr)
+static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc, SpriteType sprite_type, SpriteEncoder *encoder, const TrueColourSet *colours = nullptr, bool want_32bpp = false)
 {
 	SpriteCollMap<LoadedSpriteCopy> copies;
 	SpriteLoader::SpriteCollection empty;
@@ -596,7 +600,7 @@ static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc,
 	ZoomLevels avail_8bpp;
 	ZoomLevels avail_32bpp;
 	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
-	if (encoder->Is32BppSupported()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (want_32bpp || encoder->Is32BppSupported()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
 	const bool rgb = avail.Any();
 	if (avail.None()) avail = loader.LoadSprite(empty, *sc->file, sc->file_pos, sprite_type, false, sc->control_flags, avail_8bpp, avail_32bpp);
 	/* In the same colours as the loaded vehicle, or every painted pixel would differ and be load. */
@@ -611,6 +615,49 @@ static SpriteCollMap<LoadedSpriteCopy> ReadGreenLoadEmpty(const SpriteCache *sc,
 		copy.data.assign(s.data, s.data + static_cast<size_t>(s.width) * s.height);
 	}
 	return copies;
+}
+
+/**
+ * Cut a load out of a texture (SetCutoutSprite()): every pixel of the stencil
+ * takes the texture's colour at its place, moved by the start the set gave
+ * and round again at the texture's edges, times the stencil's own colour as
+ * a shading; its alpha is the stencil's times the texture's, its mask index
+ * stays the stencil's, for the colours. The start is in pixels of the normal
+ * zoom and scaled to each level; a level the texture has not got is left as
+ * the stencil is.
+ * @param sprite the stencil, as read
+ * @param avail the zoom levels read
+ * @param texture the texture, copied out level by level (ReadGreenLoadEmpty())
+ * @param x where in the texture the cut starts, in pixels of the normal zoom
+ * @param y and down
+ * @return how many pixels were cut, over all zoom levels
+ */
+static uint CutOutTexture(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, const SpriteCollMap<LoadedSpriteCopy> &texture, int x, int y)
+{
+	uint cut = 0;
+	for (ZoomLevel zoom : avail) {
+		const LoadedSpriteCopy &t = texture[zoom];
+		if (t.data.empty() || t.width == 0 || t.height == 0) continue;
+		SpriteLoader::Sprite &s = sprite[zoom];
+		if (s.data == nullptr) continue;
+		const int scale = zoom <= ZoomLevel::Normal ? 1 << (to_underlying(ZoomLevel::Normal) - to_underlying(zoom)) : 1;
+		const int sx = x * scale, sy = y * scale;
+		for (int py = 0; py < s.height; py++) {
+			const int ty = ((py + sy) % t.height + t.height) % t.height;
+			for (int px = 0; px < s.width; px++) {
+				SpriteLoader::CommonPixel &p = s.data[static_cast<size_t>(py) * s.width + px];
+				if (p.a == 0) continue;
+				const int tx = ((px + sx) % t.width + t.width) % t.width;
+				const SpriteLoader::CommonPixel &q = t.data[static_cast<size_t>(ty) * t.width + tx];
+				p.r = static_cast<uint8_t>(q.r * p.r / 255);
+				p.g = static_cast<uint8_t>(q.g * p.g / 255);
+				p.b = static_cast<uint8_t>(q.b * p.b / 255);
+				p.a = static_cast<uint8_t>(p.a * q.a / 255);
+				cut++;
+			}
+		}
+	}
+	return cut;
 }
 
 /**
@@ -687,6 +734,11 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	/* A vehicle in the colours of its set (SetTrueColourSprite()). */
 	const TrueColourSet *colours = sc->true_colours != 0 ? &GetTrueColourSet(sc->true_colours) : nullptr;
 
+	/* A load cut out of a texture reads the texture first, since the loader's
+	 * buffers are shared (SetCutoutSprite()). */
+	SpriteCollMap<LoadedSpriteCopy> cutout_texture;
+	if (sc->cutout_texture != 0) cutout_texture = ReadGreenLoadEmpty(GetSpriteCache(sc->cutout_texture), sprite_type, encoder, nullptr, true);
+
 	/* A loaded vehicle with its load drawn green reads its empty self first,
 	 * since the loader's buffers are shared (SetGreenLoadSprite()). */
 	SpriteCollMap<LoadedSpriteCopy> green_load_empty;
@@ -708,11 +760,12 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	if (sprite_avail.None()) {
 		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, false, sc->control_flags, avail_8bpp, avail_32bpp);
 		if (sprite_type == SpriteType::Normal && avail_32bpp.Any() && !encoder->Is32BppSupported() && sprite_avail.None()) {
-			if (colours != nullptr) {
-				/* Painted in 32bpp, from the grey's lightness, and only then
-				 * made 8bpp: the palette's nearest to each painted pixel. */
+			if (colours != nullptr || sc->cutout_texture != 0) {
+				/* Cut and painted in 32bpp, from the grey's lightness, and
+				 * only then made 8bpp: the palette's nearest to each pixel. */
 				sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
-				PaintTrueColours(sprite, sprite_avail, *colours, true, false);
+				if (sc->cutout_texture != 0) CutOutTexture(sprite, sprite_avail, cutout_texture, sc->cutout_x, sc->cutout_y);
+				if (colours != nullptr) PaintTrueColours(sprite, sprite_avail, *colours, true, false);
 				for (ZoomLevel zoom : sprite_avail) Convert32bppTo8bpp(sprite[zoom]);
 				painted = true;
 			} else {
@@ -758,8 +811,10 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 		return s;
 	}
 
-	/* The colours first, the green load over them: a load layer is green
-	 * whole, and the empty vehicle it is told from is painted alike. */
+	/* The texture cut out first, the colours over it, the green load over
+	 * them: a load layer is green whole, and the empty vehicle it is told
+	 * from is painted alike. */
+	if (sc->cutout_texture != 0 && read_32bpp) CutOutTexture(sprite, sprite_avail, cutout_texture, sc->cutout_x, sc->cutout_y);
 	if (colours != nullptr && !painted) PaintTrueColours(sprite, sprite_avail, *colours, read_32bpp, !encoder->Is32BppSupported());
 	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty, green_whole);
 
@@ -975,6 +1030,7 @@ bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id)
 	sc->control_flags = control_flags;
 	sc->green_load_empty = 0;
 	sc->true_colours = 0;
+	sc->cutout_texture = 0;
 
 	return true;
 }
@@ -994,6 +1050,55 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr)
 	scnew->control_flags = scold->control_flags;
 	scnew->green_load_empty = 0;
 	scnew->true_colours = scold->true_colours;
+	scnew->cutout_texture = scold->cutout_texture;
+	scnew->cutout_x = scold->cutout_x;
+	scnew->cutout_y = scold->cutout_y;
+}
+
+/**
+ * Make a sprite a load cut out of a texture: the picture 'stencil' over again
+ * with every pixel of it taken from 'texture' -- its alpha the stencil's
+ * times the texture's, its colour the texture's times the stencil's as a
+ * shading (white as it is, darker shaded), its mask index the stencil's --
+ * the texture taken from x, y on and round again at its edges, so one
+ * texture serves every heap of a cargo and no two heaps need look alike
+ * (CutOutTexture(), the colleague's point 10). Made when the sprite is read.
+ * @param sprite the sprite to make
+ * @param stencil the picture of the load's shape and shading
+ * @param texture the picture of the cargo, any size
+ * @param x where in the texture the cut starts, in pixels of the normal zoom
+ * @param y and down
+ * @return whether it was made: both must be pictures read from a file
+ */
+bool SetCutoutSprite(SpriteID sprite, SpriteID stencil, SpriteID texture, int16_t x, int16_t y)
+{
+	if (stencil >= _spritecache.size() || texture >= _spritecache.size()) return false;
+	const SpriteCache *scs = GetSpriteCache(stencil);
+	const SpriteCache *sct = GetSpriteCache(texture);
+	if (scs->file == nullptr || scs->type != SpriteType::Normal || sct->file == nullptr || sct->type != SpriteType::Normal) return false;
+
+	DupSprite(stencil, sprite);
+	SpriteCache *sc = GetSpriteCache(sprite);
+	sc->cutout_texture = texture;
+	sc->cutout_x = x;
+	sc->cutout_y = y;
+	return true;
+}
+
+/** Where the next sprite made from others goes (AllocateDerivedSpriteID()); 0 until the first. */
+static SpriteID _derived_next = 0;
+
+/**
+ * A sprite number for a picture made from others -- a vehicle in colours,
+ * a load cut out of a texture -- after the last sprite the game and its sets
+ * have read. One counter for all of them, so none takes another's.
+ * @return the number, or 0 when there is no room
+ */
+SpriteID AllocateDerivedSpriteID()
+{
+	if (_derived_next == 0) _derived_next = GetMaxSpriteID();
+	if (_derived_next >= MAX_SPRITES) return 0;
+	return _derived_next++;
 }
 
 /**
@@ -1098,7 +1203,9 @@ std::string DescribeTrueColourSprite(SpriteID sprite)
 {
 	if (sprite >= _spritecache.size()) return "neni";
 	const SpriteCache *sc = GetSpriteCache(sprite);
-	if (sc->true_colours == 0 || sc->file == nullptr) return "bez barev";
+	if ((sc->true_colours == 0 && sc->cutout_texture == 0) || sc->file == nullptr) return "bez barev";
+	SpriteCollMap<LoadedSpriteCopy> cutout_texture;
+	if (sc->cutout_texture != 0) cutout_texture = ReadGreenLoadEmpty(GetSpriteCache(sc->cutout_texture), SpriteType::Normal, BlitterFactory::GetCurrentBlitter(), nullptr, true);
 
 	SpriteLoader::SpriteCollection coll;
 	ZoomLevels avail;
@@ -1115,21 +1222,25 @@ std::string DescribeTrueColourSprite(SpriteID sprite)
 	ZoomLevels one{top};
 	const SpriteLoader::Sprite &s = coll[top];
 	const size_t n = static_cast<size_t>(s.width) * s.height;
-	/* A painted pixel is its colour and no longer a mask index. */
+	uint cut = sc->cutout_texture != 0 && bpp32 ? CutOutTexture(coll, one, cutout_texture, sc->cutout_x, sc->cutout_y) : 0;
+	/* A painted pixel is its colour and no longer a mask index; a cut one
+	 * counts as painted too, since it has a colour of its own now. */
 	std::vector<uint8_t> masked(n);
-	for (size_t i = 0; i < n; i++) masked[i] = s.data[i].m;
-	uint painted = PaintTrueColours(coll, one, GetTrueColourSet(sc->true_colours), bpp32, false);
+	for (size_t i = 0; i < n; i++) masked[i] = sc->cutout_texture != 0 ? (s.data[i].a != 0 ? 1 : 0) : s.data[i].m;
+	uint painted = sc->true_colours != 0 ? PaintTrueColours(coll, one, GetTrueColourSet(sc->true_colours), bpp32, false) : 0;
+	if (sc->true_colours == 0) painted = cut;
 
 	std::map<uint32_t, uint> counts;
 	for (size_t i = 0; i < n; i++) {
 		const SpriteLoader::CommonPixel &p = s.data[i];
-		if (masked[i] != 0 && p.m == 0) counts[p.r << 16 | p.g << 8 | p.b]++;
+		if (masked[i] != 0 && (p.m == 0 || sc->cutout_texture != 0) && p.a != 0) counts[p.r << 16 | p.g << 8 | p.b]++;
 	}
 	std::vector<std::pair<uint, uint32_t>> order;
 	for (const auto &[rgb, n] : counts) order.emplace_back(n, rgb);
 	std::ranges::sort(order, std::greater{});
 
-	std::string out = fmt::format("z {} zoom {} {} natreno {} px", sc->id, to_underlying(top), bpp32 ? "32bpp" : "8bpp", painted);
+	std::string out = fmt::format("z {} zoom {} {}{} sada {} natreno {} px", sc->id, to_underlying(top), bpp32 ? "32bpp" : "8bpp",
+			sc->cutout_texture != 0 ? fmt::format(" vystrizeno z {} od {},{} {} px", GetSpriteCache(sc->cutout_texture)->id, sc->cutout_x, sc->cutout_y, cut) : "", sc->true_colours, painted);
 	for (size_t i = 0; i < std::min<size_t>(3, order.size()); i++) out += fmt::format(" #{:06X}:{}", order[i].second, order[i].first);
 	return out;
 }
@@ -1344,8 +1455,11 @@ void GfxInitSpriteMem()
 	_sprite_files.clear();
 	_spritecache_bytes_used = 0;
 
-	/* The pictures made in colours were made from sprites now gone. */
+	/* The pictures made in colours and the loads cut out of textures were
+	 * made from sprites now gone. */
+	_derived_next = 0;
 	ResetTrueColourSprites();
+	ResetCutoutSprites();
 }
 
 /**

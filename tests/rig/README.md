@@ -429,7 +429,15 @@ and reads #CE5A2D at a year, #B4503C at two and after, orange again at none.
 A sixth detail, unnamed in 1C0, is a green patch on the body (mask 0x70-0x77)
 the set turns rather than paints (register 101 = 1) and colours itself by the
 cargo (option FE, asked with the vehicle): carrying passengers it is hay,
-#F0EF69, refitted to mail it is green as drawn, #28A03C.
+#F0EF69, refitted to mail it is green as drawn, #28A03C. The vehicle is a
+sprite stack of three layers: the vehicle, a stencil (an ellipse, 254 above
+and grey 128 below, mask 0x70-0x77, bit 30 of register 100 and a start of
+3,5 in registers 101 and 102) and a texture of four greens in 16-pixel
+blocks the stencil is cut from (`src/cargo_cutout.h`). The probe reads two
+layers, the second cut from the texture: with mail the texture's greens at
+half under the grey, #1E5A28 and #0F3C19, with passengers the same cut
+turned to hay, #878744; the reading is taken before the refit back, which
+draws the vehicle over again itself.
 
 `getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,

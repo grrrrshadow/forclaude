@@ -309,6 +309,61 @@ vehicle's parts are all painted with the choices on its front, each part asked
 of its own engine. In an 8bpp game each painted pixel becomes the nearest
 colour of the palette.
 
+### 5. A load cut out of one texture
+
+The player's word: one picture of marijuana for every body, and for each
+vehicle, direction and load only the outline, which takes next to nothing in
+the file; for loose cargo (marijuana, hay, coal, sand), not for crates and
+barrels. Two sprites of the set:
+
+- the **texture**: one picture of the cargo, 32bpp, any size, in the zoom
+  levels the stencils have;
+- the **stencil**: the load's shape as alpha (0 outside, 255 inside, soft at
+  the edge), its RGB a **shading** the texture is multiplied by (white as it
+  is, grey shaded, black black), and a mask (`c32bpp | mask`) where the load
+  is to be coloured or turned by section 4.
+
+In the **sprite stack** the stencil is one layer and the texture the layer
+right after it. In the stencil layer's register **0x100** set **bit 30** ("cut
+me out of the next layer"), with bit 31 ("more layers") as ever, and in
+registers **0x101** and **0x102** where in the texture the cut starts (x and
+y, in pixels of the normal zoom, scaled to each level); the texture goes round
+at its edges, so any start will do and no two heaps need look alike. The game
+makes one sprite of the two when it is read -- alpha the stencil's times the
+texture's, colour the texture's times the shading, mask the stencil's -- and
+draws it in the stencil's place as any load: coloured or turned by section 4,
+green for the game's marijuana, scaled for the levels not in the file. The
+texture layer itself is not drawn. The file holds one texture per cargo; the
+memory of the game is as with a load drawn in full, since the sprite made is
+full.
+
+```
+switch<RoadVehicles, 0x20, PrimaryDWord> // layer 1, the stencil
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0xC0000000;      // bits 31 and 30
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000003;      // x = 3
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000101;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000005;      // y = 5
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000102;
+        value1 = TempStore(value1, value2);
+    };
+    ranges: { 0x00000000: 0x0005; };               // the stencil's sprite set
+    default: 0x0005;
+}
+```
+
+The rig's `tests/rig/grf/barvy.yagl` is a stack of three layers this way.
+As in any Action 2 chain, the switch of a layer may refer only to groups
+defined before it in the file: a reference to a number not yet defined
+resolves to nothing and that layer is simply not drawn.
+
 ## Limits and rules
 
 - At most 16 details, 32 options each. More are not read.

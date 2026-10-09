@@ -31,6 +31,9 @@ struct SpriteCache {
 	SpriteCacheCtrlFlags control_flags{}; ///< Control flags, see SpriteCacheCtrlFlags
 	SpriteID green_load_empty = 0; ///< For a loaded vehicle drawn with a green load (SetGreenLoadSprite()): the same vehicle empty, whose difference from this one is the load; GREEN_LOAD_WHOLE for a set's load layer drawn green whole (SetGreenLayerSprite()).
 	uint16_t true_colours = 0; ///< For a vehicle drawn in the colours of its set (SetTrueColourSprite()): the colours, a set of true_colour.h; 0 for a picture as it is.
+	SpriteID cutout_texture = 0; ///< For a load cut out of a texture by this sprite as the stencil (SetCutoutSprite()): the texture; 0 for a picture as it is.
+	int16_t cutout_x = 0; ///< Where in the texture the cut starts, in pixels of the normal zoom.
+	int16_t cutout_y = 0; ///< And down.
 
 	void ClearSpriteData();
 };

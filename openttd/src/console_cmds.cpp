@@ -8495,7 +8495,9 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
  * (its painted pixels and their commonest colours, read in 32bpp), in the
  * purchase list and on the vehicle; refits it from passengers to mail and
  * back and watches the heap the set turns to hay by the cargo (option FE) go
- * green again; ages the vehicle by hand and watches the
+ * green again, and the load cut out of the texture by the stencil layer
+ * (bit 30 of register 100) come out in the texture's greens, shaded, as one
+ * layer; ages the vehicle by hand and watches the
  * cab's orange fade to brick red year by year and come back new; then
  * chooses other colours, a detail that
  * is no colour (the company colour) and the beacon of variable 5D, reads the
@@ -8608,12 +8610,34 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
 	std::string heap_mail = DescribeVehicleTrueColours(v);
 	std::string heap_mail_pic = DescribeTrueColourSprite(picture());
+	/* The load cut out of the texture, the second layer of the stack: the
+	 * texture layer is gone into it, and it is green blocks of the texture
+	 * with mail, shaded darker below, hay with passengers. Read before the
+	 * refit back, which draws the vehicle over again itself (MarkDirty()). */
+	uint layers = v->sprite_cache.sprite_seq.count;
+	auto second_layer = [&]() {
+		if (v->sprite_cache.sprite_seq.count < 2) return std::string("jen jedna vrstva");
+		SpriteID s = v->sprite_cache.sprite_seq.seq[1].sprite;
+		return fmt::format("obrazek {}: {}", s, DescribeTrueColourSprite(s));
+	};
+	std::string cut_mail = second_layer();
 	CommandCost back = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, v->index, GetCargoTypeByLabel(CT_PASSENGERS), 0, false, false, 0));
 	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
+	picture();
+	std::string cut_pax = second_layer();
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi: {}", heap_pax);
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi obrazek: {}", heap_pax_pic);
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s postou ({}): {}", to_mail.Succeeded() ? "prestaveno" : "PRESTAVBA ODMITNUTA", heap_mail);
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s postou obrazek: {}", heap_mail_pic);
+	IConsolePrint(CC_DEFAULT, "testbarvy: vrstev {}, kupa z textury s postou: {}", layers, cut_mail);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa z textury s cestujicimi: {}", cut_pax);
+	/* The stencil's lower half is grey 128, so the commonest colours are the
+	 * texture's greens at half: (60,180,80) -> #1E5A28, (30,120,50) ->
+	 * #0F3C19; with passengers the same cut turned to hay, #878744. */
+	bool cutout_ok = layers == 2 && cut_mail.find("vystrizeno") != std::string::npos && cut_mail.find("#1E5A28") != std::string::npos && cut_mail.find("#0F3C19") != std::string::npos
+			&& cut_pax.find("vystrizeno") != std::string::npos && cut_pax.find("#878744") != std::string::npos && cut_pax.find("#1E5A28") == std::string::npos;
+	if (!cutout_ok) refuse("kupa z textury: 2 vrstvy, s postou zelene bloky textury stinovane (#1E5A28, #0F3C19), s cestujicimi otocena na seno (#878744)");
+
 	bool heap_ok = to_mail.Succeeded() && back.Succeeded() && heap_pax.find("otoceni -50 sytost 96/128 jas 192/128") != std::string::npos
 			&& heap_mail.find("otoceni 0 sytost 128/128 jas 128/128") != std::string::npos && heap_pax_pic.find("#28A03C") == std::string::npos && heap_mail_pic.find("#28A03C") != std::string::npos;
 	if (!heap_ok) refuse("kupa podle nakladu: s cestujicimi ma byt otocena na seno (-50, 96, 192) a bez #28A03C, s postou neotocena a zelena #28A03C");
@@ -8694,9 +8718,9 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 		}
 	}
 
-	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} sad={} obrazku={}", aspects.size(),
+	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} textura={} sad={} obrazku={}", aspects.size(),
 			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
-			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
+			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", cutout_ok ? "vystrizena" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
 	return true;
 }
 

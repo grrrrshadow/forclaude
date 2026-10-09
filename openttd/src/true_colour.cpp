@@ -23,8 +23,6 @@
 static std::vector<TrueColourSet> _true_colour_sets;
 /** The pictures made in a set of colours: the picture and the set, to the picture made. */
 static std::unordered_map<uint64_t, SpriteID> _true_colour_sprites;
-/** Where the next picture made goes; 0 until the first, which goes after the last sprite read. */
-static SpriteID _true_colour_next = 0;
 /** Changes whenever the sets are read anew, so every vehicle asks its colours again (GetVehicleTrueColours()). */
 static uint16_t _true_colour_epoch = 1;
 
@@ -231,10 +229,8 @@ SpriteID TrueColourSprite(SpriteID sprite, uint16_t set)
 	if (it != _true_colour_sprites.end()) return it->second;
 	if (_true_colour_sprites.size() >= TRUE_COLOUR_SPRITE_LIMIT) return sprite;
 
-	if (_true_colour_next == 0) _true_colour_next = GetMaxSpriteID();
-	if (_true_colour_next >= MAX_SPRITES) return sprite;
-	if (!SetTrueColourSprite(_true_colour_next, sprite, set)) return sprite;
-	SpriteID made = _true_colour_next++;
+	SpriteID made = AllocateDerivedSpriteID();
+	if (made == 0 || !SetTrueColourSprite(made, sprite, set)) return sprite;
 	_true_colour_sprites.emplace(key, made);
 	return made;
 }
@@ -248,7 +244,6 @@ void ResetTrueColourSprites()
 {
 	if (!_true_colour_sprites.empty()) Debug(sprite, 3, "Forgetting {} pictures in colours", _true_colour_sprites.size());
 	_true_colour_sprites.clear();
-	_true_colour_next = 0;
 	if (++_true_colour_epoch == 0) _true_colour_epoch = 1;
 }
 
