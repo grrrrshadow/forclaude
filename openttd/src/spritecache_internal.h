@@ -34,6 +34,8 @@ struct SpriteCache {
 	SpriteID cutout_texture = 0; ///< For a load cut out of a texture by this sprite as the stencil (SetCutoutSprite()): the texture; 0 for a picture as it is.
 	int16_t cutout_x = 0; ///< Where in the texture the cut starts, in pixels of the normal zoom.
 	int16_t cutout_y = 0; ///< And down.
+	int16_t shift_x = 0; ///< For a picture its set moved (SetShiftedSprite()): how far to the right, in sixteenths of a pixel of the normal zoom; 0 for a picture where it is.
+	int16_t shift_y = 0; ///< And down.
 
 	void ClearSpriteData();
 };

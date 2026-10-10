@@ -364,6 +364,43 @@ As in any Action 2 chain, the switch of a layer may refer only to groups
 defined before it in the file: a reference to a number not yet defined
 resolves to nothing and that layer is simply not drawn.
 
+### 6. A layer moved, a layer turned round: registers 0x103 to 0x105
+
+The colleague's word: a cart pushed is the cart pulled, seen from the
+direction four on; a lorry going back is the lorry going there. The same
+pixels, another alignment, and the file so far held them twice. Three more
+registers of a layer of the sprite stack, read with the layer's sprite:
+
+- **0x103** and **0x104**: how far the layer is drawn to the right and down,
+  in **sixteenths of a pixel of the normal zoom** (a pixel of zin16, half a
+  pixel of zin8, a quarter of zin4), signed. The game makes a sprite of the
+  picture with its offsets moved and draws that, in the world and in every
+  window, once for each picture and shift.
+- **0x105**: the layer takes its picture from its sprite set as if the vehicle
+  faced that many directions further round: 4 turns it about, so a set of
+  eight pictures serves the cart both ways, and the switch on the vehicle's
+  direction (variable 0x9F) gives each way its own shift in 0x103 and 0x104.
+
+A layer that is a stencil (section 5) is moved and turned too; its cut is
+made in its own pixels, so the start in 0x101 and 0x102 is unchanged. The
+three registers, like bit 30, are read only from a set that asked for the
+feature (section 1): any other set is drawn as it always was.
+
+```
+    value2 = variable[0x1A] & 0x00000010;      // 16 sixteenths = 1 pixel right
+    value1 = Assign(value1, value2);
+    value2 = variable[0x1A] & 0x00000103;
+    value1 = TempStore(value1, value2);
+    value2 = variable[0x1A] & 0xFFFFFFE0;      // -32 = 2 pixels up
+    value1 = Assign(value1, value2);
+    value2 = variable[0x1A] & 0x00000104;
+    value1 = TempStore(value1, value2);
+    value2 = variable[0x1A] & 0x00000004;      // four directions on
+    value1 = Assign(value1, value2);
+    value2 = variable[0x1A] & 0x00000105;
+    value1 = TempStore(value1, value2);
+```
+
 ## Limits and rules
 
 - At most 16 details, 32 options each. More are not read.

@@ -265,6 +265,8 @@ add_files(
     landscape_cmd.h
     landscape_type.h
     language.h
+    layer_shift.cpp
+    layer_shift.h
     league_base.h
     league_cmd.h
     league_cmd.cpp

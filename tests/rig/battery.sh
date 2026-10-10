@@ -1674,7 +1674,11 @@ echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testko
 # in 101 and 102) cut out of the third, a texture of greens in blocks
 # (cargo_cutout.h): the probe reads two layers, the second cut from the
 # texture, the texture's greens at half under the stencil's grey, and the
-# same cut turned to hay with passengers. odmitnuto is zero.
+# same cut turned to hay with passengers. The stencil layer is also moved by
+# registers 103 and 104 (16 right, 32 up in sixteenths of a normal pixel)
+# and taken from four directions on (105, layer_shift.h): the probe reads
+# the stencil as sprite 28 of the file, not 32, with its offsets moved from
+# -20,-12 to -12,-28 at 8x. odmitnuto is zero.
 BARVY_CFG=$S/barvy_openttd.cfg
 sed '/^\[newgrf\]$/a barvy.grf = ' "$CFG_KEEP" > $BARVY_CFG
 run_scene barvy "testbarvy" 30 -c $BARVY_CFG

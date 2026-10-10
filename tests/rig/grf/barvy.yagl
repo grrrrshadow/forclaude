@@ -19,7 +19,10 @@
 // ellipse, white above and grey below, mask 0x70-0x77) with bit 30 of
 // register 100 and a start of 3,5 in registers 101 and 102, and the texture
 // of the cargo (greens in blocks) the stencil is cut from; the game makes
-// one load of the two, turned to hay like the patch.
+// one load of the two, turned to hay like the patch. The stencil layer is
+// also moved a pixel right and two up (registers 103, 104, sixteenths of a
+// normal pixel) and taken from four directions on (105), as a cart pushed
+// is the cart pulled the other way round.
 // the cab is then the company colour, as drawn. The beacon is detail 4, read
 // in variable 5D. The pictures are grey 32bpp with a mask, zin8 only:
 // flat areas at the lightness where each colour is exactly itself, a row at
@@ -289,7 +292,7 @@ switch<RoadVehicles, 0x1F, PrimaryDWord> // layer 0, the vehicle: more layers fo
     };
     default: 0x0002;
 }
-switch<RoadVehicles, 0x20, PrimaryDWord> // layer 1, the stencil: cut out of the next layer (bit 30), more follow (bit 31), from 3,5 in the texture (registers 101, 102)
+switch<RoadVehicles, 0x20, PrimaryDWord> // layer 1, the stencil: cut out of the next layer (bit 30), more follow (bit 31), from 3,5 in the texture (registers 101, 102); moved 16 right and 32 up in sixteenths of a normal pixel (103, 104) and taken from four directions on (105)
 {
     expression:
     {
@@ -303,6 +306,18 @@ switch<RoadVehicles, 0x20, PrimaryDWord> // layer 1, the stencil: cut out of the
         value2 = variable[0x1A] & 0x00000005;
         value1 = Assign(value1, value2);
         value2 = variable[0x1A] & 0x00000102;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000010;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000103;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0xFFFFFFE0;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000104;
+        value1 = TempStore(value1, value2);
+        value2 = variable[0x1A] & 0x00000004;
+        value1 = Assign(value1, value2);
+        value2 = variable[0x1A] & 0x00000105;
         value1 = TempStore(value1, value2);
     };
     ranges:

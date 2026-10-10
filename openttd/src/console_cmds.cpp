@@ -8637,6 +8637,13 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	bool cutout_ok = layers == 2 && cut_mail.find("vystrizeno") != std::string::npos && cut_mail.find("#1E5A28") != std::string::npos && cut_mail.find("#0F3C19") != std::string::npos
 			&& cut_pax.find("vystrizeno") != std::string::npos && cut_pax.find("#878744") != std::string::npos && cut_pax.find("#1E5A28") == std::string::npos;
 	if (!cutout_ok) refuse("kupa z textury: 2 vrstvy, s postou zelene bloky textury stinovane (#1E5A28, #0F3C19), s cestujicimi otocena na seno (#878744)");
+	/* The stencil layer is moved by registers 103 and 104 (16 right, 32 up
+	 * in sixteenths of a normal pixel: 8 and 16 pixels at 8x, the file's
+	 * offsets -20,-12 become -12,-28) and taken from four directions on
+	 * (105): the vehicle faces NW, direction 7, so the stencil is sprite 3
+	 * of its set, file sprite 28, not 32 (layer_shift.h). */
+	bool shift_ok = cut_mail.find("z 28 ") != std::string::npos && cut_mail.find("posun 16,-32 ofs -12,-28") != std::string::npos;
+	if (!shift_ok) refuse("posun vrstvy: obrys ze smeru + 4 (sprite 28) posunuty o 16,-32 na ofs -12,-28");
 
 	bool heap_ok = to_mail.Succeeded() && back.Succeeded() && heap_pax.find("otoceni -50 sytost 96/128 jas 192/128") != std::string::npos
 			&& heap_mail.find("otoceni 0 sytost 128/128 jas 128/128") != std::string::npos && heap_pax_pic.find("#28A03C") == std::string::npos && heap_mail_pic.find("#28A03C") != std::string::npos;
@@ -8718,9 +8725,9 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 		}
 	}
 
-	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} textura={} sad={} obrazku={}", aspects.size(),
+	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} textura={} vrstva={} sad={} obrazku={}", aspects.size(),
 			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
-			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", cutout_ok ? "vystrizena" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
+			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", cutout_ok ? "vystrizena" : "NE", shift_ok ? "posunuta" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
 	return true;
 }
 

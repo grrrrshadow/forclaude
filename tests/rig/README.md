@@ -437,7 +437,12 @@ blocks the stencil is cut from (`src/cargo_cutout.h`). The probe reads two
 layers, the second cut from the texture: with mail the texture's greens at
 half under the grey, #1E5A28 and #0F3C19, with passengers the same cut
 turned to hay, #878744; the reading is taken before the refit back, which
-draws the vehicle over again itself.
+draws the vehicle over again itself. The stencil layer is also moved by
+registers 103 and 104 (16 right and 32 up, in sixteenths of a pixel of the
+normal zoom) and taken from four directions on (register 105,
+`src/layer_shift.h`, the colleague's cart pushed being the cart pulled the
+other way round): the probe reads it as sprite 28 of the file instead of 32,
+with the offsets -20,-12 of the file moved to -12,-28 at 8x.
 
 `getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,

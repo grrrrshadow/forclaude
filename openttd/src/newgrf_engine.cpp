@@ -11,6 +11,7 @@
 #include "vehicle_config.h"
 #include "true_colour.h"
 #include "cargo_cutout.h"
+#include "layer_shift.h"
 #include "debug.h"
 #include "train.h"
 #include "roadveh.h"
@@ -1177,15 +1178,25 @@ static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction d
 	uint max_stack = sprite_stack ? static_cast<uint>(std::size(result->seq)) : 1;
 	/* A layer with bit 30 of register 100 is the stencil of a load cut out of
 	 * the layer after it, the texture, from where registers 101 and 102 say
-	 * (cargo_cutout.h): the two become one sprite in the stencil's place. */
+	 * (cargo_cutout.h): the two become one sprite in the stencil's place. A
+	 * layer is drawn moved by registers 103 and 104, in sixteenths of a
+	 * pixel of the normal zoom (layer_shift.h), and takes its picture from
+	 * the set as if the vehicle went register 105 directions further round:
+	 * a cart pushed is the cart pulled, from the direction four on. All of
+	 * it only from a set that asked for this game's vehicle configuration
+	 * (GRFFile::vehicle_config): another set may leave anything in those
+	 * registers, and is drawn as it always was. */
 	bool stencil = false;
 	int16_t cut_x = 0, cut_y = 0;
+	const bool ours = sprite_stack && object.grffile != nullptr && object.grffile->vehicle_config;
 	for (uint stack = 0; stack < max_stack; ++stack) {
 		object.callback_param1 = to_underlying(image_type) | (stack << 8);
 		const auto *group = object.Resolve<ResultSpriteGroup>();
 		int32_t reg100 = sprite_stack ? object.GetRegister(0x100) : 0;
 		if (group != nullptr && group->num_sprites != 0) {
-			SpriteID sprite = group->sprite + (to_underlying(direction) % group->num_sprites);
+			uint turned = ours ? static_cast<uint>(object.GetRegister(0x105)) : 0;
+			SpriteID sprite = group->sprite + ((to_underlying(direction) + turned) % group->num_sprites);
+			if (ours) sprite = ShiftedSprite(sprite, static_cast<int16_t>(object.GetRegister(0x103)), static_cast<int16_t>(object.GetRegister(0x104)));
 			if (stencil) {
 				result->seq[result->count - 1].sprite = CutoutSprite(result->seq[result->count - 1].sprite, sprite, cut_x, cut_y);
 				stencil = false;
@@ -1193,7 +1204,7 @@ static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction d
 				result->seq[result->count].sprite = sprite;
 				result->seq[result->count].pal    = GB(reg100, 0, 16); // zero means default recolouring
 				result->count++;
-				if (sprite_stack && HasBit(reg100, 30)) {
+				if (ours && HasBit(reg100, 30)) {
 					stencil = true;
 					cut_x = static_cast<int16_t>(object.GetRegister(0x101));
 					cut_y = static_cast<int16_t>(object.GetRegister(0x102));

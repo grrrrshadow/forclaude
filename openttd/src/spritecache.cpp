@@ -22,6 +22,7 @@
 #include "palette_func.h"
 #include "true_colour.h"
 #include "cargo_cutout.h"
+#include "layer_shift.h"
 
 #include "table/sprites.h"
 #include "table/palette_convert.h"
@@ -661,6 +662,41 @@ static uint CutOutTexture(SpriteLoader::SpriteCollection &sprite, ZoomLevels ava
 }
 
 /**
+ * A shift given in sixteenths of a pixel of the normal zoom, in the pixels of
+ * a zoom level: sixteen times as many at 16x, one sixteenth at the normal
+ * zoom, rounded to the nearest.
+ * @param shift the shift, in sixteenths of a normal pixel
+ * @param zoom the level
+ * @return the shift in that level's pixels
+ */
+static int ScaledShift(int shift, ZoomLevel zoom)
+{
+	const int up = zoom <= ZoomLevel::Normal ? 1 << (to_underlying(ZoomLevel::Normal) - to_underlying(zoom)) : 1;
+	const int down = 16 * (zoom > ZoomLevel::Normal ? 1 << (to_underlying(zoom) - to_underlying(ZoomLevel::Normal)) : 1);
+	const int n = shift * up;
+	return (n + (n >= 0 ? down / 2 : -(down / 2))) / down;
+}
+
+/**
+ * Move a picture its set moved (SetShiftedSprite()): the offsets of every
+ * zoom level read, by the shift in that level's pixels (ScaledShift()); the
+ * levels the game makes from these take theirs from them.
+ * @param sprite the picture, as read
+ * @param avail the zoom levels read
+ * @param dx how far to the right, in sixteenths of a pixel of the normal zoom
+ * @param dy and down
+ */
+static void ShiftSpriteOffsets(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, int dx, int dy)
+{
+	for (ZoomLevel zoom : avail) {
+		SpriteLoader::Sprite &s = sprite[zoom];
+		if (s.data == nullptr) continue;
+		s.x_offs = static_cast<int16_t>(s.x_offs + ScaledShift(dx, zoom));
+		s.y_offs = static_cast<int16_t>(s.y_offs + ScaledShift(dy, zoom));
+	}
+}
+
+/**
  * Draw the load of a loaded vehicle green (SetGreenLoadSprite()): every pixel
  * of the loaded picture that the empty one does not have the same.
  * @param sprite the loaded vehicle, as read
@@ -817,6 +853,8 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	if (sc->cutout_texture != 0 && read_32bpp) CutOutTexture(sprite, sprite_avail, cutout_texture, sc->cutout_x, sc->cutout_y);
 	if (colours != nullptr && !painted) PaintTrueColours(sprite, sprite_avail, *colours, read_32bpp, !encoder->Is32BppSupported());
 	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty, green_whole);
+	/* Moved by its set (SetShiftedSprite()): the levels made below follow. */
+	if (sc->shift_x != 0 || sc->shift_y != 0) ShiftSpriteOffsets(sprite, sprite_avail, sc->shift_x, sc->shift_y);
 
 	if (!ResizeSprites(sprite, sprite_avail, encoder)) {
 		if (id == SPR_IMG_QUERY) UserError("Okay... something went horribly wrong. I couldn't resize the fallback sprite. What should I do?");
@@ -1031,6 +1069,8 @@ bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id)
 	sc->green_load_empty = 0;
 	sc->true_colours = 0;
 	sc->cutout_texture = 0;
+	sc->shift_x = 0;
+	sc->shift_y = 0;
 
 	return true;
 }
@@ -1053,6 +1093,8 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr)
 	scnew->cutout_texture = scold->cutout_texture;
 	scnew->cutout_x = scold->cutout_x;
 	scnew->cutout_y = scold->cutout_y;
+	scnew->shift_x = scold->shift_x;
+	scnew->shift_y = scold->shift_y;
 }
 
 /**
@@ -1082,6 +1124,32 @@ bool SetCutoutSprite(SpriteID sprite, SpriteID stencil, SpriteID texture, int16_
 	sc->cutout_texture = texture;
 	sc->cutout_x = x;
 	sc->cutout_y = y;
+	return true;
+}
+
+/**
+ * Make a sprite a picture moved by its set: 'original' over again with its
+ * offsets moved by dx and dy (ShiftSpriteOffsets(), the colleague's word: the
+ * same pixels with another alignment, as a cart pushed is the cart pulled
+ * from the direction four on). Made when the sprite is read; a picture
+ * already cut out or moved keeps that and is moved further.
+ * @param sprite the sprite to make
+ * @param original the picture
+ * @param dx how far to the right, in sixteenths of a pixel of the normal zoom
+ * @param dy and down
+ * @return whether it was made: the original must be a picture read from a file
+ */
+bool SetShiftedSprite(SpriteID sprite, SpriteID original, int16_t dx, int16_t dy)
+{
+	if (original >= _spritecache.size()) return false;
+	const SpriteCache *sco = GetSpriteCache(original);
+	if (sco->file == nullptr || sco->type != SpriteType::Normal) return false;
+
+	DupSprite(original, sprite);
+	SpriteCache *sc = GetSpriteCache(sprite);
+	sc->green_load_empty = sco->green_load_empty;
+	sc->shift_x = static_cast<int16_t>(sc->shift_x + dx);
+	sc->shift_y = static_cast<int16_t>(sc->shift_y + dy);
 	return true;
 }
 
@@ -1203,7 +1271,7 @@ std::string DescribeTrueColourSprite(SpriteID sprite)
 {
 	if (sprite >= _spritecache.size()) return "neni";
 	const SpriteCache *sc = GetSpriteCache(sprite);
-	if ((sc->true_colours == 0 && sc->cutout_texture == 0) || sc->file == nullptr) return "bez barev";
+	if ((sc->true_colours == 0 && sc->cutout_texture == 0 && sc->shift_x == 0 && sc->shift_y == 0) || sc->file == nullptr) return "bez barev";
 	SpriteCollMap<LoadedSpriteCopy> cutout_texture;
 	if (sc->cutout_texture != 0) cutout_texture = ReadGreenLoadEmpty(GetSpriteCache(sc->cutout_texture), SpriteType::Normal, BlitterFactory::GetCurrentBlitter(), nullptr, true);
 
@@ -1229,6 +1297,7 @@ std::string DescribeTrueColourSprite(SpriteID sprite)
 	for (size_t i = 0; i < n; i++) masked[i] = sc->cutout_texture != 0 ? (s.data[i].a != 0 ? 1 : 0) : s.data[i].m;
 	uint painted = sc->true_colours != 0 ? PaintTrueColours(coll, one, GetTrueColourSet(sc->true_colours), bpp32, false) : 0;
 	if (sc->true_colours == 0) painted = cut;
+	if (sc->shift_x != 0 || sc->shift_y != 0) ShiftSpriteOffsets(coll, one, sc->shift_x, sc->shift_y);
 
 	std::map<uint32_t, uint> counts;
 	for (size_t i = 0; i < n; i++) {
@@ -1239,8 +1308,9 @@ std::string DescribeTrueColourSprite(SpriteID sprite)
 	for (const auto &[rgb, n] : counts) order.emplace_back(n, rgb);
 	std::ranges::sort(order, std::greater{});
 
-	std::string out = fmt::format("z {} zoom {} {}{} sada {} natreno {} px", sc->id, to_underlying(top), bpp32 ? "32bpp" : "8bpp",
-			sc->cutout_texture != 0 ? fmt::format(" vystrizeno z {} od {},{} {} px", GetSpriteCache(sc->cutout_texture)->id, sc->cutout_x, sc->cutout_y, cut) : "", sc->true_colours, painted);
+	std::string out = fmt::format("z {} zoom {} {}{}{} sada {} natreno {} px", sc->id, to_underlying(top), bpp32 ? "32bpp" : "8bpp",
+			sc->cutout_texture != 0 ? fmt::format(" vystrizeno z {} od {},{} {} px", GetSpriteCache(sc->cutout_texture)->id, sc->cutout_x, sc->cutout_y, cut) : "",
+			sc->shift_x != 0 || sc->shift_y != 0 ? fmt::format(" posun {},{} ofs {},{}", sc->shift_x, sc->shift_y, s.x_offs, s.y_offs) : "", sc->true_colours, painted);
 	for (size_t i = 0; i < std::min<size_t>(3, order.size()); i++) out += fmt::format(" #{:06X}:{}", order[i].second, order[i].first);
 	return out;
 }
@@ -1460,6 +1530,7 @@ void GfxInitSpriteMem()
 	_derived_next = 0;
 	ResetTrueColourSprites();
 	ResetCutoutSprites();
+	ResetShiftedSprites();
 }
 
 /**

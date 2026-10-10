@@ -64,6 +64,7 @@ void SetGreenLoadSprite(SpriteID sprite, SpriteID full, SpriteID empty);
 void SetGreenLayerSprite(SpriteID sprite, SpriteID layer);
 bool SetTrueColourSprite(SpriteID sprite, SpriteID original, uint16_t colours);
 bool SetCutoutSprite(SpriteID sprite, SpriteID stencil, SpriteID texture, int16_t x, int16_t y);
+bool SetShiftedSprite(SpriteID sprite, SpriteID original, int16_t dx, int16_t dy);
 SpriteID AllocateDerivedSpriteID();
 std::string DescribeTrueColourSprite(SpriteID sprite);
 std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
