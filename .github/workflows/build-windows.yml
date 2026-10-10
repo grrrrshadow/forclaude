@@ -12,13 +12,13 @@ on:
   workflow_dispatch:
     inputs:
       source_repo:
-        description: 'Source repository to build (owner/repo)'
+        description: 'Override: build an external repository instead of the vendored openttd/ in this repo (owner/repo, e.g. for comparison against upstream vanilla)'
         required: false
-        default: 'OpenTTD/OpenTTD'
+        default: ''
       source_ref:
-        description: 'Git ref (tag/branch/commit) to build'
+        description: 'Git ref (tag/branch/commit) to build, only used together with source_repo'
         required: false
-        default: '15.3'
+        default: '16.0-beta2'
       arch:
         description: 'Target architecture'
         required: true
@@ -31,19 +31,58 @@ on:
 
 jobs:
   windows:
-    name: Windows (${{ inputs.arch }})
+    name: Windows (${{ inputs.arch || 'x64' }})
+    # windows-latest (not pinned): the vendored source is OpenTTD 16.0-beta2
+    # since 2026-08-15 (see openttd/VENDORED_SOURCE.md) -- its C++20
+    # EnumBitSet constexpr constructors need a newer MSVC than windows-2022
+    # ships (hit as C2131 "expression did not evaluate to a constant" in
+    # src/signal.cpp), and beta16 pulls its own newer vcpkg baseline, so the
+    # old windows-2022 pin from the 15.3/breakpad era (see BUILD_NOTES.md
+    # run #2, and the same pin still in effect on the backup-15.3-decouple
+    # branch) no longer applies here.
     runs-on: windows-latest
 
     steps:
-    - name: Checkout OpenTTD source
+    - name: Checkout this repository (vendored OpenTTD source lives in openttd/)
+      uses: actions/checkout@v6
+
+    - name: Checkout external OpenTTD source (only if source_repo override given)
+      if: inputs.source_repo != ''
       uses: actions/checkout@v6
       with:
         repository: ${{ inputs.source_repo }}
-        ref: ${{ inputs.source_ref }}
+        ref: ${{ inputs.source_ref || '15.3' }}
         # Full history + tags, so CMake's FindVersion.cmake can run
         # `git describe`/`git name-rev` and detect the version the same
         # way it would for an official checkout (e.g. "15.3").
         fetch-depth: 0
+        path: external-openttd-src
+
+    - name: Select source directory
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.source_repo }}" ]; then
+          echo "SOURCE_DIR=external-openttd-src" >> "$GITHUB_ENV"
+        else
+          echo "SOURCE_DIR=openttd" >> "$GITHUB_ENV"
+        fi
+
+    - name: Write custom version string (only for the vendored source)
+      if: inputs.source_repo == ''
+      shell: bash
+      run: |
+        # The vendored openttd/ has no .git of its own (see VENDORED_SOURCE.md),
+        # so FindVersion.cmake would otherwise fall back to the generic
+        # "norev0000" placeholder. Providing .ottdrev is FindVersion.cmake's
+        # own supported override for exactly this case (see
+        # cmake/scripts/FindVersion.cmake) -- it's read before the
+        # norev0000 fallback, so this shows a readable, build-specific
+        # string in the main menu / window title instead.
+        printf 'Openttd 16 beta2 Decouple by Karel Macha pre-alpha LIVE FROM EFFING CANARY ISLANDS read about ottd to the end  #%s\t%s\t1\t%s\t0\t0\n' \
+          "${{ github.run_number }}" \
+          "$(date -u +%Y%m%d)" \
+          "${GITHUB_SHA:0:10}" \
+          > "${GITHUB_WORKSPACE}/${SOURCE_DIR}/.ottdrev"
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -59,7 +98,10 @@ jobs:
       shell: bash
       run: |
         echo "::group::Install choco dependencies"
-        choco install pandoc
+        # pandoc is optional (only used to generate COPYING.rtf in the
+        # bundle, see BUILD_NOTES.md); don't fail the whole build if
+        # Chocolatey's registry has a transient hiccup finding it.
+        choco install pandoc || echo "pandoc install failed, continuing without it (optional dependency)"
         echo "::endgroup::"
 
         echo "::group::Install breakpad dependencies"
@@ -81,7 +123,7 @@ jobs:
         cd build-host
 
         echo "::group::CMake"
-        cmake ${GITHUB_WORKSPACE} \
+        cmake ${GITHUB_WORKSPACE}/${SOURCE_DIR} \
           -GNinja \
           -DOPTION_TOOLS_ONLY=ON \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -91,10 +133,10 @@ jobs:
         cmake --build . --target tools
         echo "::endgroup::"
 
-    - name: Configure developer command prompt for ${{ inputs.arch }}
+    - name: Configure developer command prompt for ${{ inputs.arch || 'x64' }}
       uses: ilammy/msvc-dev-cmd@v1
       with:
-        arch: ${{ inputs.arch }}
+        arch: ${{ inputs.arch || 'x64' }}
 
     - name: Build OpenTTD
       shell: bash
@@ -103,9 +145,9 @@ jobs:
         cd build
 
         echo "::group::CMake"
-        cmake ${GITHUB_WORKSPACE} \
+        cmake ${GITHUB_WORKSPACE}/${SOURCE_DIR} \
           -GNinja \
-          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-windows-static \
+          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch || 'x64' }}-windows-static \
           -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}" \
           -DHOST_BINARY_DIR=${GITHUB_WORKSPACE}/build-host \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -142,20 +184,20 @@ jobs:
     - name: Store bundles
       uses: actions/upload-artifact@v5
       with:
-        name: openttd-windows-${{ inputs.arch }}
+        name: openttd-windows-${{ inputs.arch || 'x64' }}-run${{ github.run_number }}
         path: build/bundles
         retention-days: 14
 
     - name: Store raw exe
       uses: actions/upload-artifact@v5
       with:
-        name: openttd-exe-${{ inputs.arch }}
+        name: openttd-exe-${{ inputs.arch || 'x64' }}-run${{ github.run_number }}
         path: build/openttd.exe
         retention-days: 14
 
     - name: Store symbols
       uses: actions/upload-artifact@v5
       with:
-        name: symbols-windows-${{ inputs.arch }}
+        name: symbols-windows-${{ inputs.arch || 'x64' }}-run${{ github.run_number }}
         path: build/symbols
         retention-days: 14

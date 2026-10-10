@@ -1,0 +1,36 @@
+// Test GRF: one of the game's own sets, put in baseset/decouple/ by the scene
+// vestaveny (AppendBuiltinGRFs()). It takes the second road vehicle; its block 1
+// answers 0x77 (a block without ranges answers the value it computed). Kept in
+// the rig directory, not in the home's newgrf/, and put in place for the two
+// scenes that play it.
+//     yagl -e <out>/vestaveny.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+grf // Action08
+{
+    grf_id: "RIGv";
+    version: GRF8;
+    name: "Rig: vestaveny";
+    description: "One of the game's own sets";
+}
+switch<RoadVehicles, 0x01, PrimaryByte> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00000077;
+    };
+    ranges:
+    {
+    };
+    default: 0x7FFF;
+}
+feature_graphics<RoadVehicles> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x0001;
+    feature_ids: [ 0x0001 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}

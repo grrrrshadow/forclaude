@@ -1,0 +1,806 @@
+# Headless rig scripts
+
+Scripts for the headless test rig (the `test*` console commands in
+`openttd/src/console_cmds.cpp`). They drive a `-vnull` build of the game
+through scripted scenes and count what the trace lines say.
+
+Working directory layout, pointed to by `RIG_DIR`:
+
+- `build/openttd` — a build of this tree, and beside it
+  `build/openttdDecouple.cfg`, the config this build writes (it keeps its
+  config next to its own binary and under a name of its own, so that a
+  player's vanilla config is left alone — see `DeterminePaths()`). The settings the scenes are written against, `vlak123`
+  tracing among them, live there; the battery puts its kept copy back after
+  every scene,
+- `ttdhome/`, `h2/`, `h3/` — three `HOME` directories (each with
+  `.openttd/scripts/`, base graphics), so three scenes can run at once. A
+  home's own `openttd.cfg`, if it has one, is no longer read or written by a
+  run,
+- the saves from `saves/` copied in, under the names the battery calls them
+  by: `eka.sav`, `emu.sav`, `emu_reverz.sav` as `emu2.sav`,
+  `loko_obou_stran.sav` as `loko2.sav`, `new1.sav`, `obmena.sav`,
+  `obmenaporucha.sav`, `odtah_peron.sav` as `back2.sav`, `porucha.sav`,
+  `porucha_nastupiste.sav` as `porucha2.sav`, `porucha_za_vlakem.sav` as
+  `porucha3.sav`, `rada_s_masinkou.sav` as `rada_masinka.sav`, `rig.sav`,
+  `vlak31.sav`, `panicky_krizovatka.sav`, `panicky_krizovatka2.sav`, `panicky_vlak6.sav`.
+
+**Copy them before the first run.** A scene whose save is not there does not
+fail: the game says "Game load failed", the scene ends after six lines, and
+every counter comes out zero. Zero equals zero, so the stable file matches
+the last one and the battery reports the run as clean while a third of it
+never happened. Anything the battery says about a build is only worth as much
+as the number of scenes that actually loaded -- if a run looks suspiciously
+unchanged, count `Game load failed` across `reg_*.log` first.
+
+A save made with NewGRFs needs those sets in the rig's `HOME` as well
+(`<home>/.openttd/newgrf/`, the `.tar` files as the game downloaded them),
+or the game disables them, replaces every vehicle with a default one of
+another length and shape, and the save is a different game. The player's
+`sivy2.sav` (nose-first coupling of a steam engine with its tender) needs
+CZTR Rails 2.2.4, CZTR Engines Steam 1.0.2 and CZTR Wagons Cargo 1.1.0.
+
+The rig has **only those three** sets; the player plays with about a dozen
+(road set, diesel, electric and EMU engines, passenger wagons, stations,
+rail add-ons). A save of his therefore loads here with most of its sets
+disabled, and the log says so: `NewGRF ... not found`. Count those lines
+before concluding anything about a save of his, and do not read "it works
+here" as "it works for him" when the question is about what a set does.
+
+The themed town scenes (`domy`, `domyvypnute`) need two house sets beside
+those, as plain `.grf` files in the same `newgrf/` of every home:
+`ogfx-mars-houses-rehabs.grf` ("(Fixed) OpenGFX Mars Houses", 524A450B, the
+one BaNaNaS offers for new games) and `ogfx-mars-houses.grf` (the older
+OpenGFX Mars Habitats, 4F474D05, which switches the original houses off).
+Both are built and kept in the repository github.com/Gadg8eer/OpenGFX-Mars-reHabs-Late-Start,
+under `MarsHabs-Late-Start/ogfx-mars-houses-rehabs/` and `MarsHouse/`. The
+content server itself (TCP 3978) is out of reach from a container, so the
+game cannot fetch them there on its own. Without them both scenes come out
+with odmitnuto above zero.
+
+The first of them is also the game's own Mars house set (mars_houses.h): with
+it in the home, the game puts it into every new game of every scene. Its
+houses stay out of every town not told to build from them, so the scenes'
+maps come out as without it. The Mars towns themselves are off in the
+battery's new games (`economy.mars_towns 0`, which also keeps the game from
+reaching for the content server to fetch the set); `marsmesta` and
+`marsmestacz` turn them on through `SCENE_NEWGAME`, as `klimamesta` does the
+towns of the other climates' houses (`economy.temperate_towns` and the
+three like it), which need no set at all: the houses of all four climates are
+in the base graphics. The two snow scenes (`snihtemperate`, `snihvyp`) start
+a hilly temperate map the same way and need nothing but the base graphics
+either: the snowy ground, rails and roads are in the temperate base file.
+
+The game holds 128 cargo types (`NUM_CARGO`, `CargoTypes` with two words).
+No scene can tell: each plays with a climate's dozen. The `naklady` scene
+runs the probe `testnaklady`, which exercises the set itself -- bits above
+64, the words, the set as a string parameter and through an encoded string,
+the cargo monitor numbers -- and is the one place that would notice the set
+breaking.
+
+## Memory errors: the rig does not see them
+
+The battery measures behaviour, not memory. A write past the end of an
+array can leave every scene green on one compiler and break the game on
+another, which is exactly what happened with the cargo for road vehicles
+(TEMATA8 §37). When a change touches tables, arrays or indices, build with
+the sanitizers and run a scene or two through that build:
+
+    cmake <srcdir> -DCMAKE_BUILD_TYPE=Debug -DOPTION_DEDICATED=ON \
+        -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+        -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+in a build directory of its own (it is slow and the binary is huge, so not
+the one the battery uses), then run it with `ASAN_OPTIONS=detect_leaks=0`.
+`openttd.grf` is kept built in `media/baseset/` (the colleague's yagl makes
+it, see `COMPILING.md`); a build only copies it beside the binary with the
+rest of the baseset graphics.
+
+Five saves the battery asks for are the player's and are not in `saves/`:
+`s.sav` (scene `nakladsav`), `save91.sav` (`save91`, `save91rev`),
+`umak.sav` (`mess`), `umins.sav` (`messodvoz`, `messodtah`) and
+`domek128.sav` (`sklad128`). Those seven scenes cannot run without them.
+
+`battery.sh` — the regression battery. Prints one line per scene:
+`spojeno` (couplings), `odtazeno` (tows completed), `havaroval`, `srazka`,
+`assert`, `vyjimka`, `zaznam` (anomaly record lines), `auto` (road vehicles
+boarding and leaving whatever carries them), `odmitnuto` (rig commands the
+game refused -- a command writes `ODMITNUTO` when it is told no, for the
+scenes where the other numbers would go on looking the same), `depa`
+(arrivals in a depot).
+
+The first six do not move between runs of the same build. **`depa` does** --
+by one, on the long tow scenes -- so a plain diff of two runs reports
+differences that are the rig's own timing and not the change under test. Set
+`BATTERY_STABLE` to a path and the six load-bearing counters are written
+there as well; diff those:
+
+    RIG_DIR=... BATTERY_STABLE=run1.stable ./battery.sh > run1.out
+    RIG_DIR=... BATTERY_STABLE=run2.stable ./battery.sh > run2.out
+    diff run1.stable run2.stable
+
+Since the map is fixed (below), one run is enough and there is something to
+diff it against: `battery_baseline.stable` here is a full run and the file to
+compare a change to.
+
+    RIG_DIR=... BATTERY_STABLE=run.stable ./battery.sh > run.out
+    diff battery_baseline.stable run.stable
+
+Seven of its scenes need saves that are not in the repository and come out all
+zeroes without them, so on a rig missing those the difference is those seven
+lines and nothing else. Take the baseline again when a change is meant to
+move a counter, and say in the commit which counters moved and why.
+
+Two things that look like fixes for the wobble and are not, both tried:
+turning random breakdowns off steadies it but guts three scenes built on a
+breakdown happening (`odtahotoc` drops to nothing at all), and turning
+automatic servicing off changes nothing -- the wobble is in the tow scenes
+themselves.
+
+## The map every new-game scene is built on
+
+A scene that does not load a save builds its own track, stations and road
+stops on the land the generator gave it, and on hilly or watery land some of
+that cannot be built at all: the scene ends early, every counter reads zero,
+and the run looks like a change in the game. `battery.sh` therefore fixes the
+map for those scenes -- one seed, the flattest land and the lowest sea level
+the generator offers (`NEWGAME` at the top of the script). Three runs of the
+same scene then come out identical line for line, and two whole runs of the
+battery give the same stable file.
+
+It is the flat land that does the work, not the seed: every seed tried builds
+every scene once the land is flat. Changing any of the three settings makes a
+different map, so the stable file has to be taken again -- that is a
+re-baselining, not a regression. Scenes that load a save are untouched by
+this; their map is in the save.
+
+`matrix_gen.py [mx] [mw] [me]` — the coupling matrix on `rig.sav`: four
+waiters released slowly from one side of station 1, then a collector and
+three clones (`testklon ... stoj`, released one by one with `testbrzda`)
+from the left or from the right; four spacing variants per combination.
+Families: `mx` waiting trains (17–20 from the right, 25–28 from the left;
+collectors 5 / 14), `mw` rakes dropped by deliverers (9–12 / 1–4), `me`
+dual-headed units (57–60 / 33–36; collectors 61 / 37), `ms` those same
+units collected by a plain engine (5 / 14), `mv` dropped rakes collected
+by a dual-headed unit (37 / 61). Writes
+`mx_ttdhome.sh`, `mx_h2.sh`, `mx_h3.sh` into `RIG_DIR`; run them in
+parallel. `matrix_baseline_ce1effd.out` is the result on the tree before
+the crossed-coupling fix: same side 4/4 everywhere, crossed waiting trains
+and crossed units 1 coupling + 3 collisions in every scene, crossed rakes
+4/4. `matrix_after_fix.out` is the same matrix after the fixes (partner
+chosen before the road is planned; order progress kept when a unit's
+identity moves to its other head; the dual-head list normalisation left
+to sheds): all 80 scenes 4/4, no collision and no assert, and the units
+put down crossed go on to their next stop and home.
+
+Scenes are to be re-run once the engine–wagons–engine depots (A/B) are
+worked on again.
+
+## The rig's own sets, in yagl
+
+Every NewGRF the rig makes for itself is a yagl script in `grf/` -- `grf/<set>.yagl`,
+with its sprite sheets beside it (`<set>-*.png`) -- written in the colleague's
+yagl, the one tool this game's sets are made with. The player's rule: no
+grfcodec, no nml and no GRF written by hand; what yagl lacks is reported to
+the colleague and added to yagl. Each script starts with a comment that says
+what the set is for and which scene plays it.
+
+The battery builds every one of them at the start of every run, so the
+scenes play what the scripts say and yagl goes through every set each time:
+
+    yagl -e $RIG_DIR/rig_grf/<set>.grf tests/rig/grf
+
+and copies them into the home's `newgrf/` (`vestaveny.grf` into the rig
+directory, see its section). yagl is looked for at `$YAGL`, then on the path;
+build it from the colleague's copy (`grrrrf`, `yagl/yagl-main`, his
+`yagl/POSTUP.md`: `cmake -G Ninja .. && ninja`). Without it the battery says
+so and plays the sets already in the home.
+
+The scripts came from the sets the rig had (nfo for grfcodec, nml, two written
+by hand in Python), decoded with `yagl -d`; built again they are the same sets
+for the game -- every pseudo-sprite, every sprite's size, offsets and pixels --
+except where yagl writes the same thing another way the game reads alike: an
+id as an extended byte, the bit of an Action 7 bit test as one byte, a house
+layout of one building sprite at height 0 in the short form, a quote in a text
+as yagl's code {dq}.
+
+## Two tiny NewGRFs that fight over our cargo slot
+
+`grf/slot63_blank.yagl` and `grf/slot63_taken.yagl` are complete NewGRFs of two
+records each. One blanks cargo slot 63 and the other puts a
+cargo of its own there -- the slot the cargo for road vehicles on wagons is
+put in (road_on_rail.h). They exist because the player's set does one of those
+two things and nothing here reproduced it: with them, it reproduces in one
+run. The battery builds them and plays neither:
+
+    cp $RIG_DIR/rig_grf/slot63_taken.grf <rig home>/.openttd/newgrf/
+
+then add a line `slot63_taken.grf =` under `[newgrf]` in that home's
+`openttd.cfg`, start a game and read the last line of `dump_info cargotypes`.
+Blanked, the cargo takes the slot back; taken, it moves down to 62. Either
+way it must still be in the cargo mask and in every wagon's refit mask.
+
+Worth keeping because the first of them found a crash: a cargo moved to
+another slot after the NewGRFs had spoken never got the once-over that gives
+every cargo a town production effect, and the next thing that sorted cargoes
+walked into an assertion.
+
+## The house picker with a set that switches the original houses off
+
+The scene `domypickervypnute` opens the house picker with the older Mars set
+(4F474D05, `ogfx-mars-houses.grf`, which switches the original houses off)
+and counts what the list shows for each climate, for every house, and for
+the temperate houses of 1950 and 2050. The player picks from that list by
+hand and no set narrows it (HouseCanBePlacedByHand()): Swedish Houses, which
+puts its own houses in place of all the temperate ones, left the list of
+the temperate houses empty in the player's game. `testdomy picker <set>
+[year]` refuses an empty list and a house not of the set or the year.
+
+## A house set that puts a four-tile block in place of the statue
+
+`grf/house_over.yagl` (with `grf/house_over-8bpp-normal-0.png`) is a house set of one
+house: a four-tile block made from the stadium, put in place of the statue
+(original house 9, one tile) -- what house sets do to the originals, here
+with a size that differs, which nml refuses to write and older sets do. It
+switches the stadium (houses 32 to 35) off as well, as sets switch originals
+off: the game used to clear the size of a switched-off original, and a
+stadium placed by hand came out as one tile. The
+map reads a tile's house through that replacement (GetHouseType()), so a
+house placed by hand used to be read back as the replacement: placed as the
+statue it stood on one tile with a four-tile spec, and the tile loop
+asserted on the tiles that were not there. Now the house the player picked,
+and every original a town of chosen sets builds, is kept as itself on its
+tile (IsHouseKeptOriginal(), a bit in m8 that old saves have clear), and the
+map reads it as such.
+
+The scene `domypostav` places the statue by hand twice (`testdomy postav <x>
+<y> <house>`), which has to leave a statue standing on its one tile, ticks a
+town to the temperate houses and grows it: every house it puts up has to be
+a temperate one. With a set in place of every temperate house such a town
+had nothing of them to build and mixed every house instead.
+
+## A set that gives up after it has changed things
+
+`grf/quits_late.yagl` is a NewGRF of three
+actions: it switches every default cargo off and then dies with a fatal
+error. That is what Industries of the Caribbean does next to another
+industry set -- its header switches the game's cargoes and industries off
+before the checks that refuse the other set -- and the player's game with
+XIS beside it had no cargoes left, no passengers among them; a passenger
+ship with no cargo of its own then stopped the game in an assertion
+(road_on_rail.cpp). The game now reads its sets again without a set that
+gave up (GfxLoadSprites()), which is what the player would otherwise have to do
+by hand on seeing the set marked disabled.
+
+The scene `grfvzdalo` plays it and asks `testnaklady 13`
+for the dozen cargoes of toyland plus the road-vehicle cargo; its one record
+line (zaznam=1) is the game saying the set gave up. Without the second
+reading the count is 1, and before the ship was taught to check its cargo
+the scene ended in the assertion.
+
+## Two cargo sets that bring the same cargoes
+
+`grf/cargo_a.yagl` and `grf/cargo_b.yagl` each switch the game's cargoes off and bring three cargoes under the ids 0,
+1 and 2: A passengers, coal and RIGA; B passengers, RIGB and coal. Every set
+numbers its cargoes from 0, so before the cargo slots of
+newgrf_act0_cargo.cpp the second set wrote over the first one's and its own
+cargo was gone -- the reason industry sets refuse one another.
+
+The scenes `nakladysdilene` (A, then B) and
+`nakladysdilene2` (B, then A) ask `testnaklady` for 5 cargoes -- the shared
+passengers and coal, both sets' own and the road-vehicle cargo -- and for
+the names of the set that came last on the shared ones: a later set writes
+its properties over a cargo it shares, as sets always did, and ECS counts on
+it.
+
+## A set that refuses another
+
+`grf/refuses_a.yagl` refuses cargo set A the way industry sets refuse one
+another -- an Action 9 on A's status, and a fatal error three sprites later
+-- and otherwise brings a cargo of its own, RIGR, under the id of A's
+passengers.
+
+`grfodmita` plays A and this set with economy.newgrf_side_by_side on (the
+default): the game reads the sets again with A hidden from the set's check
+(LoadNewGRF()), and `testnaklady` asks for A's three cargoes, RIGR and the
+road-vehicle cargo; the record line (zaznam=1) says who refused whom.
+`grfodmitavyp` plays the same with the setting off: the set is switched off
+as ever and RIGR is not in the game.
+
+## The original industries of other climates
+
+`economy.industries_temperate`, `_arctic`, `_tropic` and `_toyland`
+(climate_industries.h) put the original industries of a climate into every
+game, beside what is there, with the cargoes they need, and no set switches
+them off or takes their places. `testprumysl [min]` lists every original
+industry the game has with its climates, whether it is on, whether a set
+took its place, how many stand on the map and what it produces and takes,
+and the cargoes placed for them; it refuses an industry of a climate on that
+is off or replaced, and fewer than min of them on the map.
+
+`prumyslklimat` switches the temperate, arctic and desert industries on in
+the toyland map. `prumyslsada` switches the temperate ones on in a temperate
+game with XIS, which switches the originals off and takes their places --
+`xis.grf` in every home's `newgrf/` (XIS 0.6.2 from BaNaNaS, the player's
+copy in the grrrrf release par4).
+
+Some sprites of the original industries are put in place by the file of the
+climate played (CLIMATE_INDUSTRY_SPRITE_RANGES in climate_industries.h): the
+forest and the cotton candy forest share theirs, and the farm, the oil wells
+and the ground of the water supply are the climate's own. Every climate's own
+of them is loaded into a block of its own, and an industry of another climate
+is drawn with its climate's. `testprumysl` lists each such sprite of an
+industry of another climate with the sprite drawn and the file it comes from,
+and refuses one drawn from the file of the climate played. `prumyslgrafika`
+plays a temperate map with the three other climates on.
+
+`economy.extra_industries` puts in the game's own industries, in every
+climate: the marijuana plantation -- the last industry type, on a tile of its
+own (the last industry tile, which no set is given) drawn as the fruit
+plantation's, growing marijuana (MARI) -- and the coffeeshop, built in towns
+only, on the tile before it, drawn as the desert house with the palm tree,
+taking marijuana 8/8 and tobacco, paper, tourists and alcohol 8/8 each where
+a set brings them. The houses stay as they always were. It is on by default,
+so the rig's new game switches it off, as it does the Mars towns; so does
+every scene played from a save, which, made before the setting, would take
+the new-game value and have the industries come into it. `testprumysl [min
+[plantaze [hulirny]]]` lists both: refused when it is on and either is not in
+the game or not in every climate, when the plantation grows anything but
+marijuana or is not on its own tile, when the coffeeshop may stand outside a
+town, produces anything or does not take one of its cargoes the game has,
+when a house takes marijuana, and with fewer than `plantaze` plantations or
+`hulirny` coffeeshops on the map; refused when it is off and either industry
+or marijuana is there all the same. `marihuana` switches it on in the toyland
+map, `marihuanasada` in a temperate game with XIS.
+
+The game's own vehicles -- the car carriers, and the marijuana wagons and
+lorries, copies of the coal truck of each railtype and of the three coal
+lorries -- are mapped under a mark of their own
+(EngineOverrideManager::GAMES_OWN_GRFID), so no set reaches them by number to
+take them over or switch them off; the marijuana ones are in the game exactly
+while the industries are. Loaded, they draw their coal green: the loaded
+picture is made again from the base set's loaded and empty pictures, with the
+pixels the two do not share in the leaf greens (green_load.h). Ships and
+aircraft that carry goods carry marijuana too. `testprumysl` lists every one
+of the game's own vehicles -- under the mark or not, taken over by a set or
+not, in the game or not, what it carries -- every set vehicle numbered where
+one of them sits, every green loaded picture with how many of its pixels are
+green (refused when none or all are), and refuses a goods ship or aircraft
+that does not take marijuana. `vozidlahry` plays rig.sav, made before the mark:
+the car carriers are moved under it. `vozidlasada` plays `grf/claims_own.yagl`
+(built into `claims_own.grf` in the home's `newgrf/`, as the other rig sets
+are), a wagon under the car carrier's number and a lorry under the first
+marijuana lorry's: they have to stand beside the game's own.
+
+Only car carriers take road vehicles: the game's own and, in any set, the
+flat wagons named Pao, Pasy, Sgs or Smmp (IsCarCarrierWagon()); `testnaklady`
+lists them and refuses any other wagon offering the fitting. Of a set's coal
+wagons only the St and the U take marijuana (IsGreenLayerWagon()). A wagon is
+known by any name the purchase list shows for it over the years -- CZTR's U
+is a Kᵉ until the set renames it. It is drawn as its set draws it carrying
+coal, with the coal green: the layer over the wagon where the set draws its
+load as one (CZTR 1.1.0), or what the loaded picture has and the empty one has
+not where the load is in the wagon's own picture (CZTR 1.0.0). `testzelenest`
+builds each into the company's first rail depot and asks for its picture in
+every direction, full and empty -- the rig draws nothing, so nothing else would
+make the green pictures -- and refuses a full one without green or an empty
+one with it. Scene `zelenest` needs the player's CZTR wagon set and steam
+engines in the home's `newgrf/` (the two tars named under "A lorry with a
+trailer" below); the rig runs with the null blitter, and the set's pictures
+being 32bpp only, the green pixels are counted from the file. Scene
+`zelenestjednovrstvy` plays `grf/st_old.yagl`, a St with its coal in its own
+picture, the case of CZTR 1.0.0, which the rig has not got.
+
+`cztrvymena` plays `grf/firs5_like.yagl`, a set with FIRS 5's id and nothing
+else, together with the player's CZTR Wagons-Cargo 1.1.0 from the tar above
+and `grf/cztr_old.yagl`, a stand-in for CZTR Wagons-Cargo 1.0.0 -- the set's id
+and that release's name on the one-layer St. The game plays the stand-in in
+1.1.0's place (`testgrf hra` says what it plays); `cztrbezfirs` is the same
+without FIRS 5, where 1.1.0 plays as it is.
+
+`konfig` plays `grf/konfig.yagl`, the set for the game's configurator
+(`docs/decouple_vehicle_config.md`): a road vehicle whose set names two
+details for the player to choose -- a crew of three and a cart of two --
+through callback 1C0, and draws another picture for any choice but the
+first, by variable 5C; the alien of the crew is hidden (result 401) unless
+the cart is pushed, which the set reads off the vehicle it is asked about. And a wagon with nine details -- graffiti of two
+options, seven of one, a ninth of two read in variable 5E -- since a wagon
+carries its own choices and keeps them through uncoupling (the set's
+`VehicleConfigHead()`); `testkonfig` chooses on one wagon of a train, on the
+whole train, uncouples the wagon and watches the train's configurator follow
+the refit window's selection. Written the way the colleague writes his sets,
+so that the test runs the very recipe his sets use; its pictures are zin8
+only, as his are.
+
+`barvy` plays `grf/barvy.yagl`, the set for the colours of the configurator
+(`docs/decouple_vehicle_config.md`, `src/true_colour.h`): a road vehicle with
+five details, of which the cab, the body and the radiator are colours given
+through callback 1C1 -- the first of the eight mask indices each paints
+(0xC6, 0x60, 0x68), the colour of each option as 0x00RRGGBB in register 100,
+the player's three numbers of lightening in register 100 of a detail or 101
+of an option -- and a beacon drawn by detail 4, in variable 5D. Its pictures
+(`barvy-zin8.png` and the mask `barvy-mask-zin8.png`) are grey with flat areas
+at the lightness where each colour is exactly itself, a row at 254 and one
+darker, so `testbarvy` can read the painted colours back: the commonest is
+the colour itself, the light row of the body #F7C8AF in the default orange
+(lightening stopped at 200, 100/155 of the way to white at most 255). The
+cab's orange fades to brick red over two years in steps of one (registers 102
+to 104; the player's sets will take twenty): the probe sets the vehicle's age
+and reads #CE5A2D at a year, #B4503C at two and after, orange again at none.
+A sixth detail, unnamed in 1C0, is a green patch on the body (mask 0x70-0x77)
+the set turns rather than paints (register 101 = 1) and colours itself by the
+cargo (option FE, asked with the vehicle): carrying passengers it is hay,
+#F0EF69, refitted to mail it is green as drawn, #28A03C. The vehicle is a
+sprite stack of three layers: the vehicle, a stencil (an ellipse, 254 above
+and grey 128 below, mask 0x70-0x77, bit 30 of register 100 and a start of
+3,5 in registers 101 and 102) and a texture of four greens in 16-pixel
+blocks the stencil is cut from (`src/cargo_cutout.h`). The probe reads two
+layers, the second cut from the texture: with mail the texture's greens at
+half under the grey, #1E5A28 and #0F3C19, with passengers the same cut
+turned to hay, #878744; the reading is taken before the refit back, which
+draws the vehicle over again itself. The stencil layer is also moved by
+registers 103 and 104 (16 right and 32 up, in sixteenths of a pixel of the
+normal zoom) and taken from four directions on (register 105,
+`src/layer_shift.h`, the colleague's cart pushed being the cart pulled the
+other way round): the probe reads it as sprite 28 of the file instead of 32,
+with the offsets -20,-12 of the file moved to -12,-28 at 8x.
+
+`testsada <text> [years] [plny]` builds the rail vehicle of any set whose
+name has the text in it, into a depot built for it, gives it that many years
+of age and, with `plny`, a full load of its cargo, and describes the colours
+its set gives each part and the pictures each part is drawn with, layer by
+layer: the colleague's wagons read without a screen, whatever their year
+(the engine is made available by hand).
+
+`getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
+own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
+as GETS does.
+
+`testjmena <text>` lists the rail vehicles whose name, as the set gives it or
+as the purchase list shows it now, has the text in it.
+
+A rake fetched on the player's call with an engine riding inside it (a
+decouple gone wrong) is taken apart in the shed: each engine a parked train of
+its own, the wagons stored rakes (SplitStoredRakeAtEngines()); nothing of it
+drives off. A breakdown fetched by the tow is put right and leaves on its own
+orders as before.
+
+`testdelky` is the game's own spacing test (CheckTrainsLengths(), which
+reports a train as broken and pauses the game at every load) train by train
+and pair by pair: which two pieces stand how far apart and how far they should.
+Each such train is refused (ODMITNUTO). Couplings used to leave a pixel too
+little on the straight and four round a curve; a coupled train is spread to a
+length between every two pieces now, so a scene that couples ends with none.
+
+`testdomy pole <x> <y> [r]` lists the houses within r tiles of a tile, by id
+and name, and how many tiles of each: for telling which house a player means
+by where it stands on a save of theirs.
+
+## A lorry with a trailer, which needs the player's own sets
+
+The game's own road vehicles are all one piece, so nothing in a plain rig
+run says what a lorry and trailer does on a wagon -- and that is the case
+the wagon lengths are about (road_on_rail.h). `testautovlak 1 tirak` builds
+the scene with one, and it needs a home set up with three of the player's
+NewGRFs and a late enough year:
+
+    <home>/.openttd/newgrf/   CZTR_Truck_SetBRYLE1-rozestupy-cisty.grf
+                              4d490213-cztr_wagons_cargo-1.1.0.tar
+                              4d490207-cztr_engines_steam-1.0.2.tar
+    openttd.cfg               landscape = temperate, starting_year = 2030
+
+Each of the three is needed for its own reason. The truck set as it is
+published has no vehicle a company can buy -- the player's own build of it
+does, and that is the one to use. The wagon set brings the long wagons: its
+freight wagons are built of several pieces and run from 14 to 20 eighths,
+where the game's own are 8, and a lorry and trailer measures 15. And the
+steam engines are there only so that plain rail exists at all: a railtype is
+available to a company once an engine of it has been introduced, and with the
+wagon set loaded and no engine set, the scene cannot build so much as a shed
+("depot failed"). The year has to be late enough for the long lorries and
+early enough for a long wagon to still be in production; 2030 is both.
+
+The scene then picks the longest wagon the game has -- the one built of the
+most pieces -- rather than the car carrier, because nothing shorter than the
+lorry can carry it. Four rides in nine thousand ticks, and the trailer is put
+down on the road behind its lorry and drives on at its own length behind it.
+
+## A steam engine with its tender, which needs a set that has one
+
+The game's own engines are all one vehicle, so nothing in a plain rig run
+ever built an engine that comes with a tender. Such an engine used to be one
+vehicle with one articulated part, and that shape was the one coupling the
+game refused outright: its list cannot be turned round, so meeting a rake
+nose first it would have ended at the tender while the engine is what stands
+against the wagons. Now the pair is made into a two-headed engine at build
+time (MakeTenderRearHead() in train_cmd.cpp): the tender keeps its own
+picture and contributes nothing, and the list turns round like any other.
+`testspoj tendr` is where that is measured. It needs the same home as the
+lorry scene, or any home with a set of steam engines in it:
+
+    <home>/.openttd/newgrf/   4d490207-cztr_engines_steam-1.0.2.tar
+                              4d490213-cztr_wagons_cargo-1.1.0.tar
+    openttd.cfg               landscape = temperate, starting_year = 1930
+
+Without such a set the scene says so and stops, which is why it is not in the
+battery: on the game's own engines there is nothing to build it with.
+
+Two runs to make:
+
+    testspoj tendr            the collector meets the rake nose first
+    testspoj tendr couvej     it backs onto the rake instead
+
+Both couple clean and both trains reach their depot: spojeno=1, no broken
+step, nothing in the record, depa=3. Nose first, the joined train runs
+tender first to the far depot, the way a steam engine backs a train. Before
+the pair, the first run broke seventeen steps, the same seventeen every
+time, and that number is what the refusal had been holding back.
+
+`testtvar <unit>` shows the pair: `par masinka s N` on the engine and
+`par tendr s N` on the tender, N being the other's index. A tender with
+`BEZ PARTNERA` is a pair that came apart on load, which is the one way this
+can quietly fail; save the scene (`save x`) and load it back to check.
+
+The refusal itself stays only for an engine built of *unequal* articulated
+parts -- deliberately not made into a pair, since its parts would have to
+trade places on the ground and for such an engine that shows. No such engine
+is in the rig's sets; the refusal is read, not measured.
+
+## An engine of equal pieces, and a wagon of pieces drawn flipped
+
+The player's sets draw every engine as three pieces -- an invisible stub, the
+body, an invisible stub -- and every wagon likewise. Two things follow from
+that shape, and the rig measures both.
+
+**The engine couples at its nose.** A unit whose pieces are the same length two
+by two from the ends is the same shape read from either end, so its pieces can
+trade places on the ground with nothing visibly moving (`MirrorUnitPieces()`),
+and the list turns round like any other (`ConsistCanBeRelinked()`). The rig's
+own sets have no such engine, so `testspoj clanky` makes one: the collector's
+engine gets two articulated pieces of its own kind behind it in the shed
+(`MakeEngineOfPieces()`, console `testclanky <unit> [pieces]`). They are full
+length, since only a set can say a piece is short, so every piece shows the
+engine's own picture -- the list and the ground can be measured on it, the
+picture cannot.
+
+    testspoj clanky           three-piece engine meets the rake nose first
+    testspoj clanky couvej    the same engine backs onto it
+
+Both: spojeno=1, no broken step, nothing in the record, depa=3. Before the
+rule the first was the refusal, and the player's log shows what the refusal
+did to his shunter: it drove into a shed to turn, came back tail first, and
+coupled a lap late.
+
+**The wagon keeps its picture.** A rake met head on has every wagon's
+direction reversed and Flipped set, which for a one-piece wagon leaves the
+picture as it was. A wagon of several pieces was drawn wrong: each piece
+painted its own cut of the picture mirrored, in place, after the pieces had
+traded places -- the front of the wagon at its back. Now a flipped piece
+draws its mirror piece (`PieceDrawnAs()`), and every coupling checks the
+promise that nothing on the screen changes: `PictureKeptAfterJoin()` reads
+the sprites at every spot before and after and writes `SPOJENI PREKRESLILO`
+into the record for any spot that looks different. That check needs wagons of
+several pieces, so it is measured in the lorry-scene home (h_tir), whose
+wagon set draws them:
+
+    testspoj kloub            three such wagons, met head on: every wagon flips
+    testspoj kloub jeden      one such wagon: a single unit turned round inside itself
+    testspoj kloub couvej     backing on: nothing flips
+
+All three: spojeno=1, record empty. With `testzrcadlo off` (the old drawing)
+the first writes six `SPOJENI PREKRESLILO` lines, one per end piece of each
+wagon; `testzrcadlo on` writes none. `testkresba <unit>|<x> <y>|vse` prints
+every piece's sprites, box, facing, flip, which piece it draws as, and what it
+carries -- the whole of what a picture is made of, since the rig cannot look
+at one; `testvse` includes it.
+
+`testnatoceni` reports a piece only when it faces a right angle or more away
+from its head. A piece in a bend stands 45 degrees off and is right to; the
+player's log had eight of those reported as faults.
+
+A lorry riding on a wagon is part of that wagon's picture and keeps the same
+promise, so `testkresba` prints it too: its facing, the facing the wagon under
+it is drawn with, and `sedi` or `NESEDI` between them. It went wrong in
+exactly the place the wagons did -- a flipped wagon laid its lorry out from
+the recorded direction, so the lorry spun round on the spot and moved to the
+wagon's other end while the wagon itself did not move at all. On the player's
+save that was 24 `NESEDI` against 0 after the fix.
+
+`pozn <text>` writes a line of the player's own into the record, with the tick
+on it, for saying what was on the screen at that moment.
+
+`testpaluba [pixels]` moves the deck a carried lorry stands on, while the game
+runs, and redraws every one of them at once. How high a wagon's deck is is
+written nowhere -- no wagon says, and every set draws its own at its own
+height -- so that number is chosen by eye at the screen and then written into
+the source. Where along the wagon the lorry stands is not chosen by eye: its
+chain's middle goes on the wagon's middle, which needs no number and comes out
+right for a wagon of any length.
+
+## A wagon holding an order list, and a window left on the wrong vehicle
+
+Two faults the rig cannot see by counting, because both are a state that
+hurts only when something asks about it: a vehicle that is not the head of
+any train yet carries an order list (a rake head that was collected and never
+gave its list up), and a window left open on a vehicle that has since stopped
+being a head (a train turned round in the list keeps its identity on the
+other head). Cargo distribution asks the first with `IsStoppedInDepot()` on
+its stale-link sweep, the player's screen asks the second on the next
+refresh, and both are an assert, `this == this->First()`.
+
+`testokna` asks both questions itself: it lists every open vehicle window
+and every order list's first shared vehicle, says which are not heads, writes
+a record line for each, and then refreshes every vehicle window the way a
+livery change does. `testspoj ... okno` opens the collector's window before it
+sets off, so there is a window to leave behind. The battery runs `testokna`
+on `zakl` and `vlek`; its record counter is what catches a regression.
+
+Found on the player's game with a steam engine coupling nose first and cargo
+distribution on. The rig ran that coupling clean, because the rig plays with
+distribution off and has no screen; the probe was written to make the rig
+ask what the player's game asked.
+
+## Which half of "load onto wagons" a scene measures
+
+Boarding a train used to be two choices, by train or onto wagons, and it is
+now five: by train to my next stop, by train or shunter wherever it goes, on
+wagons meant for my next stop, on any wagons, and not at all. `testautovlak`
+takes the same two words it always did, and they now name two of the five:
+`posun` is by train or shunter wherever it goes, `vlakem` is by train to my
+next stop. `posun` is not the wagon choice, although it reads like one --
+the scene builds a shunter, an engine with a wagon, and a shunter is a
+train. The wagon choices want a rake standing with no engine, which this
+scene does not build.
+
+That is worth knowing before reading `autoposun` as a regression: when one
+choice is split into two, what the scene measured is split with it, and the
+scene has to be told which half it still measures. The battery caught this
+as `autoposun: auto=1` turning into `auto=0`, and nothing in the game was
+wrong.
+
+## Riding in a ship and in an aircraft, and the water the rig has to dig
+
+`testautoletadlo` and `testautolod` are the sisters of `testautovlak` for the
+air and the water: two stations with a road stop of their own beside them, a
+carrier fitted for road vehicles shuttling between them, and cars ordered to
+board at the first and get off at the second. `testautolod` takes a count, so
+`testautolod 2` fills a two-car ship and shows both cars getting on at once --
+the one thing rails never had, since a wagon takes exactly one.
+
+Both scenes have to make their own ground, and neither is as simple as it
+looks:
+
+- **The aircraft scene moves the calendar on.** The aeroplanes of the early
+  years seat too few people to carry a car at all, which is the rule working
+  as asked; the scene therefore sets the date forward the way the date cheat
+  does before it looks for one. It also asks which airport is available in that
+  year rather than naming one, because the small airport -- the obvious choice
+  -- stops being available part way through the game.
+- **The ship scene digs its own canal.** The rig's map is generated as flat as
+  the generator will make it (above), so there is no water and no shore. Water
+  is *built* rather than dug: a hole in flat land stays a hole, since nothing
+  floods it unless it reaches the sea. And a dock needs an inclined tile with
+  **two** tiles of water in front of it, so the canal is two rows wide; with
+  one row it fails with "site unsuitable" and says nothing about which of its
+  half-dozen conditions was the one that failed.
+
+The order in the ship scene matters: canal first, then the shore. The corners
+a tile shares with the water beside it cannot be raised once the water is
+there, and the pair that makes the tile fall towards the water is the pair it
+does not share.
+
+## Action 2 IDs above 255, and the lock of our own sets
+
+`grf/bloky_siroke.yagl` and `grf/bloky_zamek.yagl` are NewGRFs for
+the two names this game answers in an Action 14 feature test and no other game
+does (`newgrf_act14.cpp`):
+
+- `decouple_more_action2_ids` switches the file over to two-byte Action 2 IDs:
+  the ID of every Action 2 and the subroutine of variable 0x7E are then a word,
+  0 to 0x7FFD (0x7FFE and 0x7FFF are taken in references). A set with 128
+  cargoes and many liveries per vehicle runs out of the 255 IDs a byte gives.
+- `decouple_128_cargo` is only a lock: the set asks for it, tests the bit it
+  asked to have set on variable 0x9D, and stops itself with an Action B where
+  nobody answers.
+
+`bloky_siroke` asks both and builds blocks 7, 300, 600 and 1000 for the first
+road vehicle: 1000 calls 600 as a subroutine, gets 5 and goes on to 300, which
+answers 0x123 (a block without ranges answers the value it computed, not its
+default). `bloky_zamek` asks a name nobody answers, as any other game treats
+ours, and its lock switches it off.
+
+Two things the files had to learn, and a set of ours has to as well:
+
+- **The Action 14 comes before the Action 8.** A file is scanned only up to its
+  Action 8, and the feature tests are read in that scan and nowhere else.
+- **Bit 0 of 0x9D is no lock.** 0x9D is the platform variable, 1 in every
+  OpenTTD, so the lock tests bit 8. (yagl writes that test with
+  `global_var[0x9D] & 0xFF` and `1 << 8`; for a bit test the game takes the
+  bit as a byte and masks nothing, so bit 8 is tested all the same.)
+
+The scene `bloky` starts a game with both and reads them with `testbloky`: the
+state of every set, whether it reads two-byte IDs, the bits on 0x9D, and the
+callback of every road vehicle a set took. It saves the game, and `blokysav`
+loads it and asks again: the answers of Action 14 used not to come with a set
+loaded from a savegame, and the set then switched itself off on its own lock.
+
+## The game's own sets, in baseset/decouple/
+
+Every NewGRF in `baseset/decouple/` goes into every new game, whatever it is
+called and whatever its GRF ID (`AppendBuiltinGRFs()`): the sets that carry
+the 128 cargoes of the game's industry. The new-game list gets them when it is
+read from `openttd.cfg`, so the player sees them in the NewGRF window and may
+move them; the window refuses to remove one with a red message, and no set can
+switch one off with an Action E. A savegame keeps the sets it was saved with.
+
+`grf/vestaveny.yagl` is such a set: it takes the second road vehicle and its
+callback answers 0x77. `grf/vypinac.yagl` is an ordinary set that switches it
+off by its GRF ID and must not manage to. The battery puts `vestaveny.grf` in
+the rig directory, not in the home's `newgrf/`: the scene puts it into
+`baseset/decouple/`.
+
+The scenes `vestaveny` and `vestavenysav` put `vestaveny.grf` into
+`baseset/decouple/` of the scene's config directory and take it out again
+after: anywhere the rig always looks it would be in every scene. The first
+starts a game with only `vypinac` in the config and saves it; the second loads
+the save. Both read with `testbloky` that the set is on and one of the game's
+own, that `vypinac` is on as well, and that the car the set took answers 0x77.
+The window's refusal is not played by the rig (no window there).
+
+## A set's 16x sprites (zin16, zoom code 7)
+
+`grf/zin16_test.yagl` is a container version 2 set with the 16x level this
+game reads (zoom code 7, `ZoomLevel::In16x`, `LoadSpriteV2()` in
+`src/spriteloader/grf.cpp`; 8x is code 6, the NewGRF codes end at 5). yagl
+names them zin8 and zin16 (grfcodec knows no code past 5); its three sheets
+hold the levels.
+
+Two sprites are replaced (Action A, 3981 and 3982 of the base set), squares
+of one colour per level: 3981 has 4x red, 8x green and 16x blue; 3982 has 16x
+alone, red and blue pixels alternating. The scene `zin16` reads them with
+`testzoom8 sprite <id>` (`DescribeSpriteLevels()`), which reads the sprite
+from its file again and says which levels the file has, which were read, and
+the size and middle pixel of 16x, 8x and 4x as they go to the encoder:
+
+- 16x off (the default): 3981 reads 4x and 8x and leaves its 16x record
+  unread (the set has an 8x; `skip_16x`), its 8x is the set's green and 16x
+  has no pixels; 3982 reads its 16x and the game makes the 8x from it, the
+  mean of each 2x2 block, (128, 0, 128) (`ResizeSpriteOut()`), and the 4x
+  the same.
+- 16x on (`gui.zoom_min 0`): both read their 16x, blue and the red-blue
+  board, and 3982's 8x is still the mean.
+- 16x on with the sprite resolution held at 8x (`gui.sprite_zoom_min 1`):
+  3982's 16x is its 8x doubled again, (128, 0, 128).
+
+The rig runs the null blitter, so the sprites come through
+`SpriteLoaderMakeIndexed`: the middle pixel keeps its RGBA and gains the
+palette index `m`.
+
+## Fast forward and slow motion on one button
+
+The player's word: one click on the fast forward button runs the game fast,
+two clicks slow, so that vehicles can be watched closely; how slow is a
+setting of its own, `gui.slow_motion_speed` (Environment > Time, 30 % of the
+normal speed by default, 10 to 90). A double click comes as a click and then
+a second one: had the first set the game going fast at once, the game would
+run days ahead in the moment between them. So a click at normal speed waits
+out the time for a double click (`TIME_BETWEEN_DOUBLE_CLICK`, half a second)
+before it goes fast, a second click within it goes slow instead, and a click
+while the game runs fast or slow goes back to normal at once
+(`FastForwardButtonClick()`, `UpdateFastForwardClick()` in toolbar_gui.cpp).
+The hotkey and holding Tab stay as they were. The button is lowered in slow
+motion as in fast; an icon of its own is to come.
+
+The scene `zrychleni` plays `testzrychleni`, which clicks the main toolbar's
+button through its `OnClick` with the click count, as the mouse does, waits
+the double-click time where a step needs it, and refuses any step that ends
+at another speed than it should.
+
+## Students are studentky, and the coffeeshop takes them
+
+`grf/studenti.yagl` brings the cargo STUD under the name "Students", as the
+industry sets do. The game renames it Studentky whatever the set says
+(`NameStudentCargo()`), in every language, and the coffeeshop takes it
+(`COFFEESHOP_CARGOES`).
+
+The scene `studentky` writes the cargoes and industries with the console
+command `prum` and reads the cargo's name and what the coffeeshop takes.

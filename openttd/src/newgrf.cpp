@@ -1,0 +1,2858 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file newgrf.cpp Base of all NewGRF support. */
+
+#include "stdafx.h"
+#include "cztr_wagons.h"
+#include "core/backup_type.hpp"
+#include "core/container_func.hpp"
+#include "company_manager_face.h"
+#include "debug.h"
+#include "fileio_func.h"
+#include "engine_func.h"
+#include "engine_base.h"
+#include "road_on_rail.h"
+#include "articulated_vehicles.h"
+#include "newgrf_spritegroup.h"
+#include "bridge.h"
+#include "town.h"
+#include "newgrf_engine.h"
+#include "newgrf_text.h"
+#include "spritecache.h"
+#include "currency_func.h"
+#include "landscape.h"
+#include "newgrf_badge.h"
+#include "newgrf_badge_config.h"
+#include "newgrf_cargo.h"
+#include "newgrf_sound.h"
+#include "newgrf_station.h"
+#include "industrytype.h"
+#include "newgrf_canal.h"
+#include "newgrf_townname.h"
+#include "newgrf_industries.h"
+#include "newgrf_airporttiles.h"
+#include "newgrf_airport.h"
+#include "newgrf_object.h"
+#include "network/core/config.h"
+#include "smallmap_gui.h"
+#include "genworld.h"
+#include "error_func.h"
+#include "vehicle_base.h"
+#include "anomaly_log.h"
+#include "climate_industries.h"
+#include "strings_func.h"
+#include "road.h"
+#include "newgrf_roadstop.h"
+#include "newgrf_signals.h"
+#include "newgrf/newgrf_bytereader.h"
+#include "newgrf/newgrf_internal_vehicle.h"
+#include "newgrf/newgrf_internal.h"
+#include "newgrf/newgrf_stringmapping.h"
+
+#include "table/strings.h"
+#include "table/pricebase.h"
+
+#include "safeguards.h"
+
+/* TTDPatch extended GRF format codec
+ * (c) Petr Baudis 2004 (GPL'd)
+ * Changes by Florian octo Forster are (c) by the OpenTTD development team.
+ *
+ * Contains portions of documentation by TTDPatch team.
+ * Thanks especially to Josef Drexler for the documentation as well as a lot
+ * of help at #tycoon. Also thanks to Michael Blunck for his GRF files which
+ * served as subject to the initial testing of this codec. */
+
+/** List of all loaded GRF files */
+static std::vector<GRFFile> _grf_files;
+
+std::span<const GRFFile> GetAllGRFFiles()
+{
+	return _grf_files;
+}
+
+/** Miscellaneous GRF features, set by Action 0x0D, parameter 0x9E */
+GrfMiscBits _misc_grf_features{};
+
+/** Indicates which are the newgrf features currently loaded ingame */
+GRFLoadedFeatures _loaded_newgrf_features;
+
+GrfProcessingState _cur_gps;
+
+TypedIndexContainer<std::vector<GRFTempEngineData>, EngineID> _gted;  ///< Temporary engine data used during NewGRF loading
+
+/**
+ * Debug() function dedicated to newGRF debugging messages
+ * Function is essentially the same as Debug(grf, severity, ...) with the
+ * addition of file:line information when parsing grf files.
+ * @note for the above reason(s) GrfMsg() should ONLY be used for
+ * loading/parsing grf files, not for runtime debug messages as there
+ * is no file information available during that time.
+ * @param severity debugging severity level, see debug.h
+ * @param msg the message
+ */
+void GrfMsgI(int severity, const std::string &msg)
+{
+	if (_cur_gps.grfconfig == nullptr) {
+		Debug(grf, severity, "{}", msg);
+	} else {
+		Debug(grf, severity, "[{}:{}] {}", _cur_gps.grfconfig->filename, _cur_gps.nfo_line, msg);
+	}
+}
+
+/**
+ * Obtain a NewGRF file by its grfID
+ * @param grfid The grfID to obtain the file for
+ * @return The file.
+ */
+GRFFile *GetFileByGRFID(GrfID grfid)
+{
+	auto it = std::ranges::find(_grf_files, grfid, &GRFFile::grfid);
+	if (it != std::end(_grf_files)) return &*it;
+	return nullptr;
+}
+
+/**
+ * Obtain a NewGRF file by its filename
+ * @param filename The filename to obtain the file for.
+ * @return The file.
+ */
+static GRFFile *GetFileByFilename(const std::string &filename)
+{
+	auto it = std::ranges::find(_grf_files, filename, &GRFFile::filename);
+	if (it != std::end(_grf_files)) return &*it;
+	return nullptr;
+}
+
+/**
+ * Reset all NewGRFData that was used only while processing data.
+ * @param gf The file to reset the data for.
+ */
+static void ClearTemporaryNewGRFData(GRFFile *gf)
+{
+	gf->labels.clear();
+}
+
+/**
+ * Disable a GRF
+ * @param message Error message or STR_NULL.
+ * @param config GRFConfig to disable, nullptr for current.
+ * @return Error message of the GRF for further customisation.
+ */
+GRFError *DisableGrf(StringID message, GRFConfig *config)
+{
+	GRFFile *file;
+	if (config != nullptr) {
+		file = GetFileByGRFID(config->ident.grfid);
+	} else {
+		config = _cur_gps.grfconfig;
+		file = _cur_gps.grffile;
+	}
+
+	config->status = GRFStatus::Disabled;
+	if (file != nullptr) ClearTemporaryNewGRFData(file);
+	if (config == _cur_gps.grfconfig) _cur_gps.skip_sprites = -1;
+
+	if (message == STR_NULL) return nullptr;
+
+	auto it = std::ranges::find(config->errors, _cur_gps.nfo_line, &GRFError::nfo_line);
+	if (it == std::end(config->errors)) {
+		it = config->errors.emplace(it, STR_NEWGRF_ERROR_MSG_FATAL, _cur_gps.nfo_line, message);
+	}
+	if (config == _cur_gps.grfconfig) it->param_value[0] = _cur_gps.nfo_line;
+	return &*it;
+}
+
+/**
+ * Disable a static NewGRF when it is influencing another (non-static)
+ * NewGRF as this could cause desyncs.
+ *
+ * We could just tell the NewGRF querying that the file doesn't exist,
+ * but that might give unwanted results. Disabling the NewGRF gives the
+ * best result as no NewGRF author can complain about that.
+ * @param c The NewGRF to disable.
+ */
+void DisableStaticNewGRFInfluencingNonStaticNewGRFs(GRFConfig &c)
+{
+	GRFError *error = DisableGrf(STR_NEWGRF_ERROR_STATIC_GRF_CAUSES_DESYNC, &c);
+	error->data = _cur_gps.grfconfig->GetName();
+}
+
+static std::map<GrfID, GrfID> _grf_id_overrides;
+
+/**
+ * Set the override for a NewGRF
+ * @param source_grfid The grfID which wants to override another NewGRF.
+ * @param target_grfid The grfID which is being overridden.
+ */
+void SetNewGRFOverride(GrfID source_grfid, GrfID target_grfid)
+{
+	if (target_grfid == 0) {
+		_grf_id_overrides.erase(source_grfid);
+		GrfMsg(5, "SetNewGRFOverride: Removed override of {:X}", std::byteswap(source_grfid));
+	} else {
+		_grf_id_overrides[source_grfid] = target_grfid;
+		GrfMsg(5, "SetNewGRFOverride: Added override of {:X} to {:X}", std::byteswap(source_grfid), std::byteswap(target_grfid));
+	}
+}
+
+/**
+ * Get overridden GRF for current GRF if present.
+ * @return Overridden GRFFile if present, or nullptr.
+ */
+GRFFile *GetCurrentGRFOverride()
+{
+	auto found = _grf_id_overrides.find(_cur_gps.grffile->grfid);
+	if (found != std::end(_grf_id_overrides)) {
+		GRFFile *grffile = GetFileByGRFID(found->second);
+		if (grffile != nullptr) return grffile;
+	}
+	return nullptr;
+}
+
+/**
+ * Returns the engine associated to a certain internal_id, resp. allocates it.
+ * @param file NewGRF that wants to change the engine.
+ * @param type Vehicle type.
+ * @param internal_id Engine ID inside the NewGRF.
+ * @param static_access If the engine is not present, return nullptr instead of allocating a new engine. (Used for static Action 0x04).
+ * @return The requested engine.
+ */
+Engine *GetNewEngine(const GRFFile *file, VehicleType type, uint16_t internal_id, bool static_access)
+{
+	/* Hack for add-on GRFs that need to modify another GRF's engines. This lets
+	 * them use the same engine slots. */
+	GrfID scope_grfid = INVALID_GRFID; // If not using dynamic_engines, all newgrfs share their ID range
+	if (_settings_game.vehicle.dynamic_engines) {
+		/* If dynamic_engies is enabled, there can be multiple independent ID ranges. */
+		scope_grfid = file->grfid;
+		if (auto it = _grf_id_overrides.find(file->grfid); it != std::end(_grf_id_overrides)) {
+			scope_grfid = it->second;
+			const GRFFile *grf_match = GetFileByGRFID(scope_grfid);
+			if (grf_match == nullptr) {
+				GrfMsg(5, "Tried mapping from GRFID {:x} to {:x} but target is not loaded", std::byteswap(file->grfid), std::byteswap(scope_grfid));
+			} else {
+				GrfMsg(5, "Mapping from GRFID {:x} to {:x}", std::byteswap(file->grfid), std::byteswap(scope_grfid));
+			}
+		}
+
+		/* Check if the engine is registered in the override manager */
+		EngineID engine = _engine_mngr.GetID(type, internal_id, scope_grfid);
+		if (engine != EngineID::Invalid()) {
+			Engine *e = Engine::Get(engine);
+			if (!e->grf_prop.HasGrfFile()) {
+				e->grf_prop.SetGRFFile(file);
+			}
+			return e;
+		}
+	}
+
+	/* Check if there is an unreserved slot */
+	EngineID engine = _engine_mngr.UseUnreservedID(type, internal_id, scope_grfid, static_access);
+	if (engine != EngineID::Invalid()) {
+		Engine *e = Engine::Get(engine);
+
+		if (!e->grf_prop.HasGrfFile()) {
+			e->grf_prop.SetGRFFile(file);
+			GrfMsg(5, "Replaced engine at index {} for GRFID {:x}, type {}, index {}", e->index, std::byteswap(file->grfid), type, internal_id);
+		}
+
+		return e;
+	}
+
+	if (static_access) return nullptr;
+
+	if (!Engine::CanAllocateItem()) {
+		GrfMsg(0, "Can't allocate any more engines");
+		return nullptr;
+	}
+
+	size_t engine_pool_size = Engine::GetPoolSize();
+
+	/* ... it's not, so create a new one based off an existing engine */
+	Engine *e = Engine::Create(type, internal_id);
+	e->grf_prop.SetGRFFile(file);
+
+	/* Reserve the engine slot */
+	_engine_mngr.SetID(type, internal_id, scope_grfid, std::min<uint8_t>(internal_id, GetOriginalEngineCount(type)), e->index);
+
+	if (engine_pool_size != Engine::GetPoolSize()) {
+		/* Resize temporary engine data ... */
+		_gted.resize(Engine::GetPoolSize());
+	}
+	if (type == VehicleType::Train) {
+		_gted[e->index].railtypelabels.clear();
+		for (RailType rt : e->VehInfo<RailVehicleInfo>().railtypes) _gted[e->index].railtypelabels.push_back(GetRailTypeInfo(rt)->label);
+	}
+
+	GrfMsg(5, "Created new engine at index {} for GRFID {:x}, type {}, index {}", e->index, std::byteswap(file->grfid), type, internal_id);
+
+	return e;
+}
+
+/**
+ * Return the ID of a new engine
+ * @param file The NewGRF file providing the engine.
+ * @param type The Vehicle type.
+ * @param internal_id NewGRF-internal ID of the engine.
+ * @return The new EngineID.
+ * @note depending on the dynamic_engine setting and a possible override
+ *       property the grfID may be unique or overwriting or partially re-defining
+ *       properties of an existing engine.
+ */
+EngineID GetNewEngineID(const GRFFile *file, VehicleType type, uint16_t internal_id)
+{
+	GrfID scope_grfid = INVALID_GRFID; // If not using dynamic_engines, all newgrfs share their ID range
+	if (_settings_game.vehicle.dynamic_engines) {
+		scope_grfid = file->grfid;
+		if (auto it = _grf_id_overrides.find(file->grfid); it != std::end(_grf_id_overrides)) {
+			scope_grfid = it->second;
+		}
+	}
+
+	return _engine_mngr.GetID(type, internal_id, scope_grfid);
+}
+
+
+
+
+/**
+ * Translate the refit mask. refit_mask is uint32_t as it has not been mapped to CargoTypes.
+ * @param refit_mask The bitmask to convert.
+ * @return The converted CargoTypes.
+ */
+CargoTypes TranslateRefitMask(uint32_t refit_mask)
+{
+	CargoTypes result{};
+	for (uint8_t bit : SetBitIterator(refit_mask)) {
+		CargoType cargo = GetCargoTranslation(bit, _cur_gps.grffile, true);
+		if (IsValidCargoType(cargo)) result.Set(cargo);
+	}
+	return result;
+}
+
+/**
+ * Converts TTD(P) Base Price pointers into the enum used by OTTD
+ * See http://wiki.ttdpatch.net/tiki-index.php?page=BaseCosts
+ * @param base_pointer TTD(P) Base Price Pointer
+ * @param error_location Function name for grf error messages
+ * @param[out] index If \a base_pointer is valid, \a index is assigned to the matching price; else it is left unchanged
+ */
+void ConvertTTDBasePrice(uint32_t base_pointer, std::string_view error_location, Price *index)
+{
+	/* Special value for 'none' */
+	if (base_pointer == 0) {
+		*index = Price::Invalid;
+		return;
+	}
+
+	static const uint32_t start = 0x4B34; ///< Position of first base price
+	static const uint32_t size  = 6;      ///< Size of each base price record
+
+	if (base_pointer < start || (base_pointer - start) % size != 0 || (base_pointer - start) / size >= to_underlying(Price::End)) {
+		GrfMsg(1, "{}: Unsupported running cost base 0x{:04X}, ignoring", error_location, base_pointer);
+		return;
+	}
+
+	*index = (Price)((base_pointer - start) / size);
+}
+
+/**
+ * Get the language map associated with a given NewGRF and language.
+ * @param grfid       The NewGRF to get the map for.
+ * @param language_id The (NewGRF) language ID to get the map for.
+ * @return The LanguageMap, or nullptr if it couldn't be found.
+ */
+/* static */ const LanguageMap *LanguageMap::GetLanguageMap(GrfID grfid, GRFLanguage language_id)
+{
+	const GRFFile *grffile = GetFileByGRFID(grfid);
+	if (grffile == nullptr) return nullptr;
+
+	auto it = grffile->language_map.find(language_id);
+	if (it == std::end(grffile->language_map)) return nullptr;
+
+	return &it->second;
+}
+
+/**
+ * Set the current NewGRF as unsafe for static use
+ * @note Used during safety scan on unsafe actions.
+ */
+void GRFUnsafe(ByteReader &)
+{
+	_cur_gps.grfconfig->flags.Set(GRFConfigFlag::Unsafe);
+
+	/* Skip remainder of GRF */
+	_cur_gps.skip_sprites = -1;
+}
+
+/** Reset and clear all NewGRFs */
+static void ResetNewGRF()
+{
+	_cur_gps.grfconfig = nullptr;
+	_cur_gps.grffile = nullptr;
+	_grf_files.clear();
+
+	/* We store pointers to GRFFiles in many places, so need to ensure that the pointers do not become invalid
+	 * due to vector reallocation. Should not happen due to loading taking place in multiple stages, but
+	 * reserving when the size is known is good practice anyway. */
+	_grf_files.reserve(_grfconfig.size());
+}
+
+/** Clear all NewGRF errors */
+static void ResetNewGRFErrors()
+{
+	for (const auto &c : _grfconfig) {
+		c->errors.clear();
+	}
+}
+
+extern void ResetCallbacks(bool final);
+extern void ResetGRM();
+
+/**
+ * Reset all NewGRF loaded data
+ */
+void ResetNewGRFData()
+{
+	CleanUpStrings();
+	CleanUpGRFTownNames();
+
+	ResetBadges();
+
+	/* Copy/reset original engine info data */
+	SetupEngines();
+
+	/* Copy/reset original bridge info data */
+	ResetBridges();
+
+	/* Reset rail type information */
+	ResetRailTypes();
+	/* Signal styles come out of the sets that are about to be read. */
+	ResetSignalStyles();
+
+	/* Copy/reset original road type info data */
+	ResetRoadTypes();
+
+	/* Allocate temporary refit/cargo class data */
+	_gted.resize(Engine::GetPoolSize());
+
+	/* Fill rail type label temporary data for default trains */
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		_gted[e->index].railtypelabels.clear();
+		for (RailType rt : e->VehInfo<RailVehicleInfo>().railtypes) _gted[e->index].railtypelabels.push_back(GetRailTypeInfo(rt)->label);
+	}
+
+	/* Reset GRM reservations */
+	ResetGRM();
+
+	/* Reset generic feature callback lists */
+	ResetGenericCallbacks();
+
+	/* Reset price base data */
+	ResetPriceBaseMultipliers();
+
+	/* Reset the currencies array */
+	ResetCurrencies();
+
+	/* Reset the house array */
+	ResetHouses();
+
+	/* Reset the industries structures*/
+	ResetIndustries();
+
+	/* Reset the objects. */
+	ObjectClass::Reset();
+	ResetObjects();
+
+	/* Reset station classes */
+	StationClass::Reset();
+
+	/* Reset airport-related structures */
+	AirportClass::Reset();
+	AirportSpec::ResetAirports();
+	AirportTileSpec::ResetAirportTiles();
+
+	/* Reset road stop classes */
+	RoadStopClass::Reset();
+
+	/* Reset canal sprite groups and flags */
+	_water_feature.fill({});
+
+	ResetFaces();
+
+	/* Reset the snowline table. */
+	ClearSnowLine();
+
+	/* Reset NewGRF files */
+	ResetNewGRF();
+
+	/* Reset NewGRF errors. */
+	ResetNewGRFErrors();
+
+	/* Set up the default cargo types */
+	SetupCargoForClimate(_settings_game.game_creation.landscape);
+	ResetCargoSlots();
+
+	/* Reset misc GRF features and train list display variables */
+	_misc_grf_features = {};
+
+	_loaded_newgrf_features.has_2CC = false;
+	_loaded_newgrf_features.used_liveries = LiveryScheme::Default;
+	_loaded_newgrf_features.shore = ShoreReplacement::None;
+	_loaded_newgrf_features.tram = TramDepotReplacement::None;
+
+	/* Clear all GRF overrides */
+	_grf_id_overrides.clear();
+
+	InitializeSoundPool();
+	_spritegroup_pool.CleanPool();
+	ResetCallbacks(false);
+}
+
+/**
+ * Reset NewGRF data which is stored persistently in savegames.
+ */
+void ResetPersistentNewGRFData()
+{
+	/* Reset override managers */
+	_engine_mngr.ResetToDefaultMapping();
+	_house_mngr.ResetMapping();
+	_industry_mngr.ResetMapping();
+	_industile_mngr.ResetMapping();
+	_airport_mngr.ResetMapping();
+	_airporttile_mngr.ResetMapping();
+}
+
+/**
+ * Get the cargo translation table to use for the given GRF file.
+ * @param grffile GRF file.
+ * @returns Readonly cargo translation table to use.
+ */
+std::span<const CargoLabel> GetCargoTranslationTable(const GRFFile &grffile)
+{
+	/* Always use the translation table if it's installed. */
+	if (!grffile.cargo_list.empty()) return grffile.cargo_list;
+
+	/* Pre-v7 use climate-dependent "slot" table. */
+	if (grffile.grf_version < 7) return GetClimateDependentCargoTranslationTable();
+
+	/* Otherwise use climate-independent "bitnum" table. */
+	return GetClimateIndependentCargoTranslationTable();
+}
+
+/**
+ * Construct the Cargo Mapping
+ * @note This is the reverse of a cargo translation table
+ */
+static void BuildCargoTranslationMap()
+{
+	_cur_gps.grffile->cargo_map.fill(UINT8_MAX);
+
+	auto cargo_list = GetCargoTranslationTable(*_cur_gps.grffile);
+
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		/* Check the translation table for this cargo's label */
+		int idx = find_index(cargo_list, cs->label);
+		if (idx >= 0) _cur_gps.grffile->cargo_map[cs->Index()] = idx;
+	}
+}
+
+/**
+ * Prepare loading a NewGRF file with its config
+ * @param config The NewGRF configuration struct with name, id, parameters and alike.
+ */
+static void InitNewGRFFile(const GRFConfig &config)
+{
+	GRFFile *newfile = GetFileByFilename(config.filename);
+	if (newfile != nullptr) {
+		/* We already loaded it once. */
+		_cur_gps.grffile = newfile;
+		return;
+	}
+
+	assert(_grf_files.size() < _grf_files.capacity()); // We must not invalidate pointers.
+	_cur_gps.grffile = &_grf_files.emplace_back(config);
+}
+
+/**
+ * Constructor for GRFFile
+ * @param config GRFConfig to copy name, grfid and parameters from.
+ */
+GRFFile::GRFFile(const GRFConfig &config)
+{
+	this->filename = config.filename;
+	this->grfid = config.ident.grfid;
+
+	/* What the file said about itself before there was a GRFFile to say it
+	 * to: the Action 0 properties it asked for by name, and the answers to
+	 * the feature tests it asked (see newgrf_act14.cpp). */
+	for (const auto &[key, id] : config.action0_property_remaps) {
+		this->action0_property_remaps[key] = static_cast<MappedProperty>(id);
+	}
+	this->mapped_variables = config.mapped_variables;
+	this->feature_test_var8d = config.feature_test_var8d;
+	this->vehicle_config = config.vehicle_config;
+	this->feature_test_var9d = config.feature_test_var9d;
+	this->feature_test_var91 = config.feature_test_var91;
+
+	/* Initialise local settings to defaults */
+	this->traininfo_vehicle_pitch = 0;
+	this->traininfo_vehicle_width = TRAININFO_DEFAULT_VEHICLE_WIDTH;
+
+	/* Mark price_base_multipliers as 'not set' */
+	this->price_base_multipliers.fill(INVALID_PRICE_MODIFIER);
+
+	/* Initialise rail type map with default rail types */
+	this->railtype_map.fill(INVALID_RAILTYPE);
+	this->railtype_map[0] = RAILTYPE_RAIL;
+	this->railtype_map[1] = RAILTYPE_ELECTRIC;
+	this->railtype_map[2] = RAILTYPE_MONO;
+	this->railtype_map[3] = RAILTYPE_MAGLEV;
+
+	/* Initialise road type map with default road types */
+	this->roadtype_map.fill(INVALID_ROADTYPE);
+	this->roadtype_map[0] = ROADTYPE_ROAD;
+
+	/* Initialise tram type map with default tram types */
+	this->tramtype_map.fill(INVALID_ROADTYPE);
+	this->tramtype_map[0] = ROADTYPE_TRAM;
+
+	/* Copy the initial parameter list */
+	this->param = config.param;
+}
+
+/* Some compilers get confused about vectors of unique_ptrs. */
+GRFFile::GRFFile() = default;
+GRFFile::GRFFile(GRFFile &&other) = default;
+GRFFile::~GRFFile() = default;
+
+/**
+ * Find first cargo label that exists and is active from a list of cargo labels.
+ * @param labels List of cargo labels.
+ * @returns First cargo label in list that exists, or CT_INVALID if none exist.
+ */
+static CargoLabel GetActiveCargoLabel(const std::initializer_list<CargoLabel> &labels)
+{
+	for (const CargoLabel &label : labels) {
+		CargoType cargo_type = GetCargoTypeByLabel(label);
+		if (cargo_type != INVALID_CARGO) return label;
+	}
+	return CT_INVALID;
+}
+
+/**
+ * Get active cargo label from either a cargo label or climate-dependent mixed cargo type.
+ * @param label Cargo label or climate-dependent mixed cargo type.
+ * @returns Active cargo label, or CT_INVALID if cargo label is not active.
+ */
+static CargoLabel GetActiveCargoLabel(const std::variant<CargoLabel, MixedCargoType> &label)
+{
+	struct visitor {
+		CargoLabel operator()(const CargoLabel &label) { return label; }
+		CargoLabel operator()(const MixedCargoType &mixed)
+		{
+			/* With the industries of other climates switched on, the kinds
+			 * of several climates are in the game at once, and the first of
+			 * them present is not necessarily the played climate's: that
+			 * one comes first (climate_industries.h). */
+			if (IndustryClimatesOn().Any()) {
+				CargoLabel own = MixedCargoLabelFor(mixed, _settings_game.game_creation.landscape);
+				if (own != CT_INVALID && IsValidCargoType(GetCargoTypeByLabel(own))) return own;
+			}
+			switch (mixed) {
+				case MCT_LIVESTOCK_FRUIT: return GetActiveCargoLabel({CT_LIVESTOCK, CT_FRUIT});
+				case MCT_GRAIN_WHEAT_MAIZE: return GetActiveCargoLabel({CT_GRAIN, CT_WHEAT, CT_MAIZE});
+				case MCT_VALUABLES_GOLD_DIAMONDS: return GetActiveCargoLabel({CT_VALUABLES, CT_GOLD, CT_DIAMONDS});
+				default: NOT_REACHED();
+			}
+		}
+	};
+
+	return std::visit(visitor{}, label);
+}
+
+/**
+ * Precalculate refit masks from cargo classes for all vehicles.
+ */
+static void CalculateRefitMasks()
+{
+	CargoTypes original_known_cargoes{};
+	for (CargoType cargo_type : EnumRange(NUM_CARGO)) {
+		if (IsDefaultCargo(cargo_type)) original_known_cargoes.Set(cargo_type);
+	}
+
+	for (Engine *e : Engine::Iterate()) {
+		EngineID engine = e->index;
+		EngineInfo *ei = &e->info;
+		bool only_defaultcargo; ///< Set if the vehicle shall carry only the default cargo
+
+		/* Apply default cargo translation map if cargo type hasn't been set, either explicitly or by aircraft cargo handling. */
+		if (!IsValidCargoType(e->info.cargo_type)) {
+			e->info.cargo_type = GetCargoTypeByLabel(GetActiveCargoLabel(e->info.cargo_label));
+		}
+
+		/* If the NewGRF did not set any cargo properties, we apply default values. */
+		if (_gted[engine].defaultcargo_grf == nullptr) {
+			/* If the vehicle has any capacity, apply the default refit masks */
+			if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().capacity != 0) {
+				static constexpr LandscapeType T = LandscapeType::Temperate;
+				static constexpr LandscapeType A = LandscapeType::Arctic;
+				static constexpr LandscapeType S = LandscapeType::Tropic;
+				static constexpr LandscapeType Y = LandscapeType::Toyland;
+				static const struct DefaultRefitMasks {
+					LandscapeTypes climate;
+					CargoLabel cargo_label;
+					CargoClasses cargo_allowed;
+					CargoClasses cargo_disallowed;
+				} _default_refit_masks[] = {
+					{{T, A, S, Y}, CT_PASSENGERS, {CargoClass::Passengers},                      {}},
+					{{T, A, S   }, CT_MAIL,       {CargoClass::Mail},                            {}},
+					{{T, A, S   }, CT_VALUABLES,  {CargoClass::Armoured},                        {CargoClass::Liquid}},
+					{{         Y}, CT_MAIL,       {CargoClass::Mail, CargoClass::Armoured},      {CargoClass::Liquid}},
+					{{T, A      }, CT_COAL,       {CargoClass::Bulk},                            {}},
+					{{      S   }, CT_COPPER_ORE, {CargoClass::Bulk},                            {}},
+					{{         Y}, CT_SUGAR,      {CargoClass::Bulk},                            {}},
+					{{T, A, S   }, CT_OIL,        {CargoClass::Liquid},                          {}},
+					{{         Y}, CT_COLA,       {CargoClass::Liquid},                          {}},
+					{{T         }, CT_GOODS,      {CargoClass::PieceGoods, CargoClass::Express}, {CargoClass::Liquid, CargoClass::Passengers}},
+					{{   A, S   }, CT_GOODS,      {CargoClass::PieceGoods, CargoClass::Express}, {CargoClass::Liquid, CargoClass::Passengers, CargoClass::Refrigerated}},
+					{{   A, S   }, CT_FOOD,       {CargoClass::Refrigerated},                    {}},
+					{{         Y}, CT_CANDY,      {CargoClass::PieceGoods, CargoClass::Express}, {CargoClass::Liquid, CargoClass::Passengers}},
+				};
+
+				if (e->type == VehicleType::Aircraft) {
+					/* Aircraft default to "light" cargoes */
+					_gted[engine].cargo_allowed = {CargoClass::Passengers, CargoClass::Mail, CargoClass::Armoured, CargoClass::Express};
+					_gted[engine].cargo_disallowed = {CargoClass::Liquid};
+				} else if (e->type == VehicleType::Ship) {
+					CargoLabel label = GetActiveCargoLabel(ei->cargo_label);
+					switch (label.base()) {
+						case CT_PASSENGERS.base():
+							/* Ferries */
+							_gted[engine].cargo_allowed = {CargoClass::Passengers};
+							_gted[engine].cargo_disallowed = {};
+							break;
+						case CT_OIL.base():
+							/* Tankers */
+							_gted[engine].cargo_allowed = {CargoClass::Liquid};
+							_gted[engine].cargo_disallowed = {};
+							break;
+						default:
+							/* Cargo ships */
+							if (_settings_game.game_creation.landscape == LandscapeType::Toyland) {
+								/* No tanker in toyland :( */
+								_gted[engine].cargo_allowed = {CargoClass::Mail, CargoClass::Armoured, CargoClass::Express, CargoClass::Bulk, CargoClass::PieceGoods, CargoClass::Liquid};
+								_gted[engine].cargo_disallowed = {CargoClass::Passengers};
+							} else {
+								_gted[engine].cargo_allowed = {CargoClass::Mail, CargoClass::Armoured, CargoClass::Express, CargoClass::Bulk, CargoClass::PieceGoods};
+								_gted[engine].cargo_disallowed = {CargoClass::Liquid, CargoClass::Passengers};
+							}
+							break;
+					}
+					e->VehInfo<ShipVehicleInfo>().old_refittable = true;
+				} else if (e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) {
+					/* Train engines default to all cargoes, so you can build single-cargo consists with fast engines.
+					 * Trains loading multiple cargoes may start stations accepting unwanted cargoes. */
+					_gted[engine].cargo_allowed = {CargoClass::Passengers, CargoClass::Mail, CargoClass::Armoured, CargoClass::Express, CargoClass::Bulk, CargoClass::PieceGoods, CargoClass::Liquid};
+					_gted[engine].cargo_disallowed = {};
+				} else {
+					/* Train wagons and road vehicles are classified by their default cargo type */
+					CargoLabel label = GetActiveCargoLabel(ei->cargo_label);
+					for (const auto &drm : _default_refit_masks) {
+						if (!drm.climate.Test(_settings_game.game_creation.landscape)) continue;
+						if (drm.cargo_label != label) continue;
+
+						_gted[engine].cargo_allowed = drm.cargo_allowed;
+						_gted[engine].cargo_disallowed = drm.cargo_disallowed;
+						break;
+					}
+
+					/* All original cargoes have specialised vehicles, so exclude them */
+					_gted[engine].ctt_exclude_mask = original_known_cargoes;
+				}
+			}
+			_gted[engine].UpdateRefittability(_gted[engine].cargo_allowed.Any());
+
+			if (IsValidCargoType(ei->cargo_type)) _gted[engine].ctt_exclude_mask.Reset(ei->cargo_type);
+		}
+
+		/* Compute refittability */
+		{
+			CargoTypes mask{};
+			CargoTypes not_mask{};
+			CargoTypes xor_mask = ei->refit_mask;
+
+			/* If the original masks set by the grf are zero, the vehicle shall only carry the default cargo.
+			 * Note: After applying the translations, the vehicle may end up carrying no defined cargo. It becomes unavailable in that case. */
+			only_defaultcargo = _gted[engine].refittability != GRFTempEngineData::Refittability::NonEmpty;
+
+			if (_gted[engine].cargo_allowed.Any()) {
+				/* Build up the list of cargo types from the set cargo classes. */
+				for (const CargoSpec *cs : CargoSpec::Iterate()) {
+					if (cs->classes.Any(_gted[engine].cargo_allowed) && cs->classes.All(_gted[engine].cargo_allowed_required)) mask.Set(cs->Index());
+					if (cs->classes.Any(_gted[engine].cargo_disallowed)) not_mask.Set(cs->Index());
+				}
+			}
+
+			CargoTypes invalid_mask = CargoTypes{_cargo_mask}.Flip();
+			ei->refit_mask = mask.Reset(not_mask).Flip(xor_mask).Reset(invalid_mask);
+
+			/* Apply explicit refit includes/excludes. */
+			ei->refit_mask.Set(_gted[engine].ctt_include_mask);
+			ei->refit_mask.Reset(_gted[engine].ctt_exclude_mask);
+
+			/* Custom refit mask callback. */
+			const GRFFile *file = _gted[e->index].defaultcargo_grf;
+			if (file == nullptr) file = e->GetGRF();
+			if (file != nullptr && e->info.callback_mask.Test(VehicleCallbackMask::CustomRefit)) {
+				for (const CargoSpec *cs : CargoSpec::Iterate()) {
+					uint8_t local_slot = file->cargo_map[cs->Index()];
+					uint16_t callback = GetVehicleCallback(CBID_VEHICLE_CUSTOM_REFIT, cs->classes.base(), local_slot, engine, nullptr);
+					switch (callback) {
+						case CALLBACK_FAILED:
+						case 0:
+							break; // Do nothing.
+						case 1: ei->refit_mask.Set(cs->Index()); break;
+						case 2: ei->refit_mask.Reset(cs->Index()); break;
+
+						default: ErrorUnknownCallbackResult(file->grfid, CBID_VEHICLE_CUSTOM_REFIT, callback);
+					}
+				}
+			}
+		}
+
+		/* Clear invalid cargoslots (from default vehicles or pre-NewCargo GRFs) */
+		if (IsValidCargoType(ei->cargo_type) && !_cargo_mask.Test(ei->cargo_type)) ei->cargo_type = INVALID_CARGO;
+
+		/* Ensure that the vehicle is either not refittable, or that the default cargo is one of the refittable cargoes.
+		 * Note: Vehicles refittable to no cargo are handle differently to vehicle refittable to a single cargo. The latter might have subtypes. */
+		if (!only_defaultcargo && (e->type != VehicleType::Ship || e->VehInfo<ShipVehicleInfo>().old_refittable) && IsValidCargoType(ei->cargo_type) && !ei->refit_mask.Test(ei->cargo_type)) {
+			ei->cargo_type = INVALID_CARGO;
+		}
+
+		/* Check if this engine's cargo type is valid. If not, set to the first refittable
+		 * cargo type. Finally disable the vehicle, if there is still no cargo. */
+		if (!IsValidCargoType(ei->cargo_type) && ei->refit_mask.Any()) {
+			/* Figure out which CTT to use for the default cargo, if it is 'first refittable'. */
+			const GRFFile *file = _gted[engine].defaultcargo_grf;
+			if (file == nullptr) file = e->GetGRF();
+			if (file != nullptr && file->grf_version >= 8 && !file->cargo_list.empty()) {
+				/* Use first refittable cargo from cargo translation table */
+				uint8_t best_local_slot = UINT8_MAX;
+				for (CargoType cargo_type : ei->refit_mask) {
+					uint8_t local_slot = file->cargo_map[cargo_type];
+					if (local_slot < best_local_slot) {
+						best_local_slot = local_slot;
+						ei->cargo_type = cargo_type;
+					}
+				}
+			}
+
+			if (!IsValidCargoType(ei->cargo_type)) {
+				/* Use first refittable cargo slot */
+				ei->cargo_type = *ei->refit_mask.begin();
+			}
+		}
+		if (!IsValidCargoType(ei->cargo_type) && e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon && e->VehInfo<RailVehicleInfo>().capacity == 0) {
+			/* For train engines which do not carry cargo it does not matter if their cargo type is invalid.
+			 * Fallback to the first available instead, if the cargo type has not been changed (as indicated by
+			 * cargo_label not being CT_INVALID). */
+			if (GetActiveCargoLabel(ei->cargo_label) != CT_INVALID) {
+				ei->cargo_type = *_standard_cargo_mask.begin();
+			}
+		}
+		if (!IsValidCargoType(ei->cargo_type)) ei->climates = {};
+
+		/* Clear refit_mask for not refittable ships */
+		if (e->type == VehicleType::Ship && !e->VehInfo<ShipVehicleInfo>().old_refittable) {
+			ei->refit_mask.Reset();
+		}
+	}
+}
+
+/**
+ * Does the set this engine comes from name a cargo in its own cargo table? Then
+ * it knows the cargo, and which of its vehicles carry it is the set's to say.
+ * @param e the engine
+ * @param label the cargo
+ * @return whether its set names it
+ */
+static bool GrfNamesCargo(const Engine *e, CargoLabel label)
+{
+	const GRFFile *grf = e->GetGRF();
+	return grf != nullptr && std::ranges::find(grf->cargo_list, label) != grf->cargo_list.end();
+}
+
+/**
+ * Put the cargo for road vehicles on wagons (CT_ROLA, see road_on_rail.h) into
+ * the refit mask of every rail wagon in the game, the way the wagon cargo
+ * exception above widens its wagons: through the mask, so that the refit
+ * window, the buy window's filter and the refit command all find it by the
+ * one road they already know, and no window has to know about it by name.
+ *
+ * The car carriers only: the game's own, and the flat wagons of any set the
+ * player named (IsCarCarrierWagon()). Engines never: a lorry rides on a
+ * wagon. The articulated parts of a car carrier get the bit too, so that a
+ * refit of the wagon carries them along (RefitVehicle() refits a vehicle part
+ * by part, each by its own mask) -- asked of the wagon, since a part has a
+ * name of its own or none.
+ *
+ * Ships and aircraft are offered it too, as far as they can carry anything
+ * (CanCarryRoadVehicles()): the player asked that any of them be usable, not
+ * one special vessel per climate the way a car-carrying wagon would have been.
+ *
+ * Done after CalculateRefitMasks() and not in it, on purpose: that function
+ * picks a wagon's default cargo from its mask when the set's own choice is
+ * not in this game, and disables the wagon when nothing is left -- a bit
+ * added before that would have made a wagon with no cargo of its own a
+ * buildable car carrier by accident.
+ */
+static void OfferRoadVehiclesToCarriers()
+{
+	if (!IsValidCargoType(_road_vehicle_cargo)) {
+		/* The cargo is not in this game at all, so no wagon can be fitted and
+		 * the fitting is simply absent from every window -- which looks to a
+		 * player exactly like a fault, and says nothing about itself. A set
+		 * having taken the slot is the one way this happens on purpose; any
+		 * other way is a fault, and either way this is where it is said. */
+		LogAnomaly("Naklad na prepravu vozidel (ROLA) v teto hre neni - vagony nejde prestavet na auta. Slot {} obsadila jina sada?", NUM_CARGO - 1);
+		return;
+	}
+	/* Taken out of every wagon's mask first: a set's wagon that is refitted by
+	 * cargo class takes any special cargo, this one with it. Not out of the
+	 * wagons of a set that names the cargo in its own table: that set knows it,
+	 * and which of its wagons carry road vehicles is its to say -- the player's
+	 * way for a set of his, CZTR giving a wagon ROLA. Except the borrowed
+	 * wagon set, whose wagons are handed every cargo there is
+	 * (ApplyWagonCargoException()). */
+	extern bool IsWagonCargoExceptionGrf(const GRFConfig &config);
+	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (GrfNamesCargo(e, CT_ROLA)) {
+			const GRFConfig *config = GetGRFConfig(e->GetGRF()->grfid);
+			if (config == nullptr || !IsWagonCargoExceptionGrf(*config)) continue;
+		}
+		e->info.refit_mask.Reset(_road_vehicle_cargo);
+	}
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type == VehicleType::Train) {
+			if (!IsCarCarrierWagon(e)) continue;
+			e->info.refit_mask.Set(_road_vehicle_cargo);
+			for (EngineID part : GetArticulatedPartEngines(e->index)) {
+				if (Engine *p = Engine::GetIfValid(part); p != nullptr) p->info.refit_mask.Set(_road_vehicle_cargo);
+			}
+			continue;
+		}
+		if (!CanCarryRoadVehicles(e)) continue;
+		/* A passenger ship takes cars beside its passengers and is not
+		 * fitted for them (TakesRoadVehiclesBesidePassengers()). */
+		if (TakesRoadVehiclesBesidePassengers(e)) continue;
+		e->info.refit_mask.Set(_road_vehicle_cargo);
+	}
+}
+
+
+/**
+ * Let a church or a park of the original town houses (IsStudentHouse()) take
+ * studentky (CT_STUDENTKY) in full, in a slot of its own after the cargoes it
+ * takes already, when the game has them; it makes them too (TileLoop_Town()).
+ * @param hs The house.
+ */
+static void AddStudentAcceptance(HouseSpec &hs)
+{
+	if (!IsStudentHouse(hs)) return;
+	CargoType cargo = GetCargoTypeByLabel(CT_STUDENTKY);
+	if (!IsValidCargoType(cargo)) return;
+
+	for (uint i = 0; i < lengthof(hs.accepts_cargo); ++i) {
+		if (hs.accepts_cargo[i] == cargo) return;
+		if (IsValidCargoType(hs.accepts_cargo[i]) && hs.cargo_acceptance[i] != 0) continue;
+		hs.accepts_cargo[i] = cargo;
+		hs.cargo_acceptance[i] = 8;
+		return;
+	}
+}
+
+/**
+ * The students are studentky in this game, whatever the set that brings them
+ * calls them -- the player's word -- and the coffeeshop takes them.
+ */
+static void NameStudentCargo()
+{
+	CargoType cargo = GetCargoTypeByLabel(CT_STUDENTKY);
+	if (!IsValidCargoType(cargo)) return;
+	CargoSpec *cs = CargoSpec::Get(cargo);
+	cs->name = STR_CARGO_PLURAL_STUDENTKY;
+	cs->name_single = STR_CARGO_SINGULAR_STUDENTKA;
+	cs->quantifier = STR_QUANTITY_STUDENTKY;
+	cs->abbrev = STR_ABBREV_STUDENTKY;
+}
+
+/**
+ * Let every ship and aircraft that carries goods carry marijuana too, when the
+ * game's own industries are in it (economy.extra_industries): the refit is
+ * put into its mask, and it carries as much of it as it would of anything,
+ * the way the game works out a refit's capacity. "Goods" is any cargo that
+ * is goods to a town -- goods, and the sweets of toyland -- in the default
+ * cargo or the mask. The lorries and wagons for marijuana are the game's own
+ * (MarijuanaEngineImages()); no ship or aircraft is, and no set's vehicle
+ * knows the cargo by name.
+ *
+ * Nothing else is refitted to it but the wagons the player named by name
+ * (IsGreenLayerWagon(), below) and the vehicles of a set that names the cargo
+ * in its own cargo table. Marijuana is bulk cargo, and a vehicle refitted by
+ * class takes it with the coal: every coal lorry and coal wagon of every set
+ * would carry it -- the closed hoppers with lids among them, where no load is
+ * ever seen -- and stood above the game's own marijuana lorry in the list. The
+ * player: the lorries for marijuana are there, the coal ones need not carry
+ * it, and a wagon whose load cannot be seen is not worth refitting. So it
+ * comes out of every mask but those of the vehicles built for it. A set that
+ * names the cargo in its cargo table knows it, and its vehicles keep what the
+ * set made of it (the player's own sets): that is how a set says which of its
+ * vehicles carry it (GrfNamesCargo()). Letting the class decide instead was
+ * tried on 30. 9. and handed it to eight coal wagons of GETS, four of them
+ * closed hoppers; the player said no.
+ *
+ * Done after CalculateRefitMasks(), like OfferRoadVehiclesToCarriers(), so a
+ * vessel's own choice of cargo is made first.
+ */
+static void OfferMarijuanaToShipsAndAircraft()
+{
+	CargoType marijuana = GetCargoTypeByLabel(CT_MARIJUANA);
+	if (!IsValidCargoType(marijuana)) return;
+
+	for (Engine *e : Engine::Iterate()) {
+		if (e->GetDefaultCargoType() == marijuana || GrfNamesCargo(e, CT_MARIJUANA)) continue;
+		e->info.refit_mask.Reset(marijuana);
+	}
+	/* The wagons the player named -- the St and the U of CZTR, the Eanos and
+	 * the Eaos of GETS, by their exact names (EngineNameIsKind()): they carry
+	 * it as their coal drawn green (IsGreenLayerWagon()), with their
+	 * articulated parts, as a car carrier takes road vehicles. */
+	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (!IsGreenLayerWagon(e)) continue;
+		e->info.refit_mask.Set(marijuana);
+		for (EngineID part : GetArticulatedPartEngines(e->index)) {
+			if (Engine *p = Engine::GetIfValid(part); p != nullptr) p->info.refit_mask.Set(marijuana);
+		}
+	}
+
+	auto is_goods = [](CargoType cargo) {
+		return IsValidCargoType(cargo) && CargoSpec::Get(cargo)->town_acceptance_effect == TownAcceptanceEffect::Goods;
+	};
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Ship && e->type != VehicleType::Aircraft) continue;
+		bool carries_goods = is_goods(e->GetDefaultCargoType());
+		for (CargoType cargo : e->info.refit_mask) {
+			if (carries_goods) break;
+			carries_goods = is_goods(cargo);
+		}
+		if (carries_goods) e->info.refit_mask.Set(marijuana);
+	}
+}
+
+/**
+ * Explosives (CT_EXPLOSIVES) are an armoured cargo, so every vehicle that takes
+ * armoured cargo is offered them -- the armoured lorries, which are what the
+ * player asked for, and the armoured vans of the railways with them. Not ships
+ * and aircraft: they take explosives only inside a car, and a car's explosives
+ * are what their raid drops (see DropRaidBombs()). A ship or aircraft of a set
+ * whose own cargo they are, or whose set names them in its cargo table
+ * (GrfNamesCargo()), keeps them.
+ */
+static void OfferExplosivesToArmouredOnly()
+{
+	CargoType explosives = GetCargoTypeByLabel(CT_EXPLOSIVES);
+	if (!IsValidCargoType(explosives)) return;
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Ship && e->type != VehicleType::Aircraft) continue;
+		if (e->GetDefaultCargoType() == explosives || GrfNamesCargo(e, CT_EXPLOSIVES)) continue;
+		e->info.refit_mask.Reset(explosives);
+	}
+}
+
+/** Set to use the correct action0 properties for each canal feature */
+static void FinaliseCanals()
+{
+	for (CanalFeature i : EnumRange(CanalFeature::End)) {
+		if (_water_feature[i].grffile != nullptr) {
+			_water_feature[i].callback_mask = _water_feature[i].grffile->canal_local_properties[i].callback_mask;
+			_water_feature[i].flags = _water_feature[i].grffile->canal_local_properties[i].flags;
+		}
+	}
+}
+
+/*
+ * The named exception for one particular wagon set.
+ *
+ * CZTR Wagons-Cargo is a set of Czech wagons whose author gave each of them
+ * only the cargoes of the industries it was drawn for. That makes the whole set
+ * useless with any other industry set, and with FIRS in particular, for a
+ * reason that has nothing to do with the wagons themselves: they are ordinary
+ * open, covered and tank wagons and there is no reason a box van should refuse
+ * a cargo because the set does not know about the industry that made it.
+ *
+ * So this is a named exception, not a rule: it names one GRF, by its id and by
+ * its name together, and does nothing at all to anything else. The name is
+ * checked as well as the id, and with its version number, so that this reaches
+ * exactly the one release that needs it. The author has since published 1.1.0
+ * and that one is to be left alone entirely -- whatever it does, it does on its
+ * own terms, and a game that quietly rewrites a newer set than the one it was
+ * told about is a game nobody can reason about.
+ *
+ * The GRF still loads normally and is marked in the list with a warning saying
+ * what was done, because a game that silently rewrites somebody's NewGRF is a
+ * game that cannot be reasoned about.
+ *
+ * The work is in two halves because the game narrows a vehicle's cargoes down
+ * and then disables outright any vehicle left with none, and once a vehicle is
+ * disabled nothing done afterwards brings it back. So the widening has to
+ * happen before CalculateRefitMasks() and the rest after it.
+ */
+
+/** Written the way it reads in the file: "MI\x02\x13". The id is stored the other way round in memory. */
+static constexpr GrfID WAGON_CARGO_EXCEPTION_GRFID = 0x4D490213;
+/** Checked as well as the id, so that only the one release this was written for is touched. */
+static const std::string_view WAGON_CARGO_EXCEPTION_NAME = "CZTR Wagons-Cargo 1.0.0";
+
+/**
+ * Is this the one NewGRF the wagon-cargo exception is written for?
+ * @param config NewGRF to test.
+ * @note Both the id and the name are checked, so that the exception reaches exactly the
+ *       one release it was written for and no other.
+ */
+bool IsWagonCargoExceptionGrf(const GRFConfig &config)
+{
+	return std::byteswap(config.ident.grfid) == WAGON_CARGO_EXCEPTION_GRFID && config.GetName() == WAGON_CARGO_EXCEPTION_NAME;
+}
+
+/** FIRS 5. Written the way it reads in the file; the id is stored the other way round in memory. */
+static constexpr GrfID FIRS_5_GRFID = 0xF1250009;
+
+/**
+ * Is FIRS 5 among these NewGRFs?
+ * @param list NewGRFs to look through -- a game's, or a savegame's.
+ */
+static bool HasFirs5(const GRFConfigList &list)
+{
+	for (const auto &c : list) {
+		if (c->status == GRFStatus::NotFound) continue;
+		if (std::byteswap(c->ident.grfid) == FIRS_5_GRFID) return true;
+	}
+	return false;
+}
+
+/**
+ * Is this a NewGRF the game must have in the very release a savegame names, rather
+ * than in whatever release of the same set happens to be on the disk?
+ *
+ * Ordinarily a newer release of a set stands in for an older one and that is the
+ * right thing: sets say in their own header which releases they may stand in for,
+ * and where they say nothing the game takes the newest. That stays exactly as it
+ * was for everything.
+ *
+ * Except here. The wagons that make FIRS 5 work alongside the CZTR sets are one
+ * release and no other -- it is the release the cargo exception above is written
+ * for, and the one LoadNewGRF() refuses to run any substitute for. So a savegame
+ * naming that release and a disk holding a different one is not a case of "near
+ * enough": the substitute would be loaded, refused, and switched off, and the
+ * game would run with no wagons at all. Reported missing instead, which is what
+ * it is, so that the machinery for fetching what is missing works on it.
+ *
+ * All of this set's releases declare version nought and lowest-loadable nought,
+ * so the game cannot tell them apart by version -- only the savegame's checksum
+ * says which one is meant.
+ *
+ * @param list The NewGRFs of the game or savegame @p config belongs to.
+ * @param config The NewGRF in question.
+ */
+bool MustMatchSavegameRelease(const GRFConfigList &list, const GRFConfig &config)
+{
+	if (std::byteswap(config.ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) return false;
+	return HasFirs5(list);
+}
+
+/**
+ * Which releases a savegame names this game has not got and will not take a
+ * substitute for.
+ * @param list A savegame's NewGRFs, already looked up against the disk by
+ *             IsGoodGRFConfigList() -- the ones it could not find are the ones
+ *             asked about here.
+ * @return Their identities, checksums and all, ready to be asked for.
+ */
+std::vector<GRFIdentifier> GetSavegameReleasesToFetch(const GRFConfigList &list)
+{
+	std::vector<GRFIdentifier> wanted;
+	for (const auto &c : list) {
+		if (c->status != GRFStatus::NotFound) continue;
+		if (!MustMatchSavegameRelease(list, *c)) continue;
+		wanted.push_back(c->ident);
+	}
+	return wanted;
+}
+
+/**
+ * The checksum of CZTR Wagons-Cargo 1.0.0, whole, as the game reckons it (of
+ * the data section, CalcGRFMD5Sum()): reckoned from the release itself, which
+ * is in the forclaude release 'newgrf' (newgrf.zip, CZTR_Wagons_cargo.grf,
+ * 174 480 569 bytes). The content service shows only its first four bytes,
+ * 9ae03f3f, but finds a release by the whole checksum and does not answer
+ * a question with the rest nought -- which is why the fetch never got it.
+ */
+static constexpr std::array<uint8_t, MD5_HASH_BYTES> CZTR_WAGONS_FOR_FIRS5_MD5 = {
+	0x9a, 0xe0, 0x3f, 0x3f, 0xf3, 0xfe, 0x1a, 0x6a, 0x86, 0x63, 0xf2, 0xff, 0x9d, 0xf2, 0x5d, 0xa5,
+};
+
+/**
+ * What to ask the content service for to get CZTR Wagons-Cargo 1.0.0: the set's
+ * id and the release's whole checksum, the way a savegame asks for what it names.
+ */
+GRFIdentifier CztrWagonsForFirs5Identifier()
+{
+	GRFIdentifier id{};
+	id.grfid = std::byteswap(WAGON_CARGO_EXCEPTION_GRFID);
+	std::ranges::copy(CZTR_WAGONS_FOR_FIRS5_MD5, id.md5sum.begin());
+	return id;
+}
+
+/**
+ * Is this CZTR Wagons-Cargo 1.0.0, as the content service describes a release?
+ * @param grfid the set's id, the way it is kept in memory
+ * @param md5sum the release's checksum
+ */
+bool IsCztrWagonsForFirs5(GrfID grfid, const MD5Hash &md5sum)
+{
+	return std::byteswap(grfid) == WAGON_CARGO_EXCEPTION_GRFID && std::ranges::equal(md5sum, CZTR_WAGONS_FOR_FIRS5_MD5);
+}
+
+/**
+ * CZTR Wagons-Cargo 1.0.0 on the disk, if it is there.
+ * @return its configuration among the scanned sets, or nullptr
+ */
+static const GRFConfig *FindCztrWagonsForFirs5OnDisk()
+{
+	for (const auto &c : _all_grfs) {
+		if (c->flags.Test(GRFConfigFlag::Invalid)) continue;
+		if (IsWagonCargoExceptionGrf(*c)) return c.get();
+	}
+	return nullptr;
+}
+
+/**
+ * Does this list of sets want CZTR Wagons-Cargo 1.0.0 in another release's
+ * place: FIRS 5 and another release of the set in it? A release a savegame
+ * names and the disk has not got counts -- 1.0.0 stands in for that too.
+ * @param list the sets of a game, a savegame, or the next game
+ */
+bool CztrWagonsForFirs5Wanted(const GRFConfigList &list)
+{
+	if (!HasFirs5(list)) return false;
+	for (const auto &c : list) {
+		if (std::byteswap(c->ident.grfid) == WAGON_CARGO_EXCEPTION_GRFID && !IsWagonCargoExceptionGrf(*c)) return true;
+	}
+	return false;
+}
+
+/**
+ * Does this list of sets want CZTR Wagons-Cargo 1.0.0 and the disk not have it?
+ * @param list the sets of a game, a savegame, or the next game
+ */
+bool CztrWagonsForFirs5Missing(const GRFConfigList &list)
+{
+	return CztrWagonsForFirs5Wanted(list) && FindCztrWagonsForFirs5OnDisk() == nullptr;
+}
+
+/**
+ * Put CZTR Wagons-Cargo 1.0.0 from the disk in the place of every other
+ * release of the set in a list that plays FIRS 5, keeping the release's place
+ * in the list and its parameters. The player's word: everything works with
+ * 1.0.0, so a game is not to stop over the other release.
+ * @param list the sets of a game or of the next game
+ * @return whether anything was put in place
+ */
+bool SwapInCztrWagonsForFirs5(GRFConfigList &list)
+{
+	if (!CztrWagonsForFirs5Wanted(list)) return false;
+	const GRFConfig *disk = FindCztrWagonsForFirs5OnDisk();
+	if (disk == nullptr) return false;
+	bool swapped = false;
+	for (auto &c : list) {
+		if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID || IsWagonCargoExceptionGrf(*c)) continue;
+		auto fresh = std::make_unique<GRFConfig>(*disk);
+		fresh->CopyParams(*c);
+		Debug(grf, 1, "CZTR Wagons-Cargo: '{}' plays in place of '{}' alongside FIRS 5", fresh->GetName(), c->GetName());
+		c = std::move(fresh);
+		swapped = true;
+	}
+	return swapped;
+}
+
+/**
+ * Find the activated NewGRF the wagon-cargo exception is written for.
+ * @return Its configuration, or nullptr when it is not in this game.
+ */
+static GRFConfig *FindWagonCargoExceptionGrf()
+{
+	for (const auto &c : _grfconfig) {
+		if (c->status != GRFStatus::Activated) continue;
+		if (!IsWagonCargoExceptionGrf(*c)) continue;
+		return c.get();
+	}
+	return nullptr;
+}
+
+/**
+ * Is this engine a wagon out of the NewGRF the exception is written for?
+ * @param e Engine to test.
+ * @note Only ever called once FindWagonCargoExceptionGrf() has confirmed the set is present,
+ *       so the id alone is enough to tell the wagons apart from everything else in the game.
+ */
+static bool IsWagonCargoExceptionWagon(const Engine *e)
+{
+	if (e->type != VehicleType::Train) return false;
+	const GRFFile *file = e->GetGRF();
+	if (file == nullptr || std::byteswap(file->grfid) != WAGON_CARGO_EXCEPTION_GRFID) return false;
+	return e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
+}
+
+/** What PrepareWagonCargoException() has to keep for ApplyWagonCargoException() to use. */
+struct WagonCargoExceptionState {
+	CargoClasses classes; ///< The cargo classes the author gave the wagon.
+	LandscapeTypes climates; ///< The climates the wagon is available in.
+};
+
+/**
+ * Per wagon of the exception's set, what it looked like before the game narrowed it down.
+ * Filled by PrepareWagonCargoException() and emptied again by ApplyWagonCargoException().
+ */
+static std::map<EngineID, WagonCargoExceptionState> _wagon_cargo_exception_state;
+
+/**
+ * Note what the exception's wagons look like before the game narrows them down.
+ *
+ * Two things have to be read here and cannot be read afterwards.
+ *
+ * The climates a wagon is available in, because CalculateRefitMasks() ends by emptying them
+ * for any vehicle whose cargoes have all been narrowed away, and an emptied vehicle is out
+ * of the depot list for good. The set does narrow some of its wagons down to nothing: they
+ * are restricted to bulk cargo and then given a list of cargoes they must never carry, and
+ * with an industry set the wagon was not drawn for, that list can cover every bulk cargo the
+ * game has. Uacs is one such wagon.
+ *
+ * And the cargo classes the author gave the wagon, which are the only thing that says
+ * whether it is an open wagon, a van or a tanker.
+ *
+ * Deliberately nothing else: the refit mask the game works out from the set's own properties
+ * is exactly the list of cargoes the author drew this wagon carrying, and that list is what
+ * ApplyWagonCargoException() needs to be able to tell a cargo the set knows from one it does
+ * not. Widening anything here would destroy it before it could be read.
+ */
+static void PrepareWagonCargoException()
+{
+	_wagon_cargo_exception_state.clear();
+	if (FindWagonCargoExceptionGrf() == nullptr) return;
+
+	for (Engine *e : Engine::Iterate()) {
+		if (!IsWagonCargoExceptionWagon(e)) continue;
+
+		_wagon_cargo_exception_state[e->index] = {_gted[e->index].cargo_allowed, e->info.climates};
+	}
+}
+
+/**
+ * Does this sprite group, resolved with any luck at all, end in a real picture?
+ *
+ * Walked rather than resolved: resolution follows one path picked by the live values of
+ * the variables, and what is needed here is whether *any* path from this point reaches a
+ * picture. A callback-result group is a dead end -- during sprite resolution it yields no
+ * sprites and the vehicle falls back to the substitute's graphics.
+ *
+ * @param g Group to walk; may be nullptr.
+ * @param depth Recursion guard.
+ */
+static bool SpriteChainLeadsToPicture(const SpriteGroup *g, uint depth = 0)
+{
+	if (g == nullptr || depth > 32) return false;
+
+	if (const auto *rs = dynamic_cast<const ResultSpriteGroup *>(g); rs != nullptr) return rs->num_sprites > 0;
+	if (dynamic_cast<const CallbackResultSpriteGroup *>(g) != nullptr) return false;
+
+	if (const auto *real = dynamic_cast<const RealSpriteGroup *>(g); real != nullptr) {
+		for (const SpriteGroup *sub : real->loaded) if (SpriteChainLeadsToPicture(sub, depth + 1)) return true;
+		for (const SpriteGroup *sub : real->loading) if (SpriteChainLeadsToPicture(sub, depth + 1)) return true;
+		return false;
+	}
+
+	if (const auto *rnd = dynamic_cast<const RandomizedSpriteGroup *>(g); rnd != nullptr) {
+		for (const SpriteGroup *sub : rnd->groups) if (SpriteChainLeadsToPicture(sub, depth + 1)) return true;
+		return false;
+	}
+
+	if (const auto *det = dynamic_cast<const DeterministicSpriteGroup *>(g); det != nullptr) {
+		for (const auto &range : det->ranges) {
+			if (!range.result.calculated_result && SpriteChainLeadsToPicture(range.result.group, depth + 1)) return true;
+		}
+		return !det->default_result.calculated_result && SpriteChainLeadsToPicture(det->default_result.group, depth + 1);
+	}
+
+	return false;
+}
+
+/**
+ * Collect, from one wagon's sprite chains, the cargo translation slots its author drew a
+ * picture for.
+ *
+ * The set never names a picture per cargo where the game would look for one -- its Action 3
+ * lists are empty -- but inside the chains it switches on the cargo variable, slot by slot,
+ * with everything unknown falling through to a dead end. So the chains themselves are the
+ * only record of what was drawn, and this reads it: every switch on the cargo variable is
+ * found, and a range whose target still leads to a picture marks its slots as drawn.
+ *
+ * @param g Group to walk.
+ * @param[in,out] slots Marked per translation slot.
+ * @param depth Recursion guard.
+ */
+static void CollectDrawnCargoSlots(const SpriteGroup *g, std::bitset<256> &slots, uint depth = 0)
+{
+	if (g == nullptr || depth > 32) return;
+
+	if (const auto *real = dynamic_cast<const RealSpriteGroup *>(g); real != nullptr) {
+		for (const SpriteGroup *sub : real->loaded) CollectDrawnCargoSlots(sub, slots, depth + 1);
+		for (const SpriteGroup *sub : real->loading) CollectDrawnCargoSlots(sub, slots, depth + 1);
+		return;
+	}
+
+	if (const auto *rnd = dynamic_cast<const RandomizedSpriteGroup *>(g); rnd != nullptr) {
+		for (const SpriteGroup *sub : rnd->groups) CollectDrawnCargoSlots(sub, slots, depth + 1);
+		return;
+	}
+
+	const auto *det = dynamic_cast<const DeterministicSpriteGroup *>(g);
+	if (det == nullptr) return;
+
+	bool asks_cargo = !det->adjusts.empty() && det->adjusts.back().variable == 0x47;
+	for (const auto &range : det->ranges) {
+		if (range.result.calculated_result) continue;
+		if (asks_cargo && SpriteChainLeadsToPicture(range.result.group)) {
+			for (uint32_t slot = range.low; slot <= range.high && slot < 256; slot++) slots.set(slot);
+		}
+		CollectDrawnCargoSlots(range.result.group, slots, depth + 1);
+	}
+	if (!det->default_result.calculated_result) CollectDrawnCargoSlots(det->default_result.group, slots, depth + 1);
+}
+
+/**
+ * Pick the cargo one of the exception's wagons is built carrying.
+ *
+ * Every wagon can now be refitted to everything, but it still has to be built carrying one
+ * particular cargo, and that choice is not cosmetic: the game works a wagon's capacity for
+ * every other cargo out by comparing it against the one it was built for. Taking simply the
+ * first cargo in the game would make every open wagon a passenger coach and throw all those
+ * capacities out.
+ *
+ * So the cargo is chosen from the classes the author gave the wagon -- bulk for an open
+ * wagon, piece goods for a van, liquid for a tanker -- and only if this game has no cargo of
+ * those classes at all does it fall back to the first cargo there is.
+ *
+ * @param e The wagon.
+ * @return The cargo to build it carrying, or #INVALID_CARGO if the game has no cargo at all.
+ */
+static CargoType PickWagonCargoExceptionDefaultCargo(const Engine *e)
+{
+	/* Never the cargo for road vehicles on wagons, whatever the widened mask
+	 * says. A wagon that carries one is a car carrier, and a car carrier is a
+	 * vehicle of its own that the player buys as such (road_on_rail.h); a
+	 * wagon of somebody's set landing on it by accident would be one, with a
+	 * capacity of one vehicle, without its author or the player ever asking.
+	 * It is class Special, and so is the livery cargo a set uses for its
+	 * repaints -- which is exactly the kind of wagon this picks a cargo for. */
+	auto usable = [&](const CargoSpec *cs) {
+		return e->info.refit_mask.Test(cs->Index()) && cs->Index() != _road_vehicle_cargo;
+	};
+
+	auto found = _wagon_cargo_exception_state.find(e->index);
+	if (found != std::end(_wagon_cargo_exception_state) && found->second.classes.Any()) {
+		for (const CargoSpec *cs : CargoSpec::Iterate()) {
+			if (!usable(cs)) continue;
+			if (cs->classes.Any(found->second.classes)) return cs->Index();
+		}
+	}
+
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		if (usable(cs)) return cs->Index();
+	}
+	return INVALID_CARGO;
+}
+
+/**
+ * Finish the exception once the game has worked its refit masks out: every cargo, and a
+ * capacity to carry it in.
+ *
+ * The set declares a capacity of one for most of its wagons and then answers both capacity
+ * callbacks -- the property change callback for the capacity property, and the refit
+ * capacity callback -- with zero, so those wagons carry nothing whatever the game does with
+ * their refit mask. Their capacity is therefore taken from the original coal wagon and the
+ * callbacks are left unasked.
+ *
+ * The graphics are settled here too, and not the way the Action 3s suggest. None of them
+ * names a picture per cargo -- every one lists a default group and, at most, a purchase
+ * group -- but inside those groups the set switches on the *cargo subtype*, which is what
+ * a refit to a cargo the set knows sets, and which is therefore a picture per cargo by
+ * another route. Carrying a cargo the author never drew, the wagon keeps whatever subtype it
+ * had, that subtype names a picture that is not in this group, and the vehicle falls back to
+ * the sprites of whatever it was substituted from: it is drawn as an entirely different
+ * vehicle. So the cargoes the author did draw are noted here, and a wagon carrying anything
+ * else is shown to its NewGRF as having no subtype at all, which lands it on the first
+ * picture it has. See the cargo subtype variable in newgrf_engine.cpp.
+ */
+static void ApplyWagonCargoException()
+{
+	GRFConfig *config = FindWagonCargoExceptionGrf();
+	if (config == nullptr) return;
+
+	/* What to give a wagon that has no capacity of its own: the original coal truck's,
+	 * read from the original vehicle table. Not from the engine pool -- this very set
+	 * redefines the original wagons, so by now the pool holds its numbers, not the
+	 * game's, and there may be no unmodified wagon left in it at all. */
+	uint16_t coal_capacity = GetOriginalCoalWagonCapacity();
+
+	uint changed = 0;
+	for (Engine *e : Engine::Iterate()) {
+		if (!IsWagonCargoExceptionWagon(e)) continue;
+
+		RailVehicleInfo &rvi = e->VehInfo<RailVehicleInfo>();
+
+		/* A wagon with a capacity of one is a wagon whose capacity was meant to come from
+		 * the callbacks, and the callbacks say zero. The wagons that do state a real
+		 * capacity keep it, and keep the game's ordinary handling with it.
+		 *
+		 * Only a wagon the player can actually buy gets this. The set builds its longer
+		 * wagons out of an engine and one or more invisible articulated parts, and those
+		 * parts declare a capacity of one as well; giving each of them a coal wagon's load
+		 * would make one wagon carry two or three wagons' worth. A part is not available in
+		 * any climate -- that is what makes it a part rather than a vehicle -- so that is
+		 * what tells the two apart. */
+		auto found = _wagon_cargo_exception_state.find(e->index);
+
+		/* The climates go back the way the author wrote them. A wagon left with no cargo has
+		 * had them emptied by now, and an emptied wagon cannot be bought however many cargoes
+		 * are handed to it afterwards. */
+		if (found != std::end(_wagon_cargo_exception_state)) e->info.climates = found->second.climates;
+
+		if (rvi.capacity <= 1 && coal_capacity != 0 && e->info.climates.Any()) {
+			rvi.capacity = coal_capacity;
+			e->ignore_capacity_callback = true;
+		}
+
+		/* Read before widening: what the mask says now is exactly the cargoes the author drew
+		 * this wagon carrying, which is the only way to tell those from the rest afterwards. */
+		e->drawn_cargoes = e->info.refit_mask;
+		e->has_drawn_cargoes = true;
+
+		/* What the pictures themselves say was drawn, which is the authority the refit mask
+		 * is only an approximation of: the chains switch on the cargo's translation slot,
+		 * and the slots that lead to a picture are the cargoes there are pictures for. */
+		e->drawn_slots.reset();
+		for (CargoType cargo : CargoTypes{_cargo_mask}) {
+			CollectDrawnCargoSlots(e->grf_prop.GetSpriteGroup(cargo), e->drawn_slots);
+		}
+		CollectDrawnCargoSlots(e->grf_prop.GetSpriteGroup(CargoGRFFileProps::SG_DEFAULT), e->drawn_slots);
+
+		/* The cargo to impersonate when the one actually carried has no picture: any cargo
+		 * of this game whose translation slot has one. Preferred among the classes the
+		 * author gave the wagon, so an open wagon poses as carrying something bulk rather
+		 * than as a passenger coach; failing that, any cargo with a picture at all. */
+		e->disguise_cargo = INVALID_CARGO;
+		const GRFFile *own_file = e->GetGRF();
+		auto found_state = _wagon_cargo_exception_state.find(e->index);
+		CargoClasses preferred = found_state != std::end(_wagon_cargo_exception_state) ? found_state->second.classes : CargoClasses{};
+		for (int pass = 0; pass < 2 && !IsValidCargoType(e->disguise_cargo); pass++) {
+			for (const CargoSpec *cs : CargoSpec::Iterate()) {
+				if (!_cargo_mask.Test(cs->Index())) continue;
+				if (pass == 0 && preferred.Any() && !cs->classes.Any(preferred)) continue;
+				uint8_t slot = own_file->cargo_map[cs->Index()];
+				if (!e->drawn_slots.test(slot)) continue;
+				e->disguise_cargo = cs->Index();
+				break;
+			}
+		}
+
+		/* Every cargo this game has, whoever brought it -- which is what _cargo_mask is. */
+		e->info.refit_mask = CargoTypes{_cargo_mask};
+
+		/* Something has to be the cargo it is built carrying, and what it was
+		 * built carrying may not be in this game at all. */
+		CargoType cargo = PickWagonCargoExceptionDefaultCargo(e);
+		if (IsValidCargoType(cargo)) e->info.cargo_type = cargo;
+		changed++;
+
+		Debug(grf, 2, "Wagon exception: engine {:#x} capacity {} default cargo {} drawn cargoes {} climates {:#x}",
+				e->grf_prop.local_id, rvi.capacity, e->info.cargo_type, e->drawn_cargoes.Count(), e->info.climates.base());
+	}
+
+	_wagon_cargo_exception_state.clear();
+
+	if (changed == 0) return;
+
+	auto &error = config->errors.emplace_back(STR_NEWGRF_ERROR_MSG_WARNING, 0);
+	error.message = STR_NEWGRF_ERROR_WAGON_CARGO_EXCEPTION;
+}
+
+/**
+ * Take away every NewGRF's say in how its trains turn round.
+ *
+ * Two engine flags let a NewGRF decide that for itself, and both of them reach straight into
+ * machinery this build has rewritten:
+ *
+ * - a "has a cab" flag on a vehicle, which says an unpowered wagon may lead a train. It is
+ *   what ReverseTrainDirection() asks before it decides whether a train turns round on the
+ *   spot or simply starts driving the other way, so a set that hands it out changes what
+ *   every train carrying such a vehicle does at the end of a platform;
+ * - an "old depot-flip handling" flag, which says the set draws and measures a flipped
+ *   vehicle itself rather than letting the game do it.
+ *
+ * Which way round a train runs is decided here, by measuring the train and by rules the
+ * player can see, and a set that quietly overrules that from the outside makes those
+ * decisions unreadable -- and unreproducible, because it depends on which sets are loaded.
+ * So the flags are dropped and every train, from whatever set, turns round the same way.
+ *
+ * This is not aimed at any one NewGRF and takes nothing away that a player would notice
+ * beyond that: a vehicle keeps its graphics, its capacity and everything else it declared.
+ */
+static void IgnoreNewGRFReversingFlags()
+{
+	for (Engine *e : Engine::Iterate()) {
+		if (e->type != VehicleType::Train) continue;
+		if (e->GetGRF() == nullptr) continue;
+
+		e->info.extra_flags.Reset(ExtraEngineFlag::HasCab);
+		e->info.misc_flags.Reset(EngineMiscFlag::RailFlips);
+	}
+}
+
+/** Check for invalid engines */
+static void FinaliseEngineArray()
+{
+	for (Engine *e : Engine::Iterate()) {
+		if (e->GetGRF() == nullptr) {
+			/* An engine no set brought is the game's: under the plain number of
+			 * an original vehicle, or under the mark of the game's own
+			 * (EngineOverrideManager::GAMES_OWN_GRFID). Anything else is a set's
+			 * vehicle whose set is gone. */
+			auto found = std::ranges::find(_engine_mngr.mappings[e->type], e->index, &EngineIDMapping::engine);
+			if (found == std::end(_engine_mngr.mappings[e->type]) || (found->grfid != INVALID_GRFID && found->grfid != EngineOverrideManager::GAMES_OWN_GRFID) || found->internal_id != found->substitute_id) {
+				e->info.string_id = STR_NEWGRF_INVALID_ENGINE;
+			}
+		}
+
+		/* Do final mapping on variant engine ID. */
+		if (e->info.variant_id != EngineID::Invalid()) {
+			e->info.variant_id = GetNewEngineID(e->grf_prop.grffile, e->type, e->info.variant_id.base());
+		}
+
+		if (!e->info.climates.Test(_settings_game.game_creation.landscape)) continue;
+
+		switch (e->type) {
+			case VehicleType::Train:
+				for (RailType rt : e->VehInfo<RailVehicleInfo>().railtypes) {
+					AppendCopyableBadgeList(e->badges, GetRailTypeInfo(rt)->badges, GrfSpecFeature::Trains);
+				}
+				break;
+			case VehicleType::Road: AppendCopyableBadgeList(e->badges, GetRoadTypeInfo(e->VehInfo<RoadVehicleInfo>().roadtype)->badges, GrfSpecFeature::RoadVehicles); break;
+			default: break;
+		}
+
+		/* Skip wagons, there livery is defined via the engine */
+		if (e->type != VehicleType::Train || e->VehInfo<RailVehicleInfo>().railveh_type != RailVehicleType::Wagon) {
+			LiveryScheme ls = GetEngineLiveryScheme(e->index, EngineID::Invalid(), nullptr);
+			_loaded_newgrf_features.used_liveries.Set(ls);
+			/* Note: For ships and roadvehicles we assume that they cannot be refitted between passenger and freight */
+
+			if (e->type == VehicleType::Train) {
+				_loaded_newgrf_features.used_liveries.Set(LiveryScheme::FreightWagon);
+				switch (ls) {
+					case LiveryScheme::Steam:
+					case LiveryScheme::Diesel:
+					case LiveryScheme::Electric:
+					case LiveryScheme::Monorail:
+					case LiveryScheme::Maglev:
+						_loaded_newgrf_features.used_liveries.Set(LiveryScheme::PassengerWagonSteam + ls - LiveryScheme::Steam);
+						break;
+
+					case LiveryScheme::DMU:
+					case LiveryScheme::EMU:
+						_loaded_newgrf_features.used_liveries.Set(LiveryScheme::PassengerWagonDiesel + ls - LiveryScheme::DMU);
+						break;
+
+					default: NOT_REACHED();
+				}
+			}
+		}
+	}
+
+	/* Check engine variants don't point back on themselves (either directly or via a loop) then set appropriate flags
+	 * on variant engine. This is performed separately as all variant engines need to have been resolved.
+	 * Use Floyd's cycle-detection algorithm to handle the case where a cycle is present but does
+	 * not include the starting engine ID. */
+	for (Engine *e : Engine::Iterate()) {
+		EngineID parent = e->info.variant_id;
+		EngineID parent_slow = parent;
+		bool update_slow = false;
+		while (parent != EngineID::Invalid()) {
+			parent = Engine::Get(parent)->info.variant_id;
+			if (update_slow) parent_slow = Engine::Get(parent_slow)->info.variant_id;
+			update_slow = !update_slow;
+			if (parent != e->index && parent != parent_slow) continue;
+
+			/* Engine looped back on itself, so clear the variant. */
+			e->info.variant_id = EngineID::Invalid();
+
+			GrfMsg(1, "FinaliseEngineArray: Variant of engine {:x} in '{}' loops back on itself", e->grf_prop.local_id, e->GetGRF()->filename);
+			break;
+		}
+
+		if (e->info.variant_id != EngineID::Invalid()) {
+			Engine::Get(e->info.variant_id)->display_flags.Set({EngineDisplayFlag::HasVariants, EngineDisplayFlag::IsFolded});
+		}
+	}
+}
+
+/** Check for invalid cargoes */
+void FinaliseCargoArray()
+{
+	/* First, the cargo for road vehicles on wagons, now that the NewGRFs have
+	 * had their say: still where it was put if nobody touched that slot, and
+	 * moved to the highest free one if a set took it or blanked it. Before the
+	 * loop below and not after it, because a slot filled in here is a cargo
+	 * like any other and wants what that loop hands out -- a town production
+	 * effect above all, which everything that sorts cargoes insists on. */
+	PlaceRoadVehicleCargo();
+	PlaceClimateIndustryCargoes();
+
+	for (CargoSpec &cs : CargoSpec::array) {
+		if (cs.town_production_effect == TownProductionEffect::Invalid) {
+			/* Set default town production effect by cargo label. */
+			switch (cs.label.base()) {
+				case CT_PASSENGERS.base(): cs.town_production_effect = TownProductionEffect::Passengers; break;
+				case CT_MAIL.base():       cs.town_production_effect = TownProductionEffect::Mail; break;
+				default:                   cs.town_production_effect = TownProductionEffect::None; break;
+			}
+		}
+		if (!cs.IsValid()) {
+			cs.name = cs.name_single = cs.units_volume = STR_NEWGRF_INVALID_CARGO;
+			cs.quantifier = STR_NEWGRF_INVALID_CARGO_QUANTITY;
+			cs.abbrev = STR_NEWGRF_INVALID_CARGO_ABBREV;
+		}
+	}
+}
+
+/**
+ * Check if a given housespec is valid and disable it if it's not.
+ * The housespecs that follow it are used to check the validity of
+ * multitile houses.
+ * @param hs The housespec to check.
+ * @param next1 The housespec that follows \c hs.
+ * @param next2 The housespec that follows \c next1.
+ * @param next3 The housespec that follows \c next2.
+ * @param filename The filename of the newgrf this house was defined in.
+ * @return Whether the given housespec is valid.
+ */
+static bool IsHouseSpecValid(HouseSpec &hs, const HouseSpec *next1, const HouseSpec *next2, const HouseSpec *next3, const std::string &filename)
+{
+	if ((hs.building_flags.Any(BUILDING_HAS_2_TILES) &&
+				(next1 == nullptr || !next1->enabled || next1->building_flags.Any(BUILDING_HAS_1_TILE))) ||
+			(hs.building_flags.Any(BUILDING_HAS_4_TILES) &&
+				(next2 == nullptr || !next2->enabled || next2->building_flags.Any(BUILDING_HAS_1_TILE) ||
+				next3 == nullptr || !next3->enabled || next3->building_flags.Any(BUILDING_HAS_1_TILE)))) {
+		hs.enabled = false;
+		if (!filename.empty()) Debug(grf, 1, "FinaliseHouseArray: {} defines house {} as multitile, but no suitable tiles follow. Disabling house.", filename, hs.grf_prop.local_id);
+		return false;
+	}
+
+	/* Some places sum population by only counting north tiles. Other places use all tiles causing desyncs.
+	 * As the newgrf specs define population to be zero for non-north tiles, we just disable the offending house.
+	 * If you want to allow non-zero populations somewhen, make sure to sum the population of all tiles in all places. */
+	if ((hs.building_flags.Any(BUILDING_HAS_2_TILES) && next1->population != 0) ||
+			(hs.building_flags.Any(BUILDING_HAS_4_TILES) && (next2->population != 0 || next3->population != 0))) {
+		hs.enabled = false;
+		if (!filename.empty()) Debug(grf, 1, "FinaliseHouseArray: {} defines multitile house {} with non-zero population on additional tiles. Disabling house.", filename, hs.grf_prop.local_id);
+		return false;
+	}
+
+	/* Substitute type is also used for override, and having an override with a different size causes crashes.
+	 * This check should only be done for NewGRF houses because grf_prop.subst_id is not set for original houses.*/
+	if (!filename.empty() && (hs.building_flags & BUILDING_HAS_1_TILE) != (HouseSpec::Get(hs.grf_prop.subst_id)->building_flags & BUILDING_HAS_1_TILE)) {
+		hs.enabled = false;
+		Debug(grf, 1, "FinaliseHouseArray: {} defines house {} with different house size then it's substitute type. Disabling house.", filename, hs.grf_prop.local_id);
+		return false;
+	}
+
+	/* Make sure that additional parts of multitile houses are not available. */
+	if (!hs.building_flags.Any(BUILDING_HAS_1_TILE) && hs.building_availability.Any(HZ_ZONE_ALL) && hs.building_availability.Any(HZ_CLIMATE_ALL)) {
+		hs.enabled = false;
+		if (!filename.empty()) Debug(grf, 1, "FinaliseHouseArray: {} defines house {} without a size but marked it as available. Disabling house.", filename, hs.grf_prop.local_id);
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Make sure there is at least one house available in the year 0 for the given
+ * climate / housezone combination.
+ * @param bitmask The climate and housezone to check for. Exactly one climate
+ *   bit and one housezone bit should be set.
+ */
+static void EnsureEarlyHouse(HouseZones bitmask)
+{
+	TimerGameCalendar::Year min_year = CalendarTime::MAX_YEAR;
+
+	for (const auto &hs : HouseSpec::Specs()) {
+		if (!hs.enabled) continue;
+		if (!hs.building_availability.All(bitmask)) continue;
+		if (hs.min_year < min_year) min_year = hs.min_year;
+	}
+
+	if (min_year == 0) return;
+
+	for (auto &hs : HouseSpec::Specs()) {
+		if (!hs.enabled) continue;
+		if (!hs.building_availability.All(bitmask)) continue;
+		if (hs.min_year == min_year) hs.min_year = CalendarTime::MIN_YEAR;
+	}
+}
+
+/**
+ * Add all new houses to the house array. House properties can be set at any
+ * time in the GRF file, so we can only add a house spec to the house array
+ * after the file has finished loading. We also need to check the dates, due to
+ * the TTDPatch behaviour described below that we need to emulate.
+ */
+static void FinaliseHouseArray()
+{
+	/* If there are no houses with start dates before 1930, then all houses
+	 * with start dates of 1930 have them reset to 0. This is in order to be
+	 * compatible with TTDPatch, where if no houses have start dates before
+	 * 1930 and the date is before 1930, the game pretends that this is 1930.
+	 * If there have been any houses defined with start dates before 1930 then
+	 * the dates are left alone.
+	 * On the other hand, why 1930? Just 'fix' the houses with the lowest
+	 * minimum introduction date to 0.
+	 */
+	for (auto &file : _grf_files) {
+		if (file.housespec.empty()) continue;
+
+		size_t num_houses = file.housespec.size();
+		for (size_t i = 0; i < num_houses; i++) {
+			auto &hs = file.housespec[i];
+
+			if (hs == nullptr) continue;
+
+			const HouseSpec *next1 = (i + 1 < num_houses ? file.housespec[i + 1].get() : nullptr);
+			const HouseSpec *next2 = (i + 2 < num_houses ? file.housespec[i + 2].get() : nullptr);
+			const HouseSpec *next3 = (i + 3 < num_houses ? file.housespec[i + 3].get() : nullptr);
+
+			if (!IsHouseSpecValid(*hs, next1, next2, next3, file.filename)) continue;
+
+			_house_mngr.SetEntitySpec(std::move(*hs));
+		}
+
+		/* Won't be used again */
+		file.housespec.clear();
+		file.housespec.shrink_to_fit();
+	}
+
+	for (size_t i = 0; i < HouseSpec::Specs().size(); i++) {
+		HouseSpec *hs = HouseSpec::Get(i);
+		const HouseSpec *next1 = (i + 1 < NUM_HOUSES ? HouseSpec::Get(i + 1) : nullptr);
+		const HouseSpec *next2 = (i + 2 < NUM_HOUSES ? HouseSpec::Get(i + 2) : nullptr);
+		const HouseSpec *next3 = (i + 3 < NUM_HOUSES ? HouseSpec::Get(i + 3) : nullptr);
+
+		/* We need to check all houses again to we are sure that multitile houses
+		 * did get consecutive IDs and none of the parts are missing. */
+		if (!IsHouseSpecValid(*hs, next1, next2, next3, std::string{}) && i >= NEW_HOUSE_OFFSET) {
+			/* GetHouseNorthPart checks 3 houses that are directly before
+			 * it in the house pool. If any of those houses have multi-tile
+			 * flags set it assumes it's part of a multitile house. Since
+			 * we can have invalid houses in the pool marked as disabled, we
+			 * don't want to have them influencing valid tiles. As such set
+			 * building_flags to zero here to make sure any house following
+			 * this one in the pool is properly handled as 1x1 house.
+			 *
+			 * Not for the game's own houses: their parts are always there,
+			 * whether a set switched them off or not, and a town of chosen
+			 * sets or the player builds a switched-off original as itself
+			 * (IsHouseKeptOriginal()) -- with its size. Cleared, the stadium
+			 * a set had switched off came out as one tile. */
+			hs->building_flags = {};
+		}
+
+		/* Apply default cargo translation map for unset cargo slots */
+		for (uint i = 0; i < lengthof(hs->accepts_cargo_label); ++i) {
+			if (!IsValidCargoType(hs->accepts_cargo[i])) hs->accepts_cargo[i] = GetCargoTypeByLabel(hs->accepts_cargo_label[i]);
+			/* Disable acceptance if cargo type is invalid. */
+			if (!IsValidCargoType(hs->accepts_cargo[i])) hs->cargo_acceptance[i] = 0;
+		}
+		AddStudentAcceptance(*hs);
+	}
+
+	HouseZones climate_mask = GetClimateMaskForLandscape();
+	for (HouseZone climate : climate_mask) {
+		for (HouseZone zone : HZ_ZONE_ALL) {
+			EnsureEarlyHouse({climate, zone});
+		}
+	}
+}
+
+/**
+ * Add all new industries to the industry array. Industry properties can be set at any
+ * time in the GRF file, so we can only add a industry spec to the industry array
+ * after the file has finished loading.
+ */
+static void FinaliseIndustriesArray()
+{
+	for (auto &file : _grf_files) {
+		for (auto &indsp : file.industryspec) {
+			if (indsp == nullptr || !indsp->enabled) continue;
+
+			_industry_mngr.SetEntitySpec(std::move(*indsp));
+		}
+
+		for (auto &indtsp : file.indtspec) {
+			if (indtsp != nullptr) {
+				_industile_mngr.SetEntitySpec(std::move(*indtsp));
+			}
+		}
+
+		/* Won't be used again */
+		file.industryspec.clear();
+		file.industryspec.shrink_to_fit();
+		file.indtspec.clear();
+		file.indtspec.shrink_to_fit();
+	}
+
+	for (auto &indsp : _industry_specs) {
+		if (indsp.enabled && indsp.grf_prop.HasGrfFile()) {
+			for (auto &conflicting : indsp.conflicting) {
+				conflicting = MapNewGRFIndustryType(conflicting, indsp.grf_prop.grfid);
+			}
+		}
+		if (!indsp.enabled) {
+			indsp.name = STR_NEWGRF_INVALID_INDUSTRYTYPE;
+		}
+
+		/* Apply default cargo translation map for unset cargo slots */
+		for (size_t i = 0; i < std::size(indsp.produced_cargo_label); ++i) {
+			if (!IsValidCargoType(indsp.produced_cargo[i])) indsp.produced_cargo[i] = GetCargoTypeByLabel(GetActiveCargoLabel(indsp.produced_cargo_label[i]));
+		}
+		for (size_t i = 0; i < std::size(indsp.accepts_cargo_label); ++i) {
+			if (!IsValidCargoType(indsp.accepts_cargo[i])) indsp.accepts_cargo[i] = GetCargoTypeByLabel(GetActiveCargoLabel(indsp.accepts_cargo_label[i]));
+		}
+	}
+
+	for (auto &indtsp : _industry_tile_specs) {
+		/* Apply default cargo translation map for unset cargo slots */
+		for (size_t i = 0; i < std::size(indtsp.accepts_cargo_label); ++i) {
+			if (!IsValidCargoType(indtsp.accepts_cargo[i])) indtsp.accepts_cargo[i] = GetCargoTypeByLabel(GetActiveCargoLabel(indtsp.accepts_cargo_label[i]));
+		}
+	}
+
+	/* The original industries by their home climates, when climates are switched on. */
+	ResolveOriginalIndustryCargoes();
+	ResolveExtraIndustryCargoes();
+}
+
+/**
+ * Add all new objects to the object array. Object properties can be set at any
+ * time in the GRF file, so we can only add an object spec to the object array
+ * after the file has finished loading.
+ */
+static void FinaliseObjectsArray()
+{
+	for (auto &file : _grf_files) {
+		for (auto &objectspec : file.objectspec) {
+			if (objectspec != nullptr && objectspec->grf_prop.HasGrfFile() && objectspec->IsEnabled()) {
+				_object_mngr.SetEntitySpec(std::move(*objectspec));
+			}
+		}
+
+		/* Won't be used again */
+		file.objectspec.clear();
+		file.objectspec.shrink_to_fit();
+	}
+
+	ObjectSpec::BindToClasses();
+}
+
+/**
+ * Add all new airports to the airport array. Airport properties can be set at any
+ * time in the GRF file, so we can only add a airport spec to the airport array
+ * after the file has finished loading.
+ */
+static void FinaliseAirportsArray()
+{
+	for (auto &file : _grf_files) {
+		for (auto &as : file.airportspec) {
+			if (as != nullptr && as->enabled) {
+				_airport_mngr.SetEntitySpec(std::move(*as));
+			}
+		}
+
+		for (auto &ats : file.airtspec) {
+			if (ats != nullptr && ats->enabled) {
+				_airporttile_mngr.SetEntitySpec(std::move(*ats));
+			}
+		}
+
+		/* Won't be used again */
+		file.airportspec.clear();
+		file.airportspec.shrink_to_fit();
+		file.airtspec.clear();
+		file.airtspec.shrink_to_fit();
+	}
+}
+
+/** Helper class to invoke a GrfActionHandler. */
+struct InvokeGrfActionHandler {
+	template <uint8_t TAction>
+	static void Invoke(ByteReader &buf, GrfLoadingStage stage)
+	{
+		switch (stage) {
+			case GrfLoadingStage::FileScan: GrfActionHandler<TAction>::FileScan(buf); break;
+			case GrfLoadingStage::SafetyScan: GrfActionHandler<TAction>::SafetyScan(buf); break;
+			case GrfLoadingStage::LabelScan: GrfActionHandler<TAction>::LabelScan(buf); break;
+			case GrfLoadingStage::Init: GrfActionHandler<TAction>::Init(buf); break;
+			case GrfLoadingStage::Reserve: GrfActionHandler<TAction>::Reserve(buf); break;
+			case GrfLoadingStage::Activation: GrfActionHandler<TAction>::Activation(buf); break;
+			default: NOT_REACHED();
+		}
+	}
+
+	using Invoker = void(*)(ByteReader &buf, GrfLoadingStage stage);
+	static constexpr Invoker funcs[] = { // Must be listed in action order.
+		Invoke<0x00>, Invoke<0x01>, Invoke<0x02>, Invoke<0x03>, Invoke<0x04>, Invoke<0x05>, Invoke<0x06>, Invoke<0x07>,
+		Invoke<0x08>, Invoke<0x09>, Invoke<0x0A>, Invoke<0x0B>, Invoke<0x0C>, Invoke<0x0D>, Invoke<0x0E>, Invoke<0x0F>,
+		Invoke<0x10>, Invoke<0x11>, Invoke<0x12>, Invoke<0x13>, Invoke<0x14>,
+	};
+
+	static void Invoke(uint8_t action, GrfLoadingStage stage, ByteReader &buf)
+	{
+		Invoker func = action < std::size(funcs) ? funcs[action] : nullptr;
+		if (func == nullptr) {
+			GrfMsg(7, "DecodeSpecialSprite: Skipping unknown action 0x{:02X}", action);
+		} else {
+			GrfMsg(7, "DecodeSpecialSprite: Handling action 0x{:02X} in stage {}", action, stage);
+			func(buf, stage);
+		}
+	}
+};
+
+/* Here we perform initial decoding of some special sprites (as are they
+ * described at http://www.ttdpatch.net/src/newgrf.txt, but this is only a very
+ * partial implementation yet).
+ * XXX: We consider GRF files trusted. It would be trivial to exploit OTTD by
+ * a crafted invalid GRF file. We should tell that to the user somehow, or
+ * better make this more robust in the future. */
+static void DecodeSpecialSprite(ReusableBuffer<uint8_t> &allocator, uint num, GrfLoadingStage stage)
+{
+	uint8_t *buf;
+	auto it = _grf_line_to_action6_sprite_override.find({_cur_gps.grfconfig->ident.grfid, _cur_gps.nfo_line});
+	if (it == _grf_line_to_action6_sprite_override.end()) {
+		/* No preloaded sprite to work with; read the
+		 * pseudo sprite content. */
+		buf = allocator.Allocate(num);
+		_cur_gps.file->ReadBlock(buf, num);
+	} else {
+		/* Use the preloaded sprite data. */
+		buf = it->second.data();
+		assert(it->second.size() == num);
+		GrfMsg(7, "DecodeSpecialSprite: Using preloaded pseudo sprite data");
+
+		/* Skip the real (original) content of this action. */
+		_cur_gps.file->SeekTo(num, SEEK_CUR);
+	}
+
+	ByteReader br(buf, num);
+
+	try {
+		uint8_t action = br.ReadByte();
+
+		if (action == 0xFF) {
+			GrfMsg(2, "DecodeSpecialSprite: Unexpected data block, skipping");
+		} else if (action == 0xFE) {
+			GrfMsg(2, "DecodeSpecialSprite: Unexpected import block, skipping");
+		} else {
+			InvokeGrfActionHandler::Invoke(action, stage, br);
+		}
+	} catch (...) {
+		GrfMsg(1, "DecodeSpecialSprite: Tried to read past end of pseudo-sprite data");
+		DisableGrf(STR_NEWGRF_ERROR_READ_BOUNDS);
+	}
+}
+
+/**
+ * Load a particular NewGRF from a SpriteFile.
+ * @param config The configuration of the to be loaded NewGRF.
+ * @param stage  The loading stage of the NewGRF.
+ * @param file   The file to load the GRF data from.
+ */
+static void LoadNewGRFFileFromFile(GRFConfig &config, GrfLoadingStage stage, SpriteFile &file)
+{
+	AutoRestoreBackup cur_file(_cur_gps.file, &file);
+	AutoRestoreBackup cur_config(_cur_gps.grfconfig, &config);
+
+	Debug(grf, 2, "LoadNewGRFFile: Reading NewGRF-file '{}'", config.filename);
+
+	uint8_t grf_container_version = file.GetContainerVersion();
+	if (grf_container_version == 0) {
+		Debug(grf, 7, "LoadNewGRFFile: Custom .grf has invalid format");
+		return;
+	}
+
+	if (stage == GrfLoadingStage::Init || stage == GrfLoadingStage::Activation) {
+		/* We need the sprite offsets in the init stage for NewGRF sounds
+		 * and in the activation stage for real sprites. */
+		ReadGRFSpriteOffsets(file);
+	} else {
+		/* Skip sprite section offset if present. */
+		if (grf_container_version >= 2) file.ReadDword();
+	}
+
+	if (grf_container_version >= 2) {
+		/* Read compression value. */
+		uint8_t compression = file.ReadByte();
+		if (compression != 0) {
+			Debug(grf, 7, "LoadNewGRFFile: Unsupported compression format");
+			return;
+		}
+	}
+
+	/* Skip the first sprite; we don't care about how many sprites this
+	 * does contain; newest TTDPatches and George's longvehicles don't
+	 * neither, apparently. */
+	uint32_t num = grf_container_version >= 2 ? file.ReadDword() : file.ReadWord();
+	if (num == 4 && file.ReadByte() == 0xFF) {
+		file.ReadDword();
+	} else {
+		Debug(grf, 7, "LoadNewGRFFile: Custom .grf has invalid format");
+		return;
+	}
+
+	_cur_gps.ClearDataForNextFile();
+
+	ReusableBuffer<uint8_t> allocator;
+
+	while ((num = (grf_container_version >= 2 ? file.ReadDword() : file.ReadWord())) != 0) {
+		uint8_t type = file.ReadByte();
+		_cur_gps.nfo_line++;
+
+		if (type == 0xFF) {
+			if (_cur_gps.skip_sprites == 0) {
+				/* Limit the special sprites to 1 MiB. */
+				if (num > 1024 * 1024) {
+					GrfMsg(0, "LoadNewGRFFile: Unexpectedly large sprite, disabling");
+					DisableGrf(STR_NEWGRF_ERROR_UNEXPECTED_SPRITE);
+					break;
+				}
+
+				DecodeSpecialSprite(allocator, num, stage);
+
+				/* Stop all processing if we are to skip the remaining sprites */
+				if (_cur_gps.skip_sprites == -1) break;
+
+				continue;
+			} else {
+				file.SkipBytes(num);
+			}
+		} else {
+			if (_cur_gps.skip_sprites == 0) {
+				GrfMsg(0, "LoadNewGRFFile: Unexpected sprite, disabling");
+				DisableGrf(STR_NEWGRF_ERROR_UNEXPECTED_SPRITE);
+				break;
+			}
+
+			if (grf_container_version >= 2 && type == 0xFD) {
+				/* Reference to data section. Container version >= 2 only. */
+				file.SkipBytes(num);
+			} else {
+				file.SkipBytes(7);
+				SkipSpriteData(file, type, num - 8);
+			}
+		}
+
+		if (_cur_gps.skip_sprites > 0) _cur_gps.skip_sprites--;
+	}
+}
+
+/**
+ * Load a particular NewGRF.
+ * @param config     The configuration of the to be loaded NewGRF.
+ * @param stage      The loading stage of the NewGRF.
+ * @param subdir     The sub directory to find the NewGRF in.
+ * @param temporary  The NewGRF/sprite file is to be loaded temporarily and should be closed immediately,
+ *                   contrary to loading the SpriteFile and having it cached by the SpriteCache.
+ */
+void LoadNewGRFFile(GRFConfig &config, GrfLoadingStage stage, Subdirectory subdir, bool temporary)
+{
+	const std::string &filename = config.filename;
+
+	/* A .grf file is activated only if it was active when the game was
+	 * started.  If a game is loaded, only its active .grfs will be
+	 * reactivated, unless "loadallgraphics on" is used.  A .grf file is
+	 * considered active if its action 8 has been processed, i.e. its
+	 * action 8 hasn't been skipped using an action 7.
+	 *
+	 * During activation, only actions 0, 1, 2, 3, 4, 5, 7, 8, 9, 0A and 0B are
+	 * carried out.  All others are ignored, because they only need to be
+	 * processed once at initialization.  */
+	if (stage != GrfLoadingStage::FileScan && stage != GrfLoadingStage::SafetyScan && stage != GrfLoadingStage::LabelScan) {
+		_cur_gps.grffile = GetFileByFilename(filename);
+		if (_cur_gps.grffile == nullptr) UserError("File '{}' lost in cache.\n", filename);
+		if (stage == GrfLoadingStage::Reserve && config.status != GRFStatus::Initialised) return;
+		if (stage == GrfLoadingStage::Activation && !config.flags.Test(GRFConfigFlag::Reserved)) return;
+	}
+
+	bool needs_palette_remap = config.palette & GRFP_USE_MASK;
+	if (temporary) {
+		SpriteFile temporarySpriteFile(filename, subdir, needs_palette_remap);
+		LoadNewGRFFileFromFile(config, stage, temporarySpriteFile);
+	} else {
+		LoadNewGRFFileFromFile(config, stage, OpenCachedSpriteFile(filename, subdir, needs_palette_remap));
+	}
+}
+
+/**
+ * Relocates the old shore sprites at new positions.
+ *
+ * 1. If shore sprites are neither loaded by Action5 nor ActionA, the extra sprites from openttd(w/d).grf are used. (ShoreReplacement::OnlyNew)
+ * 2. If a newgrf replaces some shore sprites by ActionA. The (maybe also replaced) grass tiles are used for corner shores. (ShoreReplacement::ActionA)
+ * 3. If a newgrf replaces shore sprites by Action5 any shore replacement by ActionA has no effect. (ShoreReplacement::Action5)
+ */
+static void ActivateOldShore()
+{
+	/* Use default graphics, if no shore sprites were loaded.
+	 * Should not happen, as the base set's extra grf should include some. */
+	if (_loaded_newgrf_features.shore == ShoreReplacement::None) _loaded_newgrf_features.shore = ShoreReplacement::ActionA;
+
+	if (_loaded_newgrf_features.shore != ShoreReplacement::Action5) {
+		DupSprite(SPR_ORIGINALSHORE_START +  1, SPR_SHORE_BASE +  1); // SLOPE_W
+		DupSprite(SPR_ORIGINALSHORE_START +  2, SPR_SHORE_BASE +  2); // SLOPE_S
+		DupSprite(SPR_ORIGINALSHORE_START +  6, SPR_SHORE_BASE +  3); // SLOPE_SW
+		DupSprite(SPR_ORIGINALSHORE_START +  0, SPR_SHORE_BASE +  4); // SLOPE_E
+		DupSprite(SPR_ORIGINALSHORE_START +  4, SPR_SHORE_BASE +  6); // SLOPE_SE
+		DupSprite(SPR_ORIGINALSHORE_START +  3, SPR_SHORE_BASE +  8); // SLOPE_N
+		DupSprite(SPR_ORIGINALSHORE_START +  7, SPR_SHORE_BASE +  9); // SLOPE_NW
+		DupSprite(SPR_ORIGINALSHORE_START +  5, SPR_SHORE_BASE + 12); // SLOPE_NE
+	}
+
+	if (_loaded_newgrf_features.shore == ShoreReplacement::ActionA) {
+		DupSprite(SPR_FLAT_GRASS_TILE + 16, SPR_SHORE_BASE +  0); // SLOPE_STEEP_S
+		DupSprite(SPR_FLAT_GRASS_TILE + 17, SPR_SHORE_BASE +  5); // SLOPE_STEEP_W
+		DupSprite(SPR_FLAT_GRASS_TILE +  7, SPR_SHORE_BASE +  7); // SLOPE_WSE
+		DupSprite(SPR_FLAT_GRASS_TILE + 15, SPR_SHORE_BASE + 10); // SLOPE_STEEP_N
+		DupSprite(SPR_FLAT_GRASS_TILE + 11, SPR_SHORE_BASE + 11); // SLOPE_NWS
+		DupSprite(SPR_FLAT_GRASS_TILE + 13, SPR_SHORE_BASE + 13); // SLOPE_ENW
+		DupSprite(SPR_FLAT_GRASS_TILE + 14, SPR_SHORE_BASE + 14); // SLOPE_SEN
+		DupSprite(SPR_FLAT_GRASS_TILE + 18, SPR_SHORE_BASE + 15); // SLOPE_STEEP_E
+
+		/* XXX - SLOPE_EW, SLOPE_NS are currently not used.
+		 *       If they would be used somewhen, then these grass tiles will most like not look as needed */
+		DupSprite(SPR_FLAT_GRASS_TILE +  5, SPR_SHORE_BASE + 16); // SLOPE_EW
+		DupSprite(SPR_FLAT_GRASS_TILE + 10, SPR_SHORE_BASE + 17); // SLOPE_NS
+	}
+}
+
+/**
+ * Relocate the old tram depot sprites to the new position, if no new ones were loaded.
+ */
+static void ActivateOldTramDepot()
+{
+	if (_loaded_newgrf_features.tram == TramDepotReplacement::WithTrack) {
+		DupSprite(SPR_ROAD_DEPOT               + 0, SPR_TRAMWAY_DEPOT_NO_TRACK + 0); // use road depot graphics for "no tracks"
+		DupSprite(SPR_TRAMWAY_DEPOT_WITH_TRACK + 1, SPR_TRAMWAY_DEPOT_NO_TRACK + 1);
+		DupSprite(SPR_ROAD_DEPOT               + 2, SPR_TRAMWAY_DEPOT_NO_TRACK + 2); // use road depot graphics for "no tracks"
+		DupSprite(SPR_TRAMWAY_DEPOT_WITH_TRACK + 3, SPR_TRAMWAY_DEPOT_NO_TRACK + 3);
+		DupSprite(SPR_TRAMWAY_DEPOT_WITH_TRACK + 4, SPR_TRAMWAY_DEPOT_NO_TRACK + 4);
+		DupSprite(SPR_TRAMWAY_DEPOT_WITH_TRACK + 5, SPR_TRAMWAY_DEPOT_NO_TRACK + 5);
+	}
+}
+
+/**
+ * Decide whether price base multipliers of grfs shall apply globally or only to the grf specifying them
+ */
+static void FinalisePriceBaseMultipliers()
+{
+	/** Features, to which '_grf_id_overrides' applies. Currently vehicle features only. */
+	static constexpr GrfSpecFeatures override_features{GrfSpecFeature::Trains, GrfSpecFeature::RoadVehicles, GrfSpecFeature::Ships, GrfSpecFeature::Aircraft};
+
+	/* Evaluate grf overrides */
+	int num_grfs = (uint)_grf_files.size();
+	std::vector<int> grf_overrides(num_grfs, -1);
+	for (int i = 0; i < num_grfs; i++) {
+		GRFFile &source = _grf_files[i];
+		auto it = _grf_id_overrides.find(source.grfid);
+		if (it == std::end(_grf_id_overrides)) continue;
+		GrfID override_grfid = it->second;
+
+		auto dest = std::ranges::find(_grf_files, override_grfid, &GRFFile::grfid);
+		if (dest == std::end(_grf_files)) continue;
+
+		grf_overrides[i] = static_cast<int>(std::ranges::distance(std::begin(_grf_files), dest));
+		assert(grf_overrides[i] >= 0);
+	}
+
+	/* Override features and price base multipliers of earlier loaded grfs */
+	for (int i = 0; i < num_grfs; i++) {
+		if (grf_overrides[i] < 0 || grf_overrides[i] >= i) continue;
+		GRFFile &source = _grf_files[i];
+		GRFFile &dest = _grf_files[grf_overrides[i]];
+
+		GrfSpecFeatures features = (source.grf_features | dest.grf_features) & override_features;
+		source.grf_features.Set(features);
+		dest.grf_features.Set(features);
+
+		for (Price p : EnumRange(Price::End)) {
+			/* No price defined -> nothing to do */
+			if (!features.Test(_price_base_specs[p].grf_feature) || source.price_base_multipliers[p] == INVALID_PRICE_MODIFIER) continue;
+			Debug(grf, 3, "'{}' overrides price base multiplier {} of '{}'", source.filename, p, dest.filename);
+			dest.price_base_multipliers[p] = source.price_base_multipliers[p];
+		}
+	}
+
+	/* Propagate features and price base multipliers of afterwards loaded grfs, if none is present yet */
+	for (int i = num_grfs - 1; i >= 0; i--) {
+		if (grf_overrides[i] < 0 || grf_overrides[i] <= i) continue;
+		GRFFile &source = _grf_files[i];
+		GRFFile &dest = _grf_files[grf_overrides[i]];
+
+		GrfSpecFeatures features = (source.grf_features | dest.grf_features) & override_features;
+		source.grf_features.Set(features);
+		dest.grf_features.Set(features);
+
+		for (Price p : EnumRange(Price::End)) {
+			/* Already a price defined -> nothing to do */
+			if (!features.Test(_price_base_specs[p].grf_feature) || dest.price_base_multipliers[p] != INVALID_PRICE_MODIFIER) continue;
+			Debug(grf, 3, "Price base multiplier {} from '{}' propagated to '{}'", p, source.filename, dest.filename);
+			dest.price_base_multipliers[p] = source.price_base_multipliers[p];
+		}
+	}
+
+	/* The 'master grf' now have the correct multipliers. Assign them to the 'addon grfs' to make everything consistent. */
+	for (int i = 0; i < num_grfs; i++) {
+		if (grf_overrides[i] < 0) continue;
+		GRFFile &source = _grf_files[i];
+		GRFFile &dest = _grf_files[grf_overrides[i]];
+
+		GrfSpecFeatures features = (source.grf_features | dest.grf_features) & override_features;
+		source.grf_features.Set(features);
+		dest.grf_features.Set(features);
+
+		for (Price p : EnumRange(Price::End)) {
+			if (!features.Test(_price_base_specs[p].grf_feature)) continue;
+			if (source.price_base_multipliers[p] != dest.price_base_multipliers[p]) {
+				Debug(grf, 3, "Price base multiplier {} from '{}' propagated to '{}'", p, dest.filename, source.filename);
+			}
+			source.price_base_multipliers[p] = dest.price_base_multipliers[p];
+		}
+	}
+
+	/* Apply fallback prices for grf version < 8 */
+	for (auto &file : _grf_files) {
+		if (file.grf_version >= 8) continue;
+		PriceMultipliers &price_base_multipliers = file.price_base_multipliers;
+		for (Price p : EnumRange(Price::End)) {
+			Price fallback_price = _price_base_specs[p].fallback_price;
+			if (fallback_price != Price::Invalid && price_base_multipliers[p] == INVALID_PRICE_MODIFIER) {
+				/* No price multiplier has been set.
+				 * So copy the multiplier from the fallback price, maybe a multiplier was set there. */
+				price_base_multipliers[p] = price_base_multipliers[fallback_price];
+			}
+		}
+	}
+
+	/* Decide local/global scope of price base multipliers */
+	for (auto &file : _grf_files) {
+		PriceMultipliers &price_base_multipliers = file.price_base_multipliers;
+		for (Price p : EnumRange(Price::End)) {
+			if (price_base_multipliers[p] == INVALID_PRICE_MODIFIER) {
+				/* No multiplier was set; set it to a neutral value */
+				price_base_multipliers[p] = 0;
+			} else {
+				if (!file.grf_features.Test(_price_base_specs[p].grf_feature)) {
+					/* The grf does not define any objects of the feature,
+					 * so it must be a difficulty setting. Apply it globally */
+					Debug(grf, 3, "'{}' sets global price base multiplier {}", file.filename, p);
+					SetPriceBaseMultiplier(p, price_base_multipliers[p]);
+					price_base_multipliers[p] = 0;
+				} else {
+					Debug(grf, 3, "'{}' sets local price base multiplier {}", file.filename, p);
+				}
+			}
+		}
+	}
+}
+
+template <typename T>
+void AddBadgeToSpecs(T &specs, GrfSpecFeature feature, Badge &badge)
+{
+	for (auto &spec : specs) {
+		if (spec == nullptr) continue;
+		spec->badges.push_back(badge.index);
+		badge.features.Set(feature);
+	}
+}
+
+/** Finish up applying badges to things */
+static void FinaliseBadges()
+{
+	for (const auto &file : _grf_files) {
+		Badge *badge = GetBadgeByLabel(fmt::format("newgrf/{:08x}", std::byteswap(file.grfid)));
+		if (badge == nullptr) continue;
+
+		for (Engine *e : Engine::Iterate()) {
+			if (e->grf_prop.grffile != &file) continue;
+			e->badges.push_back(badge->index);
+			badge->features.Set(GetGrfSpecFeature(e->type));
+		}
+
+		AddBadgeToSpecs(file.stations, GrfSpecFeature::Stations, *badge);
+		AddBadgeToSpecs(file.housespec, GrfSpecFeature::Houses, *badge);
+		AddBadgeToSpecs(file.industryspec, GrfSpecFeature::Industries, *badge);
+		AddBadgeToSpecs(file.indtspec, GrfSpecFeature::IndustryTiles, *badge);
+		AddBadgeToSpecs(file.objectspec, GrfSpecFeature::Objects, *badge);
+		AddBadgeToSpecs(file.airportspec, GrfSpecFeature::Airports, *badge);
+		AddBadgeToSpecs(file.airtspec, GrfSpecFeature::AirportTiles, *badge);
+		AddBadgeToSpecs(file.roadstops, GrfSpecFeature::RoadStops, *badge);
+	}
+
+	ApplyBadgeFeaturesToClassBadges();
+	AddBadgeClassesToConfiguration();
+}
+
+extern void InitGRFTownGeneratorNames();
+
+/** Finish loading NewGRFs and execute needed post-processing */
+static void AfterLoadGRFs()
+{
+	/* Cached callback groups are no longer needed. */
+	ResetCallbacks(true);
+
+	FinaliseStringMapping();
+
+	/* Clear the action 6 override sprites. */
+	_grf_line_to_action6_sprite_override.clear();
+
+	FinaliseBadges();
+
+	/* Polish cargoes */
+	FinaliseCargoArray();
+	NameStudentCargo();
+
+	/* The one named exception has to widen its wagons' cargoes before the masks are
+	 * worked out, because working them out is what disables a wagon left without any. */
+	PrepareWagonCargoException();
+
+	/* Pre-calculate all refit masks after loading GRF files. */
+	CalculateRefitMasks();
+
+	/* And then finish the exception off. */
+	ApplyWagonCargoException();
+
+	/* Every rail wagon may carry a road vehicle. */
+	OfferRoadVehiclesToCarriers();
+	OfferMarijuanaToShipsAndAircraft();
+	OfferExplosivesToArmouredOnly();
+
+	/* No NewGRF gets a say in how its trains turn round. */
+	IgnoreNewGRFReversingFlags();
+
+	/* Polish engines */
+	FinaliseEngineArray();
+
+	/* Set the actually used Canal properties */
+	FinaliseCanals();
+
+	/* Add all new houses to the house array. */
+	FinaliseHouseArray();
+
+	/* Add all new industries to the industry array. */
+	FinaliseIndustriesArray();
+
+	/* Add all new objects to the object array. */
+	FinaliseObjectsArray();
+
+	InitializeSortedCargoSpecs();
+
+	/* Sort the list of industry types. */
+	SortIndustryTypes();
+
+	/* Create dynamic list of industry legends for smallmap_gui.cpp */
+	BuildIndustriesLegend();
+
+	/* Build the routemap legend, based on the available cargos */
+	BuildLinkStatsLegend();
+
+	/* Add all new airports to the airports array. */
+	FinaliseAirportsArray();
+	BindAirportSpecs();
+
+	/* Update the townname generators list */
+	InitGRFTownGeneratorNames();
+
+	/* Run all queued vehicle list order changes */
+	CommitVehicleListOrderChanges();
+
+	/* Load old shore sprites in new position, if they were replaced by ActionA */
+	ActivateOldShore();
+
+	/* Load old tram depot sprites in new position, if no new ones are present */
+	ActivateOldTramDepot();
+
+	/* Set up custom rail types */
+	InitRailTypes();
+	InitRoadTypes();
+
+	for (Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (_gted[e->index].rv_max_speed != 0) {
+			/* Set RV maximum speed from the mph/0.8 unit value */
+			e->VehInfo<RoadVehicleInfo>().max_speed = _gted[e->index].rv_max_speed * 4;
+		}
+
+		RoadTramType rtt = e->info.misc_flags.Test(EngineMiscFlag::RoadIsTram) ? RoadTramType::Tram : RoadTramType::Road;
+
+		const GRFFile *file = e->GetGRF();
+		if (file == nullptr || _gted[e->index].roadtramtype == 0) {
+			e->VehInfo<RoadVehicleInfo>().roadtype = (rtt == RoadTramType::Tram) ? ROADTYPE_TRAM : ROADTYPE_ROAD;
+			continue;
+		}
+
+		/* Remove +1 offset. */
+		_gted[e->index].roadtramtype--;
+
+		const std::vector<RoadTypeLabel> *list = (rtt == RoadTramType::Tram) ? &file->tramtype_list : &file->roadtype_list;
+		if (_gted[e->index].roadtramtype < list->size())
+		{
+			RoadTypeLabel rtl = (*list)[_gted[e->index].roadtramtype];
+			RoadType rt = GetRoadTypeByLabel(rtl);
+			if (rt != INVALID_ROADTYPE && GetRoadTramType(rt) == rtt) {
+				e->VehInfo<RoadVehicleInfo>().roadtype = rt;
+				continue;
+			}
+		}
+
+		/* Road type is not available, so disable this engine */
+		e->info.climates = {};
+	}
+
+	for (Engine *e : Engine::IterateType(VehicleType::Train)) {
+		RailTypes railtypes{};
+		for (RailTypeLabel label : _gted[e->index].railtypelabels) {
+			auto rt = GetRailTypeByLabel(label);
+			if (rt != INVALID_RAILTYPE) railtypes.Set(rt);
+		}
+
+		if (railtypes.Any()) {
+			e->VehInfo<RailVehicleInfo>().railtypes = railtypes;
+			e->VehInfo<RailVehicleInfo>().intended_railtypes = railtypes;
+		} else if (!_gted[e->index].railtypelabels.empty()) {
+			/* The engine asks for a rail type no loaded NewGRF provides -- a vehicle set
+			 * made for a companion track set the player did not load. Vanilla disables the
+			 * engine, which from the player's side is a train set that silently refuses to
+			 * start. Here it runs on the game's ordinary rails instead: an electric engine
+			 * on the electrified ordinary rail, everything else on plain track. The train
+			 * exists and drives; the special track was the author's preference, not a
+			 * precondition. */
+			RailType fallback = INVALID_RAILTYPE;
+			if (e->VehInfo<RailVehicleInfo>().engclass >= EngineClass::Electric) fallback = GetRailTypeByLabel(RAILTYPE_LABEL_ELECTRIC);
+			if (fallback == INVALID_RAILTYPE) fallback = GetRailTypeByLabel(RAILTYPE_LABEL_RAIL);
+			if (fallback == INVALID_RAILTYPE) fallback = RAILTYPE_RAIL;
+
+			e->VehInfo<RailVehicleInfo>().railtypes = RailTypes{}.Set(fallback);
+			e->VehInfo<RailVehicleInfo>().intended_railtypes = RailTypes{}.Set(fallback);
+		} else {
+			/* No rail type was ever named at all; nothing to fall back from. */
+			e->info.climates = {};
+		}
+	}
+
+	/* The sets have had their say about the game's own vehicles; where the
+	 * player asked for it, it is taken back (engine.cpp). Before the year
+	 * engine aging stops is worked out, because that reads which vehicles
+	 * exist at all. */
+	ApplyOriginalVehicleSettings();
+
+	SetYearEngineAgingStops();
+
+	FinalisePriceBaseMultipliers();
+
+	/* Deallocate temporary loading data */
+	_gted.clear();
+	_grm_sprites.clear();
+}
+
+/**
+ * Load all the NewGRFs.
+ * @param load_index The offset for the first sprite to add.
+ * @param num_baseset Number of NewGRFs at the front of the list to look up in the baseset dir instead of the newgrf dir.
+ */
+bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds)
+{
+	/* In case of networking we need to "sync" the start values
+	 * so all NewGRFs are loaded equally. For this we use the
+	 * start date of the game and we set the counters, etc. to
+	 * 0 so they're the same too. */
+	AutoRestoreBackup backup_date{TimerGameCalendar::date};
+	AutoRestoreBackup backup_year{TimerGameCalendar::year};
+	AutoRestoreBackup backup_date_fract{TimerGameCalendar::date_fract};
+
+	AutoRestoreBackup backup_economy_date{TimerGameEconomy::date};
+	AutoRestoreBackup backup_economy_year{TimerGameEconomy::year};
+	AutoRestoreBackup backup_economy_date_fract{TimerGameEconomy::date_fract};
+
+	AutoRestoreBackup backup_tick_counter{TimerGameTick::counter};
+	AutoRestoreBackup backup_display_opt{_display_opt};
+
+	if (_networking) {
+		TimerGameCalendar::year = _settings_game.game_creation.starting_year;
+		TimerGameCalendar::date = TimerGameCalendar::ConvertYMDToDate(TimerGameCalendar::year, 0, 1);
+		TimerGameCalendar::date_fract = 0;
+
+		TimerGameEconomy::year = TimerGameEconomy::Year{_settings_game.game_creation.starting_year.base()};
+		TimerGameEconomy::date = TimerGameEconomy::ConvertYMDToDate(TimerGameEconomy::year, 0, 1);
+		TimerGameEconomy::date_fract = 0;
+
+		TimerGameTick::counter = 0;
+		_display_opt.Reset();
+	}
+
+	InitializePatchFlags();
+
+	/* The reset below clears every set's errors, and a set that gave up in
+	 * an earlier round of this loading would lose the message saying why it
+	 * is off. */
+	const auto &gave_up = rounds.gave_up;
+	std::vector<std::pair<GRFConfig *, std::vector<GRFError>>> kept_errors;
+	for (const auto &c : _grfconfig) {
+		if (std::ranges::find(gave_up, c.get()) != gave_up.end()) kept_errors.emplace_back(c.get(), c->errors);
+	}
+	ResetRefusals(rounds.hidden);
+
+	ResetNewGRFData();
+
+	for (auto &[c, errors] : kept_errors) c->errors = std::move(errors);
+
+	/*
+	 * Reset the status of all files, so we can 'retry' to load them.
+	 * This is needed when one for example rearranges the NewGRFs in-game
+	 * and a previously disabled NewGRF becomes usable. If it would not
+	 * be reset, the NewGRF would remain disabled even though it should
+	 * have been enabled. A set that gave up in an earlier round of this
+	 * loading stays off (GfxLoadSprites()).
+	 */
+	for (const auto &c : _grfconfig) {
+		if (c->status == GRFStatus::NotFound) continue;
+		if (std::ranges::find(gave_up, c.get()) != gave_up.end()) {
+			c->status = GRFStatus::Disabled;
+			c->flags.Reset(GRFConfigFlag::Reserved);
+		} else {
+			c->status = GRFStatus::Unknown;
+		}
+	}
+
+	/* The other half of letting FIRS 5 run alongside the CZTR sets (see the
+	 * status-query exception in newgrf_act7_9.cpp): the wagons that make that
+	 * combination work are exactly one release, CZTR Wagons-Cargo 1.0.0 --
+	 * the one whose cargoes this game feeds from FIRS through the wagon-cargo
+	 * exception above. Any other release of that set is not prepared for
+	 * FIRS 5 and the exception deliberately leaves it alone. The first cut
+	 * refused to run it alongside FIRS 5, with a message saying which release
+	 * to use instead; the player took that back -- "everything works with
+	 * 1.0.0, all cargoes, nothing to wait for" -- so a game that has 1.0.0 on
+	 * the disk plays it in the other release's place, parameters and all
+	 * (SwapInCztrWagonsForFirs5()), and one that has not fetches it
+	 * (cztr_wagons.cpp) and meanwhile says so on the release it switches off.
+	 * Without FIRS 5 in the game, nothing here does anything. */
+	if (HasFirs5(_grfconfig)) {
+		SwapInCztrWagonsForFirs5(_grfconfig);
+		for (const auto &c : _grfconfig) {
+			if (c->status == GRFStatus::NotFound) continue;
+			if (std::byteswap(c->ident.grfid) != WAGON_CARGO_EXCEPTION_GRFID) continue;
+			if (IsWagonCargoExceptionGrf(*c)) continue; // 1.0.0 is the release that works
+			DisableGrf(IsFetchingCztrWagonsForFirs5() ? STR_NEWGRF_ERROR_CZTR_WAGONS_FETCHING_FOR_FIRS5 : STR_NEWGRF_ERROR_CZTR_WAGONS_NOT_READY_FOR_FIRS5, c.get());
+		}
+	}
+
+	/* The sets off before the reading starts: any other set off after it
+	 * went off while it was being read. */
+	std::vector<const GRFConfig *> off_before;
+	for (const auto &c : _grfconfig) {
+		if (c->status == GRFStatus::Disabled) off_before.push_back(c.get());
+	}
+
+	_cur_gps.spriteid = load_index;
+
+	/* Load newgrf sprites
+	 * in each loading stage, (try to) open each file specified in the config
+	 * and load information from it. */
+	for (GrfLoadingStage stage : EnumRange(GrfLoadingStage::LabelScan, GrfLoadingStage::End)) {
+		/* Set activated grfs back to will-be-activated between reservation- and activation-stage.
+		 * This ensures that action7/9 conditions 0x06 - 0x0A work correctly. */
+		for (const auto &c : _grfconfig) {
+			if (c->status == GRFStatus::Activated) c->status = GRFStatus::Initialised;
+		}
+
+		if (stage == GrfLoadingStage::Reserve) {
+			static const std::pair<uint32_t, uint32_t> default_grf_overrides[] = {
+				{ std::byteswap(0x44442202), std::byteswap(0x44440111) }, // UKRS addons modifies UKRS
+				{ std::byteswap(0x6D620402), std::byteswap(0x6D620401) }, // DBSetXL ECS extension modifies DBSetXL
+				{ std::byteswap(0x4D656f20), std::byteswap(0x4D656F17) }, // LV4cut modifies LV4
+			};
+			for (const auto &grf_override : default_grf_overrides) {
+				SetNewGRFOverride(grf_override.first, grf_override.second);
+			}
+		}
+
+		uint num_grfs = 0;
+		uint num_non_static = 0;
+
+		_cur_gps.stage = stage;
+		for (const auto &c : _grfconfig) {
+			if (c->status == GRFStatus::Disabled || c->status == GRFStatus::NotFound) continue;
+			if (stage > GrfLoadingStage::Init && c->flags.Test(GRFConfigFlag::InitOnly)) continue;
+
+			Subdirectory subdir = (num_grfs < num_baseset || c->builtin) ? Subdirectory::Baseset : Subdirectory::NewGrf;
+			if (!FioCheckFileExists(c->filename, subdir)) {
+				Debug(grf, 0, "NewGRF file is missing '{}'; disabling", c->filename);
+				c->status = GRFStatus::NotFound;
+				continue;
+			}
+
+			if (stage == GrfLoadingStage::LabelScan) InitNewGRFFile(*c);
+
+			if (!c->flags.Test(GRFConfigFlag::Static) && !c->flags.Test(GRFConfigFlag::System)) {
+				if (num_non_static == NETWORK_MAX_GRF_COUNT) {
+					Debug(grf, 0, "'{}' is not loaded as the maximum number of non-static GRFs has been reached", c->filename);
+					c->status = GRFStatus::Disabled;
+					c->errors.emplace_back(STR_NEWGRF_ERROR_MSG_FATAL, 0, STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED);
+					continue;
+				}
+				num_non_static++;
+			}
+
+			num_grfs++;
+
+			LoadNewGRFFile(*c, stage, subdir, false);
+			if (stage == GrfLoadingStage::Reserve) {
+				c->flags.Set(GRFConfigFlag::Reserved);
+			} else if (stage == GrfLoadingStage::Activation) {
+				c->flags.Reset(GRFConfigFlag::Reserved);
+				assert(GetFileByGRFID(c->ident.grfid) == _cur_gps.grffile);
+				ClearTemporaryNewGRFData(_cur_gps.grffile);
+				BuildCargoTranslationMap();
+				Debug(sprite, 2, "LoadNewGRF: Currently {} sprites are loaded", _cur_gps.spriteid);
+			} else if (stage == GrfLoadingStage::Init && c->flags.Test(GRFConfigFlag::InitOnly)) {
+				/* We're not going to activate this, so free whatever data we allocated */
+				ClearTemporaryNewGRFData(_cur_gps.grffile);
+			}
+		}
+	}
+
+	/* We've finished reading files. */
+	_cur_gps.grfconfig = nullptr;
+	_cur_gps.grffile = nullptr;
+
+	/* Pseudo sprite processing is finished; free temporary stuff */
+	_cur_gps.ClearDataForNextFile();
+
+	/* Call any functions that should be run after GRFs have been loaded. */
+	AfterLoadGRFs();
+
+	/* A set that went off while it was being read -- a fatal error of its
+	 * own, another set's Action E -- may have changed the game before it
+	 * did: Industries of the Caribbean switches the game's cargoes and
+	 * industries off before it checks for another industry set and gives
+	 * up, and beside XIS it left the game with no cargoes at all. Nothing
+	 * takes a set's changes back one by one, so the caller reads everything
+	 * again without it (GfxLoadSprites()). A set that was never read --
+	 * one too many for the game -- changed nothing and needs no new round.
+	 *
+	 * A set that gave up because another set is loaded -- it asked whether
+	 * that set is there and stopped with a fatal error a few sprites later,
+	 * the way every nml industry set refuses the others -- is read again
+	 * instead, with that set and the rest of its family hidden from its
+	 * checks (economy.newgrf_side_by_side). Industry sets refuse one another
+	 * because each wrote over the other's cargoes, and here they do not
+	 * (the cargo slots of newgrf_act0_cargo.cpp). Every such round hides a
+	 * family more from a set, and the families are finite, so it ends. */
+	bool again = false;
+	for (const auto &c : _grfconfig) {
+		if (c->status != GRFStatus::Disabled) continue;
+		if (std::ranges::find(off_before, c.get()) != off_before.end()) continue;
+		if (std::ranges::any_of(c->errors, [](const GRFError &e) { return e.message == STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED; })) continue;
+
+		const GRFConfig *refused = _settings_game.economy.newgrf_side_by_side ? RefusedBy(c.get()) : nullptr;
+		if (refused != nullptr) {
+			std::pair<uint32_t, uint32_t> hide{c->ident.grfid, refused->ident.grfid & GRFID_FAMILY_MASK};
+			if (std::ranges::find(rounds.hidden, hide) == rounds.hidden.end()) {
+				LogAnomaly("Sada {} odmitla sadu {} - pri dalsim cteni ji a sady z jeji rodiny ({:06X}xx) neuvidi.", c->GetName(), refused->GetName(), std::byteswap(refused->ident.grfid) >> 8);
+				rounds.hidden.push_back(hide);
+				again = true;
+				continue;
+			}
+		}
+
+		/* Why, in the words the NewGRF window uses, so the record says it too. */
+		std::string reason;
+		if (!c->errors.empty()) {
+			const GRFError &error = c->errors.back();
+			std::array<StringParameter, 3 + std::tuple_size_v<decltype(error.param_value)>> params{};
+			auto it = params.begin();
+			*it++ = error.custom_message;
+			*it++ = c->filename;
+			*it++ = error.data;
+			for (const uint32_t &value : error.param_value) *it++ = value;
+			reason = GetStringWithArgs(error.message != STR_NULL ? error.message : STR_JUST_RAW_STRING, {params.begin(), it});
+		}
+		LogAnomaly("Sada {} se vypnula az behem nacitani, kdyz uz mohla neco zmenit - sady se nacitaji znovu bez ni. Duvod: {}", c->GetName(), reason);
+		rounds.gave_up.push_back(c.get());
+		again = true;
+	}
+	return again;
+}
+
+/**
+ * Get the \c GrfSpecFeature associated with a \c VehicleType
+ * @param type The vehicle type.
+ * @return the \c GrfSpecFeature
+ */
+GrfSpecFeature GetGrfSpecFeature(VehicleType type)
+{
+	switch (type) {
+		case VehicleType::Train: return GrfSpecFeature::Trains;
+		case VehicleType::Road: return GrfSpecFeature::RoadVehicles;
+		case VehicleType::Ship: return GrfSpecFeature::Ships;
+		case VehicleType::Aircraft: return GrfSpecFeature::Aircraft;
+		default: return GrfSpecFeature::Invalid;
+	}
+}
+
+/**
+ * Get the \c VehicleType associated with a \c GrfSpecFeature
+ * @param feature The feature.
+ * @return the \c VehicleType
+ */
+VehicleType GetVehicleType(GrfSpecFeature feature)
+{
+	switch (feature) {
+		case GrfSpecFeature::Trains: return VehicleType::Train;
+		case GrfSpecFeature::RoadVehicles: return VehicleType::Road;
+		case GrfSpecFeature::Ships: return VehicleType::Ship;
+		case GrfSpecFeature::Aircraft: return VehicleType::Aircraft;
+		default: return VehicleType::Invalid;
+	}
+}

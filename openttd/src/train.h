@@ -1,0 +1,693 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file train.h Base for the train class. */
+
+#ifndef TRAIN_H
+#define TRAIN_H
+
+#include <array>
+#include "core/enum_type.hpp"
+
+#include "newgrf_engine.h"
+#include "cargotype.h"
+#include "rail.h"
+#include "engine_base.h"
+#include "rail_map.h"
+#include "ground_vehicle.hpp"
+#include "timer/timer_game_economy.h"
+
+struct Train;
+
+/** Rail vehicle flags. */
+enum class VehicleRailFlag : uint8_t {
+	Reversing = 0, ///< Train is slowing down to reverse.
+	Tender = 1, ///< (the tender only) The tender of a tender pair, whichever end of the list it is at. See MakeTenderRearHead().
+	RescueGivenUp = 2, ///< (head only) A rescue engine stood against this case and the coupling was refused until it gave up, so no engine is sent to it again; it waits out its deadline as if there were none. Cleared when a new case starts. See TrainLocoHandler().
+	PoweredWagon = 3, ///< Wagon is powered.
+	Flipped = 4, ///< Reverse the visible direction of the vehicle.
+	TenderPair = 5, ///< (both heads) A steam engine and its tender made into a two-headed engine at build time, so the list can be turned round with the tender first. The tender keeps its own engine type and picture, contributes nothing, and the engine is not halved the way a real dual head is. See MakeTenderRearHead().
+
+	AllowedOnNormalRail = 6, ///< Electric train engine is allowed to run on normal rail. */
+	Reversed = 7, ///< Used for vehicle var 0xFE bit 8 (toggled each time the train is reversed, accurate for first vehicle only).
+	Stuck = 8, ///< Train can't get a path reservation.
+	LeavingStation = 9, ///< Train is just leaving a station.
+	FlippedBeforeTow = 10, ///< Was Flipped when a rescue engine coupled to its train; restored when the train is put down. See RestoreCasualtyOrientation().
+	BackwardsBeforeTow = 11, ///< (head only) Its train was driving backwards when a rescue engine coupled to it; restored when it is put down.
+	CoupledHere = 12, ///< The coupling that joined this vehicle's part to the train happened just in front of it; a "decouple the whole train" order cuts here. See FindCoupledBoundary().
+	AutomaticDeparture = 14, ///< (head only) Leaving a station on an order that asked for the shortest way: the next order advance may turn the train round for a shorter route if it can lead from both ends. Set on departure, cleared when that question has been asked. See YapfTrainCheckReverse().
+	FoundingViaWaypoint = 13, ///< (head only) A founding run found no rake behind the station waypoint it is bound for: the waypoint is driven to as a plain via, the couple order behind it is concluded there. See IsHoldingShortOfStationWaypoint().
+	HoldReleased = 15, ///< (head only) The player turned this train round by hand while it stood in the wait before a station waypoint: the wait is over, the train drives on booked like any other, until the waypoint order is done. See IsHoldingShortOfStationWaypoint().
+};
+/** Bitset of the %VehicleRailFlag elements. */
+using VehicleRailFlags = EnumBitSet<VehicleRailFlag, uint16_t>;
+
+/** Modes for ignoring signals. */
+enum TrainForceProceeding : uint8_t {
+	TFP_NONE   = 0,    ///< Normal operation.
+	TFP_STUCK  = 1,    ///< Proceed till next signal, but ignore being stuck till then. This includes force leaving depots.
+	TFP_SIGNAL = 2,    ///< Ignore next signal, after the signal ignore being stuck.
+};
+
+/** Flags for Train::ConsistChanged */
+enum class ConsistChangeFlag : uint8_t {
+	Length, ///< Allow vehicles to change length.
+	Capacity, ///< Allow vehicles to change capacity.
+};
+/** Bitset of the %ConsistChangeFlag elements. */
+using ConsistChangeFlags = EnumBitSet<ConsistChangeFlag, uint8_t>;
+
+static constexpr ConsistChangeFlags CCF_TRACK{}; ///< Valid changes while vehicle is driving, and possibly changing tracks.
+static constexpr ConsistChangeFlags CCF_LOADUNLOAD{}; ///< Valid changes while vehicle is loading/unloading.
+static constexpr ConsistChangeFlags CCF_AUTOREFIT{ConsistChangeFlag::Capacity}; ///< Valid changes for autorefitting in stations.
+static constexpr ConsistChangeFlags CCF_REFIT{ConsistChangeFlag::Length, ConsistChangeFlag::Capacity}; ///< Valid changes for refitting in a depot.
+static constexpr ConsistChangeFlags CCF_ARRANGE{ConsistChangeFlag::Length, ConsistChangeFlag::Capacity}; ///< Valid changes for arranging the consist in a depot.
+static constexpr ConsistChangeFlags CCF_SAVELOAD{ConsistChangeFlag::Length}; ///< Valid changes when loading a savegame. (Everything that is not stored in the save.)
+
+uint8_t FreightWagonMult(CargoType cargo);
+
+void CheckTrainsLengths();
+
+void FreeTrainTrackReservation(const Train *v, TileIndex from_tile = INVALID_TILE, Trackdir from_td = Trackdir::Invalid);
+bool TryPathReserve(Train *v, bool mark_as_stuck = false, bool first_tile_okay = false);
+
+int GetTrainStopLocation(StationID station_id, TileIndex tile, const Train *moving_front, int *station_ahead, int *station_length);
+
+void GetTrainSpriteSize(EngineID engine, uint &width, uint &height, int &xoffs, int &yoffs, EngineImageType image_type);
+
+bool TrainOnCrossing(TileIndex tile);
+void NormalizeTrainVehInDepot(const Train *u);
+
+Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
+bool TrainAwaitsRescue(Train *v);
+bool IsSignalOverrunOn();
+bool IsSignalOverrunOn(const Train *v);
+std::pair<int, int> BrakeTableAt(int speed);
+
+/** The braking table: km/h shed on one tile, one number a band of speed, top band first (see GetBrakeCurve()). */
+using BrakeDropTable = std::array<uint8_t, 11>;
+BrakeDropTable GameBrakeDropTable();
+
+void RestoreCoupleErrandAfterBreakdown(Train *v);
+bool IsConsistStandingAtStation(const Train *consist, StationID station);
+bool IsWholeTrainInsideDepot(const Train *v);
+bool IsAnyPartInsideDepot(const Train *v);
+bool IsDepotDoorBookedByAnother(const Train *v);
+bool HasCoupleTarget(const Train *v);
+bool IsFoundingHeldEngineFirst(const Train *v);
+bool IsCoupleHeldNoseFirst(const Train *v);
+void ReleaseCoupleErrand(Train *t);
+bool IsWaitingToBeCoupled(const Train *v);
+bool IsRakeClaimedForCoupling(const Train *rake);
+void MarkCoupleClaimChanged(const Train *rake);
+void AdoptWagonRakeOrder(Train *rake, VehicleOrderID index);
+bool IsWaitingToBeRescued(const Train *v);
+bool IsAnyRescueEngineAvailable(const Train *v);
+StringID SellTrainForScrapRefusal(const Train *v);
+bool IsOnRescueRun(const Train *v);
+bool IsFetchingCasualty(const Train *v);
+bool IsRescueTargetAttached(const Train *v);
+bool CarriesAnotherTrain(const Train *v);
+void LeaveHeadlessChainWaiting(Train *chain);
+bool HandleRescueEngineInDepot(Train *tow);
+void StraightenTowInDepot(Train *tow);
+void EndRescueErrand(Train *tow);
+bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile);
+bool IsRescueTargetOnTile(const Train *v, TileIndex tile);
+bool IsOnSameRailPlatform(TileIndex tile, TileIndex other);
+bool IsOnCasualtyPlatform(const Train *v, TileIndex tile);
+bool IsCasualtyPlatformTileFree(const Train *v, TileIndex tile);
+bool IsCasualtyAheadOnPlatform(const Train *v, TileIndex tile, Trackdir trackdir);
+uint PlatformLengthBeforeCasualty(const Train *v, TileIndex entry, DiagDirection dir);
+bool IsRescueRoadFreeOnTile(const Train *v, TileIndex tile);
+bool Forbid90DegFor(const Train *v);
+TrackBits RescueRoadTracksOnTile(const Train *v, TileIndex tile);
+bool IsCoupleTargetOnTile(const Train *v, TileIndex tile);
+bool IsCouplePartnerStandingOn(const Train *v, TileIndex tile);
+bool TryDecoupleAtStation(Train *v, uint8_t keep_count, bool whole_train, OrderLoadType load_type, OrderUnloadType unload_type, uint16_t hold_ticks, StationID cargo_dest = StationID::Invalid(), bool sell = false);
+Train *FindCoupledBoundary(Train *v);
+bool MakeTenderRearHead(Train *engine);
+const Train *PieceDrawnAs(const Train *piece);
+uint WagonUnitsBehindEngine(const Train *v);
+bool CoupleOrderWouldFindSomething(const Train *v, const struct Order &order);
+const Train *CoupleOrderWouldTake(const Train *v, const struct Order &order);
+uint CoupleRakeFullness(const Train *rake, const struct Order &order);
+void ExplainDepotCoupling(Train *v, VehicleOrderID index);
+bool CoupleTypeFilterWouldTake(const Train *rake, EngineID model);
+bool IsTunnelBridgeOccupied(TileIndex tile);
+bool TunnelBridgeCanFollowIn(TileIndex entry);
+
+/** Variables that are cached to improve performance and such */
+struct TrainCache {
+	/** Cached wagon override spritegroup. */
+	const struct SpriteGroup *cached_override = nullptr;
+
+	/* cached values, recalculated on load and each time a vehicle is added to/removed from the consist. */
+	bool cached_tilt = false; ///< train can tilt; feature provides a bonus in curves
+	uint8_t user_def_data = 0; ///< Cached property 0x25. Can be set by Callback 0x36.
+
+	int16_t cached_curve_speed_mod = 0; ///< curve speed modifier of the entire train
+	uint16_t cached_max_curve_speed = 0; ///< max consist speed limited by curves
+
+	/**
+	 * Compare variables with another instance of this class.
+	 * @param other The other instance of TrainCache.
+	 * @return The std::strong_ordering of the comparison.
+	 */
+	auto operator<=>(const TrainCache &other) const = default;
+};
+
+/**
+ * Why a rescue engine standing on call has not been sent to anything.
+ *
+ * An engine that never leaves is otherwise a closed box, and "it just sits
+ * there" is all anyone can report about it. Written down by the code that
+ * decides, read back by the window.
+ */
+enum class RescueHold : uint8_t {
+	None,          ///< Nothing holding it; it is out or about to be.
+	Braked,        ///< Standing with its brake on, so it is parked rather than waiting.
+	HasOrders,     ///< Has orders of its own, which a rescue engine cannot have.
+	NobodyWaiting, ///< Nothing anywhere is broken down or wrecked.
+	NotEligible,   ///< Something is, but it does not count as waiting to be fetched.
+	AllTaken,      ///< Something is waiting, but another engine is already going for it.
+	CloserOne,     ///< Something is waiting, but another engine on call stands nearer to it and is the one to go.
+	ExitBlocked,   ///< Called out, but the block outside the depot is occupied.
+	NoPath,        ///< Called out, but no route to the casualty can be reserved.
+	NoDepot,       ///< Has the casualty in tow, but no depot it can reach to put it down in.
+	CannotCouple,  ///< Reached the casualty and stood against it, but the coupling was refused again and again, so it gave up on it.
+};
+
+/**
+ * Why a train is standing instead of buying wagons into a shed or putting
+ * wagons down in one. Written by the code that refuses, read back by the
+ * window, the same way as #RescueHold.
+ */
+enum class DepotHold : uint8_t {
+	None,         ///< Nothing holding it.
+	BuyFull,      ///< Its order would buy wagons, but the shed already stores as many as a shed takes.
+	DecoupleFull, ///< Its order puts wagons down here, but the shed would then store more than a shed takes.
+	BuyNeverFull, ///< Its order would buy wagons, but it only takes full ones, and a wagon is bought empty.
+};
+
+/**
+ * 'Train' is either a loco or a wagon.
+ */
+struct Train final : public GroundVehicle<Train, VehicleType::Train> {
+	VehicleRailFlags flags{}; ///< Which flags has this train currently set. @see VehicleRailFlag for more details.
+	uint16_t crash_anim_pos = 0; ///< Crash animation counter.
+	uint16_t wait_counter = 0; ///< Ticks waiting in front of a signal, ticks being stuck or a counter for forced proceeding through signals.
+
+	TrainCache tcache{}; ///< Set of cached variables, recalculated on load and each time a vehicle is added to/removed from the consist.
+
+	/** Link between the two ends of a multiheaded engine. */
+	Train *other_multiheaded_part = nullptr;
+
+	RailTypes compatible_railtypes{}; ///< With which rail types the train is compatible.
+	RailTypes railtypes{}; ///< On which rail types the train can run.
+
+	TrackBits track{}; ///< On which track the train currently is.
+	TrainForceProceeding force_proceed{}; ///< How the train should behave when it encounters next obstacle.
+
+	/* Rescue towing. See FEATURE_DESIGN_COUPLING_TOW.md. Only ever set on the
+	 * head of a consist; the first two on a rescue engine, the last on the
+	 * casualty it is being sent to. */
+	TileIndex rescue_home_depot = INVALID_TILE; ///< Depot a rescue engine is stationed at and returns to when it is done.
+	VehicleID rescue_target = VehicleID::Invalid(); ///< Casualty a rescue engine has been sent to fetch, so no two are sent to the same one.
+
+	RescueHold rescue_hold = RescueHold::None; ///< NOSAVE: why an engine on call has not been sent anywhere, so the window can say so.
+	VehicleID rescue_skip = VehicleID::Invalid(); ///< NOSAVE: a case this engine gave up on for now because no road to it could be booked; others come first.
+	StationID honk_waypoint = StationID::Invalid(); ///< NOSAVE: a station waypoint whose order was concluded short of it and asked for the horn; sounded when the train passes its tile.
+	uint8_t rescue_nopath_tries = 0; ///< NOSAVE: how many times in a row the road to the current case could not be booked.
+	mutable int driver_ceiling = INT32_MAX; ///< NOSAVE: the driver's own braking ceiling (BrakingCeiling()) as GetCurrentMaxSpeed() last found it, INT32_MAX when it did not ask.
+	uint16_t couple_refuse_tries = 0; ///< NOSAVE: how many ticks in a row a coupling has been refused while standing against the partner. A rescue engine gives the case up when it runs out; see TrainLocoHandler().
+	TimerGameEconomy::Date rescue_deadline{}; ///< When a casualty gives up waiting to be fetched and sorts itself out the vanilla way. Unset while nothing is wrong.
+
+	/* The driver of this train, as the player set him in the driver window
+	 * (ShowTrainDriverWindow(), opened by a click on the train's name in its
+	 * window). Each 0 means "as the game setting says"; anything else is the
+	 * train's own and stands in for the setting. Only the head of a consist
+	 * is asked (see DriverOf() in train_cmd.cpp), so a train picked up and
+	 * carried as wagons is driven by whoever picked it up. The player's
+	 * rule: every engine can have its own driver. */
+	uint8_t driver_sight = 0; ///< vehicle.train_braking for this train: 0 = as game, 1 = watches ETCS (off), 2..5 = sees 5, 10, 15, 20 tiles
+	uint8_t driver_signals = 0; ///< vehicle.train_driver_signals for this train: 0 = as game, 1..3 = reads the line through that many signals
+	uint8_t driver_stop_brake = 0; ///< vehicle.train_stop_brake_weaker for this train: 0 = as game, 1 = 30 % weaker, 2 = 10 % weaker
+	uint8_t driver_memory = 0; ///< vehicle.train_warning_memory for this train: 0 = as game, 1..6 = never forgets, 20, 15, 10, 5, 3 tiles
+	uint8_t driver_drop[11] = {}; ///< the braking table for this train, top band first: 0 = as game, else km/h shed on one tile
+	std::string driver_name; ///< the driver's name, as the player gave it in the driver window; empty when he has none. Shown after the train's name in its window.
+
+	/**
+	 * Take another train's driver over, as a clone or a replacement does.
+	 * @param with_name whether his name comes too: a replacement is the same
+	 *        train with the same man at the controls, a clone is another train
+	 *        and one man cannot drive two
+	 */
+	void CopyDriverFrom(const Train *other, bool with_name)
+	{
+		if (with_name) this->driver_name = other->driver_name;
+		this->driver_sight = other->driver_sight;
+		this->driver_signals = other->driver_signals;
+		this->driver_stop_brake = other->driver_stop_brake;
+		this->driver_memory = other->driver_memory;
+		std::copy(std::begin(other->driver_drop), std::end(other->driver_drop), std::begin(this->driver_drop));
+	}
+
+	/* "Brake, fail to brake and crash" (vehicle.train_braking). Only
+	 * ever set on the head of a consist. */
+	bool overran_red = false; ///< Ran past a red signal too fast to be stopped at it, and has not come to a stand since; a crash meanwhile is that overrun's doing.
+	bool overran_on_stop = false; ///< ... and it was the player's stop button that was bringing it to a stand, so the crash is the player's.
+	bool stop_crash_news = false; ///< A wreck made by the player's stop; the papers write about it again when a tow sets out for it.
+
+	/**
+	 * How many wagons this train keeps when it finishes the decoupling its
+	 * depot order asked for, carried from the moment of arrival to the moment
+	 * the work is safe to do -- **plus one**. Zero means no decoupling is owed.
+	 *
+	 * The plus one is because keeping no wagons at all is a perfectly ordinary
+	 * order (the engine drops the lot and goes on alone), so a plain count
+	 * could not tell "keep none" apart from "nothing to do".
+	 *
+	 * Arriving at the ordered depot concludes the order on the spot
+	 * (VehicleEnterDepot() wipes it to a dummy), but taking a train apart is
+	 * consist surgery and may only happen at the point in the tick where
+	 * nothing is walking along the consist -- the same reason the rescue
+	 * errand is handled there. So the count is written down at arrival and
+	 * honoured from TrainLocoHandler(). Saved, so a game written between the
+	 * two moments still owes the split after loading.
+	 */
+	uint8_t depot_decouple_pending = 0;
+	static constexpr uint8_t DEPOT_DECOUPLE_WHOLE = 0xFF; ///< #depot_decouple_pending value for "drop the whole coupled train" rather than a count.
+	bool depot_decouple_sell = false; ///< The wagons that #depot_decouple_pending is about are sold once they are down, not stored. Written and honoured at the same two moments, and saved for the same reason.
+	DepotHold depot_hold = DepotHold::None; ///< Why this train stands instead of buying into or putting wagons down in a shed. Saved, so a game loaded mid-wait does not announce the wait a second time.
+	/**
+	 * How many tiles the leading end has entered since it last passed a
+	 * signal facing it, UINT8_MAX for "long ago or never". With "brake, fail
+	 * to brake and crash" on, the driver forgets what that signal told him
+	 * after as many tiles as the player's setting says
+	 * (vehicle.train_warning_memory; see BrakingCeiling()). Saved, so a game
+	 * loaded between a signal and the red after it drives on the same.
+	 */
+	uint8_t tiles_past_signal = UINT8_MAX;
+
+	/**
+	 * The rake this train has just left standing in the shed it is in.
+	 *
+	 * A depot order may put wagons down and take wagons on, in that order, and
+	 * what was put down must not be what gets taken back on -- otherwise the
+	 * train drops its rake and picks the same one up again on the next tick,
+	 * over and over, and the order never ends. The name is written down at the
+	 * decoupling and holds only while this train is still standing in that
+	 * shed working that order; once it has driven out, the rake is an ordinary
+	 * stored one and this train may be sent back for it like anybody else.
+	 *
+	 * Saved, because the wait for a suitable rake to collect can be long: a
+	 * game written while the train stands in the shed between the two halves
+	 * of its order has to remember which rake is its own leavings.
+	 */
+	VehicleID depot_dropped_rake = VehicleID::Invalid();
+
+	/**
+	 * The road vehicle riding on this wagon, or invalid. One wagon carries one
+	 * road vehicle; the vehicle keeps its own number and orders and gets off
+	 * by itself at the station its next order names. Only a wagon refitted to
+	 * CT_ROLA takes one, and while it rides the wagon holds one unit of that
+	 * cargo so that it counts as full. See road_on_rail.h.
+	 */
+	VehicleID carrying = VehicleID::Invalid();
+
+	/**
+	 * Which engine has spoken for this rake of wagons, set on the rake itself.
+	 *
+	 * An engine sent to collect wagons has nowhere to stop once it has set off
+	 * -- reaching them is the whole route -- and nowhere else to go if it finds
+	 * them gone, so two engines sent to the same rake means one of them with no
+	 * errand and no way to end it. The first to want a rake takes it, and the
+	 * rake is no longer offered to anyone else until that engine has it or has
+	 * given up. See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	VehicleID couple_claim = VehicleID::Invalid();
+
+	/**
+	 * Which rake this engine has spoken for, set on the engine itself.
+	 *
+	 * The other half of the same fact, written down twice on purpose. The rake
+	 * carries the name of the engine so that no second engine takes it; the
+	 * engine carries the name of the rake so that it knows, without going
+	 * looking, that it already has one and which one.
+	 *
+	 * That second half is what stops it setting off before the choice is made.
+	 * Reserving track first and choosing afterwards meant the track was held
+	 * against everybody else while nothing was decided, and then the engine
+	 * went to whatever it had reserved rather than to what it had chosen. So:
+	 * choose first, then reserve, then move.
+	 */
+	VehicleID couple_target = VehicleID::Invalid();
+
+	/** Create new Train object. @copydoc GroundVehicle::GroundVehicle */
+	Train(VehicleID index) : GroundVehicleBase(index) {}
+	/** We want to 'destruct' the right class. */
+	~Train() override { this->PreDestructor(); }
+
+	friend struct GroundVehicle<Train, VehicleType::Train>; // GroundVehicle needs to use the acceleration functions defined at Train.
+
+	void MarkDirty() override;
+	void UpdateDeltaXY() override;
+	ExpensesType GetExpenseType(bool income) const override { return income ? ExpensesType::TrainRevenue : ExpensesType::TrainRun; }
+	void PlayLeaveStationSound(bool force = false) const override;
+	bool IsPrimaryVehicle() const override { return this->IsFrontEngine(); }
+	void GetImage(Direction direction, EngineImageType image_type, VehicleSpriteSeq *result) const override;
+	int GetDisplaySpeed() const override { return this->gcache.last_speed; }
+	int GetDisplayMaxSpeed() const override { return this->vcache.cached_max_speed; }
+	Money GetRunningCost() const override;
+	int GetCursorImageOffset() const;
+	int GetDisplayImageWidth(Point *offset = nullptr) const;
+	bool IsInDepot() const override { return this->track == Track::Depot; }
+	bool Tick() override;
+	void OnNewCalendarDay() override;
+	void OnNewEconomyDay() override;
+	uint Crash(bool flooded = false) override;
+	Trackdir GetVehicleTrackdir() const override;
+	TileIndex GetOrderStationLocation(StationID station) override;
+	ClosestDepot FindClosestDepot() override;
+
+	void ReserveTrackUnderConsist() const;
+
+	uint16_t GetCurveSpeedLimit() const;
+
+	void ConsistChanged(ConsistChangeFlags allowed_changes);
+
+	int UpdateSpeed();
+
+	void UpdateAcceleration();
+
+	int GetCurrentMaxSpeed() const override;
+
+	/**
+	 * Is this the tender of a steam engine, made into one head of a pair at
+	 * build time so the pair can be turned round in the list? See
+	 * MakeTenderRearHead(). It is the articulated part it used to be in every
+	 * respect but the list: it draws itself, weighs nothing of its own, pulls
+	 * nothing, costs nothing, and cannot be parted from its engine.
+	 *
+	 * A property of the vehicle, not a place in the list. Turned round, the
+	 * tender is the front head and the engine the rear one -- and asked by
+	 * role, the engine was the one that "contributed nothing": the train had
+	 * no power at all and crept at the platform, turning at each end of
+	 * itself.
+	 */
+	inline bool IsTender() const
+	{
+		return this->flags.Test(VehicleRailFlag::Tender);
+	}
+
+	/**
+	 * The engine of this vehicle's unit for anything that names or replaces
+	 * it: itself, unless it is the tender of a pair -- a tender at the head of
+	 * the list is still a tender, and the train is still the engine beside it.
+	 */
+	inline const Train *GetPairEngine() const
+	{
+		if (this->IsTender() && this->other_multiheaded_part != nullptr) return this->other_multiheaded_part;
+		return this;
+	}
+
+	/**
+	 * Get the next real (non-articulated part and non rear part of dualheaded engine) vehicle in the consist.
+	 * @return Next vehicle in the consist.
+	 */
+	inline Train *GetNextUnit() const
+	{
+		Train *v = this->GetNextVehicle();
+		if (v != nullptr && v->IsRearDualheaded()) v = v->GetNextVehicle();
+
+		return v;
+	}
+
+	/**
+	 * Get the previous real (non-articulated part and non rear part of dualheaded engine) vehicle in the consist.
+	 * @return Previous vehicle in the consist.
+	 */
+	inline Train *GetPrevUnit()
+	{
+		Train *v = this->GetPrevVehicle();
+		if (v != nullptr && v->IsRearDualheaded()) v = v->GetPrevVehicle();
+
+		return v;
+	}
+
+	/**
+	 * Calculate the offset from this vehicle's center to the following center taking the vehicle lengths into account.
+	 * @return Offset from center to center.
+	 */
+	int CalcNextVehicleOffset() const
+	{
+		/* For vehicles with odd lengths the part before the center will be one unit
+		 * longer than the part after the center. This means we have to round up the
+		 * length of the next vehicle but may not round the length of the current
+		 * vehicle. */
+		uint8_t rounding = this->IsDrivingBackwards() ? 1 : 0;
+		return (this->gcache.cached_veh_length + rounding) / 2 + (this->GetMovingNext() != nullptr ? this->GetMovingNext()->gcache.cached_veh_length + 1 - rounding : 0) / 2;
+	}
+
+	/**
+	 * Allows to know the acceleration type of a vehicle.
+	 * @return Acceleration type of the vehicle.
+	 */
+	inline VehicleAccelerationModel GetAccelerationType() const
+	{
+		return GetRailTypeInfo(GetRailType(this->tile))->acceleration_type;
+	}
+
+protected: // These functions should not be called outside acceleration code.
+
+	/**
+	 * Allows to know the power value that this vehicle will use.
+	 * @return Power value from the engine in HP, or zero if the vehicle is not powered.
+	 */
+	inline uint16_t GetPower() const
+	{
+		/* Power is not added for articulated parts -- nor for a tender made
+		 * into a rear head, which is the articulated part it was. */
+		if (!this->IsArticulatedPart() && !this->IsTender() && HasPowerOnRail(this->railtypes, GetRailType(this->tile))) {
+			uint16_t power = GetVehicleProperty(this, PROP_TRAIN_POWER, RailVehInfo(this->engine_type)->power);
+			/* Halve power for multiheaded parts: a real dual head is the same
+			 * engine twice and each half carries half. The engine of a tender
+			 * pair is the whole engine and its tender carries nothing. */
+			if (this->IsMultiheaded() && !this->flags.Test(VehicleRailFlag::TenderPair)) power /= 2;
+			return power;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Returns a value if this articulated part is powered.
+	 * @return Power value from the articulated part in HP, or zero if it is not powered.
+	 */
+	inline uint16_t GetPoweredPartPower() const
+	{
+		/* For powered wagons the engine defines the type of engine (i.e. railtype) */
+		if (this->flags.Test(VehicleRailFlag::PoweredWagon) && HasPowerOnRail(this->railtypes, GetRailType(this->tile))) {
+			return RailVehInfo(this->gcache.first_engine)->pow_wag_power;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Allows to know the weight value that this vehicle will use.
+	 * @return Weight value from the engine in tonnes.
+	 */
+	inline uint16_t GetWeight() const
+	{
+		uint16_t weight = CargoSpec::Get(this->cargo_type)->WeightOfNUnitsInTrain(this->cargo.StoredCount());
+
+		/* Vehicle weight is not added for articulated parts -- a set puts the
+		 * whole unit's weight on its head -- and a tender made into a rear head
+		 * is the articulated part it was, so it is not counted twice. */
+		if (!this->IsArticulatedPart() && !this->IsTender()) {
+			weight += GetVehicleProperty(this, PROP_TRAIN_WEIGHT, RailVehInfo(this->engine_type)->weight);
+		}
+
+		/* Powered wagons have extra weight added. */
+		if (this->flags.Test(VehicleRailFlag::PoweredWagon)) {
+			weight += RailVehInfo(this->gcache.first_engine)->pow_wag_weight;
+		}
+
+		return weight;
+	}
+
+	/**
+	 * Calculates the weight value that this vehicle will have when fully loaded with its current cargo.
+	 * @return Weight value in tonnes.
+	 */
+	uint16_t GetMaxWeight() const override;
+
+	/**
+	 * Allows to know the tractive effort value that this vehicle will use.
+	 * @return Tractive effort value from the engine.
+	 */
+	inline uint8_t GetTractiveEffort() const
+	{
+		return GetVehicleProperty(this, PROP_TRAIN_TRACTIVE_EFFORT, RailVehInfo(this->engine_type)->tractive_effort);
+	}
+
+	/**
+	 * Gets the area used for calculating air drag.
+	 * @return Area of the engine in m^2.
+	 */
+	inline uint8_t GetAirDragArea() const
+	{
+		/* Air drag is higher in tunnels due to the limited cross-section. */
+		return (this->track == Track::Wormhole && this->vehstatus.Test(VehState::Hidden)) ? 28 : 14;
+	}
+
+	/**
+	 * Gets the air drag coefficient of this vehicle.
+	 * @return Air drag value from the engine.
+	 */
+	inline uint8_t GetAirDrag() const
+	{
+		return RailVehInfo(this->engine_type)->air_drag;
+	}
+
+	/**
+	 * Checks the current acceleration status of this vehicle.
+	 * @return Acceleration status.
+	 */
+	inline AccelStatus GetAccelerationStatus() const
+	{
+		return this->vehstatus.Test(VehState::Stopped) || this->flags.Any({VehicleRailFlag::Reversing, VehicleRailFlag::Stuck}) ? AS_BRAKE : AS_ACCEL;
+	}
+
+	/**
+	 * Calculates the current speed of this vehicle.
+	 * @return Current speed in km/h-ish.
+	 */
+	inline uint16_t GetCurrentSpeed() const
+	{
+		return this->cur_speed;
+	}
+
+	/**
+	 * Returns the rolling friction coefficient of this vehicle.
+	 * @return Rolling friction coefficient in [1e-4].
+	 */
+	inline uint32_t GetRollingFriction() const
+	{
+		/* Rolling friction for steel on steel is between 0.1% and 0.2%.
+		 * The friction coefficient increases with speed in a way that
+		 * it doubles at 512 km/h, triples at 1024 km/h and so on. */
+		return 15 * (512 + this->GetCurrentSpeed()) / 512;
+	}
+
+	/**
+	 * Returns the slope steepness used by this vehicle.
+	 * @return Slope steepness used by the vehicle.
+	 */
+	inline uint32_t GetSlopeSteepness() const
+	{
+		return _settings_game.vehicle.train_slope_steepness;
+	}
+
+	/**
+	 * Gets the maximum speed allowed by the track for this vehicle.
+	 * @return Maximum speed allowed.
+	 */
+	inline uint16_t GetMaxTrackSpeed() const
+	{
+		return GetRailTypeInfo(GetRailType(this->tile))->max_speed;
+	}
+
+	/**
+	 * Returns the curve speed modifier of this vehicle.
+	 * @return Current curve speed modifier, in fixed-point binary representation with 8 fractional bits.
+	 */
+	inline int16_t GetCurveSpeedModifier() const
+	{
+		return GetVehicleProperty(this, PROP_TRAIN_CURVE_SPEED_MOD, RailVehInfo(this->engine_type)->curve_speed_mod, true);
+	}
+
+	/**
+	 * Checks if the vehicle is at a tile that can be sloped.
+	 * @return True if the tile can be sloped.
+	 */
+	inline bool TileMayHaveSlopedTrack() const
+	{
+		/* Any track that isn't TRACK_BIT_X or TRACK_BIT_Y cannot be sloped. */
+		return this->track == Track::X || this->track == Track::Y;
+	}
+
+	/**
+	 * Trains can always use the faster algorithm because they
+	 * have always the same direction as the track under them.
+	 * @return false
+	 */
+	inline bool HasToUseGetSlopePixelZ()
+	{
+		return false;
+	}
+};
+
+/**
+ * Is this a headless rake of wagons standing out on the network -- one left
+ * behind by a decoupling train, waiting for an engine to come and collect it?
+ *
+ * Vanilla only ever has engineless wagons inside a depot, where they are
+ * inert: they cannot be clicked on the map, they load nothing and they go
+ * nowhere. Wagons left on a platform are none of those things. They stand at a
+ * station and take on cargo, and the player has to be able to see what they
+ * are doing and tell them to stop. So they count as something the player deals
+ * with directly, in the few places that decide whether a vehicle can be looked
+ * at and started or stopped -- and nowhere else, because in every other
+ * respect they are still not a train.
+ *
+ * @param v The vehicle to test; may be any part, the question is about the
+ *          consist it belongs to.
+ * @return Whether this is such a rake.
+ */
+/**
+ * Show a train's orientation in its status line.
+ *
+ * A testing switch, not a setting: the console command "vlak123" flips it. The two
+ * things a train is described by cannot be read off the screen at all -- which end of
+ * the list goes first, and which way the head vehicle is facing -- and nearly every
+ * fault in coupling has been one of them disagreeing with the other. Off by default.
+ */
+extern bool _show_train_orientation;
+
+/* Rig: who is giving ground back right now (pbs.cpp), and a way to wreck a
+ * train where it stands. See SayIfGroundUnderTrainGivenBack(). */
+extern const Train *_ground_freer;
+extern const char *_ground_freer_why;
+extern std::string _rescue_road_failure;
+std::string DescribeTrackHolder(TileIndex tile, const Train *casualty);
+uint TrainCrashed(Train *v);
+void ClearWreck(Train *t);
+
+bool IsHoldingShortOfStationWaypoint(const Train *v);
+
+inline bool IsWaitingWagonChain(const Vehicle *v)
+{
+	if (v->type != VehicleType::Train) return false;
+	const Train *head = Train::From(v)->First();
+	return head->IsFreeWagon() && !head->IsInDepot();
+}
+
+/**
+ * Has the player asked for these waiting wagons to be towed to a depot?
+ * The call is written as a rescue deadline on the rake, the same way a
+ * breakdown is written on an engine (see CmdRequestWagonTow()).
+ */
+inline bool IsWagonTowRequested(const Train *v)
+{
+	const Train *head = v->First();
+	return head->IsFreeWagon() && head->rescue_deadline != TimerGameEconomy::Date{};
+}
+
+#endif /* TRAIN_H */

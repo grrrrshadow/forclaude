@@ -1,0 +1,846 @@
+[
+ {
+  "name": "gymnazium_w",
+  "x4": {
+   "file": "gymnazium_w_32bpp.png",
+   "w": 128,
+   "h": 136,
+   "x": -124,
+   "y": -7
+  },
+  "x8": {
+   "file": "gymnazium_w_8x_32bpp.png",
+   "w": 256,
+   "h": 270,
+   "x": -248,
+   "y": -13
+  }
+ },
+ {
+  "name": "gymnazium_s",
+  "x4": {
+   "file": "gymnazium_s_32bpp.png",
+   "w": 256,
+   "h": 331,
+   "x": -124,
+   "y": -203
+  },
+  "x8": {
+   "file": "gymnazium_s_8x_32bpp.png",
+   "w": 512,
+   "h": 663,
+   "x": -248,
+   "y": -406
+  }
+ },
+ {
+  "name": "gymnazium_e",
+  "x4": {
+   "file": "gymnazium_e_32bpp.png",
+   "w": 128,
+   "h": 206,
+   "x": 4,
+   "y": -77
+  },
+  "x8": {
+   "file": "gymnazium_e_8x_32bpp.png",
+   "w": 256,
+   "h": 411,
+   "x": 8,
+   "y": -154
+  }
+ },
+ {
+  "name": "automat",
+  "x4": {
+   "file": "automat_32bpp.png",
+   "w": 256,
+   "h": 153,
+   "x": -123,
+   "y": -24
+  },
+  "x8": {
+   "file": "automat_8x_32bpp.png",
+   "w": 512,
+   "h": 304,
+   "x": -247,
+   "y": -48
+  }
+ },
+ {
+  "name": "gymnazium_holky_w",
+  "x4": {
+   "file": "gymnazium_holky_w_32bpp.png",
+   "w": 128,
+   "h": 136,
+   "x": -124,
+   "y": -7
+  },
+  "x8": {
+   "file": "gymnazium_holky_w_8x_32bpp.png",
+   "w": 256,
+   "h": 270,
+   "x": -248,
+   "y": -13
+  }
+ },
+ {
+  "name": "gymnazium_holky_s",
+  "x4": {
+   "file": "gymnazium_holky_s_32bpp.png",
+   "w": 256,
+   "h": 331,
+   "x": -124,
+   "y": -203
+  },
+  "x8": {
+   "file": "gymnazium_holky_s_8x_32bpp.png",
+   "w": 512,
+   "h": 663,
+   "x": -248,
+   "y": -406
+  }
+ },
+ {
+  "name": "automat_holky",
+  "x4": {
+   "file": "automat_holky_32bpp.png",
+   "w": 256,
+   "h": 153,
+   "x": -123,
+   "y": -24
+  },
+  "x8": {
+   "file": "automat_holky_8x_32bpp.png",
+   "w": 512,
+   "h": 304,
+   "x": -247,
+   "y": -48
+  }
+ },
+ {
+  "name": "socha_kamen",
+  "x4": {
+   "file": "socha_kamen_32bpp.png",
+   "w": 255,
+   "h": 229,
+   "x": -124,
+   "y": -100
+  },
+  "x8": {
+   "file": "socha_kamen_8x_32bpp.png",
+   "w": 512,
+   "h": 455,
+   "x": -248,
+   "y": -199
+  }
+ },
+ {
+  "name": "socha_kamen_holky",
+  "x4": {
+   "file": "socha_kamen_holky_32bpp.png",
+   "w": 255,
+   "h": 229,
+   "x": -124,
+   "y": -100
+  },
+  "x8": {
+   "file": "socha_kamen_holky_8x_32bpp.png",
+   "w": 512,
+   "h": 455,
+   "x": -248,
+   "y": -199
+  }
+ },
+ {
+  "name": "socha_bronz",
+  "x4": {
+   "file": "socha_bronz_32bpp.png",
+   "w": 255,
+   "h": 229,
+   "x": -124,
+   "y": -100
+  },
+  "x8": {
+   "file": "socha_bronz_8x_32bpp.png",
+   "w": 512,
+   "h": 455,
+   "x": -248,
+   "y": -199
+  }
+ },
+ {
+  "name": "socha_bronz_holky",
+  "x4": {
+   "file": "socha_bronz_holky_32bpp.png",
+   "w": 255,
+   "h": 229,
+   "x": -124,
+   "y": -100
+  },
+  "x8": {
+   "file": "socha_bronz_holky_8x_32bpp.png",
+   "w": 512,
+   "h": 455,
+   "x": -248,
+   "y": -199
+  }
+ },
+ {
+  "name": "pole_mari_zaklad",
+  "x4": {
+   "file": "pole_mari_zaklad_32bpp.png",
+   "w": 254,
+   "h": 128,
+   "x": -123,
+   "y": 0
+  },
+  "x8": {
+   "file": "pole_mari_zaklad_8x_32bpp.png",
+   "w": 510,
+   "h": 256,
+   "x": -247,
+   "y": 0
+  }
+ },
+ {
+  "name": "pole_cesta",
+  "x4": {
+   "file": "pole_cesta_32bpp.png",
+   "w": 254,
+   "h": 128,
+   "x": -123,
+   "y": 0
+  },
+  "x8": {
+   "file": "pole_cesta_8x_32bpp.png",
+   "w": 510,
+   "h": 256,
+   "x": -247,
+   "y": 0
+  }
+ },
+ {
+  "name": "pole_bouda",
+  "x4": {
+   "file": "pole_bouda_32bpp.png",
+   "w": 174,
+   "h": 132,
+   "x": -127,
+   "y": -10
+  },
+  "x8": {
+   "file": "pole_bouda_8x_32bpp.png",
+   "w": 385,
+   "h": 269,
+   "x": -254,
+   "y": -19
+  }
+ },
+ {
+  "name": "pole_mari_male",
+  "x4": {
+   "file": "pole_mari_male_32bpp.png",
+   "w": 253,
+   "h": 133,
+   "x": -123,
+   "y": -6
+  },
+  "x8": {
+   "file": "pole_mari_male_8x_32bpp.png",
+   "w": 509,
+   "h": 267,
+   "x": -247,
+   "y": -11
+  }
+ },
+ {
+  "name": "pole_mari_vzrostle",
+  "x4": {
+   "file": "pole_mari_vzrostle_32bpp.png",
+   "w": 254,
+   "h": 162,
+   "x": -123,
+   "y": -34
+  },
+  "x8": {
+   "file": "pole_mari_vzrostle_8x_32bpp.png",
+   "w": 510,
+   "h": 323,
+   "x": -247,
+   "y": -67
+  }
+ },
+ {
+  "name": "pole_holky_sz",
+  "x4": {
+   "file": "pole_holky_sz_32bpp.png",
+   "w": 36,
+   "h": 50,
+   "x": -39,
+   "y": -14
+  },
+  "x8": {
+   "file": "pole_holky_sz_8x_32bpp.png",
+   "w": 71,
+   "h": 97,
+   "x": -78,
+   "y": -27
+  }
+ },
+ {
+  "name": "pole_holky_jv",
+  "x4": {
+   "file": "pole_holky_jv_32bpp.png",
+   "w": 45,
+   "h": 55,
+   "x": 12,
+   "y": 60
+  },
+  "x8": {
+   "file": "pole_holky_jv_8x_32bpp.png",
+   "w": 88,
+   "h": 107,
+   "x": 24,
+   "y": 123
+  }
+ },
+ {
+  "name": "pole_prace_real_f2",
+  "x4": {
+   "file": "pole_prace_real_f2_32bpp.png",
+   "w": 233,
+   "h": 123,
+   "x": -113,
+   "y": 3
+  },
+  "x8": {
+   "file": "pole_prace_real_f2_8x_32bpp.png",
+   "w": 475,
+   "h": 249,
+   "x": -241,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_sedi_f2",
+  "x4": {
+   "file": "pole_prace_sedi_f2_32bpp.png",
+   "w": 233,
+   "h": 122,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_sedi_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_punk_f2",
+  "x4": {
+   "file": "pole_prace_punk_f2_32bpp.png",
+   "w": 233,
+   "h": 122,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_punk_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_pubg_f2",
+  "x4": {
+   "file": "pole_prace_pubg_f2_32bpp.png",
+   "w": 235,
+   "h": 122,
+   "x": -115,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_pubg_f2_8x_32bpp.png",
+   "w": 479,
+   "h": 251,
+   "x": -240,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_char16_f2",
+  "x4": {
+   "file": "pole_prace_char16_f2_32bpp.png",
+   "w": 233,
+   "h": 122,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_char16_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_chill_f2",
+  "x4": {
+   "file": "pole_prace_chill_f2_32bpp.png",
+   "w": 233,
+   "h": 124,
+   "x": -113,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_prace_chill_f2_8x_32bpp.png",
+   "w": 477,
+   "h": 251,
+   "x": -238,
+   "y": 5
+  }
+ },
+ {
+  "name": "pole_prace_real_f3",
+  "x4": {
+   "file": "pole_prace_real_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
+   "x": -123,
+   "y": 4
+  },
+  "x8": {
+   "file": "pole_prace_real_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
+ },
+ {
+  "name": "pole_prace_sedi_f3",
+  "x4": {
+   "file": "pole_prace_sedi_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
+   "x": -123,
+   "y": 4
+  },
+  "x8": {
+   "file": "pole_prace_sedi_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
+ },
+ {
+  "name": "pole_prace_punk_f3",
+  "x4": {
+   "file": "pole_prace_punk_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
+   "x": -123,
+   "y": 4
+  },
+  "x8": {
+   "file": "pole_prace_punk_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
+ },
+ {
+  "name": "pole_prace_pubg_f3",
+  "x4": {
+   "file": "pole_prace_pubg_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
+   "x": -123,
+   "y": 4
+  },
+  "x8": {
+   "file": "pole_prace_pubg_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
+ },
+ {
+  "name": "pole_prace_char16_f3",
+  "x4": {
+   "file": "pole_prace_char16_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
+   "x": -123,
+   "y": 4
+  },
+  "x8": {
+   "file": "pole_prace_char16_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
+ },
+ {
+  "name": "pole_prace_chill_f3",
+  "x4": {
+   "file": "pole_prace_chill_f3_32bpp.png",
+   "w": 254,
+   "h": 124,
+   "x": -123,
+   "y": 4
+  },
+  "x8": {
+   "file": "pole_prace_chill_f3_8x_32bpp.png",
+   "w": 510,
+   "h": 249,
+   "x": -247,
+   "y": 7
+  }
+ },
+ {
+  "name": "zastavka_x_vzadu",
+  "x4": {
+   "file": "zastavka_x_vzadu_32bpp.png",
+   "w": 116,
+   "h": 71,
+   "x": -89,
+   "y": -2
+  },
+  "x8": {
+   "file": "zastavka_x_vzadu_8x_32bpp.png",
+   "w": 238,
+   "h": 139,
+   "x": -190,
+   "y": -3
+  }
+ },
+ {
+  "name": "zastavka_y_vzadu",
+  "x4": {
+   "file": "zastavka_y_vzadu_32bpp.png",
+   "w": 116,
+   "h": 70,
+   "x": 11,
+   "y": 17
+  },
+  "x8": {
+   "file": "zastavka_y_vzadu_8x_32bpp.png",
+   "w": 248,
+   "h": 139,
+   "x": 20,
+   "y": 34
+  }
+ },
+ {
+  "name": "zastavka_x_vpredu",
+  "x4": {
+   "file": "zastavka_x_vpredu_32bpp.png",
+   "w": 113,
+   "h": 69,
+   "x": -162,
+   "y": 33
+  },
+  "x8": {
+   "file": "zastavka_x_vpredu_8x_32bpp.png",
+   "w": 242,
+   "h": 136,
+   "x": -325,
+   "y": 66
+  }
+ },
+ {
+  "name": "chatka_predni",
+  "x4": {
+   "file": "chatka_predni_32bpp.png",
+   "w": 256,
+   "h": 306,
+   "x": -124,
+   "y": -178
+  },
+  "x8": {
+   "file": "chatka_predni_8x_32bpp.png",
+   "w": 512,
+   "h": 611,
+   "x": -248,
+   "y": -355
+  }
+ },
+ {
+  "name": "chatka_zadni",
+  "x4": {
+   "file": "chatka_zadni_32bpp.png",
+   "w": 128,
+   "h": 241,
+   "x": 4,
+   "y": -112
+  },
+  "x8": {
+   "file": "chatka_zadni_8x_32bpp.png",
+   "w": 256,
+   "h": 479,
+   "x": 8,
+   "y": -223
+  }
+ },
+ {
+  "name": "chatka_stoji_predni",
+  "x4": {
+   "file": "chatka_stoji_predni_32bpp.png",
+   "w": 135,
+   "h": 109,
+   "x": -22,
+   "y": -34
+  },
+  "x8": {
+   "file": "chatka_stoji_predni_8x_32bpp.png",
+   "w": 269,
+   "h": 216,
+   "x": -44,
+   "y": -66
+  }
+ },
+ {
+  "name": "chatka_sedi_predni",
+  "x4": {
+   "file": "chatka_sedi_predni_32bpp.png",
+   "w": 144,
+   "h": 47,
+   "x": -57,
+   "y": 10
+  },
+  "x8": {
+   "file": "chatka_sedi_predni_8x_32bpp.png",
+   "w": 285,
+   "h": 91,
+   "x": -113,
+   "y": 21
+  }
+ },
+ {
+  "name": "pole_seno",
+  "x4": {
+   "file": "pole_seno_32bpp.png",
+   "w": 162,
+   "h": 119,
+   "x": -30,
+   "y": 2
+  },
+  "x8": {
+   "file": "pole_seno_8x_32bpp.png",
+   "w": 388,
+   "h": 242,
+   "x": -125,
+   "y": 10
+  }
+ },
+ {
+  "name": "zastavka_y_vpredu",
+  "x4": {
+   "file": "zastavka_y_vpredu_32bpp.png",
+   "w": 84,
+   "h": 62,
+   "x": -106,
+   "y": 39
+  },
+  "x8": {
+   "file": "zastavka_y_vpredu_8x_32bpp.png",
+   "w": 185,
+   "h": 126,
+   "x": -226,
+   "y": 77
+  }
+ },
+ {
+  "name": "ohnostroj_start",
+  "x4": {
+   "file": "ohnostroj_start_32bpp.png",
+   "w": 87,
+   "h": 299,
+   "x": -41,
+   "y": -233
+  },
+  "x8": {
+   "file": "ohnostroj_start_8x_32bpp.png",
+   "w": 174,
+   "h": 597,
+   "x": -82,
+   "y": -466
+  }
+ },
+ {
+  "name": "ohnostroj_zelena_1",
+  "x4": {
+   "file": "ohnostroj_zelena_1_32bpp.png",
+   "w": 94,
+   "h": 93,
+   "x": -44,
+   "y": -282
+  },
+  "x8": {
+   "file": "ohnostroj_zelena_1_8x_32bpp.png",
+   "w": 186,
+   "h": 186,
+   "x": -87,
+   "y": -564
+  }
+ },
+ {
+  "name": "ohnostroj_zelena_2",
+  "x4": {
+   "file": "ohnostroj_zelena_2_32bpp.png",
+   "w": 175,
+   "h": 176,
+   "x": -85,
+   "y": -319
+  },
+  "x8": {
+   "file": "ohnostroj_zelena_2_8x_32bpp.png",
+   "w": 348,
+   "h": 350,
+   "x": -169,
+   "y": -637
+  }
+ },
+ {
+  "name": "ohnostroj_zelena_3",
+  "x4": {
+   "file": "ohnostroj_zelena_3_32bpp.png",
+   "w": 244,
+   "h": 246,
+   "x": -120,
+   "y": -340
+  },
+  "x8": {
+   "file": "ohnostroj_zelena_3_8x_32bpp.png",
+   "w": 488,
+   "h": 491,
+   "x": -240,
+   "y": -680
+  }
+ },
+ {
+  "name": "ohnostroj_modra_1",
+  "x4": {
+   "file": "ohnostroj_modra_1_32bpp.png",
+   "w": 95,
+   "h": 92,
+   "x": -44,
+   "y": -282
+  },
+  "x8": {
+   "file": "ohnostroj_modra_1_8x_32bpp.png",
+   "w": 190,
+   "h": 183,
+   "x": -88,
+   "y": -564
+  }
+ },
+ {
+  "name": "ohnostroj_modra_2",
+  "x4": {
+   "file": "ohnostroj_modra_2_32bpp.png",
+   "w": 178,
+   "h": 172,
+   "x": -86,
+   "y": -319
+  },
+  "x8": {
+   "file": "ohnostroj_modra_2_8x_32bpp.png",
+   "w": 356,
+   "h": 343,
+   "x": -172,
+   "y": -637
+  }
+ },
+ {
+  "name": "ohnostroj_modra_3",
+  "x4": {
+   "file": "ohnostroj_modra_3_32bpp.png",
+   "w": 250,
+   "h": 240,
+   "x": -122,
+   "y": -340
+  },
+  "x8": {
+   "file": "ohnostroj_modra_3_8x_32bpp.png",
+   "w": 500,
+   "h": 479,
+   "x": -245,
+   "y": -680
+  }
+ },
+ {
+  "name": "ohnostroj_cervena_1",
+  "x4": {
+   "file": "ohnostroj_cervena_1_32bpp.png",
+   "w": 96,
+   "h": 96,
+   "x": -44,
+   "y": -284
+  },
+  "x8": {
+   "file": "ohnostroj_cervena_1_8x_32bpp.png",
+   "w": 191,
+   "h": 191,
+   "x": -87,
+   "y": -568
+  }
+ },
+ {
+  "name": "ohnostroj_cervena_2",
+  "x4": {
+   "file": "ohnostroj_cervena_2_32bpp.png",
+   "w": 179,
+   "h": 182,
+   "x": -85,
+   "y": -324
+  },
+  "x8": {
+   "file": "ohnostroj_cervena_2_8x_32bpp.png",
+   "w": 356,
+   "h": 363,
+   "x": -169,
+   "y": -647
+  }
+ },
+ {
+  "name": "ohnostroj_cervena_3",
+  "x4": {
+   "file": "ohnostroj_cervena_3_32bpp.png",
+   "w": 250,
+   "h": 255,
+   "x": -120,
+   "y": -347
+  },
+  "x8": {
+   "file": "ohnostroj_cervena_3_8x_32bpp.png",
+   "w": 501,
+   "h": 509,
+   "x": -241,
+   "y": -694
+  }
+ },
+ {
+  "name": "plakat_tatra148",
+  "x4": {
+   "file": "plakat_tatra148_32bpp.png",
+   "w": 1529,
+   "h": 1038,
+   "x": 2,
+   "y": 3
+  },
+  "x8": null
+ }
+]

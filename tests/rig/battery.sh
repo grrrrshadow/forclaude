@@ -1,0 +1,2003 @@
+#!/bin/bash
+S=${RIG_DIR:?set RIG_DIR to the rig working directory (build/, ttdhome/, h2/, h3/, *.sav)}
+H=$S/ttdhome
+
+# One map for every scene that starts a new game, instead of a fresh random one
+# each time. A scene builds its own track, stations and road stops on whatever
+# land it is given, and on a hilly or watery map some of that simply cannot be
+# built: the scene then ends early, every counter comes out zero, and the run
+# reads as a change in the game when it is a change in the map. That was the
+# standing wobble in nakladcekat, nakladsmer, zaloz and the two car scenes, and
+# it cost a reading of the battery every few runs.
+#
+# A fixed seed alone is not enough -- it is the flat land that makes the scenes
+# buildable, and the flattest, least watery setting the generator has. With
+# both, three runs of the same scene come out identical line for line.
+#
+# Everything the generator reads belongs in here, and most of it was left to
+# the home's own openttd.cfg: the game writes that file every time it exits,
+# so a scene played from a savegame -- or a game of the player's opened in
+# this home to look at something -- left the next run's new games with that
+# game's climate, map size, year, towns and industries. Scenes then built
+# themselves somewhere else on a different map: three of them came out with
+# different numbers the first time this happened, and two failed to build at
+# all the second. Both read as a regression and were nothing of the sort.
+#
+# Changing any of these makes a different map and therefore different numbers
+# in the stable file: it is a re-baselining, not a regression.
+# The Mars towns are off for every scene but their own: they are made on top
+# of the other towns and would move everything after them on the map, and
+# with them off the game does not reach for the content server to fetch the
+# Mars houses either (FetchMarsHousesIfMissing()). The splitting of house
+# sets among towns is off for the same reason: it is on by default, and the
+# scenes with a house set loaded were written with towns of every house. A
+# scene that wants either says so in SCENE_NEWGAME, which run_scene puts in
+# before the newgame line. So are the game's own industries, the marijuana
+# plantation and the coffeeshop (economy.extra_industries), on by default: they
+# would add industries to every generated map; the scenes marihuana and
+# marihuanasada switch them on.
+#
+# The seed is handed to the newgame command itself, not left in the settings
+# below. That command carries a seed of its own, and when it is not given one
+# it puts a fresh random number into the setting before generating: the seed
+# line below was therefore overwritten every single time, and every scene that
+# starts a new game has been playing a different map -- the very thing this
+# block says it stops. The setting is kept as well, so anything that reads it
+# rather than the command's argument sees the same number.
+NEWGAME='setting_newgame game_creation.landscape toyland
+setting_newgame game_creation.generation_seed 1
+setting_newgame game_creation.map_x 8
+setting_newgame game_creation.map_y 8
+setting_newgame game_creation.starting_year 1950
+setting_newgame game_creation.land_generator 1
+setting_newgame game_creation.variety 0
+setting_newgame game_creation.tree_placer 2
+setting_newgame game_creation.amount_of_rivers 2
+setting_newgame difficulty.terrain_type 0
+setting_newgame difficulty.quantity_sea_lakes 0
+setting_newgame difficulty.number_towns 2
+setting_newgame difficulty.industry_density 4
+setting_newgame economy.mars_towns 0
+setting_newgame economy.split_house_grfs 0
+setting_newgame economy.extra_industries 0
+newgame 1'
+
+# This build keeps its config beside its own binary and under a name of its
+# own, so that a player who installs it next to the game they already play
+# keeps their own settings (fileio.cpp, DeterminePaths). The config the battery
+# puts back is therefore build/openttdDecouple.cfg, and a home's own
+# openttd.cfg -- the vanilla one, if the home has one at all -- is never read
+# or written by a run. Everything else still comes out of the home: savegames,
+# base graphics, NewGRFs.
+#
+# The game writes that openttd.cfg every time it exits, with whatever
+# settings the game it just played had. A scene played from a savegame
+# therefore hands the next scene that savegame's settings -- and not only the
+# map's: a scene that funds an industry or founds a town reads settings the
+# block above says nothing about. Rather than chase them one at a time, the
+# config is put back the way it was after every scene, so each one starts from
+# the same place whatever the one before it played.
+# The kept copy is the battery's own, not whatever the home happens to hold
+# when a run starts: anything played in this home between two runs -- a
+# savegame opened to look at something -- leaves its settings behind, and
+# snapshotting those would hand them to every scene of the next run. The first
+# run ever takes the copy; every run after it puts that copy back first.
+CFG=$S/build/openttdDecouple.cfg
+CFG_KEEP=$S/battery_openttd.cfg
+# A rig set up before the config moved has the settings the scenes are written
+# against in the home; take them from there the one time build/ has none yet.
+if [ ! -f "$CFG_KEEP" ] && [ ! -f "$CFG" ] && [ -f "$H/.config/openttd/openttd.cfg" ]; then
+  cp "$H/.config/openttd/openttd.cfg" "$CFG"
+fi
+if [ -f "$CFG_KEEP" ]; then cp "$CFG_KEEP" "$CFG"; else cp "$CFG" "$CFG_KEEP"; fi
+
+run_scene() { # name scr-content ticks extra-args
+  local name=$1 scr=$2 ticks=$3; shift 3
+  # The rig runs the breakdown length long (a quarter of a year, the value the
+  # scenes were written against); the player's default is a fortnight.
+  printf 'setting vehicle.rescue_wait_days 90\n%s\n' "$scr" > $H/.openttd/scripts/game_start.scr
+  # A scene played from a save must not have autoexec start a new game over it;
+  # that silently ran every save scene on a fresh map for weeks.
+  local newgame=$NEWGAME
+  [ -n "$SCENE_NEWGAME" ] && newgame=${NEWGAME/$'\n'newgame 1/$'\n'$SCENE_NEWGAME$'\n'newgame 1}
+  # A save made before the game's own industries (economy.extra_industries)
+  # has no word on them and takes the new-game value, on by default: they would
+  # come into the saved game and play it differently. Off for saves, as the
+  # scenes were written.
+  case "$*" in *-g*) printf 'setting_newgame economy.extra_industries 0\n' > $H/.openttd/scripts/autoexec.scr ;; *) printf '%s\n' "$newgame" > $H/.openttd/scripts/autoexec.scr ;; esac
+  HOME=$H timeout 300 $S/build/openttd -vnull:ticks=$ticks -snull -mnull "$@" > $S/reg_$name.log 2>&1
+  cp "$CFG_KEEP" "$CFG"
+  local spoj=$(grep -c 'spojeno' $S/reg_$name.log)
+  local hav=$(grep -c 'HAVAROVAL' $S/reg_$name.log)
+  local srz=$(grep -c 'Srazka' $S/reg_$name.log)
+  local ast=$(grep -ci 'assert' $S/reg_$name.log)
+  local odt=$(grep -c 'odtah dokoncen' $S/reg_$name.log)
+  # A crash counts as one too: a save that brought the game down while it was
+  # being read left every other counter at zero, which reads as a quiet scene.
+  local exc=$(grep -ci 'terminate\|exception\|crash log written' $S/reg_$name.log)
+  local dep=$(grep -c 'vjel do depa' $S/reg_$name.log)
+  # The anomaly record (anomaly_log.h): lines the game writes when it had to
+  # work around something. Always on, so a scene that starts writing them is
+  # saying something changed even when every other counter holds.
+  # The temporary consist dump (VYPIS, see LogConsistState()) writes to the
+  # same record and would drown this counter, which is here to say that
+  # something happened that should not have. It goes out with the dump.
+  local zaz=$(grep 'ZAZNAM:' $S/reg_$name.log | grep -vc 'VYPIS')
+  # Road vehicles boarding and leaving whatever carries them -- a train, a ship
+  # or an aircraft (road_on_rail.h): boardings plus alightings, so a scene where
+  # the ride works counts an even number of them.
+  local aut=$(( $(grep -c 'nalozeno na' $S/reg_$name.log) + $(grep -c 'slozeno z' $S/reg_$name.log) ))
+  # Rig commands the game refused (written ODMITNUTO by the command): a scene
+  # that asks the game to do something and is told no, where the numbers
+  # above would go on looking the same.
+  local odm=$(grep -c 'ODMITNUTO' $S/reg_$name.log)
+  # Two lines, one file each. The seven counters above are the load-bearing
+  # ones and do not move between runs of the same build; the depot-arrival
+  # tally does, by one, on the long tow scenes -- it is worth reading and
+  # not worth diffing, so it is kept out of the file meant for diffing.
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut odmitnuto=$odm depa=$dep"
+  echo "$name: spojeno=$spoj odtazeno=$odt havaroval=$hav srazka=$srz assert=$ast vyjimka=$exc zaznam=$zaz auto=$aut odmitnuto=$odm" >> ${BATTERY_STABLE:-/dev/null}
+}
+: > ${BATTERY_STABLE:-/dev/null}
+# The rig's own sets (grf/*.yagl, see README.md) are built here, every run,
+# with the colleague's yagl -- the one tool this game's sets are made with (the
+# player's rule: no grfcodec, no nml, no GRF written by hand). The battery
+# plays what the sources say, and every run puts yagl through every set: the
+# player's word is that yagl is to be exercised and grow. yagl is looked for
+# at $YAGL, then on the path; it is built from the colleague's copy (grrrrf,
+# yagl/yagl-main, his yagl/POSTUP.md). Without it the sets already in the home
+# are played as they are, and a line says so.
+RIG_GRF=$(cd "$(dirname "${BASH_SOURCE[0]}")/grf" && pwd)
+YAGL=${YAGL:-$(command -v yagl)}
+if [ -n "$YAGL" ] && [ -x "$YAGL" ]; then
+  mkdir -p $S/rig_grf
+  for src in $RIG_GRF/*.yagl; do
+    n=$(basename "$src" .yagl)
+    rm -f $S/rig_grf/$n.grf $S/rig_grf/$n.grf.bak
+    "$YAGL" -e $S/rig_grf/$n.grf "$RIG_GRF" > $S/rig_grf/$n.log 2>&1 || echo "yagl: $n.grf did not build, see $S/rig_grf/$n.log"
+  done
+  # The sets the scenes play from the home's newgrf/; vestaveny is kept in the
+  # rig directory and put in baseset/decouple/ by its own two scenes; the two
+  # slot63 sets are played by hand (README.md) and only built.
+  for n in barvy bloky_siroke bloky_zamek cargo_a cargo_b claims_own cztr_old firs5_like gets_like house_over konfig quits_late refuses_a st_old studenti vypinac zin16_test; do
+    [ -f $S/rig_grf/$n.grf ] && cp $S/rig_grf/$n.grf $H/.openttd/newgrf/
+  done
+  [ -f $S/rig_grf/vestaveny.grf ] && cp $S/rig_grf/vestaveny.grf $S/
+else
+  echo "yagl not found (set YAGL): the rig's sets are played as they are in the home"
+fi
+printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
+run_scene zakl "vlak123 on
+testspoj
+testza 6000 testokna" 8000
+run_scene couvej "vlak123 on
+testspoj couvej" 8000
+# The collector breaks down on its way to the rake and nobody comes for it,
+# so the breakdown mends itself after the wait. It used to come back as a
+# plain stop: waiting to be fetched had taken "go to couple" off the order it
+# carries and mending gave back only half, so it booked its road to the
+# platform and not to the wagons, stood against them and never coupled.
+# spojeno=1 is the pass, the same as zakl.
+run_scene poruchaspoj "setting vehicle.rescue_wait_days 7
+vlak123 on
+testspoj
+testza 1000 testporucha 2" 10000
+# The braking table (vehicle.train_brake_drop_*, the player's own curve).
+# The scenes about running past a red were written for the physics curve,
+# where ten wagons from 60 km/h took a dozen tiles to stop; the table brakes
+# far harder as it comes, so the ten-wagon scenes set it lazy -- four km/h a
+# tile down to 60, a little more below -- and go on testing what they tested:
+# a driver who sees the red too late. Light trains keep the table as it
+# comes.
+LINE_BRZDY="setting vehicle.train_brake_drop_130 4
+setting vehicle.train_brake_drop_100 4
+setting vehicle.train_brake_drop_80 4
+setting vehicle.train_brake_drop_60 4
+setting vehicle.train_brake_drop_40 5
+setting vehicle.train_brake_drop_20 6
+setting vehicle.train_brake_drop_10 8"
+# "Brake, fail to brake and crash" (vehicle.train_braking, on: 1 = the
+# driver sees 5 tiles). A light engine stands braked at a platform; a train
+# of ten wagons comes up behind it towards the path signal guarding that
+# block, and the player's stop is pressed on it three tiles short. With the
+# setting on nobody drives a stopped train: it brakes the gentle way, 30 %
+# weaker, cannot stop, runs past the red and hits the engine (srazka=1, and
+# both are wrecks). A tow fetches the one that failed to brake (spojeno=1
+# odtazeno=1); a helicopter lands by it and leaves when the tow has it; the
+# papers write it up twice. (Seeing 20 tiles, the driver now sees the red
+# path signal with the platform taken behind it and has braked long before
+# the stop is pressed -- see nedobrzdilbez.)
+run_scene nedobrzdil "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil cesta vozu 10 stopka 3 odtah" 9000
+# The same with the setting off, the game as it was: the stop is the game's
+# own brake and the train stands short of the red (srazka=0).
+# The same with forest planted all round: nowhere in the papers' picture to
+# land, so the helicopter circles over the wreck until the tow has it.
+run_scene nedobrzdilles "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil cesta vozu 10 stopka 3 odtah les" 9000
+# How far the driver sees from the cab, the same setting's "sees 5 tiles"
+# (vehicle.train_braking 1). He starts braking too late for a ten-wagon train
+# and runs past the red into the engine at the platform (srazka=1).
+run_scene nedobrzdilvidet5 "$LINE_BRZDY
+setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 10 odtah" 9000
+run_scene nedobrzdilvyp "vlak123 on
+testnedobrzdil cesta stopka 3 odtah" 9000
+# Setting on, nobody touches the stop: the train is driven, ten wagons behind
+# it, and the driver sees 20 tiles. The path signal guarding the platform is
+# one of the signals he reads, it is red and the platform behind it is taken.
+# He sees it in time and brakes as he plans with the setting off -- the gentle
+# rate -- but this line's braking table is weak (LINE_BRZDY, 4 km/h a tile:
+# fifteen tiles from 72), so he fails to brake and runs into the engine at the
+# platform (srazka=1, havaroval=2; the tow takes the wrecks). The player's rule
+# (TEMATA_RUZNE §120): the table is only how hard a train brakes, never how
+# the driver plans -- planned by the table, a weak table ran the trains'
+# acceleration. Before that he stood short of it here.
+run_scene nedobrzdilbez "$LINE_BRZDY
+setting vehicle.train_braking 4
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil cesta vozu 10 odtah" 9000
+# A path signal with the platform behind it taken, ten wagons driven at it,
+# sight 5. The signal used to be left green by the booking tried from a
+# distance that came to nothing; the driver let the brake off and the game
+# stopped him dead at the signal from 62. Now it goes back to red, he brakes,
+# arrives at 60, runs past and hits the engine on the platform (srazka=1).
+run_scene nedobrzdilcesta "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil cesta vozu 10 odtah" 9000
+# A light train stops short of that red; then the button in the train's
+# window sends it past. The signal stays red; the driver reads the engine
+# on the first tile of the platform -- the platform used to be read at its
+# far end only, he pulled away to 61 and hit it -- brakes, but sees it late
+# from a stand and still touches it (srazka=1, at 28).
+run_scene projetcervenou "setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil cesta odtah
+testzatik 4500 testprojet 2" 9000
+# The player's three block signals in a row, the stop pressed eight tiles
+# short of the last one. The game's own cut to a crawl on the last tile
+# before a red is left out with the setting on; this light train brakes by
+# the physics in a few tiles and stands short of the red (srazka=0).
+run_scene nedobrzdilblok "setting vehicle.train_braking 4
+vlak123 on
+testnedobrzdil blok stopka 8 odtah" 9000
+# The warning aspect ("orange"): a signal tells the driver about the next one
+# even where he cannot see it (vehicle.train_driver_signals, through how many
+# he reads; vehicle.train_warning_signals, how many masts show it; and
+# vehicle.train_warning_memory, how long he keeps it in mind). Ten wagons,
+# sees 5 tiles. The signal before the red 2 tiles short of it: he learns of
+# the red 7 tiles out and runs past (srazka=1). 20 tiles short: he knows of
+# the red from there and stands short of it (srazka=0). The same, but he
+# forgets after 5 tiles, or after 3: runs past again (srazka=1). Two orange signals, 2
+# tiles apart: he knows of the red from the signal before those and stops.
+# The scenes above that are about running past a red set him to forget after
+# 5 tiles, or their signals, 22 tiles apart, would warn him in time.
+run_scene oranzblizko "$LINE_BRZDY
+setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 2 odtah" 9000
+# The two below crash too since the table stopped planning (see
+# nedobrzdilbez): the driver reads the yellows as he did, brakes by the gentle
+# plan, and the weak table does not stop him.
+run_scene oranzdaleko "$LINE_BRZDY
+setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+run_scene oranzzapomene "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 4
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+run_scene oranzzapomene3 "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_memory 5
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 20 odtah" 9000
+# Signals every two tiles, the player's screenshot. The driver reads as many
+# signals ahead of the train as his setting says (vehicle.train_driver_signals;
+# how many masts show orange is the line's own setting since the player split
+# the two), and no more, however many he can see: with two he rolls at full
+# speed until the red is the second signal ahead (four tiles), with one until
+# it is the next (two), and three wagons at 72 on the lazy table run past it
+# either way (srazka=1). A first go let every signal in sight tell him about
+# the ones after it, and he braked with two greens and two oranges still in
+# front of him.
+run_scene oranzhusto2 "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_signals 2
+setting vehicle.train_driver_signals 2
+vlak123 on
+testnedobrzdil blok vozu 3 husto odtah" 9000
+run_scene oranzhusto1 "$LINE_BRZDY
+setting vehicle.train_braking 1
+vlak123 on
+testnedobrzdil blok vozu 3 husto odtah" 9000
+run_scene oranzdve "$LINE_BRZDY
+setting vehicle.train_braking 1
+setting vehicle.train_warning_signals 2
+setting vehicle.train_driver_signals 2
+vlak123 on
+testnedobrzdil blok vozu 10 rozestup 2 odtah" 9000
+run_scene depo "vlak123 on
+testspoj depo" 8000
+run_scene depopocet "vlak123 on
+testspoj depo pocet" 8000
+run_scene depostoji "vlak123 on
+testspoj depo stoji" 8000
+run_scene depozrus "vlak123 on
+testspoj depo
+testza 400 testzrus" 8000
+run_scene depovagony "vlak123 on
+testspoj depo
+testza 400 testzrus
+testza 1200 testvagony 3" 12000
+run_scene depooboji "vlak123 on
+testspoj depo oboji" 12000
+run_scene sklad2 "vlak123 on
+testspoj depo sklad 2" 12000
+run_scene sklad6 "vlak123 on
+testspoj depo sklad 6" 12000
+run_scene sklad20 "vlak123 on
+testspoj depo sklad 20" 12000
+run_scene skladdve "vlak123 on
+testspoj depo sklad 3" 13000
+run_scene koupitpri "vlak123 on
+testspoj depo sklad 2
+testza 300 testvagony 3" 12000
+run_scene filtrspatny "vlak123 on
+testspoj depo pocet
+testza 200 testfiltr 6" 12000
+run_scene filtropraveny "vlak123 on
+testspoj depo pocet
+testza 200 testfiltr 6
+testza 6000 testfiltr" 12000
+# A collector whose engine is one unit of three equal pieces (the shape a set
+# draws its shunters in, MakeEngineOfPieces()), meeting the rake nose first:
+# its pieces trade places on the ground and it couples at its nose, where the
+# same unit of unequal pieces is refused. The record's picture check
+# (PictureKeptAfterJoin()) runs on every coupling; a line from it here is the
+# flipped pieces being drawn wrong. 'couvej' is the same engine backing on.
+run_scene clanky "vlak123 on
+testspoj clanky
+testza 6000 testnatoceni" 8000
+run_scene clankycouvej "vlak123 on
+testspoj clanky couvej
+testza 6000 testnatoceni" 8000
+# A mixed rake -- wagons of two cargoes -- and a collector asking for one of
+# them when it is full. The empty wagon of the other cargo must not keep the
+# rake from counting as full: the fullness question is the named cargo's.
+run_scene smes "vlak123 on
+testspoj smes
+testfiltr 0
+testfiltr plne
+testza 1500 testfiltr zkouska
+testza 2000 testnalozit rada 0
+testza 2400 testfiltr zkouska" 12000
+run_scene rad "vlak123 on
+testspoj rad" 10000
+run_scene blok "vlak123 on
+testspoj blok" 8000
+# A collector standing at the far end waiting for wagons it cannot have yet
+# (the dropper still holds the platform) is called off to a depot by hand.
+# The depot order must not come out still carrying the coupling errand: with
+# it the train stood where it was, its window saying "heading for depot", and
+# only skipping the order ever freed it -- the player's report. It drives in,
+# so depa 2: the dropper's own arrival and this one.
+run_scene dodepa "vlak123 on
+testspoj blok
+testza 600 testdodepa 2" 8000
+run_scene vlek "vlak123 on
+testspoj vlek
+testza 9000 testokna" 8000
+run_scene vlekblok "vlak123 on
+testspoj vlek blok" 8000
+run_scene odtahrovina "vlak123 on
+testodtah rovina" 14000
+run_scene odtahkrizeni "vlak123 on
+testodtah krizeni" 14000
+run_scene odtahjednosmer "vlak123 on
+testodtah jednosmer 0" 14000
+run_scene odtahdaleko "vlak123 on
+testodtah daleko 0" 16000
+# Two rescue engines, one five tiles from the casualty and one thirty-four
+# away. Each used to ask only which casualty was nearest to itself and then
+# take it, so whose turn came first decided who went -- and the far one went
+# (the player's report of 21. 9.). They compare themselves with each other now.
+run_scene odtahdveblizsi "vlak123 on
+testodtah daleko 0 dve" 16000
+run_scene odtahbezdepa "vlak123 on
+testodtah daleko 0
+testza 1000 testdepo pryc
+testza 9000 testdepo zpet" 22000
+run_scene odtahvagony "vlak123 on
+testodtah vagony
+testza 5000 testokno 0
+testza 6000 testodvoz vse" 20000
+# A train the player sells to the scrapyard out on the line: the other reason a
+# rescue engine is sent for something. The tow fetches it and the depot breaks
+# it up instead of repairing it, so this scene counts a tow like the breakdown
+# scenes do -- what tells them apart is the line saying the train was scrapped.
+# Wagons an order puts down and sells, the two ways round. In a depot they are
+# sold on the spot; at a platform a tow is called for them and they are sold
+# when it brings them in, so that scene counts a tow like the others do. The
+# price is the ordinary one -- the sale goes through the same command the
+# player's own sell button uses.
+# A depot order told to buy the wagons the shed has not got: the shed starts
+# empty, the order wants six, so six are bought into it, made up into a rake
+# and collected. The buying is switched on before the train sets off, because
+# an order already being worked is a copy the train is carrying -- the same
+# thing that is true of every other order flag.
+run_scene koupitvagonky "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0" 12000
+# The wagon list opened from an order, and its button pressed, the way the
+# player does it. The only scene that looks into that window at all: it opened
+# with no button in it when it was reached from a station order (no depot
+# behind it, so nothing to answer with), and its list still held locomotives
+# because the list was made before the window knew what it was being asked.
+# Both were found by hand, neither by any counter.
+run_scene vybervagonu "vlak123 on
+testspoj depo
+testpocet 2 0 3
+testvybervagonu 2 0" 3000
+# The same window with a cargo already on the order, which is the other way in
+# and the one that has to keep working: the list opens narrowed to that cargo
+# and the press writes both halves of the answer, the type and the cargo.
+#
+# Without a cargo the window stands on "every cargo" -- a number above the
+# cargoes, not a cargo -- and it used to send that to the order as though it
+# were one. The order refused it, the type had already gone in by then, and
+# what the player got was the type set and a refusal on the screen at the same
+# moment. Every counter here said the press had worked, so the probe now asks
+# outright whether a refusal popped up.
+# The same window from an order to a station, which names no depot. The
+# button was switched on after the window had been laid out without it, so
+# it had no width and the cargo filter beside it took the whole row -- the
+# probe asked only whether it was switched on, and it was. It asks whether
+# it has any width now (odmitnuto=0).
+run_scene vybervagonustanice "vlak123 on
+testspoj
+testvybervagonu 2 0" 3000
+run_scene vybervagonunaklad "vlak123 on
+testspoj depo
+testfiltr 0
+testvybervagonu 2 0" 3000
+# And the wagon named on the order is the only one it will couple: the shed
+# is given three wagons of one kind by the deliverer and the order asks for
+# another, so it leaves them alone and buys three of its own. A wagon does not
+# carry just any road vehicle, which is why which one it is has to count.
+run_scene koupitjinytyp "vlak123 on
+testspoj depo
+testpocet 2 0 3
+testkoupit 2 0 28" 12000
+# And of its own kind it buys only what is missing: five of the named wagon
+# stand in the shed, the order wants six, one is bought (the trace says
+# "koupeno 1 vagonku ... chybelo 1") and the six are coupled.
+run_scene koupitdoplnit "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0
+testdepovagony 2 0 5" 12000
+# "Any number" on an order that buys its own wagons: a full train's worth, the
+# player having set his own limit to fifteen tiles and read any as fifteen
+# tiles. The limit is put down to five here so the number is small enough to
+# read: the engine is one tile, so eight wagons fit behind it and nine are
+# bought -- one to measure a wagon by and eight by division. Bought and
+# collected are one question, not two: wagons stand in a shed one by one, so
+# an order that bought nine and then collected "any rake" would leave with one
+# of them.
+# The same reading without any buying: "if he leaves any number, it buys the
+# maximum allowed length, or it couples what is in the shed". The limit is put
+# down to two tiles, which is the engine plus three wagons, and three is what
+# stands in the shed -- so the whole of it leaves, and the arithmetic that says
+# so is the same one the buying uses.
+run_scene depocelyvlak "vlak123 on
+setting vehicle.max_train_length 2
+testspoj depo" 12000
+run_scene koupitcelyvlak "vlak123 on
+setting vehicle.max_train_length 5
+testspoj depo
+testkoupit 2 0" 12000
+# The wagon type and the cargo filter said together -- "this model, carrying
+# that". They used to rule each other out; now the cargo list is narrowed to
+# what the named wagon can be fitted for, and both stand on the order at once.
+# The probe line is the point: no counter can show what an order holds.
+run_scene typsnakladem "vlak123 on
+testspoj depo
+testfiltr 0
+testkoupit 2 0
+testza 200 testfiltr zkouska" 12000
+# And the way back out, which is one press: "every cargo" lets go of the named
+# wagon as well, so the cargo list is the whole of it again and the order takes
+# whatever comes. The probe must then say no cargo and no wagon.
+run_scene typvsechny "vlak123 on
+testspoj depo
+testfiltr 0
+testkoupit 2 0
+testza 200 testfiltr
+testza 400 testfiltr zkouska" 12000
+# The filter row drops out of the window downwards instead of taking a line
+# from the order list. Nothing in the rig had ever measured a window's height,
+# and that is exactly where this went wrong: pressing "couple" cost the player
+# a line of orders and pushed every button above it up. The scene reads three
+# heights three times -- row off, on, off -- and what it watches is the list
+# staying the same size while the window grows by the row and shrinks back.
+run_scene oknorozkazu "vlak123 on
+testspoj depo
+testza 100 testoknorozkazu 1 0" 12000
+# Which refit button an order shows and whether it can be pressed. Greying is
+# invisible to every counter and this one has now been decided three different
+# ways: at a platform a train is never refitted, because what it hauls is
+# decided by what it couples and lets go of, and both happen at a platform; in
+# a shed it always can be, because the test that used to grey it asks the
+# engine whether anything behind it can be refitted and a collecting engine
+# arrives with nothing behind it at all.
+run_scene prestavbacudlik "vlak123 on
+testspoj
+testza 200 testprestavba 2 0
+testza 400 testprestavba 2 1" 3000
+# What the refit offers a collecting order, which is now a question of the
+# order and not of the train: the wagons it is going to fetch, not the ones
+# behind the engine at that moment. A collecting engine arrives with nothing
+# behind it, so asked of the train the answer could only ever be "nothing".
+# Three readings in a row -- no type named, a type named, the type taken away
+# again -- and the last one is the point: the player saw a list that stayed
+# narrowed after he had removed the type, because it was being read off the
+# wagons he still had coupled.
+run_scene prestavbanabidka "vlak123 on
+testspoj depo
+testza 200 testprestavba 2 0
+testza 300 testkoupit 2 0
+testza 400 testprestavba 2 0
+testza 500 testmof 2 0 16 255
+testza 600 testprestavba 2 0" 3000
+# The type list of a depot order, read line by line the way the player walks
+# it: the wagon named and bought, the buying switched off from the list (the
+# type stays and only filters), the cargo let go to "every cargo" (the type
+# stays -- the cargo does not reach into it), and the buying switched back on
+# from the list, which writes the wagon's first cargo into the filter, because
+# what is bought has a cargo. Each change prints what the order then holds.
+# A shed stores only so many wagons (DEPOT_WAGON_LIMIT, 420): past that an
+# order neither buys into it nor puts wagons down in it, and the train stands
+# and says why. The shed is filled by hand to 418 with wagons of another model,
+# so the collector buys two and stops at the limit, and the deliverer arriving
+# with three stands in the shed with its split owed. Ten are then sold by hand:
+# the collector buys the rest and leaves, the deliverer puts its three down.
+# The last line reads the shed: 410 + 4 bought - 6 taken + 3 put down = 411.
+run_scene depoplne "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0
+testdepovagony 2 0 418 jiny
+testza 3000 testdepovagony 2 0 -10
+testza 7000 testdepovagony 2 0 0" 8000
+# An order told to buy, that takes only full wagons. A wagon is bought empty
+# and nothing loads it in a shed, so it could never take one: it used to buy
+# the whole shortfall again on every tick. Now it buys nothing and says why.
+run_scene koupitplne "vlak123 on
+testspoj depo
+testpocet 2 0 6
+testkoupit 2 0
+testmof 2 0 15 2" 4000
+# Picking a type in the window names it and buys nothing: "Koupit" is the
+# player's second choice in the list (odmitnuto=0).
+run_scene typbezkoupeni "vlak123 on
+testspoj depo
+testza 200 testkoupit 2 0 jentyp" 3000
+run_scene rolovaktypu "vlak123 on
+testspoj depo
+testza 200 testkoupit 2 0
+testza 300 testmof 2 0 28 0
+testza 400 testmof 2 0 16 255
+testza 500 testmof 2 0 28 1
+testza 600 testprestavba 2 0" 3000
+# The two ways a collecting order can read its filters: "find a rake like
+# this" asks the whole rake and "search the rake for this" asks wagon by wagon.
+# One rake of three at the platform, two of them loaded and one left empty,
+# and the order says empty + this cargo + at least one. Read of the whole rake
+# that is a no, the rake is not empty; read wagon by wagon it is a yes, one
+# empty wagon is in it. The player's own case, with his tanker and his one
+# empty flat: he wanted "five of them are loaded, so go", and nothing he could
+# set said it. The collector is held with "at least 99" until the rake is half
+# loaded, or it would take the empty rake before the question is asked at all.
+# spojeno=1 is the point: the switch is made on the waiting train, and a
+# waiting train reads its own copy of the order, which used to miss most of
+# the description.
+run_scene hledejvrade "vlak123 on
+testspoj
+testfiltr prazdne
+testfiltr 0
+testminimalne 2 0 99
+testza 1000 testnalozit rada 0 vagonkazdy2
+testza 1200 testminimalne 2 0 1
+testza 1300 testfiltr zkouska
+testza 1300 testrezim 2 0
+testza 1400 testmof 2 0 29 1
+testza 1500 testfiltr zkouska
+testza 1500 testrezim 2 0" 10000
+# Founding with the search reading switched on, which the player asked to keep
+# together: "when it finds no rake, it founds one". The founding order is the
+# second order of the founder, a station one, and the switch is made on it
+# before anything moves. The numbers have to come out exactly as in zaloz --
+# the search reading changes which rakes count as something to couple to, and
+# in this scene every rake there is counts, so nothing may change.
+run_scene zalozhledej "vlak123 on
+testspoj zaloz 6
+testmof 2 1 29 1
+testza 300 testrezim 2 1
+testza 30000 testbrzda 3" 40000
+run_scene prodatvagonkydepo "vlak123 on
+testspoj depo
+testprodatvagonky 1 0 1" 12000
+run_scene prodatvagonkyperon "vlak123 on
+testodtah vagony
+testprodatvagonky 1 0 1" 20000
+# The sell icon in the vehicle's own window -- the row where refitting stands
+# dark out on the line. The only scene that looks into that window at all:
+# which of the two buttons is in the row, and whether it can be pressed, are
+# things no counter can see. The wagon list had exactly that hole once (a
+# window opened with no way to answer it) and the player found it by hand.
+run_scene ikonaprodatvlak "vlak123 on
+testodtah prodat
+testza 100 testikonaprodat 1" 16000
+# And the wagons' own icon, pressed: it marks them sold, the tow comes for them
+# as it does for any rake, and the shed is where they are sold.
+run_scene ikonaprodatvagonky "vlak123 on
+testodtah vagony
+testza 3000 testikonaprodat vagonky" 20000
+run_scene odtahprodat "vlak123 on
+testodtah prodat" 16000
+# A sold train the tow turns out not to be able to take: joined, the two would
+# be longer than the game allows, so the coupling is refused on the first tick
+# and on every tick after it. The engine used to stand against it asking for
+# the rest of the game, silently. It gives the case up now and goes home, and
+# the sold train -- which nobody else will be able to take either, by the same
+# rule -- disappears, because the player has been paid and the line is his
+# again. The record lines are the point of the scene, so zaznam is not zero.
+run_scene odtahprodatdlouhy "vlak123 on
+testodtah prodatdlouhy" 24000
+# The same too-long pair with a breakdown in place of the sold train, and two
+# tows. It used to leave two wrecks. The refused coupling had already turned
+# the broken train round -- a wagon at its head, no longer the tow's partner --
+# and the tow ran straight into it; and a tow that gave the case up drove on
+# the way it faced, into it again. The refusal puts both trains back as they
+# were, a tow giving up turns away from the train it stood at, and a tow never
+# wrecks a train that stands broken down or wrecked: it stops against it. The
+# first tow gives up and goes home, and the case is not taken again -- the two
+# tows used to go out for it by turns until it mended -- so zaznam is 3 (the
+# refusal, the giving up, the deadline) and havaroval and srazka are zero. No
+# "ZEM NEDRZI" either: the tow driving off the tile it shared with the
+# breakdown's last wagon gave back the track under that wagon.
+run_scene porouchanydlouhy "vlak123 on
+testodtah porouchanydlouhy dve" 30000
+# An engine leaves its wagon on the platform and breaks down one tile on, so
+# the wagon stands on the one place the tow could stop. The tow does not take
+# wagons of its own accord: it waits at home until the road comes free or the
+# breakdown mends, and the record says why, naming the rake and where it
+# stands.
+run_scene odtahzavagonky "vlak123 on
+testodtah vagony
+testporuchana 1 182 25" 12000
+# And the rule that keeps the two apart: nobody buys a breakdown. The scene
+# breaks the train down and tries to sell it a moment later, so odmitnuto=1 is
+# the pass here -- a zero would mean the scrapyard took it.
+run_scene odtahprodatporucha "vlak123 on
+testodtah prodatporucha" 16000
+run_scene okruh "vlak123 on
+testokruh" 16000
+# The player's reverse button on a tow standing on call in its shed. The tow
+# used to be put straight again every tick it stood at home, so the button
+# turned it round for one tick and no longer: a tow could not be sent out tail
+# first on purpose, which any other engine can. Turned three times, read after
+# each, and then left to fetch the casualty the way it now faces -- the
+# whole errand must still come off (odtazeno=1, as in odtahrovina).
+run_scene odtahcudlik "vlak123 on
+testodtah rovina
+testzatik 20 testotoc 2
+testzatik 30 testcouva 2 ano
+testzatik 40 testotoc 2
+testzatik 50 testcouva 2 ne
+testzatik 60 testotoc 2
+testzatik 70 testcouva 2 ano" 16000
+run_scene naklad "vlak123 on
+testnaklad
+testza 4000 testbrzda 1" 12000
+run_scene nakladcekat "vlak123 on
+testnaklad cekat
+testza 6000 testbrzda 2" 12000
+run_scene nakladsmer "vlak123 on
+testza 3000 testokno smer 0
+testza 3000 testokno smer 1
+testza 3000 testokno 1
+testnaklad smerovani
+testza 2500 testbrzda 2" 20000
+printf '' > $H/.openttd/scripts/autoexec.scr
+run_scene nakladcil "vlak123 on
+setting linkgraph.distribution_default asymmetric
+testnaklad cil
+testza 4000 testbrzda 1
+testza 9000 testcil" 12000
+run_scene nakladsav "vlak123 on
+unpause
+testza 50 testbrzda 1" 6000 -g $S/s.sav
+run_scene emu "testpauza
+vlak123 on
+testza 10 testbrzda 1
+testza 10 testbrzda 2
+testza 10 testbrzda 3
+testza 10 testbrzda 4
+testza 10 testbrzda 5
+testza 10 testbrzda 6
+testza 10 testbrzda 7
+testza 10 testbrzda 8" 20000 -g $S/emu.sav
+run_scene emujz "testpauza
+vlak123 on
+testza 10 testbrzda 9
+testza 10 testbrzda 10
+testza 10 testbrzda 11
+testza 10 testbrzda 12
+testza 10 testbrzda 13
+testza 10 testbrzda 14
+testza 10 testbrzda 15
+testza 10 testbrzda 16" 20000 -g $S/emu2.sav
+run_scene save91 "testpauza
+vlak123 on
+testza 10 testbrzda 1
+testza 10 testbrzda 2
+testza 10 testbrzda 3
+testza 10 testbrzda 4
+testza 10 testbrzda 5
+testza 10 testbrzda 6
+testza 10 testbrzda 7
+testza 10 testbrzda 8
+testza 10 testbrzda 9
+testza 10 testbrzda 10
+testza 10 testbrzda 11
+testza 10 testbrzda 12" 12000 -g $S/save91.sav
+run_scene save91rev "testpauza
+vlak123 on
+testza 10 testbrzda 1
+testza 10 testbrzda 2
+testza 10 testbrzda 3
+testza 10 testbrzda 4
+testza 10 testbrzda 5
+testza 10 testbrzda 6
+testza 10 testbrzda 7
+testza 10 testbrzda 8
+testza 10 testbrzda 9
+testza 10 testbrzda 10
+testza 10 testbrzda 11
+testza 10 testbrzda 12
+testotoc" 12000 -g $S/save91.sav
+# Player's save: a collector with a wagon behind it comes in nose first onto a
+# waiting train -- the joined chain has no engine at its head. It must wait to
+# be collected (order at the station), not stand there with nothing.
+run_scene mess "testpauza
+vlak123 on
+testbrzda 17
+testbrzda 18
+testbrzda 19
+testbrzda 20
+testza 3 testklon 24 3
+testza 28 testvozy vse" 30000 -g $S/umak.sav
+# The same save a step later, four such chains standing at the platforms: an
+# ordinary engine with a couple order fetches one and puts it down in a depot.
+run_scene messodvoz "testpauza
+vlak123 on
+testrada vse
+testbrzda 28
+testza 14 testvozy vse" 15000 -g $S/umins.sav
+# ... and the tow, called from the rake's window, takes one to the depot.
+run_scene messodtah "testpauza
+vlak123 on
+testrada vse
+testodtahovka 28
+testbrzda 28
+testza 2 testodvoz vse
+testza 16 testvozy vse" 17000 -g $S/umins.sav
+# Player's save: the tow is held in its shed by a casualty it cannot book a
+# road to; wagons called for opposite the door must still be fetched.
+run_scene ekaodtah "vlak123 on
+testpauza
+testodvoz 120 78
+testza 5000 testodvoz 120 79
+testza 14000 testvozy vse" 15000 -g $S/eka.sav
+# Player's save: a train sent through a red into one entering a depot must
+# crash (two wrecks), and the tow must not become the third.
+run_scene vlak31 "vlak123 on
+testpauza" 12000 -g $S/vlak31.sav
+# Player's save: a train broken down half inside a depot is pushed in by the
+# tow, put down and serviced there, and leaves on its own orders.
+run_scene protlacit "vlak123 on
+testpauza
+testprojet 31
+testporucha 32
+testbrzda 32" 12000 -g $S/vlak31.sav
+# Player's save: a rake with an engine riding inside it (a decouple gone wrong)
+# hangs off the west end of a dead-end platform onto the curve, and the player
+# called a tow for it. The tow's station order never found it -- the search
+# looked along the platform, and the tile the rake's tail stands on is the one
+# the road in has to cross -- so it is fetched by its tile, as a breakdown is
+# (RakeLiesOnPlatform()); met round the curve with no room to lay it out, the
+# coupling is clean enough on consecutive pieces of one track; and the joined
+# train is spread to a length between every two pieces (CloseUpCoupledConsist)
+# -- the save loaded with two trains the game reports as broken and pauses for,
+# coupled a pixel too close by an older build; testdelky finds none at the end.
+# In the shed the rake is taken apart at its engine (SplitStoredRakeAtEngines):
+# two stored rakes of three and the engine as a parked train of its own --
+# nothing the tow brings in on a call written by hand drives off, the player
+# puts it together. odtazeno 1; the one record line is the tow giving up its
+# saved station order before it is sent again.
+run_scene radasmasinkou "vlak123 on
+testpauza
+testza 12000 testdelky" 12200 -g $S/rada_masinka.sav
+# Player's save (domek128.sav, see README.md): made before the game had its own
+# industries, loaded and saved again by a build that had them, with marijuana
+# waiting at a station in cargo slot 126. Read again, it brought the game down
+# in CargoPacket::AfterLoad: the packets of a cargo in a slot past 64 were never
+# turned from numbers back into packets (SlStationGoods::FixPointers()). It has
+# to load and run: vyjimka is zero, and testprumysl refuses nothing.
+run_scene sklad128 "testprumysl" 200 -g $S/domek128.sav
+# Player's save: a breakdown bent across the points at a depot door; the tow
+# must not creep over it (that brought the game down), it stays home. A second
+# breakdown on the curve at (98,60) is then straightened and towed in; that
+# used to tear the casualty (close-up ran out of steps, TEMATA 4.25) and is
+# expected snug now: odtazeno 1, no assert. The tow sent for the first one
+# gives it up where it stands, too far to couple; it used to drive on into it
+# then (havaroval 2, srazka 1) and turns away from it now, as in
+# porouchanydlouhy -- havaroval and srazka are zero.
+run_scene poruchavrata "vlak123 on
+testpauza
+testbrzda 3
+testbrzda 4" 15000 -g $S/porucha.sav
+# Player's save: a breakdown standing on a platform; the tow's destination is
+# a tile in the middle of a platform, which the search steps over in one go.
+run_scene poruchanastup "vlak123 on
+testpauza" 12000 -g $S/porucha2.sav
+# Player's save: a casualty on a platform with a second engine stopped behind
+# it; the tow has to book the whole road round, in through the one-way signals
+# from the front. Then the repaired train must not run into the stopped one.
+run_scene poruchazavlakem "vlak123 on
+testpauza" 12000 -g $S/porucha3.sav
+# Player's save: a casualty standing in the middle of a platform, a parallel
+# platform of the same station beside it. The tow must stop on the casualty's
+# own platform right before it, not on the platform next door, and must not
+# write the station visit down as an order.
+run_scene odtahperon "vlak123 on
+testpauza
+testodtahovka 36
+testbrzda 36" 12000 -g $S/back2.sav
+# Player's save: locomotive-both-ends trains, four waiting, one collector
+# cloned three times. Default order: keep nought -- the collector leaves alone,
+# a headless rake with locomotives inside stays (the player's choice).
+run_scene lokonula "testpauza
+vlak123 on
+testza 10 testbrzda 17
+testza 10 testbrzda 18
+testza 10 testbrzda 19
+testza 10 testbrzda 20
+testza 8000 testbrzda 21
+testza 8000 testklon 21 3" 30000 -g $S/loko2.sav
+# Same, with the decouple order switched to "drop the whole coupled train":
+# every collector keeps its three, every waiter wakes with its three.
+run_scene lokocely "testpauza
+vlak123 on
+testcelyvlak 21 2
+testza 10 testbrzda 17
+testza 10 testbrzda 18
+testza 10 testbrzda 19
+testza 10 testbrzda 20
+testza 8000 testbrzda 21
+testza 8000 testklon 21 3" 30000 -g $S/loko2.sav
+# Founding a rake: the feeder fetches pairs from the west shed and pushes them
+# onto the rake at the platform (2, 4 -- the four-tile platform has no room for
+# the feeder plus a tile after that), then waits with "rake full"; the collector,
+# released at 30000, takes the four; the feeder founds the next rake.
+# This scene builds its own second platform, and used to be the noisiest in
+# the battery: on a random map there was sometimes nowhere to put it ("druhe
+# nastupiste se nepodarilo postavit"), which gave spojeno=0 instead of 7 with
+# no crash and no change of build -- 7, 7, 0 on three runs of one binary. The
+# fixed flat map at the top of this file is what stopped that; if this ever
+# comes out zero again, look in the scene's log for that line before believing
+# anything else.
+run_scene zaloz "vlak123 on
+testspoj zaloz 6
+testza 30000 testbrzda 3" 40000
+# The player's arrangement: one station waypoint on the throat, two platforms
+# behind it, and a founding order behind the waypoint. The rake fills at four,
+# and the feeder then founds the next one on the platform that is free instead
+# of standing and waiting for a collector -- which is the whole point of the
+# scene, so the line about it in reg_zalozsmerperon.log is what to read. It
+# also exercises two things that used to stop it dead: leaving the shed at all,
+# and coming out of it wagons first.
+run_scene zalozsmerperon "vlak123 on
+testspoj zaloz smer 4" 40000
+# Player's save: founding a rake behind a station waypoint while standing at
+# a plain one; the feeder must go through "peron3" and found on the platform
+# behind it, not on the loading platforms, and must not roll off the stub
+# unbooked into the junction (TEMATA 2.38, 4.22). Two couplings, no crash.
+run_scene zalozsmer "testpauza
+vlak123 on" 12000 -g $S/new1.sav
+# The same save run long enough for the yard to work through several rounds
+# of drop and collect. A collector's road used to be allowed to end on the
+# tile before its rake's platform with the platform tiles up to the rake
+# nobody's; the engine that had just put the rake down rolled onto the first
+# of them and came to a stand at the signal nose to nose with the collector,
+# about 25000 ticks in (TEMATA 20, trains 2 and 4). No crash, and the traffic
+# keeps running rather than stopping at the wreck: dozens of couplings, not two.
+run_scene zalozsmerdlouho "testpauza
+vlak123 on" 27000 -g $S/new1.sav
+# Player's save: the tow fetches a breakdown, is turned round on the way home
+# (a tick-timed testotoc, after the coupling) and backs into the depot wagons
+# first; autoreplace at the depot must leave the joined train alone and the
+# casualty must be put down and replaced on its own (TEMATA 4.24). No assert.
+run_scene odtahotoc "testpauza
+vlak123 on
+testza 10 testbrzda 5
+testzatik 2450 testotoc 5" 6000 -g $S/obmenaporucha.sav
+# Player's save, the tow let off the brake at once (the casualty gives up
+# waiting ten days in): the casualty stands with its tail on the points at the
+# platform throat, the tow straightens it across the platform, couples snug,
+# is turned back by the red signal and pushes it into the depot (139,167).
+# Coupled, delivered, no assert (TEMATA 4.25).
+run_scene odtahvyhybka "testpauza
+vlak123 on
+testzatik 10 testbrzda 5" 6000 -g $S/obmenaporucha.sav
+# A train torn open on purpose (14 px behind its leading vehicle, the rig's
+# testmezera) drives into a depot: the follower steps onto the depot tile
+# after the vehicle ahead is already hidden inside, which used to be the
+# "krok ROZBITY" assert in the doorway. Expected: it goes in, the hole
+# closes inside, it comes out snug. depa 1, no assert (TEMATA 4.27).
+run_scene mezera "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testzatik 10 testskip 1
+testzatik 300 testmezera 1 6
+testzatik 1500 testbrzda 1" 4000 -g $S/obmena.sav
+# Automatic departure, single-engine half (TEMATA 2.41): on obmena.sav the
+# wait flags are cleared and trains 1 (came in pushing) and 3 (pulling) get
+# "automatic" on their station order, 2 gets reverse-out and 4 nothing, then
+# all four are skipped out. 1 turns so its engine leads, 3 does not, 2 and 4
+# behave as before; the toggles are also shown to exclude each other. All
+# four reach a depot: depa 5 (train 1 laps once), no assert, no collision.
+run_scene auto "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testmof 1 1 11 0
+testmof 2 1 11 0
+testmof 3 0 11 0
+testmof 4 0 11 0
+testauto 1 1
+testmof 1 1 14 1
+testrozkazy
+testauto 1 1
+testrozkazy
+testauto 3 0
+testmof 2 1 14 1
+testza 10 teststav
+testzatik 50 testskip 1
+testzatik 50 testskip 2
+testzatik 50 testskip 3
+testzatik 50 testskip 4" 3000 -g $S/obmena.sav
+# Player's polygon (rig.sav), depot C: station 1 then back to the depot; the
+# way on is a long loop through station 2, the way back is straight. Released
+# with spacing (six at once lock up in the depot junction). Dual-headed
+# units: 67 (automatic) turns because back is shorter, 66 (reverse out)
+# turns, 65 (no flag) carries on round the loop. Three home, no assert.
+run_scene rigC2h "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testza 10 teststav
+testzatik 10 testbrzda 67
+testzatik 1200 testbrzda 66
+testzatik 2400 testbrzda 65" 9000 -g $S/rig.sav
+# Same with light engines 76/75/74: a lone engine can lead from both ends,
+# so 76 (automatic) also takes the shorter way back.
+run_scene rigC1m "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testza 10 teststav
+testzatik 10 testbrzda 76
+testzatik 1200 testbrzda 75
+testzatik 2400 testbrzda 74" 9000 -g $S/rig.sav
+# The player's known tests on the polygon, one depot each: release the four
+# deliverers/waiters, then let one collector out and clone it three times.
+run_scene rigD0 "vlak123 on
+testpauza
+testza 10 testbrzda 1
+testza 10 testbrzda 2
+testza 10 testbrzda 3
+testza 10 testbrzda 4
+testza 8000 testbrzda 5
+testza 8000 testklon 5 3" 30000 -g $S/rig.sav
+run_scene rigD3 "vlak123 on
+testpauza
+testza 10 testbrzda 9
+testza 10 testbrzda 10
+testza 10 testbrzda 11
+testza 10 testbrzda 12
+testza 8000 testbrzda 13
+testza 8000 testklon 13 3" 30000 -g $S/rig.sav
+run_scene rigD1 "vlak123 on
+testpauza
+testza 10 testbrzda 17
+testza 10 testbrzda 18
+testza 10 testbrzda 19
+testza 10 testbrzda 20
+testza 8000 testbrzda 21
+testza 8000 testklon 21 3" 30000 -g $S/rig.sav
+run_scene rigD2 "vlak123 on
+testpauza
+testza 10 testbrzda 25
+testza 10 testbrzda 26
+testza 10 testbrzda 27
+testza 10 testbrzda 28
+testza 8000 testbrzda 29
+testza 8000 testklon 29 3" 30000 -g $S/rig.sav
+run_scene rigD5 "vlak123 on
+testpauza
+testza 10 testbrzda 33
+testza 10 testbrzda 34
+testza 10 testbrzda 35
+testza 10 testbrzda 36
+testza 8000 testbrzda 37
+testza 8000 testklon 37 3" 30000 -g $S/rig.sav
+run_scene rigD4 "vlak123 on
+testpauza
+testza 10 testbrzda 57
+testza 10 testbrzda 58
+testza 10 testbrzda 59
+testza 10 testbrzda 60
+testza 8000 testbrzda 61
+testza 8000 testklon 61 3" 30000 -g $S/rig.sav
+# Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
+# waiter is collected by a dual-headed collector whose next stop is back the
+# way it came. 62 with no flag carries on round the loop; 63 with "automatic"
+# asks the pathfinder at the coupling's conclusion, hears back is shorter,
+# turns. Both drop the waiter at station 3 and both go home: depa 2.
+run_scene cplnic "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testmof 62 1 14 0
+testzatik 10 testbrzda 58
+testzatik 1500 testbrzda 62" 8000 -g $S/rig.sav
+run_scene cplauto "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testmof 63 0 14 0
+testauto 63 0
+testzatik 10 testbrzda 59
+testzatik 1500 testbrzda 63" 8000 -g $S/rig.sav
+# Same with a single engine collecting an engine-plus-wagons waiter: the end
+# the partner hung off cannot lead, so "automatic" turns the train engine
+# first, as reversing out would.
+run_scene cplauto1 "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testmof 21 1 14 0
+testauto 21 1
+testzatik 10 testbrzda 17
+testzatik 1500 testbrzda 21" 8000 -g $S/rig.sav
+
+# A bore with signals on its mouths, put there the way the player does it:
+# a drag along the line that runs across the bridge, then a train let out of
+# the depot to cross it. Watched for the usual -- nothing crashes, nothing
+# asserts, nobody hits anybody -- and the trace in reg_tunel.log says whether
+# the train got over. Skipped where the save is not in the working directory,
+# so the battery still runs without it.
+if [ -f $S/brzda.sav ]; then run_scene tunel "testtunel 48 66 tah
+teststartdepo 48 51
+testsleduj 3 100" 12000 -g $S/brzda.sav; fi
+
+# Two trains down one long signalled tunnel, one behind the other, on the
+# player's own save. The second one now follows the first in rather than
+# waiting outside for the bore to empty: it comes down to the leader's speed
+# on the way to the mouth and goes in behind it. What is watched here is what
+# the battery always watches -- nothing crashes, nothing asserts, nobody hits
+# anybody -- with the positions in reg_tunel2.log saying whether both were in
+# there at once. Skipped where the save is not in the working directory.
+if [ -f $S/brzda2.sav ]; then run_scene tunel2 "testpauza
+testbrzda 4
+testbrzda 5
+testza 2000 testkde
+testza 6000 testkde" 12000 -g $S/brzda2.sav; fi
+
+# The same two trains, with the first stopped by hand while it is inside the
+# tunnel with the second one behind it. Nothing in a bore brings a train to a
+# stand -- no tile boundary to refuse to cross, no signal to stand at -- so
+# this is the scene that says the hold behind the train in front is a real
+# stop and not merely a slower speed. It crashed both trains until it was.
+if [ -f $S/brzda2.sav ]; then run_scene tunelstop "vlak123 on
+testpauza
+testbrzda 4
+testbrzda 5
+testzatik 1500 testbrzda 4
+testzatik 2600 testkde" 2800 -g $S/brzda2.sav; fi
+
+# Turning a train round in a depot doorway, which used to freeze it: the
+# reverse button on a moving train sets a mark and lets it brake, and the
+# turn itself was refused on the doorstep, so the mark stayed and the train
+# stood there for good. Three moments on the player's save, all with the
+# seven-vehicle train 2: on its way out with one vehicle through the door
+# (otocvyjezd), started but still wholly inside (otocuvnitr), and on its way
+# back in with part of it hidden already (otocvjezd -- it is sent back by an
+# earlier turn out on the line). Each ends with the train running again;
+# testdelka says the spacing survived and the log says whether it moved.
+if [ -f $S/brzda2.sav ]; then run_scene otocvyjezd "vlak123 on
+testpauza
+testbrzda 2
+testzatik 40 testotoc 2
+testzatik 300 testkde
+testzatik 300 testdelka 2
+testzatik 900 testkde
+testzatik 900 testdelka 2" 1000 -g $S/brzda2.sav; fi
+if [ -f $S/brzda2.sav ]; then run_scene otocuvnitr "vlak123 on
+testpauza
+testbrzda 2
+testzatik 5 testotoc 2
+testzatik 300 testkde
+testzatik 300 testdelka 2" 400 -g $S/brzda2.sav; fi
+if [ -f $S/brzda2.sav ]; then run_scene otocvjezd "vlak123 on
+testpauza
+testbrzda 2
+testzatik 300 testotoc 2
+testzatik 830 testotoc 2
+testzatik 1000 testkde
+testzatik 1000 testdelka 2
+testzatik 1500 testkde
+testzatik 1500 testdelka 2" 1600 -g $S/brzda2.sav; fi
+
+# And on a bridge: turned round halfway across, the train has to say it is
+# now going the other way -- the mouths read that off its vehicles -- come
+# back out of the mouth it went in by, and drive home into its shed. Skipped
+# where the save is not in the working directory.
+if [ -f $S/brzda.sav ]; then run_scene otocmost "vlak123 on
+testtunel 48 66 tah
+teststartdepo 48 51
+testzatik 480 testotoc 3
+testzatik 560 testmapa 48 66 48 82
+testzatik 1400 testkde" 1500 -g $S/brzda.sav; fi
+
+# The wreck the tow was sent for clears itself off the line while the tow is
+# still on its way (a two-day wait, the tow far off). The tow must end its
+# errand there and then and come home -- not drive on to where the wreck was
+# and take whatever stands there. Measured as: no coupling, the tow back in
+# its shed (depa).
+run_scene vrakzmizi "vlak123 on
+setting vehicle.rescue_wait_days 2
+testodtah daleko 0
+testzatik 300 testvrak 1
+testzatik 2400 teststav" 5000
+
+# The engine sent for a casualty is stopped by the player while still in its
+# shed. Parked, it is never going to leave, so it lets the case go and the
+# other engine on call fetches it instead (odtazeno=1).
+run_scene stopkadepo "vlak123 on
+testodtah daleko 0 dve
+testzatik 260 testbrzda 2" 8000
+
+# And stopped out on the line it keeps what it was sent for -- stopping is not
+# standing down. Started again, it finishes the job (odtazeno=1).
+run_scene stopkatrat "vlak123 on
+testodtah daleko 0
+testzatik 700 testbrzda 2
+testzatik 1720 testbrzda 2" 6000
+
+# A road vehicle ordered to board a train at one station and ride it to the
+# next (road_on_rail.h): a bus goes to the first station's stop, waits for
+# the shuttle, rides the wagon to the second station, gets off onto its stop
+# there, works the stop, and drives back by road to do it again. Two full
+# rounds: auto=4. Twelve thousand ticks and not eight: how long a round takes
+# depends on how far the map put the road stop from the station, and at eight
+# thousand the second alighting fell off the end on the longer maps, which
+# read as a change in the feature when it was only a change in the map. The
+# map is fixed now (see the top of this file), so the length is comfort rather
+# than necessity -- and cheap.
+run_scene autovlak "vlak123 on
+testautovlak
+testzatik 200 testrozkazokna
+testzatik 200 testokno rozkazy auto
+testzatik 400 testauta" 12000
+
+# A train that vanishes with a car still standing on it. The car used to be cut
+# loose and left in the state a carried vehicle is parked in -- the wormhole
+# state, on a rail tile -- and the first thing the ordinary road code asks of a
+# vehicle in a wormhole is which bridge it is on. There is none, and the game
+# went down there (the player's crash of 2026-09-21). It goes with the wagon
+# now, and the record says so; the scene reads that line.
+run_scene autozanik "vlak123 on
+setting vehicle.rescue_wait_days 1
+testautovlak
+testzatik 2400 testprodat 1" 9000
+# Selling a train with a lorry still standing on it. A wagon with a lorry on
+# its back is not for sale -- the lorry would be left on nothing -- and that is
+# right when the player is doing the selling: he gets it off first. An engine
+# sent to sell a train in a shed cannot, and the refusal left the whole train
+# standing there sold and unsellable (the player's report of 21. 9., twice).
+# The lorries go first and the train after them, which is his own reading.
+run_scene prodatsautem "vlak123 on
+testautovlak
+testzatik 2400 testdodepa 1
+testzatik 5000 testprodat 1" 12000
+# Two road vehicles and one wagon, so one of them always has to wait its turn:
+# the queue the "how many are waiting for a train" condition is about. The
+# first rides twice and the second once, so auto=6. On a random map this one
+# used to come out 4, when the road was long enough that the second car's turn
+# fell past the end of the scene, or 0 when the town's local authority refused
+# the road stop and the scene never got built at all ("road stop failed" in
+# its log) -- both are what the fixed map at the top of this file is for.
+# The condition sits at the head of the second one's list and is asked as it
+# comes round; the answers are in the scene's own log, next to what the cars
+# were doing.
+run_scene autodve "vlak123 on
+testautovlak 2
+testpodminka auto 2 0 12 4 0 2
+testzatik 400 testauta
+testzatik 420 testpodminka auto 2 zkus 12 4 0
+testzatik 1700 testpodminka auto 2 zkus 12 4 0
+testzatik 3400 testpodminka auto 2 zkus 12 4 0" 12000
+
+# The other way of boarding (road_on_rail.h): the train is a shunter with one
+# order, the first station, where it then stands for good. "Load onto wagons
+# or a shunter" boards it anyway -- the car goes wherever the wagon goes, and
+# this one goes nowhere, so auto=1: one boarding, no alighting. The control
+# gives the same shunter and the same car the "by train" order: the shunter
+# does not go to the car's next stop, so the car rightly refuses it, auto=0.
+run_scene autoposun "vlak123 on
+testautovlak 1 posun
+testzatik 400 testauta" 6000
+run_scene autoposunne "vlak123 on
+testautovlak 1 vlakem
+testzatik 400 testauta" 6000
+
+# Riding in an aircraft and in a ship (road_on_rail.h). Both count boardings
+# plus alightings, so a working ride comes out even. The aircraft takes one
+# car; the ship in this scene takes two and both get on at once, which is what
+# the counter is really watching -- a carrier that holds several is the one
+# thing rails never had. The ship scene digs its own canal and raises its own
+# shore, since the rig's map is generated flat and has neither.
+# testrozkazokna opens the orders window of every vehicle and repaints it. A
+# ship's and an aircraft's window is built from a different set of widgets than
+# a train's and has none of ours, and a line that touched one of ours without
+# asking whether it is there took the game down the first time the player
+# opened an aircraft's orders. Nothing in the rig had ever opened a window --
+# every scene drives vehicles, none of them looks at one -- so it ran for days
+# unseen. A crash here ends the scene, and every counter after it is missing.
+run_scene autoletadlo "vlak123 on
+testautoletadlo
+testzatik 2000 testrozkazokna
+testzatik 3000 testauta" 12000
+# The car flies there and back: both of its orders board the aircraft. An
+# order to board is written "no load, no unload", and the game's search for
+# the next stop skips such orders -- so the car found nowhere to get off and
+# waited at the first stop for ever (the player's "the aircraft brought a car
+# and took none away"). It gets off at its next station order now.
+run_scene autoletadlotam "vlak123 on
+testautoletadlo tamizpet
+testzatik 3000 testauta
+testzatik 9000 testauta" 12000
+# A car each way on the aircraft, two each way on a ship for two: unload, a
+# pause of about three seconds, load, and the vessel waits for all of it.
+# Before, a vessel with nothing of its own to load left a tick after the car
+# got off, and whether the car waiting got on depended on which of the two
+# the game moved first; and on the ship the cars waiting stood in the one
+# stop the cars aboard needed, each waiting for the other for ever.
+run_scene autoletadlodve "vlak123 on
+testautoletadlo protijedouci
+testzatik 9000 testauta" 12000
+run_scene autoloddve "vlak123 on
+testautolod 2 protijedouci
+testzatik 9000 testauta" 14000
+run_scene autolod "vlak123 on
+testautolod 2
+testzatik 2000 testrozkazokna
+testzatik 3000 testauta" 12000
+
+# The fitting put on through the train's front, the way the refit window does
+# it, with the train held in the shed. It once was refused -- the check meant
+# for ships and aircraft was asked of the locomotive -- and nothing in the
+# battery noticed, because the scenes buy their wagons fitted. The wagon here
+# is a car carrier by birth (in toyland it takes nothing else), so the refit
+# changes nothing and the ride goes on as in autovlak; what the scene watches
+# is the refusal itself: odmitnuto=0.
+run_scene autonaauta "vlak123 on
+testautovlak
+testbrzda 1
+testnaauta 1
+testbrzda 1
+testzatik 400 testauta" 12000
+
+
+# Where the carried vehicle's picture lands beside its wagon's, across the
+# screen, in all eight directions -- worked out from the two bounding boxes and
+# the two sprites rather than looked at. The point of keeping it: it says in
+# black and white that a step across the rails moves the picture four pixels
+# sideways facing north or south, two on the slants, and NOTHING at all facing
+# east or west, where across the rails is straight up and down the screen. A
+# sideways knob that cannot move two of the eight directions is worth having
+# written down, and the numbers change the moment anything touches how either
+# of them is drawn.
+run_scene autosmery "vlak123 on
+testautovlak
+testza 2990 testbrzda 1
+testza 3000 testsmery 1
+testzatik 3100 testauta" 4000
+
+# Themed towns ("Domy z" in the town window and in the found town window).
+# Both scenes need a house set in the home's newgrf/ that the rig does not
+# otherwise play with (see README.md), handed to the game through a config of
+# their own, a copy of the kept one with the set put into [newgrf].
+#
+# domy: the Mars houses of BaNaNaS (524A450B), which leave the original houses
+# on and build nothing before 2030 by their own years. A town is ticked Mars,
+# then Mars and its climate, then only the climate, growing after each; then a
+# town is founded of Mars through the found town window, grows, and grows
+# again in 2035. Every house a themed town puts up has to be of its sets, and
+# the Mars town has to build Mars from 1950 -- a set that has nothing in its
+# years yet builds its houses from the start (TryBuildTownHouse()).
+#
+# domyvypnute: the older Mars set (4F474D05), which switches the original
+# houses off. A town ticked to its climate still builds the climate's houses
+# -- they are the game's own -- while a town of every house builds, as ever,
+# what the set leaves on.
+#
+# A missing set shows as odmitnuto: the click in the list changes nothing.
+DOMY_CFG=$S/domy_openttd.cfg
+sed '/^\[newgrf\]$/a ogfx-mars-houses-rehabs.grf = ' "$CFG_KEEP" > $DOMY_CFG
+run_scene domy "setting economy.found_town 2
+testdomy
+testdomy okno 0 524A450B
+testdomy rust 0 30
+testdomy okno 0 klima
+testdomy rust 0 30
+testdomy okno 0 524A450B
+testdomy rust 0 20
+testdomy zaloz 150 200 524A450B
+testdomy rust posledni 20
+testdomy rok 2035
+testdomy rust posledni 20
+testdomy" 100 -c $DOMY_CFG
+DOMY2_CFG=$S/domy2_openttd.cfg
+sed '/^\[newgrf\]$/a ogfx-mars-houses.grf = ' "$CFG_KEEP" > $DOMY2_CFG
+run_scene domyvypnute "testdomy
+testdomy okno 0 klima
+testdomy rust 0 30
+testdomy rust 1 30
+testdomy" 100 -c $DOMY2_CFG
+
+# The Mars towns of a new map (economy.mars_towns, three by default in the
+# game): three small towns among the others built of the Mars houses alone,
+# named for Mars -- in Czech when the towns are named in Czech (the second
+# scene) -- and no Mars house in any other town. The Mars houses are put into
+# the new game by the game itself, from the home's newgrf/, no config needed.
+SCENE_NEWGAME='setting_newgame economy.mars_towns 3' run_scene marsmesta "testdomy
+testdomy mars" 100
+SCENE_NEWGAME='setting_newgame economy.mars_towns 3
+setting_newgame game_creation.town_name 15' run_scene marsmestacz "testdomy mars" 100
+
+# The houses of the other climates as sets: their pictures are in the base
+# graphics whatever the climate played, so a toyland town ticked to the
+# temperate houses builds them, on toyland ground. The arctic set is not on
+# offer here at all -- arctic houses go up on snow only, and toyland has none
+# (testdomy lists the sets: no arktida among them). A town is founded of the
+# temperate houses through the found town window and grows.
+run_scene domyklima "setting economy.found_town 2
+testdomy
+testdomy okno 0 mirne
+testdomy rust 0 30
+testdomy okno 0 poust
+testdomy rust 0 20
+testdomy zaloz 150 200 mirne
+testdomy rust posledni 20
+testdomy" 100
+
+# The themed towns of a new map by the settings: two of the temperate houses
+# and one of the desert houses on top of the ordinary towns, each all of its
+# set. The toyland line is set too and has to count for nothing: toyland is
+# the climate played here, and its towns are the ordinary ones (the line is
+# greyed in the settings window, SettingDesc::IsEditable()).
+SCENE_NEWGAME='setting_newgame economy.temperate_towns 2
+setting_newgame economy.tropic_towns 1
+setting_newgame economy.toyland_towns 3' run_scene klimamesta "testdomy mapa" 100
+
+# Snow in the temperate climate (game_creation.temperate_snow): a hilly
+# temperate map with the snow line given at height 8 -- the temperate line
+# is given, not worked out from a coverage as the arctic's is. After four rounds of the
+# tile loop every clear and tree tile from a step below the line up has to be
+# snowy and none lower down, and the towns founded above the line have to be
+# of the arctic houses -- switched on here, as it is off by default
+# (economy.arctic_towns_on_snow). The second scene is the same map with snow
+# off: not one snowy tile, no town with a set -- the temperate climate as it
+# always was.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame difficulty.terrain_type 3
+setting_newgame game_creation.temperate_snow 1
+setting_newgame game_creation.snow_line_height 8
+setting_newgame economy.arctic_towns_on_snow 1' run_scene snihtemperate "testza 1000 testsnih" 1200
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame difficulty.terrain_type 3' run_scene snihvyp "testza 1000 testsnih" 1200
+# The same snowy map with the arctic towns above the line switched off
+# (economy.arctic_towns_on_snow): the snow as before, and the towns above the
+# line ordinary ones, of every house.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame difficulty.terrain_type 3
+setting_newgame game_creation.temperate_snow 1
+setting_newgame game_creation.snow_line_height 8
+setting_newgame economy.arctic_towns_on_snow 0' run_scene snihbezarktidy "testza 1000 testsnih" 1200
+
+# The GRFs split (economy.split_house_grfs): with the older Mars set loaded
+# as an ordinary house GRF (the game's own Mars set does not count), every
+# ordinary town of the map has to be of it and none of every house. The rig
+# has one house GRF besides Mars, so the turns among several are not seen
+# here; the split with two is the same modulo.
+SCENE_NEWGAME='setting_newgame economy.split_house_grfs 1' run_scene delenigrf "testdomy mapa" 100 -c $DOMY2_CFG
+
+# The orders window's departure buttons, "reverse out" and "leave by itself",
+# on a train with a station order set to reverse out and a depot order after
+# it: greyed and up on the depot order (the depot has a turn-around button of
+# its own), as on any order that is not a station's. They once stayed lit and
+# down there, left over from the station order before.
+run_scene smerdepo "vlak123 on
+testspoj
+testzatik 100 testsmerdepo" 400
+
+# The house picker's "Houses from" (the player's way of building a themed
+# town by hand): filtered to the temperate houses in toyland, to the Mars set
+# and back to every house, the list shows that set's houses and no others.
+run_scene domypicker "testdomy picker mirne
+testdomy picker 524A450B
+testdomy picker vse" 100 -c $DOMY_CFG
+
+# The set of cargo types with its 128 slots (CargoTypes), put through its
+# paces by the probe: cargoes above 64, the words, the set as a string
+# parameter and through an encoded string, the cargo monitor numbers. The
+# rest of the battery plays with a climate's dozen cargoes and cannot tell.
+run_scene naklady "testnaklady" 100
+
+# A set that switches every default cargo off and then gives up with a fatal
+# error (grf/quits_late.yagl, see README.md): the shape of Industries of the
+# Caribbean next to XIS, which left the player's game with no cargoes and a
+# passenger ship with no cargo of its own in an assertion. The game reads its
+# sets again without a set that gave up (GfxLoadSprites()), so the game has its
+# dozen cargoes and the road-vehicle cargo (13), and the one record line is
+# the game saying which set gave up.
+QUITS_CFG=$S/quits_openttd.cfg
+sed '/^\[newgrf\]$/a quits_late.grf = ' "$CFG_KEEP" > $QUITS_CFG
+run_scene grfvzdalo "testnaklady 13" 100 -c $QUITS_CFG
+
+# Two cargo sets side by side (grf/cargo_a.yagl, grf/cargo_b.yagl, README.md):
+# each switches the game's cargoes off and brings three cargoes under the ids
+# 0, 1 and 2, passengers and coal among them. The second set shares the first
+# one's passengers and coal, writing its own properties over them as sets
+# always did (ECS counts on it), and its own cargo goes into a free slot (the
+# cargo slots of newgrf_act0_cargo.cpp): passengers, coal, both sets' own
+# cargo and the road-vehicle cargo, 5. Before, the second set wrote over the
+# first one's slots and the game had 4, the first set's own cargo gone. Played
+# in both orders, the names saying the shared cargoes are the later set's.
+SDIL_CFG=$S/sdilene_openttd.cfg
+sed -e '/^\[newgrf\]$/a cargo_a.grf = ' -e '/^\[newgrf\]$/a cargo_b.grf = ' "$CFG_KEEP" > $SDIL_CFG
+run_scene nakladysdilene "testnaklady 5 PassengersB CoalB RigCargoA RigCargoB !PassengersA !CoalA" 100 -c $SDIL_CFG
+SDIL2_CFG=$S/sdilene2_openttd.cfg
+sed -e '/^\[newgrf\]$/a cargo_b.grf = ' -e '/^\[newgrf\]$/a cargo_a.grf = ' "$CFG_KEEP" > $SDIL2_CFG
+run_scene nakladysdilene2 "testnaklady 5 PassengersA CoalA RigCargoA RigCargoB !PassengersB !CoalB" 100 -c $SDIL2_CFG
+
+# A set that refuses another the way industry sets do (grf/refuses_a.yagl):
+# it asks whether cargo set A is there, stops with a fatal error if it is,
+# and otherwise brings a cargo of its own under A's passengers' id. With
+# economy.newgrf_side_by_side on (the default) the game reads the sets again
+# with A hidden from its check, and both run: A's three cargoes, RIGR in a
+# free slot and the road-vehicle cargo, 5; the record line says who refused
+# whom. Off, the set is switched off as ever: A's three and road vehicles, 4.
+ODMITA_CFG=$S/odmita_openttd.cfg
+sed -e '/^\[newgrf\]$/a cargo_a.grf = ' -e '/^\[newgrf\]$/a refuses_a.grf = ' "$CFG_KEEP" > $ODMITA_CFG
+run_scene grfodmita "testnaklady 5 PassengersA CoalA RigCargoA RigCargoR" 100 -c $ODMITA_CFG
+SCENE_NEWGAME='setting_newgame economy.newgrf_side_by_side false' run_scene grfodmitavyp "testnaklady 4 PassengersA CoalA RigCargoA !RigCargoR" 100 -c $ODMITA_CFG
+
+# The house picker with a set that switches the original houses off (the
+# older Mars set, 4F474D05): the list still has the original houses, every
+# house and each climate chosen -- the player picks from it by hand, and a
+# town told to build from a climate still builds them (HouseSetCanBuild()). It listed none with Swedish Houses in the player's
+# game; an empty list shows as odmitnuto.
+run_scene domypickervypnute "testdomy picker mirne
+testdomy picker arktida
+testdomy picker poust
+testdomy picker toyland
+testdomy picker vse
+testdomy picker mirne 1950
+testdomy picker mirne 2050
+testdomy picker vse 1950" 100 -c $DOMY2_CFG
+
+# A house placed by hand where a set put a house of its own in place of it
+# (grf/house_over.yagl, see README.md): the statue, with a four-tile block in
+# its place. The player picked the statue, so the statue it is, kept as
+# itself on its tile (IsHouseKeptOriginal(), the bit in m8) where a town of
+# every house would build the block for it. Read back through the block it
+# stood on one tile with a four-tile spec, and the tile loop walked into an
+# assertion on the three tiles that were not there -- the player's crash on
+# a house placed from the picker. The probe says what stands there and
+# refuses a house on fewer tiles than its spec; the tile loop runs 600 ticks.
+# The set switches the stadium off too, as sets do to originals: placed by
+# hand it still has to stand on its four tiles -- the game used to clear the
+# size of a switched-off original, and the stadium came out as one tile.
+# Then a town ticked to the temperate houses grows: every house it puts up
+# has to be a temperate one, statues as themselves among them -- with a set
+# in place of every temperate house, such a town had nothing to build and
+# mixed every house instead (the player's report).
+HOVER_CFG=$S/hover_openttd.cfg
+sed '/^\[newgrf\]$/a house_over.grf = ' "$CFG_KEEP" > $HOVER_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene domypostav "setting economy.place_houses 2
+testdomy postav 60 60 9
+testdomy postav 100 100 9
+testdomy postav 80 80 32
+testdomy okno 0 mirne
+testzatik 600 testdomy rust 0 40
+testzatik 650 testdomy" 700 -c $HOVER_CFG
+
+# The original industries of other climates (economy.industries_temperate,
+# _arctic, _tropic; climate_industries.h): on the toyland map every industry
+# of the three climates on has to be switched on, none replaced by a set, and
+# at least a dozen of them have to stand on the map, with the cargoes they
+# need placed for them. testprumysl lists them with what each produces and
+# takes -- the gold mine gold, the factory every kind of grain on.
+SCENE_NEWGAME='setting_newgame economy.industries_temperate 1
+setting_newgame economy.industries_arctic 1
+setting_newgame economy.industries_tropic 1' run_scene prumyslklimat "testprumysl 12" 100
+# The graphics of the industries of other climates (CLIMATE_INDUSTRY_SPRITE_RANGES):
+# on a temperate map with the three other climates on, every sprite the file
+# of a climate puts in place of the temperate one -- the cotton candy forest,
+# the desert farm, the ground of the water supply -- is drawn as the
+# industry's own climate draws it. prumyslklimat checks the same from toyland.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.industries_arctic 1
+setting_newgame economy.industries_tropic 1
+setting_newgame economy.industries_toyland 1' run_scene prumyslgrafika "testprumysl 12" 100
+# The temperate industries switched on beside an industry set that switches
+# them off and takes their places (XIS, xis.grf in the home's newgrf/, see
+# README.md): the originals have to stay, each in its own place, and the
+# set's industries beside them.
+XIS_CFG=$S/xis_battery_openttd.cfg
+sed '/^\[newgrf\]$/a xis.grf = 0 0 0 0 0 0 16 150 80 300' "$CFG_KEEP" > $XIS_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.industries_temperate 1' run_scene prumyslsada "testprumysl 8
+testnaklady" 100 -c $XIS_CFG
+# The game's own industries (economy.extra_industries): on the toyland map the
+# marijuana plantation has to be in the game on a tile of its own drawn as the
+# fruit plantation's, growing marijuana, and the coffeeshop in towns on a tile
+# of its own, taking all of the marijuana and of the other cargoes of its list
+# the game has, with at least one of each standing on the map, marijuana among
+# the cargoes, and no house taking it. Beside XIS, which switches the temperate
+# industries off and brings its own, they have to stay as they are. Seventeen
+# cargoes: toyland's twelve, marijuana, and the road vehicles, hemp fibre,
+# explosives and studentky of the game's own.
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene marihuana "testprumysl 0 1 1
+testnaklady 17 Marijuana" 100
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene marihuanasada "testprumysl 0 1 1
+testnaklady" 100 -c $XIS_CFG
+# The game's own vehicles -- the car carriers, the marijuana wagons and lorries
+# -- are mapped under a mark of their own, out of every set's reach. In a save
+# made before that (rig.sav) the car carriers are moved under the mark with the
+# numbers the save gave them, and the marijuana vehicles are added, out of the
+# game with the industries (off for saves, see run_scene).
+run_scene vozidlahry "testprumysl" 100 -g $S/rig.sav
+# A set numbering its vehicles where the game's own sit (grf/claims_own.yagl,
+# claims_own.grf in the home's newgrf/, see README.md): a wagon under the car
+# carrier's number and a lorry under the first marijuana lorry's. Big sets get
+# there as a matter of course, and the car carrier used to become the set's.
+# The game's own have to stay the game's, the set's stand beside them.
+# The St and the U of CZTR Wagons carrying marijuana (IsGreenLayerWagon()), with the
+# player's wagon set and steam engines in the home's newgrf/ (README.md): it
+# takes the refit, and full it is drawn as its set draws it carrying coal with
+# the coal layer green -- testzelenest builds one and asks for its picture in
+# every direction, since the rig draws nothing. testnaklady lists the car
+# carriers of the set by name. odmitnuto is zero; without the sets it is one.
+ST_CFG=$S/st_openttd.cfg
+sed '/^\[newgrf\]$/a 4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.0/cztr_wagons_cargo.grf = \n4d490207-cztr_engines_steam-1.0.2.tar/cztr_engines_steam-1.0.2/cztr_engines-steam.grf = ' "$CFG_KEEP" > $ST_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame game_creation.starting_year 2030
+setting_newgame economy.extra_industries 1' run_scene zelenest "testautovlak
+testzelenest
+testprumysl
+testnaklady" 50 -c $ST_CFG
+# A St that draws its coal into its own picture, as CZTR Wagons 1.0.0 does and
+# the rig's copy of CZTR does not (grf/st_old.yagl, st_old.grf in the home's
+# newgrf/): carrying marijuana, the pixels its loaded picture does not share
+# with its empty one are drawn green. odmitnuto is zero.
+STO_CFG=$S/st_old_openttd.cfg
+sed '/^\[newgrf\]$/a st_old.grf = ' "$CFG_KEEP" > $STO_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene zelenestjednovrstvy "testautovlak
+testzelenest" 50 -c $STO_CFG
+# CZTR Wagons-Cargo 1.0.0 in another release's place (SwapInCztrWagonsForFirs5()):
+# a game with FIRS 5 -- its id alone, grf/firs5_like.yagl, firs5_like.grf in
+# the home's newgrf/ -- and the player's 1.1.0 plays the rig's stand-in for
+# 1.0.0 (grf/cztr_old.yagl, cztr_old.grf there too: the set's id and that
+# release's name) in 1.1.0's place, and says so with the grf debug on
+# (vymena=1). testgrf hra lists what the game plays: 4D490213 is the stand-in,
+# active. The player's word: everything works with 1.0.0, so the game is not
+# to stop over 1.1.0. Without FIRS 5 (cztrbezfirs) 1.1.0 plays as it is.
+VYM_CFG=$S/cztr_vymena_openttd.cfg
+sed '/^\[newgrf\]$/a firs5_like.grf = \n4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.0/cztr_wagons_cargo.grf = ' "$CFG_KEEP" > $VYM_CFG
+run_scene cztrvymena "testgrf hra" 20 -c $VYM_CFG -d grf=1
+echo "cztrvymena: vymena=$(grep -c 'plays in place of' $S/reg_cztrvymena.log) $(grep 'testgrf: hra 4D490213' $S/reg_cztrvymena.log | sed 's/.*testgrf: hra //' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+BEZ_CFG=$S/cztr_bezfirs_openttd.cfg
+sed '/^\[newgrf\]$/a 4d490213-cztr_wagons_cargo-1.1.0.tar/cztr_wagons_cargo-1.1.0/cztr_wagons_cargo.grf = ' "$CFG_KEEP" > $BEZ_CFG
+run_scene cztrbezfirs "testgrf hra" 20 -c $BEZ_CFG -d grf=1
+echo "cztrbezfirs: vymena=$(grep -c 'plays in place of' $S/reg_cztrbezfirs.log) $(grep 'testgrf: hra 4D490213' $S/reg_cztrbezfirs.log | sed 's/.*testgrf: hra //' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The configurator (vehicle_config.h, docs/decouple_vehicle_config.md): the
+# rig's set grf/konfig.yagl (konfig.grf in the home's newgrf/, built with
+# the colleague's yagl, the one tool our sets are made with) names two details
+# on a road vehicle -- a crew of three, a cart of two -- and draws another
+# picture for any choice but the first. testkonfig reads the details as the
+# game does (2 details, 5 options), changes a choice by command (the picture
+# and variable 5C follow), asks for choices that do not exist and for one on
+# a vehicle under way (refused), tries the alien the set hides unless the cart
+# is pushed (result 401: hidden and refused on a pulled cart, offered on a
+# pushed one), chooses through the window, and looks at the
+# refit window's Configurator button (on for the set's vehicle, off for a
+# vehicle without details); then on a train of the set's wagons: the choice
+# goes to the wagon selected and stays on it uncoupled, a ninth detail reads
+# in variable 5E, the configurator follows the selection. odmitnuto is zero.
+KONF_CFG=$S/konfig_openttd.cfg
+sed '/^\[newgrf\]$/a konfig.grf = ' "$CFG_KEEP" > $KONF_CFG
+run_scene konfig "testkonfig" 30 -c $KONF_CFG
+echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testkonfig: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The colours of the configurator (true_colour.h): the rig's set
+# grf/barvy.yagl (barvy.grf in the home's newgrf/) offers five details on a
+# road vehicle, of which the cab, the body and the radiator are colours
+# (callback 1C1: the mask indices each paints, the colour of each option as
+# 0x00RRGGBB in register 100, the player's three numbers of lightening in
+# register 100 of the detail or 101 of the option), and draws a beacon by
+# detail 4 in variable 5D. testbarvy reads the colours of the purchase list
+# and of the vehicle built (the same), the picture painted in them (pixels
+# and the commonest colours, read in 32bpp), refits it to mail and back (a
+# heap the set turns to hay by the cargo, option FE, goes green again), ages
+# the vehicle by hand (the
+# cab's orange fades to brick red over two years, registers 102 to 104, a
+# picture per step, new again orange), chooses other colours and the
+# beacon (picture and colours change, 5D is 1), the cab in the company
+# colour (no colour of the set for it), reads the picture through the rig's
+# blitter, and opens the configurator from the refit window: five rows of
+# eight shown, closed with the refit window. The vehicle is a sprite stack of
+# three layers, the second a stencil (bit 30 of register 100, a start of 3,5
+# in 101 and 102) cut out of the third, a texture of greens in blocks
+# (cargo_cutout.h): the probe reads two layers, the second cut from the
+# texture, the texture's greens at half under the stencil's grey, and the
+# same cut turned to hay with passengers. The stencil layer is also moved by
+# registers 103 and 104 (16 right, 32 up in sixteenths of a normal pixel)
+# and taken from four directions on (105, layer_shift.h): the probe reads
+# the stencil as sprite 28 of the file, not 32, with its offsets moved from
+# -20,-12 to -12,-28 at 8x. odmitnuto is zero.
+BARVY_CFG=$S/barvy_openttd.cfg
+sed '/^\[newgrf\]$/a barvy.grf = ' "$CFG_KEEP" > $BARVY_CFG
+run_scene barvy "testbarvy" 30 -c $BARVY_CFG
+echo "barvy: $(grep -o 'testbarvy: SOUHRN.*' $S/reg_barvy.log | sed 's/testbarvy: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Wagons named the way GETS names them -- what the wagon is and its kind in
+# quotes (grf/gets_like.yagl, gets_like.grf in the home's newgrf/). The name
+# rules read the part in quotes: the Eaos and its livery take marijuana, the
+# Rns-z 643 and the Sgmmrs livery take road vehicles, the Eaoss and the Ssla
+# Köln -- the one the player said no to -- take neither (testjmena says so,
+# na auta / na travu). Of the open wagons the player picked by kind and town
+# (30. 9.), the Om Breslau takes marijuana, the Omm 55 and the Om Schwerin
+# do not: a kind alone is not a pick. Nor the Om Ludwigshafen, which the
+# player left out. testprumysl says which wagons carry it
+# and that no other vehicle of the set can be fitted for it. The Eaos draws its coal as a layer over the wagon, as
+# GETS does: full, only the layer is green; empty, nothing is. odmitnuto is
+# zero.
+GETS_CFG=$S/gets_like_openttd.cfg
+sed '/^\[newgrf\]$/a gets_like.grf = ' "$CFG_KEEP" > $GETS_CFG
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene getsjmena "testprumysl
+testjmena Eao
+testjmena Om
+testjmena Rns
+testjmena Sgmmrs
+testjmena Ssla
+testautovlak
+testzelenest" 50 -c $GETS_CFG
+echo "getsjmena: marihuana $(grep -o "St [0-9]* '[^']*' vozi marihuanu" $S/reg_getsjmena.log | sed "s/^St [0-9]* //; s/ vozi marihuanu//" | tr '\n' ' ')$(grep -o 'jinych vozidel s prestavbou na marihuanu: [0-9]*' $S/reg_getsjmena.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The explosives chain (economy.extra_industries): the marijuana plantation
+# grows hemp fibre beside the marijuana, the oil refinery takes the fibre and
+# makes explosives beside goods, the coffeeshop takes the explosives; the armoured
+# lorries and vans can be fitted for them, ships and aircraft cannot (they
+# carry them only inside a car). testvybusniny says so, and says fibre was
+# grown last month. odmitnuto is zero.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene vybusniny "testvybusniny
+testza 3000 testvybusniny" 3100
+# The bomb a car of explosives makes, let off by hand between the two trains
+# of the overrun scene: both within three tiles are wrecks at once
+# (havaroval=2), nothing is broken down, and the tow sets out for them.
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene atomovka "vlak123 on
+testnedobrzdil blok vozu 10 odtah
+testza 2500 testvybusniny shod 204 21" 5000
+# The sandbox options: the maximum map height is the last row of the window,
+# below the sandbox settings -- the player's word, beside the year the two
+# were mixed up. Its right arrow raises the height by one and leaves the year
+# alone (testpiskoviste). odmitnuto is zero.
+run_scene piskoviste "testpiskoviste" 20
+# Ten presses in a row, each a reload of every set: the height goes up by ten.
+# The player's game went down doing this; a block that threw the presses
+# away was tried and taken out again at his word -- the other buttons are to
+# stay as they are, whatever happens here.
+run_scene piskovisteklik "testpiskoviste 10" 20
+# The player's junction (saves/panicky_krizovatka*.sav): two parallel
+# diagonal pieces on one tile. A train refused its road gives back what it
+# booked, and the give-back stopped at any train on the tile -- on the other
+# diagonal too -- leaving track booked to nobody, on which the next trains
+# waited for good. The saves carry that track already; it is given back by
+# hand (testrez uvolni) and then trains 3 and 8, and in the later save 3 and
+# 9, must all get away, and nothing may be booked to nobody afterwards
+# afterwards: nikdo=0 zaseknuto=0 on the lines below.
+run_scene krizovatka "unpause
+testrez uvolni 116 38
+testza 3000 testrez 106 30 122 53
+testza 3000 testkde" 3100 -g $S/panicky_krizovatka.sav
+run_scene krizovatka2 "unpause
+testrez uvolni 117 39
+testrez uvolni 118 39
+testza 3000 testrez 106 30 122 53
+testza 3000 testkde" 3100 -g $S/panicky_krizovatka2.sav
+for k in krizovatka krizovatka2; do
+  echo "$k: nikdo=$(grep 'testrez: (' $S/reg_$k.log | grep -v uvolnena | grep -c 'nikdo\.') zaseknuto=$(grep 'kde [389]:' $S/reg_$k.log | grep -c 'zasekly ano')"
+  echo "$k: nikdo=$(grep 'testrez: (' $S/reg_$k.log | grep -v uvolnena | grep -c 'nikdo\.') zaseknuto=$(grep 'kde [389]:' $S/reg_$k.log | grep -c 'zasekly ano')" >> ${BATTERY_STABLE:-/dev/null}
+done
+# The driver's name, the first row of the driver window: typed in and kept
+# it reads after the train's name in the train's window (Train #1 "Pepa"),
+# "everything as the game says" leaves it alone, and it comes back with the
+# saved game; the other train has none.
+rm -f $H/.local/share/openttd/save/ridicjmeno.sav
+run_scene ridicjmeno "vlak123 on
+testspoj
+testza 200 testridicokno 1 Pepa
+testza 220 save ridicjmeno" 1000
+run_scene ridicjmenosav "testridic 1
+testridic 2" 20 -g $H/.local/share/openttd/save/ridicjmeno.sav
+echo "ridicjmeno: $(grep -o "okno vlaku '.*'" $S/reg_ridicjmeno.log) po nacteni: $(grep -o "vlaku [12]: jmeno '[^']*'" $S/reg_ridicjmenosav.log | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Full is full (saves/panicky_vlak6.sav): train 6, told to take full iron ore
+# wagons and found a rake of nine at station 9, was on its way to the row of
+# empty wagons standing there with "no loading" -- a row moved up to the
+# loading in pieces -- because a rake that loads nothing counted as full.
+# Its old choice is forgotten (testspojfiltr ... zrus): the order must not take
+# the empty row, and train 6 founds a full rake of its own there.
+run_scene vlak6plne "vlak123 on
+testspojfiltr 6 35 60 zrus
+testpauza" 1500 -g $S/panicky_vlak6.sav
+echo "vlak6plne: $(grep -o 'radu na (35,60): [A-Za-z]*' $S/reg_vlak6plne.log) zaklada=$(grep -c 'Vlak 6: zaklada radu' $S/reg_vlak6plne.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The braking table does not run acceleration (TEMATA_RUZNE §120): the
+# player's junction save, the setting on (sight 20) and every band of the
+# table at 1 km/h a tile. Train 8 used to be held at 15 km/h for most of this
+# run -- a platform in sight and a table that could stop it from nothing more
+# -- and now pulls away as with the setting off. patnact is how many of its
+# readings are 15/15; it was 37.
+PK_TAB1="setting vehicle.train_braking 4"
+for k in 300 250 200 160 130 100 80 60 40 20 10; do PK_TAB1="$PK_TAB1
+setting vehicle.train_brake_drop_$k 1"; done
+PK_KDE=""; for t in $(seq 20 20 1200); do PK_KDE="$PK_KDE
+testzatik $t testkde"; done
+run_scene zrychleni "testpauza
+$PK_TAB1
+testrez uvolni 117 39
+testrez uvolni 118 39$PK_KDE" 1300 -g $S/panicky_krizovatka2.sav
+echo "zrychleni: patnact=$(grep 'kde 8:' $S/reg_zrychleni.log | grep -c 'rychlost 15/15')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The purchase list's "refittable to" line (testnakup): a long list is not
+# written out -- "carries almost everything" instead, the player's words; a
+# short one and "all but" a few stay. CZTR's wagons in a game of 25 cargoes:
+# how many say which. The cargo for road vehicles is left out of "all but".
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame game_creation.starting_year 2030
+setting_newgame economy.industries_temperate 1
+setting_newgame economy.industries_arctic 1
+setting_newgame economy.industries_tropic 1
+setting_newgame economy.extra_industries 1' run_scene nakup "testnakup a" 20 -c $S/st_openttd.cfg
+echo "nakup: skoro_vse=$(grep -c 'Carries almost everything' $S/reg_nakup.log) krome=$(grep -c 'All but' $S/reg_nakup.log) krome_silnicni=$(grep 'All but' $S/reg_nakup.log | grep -c 'Road vehicles')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The player's cheat "mmm": every vehicle of the company filled to the brim,
+# to look at the full sprites of all the cargoes. The car of the scene is
+# filled (30/30), the train's coach too (osobni), a second "mmm" finds nothing
+# to fill, and both drive on with the cargo and deliver it (vyjimka=0 -- the
+# first cut made packets without asking the pool and the game went down).
+# Office blocks by stop B take the passengers, so the car and the train
+# really deliver them: the player's game went down there, on cargo filled
+# without its loading tile (assert in_vehicle in CargoPacket::GetDistance()),
+# and with no one to take the cargo the scene never got that far. The cargo
+# is from the station the vehicle last called at, or the nearest, as the
+# player asked. Both reach B at tick 2258 and unload there (car 30/30 to
+# 0/30, coach 40/40 down), and the offices then fill them again with B's own
+# passengers -- so the two snapshots are taken as they unload, ticks 2380 and
+# 2480; the car is empty at the second, the coach on its way down.
+printf '%s\n' "$NEWGAME" > $H/.openttd/scripts/autoexec.scr
+run_scene mmm "setting economy.place_houses 2
+vlak123 on
+testautovlak osobni
+testdomy postav 196 19 0
+testdomy postav 197 19 0
+testdomy postav 198 19 0
+testdomy postav 196 23 0
+testdomy postav 197 23 0
+testdomy postav 198 23 0
+testzatik 50 mmm
+testzatik 51 testtvar auto 1
+testzatik 51 testvozy 1
+testzatik 52 mmm
+testzatik 2380 testtvar auto 1
+testzatik 2380 testvozy 1
+testzatik 2480 testtvar auto 1
+testzatik 2480 testvozy 1" 6000
+echo "mmm: $(grep -o 'mmm: nalozeno [^.]*' $S/reg_mmm.log | tr '\n' ' ')$(grep -o 'naklad [0-9]* [0-9]*/[0-9]*' $S/reg_mmm.log | tr '\n' ' ')vagon=$(grep -o 'naklad [0-9]*/[0-9]* [A-Za-z]*' $S/reg_mmm.log | grep -v 'naklad 0/0' | tr '\n' ' ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+OWN_CFG=$S/claims_own_openttd.cfg
+sed '/^\[newgrf\]$/a claims_own.grf = ' "$CFG_KEEP" > $OWN_CFG
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vozidlasada "testprumysl" 100 -c $OWN_CFG
+# Action 2 IDs above 255 (grf/bloky_siroke.yagl, grf/bloky_zamek.yagl, see
+# README.md). A set that asks for 'decouple_more_action2_ids' writes its block
+# IDs in two bytes: bloky_siroke builds blocks 7, 300, 600 and 1000 for the
+# first road vehicle, 1000 calls 600 as a subroutine and goes on to 300, and
+# the callback answers 123. It asks for 'decouple_128_cargo' as well and loads
+# past its own lock. bloky_zamek asks a name nobody answers, the way any other
+# game treats our two, and its lock switches it off. The answers of Action 14
+# are read only while a file is scanned; a set loaded from a savegame used to
+# come without them, so the same is asked again of the saved game.
+BLOKY_CFG=$S/bloky_openttd.cfg
+sed -e '/^\[newgrf\]$/a bloky_siroke.grf = ' -e '/^\[newgrf\]$/a bloky_zamek.grf = ' "$CFG_KEEP" > $BLOKY_CFG
+# With -c the game saves next to that config file, in $S/save/.
+rm -f $S/save/bloky.sav
+run_scene bloky "testbloky
+testzatik 5 save bloky" 20 -c $BLOKY_CFG
+run_scene blokysav "testbloky" 20 -g $S/save/bloky.sav
+for k in bloky blokysav; do
+  echo "$k: siroke=$(grep -o 'bloky_siroke.grf [a-z]*, siroka cisla [a-z]*' $S/reg_$k.log) zamek=$(grep -o 'bloky_zamek.grf [a-z]*' $S/reg_$k.log) $(grep -o 'z GRF 52494762 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
+# The game's own sets (AppendBuiltinGRFs(), grf/vestaveny.yagl and
+# grf/vypinac.yagl, see README.md): every NewGRF in baseset/decouple/ goes into
+# every new game without a word in openttd.cfg, and the player cannot take it
+# out. vestaveny.grf is kept in the rig directory and put into baseset/decouple/
+# of the scene's config directory for these two scenes only -- anywhere else it
+# would be in every scene. vypinac, an ordinary set, switches it off by its GRF
+# ID (Action E) and must not manage to. The saved game loads it back from
+# baseset/.
+VEST_CFG=$S/vestaveny_openttd.cfg
+sed '/^\[newgrf\]$/a vypinac.grf = ' "$CFG_KEEP" > $VEST_CFG
+mkdir -p $S/baseset/decouple
+cp $S/vestaveny.grf $S/baseset/decouple/
+rm -f $S/save/vestaveny.sav
+run_scene vestaveny "testbloky
+testzatik 5 save vestaveny" 20 -c $VEST_CFG
+run_scene vestavenysav "testbloky" 20 -g $S/save/vestaveny.sav -c $VEST_CFG
+rm -rf $S/baseset/decouple
+for k in vestaveny vestavenysav; do
+  # The state line is read from the set's own line: baseset/decouple/grafika/
+  # (AppendStaticGRFConfigs()) is empty since the game's own pictures went into
+  # openttd.grf, but anything put there would be listed as the game's own too.
+  echo "$k: $(grep -o 'decouple/vestaveny.grf [a-z]*' $S/reg_$k.log) $(grep 'decouple/vestaveny.grf' $S/reg_$k.log | grep -o 'chyb [0-9]*, vestaveny ano') vypinac=$(grep -o 'vypinac.grf [a-z]*' $S/reg_$k.log | cut -d' ' -f2) $(grep -o 'z GRF 52494776 callback [0-9A-F]*' $S/reg_$k.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
+# Students (grf/studenti.yagl, studenti.grf in the home's newgrf/, see
+# README.md): a set brings STUD as "Students"; the game calls the cargo
+# Studentky whatever the set says, and the coffeeshop takes it (prum).
+STUD_CFG=$S/studenti_openttd.cfg
+sed '/^\[newgrf\]$/a studenti.grf = ' "$CFG_KEEP" > $STUD_CFG
+rm -f $S/save/prumysl*.txt
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene studentky "prum" 20 -c $STUD_CFG
+PRUM_FILE=$(ls -t $S/save/prumysl*.txt 2>/dev/null | head -1)
+echo "studentky: $(grep -m1 '| STUD |' "$PRUM_FILE" | cut -d'|' -f2-3) hulirna bere:$(grep '| Coffeeshop |' "$PRUM_FILE" | cut -d'|' -f4)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Studentky of the game's own (CT_STUDENTKY, with economy.extra_industries):
+# the churches and parks of the original houses take them 8/8 and make them
+# on top of their passengers, in every climate that has them (teststudentky).
+# Off, the cargo is not in the game at all.
+for kl in temperate arctic; do
+  SCENE_NEWGAME="setting_newgame game_creation.landscape $kl
+setting_newgame economy.extra_industries 1" run_scene kostely_$kl "testzatik 3000 teststudentky" 3100
+  echo "kostely_$kl: $(grep -o 'naklad STUD.*' $S/reg_kostely_$kl.log) | $(grep 'klima ano' $S/reg_kostely_$kl.log | grep -o 'dum.*' | tr '\n' ' ')| $(grep -o 'na mape.*' $S/reg_kostely_$kl.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+done
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate' run_scene kostely_bez "testzatik 300 teststudentky" 400
+echo "kostely_bez: $(grep -o 'naklad STUD.*' $S/reg_kostely_bez.log)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The girls' grammar school, the vending machine and the statue of Karel
+# Macha (economy.extra_industries, testgymnazium): what they take and make,
+# their sprites, a school, a machine and a statue funded, the machine refused
+# far from a school and the coffeeshop and the statue near one; then a
+# delivery to each, which brings the girls, and 3000 ticks on, when they have
+# gone again (30 days). One line per call of the probe: girls, the sprites
+# drawn, the plantations' season, the studentky made and the distances.
+gym_block() { awk -v n=$2 '{ end = ($0 ~ /testgymnazium: na mape/) } /testgymnazium: (.* holky |plantaz |gymnazium [0-9]|automat [0-9]|hulirna [0-9]|socha [0-9]|na mape)/ { sub(/.*testgymnazium: /, ""); line = line $0 "|" } end { if (++b == n) print line; line = "" }' $1; }
+for kl in temperate arctic; do
+  SCENE_NEWGAME="setting_newgame game_creation.landscape $kl
+setting_newgame economy.extra_industries 1" run_scene gymnazium_$kl "testgymnazium postav
+testgymnazium holky
+testzatik 3000 testgymnazium" 3100
+  L=$S/reg_gymnazium_$kl.log
+  echo "gymnazium_$kl: $(grep -o 'testgymnazium: 23[5-7] .*' $L | sort -u | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -o 'testgymnazium: sprite .*' $L | sort -u | cut -d' ' -f3- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  echo "gymnazium_$kl: $(grep -oE 'testgymnazium: (.* (postaveno|slo by postavit) .*|automat daleko.*|hulirna u gymnazia.*|socha u gymnazia.*)' $L | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+  for b in 1 2 3; do echo "gymnazium_$kl $b: $(gym_block $L $b)" | tee -a ${BATTERY_STABLE:-/dev/null}; done
+done
+# The plantation lives by the girls (MarijuanaPlantationStage()): bare until
+# studentky come; a delivery, and 13 days on the plants are small with the
+# girls about; 47 days on they are grown and the girls gone (30 days); 216
+# days on -- half a year without the girls -- the field is bare again. One
+# line per call of the probe; the road row is the player's, not the
+# industry's (cesta volna 5/5).
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene plantaz "testgymnazium
+testgymnazium plantaz
+testzatik 1000 testgymnazium
+testzatik 3500 testgymnazium
+testzatik 16000 testgymnazium" 16100
+echo "plantaz: $(grep -o 'testgymnazium: plantaz .*' $S/reg_plantaz.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The girls at a drive-through bus stop while studentky wait there
+# (testzastavka): none without them, at both stops with them.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene zastavka "testzastavka" 30
+echo "zastavka: $(grep -o 'testzastavka: .*' $S/reg_zastavka.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The coffeeshop's hut on 2x1 tiles (testhulirna) and the girls laid over its
+# front tile, the player's word: none until studentky come, marijuana alone
+# changes nothing, standing after studentky, sitting when marijuana came to
+# them too, none again when both are long ago.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene hulirna "testhulirna postav
+testhulirna mari
+testhulirna nic stud
+testhulirna mari
+testhulirna nic" 30
+echo "hulirna: $(grep -o 'testhulirna: .*' $S/reg_hulirna.log | cut -d' ' -f2- | sed 's/postavena u ([0-9]*,[0-9]*)/postavena/' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The fireworks over the hut (HutHasFireworks(), HutFireworkSprite()), the
+# player's word: explosives light them, but only while the girls sit --
+# explosives to standing girls light nothing. Each phase of each firework
+# picks its colour anew, so the six listed differ; the yard tile is animated
+# after a tile loop, and stops when the fireworks are over.
+SCENE_NEWGAME='setting_newgame game_creation.landscape temperate
+setting_newgame economy.extra_industries 1' run_scene ohnostroj "testhulirna postav stud boom
+testhulirna mari
+testzatik 300 testhulirna
+testzatik 320 testhulirna nic
+testzatik 600 testhulirna" 700
+echo "ohnostroj: $(grep -o 'testhulirna: .*' $S/reg_ohnostroj.log | cut -d' ' -f2- | sed 's/postavena u ([0-9]*,[0-9]*)/postavena/' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The 8x zoom (ZoomLevel::In8x, testzoom8): the base is 8 and the config of
+# before, naming 0 for the most zoomed in there was, keeps the most zoomed in,
+# 8x now (IFV_ZOOM_IN_8X); the main view zooms in to In8x, a tile 256 px wide,
+# and every sprite has a level there, twice its 4x one.
+run_scene zoom8 "testzoom8
+setting gui.zoom_min 0
+testzoom8 dovnitr" 30
+echo "zoom8: $(grep -o 'testzoom8: .*' $S/reg_zoom8.log | grep -v 'cache spritu' | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The 16x level of a set (zoom code 7, ZoomLevel::In16x; grf/zin16_test.yagl,
+# see README.md): sprite 3981 has 4x, 8x and 16x, 3982 only 16x. With 16x off
+# (the default) the 8x of 3981 is the set's own and its 16x record stays
+# unread; the 8x of 3982 is made from its 16x, the mean of each 2x2 block.
+# With 16x on both draw their own 16x; with the sprite resolution held at 8x
+# the 16x of 3982 is its 8x doubled again. Built with the rig's other sets at
+# the top of the run.
+ZIN16_CFG=$S/zin16_openttd.cfg
+sed -e '/^\[newgrf\]$/a zin16_test.grf = ' "$CFG_KEEP" > $ZIN16_CFG
+run_scene zin16 "testzoom8 sprite 3981
+testzoom8 sprite 3982
+setting gui.zoom_min 0
+testzoom8 sprite 3981
+testzoom8 sprite 3982
+setting gui.sprite_zoom_min 1
+testzoom8 sprite 3982" 20 -c $ZIN16_CFG
+echo "zin16: $(grep -o 'testzoom8: sprite .*' $S/reg_zin16.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The fast forward button (the player's word: one click fast, two clicks
+# slow; gui.slow_motion_speed, 30 % by default, see README.md): testzrychleni
+# clicks the main toolbar's button the way the mouse does and reads the game
+# speed after each step. A click at normal speed goes fast only once the time
+# for a double click is over, so a double click never runs the game ahead
+# before it slows down.
+run_scene zrychleni "testzrychleni" 20
+echo "zrychleni: $(grep -o 'testzrychleni: .*' $S/reg_zrychleni.log | cut -d' ' -f2-)" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Czech lines the language compiler throws away: a line that does not fit the
+# English one -- a {RAW_STRING} where Czech has to write {STRING}, most often --
+# is dropped without a word and the game shows the English. The driver's
+# window came out half English that way. nesedi has to be zero.
+NESEDI=$($S/build/src/strgen/strgen -s ../../openttd/src/lang -d $S/strgen_check -w ../../openttd/src/lang/czech.txt 2>&1 | grep -c "doesn't match")
+echo "cestina: nesedi=$NESEDI"
+echo "cestina: nesedi=$NESEDI" >> ${BATTERY_STABLE:-/dev/null}

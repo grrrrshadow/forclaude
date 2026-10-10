@@ -1,0 +1,1039 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file order_base.h Base class for orders. */
+
+#ifndef ORDER_BASE_H
+#define ORDER_BASE_H
+
+#include "order_type.h"
+#include "core/pool_type.hpp"
+#include "core/bitmath_func.hpp"
+#include "cargo_type.h"
+#include "depot_type.h"
+#include "station_type.h"
+#include "vehicle_type.h"
+#include "timer/timer_game_tick.h"
+#include "saveload/saveload.h"
+
+using OrderListPool = Pool<OrderList, OrderListID, 128>;
+extern OrderListPool _orderlist_pool;
+
+template <typename, typename>
+class EndianBufferWriter;
+
+/**
+ * If you change this, keep in mind that it is also saved in 2 other places:
+ * - Load_ORDR, all the global orders
+ * - Vehicle -> current_order
+ */
+struct Order {
+private:
+	friend struct VEHSChunkHandler;                             ///< Loading of ancient vehicles.
+	friend SaveLoadTable GetOrderDescription();                 ///< Saving and loading of orders.
+	/* So we can use private/protected variables in the saveload code */
+	friend class SlVehicleCommon;
+	friend class SlVehicleDisaster;
+	template <typename T>
+	friend class SlOrders;
+
+	template <typename Tcont, typename Titer>
+	friend EndianBufferWriter<Tcont, Titer> &operator <<(EndianBufferWriter<Tcont, Titer> &buffer, const Order &data);
+	friend class EndianBufferReader &operator >>(class EndianBufferReader &buffer, Order &order);
+
+	uint8_t type = 0; ///< The type of order + non-stop flags
+	uint8_t flags = 0; ///< Load/unload types, depot order/action types.
+	DestinationID dest{}; ///< The destination of the order.
+
+	CargoType refit_cargo = CARGO_NO_REFIT; ///< Refit CargoType
+
+	uint16_t wait_time = 0; ///< How long in ticks to wait at the destination.
+	uint16_t travel_time = 0; ///< How long in ticks the journey to this destination should take.
+	uint16_t max_speed = UINT16_MAX; ///< How fast the vehicle may go on the way to the destination.
+
+	/**
+	 * Whether this order leaves part of the train behind, and how much of it
+	 * stays on: the engine, plus #decouple_keep_wagons wagons.
+	 *
+	 * The engine is not counted. A player asking for "keep two" means two
+	 * wagons and takes the engine for granted -- it is the thing doing the
+	 * leaving, so counting it as one of the things left with is a way of
+	 * thinking nobody has. Counting it also made zero mean two different
+	 * things at once ("keep nothing" and "do not decouple"), so the useful
+	 * case of dropping the whole rake could not be asked for at all; and on a
+	 * train whose first two units were a single engine and a double-headed
+	 * one, "keep two" fell inside the double engine and the order silently did
+	 * nothing.
+	 *
+	 * So the two questions are two fields. Whether to decouple at all is the
+	 * button; how many wagons stay is a number that may be zero, and zero is
+	 * the default: leave the lot, engine goes on alone.
+	 *
+	 * Deliberately their own fields, not packed into `flags` alongside
+	 * unrelated per-order-type data -- see FEATURE_DESIGN_COUPLING_TOW.md,
+	 * "Bug D" for why that aliasing bit-packing approach caused real bugs in
+	 * the patch this feature is inspired by.
+	 */
+	bool decouple = false;
+	uint8_t decouple_keep_wagons = 0;
+	/**
+	 * The other answer to "what stays on": not a number of wagons but "what
+	 * this train came with" -- the decoupling drops exactly what it coupled
+	 * on the way, at the coupling that joined it (see FindCoupledBoundary()).
+	 * The player's word for it is "decouple the whole train"; a count of zero
+	 * stays what it was, every wagon down, which is the right thing for a
+	 * rake but cuts a locomotive-both-ends train behind its front engine.
+	 * Only meaningful if #decouple; when nothing is remembered it falls back
+	 * to that zero.
+	 */
+	bool decouple_whole_train = false;
+
+	/**
+	 * If true, the wagons this order puts down are not put down to be
+	 * collected again -- they are sold. In a depot that happens on the spot;
+	 * at a platform a rescue engine is called for them and they are sold when
+	 * it brings them in, because a depot is where a vehicle is sold. The
+	 * player is paid what he would be paid for selling them by hand.
+	 * Only meaningful if #decouple. See TryDecoupleAtStation().
+	 */
+	bool sell_decoupled = false;
+
+	/**
+	 * The old "how many vehicles from the front stay on, zero means do not
+	 * decouple" field, kept only so that orders written before the two
+	 * questions were separated still mean what they meant.
+	 *
+	 * Saves are matched by field name, so an old save brings this and neither
+	 * of the two above; migration turns it into them once, on load, and writes
+	 * zero here from then on. See AfterLoadDecoupleCounts().
+	 */
+	uint8_t decouple_count = 0;
+
+	/**
+	 * If true, delay leaving this station until a compatible stopped
+	 * train arrives immediately ahead to couple with (see
+	 * GetTrainCouplePartner() and FEATURE_DESIGN_COUPLING_TOW.md).
+	 * Dedicated field, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D").
+	 */
+	bool wait_for_couple = false;
+
+	/**
+	 * If true, this order's destination is a place to meet and couple
+	 * with a partner train, rather than an ordinary stop. Unlike
+	 * #wait_for_couple (which just delays departure once already
+	 * stopped), this also allows the train to reverse to reach that
+	 * destination -- normal reversal-at-signals/reversal-in-stations
+	 * safety locks only guard *unintended* reversal risking a crash
+	 * into wagons left behind by a decouple order; reversing on
+	 * purpose, under a player-given order whose entire point is to
+	 * reach a coupling partner, is not that. Dedicated field, not
+	 * packed into `flags` -- same rationale as decouple_count ("Bug D").
+	 * See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool go_to_couple = false;
+
+	/**
+	 * If true, a train visiting this depot turns around there, ending up
+	 * facing the way it came from.
+	 *
+	 * The engine's own rule is that a train always leaves a depot facing
+	 * forwards, turning it around on the way in if that is what it takes, on
+	 * the grounds that this lets a player straighten out a confused train.
+	 * That is fine for a visit the player asked for, but a train also enters
+	 * depots on its own for scheduled servicing -- and a train that went in
+	 * reversing and came back out the other way round has had a setup the
+	 * player never touched quietly rearranged underneath them. Which is worse
+	 * the more the layout depends on which way round a train is, and this
+	 * feature makes that matter a great deal. So turning around is something a
+	 * depot does on request, not by itself. Dedicated field, not packed into
+	 * `flags` -- same rationale as decouple_count ("Bug D"). See
+	 * FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool turn_around_in_depot = false;
+
+	/**
+	 * If true, a train leaving this station reverses out of it rather than
+	 * carrying on the way it was facing.
+	 *
+	 * A train that has just left wagons behind here, or picked some up, very
+	 * often wants to go back the way it came; left to itself it instead looks
+	 * for a way round, which may be a long way round or may not exist. Reversing
+	 * is something the game already does perfectly well at a dead end, so this
+	 * just asks for the same thing at a place the player chooses. Dedicated
+	 * field, not packed into `flags` -- same rationale as decouple_count
+	 * ("Bug D"). See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	bool reverse_out_of_station = false;
+
+	/**
+	 * If true, a train leaving this station goes engine first and then takes
+	 * the shortest way to wherever it is going next.
+	 *
+	 * The third answer to "which way out": neither "carry on as you are
+	 * moving" nor "go back the way you came", but "the engine leads, and
+	 * from there whichever way is shorter". For a train that can lead from
+	 * both ends -- a cab or an engine at the back -- the first half is true
+	 * whichever end goes first, so it comes down to the shorter way alone,
+	 * and the train is let off the rule that it never turns round on the
+	 * line: swapping which end leads is not a turn for such a train. For a
+	 * train with one engine the shorter way is always engine first, so this
+	 * amounts to reversing out only when it came in pushing. Never together
+	 * with reversing out; the command keeps the two apart. The player's
+	 * consent to the choice is this flag: without it nothing turns by itself.
+	 */
+	bool automatic_departure = false;
+
+	/**
+	 * A road vehicle's order: how it gets itself carried on from this station,
+	 * instead of driving on. One of four ways, or none at all. Dedicated
+	 * field, same rationale as decouple_count ("Bug D"). See OrderBoardMode
+	 * and road_on_rail.h.
+	 */
+	OrderBoardMode board_mode = OrderBoardMode::None;
+
+	/**
+	 * What #board_mode was before it was one field: two flags, "board a train
+	 * going my way" and "board any wagons standing here". They are read from
+	 * old savegames and turned into the field above (AfterLoadGame()), and
+	 * they are still written, always false, because a savegame's field list is
+	 * matched by name and a game saved with them cannot be loaded by a build
+	 * that has dropped them.
+	 */
+	bool load_on_train = false;
+	bool load_on_wagons = false; ///< @copydoc load_on_train
+
+	/**
+	 * A train passing this station waypoint sounds its horn there. The
+	 * player's touch of life on a waypoint that otherwise only names a group
+	 * of platforms; off by default, so nothing honks that was not asked to.
+	 */
+	bool honk = false;
+
+	/**
+	 * The couple count is a minimum: the order collects the rake once it has
+	 * grown to at least that many vehicles, rather than one of exactly that
+	 * size. Never together with #couple_max, which is the other way about;
+	 * the command keeps the two apart.
+	 */
+	bool couple_min = false;
+
+	/**
+	 * The couple count is a maximum: the order collects a rake of up to that
+	 * many vehicles, 0 for as many as the platform holds.
+	 *
+	 * Founding used to carry this meaning with it, and for a while that was
+	 * the only way to say it -- so a train could be told to build a rake up
+	 * to a size, but not to collect one up to a size without building. The
+	 * two are separate buttons now. An order saved before they were
+	 * separated has only the founding flag, which is why every reading of
+	 * the number asks IsCoupleCountCeiling() rather than this field: an old
+	 * founding order is a ceiling whether or not this was ever written.
+	 */
+	bool couple_max = false;
+
+	/**
+	 * What a "go to couple" order will accept when it gets there: how full the
+	 * wagons are, what they are carrying, and how many of them there are.
+	 *
+	 * Three filters, each one narrowing the choice further, every combination
+	 * allowed and none ruling any other out. Left as they are, the order takes
+	 * the first rake waiting at its destination, which is what it always did.
+	 *
+	 * They filter which rake the train sets out for. They never say to take
+	 * part of one: a rake either matches and is collected whole, or it does not
+	 * and is left alone. Splitting a train up is what the decoupling order is
+	 * for. Dedicated fields, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D"). See FEATURE_DESIGN_COUPLING_TOW.md.
+	 */
+	OrderCoupleLoad couple_load = OrderCoupleLoad::Any;
+	CargoType couple_cargo = INVALID_CARGO; ///< Cargo the wagons have to carry; INVALID_CARGO for any.
+	uint8_t couple_count = 0;               ///< How many vehicles the rake has to have; 0 for any.
+	/**
+	 * The couple order founds a rake where there is none: finding nothing to
+	 * couple to, it is concluded and the decouple order behind it puts the
+	 * train's wagons down as the start of one; finding a rake, it couples and
+	 * the decouple order grows it. #couple_count is then the rake's final
+	 * size (0 = whatever the platform holds), and no rake is ever built past
+	 * the platform. The player's design; see FoundingCoupleOrderHold().
+	 */
+	bool couple_found_rake = false;
+
+	/**
+	 * The filters are asked of each vehicle in the rake rather than of the
+	 * rake as a whole, and the count then says how many such vehicles the rake
+	 * has to have: "a rake with at least five full car carriers in it" instead
+	 * of "a full rake of at least five vehicles".
+	 *
+	 * The player's design, and it came out of a rake that would not go. His
+	 * had five loaded car carriers, a tanker and one empty flat, and the
+	 * order said full + road vehicles + at least five. Asked of the whole rake
+	 * that is a no -- the empty flat is a car carrier with room in it -- and
+	 * nothing he could set said what he meant, which was "five are loaded, so
+	 * go". Asked wagon by wagon it is a yes.
+	 *
+	 * Two questions, then, and a button for each: what the rake is like, and
+	 * what is in the rake. The rake is taken whole either way -- a rake at a
+	 * platform is one coupled thing -- so with this set the collector brings
+	 * along whatever else is in it. Which is why the sorting of rakes by what
+	 * they carry has to come before any filter on where they are bound.
+	 *
+	 * A platform's setting only. In a shed the store is drawn from a few
+	 * wagons at a time, so the two readings come to the same thing there, and
+	 * the buttons are not shown.
+	 */
+	bool couple_search = false;
+
+	/**
+	 * The wagon this order buys when the depot it collects from has not got
+	 * enough of them, and #couple_buy_wagons, which says whether it buys at
+	 * all.
+	 *
+	 * The player's design: early on there are no wagons in circulation to
+	 * collect, so a shunter working a yard buys what it is short of and
+	 * couples that; once enough of them are going round, the player turns the
+	 * buying off and the same order goes on collecting what comes back. The
+	 * model is picked from the ordinary purchase list, which opens showing
+	 * wagons only and already filtered to #couple_cargo -- so what is bought
+	 * can always carry what the order asked for, and it is bought already
+	 * fitted for it.
+	 *
+	 * The model stays written down when the buying is switched off, so
+	 * switching it back on needs no second trip to the purchase list.
+	 */
+	EngineID couple_buy_engine = EngineID::Invalid();
+	bool couple_buy_wagons = false;
+
+	/**
+	 * Which station's cargo the wagons this order puts down are to load while
+	 * they stand and wait for somebody to collect them.
+	 *
+	 * Only for a game with cargo distribution switched on, where cargo waiting
+	 * at a station is sorted by where it is going next and a vehicle is handed
+	 * only what suits its own route. A rake left at a platform has no route --
+	 * its two orders both name the platform it is standing on, so the walk
+	 * that collects "the stations you will stop at" skips them both and comes
+	 * back empty -- and the station therefore hands it nothing but the cargo
+	 * it never found a route for. The player watches wagons stand all day and
+	 * take on a crumb at a time.
+	 *
+	 * This is the player saying where that cargo is bound, so the wagons can
+	 * be filled with something that wants to go there. It buys nothing in a
+	 * game with distribution off, where any cargo goes on any vehicle.
+	 *
+	 * It is not a journey and it promises none: the wagons go wherever the
+	 * engine that collects them is going, which may be somewhere else
+	 * entirely. Cargo carried off the plan's way is simply planned afresh at
+	 * the next station it reaches -- a worse route, never a lost load -- which
+	 * is why this can be a hint rather than a contract.
+	 *
+	 * Dedicated field, not packed into `flags` -- same rationale as
+	 * decouple_count ("Bug D").
+	 */
+	StationID decouple_cargo_dest = StationID::Invalid();
+
+public:
+	Order() {}
+	Order(uint8_t type, uint8_t flags, DestinationID dest) : type(type), flags(flags), dest(dest) {}
+
+	/**
+	 * Check whether this order is of the given type.
+	 * @param type the type to check against.
+	 * @return true if the order matches.
+	 */
+	inline bool IsType(OrderType type) const { return this->GetType() == type; }
+
+	/**
+	 * Get the type of order of this order.
+	 * @return the order type.
+	 */
+	inline OrderType GetType() const { return (OrderType)GB(this->type, 0, 4); }
+
+	void Free();
+
+	void MakeGoToStation(StationID destination);
+	void MakeGoToDepot(DestinationID destination, OrderDepotTypeFlags order, OrderNonStopFlags non_stop_type = OrderNonStopFlag::NonStop, OrderDepotActionFlags action = {}, CargoType cargo = CARGO_NO_REFIT);
+	void MakeGoToWaypoint(StationID destination);
+	void MakeLoading(bool ordered);
+	void MakeLeaveStation();
+	void MakeDummy();
+	void MakeConditional(VehicleOrderID order);
+	void MakeImplicit(StationID destination);
+
+	/**
+	 * Is this a 'goto' order with a real destination?
+	 * @return True if the type is either #OT_GOTO_WAYPOINT, #OT_GOTO_DEPOT or #OT_GOTO_STATION.
+	 */
+	inline bool IsGotoOrder() const
+	{
+		return IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION);
+	}
+
+	/**
+	 * Gets the destination of this order.
+	 * @pre IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION).
+	 * @return the destination of the order.
+	 */
+	inline DestinationID GetDestination() const { return this->dest; }
+
+	/**
+	 * Sets the destination of this order.
+	 * @param destination the new destination of the order.
+	 * @pre IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION).
+	 */
+	inline void SetDestination(DestinationID destination) { this->dest = destination; }
+
+	/**
+	 * Is this order a refit order.
+	 * @pre IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION)
+	 * @return true if a refit should happen.
+	 */
+	inline bool IsRefit() const { return this->refit_cargo < NUM_CARGO || this->refit_cargo == CARGO_AUTO_REFIT; }
+
+	/**
+	 * Is this order a auto-refit order.
+	 * @pre IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION)
+	 * @return true if a auto-refit should happen.
+	 */
+	inline bool IsAutoRefit() const { return this->refit_cargo == CARGO_AUTO_REFIT; }
+
+	/**
+	 * Get the cargo to to refit to.
+	 * @pre IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION)
+	 * @return the cargo type.
+	 */
+	inline CargoType GetRefitCargo() const { return this->refit_cargo; }
+
+	void SetRefit(CargoType cargo);
+
+	/**
+	 * Does this order leave part of the train behind?
+	 * @pre IsType(OT_GOTO_STATION) || IsType(OT_GOTO_DEPOT)
+	 */
+	inline bool ShouldDecoupleOnDeparture() const { return this->decouple; }
+
+	/** Set whether this order leaves part of the train behind. */
+	inline void SetDecouple(bool decouple) { this->decouple = decouple; }
+
+	/**
+	 * How many wagons stay on with the engine when this order decouples.
+	 * The engine itself is never counted and never left behind, so zero is a
+	 * real answer: the engine goes on alone. Only meaningful if
+	 * #ShouldDecoupleOnDeparture.
+	 */
+	inline uint8_t GetDecoupleCount() const { return this->decouple_keep_wagons; }
+
+	/** Set how many wagons stay on with the engine; zero keeps none of them. */
+	inline void SetDecoupleCount(uint8_t count) { this->decouple_keep_wagons = count; }
+
+	/** Does this order drop exactly what the train coupled, rather than keep a number of wagons? Only meaningful if #ShouldDecoupleOnDeparture. */
+	inline bool ShouldDecoupleWholeTrain() const { return this->decouple_whole_train; }
+
+	/** Set whether the decoupling drops exactly what the train coupled. */
+	inline void SetDecoupleWholeTrain(bool whole) { this->decouple_whole_train = whole; }
+
+	/** Are the wagons this order puts down sold rather than left to be collected? Only meaningful if #ShouldDecoupleOnDeparture. */
+	inline bool ShouldSellDecoupled() const { return this->sell_decoupled; }
+
+	/** Set whether the wagons this order puts down are sold. */
+	inline void SetSellDecoupled(bool sell) { this->sell_decoupled = sell; }
+
+	/** Where the cargo the wagons this order puts down are to load is bound, or StationID::Invalid() for no such hint. See #decouple_cargo_dest. */
+	inline StationID GetDecoupleCargoDest() const { return this->decouple_cargo_dest; }
+
+	/** Set where the cargo the dropped wagons are to load is bound; StationID::Invalid() clears it. */
+	inline void SetDecoupleCargoDest(StationID dest) { this->decouple_cargo_dest = dest; }
+
+	/**
+	 * Convert an order written under the old single count into the switch and
+	 * the wagon count that replaced it, once, on load.
+	 *
+	 * The old count was the engine plus the wagons, so one off it is the
+	 * wagons; and any count at all meant decoupling was on. Emptying the old
+	 * field is what keeps "has the old field" a reliable mark of an old save.
+	 *
+	 * @return whether there was anything to convert.
+	 */
+	bool MigrateLegacyDecoupleCount()
+	{
+		if (this->decouple_count == 0) return false;
+		this->decouple = true;
+		this->decouple_keep_wagons = this->decouple_count - 1;
+		this->decouple_count = 0;
+		return true;
+	}
+
+	/**
+	 * Turn the two old boarding flags into the one #board_mode field, once, on
+	 * load.
+	 *
+	 * "By train" always meant a train going where this vehicle is going, and
+	 * "on wagons" always meant whatever stands here -- so each old flag is one
+	 * of the four ways, and the player's orders come through saying what they
+	 * said. Emptying the old fields is what keeps "has an old field set" a
+	 * reliable mark of a save written before this.
+	 *
+	 * @return whether there was anything to convert.
+	 */
+	bool MigrateLegacyBoardMode()
+	{
+		if (!this->load_on_train && !this->load_on_wagons) return false;
+		if (this->board_mode == OrderBoardMode::None) {
+			this->board_mode = this->load_on_train ? OrderBoardMode::TrainToNext : OrderBoardMode::WagonsAnywhere;
+		}
+		this->load_on_train = false;
+		this->load_on_wagons = false;
+		return true;
+	}
+
+	/** Should we delay leaving this station until a partner train arrives to couple with? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldWaitForCouple() const { return this->wait_for_couple; }
+
+	/** Set whether to delay leaving this station until a partner train arrives to couple with. */
+	inline void SetWaitForCouple(bool wait) { this->wait_for_couple = wait; }
+
+	/** Is this order's destination a place to travel to (reversing along the way if needed) in order to couple with a partner train there? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldGoToCouple() const { return this->go_to_couple; }
+
+	/** Does this couple order found a rake where there is none, and grow it where there is? */
+	inline bool ShouldFoundRake() const { return this->couple_found_rake; }
+
+	/** Set whether this couple order founds and grows a rake. */
+	inline void SetFoundRake(bool found) { this->couple_found_rake = found; }
+
+	/** Which wagon this order buys when the depot is short of them; EngineID::Invalid() for none chosen. */
+	inline EngineID GetCoupleBuyEngine() const { return this->couple_buy_engine; }
+
+	/** Set which wagon this order buys when the depot is short of them. */
+	inline void SetCoupleBuyEngine(EngineID engine) { this->couple_buy_engine = engine; }
+
+	/** Does this order buy wagons in the depot when there are not enough to collect? */
+	inline bool ShouldBuyWagons() const { return this->couple_buy_wagons; }
+
+	/** Set whether this order buys wagons when there are not enough to collect. */
+	inline void SetBuyWagons(bool buy) { this->couple_buy_wagons = buy; }
+
+	/** Is the couple count a minimum -- any rake of at least that many vehicles will do -- rather than an exact size? */
+	/** Are the filters asked of each vehicle in the rake rather than of the rake as a whole? */
+	inline bool ShouldSearchInRake() const { return this->couple_search; }
+
+	/** Ask the filters of each vehicle in the rake rather than of the rake as a whole. */
+	inline void SetSearchInRake(bool search) { this->couple_search = search; }
+
+	inline bool IsCoupleCountMinimum() const { return this->couple_min; }
+
+	/** Set whether the couple count is a minimum. */
+	inline void SetCoupleCountMinimum(bool minimum) { this->couple_min = minimum; }
+
+	/** Is the couple count a maximum -- a rake of up to that many vehicles -- rather than an exact size? */
+	inline bool IsCoupleCountMaximum() const { return this->couple_max; }
+
+	/** Set whether the couple count is a maximum. */
+	inline void SetCoupleCountMaximum(bool maximum) { this->couple_max = maximum; }
+
+	/**
+	 * Is the couple count a ceiling rather than the size of the rake to look for?
+	 *
+	 * Two ways to end up one: saying so, or founding a rake -- a rake being
+	 * built is by nature not yet its final size, so the number can only be
+	 * what it is being built up to. Everything that reads the number asks
+	 * this, which is also what keeps orders saved before the two were told
+	 * apart behaving as they did.
+	 */
+	inline bool IsCoupleCountCeiling() const { return this->couple_max || this->couple_found_rake; }
+
+	/** Set whether this order's destination is a place to travel to in order to couple with a partner train there. */
+	inline void SetGoToCouple(bool go) { this->go_to_couple = go; }
+
+	/** How a road vehicle gets itself carried on from this station. @pre IsType(OT_GOTO_STATION) */
+	inline OrderBoardMode GetBoardMode() const { return this->board_mode; }
+
+	/** Set how a road vehicle gets itself carried on from this station. */
+	inline void SetBoardMode(OrderBoardMode mode) { this->board_mode = mode; }
+
+	/** Does a road vehicle board something at this station at all? @pre IsType(OT_GOTO_STATION) */
+	inline bool ShouldBoardAtStation() const { return this->board_mode != OrderBoardMode::None; }
+
+	/** Does it ask for a ride that is going where it is going, rather than any ride at all? */
+	inline bool BoardsOnlyTowardsNext() const { return this->board_mode == OrderBoardMode::TrainToNext || this->board_mode == OrderBoardMode::WagonsToNext; }
+
+	/** Does it want a train (or a shunter), rather than a rake of wagons standing by itself? */
+	inline bool BoardsATrain() const { return this->board_mode == OrderBoardMode::TrainToNext || this->board_mode == OrderBoardMode::TrainAnywhere; }
+
+	/** Should a train visiting this depot turn around there? @pre IsType(OT_GOTO_DEPOT) */
+	inline bool ShouldTurnAroundInDepot() const { return this->turn_around_in_depot; }
+
+	/** Set whether a train visiting this depot turns around there. */
+	inline void SetTurnAroundInDepot(bool turn) { this->turn_around_in_depot = turn; }
+
+	/** Should a train leaving this station reverse out of it? @pre IsType(OT_GOTO_STATION) */
+	/** How full the wagons this order will collect have to be. */
+	inline OrderCoupleLoad GetCoupleLoad() const { return this->couple_load; }
+	/** Set how full the wagons this order will collect have to be. */
+	inline void SetCoupleLoad(OrderCoupleLoad load) { this->couple_load = load; }
+
+	/** Cargo the wagons this order will collect have to carry, or INVALID_CARGO for any. */
+	inline CargoType GetCoupleCargo() const { return this->couple_cargo; }
+	/** Set the cargo the wagons this order will collect have to carry. */
+	inline void SetCoupleCargo(CargoType cargo) { this->couple_cargo = cargo; }
+
+	/** How many vehicles the rake this order will collect has to have, or 0 for any. */
+	inline uint8_t GetCoupleCount() const { return this->couple_count; }
+	/** Set how many vehicles the rake this order will collect has to have. */
+	inline void SetCoupleCount(uint8_t count) { this->couple_count = count; }
+
+	inline bool ShouldReverseOutOfStation() const { return this->reverse_out_of_station; }
+
+	/** Does a train sound its horn as it passes this waypoint? */
+	inline bool ShouldHonk() const { return this->honk; }
+	/** Set whether a train sounds its horn as it passes this waypoint. */
+	inline void SetHonk(bool honk) { this->honk = honk; }
+
+	/** Set whether a train leaving this station reverses out of it. */
+	inline void SetReverseOutOfStation(bool reverse) { this->reverse_out_of_station = reverse; }
+
+	/** Does a train leaving this station go engine first and then the shortest way? */
+	inline bool ShouldDepartAutomatically() const { return this->automatic_departure; }
+	/** Set whether a train leaving this station goes engine first and then the shortest way. */
+	inline void SetAutomaticDeparture(bool automatic) { this->automatic_departure = automatic; }
+
+	/**
+	 * Is this order a OrderLoadType::FullLoad or OrderLoadType::FullLoadAny?
+	 * @return true iff the order is a full load or full load any order.
+	 */
+	inline bool IsFullLoadOrder() const
+	{
+		OrderLoadType type = GetLoadType();
+		return type == OrderLoadType::FullLoad || type == OrderLoadType::FullLoadAny;
+	}
+
+	/**
+	 * How must the consist be loaded?
+	 * @return The way to load the vehicle.
+	 */
+	inline OrderLoadType GetLoadType() const { return static_cast<OrderLoadType>(GB(this->flags, 4, 3)); }
+
+	/**
+	 * How must the consist be unloaded?
+	 * @return The way to unload the vehicle.
+	 */
+	inline OrderUnloadType GetUnloadType() const { return static_cast<OrderUnloadType>(GB(this->flags, 0, 3)); }
+
+	/**
+	 * At which stations must we stop?
+	 * @return Which stations to stop at.
+	 */
+	inline OrderNonStopFlags GetNonStopType() const { return static_cast<OrderNonStopFlags>(GB(this->type, 6, 2)); }
+
+	/**
+	 * Where must we stop at the platform?
+	 * @return Where at the platform to stop.
+	 */
+	inline OrderStopLocation GetStopLocation() const { return static_cast<OrderStopLocation>(GB(this->type, 4, 2)); }
+
+	/**
+	 * What caused us going to the depot?
+	 * @return The reason to go to the depot.
+	 */
+	inline OrderDepotTypeFlags GetDepotOrderType() const { return static_cast<OrderDepotTypeFlags>(GB(this->flags, 0, 3)); }
+
+	/**
+	 * What are we going to do when in the depot.
+	 * @return What to do in the depot.
+	 */
+	inline OrderDepotActionFlags GetDepotActionType() const { return static_cast<OrderDepotActionFlags>(GB(this->flags, 3, 4)); }
+
+	/**
+	 * What variable do we have to compare?
+	 * @return The variable of the comparison.
+	 */
+	inline OrderConditionVariable GetConditionVariable() const { return static_cast<OrderConditionVariable>(GB(this->dest.value, 11, 5)); }
+
+	/**
+	 * What is the comparator to use?
+	 * @return The comparator for the comparison.
+	 */
+	inline OrderConditionComparator GetConditionComparator() const { return static_cast<OrderConditionComparator>(GB(this->type, 5, 3)); }
+
+	/**
+	 * Get the order to skip to.
+	 * @return The sub-order to skip to.
+	 */
+	inline VehicleOrderID GetConditionSkipToOrder() const { return this->flags; }
+
+	/**
+	 * Get the value to base the skip on.
+	 * @return The value to compare the variable against.
+	 */
+	inline uint16_t GetConditionValue() const { return GB(this->dest.value, 0, 11); }
+
+	/**
+	 * Set how the consist must be loaded.
+	 * @param load_type The new load type, i.e. whether to load.
+	 */
+	inline void SetLoadType(OrderLoadType load_type) { SB(this->flags, 4, 3, to_underlying(load_type)); }
+
+	/**
+	 * Set how the consist must be unloaded.
+	 * @param unload_type The new unload type, i.e. whether to unload.
+	 */
+	inline void SetUnloadType(OrderUnloadType unload_type) { SB(this->flags, 0, 3, to_underlying(unload_type)); }
+
+	/**
+	 * Set whether we must stop at stations or not.
+	 * @param non_stop_type The new non stop type, i.e. where to stop.
+	 */
+	inline void SetNonStopType(OrderNonStopFlags non_stop_type) { SB(this->type, 6, 2, non_stop_type.base()); }
+
+	/**
+	 * Set where we must stop at the platform.
+	 * @param stop_location The location to stop at.
+	 */
+	inline void SetStopLocation(OrderStopLocation stop_location) { SB(this->type, 4, 2, to_underlying(stop_location)); }
+
+	/**
+	 * Set the cause to go to the depot.
+	 * @param depot_order_type The reason to go to the depot.
+	 */
+	inline void SetDepotOrderType(OrderDepotTypeFlags depot_order_type) { SB(this->flags, 0, 3, depot_order_type.base()); }
+
+	/**
+	 * Set what we are going to do in the depot.
+	 * @param depot_service_type What to do in the depot.
+	 */
+	inline void SetDepotActionType(OrderDepotActionFlags depot_service_type) { SB(this->flags, 3, 4, depot_service_type.base()); }
+
+	/**
+	 * Set variable we have to compare.
+	 * @param condition_variable The new variable to compare on.
+	 */
+	inline void SetConditionVariable(OrderConditionVariable condition_variable) { SB(this->dest.value, 11, 5, to_underlying(condition_variable)); }
+
+	/**
+	 * Set the comparator to use.
+	 * @param condition_comparator The new comparator to compare with.
+	 */
+	inline void SetConditionComparator(OrderConditionComparator condition_comparator) { SB(this->type, 5, 3, to_underlying(condition_comparator)); }
+
+	/**
+	 * Get the order to skip to.
+	 * @param order_id The new order to skip to.
+	 */
+	inline void SetConditionSkipToOrder(VehicleOrderID order_id) { this->flags = order_id; }
+
+	/**
+	 * Set the value to base the skip on.
+	 * @param value The new value to compare against.
+	 */
+	inline void SetConditionValue(uint16_t value) { SB(this->dest.value, 0, 11, value); }
+
+	/* As conditional orders write their "skip to" order all over the flags, we cannot check the
+	 * flags to find out if timetabling is enabled. However, as conditional orders are never
+	 * autofilled we can be sure that any non-zero values for their wait_time and travel_time are
+	 * explicitly set (but travel_time is actually unused for conditionals). */
+
+	/**
+	 * Does this order have an explicit wait time set?
+	 * @return \c true iff the wait time has been set.
+	 */
+	inline bool IsWaitTimetabled() const { return this->IsType(OT_CONDITIONAL) ? this->wait_time > 0 : HasBit(this->flags, 3); }
+
+	/**
+	 * Does this order have an explicit travel time set?
+	 * @return \c true iff the travel time has been set.
+	 */
+	inline bool IsTravelTimetabled() const { return this->IsType(OT_CONDITIONAL) ? this->travel_time > 0 : HasBit(this->flags, 7); }
+
+	/**
+	 * Get the time in ticks a vehicle should wait at the destination or 0 if it's not timetabled.
+	 * @return The wait time when explicitly timetabled, otherwise \c 0.
+	 */
+	inline uint16_t GetTimetabledWait() const { return this->IsWaitTimetabled() ? this->wait_time : 0; }
+	/**
+	 * Get the time in ticks a vehicle should take to reach the destination or 0 if it's not timetabled.
+	 * @return The travel time when explicitly timetabled, otherwise \c 0.
+	 */
+	inline uint16_t GetTimetabledTravel() const { return this->IsTravelTimetabled() ? this->travel_time : 0; }
+
+	/**
+	 * Get the time in ticks a vehicle will probably wait at the destination (timetabled or not).
+	 * @return The raw wait time.
+	 */
+	inline uint16_t GetWaitTime() const { return this->wait_time; }
+
+	/**
+	 * Get the time in ticks a vehicle will probably take to reach the destination (timetabled or not).
+	 * @return The raw travel time.
+	 */
+	inline uint16_t GetTravelTime() const { return this->travel_time; }
+
+	/**
+	 * Get the maximum speed in km-ish/h a vehicle is allowed to reach on the way to the
+	 * destination.
+	 * @return maximum speed.
+	 */
+	inline uint16_t GetMaxSpeed() const { return this->max_speed; }
+
+	/**
+	 * Set if the wait time is explicitly timetabled (unless the order is conditional).
+	 * @param timetabled Whether the conditional order's wait time is explicitly timetabled.
+	 */
+	inline void SetWaitTimetabled(bool timetabled) { if (!this->IsType(OT_CONDITIONAL)) AssignBit(this->flags, 3, timetabled); }
+
+	/**
+	 * Set if the travel time is explicitly timetabled (unless the order is conditional).
+	 * @param timetabled Whether the conditional order's travel time is explicitly timetabled.
+	 */
+	inline void SetTravelTimetabled(bool timetabled) { if (!this->IsType(OT_CONDITIONAL)) AssignBit(this->flags, 7, timetabled); }
+
+	/**
+	 * Set the time in ticks to wait at the destination.
+	 * @param time Time to set as wait time.
+	 */
+	inline void SetWaitTime(uint16_t time) { this->wait_time = time;  }
+
+	/**
+	 * Set the time in ticks to take for travelling to the destination.
+	 * @param time Time to set as travel time.
+	 */
+	inline void SetTravelTime(uint16_t time) { this->travel_time = time; }
+
+	/**
+	 * Set the maximum speed in km-ish/h a vehicle is allowed to reach on the way to the
+	 * destination.
+	 * @param speed Speed to be set.
+	 */
+	inline void SetMaxSpeed(uint16_t speed) { this->max_speed = speed; }
+
+	bool ShouldStopAtStation(const Vehicle *v, StationID station) const;
+	bool CanLoadOrUnload() const;
+	bool CanLeaveWithCargo(bool has_cargo) const;
+
+	TileIndex GetLocation(const Vehicle *v, bool airport = false) const;
+
+	/**
+	 * Checks if travel_time and wait_time apply to this order and if they are timetabled.
+	 * @return \c true iff the travel and wait time are timetabled whenever possible.
+	 */
+	inline bool IsCompletelyTimetabled() const
+	{
+		if (!this->IsTravelTimetabled() && !this->IsType(OT_CONDITIONAL)) return false;
+		if (!this->IsWaitTimetabled() && this->IsType(OT_GOTO_STATION) &&
+				!this->GetNonStopType().Test(OrderNonStopFlag::GoVia)) {
+			return false;
+		}
+		return true;
+	}
+
+	void AssignOrder(const Order &other);
+	bool Equals(const Order &other) const;
+	bool EqualsAsWritten(const Order &other) const;
+
+	uint16_t MapOldOrder() const;
+	void ConvertFromOldSavegame();
+};
+
+/** Compatibility struct to allow saveload of pool-based orders. */
+struct OldOrderSaveLoadItem {
+	uint32_t index = 0; ///< This order's index (1-based).
+	uint32_t next = 0; ///< The next order index (1-based).
+	Order order{}; ///< The order data.
+};
+
+OldOrderSaveLoadItem *GetOldOrder(size_t pool_index);
+OldOrderSaveLoadItem &AllocateOldOrder(size_t pool_index);
+
+void InsertOrder(Vehicle *v, Order &&new_o, VehicleOrderID sel_ord);
+void DeleteOrder(Vehicle *v, VehicleOrderID sel_ord);
+
+/**
+ * Shared order list linking together the linked list of orders and the list
+ *  of vehicles sharing this order list.
+ */
+struct OrderList : OrderListPool::PoolItem<&_orderlist_pool> {
+private:
+	friend void AfterLoadVehiclesPhase1(bool part_of_load); ///< For instantiating the shared vehicle chain
+	friend SaveLoadTable GetOrderListDescription(); ///< Saving and loading of order lists.
+	friend struct ORDLChunkHandler;
+	template <typename T>
+	friend class SlOrders;
+
+	VehicleOrderID num_manual_orders = 0; ///< NOSAVE: How many manually added orders are there in the list.
+	uint num_vehicles = 0; ///< NOSAVE: Number of vehicles that share this order list.
+	Vehicle *first_shared = nullptr; ///< NOSAVE: pointer to the first vehicle in the shared order chain.
+	std::vector<Order> orders; ///< Orders of the order list.
+	uint32_t old_order_index = 0;
+
+	TimerGameTick::Ticks timetable_duration{}; ///< NOSAVE: Total timetabled duration of the order list.
+	TimerGameTick::Ticks total_duration{}; ///< NOSAVE: Total (timetabled or not) duration of the order list.
+
+public:
+	/**
+	 * Default constructor producing an invalid order list.
+	 * @param index index of the list within the order list pool
+	 */
+	OrderList(OrderListID index) : OrderListPool::PoolItem<&_orderlist_pool>(index) {}
+
+	/**
+	 * Create an order list with the order for the given vehicle.
+	 * @param index index of the list within the order list pool
+	 * @param order Rvalue reference to the order.
+	 * @param v any vehicle using this orderlist
+	 */
+	OrderList(OrderListID index, Order &&order, Vehicle *v) : OrderListPool::PoolItem<&_orderlist_pool>(index)
+	{
+		this->orders.emplace_back(std::move(order));
+		this->Initialize(v);
+	}
+
+	OrderList(OrderListID index, std::vector<Order> &&orders, Vehicle *v) : OrderListPool::PoolItem<&_orderlist_pool>(index)
+	{
+		this->orders = std::move(orders);
+		this->Initialize(v);
+	}
+
+	OrderList(OrderListID index, Vehicle *v) : OrderListPool::PoolItem<&_orderlist_pool>(index)
+	{
+		this->Initialize(v);
+	}
+
+	/** Destructor. Invalidates OrderList for re-usage by the pool. */
+	~OrderList() {}
+
+	void Initialize(Vehicle *v);
+
+	void RecalculateTimetableDuration();
+
+	/**
+	 * Get the first order of the order chain.
+	 * @return the first order of the chain.
+	 */
+	inline VehicleOrderID GetFirstOrder() const { return this->orders.empty() ? INVALID_VEH_ORDER_ID : 0; }
+
+	inline std::span<const Order> GetOrders() const { return this->orders; }
+	inline std::span<Order> GetOrders() { return this->orders; }
+
+	/**
+	 * Get a certain order of the order chain.
+	 * @param index zero-based index of the order within the chain.
+	 * @return the order at position index.
+	 */
+	const Order *GetOrderAt(VehicleOrderID index) const
+	{
+		if (index >= this->GetNumOrders()) return nullptr;
+		return &this->orders[index];
+	}
+
+	Order *GetOrderAt(VehicleOrderID index)
+	{
+		if (index >= this->GetNumOrders()) return nullptr;
+		return &this->orders[index];
+	}
+
+	/**
+	 * Get the last order of the order chain.
+	 * @return the last order of the chain.
+	 */
+	inline VehicleOrderID GetLastOrder() const { return this->orders.empty() ? INVALID_VEH_ORDER_ID : (this->GetNumOrders() - 1); }
+
+	/**
+	 * Get the order after the given one or the first one, if the given one is the
+	 * last one.
+	 * @param cur Order to find the next one for.
+	 * @return Next order.
+	 */
+	inline VehicleOrderID GetNext(VehicleOrderID cur) const
+	{
+		if (this->orders.empty()) return INVALID_VEH_ORDER_ID;
+		return static_cast<VehicleOrderID>((cur + 1) % this->GetNumOrders());
+	}
+
+	/**
+	 * Get number of orders in the order list.
+	 * @return number of orders in the chain.
+	 */
+	inline VehicleOrderID GetNumOrders() const { return static_cast<VehicleOrderID>(std::size(this->orders)); }
+
+	/**
+	 * Get number of manually added orders in the order list.
+	 * @return number of manual orders in the chain.
+	 */
+	inline VehicleOrderID GetNumManualOrders() const { return this->num_manual_orders; }
+
+	void GetNextStoppingStation(std::vector<StationID> &next_station, const Vehicle *v, VehicleOrderID first = INVALID_VEH_ORDER_ID, uint hops = 0) const;
+	VehicleOrderID GetNextDecisionNode(VehicleOrderID next, uint hops) const;
+
+	void InsertOrderAt(Order &&order, VehicleOrderID index);
+	void DeleteOrderAt(VehicleOrderID index);
+	void MoveOrder(VehicleOrderID from, VehicleOrderID to);
+
+	/**
+	 * Is this a shared order list?
+	 * @return whether this order list is shared among multiple vehicles
+	 */
+	inline bool IsShared() const { return this->num_vehicles > 1; };
+
+	/**
+	 * Get the first vehicle of this vehicle chain.
+	 * @return the first vehicle of the chain.
+	 */
+	inline Vehicle *GetFirstSharedVehicle() const { return this->first_shared; }
+
+	/**
+	 * Return the number of vehicles that share this orders list
+	 * @return the count of vehicles that use this shared orders list
+	 */
+	inline uint GetNumVehicles() const { return this->num_vehicles; }
+
+	/**
+	 * Adds the given vehicle to this shared order list.
+	 * @note This is supposed to be called after the vehicle has been inserted
+	 *       into the shared vehicle chain.
+	 * @param v vehicle to add to the list
+	 */
+	inline void AddVehicle([[maybe_unused]] Vehicle *v) { ++this->num_vehicles; }
+
+	void RemoveVehicle(Vehicle *v);
+
+	bool IsCompleteTimetable() const;
+
+	/**
+	 * Gets the total duration of the vehicles timetable or Ticks::INVALID_TICKS is the timetable is not complete.
+	 * @return total timetable duration or Ticks::INVALID_TICKS for incomplete timetables
+	 */
+	inline TimerGameTick::Ticks GetTimetableTotalDuration() const { return this->IsCompleteTimetable() ? this->timetable_duration : Ticks::INVALID_TICKS; }
+
+	/**
+	 * Gets the known duration of the vehicles timetable even if the timetable is not complete.
+	 * @return known timetable duration
+	 */
+	inline TimerGameTick::Ticks GetTimetableDurationIncomplete() const { return this->timetable_duration; }
+
+	/**
+	 * Gets the known duration of the vehicles orders, timetabled or not.
+	 * @return  known order duration.
+	 */
+	inline TimerGameTick::Ticks GetTotalDuration() const { return this->total_duration; }
+
+	/**
+	 * Must be called if an order's timetable is changed to update internal book keeping.
+	 * @param delta By how many ticks has the timetable duration changed
+	 */
+	void UpdateTimetableDuration(TimerGameTick::Ticks delta) { this->timetable_duration += delta; }
+
+	/**
+	 * Must be called if an order's timetable is changed to update internal book keeping.
+	 * @param delta By how many ticks has the total duration changed
+	 */
+	void UpdateTotalDuration(TimerGameTick::Ticks delta) { this->total_duration += delta; }
+
+	void FreeChain(bool keep_orderlist = false);
+
+	void DebugCheckSanity() const;
+};
+
+#endif /* ORDER_BASE_H */
