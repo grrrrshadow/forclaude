@@ -444,6 +444,13 @@ normal zoom) and taken from four directions on (register 105,
 other way round): the probe reads it as sprite 28 of the file instead of 32,
 with the offsets -20,-12 of the file moved to -12,-28 at 8x.
 
+`testsada <text> [years] [plny]` builds the rail vehicle of any set whose
+name has the text in it, into a depot built for it, gives it that many years
+of age and, with `plny`, a full load of its cargo, and describes the colours
+its set gives each part and the pictures each part is drawn with, layer by
+layer: the colleague's wagons read without a screen, whatever their year
+(the engine is made available by hand).
+
 `getsjmena` plays `grf/gets_like.yagl`, wagons named the way GETS names its
 own (`Open Wagon "Eaos"`) and one drawing its coal as a layer over the wagon,
 as GETS does.

@@ -9278,6 +9278,99 @@ static bool ConTestLengths(std::span<std::string_view> argv)
 }
 
 /**
+ * A vehicle of a set in the rig, the colleague's wagons above all: build the
+ * rail vehicle whose name has the text in it, into a depot built for it, give
+ * it an age in years, and say for each part what colours its set gives it
+ * (DescribeVehicleTrueColours()) and what pictures it is drawn with, layer by
+ * layer (DescribeTrueColourSprite()) -- so a set that fades with age, cuts
+ * loads from a texture or moves a layer can be read without a screen. Each
+ * call builds another vehicle, full of its cargo on 'plny'. Usage:
+ * 'testsada <text> [roky] [plny]'.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestSetVehicle(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Build the rail vehicle of a set whose name has the text in it, aged so many years, full of its cargo with 'plny', and describe the colours and pictures of each part. Usage: 'testsada <text> [years] [plny]'.");
+		return true;
+	}
+	int years = 0;
+	if (argv.size() > 2) {
+		auto value = ParseType<int>(argv[2]);
+		if (!value.has_value()) {
+			IConsolePrint(CC_ERROR, "testsada: roky maji byt cislo, ne '{}'", argv[2]);
+			return true;
+		}
+		years = *value;
+	}
+	const bool full = argv.size() > 3 && argv[3] == "plny";
+	EngineID eid = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+		if (e->info.string_id == INVALID_STRING_ID || !e->VehInfo<RailVehicleInfo>().railtypes.Test(RAILTYPE_RAIL)) continue;
+		if (GetString(STR_ENGINE_NAME, e->index).find(argv[1]) == std::string::npos) continue;
+		eid = e->index;
+		break;
+	}
+	if (eid == EngineID::Invalid()) {
+		IConsolePrint(CC_DEFAULT, "testsada: zadne kolejove vozidlo se jmenem '{}'", argv[1]);
+		return true;
+	}
+	/* A headless new game has no company: make one to build as, with money
+	 * and the rail type, whatever the year. */
+	if (Company::GetIfValid(_local_company) == nullptr) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (made == nullptr) {
+			IConsolePrint(CC_ERROR, "testsada: neni firma, za kterou stavet");
+			return true;
+		}
+		SetLocalCompany(made->index);
+	}
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	Company::Get(_current_company)->avail_railtypes.Set(RAILTYPE_RAIL);
+	Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+	/* Whatever the year of the game and of the vehicle: the rig reads
+	 * pictures, not availability. */
+	Engine::Get(eid)->company_avail.Set(_local_company);
+	Engine::Get(eid)->flags.Set(EngineFlag::Available);
+	auto free = [](TileIndex t) { return IsTileType(t, TileType::Clear) && GetTileSlope(t) == SLOPE_FLAT; };
+	TileIndex shed = INVALID_TILE;
+	for (TileIndex t : SpiralTileSequence(TileXY(Map::SizeX() / 2, Map::SizeY() / 2), 61)) {
+		if (TileX(t) + 2 >= Map::SizeX() || TileY(t) + 2 >= Map::SizeY() || !free(t)) continue;
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, t, RAILTYPE_RAIL, DiagDirection::NE).Succeeded()) {
+			shed = t;
+			break;
+		}
+	}
+	if (shed == INVALID_TILE) {
+		IConsolePrint(CC_DEFAULT, "testsada: depo nejde postavit");
+		return true;
+	}
+	auto [cost, veh, u1, u2, u3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, shed, eid, true, INVALID_CARGO, ClientID::Invalid);
+	if (cost.Failed()) {
+		IConsolePrint(CC_DEFAULT, "testsada: '{}' nejde postavit: {}", GetString(STR_ENGINE_NAME, eid), RefusalReason(cost));
+		return true;
+	}
+	Train *v = Train::Get(veh);
+	for (Vehicle *u = v; u != nullptr; u = u->Next()) {
+		u->age = TimerGameCalendar::Date{years * CalendarTime::DAYS_IN_YEAR};
+		if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) AppendConsoleCargo(u, CargoPacket::Create(StationID::Invalid(), u->cargo_cap, Source{}));
+		u->sprite_cache.last_direction = Direction::Invalid;
+	}
+	v->UpdateViewport(true, true);
+	uint part = 0;
+	for (Vehicle *u = v; u != nullptr; u = u->Next(), part++) {
+		IConsolePrint(CC_DEFAULT, "testsada: '{}' clanek {} ({}), naklad {} {}/{}, {} let: {}", GetString(STR_ENGINE_NAME, eid), part, u->IsArticulatedPart() ? "kloubovy" : "hlava",
+				IsValidCargoType(u->cargo_type) ? GetString(CargoSpec::Get(u->cargo_type)->name) : "zadny", u->cargo.StoredCount(), u->cargo_cap, years, DescribeVehicleTrueColours(u));
+		for (uint i = 0; i < u->sprite_cache.sprite_seq.count; i++) {
+			SpriteID sprite = u->sprite_cache.sprite_seq.seq[i].sprite;
+			IConsolePrint(CC_DEFAULT, "testsada:   vrstva {} obrazek {}: {}", i, sprite, DescribeTrueColourSprite(sprite));
+		}
+	}
+	return true;
+}
+
+/**
  * The rail vehicles whose name has a piece of text in it: the name the set
  * gives the vehicle and the name the purchase list shows, which a set may
  * change over the years (CZTR's Pasy shows as Sgs from 1980). For finding the
@@ -14461,6 +14554,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testkoupit",              ConTestBuyWagons);
 	IConsole::CmdRegister("testzelenest",            ConTestGreenSt);
 	IConsole::CmdRegister("testjmena",               ConTestNames);
+	IConsole::CmdRegister("testsada",                ConTestSetVehicle);
 	IConsole::CmdRegister("testdelky",               ConTestLengths);
 	IConsole::CmdRegister("testdepovagony",          ConTestDepotWagons);
 	IConsole::CmdRegister("testspolehlivost",        ConTestReliability);
