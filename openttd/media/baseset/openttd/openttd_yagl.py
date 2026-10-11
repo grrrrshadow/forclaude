@@ -6,7 +6,7 @@ grfcodec). The source is openttd.yagl beside this script, the set as yagl
 reads and writes it, with the game's original sprites on the palette sheet
 openttd-8bpp-normal-0.png and the pictures of our own -- the school, the
 automat, the statue, the plantation, the bus-stop girls, the hut, the
-fireworks, the poster -- on sheets of our own, openttd-nase-*.png, laid out
+fireworks -- on sheets of our own, openttd-nase-*.png, laid out
 here from the pieces openttd_budovy.py cuts from the colleague's renders
 (budovy_manifest.json). Our GUI icons -- the blueprint toolbar, the rescue
 engine, the crosshairs, the raid rocket, the cargo icons of the road
@@ -22,7 +22,7 @@ openttd.yagl: for every entry of the manifest, the block of the OpenTTD GUI
 sprite it stands for (SPR_OPENTTD_BASE + 231 and on, the order of the
 manifest) is made anew from the finest render there is -- the 16x piece
 (zin16) where the colleague renders one, else the 8x piece (zin8), else the
-4x piece (zin4, the poster). 32bpp only: the player's word is that we make
+4x piece (zin4). 32bpp only: the player's word is that we make
 no palette pictures, as the colleague's sets have none. The levels not in
 the file the game works out by scaling (ResizeSprites() in
 src/spritecache.cpp), 4x from 8x among them: the renders go in as they are,

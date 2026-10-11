@@ -9348,11 +9348,6 @@ replace_sprites<OpenTTDGUI, 0x0000> // <new_feature_type, offset>  Action05
     {
         [501, 509, -241, -694], zin8, c32bpp | chunked, "openttd-nase-zin8.png", [1443, 4418];
     }
-    // Replace OpenTTDGUI sprite 0x0118
-    sprite_id<0x00000703>
-    {
-        [1529, 1038, 2, 3], zin4, c32bpp | chunked, "openttd-nase-zin4.png", [8, 8];
-    }
 }
 // Record #56
 ignore // Action0C

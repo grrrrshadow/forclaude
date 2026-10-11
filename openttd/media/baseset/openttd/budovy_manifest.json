@@ -831,16 +831,5 @@
    "x": -241,
    "y": -694
   }
- },
- {
-  "name": "plakat_tatra148",
-  "x4": {
-   "file": "plakat_tatra148_32bpp.png",
-   "w": 1529,
-   "h": 1038,
-   "x": 2,
-   "y": 3
-  },
-  "x8": null
  }
 ]

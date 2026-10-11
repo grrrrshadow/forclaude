@@ -210,117 +210,6 @@ enum GlobalHotKeys : int32_t {
 	GHK_CLOSE_ERROR,
 };
 
-/**
- * The poster that drives in at every start of the game, the player's word:
- * the colleague's orange Tatra 148 with marijuana (SPR_START_POSTER) comes in
- * from the right edge of the screen while the graphics are searched, drives
- * south-west, stands, then backs out the way it came -- on under the menu
- * when the search is over sooner. It is drawn on the main window, under
- * every other window; the search window stands higher to make room for it
- * (ScanProgressWindow). It moves only while it is being drawn: its clock is
- * the time between one paint of it and the next, and a long gap counts as a
- * frame. While the search window is up it drives in and stands, and goes on
- * standing until the search is over, so that it is still there under the menu.
- * The first cut ran on real time from the first paint: with the player's sets
- * the search and the loading of every sprite after it, during which nothing is
- * drawn, took longer than the whole ride, and the poster never showed.
- */
-struct StartPoster {
-	static constexpr int IN_MS = 6000; ///< Driving in: the player, "30 % of today's speed", of the 1800 ms it was.
-	static constexpr int STAND_MS = 3500; ///< Standing.
-	static constexpr int OUT_MS = 6000; ///< Backing out, as slow.
-
-	static constexpr uint MAX_STEP_MS = 100; ///< The most one paint moves it on, however long since the last.
-
-	uint elapsed_ms = 0; ///< How long it has been on its way, in time it was drawn.
-	std::optional<std::chrono::steady_clock::time_point> last_paint{}; ///< When it was last drawn.
-	Rect drawn{0, 0, -1, -1}; ///< Where it was drawn last, to be drawn over when it moves.
-	bool done = false; ///< It has gone.
-
-	/**
-	 * Where the poster is now, and at which zoom it is drawn: always its own
-	 * 4x level, the picture as the colleague made it, pixel for pixel and at
-	 * no other size (the player: "the poster is shown once, one size"),
-	 * standing a twentieth of the screen in from the bottom right -- or with
-	 * its top at the screen's top where the screen is lower than the poster.
-	 * It comes in along the screen's south-west slope (two across, one down)
-	 * from just off the right edge, slowing down, and backs out along it.
-	 * @param zoom set to the zoom it is drawn at
-	 * @return its rectangle, or nothing when it is not on the screen
-	 */
-	std::optional<Rect> Where(ZoomLevel &zoom)
-	{
-		if (this->done || _screen.width <= 0 || _screen.height <= 0) return std::nullopt;
-		int ms = static_cast<int>(this->elapsed_ms);
-		if (ms >= IN_MS + STAND_MS + OUT_MS) {
-			this->done = true;
-			return std::nullopt;
-		}
-
-		zoom = ZoomLevel::In4x;
-		Dimension d = GetSpriteSize(SPR_START_POSTER, nullptr, zoom);
-		int w = static_cast<int>(d.width);
-		int h = static_cast<int>(d.height);
-
-		int stop_x = _screen.width - _screen.width / 20 - w;
-		int stop_y = std::max(0, _screen.height - _screen.height / 20 - h);
-		int start_x = _screen.width;
-		int start_y = stop_y - (start_x - stop_x) / 2;
-
-		/* How far along the way from the edge to the stop it is, 0 to 1. */
-		double along;
-		if (ms < IN_MS) {
-			double p = static_cast<double>(ms) / IN_MS;
-			along = 1.0 - (1.0 - p) * (1.0 - p);
-		} else if (ms < IN_MS + STAND_MS) {
-			along = 1.0;
-		} else {
-			double q = static_cast<double>(ms - IN_MS - STAND_MS) / OUT_MS;
-			along = 1.0 - q * q;
-		}
-		int x = start_x + static_cast<int>((stop_x - start_x) * along);
-		int y = start_y + static_cast<int>((stop_y - start_y) * along);
-		return Rect{x, y, x + w - 1, y + h - 1};
-	}
-
-	/** Draw it, if it is on the screen, and move it on by the time since it was last drawn. */
-	void Draw()
-	{
-		if (this->done) return;
-		auto now = std::chrono::steady_clock::now();
-		if (this->last_paint.has_value()) {
-			uint step = static_cast<uint>(std::min<int64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - *this->last_paint).count(), MAX_STEP_MS));
-			if (HasModalProgress()) {
-				/* The graphics are being searched: drive in and stand. */
-				this->elapsed_ms = std::min<uint>(this->elapsed_ms + step, IN_MS);
-			} else {
-				this->elapsed_ms += step;
-			}
-		}
-		this->last_paint = now;
-		ZoomLevel zoom;
-		std::optional<Rect> r = this->Where(zoom);
-		if (!r.has_value()) return;
-		DrawSprite(SPR_START_POSTER, PAL_NONE, r->left, r->top, nullptr, zoom);
-	}
-
-	/** Have the screen drawn anew where it was and where it is now, while it moves. */
-	void MarkDirty()
-	{
-		if (this->done && this->drawn.right < this->drawn.left) return;
-		ZoomLevel zoom;
-		std::optional<Rect> r = this->Where(zoom);
-		if (this->drawn.right >= this->drawn.left) AddDirtyBlock(this->drawn.left, this->drawn.top, this->drawn.right + 1, this->drawn.bottom + 1);
-		if (r.has_value()) {
-			AddDirtyBlock(r->left, r->top, r->right + 1, r->bottom + 1);
-			this->drawn = *r;
-		} else {
-			this->drawn = {0, 0, -1, -1};
-		}
-	}
-};
-static StartPoster _start_poster;
-
 struct MainWindow : Window
 {
 	MainWindow(WindowDesc &desc) : Window(desc)
@@ -390,16 +279,7 @@ struct MainWindow : Window
 
 			int text_y = this->height - GetCharacterHeight(FontSize::Normal) * 2;
 			DrawString(0, this->width - 1, text_y, STR_INTRO_VERSION, TextColour::White, {AlignmentH::Centre, AlignmentV::Middle});
-
-			/* The poster of the start of the game, over the title's map and
-			 * under every window. */
-			_start_poster.Draw();
 		}
-	}
-
-	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
-	{
-		if (_game_mode == GameMode::Menu) _start_poster.MarkDirty();
 	}
 
 	EventState OnHotkey(int hotkey) override

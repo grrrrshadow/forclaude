@@ -2173,16 +2173,6 @@ struct ScanProgressWindow : public Window {
 		this->InitNested(1);
 	}
 
-	/**
-	 * In the top left corner of the screen, out of the way of the poster of
-	 * the start of the game, which drives in under it (main_gui.cpp); the
-	 * player: "it is in the way, put it right in the top left corner".
-	 */
-	Point OnInitialPosition([[maybe_unused]] int16_t sm_width, [[maybe_unused]] int16_t sm_height, [[maybe_unused]] int window_number) override
-	{
-		return {0, 0};
-	}
-
 	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
