@@ -197,7 +197,7 @@ texts) with variable 0x10 as for 1C0:
 | bits 8..15 | bits 0..7 | asks for | answer |
 |---|---|---|---|
 | detail *a* | **0xFF** | is detail *a* a colour, and where | the **first of its eight mask indices** (`0x8000 \| index`); register 0x100 its lightening (below), 0 for the usual; register 0x101 = 1 for a detail turned, not painted (below). Any other answer, or none: the detail is no colour. |
-| detail *a* | **0xFE** | the set's own colour of detail *a* on this vehicle, by its cargo | **`0x40F`** with the same registers as an option's answer, standing in its place; anything else: the option's answer stands (below). |
+| detail *a* | **0xFE** | the set's own colour of detail *a* on this vehicle, by its cargo and its subtype | **`0x40F`** with the same registers as an option's answer, standing in its place; anything else: the option's answer stands (below). |
 | detail *a* | option *o* | the colour of option *o* | **`0x40F`** (`0x840F`) with the colour in register **0x100** as `0x00RRGGBB`; register **0x101** a lightening of this colour's own, 0 for the detail's; registers **0x102** to **0x104** a fading with age (below), 0x103 = 0 for none. Any other answer: this option is no colour, the pixels stay as drawn (in the company colour where the mask is the company colour's). |
 
 The game asks with the option the player chose, the first option in the
@@ -294,10 +294,13 @@ that the game asks 1C1 once more with option **0xFE**, **with the vehicle** --
 the part whose picture it is, so variable 0x47 is that part's cargo -- after
 the option's answer: answered `0x40F`, its registers stand in place of the
 option's (the colour or the turn, the fading). Any other answer leaves the
-option's. The answer is remembered by the part's cargo, so the set is to
-answer by the cargo and nothing else of the part; it is asked again on a
-refit. In the purchase list it is asked without a vehicle, where 0x47 is the
-engine's default cargo. A detail that is the set's alone needs no row: leave
+option's. The answer is remembered by the part's cargo and its subtype, so
+option 0xFE may answer by the cargo and its subtype (variables 0x47 and
+0xF2) and nothing else of the part -- a civil and a military Tatra with the
+same cargo, told apart by the refit, or red and grey bricks; it is asked
+again on a refit, to another cargo or another subtype. In the purchase list
+it is asked without a vehicle, where 0x47 is the engine's default cargo and
+the subtype 0. A detail that is the set's alone needs no row: leave
 it unnamed in 1C0 after the named ones (the list of names ends there, the
 colours do not), or name it and answer 401. (The colleague's point 8.)
 

@@ -429,7 +429,10 @@ and reads #CE5A2D at a year, #B4503C at two and after, orange again at none.
 A sixth detail, unnamed in 1C0, is a green patch on the body (mask 0x70-0x77)
 the set turns rather than paints (register 101 = 1) and colours itself by the
 cargo (option FE, asked with the vehicle): carrying passengers it is hay,
-#F0EF69, refitted to mail it is green as drawn, #28A03C. The vehicle is a
+#F0EF69, refitted to mail it is green as drawn, #28A03C; passengers of cargo
+subtype 1 (variable F2, a military vehicle with the civil one's cargo) are
+left green too, and back on subtype 0 hay again -- the game remembers the
+answer by the cargo and its subtype. The vehicle is a
 sprite stack of three layers: the vehicle, a stencil (an ellipse, 254 above
 and grey 128 below, mask 0x70-0x77, bit 30 of register 100 and a start of
 3,5 in registers 101 and 102) and a texture of four greens in 16-pixel

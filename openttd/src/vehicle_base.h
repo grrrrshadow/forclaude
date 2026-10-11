@@ -314,6 +314,7 @@ public:
 	mutable uint16_t true_colours_epoch = 0; ///< true_colours is good while this is GetTrueColourEpoch(); 0 after the player chose anew.
 	mutable uint8_t true_colours_age_years = 0; ///< The age in years true_colours was made for: a paint that fades with age is made anew each year.
 	mutable CargoType true_colours_cargo = INVALID_CARGO; ///< The cargo true_colours was made for: a colour the set picks by the cargo is made anew on a refit.
+	mutable uint8_t true_colours_subtype = 0; ///< The cargo subtype true_colours was made for: a colour the set picks by the subtype is made anew on a refit to another.
 	uint16_t cargo_cap = 0; ///< total capacity
 	uint16_t refit_cap = 0; ///< Capacity left over from before last refit.
 	uint16_t cargo_age_counter = 0; ///< Ticks till cargo is aged next.

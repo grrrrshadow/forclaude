@@ -255,8 +255,8 @@ static std::optional<TrueColourRange> VehicleConfigColour(EngineID engine, uint 
 	return range;
 }
 
-/** The colours of an engine in the options chosen as the set gives them, fading and all, asked of the set once: the engine, the options and the cargo, to the colours. */
-static std::map<std::tuple<EngineID, VehicleConfigOptions, CargoType>, TrueColourSet> _engine_colour_ranges;
+/** The colours of an engine in the options chosen as the set gives them, fading and all, asked of the set once: the engine, the options, the cargo and its subtype, to the colours. */
+static std::map<std::tuple<EngineID, VehicleConfigOptions, CargoType, uint8_t>, TrueColourSet> _engine_colour_ranges;
 /** GetTrueColourEpoch() when _engine_colour_ranges was last good. */
 static uint16_t _engine_colour_ranges_epoch = 0;
 
@@ -265,8 +265,10 @@ static uint16_t _engine_colour_ranges_epoch = 0;
  * them: every detail of its set that is a colour, in the colour of the
  * option chosen, with the fading the set gave it.
  * A colour the set picks by the cargo is asked with the part whose picture
- * it is and remembered by the part's cargo: the set is to answer by the
- * cargo and nothing else of the part.
+ * it is and remembered by the part's cargo and its subtype (the colleague's
+ * word: a civil and a military Tatra with the same cargo, told apart by the
+ * refit's subtype): the set is to answer by those two and nothing else of
+ * the part.
  * @param engine the engine
  * @param options the option chosen for each detail
  * @param v the part whose picture it is, or nullptr in the purchase list
@@ -283,7 +285,8 @@ static const TrueColourSet &EngineColourRanges(EngineID engine, const VehicleCon
 		_engine_colour_ranges_epoch = GetTrueColourEpoch();
 	}
 	const CargoType cargo = v != nullptr ? v->cargo_type : INVALID_CARGO;
-	auto it = _engine_colour_ranges.find({engine, options, cargo});
+	const uint8_t subtype = v != nullptr ? v->cargo_subtype : 0;
+	auto it = _engine_colour_ranges.find({engine, options, cargo, subtype});
 	if (it != _engine_colour_ranges.end()) return it->second;
 
 	TrueColourSet colours;
@@ -291,7 +294,7 @@ static const TrueColourSet &EngineColourRanges(EngineID engine, const VehicleCon
 		std::optional<TrueColourRange> range = VehicleConfigColour(engine, a, options[a], v);
 		if (range.has_value()) colours.push_back(*range);
 	}
-	return _engine_colour_ranges.emplace(std::tuple{engine, options, cargo}, std::move(colours)).first->second;
+	return _engine_colour_ranges.emplace(std::tuple{engine, options, cargo, subtype}, std::move(colours)).first->second;
 }
 
 /**
@@ -301,7 +304,7 @@ static const TrueColourSet &EngineColourRanges(EngineID engine, const VehicleCon
  * @param engine the engine
  * @param options the option chosen for each detail; all nought in the purchase list
  * @param age_years the vehicle's age in whole years; 0 in the purchase list
- * @param v the part whose picture it is, for a colour the set picks by the cargo; nullptr in the purchase list
+ * @param v the part whose picture it is, for a colour the set picks by the cargo and its subtype; nullptr in the purchase list
  * @return the colours (InternTrueColourSet()); 0 for none
  */
 uint16_t GetEngineTrueColours(EngineID engine, const VehicleConfigOptions &options, uint age_years, const Vehicle *v)
@@ -334,11 +337,12 @@ static uint VehicleAgeYears(const Vehicle *v)
 uint16_t GetVehicleTrueColours(const Vehicle *v)
 {
 	const uint years = VehicleAgeYears(v);
-	if (v->true_colours_epoch == GetTrueColourEpoch() && v->true_colours_age_years == years && v->true_colours_cargo == v->cargo_type) return v->true_colours;
+	if (v->true_colours_epoch == GetTrueColourEpoch() && v->true_colours_age_years == years && v->true_colours_cargo == v->cargo_type && v->true_colours_subtype == v->cargo_subtype) return v->true_colours;
 	v->true_colours = GetEngineTrueColours(v->engine_type, VehicleConfigHead(v)->config_options, years, v);
 	v->true_colours_epoch = GetTrueColourEpoch();
 	v->true_colours_age_years = static_cast<uint8_t>(years);
 	v->true_colours_cargo = v->cargo_type;
+	v->true_colours_subtype = v->cargo_subtype;
 	return v->true_colours;
 }
 

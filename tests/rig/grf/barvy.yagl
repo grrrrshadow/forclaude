@@ -14,7 +14,9 @@
 // A sixth detail, unnamed in 1C0, is a heap on the body (mask 0x70-0x77, a
 // green patch) that is turned rather than painted (register 101 = 1): the
 // set itself makes it hay when the vehicle carries passengers (option FE by
-// variable 47), and leaves it as the option says, unturned, for other cargo.
+// variable 47), and leaves it as the option says, unturned, for other cargo
+// and for passengers of cargo subtype 1 (variable F2): a civil and a
+// military vehicle with the same cargo, told apart by the refit.
 // The vehicle is a sprite stack of three layers: the vehicle, a stencil (an
 // ellipse, white above and grey below, mask 0x70-0x77) with bit 30 of
 // register 100 and a start of 3,5 in registers 101 and 102, and the texture
@@ -553,7 +555,19 @@ switch<RoadVehicles, 0x1C, PrimaryDWord> // heap carrying passengers: hay -- hue
     };
     default: 0x840F;
 }
-switch<RoadVehicles, 0x1D, PrimaryDWord> // the heap's colour by the cargo (option FE, asked with the vehicle): passengers (class bit 0) hay, anything else as the option says
+switch<RoadVehicles, 0x1E, PrimaryDWord> // passengers by the cargo subtype (variable F2): subtype 0 hay, any other as the option says -- a civil and a military vehicle with the same cargo
+{
+    expression:
+    {
+        value1 = variable[0xF2] & 0x000000FF;
+    };
+    ranges:
+    {
+        0x00000000: 0x001C;
+    };
+    default: 0x8400;
+}
+switch<RoadVehicles, 0x1D, PrimaryDWord> // the heap's colour by the cargo and its subtype (option FE, asked with the vehicle): passengers (class bit 0) by the subtype, anything else as the option says
 {
     expression:
     {
@@ -561,7 +575,7 @@ switch<RoadVehicles, 0x1D, PrimaryDWord> // the heap's colour by the cargo (opti
     };
     ranges:
     {
-        0x00010000: 0x001C;
+        0x00010000: 0x001E;
     };
     default: 0x8400;
 }

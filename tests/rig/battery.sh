@@ -1662,7 +1662,8 @@ echo "konfig: $(grep -o 'testkonfig: SOUHRN.*' $S/reg_konfig.log | sed 's/testko
 # detail 4 in variable 5D. testbarvy reads the colours of the purchase list
 # and of the vehicle built (the same), the picture painted in them (pixels
 # and the commonest colours, read in 32bpp), refits it to mail and back (a
-# heap the set turns to hay by the cargo, option FE, goes green again), ages
+# heap the set turns to hay by the cargo, option FE, goes green again; on
+# passengers of cargo subtype 1 it stays green, on subtype 0 hay), ages
 # the vehicle by hand (the
 # cab's orange fades to brick red over two years, registers 102 to 104, a
 # picture per step, new again orange), chooses other colours and the

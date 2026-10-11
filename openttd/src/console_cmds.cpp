@@ -8622,6 +8622,25 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
 	picture();
 	std::string cut_pax = second_layer();
+	/* The same cargo of another subtype (variable F2), as a military Tatra is
+	 * the civil one refitted (the colleague's request): the set leaves the
+	 * heap as the option says, green #28A03C; back on subtype 0 it is hay
+	 * again. Remembered by the cargo alone, both would be the one asked first. */
+	CommandCost to_sub1 = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, v->index, GetCargoTypeByLabel(CT_PASSENGERS), 1, false, false, 0));
+	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
+	const uint sub1 = v->cargo_subtype;
+	std::string heap_sub1 = DescribeVehicleTrueColours(v);
+	std::string heap_sub1_pic = DescribeTrueColourSprite(picture());
+	CommandCost to_sub0 = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, v->index, GetCargoTypeByLabel(CT_PASSENGERS), 0, false, false, 0));
+	for (Vehicle *u = v; u != nullptr; u = u->Next()) u->sprite_cache.last_direction = Direction::Invalid;
+	std::string heap_sub0_pic = DescribeTrueColourSprite(picture());
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi podtyp {} ({}): {}", sub1, to_sub1.Succeeded() ? "prestaveno" : "PRESTAVBA ODMITNUTA", heap_sub1);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa podtyp {} obrazek: {}", sub1, heap_sub1_pic);
+	IConsolePrint(CC_DEFAULT, "testbarvy: kupa zpet podtyp {} obrazek: {}", v->cargo_subtype, heap_sub0_pic);
+	bool subtype_ok = to_sub1.Succeeded() && to_sub0.Succeeded() && sub1 == 1 && v->cargo_subtype == 0
+			&& heap_sub1.find("otoceni 0 sytost 128/128 jas 128/128") != std::string::npos
+			&& heap_sub1_pic.find("#28A03C") != std::string::npos && heap_sub0_pic.find("#28A03C") == std::string::npos;
+	if (!subtype_ok) refuse("kupa podle podtypu: cestujici podtyp 1 neotoceni a zelena #28A03C, podtyp 0 zase seno");
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi: {}", heap_pax);
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s cestujicimi obrazek: {}", heap_pax_pic);
 	IConsolePrint(CC_DEFAULT, "testbarvy: kupa s postou ({}): {}", to_mail.Succeeded() ? "prestaveno" : "PRESTAVBA ODMITNUTA", heap_mail);
@@ -8722,9 +8741,9 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 		}
 	}
 
-	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} textura={} vrstva={} sad={} obrazku={}", aspects.size(),
+	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} podtyp={} textura={} vrstva={} sad={} obrazku={}", aspects.size(),
 			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
-			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", cutout_ok ? "vystrizena" : "NE", shift_ok ? "posunuta" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
+			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", subtype_ok ? "podle podtypu" : "NE", cutout_ok ? "vystrizena" : "NE", shift_ok ? "posunuta" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
 	return true;
 }
 
