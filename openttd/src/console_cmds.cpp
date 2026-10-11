@@ -2479,17 +2479,14 @@ static bool ConTestSmoke(std::span<std::string_view> argv)
 static bool ConIndustryHealth(std::span<std::string_view> argv)
 {
 	if (argv.empty()) return true;
-	/* "mm" is the same switch with less typing, back for the player's testing
-	 * of the bomb. Under that name there is no second word to step over. */
-	const size_t first = (argv[0] == "mm") ? 1 : 2;
-	if (first == 2 && (argv.size() < 2 || argv[1] != "karla")) {
+	const size_t first = 2;
+	if (argv.size() < 2 || argv[1] != "karla") {
 		IConsolePrint(CC_HELP, "Show how much of an industry's building is left, in its own window.");
 		IConsolePrint(CC_HELP, "Usage: 'miluju karla' to flip it, or 'miluju karla on' / 'miluju karla off'.");
-		IConsolePrint(CC_HELP, "'mm' is the short way of typing the same thing.");
 		return true;
 	}
 
-	/* The switch itself follows the name: "miluju karla on", "mm on". */
+	/* The switch itself follows the name: "miluju karla on". */
 	if (argv.size() > first) {
 		if (argv[first] == "on" || argv[first] == "1") {
 			_show_industry_health = true;
@@ -14475,7 +14472,6 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("dump_info",               ConDumpInfo);
 
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
-	IConsole::CmdRegister("mm",                      ConIndustryHealth);
 	IConsole::CmdRegister("mmm",                     ConFillVehicles);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
 	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
