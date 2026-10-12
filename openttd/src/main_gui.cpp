@@ -214,6 +214,7 @@ enum GlobalHotKeys : int32_t {
 	GHK_ROTATE_RIGHT,      ///< Turn it to the right: N, or Ctrl and period.
 	GHK_ROTATE_LEFT_45,    ///< To the previous of the eight directions: Ctrl and Y.
 	GHK_ROTATE_RIGHT_45,   ///< To the next of them: Ctrl and N.
+	GHK_ROTATE_NORTH, ///< the map view back to north (three_d.h)
 };
 
 struct MainWindow : Window
@@ -355,6 +356,7 @@ struct MainWindow : Window
 			case GHK_ROTATE_RIGHT: RotateView(THREE_D_KEY_STEP_DEG); break;
 			case GHK_ROTATE_LEFT_45: RotateView(-THREE_D_KEY_STEP_CTRL_DEG); break;
 			case GHK_ROTATE_RIGHT_45: RotateView(THREE_D_KEY_STEP_CTRL_DEG); break;
+			case GHK_ROTATE_NORTH: ResetViewYaw(); break;
 
 			case GHK_CRASH: // Crash the game
 				*(volatile uint8_t *)nullptr = 0;
@@ -547,6 +549,7 @@ struct MainWindow : Window
 		Hotkey({'N', WKC_CTRL | WKC_PERIOD}, "rotate_view_right", GHK_ROTATE_RIGHT),
 		Hotkey('Y' | WKC_CTRL, "rotate_view_left_45", GHK_ROTATE_LEFT_45),
 		Hotkey('N' | WKC_CTRL, "rotate_view_right_45", GHK_ROTATE_RIGHT_45),
+		Hotkey(WKC_HOME, "rotate_view_north", GHK_ROTATE_NORTH),
 	}};
 };
 

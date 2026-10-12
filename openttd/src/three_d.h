@@ -142,9 +142,15 @@ static constexpr int THREE_D_KEY_STEP_DEG = 15;
 static constexpr int THREE_D_KEY_STEP_CTRL_DEG = 45;
 /** The middle button dragged this many pixels turns the view by a degree. */
 static constexpr int THREE_D_DRAG_PIXELS_PER_DEG = 4;
+/** Two clicks of the middle button within this many milliseconds, without a drag, put the view back to north. */
+static constexpr int THREE_D_DOUBLE_CLICK_MS = 500;
+
+/** How far past the edge of the map the turned view may go, in tiles: the void around the map the player may look at. */
+static constexpr int THREE_D_VOID_TILES = 64;
 
 bool ThreeDEnabled();
 float GetViewYaw();
+float GetViewYawSigned();
 bool IsViewTurned();
 bool IsViewportTurned(const Viewport &vp);
 int TurnedDirectionStep();

@@ -3084,6 +3084,24 @@ static inline void ClampViewportToMap(const Viewport &vp, int *scroll_x, int *sc
 		*scroll_y + vp.virtual_height / 2
 	};
 
+	/* Turned, the view may go on past the edge of the map into the void around it, THREE_D_VOID_TILES tiles
+	 * beyond (the player: the black nothing must be bigger, for the camera to move there); the ground point
+	 * under the middle of the screen is what is kept within that. Facing north the game clamps as it always did. */
+	if (IsViewportTurned(vp)) {
+		double wx, wy;
+		InverseTurnedFlatF(pt.x, pt.y, 0, wx, wy);
+		const double margin = THREE_D_VOID_TILES * TILE_SIZE;
+		double cx = Clamp(wx, -margin, Map::SizeX() * TILE_SIZE + margin);
+		double cy = Clamp(wy, -margin, Map::SizeY() * TILE_SIZE + margin);
+		if (cx != wx || cy != wy) {
+			double vx, vy;
+			ProjectTurnedF(cx, cy, 0, vx, vy);
+			*scroll_x = static_cast<int>(std::lround(vx)) - vp.virtual_width / 2;
+			*scroll_y = static_cast<int>(std::lround(vy)) - vp.virtual_height / 2;
+		}
+		return;
+	}
+
 	/* Find nearest tile that is within borders of the map. */
 	bool clamped;
 	pt = InverseRemapCoords2(pt.x, pt.y, true, &clamped);

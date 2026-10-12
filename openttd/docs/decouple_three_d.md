@@ -23,19 +23,30 @@ tree in an old game does.
   no turning, no previews, the game as it was. Switching it off puts the view
   back to north.
 - **Turning.** The **middle mouse button** held and dragged sideways turns the
-  view, four pixels to a degree (the right button scrolls as it always has).
-  The keys **Y** and **N** turn by 15 degrees to the left and to the right,
-  with **Ctrl** by 45, the next of the eight directions vehicles have
-  pictures for; Ctrl+, and Ctrl+. do the same. Y and N are the only two
-  letters no window of the game binds (`rotate_view_left`,
-  `rotate_view_right`, `rotate_view_left_45`, `rotate_view_right_45` in the
-  hotkeys file, under the global ones).
+  view, four pixels to a degree; the cursor stays where the button went down,
+  the way it does when the right button scrolls, so the mouse never runs off
+  the screen (the right button scrolls as it always has). **Two clicks of the
+  middle button** one after the other, without a drag (the player's idea: the
+  same button as the turn), or the **Home** key, put the view back to north;
+  a single click does nothing, so pressing the button to turn never resets
+  the view. The keys
+  **Y** and **N** turn by 15 degrees to the left and to the right, with
+  **Ctrl** by 45, the next of the eight directions vehicles have pictures
+  for; Ctrl+, and Ctrl+. do the same. Y and N are the only two letters no
+  window of the game binds (`rotate_view_left`, `rotate_view_right`,
+  `rotate_view_left_45`, `rotate_view_right_45`, `rotate_view_north` in the
+  hotkeys file, under the global ones). The view turns no further than half
+  a turn either way, 180 degrees to the right or to the left: no spinning
+  round and round (the player's word).
 - The view turns about the ground point under the middle of the screen, which
   stays where it is. Scrolling, zooming, clicking on tiles, the town and
-  station names, the floating texts all work turned. The angle is nobody's but
-  this client's: not in the savegame, not in the config; every game starts
-  facing north. Only the main view turns; the extra viewports and the ones in
-  vehicle windows keep facing north.
+  station names, the floating texts all work turned. Turned, the view may
+  scroll on past the edge of the map, 64 tiles into the black void around
+  it, for the camera to get round the corner of the map; facing north the
+  edge holds as it always did. The angle is nobody's but this client's: not
+  in the savegame, not in the config; every game starts facing north. Only
+  the main view turns; the extra viewports and the ones in vehicle windows
+  keep facing north.
 - Vehicles show the picture of the direction they face **as seen from the
   turn**: a train heading north on a view turned by 90 degrees shows its
   westward picture and runs along what is now a horizontal track. Between two

@@ -3087,12 +3087,36 @@ void HandleMouseEvents()
 	}
 
 	/* The middle button held and dragged sideways turns the map view
-	 * (three_d.h): so many pixels a degree, from where the button went down. */
+	 * (three_d.h): so many pixels a degree. The cursor stays where the button
+	 * went down (_cursor.fix_at, the way the right button scrolls), so the
+	 * mouse never runs off the edge of the screen; the motion comes in
+	 * _cursor.delta. Two clicks of it, one after the other without a drag,
+	 * put the view back to north (the player: the same button as the turn,
+	 * two clicks on it could centre the view back). */
 	static bool middle_was = false;
-	static int middle_x = 0;
+	static bool middle_dragged = false;
+	static std::chrono::steady_clock::time_point middle_clicked = {};
 	if (_middle_button_down) {
-		if (middle_was) RotateViewByDrag(_cursor.pos.x - middle_x);
-		middle_x = _cursor.pos.x;
+		if (!middle_was) {
+			middle_dragged = false;
+			_cursor.fix_at = true;
+		} else if (_cursor.delta.x != 0) {
+			middle_dragged = true;
+			RotateViewByDrag(_cursor.delta.x);
+		}
+	} else if (middle_was) {
+		if (!_scrolling_viewport) _cursor.fix_at = false;
+		if (middle_dragged) {
+			middle_clicked = {};
+		} else {
+			auto now = std::chrono::steady_clock::now();
+			if (now - middle_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
+				ResetViewYaw();
+				middle_clicked = {};
+			} else {
+				middle_clicked = now;
+			}
+		}
 	}
 	middle_was = _middle_button_down;
 
