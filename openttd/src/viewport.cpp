@@ -96,6 +96,7 @@
 #include "console_func.h"
 
 #include <chrono>
+#include <cmath>
 #include <forward_list>
 #include <stack>
 
