@@ -598,6 +598,7 @@ GRFFile::GRFFile(const GRFConfig &config)
 	this->mapped_variables = config.mapped_variables;
 	this->feature_test_var8d = config.feature_test_var8d;
 	this->vehicle_config = config.vehicle_config;
+	this->vehicle_config_random = config.vehicle_config_random;
 	this->feature_test_var9d = config.feature_test_var9d;
 	this->feature_test_var91 = config.feature_test_var91;
 

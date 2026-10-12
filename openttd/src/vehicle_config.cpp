@@ -172,6 +172,27 @@ void CopyVehicleConfig(const Vehicle *from_front, Vehicle *to_front)
 }
 
 /**
+ * The random byte a set's colour by chance is asked with (option 0xFE of
+ * callback 1C1, variable 18): the low byte of the random bits of the part
+ * that carries the choices (VehicleConfigHead()), so the articulated parts of
+ * a wagon and the trailer of a tractor come out one colour. The game gives
+ * the bits when the vehicle is bought and never deals them again; only a set
+ * that re-randomises them itself changes the colour. Given only to a set that
+ * asked for the feature 'decouple_vehicle_config_random'; nought to any other
+ * and in the purchase list.
+ * @param engine the engine whose set is asked
+ * @param v the part whose picture it is, or nullptr in the purchase list
+ * @return the byte
+ */
+static uint8_t VehicleConfigRandom(EngineID engine, const Vehicle *v)
+{
+	if (v == nullptr) return 0;
+	const Engine *e = Engine::GetIfValid(engine);
+	if (e == nullptr || e->GetGRF() == nullptr || !e->GetGRF()->vehicle_config_random) return 0;
+	return static_cast<uint8_t>(GB(VehicleConfigHead(v)->random_bits, 0, 8));
+}
+
+/**
  * The colour of a detail from the set (CBID_VEHICLE_DECOUPLE_CONFIG_COLOUR).
  * Asked like the texts, of the engine alone, so a vehicle's colours follow
  * from its engine and the options chosen and nothing else.
@@ -199,13 +220,19 @@ void CopyVehicleConfig(const Vehicle *from_front, Vehicle *to_front)
  * answered 40F, its registers stand in place of the option's -- the colour,
  * the turn, the fading. The player: "the player does not choose the colour
  * of the load; we turn marijuana the colour of hay".
+ *
+ * A set that asked for 'decouple_vehicle_config_random' is given the
+ * vehicle's random byte with option 0xFE in variable 18 (VehicleConfigRandom()),
+ * and may answer by it: every container a colour of its own from one set of
+ * pictures (the colleague's request, hra/nahodna-barva).
  * @param engine the engine
  * @param aspect which detail
  * @param option the option chosen for it
  * @param v the part whose picture it is, or nullptr in the purchase list
+ * @param random the vehicle's random byte for the set's own colour, 0 where the set did not ask for it
  * @return the colour of the detail, or nothing
  */
-static std::optional<TrueColourRange> VehicleConfigColour(EngineID engine, uint aspect, uint option, const Vehicle *v)
+static std::optional<TrueColourRange> VehicleConfigColour(EngineID engine, uint aspect, uint option, const Vehicle *v, uint8_t random)
 {
 	std::array<int32_t, 16> regs100;
 	uint16_t cb = GetVehicleCallback(CBID_VEHICLE_DECOUPLE_CONFIG_COLOUR, (aspect << 8) | 0xFF, 0, engine, nullptr, regs100);
@@ -246,7 +273,7 @@ static std::optional<TrueColourRange> VehicleConfigColour(EngineID engine, uint 
 	bool any = cb == 0x40F;
 	if (any) take(regs100);
 
-	cb = GetVehicleCallback(CBID_VEHICLE_DECOUPLE_CONFIG_COLOUR, (aspect << 8) | 0xFE, 0, engine, v, regs100);
+	cb = GetVehicleCallback(CBID_VEHICLE_DECOUPLE_CONFIG_COLOUR, (aspect << 8) | 0xFE, random, engine, v, regs100);
 	if (cb == 0x40F) {
 		take(regs100);
 		any = true;
@@ -255,8 +282,8 @@ static std::optional<TrueColourRange> VehicleConfigColour(EngineID engine, uint 
 	return range;
 }
 
-/** The colours of an engine in the options chosen as the set gives them, fading and all, asked of the set once: the engine, the options, the cargo and its subtype, to the colours. */
-static std::map<std::tuple<EngineID, VehicleConfigOptions, CargoType, uint8_t>, TrueColourSet> _engine_colour_ranges;
+/** The colours of an engine in the options chosen as the set gives them, fading and all, asked of the set once: the engine, the options, the cargo, its subtype and the random byte (0 but for a set that asked), to the colours. */
+static std::map<std::tuple<EngineID, VehicleConfigOptions, CargoType, uint8_t, uint8_t>, TrueColourSet> _engine_colour_ranges;
 /** GetTrueColourEpoch() when _engine_colour_ranges was last good. */
 static uint16_t _engine_colour_ranges_epoch = 0;
 
@@ -268,7 +295,8 @@ static uint16_t _engine_colour_ranges_epoch = 0;
  * it is and remembered by the part's cargo and its subtype (the colleague's
  * word: a civil and a military Tatra with the same cargo, told apart by the
  * refit's subtype): the set is to answer by those two and nothing else of
- * the part.
+ * the part -- and, if it asked for the feature, by the random byte given in
+ * variable 18 (VehicleConfigRandom()), remembered as well.
  * @param engine the engine
  * @param options the option chosen for each detail
  * @param v the part whose picture it is, or nullptr in the purchase list
@@ -286,15 +314,16 @@ static const TrueColourSet &EngineColourRanges(EngineID engine, const VehicleCon
 	}
 	const CargoType cargo = v != nullptr ? v->cargo_type : INVALID_CARGO;
 	const uint8_t subtype = v != nullptr ? v->cargo_subtype : 0;
-	auto it = _engine_colour_ranges.find({engine, options, cargo, subtype});
+	const uint8_t random = VehicleConfigRandom(engine, v);
+	auto it = _engine_colour_ranges.find({engine, options, cargo, subtype, random});
 	if (it != _engine_colour_ranges.end()) return it->second;
 
 	TrueColourSet colours;
 	for (uint a = 0; a < VEHICLE_CONFIG_MAX_ASPECTS; a++) {
-		std::optional<TrueColourRange> range = VehicleConfigColour(engine, a, options[a], v);
+		std::optional<TrueColourRange> range = VehicleConfigColour(engine, a, options[a], v, random);
 		if (range.has_value()) colours.push_back(*range);
 	}
-	return _engine_colour_ranges.emplace(std::tuple{engine, options, cargo, subtype}, std::move(colours)).first->second;
+	return _engine_colour_ranges.emplace(std::tuple{engine, options, cargo, subtype, random}, std::move(colours)).first->second;
 }
 
 /**
@@ -337,12 +366,14 @@ static uint VehicleAgeYears(const Vehicle *v)
 uint16_t GetVehicleTrueColours(const Vehicle *v)
 {
 	const uint years = VehicleAgeYears(v);
-	if (v->true_colours_epoch == GetTrueColourEpoch() && v->true_colours_age_years == years && v->true_colours_cargo == v->cargo_type && v->true_colours_subtype == v->cargo_subtype) return v->true_colours;
+	const uint8_t random = VehicleConfigRandom(v->engine_type, v);
+	if (v->true_colours_epoch == GetTrueColourEpoch() && v->true_colours_age_years == years && v->true_colours_cargo == v->cargo_type && v->true_colours_subtype == v->cargo_subtype && v->true_colours_random == random) return v->true_colours;
 	v->true_colours = GetEngineTrueColours(v->engine_type, VehicleConfigHead(v)->config_options, years, v);
 	v->true_colours_epoch = GetTrueColourEpoch();
 	v->true_colours_age_years = static_cast<uint8_t>(years);
 	v->true_colours_cargo = v->cargo_type;
 	v->true_colours_subtype = v->cargo_subtype;
+	v->true_colours_random = random;
 	return v->true_colours;
 }
 

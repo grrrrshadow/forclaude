@@ -59,6 +59,7 @@ GRFConfig::GRFConfig(const GRFConfig &config) :
 	feature_test_var91(config.feature_test_var91),
 	wide_action2_ids(config.wide_action2_ids),
 	vehicle_config(config.vehicle_config),
+	vehicle_config_random(config.vehicle_config_random),
 	builtin(config.builtin),
 	builtin_graphics(config.builtin_graphics)
 {
@@ -555,6 +556,7 @@ compatible_grf:
 				c->feature_test_var91 = f->feature_test_var91;
 				c->wide_action2_ids = f->wide_action2_ids;
 				c->vehicle_config = f->vehicle_config;
+				c->vehicle_config_random = f->vehicle_config_random;
 				c->builtin = f->builtin;
 			}
 		}

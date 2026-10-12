@@ -448,6 +448,11 @@ static const KnownFeature _known_features[] = {
 	 * for the player to choose (callback 1C0), give the colours of those that
 	 * are colours (callback 1C1) and read the choice (variables 5C and 5D). */
 	{ "decouple_vehicle_config", 1 },
+	/* A colour by chance (vehicle_config.cpp): option 0xFE of callback 1C1 is
+	 * given the vehicle's random byte in variable 18, and the colours are
+	 * remembered by it too. Only for a set that asks, so no other set's
+	 * colours are kept 256 times over. */
+	{ "decouple_vehicle_config_random", 1 },
 };
 
 /** @copydoc TextHandler */
@@ -662,6 +667,7 @@ static bool HandleFeatureTest(ByteReader &buf)
 				action.name, action.min_version, action.max_version, known.version);
 		if (action.name == "decouple_more_action2_ids") _cur_gps.grfconfig->wide_action2_ids = true;
 		if (action.name == "decouple_vehicle_config") _cur_gps.grfconfig->vehicle_config = true;
+		if (action.name == "decouple_vehicle_config_random") _cur_gps.grfconfig->vehicle_config_random = true;
 		AnswerNameMap(true);
 		return true;
 	}

@@ -8744,6 +8744,63 @@ static bool ConTestVehicleColours(std::span<std::string_view> argv)
 	IConsolePrint(CC_DEFAULT, "testbarvy: SOUHRN podrobnosti={} nakup={} volba={} firemni={} 5D={} okno={} zavreni={} stari={} kupa={} podtyp={} textura={} vrstva={} sad={} obrazku={}", aspects.size(),
 			bought != "bez barev" ? "barvy" : "bez", second != first ? "zmenen" : "stejny", third_colours.find("0xC6") == std::string::npos ? "ano" : "ne",
 			GetVehicleConfigVariable(v, 4), shown, closed ? "ano" : "ne", fades ? "bledne" : "NE", heap_ok ? "podle nakladu" : "NE", subtype_ok ? "podle podtypu" : "NE", cutout_ok ? "vystrizena" : "NE", shift_ok ? "posunuta" : "NE", GetTrueColourSetCount(), GetTrueColourSpriteCount());
+
+	/* A colour by chance ('decouple_vehicle_config_random', the colleague's
+	 * containers, hra/nahodna-barva): the set's second vehicle, a container
+	 * whose one detail the set colours by the random byte the game gives option
+	 * FE in variable 18, as (b, 0x40, 255 - b). Four bought: each the colour of
+	 * its own byte, and not all one colour; the purchase list asked with byte
+	 * 0, #0040FF; the colour kept through a refit to mail and back. After the
+	 * cart's summary, which this leaves as it was. */
+	EngineID box = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (e->company_avail.Test(_local_company) && GetString(STR_ENGINE_NAME, e->index).find("kontejner") != std::string::npos) box = e->index;
+	}
+	if (box == EngineID::Invalid()) {
+		refuse("vozidlo 'kontejner' neni ve hre (barvy.grf)");
+		return true;
+	}
+	auto by_byte = [](uint8_t b) { return fmt::format("#{:02X}40{:02X}", b, 255 - b); };
+	std::string box_bought = DescribeEngineTrueColours(box, {});
+	const bool box_bought_ok = box_bought.find(by_byte(0)) != std::string::npos;
+	IConsolePrint(CC_DEFAULT, "testbarvy: kontejner nakup: {}", box_bought);
+	std::set<std::string> box_colours;
+	uint box_built = 0, box_own = 0;
+	Vehicle *box_first = nullptr;
+	for (int i = 0; i < 4; i++) {
+		auto [bc, bveh, b1, b2, b3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, box, true, INVALID_CARGO, ClientID::Invalid);
+		if (bc.Failed()) {
+			refuse(fmt::format("kontejner: {}", RefusalReason(bc)));
+			break;
+		}
+		Vehicle *b = Vehicle::Get(bveh);
+		if (box_first == nullptr) box_first = b;
+		box_built++;
+		const uint8_t byte = static_cast<uint8_t>(GB(b->random_bits, 0, 8));
+		std::string colours = DescribeVehicleTrueColours(b);
+		const bool own = colours.find(by_byte(byte)) != std::string::npos;
+		if (own) {
+			box_own++;
+			box_colours.insert(by_byte(byte));
+		}
+		IConsolePrint(CC_DEFAULT, "testbarvy: kontejner {} bajt {}: {}{}", i + 1, byte, colours, own ? "" : " (NESEDI S BAJTEM)");
+	}
+	bool box_refit_ok = false;
+	if (box_first != nullptr) {
+		const std::string want = by_byte(static_cast<uint8_t>(GB(box_first->random_bits, 0, 8)));
+		CommandCost m = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, box_first->index, GetCargoTypeByLabel(CT_MAIL), 0, false, false, 0));
+		std::string with_mail = DescribeVehicleTrueColours(box_first);
+		CommandCost p = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, box_first->index, GetCargoTypeByLabel(CT_PASSENGERS), 0, false, false, 0));
+		std::string back_pax = DescribeVehicleTrueColours(box_first);
+		box_refit_ok = m.Succeeded() && p.Succeeded() && with_mail.find(want) != std::string::npos && back_pax.find(want) != std::string::npos;
+		IConsolePrint(CC_DEFAULT, "testbarvy: kontejner 1 s postou: {}; zpet: {}", with_mail, back_pax);
+	}
+	if (!box_bought_ok) refuse("kontejner v nakupu ma byt barvy bajtu 0, #0040FF");
+	if (box_own != box_built || box_built != 4) refuse(fmt::format("kontejneru podle bajtu {} z {}, postaveno {} ze 4", box_own, box_built, box_built));
+	if (box_colours.size() < 2) refuse("vsechny kontejnery maji jednu barvu");
+	if (!box_refit_ok) refuse("kontejner po prestavbe na postu a zpet nema barvu sveho bajtu");
+	IConsolePrint(CC_DEFAULT, "testbarvy: NAHODA vozu={} podle_bajtu={} ruznych={} nakup={} prestavba={}", box_built, box_own,
+			box_colours.size() >= 2 ? "vic" : "jedna", box_bought_ok ? "bajt0" : "NE", box_refit_ok ? "drzi" : "NE");
 	return true;
 }
 

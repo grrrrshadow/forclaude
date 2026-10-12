@@ -168,6 +168,7 @@ struct GRFFile {
 	uint traininfo_vehicle_width = 0; ///< Width (in pixels) of a 8/8 train vehicle in depot GUI and vehicle details
 	bool cargo_list_is_fallback = false; ///< Set if cargo types have been created but a cargo list has not been installed
 	bool vehicle_config = false; ///< The set asked for 'decouple_vehicle_config' (vehicle_config.h): its vehicles read the player's choice in variables 5C and 5D. Copied from GRFConfig, Action 14 is read at the file scan only.
+	bool vehicle_config_random = false; ///< The set asked for 'decouple_vehicle_config_random': its own colour (1C1 option 0xFE) may be by the vehicle's random byte, given in variable 18. Copied from GRFConfig.
 
 	GrfSpecFeatures grf_features{}; ///< Bitset of GrfSpecFeature the grf uses
 	PriceMultipliers price_base_multipliers{}; ///< Price base multipliers as set by the grf.

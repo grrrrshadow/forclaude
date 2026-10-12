@@ -202,6 +202,7 @@ struct GRFConfig {
 	std::vector<uint32_t> feature_test_var91{}; ///< NOSAVE
 	bool wide_action2_ids = false; ///< NOSAVE: Action 2 IDs are two bytes ('decouple_more_action2_ids').
 	bool vehicle_config = false; ///< NOSAVE: the set's vehicles may offer details for the player to choose ('decouple_vehicle_config', vehicle_config.h).
+	bool vehicle_config_random = false; ///< NOSAVE: the set's own colour may be by chance ('decouple_vehicle_config_random', vehicle_config.cpp).
 	bool builtin = false; ///< NOSAVE: one of the game's own sets, from baseset/decouple/ (see AppendBuiltinGRFs()).
 	bool builtin_graphics = false; ///< NOSAVE: a set of graphics of the game's own, from baseset/decouple/grafika/: static in every game, never in the list of sets (see AppendStaticGRFConfigs()).
 

@@ -29,17 +29,27 @@
 // in variable 5D. The pictures are grey 32bpp with a mask, zin8 only:
 // flat areas at the lightness where each colour is exactly itself, a row at
 // 254 and one darker, so the rig can read the colours back.
+// The set also asks for decouple_vehicle_config_random and has a second
+// vehicle, a container (0x59): one detail, unnamed, painting the body's mask
+// 0x60-0x67, coloured by option FE alone from the random byte the game gives
+// in variable 18, as (b, 0x40, 255 - b) -- every container its own colour.
 // Written in the colleague's yagl dialect, as konfig.yagl.
 //     yagl -e <out>/barvy.grf tests/rig/grf      (the battery builds it every run)
 yagl_version: "";
 grf_format: Container2;
-optional_info // Action14: the feature test, answered on bit 9 of 0x9D
+optional_info // Action14: the feature tests, answered on bits 9 and 10 of 0x9D
 {
     FTST: 
     {
         NAME: default, "decouple_vehicle_config";
         MINV: [ 0x01 0x00 ];
         SETP: [ 0x09 ];
+    }
+    FTST: 
+    {
+        NAME: default, "decouple_vehicle_config_random";
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x0A ];
     }
 }
 grf // Action08
@@ -625,5 +635,89 @@ feature_graphics<RoadVehicles> // Action03
     cargo_types:
     {
         0xFF: 0x0004;
+    };
+}
+properties<RoadVehicles, 0x0059> // Action00: the container, coloured by chance
+{
+    {
+        long_introduction_date: date(1920/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0003;
+        cargo_capacity: 0x10;
+        loading_speed: 0x02;
+        sprite_id: 0xFF;
+        speed_2_kmh: 0x30;
+        power_10_hp: 0x01;
+        weight_quarter_tons: 0x04;
+        cost_factor: 0x08;
+        running_cost_factor: 0x04;
+        running_cost_base: 0x00004C48;
+        callback_flags_mask: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<RoadVehicles, default, 0x0059> // Action04: the container's name
+{
+    /* 0x0059 */ "Rig: kontejner nahodny";
+}
+switch<RoadVehicles, 0x30, PrimaryDWord> // the container's colour by chance (option FE): register 100 = (b, 0x40, 255 - b), b the random byte the game gives in variable 18
+{
+    expression:
+    {
+        value1 = variable[0x18] & 0x000000FF;
+        value2 = variable[0x1A] & 0x00000010;
+        value1 = ShiftLeft(value1, value2);
+        value2 = variable[0x18] & 0x000000FF;
+        value1 = BitwiseOr(value1, value2);
+        value2 = variable[0x1A] & 0x000000FF;
+        value1 = BitwiseXor(value1, value2);
+        value2 = variable[0x1A] & 0x00004000;
+        value1 = BitwiseOr(value1, value2);
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x840F;
+    };
+    default: 0x840F;
+}
+switch<RoadVehicles, 0x31, PrimaryDWord> // the container's colours (callback 1C1): one detail, unnamed, painting the body's mask 0x60-0x67; no option colour; the set's own by chance (option FE)
+{
+    expression:
+    {
+        value1 = variable[0x10] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000000FF: 0x8060;
+        0x000000FE: 0x0030;
+    };
+    default: 0x8400;
+}
+switch<RoadVehicles, 0x32, PrimaryDWord> // the container's callbacks: colours (1C1), the picture as the cart's
+{
+    expression:
+    {
+        value1 = variable[0x0C] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x000001C1: 0x0031;
+    };
+    default: 0x0021;
+}
+feature_graphics<RoadVehicles> // Action03: the container
+{
+    livery_override: false;
+    default_set_id: 0x0032;
+    feature_ids: [ 0x0059 ];
+    cargo_types:
+    {
+        0xFF: 0x0032;
     };
 }

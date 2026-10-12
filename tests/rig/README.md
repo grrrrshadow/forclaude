@@ -447,6 +447,15 @@ normal zoom) and taken from four directions on (register 105,
 other way round): the probe reads it as sprite 28 of the file instead of 32,
 with the offsets -20,-12 of the file moved to -12,-28 at 8x.
 
+The same set asks for `decouple_vehicle_config_random` too and has a second
+vehicle, `Rig: kontejner nahodny`: one detail, unnamed, painting the body's
+mask 0x60-0x67, which the set colours by option FE alone from the random byte
+the game gives in variable 18, as (b, 0x40, 255 - b). After the cart's summary
+`testbarvy` buys four of them and writes each one's byte and colours, then
+`testbarvy: NAHODA`: all four the colour of their own byte, more than one
+colour, the purchase list byte 0 (#0040FF), and the colour kept through a
+refit to mail and back. The battery's line is `barvynahoda`.
+
 `testsada <text> [years] [plny]` builds the rail vehicle of any set whose
 name has the text in it, into a depot built for it, gives it that many years
 of age and, with `plny`, a full load of its cargo, and describes the colours

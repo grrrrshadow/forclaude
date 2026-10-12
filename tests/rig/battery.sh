@@ -1684,6 +1684,16 @@ BARVY_CFG=$S/barvy_openttd.cfg
 sed '/^\[newgrf\]$/a barvy.grf = ' "$CFG_KEEP" > $BARVY_CFG
 run_scene barvy "testbarvy" 30 -c $BARVY_CFG
 echo "barvy: $(grep -o 'testbarvy: SOUHRN.*' $S/reg_barvy.log | sed 's/testbarvy: SOUHRN //')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# A colour by chance (the feature decouple_vehicle_config_random, the
+# colleague's containers): after the cart's summary the probe buys four of the
+# set's containers, whose one detail the set colours by the random byte the
+# game gives option FE in variable 18 as (b, 0x40, 255 - b). Each comes out the
+# colour of its own byte and not all one; the purchase list is byte 0, #0040FF;
+# a refit to mail and back keeps the colour. odmitnuto above stays zero.
+# The container's purchase picture is painted before the cart is looked at,
+# so since it came the cart's summary counts one set and two pictures more
+# (sad=8 obrazku=19, were 7 and 17); every colour of the cart is as it was.
+echo "barvynahoda: $(grep -o 'testbarvy: NAHODA.*' $S/reg_barvy.log | sed 's/testbarvy: NAHODA //')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Wagons named the way GETS names them -- what the wagon is and its kind in
 # quotes (grf/gets_like.yagl, gets_like.grf in the home's newgrf/). The name
 # rules read the part in quotes: the Eaos and its livery take marijuana, the

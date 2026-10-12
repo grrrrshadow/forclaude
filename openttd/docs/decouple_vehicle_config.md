@@ -197,7 +197,7 @@ texts) with variable 0x10 as for 1C0:
 | bits 8..15 | bits 0..7 | asks for | answer |
 |---|---|---|---|
 | detail *a* | **0xFF** | is detail *a* a colour, and where | the **first of its eight mask indices** (`0x8000 \| index`); register 0x100 its lightening (below), 0 for the usual; register 0x101 = 1 for a detail turned, not painted (below). Any other answer, or none: the detail is no colour. |
-| detail *a* | **0xFE** | the set's own colour of detail *a* on this vehicle, by its cargo and its subtype | **`0x40F`** with the same registers as an option's answer, standing in its place; anything else: the option's answer stands (below). |
+| detail *a* | **0xFE** | the set's own colour of detail *a* on this vehicle, by its cargo and its subtype (and by chance, variable 0x18, if the set asked for it, below) | **`0x40F`** with the same registers as an option's answer, standing in its place; anything else: the option's answer stands (below). |
 | detail *a* | option *o* | the colour of option *o* | **`0x40F`** (`0x840F`) with the colour in register **0x100** as `0x00RRGGBB`; register **0x101** a lightening of this colour's own, 0 for the detail's; registers **0x102** to **0x104** a fading with age (below), 0x103 = 0 for none. Any other answer: this option is no colour, the pixels stay as drawn (in the company colour where the mask is the company colour's). |
 
 The game asks with the option the player chose, the first option in the
@@ -303,6 +303,60 @@ it is asked without a vehicle, where 0x47 is the engine's default cargo and
 the subtype 0. A detail that is the set's alone needs no row: leave
 it unnamed in 1C0 after the named ones (the list of names ends there, the
 colours do not), or name it and answer 401. (The colleague's point 8.)
+
+**The set's own colour, by chance.** Every container on a train a colour of its
+own, from one set of pictures (the colleague's request, grrrrf
+`hra/nahodna-barva/`). A set that asks for a second feature,
+
+```
+optional_info // Action14
+{
+    FTST:
+    {
+        NAME: default, "decouple_vehicle_config_random";
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x0A ];            // another free bit of global variable 0x9D
+    }
+}
+```
+
+is given with option **0xFE** the vehicle's **random byte in variable 0x18**
+(the callback's second parameter): bits 0-7 of the random bits of the part that
+carries the choices -- the wagon, the engine or the tractor -- so a wagon's
+articulated parts and a tractor's trailer are all one colour. The game deals
+the bits when the vehicle is bought and never again; the colour stays the
+vehicle's for its life, unless the set re-randomises the bits itself (a random
+Action 2 with triggers), when it is asked again. The colour is remembered by
+that byte too, so option 0xFE may answer by the cargo, its subtype and the
+byte, nothing else. In the purchase list the byte is 0. A set that did not ask
+reads 0 in variable 0x18 and its colours are remembered as before, without the
+byte. A colour by chance in register 100, as the rig's container does it
+(`tests/rig/grf/barvy.yagl`, (b, 0x40, 255 - b)):
+
+```
+switch<Trains, 0x30, PrimaryDWord> // option FE: register 100 = 0x00RRGGBB from the random byte b
+{
+    expression:
+    {
+        value1 = variable[0x18] & 0x000000FF;      // b
+        value2 = variable[0x1A] & 0x00000010;
+        value1 = ShiftLeft(value1, value2);        // red = b
+        value2 = variable[0x18] & 0x000000FF;
+        value1 = BitwiseOr(value1, value2);
+        value2 = variable[0x1A] & 0x000000FF;
+        value1 = BitwiseXor(value1, value2);       // blue = 255 - b
+        value2 = variable[0x1A] & 0x00004000;
+        value1 = BitwiseOr(value1, value2);        // green 0x40
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);        // register 100
+    };
+    ranges: { 0x00000000: 0x840F; };
+    default: 0x840F;
+}
+```
+
+Or a turn of the hue by the byte (a detail turned, register 101 of option 0xFF
+= 1): one picture of a container, its paint turned round the colour wheel.
 
 **How the game draws it.** The picture is made again with the painted pixels in
 their colours when it is read, once for each set of colours some vehicle is in,
@@ -417,5 +471,6 @@ feature (section 1): any other set is drawn as it always was.
   graphics for its articulated parts and the trailer read the same value.
 - A colour detail paints eight mask indices in a row from the one the set
   gives, never the animated colours of the palette (0xE3 and up).
-- The colours are asked once for each engine and choice and kept until the
-  sets are read again; keep callback 1C1 without side effects too.
+- The colours are asked once for each engine and choice (and cargo, subtype,
+  and the random byte for a set that asked for it) and kept until the sets are
+  read again; keep callback 1C1 without side effects too.
