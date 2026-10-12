@@ -52,6 +52,7 @@
 #include "core/string_consumer.hpp"
 
 #include "widgets/industry_widget.h"
+#include "three_d.h"
 
 #include "table/strings.h"
 
@@ -820,12 +821,14 @@ public:
 		if (!i->IsCargoProduced() && !i->IsCargoAccepted()) this->DisableWidget(WID_IV_GRAPH);
 
 		this->InvalidateData();
+		ShowThreeDIndustryPreview(static_cast<IndustryID>(window_number));
 	}
 
 	/** Close the industry production window. */
 	~IndustryViewWindow() override
 	{
 		CloseWindowById(WindowClass::IndustryProductionGraph, this->window_number, false);
+		CloseWindowById(WindowClass::ThreeDIndustryPreview, this->window_number, false);
 	}
 
 	void OnInit() override

@@ -83,20 +83,33 @@ static inline TrackBits GetTileShipTrackStatus(TileIndex tile)
 	return TrackdirBitsToTrackBits(GetTileTrackStatus(tile, TransportType::Water, RoadTramType::Invalid).trackdirs);
 }
 
-static void GetShipIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
+/**
+ * The icon of a ship facing a direction, for the 3D preview that turns
+ * (three_d_preview_gui.cpp); the purchase list shows it facing west.
+ * @param engine the engine
+ * @param dir the direction it faces
+ * @param image_type where the picture is shown
+ * @param[out] result the sprites
+ */
+void GetShipIcon(EngineID engine, Direction dir, EngineImageType image_type, VehicleSpriteSeq *result)
 {
 	const Engine *e = Engine::Get(engine);
 	uint8_t spritenum = e->VehInfo<ShipVehicleInfo>().image_index;
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
-		GetCustomVehicleIcon(engine, Direction::W, image_type, result);
+		GetCustomVehicleIcon(engine, dir, image_type, result);
 		if (result->IsValid()) return;
 
 		spritenum = e->original_image_index;
 	}
 
 	assert(IsValidImageIndex<VehicleType::Ship>(spritenum));
-	result->Set(to_underlying(Direction::W) + _ship_sprites[spritenum]);
+	result->Set(to_underlying(dir) + _ship_sprites[spritenum]);
+}
+
+static void GetShipIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
+{
+	GetShipIcon(engine, Direction::W, image_type, result);
 }
 
 void DrawShipEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type)

@@ -17,6 +17,9 @@
 #include "gfx_type.h"
 #include "vehicle_type.h"
 #include "engine_base.h"
+#include "direction_type.h"
+
+struct VehicleSpriteSeq;
 
 struct GUIEngineListItem {
 	EngineID engine_id;       ///< Engine to display in build purchase list
@@ -38,6 +41,12 @@ StringID GetEngineCategoryName(EngineID engine);
 std::string GetEngineInfoString(EngineID engine);
 
 void DrawVehicleEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type);
+
+/* The icons of the vehicles facing any direction, for the 3D preview that turns (three_d_preview_gui.cpp). */
+void GetTrainIcon(EngineID engine, bool rear_head, Direction dir, int &y, EngineImageType image_type, VehicleSpriteSeq *result);
+void GetRoadVehIcon(EngineID engine, Direction dir, EngineImageType image_type, VehicleSpriteSeq *result);
+void GetShipIcon(EngineID engine, Direction dir, EngineImageType image_type, VehicleSpriteSeq *result);
+void GetAircraftIcon(EngineID engine, Direction dir, EngineImageType image_type, VehicleSpriteSeq *result);
 void DrawTrainEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type);
 void DrawRoadVehEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type);
 void DrawShipEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type);

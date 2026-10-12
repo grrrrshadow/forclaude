@@ -149,13 +149,30 @@ block is clipped away. The block is first cleared black, which also tells the
 faces are written straight into it, the billboards through the blitter as
 always. It needs a 32bpp blitter: with an 8bpp one the angle stays 0.
 
-What is not there yet: the previews that turn (purchase window, beside the
-industry window), the girls about the school, the machine and the statue and
-the hut's girls as renders of their own (the buildings turn without them for
-now), the plantation, boxes for the houses of the other climates, the proper
-sorting of long things against each other, the smaller textures of the
-zoomed-out view, the seams at the edges of the map. Facing north nothing of
-this runs.
+What is not there yet: the girls about the school, the machine and the statue
+and the hut's girls as renders of their own (the buildings turn without them
+for now, in the map and in the preview), the plantation, boxes for the houses
+of the other climates, the proper sorting of long things against each other,
+the smaller textures of the zoomed-out view, the seams at the edges of the
+map. Facing north nothing of this runs.
+
+## The previews that turn
+
+`src/three_d_preview_gui.cpp`. A small window opens beside the **purchase
+window** with the vehicle chosen there, four times its size (the 4x pictures
+of a set that has them, the others doubled up), in the company's colours,
+turning by itself through its eight directions; a multiheaded engine shows
+both heads one behind the other. It works for the sets of the original kind
+too, with their one picture a direction. Beside the **window of one of the
+game's own industries** that has eight renders (the school, the machine, the
+statue, the hut) a window shows the building from the render of the
+direction the map view is turned to, a quarter the size of the render. Both
+have arrows that turn them on by one direction and a button that lets them
+turn by themselves; both keep beside their window, follow it when it moves,
+and close with it. Off (the setting), neither opens. The icons of the
+vehicles facing any direction are `GetTrainIcon()`, `GetRoadVehIcon()`,
+`GetShipIcon()`, `GetAircraftIcon()` (`engine_gui.h`); the purchase list goes
+on using the ones facing west.
 
 ## The rig
 
@@ -173,7 +190,14 @@ them and whether their sprites are there, `test3d model <name>` reads the
 first render and makes the picture at the angle and zoom of the view, saying
 how long each took, `test3d budovy` says where such buildings stand on the
 map, `test3d postav <x> <y> <name>` puts one there (a house, or one of the
-game's own industries, which must be in a town). Screenshots asked for under the null driver are made on the
+game's own industries, which must be in a town). For the previews:
+`test3d okno nakup <auto|vlak|lod|letadlo>` opens the purchase window (with a
+company made for it, since the null driver's game starts as a spectator),
+`test3d okno prumysl <x> <y>` the window of the industry on that tile,
+`test3d okna` lists every window, and `test3d snimek <name> okna` writes the
+whole screen with the windows (the plain `snimek` is the viewport alone; the
+world generation still counts as in progress at the first tick, which would
+leave every other window undrawn, so the rig calls it over). Screenshots asked for under the null driver are made on the
 spot (`MakeScreenshot()`), since that driver never drains the main-thread
 queue.
 

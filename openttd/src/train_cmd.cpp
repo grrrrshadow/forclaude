@@ -1937,6 +1937,39 @@ std::vector<std::pair<SpriteID, SpriteID>> WagonLoadPictures(uint8_t image_index
 	return pictures;
 }
 
+/**
+ * The icon of a rail engine facing a direction, for the 3D preview that turns
+ * (three_d_preview_gui.cpp); GetRailIcon() is the one the purchase list uses,
+ * facing west.
+ * @param engine the engine
+ * @param rear_head the rear head of a multiheaded engine
+ * @param dir the direction it faces
+ * @param[in,out] y the vertical position, moved by the set's pitch
+ * @param image_type where the picture is shown
+ * @param[out] result the sprites
+ */
+void GetTrainIcon(EngineID engine, bool rear_head, Direction dir, int &y, EngineImageType image_type, VehicleSpriteSeq *result)
+{
+	const Engine *e = Engine::Get(engine);
+	uint8_t spritenum = e->VehInfo<RailVehicleInfo>().image_index;
+
+	if (IsCustomVehicleSpriteNum(spritenum)) {
+		GetCustomVehicleIcon(engine, dir, image_type, result);
+		if (result->IsValid()) {
+			if (e->GetGRF() != nullptr) {
+				y += ScaleSpriteTrad(e->GetGRF()->traininfo_vehicle_pitch);
+			}
+			return;
+		}
+
+		spritenum = Engine::Get(engine)->original_image_index;
+	}
+
+	if (rear_head) spritenum++;
+
+	result->Set(GetDefaultTrainSprite(spritenum, dir));
+}
+
 static void GetRailIcon(EngineID engine, bool rear_head, int &y, EngineImageType image_type, VehicleSpriteSeq *result)
 {
 	const Engine *e = Engine::Get(engine);

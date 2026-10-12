@@ -41,6 +41,8 @@
 #include "core/geometry_type.hpp"
 #include "house_type.h"
 #include "industry_type.h"
+#include "engine_type.h"
+#include "window_type.h"
 #include "zoom_type.h"
 
 struct Viewport;
@@ -135,6 +137,11 @@ struct ThreeDModelPicture {
 const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLevel zoom);
 std::string DescribeThreeDModel(const ThreeDModel *model);
 void ClearThreeDModelCache();
+
+/* The previews that turn (three_d_preview_gui.cpp). */
+void ShowThreeDVehiclePreview(WindowNumber parent_number);
+void ShowThreeDIndustryPreview(IndustryID industry);
+EngineID GetBuildVehicleSelectedEngine(WindowNumber number);
 
 /** A step of the keys: 15 degrees, a quarter of the way to the next of the eight directions. */
 static constexpr int THREE_D_KEY_STEP_DEG = 15;

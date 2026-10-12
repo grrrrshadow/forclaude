@@ -53,6 +53,7 @@ add_files(
     story_widget.h
     subsidy_widget.h
     terraform_widget.h
+    three_d_widget.h
     timetable_widget.h
     toolbar_widget.h
     town_widget.h

@@ -108,20 +108,33 @@ int RoadVehicle::GetDisplayImageWidth(Point *offset) const
 	return ScaleSpriteTrad(this->gcache.cached_veh_length * reference_width / VEHICLE_LENGTH);
 }
 
-static void GetRoadVehIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
+/**
+ * The icon of a road vehicle facing a direction, for the 3D preview that turns
+ * (three_d_preview_gui.cpp); the purchase list shows it facing west.
+ * @param engine the engine
+ * @param dir the direction it faces
+ * @param image_type where the picture is shown
+ * @param[out] result the sprites
+ */
+void GetRoadVehIcon(EngineID engine, Direction dir, EngineImageType image_type, VehicleSpriteSeq *result)
 {
 	const Engine *e = Engine::Get(engine);
 	uint8_t spritenum = e->VehInfo<RoadVehicleInfo>().image_index;
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
-		GetCustomVehicleIcon(engine, Direction::W, image_type, result);
+		GetCustomVehicleIcon(engine, dir, image_type, result);
 		if (result->IsValid()) return;
 
 		spritenum = e->original_image_index;
 	}
 
 	assert(IsValidImageIndex<VehicleType::Road>(spritenum));
-	result->Set(to_underlying(Direction::W) + _roadveh_images[spritenum]);
+	result->Set(to_underlying(dir) + _roadveh_images[spritenum]);
+}
+
+static void GetRoadVehIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
+{
+	GetRoadVehIcon(engine, Direction::W, image_type, result);
 }
 
 void RoadVehicle::GetImage(Direction direction, EngineImageType image_type, VehicleSpriteSeq *result) const

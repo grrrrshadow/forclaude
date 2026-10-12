@@ -35,6 +35,7 @@
 #include "dropdown_type.h"
 #include "dropdown_func.h"
 #include "engine_gui.h"
+#include "three_d.h"
 #include "cargotype.h"
 #include "core/geometry_func.hpp"
 #include "autoreplace_func.h"
@@ -1393,8 +1394,10 @@ struct BuildVehicleWindow : Window {
 
 		if (tile == INVALID_TILE) {
 			this->FinishInitNested(type);
+			ShowThreeDVehiclePreview(this->window_number);
 		} else {
 			this->FinishInitNested(tile);
+			ShowThreeDVehiclePreview(this->window_number);
 		}
 
 		this->querystrings[WID_BV_FILTER] = &this->vehicle_editbox;
@@ -1478,6 +1481,7 @@ struct BuildVehicleWindow : Window {
 		if (cargo == CargoFilterCriteria::CF_ANY || cargo == CargoFilterCriteria::CF_ENGINES || cargo == CargoFilterCriteria::CF_NONE) cargo = INVALID_CARGO;
 
 		this->sel_engine = engine;
+		InvalidateWindowClassesData(WindowClass::ThreeDVehiclePreview);
 		this->SetBuyVehicleText();
 
 		if (this->sel_engine == EngineID::Invalid()) return;
@@ -2354,4 +2358,15 @@ void ShowBuildVehicleWindow(TileIndex tile, VehicleType type)
 	CloseWindowById(WindowClass::BuildVehicle, num);
 
 	new BuildVehicleWindow(_build_vehicle_desc, tile, type);
+}
+
+/**
+ * The engine chosen in a purchase window, for the 3D preview beside it (three_d_preview_gui.cpp).
+ * @param number the purchase window's number
+ * @return the engine, or EngineID::Invalid() when none is chosen or the window has gone
+ */
+EngineID GetBuildVehicleSelectedEngine(WindowNumber number)
+{
+	const BuildVehicleWindow *w = dynamic_cast<const BuildVehicleWindow *>(FindWindowById(WindowClass::BuildVehicle, number));
+	return w == nullptr ? EngineID::Invalid() : w->sel_engine;
 }

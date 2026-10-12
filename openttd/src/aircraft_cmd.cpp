@@ -197,20 +197,33 @@ void GetRotorImage(const Aircraft *v, EngineImageType image_type, VehicleSpriteS
 	result->Set(SPR_ROTOR_STOPPED + w->state);
 }
 
-static void GetAircraftIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
+/**
+ * The icon of an aircraft facing a direction, for the 3D preview that turns
+ * (three_d_preview_gui.cpp); the purchase list shows it facing west.
+ * @param engine the engine
+ * @param dir the direction it faces
+ * @param image_type where the picture is shown
+ * @param[out] result the sprites
+ */
+void GetAircraftIcon(EngineID engine, Direction dir, EngineImageType image_type, VehicleSpriteSeq *result)
 {
 	const Engine *e = Engine::Get(engine);
 	uint8_t spritenum = e->VehInfo<AircraftVehicleInfo>().image_index;
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
-		GetCustomVehicleIcon(engine, Direction::W, image_type, result);
+		GetCustomVehicleIcon(engine, dir, image_type, result);
 		if (result->IsValid()) return;
 
 		spritenum = e->original_image_index;
 	}
 
 	assert(IsValidImageIndex<VehicleType::Aircraft>(spritenum));
-	result->Set(to_underlying(Direction::W) + _aircraft_sprite[spritenum]);
+	result->Set(to_underlying(dir) + _aircraft_sprite[spritenum]);
+}
+
+static void GetAircraftIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
+{
+	GetAircraftIcon(engine, Direction::W, image_type, result);
 }
 
 void DrawAircraftEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type)

@@ -65,6 +65,7 @@
 #include "fontcache.h"
 #include "screenshot.h"
 #include "three_d.h"
+#include "progress.h"
 #include "genworld.h"
 #include "strings_func.h"
 #include "viewport_func.h"
@@ -8492,6 +8493,8 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
  * drawn for real), 'test3d mys <x> <y>' says which tile the game finds under
  * a pixel of the screen, 'test3d stav' prints the angle.
  */
+void ShowIndustryViewWindow(IndustryID industry);
+
 static bool ConTest3D(std::span<std::string_view> argv)
 {
 	if (argv.size() < 2) {
@@ -8560,6 +8563,40 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", model->name, *x, *y);
 		}
+	} else if (what == "okno" && argv.size() > 2) {
+		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'. */
+		if (argv[2] == "nakup") {
+			/* The purchase window needs a company; the null driver's game starts as a spectator. */
+			if (_local_company == COMPANY_SPECTATOR) {
+				extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+				Company *made = Company::IsValidID(CompanyID::Begin()) ? Company::Get(CompanyID::Begin()) : DoStartupNewCompany(false, CompanyID::Invalid());
+				if (made != nullptr) SetLocalCompany(made->index);
+			}
+			VehicleType type = VehicleType::Road;
+			if (argv.size() > 3) {
+				if (argv[3] == "vlak") type = VehicleType::Train;
+				if (argv[3] == "lod") type = VehicleType::Ship;
+				if (argv[3] == "letadlo") type = VehicleType::Aircraft;
+			}
+			ShowBuildVehicleWindow(INVALID_TILE, type);
+		} else if (argv[2] == "prumysl") {
+			auto x = number(3), y = number(4);
+			if (x.has_value() && y.has_value() && IsTileType(TileXY(*x, *y), TileType::Industry)) {
+				ShowIndustryViewWindow(GetIndustryIndex(TileXY(*x, *y)));
+			} else {
+				IConsolePrint(CC_ERROR, "test3d: no industry at {},{}", argv.size() > 3 ? argv[3] : "?", argv.size() > 4 ? argv[4] : "?");
+			}
+		}
+		for (const Window *w : Window::Iterate()) {
+			if (w->window_class == WindowClass::ThreeDVehiclePreview || w->window_class == WindowClass::ThreeDIndustryPreview) {
+				IConsolePrint(CC_DEFAULT, "test3d: preview window at {},{} size {}x{}", w->left, w->top, w->width, w->height);
+			}
+		}
+	} else if (what == "okna") {
+		/* Every window there is, for the rig. */
+		for (const Window *w : Window::Iterate()) {
+			IConsolePrint(CC_DEFAULT, "test3d: window class {} number {} at {},{} size {}x{}", to_underlying(w->window_class), static_cast<int32_t>(w->window_number), w->left, w->top, w->width, w->height);
+		}
 	} else if (what == "model" && argv.size() > 2) {
 		const ThreeDModel *model = GetThreeDModelByName(argv[2]);
 		if (model == nullptr) {
@@ -8602,7 +8639,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* The world generation progress window is still up at the first tick of a new game, and the last screenshot's message too. */
 		CloseWindowByClass(WindowClass::ModalProgress);
 		CloseWindowByClass(WindowClass::ErrorMessage);
-		bool ok = MakeScreenshot(SC_VIEWPORT, std::string(argv[2]));
+		/* While the world generation counts as in progress, only the main window and the progress window are
+		 * drawn (MayBeShown()); at the first tick of a new game it still does, so the rig calls it over. */
+		if (HasModalProgress()) SetModalProgress(false);
+		/* "okna": the whole screen with the windows, as the crash log takes it (SC_VIEWPORT hides the windows); the
+		 * screen is drawn first, since the null driver only draws between ticks. The file goes where the crash log's would. */
+		bool windows = argv.size() > 3 && argv[3] == "okna";
+		if (windows) {
+			UndrawMouseCursor();
+			MarkWholeScreenDirty(); // a viewport screenshot before left the windows undrawn
+			DrawDirtyBlocks();
+		}
+		bool ok = MakeScreenshot(windows ? SC_CRASHLOG : SC_VIEWPORT, std::string(argv[2]));
 		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: snimek {} {}", argv[2], ok ? "zapsan" : "ODMITNUTO - nezapsan");
 	} else if (what == "cas") {
 		/* How long the whole screen takes to draw, ten times over, at the angle set. */
