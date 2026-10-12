@@ -1,0 +1,410 @@
+// The game's own buildings from eight directions with depth and normals, 16x: see openttd_3d_grf.py.
+// Built from the colleague's renders in grrrrf; the PNG files are not kept here.
+yagl_version: "";
+grf_format: Container2;
+grf // Action08
+{
+    grf_id: "DC31";
+    version: GRF8;
+    name: "Decouple: buildings in 3D (budovy3d_1)";
+    description: "The game's own buildings from eight directions with depth and normals, for the turned view (OpenTTD Decouple by Karel Macha)";
+}
+replacement_sprite_sets // Action0A
+{
+    replacement_sprite_set<0x8000> // dum_07_hotel: house 0x07, 1x2 tiles
+    {
+        sprite_id<0x00000001> // d0 colour
+        {
+            [1500, 1476, -492, -716], zin16, c32bpp | chunked, "dum_07_hotel_d0_barva.png", [0, 0];
+        }
+        sprite_id<0x00000002> // d0 depth
+        {
+            [1500, 1476, -492, -716], zin16, c32bpp | chunked, "dum_07_hotel_d0_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000003> // d0 normals
+        {
+            [1500, 1476, -492, -716], zin16, c32bpp | chunked, "dum_07_hotel_d0_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000004> // d1 colour
+        {
+            [748, 1480, -758, -758], zin16, c32bpp | chunked, "dum_07_hotel_d1_barva.png", [0, 0];
+        }
+        sprite_id<0x00000005> // d1 depth
+        {
+            [748, 1480, -758, -758], zin16, c32bpp | chunked, "dum_07_hotel_d1_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000006> // d1 normals
+        {
+            [748, 1480, -758, -758], zin16, c32bpp | chunked, "dum_07_hotel_d1_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000007> // d2 colour
+        {
+            [1496, 1452, -1516, -948], zin16, c32bpp | chunked, "dum_07_hotel_d2_barva.png", [0, 0];
+        }
+        sprite_id<0x00000008> // d2 depth
+        {
+            [1496, 1452, -1516, -948], zin16, c32bpp | chunked, "dum_07_hotel_d2_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000009> // d2 normals
+        {
+            [1496, 1452, -1516, -948], zin16, c32bpp | chunked, "dum_07_hotel_d2_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000000A> // d3 colour
+        {
+            [1424, 1056, -1436, -1061], zin16, c32bpp | chunked, "dum_07_hotel_d3_barva.png", [0, 0];
+        }
+        sprite_id<0x0000000B> // d3 depth
+        {
+            [1424, 1056, -1436, -1061], zin16, c32bpp | chunked, "dum_07_hotel_d3_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000000C> // d3 normals
+        {
+            [1424, 1056, -1436, -1061], zin16, c32bpp | chunked, "dum_07_hotel_d3_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000000D> // d4 colour
+        {
+            [1500, 1376, -1008, -1384], zin16, c32bpp | chunked, "dum_07_hotel_d4_barva.png", [0, 0];
+        }
+        sprite_id<0x0000000E> // d4 depth
+        {
+            [1500, 1376, -1008, -1384], zin16, c32bpp | chunked, "dum_07_hotel_d4_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000000F> // d4 normals
+        {
+            [1500, 1376, -1008, -1384], zin16, c32bpp | chunked, "dum_07_hotel_d4_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000010> // d5 colour
+        {
+            [748, 1404, 10, -1410], zin16, c32bpp | chunked, "dum_07_hotel_d5_barva.png", [0, 0];
+        }
+        sprite_id<0x00000011> // d5 depth
+        {
+            [748, 1404, 10, -1410], zin16, c32bpp | chunked, "dum_07_hotel_d5_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000012> // d5 normals
+        {
+            [748, 1404, 10, -1410], zin16, c32bpp | chunked, "dum_07_hotel_d5_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000013> // d6 colour
+        {
+            [1496, 1428, 20, -1180], zin16, c32bpp | chunked, "dum_07_hotel_d6_barva.png", [0, 0];
+        }
+        sprite_id<0x00000014> // d6 depth
+        {
+            [1496, 1428, 20, -1180], zin16, c32bpp | chunked, "dum_07_hotel_d6_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000015> // d6 normals
+        {
+            [1496, 1428, 20, -1180], zin16, c32bpp | chunked, "dum_07_hotel_d6_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000016> // d7 colour
+        {
+            [1424, 1092, 12, -735], zin16, c32bpp | chunked, "dum_07_hotel_d7_barva.png", [0, 0];
+        }
+        sprite_id<0x00000017> // d7 depth
+        {
+            [1424, 1092, 12, -735], zin16, c32bpp | chunked, "dum_07_hotel_d7_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000018> // d7 normals
+        {
+            [1424, 1092, 12, -735], zin16, c32bpp | chunked, "dum_07_hotel_d7_normaly.png", [0, 0];
+        }
+    }
+    replacement_sprite_set<0x8018> // dum_09_socha: house 0x09, 1x1 tiles
+    {
+        sprite_id<0x00000019> // d0 colour
+        {
+            [968, 536, -484, -36], zin16, c32bpp | chunked, "dum_09_socha_d0_barva.png", [0, 0];
+        }
+        sprite_id<0x0000001A> // d0 depth
+        {
+            [968, 536, -484, -36], zin16, c32bpp | chunked, "dum_09_socha_d0_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000001B> // d0 normals
+        {
+            [968, 536, -484, -36], zin16, c32bpp | chunked, "dum_09_socha_d0_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000001C> // d1 colour
+        {
+            [688, 464, -706, -111], zin16, c32bpp | chunked, "dum_09_socha_d1_barva.png", [0, 0];
+        }
+        sprite_id<0x0000001D> // d1 depth
+        {
+            [688, 464, -706, -111], zin16, c32bpp | chunked, "dum_09_socha_d1_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000001E> // d1 normals
+        {
+            [688, 464, -706, -111], zin16, c32bpp | chunked, "dum_09_socha_d1_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000001F> // d2 colour
+        {
+            [972, 536, -996, -292], zin16, c32bpp | chunked, "dum_09_socha_d2_barva.png", [0, 0];
+        }
+        sprite_id<0x00000020> // d2 depth
+        {
+            [972, 536, -996, -292], zin16, c32bpp | chunked, "dum_09_socha_d2_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000021> // d2 normals
+        {
+            [972, 536, -996, -292], zin16, c32bpp | chunked, "dum_09_socha_d2_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000022> // d3 colour
+        {
+            [688, 464, -706, -469], zin16, c32bpp | chunked, "dum_09_socha_d3_barva.png", [0, 0];
+        }
+        sprite_id<0x00000023> // d3 depth
+        {
+            [688, 464, -706, -469], zin16, c32bpp | chunked, "dum_09_socha_d3_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000024> // d3 normals
+        {
+            [688, 464, -706, -469], zin16, c32bpp | chunked, "dum_09_socha_d3_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000025> // d4 colour
+        {
+            [968, 532, -484, -544], zin16, c32bpp | chunked, "dum_09_socha_d4_barva.png", [0, 0];
+        }
+        sprite_id<0x00000026> // d4 depth
+        {
+            [968, 532, -484, -544], zin16, c32bpp | chunked, "dum_09_socha_d4_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000027> // d4 normals
+        {
+            [968, 532, -484, -544], zin16, c32bpp | chunked, "dum_09_socha_d4_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000028> // d5 colour
+        {
+            [688, 464, 18, -469], zin16, c32bpp | chunked, "dum_09_socha_d5_barva.png", [0, 0];
+        }
+        sprite_id<0x00000029> // d5 depth
+        {
+            [688, 464, 18, -469], zin16, c32bpp | chunked, "dum_09_socha_d5_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000002A> // d5 normals
+        {
+            [688, 464, 18, -469], zin16, c32bpp | chunked, "dum_09_socha_d5_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000002B> // d6 colour
+        {
+            [972, 536, 24, -292], zin16, c32bpp | chunked, "dum_09_socha_d6_barva.png", [0, 0];
+        }
+        sprite_id<0x0000002C> // d6 depth
+        {
+            [972, 536, 24, -292], zin16, c32bpp | chunked, "dum_09_socha_d6_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000002D> // d6 normals
+        {
+            [972, 536, 24, -292], zin16, c32bpp | chunked, "dum_09_socha_d6_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000002E> // d7 colour
+        {
+            [688, 464, 18, -111], zin16, c32bpp | chunked, "dum_09_socha_d7_barva.png", [0, 0];
+        }
+        sprite_id<0x0000002F> // d7 depth
+        {
+            [688, 464, 18, -111], zin16, c32bpp | chunked, "dum_09_socha_d7_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000030> // d7 normals
+        {
+            [688, 464, 18, -111], zin16, c32bpp | chunked, "dum_09_socha_d7_normaly.png", [0, 0];
+        }
+    }
+    replacement_sprite_set<0x8030> // dum_0a_fontana: house 0x0a, 1x1 tiles
+    {
+        sprite_id<0x00000031> // d0 colour
+        {
+            [968, 604, -484, -104], zin16, c32bpp | chunked, "dum_0a_fontana_d0_barva.png", [0, 0];
+        }
+        sprite_id<0x00000032> // d0 depth
+        {
+            [968, 604, -484, -104], zin16, c32bpp | chunked, "dum_0a_fontana_d0_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000033> // d0 normals
+        {
+            [968, 604, -484, -104], zin16, c32bpp | chunked, "dum_0a_fontana_d0_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000034> // d1 colour
+        {
+            [688, 476, -706, -123], zin16, c32bpp | chunked, "dum_0a_fontana_d1_barva.png", [0, 0];
+        }
+        sprite_id<0x00000035> // d1 depth
+        {
+            [688, 476, -706, -123], zin16, c32bpp | chunked, "dum_0a_fontana_d1_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000036> // d1 normals
+        {
+            [688, 476, -706, -123], zin16, c32bpp | chunked, "dum_0a_fontana_d1_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000037> // d2 colour
+        {
+            [972, 600, -996, -356], zin16, c32bpp | chunked, "dum_0a_fontana_d2_barva.png", [0, 0];
+        }
+        sprite_id<0x00000038> // d2 depth
+        {
+            [972, 600, -996, -356], zin16, c32bpp | chunked, "dum_0a_fontana_d2_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000039> // d2 normals
+        {
+            [972, 600, -996, -356], zin16, c32bpp | chunked, "dum_0a_fontana_d2_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000003A> // d3 colour
+        {
+            [688, 480, -706, -485], zin16, c32bpp | chunked, "dum_0a_fontana_d3_barva.png", [0, 0];
+        }
+        sprite_id<0x0000003B> // d3 depth
+        {
+            [688, 480, -706, -485], zin16, c32bpp | chunked, "dum_0a_fontana_d3_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000003C> // d3 normals
+        {
+            [688, 480, -706, -485], zin16, c32bpp | chunked, "dum_0a_fontana_d3_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000003D> // d4 colour
+        {
+            [968, 600, -484, -612], zin16, c32bpp | chunked, "dum_0a_fontana_d4_barva.png", [0, 0];
+        }
+        sprite_id<0x0000003E> // d4 depth
+        {
+            [968, 600, -484, -612], zin16, c32bpp | chunked, "dum_0a_fontana_d4_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000003F> // d4 normals
+        {
+            [968, 600, -484, -612], zin16, c32bpp | chunked, "dum_0a_fontana_d4_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000040> // d5 colour
+        {
+            [688, 480, 18, -485], zin16, c32bpp | chunked, "dum_0a_fontana_d5_barva.png", [0, 0];
+        }
+        sprite_id<0x00000041> // d5 depth
+        {
+            [688, 480, 18, -485], zin16, c32bpp | chunked, "dum_0a_fontana_d5_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000042> // d5 normals
+        {
+            [688, 480, 18, -485], zin16, c32bpp | chunked, "dum_0a_fontana_d5_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000043> // d6 colour
+        {
+            [972, 600, 24, -356], zin16, c32bpp | chunked, "dum_0a_fontana_d6_barva.png", [0, 0];
+        }
+        sprite_id<0x00000044> // d6 depth
+        {
+            [972, 600, 24, -356], zin16, c32bpp | chunked, "dum_0a_fontana_d6_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000045> // d6 normals
+        {
+            [972, 600, 24, -356], zin16, c32bpp | chunked, "dum_0a_fontana_d6_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000046> // d7 colour
+        {
+            [688, 476, 18, -123], zin16, c32bpp | chunked, "dum_0a_fontana_d7_barva.png", [0, 0];
+        }
+        sprite_id<0x00000047> // d7 depth
+        {
+            [688, 476, 18, -123], zin16, c32bpp | chunked, "dum_0a_fontana_d7_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000048> // d7 normals
+        {
+            [688, 476, 18, -123], zin16, c32bpp | chunked, "dum_0a_fontana_d7_normaly.png", [0, 0];
+        }
+    }
+    replacement_sprite_set<0x8048> // dum_0b_park: house 0x0b, 1x1 tiles
+    {
+        sprite_id<0x00000049> // d0 colour
+        {
+            [1000, 940, -500, -424], zin16, c32bpp | chunked, "dum_0b_park_d0_barva.png", [0, 0];
+        }
+        sprite_id<0x0000004A> // d0 depth
+        {
+            [1000, 940, -500, -424], zin16, c32bpp | chunked, "dum_0b_park_d0_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000004B> // d0 normals
+        {
+            [1000, 940, -500, -424], zin16, c32bpp | chunked, "dum_0b_park_d0_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000004C> // d1 colour
+        {
+            [752, 832, -758, -455], zin16, c32bpp | chunked, "dum_0b_park_d1_barva.png", [0, 0];
+        }
+        sprite_id<0x0000004D> // d1 depth
+        {
+            [752, 832, -758, -455], zin16, c32bpp | chunked, "dum_0b_park_d1_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000004E> // d1 normals
+        {
+            [752, 832, -758, -455], zin16, c32bpp | chunked, "dum_0b_park_d1_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000004F> // d2 colour
+        {
+            [1016, 800, -1028, -548], zin16, c32bpp | chunked, "dum_0b_park_d2_barva.png", [0, 0];
+        }
+        sprite_id<0x00000050> // d2 depth
+        {
+            [1016, 800, -1028, -548], zin16, c32bpp | chunked, "dum_0b_park_d2_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000051> // d2 normals
+        {
+            [1016, 800, -1028, -548], zin16, c32bpp | chunked, "dum_0b_park_d2_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000052> // d3 colour
+        {
+            [748, 648, -754, -649], zin16, c32bpp | chunked, "dum_0b_park_d3_barva.png", [0, 0];
+        }
+        sprite_id<0x00000053> // d3 depth
+        {
+            [748, 648, -754, -649], zin16, c32bpp | chunked, "dum_0b_park_d3_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000054> // d3 normals
+        {
+            [748, 648, -754, -649], zin16, c32bpp | chunked, "dum_0b_park_d3_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000055> // d4 colour
+        {
+            [1000, 696, -500, -700], zin16, c32bpp | chunked, "dum_0b_park_d4_barva.png", [0, 0];
+        }
+        sprite_id<0x00000056> // d4 depth
+        {
+            [1000, 696, -500, -700], zin16, c32bpp | chunked, "dum_0b_park_d4_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000057> // d4 normals
+        {
+            [1000, 696, -500, -700], zin16, c32bpp | chunked, "dum_0b_park_d4_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000058> // d5 colour
+        {
+            [752, 668, 6, -669], zin16, c32bpp | chunked, "dum_0b_park_d5_barva.png", [0, 0];
+        }
+        sprite_id<0x00000059> // d5 depth
+        {
+            [752, 668, 6, -669], zin16, c32bpp | chunked, "dum_0b_park_d5_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000005A> // d5 normals
+        {
+            [752, 668, 6, -669], zin16, c32bpp | chunked, "dum_0b_park_d5_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000005B> // d6 colour
+        {
+            [1016, 828, 12, -576], zin16, c32bpp | chunked, "dum_0b_park_d6_barva.png", [0, 0];
+        }
+        sprite_id<0x0000005C> // d6 depth
+        {
+            [1016, 828, 12, -576], zin16, c32bpp | chunked, "dum_0b_park_d6_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000005D> // d6 normals
+        {
+            [1016, 828, 12, -576], zin16, c32bpp | chunked, "dum_0b_park_d6_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000005E> // d7 colour
+        {
+            [748, 856, 6, -475], zin16, c32bpp | chunked, "dum_0b_park_d7_barva.png", [0, 0];
+        }
+        sprite_id<0x0000005F> // d7 depth
+        {
+            [748, 856, 6, -475], zin16, c32bpp | chunked, "dum_0b_park_d7_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000060> // d7 normals
+        {
+            [748, 856, 6, -475], zin16, c32bpp | chunked, "dum_0b_park_d7_normaly.png", [0, 0];
+        }
+    }
+}

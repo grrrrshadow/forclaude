@@ -8515,6 +8515,70 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		SetViewYaw(degrees);
 		/* The turn moved the scroll position to keep the middle in place; the view follows at the next tick, here now. */
 		UpdateViewportPosition(w, 0);
+	} else if (what == "modely") {
+		/* The buildings with eight renders (ThreeDModel) and whether their sprites are there. */
+		for (uint i = 0; i < GetThreeDModelCount(); i++) IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDModel(GetThreeDModel(i)));
+	} else if (what == "budovy") {
+		/* Where the buildings with eight renders stand on the map. */
+		for (const auto tile : Map::Iterate()) {
+			if (!IsTileType(tile, TileType::House)) continue;
+			HouseID house = GetHouseType(tile);
+			if (house >= NEW_HOUSE_OFFSET || GetHouseNorthPart(house) != 0) continue;
+			const ThreeDModel *model = GetThreeDHouseModel(house);
+			if (model != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (house {:#x}) at {},{}{}", model->name, house, TileX(tile), TileY(tile), IsHouseCompleted(tile) ? "" : " (being built)");
+		}
+		for (const Industry *ind : Industry::Iterate()) {
+			const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
+			if (model != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{}{}", model->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), IsIndustryCompleted(ind->location.tile) ? "" : " (being built)");
+		}
+	} else if (what == "postav" && argv.size() > 4) {
+		/* Put a building with eight renders on the map, by its model's name: a house or one of the game's own industries. */
+		auto x = number(2), y = number(3);
+		const ThreeDModel *model = GetThreeDModelByName(argv[4]);
+		if (!x.has_value() || !y.has_value() || model == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <model>' (test3d modely lists them).");
+			return true;
+		}
+		TileIndex tile = TileXY(*x, *y);
+		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
+		CommandCost cost;
+		if (model->kind == ThreeDModelKind::House) {
+			cost = Command<Commands::PlaceHouse>::Do(DoCommandFlag::Execute, tile, static_cast<HouseID>(model->id), false, true);
+		} else {
+			cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, static_cast<IndustryType>(model->id), 0, true, 0);
+			if (cost.Succeeded() && IsTileType(tile, TileType::Industry)) {
+				Industry *ind = Industry::GetByTile(tile);
+				SB(ind->random, 0, 1, model->kind == ThreeDModelKind::IndustryVariant ? 1 : 0);
+				for (TileIndex t : ind->location) {
+					if (IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index) MarkTileDirtyByTile(t);
+				}
+			}
+		}
+		cur_company.Restore();
+		if (cost.Failed()) {
+			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", model->name, *x, *y, GetString(cost.GetErrorMessage()));
+		} else {
+			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", model->name, *x, *y);
+		}
+	} else if (what == "model" && argv.size() > 2) {
+		const ThreeDModel *model = GetThreeDModelByName(argv[2]);
+		if (model == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: no model '{}' (test3d modely lists them).", argv[2]);
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDModel(model));
+		auto t0 = std::chrono::steady_clock::now();
+		const ThreeDModelPicture *pic = GetThreeDModelPicture(model, vp->zoom);
+		double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+		if (pic == nullptr) {
+			IConsolePrint(CC_DEFAULT, "test3d: no picture at {} degrees, zoom {}", GetViewYaw(), to_underlying(vp->zoom));
+		} else {
+			size_t filled = 0;
+			for (uint32_t p : pic->pixels) {
+				if (Colour(p).a != 0) filled++;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: picture at {} degrees, zoom {}: {}x{} at {},{} from the origin, {} pixels filled, made in {:.1f} ms", GetViewYaw(), to_underlying(vp->zoom), pic->width, pic->height, pic->left, pic->top, filled, ms);
+		}
 	} else if (what == "stred") {
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) {

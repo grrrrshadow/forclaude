@@ -23,6 +23,7 @@
 #include "true_colour.h"
 #include "cargo_cutout.h"
 #include "layer_shift.h"
+#include "three_d.h"
 
 #include "table/sprites.h"
 #include "table/palette_convert.h"
@@ -1770,6 +1771,7 @@ void GfxInitSpriteMem()
 	ResetTrueColourSprites();
 	ResetCutoutSprites();
 	ResetShiftedSprites();
+	ClearThreeDModelCache();
 }
 
 /**
@@ -1782,8 +1784,42 @@ void GfxClearSpriteCache()
 	for (SpriteCache &sc : _spritecache) {
 		if (sc.ptr != nullptr) sc.ClearSpriteData();
 	}
+	ClearThreeDModelCache();
 
 	VideoDriver::GetInstance()->ClearSystemSprites();
+}
+
+/**
+ * The 16x level of a sprite as its file has it, not through the blitter: for
+ * the 3D's buildings (three_d.h), whose depth and normals are sprites too.
+ * @param sprite the sprite
+ * @param[out] pixels its pixels, Colour::data, row by row
+ * @param[out] width,height its size
+ * @param[out] x_offs,y_offs its offsets
+ * @return whether the sprite has a 32bpp level of 16x
+ */
+bool ReadRawSprite16x(SpriteID sprite, std::vector<uint32_t> &pixels, int &width, int &height, int &x_offs, int &y_offs)
+{
+	if (!SpriteExists(sprite)) return false;
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->file == nullptr || sc->type != SpriteType::Normal || sc->file_pos == SIZE_MAX) return false;
+
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	SpriteLoader::SpriteCollection collection;
+	ZoomLevels avail_8bpp, avail_32bpp;
+	ZoomLevels loaded = loader.LoadSprite(collection, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (!loaded.Test(ZoomLevel::In16x)) return false;
+
+	const SpriteLoader::Sprite &s = collection[ZoomLevel::In16x];
+	width = s.width;
+	height = s.height;
+	x_offs = s.x_offs;
+	y_offs = s.y_offs;
+	pixels.resize(static_cast<size_t>(width) * height);
+	for (size_t i = 0; i < pixels.size(); i++) {
+		pixels[i] = Colour(s.data[i].r, s.data[i].g, s.data[i].b, s.data[i].a).data;
+	}
+	return true;
 }
 
 /**

@@ -541,6 +541,7 @@ add_files(
     thread.h
     three_d.cpp
     three_d.h
+    three_d_model.cpp
     tile_cmd.h
     tile_map.cpp
     tile_map.h

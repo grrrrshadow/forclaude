@@ -95,6 +95,8 @@
 #include "three_d.h"
 #include "transparency.h"
 #include "console_func.h"
+#include "industry.h"
+#include "industry_map.h"
 
 #include <chrono>
 #include <cmath>
@@ -1965,6 +1967,7 @@ struct TurnedTimes {
 	double warp = 0;    ///< laying the textures over the faces
 	double collect = 0; ///< the tiles' draw procedures
 	double standing = 0; ///< the billboards
+	double models = 0;  ///< the buildings with eight renders: their pictures made and laid
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
 };
@@ -1979,8 +1982,8 @@ static inline double TurnedNow()
 void TurnedTimingsPrint()
 {
 	const TurnedTimes &t = _turned_times;
-	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}",
-			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing);
+	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f}",
+			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models);
 	_turned_times = TurnedTimes();
 }
 
@@ -2466,6 +2469,51 @@ static void DrawTurnedGenericBox(const DrawPixelInfo &frame, const ParentSpriteT
 }
 
 /**
+ * One of the game's buildings rendered from eight directions (box_kind 3,
+ * ThreeDModel): its picture at the angle, made from the two renders either
+ * side of it (GetThreeDModelPicture()), laid at its origin, the north corner of
+ * its north tile at the ground. The building is drawn once, whole; the sprites
+ * of its tiles are left out (box_kind 4).
+ */
+static void DrawTurnedModel(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	const ThreeDModel *model = GetThreeDModel(ps.box_dx);
+	if (model == nullptr) return;
+	double t0 = TurnedNow();
+	const ThreeDModelPicture *pic = GetThreeDModelPicture(model, frame.zoom);
+	bool debug = _turned_debug_tile != INVALID_TILE && TileXY(ps.box_ox / TILE_SIZE, ps.box_oy / TILE_SIZE) == _turned_debug_tile;
+	if (debug && pic == nullptr) IConsolePrint(CC_DEFAULT, "ladeni: model {} has no picture", model->name);
+	if (pic != nullptr) {
+		double vx, vy;
+		ProjectTurnedF(ps.box_ox, ps.box_oy, ps.box_oz, vx, vy);
+		double scale = 1.0 / (1 << to_underlying(frame.zoom));
+		int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + pic->left;
+		int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + pic->top;
+		int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+		int x0 = std::max(0, -ox), x1 = std::min(pic->width, fw - ox);
+		int y0 = std::max(0, -oy), y1 = std::min(pic->height, fh - oy);
+		if (debug) IConsolePrint(CC_DEFAULT, "ladeni: model {} at {},{},{}: picture {}x{} at {},{} of the block {}x{} (rows {}..{}, columns {}..{})", model->name, ps.box_ox, ps.box_oy, ps.box_oz, pic->width, pic->height, ox, oy, fw, fh, y0, y1, x0, x1);
+		uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+		for (int y = y0; y < y1; y++) {
+			const uint32_t *src = &pic->pixels[static_cast<size_t>(y) * pic->width];
+			uint32_t *row = dst + static_cast<size_t>(oy + y) * frame.pitch + ox;
+			for (int x = x0; x < x1; x++) {
+				Colour s(src[x]);
+				if (s.a == 0) continue;
+				if (s.a == 255) {
+					row[x] = Colour(s.r, s.g, s.b).data;
+				} else {
+					Colour d(row[x]);
+					uint a = s.a, na = 255 - a;
+					row[x] = Colour(static_cast<uint8_t>((s.r * a + d.r * na + 127) / 255), static_cast<uint8_t>((s.g * a + d.g * na + 127) / 255), static_cast<uint8_t>((s.b * a + d.b * na + 127) / 255)).data;
+				}
+			}
+		}
+	}
+	_turned_times.models += TurnedNow() - t0;
+}
+
+/**
  * Lay the ground of a plain tile (no foundation) from the block's north-up
  * texture (ViewportDoDrawTurned()) over its four corners where the turned view
  * puts them: four triangles meeting in the middle, so slopes keep their folds.
@@ -2596,6 +2644,14 @@ static void ViewportDoDrawTurned()
 	}
 	std::sort(tiles.begin(), tiles.end(), [](const TurnedTile &a, const TurnedTile &b) { return a.near < b.near; });
 
+	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile. */
+	struct TurnedModel {
+		const ThreeDModel *model;
+		TileIndex origin;
+		int z;
+	};
+	std::vector<TurnedModel> models;
+
 	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. */
 	_vd.dpi = cdpi;
 	double t_collect = 0;
@@ -2655,6 +2711,33 @@ static void ViewportDoDrawTurned()
 		}
 		t_collect += TurnedNow() - tc0;
 
+		/* One of the game's buildings rendered from eight directions (ThreeDModel): drawn once, whole, from the
+		 * two renders either side of the angle (DrawTurnedModel()), in place of the sprites of its tiles. */
+		if (_cur_ti.tile != INVALID_TILE) {
+			const ThreeDModel *model = nullptr;
+			TileIndex origin = INVALID_TILE;
+			if (tile_type == TileType::House && !IsTransparencySet(TransparencyOption::Houses) && IsHouseCompleted(_cur_ti.tile)) {
+				HouseID house = GetHouseType(_cur_ti.tile);
+				if (house < NEW_HOUSE_OFFSET) {
+					HouseID north = house;
+					origin = _cur_ti.tile + GetHouseNorthPart(north);
+					model = GetThreeDHouseModel(north);
+				}
+			} else if (tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries) && IsIndustryCompleted(_cur_ti.tile)) {
+				const Industry *ind = Industry::GetByTile(_cur_ti.tile);
+				model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
+				origin = ind->location.tile;
+			}
+			if (model != nullptr) {
+				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+				bool known = false;
+				for (const TurnedModel &tm : models) {
+					if (tm.origin == origin) known = true;
+				}
+				if (!known) models.push_back({model, origin, _cur_ti.z});
+				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: model {} by tile {},{}, z {}{}", model->name, TileX(origin), TileY(origin), _cur_ti.z, known ? " (known)" : "");
+			}
+		}
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
 		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses)) {
 			HouseID house = GetHouseType(_cur_ti.tile);
@@ -2665,7 +2748,7 @@ static void ViewportDoDrawTurned()
 				if (model != nullptr) {
 					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 						ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
-						if (ps.image == SPR_EMPTY_BOUNDING_BOX) continue;
+						if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
 						ps.box_kind = 1;
 						ps.box = model;
 						ps.box_ox = TileX(north_tile) * TILE_SIZE;
@@ -2704,6 +2787,34 @@ static void ViewportDoDrawTurned()
 		}
 	}
 	_turned_times.collect += t_collect;
+
+	/* Each building with eight renders is one thing to draw among the standing ones, by the box of its plot. */
+	for (const TurnedModel &tm : models) {
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
+		int ox = TileX(tm.origin) * TILE_SIZE, oy = TileY(tm.origin) * TILE_SIZE;
+		ps.xmin = ox;
+		ps.xmax = ox + tm.model->tiles_x * TILE_SIZE - 1;
+		ps.ymin = oy;
+		ps.ymax = oy + tm.model->tiles_y * TILE_SIZE - 1;
+		ps.zmin = tm.z;
+		ps.zmax = tm.z + MAX_BUILDING_PIXELS;
+		ps.x = ps.y = ps.left = ps.top = 0;
+		ps.image = SPR_EMPTY_BOUNDING_BOX;
+		ps.pal = PAL_NONE;
+		ps.sub = nullptr;
+		ps.first_child = -1;
+		ps.order = 0;
+		ps.ax = ox;
+		ps.ay = oy;
+		ps.az = tm.z;
+		ps.box = nullptr;
+		ps.box_ox = ox;
+		ps.box_oy = oy;
+		ps.box_oz = tm.z;
+		ps.box_dx = static_cast<int16_t>(GetThreeDModelIndex(tm.model));
+		ps.box_dy = 0;
+		ps.box_kind = 3;
+	}
 
 	/* The ground of the whole block, north-up, in one texture: the plain tiles' sprites drawn as the game draws
 	 * them, so neighbouring tiles fit together and the edges of the warped tiles meet at any zoom. A tile with a
@@ -2823,6 +2934,11 @@ static void ViewportDoDrawTurned()
 			DrawTurnedGenericBox(frame, *ps);
 			continue;
 		}
+		if (ps->box_kind == 3) {
+			DrawTurnedModel(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 4) continue; // a tile of a building with eight renders: drawn whole above
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
 		int child_idx = ps->first_child;
 		while (child_idx >= 0) {

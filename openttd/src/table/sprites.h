@@ -508,8 +508,20 @@ static constexpr SpriteID SPR_GREEN_LAYER_BASE = SPR_GREEN_LOAD_BASE + GREEN_LOA
 static constexpr uint16_t GREEN_LAYER_SPRITE_COUNT = 512;
 /** @} */
 
+/** @{
+ * The game's own buildings from eight directions with depth and normals, for
+ * the turned view (three_d.h, table/three_d_models.h): the sets under
+ * baseset/decouple/grafika/budovy3d_*.grf lay their sprites here through
+ * Action A with sprite numbers from DECOUPLE_3D_ACTION_A_FIRST on
+ * (SpriteReplace() in newgrf_acta.cpp), a model's 24 at first + direction * 3
+ * + (0 the colour, 1 the depth, 2 the normals). */
+static constexpr SpriteID SPR_DECOUPLE_3D_BASE = SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT;
+static constexpr uint16_t DECOUPLE_3D_SPRITE_COUNT = 2048;
+static constexpr uint16_t DECOUPLE_3D_ACTION_A_FIRST = 0x8000;
+/** @} */
+
 /** From where can we start putting NewGRFs. */
-static const SpriteID SPR_NEWGRFS_BASE = SPR_GREEN_LAYER_BASE + GREEN_LAYER_SPRITE_COUNT;
+static const SpriteID SPR_NEWGRFS_BASE = SPR_DECOUPLE_3D_BASE + DECOUPLE_3D_SPRITE_COUNT;
 
 /** Manager face sprites.
  * @{ */

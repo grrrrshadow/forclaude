@@ -100,7 +100,33 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    bounding box's footprint on the screen (a tower on a wide base) the box is
    narrowed to the sprite's width. Low things (fences, heaps, under a height
    level) stay billboards.
-4. **The signs** (town, station, waypoint and sign names) and the floating
+4. **The buildings rendered from eight directions with depth and normals**
+   (`src/three_d_model.cpp`, the table `table/three_d_models.h`: ten
+   houses of the temperate climate, the school, the statue of stone and of
+   bronze, the machine and the hut) turn for real. Every pixel of a render
+   is a world point -- the camera that took it says where, the depth
+   sprite says how far along the line of sight -- so the eight renders are
+   eight point clouds in one frame, the building's. At any angle the two
+   renders either side of it are put, point by point, through the game's
+   turned projection and splat where they land, the nearest point winning
+   its pixel; where both renders have a point at a pixel within 0.4 m of
+   each other it is the same surface and their colours mix, by the angle
+   and by how squarely each render saw the surface (its normal against the
+   line of sight); where one has it, it alone. At the eight directions
+   themselves the picture is the render. The building is drawn once, whole,
+   at the north corner of its north tile; the sprites of its tiles are left
+   out. A render is read from its sprites when first needed and kept per
+   level of zoom, a pixel of a level standing for a block of pixels of the
+   render (the nearest surface in the block), so the work goes with the
+   pixels on the screen, not with the render; up to 320 MB of renders are
+   kept, the least recently used going first. The theatre's picture takes
+   12 ms at 8x, 3 ms at 4x and a fifth of a millisecond at the normal zoom;
+   reading a render from its sprites takes 40 ms (a house) to 170 ms (the
+   school, the hotel), paid when a building is first drawn and when the
+   turn crosses one of the eight directions. Facing north the game draws
+   the house or industry as it always did (its original sprite), so a house
+   with a render changes its look at the first degree of a turn.
+5. **The signs** (town, station, waypoint and sign names) and the floating
    texts are collected north-up and each moved to where the ground under it is
    drawn turned.
 
@@ -113,11 +139,12 @@ faces are written straight into it, the billboards through the blitter as
 always. It needs a 32bpp blitter: with an 8bpp one the angle stays 0.
 
 What is not there yet: the previews that turn (purchase window, beside the
-industry window), the eight-direction pictures of our zin16 buildings, boxes
-for the houses of the other climates and for industries (billboards for now),
-the proper sorting of long things against each other, the smaller textures of
-the zoomed-out view, the seams at the edges of the map. Facing north nothing
-of this runs.
+industry window), the girls about the school, the machine and the statue and
+the hut's girls as renders of their own (the buildings turn without them for
+now), the plantation, boxes for the houses of the other climates, the proper
+sorting of long things against each other, the smaller textures of the
+zoomed-out view, the seams at the edges of the map. Facing north nothing of
+this runs.
 
 ## The rig
 
@@ -130,7 +157,12 @@ the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole
 screen and says where the time went, `test3d ladeni <x> <y>` writes out how
 that tile is drawn (its sprites, walls, corners) and its texture as
-`textura.ppm`. Screenshots asked for under the null driver are made on the
+`textura.ppm`. For the buildings with eight renders: `test3d modely` lists
+them and whether their sprites are there, `test3d model <name>` reads the
+first render and makes the picture at the angle and zoom of the view, saying
+how long each took, `test3d budovy` says where such buildings stand on the
+map, `test3d postav <x> <y> <name>` puts one there (a house, or one of the
+game's own industries, which must be in a town). Screenshots asked for under the null driver are made on the
 spot (`MakeScreenshot()`), since that driver never drains the main-thread
 queue.
 
@@ -144,7 +176,20 @@ the cost of turning and scrolling, not of vehicles moving.
 
 openttd.grf stays as it is (the player's rule). The 16x pictures go into sets
 of their own under `media/baseset/decouple/grafika/` (`zastavka.grf` first,
-the girls at the bus stop; `grafika/README.md` there), static in every game,
+the girls at the bus stop; `zastavka/README.md` there), static in every game,
 laid over openttd.grf's sprites with Action A: a set of the game's own
 graphics may replace any sprite loaded so far, openttd.grf's included
 (`SpriteReplace()` in `src/newgrf/newgrf_acta.cpp`, `GRFConfig::builtin_graphics`).
+
+The renders of the buildings that turn are the sets `budovy3d_*.grf` there,
+each under 100 MB, made by `grafika/openttd_3d_grf.py` from the colleague's
+renders (grrrrf): for every model and direction three sprites of 16x only,
+the colour, the depth (a 32bpp picture: red the high byte, green the low
+byte, alpha 255 where measured) and the normals, 24 a model. They go into a
+block of the game's own, `SPR_DECOUPLE_3D_BASE` (2048 sprites before
+`SPR_NEWGRFS_BASE`), through Action A with sprite numbers from 0x8000 on,
+which a set of the game's own graphics may use for that block. The same
+script writes the table `src/table/three_d_models.h` (which house or
+industry each model is, its plot, and for every direction the camera that
+took the render). The pictures themselves are not kept in the repository,
+only the sets and their `.yagl`.

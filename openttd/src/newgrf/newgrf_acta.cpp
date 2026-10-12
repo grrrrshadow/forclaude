@@ -47,7 +47,7 @@ static void SpriteReplace(ByteReader &buf)
 
 	for (uint i = 0; i < num_sets; i++) {
 		uint8_t num_sprites = buf.ReadByte();
-		uint16_t first_sprite = buf.ReadWord();
+		SpriteID first_sprite = buf.ReadWord();
 
 		GrfMsg(2, "SpriteReplace: [Set {}] Changing {} sprites, beginning with {}",
 			i, num_sprites, first_sprite
@@ -55,8 +55,22 @@ static void SpriteReplace(ByteReader &buf)
 
 		/* A set of the game's own graphics (baseset/decouple/grafika/, GRFConfig::builtin_graphics) may lay
 		 * its pictures over any sprite loaded so far, openttd.grf's own included: that is what it is for
-		 * (the 16x levels of the 3D era, with openttd.grf left as it is). */
-		bool own_graphics = _cur_gps.grfconfig != nullptr && _cur_gps.grfconfig->builtin_graphics && first_sprite + num_sprites <= _cur_gps.spriteid;
+		 * (the 16x levels of the 3D era, with openttd.grf left as it is). With sprite numbers from
+		 * DECOUPLE_3D_ACTION_A_FIRST on it fills the block of the 3D's buildings (SPR_DECOUPLE_3D_BASE,
+		 * three_d.h), which a word of an Action A could not otherwise reach. */
+		bool own_graphics = _cur_gps.grfconfig != nullptr && _cur_gps.grfconfig->builtin_graphics;
+		if (own_graphics && first_sprite >= DECOUPLE_3D_ACTION_A_FIRST) {
+			uint offset = first_sprite - DECOUPLE_3D_ACTION_A_FIRST;
+			if (offset + num_sprites > DECOUPLE_3D_SPRITE_COUNT) {
+				GrfMsg(0, "SpriteReplace: [Set {}] {} sprites from {} do not fit the block of the 3D's buildings ({}), ignoring.", i, num_sprites, first_sprite, DECOUPLE_3D_SPRITE_COUNT);
+				first_sprite = _cur_gps.spriteid;
+				_cur_gps.spriteid += num_sprites;
+			} else {
+				first_sprite = SPR_DECOUPLE_3D_BASE + offset;
+			}
+		} else {
+			own_graphics = own_graphics && first_sprite + num_sprites <= _cur_gps.spriteid;
+		}
 
 		if (first_sprite + num_sprites >= SPR_OPENTTD_BASE && !own_graphics) {
 			/* Outside allowed range, check for GRM sprite reservations. */

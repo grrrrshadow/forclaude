@@ -34,6 +34,7 @@ add_files(
     strgen_tables.h
     string_colours.h
     three_d_houses.h
+    three_d_models.h
     town_land.h
     townname.h
     track_data.h

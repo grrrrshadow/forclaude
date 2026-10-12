@@ -1,0 +1,113 @@
+// The game's own buildings from eight directions with depth and normals, 16x: see openttd_3d_grf.py.
+// Built from the colleague's renders in grrrrf; the PNG files are not kept here.
+yagl_version: "";
+grf_format: Container2;
+grf // Action08
+{
+    grf_id: "DC36";
+    version: GRF8;
+    name: "Decouple: buildings in 3D (budovy3d_6)";
+    description: "The game's own buildings from eight directions with depth and normals, for the turned view (OpenTTD Decouple by Karel Macha)";
+}
+replacement_sprite_sets // Action0A
+{
+    replacement_sprite_set<0x8150> // chatka: industry IT_COFFEESHOP, 2x1 tiles
+    {
+        sprite_id<0x00000151> // d0 colour
+        {
+            [1400, 1184, -964, -456], zin16, c32bpp | chunked, "chatka_d0_barva.png", [0, 0];
+        }
+        sprite_id<0x00000152> // d0 depth
+        {
+            [1400, 1184, -964, -456], zin16, c32bpp | chunked, "chatka_d0_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000153> // d0 normals
+        {
+            [1400, 1184, -964, -456], zin16, c32bpp | chunked, "chatka_d0_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000154> // d1 colour
+        {
+            [1440, 812, -1440, -464], zin16, c32bpp | chunked, "chatka_d1_barva.png", [0, 0];
+        }
+        sprite_id<0x00000155> // d1 depth
+        {
+            [1440, 812, -1440, -464], zin16, c32bpp | chunked, "chatka_d1_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000156> // d1 normals
+        {
+            [1440, 812, -1440, -464], zin16, c32bpp | chunked, "chatka_d1_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000157> // d2 colour
+        {
+            [1452, 820, -1484, -616], zin16, c32bpp | chunked, "chatka_d2_barva.png", [0, 0];
+        }
+        sprite_id<0x00000158> // d2 depth
+        {
+            [1452, 820, -1484, -616], zin16, c32bpp | chunked, "chatka_d2_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000159> // d2 normals
+        {
+            [1452, 820, -1484, -616], zin16, c32bpp | chunked, "chatka_d2_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000015A> // d3 colour
+        {
+            [720, 796, -720, -808], zin16, c32bpp | chunked, "chatka_d3_barva.png", [0, 0];
+        }
+        sprite_id<0x0000015B> // d3 depth
+        {
+            [720, 796, -720, -808], zin16, c32bpp | chunked, "chatka_d3_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000015C> // d3 normals
+        {
+            [720, 796, -720, -808], zin16, c32bpp | chunked, "chatka_d3_normaly.png", [0, 0];
+        }
+        sprite_id<0x0000015D> // d4 colour
+        {
+            [1400, 780, -436, -820], zin16, c32bpp | chunked, "chatka_d4_barva.png", [0, 0];
+        }
+        sprite_id<0x0000015E> // d4 depth
+        {
+            [1400, 780, -436, -820], zin16, c32bpp | chunked, "chatka_d4_hloubka.png", [0, 0];
+        }
+        sprite_id<0x0000015F> // d4 normals
+        {
+            [1400, 780, -436, -820], zin16, c32bpp | chunked, "chatka_d4_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000160> // d5 colour
+        {
+            [1440, 612, 0, -616], zin16, c32bpp | chunked, "chatka_d5_barva.png", [0, 0];
+        }
+        sprite_id<0x00000161> // d5 depth
+        {
+            [1440, 612, 0, -616], zin16, c32bpp | chunked, "chatka_d5_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000162> // d5 normals
+        {
+            [1440, 612, 0, -616], zin16, c32bpp | chunked, "chatka_d5_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000163> // d6 colour
+        {
+            [1452, 1020, 32, -552], zin16, c32bpp | chunked, "chatka_d6_barva.png", [0, 0];
+        }
+        sprite_id<0x00000164> // d6 depth
+        {
+            [1452, 1020, 32, -552], zin16, c32bpp | chunked, "chatka_d6_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000165> // d6 normals
+        {
+            [1452, 1020, 32, -552], zin16, c32bpp | chunked, "chatka_d6_normaly.png", [0, 0];
+        }
+        sprite_id<0x00000166> // d7 colour
+        {
+            [716, 1188, 0, -480], zin16, c32bpp | chunked, "chatka_d7_barva.png", [0, 0];
+        }
+        sprite_id<0x00000167> // d7 depth
+        {
+            [716, 1188, 0, -480], zin16, c32bpp | chunked, "chatka_d7_hloubka.png", [0, 0];
+        }
+        sprite_id<0x00000168> // d7 normals
+        {
+            [716, 1188, 0, -480], zin16, c32bpp | chunked, "chatka_d7_normaly.png", [0, 0];
+        }
+    }
+}

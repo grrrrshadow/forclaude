@@ -43,9 +43,9 @@ struct ParentSpriteToDraw {
 	int32_t box_ox;                   ///< world X of the origin of the boxes: the north corner of a house's north tile, or of the bounding box
 	int32_t box_oy;                   ///< world Y of it
 	int32_t box_oz;                   ///< world Z of the ground the thing stands on
-	int16_t box_dx;                   ///< box_kind 1: this tile's place in the house, tiles along X from its north tile; box_kind 2: the box's extent along X (world units)
+	int16_t box_dx;                   ///< box_kind 1: this tile's place in the house, tiles along X from its north tile; box_kind 2: the box's extent along X (world units); box_kind 3: the model's index (GetThreeDModel())
 	int16_t box_dy;                   ///< and along Y
-	int32_t box_kind = 0;             ///< how the turned view draws this sprite (three_d.h): 0 a billboard, 1 the boxes of a house's hand table, 2 one box of its bounding box. The struct stays a multiple of 16 bytes for the SSE4 sorter.
+	int32_t box_kind = 0;             ///< how the turned view draws this sprite (three_d.h): 0 a billboard, 1 the boxes of a house's hand table, 2 one box of its bounding box, 3 a building with eight renders, whole (an entry of its own, no sprite), 4 nothing: a tile of such a building. The struct stays a multiple of 16 bytes for the SSE4 sorter.
 };
 
 typedef std::vector<ParentSpriteToDraw*> ParentSpriteToSortVector;
