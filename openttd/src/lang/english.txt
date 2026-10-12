@@ -2211,6 +2211,8 @@ STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Limit the maxim
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE                            :Memory for sprites: {STRING2}
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :How much memory the game may keep sprites in, with a 32bpp blitter (a quarter of it with 8bpp). When it is full the game drops sprites and loads them again as the view moves, which shows as stutter. A game with many NewGRFs wants more; 8x zoom keeps four times the sprite memory of 4x and 16x four times that again. The default, 2048 MB, is for this game's default zoom, 8x: four times the 512 MB vanilla OpenTTD has for 4x. 16x wants about 8192 MB
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
+STR_CONFIG_SETTING_SPRITE_MITCHELL                              :Use Mitchell for scaling sprites down: {STRING2}
+STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :The 8x and 4x zoom of a 32bpp set that draws only finer pictures (zin16 or zin8) are made straight from its finest picture with Mitchell's filter: sharper edges, rails and lettering, light parts not darkened. Off, they are made by halves from the mean of each 2x2 block. Mitchell takes about twice as long to load a sprite, which can show as a short stutter when many new pictures appear at once. Sets that draw their own 8x and 4x are not touched
 ###length 5
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_16X                       :16x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_8X                        :8x

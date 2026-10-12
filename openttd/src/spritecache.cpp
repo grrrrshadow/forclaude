@@ -27,6 +27,9 @@
 #include "table/sprites.h"
 #include "table/palette_convert.h"
 
+#include <array>
+#include <cmath>
+
 #include "safeguards.h"
 
 
@@ -325,6 +328,187 @@ static void ResizeSpriteOut(SpriteLoader::SpriteCollection &sprite, ZoomLevel zo
 	}
 }
 
+/** sRGB to linear light, for each byte (DownscaleMitchell()). */
+static const std::array<float, 256> &SrgbToLinear()
+{
+	static const std::array<float, 256> table = [] {
+		std::array<float, 256> t{};
+		for (int i = 0; i < 256; i++) {
+			const double c = i / 255.0;
+			t[i] = static_cast<float>(c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4));
+		}
+		return t;
+	}();
+	return table;
+}
+
+/** Linear light back to an sRGB byte, in 4096 steps (DownscaleMitchell()). */
+static const std::array<uint8_t, 4096> &LinearToSrgb()
+{
+	static const std::array<uint8_t, 4096> table = [] {
+		std::array<uint8_t, 4096> t{};
+		for (int i = 0; i < 4096; i++) {
+			const double c = i / 4095.0;
+			const double s = c <= 0.0031308 ? c * 12.92 : 1.055 * std::pow(c, 1 / 2.4) - 0.055;
+			t[i] = static_cast<uint8_t>(std::lround(std::clamp(s, 0.0, 1.0) * 255));
+		}
+		return t;
+	}();
+	return table;
+}
+
+/**
+ * Mitchell-Netravali's cubic, B = C = 1/3: hardly any light or dark fringe
+ * around a hard edge, which a sprite against the transparent has everywhere.
+ * @param x the distance from the centre, in target pixels
+ * @return the weight
+ */
+static float MitchellWeight(float x)
+{
+	constexpr float B = 1.0f / 3, C = 1.0f / 3;
+	x = std::fabs(x);
+	if (x < 1) return ((12 - 9 * B - 6 * C) * x * x * x + (-18 + 12 * B + 6 * C) * x * x + (6 - 2 * B)) / 6;
+	if (x < 2) return ((-B - 6 * C) * x * x * x + (6 * B + 30 * C) * x * x + (-12 * B - 48 * C) * x + (8 * B + 24 * C)) / 6;
+	return 0;
+}
+
+/**
+ * Make a level a 32bpp sprite has not got straight from a finer one with
+ * Mitchell's filter -- the 4x of a set's zin16 from the zin16 itself, not
+ * from an 8x made of it first -- the player's setting (gui.sprite_mitchell)
+ * on the colleague's proposal. Separable (the rows, then the columns), in
+ * linear light, the colour weighted by alpha (premultiplied), so no colour
+ * of a see-through pixel bleeds in and no edge lights up; what the cubic
+ * overshoots is clipped. Past the sprite's edge its last pixel goes on: a
+ * transparent outside, as first written, softened every edge, and the game's
+ * buildings are cut into strips and a set's wagons into pieces that meet
+ * edge to edge, so every joint showed as a see-through line. The mask byte
+ * cannot be averaged: it is the one most of the source pixels under the
+ * target pixel have, weighted by their alpha, so the edge of a paint stays
+ * smooth. Size and offsets as ResizeSpriteOut() gives them; the target pixel
+ * x covers the source pixels f x to f x + f - 1, as there.
+ * @param sprite the sprite, as read
+ * @param from the finer level, with its pixels
+ * @param to the level to make
+ */
+static void DownscaleMitchell(SpriteLoader::SpriteCollection &sprite, ZoomLevel from, ZoomLevel to)
+{
+	const SpriteLoader::Sprite &src = sprite[from];
+	SpriteLoader::Sprite &dst = sprite[to];
+	const int shift = to_underlying(to) - to_underlying(from);
+	const int f = 1 << shift;
+	auto unscale = [shift, f](int v) { return (v + f - 1) >> shift; };
+	dst.width = static_cast<uint16_t>(unscale(src.width));
+	dst.height = static_cast<uint16_t>(unscale(src.height));
+	dst.x_offs = static_cast<int16_t>(unscale(src.x_offs));
+	dst.y_offs = static_cast<int16_t>(unscale(src.y_offs));
+	dst.colours = src.colours;
+	dst.AllocateData(to, static_cast<size_t>(dst.width) * dst.height);
+
+	const int sw = src.width, sh = src.height, dw = dst.width, dh = dst.height;
+	const int taps = 4 * f; // the cubic reaches two target pixels each way
+	/* The weights of each target index along one axis: the first source
+	 * index and taps weights, summing to one over the whole reach. */
+	auto make_taps = [&](int n, std::vector<int> &first, std::vector<float> &weights) {
+		first.resize(n);
+		weights.resize(static_cast<size_t>(n) * taps);
+		for (int o = 0; o < n; o++) {
+			const float centre = f * o + f / 2.0f - 0.5f;
+			first[o] = static_cast<int>(std::floor(centre - 2 * f)) + 1;
+			float sum = 0;
+			for (int k = 0; k < taps; k++) sum += weights[static_cast<size_t>(o) * taps + k] = MitchellWeight((first[o] + k - centre) / f);
+			for (int k = 0; k < taps; k++) weights[static_cast<size_t>(o) * taps + k] /= sum;
+		}
+	};
+	static std::vector<int> first_x, first_y;
+	static std::vector<float> weights_x, weights_y, pre, mid;
+	make_taps(dw, first_x, weights_x);
+	make_taps(dh, first_y, weights_y);
+
+	/* The source in linear light, premultiplied by alpha. */
+	const std::array<float, 256> &linear = SrgbToLinear();
+	pre.resize(static_cast<size_t>(sw) * sh * 4);
+	for (size_t i = 0; i < static_cast<size_t>(sw) * sh; i++) {
+		const SpriteLoader::CommonPixel &p = src.data[i];
+		const float a = p.a / 255.0f;
+		pre[i * 4 + 0] = linear[p.r] * a;
+		pre[i * 4 + 1] = linear[p.g] * a;
+		pre[i * 4 + 2] = linear[p.b] * a;
+		pre[i * 4 + 3] = a;
+	}
+
+	/* The rows: every source row to the target width. */
+	mid.assign(static_cast<size_t>(dw) * sh * 4, 0.0f);
+	for (int y = 0; y < sh; y++) {
+		const float *row = &pre[static_cast<size_t>(y) * sw * 4];
+		float *out = &mid[static_cast<size_t>(y) * dw * 4];
+		for (int x = 0; x < dw; x++) {
+			const float *w = &weights_x[static_cast<size_t>(x) * taps];
+			float r = 0, g = 0, b = 0, a = 0;
+			for (int k = 0; k < taps; k++) {
+				const float *q = &row[static_cast<size_t>(std::clamp(first_x[x] + k, 0, sw - 1)) * 4];
+				r += q[0] * w[k];
+				g += q[1] * w[k];
+				b += q[2] * w[k];
+				a += q[3] * w[k];
+			}
+			out[x * 4 + 0] = r;
+			out[x * 4 + 1] = g;
+			out[x * 4 + 2] = b;
+			out[x * 4 + 3] = a;
+		}
+	}
+
+	/* The columns, and back to bytes. */
+	const std::array<uint8_t, 4096> &srgb = LinearToSrgb();
+	std::array<std::pair<uint8_t, uint32_t>, 16 * 16> votes{};
+	for (int y = 0; y < dh; y++) {
+		const float *w = &weights_y[static_cast<size_t>(y) * taps];
+		for (int x = 0; x < dw; x++) {
+			float r = 0, g = 0, b = 0, a = 0;
+			for (int k = 0; k < taps; k++) {
+				const float *q = &mid[(static_cast<size_t>(std::clamp(first_y[y] + k, 0, sh - 1)) * dw + x) * 4];
+				r += q[0] * w[k];
+				g += q[1] * w[k];
+				b += q[2] * w[k];
+				a += q[3] * w[k];
+			}
+			SpriteLoader::CommonPixel &o = dst.data[static_cast<size_t>(y) * dw + x];
+			a = std::clamp(a, 0.0f, 1.0f);
+			if (a * 255 < 0.5f) {
+				o = SpriteLoader::CommonPixel{};
+				continue;
+			}
+			auto back = [&](float v) { return srgb[static_cast<int>(std::clamp(v / a, 0.0f, 1.0f) * 4095 + 0.5f)]; };
+			o.r = back(r);
+			o.g = back(g);
+			o.b = back(b);
+			o.a = static_cast<uint8_t>(a * 255 + 0.5f);
+			/* The mask by vote, over the source pixels under this one: a
+			 * paint's mask, or the palette colour of a 32bpp sprite made
+			 * 8bpp for an 8bpp blitter (SpriteLoaderMakeIndexed). */
+			o.m = 0;
+			size_t n = 0;
+			for (int sy = y * f; sy < std::min(sh, y * f + f); sy++) {
+				for (int sx = x * f; sx < std::min(sw, x * f + f); sx++) {
+					const SpriteLoader::CommonPixel &p = src.data[static_cast<size_t>(sy) * sw + sx];
+					size_t i = 0;
+					while (i < n && votes[i].first != p.m) i++;
+					if (i == n) votes[n++] = {p.m, 0};
+					votes[i].second += p.a;
+				}
+			}
+			uint32_t best = 0;
+			for (size_t i = 0; i < n; i++) {
+				if (votes[i].second > best) {
+					best = votes[i].second;
+					o.m = votes[i].first;
+				}
+			}
+		}
+	}
+}
+
 static bool PadSingleSprite(SpriteLoader::Sprite *sprite, ZoomLevel zoom, uint pad_left, uint pad_top, uint pad_right, uint pad_bottom)
 {
 	uint width  = sprite->width + pad_left + pad_right;
@@ -437,19 +621,40 @@ static bool ResizeSprites(SpriteLoader::SpriteCollection &sprite, ZoomLevels spr
 		break;
 	}
 	if (first_avail == ZoomLevel::End) return false;
+	/* Mitchell (the player's setting, gui.sprite_mitchell): the 8x and the
+	 * 4x a set with true colours has not got, each made straight from its
+	 * finest level -- the 4x of a zin16 from the zin16 itself. */
+	const bool mitchell = _settings_client.gui.sprite_mitchell && sprite[first_avail].colours.Test(SpriteComponent::RGB);
 	if (first_avail > root) {
 		if (!ResizeSpriteIn(sprite, first_avail, root)) return false;
 		sprite_avail.Set(root);
 	} else if (first_avail < root && !sprite_avail.Test(root)) {
 		/* The set has 16x (zoom code 7) and no 8x, and 16x is off: the 8x
-		 * is made from the 16x here, the mean of each 2x2 block, as every
-		 * coarser level is made below. The 16x pixels are not kept. */
-		ResizeSpriteOut(sprite, root);
+		 * is made from the 16x here, with Mitchell or the mean of each 2x2
+		 * block, as every coarser level is made below. The 16x pixels are
+		 * not kept. */
+		if (mitchell) {
+			DownscaleMitchell(sprite, first_avail, root);
+		} else {
+			ResizeSpriteOut(sprite, root);
+		}
 		sprite_avail.Set(root);
 	}
 
 	/* Pad sprites to make sizes match. */
 	if (!PadSprites(sprite, sprite_avail, encoder)) return false;
+
+	/* With Mitchell, the 8x and the 4x below the root, from the finest level
+	 * while its pixels are still here: after the padding, so they come out
+	 * the size the levels made below would, and no sprite grows by the
+	 * rounding of a level padded with the rest. */
+	if (mitchell) {
+		for (ZoomLevel zoom : {ZoomLevel::In8x, ZoomLevel::In4x}) {
+			if (zoom <= first_avail || sprite_avail.Test(zoom)) continue;
+			DownscaleMitchell(sprite, first_avail, zoom);
+			sprite_avail.Set(zoom);
+		}
+	}
 
 	if (root != ZoomLevel::Min) {
 		/* The size of the 16x level, for the sprite's header and the checks
@@ -917,6 +1122,40 @@ std::string DescribeSpriteLevels(SpriteID sprite)
 			const SpriteLoader::CommonPixel &p = s.data[static_cast<size_t>(s.height / 2) * s.width + s.width / 2];
 			out += fmt::format(" stred {},{},{},{} m{}", p.r, p.g, p.b, p.a, p.m);
 		}
+	}
+	return out;
+}
+
+/**
+ * Rig probe (testzoom8 filtr): the 8x and the 4x the game makes of a 32bpp
+ * sprite, read in 32bpp whatever the blitter (the rig's draws in 8bpp, where
+ * no filter is used), with the filter the setting chooses: the size, the
+ * middle pixel and the pixel at the left edge of the middle row.
+ * @param sprite the sprite
+ * @return the description, one line
+ */
+std::string DescribeSpriteFilter(SpriteID sprite)
+{
+	if (sprite >= _spritecache.size()) return "neni";
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->file == nullptr || sc->type != SpriteType::Normal) return "neni obrazek";
+	SpriteLoader::SpriteCollection coll;
+	ZoomLevels avail_8bpp;
+	ZoomLevels avail_32bpp;
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	ZoomLevels avail = loader.LoadSprite(coll, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (avail.None()) return "bez 32bpp";
+	std::string out = fmt::format("{} z {}", _settings_client.gui.sprite_mitchell ? "mitchell" : "krabice", sc->file->GetSimplifiedFilename());
+	if (!ResizeSprites(coll, avail, BlitterFactory::GetCurrentBlitter())) return out + " nejde";
+	for (ZoomLevel zoom : {ZoomLevel::In8x, ZoomLevel::In4x}) {
+		const SpriteLoader::Sprite &s = coll[zoom];
+		if (s.data == nullptr) {
+			out += fmt::format(" {}:bez pixelu", to_underlying(zoom));
+			continue;
+		}
+		const SpriteLoader::CommonPixel &m = s.data[static_cast<size_t>(s.height / 2) * s.width + s.width / 2];
+		const SpriteLoader::CommonPixel &e = s.data[static_cast<size_t>(s.height / 2) * s.width];
+		out += fmt::format(" {}:{}x{} stred {},{},{},{} okraj {},{},{},{}", to_underlying(zoom), s.width, s.height, m.r, m.g, m.b, m.a, e.r, e.g, e.b, e.a);
 	}
 	return out;
 }

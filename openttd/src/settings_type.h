@@ -252,6 +252,7 @@ struct GUISettings {
 	ZoomLevel zoom_max; ///< maximum zoom out level
 	ZoomLevel sprite_zoom_min; ///< maximum zoom level at which higher-resolution alternative sprites will be used (if available) instead of scaling a lower resolution sprite
 	uint32_t sprite_cache_size_mb; ///< Memory for the sprite cache in MB with a 32bpp blitter (a quarter of it with 8bpp), the player's to set: more sets and finer zoom want more, else the game loads sprites over and over.
+	bool sprite_mitchell; ///< The 8x and the 4x a 32bpp set has not got made straight from its finest level with Mitchell's filter (DownscaleMitchell()), not by halves with a 2x2 mean: sharper, and about twice the time to load a sprite.
 	uint32_t autosave_interval; ///< how often should we do autosaves?
 	bool threaded_saves; ///< should we do threaded saves?
 	bool keep_all_autosave; ///< name the autosave in a different way

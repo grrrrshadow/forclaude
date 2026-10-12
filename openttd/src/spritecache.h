@@ -67,6 +67,7 @@ bool SetCutoutSprite(SpriteID sprite, SpriteID stencil, SpriteID texture, int16_
 bool SetShiftedSprite(SpriteID sprite, SpriteID original, int16_t dx, int16_t dy);
 SpriteID AllocateDerivedSpriteID();
 std::string DescribeTrueColourSprite(SpriteID sprite);
+std::string DescribeSpriteFilter(SpriteID sprite);
 std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 
 size_t GetSpriteCacheBytesUsed();

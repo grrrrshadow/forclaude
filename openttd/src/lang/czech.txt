@@ -2310,6 +2310,8 @@ STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Omezte maximál
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE                            :Paměť pro sprity: {STRING}
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :Kolik paměti smí hra držet sprity, s 32bpp blitterem (s 8bpp čtvrtinu). Když je plná, hra sprity zahazuje a při posunu pohledu je načítá znova, což se projeví škubáním. Hra s mnoha NewGRF chce víc; přiblížení 8x drží čtyřikrát víc paměti spritů než 4x a 16x zase čtyřikrát víc. Výchozích 2048 MB je pro výchozí přiblížení této hry, 8x: čtyřikrát víc než 512 MB, které má vanilla pro 4x. 16x chce asi 8192 MB
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
+STR_CONFIG_SETTING_SPRITE_MITCHELL                              :Použít Mitchell pro zmenšování spritů: {STRING}
+STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 8x a 4x u 32bpp sady, která kreslí jen jemnější obrázky (zin16 nebo zin8), se udělá rovnou z jejího nejjemnějšího obrázku Mitchellovým filtrem: ostřejší hrany, koleje i nápisy, světlá místa neztmavnou. Vypnuté se dělá po polovinách průměrem bloku 2×2. Mitchell načítá sprite asi dvakrát déle, což se může projevit krátkým škubnutím, když se naráz objeví hodně nových obrázků. Sady, které kreslí vlastní 8x a 4x, se to netýká
 ###length 5
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_16X                       :16x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_8X                        :8x

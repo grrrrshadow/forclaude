@@ -14270,7 +14270,7 @@ static bool ConTestZrychleni(std::span<std::string_view> argv)
 static bool ConTestZoom8(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory; 'sprite <id>' for the levels of one sprite. Usage: 'testzoom8 [dovnitr | nacti [vse] | sprite <id>]'");
+		IConsolePrint(CC_HELP, "Rig: the 8x zoom - base, settings, main view, sprite sizes, cache memory; 'sprite <id>' for the levels of one sprite, 'filtr <id>' for its 8x and 4x in 32bpp with the scaling filter. Usage: 'testzoom8 [dovnitr | nacti [vse] | sprite <id> | filtr <id>]'");
 		return true;
 	}
 
@@ -14281,6 +14281,18 @@ static bool ConTestZoom8(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_DEFAULT, "testzoom8: sprite {} zoom_min {} sprite_zoom_min {} {}", *id, to_underlying(_settings_client.gui.zoom_min), to_underlying(_settings_client.gui.sprite_zoom_min), DescribeSpriteLevels(*id));
+		return true;
+	}
+
+	/* The 8x and the 4x of a 32bpp sprite with the filter the setting
+	 * chooses (gui.sprite_mitchell, DescribeSpriteFilter()). */
+	if (argv.size() > 2 && argv[1] == "filtr") {
+		auto id = ParseInteger<uint32_t>(argv[2]);
+		if (!id.has_value()) {
+			IConsolePrint(CC_ERROR, "testzoom8: filtr needs a number.");
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "testzoom8: filtr {} {}", *id, DescribeSpriteFilter(*id));
 		return true;
 	}
 

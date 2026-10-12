@@ -766,17 +766,27 @@ the size and middle pixel of 16x, 8x and 4x as they go to the encoder:
 
 - 16x off (the default): 3981 reads 4x and 8x and leaves its 16x record
   unread (the set has an 8x; `skip_16x`), its 8x is the set's green and 16x
-  has no pixels; 3982 reads its 16x and the game makes the 8x from it, the
-  mean of each 2x2 block, (128, 0, 128) (`ResizeSpriteOut()`), and the 4x
-  the same.
+  has no pixels; 3982 reads its 16x and the game makes the 8x and the 4x
+  from it with Mitchell (`gui.sprite_mitchell`, below): the red-blue board's
+  mean in linear light, (188, 0, 188).
 - 16x on (`gui.zoom_min 0`): both read their 16x, blue and the red-blue
   board, and 3982's 8x is still the mean.
 - 16x on with the sprite resolution held at 8x (`gui.sprite_zoom_min 1`):
-  3982's 16x is its 8x doubled again, (128, 0, 128).
+  3982's 16x is its 8x doubled again, (188, 0, 188).
 
 The rig runs the null blitter, so the sprites come through
 `SpriteLoaderMakeIndexed`: the middle pixel keeps its RGBA and gains the
 palette index `m`.
+
+The scene `zin16filtr`, with a fresh config of its own (the scene before
+saves 16x on into its config), reads the same sprites in 32bpp whatever the blitter
+(`testzoom8 filtr <id>`, `DescribeSpriteFilter()`) and shows the 8x and 4x the
+game makes with the filter the player chooses, `gui.sprite_mitchell` (Game
+options > Graphics, under the sprite memory, on by default): with Mitchell
+both of 3982's come straight from its 16x (`DownscaleMitchell()`), the
+red-blue board's mean in linear light, (188, 0, 188), the colour the eye
+sees, the edge as whole as the middle; switched off, the 2x2 mean in sRGB,
+the darker (128, 0, 128). 3981 draws its own 8x and 4x, untouched either way.
 
 ## Fast forward and slow motion on one button
 

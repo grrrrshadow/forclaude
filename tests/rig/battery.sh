@@ -1987,6 +1987,25 @@ testzoom8 sprite 3982
 setting gui.sprite_zoom_min 1
 testzoom8 sprite 3982" 20 -c $ZIN16_CFG
 echo "zin16: $(grep -o 'testzoom8: sprite .*' $S/reg_zin16.log | cut -d' ' -f2- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The filter for the levels a set leaves out (gui.sprite_mitchell, on by
+# default; DownscaleMitchell() in spritecache.cpp): testzoom8 filtr reads the
+# sprite in 32bpp, as the rig's 8bpp blitter would not, and shows its 8x and
+# 4x. 3982 has only 16x, a chessboard of red and blue: with Mitchell both
+# come straight from it, the mean in linear light, 188,0,188, the colour the
+# eye sees, and the edge of the middle row as whole as the inside (the
+# sprite's last pixel goes on past its edge, so pieces cut to meet edge to
+# edge show no joint); with the setting off the 2x2 mean in sRGB gives the
+# darker 128,0,128. 3981 draws its own 8x and 4x, green and red, and no
+# filter touches them.
+# A config of its own, fresh from the rig's: the scene before saves 16x on
+# into its own.
+ZIN16F_CFG=$S/zin16filtr_openttd.cfg
+sed -e '/^\[newgrf\]$/a zin16_test.grf = ' "$CFG_KEEP" > $ZIN16F_CFG
+run_scene zin16filtr "testzoom8 filtr 3982
+testzoom8 filtr 3981
+setting gui.sprite_mitchell 0
+testzoom8 filtr 3982" 20 -c $ZIN16F_CFG
+echo "zin16filtr: $(grep -o 'testzoom8: filtr .*' $S/reg_zin16filtr.log | cut -d' ' -f3- | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # The fast forward button (the player's word: one click fast, two clicks
 # slow; gui.slow_motion_speed, 30 % by default, see README.md): testzrychleni
 # clicks the main toolbar's button the way the mouse does and reads the game
