@@ -92,7 +92,10 @@
 #include "network/network_func.h"
 #include "framerate_type.h"
 #include "viewport_cmd.h"
+#include "three_d.h"
+#include "console_func.h"
 
+#include <chrono>
 #include <forward_list>
 #include <stack>
 
@@ -202,7 +205,7 @@ static VpSpriteSorter _vp_sprite_sorter = nullptr;
 
 static Point MapXYZToViewport(const Viewport &vp, int x, int y, int z)
 {
-	Point p = RemapCoords(x, y, z);
+	Point p = IsViewportTurned(vp) ? ProjectTurned(x, y, z) : RemapCoords(x, y, z);
 	p.x -= vp.virtual_width / 2;
 	p.y -= vp.virtual_height / 2;
 	return p;
@@ -437,9 +440,10 @@ Point TranslateXYToTileCoord(const Viewport &vp, int x, int y, bool clamp_to_map
 		return pt;
 	}
 
-	return InverseRemapCoords2(
-			ScaleByZoom(x - vp.left, vp.zoom) + vp.virtual_left,
-			ScaleByZoom(y - vp.top, vp.zoom) + vp.virtual_top, clamp_to_map);
+	int vx = ScaleByZoom(x - vp.left, vp.zoom) + vp.virtual_left;
+	int vy = ScaleByZoom(y - vp.top, vp.zoom) + vp.virtual_top;
+	if (IsViewportTurned(vp)) return InverseRemapCoordsTurned(vx, vy, clamp_to_map);
+	return InverseRemapCoords2(vx, vy, clamp_to_map);
 }
 
 /* When used for zooming, check area below current coordinates (x,y)
@@ -749,6 +753,10 @@ void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z,
 	ps.zmax = z + bounds.extent.z - 1;
 
 	ps.first_child = LAST_CHILD_NONE;
+
+	ps.ax = x + bounds.offset.x;
+	ps.ay = y + bounds.offset.y;
+	ps.az = z + bounds.offset.z;
 
 	_vd.last_child = LAST_CHILD_PARENT;
 
@@ -1851,6 +1859,534 @@ static void ViewportDrawStrings(ZoomLevel zoom, const StringSpriteToDrawVector *
 	}
 }
 
+/*
+ * The turned view: the second renderer (three_d.h).
+ *
+ * The world is turned about a pivot and drawn by the game's own projection.
+ * The ground keeps its shape: every tile's ground sprites are drawn north-up
+ * into a small texture and the texture is laid over the four corners of the
+ * tile where the turned view puts them (four triangles meeting in the middle
+ * of the tile, so slopes keep their folds). Everything that stands -- houses,
+ * trees, vehicles, foundations with the ground on them -- is a billboard: the
+ * sprite as it is, hung from its anchor point turned, drawn far to near.
+ * Vehicles show the picture of the direction they face as seen from the turn
+ * (vehicle.cpp, DoDrawVehicle()). Signs and floating texts are left out for
+ * now.
+ */
+
+/** A corner of a turned ground triangle: where it lands in the block being drawn and where it is in the tile's texture, both in pixels. */
+struct TurnedVertex {
+	double x, y; ///< pixel in the block being drawn
+	double u, v; ///< pixel in the texture
+};
+
+/**
+ * Fill a triangle with the pixels of a texture: every pixel inside takes the
+ * texture pixel of the same world point. Both maps are affine within a
+ * triangle, so the texture coordinate changes linearly across it. Pixels the
+ * texture has nothing for (value 0) are left as they are.
+ */
+static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c)
+{
+	double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+	if (std::abs(area) < 1e-9) return;
+	double du_dx = ((b.u - a.u) * (c.y - a.y) - (c.u - a.u) * (b.y - a.y)) / area;
+	double du_dy = ((c.u - a.u) * (b.x - a.x) - (b.u - a.u) * (c.x - a.x)) / area;
+	double dv_dx = ((b.v - a.v) * (c.y - a.y) - (c.v - a.v) * (b.y - a.y)) / area;
+	double dv_dy = ((c.v - a.v) * (b.x - a.x) - (b.v - a.v) * (c.x - a.x)) / area;
+	double sign = area > 0 ? 1.0 : -1.0;
+	int y0 = std::max(0, static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
+	int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a.y, b.y, c.y}) - 0.5)));
+	for (int y = y0; y <= y1; y++) {
+		double yc = y + 0.5;
+		double xlo = -1e18, xhi = 1e18;
+		/* Inside is where E(x) = (q.x - p.x) * (yc - p.y) - (q.y - p.y) * (x - p.x) has the sign of the area, for each edge p -> q. */
+		auto edge = [&](const TurnedVertex &p, const TurnedVertex &q) {
+			double k = -(q.y - p.y) * sign;
+			double e0 = ((q.x - p.x) * (yc - p.y) + (q.y - p.y) * p.x) * sign;
+			if (k > 1e-12) {
+				xlo = std::max(xlo, -e0 / k);
+			} else if (k < -1e-12) {
+				xhi = std::min(xhi, -e0 / k);
+			} else if (e0 < 0) {
+				xlo = 1e18;
+			}
+		};
+		edge(a, b);
+		edge(b, c);
+		edge(c, a);
+		int xs = std::max(0, static_cast<int>(std::ceil(xlo - 0.5)));
+		int xe = std::min(w - 1, static_cast<int>(std::floor(xhi - 0.5)));
+		if (xs > xe) continue;
+		double u = a.u + du_dx * (xs + 0.5 - a.x) + du_dy * (yc - a.y);
+		double v = a.v + dv_dx * (xs + 0.5 - a.x) + dv_dy * (yc - a.y);
+		uint32_t *row = dst + y * pitch;
+		for (int x = xs; x <= xe; x++, u += du_dx, v += dv_dx) {
+			int iu = static_cast<int>(std::floor(u)), iv = static_cast<int>(std::floor(v));
+			if (iu < 0 || iv < 0 || iu >= tw || iv >= th) continue;
+			uint32_t p = tex[iv * tw + iu];
+			if (p == 0) {
+				/* The edge of a face falls on the outermost pixels of its diamond, whose sides step two pixels at a
+				 * time and whose tips are four apart: the nearest drawn pixel within three is the right one then. */
+				static const int near[24][2] = {
+					{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1},
+					{2, 0}, {-2, 0}, {0, 2}, {0, -2}, {2, 1}, {-2, 1}, {2, -1}, {-2, -1},
+					{3, 0}, {-3, 0}, {0, 3}, {0, -3}, {3, 1}, {-3, 1}, {3, -1}, {-3, -1},
+				};
+				for (const auto &[dx, dy] : near) {
+					int nu = iu + dx, nv = iv + dy;
+					if (nu < 0 || nv < 0 || nu >= tw || nv >= th) continue;
+					p = tex[nv * tw + nu];
+					if (p != 0) break;
+				}
+			}
+			if (p != 0) row[x] = p;
+		}
+	}
+}
+
+/** RemapCoords() of the view facing north, not rounded: where a world point is in a tile's north-up texture. */
+static inline void RemapCoordsF(double x, double y, double z, double &vx, double &vy)
+{
+	vx = (y - x) * 2 * ZOOM_BASE;
+	vy = (y + x - z) * ZOOM_BASE;
+}
+
+static std::vector<uint32_t> _turned_texture; ///< The north-up picture of the tile being drawn turned.
+TileIndex _turned_debug_tile = INVALID_TILE; ///< Rig: the tile whose turned drawing is written out (test3d ladeni).
+
+/** Rig: where the time of the turned drawing goes (test3d cas), milliseconds since the last report. */
+struct TurnedTimes {
+	double texture = 0; ///< drawing the tiles' sprites into the textures
+	double widen = 0;   ///< growing the ground over the footprints of buildings
+	double warp = 0;    ///< laying the textures over the faces
+	double collect = 0; ///< the tiles' draw procedures
+	double standing = 0; ///< the billboards
+	int tiles = 0;      ///< tiles looked at
+	int drawn = 0;      ///< tiles drawn
+};
+static TurnedTimes _turned_times;
+
+static inline double TurnedNow()
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+/** Rig: print where the time of the turned drawing went since the last call, and start over. */
+void TurnedTimingsPrint()
+{
+	const TurnedTimes &t = _turned_times;
+	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}",
+			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing);
+	_turned_times = TurnedTimes();
+}
+
+/**
+ * The ground under a house or an industry is drawn black where the building
+ * stands, for the building's sprite to cover. Turned, the ground turns and the
+ * billboard of the building does not, so the black would show beside it.
+ * Take the black out and let the ground around grow over it.
+ */
+static void FillTurnedFootprint(int tw, int th)
+{
+	uint32_t *tex = _turned_texture.data();
+	for (int y = 0; y < th; y++) {
+		uint32_t *row = tex + y * tw;
+		for (int x = 0; x < tw; x++) {
+			Colour c;
+			c.data = row[x];
+			if (c.data == 0 || c.r > 24 || c.g > 24 || c.b > 24) continue;
+			/* A run of black: filled from the drawn pixel next to it on either side, the nearer one for each pixel. */
+			int end = x;
+			while (end < tw) {
+				c.data = row[end];
+				if (c.data == 0 || c.r > 24 || c.g > 24 || c.b > 24) break;
+				end++;
+			}
+			uint32_t left = (x > 0) ? row[x - 1] : 0;
+			uint32_t right = (end < tw) ? row[end] : 0;
+			if (left == 0) left = right;
+			if (right == 0) right = left;
+			for (int i = x; i < end; i++) row[i] = (i - x < end - 1 - i) ? left : right;
+			x = end;
+		}
+	}
+}
+
+/**
+ * Draw the ground of one tile turned. The tile sprites it added (from index
+ * \a first on), its foundations and the ground drawn on top of them are drawn
+ * north-up into a texture. The tile is then a box: its top is the ground
+ * (four triangles meeting in the middle, so slopes keep their folds), its
+ * sides are the walls of the foundation, from the land below up to the ground
+ * on top, wherever the foundation raised the ground. Every face is laid over
+ * its corners where the turned view puts them, with the pixels the texture has
+ * at the same world points. The two walls the game draws (south-west and
+ * south-east) give their pixels to the two it never draws, mirrored through
+ * the middle of the tile. The foundation sprites are taken off the billboard
+ * list (ViewportDoDrawTurned()), since they are here.
+ * @param frame the block of the screen being drawn (virtual coordinates of the turned view)
+ * @param first the first tile sprite of this tile in _vd.tile_sprites_to_draw
+ * @param x0,y0 the north corner of the tile (world units)
+ * @param top_slope the slope of the ground, on top of the foundation if the tile has one
+ * @param top_z the height of the ground's north corner on flat ground, on top of the foundation if the tile has one
+ * @param raw_slope the slope of the land itself
+ * @param raw_z the height of the land's north corner on flat ground
+ * @param building whether a building stands on the tile, with the ground under it drawn black (FillTurnedFootprint())
+ */
+static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, int x0, int y0, Slope top_slope, int top_z, Slope raw_slope, int raw_z, bool building)
+{
+	bool foundation = _vd.foundation[FoundationPart::Normal] != -1 || _vd.foundation[FoundationPart::Halftile] != -1;
+	if (first >= _vd.tile_sprites_to_draw.size() && !foundation) return;
+	ZoomLevel zoom = frame.zoom;
+	int mask = ScaleByZoom(-1, zoom);
+	Slope st = RemoveHalftileSlope(top_slope), sr = RemoveHalftileSlope(raw_slope);
+
+	/* The corners north, east, south, west and the middle: where they are, the height of the ground on top and of the land below. */
+	static const Corner corners[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
+	static const int cxs[4] = {0, 0, TILE_SIZE, TILE_SIZE};
+	static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
+	double wx[5], wy[5], wz[5], bz[4];
+	for (int i = 0; i < 4; i++) {
+		wx[i] = x0 + cxs[i];
+		wy[i] = y0 + cys[i];
+		wz[i] = top_z + GetSlopePixelZInCorner(st, corners[i]);
+		bz[i] = raw_z + GetSlopePixelZInCorner(sr, corners[i]);
+	}
+	wx[4] = x0 + TILE_SIZE / 2.0;
+	wy[4] = y0 + TILE_SIZE / 2.0;
+	wz[4] = top_z + GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, st);
+
+	/* The texture: the tile north-up, a tile wide, from above the highest corner to below the lowest. */
+	double minvy = 1e18, maxvy = -1e18;
+	for (int i = 0; i < 5; i++) {
+		double vx, vy;
+		RemapCoordsF(wx[i], wy[i], wz[i], vx, vy);
+		minvy = std::min(minvy, vy);
+		maxvy = std::max(maxvy, vy);
+		if (i < 4) {
+			RemapCoordsF(wx[i], wy[i], bz[i], vx, vy);
+			minvy = std::min(minvy, vy);
+			maxvy = std::max(maxvy, vy);
+		}
+	}
+	const int margin = TILE_HEIGHT * ZOOM_BASE;
+	int tleft = (RemapCoords(x0 + TILE_SIZE, y0, 0).x - margin) & mask;
+	int ttop = (static_cast<int>(std::floor(minvy)) - margin) & mask;
+	int twidth = (2 * TILE_SIZE * 2 * ZOOM_BASE + 2 * margin + ~mask) & mask;
+	int theight = (static_cast<int>(std::ceil(maxvy)) + margin - ttop + ~mask) & mask;
+	int tw = UnScaleByZoom(twidth, zoom), th = UnScaleByZoom(theight, zoom);
+	if (tw <= 0 || th <= 0) return;
+	double t0 = TurnedNow();
+	_turned_texture.assign(static_cast<size_t>(tw) * th, 0);
+	DrawPixelInfo tdpi{
+		.dst_ptr = _turned_texture.data(),
+		.left = tleft,
+		.top = ttop,
+		.width = twidth,
+		.height = theight,
+		.pitch = tw,
+		.zoom = zoom
+	};
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+		for (size_t i = first; i < _vd.tile_sprites_to_draw.size(); i++) {
+			const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+			DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+		}
+		/* The foundation and the ground on top of it, which is its child sprites: drawn here, taken off the billboards. */
+		for (FoundationPart part : {FoundationPart::Normal, FoundationPart::Halftile}) {
+			if (_vd.foundation[part] == -1) continue;
+			ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[_vd.foundation[part]];
+			if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+			int child_idx = ps.first_child;
+			while (child_idx >= 0) {
+				const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+				child_idx = cs.next;
+				if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+					IConsolePrint(CC_DEFAULT, "ladeni:   dite zakladu {} pal {} na {},{} {}", cs.image, cs.pal, cs.x, cs.y, cs.relative ? "od rohu" : "od kotvy");
+				}
+				if (cs.relative) {
+					DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+				} else {
+					DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+				}
+			}
+			ps.first_child = LAST_CHILD_NONE;
+			ps.image = SPR_EMPTY_BOUNDING_BOX;
+		}
+	}
+	if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+		/* Rig: the texture as a picture, textura.ppm next to the executable. */
+		auto f = FileHandle::Open(std::string("textura.ppm"), "wb");
+		if (f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", tw, th);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (uint32_t p : _turned_texture) {
+				Colour c;
+				c.data = p;
+				uint8_t rgb[3] = {c.r, c.g, c.b};
+				fwrite(rgb, 1, 3, *f);
+			}
+		}
+	}
+	double t1 = TurnedNow();
+	if (building) FillTurnedFootprint(tw, th);
+	double t2 = TurnedNow();
+	_turned_times.texture += t1 - t0;
+	_turned_times.widen += t2 - t1;
+	_turned_times.drawn++;
+
+	/* A corner of a face: a world point on the screen, with its pixels taken at another (or the same) world point of the texture. */
+	double scale = 1.0 / (1 << to_underlying(zoom));
+	auto vertex = [&](double x, double y, double z, double tx, double ty, double tz) {
+		TurnedVertex r;
+		double fx, fy, cx, cy;
+		ProjectTurnedF(x, y, z, fx, fy);
+		RemapCoordsF(tx, ty, tz, cx, cy);
+		r.x = (fx - frame.left) * scale;
+		r.y = (fy - frame.top) * scale;
+		r.u = (cx - tleft) * scale;
+		r.v = (cy - ttop) * scale;
+		return r;
+	};
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
+	const uint32_t *tex = _turned_texture.data();
+
+	/* The walls, far first: the edges N-E, E-S, S-W, W-N wherever the ground on top is above the land. */
+	struct Wall {
+		int a, b;
+		double near;
+	};
+	Wall walls[4];
+	int num_walls = 0;
+	for (int e = 0; e < 4; e++) {
+		int a = e, b = (e + 1) & 3;
+		if (wz[a] <= bz[a] + 1e-6 && wz[b] <= bz[b] + 1e-6) continue;
+		double xr, yr;
+		TurnWorldPoint((wx[a] + wx[b]) / 2, (wy[a] + wy[b]) / 2, xr, yr);
+		walls[num_walls++] = {a, b, xr + yr};
+	}
+	std::sort(walls, walls + num_walls, [](const Wall &p, const Wall &q) { return p.near < q.near; });
+	for (int i = 0; i < num_walls; i++) {
+		int a = walls[i].a, b = walls[i].b;
+		/* The game draws the walls below the edges E-S and S-W; the other two take their pixels mirrored through the middle. */
+		bool drawn = (a == 1 && b == 2) || (a == 2 && b == 3);
+		int ta = drawn ? a : (a + 2) & 3, tb = drawn ? b : (b + 2) & 3;
+		TurnedVertex a_top = vertex(wx[a], wy[a], wz[a], wx[ta], wy[ta], wz[ta]);
+		TurnedVertex b_top = vertex(wx[b], wy[b], wz[b], wx[tb], wy[tb], wz[tb]);
+		TurnedVertex b_bot = vertex(wx[b], wy[b], bz[b], wx[tb], wy[tb], bz[tb]);
+		TurnedVertex a_bot = vertex(wx[a], wy[a], bz[a], wx[ta], wy[ta], bz[ta]);
+		if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+			IConsolePrint(CC_DEFAULT, "ladeni:   stena {}-{} {} blok ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) textura ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f})",
+					a, b, drawn ? "kreslena" : "zrcadlena", a_top.x, a_top.y, b_top.x, b_top.y, b_bot.x, b_bot.y, a_bot.x, a_bot.y, a_top.u, a_top.v, b_top.u, b_top.v, b_bot.u, b_bot.v, a_bot.u, a_bot.v);
+		}
+		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, a_top, b_top, b_bot);
+		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, a_top, b_bot, a_bot);
+	}
+
+	/* The top: the ground, four triangles meeting in the middle. */
+	TurnedVertex v[5];
+	for (int i = 0; i < 5; i++) v[i] = vertex(wx[i], wy[i], wz[i], wx[i], wy[i], wz[i]);
+	if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+		size_t painted = 0;
+		for (uint32_t p : _turned_texture) if (p != 0) painted++;
+		IConsolePrint(CC_DEFAULT, "ladeni: dlazdice {},{} vrch svah {} z {} zem svah {} z {} spritu {} zaklady {} sten {} textura {}x{} ({},{}) kresleno {}", x0 / TILE_SIZE, y0 / TILE_SIZE,
+				to_underlying(top_slope), top_z, to_underlying(raw_slope), raw_z, _vd.tile_sprites_to_draw.size() - first, foundation ? "ano" : "ne", num_walls, tw, th, tleft, ttop, painted);
+		for (int i = 0; i < 5; i++) {
+			IConsolePrint(CC_DEFAULT, "ladeni:   roh {} svet {},{},{} zem {} blok {:.1f},{:.1f} textura {:.1f},{:.1f}", i, wx[i], wy[i], wz[i], i < 4 ? bz[i] : wz[i], v[i].x, v[i].y, v[i].u, v[i].v);
+		}
+	}
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[0], v[1], v[4]);
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[1], v[2], v[4]);
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[2], v[3], v[4]);
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[3], v[0], v[4]);
+	_turned_times.warp += TurnedNow() - t2;
+}
+
+/**
+ * Draw a block of the main viewport with the view turned (three_d.h). Called
+ * by ViewportDoDraw() with _vd.dpi set up for the block and _cur_dpi pointing
+ * at it; takes care of everything up to the clearing of the lists.
+ */
+static void ViewportDoDrawTurned()
+{
+	const DrawPixelInfo frame = _vd.dpi;
+	ZoomLevel zoom = frame.zoom;
+	int mask = ScaleByZoom(-1, zoom);
+	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
+	if (fw <= 0 || fh <= 0) return;
+
+	/* 1. The world box under the block, from the ground up to the tallest thing there can be. */
+	int zmax = (_settings_game.construction.map_height_limit + _settings_game.construction.max_bridge_height) * TILE_HEIGHT + MAX_BUILDING_PIXELS;
+	double minx = 1e18, maxx = -1e18, miny = 1e18, maxy = -1e18;
+	for (int corner = 0; corner < 4; corner++) {
+		for (int zz : {0, zmax}) {
+			double vx = frame.left + ((corner & 1) ? frame.width : 0);
+			double vy = frame.top + ((corner & 2) ? frame.height : 0);
+			double wx, wy;
+			InverseTurnedFlatF(vx, vy, zz, wx, wy);
+			minx = std::min(minx, wx); maxx = std::max(maxx, wx);
+			miny = std::min(miny, wy); maxy = std::max(maxy, wy);
+		}
+	}
+	const int outside = 16; // tiles beyond the map edge still drawn (black)
+	int tx0 = std::max(static_cast<int>(std::floor(minx / TILE_SIZE)) - 1, -outside);
+	int tx1 = std::min(static_cast<int>(std::floor(maxx / TILE_SIZE)) + 1, static_cast<int>(Map::SizeX()) + outside);
+	int ty0 = std::max(static_cast<int>(std::floor(miny / TILE_SIZE)) - 1, -outside);
+	int ty1 = std::min(static_cast<int>(std::floor(maxy / TILE_SIZE)) + 1, static_cast<int>(Map::SizeY()) + outside);
+
+	/* 2. The north-up box of that world box: the tiles and vehicles are collected against it, so nothing in the box is clipped away. */
+	DrawPixelInfo cdpi = frame;
+	{
+		int cl = INT32_MAX, cr = INT32_MIN, ct = INT32_MAX, cb = INT32_MIN;
+		for (int corner = 0; corner < 4; corner++) {
+			for (int zz : {0, zmax}) {
+				Point p = RemapCoords(((corner & 1) ? tx1 + 1 : tx0) * TILE_SIZE, ((corner & 2) ? ty1 + 1 : ty0) * TILE_SIZE, zz);
+				cl = std::min(cl, p.x); cr = std::max(cr, p.x);
+				ct = std::min(ct, p.y); cb = std::max(cb, p.y);
+			}
+		}
+		cdpi.left = (cl - MAX_TILE_EXTENT_LEFT) & mask;
+		cdpi.top = (ct - MAX_TILE_EXTENT_TOP) & mask;
+		cdpi.width = (cr + MAX_TILE_EXTENT_RIGHT - cdpi.left + ~mask) & mask;
+		cdpi.height = (cb + MAX_TILE_EXTENT_BOTTOM - cdpi.top + ~mask) & mask;
+	}
+
+	/* 3. Clear the block: black, and the animation buffer told these pixels do not animate. */
+	BlitterFactory::GetCurrentBlitter()->DrawRect(frame.dst_ptr, fw, fh, PixelColour{0});
+
+	/* 4. The tiles that can reach into the block, far first: the ground of each warped, the rest collected. */
+	struct TurnedTile {
+		int x, y;
+		double near;
+	};
+	std::vector<TurnedTile> tiles;
+	for (int ty = ty0; ty <= ty1; ty++) {
+		for (int tx = tx0; tx <= tx1; tx++) {
+			_turned_times.tiles++;
+			double vx, vy;
+			ProjectTurnedF(tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, 0, vx, vy);
+			if (vx + 2 * TILE_PIXELS * ZOOM_BASE < frame.left || vx - 2 * TILE_PIXELS * ZOOM_BASE > frame.left + frame.width) continue;
+			/* How high the tile reaches: its land, the tallest building, and a bridge over it if there is one. */
+			int reach = MAX_BUILDING_PIXELS;
+			bool inside = IsInsideBS(tx, 0, Map::SizeX()) && IsInsideBS(ty, 0, Map::SizeY());
+			if (inside) {
+				TileIndex tile = TileXY(tx, ty);
+				reach += TilePixelHeight(tile) + 2 * TILE_HEIGHT;
+				if (IsBridgeAbove(tile)) reach += GetBridgePixelHeight(GetNorthernBridgeEnd(tile)) - TilePixelHeight(tile);
+			} else {
+				reach += 2 * TILE_HEIGHT;
+			}
+			if (vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE < frame.top || vy - (reach + TILE_PIXELS) * ZOOM_BASE > frame.top + frame.height) continue;
+			double xr, yr;
+			TurnWorldPoint(tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, xr, yr);
+			tiles.push_back({tx, ty, xr + yr});
+		}
+	}
+	std::sort(tiles.begin(), tiles.end(), [](const TurnedTile &a, const TurnedTile &b) { return a.near < b.near; });
+
+	_vd.dpi = cdpi;
+	double t_collect = 0;
+	for (const TurnedTile &t : tiles) {
+		double tc0 = TurnedNow();
+		TileType tile_type;
+		_cur_ti.x = t.x * TILE_SIZE;
+		_cur_ti.y = t.y * TILE_SIZE;
+		if (IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY())) {
+			_cur_ti.tile = TileXY(t.x, t.y);
+			tile_type = GetTileType(_cur_ti.tile);
+		} else {
+			_cur_ti.tile = INVALID_TILE;
+			tile_type = TileType::Void;
+		}
+		if (tile_type != TileType::Void) {
+			std::tie(_cur_ti.tileh, _cur_ti.z) = GetTilePixelSlope(_cur_ti.tile);
+		} else {
+			std::tie(_cur_ti.tileh, _cur_ti.z) = GetTilePixelSlopeOutsideMap(t.x, t.y);
+		}
+
+		_vd.foundation_part = FoundationPart::None;
+		_vd.foundation[FoundationPart::Normal] = -1;
+		_vd.foundation[FoundationPart::Halftile] = -1;
+		_vd.last_foundation_child[FoundationPart::Normal] = LAST_CHILD_NONE;
+		_vd.last_foundation_child[FoundationPart::Halftile] = LAST_CHILD_NONE;
+
+		size_t first = _vd.tile_sprites_to_draw.size();
+		size_t first_parent = _vd.parent_sprites_to_draw.size();
+		/* The land itself; the draw procedure levels the TileInfo when it draws a foundation. */
+		Slope raw_slope = _cur_ti.tileh;
+		int raw_z = _cur_ti.z;
+		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
+		if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
+		/* The ground lies on top of the foundation, if the tile has one. */
+		Slope ground_slope = raw_slope;
+		int ground_z = raw_z;
+		if (_cur_ti.tile != INVALID_TILE) std::tie(ground_slope, ground_z) = GetFoundationPixelSlope(_cur_ti.tile);
+		if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+			IConsolePrint(CC_DEFAULT, "ladeni: dlazdice {},{} typ {} svah {} z {} (po zakladech svah {} z {}) spritu dlazdice {} stojicich {} zaklady {}/{}", t.x, t.y, to_underlying(tile_type),
+					to_underlying(_cur_ti.tileh), _cur_ti.z, to_underlying(ground_slope), ground_z, _vd.tile_sprites_to_draw.size() - first, _vd.parent_sprites_to_draw.size() - first_parent,
+					_vd.foundation[FoundationPart::Normal], _vd.foundation[FoundationPart::Halftile]);
+			for (size_t i = first; i < _vd.tile_sprites_to_draw.size(); i++) {
+				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+				IConsolePrint(CC_DEFAULT, "ladeni:   sprite {} pal {} na {},{}", ts.image, ts.pal, ts.x, ts.y);
+			}
+			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+				IConsolePrint(CC_DEFAULT, "ladeni:   stojici {} pal {} na {},{} kotva {},{},{} deti {}", ps.image, ps.pal, ps.x, ps.y, ps.ax, ps.ay, ps.az, ps.first_child);
+			}
+		}
+		bool building = tile_type == TileType::House || tile_type == TileType::Industry;
+		t_collect += TurnedNow() - tc0;
+		DrawTurnedTileGround(frame, first, _cur_ti.x, _cur_ti.y, ground_slope, ground_z, raw_slope, raw_z, building);
+	}
+	_turned_times.collect += t_collect;
+	ViewportAddVehicles(&cdpi);
+
+	/* The signs and the floating texts: collected north-up, then each moved to where the ground under it is drawn turned. */
+	size_t first_string = _vd.string_sprites_to_draw.size();
+	ViewportAddKdtreeSigns(&cdpi);
+	DrawTextEffects(&cdpi);
+	for (size_t i = first_string; i < _vd.string_sprites_to_draw.size(); i++) {
+		StringSpriteToDraw &ss = _vd.string_sprites_to_draw[i];
+		int cx = ss.x + ScaleByZoom(ss.width / 2, zoom), cy = ss.y + 24 * ZOOM_BASE;
+		Point ground = InverseRemapCoords2(cx, cy);
+		int z = (ground.x >= 0 && ground.x < static_cast<int>(Map::SizeX() * TILE_SIZE) && ground.y >= 0 && ground.y < static_cast<int>(Map::SizeY() * TILE_SIZE)) ? GetSlopePixelZ(ground.x, ground.y) : 0;
+		Point classic = RemapCoords(ground.x, ground.y, z);
+		Point turned = ProjectTurned(ground.x, ground.y, z);
+		ss.x += turned.x - classic.x;
+		ss.y += turned.y - classic.y;
+	}
+	_vd.dpi = frame;
+
+	/* 5. Everything standing: each sprite hung from its anchor turned, far first. */
+	struct TurnedSprite {
+		double near;
+		ParentSpriteToDraw *ps;
+	};
+	std::vector<TurnedSprite> standing;
+	standing.reserve(_vd.parent_sprites_to_draw.size());
+	for (ParentSpriteToDraw &ps : _vd.parent_sprites_to_draw) {
+		Point c = RemapCoords(ps.ax, ps.ay, ps.az);
+		Point t = ProjectTurned(ps.ax, ps.ay, ps.az);
+		int dx = t.x - c.x, dy = t.y - c.y;
+		ps.x += dx;
+		ps.y += dy;
+		ps.left += dx;
+		ps.top += dy;
+		double xr, yr;
+		TurnWorldPoint((ps.xmin + ps.xmax + 1) * 0.5, (ps.ymin + ps.ymax + 1) * 0.5, xr, yr);
+		standing.push_back({xr + yr + 2.0 * ps.zmin, &ps});
+	}
+	std::sort(standing.begin(), standing.end(), [](const TurnedSprite &a, const TurnedSprite &b) { return a.near < b.near; });
+	for (const TurnedSprite &s : standing) _vd.parent_sprites_to_sort.push_back(s.ps);
+	double tb0 = TurnedNow();
+	ViewportDrawParentSprites(&_vd.parent_sprites_to_sort, &_vd.child_screen_sprites_to_draw);
+	_turned_times.standing += TurnedNow() - tb0;
+}
+
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
 	_vd.dpi.zoom = vp.zoom;
@@ -1871,24 +2407,29 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.dst_ptr = BlitterFactory::GetCurrentBlitter()->MoveTo(_cur_dpi->dst_ptr, x - _cur_dpi->left, y - _cur_dpi->top);
 	AutoRestoreBackup dpi_backup(_cur_dpi, &_vd.dpi);
 
-	ViewportAddLandscape();
-	ViewportAddVehicles(&_vd.dpi);
+	if (IsViewportTurned(vp)) {
+		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
+		ViewportDoDrawTurned();
+	} else {
+		ViewportAddLandscape();
+		ViewportAddVehicles(&_vd.dpi);
 
-	ViewportAddKdtreeSigns(&_vd.dpi);
+		ViewportAddKdtreeSigns(&_vd.dpi);
 
-	DrawTextEffects(&_vd.dpi);
+		DrawTextEffects(&_vd.dpi);
 
-	if (!_vd.tile_sprites_to_draw.empty()) ViewportDrawTileSprites(&_vd.tile_sprites_to_draw);
+		if (!_vd.tile_sprites_to_draw.empty()) ViewportDrawTileSprites(&_vd.tile_sprites_to_draw);
 
-	for (auto &psd : _vd.parent_sprites_to_draw) {
-		_vd.parent_sprites_to_sort.push_back(&psd);
+		for (auto &psd : _vd.parent_sprites_to_draw) {
+			_vd.parent_sprites_to_sort.push_back(&psd);
+		}
+
+		_vp_sprite_sorter(&_vd.parent_sprites_to_sort);
+		ViewportDrawParentSprites(&_vd.parent_sprites_to_sort, &_vd.child_screen_sprites_to_draw);
+
+		if (_draw_bounding_boxes) ViewportDrawBoundingBoxes(&_vd.parent_sprites_to_sort);
+		if (_draw_dirty_blocks) ViewportDrawDirtyBlocks();
 	}
-
-	_vp_sprite_sorter(&_vd.parent_sprites_to_sort);
-	ViewportDrawParentSprites(&_vd.parent_sprites_to_sort, &_vd.child_screen_sprites_to_draw);
-
-	if (_draw_bounding_boxes) ViewportDrawBoundingBoxes(&_vd.parent_sprites_to_sort);
-	if (_draw_dirty_blocks) ViewportDrawDirtyBlocks();
 
 	DrawPixelInfo dp = _vd.dpi;
 	ZoomLevel zoom = _vd.dpi.zoom;

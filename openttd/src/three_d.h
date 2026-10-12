@@ -12,11 +12,21 @@
  *
  * The map view is turned by an angle, the yaw, about the point in the middle
  * of the screen: 0 is the game as it has always been, drawn by the usual path
- * to the pixel; any other angle is drawn by the second renderer, which takes
- * what the tiles and vehicles say to draw and draws it turned. The angle is
- * nobody's but this client's: it is not in the savegame, not in the config,
- * and the game starts facing north every time. With the setting off nothing of
- * this exists.
+ * to the pixel; any other angle is drawn by the second renderer (viewport.cpp,
+ * ViewportDoDrawTurned()), which takes what the tiles and vehicles say to draw
+ * and draws it turned. The angle is nobody's but this client's: it is not in
+ * the savegame, not in the config, and the game starts facing north every
+ * time. With the setting off nothing of this exists.
+ *
+ * How the turn is done: the world is turned, not the camera. A world point is
+ * turned about the pivot (the ground point under the middle of the screen
+ * when the turn began) by the yaw and then drawn by the game's own projection,
+ * RemapCoords(). So the main viewport goes on being a plain viewport of a
+ * world that happens to be turned: scrolling, zooming and the dirty blocks
+ * all work as they did, and only the two directions world -> screen
+ * (ProjectTurned()) and screen -> world (InverseRemapCoordsTurned()) know
+ * about the angle. Turning changes the pivot to the point under the middle of
+ * the screen and moves the scroll position so that this point stays put.
  *
  * The player turns the view with the middle mouse button held and dragged
  * sideways (RotateViewByDrag(), 4 pixels to a degree), or with the keys Y and
@@ -28,6 +38,10 @@
 #ifndef THREE_D_H
 #define THREE_D_H
 
+#include "core/geometry_type.hpp"
+
+struct Viewport;
+
 /** A step of the keys: 15 degrees, a quarter of the way to the next of the eight directions. */
 static constexpr int THREE_D_KEY_STEP_DEG = 15;
 /** A step of the keys with Ctrl: the next of the eight directions. */
@@ -38,9 +52,18 @@ static constexpr int THREE_D_DRAG_PIXELS_PER_DEG = 4;
 bool ThreeDEnabled();
 float GetViewYaw();
 bool IsViewTurned();
+bool IsViewportTurned(const Viewport &vp);
+int TurnedDirectionStep();
 void RotateView(float degrees);
 void SetViewYaw(float degrees);
 void RotateViewByDrag(int pixels);
 void ResetViewYaw();
+
+void TurnWorldPoint(double x, double y, double &xr, double &yr);
+void UnturnWorldPoint(double xr, double yr, double &x, double &y);
+void ProjectTurnedF(double x, double y, double z, double &vx, double &vy);
+Point ProjectTurned(int x, int y, int z);
+void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y);
+Point InverseRemapCoordsTurned(int x, int y, bool clamp_to_map = false);
 
 #endif /* THREE_D_H */

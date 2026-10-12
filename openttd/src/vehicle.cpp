@@ -14,6 +14,7 @@
 #include "spritecache.h"
 #include "timetable.h"
 #include "viewport_func.h"
+#include "three_d.h"
 #include "news_func.h"
 #include "command_func.h"
 #include "company_func.h"
@@ -1213,11 +1214,23 @@ static void DoDrawVehicle(const Vehicle *v)
 		if (to != TransparencyOption::Invalid && (IsTransparencySet(to) || IsInvisibilitySet(to))) return;
 	}
 
+	/* In the turned view (three_d.h) the vehicle shows the picture of the
+	 * direction it faces as seen from there: so many of the eight directions
+	 * back as the view is turned forward. */
+	const VehicleSpriteSeq *seq = &v->sprite_cache.sprite_seq;
+	VehicleSpriteSeq turned;
+	int step = TurnedDirectionStep();
+	if (step != 0 && v->direction != Direction::Invalid && (v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship ||
+			(v->type == VehicleType::Aircraft && Aircraft::From(v)->IsNormalAircraft()))) {
+		v->GetImage(static_cast<Direction>((to_underlying(v->direction) - step) & 7), EngineImageType::OnMap, &turned);
+		if (turned.IsValid()) seq = &turned;
+	}
+
 	StartSpriteCombine();
-	for (uint i = 0; i < v->sprite_cache.sprite_seq.count; ++i) {
-		PaletteID pal2 = v->sprite_cache.sprite_seq.seq[i].pal;
+	for (uint i = 0; i < seq->count; ++i) {
+		PaletteID pal2 = seq->seq[i].pal;
 		if (!pal2 || v->vehstatus.Test(VehState::Crashed)) pal2 = pal;
-		AddSortableSpriteToDraw(v->sprite_cache.sprite_seq.seq[i].sprite, pal2, v->x_pos, v->y_pos, v->z_pos, v->bounds, shadowed, nullptr, v->draw_offs);
+		AddSortableSpriteToDraw(seq->seq[i].sprite, pal2, v->x_pos, v->y_pos, v->z_pos, v->bounds, shadowed, nullptr, v->draw_offs);
 	}
 	EndSpriteCombine();
 

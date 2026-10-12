@@ -35,6 +35,10 @@ struct ParentSpriteToDraw {
 
 	int32_t first_child;              ///< the first child to draw.
 	uint32_t order;                   ///< Used during sprite sorting
+
+	int32_t ax;                       ///< world X of the point the sprite hangs from (x, y are RemapCoords() of it plus the pixel offset); the turned view draws it there turned (three_d.h)
+	int32_t ay;                       ///< world Y of that point
+	int32_t az;                       ///< world Z of that point
 };
 
 typedef std::vector<ParentSpriteToDraw*> ParentSpriteToSortVector;

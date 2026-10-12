@@ -469,7 +469,10 @@ static bool RealMakeScreenshot(ScreenshotType t, const std::string &name, uint32
  */
 bool MakeScreenshot(ScreenshotType t, const std::string &name, uint32_t width, uint32_t height)
 {
-	if (t == SC_CRASHLOG) {
+	/* The null video driver (the test rig) never drains the main-thread queue:
+	 * a screenshot asked for there is made on the spot, or it is never made. */
+	extern bool _video_null_active;
+	if (t == SC_CRASHLOG || _video_null_active) {
 		/* Video buffer might or might not be locked. */
 		VideoDriver::VideoBufferLocker lock;
 

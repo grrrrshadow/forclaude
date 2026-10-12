@@ -64,6 +64,7 @@
 #include "fileio_func.h"
 #include "fontcache.h"
 #include "screenshot.h"
+#include "three_d.h"
 #include "genworld.h"
 #include "strings_func.h"
 #include "viewport_func.h"
@@ -8484,6 +8485,127 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
 }
 
 /**
+ * Rig probe: the turned map view (three_d.h). 'test3d uhel <stupne>' turns
+ * the main view, 'test3d stred <x> <y>' puts that tile under the middle of it,
+ * 'test3d zoom <0..>' sets its zoom level, 'test3d snimek <jmeno>' writes the
+ * screen to a PNG (under the null driver with blit= the screen is a buffer
+ * drawn for real), 'test3d mys <x> <y>' says which tile the game finds under
+ * a pixel of the screen, 'test3d stav' prints the angle.
+ */
+static bool ConTest3D(std::span<std::string_view> argv)
+{
+	if (argv.size() < 2) {
+		IConsolePrint(CC_HELP, "Rig: the turned map view. Usage: 'test3d uhel <degrees>', 'test3d stred <x> <y>', 'test3d zoom <level>', 'test3d snimek <name>', 'test3d mys <x> <y>', 'test3d stav'.");
+		return true;
+	}
+	if (_game_mode != GameMode::Normal) {
+		IConsolePrint(CC_ERROR, "test3d: only in a running game.");
+		return true;
+	}
+	Window *w = GetMainWindow();
+	ViewportData *vp = w->viewport.get();
+	std::string_view what = argv[1];
+	auto number = [&](size_t i) -> std::optional<int> {
+		if (argv.size() <= i) return std::nullopt;
+		return ParseInteger(argv[i]);
+	};
+
+	if (what == "uhel" && argv.size() > 2) {
+		float degrees = std::strtof(std::string(argv[2]).c_str(), nullptr);
+		SetViewYaw(degrees);
+		/* The turn moved the scroll position to keep the middle in place; the view follows at the next tick, here now. */
+		UpdateViewportPosition(w, 0);
+	} else if (what == "stred") {
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d: stred needs a tile x and y.");
+			return true;
+		}
+		ScrollMainWindowToTile(TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())), true);
+		UpdateViewportPosition(w, 0);
+	} else if (what == "zoom") {
+		auto z = number(2);
+		if (!z.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d: zoom needs a level.");
+			return true;
+		}
+		ZoomLevel want = static_cast<ZoomLevel>(Clamp(*z, to_underlying(ZoomLevel::Min), to_underlying(ZoomLevel::Max)));
+		for (int guard = 0; vp->zoom != want && guard < 16; guard++) {
+			if (!DoZoomInOutWindow(vp->zoom > want ? ZOOM_IN : ZOOM_OUT, w)) break;
+		}
+		UpdateViewportPosition(w, 0);
+	} else if (what == "snimek" && argv.size() > 2) {
+		/* The world generation progress window is still up at the first tick of a new game, and the last screenshot's message too. */
+		CloseWindowByClass(WindowClass::ModalProgress);
+		CloseWindowByClass(WindowClass::ErrorMessage);
+		bool ok = MakeScreenshot(SC_VIEWPORT, std::string(argv[2]));
+		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: snimek {} {}", argv[2], ok ? "zapsan" : "ODMITNUTO - nezapsan");
+	} else if (what == "cas") {
+		/* How long the whole screen takes to draw, ten times over, at the angle set. */
+		auto n = number(2);
+		int rounds = n.value_or(10);
+		auto start = std::chrono::steady_clock::now();
+		for (int i = 0; i < rounds; i++) {
+			MarkWholeScreenDirty();
+			DrawDirtyBlocks();
+		}
+		auto end = std::chrono::steady_clock::now();
+		double ms = std::chrono::duration<double, std::milli>(end - start).count() / rounds;
+		IConsolePrint(CC_DEFAULT, "test3d: cas uhel {} zoom {} obrazovka {}x{}: {:.1f} ms na prekresleni", GetViewYaw(), to_underlying(vp->zoom), _screen.width, _screen.height, ms);
+		extern void TurnedTimingsPrint();
+		TurnedTimingsPrint();
+		return true;
+	} else if (what == "vozidla") {
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (!v->IsPrimaryVehicle()) continue;
+			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} smer {} {}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
+					v->x_pos / (int)TILE_SIZE, v->y_pos / (int)TILE_SIZE, to_underlying(v->direction), v->vehstatus.Test(VehState::Hidden) ? "skryte" : "videt");
+		}
+		return true;
+	} else if (what == "vozidlo") {
+		/* The middle of the view on a vehicle: the n-th of the moving fronts that can be seen, in the order of the pool. */
+		auto n = number(2);
+		int want = n.value_or(0), seen = 0;
+		const Vehicle *found = nullptr;
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (!v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Hidden)) continue;
+			if (seen++ == want) {
+				found = v;
+				break;
+			}
+		}
+		if (found == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: vozidlo {} neni.", want);
+			return true;
+		}
+		ScrollMainWindowTo(found->x_pos, found->y_pos, found->z_pos, true);
+		UpdateViewportPosition(w, 0);
+		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction));
+	} else if (what == "ladeni") {
+		extern TileIndex _turned_debug_tile;
+		auto x = number(2), y = number(3);
+		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
+		return true;
+	} else if (what == "mys") {
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d: mys needs a screen x and y.");
+			return true;
+		}
+		Point pt = TranslateXYToTileCoord(*vp, *x, *y, false);
+		IConsolePrint(CC_DEFAULT, "test3d: mys {},{} -> svet {},{} = dlazdice {},{}", *x, *y, pt.x, pt.y, pt.x / (int)TILE_SIZE, pt.y / (int)TILE_SIZE);
+		return true;
+	} else if (what != "stav") {
+		IConsolePrint(CC_ERROR, "test3d: unknown '{}'.", what);
+		return true;
+	}
+	Point middle = TranslateXYToTileCoord(*vp, vp->left + vp->width / 2, vp->top + vp->height / 2, false);
+	IConsolePrint(CC_DEFAULT, "test3d: uhel {} krok {} zoom {} stred svet {},{} dlazdice {},{} posun {},{}", GetViewYaw(), TurnedDirectionStep(), to_underlying(vp->zoom),
+			middle.x, middle.y, middle.x / (int)TILE_SIZE, middle.y / (int)TILE_SIZE, vp->scrollpos_x, vp->scrollpos_y);
+	return true;
+}
+
+/**
  * Rig probe: the colours of the configurator (true_colour.h) on the set
  * grf/barvy.yagl -- a road vehicle whose cab, body and radiator are colours
  * the player chooses, and two details that are not. Builds one in a depot
@@ -14695,6 +14817,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testgrf",                  ConTestSavegameGrfs);
 	IConsole::CmdRegister("testkonfig",               ConTestVehicleConfig);
 	IConsole::CmdRegister("testbarvy",                ConTestVehicleColours);
+	IConsole::CmdRegister("test3d",                  ConTest3D);
 	IConsole::CmdRegister("testotoc",                ConTestReverse);
 	IConsole::CmdRegister("testcouva",               ConTestDrivingBackwards);
 	IConsole::CmdRegister("testnedobrzdil",          ConTestOverrun);

@@ -826,3 +826,17 @@ industry sets do. The game renames it Studentky whatever the set says
 
 The scene `studentky` writes the cargoes and industries with the console
 command `prum` and reads the cargo's name and what the coffeeshop takes.
+
+## The turned view, drawn headless
+
+The 3D of this game (`docs/decouple_three_d.md`) draws the main view turned
+to any angle. The rig draws it for real: the null video driver with
+`blit=32bpp-optimized` keeps a screen buffer, and the console command `test3d`
+turns the view (`uhel`), puts a tile or a vehicle under the middle (`stred`,
+`vozidlo`), sets the zoom, writes the screen to a PNG (`snimek`, made on the
+spot), says which tile is under a pixel (`mys`), times the redraw (`cas`) and
+writes out how one tile is drawn (`ladeni`). The pictures are looked at by
+eye: a town, its roads and coast from several angles; a train on a vertical
+track turned by 90 degrees runs along a horizontal one and shows its westward
+picture. Facing north the usual path draws, so the pictures at 0 are the game
+as it was.
