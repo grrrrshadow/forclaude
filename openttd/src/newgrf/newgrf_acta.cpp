@@ -53,7 +53,12 @@ static void SpriteReplace(ByteReader &buf)
 			i, num_sprites, first_sprite
 		);
 
-		if (first_sprite + num_sprites >= SPR_OPENTTD_BASE) {
+		/* A set of the game's own graphics (baseset/decouple/grafika/, GRFConfig::builtin_graphics) may lay
+		 * its pictures over any sprite loaded so far, openttd.grf's own included: that is what it is for
+		 * (the 16x levels of the 3D era, with openttd.grf left as it is). */
+		bool own_graphics = _cur_gps.grfconfig != nullptr && _cur_gps.grfconfig->builtin_graphics && first_sprite + num_sprites <= _cur_gps.spriteid;
+
+		if (first_sprite + num_sprites >= SPR_OPENTTD_BASE && !own_graphics) {
 			/* Outside allowed range, check for GRM sprite reservations. */
 			if (!IsGRMReservedSprite(first_sprite, num_sprites)) {
 				GrfMsg(0, "SpriteReplace: [Set {}] Changing {} sprites, beginning with {}, above limit of {} and not within reserved range, ignoring.",

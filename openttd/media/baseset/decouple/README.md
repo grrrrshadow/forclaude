@@ -19,14 +19,19 @@ jen obrázky. Je v každé hře včetně rozehraných savů, hráč ho v okně N
 nevidí, nikam se neukládá a nesmí měnit stav hry (hra ho čte jako statický GRF,
 stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
 
-- Teď je prázdná. Obrázky hry (gymnázium, automat, socha, dlaždice
-  marihuanové plantáže, chatka hulírny, holky na zastávce, ohňostroj, plakát)
-  jsou od 8. 10. 2026 rovnou v `openttd.grf` jako 32bpp zin8 (zin16, až budou
-  rendery), protože se staví kolegovým yaglem, který 8× i 16× zná
-  (`../openttd/openttd_yagl.py`, zdroj `openttd.yagl` a listy). `budovy.grf`,
-  který tytéž obrázky nesl jako statický GRF, tím zanikl.
-- Nový obrázek od kolegy: PNG do `../openttd/`, pak
-  `python3 openttd_budovy.py && python3 openttd_yagl.py` tamtéž
+- Obrázky hry (gymnázium, automat, socha, dlaždice marihuanové plantáže,
+  chatka hulírny, holky na zastávce, ohňostroj, plakát) jsou od 8. 10. 2026
+  rovnou v `openttd.grf` jako 32bpp zin4 a zin8, protože se staví kolegovým
+  yaglem (`../openttd/openttd_yagl.py`, zdroj `openttd.yagl` a listy).
+  `budovy.grf`, který tytéž obrázky nesl jako statický GRF, tím zanikl.
+- **Od 12. 10. 2026 (3D) se `openttd.grf` nemění** (hráč) a 16× obrázky
+  (zin16) jdou sem, každý GRF se zdroji v podsložce svého jména a postavený
+  yaglem (`yagl -e <abs>/jmeno.grf <abs>/jmeno`), pod 100 MB kvůli GitHubu:
+  `zastavka.grf` – holky na zastávce v 16× přes sprity `openttd.grf`
+  (Action A, `zastavka/README.md`); přijdou `gymnazium.grf`, `automat.grf`,
+  `socha.grf`, `chatka.grf`, `pole.grf`, `domy_*.grf` s rendery z osmi směrů.
+- Nový obrázek od kolegy ve 4× a 8× do `openttd.grf`: PNG do `../openttd/`,
+  pak `python3 openttd_budovy.py && python3 openttd_yagl.py` tamtéž
   (viz `COMPILING.md`).
 
 Kód: `AppendStaticGRFConfigs()` v `src/newgrf_config.cpp`.

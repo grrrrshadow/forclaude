@@ -58,18 +58,22 @@ For a block of the screen the second renderer takes the same lists the usual
 path takes -- what every tile's draw procedure and every vehicle says to draw
 -- and draws them turned:
 
-1. **The ground.** Every tile is a box. Its ground sprites (the tile sprites,
-   and the ground that sits on top of a foundation as the foundation's child
-   sprites) are drawn north-up into a small texture, and the texture is laid
-   over the tile's four corners where the turned view puts them, as four
-   triangles meeting in the middle so slopes keep their folds. Where a
-   foundation raised the ground, the sides of the box are walls from the land
-   up to the ground, with the pixels of the foundation sprite; the two walls
-   the game draws lend their pixels, mirrored through the middle, to the two
-   it never shows. Roads, rails, fields, water, the station platforms: all of
-   this is ground and turns with the tile. The black the ground is drawn
-   under a house or an industry (for the building to cover) is grown over
-   from the ground beside it, since the building no longer covers it exactly.
+1. **The ground.** The ground sprites of every plain tile of the block (the
+   tile sprites) are drawn north-up, as the game draws them, into one texture
+   of the whole block, where neighbouring tiles fit together; then every tile
+   is laid from that texture over its four corners where the turned view puts
+   them, as four triangles meeting in the middle so slopes keep their folds.
+   Since the neighbours' pixels are right there, the edges of the tiles meet
+   without a seam at any zoom. A tile with a foundation is a box drawn by
+   itself from its own small texture: its ground (the foundation's child
+   sprites) on top, and where the foundation raised the ground, walls from the
+   land up to the ground with the pixels of the foundation sprite; the two
+   walls the game draws lend their pixels, mirrored through the middle, to
+   the two it never shows. Roads, rails, fields, water, the station platforms:
+   all of this is ground and turns with the tile. The black the ground is
+   drawn under a house or an industry (for the building to cover) is grown
+   over from the ground beside it, since the building no longer covers it
+   exactly.
 2. **Everything standing** -- trees, foundations' walls, bridges, station
    roofs, vehicles, houses without a table -- is a billboard: the sprite as it
    is, hung from its anchor point turned (`ParentSpriteToDraw::ax, ay, az`,
@@ -124,5 +128,17 @@ that tile is drawn (its sprites, walls, corners) and its texture as
 spot (`MakeScreenshot()`), since that driver never drains the main-thread
 queue.
 
-A 1000x700 view of a town at the normal zoom: 2 ms facing north, 16 ms turned
-(zoomed out one step 40 ms, in one step 11 ms).
+A 1600x1200 view of a town at the normal zoom, turned: 44 ms a redraw of the
+whole screen (the first one longer, loading sprites), of which the block's
+texture 10, laying the tiles 28, the billboards and boxes 6; 1000x700 about
+16 ms, facing north 2 ms. Only dirty blocks are redrawn as always, so this is
+the cost of turning and scrolling, not of vehicles moving.
+
+## The graphics of the 3D era
+
+openttd.grf stays as it is (the player's rule). The 16x pictures go into sets
+of their own under `media/baseset/decouple/grafika/` (`zastavka.grf` first,
+the girls at the bus stop; `grafika/README.md` there), static in every game,
+laid over openttd.grf's sprites with Action A: a set of the game's own
+graphics may replace any sprite loaded so far, openttd.grf's included
+(`SpriteReplace()` in `src/newgrf/newgrf_acta.cpp`, `GRFConfig::builtin_graphics`).

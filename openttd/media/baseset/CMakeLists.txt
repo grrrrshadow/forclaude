@@ -93,8 +93,9 @@ endforeach()
 
 # Graphics of the game's own (AppendStaticGRFConfigs() in src/newgrf_config.cpp):
 # every NewGRF in decouple/grafika/ is static in every game, savegames included.
-# Empty now: the 8x pictures it carried while openttd.grf could not (grfcodec
-# knew no 8x) are in openttd.grf itself since it is built with yagl.
+# The 16x pictures of the 3D era go here, laid over openttd.grf's sprites,
+# which stays as it is (the player's rule): zastavka.grf first, the girls at
+# the bus stop; each set has its sources in a folder of its own name.
 file(GLOB BASESET_BUILTIN_GRAPHICS_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/grafika/*.grf)
 foreach(BUILTIN_GRAPHICS_FILE IN LISTS BASESET_BUILTIN_GRAPHICS_FILES)
     get_filename_component(BUILTIN_GRAPHICS_NAME "${BUILTIN_GRAPHICS_FILE}" NAME)

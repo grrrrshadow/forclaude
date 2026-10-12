@@ -1954,7 +1954,8 @@ static inline void RemapCoordsF(double x, double y, double z, double &vx, double
 	vy = (y + x - z) * ZOOM_BASE;
 }
 
-static std::vector<uint32_t> _turned_texture; ///< The north-up picture of the tile being drawn turned.
+static std::vector<uint32_t> _turned_texture; ///< The north-up picture of the tile or house being drawn turned.
+static std::vector<uint32_t> _turned_big; ///< The north-up picture of the ground of the whole block being drawn turned.
 TileIndex _turned_debug_tile = INVALID_TILE; ///< Rig: the tile whose turned drawing is written out (test3d ladeni).
 
 /** Rig: where the time of the turned drawing goes (test3d cas), milliseconds since the last report. */
@@ -1987,26 +1988,25 @@ void TurnedTimingsPrint()
  * The ground under a house or an industry is drawn black where the building
  * stands, for the building's sprite to cover. Turned, the ground turns and the
  * billboard of the building does not, so the black would show beside it.
- * Take the black out and let the ground around grow over it.
+ * Take the black out and let the ground around grow over it, on the rows x0..x1, y0..y1 of a texture.
  */
-static void FillTurnedFootprint(int tw, int th)
+static void FillTurnedFootprint(uint32_t *tex, int tw, int x0, int y0, int x1, int y1)
 {
-	uint32_t *tex = _turned_texture.data();
-	for (int y = 0; y < th; y++) {
+	for (int y = y0; y < y1; y++) {
 		uint32_t *row = tex + y * tw;
-		for (int x = 0; x < tw; x++) {
+		for (int x = x0; x < x1; x++) {
 			Colour c;
 			c.data = row[x];
 			if (c.data == 0 || c.r > 24 || c.g > 24 || c.b > 24) continue;
 			/* A run of black: filled from the drawn pixel next to it on either side, the nearer one for each pixel. */
 			int end = x;
-			while (end < tw) {
+			while (end < x1) {
 				c.data = row[end];
 				if (c.data == 0 || c.r > 24 || c.g > 24 || c.b > 24) break;
 				end++;
 			}
-			uint32_t left = (x > 0) ? row[x - 1] : 0;
-			uint32_t right = (end < tw) ? row[end] : 0;
+			uint32_t left = (x > x0) ? row[x - 1] : 0;
+			uint32_t right = (end < x1) ? row[end] : 0;
 			if (left == 0) left = right;
 			if (right == 0) right = left;
 			for (int i = x; i < end; i++) row[i] = (i - x < end - 1 - i) ? left : right;
@@ -2029,17 +2029,19 @@ static void FillTurnedFootprint(int tw, int th)
  * list (ViewportDoDrawTurned()), since they are here.
  * @param frame the block of the screen being drawn (virtual coordinates of the turned view)
  * @param first the first tile sprite of this tile in _vd.tile_sprites_to_draw
+ * @param end one past its last
  * @param x0,y0 the north corner of the tile (world units)
  * @param top_slope the slope of the ground, on top of the foundation if the tile has one
  * @param top_z the height of the ground's north corner on flat ground, on top of the foundation if the tile has one
  * @param raw_slope the slope of the land itself
  * @param raw_z the height of the land's north corner on flat ground
  * @param building whether a building stands on the tile, with the ground under it drawn black (FillTurnedFootprint())
+ * @param foundation_index the tile's foundation sprites (normal and halftile part) in _vd.parent_sprites_to_draw, or -1
  */
-static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, int x0, int y0, Slope top_slope, int top_z, Slope raw_slope, int raw_z, bool building)
+static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, size_t end, int x0, int y0, Slope top_slope, int top_z, Slope raw_slope, int raw_z, bool building, const int foundation_index[2])
 {
-	bool foundation = _vd.foundation[FoundationPart::Normal] != -1 || _vd.foundation[FoundationPart::Halftile] != -1;
-	if (first >= _vd.tile_sprites_to_draw.size() && !foundation) return;
+	bool foundation = foundation_index[0] != -1 || foundation_index[1] != -1;
+	if (first >= end && !foundation) return;
 	ZoomLevel zoom = frame.zoom;
 	int mask = ScaleByZoom(-1, zoom);
 	Slope st = RemoveHalftileSlope(top_slope), sr = RemoveHalftileSlope(raw_slope);
@@ -2093,14 +2095,14 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, int x
 	{
 		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
 		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
-		for (size_t i = first; i < _vd.tile_sprites_to_draw.size(); i++) {
+		for (size_t i = first; i < end; i++) {
 			const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 			DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
 		}
 		/* The foundation and the ground on top of it, which is its child sprites: drawn here, taken off the billboards. */
-		for (FoundationPart part : {FoundationPart::Normal, FoundationPart::Halftile}) {
-			if (_vd.foundation[part] == -1) continue;
-			ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[_vd.foundation[part]];
+		for (int k = 0; k < 2; k++) {
+			if (foundation_index[k] == -1) continue;
+			ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[foundation_index[k]];
 			if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
 			int child_idx = ps.first_child;
 			while (child_idx >= 0) {
@@ -2134,11 +2136,10 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, int x
 		}
 	}
 	double t1 = TurnedNow();
-	if (building) FillTurnedFootprint(tw, th);
+	if (building) FillTurnedFootprint(_turned_texture.data(), tw, 0, 0, tw, th);
 	double t2 = TurnedNow();
 	_turned_times.texture += t1 - t0;
 	_turned_times.widen += t2 - t1;
-	_turned_times.drawn++;
 
 	/* A corner of a face: a world point on the screen, with its pixels taken at another (or the same) world point of the texture. */
 	double scale = 1.0 / (1 << to_underlying(zoom));
@@ -2196,7 +2197,7 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, int x
 		size_t painted = 0;
 		for (uint32_t p : _turned_texture) if (p != 0) painted++;
 		IConsolePrint(CC_DEFAULT, "ladeni: dlazdice {},{} vrch svah {} z {} zem svah {} z {} spritu {} zaklady {} sten {} textura {}x{} ({},{}) kresleno {}", x0 / TILE_SIZE, y0 / TILE_SIZE,
-				to_underlying(top_slope), top_z, to_underlying(raw_slope), raw_z, _vd.tile_sprites_to_draw.size() - first, foundation ? "ano" : "ne", num_walls, tw, th, tleft, ttop, painted);
+				to_underlying(top_slope), top_z, to_underlying(raw_slope), raw_z, end - first, foundation ? "ano" : "ne", num_walls, tw, th, tleft, ttop, painted);
 		for (int i = 0; i < 5; i++) {
 			IConsolePrint(CC_DEFAULT, "ladeni:   roh {} svet {},{},{} zem {} blok {:.1f},{:.1f} textura {:.1f},{:.1f}", i, wx[i], wy[i], wz[i], i < 4 ? bz[i] : wz[i], v[i].x, v[i].y, v[i].u, v[i].v);
 		}
@@ -2444,6 +2445,49 @@ static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToD
 }
 
 /**
+ * Lay the ground of a plain tile (no foundation) from the block's north-up
+ * texture (ViewportDoDrawTurned()) over its four corners where the turned view
+ * puts them: four triangles meeting in the middle, so slopes keep their folds.
+ * @param frame the block of the screen being drawn
+ * @param big the texture's DrawPixelInfo (virtual coordinates of the view facing north)
+ * @param bw,bh the texture's size in pixels
+ * @param x0,y0 the north corner of the tile (world units)
+ * @param slope the slope of the tile
+ * @param z the height of its north corner on flat ground
+ */
+static void DrawTurnedTileFromBlock(const DrawPixelInfo &frame, const DrawPixelInfo &big, int bw, int bh, int x0, int y0, Slope slope, int z)
+{
+	double t0 = TurnedNow();
+	ZoomLevel zoom = frame.zoom;
+	Slope s = RemoveHalftileSlope(slope);
+	static const Corner corners[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
+	static const int cxs[4] = {0, 0, TILE_SIZE, TILE_SIZE};
+	static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
+	double scale = 1.0 / (1 << to_underlying(zoom));
+	TurnedVertex v[5];
+	for (int i = 0; i < 5; i++) {
+		double wx = (i < 4) ? x0 + cxs[i] : x0 + TILE_SIZE / 2.0;
+		double wy = (i < 4) ? y0 + cys[i] : y0 + TILE_SIZE / 2.0;
+		double wz = z + ((i < 4) ? GetSlopePixelZInCorner(s, corners[i]) : static_cast<int>(GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, s)));
+		double fx, fy, cx, cy;
+		ProjectTurnedF(wx, wy, wz, fx, fy);
+		RemapCoordsF(wx, wy, wz, cx, cy);
+		v[i].x = (fx - frame.left) * scale;
+		v[i].y = (fy - frame.top) * scale;
+		v[i].u = (cx - big.left) * scale;
+		v[i].v = (cy - big.top) * scale;
+	}
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
+	const uint32_t *tex = _turned_big.data();
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[0], v[1], v[4]);
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[1], v[2], v[4]);
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[2], v[3], v[4]);
+	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[3], v[0], v[4]);
+	_turned_times.warp += TurnedNow() - t0;
+}
+
+/**
  * Draw a block of the main viewport with the view turned (three_d.h). Called
  * by ViewportDoDraw() with _vd.dpi set up for the block and _cur_dpi pointing
  * at it; takes care of everything up to the clearing of the lists.
@@ -2495,10 +2539,16 @@ static void ViewportDoDrawTurned()
 	/* 3. Clear the block: black, and the animation buffer told these pixels do not animate. */
 	BlitterFactory::GetCurrentBlitter()->DrawRect(frame.dst_ptr, fw, fh, PixelColour{0});
 
-	/* 4. The tiles that can reach into the block, far first: the ground of each warped, the rest collected. */
+	/* 4. The tiles that can reach into the block, far first. */
 	struct TurnedTile {
 		int x, y;
 		double near;
+		TileType type;
+		Slope raw_slope, top_slope;
+		int raw_z, top_z;
+		size_t first_sprite, end_sprite;
+		int foundation[2];
+		bool building;
 	};
 	std::vector<TurnedTile> tiles;
 	for (int ty = ty0; ty <= ty1; ty++) {
@@ -2520,14 +2570,15 @@ static void ViewportDoDrawTurned()
 			if (vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE < frame.top || vy - (reach + TILE_PIXELS) * ZOOM_BASE > frame.top + frame.height) continue;
 			double xr, yr;
 			TurnWorldPoint(tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, xr, yr);
-			tiles.push_back({tx, ty, xr + yr});
+			tiles.push_back({tx, ty, xr + yr, TileType::Void, SLOPE_FLAT, SLOPE_FLAT, 0, 0, 0, 0, {-1, -1}, false});
 		}
 	}
 	std::sort(tiles.begin(), tiles.end(), [](const TurnedTile &a, const TurnedTile &b) { return a.near < b.near; });
 
+	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. */
 	_vd.dpi = cdpi;
 	double t_collect = 0;
-	for (const TurnedTile &t : tiles) {
+	for (TurnedTile &t : tiles) {
 		double tc0 = TurnedNow();
 		TileType tile_type;
 		_cur_ti.x = t.x * TILE_SIZE;
@@ -2554,19 +2605,25 @@ static void ViewportDoDrawTurned()
 		size_t first = _vd.tile_sprites_to_draw.size();
 		size_t first_parent = _vd.parent_sprites_to_draw.size();
 		/* The land itself; the draw procedure levels the TileInfo when it draws a foundation. */
-		Slope raw_slope = _cur_ti.tileh;
-		int raw_z = _cur_ti.z;
+		t.type = tile_type;
+		t.raw_slope = _cur_ti.tileh;
+		t.raw_z = _cur_ti.z;
 		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 		if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 		/* The ground lies on top of the foundation, if the tile has one. */
-		Slope ground_slope = raw_slope;
-		int ground_z = raw_z;
-		if (_cur_ti.tile != INVALID_TILE) std::tie(ground_slope, ground_z) = GetFoundationPixelSlope(_cur_ti.tile);
+		t.top_slope = t.raw_slope;
+		t.top_z = t.raw_z;
+		if (_cur_ti.tile != INVALID_TILE) std::tie(t.top_slope, t.top_z) = GetFoundationPixelSlope(_cur_ti.tile);
+		t.first_sprite = first;
+		t.end_sprite = _vd.tile_sprites_to_draw.size();
+		t.foundation[0] = _vd.foundation[FoundationPart::Normal];
+		t.foundation[1] = _vd.foundation[FoundationPart::Halftile];
+		t.building = tile_type == TileType::House || tile_type == TileType::Industry;
 		if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
 			IConsolePrint(CC_DEFAULT, "ladeni: dlazdice {},{} typ {} svah {} z {} (po zakladech svah {} z {}) spritu dlazdice {} stojicich {} zaklady {}/{}", t.x, t.y, to_underlying(tile_type),
-					to_underlying(_cur_ti.tileh), _cur_ti.z, to_underlying(ground_slope), ground_z, _vd.tile_sprites_to_draw.size() - first, _vd.parent_sprites_to_draw.size() - first_parent,
-					_vd.foundation[FoundationPart::Normal], _vd.foundation[FoundationPart::Halftile]);
-			for (size_t i = first; i < _vd.tile_sprites_to_draw.size(); i++) {
+					to_underlying(t.raw_slope), t.raw_z, to_underlying(t.top_slope), t.top_z, t.end_sprite - first, _vd.parent_sprites_to_draw.size() - first_parent,
+					t.foundation[0], t.foundation[1]);
+			for (size_t i = first; i < t.end_sprite; i++) {
 				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 				IConsolePrint(CC_DEFAULT, "ladeni:   sprite {} pal {} na {},{}", ts.image, ts.pal, ts.x, ts.y);
 			}
@@ -2575,9 +2632,7 @@ static void ViewportDoDrawTurned()
 				IConsolePrint(CC_DEFAULT, "ladeni:   stojici {} pal {} na {},{} kotva {},{},{} deti {}", ps.image, ps.pal, ps.x, ps.y, ps.ax, ps.ay, ps.az, ps.first_child);
 			}
 		}
-		bool building = tile_type == TileType::House || tile_type == TileType::Industry;
 		t_collect += TurnedNow() - tc0;
-		DrawTurnedTileGround(frame, first, _cur_ti.x, _cur_ti.y, ground_slope, ground_z, raw_slope, raw_z, building);
 
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
 		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses)) {
@@ -2602,6 +2657,76 @@ static void ViewportDoDrawTurned()
 		}
 	}
 	_turned_times.collect += t_collect;
+
+	/* The ground of the whole block, north-up, in one texture: the plain tiles' sprites drawn as the game draws
+	 * them, so neighbouring tiles fit together and the edges of the warped tiles meet at any zoom. A tile with a
+	 * foundation is drawn by itself (DrawTurnedTileGround()), since its raised ground and walls would lie over
+	 * its neighbours here. */
+	DrawPixelInfo bigdpi = frame;
+	int bw = 0, bh = 0;
+	{
+		int cl = INT32_MAX, cr = INT32_MIN, ct = INT32_MAX, cb = INT32_MIN;
+		for (const TurnedTile &t : tiles) {
+			for (int corner = 0; corner < 4; corner++) {
+				int x = t.x * TILE_SIZE + ((corner & 1) ? TILE_SIZE : 0), y = t.y * TILE_SIZE + ((corner & 2) ? TILE_SIZE : 0);
+				Point lo = RemapCoords(x, y, t.raw_z), hi = RemapCoords(x, y, t.raw_z + 2 * TILE_HEIGHT);
+				cl = std::min(cl, lo.x); cr = std::max(cr, lo.x);
+				ct = std::min(ct, hi.y); cb = std::max(cb, lo.y);
+			}
+		}
+		if (cl <= cr) {
+			const int margin = TILE_HEIGHT * ZOOM_BASE;
+			bigdpi.left = (cl - margin) & mask;
+			bigdpi.top = (ct - margin) & mask;
+			bigdpi.width = (cr + margin - bigdpi.left + ~mask) & mask;
+			bigdpi.height = (cb + margin - bigdpi.top + ~mask) & mask;
+			bw = UnScaleByZoom(bigdpi.width, zoom);
+			bh = UnScaleByZoom(bigdpi.height, zoom);
+		}
+	}
+	if (bw > 0 && bh > 0) {
+		double t0 = TurnedNow();
+		_turned_big.assign(static_cast<size_t>(bw) * bh, 0);
+		bigdpi.dst_ptr = _turned_big.data();
+		bigdpi.pitch = bw;
+		{
+			AutoRestoreBackup dpi_backup(_cur_dpi, &bigdpi);
+			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+			for (const TurnedTile &t : tiles) {
+				if (t.foundation[0] != -1 || t.foundation[1] != -1) continue;
+				for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
+					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+					DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+				}
+			}
+		}
+		double t1 = TurnedNow();
+		_turned_times.texture += t1 - t0;
+		/* The black under a building, grown over from the ground beside it: on the rows of that tile. */
+		double scale = 1.0 / (1 << to_underlying(zoom));
+		for (const TurnedTile &t : tiles) {
+			if (!t.building || t.foundation[0] != -1 || t.foundation[1] != -1) continue;
+			Point n = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_z + GetSlopeMaxPixelZ(RemoveHalftileSlope(t.top_slope)));
+			Point sth = RemapCoords(t.x * TILE_SIZE + TILE_SIZE, t.y * TILE_SIZE + TILE_SIZE, t.top_z);
+			int x0 = Clamp(static_cast<int>((n.x - TILE_SIZE * 2 * ZOOM_BASE - bigdpi.left) * scale), 0, bw);
+			int x1 = Clamp(static_cast<int>((n.x + TILE_SIZE * 2 * ZOOM_BASE - bigdpi.left) * scale) + 1, 0, bw);
+			int y0 = Clamp(static_cast<int>((n.y - bigdpi.top) * scale), 0, bh);
+			int y1 = Clamp(static_cast<int>((sth.y - bigdpi.top) * scale) + 1, 0, bh);
+			FillTurnedFootprint(_turned_big.data(), bw, x0, y0, x1, y1);
+		}
+		_turned_times.widen += TurnedNow() - t1;
+	}
+
+	/* 5. The ground, far first: a plain tile laid from the block's texture, a tile with a foundation as a box from its own. */
+	for (const TurnedTile &t : tiles) {
+		if (t.foundation[0] != -1 || t.foundation[1] != -1) {
+			DrawTurnedTileGround(frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation);
+		} else if (bw > 0 && t.first_sprite < t.end_sprite) {
+			DrawTurnedTileFromBlock(frame, bigdpi, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
+		}
+	}
+	_turned_times.drawn += static_cast<int>(tiles.size());
+
 	ViewportAddVehicles(&cdpi);
 
 	/* The signs and the floating texts: collected north-up, then each moved to where the ground under it is drawn turned. */
