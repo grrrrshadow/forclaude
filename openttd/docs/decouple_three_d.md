@@ -93,7 +93,13 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    never on show (the player: it is only background). A house of several
    tiles is drawn tile by tile, the boxes cut to the tile, each from its own
    sprite. The black the ground is drawn under a house (for the sprite to
-   cover) is grown over from the ground beside it.
+   cover) is grown over from the ground beside it. **Anything else standing
+   on a house, industry or object tile** -- a house without a table, an
+   industry's building, a lighthouse -- is one box with a flat top, its
+   bounding box, turned the same way; where the sprite is narrower than the
+   bounding box's footprint on the screen (a tower on a wide base) the box is
+   narrowed to the sprite's width. Low things (fences, heaps, under a height
+   level) stay billboards.
 4. **The signs** (town, station, waypoint and sign names) and the floating
    texts are collected north-up and each moved to where the ground under it is
    drawn turned.

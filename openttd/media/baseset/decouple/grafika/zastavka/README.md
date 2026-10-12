@@ -15,8 +15,10 @@ openttd.grf as it is -- the player's rule for all the 3D-era graphics
   the same girls from eight directions (grrrrf `postavy/osm_smeru_zin16*`,
   48.8 px/m, scale 2, no shadow), placed by the feet: offset = feet offset in
   the render + four times the 4x table point (`openttd_budovy.py`).
-- Matylda (`SPR_BUS_STOP_GIRL_Y_NEAR`) has no 16x render yet and is not in the
-  set.
+- Matylda (`SPR_BUS_STOP_GIRL_Y_NEAR`, 5165) is a second replacement set, from
+  the colleague's render of her from eight directions (direction d7, the pose
+  of the 4x and 8x). Model "Matilda" by nicolekeane, licence CC BY-NC-SA 4.0:
+  this set and its pictures carry that licence and her name (`CREDITS.md`).
 
 Build, from the repository root:
 

@@ -2338,14 +2338,21 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 static std::vector<BoxFace> _box_faces; ///< The faces of the house being drawn.
 
 /**
- * Draw a house sprite of the turned view as the boxes of its hand table
- * (ParentSpriteToDraw::box): the sprite is drawn north-up into a texture and
- * laid over the faces, far to near. A house of several tiles is drawn by each
- * of its tiles from that tile's sprite, the boxes cut to the tile.
+ * Draw a sprite of the turned view as boxes (ParentSpriteToDraw::box_kind):
+ * the sprite is drawn north-up into a texture and laid over the faces of the
+ * boxes, far to near. Only the front of the thing turns, by up to half the
+ * period either way; past that it snaps back by a quarter turn (or a half)
+ * and its front turns again, so the back of a thing of one sprite is never on
+ * show (the player: it is only background).
  * @param frame the block of the screen being drawn
- * @param ps the house sprite, already moved to where the turn puts it
+ * @param ps the sprite, already moved to where the turn puts it
+ * @param parts the boxes, in the frame of the thing (tile units from box_ox, box_oy; pixels up from box_oz)
+ * @param count how many boxes
+ * @param cut whether to cut the boxes to the rectangle cx0..cx1, cy0..cy1 of the frame (the tile of a house of several)
+ * @param centre_x,centre_y the middle of the thing in its frame, which the boxes snap about
+ * @param period the turn after which the front comes round again: 90 degrees for a square thing, 180 for a longer one
  */
-static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, const ThreeDPart *parts, uint count, bool cut, double cx0, double cx1, double cy0, double cy1, double centre_x, double centre_y, double period)
 {
 	ZoomLevel zoom = frame.zoom;
 	int mask = ScaleByZoom(-1, zoom);
@@ -2390,31 +2397,22 @@ static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToD
 	}
 	_turned_times.texture += TurnedNow() - t0;
 
-	/* The faces of the boxes, cut to this tile for a house of several tiles. */
-	const ThreeDHouse &house = *ps.box;
-	bool cut = house.tiles_x > 1 || house.tiles_y > 1;
-	double cx0 = ps.box_dx * TILE_SIZE - 0.5, cx1 = cx0 + TILE_SIZE + 1, cy0 = ps.box_dy * TILE_SIZE - 0.5, cy1 = cy0 + TILE_SIZE + 1;
+	/* The faces of the boxes. */
 	_box_faces.clear();
-	const ThreeDPart *parts = GetThreeDHouseParts(&house);
-	for (uint i = 0; i < house.count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy);
+	for (uint i = 0; i < count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy);
 	std::sort(_box_faces.begin(), _box_faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
 
-	/* Only the front of a house turns, by up to 45 degrees either way (90 for a house longer than wide); past
-	 * that the house snaps a quarter turn back and its front turns again. The player: the back of a house of one
-	 * sprite is never shown, it is only background. So the boxes stand turned against the world by a multiple of
-	 * a quarter turn, about the middle of the house. */
-	double period = (house.tiles_x == house.tiles_y) ? 90.0 : 180.0;
+	/* The front turns by up to half the period either way; past that the boxes snap back about the middle. */
 	double yaw = GetViewYaw();
 	double wrapped = std::fmod(yaw + period / 2, period) - period / 2;
 	int quarter = static_cast<int>(std::lround((yaw - wrapped) / 90.0)) & 3;
-	double hcx = house.tiles_x * TILE_SIZE / 2.0, hcy = house.tiles_y * TILE_SIZE / 2.0;
 	auto stand = [&](double x, double y, double &wx, double &wy) {
-		double dx = x - hcx, dy = y - hcy;
+		double dx = x - centre_x, dy = y - centre_y;
 		switch (quarter) {
-			default: wx = hcx + dx; wy = hcy + dy; break;
-			case 1: wx = hcx + dy; wy = hcy - dx; break;
-			case 2: wx = hcx - dx; wy = hcy - dy; break;
-			case 3: wx = hcx - dy; wy = hcy + dx; break;
+			default: wx = centre_x + dx; wy = centre_y + dy; break;
+			case 1: wx = centre_x + dy; wy = centre_y - dx; break;
+			case 2: wx = centre_x - dx; wy = centre_y - dy; break;
+			case 3: wx = centre_x - dy; wy = centre_y + dx; break;
 		}
 	};
 
@@ -2442,6 +2440,29 @@ static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToD
 		}
 	}
 	_turned_times.warp += TurnedNow() - t1;
+}
+
+/** A house sprite of the turned view as the boxes of its hand table (box_kind 1): this tile's share of them, from this tile's sprite. */
+static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	const ThreeDHouse &house = *ps.box;
+	bool cut = house.tiles_x > 1 || house.tiles_y > 1;
+	double cx0 = ps.box_dx * TILE_SIZE - 0.5, cx1 = cx0 + TILE_SIZE + 1, cy0 = ps.box_dy * TILE_SIZE - 0.5, cy1 = cy0 + TILE_SIZE + 1;
+	double period = (house.tiles_x == house.tiles_y) ? 90.0 : 180.0;
+	DrawTurnedBoxes(frame, ps, GetThreeDHouseParts(&house), house.count, cut, cx0, cx1, cy0, cy1, house.tiles_x * TILE_SIZE / 2.0, house.tiles_y * TILE_SIZE / 2.0, period);
+}
+
+/**
+ * A sprite of the turned view as one box with a flat top, its bounding box
+ * (box_kind 2): a house without a hand table, an industry's building, an
+ * object. The box was narrowed to the sprite's width when the sprite is
+ * narrower than the bounding box's footprint on the screen (a tower).
+ */
+static void DrawTurnedGenericBox(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	ThreeDPart part{0.0f, static_cast<float>(ps.box_dx), 0.0f, static_cast<float>(ps.box_dy), static_cast<float>(ps.zmax - ps.zmin + 1), ThreeDRoof::Flat, 0.0f};
+	double period = (ps.box_dx == ps.box_dy) ? 90.0 : 180.0;
+	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, ps.box_dx / 2.0, ps.box_dy / 2.0, period);
 }
 
 /**
@@ -2645,14 +2666,40 @@ static void ViewportDoDrawTurned()
 					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 						ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 						if (ps.image == SPR_EMPTY_BOUNDING_BOX) continue;
+						ps.box_kind = 1;
 						ps.box = model;
 						ps.box_ox = TileX(north_tile) * TILE_SIZE;
 						ps.box_oy = TileY(north_tile) * TILE_SIZE;
 						ps.box_oz = _cur_ti.z;
-						ps.box_dx = static_cast<int32_t>(TileX(_cur_ti.tile)) - static_cast<int32_t>(TileX(north_tile));
-						ps.box_dy = static_cast<int32_t>(TileY(_cur_ti.tile)) - static_cast<int32_t>(TileY(north_tile));
+						ps.box_dx = static_cast<int16_t>(static_cast<int>(TileX(_cur_ti.tile)) - static_cast<int>(TileX(north_tile)));
+						ps.box_dy = static_cast<int16_t>(static_cast<int>(TileY(_cur_ti.tile)) - static_cast<int>(TileY(north_tile)));
 					}
 				}
+			}
+		}
+		/* Anything else standing on a house, industry or object tile is one box, its bounding box: the box is
+		 * narrowed to the sprite's width where the sprite is narrower than the footprint on the screen (a tower on
+		 * a wide base); low things (fences, heaps) stay billboards. */
+		bool boxed_type = (tile_type == TileType::House && !IsTransparencySet(TransparencyOption::Houses)) ||
+				(tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries)) ||
+				(tile_type == TileType::Object && !IsTransparencySet(TransparencyOption::Structures));
+		if (boxed_type) {
+			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+				ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+				if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+				int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1, ez = ps.zmax - ps.zmin + 1;
+				if (ex < 2 || ey < 2 || ez < TILE_HEIGHT) continue;
+				const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
+				double footprint = 2.0 * ZOOM_BASE * (ex + ey);
+				double f = std::min(1.0, spr->width / footprint);
+				int nx = std::max(2, static_cast<int>(std::lround(ex * f))), ny = std::max(2, static_cast<int>(std::lround(ey * f)));
+				ps.box_kind = 2;
+				ps.box = nullptr;
+				ps.box_ox = ps.xmin + (ex - nx) / 2;
+				ps.box_oy = ps.ymin + (ey - ny) / 2;
+				ps.box_oz = ps.zmin;
+				ps.box_dx = static_cast<int16_t>(nx);
+				ps.box_dy = static_cast<int16_t>(ny);
 			}
 		}
 	}
@@ -2768,8 +2815,12 @@ static void ViewportDoDrawTurned()
 	double tb0 = TurnedNow();
 	for (const TurnedSprite &s : standing) {
 		const ParentSpriteToDraw *ps = s.ps;
-		if (ps->box != nullptr) {
+		if (ps->box_kind == 1) {
 			DrawTurnedHouseBox(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 2) {
+			DrawTurnedGenericBox(frame, *ps);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);

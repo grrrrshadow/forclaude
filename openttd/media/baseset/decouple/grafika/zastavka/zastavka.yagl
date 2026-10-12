@@ -13,7 +13,8 @@
 // 4x and 8x look 260 degrees, ten short of that). Each is placed by her feet
 // at the point the game's table gives, four times the 4x offsets from the
 // shelter's box origin (openttd_budovy.py). Matylda (SPR_BUS_STOP_GIRL_Y_NEAR)
-// has no 16x render yet and keeps openttd.grf's 4x and 8x.
+// is the second set below, from the colleague's render of her from eight
+// directions (12. 10. evening).
 //
 //     yagl -e <abs>/zastavka.grf <abs>/zastavka     (README.md)
 yagl_version: "";
@@ -46,6 +47,19 @@ replacement_sprite_sets // Action0A
             [113, 69, -162, 33], zin4, c32bpp | chunked, "zastavka_x_vpredu_32bpp.png", [0, 0];
             [242, 136, -325, 66], zin8, c32bpp | chunked, "zastavka_x_vpredu_8x_32bpp.png", [0, 0];
             [43, 148, -439, 133], zin16, c32bpp | chunked, "zastavka_x_vpredu_16x_32bpp.png", [0, 0];
+        }
+    }
+    // Matylda on the near pavement along Y (SPR_BUS_STOP_GIRL_Y_NEAR, 5165 = 4896 + 269), looking up the road
+    // for the bus: direction d7 of the colleague's eight (grrrrf postavy/osm_smeru_zin16_holky/matilda), the
+    // same pose as the 4x and 8x. Model "Matilda" by nicolekeane, CC BY-NC-SA 4.0: this set carries that licence
+    // and her name (CREDITS.md).
+    replacement_sprite_set<0x142D>
+    {
+        sprite_id<0x00000004>
+        {
+            [84, 62, -106, 39], zin4, c32bpp | chunked, "zastavka_y_vpredu_32bpp.png", [0, 0];
+            [185, 126, -226, 77], zin8, c32bpp | chunked, "zastavka_y_vpredu_8x_32bpp.png", [0, 0];
+            [70, 146, -302, 155], zin16, c32bpp | chunked, "zastavka_y_vpredu_16x_32bpp.png", [0, 0];
         }
     }
 }

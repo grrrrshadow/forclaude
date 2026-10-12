@@ -39,12 +39,13 @@ struct ParentSpriteToDraw {
 	int32_t ax;                       ///< world X of the point the sprite hangs from (x, y are RemapCoords() of it plus the pixel offset); the turned view draws it there turned (three_d.h)
 	int32_t ay;                       ///< world Y of that point
 	int32_t az;                       ///< world Z of that point
-	const struct ThreeDHouse *box = nullptr; ///< the turned view draws this sprite as these boxes instead of a billboard (a house with a hand table)
-	int32_t box_ox;                   ///< world X of the north corner of the house's north tile, the origin of the boxes
+	const struct ThreeDHouse *box = nullptr; ///< the hand table of the house this sprite belongs to, for box_kind 1
+	int32_t box_ox;                   ///< world X of the origin of the boxes: the north corner of a house's north tile, or of the bounding box
 	int32_t box_oy;                   ///< world Y of it
-	int32_t box_oz;                   ///< world Z of the ground the house stands on
-	int32_t box_dx;                   ///< this tile's place in the house, tiles along X from its north tile
-	int32_t box_dy;                   ///< and along Y (both wider than they need be: the SSE4 sorter wants the struct a multiple of 16 bytes)
+	int32_t box_oz;                   ///< world Z of the ground the thing stands on
+	int16_t box_dx;                   ///< box_kind 1: this tile's place in the house, tiles along X from its north tile; box_kind 2: the box's extent along X (world units)
+	int16_t box_dy;                   ///< and along Y
+	int32_t box_kind = 0;             ///< how the turned view draws this sprite (three_d.h): 0 a billboard, 1 the boxes of a house's hand table, 2 one box of its bounding box. The struct stays a multiple of 16 bytes for the SSE4 sorter.
 };
 
 typedef std::vector<ParentSpriteToDraw*> ParentSpriteToSortVector;
