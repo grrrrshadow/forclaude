@@ -70,13 +70,27 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    this is ground and turns with the tile. The black the ground is drawn
    under a house or an industry (for the building to cover) is grown over
    from the ground beside it, since the building no longer covers it exactly.
-2. **Everything standing** -- houses, trees, foundations' walls, bridges,
-   station roofs, vehicles -- is a billboard: the sprite as it is, hung from
-   its anchor point turned (`ParentSpriteToDraw::ax, ay, az`, the world point
-   `AddSortableSpriteToDraw()` was given), drawn far to near by the turned
-   depth of its bounding box. A vehicle's sprite is the one of its turned
-   direction. The game's own sprite sorter is not used here.
-3. **The signs** (town, station, waypoint and sign names) and the floating
+2. **Everything standing** -- trees, foundations' walls, bridges, station
+   roofs, vehicles, houses without a table -- is a billboard: the sprite as it
+   is, hung from its anchor point turned (`ParentSpriteToDraw::ax, ay, az`,
+   the world point `AddSortableSpriteToDraw()` was given), drawn far to near
+   by the turned depth of its bounding box. A vehicle's sprite is the one of
+   its turned direction. The game's own sprite sorter is not used here.
+3. **The houses of the original graphics with a hand table**
+   (`table/three_d_houses.h`, 26 temperate houses read off their one sprite
+   by hand: a few boxes each with flat, gable or hip roofs) are boxes. The
+   sprite is drawn north-up into a texture and laid over the faces of the
+   boxes: a face the sprite shows (the walls facing south-west and
+   south-east, the roof slopes facing them, a flat top) takes its pixels
+   where the game draws it, a face it never shows takes them from the
+   opposite face of the same box, mirrored. Only the front of a house turns,
+   by up to 45 degrees either way: past that the house snaps a quarter turn
+   back and its front turns again, so the back of a house of one sprite is
+   never on show (the player: it is only background). A house of several
+   tiles is drawn tile by tile, the boxes cut to the tile, each from its own
+   sprite. The black the ground is drawn under a house (for the sprite to
+   cover) is grown over from the ground beside it.
+4. **The signs** (town, station, waypoint and sign names) and the floating
    texts are collected north-up and each moved to where the ground under it is
    drawn turned.
 
@@ -89,11 +103,11 @@ faces are written straight into it, the billboards through the blitter as
 always. It needs a 32bpp blitter: with an 8bpp one the angle stays 0.
 
 What is not there yet: the previews that turn (purchase window, beside the
-industry window), the eight-direction pictures of our zin16 buildings and the
-box models of the 8bpp houses from the hand tables (they stand as billboards
-for now), the proper sorting of long things against each other, the smaller
-textures of the zoomed-out view, the seams at the edges of the map. Facing
-north nothing of this runs.
+industry window), the eight-direction pictures of our zin16 buildings, boxes
+for the houses of the other climates and for industries (billboards for now),
+the proper sorting of long things against each other, the smaller textures of
+the zoomed-out view, the seams at the edges of the map. Facing north nothing
+of this runs.
 
 ## The rig
 

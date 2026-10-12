@@ -93,6 +93,7 @@
 #include "framerate_type.h"
 #include "viewport_cmd.h"
 #include "three_d.h"
+#include "transparency.h"
 #include "console_func.h"
 
 #include <chrono>
@@ -2207,6 +2208,241 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, int x
 	_turned_times.warp += TurnedNow() - t2;
 }
 
+/*
+ * A house of the original graphics as boxes (ThreeDHouse, table/three_d_houses.h):
+ * its one sprite is laid over the faces of its boxes the way the ground is
+ * laid over a tile. A face the sprite shows (the walls facing +X and +Y, the
+ * roof slopes facing them, a flat top) takes its pixels where the game draws
+ * it; a face the sprite never shows takes them from the opposite face of the
+ * same box, mirrored, as the hand tables were made (model3d.py). Faces are
+ * drawn far to near. The boxes are cut to the tile being drawn, so a house of
+ * several tiles is drawn tile by tile, each from its own sprite.
+ */
+
+/** A corner of a face of a house box, in the frame of the house (tile units and pixels): the point, and the point the sprite shows it at. */
+struct BoxVertex {
+	double x, y, z;
+	double tx, ty, tz;
+};
+
+/** A face of a house box: a convex polygon and how near its middle is in the turned view. */
+struct BoxFace {
+	std::vector<BoxVertex> v;
+	double near;
+};
+
+/** Cut a convex polygon to one side of a line x = limit (axis 0) or y = limit (axis 1), the texture point cut along with it. */
+static void ClipBoxPolygon(std::vector<BoxVertex> &poly, int axis, double limit, bool keep_greater)
+{
+	std::vector<BoxVertex> out;
+	size_t n = poly.size();
+	for (size_t i = 0; i < n; i++) {
+		const BoxVertex &a = poly[i], &b = poly[(i + 1) % n];
+		double va = axis == 0 ? a.x : a.y, vb = axis == 0 ? b.x : b.y;
+		bool ina = keep_greater ? va >= limit : va <= limit;
+		bool inb = keep_greater ? vb >= limit : vb <= limit;
+		if (ina) out.push_back(a);
+		if (ina != inb) {
+			double t = (limit - va) / (vb - va);
+			out.push_back({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t,
+					a.tx + (b.tx - a.tx) * t, a.ty + (b.ty - a.ty) * t, a.tz + (b.tz - a.tz) * t});
+		}
+	}
+	poly.swap(out);
+}
+
+/** The faces of one box of a house (ThreeDPart), each cut to the tile being drawn. */
+static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, bool cut, double cx0, double cx1, double cy0, double cy1, double ox, double oy)
+{
+	/* The sprite's outline pixels sit half a pixel outside the box's true edges. */
+	const double margin = 0.25;
+	double x0 = part.x0 - margin, x1 = part.x1 + margin, y0 = part.y0 - margin, y1 = part.y1 + margin;
+	double h = part.h + 2 * margin, rise = part.rise;
+	double mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+
+	auto same = [](double x, double y, double z) { return BoxVertex{x, y, z, x, y, z}; };
+	auto add = [&](std::vector<BoxVertex> poly) {
+		if (cut) {
+			ClipBoxPolygon(poly, 0, cx0, true);
+			ClipBoxPolygon(poly, 0, cx1, false);
+			ClipBoxPolygon(poly, 1, cy0, true);
+			ClipBoxPolygon(poly, 1, cy1, false);
+		}
+		if (poly.size() < 3) return;
+		double sx = 0, sy = 0, sz = 0;
+		for (const BoxVertex &v : poly) {
+			sx += v.x;
+			sy += v.y;
+			sz += v.z;
+		}
+		double xr, yr;
+		TurnWorldPoint(ox + sx / poly.size(), oy + sy / poly.size(), xr, yr);
+		faces.push_back({std::move(poly), xr + yr + 2 * sz / poly.size()});
+	};
+
+	/* The walls: +X and +Y are the ones the sprite shows; -X and -Y take theirs mirrored to them. */
+	std::vector<BoxVertex> wall;
+	for (int side = 0; side < 2; side++) {
+		double x = side == 0 ? x1 : x0, tx = x1;
+		wall = {{x, y0, 0, tx, y0, 0}, {x, y1, 0, tx, y1, 0}, {x, y1, h, tx, y1, h}};
+		if (part.roof == ThreeDRoof::GableX) wall.push_back({x, my, h + rise, tx, my, h + rise});
+		wall.push_back({x, y0, h, tx, y0, h});
+		add(wall);
+	}
+	for (int side = 0; side < 2; side++) {
+		double y = side == 0 ? y1 : y0, ty = y1;
+		wall = {{x0, y, 0, x0, ty, 0}, {x1, y, 0, x1, ty, 0}, {x1, y, h, x1, ty, h}};
+		if (part.roof == ThreeDRoof::GableY) wall.push_back({mx, y, h + rise, mx, ty, h + rise});
+		wall.push_back({x0, y, h, x0, ty, h});
+		add(wall);
+	}
+
+	/* The roof. */
+	auto mirror_x = [&](double x, double y, double z) { return BoxVertex{x, y, z, x0 + x1 - x, y, z}; };
+	auto mirror_y = [&](double x, double y, double z) { return BoxVertex{x, y, z, x, y0 + y1 - y, z}; };
+	switch (part.roof) {
+		case ThreeDRoof::Flat:
+			add({same(x0, y0, h), same(x1, y0, h), same(x1, y1, h), same(x0, y1, h)});
+			break;
+		case ThreeDRoof::GableX:
+			/* the ridge along X at the middle of Y: the slope facing +Y is shown, the one facing -Y mirrored */
+			add({same(x0, my, h + rise), same(x1, my, h + rise), same(x1, y1, h), same(x0, y1, h)});
+			add({mirror_y(x0, y0, h), mirror_y(x1, y0, h), mirror_y(x1, my, h + rise), mirror_y(x0, my, h + rise)});
+			break;
+		case ThreeDRoof::GableY:
+			add({same(mx, y0, h + rise), same(mx, y1, h + rise), same(x1, y1, h), same(x1, y0, h)});
+			add({mirror_x(x0, y0, h), mirror_x(x0, y1, h), mirror_x(mx, y1, h + rise), mirror_x(mx, y0, h + rise)});
+			break;
+		case ThreeDRoof::Hip: {
+			double hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
+			if (hx >= hy) {
+				/* the ridge along X, shorter than the box by the hip ends */
+				double rx0 = mx - (hx - hy), rx1 = mx + (hx - hy);
+				add({same(x0, y1, h), same(x1, y1, h), same(rx1, my, h + rise), same(rx0, my, h + rise)});
+				add({mirror_y(x0, y0, h), mirror_y(x1, y0, h), mirror_y(rx1, my, h + rise), mirror_y(rx0, my, h + rise)});
+				add({same(x1, y0, h), same(x1, y1, h), same(rx1, my, h + rise)});
+				add({mirror_x(x0, y0, h), mirror_x(x0, y1, h), mirror_x(rx0, my, h + rise)});
+			} else {
+				double ry0 = my - (hy - hx), ry1 = my + (hy - hx);
+				add({same(x1, y0, h), same(x1, y1, h), same(mx, ry1, h + rise), same(mx, ry0, h + rise)});
+				add({mirror_x(x0, y0, h), mirror_x(x0, y1, h), mirror_x(mx, ry1, h + rise), mirror_x(mx, ry0, h + rise)});
+				add({same(x0, y1, h), same(x1, y1, h), same(mx, ry1, h + rise)});
+				add({mirror_y(x0, y0, h), mirror_y(x1, y0, h), mirror_y(mx, ry0, h + rise)});
+			}
+			break;
+		}
+	}
+}
+
+static std::vector<BoxFace> _box_faces; ///< The faces of the house being drawn.
+
+/**
+ * Draw a house sprite of the turned view as the boxes of its hand table
+ * (ParentSpriteToDraw::box): the sprite is drawn north-up into a texture and
+ * laid over the faces, far to near. A house of several tiles is drawn by each
+ * of its tiles from that tile's sprite, the boxes cut to the tile.
+ * @param frame the block of the screen being drawn
+ * @param ps the house sprite, already moved to where the turn puts it
+ */
+static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	ZoomLevel zoom = frame.zoom;
+	int mask = ScaleByZoom(-1, zoom);
+	const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
+
+	/* Where the game draws the sprite facing north: the turn's shift taken off again. */
+	Point c = RemapCoords(ps.ax, ps.ay, ps.az), t = ProjectTurned(ps.ax, ps.ay, ps.az);
+	int shift_x = t.x - c.x, shift_y = t.y - c.y;
+	int sx = ps.x - shift_x, sy = ps.y - shift_y, sleft = ps.left - shift_x, stop = ps.top - shift_y;
+	const int margin = TILE_HEIGHT * ZOOM_BASE;
+	int tleft = (sleft - margin) & mask;
+	int ttop = (stop - margin) & mask;
+	int twidth = (sleft + spr->width + margin - tleft + ~mask) & mask;
+	int theight = (stop + spr->height + margin - ttop + ~mask) & mask;
+	int tw = UnScaleByZoom(twidth, zoom), th = UnScaleByZoom(theight, zoom);
+	if (tw <= 0 || th <= 0) return;
+	double t0 = TurnedNow();
+	_turned_texture.assign(static_cast<size_t>(tw) * th, 0);
+	DrawPixelInfo tdpi{
+		.dst_ptr = _turned_texture.data(),
+		.left = tleft,
+		.top = ttop,
+		.width = twidth,
+		.height = theight,
+		.pitch = tw,
+		.zoom = zoom
+	};
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+		DrawSpriteViewport(ps.image, ps.pal, sx, sy, ps.sub);
+		int child_idx = ps.first_child;
+		while (child_idx >= 0) {
+			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+			child_idx = cs.next;
+			if (cs.relative) {
+				DrawSpriteViewport(cs.image, cs.pal, sleft + cs.x, stop + cs.y, cs.sub);
+			} else {
+				DrawSpriteViewport(cs.image, cs.pal, sx + cs.x, sy + cs.y, cs.sub);
+			}
+		}
+	}
+	_turned_times.texture += TurnedNow() - t0;
+
+	/* The faces of the boxes, cut to this tile for a house of several tiles. */
+	const ThreeDHouse &house = *ps.box;
+	bool cut = house.tiles_x > 1 || house.tiles_y > 1;
+	double cx0 = ps.box_dx * TILE_SIZE - 0.5, cx1 = cx0 + TILE_SIZE + 1, cy0 = ps.box_dy * TILE_SIZE - 0.5, cy1 = cy0 + TILE_SIZE + 1;
+	_box_faces.clear();
+	const ThreeDPart *parts = GetThreeDHouseParts(&house);
+	for (uint i = 0; i < house.count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy);
+	std::sort(_box_faces.begin(), _box_faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
+
+	/* Only the front of a house turns, by up to 45 degrees either way (90 for a house longer than wide); past
+	 * that the house snaps a quarter turn back and its front turns again. The player: the back of a house of one
+	 * sprite is never shown, it is only background. So the boxes stand turned against the world by a multiple of
+	 * a quarter turn, about the middle of the house. */
+	double period = (house.tiles_x == house.tiles_y) ? 90.0 : 180.0;
+	double yaw = GetViewYaw();
+	double wrapped = std::fmod(yaw + period / 2, period) - period / 2;
+	int quarter = static_cast<int>(std::lround((yaw - wrapped) / 90.0)) & 3;
+	double hcx = house.tiles_x * TILE_SIZE / 2.0, hcy = house.tiles_y * TILE_SIZE / 2.0;
+	auto stand = [&](double x, double y, double &wx, double &wy) {
+		double dx = x - hcx, dy = y - hcy;
+		switch (quarter) {
+			default: wx = hcx + dx; wy = hcy + dy; break;
+			case 1: wx = hcx + dy; wy = hcy - dx; break;
+			case 2: wx = hcx - dx; wy = hcy - dy; break;
+			case 3: wx = hcx - dy; wy = hcy + dx; break;
+		}
+	};
+
+	double scale = 1.0 / (1 << to_underlying(zoom));
+	auto vertex = [&](const BoxVertex &b) {
+		TurnedVertex r;
+		double fx, fy, cxv, cyv, wx, wy;
+		stand(b.x, b.y, wx, wy);
+		ProjectTurnedF(ps.box_ox + wx, ps.box_oy + wy, ps.box_oz + b.z, fx, fy);
+		RemapCoordsF(ps.box_ox + b.tx, ps.box_oy + b.ty, ps.box_oz + b.tz, cxv, cyv);
+		r.x = (fx - frame.left) * scale;
+		r.y = (fy - frame.top) * scale;
+		r.u = (cxv - tleft) * scale;
+		r.v = (cyv - ttop) * scale;
+		return r;
+	};
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
+	const uint32_t *tex = _turned_texture.data();
+	double t1 = TurnedNow();
+	for (const BoxFace &face : _box_faces) {
+		TurnedVertex a = vertex(face.v[0]);
+		for (size_t i = 1; i + 1 < face.v.size(); i++) {
+			DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, a, vertex(face.v[i]), vertex(face.v[i + 1]));
+		}
+	}
+	_turned_times.warp += TurnedNow() - t1;
+}
+
 /**
  * Draw a block of the main viewport with the view turned (three_d.h). Called
  * by ViewportDoDraw() with _vd.dpi set up for the block and _cur_dpi pointing
@@ -2342,6 +2578,28 @@ static void ViewportDoDrawTurned()
 		bool building = tile_type == TileType::House || tile_type == TileType::Industry;
 		t_collect += TurnedNow() - tc0;
 		DrawTurnedTileGround(frame, first, _cur_ti.x, _cur_ti.y, ground_slope, ground_z, raw_slope, raw_z, building);
+
+		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
+		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses)) {
+			HouseID house = GetHouseType(_cur_ti.tile);
+			if (house < NEW_HOUSE_OFFSET) {
+				HouseID north = house;
+				TileIndex north_tile = _cur_ti.tile + GetHouseNorthPart(north);
+				const ThreeDHouse *model = GetThreeDHouse(north);
+				if (model != nullptr) {
+					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+						ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+						if (ps.image == SPR_EMPTY_BOUNDING_BOX) continue;
+						ps.box = model;
+						ps.box_ox = TileX(north_tile) * TILE_SIZE;
+						ps.box_oy = TileY(north_tile) * TILE_SIZE;
+						ps.box_oz = _cur_ti.z;
+						ps.box_dx = static_cast<int32_t>(TileX(_cur_ti.tile)) - static_cast<int32_t>(TileX(north_tile));
+						ps.box_dy = static_cast<int32_t>(TileY(_cur_ti.tile)) - static_cast<int32_t>(TileY(north_tile));
+					}
+				}
+			}
+		}
 	}
 	_turned_times.collect += t_collect;
 	ViewportAddVehicles(&cdpi);
@@ -2382,9 +2640,25 @@ static void ViewportDoDrawTurned()
 		standing.push_back({xr + yr + 2.0 * ps.zmin, &ps});
 	}
 	std::sort(standing.begin(), standing.end(), [](const TurnedSprite &a, const TurnedSprite &b) { return a.near < b.near; });
-	for (const TurnedSprite &s : standing) _vd.parent_sprites_to_sort.push_back(s.ps);
 	double tb0 = TurnedNow();
-	ViewportDrawParentSprites(&_vd.parent_sprites_to_sort, &_vd.child_screen_sprites_to_draw);
+	for (const TurnedSprite &s : standing) {
+		const ParentSpriteToDraw *ps = s.ps;
+		if (ps->box != nullptr) {
+			DrawTurnedHouseBox(frame, *ps);
+			continue;
+		}
+		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
+		int child_idx = ps->first_child;
+		while (child_idx >= 0) {
+			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+			child_idx = cs.next;
+			if (cs.relative) {
+				DrawSpriteViewport(cs.image, cs.pal, ps->left + cs.x, ps->top + cs.y, cs.sub);
+			} else {
+				DrawSpriteViewport(cs.image, cs.pal, ps->x + cs.x, ps->y + cs.y, cs.sub);
+			}
+		}
+	}
 	_turned_times.standing += TurnedNow() - tb0;
 }
 

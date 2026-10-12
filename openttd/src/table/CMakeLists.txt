@@ -33,6 +33,7 @@ add_files(
     station_land.h
     strgen_tables.h
     string_colours.h
+    three_d_houses.h
     town_land.h
     townname.h
     track_data.h

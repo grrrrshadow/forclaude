@@ -39,8 +39,38 @@
 #define THREE_D_H
 
 #include "core/geometry_type.hpp"
+#include "house_type.h"
 
 struct Viewport;
+
+/** The roof of a box of a house drawn as boxes (ThreeDPart). */
+enum class ThreeDRoof : uint8_t {
+	Flat,   ///< a flat top at the box's height
+	GableX, ///< a gable roof with the ridge along X, rising above the walls by the rise
+	GableY, ///< a gable roof with the ridge along Y
+	Hip,    ///< a hip roof, the same slope on all four sides
+};
+
+/** A box of a house: its footprint in tile units from the north corner of the house's north tile, its wall height in pixels, its roof. */
+struct ThreeDPart {
+	float x0, x1; ///< along X, 16 to a tile
+	float y0, y1; ///< along Y
+	float h;      ///< height of the walls, pixels
+	ThreeDRoof roof;
+	float rise;   ///< how far the ridge rises above the walls, pixels
+};
+
+/** A house of the original graphics as boxes, read off its one sprite by hand (table/three_d_houses.h). */
+struct ThreeDHouse {
+	HouseID id;         ///< the house's id (its north tile)
+	uint8_t tiles_x;    ///< tiles along X
+	uint8_t tiles_y;    ///< tiles along Y
+	uint16_t first;     ///< first part in _three_d_house_parts
+	uint16_t count;     ///< number of parts
+};
+
+const ThreeDHouse *GetThreeDHouse(HouseID house);
+const ThreeDPart *GetThreeDHouseParts(const ThreeDHouse *house);
 
 /** A step of the keys: 15 degrees, a quarter of the way to the next of the eight directions. */
 static constexpr int THREE_D_KEY_STEP_DEG = 15;

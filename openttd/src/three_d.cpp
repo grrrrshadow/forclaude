@@ -23,7 +23,28 @@
 
 #include <cmath>
 
+#include "table/three_d_houses.h"
+
 #include "safeguards.h"
+
+/**
+ * The boxes of a house of the original graphics, if it has a hand table.
+ * @param house the id of the house's north tile
+ * @return its table, or nullptr for a house without one (drawn as a billboard)
+ */
+const ThreeDHouse *GetThreeDHouse(HouseID house)
+{
+	for (const ThreeDHouse &h : _three_d_houses) {
+		if (h.id == house) return &h;
+	}
+	return nullptr;
+}
+
+/** The parts of a house from GetThreeDHouse(): house->count boxes. */
+const ThreeDPart *GetThreeDHouseParts(const ThreeDHouse *house)
+{
+	return _three_d_house_parts + house->first;
+}
 
 /** The angle the map view is turned to, in degrees, 0 to 360: 0 is north up, the game as it was. */
 static float _view_yaw = 0.0f;
