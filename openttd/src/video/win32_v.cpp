@@ -42,6 +42,7 @@
 
 #include "../mouse_debug.h"
 #include "../map_drag.h"
+#include "../three_d.h"
 
 #include "../safeguards.h"
 
@@ -534,7 +535,7 @@ static void SetDarkModeForWindow(HWND hWnd, bool dark_mode)
  */
 static bool AnyMouseButtonHeld()
 {
-	return (GetKeyState(VK_LBUTTON) & 0x8000) != 0 || (GetKeyState(VK_RBUTTON) & 0x8000) != 0;
+	return (GetKeyState(VK_LBUTTON) & 0x8000) != 0 || (GetKeyState(VK_RBUTTON) & 0x8000) != 0 || (GetKeyState(VK_MBUTTON) & 0x8000) != 0;
 }
 
 LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -613,6 +614,21 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * whose grab we would throw away while it is still held, losing the
 			 * very message that would have put it right. */
 			if (!AnyMouseButtonHeld()) ReleaseCapture();
+			HandleMouseEvents();
+			return 0;
+
+		case WM_MBUTTONDOWN:
+			/* Held and dragged sideways it turns the map view (three_d.h). */
+			SetCapture(hwnd);
+			_middle_button_down = true;
+			MouseDebugLog("zprava WM_MBUTTONDOWN");
+			HandleMouseEvents();
+			return 0;
+
+		case WM_MBUTTONUP:
+			_middle_button_down = false;
+			MouseDebugLog("zprava WM_MBUTTONUP");
+			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
 			return 0;
 

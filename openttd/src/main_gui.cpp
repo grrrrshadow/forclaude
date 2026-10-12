@@ -45,6 +45,8 @@
 #include "network/network_gui.h"
 #include "network/network_base.h"
 
+#include "three_d.h"
+
 #include "table/sprites.h"
 #include "table/strings.h"
 
@@ -208,6 +210,10 @@ enum GlobalHotKeys : int32_t {
 	GHK_CHAT_SERVER,
 	GHK_CLOSE_NEWS,
 	GHK_CLOSE_ERROR,
+	GHK_ROTATE_LEFT,       ///< Turn the map view to the left (three_d.h): Y, or Ctrl and comma.
+	GHK_ROTATE_RIGHT,      ///< Turn it to the right: N, or Ctrl and period.
+	GHK_ROTATE_LEFT_45,    ///< To the previous of the eight directions: Ctrl and Y.
+	GHK_ROTATE_RIGHT_45,   ///< To the next of them: Ctrl and N.
 };
 
 struct MainWindow : Window
@@ -343,6 +349,12 @@ struct MainWindow : Window
 			case GHK_DELETE_NONVITAL_WINDOWS: CloseAllNonVitalWindows(); break;
 			case GHK_DELETE_ALL_MESSAGES: DeleteAllMessages(); break;
 			case GHK_REFRESH_SCREEN: MarkWholeScreenDirty(); break;
+
+			/* The map view turned (three_d.h); nothing happens with the 3D off. */
+			case GHK_ROTATE_LEFT: RotateView(-THREE_D_KEY_STEP_DEG); break;
+			case GHK_ROTATE_RIGHT: RotateView(THREE_D_KEY_STEP_DEG); break;
+			case GHK_ROTATE_LEFT_45: RotateView(-THREE_D_KEY_STEP_CTRL_DEG); break;
+			case GHK_ROTATE_RIGHT_45: RotateView(THREE_D_KEY_STEP_CTRL_DEG); break;
 
 			case GHK_CRASH: // Crash the game
 				*(volatile uint8_t *)nullptr = 0;
@@ -528,6 +540,13 @@ struct MainWindow : Window
 		Hotkey({WKC_CTRL | WKC_SHIFT | WKC_RETURN, WKC_CTRL | WKC_SHIFT | 'T'}, "chat_server", GHK_CHAT_SERVER),
 		Hotkey(WKC_SPACE, "close_news", GHK_CLOSE_NEWS),
 		Hotkey(WKC_SPACE, "close_error", GHK_CLOSE_ERROR),
+		/* The map view turned (three_d.h). Y and N are the only two letters no
+		 * window binds; the player: letters it must be, the comma and the
+		 * period may go behind Ctrl. */
+		Hotkey({'Y', WKC_CTRL | WKC_COMMA}, "rotate_view_left", GHK_ROTATE_LEFT),
+		Hotkey({'N', WKC_CTRL | WKC_PERIOD}, "rotate_view_right", GHK_ROTATE_RIGHT),
+		Hotkey('Y' | WKC_CTRL, "rotate_view_left_45", GHK_ROTATE_LEFT_45),
+		Hotkey('N' | WKC_CTRL, "rotate_view_right_45", GHK_ROTATE_RIGHT_45),
 	}};
 };
 

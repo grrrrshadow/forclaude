@@ -539,6 +539,8 @@ add_files(
     tgp.cpp
     tgp.h
     thread.h
+    three_d.cpp
+    three_d.h
     tile_cmd.h
     tile_map.cpp
     tile_map.h

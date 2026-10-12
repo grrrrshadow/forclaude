@@ -53,6 +53,7 @@
 #include "station_base.h"
 #include "aircraft.h"
 #include "aircraft_cmd.h"
+#include "three_d.h"
 
 #include "table/strings.h"
 #include "table/settings.h"
@@ -440,6 +441,13 @@ static void SpriteZoomMinChanged(int32_t)
 {
 	GfxClearSpriteCache();
 	/* Force all sprites to redraw at the new chosen zoom level */
+	MarkWholeScreenDirty();
+}
+
+/** The 3D switched on or off (three_d.h): off, the map view faces north again. */
+static void ThreeDChanged(int32_t)
+{
+	ResetViewYaw();
 	MarkWholeScreenDirty();
 }
 

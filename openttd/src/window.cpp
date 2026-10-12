@@ -44,6 +44,7 @@
 
 #include "mouse_debug.h"
 #include "map_drag.h"
+#include "three_d.h"
 
 #include "safeguards.h"
 
@@ -1901,6 +1902,8 @@ void InitWindowSystem()
 	_last_scroll_window = nullptr;
 	_scrolling_viewport = false;
 	MapDragReset();
+	/* Every game starts facing north (three_d.h). */
+	ResetViewYaw();
 	_mouse_hovering = false;
 
 	SetupWidgetDimensions();
@@ -3082,6 +3085,16 @@ void HandleMouseEvents()
 		mousewheel = _cursor.wheel;
 		_cursor.wheel = 0;
 	}
+
+	/* The middle button held and dragged sideways turns the map view
+	 * (three_d.h): so many pixels a degree, from where the button went down. */
+	static bool middle_was = false;
+	static int middle_x = 0;
+	if (_middle_button_down) {
+		if (middle_was) RotateViewByDrag(_cursor.pos.x - middle_x);
+		middle_x = _cursor.pos.x;
+	}
+	middle_was = _middle_button_down;
 
 	static std::chrono::steady_clock::time_point hover_time = {};
 	static Point hover_pos = {0, 0};

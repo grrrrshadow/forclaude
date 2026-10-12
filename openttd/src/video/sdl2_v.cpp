@@ -28,6 +28,7 @@
 
 #include "../mouse_debug.h"
 #include "../map_drag.h"
+#include "../three_d.h"
 
 #include "../safeguards.h"
 
@@ -482,6 +483,12 @@ bool VideoDriver_SDL_Base::PollEvent()
 					MouseDebugLog("udalost SDL_MOUSEBUTTONDOWN leve");
 					break;
 
+				case SDL_BUTTON_MIDDLE:
+					/* Held and dragged sideways it turns the map view (three_d.h). */
+					_middle_button_down = true;
+					MouseDebugLog("udalost SDL_MOUSEBUTTONDOWN prostredni");
+					break;
+
 				case SDL_BUTTON_RIGHT:
 					_right_button_down = true;
 					_right_button_clicked = true;
@@ -510,6 +517,9 @@ bool VideoDriver_SDL_Base::PollEvent()
 				_right_button_down = false;
 				MapDragSystemButton(false, "SDL_MOUSEBUTTONUP");
 				MouseDebugLog("udalost SDL_MOUSEBUTTONUP prave");
+			} else if (ev.button.button == SDL_BUTTON_MIDDLE) {
+				_middle_button_down = false;
+				MouseDebugLog("udalost SDL_MOUSEBUTTONUP prostredni");
 			}
 			HandleMouseEvents();
 			break;
