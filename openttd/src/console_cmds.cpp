@@ -8770,12 +8770,31 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		for (const Vehicle *u : Vehicle::Iterate()) {
 			if (!u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			if (!u->vehstatus.Test(VehState::Stopped)) {
+				IConsolePrint(CC_DEFAULT, "test3d: jed {} {}: uz jede (nestoji)", *type, *unit);
+				return true;
+			}
 			AutoRestoreBackup cur_company(_current_company, u->owner);
 			CommandCost r = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, u->index, false);
 			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: jed {} {}: {}", *type, *unit, r.Succeeded() ? "vyjizdi" : "NEJDE");
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: jed {} {}: takove vozidlo neni.", *type, *unit);
+	} else if (what == "smer") {
+		/* The rig: steer a vehicle from its cab, 'test3d smer <type> <unit> <direction 0..7 | 255 for as ordered>'. */
+		auto type = number(2), unit = number(3), dir = number(4);
+		if (!type.has_value() || !unit.has_value() || !dir.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d smer needs a vehicle type, a unit number and a direction (0..7, 255 as ordered).");
+			return true;
+		}
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			AutoRestoreBackup cur_company(_current_company, u->owner);
+			CommandCost r = Command<Commands::SetCabHeading>::Do(DoCommandFlag::Execute, u->index, static_cast<uint8_t>(*dir));
+			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: smer {} {} -> {}: {} (vozidlo na {},{} smer {})", *type, *unit, *dir, r.Succeeded() ? "nastaven" : "NEJDE", u->x_pos, u->y_pos, to_underlying(u->direction));
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: smer {} {}: takove vozidlo neni.", *type, *unit);
 	} else if (what == "kabina") {
 		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
 		extern std::string DescribeCabViews();

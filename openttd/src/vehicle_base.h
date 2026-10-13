@@ -299,6 +299,12 @@ public:
 	 * units the vehicle shows (GetDisplaySpeed()); 0 none. Not saved: a loaded game drives as the orders say.
 	 */
 	uint16_t cab_speed_limit = 0;
+	/**
+	 * The direction the player steers the vehicle in from its cab (cab_view.h: the left and right there), or
+	 * Direction::Invalid when it goes as its orders say. A ship minds it: it leaves its shed for it and takes the
+	 * track nearest to it on every tile. Not saved.
+	 */
+	Direction cab_heading = Direction::Invalid;
 
 	/** The cab's speed limit in the vehicle's own units of speed, or no limit at all. */
 	inline int CabSpeedLimitInternal() const

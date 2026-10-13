@@ -387,7 +387,10 @@ static bool CheckShipStayInDepot(Ship *v)
 	if (!v->IsChainInDepot()) return false;
 
 	/* Check if we should wait here for unbunching. */
-	if (v->IsWaitingForUnbunching()) return true;
+	if (v->IsWaitingForUnbunching()) {
+		Debug(misc, 5, "ship {} stays in the shed: unbunching", v->unitnumber);
+		return true;
+	}
 
 	/* We are leaving a depot, but have to go to the exact same one; re-enter.
 	 *
@@ -395,24 +398,37 @@ static bool CheckShipStayInDepot(Ship *v)
 	 * it is standing in would otherwise step out and back in for ever, and
 	 * the player's rule is that a ship in a shed can be sent -- so while the
 	 * errand is on, the shed lets go. */
-	if (v->raid_target == INVALID_TILE && v->current_order.IsType(OT_GOTO_DEPOT) &&
+	if (v->raid_target == INVALID_TILE && v->cab_heading == Direction::Invalid && v->current_order.IsType(OT_GOTO_DEPOT) &&
 			IsShipDepotTile(v->tile) && GetDepotIndex(v->tile) == v->current_order.GetDestination()) {
+		Debug(misc, 5, "ship {} stays in the shed: its order is this shed", v->unitnumber);
 		VehicleEnterDepot(v);
 		return true;
 	}
 
-	/* Don't leave depot if no destination set */
-	if (v->dest_tile == INVALID_TILE) return true;
+	/* Don't leave depot if no destination set -- unless the player steers it from its cab (cab_view.h). */
+	if (v->dest_tile == INVALID_TILE && v->cab_heading == Direction::Invalid) {
+		Debug(misc, 5, "ship {} stays in the shed: no destination", v->unitnumber);
+		return true;
+	}
 
 	/* Don't leave depot if another vehicle is already entering/leaving */
 	/* This helps avoid CPU load if many ships are set to start at the same time */
 	if (HasVehicleOnTile(v->tile, [](const Vehicle *u) {
 			return u->type == VehicleType::Ship && u->cur_speed != 0;
-		})) return true;
+		})) {
+		Debug(misc, 5, "ship {} stays in the shed: another ship moving on the tile", v->unitnumber);
+		return true;
+	}
+	Debug(misc, 5, "ship {} leaves the shed: dest {} heading {}", v->unitnumber, v->dest_tile.base(), to_underlying(v->cab_heading));
 
 	assert(v->GetVehicleTrackdir() == Trackdir::X_NE || v->GetVehicleTrackdir() == Trackdir::Y_NW);
 	v->direction = DiagDirToDir(TrackdirToExitdir(v->GetVehicleTrackdir()));
-	if (CheckReverseShip(v)) v->direction = ReverseDir(v->direction);
+	if (v->cab_heading != Direction::Invalid) {
+		/* Steered from its cab: out of the shed the way nearer the heading. */
+		if (DirDifference(v->direction, v->cab_heading) > DirDiff::Right90 && DirDifference(v->direction, v->cab_heading) < DirDiff::Left90) v->direction = ReverseDir(v->direction);
+	} else if (CheckReverseShip(v)) {
+		v->direction = ReverseDir(v->direction);
+	}
 
 	v->state = AxisToTrack(GetShipDepotAxis(v->tile));
 	v->rotation = v->direction;
@@ -487,10 +503,39 @@ static void ShipArrivesAt(const Vehicle *v, Station *st)
  * @param tracks Available track choices on \a tile
  * @return Track to choose, or Track::Invalid when to reverse.
  */
-static Track ChooseShipTrack(Ship *v, TileIndex tile, TrackBits tracks)
+/** The direction a ship goes in on a trackdir (the straight tracks along a tile's axis, the curves across it). */
+static Direction ShipTrackdirDirection(Trackdir trackdir)
+{
+	static const Direction dirs[16] = {
+		Direction::NE, Direction::SE, Direction::E, Direction::E, Direction::S, Direction::S, Direction::Invalid, Direction::Invalid,
+		Direction::SW, Direction::NW, Direction::W, Direction::W, Direction::N, Direction::N, Direction::Invalid, Direction::Invalid,
+	};
+	return dirs[to_underlying(trackdir) & 15];
+}
+
+static Track ChooseShipTrack(Ship *v, TileIndex tile, TrackBits tracks, DiagDirection enterdir)
 {
 	bool path_found = true;
 	Track track;
+
+	if (v->cab_heading != Direction::Invalid) {
+		/* Steered from its cab (cab_view.h): of the tracks it can take, the one whose direction is nearest the heading. */
+		Track best = Track::Invalid;
+		int best_off = INT32_MAX;
+		for (Track t : tracks) {
+			Direction d = ShipTrackdirDirection(TrackEnterdirToTrackdir(t, enterdir));
+			if (d == Direction::Invalid) continue;
+			int off = to_underlying(DirDifference(d, v->cab_heading));
+			if (off > 4) off = 8 - off;
+			if (off < best_off) {
+				best_off = off;
+				best = t;
+			}
+		}
+		v->path.clear();
+		v->HandlePathfindingResult(true);
+		return best;
+	}
 
 	if (v->dest_tile == INVALID_TILE) {
 		/* No destination, don't invoke pathfinder. */
@@ -953,7 +998,7 @@ static void ShipController(Ship *v)
 				}
 
 				/* Choose a direction, and continue if we find one */
-				const Track track = ChooseShipTrack(v, gp.new_tile, tracks);
+				const Track track = ChooseShipTrack(v, gp.new_tile, tracks, diagdir);
 				if (!IsValidTrack(track)) return ReverseShip(v);
 
 				/* Update XY to reflect the entrance to the new tile, and select the direction to use */

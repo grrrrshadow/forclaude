@@ -2326,6 +2326,14 @@ STR_CAB_VIEW_BRAKE_TOOLTIP                                      :{BLACK}Přibrzd
 STR_CAB_VIEW_THROTTLE                                           :{BLACK}Plyn +
 STR_CAB_VIEW_THROTTLE_TOOLTIP                                   :{BLACK}Přidat: o krok vyšší rychlost; nad maximem vozidla jede zase podle rozkazů
 STR_CAB_VIEW_LIMIT                                              :{YELLOW}drženo na {VELOCITY}
+STR_CAB_VIEW_STEERED                                            :{YELLOW}řízeno ručně
+STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}Pohled přes celou obrazovku, a zpět
+STR_CAB_VIEW_LEFT                                               :{BLACK}< Doleva
+STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Stočit loď doleva o osminu otáčky; vyjede kvůli tomu z doku i bez rozkazů
+STR_CAB_VIEW_RIGHT                                              :{BLACK}Doprava >
+STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Stočit loď doprava o osminu otáčky
+STR_CAB_VIEW_AUTO                                               :{BLACK}Podle rozkazů
+STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat loď zase jet podle rozkazů
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
 STR_CAB_VIEW_NEXT_STOP                                          :Příští zastávka: {STATION}

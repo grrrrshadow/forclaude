@@ -324,6 +324,19 @@ of vehicle minds it where it works out its speed (`Train::GetCurrentMaxSpeed()`,
 `RoadVehicle::GetCurrentMaxSpeed()`, `Ship::GetCurrentMaxSpeed()` and
 `ShipAccelerate()`, `UpdateAircraftSpeed()`); it is not saved.
 
+**A ship can be steered** (the player: "I want to drive the ship left and
+right", and it would not leave its dock without orders): **< Left** and
+**Right >** turn the heading an eighth of a turn from the heading so far (or
+from the way it goes now), **As ordered** lets it go as its orders say again.
+The heading is `Vehicle::cab_heading` (the command `SetCabHeading`, not
+saved); a ship with one leaves its shed for it without orders, or with an
+order that names that very shed, and on every tile it takes the track whose
+direction is nearest the heading (`ChooseShipTrack()`); a dead end turns it
+round as always. The panel says "steered by hand". Trains, road vehicles and
+aircraft follow their rails, roads and routes: for them the three buttons are
+greyed out. The button beside the pin puts the window over the whole screen
+and back (the player drives from the phone).
+
 The picture is made by the same means as the turned map view, with a
 perspective rasterizer and a depth buffer in place of the turned projection:
 
@@ -394,7 +407,10 @@ and the walls drawn are listed, with `misc=6` the picture and the sprites'
 textures are written as `cab_picture.ppm` and `cab_tex_<sprite>.ppm`),
 `test3d jed <type> <unit>` starts a vehicle that stands in its shed (type 0
 train, 1 road, 2 ship, 3 aircraft; with `testletadlo <x> <y>` after a
-company exists, an aircraft in the air), `test3d snimek <name>` writes
+company exists, an aircraft in the air; with `testlod`, a ship in a shed),
+`test3d smer <type> <unit> <direction 0..7 | 255>` steers a vehicle from its
+cab as the window's buttons do (with `-d misc=5` the ship says why it stays
+in its shed or that it leaves), `test3d snimek <name>` writes
 the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole
 screen and says where the time went, `test3d ladeni <x> <y>` writes out how

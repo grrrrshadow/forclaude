@@ -1305,3 +1305,27 @@ CommandCost CmdSetCabSpeedLimit(DoCommandFlags flags, VehicleID veh_id, uint16_t
 	}
 	return CommandCost();
 }
+
+/**
+ * Steer a vehicle from its cab (cab_view.h): the direction it is to go in. A ship minds it: it leaves its shed
+ * for it and takes the track nearest to it on every tile, until the heading is taken off again.
+ * @param flags type of operation
+ * @param veh_id the vehicle
+ * @param heading the Direction, or 0xFF for none: the vehicle goes as its orders say
+ */
+CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t heading)
+{
+	Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsPrimaryVehicle()) return CMD_ERROR;
+	if (heading != 0xFF && heading >= 8) return CMD_ERROR;
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		v->cab_heading = heading == 0xFF ? Direction::Invalid : static_cast<Direction>(heading);
+		if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
+		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}

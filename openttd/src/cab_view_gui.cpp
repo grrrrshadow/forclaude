@@ -28,6 +28,8 @@
 #include "command_func.h"
 #include "vehicle_cmd.h"
 #include "order_base.h"
+#include "direction_func.h"
+#include "gfx_func.h"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "blitter/factory.hpp"
@@ -45,6 +47,7 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 		NWidget(WWT_CAPTION, Colours::Grey, WID_CV_CAPTION), SetStringTip(STR_CAB_VIEW_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
 		NWidget(WWT_SHADEBOX, Colours::Grey),
 		NWidget(WWT_DEFSIZEBOX, Colours::Grey),
+		NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_CV_FULL), SetSpriteTip(SPR_LARGE_SMALL_WINDOW, STR_CAB_VIEW_FULL_TOOLTIP), SetAspect(1),
 		NWidget(WWT_STICKYBOX, Colours::Grey),
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey),
@@ -57,6 +60,11 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_BRAKE), SetStringTip(STR_CAB_VIEW_BRAKE, STR_CAB_VIEW_BRAKE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_THROTTLE), SetStringTip(STR_CAB_VIEW_THROTTLE, STR_CAB_VIEW_THROTTLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+	EndContainer(),
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_LEFT), SetStringTip(STR_CAB_VIEW_LEFT, STR_CAB_VIEW_LEFT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_AUTO), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_RIGHT), SetStringTip(STR_CAB_VIEW_RIGHT, STR_CAB_VIEW_RIGHT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
 };
@@ -64,6 +72,8 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 /** The window of the view from a vehicle's cab; the window number is the vehicle. */
 struct CabViewWindow : Window {
 	mutable CabViewCamera camera{};   ///< the eye between frames
+	bool full = false;                 ///< over the whole screen
+	Rect before_full{};                ///< where it was before that
 	mutable CabViewPicture picture{}; ///< the last picture
 
 	/* Drawn anew while the vehicle moves: about twenty-five times a second. */
@@ -96,10 +106,16 @@ struct CabViewWindow : Window {
 
 	void OnPaint() override
 	{
-		if (Vehicle::GetIfValid(this->window_number) == nullptr) {
+		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
+		if (v == nullptr) {
 			this->Close();
 			return;
 		}
+		/* Only a ship can be steered: the rest follow their roads, rails and routes. */
+		bool steerable = v->type == VehicleType::Ship;
+		this->SetWidgetDisabledState(WID_CV_LEFT, !steerable);
+		this->SetWidgetDisabledState(WID_CV_RIGHT, !steerable);
+		this->SetWidgetDisabledState(WID_CV_AUTO, !steerable || v->cab_heading == Direction::Invalid);
 		this->DrawWidgets();
 	}
 
@@ -214,11 +230,14 @@ struct CabViewWindow : Window {
 		int state_y = ty + GetCharacterHeight(FontSize::Normal) + 2;
 		std::string state_text = GetString(state);
 		DrawString(sx, sright, state_y, state_text, TextColour::FromString);
+		int note_x = sx + GetStringBoundingBox(state_text).width + 8;
 		if (v->cab_speed_limit != 0) {
 			/* Held to a speed from here: said beside the state. */
-			int sw = GetStringBoundingBox(state_text).width;
-			DrawString(sx + sw + 8, sright, state_y, GetString(STR_CAB_VIEW_LIMIT, PackVelocity(v->cab_speed_limit, v->type)), TextColour::FromString);
+			std::string limit = GetString(STR_CAB_VIEW_LIMIT, PackVelocity(v->cab_speed_limit, v->type));
+			DrawString(note_x, sright, state_y, limit, TextColour::FromString);
+			note_x += GetStringBoundingBox(limit).width + 8;
 		}
+		if (v->cab_heading != Direction::Invalid) DrawString(note_x, sright, state_y, GetString(STR_CAB_VIEW_STEERED), TextColour::FromString);
 
 		/* The load, as a figure and a bar. */
 		int percent = LoadPercent(v);
@@ -241,6 +260,36 @@ struct CabViewWindow : Window {
 				break;
 			case WID_CV_STOP:
 				Command<Commands::StartStopVehicle>::Post(STR_ERROR_CAN_T_STOP_START_TRAIN + to_underlying(v->type), v->tile, v->index, false);
+				break;
+			case WID_CV_FULL: {
+				/* Over the whole screen, and back where it was (the player: a button beside the pin, as big as the screen). */
+				if (!this->full) {
+					this->before_full = {this->left, this->top, this->left + this->width, this->top + this->height};
+					this->full = true;
+					this->left = 0;
+					this->top = 0;
+					ResizeWindow(this, _screen.width - this->width, _screen.height - this->height, false);
+				} else {
+					this->full = false;
+					this->left = this->before_full.left;
+					this->top = this->before_full.top;
+					ResizeWindow(this, this->before_full.Width() - this->width, this->before_full.Height() - this->height, false);
+				}
+				MarkWholeScreenDirty();
+				break;
+			}
+			case WID_CV_LEFT:
+			case WID_CV_RIGHT: {
+				/* Steer: an eighth of a turn from the heading so far, or from the way it goes now. */
+				if (v->type != VehicleType::Ship) break;
+				Direction from = v->cab_heading != Direction::Invalid ? v->cab_heading : v->direction;
+				if (from == Direction::Invalid) break;
+				Direction to = ChangeDir(from, widget == WID_CV_LEFT ? DirDiff::Left45 : DirDiff::Right45);
+				Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(to_underlying(to)));
+				break;
+			}
+			case WID_CV_AUTO:
+				Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
 				break;
 			case WID_CV_BRAKE:
 			case WID_CV_THROTTLE: {
