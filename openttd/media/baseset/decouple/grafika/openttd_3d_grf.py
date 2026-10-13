@@ -136,6 +136,9 @@ def main():
     for a in sys.argv:
         if a.startswith("--jen="): only += a.split("=", 1)[1].split(",")
     first_set = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--sada-od=")), 1)   # the number of the first set written
+    # --verze=N: the sets are written as budovy3d_<set>_V<N>.grf and older versions of the same set go (the player
+    # takes only the sets that changed, by the version in the name)
+    version = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--verze=")), 1)
     models = [read_model(grrrrf, *m) for m in MODELS]
 
     # the sets: models packed in order, each set under the limit (a model's size is its opaque pixels times 12 bytes)
@@ -210,7 +213,9 @@ def main():
             yagl.append("    }")
         yagl.append("}")
         (folder / f"{s['name']}.yagl").write_text("\n".join(yagl) + "\n")
-        grf = HERE / f"{s['name']}.grf"
+        for old in HERE.glob(f"{s['name']}_V*.grf"):
+            old.unlink()
+        grf = HERE / f"{s['name']}_V{version}.grf"
         print(f"{s['name']}: {len(s['models'])} models, about {s['size'] / 1e6:.0f} MB raw; yagl ...", flush=True)
         subprocess.run([YAGL, "-e", str(grf), str(folder)], check=True, stdout=subprocess.DEVNULL)
         print(f"  -> {grf} {grf.stat().st_size / 1e6:.1f} MB")

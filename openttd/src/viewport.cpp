@@ -2664,28 +2664,6 @@ static void ViewportDoDrawTurned()
 	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile, and the tiles of the plantation from their layers. */
 	std::vector<TurnedModel> &models = _turned_models;
 	models.clear();
-	/* The plantation's layers, looked up once. */
-	struct PlantationModels {
-		const ThreeDModel *soil, *small, *grown, *road, *shed, *hay, *girls_nw, *girls_se;
-		const ThreeDModel *worker[2][6];
-	};
-	static std::optional<PlantationModels> plantation;
-	if (!plantation.has_value()) {
-		PlantationModels pm;
-		pm.soil = GetThreeDModelByName("pole_mari_zaklad");
-		pm.small = GetThreeDModelByName("pole_mari_male");
-		pm.grown = GetThreeDModelByName("pole_mari_vzrostle");
-		pm.road = GetThreeDModelByName("pole_cesta");
-		pm.shed = GetThreeDModelByName("pole_bouda");
-		pm.hay = GetThreeDModelByName("pole_seno");
-		pm.girls_nw = GetThreeDModelByName("pole_holky_sz");
-		pm.girls_se = GetThreeDModelByName("pole_holky_jv");
-		for (int w = 0; w < 6; w++) {
-			pm.worker[0][w] = GetThreeDModelByName(fmt::format("pole_prace_{}_f2", ThreeDPlantationWorkerName(w)));
-			pm.worker[1][w] = GetThreeDModelByName(fmt::format("pole_prace_{}_f3", ThreeDPlantationWorkerName(w)));
-		}
-		plantation = pm;
-	}
 
 	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. */
 	_vd.dpi = cdpi;
@@ -2776,23 +2754,19 @@ static void ViewportDoDrawTurned()
 			 * the field road the road tile behind with the road, the shed and the haystack and the girls by the
 			 * road, each its own thing to sort (the road flat and first, under the cars). */
 			ThreeDPlantationTile pt;
-			if (tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries) && plantation->soil != nullptr && GetThreeDPlantationTile(_cur_ti.tile, pt)) {
+			ThreeDPlantationLayers pl;
+			if (tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries) && GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDPlantationLayers(pt, pl)) {
 				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
-				TurnedModel field{{plantation->soil}, _cur_ti.tile, _cur_ti.z, 0};
-				if (pt.stage == 1 && plantation->small != nullptr) field.layers.push_back(plantation->small);
-				if (pt.stage == 2 && plantation->grown != nullptr) field.layers.push_back(plantation->grown);
-				if (pt.worker >= 0 && pt.stage != 0 && plantation->worker[pt.stage - 1][pt.worker] != nullptr) field.layers.push_back(plantation->worker[pt.stage - 1][pt.worker]);
-				models.push_back(field);
+				models.push_back({pl.field, _cur_ti.tile, _cur_ti.z, 0});
 				if (pt.road_behind) {
 					TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
 					int road_z = GetTilePixelZ(road_tile);
-					if (plantation->road != nullptr) models.push_back({{plantation->road}, road_tile, road_z, -4 * static_cast<int>(TILE_HEIGHT)});
-					if (pt.shed && plantation->shed != nullptr) models.push_back({{plantation->shed}, road_tile, road_z, 0});
-					if (pt.shed && plantation->hay != nullptr) models.push_back({{plantation->hay}, road_tile, road_z, 0});
-					if (pt.girls_nw && plantation->girls_nw != nullptr) models.push_back({{plantation->girls_nw}, road_tile, road_z, 0});
-					if (pt.girls_se && plantation->girls_se != nullptr) models.push_back({{plantation->girls_se}, road_tile, road_z, 0});
+					for (size_t r = 0; r < pl.road.size(); r++) {
+						/* The road itself, first, flat and sorted before whatever stands on it; the rest each its own. */
+						models.push_back({pl.road[r], road_tile, road_z, r == 0 ? -4 * static_cast<int>(TILE_HEIGHT) : 0});
+					}
 				}
-				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: plantation tile x {} stage {} worker {} road behind {}: {} layers", pt.x, pt.stage, pt.worker, pt.road_behind, field.layers.size());
+				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: plantation tile x {} stage {} worker {} road behind {}: {} layers, {} things on the road", pt.x, pt.stage, pt.worker, pt.road_behind, pl.field.size(), pl.road.size());
 			}
 		}
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */

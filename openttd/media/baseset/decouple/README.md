@@ -28,12 +28,16 @@ stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
   (zin16) jdou sem, každý GRF se zdroji v podsložce svého jména a postavený
   yaglem (`yagl -e <abs>/jmeno.grf <abs>/jmeno`), pod 100 MB kvůli GitHubu:
   `zastavka.grf` – holky na zastávce v 16× přes sprity `openttd.grf`
-  (Action A, `zastavka/README.md`); `budovy3d_*.grf` – rendery budov z osmi
-  směrů s hloubkou a normálami pro otočený pohled (`docs/decouple_three_d.md`),
-  staví je `openttd_3d_grf.py` z kolegových renderů (grrrrf), tabulku pro hru
-  píše do `src/table/three_d_models.h`; zdrojové PNG se tu nedrží, jen `.yagl`.
-  Sprity jdou do bloku hry `SPR_DECOUPLE_3D_BASE` přes Action A s čísly od
-  0x8000 (jen sady grafiky hry smějí).
+  (Action A, `zastavka/README.md`); `budovy3d_<sada>_V<verze>.grf` – rendery
+  budov z osmi směrů s hloubkou a normálami pro otočený pohled
+  (`docs/decouple_three_d.md`), staví je `openttd_3d_grf.py` z kolegových
+  renderů (grrrrf), tabulku pro hru píše do `src/table/three_d_models.h`;
+  zdrojové PNG se tu nedrží, jen `.yagl`. Sprity jdou do bloku hry
+  `SPR_DECOUPLE_3D_BASE` přes Action A s čísly od 0x8000 (jen sady grafiky hry
+  smějí). **Verze v názvu** (hráč): změněná sada dostane `_V2`, `_V3`… a stará
+  z repa zmizí (`--verze=N` generátoru), takže hráč stáhne jen to, co se
+  změnilo. Build Windows tyhle sady nebalí (`.github/workflows/build-windows.yml`),
+  hráč je má v `baseset/decouple/grafika/` nainstalované hry.
 - Nový obrázek od kolegy ve 4× a 8× do `openttd.grf`: PNG do `../openttd/`,
   pak `python3 openttd_budovy.py && python3 openttd_yagl.py` tamtéž
   (viz `COMPILING.md`).

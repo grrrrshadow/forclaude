@@ -2369,3 +2369,18 @@ EngineID GetBuildVehicleSelectedEngine(WindowNumber number)
 	const BuildVehicleWindow *w = dynamic_cast<const BuildVehicleWindow *>(FindWindowById(WindowClass::BuildVehicle, number));
 	return w == nullptr ? EngineID::Invalid() : w->sel_engine;
 }
+
+/**
+ * Choose an engine in a purchase window, for the rig (test3d motor).
+ * @param number the purchase window's number
+ * @param engine the engine
+ * @return whether there was such a window
+ */
+bool SelectBuildVehicleEngine(WindowNumber number, EngineID engine)
+{
+	BuildVehicleWindow *w = dynamic_cast<BuildVehicleWindow *>(FindWindowById(WindowClass::BuildVehicle, number));
+	if (w == nullptr) return false;
+	w->SelectEngine(engine);
+	w->SetDirty();
+	return true;
+}

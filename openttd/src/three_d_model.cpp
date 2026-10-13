@@ -47,6 +47,7 @@
 #include <cmath>
 #include <list>
 #include <map>
+#include <optional>
 
 #include "table/sprites.h"
 #include "table/three_d_models.h"
@@ -644,6 +645,56 @@ const ThreeDModelPicture *GetThreeDLayersPictureAt(std::span<const ThreeDModel *
 		}
 	}
 	return &pic;
+}
+
+/**
+ * The layers a tile of the marijuana plantation is laid from, by their names
+ * in the table: the field's soil, the plants of the stage and the girl at
+ * work on it; and on the road tile behind it the road, the shed and the
+ * haystack and the pairs of girls, each its own thing for the sorting.
+ * @param tile the tile as GetThreeDPlantationTile() gives it
+ * @param[out] out the layers
+ * @return whether the layers are in the table at all
+ */
+bool GetThreeDPlantationLayers(const ThreeDPlantationTile &tile, ThreeDPlantationLayers &out)
+{
+	struct Names {
+		const ThreeDModel *soil, *small, *grown, *road, *shed, *hay, *girls_nw, *girls_se;
+		const ThreeDModel *worker[2][6];
+	};
+	static std::optional<Names> names;
+	if (!names.has_value()) {
+		Names n;
+		n.soil = GetThreeDModelByName("pole_mari_zaklad");
+		n.small = GetThreeDModelByName("pole_mari_male");
+		n.grown = GetThreeDModelByName("pole_mari_vzrostle");
+		n.road = GetThreeDModelByName("pole_cesta");
+		n.shed = GetThreeDModelByName("pole_bouda");
+		n.hay = GetThreeDModelByName("pole_seno");
+		n.girls_nw = GetThreeDModelByName("pole_holky_sz");
+		n.girls_se = GetThreeDModelByName("pole_holky_jv");
+		for (int w = 0; w < 6; w++) {
+			n.worker[0][w] = GetThreeDModelByName(fmt::format("pole_prace_{}_f2", ThreeDPlantationWorkerName(w)));
+			n.worker[1][w] = GetThreeDModelByName(fmt::format("pole_prace_{}_f3", ThreeDPlantationWorkerName(w)));
+		}
+		names = n;
+	}
+	const Names &n = *names;
+	if (n.soil == nullptr) return false;
+	out.field.clear();
+	out.road.clear();
+	out.field.push_back(n.soil);
+	if (tile.stage == 1 && n.small != nullptr) out.field.push_back(n.small);
+	if (tile.stage == 2 && n.grown != nullptr) out.field.push_back(n.grown);
+	if (tile.worker >= 0 && tile.worker < 6 && tile.stage != 0 && n.worker[tile.stage - 1][tile.worker] != nullptr) out.field.push_back(n.worker[tile.stage - 1][tile.worker]);
+	if (tile.road_behind) {
+		if (n.road != nullptr) out.road.push_back({n.road});
+		if (tile.shed && n.shed != nullptr) out.road.push_back({n.shed});
+		if (tile.shed && n.hay != nullptr) out.road.push_back({n.hay});
+		if (tile.girls_nw && n.girls_nw != nullptr) out.road.push_back({n.girls_nw});
+		if (tile.girls_se && n.girls_se != nullptr) out.road.push_back({n.girls_se});
+	}
+	return true;
 }
 
 /** What the rig prints of a model: its sprites, its first render read, how long that took (test3d model). */

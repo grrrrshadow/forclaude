@@ -233,9 +233,12 @@ laid over openttd.grf's sprites with Action A: a set of the game's own
 graphics may replace any sprite loaded so far, openttd.grf's included
 (`SpriteReplace()` in `src/newgrf/newgrf_acta.cpp`, `GRFConfig::builtin_graphics`).
 
-The renders of the buildings that turn are the sets `budovy3d_*.grf` there,
-each under 100 MB, made by `grafika/openttd_3d_grf.py` from the colleague's
-renders (grrrrf): for every model and direction three sprites of 16x only,
+The renders of the buildings that turn are the sets `budovy3d_<set>_V<version>.grf`
+there, each under 100 MB, made by `grafika/openttd_3d_grf.py` from the
+colleague's renders (grrrrf); a set made again gets the next version in its
+name and the old one goes, so the player takes only the sets that changed
+(the Windows build leaves them out; the player keeps them in the installed
+game's `baseset/decouple/grafika/`). For every model and direction three sprites of 16x only,
 the colour, the depth (a 32bpp picture: red the high byte, green the low
 byte, alpha 255 where measured) and the normals, 24 a model. They go into a
 block of the game's own, `SPR_DECOUPLE_3D_BASE` (2048 sprites before

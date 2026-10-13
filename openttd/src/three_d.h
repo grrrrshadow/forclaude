@@ -175,12 +175,21 @@ struct ThreeDPlantationTile {
 bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out);
 const char *ThreeDPlantationWorkerName(int worker);
 
+/** The layers a tile of the plantation is laid from (GetThreeDPlantationLayers()). */
+struct ThreeDPlantationLayers {
+	std::vector<const ThreeDModel *> field;                  ///< on the field tile: the soil, the plants, the girl at work
+	std::vector<std::vector<const ThreeDModel *>> road;      ///< on the road tile behind it, each its own thing: the road first, then the shed, the haystack, the girls by the edges
+};
+bool GetThreeDPlantationLayers(const ThreeDPlantationTile &tile, ThreeDPlantationLayers &out);
+
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);
 void ShowThreeDIndustryPreview(IndustryID industry);
 void DrawThreeDPreviews();
 std::string DescribeThreeDPreviews();
+void ThreeDPreviewsTick();
 EngineID GetBuildVehicleSelectedEngine(WindowNumber number);
+bool SelectBuildVehicleEngine(WindowNumber number, EngineID engine);
 
 /** A step of the keys: 15 degrees, a quarter of the way to the next of the eight directions. */
 static constexpr int THREE_D_KEY_STEP_DEG = 15;

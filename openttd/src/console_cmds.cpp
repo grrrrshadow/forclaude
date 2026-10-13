@@ -8616,7 +8616,25 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index) MarkTileDirtyByTile(t);
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: care {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), ind->plantation_care, HasGirls(ind) ? "yes" : "no");
+	} else if (what == "motor" && argv.size() > 2) {
+		/* Choose the first engine whose name has the text in it, in every purchase window open, for the preview (rig). */
+		std::string wanted(argv[2]);
+		bool chosen = false;
+		for (const Engine *e : Engine::Iterate()) {
+			std::string name = GetString(STR_ENGINE_NAME, e->index);
+			if (name.find(wanted) == std::string::npos) continue;
+			for (Window *w : Window::Iterate()) {
+				if (w->window_class == WindowClass::BuildVehicle && SelectBuildVehicleEngine(w->window_number, e->index)) {
+					IConsolePrint(CC_DEFAULT, "test3d: engine {} '{}' chosen in the purchase window {}", e->index.base(), name, static_cast<int32_t>(w->window_number));
+					chosen = true;
+				}
+			}
+			if (chosen) break;
+		}
+		if (!chosen) IConsolePrint(CC_ERROR, "test3d: no engine with '{}' in its name, or no purchase window", wanted);
+		ThreeDPreviewsTick();
 	} else if (what == "nahledy") {
+		ThreeDPreviewsTick();
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */

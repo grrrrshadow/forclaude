@@ -33,8 +33,10 @@
 #include "vehicle_base.h"
 #include "vehicle_func.h"
 #include "industry.h"
+#include "industry_map.h"
 #include "spritecache.h"
 #include "zoom_func.h"
+#include "landscape.h"
 #include "company_func.h"
 #include "blitter/factory.hpp"
 #include "timer/timer.h"
@@ -51,7 +53,7 @@ static constexpr int PREVIEW_VEHICLE_STEP_MS = 400;
 /** A building turns this many degrees a second. */
 static constexpr float PREVIEW_BUILDING_DEG_PER_S = 30.0f;
 /** The gap between the window and its preview, pixels. */
-static constexpr int PREVIEW_GAP = 8;
+static constexpr int PREVIEW_GAP = 40; // the player: the things turning almost touched the purchase window
 /** A preview wider or taller than this is drawn at the next coarser zoom (the player: a long wagon at 2x, not 4x). */
 static constexpr int PREVIEW_MAX_SIZE = 360;
 
@@ -145,6 +147,24 @@ static Direction PreviewDirection(const ThreeDPreview &p)
 	return static_cast<Direction>((to_underlying(Direction::W) - TurnedDirectionStep() + steps) & 7);
 }
 
+/**
+ * Whether a vehicle has a picture for a direction: a set whose chain wants a
+ * vehicle to choose from (the straight directions of a set that has only
+ * the four along the track) gives an empty sprite, which the preview skips.
+ */
+static bool PreviewVehicleHasPicture(EngineID engine, Direction dir)
+{
+	VehicleSpriteSeq front, rear;
+	bool two;
+	int pitch;
+	if (!PreviewVehicleSprites(engine, dir, front, rear, two, pitch)) return false;
+	for (uint i = 0; i < front.count; i++) {
+		const Sprite *spr = GetSprite(front.seq[i].sprite & SPRITE_MASK, SpriteType::Normal);
+		if (spr->width > 4 * ZOOM_BASE || spr->height > 4 * ZOOM_BASE) return true;
+	}
+	return false;
+}
+
 /** The zoom a picture of this size at 16x fits PREVIEW_MAX_SIZE at: 4x, else 2x, else the normal. */
 static ZoomLevel PreviewZoomFor(int width16, int height16)
 {
@@ -225,38 +245,86 @@ static Rect DrawIndustryPreview(const ThreeDPreview &p, bool draw)
 	IndustryID id = static_cast<IndustryID>(p.parent);
 	if (!Industry::IsValidID(id)) return {};
 	const Industry *ind = Industry::Get(id);
-	const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
-	if (model == nullptr) return {};
 	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return {};
 
 	/* The angle: the map view's, and the preview's own turn on top of it. */
 	float yaw = std::fmod(GetViewYaw() + p.yaw, 360.0f);
-	/* The zoom from the render's size: the renders are 16x. */
-	const ThreeDModelView &v = model->views[0];
-	ZoomLevel zoom = PreviewZoomFor(v.width, v.height);
-	const ThreeDModelPicture *pic = GetThreeDModelPictureAt(model, zoom, yaw, _preview_pictures);
-	if (pic == nullptr || pic->width <= 0) return {};
-	Rect r = PreviewPlace(p, pic->width, pic->height);
+
+	/* The pictures and where each goes, pixels about the industry's north corner: a building is one, the
+	 * plantation one a tile, laid at the tiles' corners as the map lays them, far first. */
+	struct Piece {
+		const ThreeDModelPicture *pic;
+		int dx, dy;
+		double near;
+	};
+	std::vector<Piece> pieces;
+	double a = yaw * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	ZoomLevel zoom;
+	const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
+	if (model != nullptr) {
+		const ThreeDModelView &v = model->views[0];
+		zoom = PreviewZoomFor(v.width, v.height);
+		const ThreeDModelPicture *pic = GetThreeDModelPictureAt(model, zoom, yaw, _preview_pictures);
+		if (pic == nullptr || pic->width <= 0) return {};
+		pieces.push_back({pic, 0, 0, 0.0});
+	} else if (ind->type == IT_MARIJUANA_PLANTATION) {
+		zoom = ZoomLevel::In2x;
+		double scale = 1.0 / (1 << to_underlying(zoom));
+		auto place = [&](TileIndex tile, std::span<const ThreeDModel *const> layers) {
+			const ThreeDModelPicture *pic = GetThreeDLayersPictureAt(layers, zoom, yaw, _preview_pictures);
+			if (pic == nullptr || pic->width <= 0) return;
+			double x = (static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile))) * TILE_SIZE;
+			double y = (static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile))) * TILE_SIZE;
+			double xr = c * x - s * y, yr = s * x + c * y;
+			pieces.push_back({pic, static_cast<int>(std::lround((yr - xr) * 2 * ZOOM_BASE * scale)), static_cast<int>(std::lround((yr + xr) * ZOOM_BASE * scale)), xr + yr});
+		};
+		for (TileIndex tile : ind->location) {
+			ThreeDPlantationTile pt;
+			ThreeDPlantationLayers pl;
+			if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != ind->index || !GetThreeDPlantationTile(tile, pt) || !GetThreeDPlantationLayers(pt, pl)) continue;
+			place(tile, pl.field);
+			if (pt.road_behind) {
+				for (const auto &item : pl.road) place(TileAddXY(tile, 0, 1), item);
+			}
+		}
+		if (pieces.empty()) return {};
+		std::sort(pieces.begin(), pieces.end(), [](const Piece &l, const Piece &r) { return l.near < r.near; });
+	} else {
+		return {};
+	}
+
+	int left = INT32_MAX, top = INT32_MAX, right = INT32_MIN, bottom = INT32_MIN;
+	for (const Piece &pc : pieces) {
+		left = std::min(left, pc.dx + pc.pic->left);
+		top = std::min(top, pc.dy + pc.pic->top);
+		right = std::max(right, pc.dx + pc.pic->left + pc.pic->width);
+		bottom = std::max(bottom, pc.dy + pc.pic->top + pc.pic->height);
+	}
+	Rect r = PreviewPlace(p, right - left, bottom - top);
 	if (r.right <= r.left) return {};
 	if (!draw) return r;
 
 	/* The pixels, with their alpha, into the screen through the clipping of the window being drawn. */
 	const DrawPixelInfo *dpi = _cur_dpi;
-	int x0 = std::max(r.left, dpi->left), x1 = std::min(r.right, dpi->left + dpi->width);
-	int y0 = std::max(r.top, dpi->top), y1 = std::min(r.bottom, dpi->top + dpi->height);
 	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
-	for (int y = y0; y < y1; y++) {
-		const uint32_t *src = &pic->pixels[static_cast<size_t>(y - r.top) * pic->width];
-		uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
-		for (int x = x0; x < x1; x++, dst++) {
-			Colour s(src[x - r.left]);
-			if (s.a == 0) continue;
-			if (s.a == 255) {
-				*dst = Colour(s.r, s.g, s.b).data;
-			} else {
-				Colour d(*dst);
-				uint a = s.a, na = 255 - a;
-				*dst = Colour(static_cast<uint8_t>((s.r * a + d.r * na + 127) / 255), static_cast<uint8_t>((s.g * a + d.g * na + 127) / 255), static_cast<uint8_t>((s.b * a + d.b * na + 127) / 255)).data;
+	for (const Piece &pc : pieces) {
+		const ThreeDModelPicture *pic = pc.pic;
+		int px = r.left + pc.dx + pc.pic->left - left, py = r.top + pc.dy + pc.pic->top - top;
+		int x0 = std::max(px, dpi->left), x1 = std::min(px + pic->width, dpi->left + dpi->width);
+		int y0 = std::max(py, dpi->top), y1 = std::min(py + pic->height, dpi->top + dpi->height);
+		for (int y = y0; y < y1; y++) {
+			const uint32_t *src = &pic->pixels[static_cast<size_t>(y - py) * pic->width];
+			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+			for (int x = x0; x < x1; x++, dst++) {
+				Colour sc(src[x - px]);
+				if (sc.a == 0) continue;
+				if (sc.a == 255) {
+					*dst = Colour(sc.r, sc.g, sc.b).data;
+				} else {
+					Colour d(*dst);
+					uint al = sc.a, na = 255 - al;
+					*dst = Colour(static_cast<uint8_t>((sc.r * al + d.r * na + 127) / 255), static_cast<uint8_t>((sc.g * al + d.g * na + 127) / 255), static_cast<uint8_t>((sc.b * al + d.b * na + 127) / 255)).data;
+				}
 			}
 		}
 	}
@@ -287,9 +355,14 @@ static void PreviewTick()
 				changed = true;
 			}
 			p.elapsed += PREVIEW_TICK_MS;
-			if (p.elapsed >= PREVIEW_VEHICLE_STEP_MS) {
+			if (p.elapsed >= PREVIEW_VEHICLE_STEP_MS || changed) {
 				p.elapsed = 0;
-				p.yaw = std::fmod(p.yaw + 45.0f, 360.0f);
+				/* The next direction that has a picture, so a set with only the four along the track still turns. */
+				for (int tries = 0; tries < 8; tries++) {
+					if (p.elapsed == 0 && tries == 0 && changed && PreviewVehicleHasPicture(p.engine, PreviewDirection(p))) break;
+					p.yaw = std::fmod(p.yaw + 45.0f, 360.0f);
+					if (PreviewVehicleHasPicture(p.engine, PreviewDirection(p))) break;
+				}
 				changed = true;
 			}
 		} else {
@@ -350,8 +423,14 @@ void ShowThreeDIndustryPreview(IndustryID industry)
 {
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
-	if (GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0)) == nullptr) return;
+	if (GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0)) == nullptr && ind->type != IT_MARIJUANA_PLANTATION) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
+}
+
+/** Rig: let the previews look at their windows now (the null driver's timers run only between ticks). */
+void ThreeDPreviewsTick()
+{
+	PreviewTick();
 }
 
 /** Rig: the previews there are, where they are drawn. */
@@ -361,6 +440,21 @@ std::string DescribeThreeDPreviews()
 	for (const ThreeDPreview &p : _previews) {
 		Rect r = PreviewRect(p);
 		s += fmt::format("{}{} at {},{}..{},{} yaw {:.0f}; ", p.vehicle ? "vehicle " : "industry ", p.vehicle ? static_cast<int32_t>(p.engine.base()) : static_cast<int32_t>(p.parent), r.left, r.top, r.right, r.bottom, p.yaw);
+		if (p.vehicle && p.engine != EngineID::Invalid()) {
+			/* The sprites of every direction, with their size: a set whose chain needs a vehicle gives empty ones. */
+			for (int d = 0; d < 8; d++) {
+				VehicleSpriteSeq front, rear;
+				bool two;
+				int pitch;
+				if (!PreviewVehicleSprites(p.engine, static_cast<Direction>(d), front, rear, two, pitch)) { s += fmt::format("d{} none; ", d); continue; }
+				s += fmt::format("d{}:", d);
+				for (uint i = 0; i < front.count; i++) {
+					const Sprite *spr = GetSprite(front.seq[i].sprite & SPRITE_MASK, SpriteType::Normal);
+					s += fmt::format(" {}({}x{})", front.seq[i].sprite & SPRITE_MASK, spr->width, spr->height);
+				}
+				s += "; ";
+			}
+		}
 	}
 	return s.empty() ? "no previews" : s;
 }

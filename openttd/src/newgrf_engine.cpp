@@ -1169,9 +1169,17 @@ uint16_t _wagon_exception_forced_slot = UINT16_MAX;
  */
 bool _resolve_vehicle_as_empty = false;
 
-static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)
+static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result, bool on_map = false)
 {
 	VehicleResolverObject object(engine, v, VehicleResolverObject::WagonOverride::Cached, false, CBID_NO_CALLBACK);
+	/* Without a vehicle the resolver takes the purchase list's sprite group, often one picture whatever the
+	 * direction; the 3D preview that turns (three_d_preview_gui.cpp) wants the pictures the map draws the
+	 * vehicle with: the group of its default cargo, as an empty vehicle of it would get. */
+	if (on_map && v == nullptr) {
+		const Engine *e = Engine::Get(engine);
+		const SpriteGroup *map_group = e->grf_prop.GetFirstSpriteGroupOf({e->GetDefaultCargoType(), CargoGRFFileProps::SG_DEFAULT});
+		if (map_group != nullptr) object.root_spritegroup = map_group;
+	}
 	result->Clear();
 
 	bool sprite_stack = EngInfo(engine)->misc_flags.Test(EngineMiscFlag::SpriteStack);
@@ -1229,7 +1237,7 @@ void GetCustomVehicleSprite(const Vehicle *v, Direction direction, EngineImageTy
 
 void GetCustomVehicleIcon(EngineID engine, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)
 {
-	GetCustomEngineSprite(engine, nullptr, direction, image_type, result);
+	GetCustomEngineSprite(engine, nullptr, direction, image_type, result, image_type == EngineImageType::OnMap);
 }
 
 static void GetRotorOverrideSprite(EngineID engine, const struct Aircraft *v, EngineImageType image_type, VehicleSpriteSeq *result)
