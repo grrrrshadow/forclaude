@@ -498,6 +498,21 @@ static LibraryLoader::Function GetKernel32Function(const std::string &symbol_nam
 	return _kernel32.GetFunction(symbol_name);
 }
 
+/**
+ * The version of Wine this is running under, when it is: Winlator on a phone,
+ * Proton, a Linux desktop. Wine's ntdll exports wine_get_version(), Windows'
+ * does not. The crash log and its trace say the version (SurveyOS()).
+ * @return the version Wine reports, or nothing under Windows
+ */
+std::optional<std::string> GetWineVersion()
+{
+	static LibraryLoader _ntdll("ntdll.dll");
+	const char *(*wine_get_version)() = _ntdll.GetFunction("wine_get_version");
+	if (wine_get_version == nullptr) return std::nullopt;
+	const char *version = wine_get_version();
+	return std::string(version != nullptr ? version : "?");
+}
+
 int OTTDStringCompare(std::string_view s1, std::string_view s2)
 {
 	typedef int (WINAPI *PFNCOMPARESTRINGEX)(LPCWSTR, DWORD, LPCWCH, int, LPCWCH, int, LPVOID, LPVOID, LPARAM);

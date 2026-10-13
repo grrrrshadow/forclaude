@@ -37,6 +37,11 @@
 #define Debug(category, level, format_string, ...) do { if ((level) == 0 || _debug_ ## category ## _level >= (level)) DebugPrint(#category, level, fmt::format(FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__)); } while (false)
 void DebugPrint(std::string_view category, int level, std::string &&message);
 
+/* A trace of where the game has been, for the crash log (CrashTrace(), crashlog.cpp): the last marks with the
+ * time since the start, on a machine that gives no stacktrace (the player's Winlator writes empty dumps). */
+void CrashTrace(std::string &&what);
+std::vector<std::string> GetCrashTrace();
+
 extern int _debug_driver_level;
 extern int _debug_grf_level;
 extern int _debug_map_level;

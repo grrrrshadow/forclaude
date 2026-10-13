@@ -120,6 +120,7 @@ void NetworkHTTPRequest::WinHttpCallback(DWORD code, void *info, DWORD length)
 			break;
 
 		case WINHTTP_CALLBACK_STATUS_REDIRECT:
+			CrashTrace("http: redirected");
 			/* Make sure we are not in a redirect loop. */
 			if (this->depth++ > 5) {
 				Debug(net, 0, "HTTP request failed: too many redirects");
@@ -141,6 +142,7 @@ void NetworkHTTPRequest::WinHttpCallback(DWORD code, void *info, DWORD length)
 			DWORD status_code_size = sizeof(status_code);
 			WinHttpQueryHeaders(this->request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status_code, &status_code_size, WINHTTP_NO_HEADER_INDEX);
 			Debug(net, 3, "HTTP request status code: {}", status_code);
+			CrashTrace(fmt::format("http: status {}", status_code));
 
 			/* If there is any error, we simply abort the request. */
 			if (status_code >= 400) {
@@ -175,6 +177,7 @@ void NetworkHTTPRequest::WinHttpCallback(DWORD code, void *info, DWORD length)
 				/* Next step: no more data available: request is finished. */
 				this->finished = true;
 				Debug(net, 1, "HTTP request succeeded");
+				CrashTrace("http: request done");
 			} else {
 				/* Next step: query for more data. */
 				WinHttpQueryDataAvailable(this->request, nullptr);
@@ -185,6 +188,7 @@ void NetworkHTTPRequest::WinHttpCallback(DWORD code, void *info, DWORD length)
 		case WINHTTP_CALLBACK_STATUS_SECURE_FAILURE:
 		case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
 			Debug(net, 0, "HTTP request failed: {}", GetLastErrorAsString());
+			CrashTrace(fmt::format("http: failed, code 0x{:x}", code));
 			this->callback.OnFailure();
 			this->finished = true;
 			break;
@@ -222,6 +226,7 @@ static void CALLBACK StaticWinHttpCallback(HINTERNET, DWORD_PTR context, DWORD c
 void NetworkHTTPRequest::Connect()
 {
 	Debug(net, 1, "HTTP request to {}", std::string(uri.begin(), uri.end()));
+	CrashTrace(fmt::format("http: request to {}", std::string(uri.begin(), uri.end())));
 
 	URL_COMPONENTS url_components = {};
 	wchar_t scheme[32];

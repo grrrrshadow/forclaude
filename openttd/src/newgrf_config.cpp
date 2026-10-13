@@ -661,9 +661,11 @@ void DoScanNewGRFFiles(NewGRFScanCallback *callback)
 	TarScanner::DoScan(TarScanner::Mode::NewGRF);
 
 	Debug(grf, 1, "Scanning for NewGRFs");
+	CrashTrace("newgrf scan");
 	uint num = GRFFileScanner::DoScan();
 
 	Debug(grf, 1, "Scan complete, found {} files", num);
+	CrashTrace(fmt::format("newgrf scan found {} files", num));
 	std::ranges::sort(_all_grfs, GRFSorter);
 	NetworkAfterNewGRFScan();
 
@@ -675,6 +677,7 @@ void DoScanNewGRFFiles(NewGRFScanCallback *callback)
 	CloseWindowByClass(WindowClass::ModalProgress);
 	SetModalProgress(false);
 	MarkWholeScreenDirty();
+	CrashTrace("newgrf scan done");
 }
 
 /**

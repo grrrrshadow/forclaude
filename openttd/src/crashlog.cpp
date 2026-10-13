@@ -8,6 +8,7 @@
 /** @file crashlog.cpp Implementation of generic function to be called to log a crash. */
 
 #include "stdafx.h"
+#include "debug.h"
 #include "crashlog.h"
 #include "survey.h"
 #include "gamelog.h"
@@ -116,6 +117,10 @@ void CrashLog::FillCrashLog()
 	 * report that narrows it down. */
 	if (!CrashLog::stage.empty()) this->survey["crash"]["stage"] = CrashLog::stage;
 	if (!CrashLog::note.empty()) this->survey["crash"]["note"] = CrashLog::note;
+	/* The last marks of where the game has been (CrashTrace()), for a machine that gives no stacktrace. */
+	if (!this->TryExecute("trace", [this]() { this->survey["crash"]["trace"] = GetCrashTrace(); return true; })) {
+		this->survey["crash"]["trace"] = "crashed while gathering information";
+	}
 
 	if (!this->TryExecute("stacktrace", [this]() { this->SurveyStacktrace(this->survey["stacktrace"]); return true; })) {
 		this->survey["stacktrace"] = "crashed while gathering information";

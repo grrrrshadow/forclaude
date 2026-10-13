@@ -18,4 +18,6 @@ wchar_t *convert_to_fs(std::string_view src, std::span<wchar_t> dst_buf);
 int OTTDStringCompare(std::string_view s1, std::string_view s2);
 int Win32StringContains(std::string_view str, std::string_view value, bool case_insensitive);
 
+std::optional<std::string> GetWineVersion();
+
 #endif /* WIN32_H */

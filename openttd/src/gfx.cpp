@@ -1323,6 +1323,7 @@ std::pair<uint8_t, uint8_t> GetBroadestDigit(FontSize size)
 
 void ScreenSizeChanged()
 {
+	CrashTrace(fmt::format("screen {}x{}", _screen.width, _screen.height));
 	_dirty_blocks_per_row = CeilDiv(_screen.width, DIRTY_BLOCK_WIDTH);
 	_dirty_blocks_per_column = CeilDiv(_screen.height, DIRTY_BLOCK_HEIGHT);
 	_dirty_blocks.resize(_dirty_blocks_per_column * _dirty_blocks_per_row);

@@ -65,6 +65,7 @@ public:
 
 	void OnConnect(bool success) override
 	{
+		CrashTrace(fmt::format("mars houses: content server {}", success ? "connected" : "not reached"));
 		if (success) return;
 		Debug(net, 1, "Mars houses: no connection to the content server");
 		delete this;
@@ -72,6 +73,7 @@ public:
 
 	void OnDisconnect() override
 	{
+		CrashTrace(fmt::format("mars houses: content server disconnected, {}", this->wanted == INVALID_CONTENT_ID ? "giving up" : "download under way"));
 		/* The connection closes when it has been idle for a while, which is
 		 * also how an answer that never came ends. Once the download is under
 		 * way it may close too -- the file comes over HTTP -- and the fetch
@@ -85,6 +87,7 @@ public:
 		if (ci.type != ContentType::NewGRF || ci.unique_id != std::byteswap(MARS_HOUSES_GRFID)) return;
 		if (ci.state != ContentInfo::State::Unselected) {
 			/* Here already, or not on the server. */
+			CrashTrace("mars houses: the server has not got them, or they are here");
 			delete this;
 			return;
 		}
@@ -93,12 +96,14 @@ public:
 		uint files, bytes;
 		_network_content_client.DownloadSelectedContent(files, bytes);
 		Debug(net, 1, "Mars houses: downloading {} ({} bytes)", ci.name, bytes);
+		CrashTrace(fmt::format("mars houses: downloading {} ({} bytes)", ci.name, bytes));
 	}
 
 	void OnDownloadComplete(ContentID cid) override
 	{
 		if (cid != this->wanted) return;
 		Debug(net, 1, "Mars houses: downloaded");
+		CrashTrace("mars houses: downloaded, newgrf scan asked for");
 		RequestNewGRFScan();
 		delete this;
 	}
@@ -114,5 +119,6 @@ void FetchMarsHousesIfMissing()
 {
 	if (!_network_available || MarsHousesFetcher::running != nullptr) return;
 	if (_settings_newgame.economy.mars_towns == 0 || HaveMarsHouses()) return;
+	CrashTrace("mars houses: not here, asking the content server");
 	new MarsHousesFetcher();
 }

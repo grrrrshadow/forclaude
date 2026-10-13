@@ -97,6 +97,10 @@
 
 #include "anomaly_log.h"
 
+#if defined(_WIN32)
+#	include "os/windows/win32.h"
+#endif
+
 #include "safeguards.h"
 
 void CallLandscapeTick();
@@ -338,6 +342,7 @@ static void ShutdownGame()
  */
 static void LoadIntroGame(bool load_newgrfs = true)
 {
+	CrashTrace(fmt::format("intro game{}", load_newgrfs ? " with the newgrfs" : ""));
 	_game_mode = GameMode::Menu;
 
 	if (load_newgrfs) ResetGRFConfig(false);
@@ -361,6 +366,7 @@ static void LoadIntroGame(bool load_newgrfs = true)
 	CheckForMissingGlyphs();
 
 	MusicLoop(); // ensure music is correct
+	CrashTrace("intro game loaded");
 }
 
 void MakeNewgameSettingsLive()
@@ -406,6 +412,7 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 
 	void OnNewGRFsScanned() override
 	{
+		CrashTrace("first newgrf scan done: config, scripts, fetches");
 		ResetGRFConfig(false);
 
 		TarScanner::DoScan(TarScanner::Mode::Scenario);
@@ -456,6 +463,8 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 		/* And the wagons that make FIRS 5 work with the CZTR sets, when the
 		 * player's sets ask for them (cztr_wagons.cpp). */
 		FetchCztrWagonsForFirs5IfMissing();
+
+		CrashTrace("first newgrf scan: fetches asked for");
 
 		/* Make sure _settings is filled with _settings_newgame if we switch to a game directly */
 		if (_switch_mode != SwitchMode::None) MakeNewgameSettingsLive();
@@ -702,6 +711,10 @@ int openttd_main(std::span<std::string_view> arguments)
 #endif
 
 	LoadFromConfig(true);
+	CrashTrace(fmt::format("config read, resolution {}x{}, hardware acceleration {}", _cur_resolution.width, _cur_resolution.height, _video_hw_accel ? "on" : "off"));
+#if defined(_WIN32)
+	if (auto wine = GetWineVersion(); wine.has_value()) CrashTrace(fmt::format("under Wine {}", *wine));
+#endif
 
 	/* A player the game is not for (IsShunnedPlayerName()): close before a
 	 * window is opened or a setting can be reached. */
@@ -780,8 +793,10 @@ int openttd_main(std::span<std::string_view> arguments)
 		}
 	}
 
+	CrashTrace(fmt::format("blitter {}", BlitterFactory::GetCurrentBlitter()->GetName()));
 	if (videodriver.empty() && !_ini_videodriver.empty()) videodriver = _ini_videodriver;
 	DriverFactoryBase::SelectDriver(videodriver, Driver::Type::Video);
+	CrashTrace(fmt::format("video driver {}, screen {}x{}", VideoDriver::GetInstance()->GetName(), _screen.width, _screen.height));
 
 	InitializeSpriteSorter();
 
@@ -835,6 +850,7 @@ int openttd_main(std::span<std::string_view> arguments)
 	/* ScanNewGRFFiles now has control over the scanner. */
 	RequestNewGRFScan(scanner.release());
 
+	CrashTrace("main loop");
 	VideoDriver::GetInstance()->MainLoop();
 
 	PostMainLoop();
@@ -1088,6 +1104,8 @@ static void UpdateSocialIntegration(GameMode game_mode)
 
 void SwitchToMode(SwitchMode new_mode)
 {
+	CrashTrace(fmt::format("switch mode {}", static_cast<int>(new_mode)));
+
 	/* If we are saving something, the network stays in its current state */
 	if (new_mode != SwitchMode::SaveGame) {
 		/* If the network is active, make it not-active */

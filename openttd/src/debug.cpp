@@ -24,6 +24,8 @@
 
 #include "network/network_admin.h"
 
+#include <array>
+#include <chrono>
 #include "safeguards.h"
 
 /** Element in the queue of debug messages that have to be passed to either NetworkAdminConsole or IConsolePrint.*/
@@ -102,6 +104,37 @@ void DumpDebugFacilityNames(std::back_insert_iterator<std::string> &output_itera
 	}
 }
 
+static constexpr size_t CRASH_TRACE_SIZE = 48;
+static std::array<std::string, CRASH_TRACE_SIZE> _crash_trace;
+static size_t _crash_trace_next = 0;
+static std::mutex _crash_trace_mutex;
+static const std::chrono::steady_clock::time_point _crash_trace_start = std::chrono::steady_clock::now();
+
+/**
+ * Mark where the game is, for the crash log: the last CRASH_TRACE_SIZE marks
+ * are written there with the time since the start, so that a crash on a
+ * machine that gives no stacktrace still says what the game was doing
+ * (every debug line printed goes in too).
+ * @param what the mark
+ */
+void CrashTrace(std::string &&what)
+{
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - _crash_trace_start).count();
+	std::lock_guard<std::mutex> lock(_crash_trace_mutex);
+	_crash_trace[_crash_trace_next % CRASH_TRACE_SIZE] = fmt::format("{:>8} ms  {}", ms, what);
+	_crash_trace_next++;
+}
+
+/** The marks of CrashTrace(), oldest first. */
+std::vector<std::string> GetCrashTrace()
+{
+	std::lock_guard<std::mutex> lock(_crash_trace_mutex);
+	std::vector<std::string> out;
+	size_t first = _crash_trace_next > CRASH_TRACE_SIZE ? _crash_trace_next - CRASH_TRACE_SIZE : 0;
+	for (size_t i = first; i < _crash_trace_next; i++) out.push_back(_crash_trace[i % CRASH_TRACE_SIZE]);
+	return out;
+}
+
 /**
  * Internal function for outputting the debug line.
  * @param category The category/classification of the debug message.
@@ -110,6 +143,7 @@ void DumpDebugFacilityNames(std::back_insert_iterator<std::string> &output_itera
  */
 void DebugPrint(std::string_view category, int level, std::string &&message)
 {
+	if (category != "desync" && category != "random") CrashTrace(fmt::format("dbg [{}:{}] {}", category, level, message));
 	if (category == "desync" && level != 0) {
 		static auto f = FioFOpenFile("commands-out.log", "wb", Subdirectory::Autosave);
 		if (!f.has_value()) return;

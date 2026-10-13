@@ -70,6 +70,7 @@ public:
 		cv.push_back(std::move(ci));
 		_network_content_client.RequestContentList(&cv, true);
 		Debug(net, 1, "CZTR Wagons-Cargo 1.0.0: asking the content server for it");
+		CrashTrace("cztr wagons: asking the content server");
 	}
 
 	~CztrWagonsFetcher() override
@@ -109,6 +110,7 @@ public:
 		uint files, bytes;
 		_network_content_client.DownloadSelectedContent(files, bytes);
 		Debug(net, 1, "CZTR Wagons-Cargo 1.0.0: downloading {} ({} bytes)", ci.name, bytes);
+		CrashTrace(fmt::format("cztr wagons: downloading {} ({} bytes)", ci.name, bytes));
 	}
 
 	void OnDownloadComplete(ContentID cid) override
@@ -116,6 +118,7 @@ public:
 		if (cid != this->wanted || this->downloaded) return;
 		this->downloaded = true;
 		Debug(net, 1, "CZTR Wagons-Cargo 1.0.0: downloaded");
+		CrashTrace("cztr wagons: downloaded, newgrf scan asked for");
 		/* On the disk now, but the game's list of what is on the disk was made
 		 * before it was; it is put in place once that list has been made again. */
 		if (!RequestNewGRFScan(this)) delete this;

@@ -92,6 +92,7 @@ void VideoDriver::StartGameThread()
 	}
 
 	Debug(driver, 1, "using {}thread for game-loop", this->is_game_threaded ? "" : "no ");
+	CrashTrace(fmt::format("game loop {}", this->is_game_threaded ? "in its own thread" : "in the video thread"));
 }
 
 void VideoDriver::StopGameThread()

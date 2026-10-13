@@ -297,6 +297,7 @@ static void RealChangeBlitter(std::string_view repl_blitter)
 	if (cur_blitter == repl_blitter) return;
 
 	Debug(driver, 1, "Switching blitter from '{}' to '{}'... ", cur_blitter, repl_blitter);
+	CrashTrace(fmt::format("blitter {} -> {}", cur_blitter, repl_blitter));
 	Blitter *new_blitter = BlitterFactory::SelectBlitter(repl_blitter);
 	if (new_blitter == nullptr) NOT_REACHED();
 	Debug(driver, 1, "Successfully switched to {}.", repl_blitter);
@@ -305,6 +306,7 @@ static void RealChangeBlitter(std::string_view repl_blitter)
 		/* Failed to switch blitter, let's hope we can return to the old one. */
 		if (BlitterFactory::SelectBlitter(cur_blitter) == nullptr || !VideoDriver::GetInstance()->AfterBlitterChange()) UserError("Failed to reinitialize video driver. Specify a fixed blitter in the config");
 	}
+	CrashTrace("blitter switched, video driver ready again");
 
 	/* Clear caches that might have sprites for another blitter. */
 	VideoDriver::GetInstance()->ClearSystemSprites();
@@ -398,6 +400,7 @@ void CheckBlitter()
 void GfxLoadSprites()
 {
 	Debug(sprite, 2, "Loading sprite set {}", _settings_game.game_creation.landscape);
+	CrashTrace("loading sprites");
 
 	SwitchNewGRFBlitter();
 
@@ -420,6 +423,7 @@ void GfxLoadSprites()
 	GfxInitPalettes();
 
 	UpdateCursorSize();
+	CrashTrace("sprites loaded");
 }
 
 /* instantiate here, because unique_ptr needs a complete type */

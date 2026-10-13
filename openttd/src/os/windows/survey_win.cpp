@@ -14,6 +14,7 @@
 
 #include <thread>
 #include <windows.h>
+#include "win32.h"
 
 #include "../../safeguards.h"
 
@@ -25,6 +26,8 @@ void SurveyOS(nlohmann::json &json)
 
 	json["os"] = "Windows";
 	json["release"] = fmt::format("{}.{}.{} ({})", os.dwMajorVersion, os.dwMinorVersion, os.dwBuildNumber, os.szCSDVersion);
+	/* Wine (Winlator on a phone, Proton) says it is Windows; the crash log should know better. */
+	if (auto wine = GetWineVersion(); wine.has_value()) json["wine"] = *wine;
 
 	MEMORYSTATUSEX status;
 	status.dwLength = sizeof(status);

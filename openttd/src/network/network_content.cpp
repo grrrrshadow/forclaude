@@ -522,6 +522,7 @@ void ClientNetworkContentSocketHandler::AfterDownload()
 	/* We read nothing; that's our marker for end-of-stream.
 	 * Now gunzip the tar and make it known. */
 	this->cur_file.reset();
+	CrashTrace(fmt::format("content: {} downloaded, unpacking", this->cur_info->filename));
 
 	if (GunzipFile(*this->cur_info)) {
 		FioRemove(GetFullFilename(*this->cur_info, true));
@@ -543,8 +544,10 @@ void ClientNetworkContentSocketHandler::AfterDownload()
 		EM_ASM(if (window["openttd_syncfs"]) openttd_syncfs());
 #endif
 
+		CrashTrace("content: unpacked, telling the callbacks");
 		this->OnDownloadComplete(this->cur_info->id);
 	} else {
+		CrashTrace("content: could not unpack");
 		ShowErrorMessage(GetEncodedString(STR_CONTENT_ERROR_COULD_NOT_EXTRACT), {}, WarningLevel::Error);
 	}
 }
@@ -557,6 +560,7 @@ bool ClientNetworkContentSocketHandler::IsCancelled() const
 /* Also called to just clean up the mess. */
 void ClientNetworkContentSocketHandler::OnFailure()
 {
+	CrashTrace(fmt::format("content: http download failed{}", this->is_cancelled ? ", cancelled" : ", trying the old way"));
 	this->http_response.clear();
 	this->http_response.shrink_to_fit();
 	this->http_response_index = -2;
@@ -592,6 +596,7 @@ void ClientNetworkContentSocketHandler::OnReceiveData(std::unique_ptr<char[]> da
 		} else {
 			/* Make sure the response is properly terminated. */
 			this->http_response.push_back('\0');
+			CrashTrace(fmt::format("content: http answer of {} bytes, files to come", this->http_response.size()));
 
 			/* And prepare for receiving the rest of the data. */
 			this->http_response_index = 0;
@@ -723,6 +728,7 @@ void ClientNetworkContentSocketHandler::Connect()
 {
 	if (this->sock != INVALID_SOCKET || this->is_connecting) return;
 
+	CrashTrace("content: connecting to the content server");
 	this->is_cancelled = false;
 	this->is_connecting = true;
 

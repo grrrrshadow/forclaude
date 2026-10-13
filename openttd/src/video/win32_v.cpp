@@ -155,6 +155,8 @@ uint8_t VideoDriver_Win32Base::GetFullscreenBpp()
  */
 bool VideoDriver_Win32Base::MakeWindow(bool full_screen, bool resize)
 {
+	CrashTrace(fmt::format("window {}x{}{}{}", this->width, this->height, full_screen ? " fullscreen" : "", resize ? " resize" : ""));
+
 	/* full_screen is whether the new window should be fullscreen,
 	 * _wnd.fullscreen is whether the current window is. */
 	_fullscreen = full_screen;
@@ -1173,6 +1175,7 @@ bool VideoDriver_Win32Base::PollEvent()
 
 void VideoDriver_Win32Base::MainLoop()
 {
+	CrashTrace("video main loop");
 	this->StartGameThread();
 
 	for (;;) {
@@ -1193,6 +1196,8 @@ void VideoDriver_Win32Base::MainLoop()
  */
 void VideoDriver_Win32Base::ClientSizeChanged(int w, int h, bool force)
 {
+	CrashTrace(fmt::format("client size {}x{}{}", w, h, force ? " forced" : ""));
+
 	/* Allocate backing store of the new size. */
 	if (this->AllocateBackingStore(w, h, force)) {
 		CopyPalette(_local_palette, true);
@@ -1287,6 +1292,7 @@ std::optional<std::string_view> VideoDriver_Win32GDI::Start(const StringList &pa
 {
 	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 0) return "Only real blitters supported";
 
+	CrashTrace("video driver gdi starting");
 	auto err = this->Initialize();
 	if (err) return err;
 
@@ -1579,6 +1585,7 @@ std::optional<std::string_view> VideoDriver_Win32OpenGL::Start(const StringList 
 
 	Dimension old_res = _cur_resolution; // Save current screen resolution in case of errors, as MakeWindow invalidates it.
 
+	CrashTrace("video driver opengl starting");
 	LoadWGLExtensions();
 
 	auto err = this->Initialize();
@@ -1590,12 +1597,15 @@ std::optional<std::string_view> VideoDriver_Win32OpenGL::Start(const StringList 
 	this->MakeWindow(_fullscreen);
 
 	/* Create and initialize OpenGL context. */
+	CrashTrace("opengl context");
 	err = this->AllocateContext();
 	if (err) {
+		CrashTrace(fmt::format("opengl context failed: {}", *err));
 		this->Stop();
 		_cur_resolution = old_res;
 		return err;
 	}
+	CrashTrace("opengl context made");
 
 	this->driver_info = GetName();
 	this->driver_info += " (";
