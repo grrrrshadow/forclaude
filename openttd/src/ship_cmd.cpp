@@ -440,6 +440,7 @@ static uint ShipAccelerate(Vehicle *v)
 	uint speed;
 	speed = std::min<uint>(v->cur_speed + v->acceleration, v->vcache.cached_max_speed);
 	speed = std::min<uint>(speed, v->current_order.GetMaxSpeed() * 2);
+	speed = std::min<uint>(speed, static_cast<uint>(v->CabSpeedLimitInternal()));
 
 	/* updates statusbar only if speed have changed to save CPU time */
 	if (speed != v->cur_speed) {

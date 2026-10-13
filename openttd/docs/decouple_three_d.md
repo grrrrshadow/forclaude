@@ -303,6 +303,76 @@ points, under two seconds to build, a few milliseconds a picture; the hull's
 outline covers the sprites' at 0.93 to 0.98. The last four models are kept
 (`GetThreeDVehicleModel()`); the sprites reloaded, they go.
 
+## The view from the cab
+
+`src/cab_view.h`, `cab_view_gui.cpp`, the drawing in `viewport.cpp`
+(`DrawCabView()`). The player (13. 10.) saw a video of someone's OpenTTD with
+a cab view and wanted the same, for a train, a road vehicle, an aircraft and a
+ship: the button with the magnifying glass in the vehicle's window (the player
+drives from the phone, so a button) opens **"Cab view: <vehicle>"**, the world
+ahead of the vehicle in perspective, drawn anew about twenty-five times a
+second while the window is open, with a panel under it: a gauge and the speed
+in figures, the top speed, the next stop (the station, the depot, none), what
+the vehicle is doing (running, stopped, loading, broken down) and how full it
+is; buttons to the vehicle's window, to put the map on it, **Brake -** and
+**Throttle +**, and Stop. The brake holds the vehicle to a speed a step (a
+tenth of its top speed) below where it is; the throttle raises that; past the
+top speed the vehicle goes as its orders say again. The speed it is held to is
+`Vehicle::cab_speed_limit`, set by the command `SetCabSpeedLimit` (so a
+network game stays in step), in the units the vehicle shows, and every kind
+of vehicle minds it where it works out its speed (`Train::GetCurrentMaxSpeed()`,
+`RoadVehicle::GetCurrentMaxSpeed()`, `Ship::GetCurrentMaxSpeed()` and
+`ShipAccelerate()`, `UpdateAircraftSpeed()`); it is not saved.
+
+The picture is made by the same means as the turned map view, with a
+perspective rasterizer and a depth buffer in place of the turned projection:
+
+- **The eye** is at the front of the vehicle, a few units ahead of its
+  position and above it, looking along its direction; it turns towards a new
+  direction over a few frames, so a curve is a swing, not a jump. True 3D is
+  taken from the game's projection: a tile is 16 units square, a unit of
+  height (z) is 0.408 of a unit of x and y (a height level of 8 stands 3.27
+  units tall), a pixel of a sprite at the normal zoom is 0.354 units across
+  and 0.408 up. The horizontal field of view is 90 degrees.
+- **The ground.** The tiles ahead within 20 tiles and the field of view are
+  asked what they draw, as the turned view asks them; their ground sprites
+  (the rails, the roads, the platforms that are ground) go north-up into one
+  texture at the normal zoom, and every tile is laid as four triangles meeting
+  in its middle, each corner at its height, with the texture pixel of the
+  world point -- in perspective, 1/depth and the texture pixel over depth
+  changing linearly across the picture (`CabRasterTriangle()`). The black
+  under a building is grown over as in the turned view.
+- **Everything standing** is drawn far to near with the depth test: what
+  stands on a house, industry, object or station tile with a footprint is a
+  **box** of its sprite (`CabDrawBox()`: the sprite's pixels over the top and
+  the two walls it shows, mirrored over the two it does not, as the turned
+  view's boxes), a platform a low box; the rest -- a tree, a signal, a lamp,
+  the other vehicles -- a **billboard** of its sprite facing the eye, sized as
+  the sprite is on the map, its foot at the middle of its bounding box. The
+  other vehicles show the picture of their direction as seen from the eye (as
+  the turned map shows them); the vehicle's own consist is left out. A line
+  of a sprite (a fence seen along its length, a wire) and a fence piece are
+  left out too: they would stand as tall posts.
+- **The catenary and the fences** along the rails, of fields, farms,
+  industries and stations are not drawn in the 3D views at all, the cab view
+  and the turned map (the player: "turn them off in these 3D views"): they
+  are lines of the north-up view and stand about as posts and ribbons. The
+  cab view collects with the catenary made invisible, the rail fences off and
+  `_draw_fences` (clear_cmd.cpp) off; the turned view the same, and a thin
+  long low box of any tile (a fence of a farm or a station) is skipped.
+- **The sky** is a gradient down to the horizon in the middle of the
+  picture, the far ground a plain green under it; what is drawn fades into
+  the haze colour from 6 tiles out to the edge of reach. In a tunnel the
+  picture is dark with the light at its end.
+- A picture of 450x300 takes about 4 ms (427 tiles, 400 billboards); the
+  sprites' textures are kept between frames (`_cab_textures`, up to 4096).
+
+What is not there yet: bridges (their pieces are billboards; the vehicle on
+one sees the ground below it), the inside of a tunnel for real, the catenary
+as wires of their own, the own vehicle's nose or cab, finer textures of the
+ground near the eye (the normal zoom, blocky up close), the buildings with
+eight renders and the new 3D objects (billboards and boxes for now).
+
 ## The rig
 
 `test3d` in the console, under the null video driver with `blit=` (so the
@@ -317,7 +387,14 @@ and five more, levelled first, on the first flat clear square of the map
 when x and y are 0 -- and sends an articulated engine along it (the first
 there is, or the one whose name has the text; the curve under the middle of
 the view), `test3d motory [text]` lists the rail engines with their pieces
-and whether the company may build them, `test3d snimek <name>` writes
+and whether the company may build them, `test3d kabina [n]` opens the cab
+view of the n-th visible vehicle (`test3d kabina cas` says how long its last
+picture took and what was in it; with `-d misc=5` the tall things, the boxes
+and the walls drawn are listed, with `misc=6` the picture and the sprites'
+textures are written as `cab_picture.ppm` and `cab_tex_<sprite>.ppm`),
+`test3d jed <type> <unit>` starts a vehicle that stands in its shed (type 0
+train, 1 road, 2 ship, 3 aircraft; with `testletadlo <x> <y>` after a
+company exists, an aircraft in the air), `test3d snimek <name>` writes
 the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole
 screen and says where the time went, `test3d ladeni <x> <y>` writes out how

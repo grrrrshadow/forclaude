@@ -2245,7 +2245,8 @@ static void DrawTrackDetails(const TileInfo *ti, const RailTypeInfo *rti, Palett
 	 * fence belongs (see TileLoop_Track()), so the fences are all back the
 	 * moment this is turned on again, and a game played with them off is the
 	 * same game as one played with them on. */
-	if (!_settings_client.gui.show_rail_fences) return;
+	extern bool _draw_fences;
+	if (!_settings_client.gui.show_rail_fences || !_draw_fences) return;
 
 	/* Base sprite for track fences.
 	 * Note: Halftile slopes only have fences on the upper part. */

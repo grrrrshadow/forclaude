@@ -1,0 +1,296 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/**
+ * @file cab_view_gui.cpp The window of the view from a vehicle's cab (cab_view.h).
+ *
+ * The world ahead of the vehicle, drawn anew every few hundredths of a second
+ * while the window is open (DrawCabView() in viewport.cpp), and under it the
+ * panel the player asked for from the video: the speed on a gauge and in
+ * figures, the top speed, the next stop, what the vehicle is doing and how full
+ * it is; buttons to its own window, to put the map on it and to stop it.
+ */
+
+#include "stdafx.h"
+#include "cab_view.h"
+#include "window_gui.h"
+#include "window_func.h"
+#include "gfx_func.h"
+#include "strings_func.h"
+#include "vehicle_base.h"
+#include "vehicle_func.h"
+#include "vehicle_gui.h"
+#include "viewport_func.h"
+#include "command_func.h"
+#include "vehicle_cmd.h"
+#include "order_base.h"
+#include "timer/timer.h"
+#include "timer/timer_window.h"
+#include "blitter/factory.hpp"
+#include "widgets/cab_view_widget.h"
+
+#include "table/strings.h"
+
+#include <cmath>
+
+#include "safeguards.h"
+
+static constexpr NWidgetPart _nested_cab_view_widgets[] = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, Colours::Grey),
+		NWidget(WWT_CAPTION, Colours::Grey, WID_CV_CAPTION), SetStringTip(STR_CAB_VIEW_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_SHADEBOX, Colours::Grey),
+		NWidget(WWT_DEFSIZEBOX, Colours::Grey),
+		NWidget(WWT_STICKYBOX, Colours::Grey),
+	EndContainer(),
+	NWidget(WWT_PANEL, Colours::Grey),
+		NWidget(WWT_EMPTY, Colours::Invalid, WID_CV_CANVAS), SetMinimalSize(360, 240), SetResize(1, 1), SetFill(1, 1),
+	EndContainer(),
+	NWidget(WWT_PANEL, Colours::Grey, WID_CV_PANEL), SetMinimalSize(360, 50), SetResize(1, 0), SetFill(1, 0), EndContainer(),
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_VEHICLE), SetStringTip(STR_CAB_VIEW_VEHICLE, STR_CAB_VIEW_VEHICLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CENTRE), SetStringTip(STR_CAB_VIEW_CENTRE, STR_CAB_VIEW_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_BRAKE), SetStringTip(STR_CAB_VIEW_BRAKE, STR_CAB_VIEW_BRAKE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_THROTTLE), SetStringTip(STR_CAB_VIEW_THROTTLE, STR_CAB_VIEW_THROTTLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_RESIZEBOX, Colours::Grey),
+	EndContainer(),
+};
+
+/** The window of the view from a vehicle's cab; the window number is the vehicle. */
+struct CabViewWindow : Window {
+	mutable CabViewCamera camera{};   ///< the eye between frames
+	mutable CabViewPicture picture{}; ///< the last picture
+
+	/* Drawn anew while the vehicle moves: about twenty-five times a second. */
+	IntervalTimer<TimerWindow> redraw{std::chrono::milliseconds(40), [this](auto) {
+		this->SetWidgetDirty(WID_CV_CANVAS);
+		this->SetWidgetDirty(WID_CV_PANEL);
+		this->SetWidgetDirty(WID_CV_STOP);
+	}};
+
+	CabViewWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
+	{
+		this->CreateNestedTree();
+		this->FinishInitNested(number);
+		const Vehicle *v = Vehicle::GetIfValid(number);
+		if (v != nullptr) this->owner = v->owner;
+	}
+
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	{
+		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
+		switch (widget) {
+			case WID_CV_CAPTION:
+				return GetString(STR_CAB_VIEW_CAPTION, this->window_number);
+			case WID_CV_STOP:
+				return GetString(v != nullptr && v->vehstatus.Test(VehState::Stopped) ? STR_CAB_VIEW_GO : STR_CAB_VIEW_STOP);
+			default:
+				return this->Window::GetWidgetString(widget, stringid);
+		}
+	}
+
+	void OnPaint() override
+	{
+		if (Vehicle::GetIfValid(this->window_number) == nullptr) {
+			this->Close();
+			return;
+		}
+		this->DrawWidgets();
+	}
+
+	/** The picture onto the screen, within the clipping of the moment. */
+	static void BlitCabPicture(const CabViewPicture &pic, int px, int py)
+	{
+		const DrawPixelInfo *dpi = _cur_dpi;
+		Blitter *blitter = BlitterFactory::GetCurrentBlitter();
+		int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
+		int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
+		for (int y = y0; y < y1; y++) {
+			const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
+			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+			for (int x = x0; x < x1; x++, dst++) {
+				Colour sc(src[x - px]);
+				*dst = Colour(sc.r, sc.g, sc.b).data;
+			}
+		}
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
+		if (v == nullptr) return;
+		switch (widget) {
+			case WID_CV_CANVAS: {
+				int w = r.Width(), h = r.Height();
+				if (w <= 0 || h <= 0) return;
+				if (!DrawCabView(v, w, h, this->camera, this->picture)) {
+					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
+					return;
+				}
+				BlitCabPicture(this->picture, r.left, r.top);
+				break;
+			}
+			case WID_CV_PANEL:
+				this->DrawPanel(r, v);
+				break;
+			default:
+				break;
+		}
+	}
+
+	/** How full the vehicle is, per cent of what it can carry, over all its parts. */
+	static int LoadPercent(const Vehicle *v)
+	{
+		uint cap = 0, has = 0;
+		for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+			cap += u->cargo_cap;
+			has += u->cargo.StoredCount();
+		}
+		if (cap == 0) return 0;
+		return static_cast<int>(std::min<uint>(100, has * 100 / cap));
+	}
+
+	/** The panel under the view: the gauge, the figures, the next stop, the state and the load. */
+	void DrawPanel(const Rect &r, const Vehicle *v) const
+	{
+		GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
+		const PixelColour light = GetColourGradient(Colours::Grey, Shade::Lightest);
+		const PixelColour dim = GetColourGradient(Colours::Grey, Shade::Normal);
+		const PixelColour red = GetColourGradient(Colours::Red, Shade::Light);
+		const PixelColour blue = GetColourGradient(Colours::LightBlue, Shade::Light);
+
+		/* The gauge: a three-quarter arc, the needle from the bottom left round to the bottom right. */
+		int rad = std::max(8, std::min(r.Height() / 2 - 3, 24));
+		int gx = r.left + rad + 6, gy = r.top + r.Height() / 2;
+		uint speed = v->GetDisplaySpeed(), max_speed = std::max<uint>(1, v->GetDisplayMaxSpeed());
+		double frac = std::min(1.0, speed / static_cast<double>(max_speed));
+		const double start = 225.0 * M_PI / 180.0, sweep = 270.0 * M_PI / 180.0;
+		const int segments = 24;
+		for (int i = 0; i < segments; i++) {
+			double a0 = start - sweep * i / segments, a1 = start - sweep * (i + 1) / segments;
+			GfxDrawLine(gx + static_cast<int>(std::lround(rad * std::cos(a0))), gy - static_cast<int>(std::lround(rad * std::sin(a0))),
+					gx + static_cast<int>(std::lround(rad * std::cos(a1))), gy - static_cast<int>(std::lround(rad * std::sin(a1))), i < segments * 3 / 4 ? light : red);
+		}
+		double na = start - sweep * frac;
+		GfxDrawLine(gx, gy, gx + static_cast<int>(std::lround((rad - 2) * std::cos(na))), gy - static_cast<int>(std::lround((rad - 2) * std::sin(na))), red);
+		GfxFillRect(gx - 1, gy - 1, gx + 1, gy + 1, light);
+
+		/* The figures beside it. */
+		int tx = gx + rad + 8;
+		int ty = r.top + 4;
+		int text_right = tx + std::max(60, r.Width() / 3);
+		DrawString(tx, text_right, ty, GetString(STR_CAB_VIEW_SPEED, PackVelocity(speed, v->type)), TextColour::White, AlignmentH::Start, false, FontSize::Large);
+		DrawString(tx, text_right, ty + GetCharacterHeight(FontSize::Large) + 1, GetString(STR_CAB_VIEW_MAX_SPEED, PackVelocity(max_speed, v->type)), TextColour::Silver, AlignmentH::Start, false, FontSize::Small);
+
+		/* The next stop and the state. */
+		int lw = std::max(40, r.Width() / 6);
+		int lx = r.right - 4 - lw;
+		int sx = text_right + 8, sright = lx - 8;
+		std::string stop;
+		const Order &o = v->current_order;
+		if (o.IsType(OT_GOTO_STATION) || o.IsType(OT_LOADING)) {
+			stop = GetString(STR_CAB_VIEW_NEXT_STOP, o.GetDestination().ToStationID());
+		} else if (o.IsType(OT_GOTO_DEPOT)) {
+			stop = GetString(STR_CAB_VIEW_TO_DEPOT);
+		} else if (o.IsType(OT_GOTO_WAYPOINT)) {
+			stop = GetString(STR_CAB_VIEW_NEXT_STOP, o.GetDestination().ToStationID());
+		} else {
+			stop = GetString(STR_CAB_VIEW_NO_DESTINATION);
+		}
+		DrawString(sx, sright, ty, stop, TextColour::White);
+		StringID state = STR_CAB_VIEW_STATE_RUNNING;
+		if (v->vehstatus.Test(VehState::Stopped)) {
+			state = STR_CAB_VIEW_STATE_STOPPED;
+		} else if (v->breakdown_ctr != 0) {
+			state = STR_CAB_VIEW_STATE_BROKEN;
+		} else if (o.IsType(OT_LOADING)) {
+			state = STR_CAB_VIEW_STATE_LOADING;
+		}
+		int state_y = ty + GetCharacterHeight(FontSize::Normal) + 2;
+		std::string state_text = GetString(state);
+		DrawString(sx, sright, state_y, state_text, TextColour::FromString);
+		if (v->cab_speed_limit != 0) {
+			/* Held to a speed from here: said beside the state. */
+			int sw = GetStringBoundingBox(state_text).width;
+			DrawString(sx + sw + 8, sright, state_y, GetString(STR_CAB_VIEW_LIMIT, PackVelocity(v->cab_speed_limit, v->type)), TextColour::FromString);
+		}
+
+		/* The load, as a figure and a bar. */
+		int percent = LoadPercent(v);
+		DrawString(lx, r.right - 4, ty, GetString(STR_CAB_VIEW_LOAD, percent), TextColour::White, AlignmentH::End);
+		int by = ty + GetCharacterHeight(FontSize::Normal) + 4;
+		GfxFillRect(lx, by, r.right - 4, by + 4, dim);
+		if (percent > 0) GfxFillRect(lx, by, lx + (lw * percent) / 100, by + 4, blue);
+	}
+
+	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
+		if (v == nullptr) return;
+		switch (widget) {
+			case WID_CV_VEHICLE:
+				ShowVehicleViewWindow(v);
+				break;
+			case WID_CV_CENTRE:
+				ScrollMainWindowTo(v->x_pos, v->y_pos, v->z_pos);
+				break;
+			case WID_CV_STOP:
+				Command<Commands::StartStopVehicle>::Post(STR_ERROR_CAN_T_STOP_START_TRAIN + to_underlying(v->type), v->tile, v->index, false);
+				break;
+			case WID_CV_BRAKE:
+			case WID_CV_THROTTLE: {
+				/* The brake lowers the speed the vehicle is held to by a step from where it is now; the throttle
+				 * raises it, and past the vehicle's own top speed lets it go free again (the limit 0). */
+				int max_speed = std::max(1, v->GetDisplayMaxSpeed());
+				int step = std::max(5, max_speed / 10);
+				int now = v->GetDisplaySpeed();
+				int limit = v->cab_speed_limit;
+				int base = limit != 0 ? std::min(limit, now) : now;
+				int next;
+				if (widget == WID_CV_BRAKE) {
+					next = std::max(5, base - step);
+				} else {
+					base = limit != 0 ? limit : now;
+					next = base + step;
+					if (next >= max_speed) next = 0;
+				}
+				Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(next));
+				break;
+			}
+			default:
+				break;
+		}
+	}
+};
+
+static WindowDesc _cab_view_desc(
+	WindowPosition::Automatic, {}, 0, 0,
+	WindowClass::CabView, WindowClass::None,
+	{},
+	_nested_cab_view_widgets
+);
+
+/** Open the view from the cab of a vehicle, or bring it to the front. */
+void ShowCabViewWindow(const Vehicle *v)
+{
+	if (v == nullptr) return;
+	AllocateWindowDescFront<CabViewWindow>(_cab_view_desc, v->index);
+}
+
+/** The rig: every cab view open, with how long its last picture took and what was in it. */
+std::string DescribeCabViews()
+{
+	std::string s;
+	for (const Window *w : Window::Iterate()) {
+		if (w->window_class != WindowClass::CabView) continue;
+		const CabViewWindow *cw = static_cast<const CabViewWindow *>(w);
+		s += fmt::format("kabina vozidla {}: {}x{} px, {:.1f} ms, {} dlazdic, {} plakatu, smer {:.0f} stupnu; ", static_cast<int32_t>(w->window_number), cw->picture.width, cw->picture.height,
+				cw->camera.ms, cw->camera.tiles, cw->camera.billboards, cw->camera.heading * 180.0 / M_PI);
+	}
+	return s.empty() ? "zadna kabina" : s;
+}

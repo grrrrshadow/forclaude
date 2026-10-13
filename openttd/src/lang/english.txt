@@ -2214,6 +2214,31 @@ STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
 STR_CONFIG_SETTING_SPRITE_MITCHELL                              :Use Mitchell for scaling sprites down: {STRING2}
 STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :The 8x and 4x zoom of a 32bpp set that draws only finer pictures (zin16 or zin8) are made straight from its finest picture with Mitchell's filter: sharper edges, rails and lettering, light parts not darkened. Off, they are made by halves from the mean of each 2x2 block. Mitchell takes about twice as long to load a sprite, which can show as a short stutter when many new pictures appear at once. Sets that draw their own 8x and 4x are not touched
 STR_CONFIG_SETTING_THREE_D                                      :3D: turning previews and turning the map view: {STRING2}
+STR_CAB_VIEW_CAPTION                                            :{WHITE}Cab view: {VEHICLE}
+STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vehicle
+STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Open the vehicle's window
+STR_CAB_VIEW_CENTRE                                             :{BLACK}On the map
+STR_CAB_VIEW_CENTRE_TOOLTIP                                     :{BLACK}Put the main view on the vehicle
+STR_CAB_VIEW_STOP                                               :{BLACK}Stop
+STR_CAB_VIEW_GO                                                 :{BLACK}Go
+STR_CAB_VIEW_STOP_TOOLTIP                                       :{BLACK}Stop the vehicle, or start it again
+STR_CAB_VIEW_BRAKE                                              :{BLACK}Brake -
+STR_CAB_VIEW_BRAKE_TOOLTIP                                      :{BLACK}Hold the vehicle to a lower speed, a step at a time
+STR_CAB_VIEW_THROTTLE                                           :{BLACK}Throttle +
+STR_CAB_VIEW_THROTTLE_TOOLTIP                                   :{BLACK}Let the vehicle go faster, a step at a time; past its top speed it goes as its orders say
+STR_CAB_VIEW_LIMIT                                              :{YELLOW}held to {VELOCITY}
+STR_CAB_VIEW_SPEED                                              :{VELOCITY}
+STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
+STR_CAB_VIEW_NEXT_STOP                                          :Next stop: {STATION}
+STR_CAB_VIEW_TO_DEPOT                                           :Next stop: the depot
+STR_CAB_VIEW_NO_DESTINATION                                     :Next stop: none
+STR_CAB_VIEW_STATE_RUNNING                                      :{GREEN}Running
+STR_CAB_VIEW_STATE_STOPPED                                      :{RED}Stopped
+STR_CAB_VIEW_STATE_LOADING                                      :{YELLOW}Loading
+STR_CAB_VIEW_STATE_BROKEN                                       :{RED}Broken down
+STR_CAB_VIEW_LOAD                                               :Load: {NUM}%
+STR_CAB_VIEW_BUTTON                                             :{BLACK}Cab
+STR_CAB_VIEW_BUTTON_TOOLTIP                                     :{BLACK}The view from the cab: the world ahead in 3D
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :The map view turns to any angle: hold the middle mouse button and drag sideways, or press Y and N (15 degrees a press, with Ctrl 45). Two clicks of the middle button, Home, or the space bar with no news or error to close, put the view back to north. The turned view is for looking: build facing north, in 2D. Vehicles, stations and this game's own buildings turn with it from their eight directions, the original houses as boxes made of their own pictures. A vehicle in the purchase list and this game's own industries get a preview that turns. Off, the game is as it always was, to the pixel
 
 ###length 5

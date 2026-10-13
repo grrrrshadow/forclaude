@@ -665,6 +665,9 @@ static int UpdateAircraftSpeed(Aircraft *v, uint speed_limit = SPEED_LIMIT_NONE,
 	uint spd = v->acceleration * 77;
 	uint8_t t;
 
+	/* The player holding it to a speed from its cab (cab_view.h). */
+	if (v->cab_speed_limit != 0) speed_limit = std::min<uint>(speed_limit, static_cast<uint>(v->CabSpeedLimitInternal()));
+
 	/* Adjust speed limits by plane speed factor to prevent taxiing
 	 * and take-off speeds being too low. */
 	speed_limit *= _settings_game.vehicle.plane_speed;

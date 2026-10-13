@@ -543,7 +543,7 @@ inline int RoadVehicle::GetCurrentMaxSpeed() const
 		}
 	}
 
-	return std::min(max_speed, this->current_order.GetMaxSpeed() * 2);
+	return std::min<int>({max_speed, this->current_order.GetMaxSpeed() * 2, this->CabSpeedLimitInternal()});
 }
 
 /**

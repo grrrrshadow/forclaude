@@ -65,6 +65,7 @@
 #include "fontcache.h"
 #include "screenshot.h"
 #include "three_d.h"
+#include "cab_view.h"
 #include "progress.h"
 #include "genworld.h"
 #include "strings_func.h"
@@ -8760,6 +8761,44 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowTo(found->x_pos, found->y_pos, found->z_pos, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction));
+	} else if (what == "jed") {
+		/* The rig: start a vehicle that stands (in its shed): 'test3d jed <type> <unit number>', type 0 train, 1 road, 2 ship, 3 aircraft. */
+		auto type = number(2), unit = number(3);
+		if (!type.has_value() || !unit.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d jed needs a vehicle type (0 train, 1 road, 2 ship, 3 aircraft) and a unit number.");
+			return true;
+		}
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			AutoRestoreBackup cur_company(_current_company, u->owner);
+			CommandCost r = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, u->index, false);
+			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: jed {} {}: {}", *type, *unit, r.Succeeded() ? "vyjizdi" : "NEJDE");
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: jed {} {}: takove vozidlo neni.", *type, *unit);
+	} else if (what == "kabina") {
+		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
+		extern std::string DescribeCabViews();
+		if (argv.size() > 2 && argv[2] == "cas") {
+			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCabViews());
+			return true;
+		}
+		auto n = number(2);
+		int want = n.value_or(0), seen = 0;
+		const Vehicle *found = nullptr;
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!u->IsPrimaryVehicle() || u->vehstatus.Test(VehState::Hidden)) continue;
+			if (seen++ == want) {
+				found = u;
+				break;
+			}
+		}
+		if (found == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: vozidlo {} neni.", want);
+			return true;
+		}
+		ShowCabViewWindow(found);
+		IConsolePrint(CC_DEFAULT, "test3d: kabina vozidla {} (typ {}) otevrena", found->unitnumber, to_underlying(found->type));
 	} else if (what == "motory") {
 		/* The rig: every rail engine whose name has the text (all without), with what 'zatacka' asks of it. */
 		std::string want = argv.size() > 2 ? std::string(argv[2]) : "";

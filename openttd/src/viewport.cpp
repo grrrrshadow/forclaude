@@ -93,6 +93,10 @@
 #include "framerate_type.h"
 #include "viewport_cmd.h"
 #include "three_d.h"
+#include "cab_view.h"
+
+extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, off while the 3D views collect
+#include "fileio_type.h"
 #include "transparency.h"
 #include "console_func.h"
 #include "industry.h"
@@ -2767,7 +2771,17 @@ static void ViewportDoDrawTurned()
 	_turned_vehicle_pictures.clear();
 	AutoRestoreBackup drawing_turned(_drawing_turned, true);
 
-	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. */
+	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. The
+	 * catenary and the fences along the rails stay out (the player: "turn them off in these 3D views"): they are
+	 * lines of the north-up view, and turned they stand about the track as posts and ribbons. */
+	TransparencyOptions no_catenary = _invisibility_opt;
+	no_catenary.Set(TransparencyOption::Catenary);
+	TransparencyOptions see_through = _transparency_opt;
+	see_through.Set(TransparencyOption::Catenary);
+	AutoRestoreBackup invisibility_backup(_invisibility_opt, no_catenary);
+	AutoRestoreBackup transparency_backup(_transparency_opt, see_through);
+	AutoRestoreBackup fences_backup(_settings_client.gui.show_rail_fences, false);
+	AutoRestoreBackup field_fences_backup(_draw_fences, false);
 	_vd.dpi = cdpi;
 	double t_collect = 0;
 	for (TurnedTile &t : tiles) {
@@ -2904,6 +2918,14 @@ static void ViewportDoDrawTurned()
 		 * turned footprint, never snapping, so the platform's edge stays by the track; anything of a height is
 		 * a box as on a house tile. */
 		bool station_type = tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings);
+		/* A fence of a farm, an industry or a station -- a thin long low box -- is a line of the north-up view and
+		 * stands about as a ribbon turned: not drawn (the player: "turn the fences off in these 3D views"). */
+		for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+			ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+			if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+			int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1, ez = ps.zmax - ps.zmin + 1;
+			if (((ex >= 8 && ey <= 2) || (ey >= 8 && ex <= 2)) && ez < TILE_HEIGHT) ps.box_kind = 4;
+		}
 		if (boxed_type || station_type) {
 			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 				ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
@@ -5236,4 +5258,669 @@ void ViewportData::CancelFollow(const Window &viewport_window)
 	this->dest_scrollpos_x = this->scrollpos_x;
 	this->dest_scrollpos_y = this->scrollpos_y;
 	this->follow_vehicle = VehicleID::Invalid();
+}
+
+/*
+ * ==========================================================================================
+ * The cab view (cab_view.h): the world ahead of a vehicle in perspective, from the eye at its
+ * front. The same lists the turned view collects, drawn by a perspective rasterizer with a
+ * depth buffer: the ground from the block's north-up texture, everything standing as a
+ * billboard of its sprite. Docs: docs/decouple_three_d.md.
+ * ==========================================================================================
+ */
+
+/** True units of the cab view to a unit of height (z): a height level, 8 units of z, stands 3.27 units of x and y tall in the game's projection (30 degrees above the horizon). */
+static constexpr double CAB_Z_SCALE = 0.408;
+/** A pixel of a sprite at the normal zoom in world units: across (its width) and up (its height), from the game's projection. */
+static constexpr double CAB_PX_ACROSS = 0.354;
+static constexpr double CAB_PX_UP = 0.408;
+static constexpr double CAB_NEAR = 2.0;        ///< world units ahead of the eye: nearer is cut off
+static constexpr int CAB_RANGE_TILES = 20;     ///< how far the view reaches, tiles
+static constexpr double CAB_FOV_TAN = 1.0;     ///< the tangent of half the horizontal field of view (90 degrees)
+static constexpr int CAB_EYE_Z = 14;           ///< the eye this many units of z above the vehicle's position
+static constexpr double CAB_EYE_AHEAD = 5.0;   ///< the eye this far ahead of the vehicle's position, world units
+static constexpr double CAB_TURN_RATE = 0.22;  ///< how much of the way to the vehicle's direction the eye turns a frame
+static constexpr double CAB_HAZE_FROM = 6.0 * TILE_SIZE; ///< the haze begins this far away
+static constexpr size_t CAB_TEXTURES_KEPT = 4096; ///< sprites kept as textures for the billboards
+
+/** A point in the eye's frame: forward, right and up from the eye (world units, up already scaled), with its texture pixel. */
+struct CabPoint {
+	double f, r, u, tu, tv;
+};
+
+/** A point on the picture with what the perspective needs: 1/depth and the texture pixel over depth. */
+struct CabVertex {
+	double sx, sy, iw, uw, vw;
+};
+
+/** The eye. */
+struct CabEye {
+	double x, y, z;  ///< world position (z in the game's units)
+	double fx, fy;   ///< the direction looked along
+	double rx, ry;   ///< the direction to the right
+	double focal;    ///< pixels: a unit across at a unit of depth
+	double cx, cy;   ///< the middle of the picture: the horizon is at cy
+};
+
+/** A sprite drawn into a texture for a billboard or a box. */
+struct CabTexture {
+	int w = 0, h = 0;
+	int ox = 0, oy = 0; ///< where the texture's top left is in the north-up virtual coordinates the sprite was drawn at (RemapCoords())
+	std::vector<uint32_t> px;
+	uint64_t used = 0;
+};
+static std::map<uint64_t, CabTexture> _cab_textures;
+static uint64_t _cab_texture_clock = 0;
+static std::vector<uint32_t> _cab_big;   ///< the north-up texture of the ground ahead
+static std::vector<float> _cab_depth;    ///< 1/depth of every pixel of the picture: the bigger the nearer, 0 nothing
+
+static inline CabPoint CabToEye(const CabEye &eye, double wx, double wy, double wz, double tu, double tv)
+{
+	double dx = wx - eye.x, dy = wy - eye.y;
+	return {dx * eye.fx + dy * eye.fy, dx * eye.rx + dy * eye.ry, (wz - eye.z) * CAB_Z_SCALE, tu, tv};
+}
+
+static inline CabVertex CabProject(const CabEye &eye, const CabPoint &p)
+{
+	double iw = 1.0 / p.f;
+	return {eye.cx + p.r * eye.focal * iw, eye.cy - p.u * eye.focal * iw, iw, p.tu * iw, p.tv * iw};
+}
+
+/** Cut a polygon to what lies ahead of the near plane. */
+static void CabClipNear(std::vector<CabPoint> &poly)
+{
+	std::vector<CabPoint> out;
+	size_t n = poly.size();
+	for (size_t i = 0; i < n; i++) {
+		const CabPoint &p = poly[i], &q = poly[(i + 1) % n];
+		bool pin = p.f >= CAB_NEAR, qin = q.f >= CAB_NEAR;
+		if (pin) out.push_back(p);
+		if (pin != qin) {
+			double t = (CAB_NEAR - p.f) / (q.f - p.f);
+			out.push_back({CAB_NEAR, p.r + (q.r - p.r) * t, p.u + (q.u - p.u) * t, p.tu + (q.tu - p.tu) * t, p.tv + (q.tv - p.tv) * t});
+		}
+	}
+	poly.swap(out);
+}
+
+/**
+ * Fill a triangle of the picture with a texture in perspective: 1/depth and the texture pixel over depth change
+ * linearly across the picture, so each pixel's texture pixel is their quotient. A pixel is drawn where the
+ * triangle is nearer than what is there.
+ * @param fill_holes take the nearest drawn pixel of the texture where it has none (the diamonds of the ground)
+ */
+static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes)
+{
+	double area = (b.sx - a.sx) * (c.sy - a.sy) - (b.sy - a.sy) * (c.sx - a.sx);
+	if (std::abs(area) < 1e-9) return;
+	auto grad = [&](double va, double vb, double vc, double &ddx, double &ddy) {
+		ddx = ((vb - va) * (c.sy - a.sy) - (vc - va) * (b.sy - a.sy)) / area;
+		ddy = ((vc - va) * (b.sx - a.sx) - (vb - va) * (c.sx - a.sx)) / area;
+	};
+	double diw_dx, diw_dy, duw_dx, duw_dy, dvw_dx, dvw_dy;
+	grad(a.iw, b.iw, c.iw, diw_dx, diw_dy);
+	grad(a.uw, b.uw, c.uw, duw_dx, duw_dy);
+	grad(a.vw, b.vw, c.vw, dvw_dx, dvw_dy);
+	double sign = area > 0 ? 1.0 : -1.0;
+	int y0 = std::max(0, static_cast<int>(std::ceil(std::min({a.sy, b.sy, c.sy}) - 0.5)));
+	int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a.sy, b.sy, c.sy}) - 0.5)));
+	for (int y = y0; y <= y1; y++) {
+		double yc = y + 0.5;
+		double xlo = -1e18, xhi = 1e18;
+		auto edge = [&](const CabVertex &p, const CabVertex &q) {
+			double k = -(q.sy - p.sy) * sign;
+			double e0 = ((q.sx - p.sx) * (yc - p.sy) + (q.sy - p.sy) * p.sx) * sign;
+			if (k > 1e-12) {
+				xlo = std::max(xlo, -e0 / k);
+			} else if (k < -1e-12) {
+				xhi = std::min(xhi, -e0 / k);
+			} else if (e0 < 0) {
+				xlo = 1e18;
+			}
+		};
+		edge(a, b);
+		edge(b, c);
+		edge(c, a);
+		int xs = std::max(0, static_cast<int>(std::ceil(xlo - 0.5)));
+		int xe = std::min(w - 1, static_cast<int>(std::floor(xhi - 0.5)));
+		if (xs > xe) continue;
+		double ox = xs + 0.5 - a.sx, oy = yc - a.sy;
+		double iw = a.iw + diw_dx * ox + diw_dy * oy;
+		double uw = a.uw + duw_dx * ox + duw_dy * oy;
+		double vw = a.vw + dvw_dx * ox + dvw_dy * oy;
+		uint32_t *row = dst + static_cast<size_t>(y) * w;
+		float *zrow = zb + static_cast<size_t>(y) * w;
+		for (int x = xs; x <= xe; x++, iw += diw_dx, uw += duw_dx, vw += dvw_dx) {
+			if (iw <= zrow[x]) continue;
+			double inv = 1.0 / iw;
+			int iu = static_cast<int>(std::floor(uw * inv)), iv = static_cast<int>(std::floor(vw * inv));
+			if (iu < 0 || iv < 0 || iu >= tw || iv >= th) continue;
+			uint32_t p = tex[static_cast<size_t>(iv) * tw + iu];
+			if (p == 0 && fill_holes) {
+				static const int near[24][2] = {
+					{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1},
+					{2, 0}, {-2, 0}, {0, 2}, {0, -2}, {2, 1}, {-2, 1}, {2, -1}, {-2, -1},
+					{3, 0}, {-3, 0}, {0, 3}, {0, -3}, {3, 1}, {-3, 1}, {3, -1}, {-3, -1},
+				};
+				for (const auto &[dx, dy] : near) {
+					int nu = iu + dx, nv = iv + dy;
+					if (nu < 0 || nv < 0 || nu >= tw || nv >= th) continue;
+					p = tex[static_cast<size_t>(nv) * tw + nu];
+					if (p != 0) break;
+				}
+			}
+			if (p == 0) continue;
+			row[x] = p;
+			zrow[x] = static_cast<float>(iw);
+		}
+	}
+}
+
+/** Draw a polygon of the eye's frame, cut to the near plane, as a fan of triangles. */
+static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, bool fill_holes)
+{
+	CabClipNear(poly);
+	if (poly.size() < 3) return;
+	CabVertex v0 = CabProject(eye, poly[0]);
+	CabVertex prev = CabProject(eye, poly[1]);
+	for (size_t i = 2; i < poly.size(); i++) {
+		CabVertex cur = CabProject(eye, poly[i]);
+		CabRasterTriangle(dst, zb, w, h, tex, tw, th, v0, prev, cur, fill_holes);
+		prev = cur;
+	}
+}
+
+/**
+ * A sprite as a texture at the normal zoom, with its child sprites: the sprite's top left at 0,0 of the texture.
+ * Kept for the next frames when it has no children and no sub-sprite (a tree, a house, a vehicle's picture).
+ */
+static const CabTexture *CabSpriteTexture(const ParentSpriteToDraw &ps)
+{
+	const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
+	int w = UnScaleByZoom(spr->width, ZoomLevel::Normal), h = UnScaleByZoom(spr->height, ZoomLevel::Normal);
+	if (w <= 0 || h <= 0) return nullptr;
+	bool cacheable = ps.first_child < 0 && ps.sub == nullptr;
+	uint64_t key = (static_cast<uint64_t>(ps.image) << 32) ^ static_cast<uint64_t>(ps.pal);
+	if (cacheable) {
+		auto it = _cab_textures.find(key);
+		if (it != _cab_textures.end()) {
+			it->second.used = ++_cab_texture_clock;
+			return &it->second;
+		}
+		if (_cab_textures.size() >= CAB_TEXTURES_KEPT) {
+			/* The oldest half goes. */
+			std::vector<std::pair<uint64_t, uint64_t>> ages;
+			for (const auto &e : _cab_textures) ages.emplace_back(e.second.used, e.first);
+			std::sort(ages.begin(), ages.end());
+			for (size_t i = 0; i < ages.size() / 2; i++) _cab_textures.erase(ages[i].second);
+		}
+	}
+	static CabTexture scratch;
+	CabTexture &t = cacheable ? _cab_textures[key] : scratch;
+	t.w = w;
+	t.h = h;
+	t.used = ++_cab_texture_clock;
+	t.px.assign(static_cast<size_t>(w) * h, 0);
+	/* The texture's origin on the whole pixel at or before the sprite's top left, so the sprite lands at 0,0. */
+	int mask = ScaleByZoom(-1, ZoomLevel::Normal);
+	t.ox = ps.left & mask;
+	t.oy = ps.top & mask;
+	DrawPixelInfo tdpi{
+		.dst_ptr = t.px.data(),
+		.left = t.ox,
+		.top = t.oy,
+		.width = ScaleByZoom(w, ZoomLevel::Normal),
+		.height = ScaleByZoom(h, ZoomLevel::Normal),
+		.pitch = w,
+		.zoom = ZoomLevel::Normal
+	};
+	AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+	AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+	DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+	int child_idx = ps.first_child;
+	while (child_idx >= 0) {
+		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+		child_idx = cs.next;
+		if (cs.relative) {
+			DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+		} else {
+			DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+		}
+	}
+	if (_debug_misc_level >= 6 && cacheable) {
+		/* The rig: the texture as a PPM in the working directory. */
+		auto f = FileHandle::Open(fmt::format("cab_tex_{}.ppm", ps.image & SPRITE_MASK), "wb");
+		if (f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", w, h);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (uint32_t p : t.px) {
+				Colour c(p);
+				uint8_t rgb[3] = {c.r, c.g, c.b};
+				fwrite(rgb, 1, 3, *f);
+			}
+		}
+	}
+	return &t;
+}
+
+/**
+ * A sprite as a box in perspective: its bounding box, the sprite's pixels laid over the top and the two walls the
+ * sprite shows (facing south-west and south-east), and over the two it never shows mirrored from those -- as the
+ * turned view does it (DrawTurnedBoxes()), but at any angle. Every face's corner takes the texture pixel of the
+ * world point where the game draws it north-up (RemapCoords()).
+ * @param ps the sprite with its box
+ */
+static void CabDrawBox(uint32_t *dst, float *zb, int w, int h, const CabTexture &tex, const CabEye &eye, const ParentSpriteToDraw &ps)
+{
+	const double x0 = ps.xmin, x1 = ps.xmax + 1, y0 = ps.ymin, y1 = ps.ymax + 1, z0 = ps.zmin, z1 = ps.zmax + 1;
+	const double scale = 1.0 / ZOOM_BASE;
+	auto at = [&](double wx, double wy, double wz, double tx, double ty, double tz) {
+		double cx, cy;
+		RemapCoordsF(tx, ty, tz, cx, cy);
+		return CabToEye(eye, wx, wy, wz, (cx - tex.ox) * scale, (cy - tex.oy) * scale);
+	};
+	auto same = [&](double x, double y, double z) { return at(x, y, z, x, y, z); };
+	auto face = [&](std::vector<CabPoint> poly) { CabDrawPolygon(dst, zb, w, h, tex.px.data(), tex.w, tex.h, std::move(poly), eye, true); };
+	/* The top. */
+	face({same(x0, y0, z1), same(x0, y1, z1), same(x1, y1, z1), same(x1, y0, z1)});
+	/* The walls the sprite shows: facing +X (south-west) and +Y (south-east). */
+	face({same(x1, y0, z0), same(x1, y1, z0), same(x1, y1, z1), same(x1, y0, z1)});
+	face({same(x0, y1, z0), same(x1, y1, z0), same(x1, y1, z1), same(x0, y1, z1)});
+	/* The two it never shows take theirs mirrored through the middle. */
+	face({at(x0, y0, z0, x1, y0, z0), at(x0, y1, z0, x1, y1, z0), at(x0, y1, z1, x1, y1, z1), at(x0, y0, z1, x1, y0, z1)});
+	face({at(x0, y0, z0, x0, y1, z0), at(x1, y0, z0, x1, y1, z0), at(x1, y0, z1, x1, y1, z1), at(x0, y0, z1, x0, y1, z1)});
+}
+
+/** A thing to draw standing: a sprite as a billboard facing the eye, a wall along a thin long box (a fence), or a box. */
+struct CabBillboard {
+	double f;          ///< its depth, for the order
+	double bx, by, bz; ///< the world point its foot stands on (z in the game's units)
+	int kind;          ///< 0 a billboard facing the eye; 1 a wall along x from w0 to w1; 2 a wall along y; 3 a box of its bounding box (a building, a platform)
+	double w0, w1;     ///< the wall's ends along its axis
+	ParentSpriteToDraw ps;
+};
+
+/**
+ * Draw the view from the cab of a vehicle.
+ * @param v the vehicle (its first piece)
+ * @param width,height the picture
+ * @param camera the eye between frames: it turns towards the vehicle's direction over a few frames
+ * @param[out] out the picture
+ * @return whether there is a picture (a 32bpp blitter)
+ */
+bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out)
+{
+	if (v == nullptr || width <= 0 || height <= 0) return false;
+	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return false;
+	double t0 = TurnedNow();
+	out.width = width;
+	out.height = height;
+	out.pixels.assign(static_cast<size_t>(width) * height, 0);
+	_cab_depth.assign(static_cast<size_t>(width) * height, 0.0f);
+	uint32_t *dst = out.pixels.data();
+	float *zb = _cab_depth.data();
+
+	/* The eye: at the front of the vehicle, looking where it goes; it turns towards a new direction over a few frames. */
+	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
+	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
+	double target = camera.valid ? camera.heading : std::atan2(-1.0, -1.0);
+	if (v->direction != Direction::Invalid) target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)]));
+	if (!camera.valid) {
+		camera.heading = target;
+		camera.valid = true;
+	} else {
+		double d = std::remainder(target - camera.heading, 2 * M_PI);
+		camera.heading = std::remainder(camera.heading + d * CAB_TURN_RATE, 2 * M_PI);
+	}
+	CabEye eye;
+	eye.fx = std::cos(camera.heading);
+	eye.fy = std::sin(camera.heading);
+	eye.rx = eye.fy;
+	eye.ry = -eye.fx;
+	eye.x = v->x_pos + eye.fx * CAB_EYE_AHEAD;
+	eye.y = v->y_pos + eye.fy * CAB_EYE_AHEAD;
+	eye.z = v->z_pos + CAB_EYE_Z;
+	eye.focal = (width / 2.0) / CAB_FOV_TAN;
+	eye.cx = width / 2.0;
+	eye.cy = height * 0.5;
+
+	/* The sky down to the horizon, the far ground under it. */
+	const Colour haze(165, 200, 240);
+	for (int y = 0; y < height; y++) {
+		Colour c;
+		if (y < eye.cy) {
+			double t = y / eye.cy;
+			c = Colour(static_cast<uint8_t>(60 + (haze.r - 60) * t), static_cast<uint8_t>(110 + (haze.g - 110) * t), static_cast<uint8_t>(210 + (haze.b - 210) * t));
+		} else {
+			c = Colour(84, 120, 64);
+		}
+		std::fill_n(dst + static_cast<size_t>(y) * width, width, c.data);
+	}
+
+	/* In a tunnel (hidden): the dark, with the light at its end. */
+	if (v->vehstatus.Test(VehState::Hidden)) {
+		std::fill(out.pixels.begin(), out.pixels.end(), Colour(8, 8, 10).data);
+		int lw = std::max(4, width / 14), lh = std::max(3, height / 14);
+		int lx = width / 2 - lw / 2, ly = static_cast<int>(eye.cy) - lh / 2;
+		for (int y = std::max(0, ly); y < std::min(height, ly + lh); y++) std::fill_n(dst + static_cast<size_t>(y) * width + std::max(0, lx), std::min(lw, width - lx), haze.data);
+		camera.ms = TurnedNow() - t0;
+		camera.tiles = 0;
+		camera.billboards = 0;
+		return true;
+	}
+
+	/* 1. The tiles ahead: within reach and the field of view, with a margin. */
+	struct CabTile {
+		int x, y;
+		double f;
+		Slope slope;
+		int z;
+		size_t first, end;
+		bool building;
+	};
+	std::vector<CabTile> tiles;
+	int tcx = v->x_pos / static_cast<int>(TILE_SIZE), tcy = v->y_pos / static_cast<int>(TILE_SIZE);
+	for (int ty = tcy - CAB_RANGE_TILES; ty <= tcy + CAB_RANGE_TILES; ty++) {
+		for (int tx = tcx - CAB_RANGE_TILES; tx <= tcx + CAB_RANGE_TILES; tx++) {
+			if (!IsInsideBS(tx, 0, Map::SizeX()) || !IsInsideBS(ty, 0, Map::SizeY())) continue;
+			CabPoint c = CabToEye(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, eye.z, 0, 0);
+			if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE) continue;
+			if (std::abs(c.r) > c.f * CAB_FOV_TAN + 3.0 * TILE_SIZE) continue;
+			tiles.push_back({tx, ty, c.f, SLOPE_FLAT, 0, 0, 0, false});
+		}
+	}
+	camera.tiles = static_cast<int>(tiles.size());
+	camera.billboards = 0;
+	if (tiles.empty()) {
+		camera.ms = TurnedNow() - t0;
+		return true;
+	}
+
+	/* 2. Their draw procedures, collected against a north-up box that holds all of them, so nothing is clipped. */
+	int tx0 = INT32_MAX, tx1 = INT32_MIN, ty0 = INT32_MAX, ty1 = INT32_MIN;
+	for (const CabTile &t : tiles) {
+		tx0 = std::min(tx0, t.x); tx1 = std::max(tx1, t.x);
+		ty0 = std::min(ty0, t.y); ty1 = std::max(ty1, t.y);
+	}
+	const ZoomLevel zoom = ZoomLevel::Normal;
+	const int mask = ScaleByZoom(-1, zoom);
+	const int zmax = (_settings_game.construction.map_height_limit + _settings_game.construction.max_bridge_height) * TILE_HEIGHT + MAX_BUILDING_PIXELS;
+	DrawPixelInfo cdpi{};
+	cdpi.zoom = zoom;
+	{
+		int cl = INT32_MAX, cr = INT32_MIN, ct = INT32_MAX, cb = INT32_MIN;
+		for (int corner = 0; corner < 4; corner++) {
+			for (int zz : {0, zmax}) {
+				Point p = RemapCoords(((corner & 1) ? tx1 + 1 : tx0) * TILE_SIZE, ((corner & 2) ? ty1 + 1 : ty0) * TILE_SIZE, zz);
+				cl = std::min(cl, p.x); cr = std::max(cr, p.x);
+				ct = std::min(ct, p.y); cb = std::max(cb, p.y);
+			}
+		}
+		cdpi.left = (cl - MAX_TILE_EXTENT_LEFT) & mask;
+		cdpi.top = (ct - MAX_TILE_EXTENT_TOP) & mask;
+		cdpi.width = (cr + MAX_TILE_EXTENT_RIGHT - cdpi.left + ~mask) & mask;
+		cdpi.height = (cb + MAX_TILE_EXTENT_BOTTOM - cdpi.top + ~mask) & mask;
+	}
+	_vd.tile_sprites_to_draw.clear();
+	_vd.parent_sprites_to_draw.clear();
+	_vd.child_screen_sprites_to_draw.clear();
+	_vd.last_child = LAST_CHILD_NONE;
+	_vd.dpi = cdpi;
+	AutoRestoreBackup cur_dpi_backup(_cur_dpi, &_vd.dpi);
+	std::vector<char> is_foundation;
+	std::vector<uint8_t> ps_kind;
+	/* The catenary stays out: its wires are lines of the north-up view and make no sense from here (to come as wires of their own). */
+	TransparencyOptions no_catenary = _invisibility_opt;
+	no_catenary.Set(TransparencyOption::Catenary);
+	TransparencyOptions see_through = _transparency_opt;
+	see_through.Set(TransparencyOption::Catenary); // invisibility counts only with the transparency set too (IsInvisibilitySet())
+	AutoRestoreBackup invisibility_backup(_invisibility_opt, no_catenary);
+	AutoRestoreBackup transparency_backup(_transparency_opt, see_through);
+	/* The fences along the rails too: lines of the north-up view, posts or ribbons from here. */
+	AutoRestoreBackup fences_backup(_settings_client.gui.show_rail_fences, false);
+	AutoRestoreBackup field_fences_backup(_draw_fences, false);
+	for (CabTile &t : tiles) {
+		_cur_ti.x = t.x * TILE_SIZE;
+		_cur_ti.y = t.y * TILE_SIZE;
+		_cur_ti.tile = TileXY(t.x, t.y);
+		TileType tile_type = GetTileType(_cur_ti.tile);
+		std::tie(_cur_ti.tileh, _cur_ti.z) = GetTilePixelSlope(_cur_ti.tile);
+		_vd.foundation_part = FoundationPart::None;
+		_vd.foundation[FoundationPart::Normal] = -1;
+		_vd.foundation[FoundationPart::Halftile] = -1;
+		_vd.last_foundation_child[FoundationPart::Normal] = LAST_CHILD_NONE;
+		_vd.last_foundation_child[FoundationPart::Halftile] = LAST_CHILD_NONE;
+		t.first = _vd.tile_sprites_to_draw.size();
+		size_t first_parent = _vd.parent_sprites_to_draw.size();
+		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
+		t.end = _vd.tile_sprites_to_draw.size();
+		t.slope = _cur_ti.tileh;
+		t.z = _cur_ti.z;
+		t.building = tile_type == TileType::House || tile_type == TileType::Industry;
+		is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
+		for (int part = 0; part < 2; part++) {
+			int idx = _vd.foundation[static_cast<FoundationPart>(part)];
+			if (idx >= static_cast<int>(first_parent) && idx < static_cast<int>(_vd.parent_sprites_to_draw.size())) is_foundation[idx] = 1;
+		}
+		/* What stands on the tile is a box of its sprite on a house, industry, object or station tile (a tree is a billboard). */
+		uint8_t kind = (tile_type == TileType::House || tile_type == TileType::Industry || tile_type == TileType::Object) ? 1 : (tile_type == TileType::Station ? 2 : 0);
+		ps_kind.resize(_vd.parent_sprites_to_draw.size(), kind);
+	}
+	is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
+	ps_kind.resize(_vd.parent_sprites_to_draw.size(), 0);
+
+	/* 3. The ground of all of them, north-up, in one texture at the normal zoom. */
+	DrawPixelInfo bigdpi{};
+	bigdpi.zoom = zoom;
+	int bw = 0, bh = 0;
+	{
+		int cl = INT32_MAX, cr = INT32_MIN, ct = INT32_MAX, cb = INT32_MIN;
+		for (const CabTile &t : tiles) {
+			for (int corner = 0; corner < 4; corner++) {
+				int x = t.x * TILE_SIZE + ((corner & 1) ? TILE_SIZE : 0), y = t.y * TILE_SIZE + ((corner & 2) ? TILE_SIZE : 0);
+				Point lo = RemapCoords(x, y, t.z), hi = RemapCoords(x, y, t.z + 3 * TILE_HEIGHT);
+				cl = std::min(cl, lo.x); cr = std::max(cr, lo.x);
+				ct = std::min(ct, hi.y); cb = std::max(cb, lo.y);
+			}
+		}
+		const int margin = TILE_HEIGHT * ZOOM_BASE;
+		bigdpi.left = (cl - margin) & mask;
+		bigdpi.top = (ct - margin) & mask;
+		bigdpi.width = (cr + margin - bigdpi.left + ~mask) & mask;
+		bigdpi.height = (cb + margin - bigdpi.top + ~mask) & mask;
+		bw = UnScaleByZoom(bigdpi.width, zoom);
+		bh = UnScaleByZoom(bigdpi.height, zoom);
+	}
+	const double scale = 1.0 / (1 << to_underlying(zoom));
+	if (bw > 0 && bh > 0 && static_cast<size_t>(bw) * bh <= 24u * 1024 * 1024) {
+		_cab_big.assign(static_cast<size_t>(bw) * bh, 0);
+		bigdpi.dst_ptr = _cab_big.data();
+		bigdpi.pitch = bw;
+		{
+			AutoRestoreBackup dpi_backup(_cur_dpi, &bigdpi);
+			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+			for (const CabTile &t : tiles) {
+				for (size_t i = t.first; i < t.end; i++) {
+					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+					DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+				}
+			}
+		}
+		/* The black under a building, grown over from the ground beside it. */
+		for (const CabTile &t : tiles) {
+			if (!t.building) continue;
+			Point n = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.z + GetSlopeMaxPixelZ(RemoveHalftileSlope(t.slope)));
+			Point sth = RemapCoords(t.x * TILE_SIZE + TILE_SIZE, t.y * TILE_SIZE + TILE_SIZE, t.z);
+			int x0 = Clamp(static_cast<int>((n.x - TILE_SIZE * 2 * ZOOM_BASE - bigdpi.left) * scale), 0, bw);
+			int x1 = Clamp(static_cast<int>((n.x + TILE_SIZE * 2 * ZOOM_BASE - bigdpi.left) * scale) + 1, 0, bw);
+			int y0 = Clamp(static_cast<int>((n.y - bigdpi.top) * scale), 0, bh);
+			int y1 = Clamp(static_cast<int>((sth.y - bigdpi.top) * scale) + 1, 0, bh);
+			FillTurnedFootprint(_cab_big.data(), bw, x0, y0, x1, y1);
+		}
+
+		/* 4. The ground in perspective: each tile four triangles meeting in its middle, so slopes keep their folds. */
+		static const Corner corners[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
+		static const int cxs[4] = {0, 0, TILE_SIZE, TILE_SIZE};
+		static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
+		for (const CabTile &t : tiles) {
+			if (t.first >= t.end) continue;
+			Slope s = RemoveHalftileSlope(t.slope);
+			CabPoint p[5];
+			for (int i = 0; i < 5; i++) {
+				double wx = (i < 4) ? t.x * TILE_SIZE + cxs[i] : t.x * TILE_SIZE + TILE_SIZE / 2.0;
+				double wy = (i < 4) ? t.y * TILE_SIZE + cys[i] : t.y * TILE_SIZE + TILE_SIZE / 2.0;
+				double wz = t.z + ((i < 4) ? GetSlopePixelZInCorner(s, corners[i]) : static_cast<int>(GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, s)));
+				double cx, cy;
+				RemapCoordsF(wx, wy, wz, cx, cy);
+				p[i] = CabToEye(eye, wx, wy, wz, (cx - bigdpi.left) * scale, (cy - bigdpi.top) * scale);
+			}
+			for (int i = 0; i < 4; i++) {
+				CabDrawPolygon(dst, zb, width, height, _cab_big.data(), bw, bh, {p[i], p[(i + 1) % 4], p[4]}, eye, true);
+			}
+		}
+	}
+
+	/* 5. Everything standing as a billboard facing the eye, far first: the tiles' sprites, then the other vehicles. */
+	std::vector<CabBillboard> bills;
+	for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
+		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		if (ps.image == SPR_EMPTY_BOUNDING_BOX || is_foundation[i]) continue;
+		double bx = (ps.xmin + ps.xmax + 1) * 0.5, by = (ps.ymin + ps.ymax + 1) * 0.5;
+		CabPoint c = CabToEye(eye, bx, by, ps.zmin, 0, 0);
+		if (c.f < CAB_NEAR * 0.5) continue;
+		/* What stands on a house, industry, object or station tile with a footprint is a box of its sprite: a
+		 * building or a roof of a height, a platform or a bench low and flat (a slab). A thin long box (a fence
+		 * along a tile's edge) is a wall along its length, not a billboard: a billboard of it would stand as a
+		 * tall post. The rest -- a tree, a signal, a lamp -- is a billboard. */
+		int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1, ez = ps.zmax - ps.zmin + 1;
+		int kind = 0;
+		double w0 = 0, w1 = 0;
+		if (ps_kind[i] != 0 && ex >= 2 && ey >= 2 && (ez >= TILE_HEIGHT || ps_kind[i] == 2)) {
+			kind = 3;
+		} else if (ex >= 8 && ey <= 2) {
+			kind = 1;
+			w0 = ps.xmin;
+			w1 = ps.xmax + 1;
+		} else if (ey >= 8 && ex <= 2) {
+			kind = 2;
+			w0 = ps.ymin;
+			w1 = ps.ymax + 1;
+		}
+		bills.push_back({c.f, bx, by, static_cast<double>(ps.zmin), kind, w0, w1, ps});
+	}
+	/* The other vehicles: their picture of the direction as seen from the eye, as the turned map shows them. */
+	double yaw_deg = camera.heading * 180.0 / M_PI + 135.0;
+	int step = static_cast<int>(std::lround(yaw_deg / 45.0)) & 7;
+	const Vehicle *own = v->First();
+	for (const Vehicle *u : Vehicle::Iterate()) {
+		if (u->First() == own) continue;
+		if (u->vehstatus.Test(VehState::Hidden)) continue;
+		if (u->type == VehicleType::Effect && u->sprite_cache.sprite_seq.count == 0) continue;
+		CabPoint c = CabToEye(eye, u->x_pos, u->y_pos, u->z_pos, 0, 0);
+		if (c.f < CAB_NEAR * 0.5 || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > c.f * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		VehicleSpriteSeq seq;
+		if (u->type == VehicleType::Effect || u->direction == Direction::Invalid) {
+			seq = u->sprite_cache.sprite_seq;
+		} else {
+			u->GetImage(static_cast<Direction>((to_underlying(u->direction) - step) & 7), EngineImageType::OnMap, &seq);
+			if (!seq.IsValid()) seq = u->sprite_cache.sprite_seq;
+		}
+		PaletteID pal = PAL_NONE;
+		if (u->vehstatus.Test(VehState::DefaultPalette)) pal = (u->vehstatus.Test(VehState::Crashed) || u->IsWrecked()) ? PALETTE_CRASH : GetVehiclePalette(u);
+		Point pt = RemapCoords(u->x_pos, u->y_pos, u->z_pos);
+		for (uint k = 0; k < seq.count; k++) {
+			const Sprite *spr = GetSprite(seq.seq[k].sprite & SPRITE_MASK, SpriteType::Normal);
+			ParentSpriteToDraw ps{};
+			ps.image = seq.seq[k].sprite;
+			ps.pal = (seq.seq[k].pal != PAL_NONE && !u->vehstatus.Test(VehState::Crashed)) ? seq.seq[k].pal : pal;
+			ps.sub = nullptr;
+			ps.first_child = LAST_CHILD_NONE;
+			ps.x = pt.x;
+			ps.y = pt.y;
+			ps.left = pt.x + spr->x_offs;
+			ps.top = pt.y + spr->y_offs;
+			bills.push_back({c.f, static_cast<double>(u->x_pos), static_cast<double>(u->y_pos), static_cast<double>(u->z_pos), 0, 0.0, 0.0, ps});
+		}
+	}
+	std::sort(bills.begin(), bills.end(), [](const CabBillboard &a, const CabBillboard &b) { return a.f > b.f; });
+	for (const CabBillboard &b : bills) {
+		const CabTexture *tex = CabSpriteTexture(b.ps);
+		if (tex == nullptr) continue;
+		double bw_units = tex->w * CAB_PX_ACROSS, bh_units = tex->h * CAB_PX_UP;
+		if (b.kind == 3) {
+			if (_debug_misc_level >= 5) Debug(misc, 5, "cab box sprite {} box {}..{} {}..{} z {}..{} tex {}x{} at {},{} depth {:.0f}", b.ps.image & SPRITE_MASK, b.ps.xmin, b.ps.xmax, b.ps.ymin, b.ps.ymax, b.ps.zmin, b.ps.zmax, tex->w, tex->h, tex->ox, tex->oy, b.f);
+			CabDrawBox(dst, zb, width, height, *tex, eye, b.ps);
+			camera.billboards++;
+			continue;
+		}
+		/* A fence of a farm, an industry or a station (a thin long box): a line of the north-up view, a ribbon from here; not drawn (the player). */
+		if (b.kind == 1 || b.kind == 2) continue;
+		if (b.kind == 0) {
+			/* A line of a sprite -- a fence seen along its length, a wire -- would stand as a tall post; and a fence
+			 * piece, a point of a box a few units high under a sprite many units tall, likewise. Neither is drawn. */
+			int ex = b.ps.xmax - b.ps.xmin + 1, ey = b.ps.ymax - b.ps.ymin + 1, ez = b.ps.zmax - b.ps.zmin + 1;
+			if (tex->w <= 2 && tex->h >= 8) continue;
+			if (ex <= 1 && ey <= 1 && ez <= 4 && bh_units > 3.0 * ez) continue;
+		}
+		if (_debug_misc_level >= 5) {
+			/* The rig: what the tall things on the picture are. */
+			double sh = bh_units * eye.focal / std::max(b.f, 1.0), sw = bw_units * eye.focal / std::max(b.f, 1.0);
+			if (sh > 80 && sh > 3 * sw) Debug(misc, 5, "cab tall sprite {} pal {:#x} box {}..{} {}..{} z {}..{} tex {}x{} wall {} depth {:.0f} on screen {:.0f}x{:.0f}", b.ps.image & SPRITE_MASK, b.ps.pal, b.ps.xmin, b.ps.xmax, b.ps.ymin, b.ps.ymax, b.ps.zmin, b.ps.zmax, tex->w, tex->h, b.kind, b.f, sw, sh);
+		}
+		const double tw = tex->w, th = tex->h;
+		std::vector<CabPoint> quad;
+		if (b.kind == 0) {
+			CabPoint foot = CabToEye(eye, b.bx, b.by, b.bz, 0, 0);
+			quad = {
+				{foot.f, foot.r - bw_units / 2, foot.u, 0.0, th},
+				{foot.f, foot.r + bw_units / 2, foot.u, tw, th},
+				{foot.f, foot.r + bw_units / 2, foot.u + bh_units, tw, 0.0},
+				{foot.f, foot.r - bw_units / 2, foot.u + bh_units, 0.0, 0.0},
+			};
+		} else {
+			/* A wall from one end of the box to the other, the sprite's height tall; both faces are drawn. */
+			if (_debug_misc_level >= 5) Debug(misc, 5, "cab wall sprite {} box {}..{} {}..{} z {}..{} tex {}x{} depth {:.0f}", b.ps.image & SPRITE_MASK, b.ps.xmin, b.ps.xmax, b.ps.ymin, b.ps.ymax, b.ps.zmin, b.ps.zmax, tex->w, tex->h, b.f);
+			CabPoint a = b.kind == 1 ? CabToEye(eye, b.w0, b.by, b.bz, 0, 0) : CabToEye(eye, b.bx, b.w0, b.bz, 0, 0);
+			CabPoint e = b.kind == 1 ? CabToEye(eye, b.w1, b.by, b.bz, 0, 0) : CabToEye(eye, b.bx, b.w1, b.bz, 0, 0);
+			quad = {
+				{a.f, a.r, a.u, 0.0, th},
+				{e.f, e.r, e.u, tw, th},
+				{e.f, e.r, e.u + bh_units, tw, 0.0},
+				{a.f, a.r, a.u + bh_units, 0.0, 0.0},
+			};
+		}
+		CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(quad), eye, false);
+		camera.billboards++;
+	}
+
+	/* 6. The haze: the far fades into the sky at the horizon. */
+	const double haze_to = CAB_RANGE_TILES * TILE_SIZE;
+	for (size_t i = 0; i < out.pixels.size(); i++) {
+		float z = zb[i];
+		if (z <= 0.0f) continue;
+		double dist = 1.0 / z;
+		if (dist <= CAB_HAZE_FROM) continue;
+		double t = std::min(1.0, (dist - CAB_HAZE_FROM) / (haze_to - CAB_HAZE_FROM)) * 0.75;
+		Colour c(out.pixels[i]);
+		out.pixels[i] = Colour(static_cast<uint8_t>(c.r + (haze.r - c.r) * t), static_cast<uint8_t>(c.g + (haze.g - c.g) * t), static_cast<uint8_t>(c.b + (haze.b - c.b) * t)).data;
+	}
+
+	if (_debug_misc_level >= 6) {
+		/* The rig: the picture as a PPM in the working directory. */
+		auto f = FileHandle::Open(std::string("cab_picture.ppm"), "wb");
+		if (f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", width, height);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (uint32_t p : out.pixels) {
+				Colour c(p);
+				uint8_t rgb[3] = {c.r, c.g, c.b};
+				fwrite(rgb, 1, 3, *f);
+			}
+		}
+	}
+	_vd.tile_sprites_to_draw.clear();
+	_vd.parent_sprites_to_draw.clear();
+	_vd.child_screen_sprites_to_draw.clear();
+	camera.ms = TurnedNow() - t0;
+	return true;
 }

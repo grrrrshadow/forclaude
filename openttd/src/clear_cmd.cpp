@@ -80,8 +80,12 @@ void DrawRoughLandTile(const TileInfo *ti)
  * Draw the fences atop a ClearGround::Fields tile.
  * @param ti The tile to draw.
  */
+/** Whether the fences of fields (and, with the setting, of rails) are drawn at all: the 3D views (three_d.h, cab_view.h) draw without them -- they are lines of the north-up view and stand about as posts and ribbons there. */
+bool _draw_fences = true;
+
 static void DrawClearLandFence(const TileInfo *ti)
 {
+	if (!_draw_fences) return;
 	/* combine fences into one sprite object */
 	StartSpriteCombine();
 

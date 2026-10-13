@@ -22,6 +22,7 @@ enum VehicleViewWidgets : WidgetID {
 	WID_VV_REFIT,              ///< Open the refit window.
 	WID_VV_SHOW_ORDERS,        ///< Show the orders of this vehicle.
 	WID_VV_SHOW_DETAILS,       ///< Show details of this vehicle.
+	WID_VV_CAB_VIEW,           ///< The view from the cab of this vehicle (cab_view.h).
 	WID_VV_CLONE,              ///< Clone this vehicle.
 	WID_VV_SELECT_DEPOT_CLONE, ///< Selection widget between 'goto depot', and 'clone vehicle' buttons.
 	WID_VV_SELECT_REFIT_TURN,  ///< Container for the 'refit' button, which can be hidden.

@@ -2313,6 +2313,31 @@ STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
 STR_CONFIG_SETTING_SPRITE_MITCHELL                              :Použít Mitchell pro zmenšování spritů: {STRING}
 STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 8x a 4x u 32bpp sady, která kreslí jen jemnější obrázky (zin16 nebo zin8), se udělá rovnou z jejího nejjemnějšího obrázku Mitchellovým filtrem: ostřejší hrany, koleje i nápisy, světlá místa neztmavnou. Vypnuté se dělá po polovinách průměrem bloku 2×2. Mitchell načítá sprite asi dvakrát déle, což se může projevit krátkým škubnutím, když se naráz objeví hodně nových obrázků. Sady, které kreslí vlastní 8x a 4x, se to netýká
 STR_CONFIG_SETTING_THREE_D                                      :3D: náhledy a otáčení herní plochy: {STRING}
+STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}
+STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vozidlo
+STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Otevřít okno vozidla
+STR_CAB_VIEW_CENTRE                                             :{BLACK}Na mapu
+STR_CAB_VIEW_CENTRE_TOOLTIP                                     :{BLACK}Přesunout hlavní pohled na vozidlo
+STR_CAB_VIEW_STOP                                               :{BLACK}Zastavit
+STR_CAB_VIEW_GO                                                 :{BLACK}Jet
+STR_CAB_VIEW_STOP_TOOLTIP                                       :{BLACK}Zastavit vozidlo, nebo ho zase rozjet
+STR_CAB_VIEW_BRAKE                                              :{BLACK}Brzda -
+STR_CAB_VIEW_BRAKE_TOOLTIP                                      :{BLACK}Přibrzdit: vozidlo se drží o krok nižší rychlosti
+STR_CAB_VIEW_THROTTLE                                           :{BLACK}Plyn +
+STR_CAB_VIEW_THROTTLE_TOOLTIP                                   :{BLACK}Přidat: o krok vyšší rychlost; nad maximem vozidla jede zase podle rozkazů
+STR_CAB_VIEW_LIMIT                                              :{YELLOW}drženo na {VELOCITY}
+STR_CAB_VIEW_SPEED                                              :{VELOCITY}
+STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
+STR_CAB_VIEW_NEXT_STOP                                          :Příští zastávka: {STATION}
+STR_CAB_VIEW_TO_DEPOT                                           :Příští zastávka: depo
+STR_CAB_VIEW_NO_DESTINATION                                     :Příští zastávka: žádná
+STR_CAB_VIEW_STATE_RUNNING                                      :{GREEN}Jede
+STR_CAB_VIEW_STATE_STOPPED                                      :{RED}Stojí
+STR_CAB_VIEW_STATE_LOADING                                      :{YELLOW}Nakládá
+STR_CAB_VIEW_STATE_BROKEN                                       :{RED}Porucha
+STR_CAB_VIEW_LOAD                                               :Náklad: {NUM}%
+STR_CAB_VIEW_BUTTON                                             :{BLACK}Kabina
+STR_CAB_VIEW_BUTTON_TOOLTIP                                     :{BLACK}Pohled z kabiny: svět před vozidlem ve 3D
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :Herní plocha se otáčí do libovolného úhlu: držet prostřední tlačítko myši a táhnout do strany, nebo klávesy Y a N (15 stupňů na stisk, s Ctrl 45). Dvojklik prostředním tlačítkem, Home nebo mezerník (když není co zavřít) vrátí pohled do normálu, na sever. Otočený pohled je jen na koukání: pro stavění je 2D, pohled na sever. Vozidla, nádraží a vlastní budovy této hry se otáčejí s ní ze svých osmi směrů, původní domy jako krabice z vlastních obrázků. Vozidlo v nákupu a vlastní průmysly této hry mají náhled, který se točí. Vypnuto: hra je, jaká vždycky byla, do pixelu
 
 ###length 5

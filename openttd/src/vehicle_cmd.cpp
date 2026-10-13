@@ -1284,3 +1284,24 @@ CommandCost CmdChangeServiceInt(DoCommandFlags flags, VehicleID veh_id, uint16_t
 
 	return CommandCost();
 }
+
+/**
+ * Hold a vehicle to a speed from its cab (cab_view.h): the brake and the throttle of the cab view.
+ * @param flags type of operation
+ * @param veh_id the vehicle
+ * @param limit the speed, in the units the vehicle shows (GetDisplaySpeed()); 0 lets it go as its orders say
+ */
+CommandCost CmdSetCabSpeedLimit(DoCommandFlags flags, VehicleID veh_id, uint16_t limit)
+{
+	Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsPrimaryVehicle()) return CMD_ERROR;
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		v->cab_speed_limit = limit;
+		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}

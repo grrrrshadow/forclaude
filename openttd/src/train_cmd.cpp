@@ -1638,7 +1638,7 @@ int Train::GetCurrentMaxSpeed() const
 		max_speed = std::min<int>(max_speed, BACKWARDS_NO_CAB_SPEED_LIMIT);
 	}
 
-	return std::min<int>(max_speed, this->gcache.cached_max_track_speed);
+	return std::min<int>({max_speed, static_cast<int>(this->gcache.cached_max_track_speed), this->CabSpeedLimitInternal()});
 }
 
 /** Update acceleration of the train from the cached power and weight. */

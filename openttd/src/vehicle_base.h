@@ -294,6 +294,18 @@ public:
 	UnitID unitnumber{}; ///< unit number, for display purposes only
 
 	uint16_t cur_speed = 0; ///< current speed
+	/**
+	 * A speed the player holds the vehicle to from its cab (cab_view.h: the brake and the throttle there), in the
+	 * units the vehicle shows (GetDisplaySpeed()); 0 none. Not saved: a loaded game drives as the orders say.
+	 */
+	uint16_t cab_speed_limit = 0;
+
+	/** The cab's speed limit in the vehicle's own units of speed, or no limit at all. */
+	inline int CabSpeedLimitInternal() const
+	{
+		if (this->cab_speed_limit == 0) return INT32_MAX;
+		return (this->type == VehicleType::Road || this->type == VehicleType::Ship) ? this->cab_speed_limit * 2 : this->cab_speed_limit;
+	}
 	uint8_t subspeed = 0; ///< fractional speed
 	uint8_t acceleration = 0; ///< used by train & aircraft
 	uint32_t motion_counter = 0; ///< counter to occasionally play a vehicle sound.
