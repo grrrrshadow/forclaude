@@ -8729,12 +8729,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		int seen = 0;
 		for (const Vehicle *v : Vehicle::Iterate()) {
 			if (!v->IsPrimaryVehicle()) continue;
-			int parts = 0;
+			int parts = 0, pieces = 1;
 			for (const Vehicle *u = v; u != nullptr; u = u->Next()) parts++;
+			for (const Vehicle *u = v; u->HasArticulatedPart(); u = u->GetNextArticulatedPart()) pieces++;
 			TileIndex vt = TileVirtXY(v->x_pos, v->y_pos);
 			bool hidden = v->vehstatus.Test(VehState::Hidden);
-			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} typu {} smer {} dilu {} {}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
-					TileX(vt), TileY(vt), to_underlying(GetTileType(vt)), to_underlying(v->direction), parts, hidden ? "skryte" : "videt",
+			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} typu {} smer {} dilu {} clanku {} {}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
+					TileX(vt), TileY(vt), to_underlying(GetTileType(vt)), to_underlying(v->direction), parts, pieces, hidden ? "skryte" : "videt",
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
 					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "");
 			if (!hidden) seen++;
@@ -8759,6 +8760,125 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowTo(found->x_pos, found->y_pos, found->z_pos, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction));
+	} else if (what == "motory") {
+		/* The rig: every rail engine whose name has the text (all without), with what 'zatacka' asks of it. */
+		std::string want = argv.size() > 2 ? std::string(argv[2]) : "";
+		std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return std::tolower(c); });
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			std::string name = GetString(STR_ENGINE_NAME, e->index);
+			std::string lower = name;
+			std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+			if (!want.empty() && lower.find(want) == std::string::npos) continue;
+			const RailVehicleInfo *rvi = RailVehInfo(e->index);
+			IConsolePrint(CC_DEFAULT, "test3d: motor {} '{}' typ {} railtypes {:#x} clanku {} dostupny {} firme {} od {}", e->index.base(), name, to_underlying(rvi->railveh_type), rvi->railtypes.base(),
+					CountArticulatedParts(e->index) + 1, e->flags.Test(EngineFlag::Available) ? "ano" : "ne", Company::IsValidID(_local_company) && e->company_avail.Test(_local_company) ? "ano" : "ne", e->intro_date.base());
+		}
+	} else if (what == "zatacka") {
+		/* The rig's curve: a shed, four tiles of straight track, a quarter turn and five more, levelled first,
+		 * and an articulated engine -- the first there is, or the one whose name has the text -- sent along it,
+		 * to see the pieces of its likeness bend on the curve as its sprites do. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d zatacka needs a tile x and y (and a part of an engine's name).");
+			return true;
+		}
+		if (_game_mode != GameMode::Normal) {
+			IConsolePrint(CC_ERROR, "test3d zatacka: only in a running game.");
+			return true;
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) {
+				IConsolePrint(CC_ERROR, "test3d zatacka: no company to build as.");
+				return true;
+			}
+			SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		std::string want = argv.size() > 4 ? std::string(argv[4]) : "";
+		std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return std::tolower(c); });
+		EngineID eid = EngineID::Invalid();
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (!e->company_avail.Test(_local_company)) continue;
+			const RailVehicleInfo *rvi = RailVehInfo(e->index);
+			if (rvi->railveh_type == RailVehicleType::Wagon || !rvi->railtypes.Test(RAILTYPE_RAIL)) continue;
+			if (want.empty()) {
+				if (CountArticulatedParts(e->index) == 0) continue;
+			} else {
+				std::string name = GetString(STR_ENGINE_NAME, e->index);
+				std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+				if (name.find(want) == std::string::npos) continue;
+			}
+			eid = e->index;
+			break;
+		}
+		if (eid == EngineID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d zatacka: no such engine{}.", want.empty() ? " of several pieces" : "");
+			return true;
+		}
+		uint x0 = *x, y0 = *y;
+		if (x0 == 0 && y0 == 0) {
+			/* Nowhere named: the first flat, clear, level square of ten tiles. */
+			bool found = false;
+			for (uint ty = 2; ty + 10 < Map::SizeY() && !found; ty++) {
+				for (uint tx = 2; tx + 10 < Map::SizeX() && !found; tx++) {
+					int h = TileHeight(TileXY(tx, ty));
+					bool good = true;
+					for (uint dy = 0; dy < 10 && good; dy++) {
+						for (uint dx = 0; dx < 10 && good; dx++) {
+							TileIndex t = TileXY(tx + dx, ty + dy);
+							if (!(IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) || TileHeight(t) < h || TileHeight(t) > h + 1) good = false;
+						}
+					}
+					if (good) {
+						x0 = tx;
+						y0 = ty;
+						found = true;
+					}
+				}
+			}
+			if (!found) {
+				IConsolePrint(CC_ERROR, "test3d zatacka: no flat clear square of ten tiles on the map.");
+				return true;
+			}
+		}
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 8, y0 + 8), TileXY(x0, y0), false, LevelMode::Level);
+		TileIndex depot = TileXY(x0 + 1, y0 + 1);
+		std::string failed;
+		CommandCost r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW);
+		if (r.Failed()) failed = fmt::format("depot at {},{}: {}", x0 + 1, y0 + 1, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
+		for (uint i = 2; i <= 5 && failed.empty(); i++) {
+			r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + i, y0 + 1), RAILTYPE_RAIL, Track::X, false);
+			if (r.Failed()) failed = fmt::format("rail X at {},{}: {}", x0 + i, y0 + 1, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
+		}
+		if (failed.empty()) {
+			r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 6, y0 + 1), RAILTYPE_RAIL, Track::Right, false);
+			if (r.Failed()) failed = fmt::format("the curve at {},{}: {}", x0 + 6, y0 + 1, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
+		}
+		for (uint i = 2; i <= 6 && failed.empty(); i++) {
+			r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + 6, y0 + i), RAILTYPE_RAIL, Track::Y, false);
+			if (r.Failed()) failed = fmt::format("rail Y at {},{}: {}", x0 + 6, y0 + i, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
+		}
+		if (!failed.empty()) {
+			IConsolePrint(CC_ERROR, "test3d zatacka: the track could not be built: {}.", failed);
+			return true;
+		}
+		UpdateSignalsInBuffer();
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed() || veh == VehicleID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d zatacka: {} could not be built.", GetString(STR_ENGINE_NAME, eid));
+			return true;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+		const Vehicle *v = Vehicle::Get(veh);
+		int pieces = 1;
+		for (const Vehicle *u = v; u->HasArticulatedPart(); u = u->GetNextArticulatedPart()) pieces++;
+		/* The curve under the middle of the view. */
+		ScrollMainWindowToTile(TileXY(x0 + 6, y0 + 1), true);
+		UpdateViewportPosition(w, 0);
+		IConsolePrint(CC_DEFAULT, "test3d: zatacka u {},{}: {} (vozidlo {}, {} clanku) vyjizdi z depa na {},{} po X a zahyba na Y u {},{}", x0, y0, GetString(STR_ENGINE_NAME, eid), v->unitnumber, pieces, x0 + 1, y0 + 1, x0 + 6, y0 + 1);
 	} else if (what == "ladeni") {
 		extern TileIndex _turned_debug_tile;
 		auto x = number(2), y = number(3);

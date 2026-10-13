@@ -2470,6 +2470,17 @@ static void DrawTurnedGenericBox(const DrawPixelInfo &frame, const ParentSpriteT
 }
 
 /**
+ * A low flat thing of a station tile as a slab, its whole bounding box (box_kind 6): a platform, a bench, a
+ * heap. It turns for real and never snaps, since its top is all the sprite shows and a flat top turns at any
+ * angle; so the platform's edge stays by the track. Its low walls take the sprite's bottom rows.
+ */
+static void DrawTurnedSlab(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	ThreeDPart part{0.0f, static_cast<float>(ps.box_dx), 0.0f, static_cast<float>(ps.box_dy), static_cast<float>(ps.zmax - ps.zmin + 1), ThreeDRoof::Flat, 0.0f};
+	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, ps.box_dx / 2.0, ps.box_dy / 2.0, 360.0);
+}
+
+/**
  * A thing the turned view draws from renders (box_kind 3): one of the game's
  * buildings rendered from eight directions (ThreeDModel), or the layers of a
  * tile of the plantation laid together, at an origin on the map.
@@ -2888,12 +2899,28 @@ static void ViewportDoDrawTurned()
 		bool boxed_type = (tile_type == TileType::House && !IsTransparencySet(TransparencyOption::Houses)) ||
 				(tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries)) ||
 				(tile_type == TileType::Object && !IsTransparencySet(TransparencyOption::Structures));
-		if (boxed_type) {
+		/* A station's platforms, buildings and roofs turn too, any set's: the layout gives every sprite its box.
+		 * A low flat thing of a station (a platform, a bench) is a slab, its top from the sprite laid over the
+		 * turned footprint, never snapping, so the platform's edge stays by the track; anything of a height is
+		 * a box as on a house tile. */
+		bool station_type = tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings);
+		if (boxed_type || station_type) {
 			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 				ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 				if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
 				int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1, ez = ps.zmax - ps.zmin + 1;
-				if (ex < 2 || ey < 2 || ez < TILE_HEIGHT) continue;
+				if (ex < 2 || ey < 2) continue;
+				if (ez < TILE_HEIGHT) {
+					if (!station_type) continue;
+					ps.box_kind = 6;
+					ps.box = nullptr;
+					ps.box_ox = ps.xmin;
+					ps.box_oy = ps.ymin;
+					ps.box_oz = ps.zmin;
+					ps.box_dx = static_cast<int16_t>(ex);
+					ps.box_dy = static_cast<int16_t>(ey);
+					continue;
+				}
 				const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
 				double footprint = 2.0 * ZOOM_BASE * (ex + ey);
 				double f = std::min(1.0, spr->width / footprint);
@@ -3064,6 +3091,10 @@ static void ViewportDoDrawTurned()
 		if (ps->box_kind == 4) continue; // a tile of a building with eight renders: drawn whole above
 		if (ps->box_kind == 5) {
 			DrawTurnedVehicle(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 6) {
+			DrawTurnedSlab(frame, *ps);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);

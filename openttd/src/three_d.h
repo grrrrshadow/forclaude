@@ -189,10 +189,11 @@ bool GetThreeDPlantationLayers(const ThreeDPlantationTile &tile, ThreeDPlantatio
  * in every view, drawn at any angle for the preview beside the purchase window.
  */
 struct ThreeDVehicleModel;
-const ThreeDVehicleModel *GetThreeDVehicleModel(EngineID engine, PaletteID pal);
+struct Vehicle;
+const ThreeDVehicleModel *GetThreeDVehicleModel(EngineID engine, PaletteID pal, const Vehicle *veh = nullptr);
 ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model);
-bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track);
-const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, bool on_track);
+bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track, int part = -1);
+const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, bool on_track, int part = -1);
 Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom);
 std::string DescribeThreeDVehicleModel(const ThreeDVehicleModel *model);
 void ClearThreeDVehicleModels();

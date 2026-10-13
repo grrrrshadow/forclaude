@@ -959,19 +959,24 @@ static uint DrawLoadGreen(SpriteLoader::SpriteCollection &sprite, ZoomLevels ava
  * @param encoder     Sprite encoder to use.
  * @return Read sprite data.
  */
-static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_type, SpriteAllocator &allocator, SpriteEncoder *encoder)
+/**
+ * Read a sprite's levels from its file as the game draws them, before they are
+ * resized and encoded: the 32bpp levels when the encoder takes them, else the
+ * 8bpp ones (or the 32bpp made 8bpp); the texture cut out, the colours of its
+ * set painted on, the green load drawn and the set's shift applied. ReadSprite()
+ * resizes and encodes what this reads; the 3D likeness of a vehicle reads a
+ * sprite this way too (ReadRawSprite()), so it is coloured as the map draws it.
+ * @param sc the sprite's cache entry
+ * @param sprite_type the type of the sprite
+ * @param encoder the encoder the levels are for (the blitter)
+ * @param[out] sprite the levels
+ * @param[out] read_32bpp whether the levels are 32bpp
+ * @return the levels read, none when the sprite cannot be read
+ */
+static ZoomLevels LoadSpriteAsDrawn(const SpriteCache *sc, SpriteType sprite_type, SpriteEncoder *encoder, SpriteLoader::SpriteCollection &sprite, bool &read_32bpp)
 {
-	/* Use current blitter if no other sprite encoder is given. */
-	if (encoder == nullptr) encoder = BlitterFactory::GetCurrentBlitter();
-
 	SpriteFile &file = *sc->file;
 	size_t file_pos = sc->file_pos;
-
-	assert(sprite_type != SpriteType::Recolour);
-	assert(IsMapgenSpriteID(id) == (sprite_type == SpriteType::MapGen));
-	assert(sc->type == sprite_type);
-
-	Debug(sprite, 9, "Load sprite {}", id);
 
 	/* A vehicle in the colours of its set (SetTrueColourSprite()). */
 	const TrueColourSet *colours = sc->true_colours != 0 ? &GetTrueColourSet(sc->true_colours) : nullptr;
@@ -987,7 +992,6 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	bool green_whole = sc->green_load_empty == GREEN_LOAD_WHOLE;
 	if (sc->green_load_empty != 0 && !green_whole) green_load_empty = ReadGreenLoadEmpty(GetSpriteCache(sc->green_load_empty), sprite_type, encoder, colours);
 
-	SpriteLoader::SpriteCollection sprite;
 	ZoomLevels sprite_avail;
 	ZoomLevels avail_8bpp;
 	ZoomLevels avail_32bpp;
@@ -998,7 +1002,7 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 		/* Try for 32bpp sprites first. */
 		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->control_flags, avail_8bpp, avail_32bpp);
 	}
-	const bool read_32bpp = sprite_avail.Any();
+	read_32bpp = sprite_avail.Any();
 	if (sprite_avail.None()) {
 		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, false, sc->control_flags, avail_8bpp, avail_32bpp);
 		if (sprite_type == SpriteType::Normal && avail_32bpp.Any() && !encoder->Is32BppSupported() && sprite_avail.None()) {
@@ -1017,6 +1021,34 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 			}
 		}
 	}
+
+	if (sprite_avail.None() || sprite_type == SpriteType::MapGen) return sprite_avail;
+
+	/* The texture cut out first, the colours over it, the green load over
+	 * them: a load layer is green whole, and the empty vehicle it is told
+	 * from is painted alike. */
+	if (sc->cutout_texture != 0 && read_32bpp) CutOutTexture(sprite, sprite_avail, cutout_texture, sc->cutout_x, sc->cutout_y);
+	if (colours != nullptr && !painted) PaintTrueColours(sprite, sprite_avail, *colours, read_32bpp, !encoder->Is32BppSupported());
+	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty, green_whole);
+	/* Moved by its set (SetShiftedSprite()): the levels made below follow. */
+	if (sc->shift_x != 0 || sc->shift_y != 0) ShiftSpriteOffsets(sprite, sprite_avail, sc->shift_x, sc->shift_y);
+	return sprite_avail;
+}
+
+static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_type, SpriteAllocator &allocator, SpriteEncoder *encoder)
+{
+	/* Use current blitter if no other sprite encoder is given. */
+	if (encoder == nullptr) encoder = BlitterFactory::GetCurrentBlitter();
+
+	assert(sprite_type != SpriteType::Recolour);
+	assert(IsMapgenSpriteID(id) == (sprite_type == SpriteType::MapGen));
+	assert(sc->type == sprite_type);
+
+	Debug(sprite, 9, "Load sprite {}", id);
+
+	SpriteLoader::SpriteCollection sprite;
+	bool read_32bpp = false;
+	ZoomLevels sprite_avail = LoadSpriteAsDrawn(sc, sprite_type, encoder, sprite, read_32bpp);
 
 	if (sprite_avail.None()) {
 		if (sprite_type == SpriteType::MapGen) return nullptr;
@@ -1052,15 +1084,6 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 
 		return s;
 	}
-
-	/* The texture cut out first, the colours over it, the green load over
-	 * them: a load layer is green whole, and the empty vehicle it is told
-	 * from is painted alike. */
-	if (sc->cutout_texture != 0 && read_32bpp) CutOutTexture(sprite, sprite_avail, cutout_texture, sc->cutout_x, sc->cutout_y);
-	if (colours != nullptr && !painted) PaintTrueColours(sprite, sprite_avail, *colours, read_32bpp, !encoder->Is32BppSupported());
-	if (sc->green_load_empty != 0) DrawLoadGreen(sprite, sprite_avail, green_load_empty, green_whole);
-	/* Moved by its set (SetShiftedSprite()): the levels made below follow. */
-	if (sc->shift_x != 0 || sc->shift_y != 0) ShiftSpriteOffsets(sprite, sprite_avail, sc->shift_x, sc->shift_y);
 
 	if (!ResizeSprites(sprite, sprite_avail, encoder)) {
 		if (id == SPR_IMG_QUERY) UserError("Okay... something went horribly wrong. I couldn't resize the fallback sprite. What should I do?");
@@ -1799,10 +1822,11 @@ void GfxClearSpriteCache()
  * @return whether the sprite has a 32bpp level of 16x
  */
 /**
- * Read a sprite's pixels straight from its file, every zoom level it has: the
- * 32bpp ones when it has them, else the 8bpp ones with the palette index in m
- * (the 3D likeness of a vehicle, three_d_vehicle.cpp). The data of the
- * collection lives until the next sprite is read this way.
+ * Read a sprite's pixels from its file as the game draws them, every zoom level
+ * it has (LoadSpriteAsDrawn(): the colours of its set painted on, its load, its
+ * shift): the 32bpp ones when it has them, else the 8bpp ones with the palette
+ * index in m (the 3D likeness of a vehicle, three_d_vehicle.cpp). The data of
+ * the collection lives until the next sprite is read this way.
  * @param sprite the sprite
  * @param[out] collection its levels
  * @param[out] is_32bpp whether the levels are 32bpp
@@ -1815,14 +1839,7 @@ ZoomLevels ReadRawSprite(SpriteID sprite, SpriteLoader::SpriteCollection &collec
 	const SpriteCache *sc = GetSpriteCache(sprite);
 	if (sc->file == nullptr || sc->type != SpriteType::Normal || sc->file_pos == SIZE_MAX) return {};
 
-	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
-	ZoomLevels avail_8bpp, avail_32bpp;
-	ZoomLevels loaded = loader.LoadSprite(collection, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
-	if (loaded.Any()) {
-		is_32bpp = true;
-		return loaded;
-	}
-	return loader.LoadSprite(collection, *sc->file, sc->file_pos, SpriteType::Normal, false, sc->control_flags, avail_8bpp, avail_32bpp);
+	return LoadSpriteAsDrawn(sc, SpriteType::Normal, BlitterFactory::GetCurrentBlitter(), collection, is_32bpp);
 }
 
 bool ReadRawSprite16x(SpriteID sprite, std::vector<uint32_t> &pixels, int &width, int &height, int &x_offs, int &y_offs)

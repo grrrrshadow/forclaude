@@ -27,9 +27,13 @@ tree in an old game does.
   the way it does when the right button scrolls, so the mouse never runs off
   the screen (the right button scrolls as it always has). **Two clicks of the
   middle button** one after the other, without a drag (the player's idea: the
-  same button as the turn), or the **Home** key, put the view back to north;
-  a single click does nothing, so pressing the button to turn never resets
-  the view. The keys
+  same button as the turn), the **Home** key, or the **space bar** when
+  there is no news or error window for it to close (the player asked for
+  the space bar; the game binds it to those two, and with neither open it is
+  free), put the view back to north; a single click does nothing, so
+  pressing the button to turn never resets the view. The turned view is for
+  looking; building is done facing north, in 2D, and the help text of the
+  setting says so. The keys
   **Y** and **N** turn by 15 degrees to the left and to the right, with
   **Ctrl** by 45, the next of the eight directions vehicles have pictures
   for; Ctrl+, and Ctrl+. do the same. Y and N are the only two letters no
@@ -54,15 +58,20 @@ tree in an old game does.
   at the angle of its direction plus the turn, so it lies along the track at
   every degree in between the eight directions instead of standing still
   while the map turns under it and jumping at the next direction (the
-  player: "they go the other way than the map and then jerk round"). A
-  vehicle a set draws turned round (an engine coupled backwards, a piece a
-  set draws reversed) is turned round here too. An articulated vehicle --
-  a truck with its trailer, a locomotive of three pieces -- is one likeness
-  drawn from its first piece to its last, so a long vehicle keeps its length
-  (on a curve it is drawn straight for now); each wagon is its own. A
-  vehicle whose likeness cannot be made (no sprites in the set, a crashed
-  one, an 8bpp blitter) shows the sprite of the nearer of the eight
+  player: "they go the other way than the map and then jerk round"). The
+  likeness is made from the vehicle's own sprites as the map draws them --
+  its load, its livery, the colours its set paints on it, an engine coupled
+  turned round -- so it is the vehicle, not its purchase-list picture. An
+  articulated vehicle -- a truck with its trailer, a locomotive of three
+  pieces -- has one likeness made from all its pieces, and each piece is
+  drawn as its own cut of it, at its own place and in its own direction,
+  so the vehicle bends on a curve as its sprites do; the two heads of a
+  double-headed engine stand at either end of the train; each wagon is its
+  own. A vehicle whose likeness cannot be made (no sprites in the set, a
+  crashed one, an 8bpp blitter) shows the sprite of the nearer of the eight
   directions as seen from the turn, as before.
+- Stations turn too, any set's: the platforms as flat slabs laid over the
+  turned tiles, the buildings and roofs as boxes, each from its own sprite.
 - Game Options: the fences along the rails are **off by default** (the
   setting the game already had, under the graphics options, to be turned
   back on at will), since turned they are billboards and stand about the
@@ -113,16 +122,27 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    by the turned depth of its bounding box. The game's own sprite sorter is
    not used here. **A vehicle** is its 3D likeness from its eight sprites
    (`AddThreeDVehicleToViewport()` in `src/three_d_vehicle.cpp`, called from
-   `DoDrawVehicle()` in place of the sprite when the view is turned): the
-   likeness rendered at the angle of the vehicle's direction plus the turn,
+   `DoDrawVehicle()` in place of the sprite when the view is turned). The
+   likeness of a vehicle on the map is made from the vehicle's own sprites
+   (`Vehicle::GetImage()`, read as the game draws them: the colours its set
+   paints on, its load, its shift, `LoadSpriteAsDrawn()` in
+   `spritecache.cpp`), one model per look (`VehicleLook()`: the sprites of
+   two directions of all its pieces hashed), so two vehicles of one engine
+   that look alike share a model and a loaded and an empty wagon do not.
+   It is rendered at the angle of the vehicle's direction plus the turn,
    foreshortened along itself between the directions the way the sprites of
    the track directions are (`on_track`), kept per whole degree, and hung
-   from the middle of the vehicle (of its first and last piece, for an
-   articulated one) with its bounding box the union of the pieces', sorted
-   with the rest by turned depth (`box_kind` 5, `AddTurnedVehiclePicture()`
-   in `viewport.cpp`). The pieces after the first add nothing; a dual-headed
-   engine's rear half is part of the front's likeness. A vehicle without a
-   likeness is a billboard of the sprite of its turned direction, as before.
+   from the vehicle's position with its bounding box, sorted with the rest
+   by turned depth (`box_kind` 5, `AddTurnedVehiclePicture()` in
+   `viewport.cpp`). A vehicle of several pieces -- an articulated one, a
+   double-headed engine -- has one model made from its pieces composed as
+   the chain spaces them, and knows where each piece lies along it
+   (`part_x`, `part_cut`: a piece ends half its length behind its
+   position); each piece is drawn as its own cut of the model about its
+   own position, in its own direction, so the vehicle bends on a curve as
+   its sprites do, and the rear head of a double-headed engine stands at
+   the end of the train. A vehicle without a likeness is a billboard of the
+   sprite of its turned direction, as before.
 3. **The houses of the original graphics with a hand table**
    (`table/three_d_houses.h`, 26 temperate houses read off their one sprite
    by hand: a few boxes each with flat, gable or hip roofs) are boxes. The
@@ -142,7 +162,14 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    bounding box, turned the same way; where the sprite is narrower than the
    bounding box's footprint on the screen (a tower on a wide base) the box is
    narrowed to the sprite's width. Low things (fences, heaps, under a height
-   level) stay billboards.
+   level) stay billboards. **A station tile** (any set's: the layout gives
+   every sprite its box) turns the same way: a low flat thing -- a
+   platform, a bench -- is a slab, its whole box with the sprite laid over
+   the top and its low walls, which turns for real and never snaps, since a
+   flat top shows at any angle and the platform's edge must stay by the
+   track (`box_kind` 6, `DrawTurnedSlab()`); anything of a height -- a
+   building, a roof -- is a box as above. The rails under the platforms are
+   ground and turn with the tile as they did.
 4. **The buildings rendered from eight directions with depth and normals**
    (`src/three_d_model.cpp`, the table `table/three_d_models.h`: ten
    houses of the temperate climate, the school, the statue of stone and of
@@ -198,13 +225,9 @@ and the hut's girls as renders of their own (the buildings turn without them
 for now, in the map and in the preview), the plantation in the preview, boxes
 for the houses of the other climates, the proper sorting of long things
 against each other, the smaller textures of the zoomed-out view, the seams at
-the edges of the map. The platforms and buildings of a station stand as
-billboards (their rails turn as ground under them, the platform sprites do
-not), so a station looks wrong at any angle but the eight -- the player:
-test vehicles on plain track, away from stations. An articulated vehicle is
-drawn straight on a curve. The first likeness of a vehicle type is made when
-it is first drawn turned, a second or two in which the game waits. Facing
-north nothing of this runs.
+the edges of the map. The first likeness of a vehicle's look is made when it
+is first drawn turned, a second or two in which the game waits. Facing north
+nothing of this runs.
 
 ## The previews that turn
 
@@ -288,7 +311,13 @@ view, `test3d stred <x> <y>` puts a tile under the middle, `test3d zoom
 <level>` sets the zoom, `test3d vozidlo [n]` puts the n-th visible vehicle
 under the middle (`test3d vozidla` lists them all, with the tile under each
 and its type -- 1 plain rail, 5 a station -- its pieces, whether it is
-stopped or coupled turned round), `test3d snimek <name>` writes
+stopped or coupled turned round), `test3d zatacka <x> <y> [name]` builds
+the curve scene -- a shed, four tiles of straight track, a quarter turn
+and five more, levelled first, on the first flat clear square of the map
+when x and y are 0 -- and sends an articulated engine along it (the first
+there is, or the one whose name has the text; the curve under the middle of
+the view), `test3d motory [text]` lists the rail engines with their pieces
+and whether the company may build them, `test3d snimek <name>` writes
 the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole
 screen and says where the time went, `test3d ladeni <x> <y>` writes out how

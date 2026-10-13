@@ -437,8 +437,15 @@ struct MainWindow : Window
 				break;
 
 			case GHK_CLOSE_NEWS: // close active news window
-				if (!HideActiveNewsMessage()) return EventState::NotHandled;
-				break;
+				if (HideActiveNewsMessage()) break;
+				/* The space bar is bound to the news and the error window; with neither to close it is free, and the
+				 * player asked for it to put the turned view (three_d.h) back to north, as Home does. */
+				if (HideActiveErrorMessage()) break;
+				if (ThreeDEnabled() && IsViewTurned()) {
+					ResetViewYaw();
+					break;
+				}
+				return EventState::NotHandled;
 
 			case GHK_CLOSE_ERROR: // close active error window
 				if (!HideActiveErrorMessage()) return EventState::NotHandled;

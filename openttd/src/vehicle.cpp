@@ -1216,22 +1216,16 @@ static void DoDrawVehicle(const Vehicle *v)
 	}
 
 	/* In the turned view (three_d.h) the vehicle is its 3D likeness made from its eight sprites, drawn at the
-	 * angle of the view (three_d_vehicle.cpp): the whole articulated vehicle, or both heads of a double-headed
-	 * engine, from its first part; the other parts are in it. Without a likeness (a set whose chain gives no
-	 * picture for some direction) it shows the sprite of the direction it faces as seen from there: so many of
-	 * the eight directions back as the view is turned forward. */
+	 * angle of the view (three_d_vehicle.cpp); a piece of an articulated vehicle, or a head of a double-headed
+	 * engine, is its own cut of the likeness at its own place and direction. Without a likeness (a set whose
+	 * chain gives no picture for some direction) it shows the sprite of the direction it faces as seen from
+	 * there: so many of the eight directions back as the view is turned forward. */
 	const VehicleSpriteSeq *seq = &v->sprite_cache.sprite_seq;
 	VehicleSpriteSeq turned;
 	int step = ViewportDrawingTurned() ? TurnedDirectionStep() : 0;
 	bool turnable = v->direction != Direction::Invalid && (v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship ||
 			(v->type == VehicleType::Aircraft && Aircraft::From(v)->IsNormalAircraft()));
 	if (ViewportDrawingTurned() && turnable && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && !v->vehstatus.Test(VehState::Crashed) && !shadowed) {
-		/* A part drawn with its first: nothing of its own. */
-		if (v->IsArticulatedPart()) return;
-		if (v->type == VehicleType::Train && Train::From(v)->IsRearDualheaded()) {
-			const Train *front = Train::From(v)->other_multiheaded_part;
-			if (front != nullptr && !front->vehstatus.Test(VehState::Crashed)) return;
-		}
 		if (AddThreeDVehicleToViewport(v, pal, _cur_dpi->zoom)) return;
 	}
 	if (step != 0 && turnable) {
