@@ -46,6 +46,15 @@ jobs:
     - name: Checkout this repository (vendored OpenTTD source lives in openttd/)
       uses: actions/checkout@v6
 
+    - name: Leave the 3D building sets out of the build (the player copies them separately)
+      shell: bash
+      run: |
+        # openttd/media/baseset/decouple/grafika/budovy3d_*.grf are 400 MB of the game's own renders
+        # (docs/decouple_three_d.md); the build does not bundle them, the player keeps them in
+        # baseset/decouple/grafika/ of the installed game and takes only the ones that changed.
+        rm -f openttd/media/baseset/decouple/grafika/budovy3d_*.grf
+        ls openttd/media/baseset/decouple/grafika/
+
     - name: Checkout external OpenTTD source (only if source_repo override given)
       if: inputs.source_repo != ''
       uses: actions/checkout@v6

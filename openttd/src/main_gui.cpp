@@ -263,6 +263,8 @@ struct MainWindow : Window
 	void OnPaint() override
 	{
 		this->DrawWidgets();
+		/* The 3D previews that turn lie over the map beside their windows (three_d_preview_gui.cpp). */
+		DrawThreeDPreviews();
 		if (_game_mode == GameMode::Menu) {
 			static const std::initializer_list<SpriteID> title_sprites = {SPR_OTTD_O, SPR_OTTD_P, SPR_OTTD_E, SPR_OTTD_N, SPR_OTTD_T, SPR_OTTD_T, SPR_OTTD_D};
 			uint letter_spacing = ScaleGUITrad(10);

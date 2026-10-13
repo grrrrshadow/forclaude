@@ -1481,7 +1481,6 @@ struct BuildVehicleWindow : Window {
 		if (cargo == CargoFilterCriteria::CF_ANY || cargo == CargoFilterCriteria::CF_ENGINES || cargo == CargoFilterCriteria::CF_NONE) cargo = INVALID_CARGO;
 
 		this->sel_engine = engine;
-		InvalidateWindowClassesData(WindowClass::ThreeDVehiclePreview);
 		this->SetBuyVehicleText();
 
 		if (this->sel_engine == EngineID::Invalid()) return;

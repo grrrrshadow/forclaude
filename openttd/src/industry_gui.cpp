@@ -828,7 +828,6 @@ public:
 	~IndustryViewWindow() override
 	{
 		CloseWindowById(WindowClass::IndustryProductionGraph, this->window_number, false);
-		CloseWindowById(WindowClass::ThreeDIndustryPreview, this->window_number, false);
 	}
 
 	void OnInit() override

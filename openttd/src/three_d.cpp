@@ -208,7 +208,7 @@ void SetViewYaw(float degrees)
 	if (!ThreeDEnabled() || BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) degrees = 0.0f;
 	float yaw = std::fmod(degrees, 360.0f);
 	if (yaw > 180.0f) yaw -= 360.0f;
-	if (yaw <= -180.0f) yaw += 360.0f;
+	if (yaw < -180.0f) yaw += 360.0f; // -180 stays -180: the stop to the left (the player: it was gone on one side)
 	if (std::abs(yaw) < 0.1f) yaw = 0.0f;
 	if (yaw == _view_yaw) return;
 

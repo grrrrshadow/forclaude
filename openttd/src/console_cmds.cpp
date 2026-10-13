@@ -8587,11 +8587,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_ERROR, "test3d: no industry at {},{}", argv.size() > 3 ? argv[3] : "?", argv.size() > 4 ? argv[4] : "?");
 			}
 		}
-		for (const Window *w : Window::Iterate()) {
-			if (w->window_class == WindowClass::ThreeDVehiclePreview || w->window_class == WindowClass::ThreeDIndustryPreview) {
-				IConsolePrint(CC_DEFAULT, "test3d: preview window at {},{} size {}x{}", w->left, w->top, w->width, w->height);
-			}
-		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
+	} else if (what == "nahledy") {
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {

@@ -2216,13 +2216,6 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :The 8x and 4x z
 STR_CONFIG_SETTING_THREE_D                                      :3D: turning previews and turning the map view: {STRING2}
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :The map view turns to any angle: hold the middle mouse button and drag sideways, or press Y and N (15 degrees a press, with Ctrl 45). Vehicles and this game's own buildings turn with it from their eight directions, the original houses as boxes made of their own pictures. A vehicle in the purchase list and this game's own industries get a preview that turns. Off, the game is as it always was, to the pixel
 
-# The 3D previews that turn (three_d_preview_gui.cpp)
-STR_THREE_D_PREVIEW_VEHICLE_CAPTION                             :{WHITE}{ENGINE} in 3D
-STR_THREE_D_PREVIEW_INDUSTRY_CAPTION                            :{WHITE}{INDUSTRY} in 3D
-STR_THREE_D_PREVIEW_LEFT_TOOLTIP                                :{BLACK}Turn the preview to the left, to the next of its eight directions
-STR_THREE_D_PREVIEW_RIGHT_TOOLTIP                               :{BLACK}Turn the preview to the right, to the next of its eight directions
-STR_THREE_D_PREVIEW_TURN                                        :{BLACK}Turn
-STR_THREE_D_PREVIEW_TURN_TOOLTIP                                :{BLACK}Let the preview turn by itself
 ###length 5
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_16X                       :16x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_8X                        :8x

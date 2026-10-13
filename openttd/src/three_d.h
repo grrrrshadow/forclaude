@@ -45,6 +45,8 @@
 #include "window_type.h"
 #include "zoom_type.h"
 
+#include <map>
+
 struct Viewport;
 
 /** The roof of a box of a house drawn as boxes (ThreeDPart). */
@@ -134,13 +136,24 @@ struct ThreeDModelPicture {
 	std::vector<uint32_t> pixels; ///< Colour::data, alpha 0 where there is nothing
 };
 
+/** A model's picture at an angle and zoom (ThreeDPictureCache: one a model, the last asked for). */
+struct ThreeDPictureEntry {
+	float yaw;
+	ZoomLevel zoom;
+	ThreeDModelPicture picture;
+};
+using ThreeDPictureCache = std::map<uint, ThreeDPictureEntry>;
+
 const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLevel zoom);
+const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache);
 std::string DescribeThreeDModel(const ThreeDModel *model);
 void ClearThreeDModelCache();
 
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);
 void ShowThreeDIndustryPreview(IndustryID industry);
+void DrawThreeDPreviews();
+std::string DescribeThreeDPreviews();
 EngineID GetBuildVehicleSelectedEngine(WindowNumber number);
 
 /** A step of the keys: 15 degrees, a quarter of the way to the next of the eight directions. */
@@ -152,8 +165,8 @@ static constexpr int THREE_D_DRAG_PIXELS_PER_DEG = 4;
 /** Two clicks of the middle button within this many milliseconds, without a drag, put the view back to north. */
 static constexpr int THREE_D_DOUBLE_CLICK_MS = 500;
 
-/** How far past the edge of the map the turned view may go, in tiles: the void around the map the player may look at. */
-static constexpr int THREE_D_VOID_TILES = 64;
+/** How far past the edge of the map the turned view may go, in tiles: the void around the map the player may look at (the player: 42, not 64). */
+static constexpr int THREE_D_VOID_TILES = 42;
 
 bool ThreeDEnabled();
 float GetViewYaw();

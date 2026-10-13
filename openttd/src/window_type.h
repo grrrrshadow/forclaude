@@ -424,18 +424,6 @@ enum class WindowClass : uint16_t {
 	BuildVehicle,
 
 	/**
-	 * The 3D preview that turns beside the purchase window (three_d_preview_gui.cpp); %Window numbers:
-	 *   - 0 = #ThreeDPreviewWidgets
-	 */
-	ThreeDVehiclePreview,
-
-	/**
-	 * The 3D preview that turns beside the industry window; %Window numbers:
-	 *   - #IndustryID = #ThreeDPreviewWidgets
-	 */
-	ThreeDIndustryPreview,
-
-	/**
 	 * Build bridge; %Window numbers:
 	 *   - #TransportType = #BuildBridgeSelectionWidgets
 	 */

@@ -2315,13 +2315,6 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 
 STR_CONFIG_SETTING_THREE_D                                      :3D: náhledy a otáčení herní plochy: {STRING}
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :Herní plocha se otáčí do libovolného úhlu: držet prostřední tlačítko myši a táhnout do strany, nebo klávesy Y a N (15 stupňů na stisk, s Ctrl 45). Vozidla a vlastní budovy této hry se otáčejí s ní ze svých osmi směrů, původní domy jako krabice z vlastních obrázků. Vozidlo v nákupu a vlastní průmysly této hry mají náhled, který se točí. Vypnuto: hra je, jaká vždycky byla, do pixelu
 
-# The 3D previews that turn (three_d_preview_gui.cpp)
-STR_THREE_D_PREVIEW_VEHICLE_CAPTION                             :{WHITE}{ENGINE} ve 3D
-STR_THREE_D_PREVIEW_INDUSTRY_CAPTION                            :{WHITE}{INDUSTRY} ve 3D
-STR_THREE_D_PREVIEW_LEFT_TOOLTIP                                :{BLACK}Otočit náhled doleva, na další z jeho osmi směrů
-STR_THREE_D_PREVIEW_RIGHT_TOOLTIP                               :{BLACK}Otočit náhled doprava, na další z jeho osmi směrů
-STR_THREE_D_PREVIEW_TURN                                        :{BLACK}Točit
-STR_THREE_D_PREVIEW_TURN_TOOLTIP                                :{BLACK}Nechat náhled točit se sám
 ###length 5
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_16X                       :16x
 STR_CONFIG_SETTING_SPRITE_ZOOM_LVL_IN_8X                        :8x

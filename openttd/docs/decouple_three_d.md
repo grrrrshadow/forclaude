@@ -41,7 +41,7 @@ tree in an old game does.
 - The view turns about the ground point under the middle of the screen, which
   stays where it is. Scrolling, zooming, clicking on tiles, the town and
   station names, the floating texts all work turned. Turned, the view may
-  scroll on past the edge of the map, 64 tiles into the black void around
+  scroll on past the edge of the map, 42 tiles into the black void around
   it, for the camera to get round the corner of the map; facing north the
   edge holds as it always did. The angle is nobody's but this client's: not
   in the savegame, not in the config; every game starts facing north. Only
@@ -158,19 +158,24 @@ map. Facing north nothing of this runs.
 
 ## The previews that turn
 
-`src/three_d_preview_gui.cpp`. A small window opens beside the **purchase
-window** with the vehicle chosen there, four times its size (the 4x pictures
-of a set that has them, the others doubled up), in the company's colours,
-turning by itself through its eight directions; a multiheaded engine shows
-both heads one behind the other. It works for the sets of the original kind
-too, with their one picture a direction. Beside the **window of one of the
-game's own industries** that has eight renders (the school, the machine, the
-statue, the hut) a window shows the building from the render of the
-direction the map view is turned to, a quarter the size of the render. Both
-have arrows that turn them on by one direction and a button that lets them
-turn by themselves; both keep beside their window, follow it when it moves,
-and close with it. Off (the setting), neither opens. The icons of the
-vehicles facing any direction are `GetTrainIcon()`, `GetRoadVehIcon()`,
+`src/three_d_preview_gui.cpp`. There is no window: the preview is a picture
+on a see-through background, drawn over the map beside the window it belongs
+to (the player: a window and buttons are not needed, it starts turning on a
+transparent background). The main window draws it after its viewport, a timer
+turns it and marks the screen under it dirty, and it goes when its window
+goes; any window over it is drawn over it, as over the map. Beside the
+**purchase window** it is the vehicle chosen there, in the company's colours,
+turning by itself through its eight directions, the pictures the map draws it
+with (the purchase icon of a set is often one picture whatever the
+direction); a multiheaded engine shows both heads one behind the other. It
+works for the sets of the original kind too, with their one picture a
+direction. Beside the **window of one of the game's own industries** that has
+eight renders (the school, the machine, the statue, the hut) it is the
+building, turning smoothly, drawn from its renders the way the map draws it,
+starting from the direction the map view is turned to. The size: four times
+the normal for what fits 360 pixels, else twice, else the normal (the player:
+a long wagon at 2x, not 4x). Off (the setting), neither appears. The icons of
+the vehicles facing any direction are `GetTrainIcon()`, `GetRoadVehIcon()`,
 `GetShipIcon()`, `GetAircraftIcon()` (`engine_gui.h`); the purchase list goes
 on using the ones facing west.
 

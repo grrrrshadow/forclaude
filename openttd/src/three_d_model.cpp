@@ -156,13 +156,8 @@ static ThreeDViewList _view_lru; ///< the levels kept, the most recently used fi
 static std::map<ThreeDViewKey, ThreeDViewList::iterator> _view_index;
 static size_t _view_bytes = 0;
 
-/** A model's picture at the angle and zoom it was last drawn at. */
-struct ThreeDPictureEntry {
-	float yaw;
-	ZoomLevel zoom;
-	ThreeDModelPicture picture;
-};
-static std::map<uint, ThreeDPictureEntry> _pictures;
+/** The models' pictures at the angle and zoom the map was last drawn at, one a model (ThreeDPictureCache). */
+static ThreeDPictureCache _pictures;
 
 /** Everything kept of the renders and the pictures made from them is dropped: the sprites are being reloaded. */
 void ClearThreeDModelCache()
@@ -482,32 +477,50 @@ static void SplatView(const ThreeDViewLevel &level, const ThreeDViewMap &map, in
  */
 const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLevel zoom)
 {
-	float yaw = GetViewYaw();
+	return GetThreeDModelPictureAt(model, zoom, GetViewYaw(), _pictures);
+}
+
+/**
+ * The picture of a model turned by any angle, at a zoom, for the previews
+ * (three_d_preview_gui.cpp) and for the map: the world turned by the angle
+ * about the model's origin and drawn by the game's projection, from the two
+ * renders either side of the angle.
+ * @param model the model
+ * @param zoom the zoom
+ * @param yaw the angle, degrees, the way the map view counts it
+ * @param cache where the picture is kept, one a model, by the angle and zoom last asked for
+ * @return the picture, or nullptr when the renders are not there
+ */
+const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache)
+{
 	uint index = GetThreeDModelIndex(model);
-	auto kept = _pictures.find(index);
-	if (kept != _pictures.end() && kept->second.yaw == yaw && kept->second.zoom == zoom) return &kept->second.picture;
+	auto kept = cache.find(index);
+	if (kept != cache.end() && kept->second.yaw == yaw && kept->second.zoom == zoom) return &kept->second.picture;
 
-	/* The turned projection of the world axes, pixels of the zoom from the origin's pixel: it is linear, so three columns. */
+	/* The projection of the world turned by the angle: a world point (x, y, z) about the origin goes to
+	 * (c x - s y, s x + c y, z) and then through RemapCoords() (TurnWorldPoint(), ProjectTurnedF()); it is linear,
+	 * so three columns, in pixels of the zoom. */
+	double a = yaw * M_PI / 180.0;
+	double c = std::cos(a), s = std::sin(a);
 	double scale = 1.0 / (1 << to_underlying(zoom));
-	double ox, oy;
-	ProjectTurnedF(0, 0, 0, ox, oy);
+	auto project = [&](double x, double y, double z, double &px, double &py) {
+		double xr = c * x - s * y, yr = s * x + c * y;
+		px = (yr - xr) * 2 * ZOOM_BASE * scale;
+		py = (yr + xr - z) * ZOOM_BASE * scale;
+	};
 	double axis[3][2];
-	for (int a = 0; a < 3; a++) {
-		double px, py;
-		ProjectTurnedF(a == 0 ? 1 : 0, a == 1 ? 1 : 0, a == 2 ? 1 : 0, px, py);
-		axis[a][0] = (px - ox) * scale;
-		axis[a][1] = (py - oy) * scale;
-	}
+	project(1, 0, 0, axis[0][0], axis[0][1]);
+	project(0, 1, 0, axis[1][0], axis[1][1]);
+	project(0, 0, 1, axis[2][0], axis[2][1]);
 
-	/* The line of sight of the turned view in the model's frame: the game looks along (-1, -1, -2) of the turned world. */
+	/* The line of sight in the model's frame: the game looks along (-1, -1, -2) of the turned world, which is
+	 * (c, s; -s, c) applied to (-1, -1) of the world as it is. */
 	ThreeDModelFrame frame = FrameOf(model);
 	double sight[3];
 	{
-		double ux, uy, zx, zy;
-		UnturnWorldPoint(0, 0, zx, zy);
-		UnturnWorldPoint(-1, -1, ux, uy);
+		double ux = c * -1 + s * -1, uy = -s * -1 + c * -1;
 		double bx, by, bz;
-		frame.ToModel(ux - zx, uy - zy, -2.0, bx, by, bz);
+		frame.ToModel(ux, uy, -2.0, bx, by, bz);
 		double len = std::sqrt(bx * bx + by * by + bz * bz);
 		sight[0] = bx / len; sight[1] = by / len; sight[2] = bz / len;
 	}
@@ -550,7 +563,7 @@ const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLe
 			miny = std::min(miny, py); maxy = std::max(maxy, py);
 		}
 	}
-	ThreeDPictureEntry &entry = _pictures[index];
+	ThreeDPictureEntry &entry = cache[index];
 	entry.yaw = yaw;
 	entry.zoom = zoom;
 	ThreeDModelPicture &pic = entry.picture;
