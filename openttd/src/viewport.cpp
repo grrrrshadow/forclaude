@@ -2483,6 +2483,95 @@ struct TurnedModel {
 /** The things of ViewportDoDrawTurned() drawn from renders, for the block being drawn; ParentSpriteToDraw::box_dx is the index. */
 static std::vector<TurnedModel> _turned_models;
 
+/** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index. */
+static std::vector<const ThreeDModelPicture *> _turned_vehicle_pictures;
+/** Whether the turned renderer is collecting what to draw (ViewportDoDrawTurned()): the vehicles then come as their likeness. */
+static bool _drawing_turned = false;
+
+bool ViewportDrawingTurned()
+{
+	return _drawing_turned;
+}
+
+/**
+ * A vehicle of the turned view as its likeness (three_d_vehicle.cpp): the picture at the angle of the view,
+ * hung from a world point, sorted by the box of the vehicle's parts.
+ * @param pic the picture, its left and top from the point it hangs from
+ * @param ax,ay,az the world point it hangs from: the middle of the vehicle's parts
+ * @param xmin,ymin,zmin,xmax,ymax,zmax the box of the parts, world units
+ */
+void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax)
+{
+	if (pic == nullptr || pic->width <= 0) return;
+	/* Not in the block at all? The picture about its point, in the units of the collecting dpi (16x). */
+	Point pt = RemapCoords(ax, ay, az);
+	int scale = 1 << to_underlying(_vd.dpi.zoom);
+	int left = pt.x + pic->left * scale, top = pt.y + pic->top * scale;
+	int right = left + pic->width * scale, bottom = top + pic->height * scale;
+	if (left >= _vd.dpi.left + _vd.dpi.width || right <= _vd.dpi.left || top >= _vd.dpi.top + _vd.dpi.height || bottom <= _vd.dpi.top) return;
+	if (_turned_vehicle_pictures.size() >= 32000) return;
+
+	ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
+	ps.x = pt.x;
+	ps.y = pt.y;
+	ps.left = left;
+	ps.top = top;
+	ps.image = SPR_EMPTY_BOUNDING_BOX;
+	ps.pal = PAL_NONE;
+	ps.sub = nullptr;
+	ps.xmin = xmin;
+	ps.xmax = xmax;
+	ps.ymin = ymin;
+	ps.ymax = ymax;
+	ps.zmin = zmin;
+	ps.zmax = zmax;
+	ps.first_child = LAST_CHILD_NONE;
+	ps.order = 0;
+	ps.ax = ax;
+	ps.ay = ay;
+	ps.az = az;
+	ps.box = nullptr;
+	ps.box_ox = ax;
+	ps.box_oy = ay;
+	ps.box_oz = az;
+	ps.box_dx = static_cast<int16_t>(_turned_vehicle_pictures.size());
+	ps.box_dy = 0;
+	ps.box_kind = 5;
+	_turned_vehicle_pictures.push_back(pic);
+	_vd.last_child = LAST_CHILD_NONE;
+}
+
+/** Draw a vehicle's likeness (box_kind 5): the picture hung from its point, turned. */
+static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
+	const ThreeDModelPicture *pic = _turned_vehicle_pictures[ps.box_dx];
+	double vx, vy;
+	ProjectTurnedF(ps.box_ox, ps.box_oy, ps.box_oz, vx, vy);
+	double scale = 1.0 / (1 << to_underlying(frame.zoom));
+	int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + pic->left;
+	int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + pic->top;
+	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	int x0 = std::max(0, -ox), x1 = std::min(pic->width, fw - ox);
+	int y0 = std::max(0, -oy), y1 = std::min(pic->height, fh - oy);
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	for (int y = y0; y < y1; y++) {
+		const uint32_t *src = &pic->pixels[static_cast<size_t>(y) * pic->width];
+		uint32_t *row = dst + static_cast<size_t>(oy + y) * frame.pitch + ox;
+		for (int x = x0; x < x1; x++) {
+			Colour s(src[x]);
+			if (s.a == 0) continue;
+			if (s.a == 255) {
+				row[x] = Colour(s.r, s.g, s.b).data;
+			} else {
+				Colour d(row[x]);
+				uint a = s.a, na = 255 - a;
+				row[x] = Colour(static_cast<uint8_t>((s.r * a + d.r * na + 127) / 255), static_cast<uint8_t>((s.g * a + d.g * na + 127) / 255), static_cast<uint8_t>((s.b * a + d.b * na + 127) / 255)).data;
+			}
+		}
+	}
+}
+
 /**
  * One of the game's buildings rendered from eight directions, or a tile of
  * the plantation from its layers (box_kind 3): the picture at the angle, made
@@ -2664,6 +2753,8 @@ static void ViewportDoDrawTurned()
 	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile, and the tiles of the plantation from their layers. */
 	std::vector<TurnedModel> &models = _turned_models;
 	models.clear();
+	_turned_vehicle_pictures.clear();
+	AutoRestoreBackup drawing_turned(_drawing_turned, true);
 
 	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. */
 	_vd.dpi = cdpi;
@@ -2971,6 +3062,10 @@ static void ViewportDoDrawTurned()
 			continue;
 		}
 		if (ps->box_kind == 4) continue; // a tile of a building with eight renders: drawn whole above
+		if (ps->box_kind == 5) {
+			DrawTurnedVehicle(frame, *ps);
+			continue;
+		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
 		int child_idx = ps->first_child;
 		while (child_idx >= 0) {
@@ -3255,6 +3350,9 @@ void UpdateViewportPosition(Window *w, uint32_t delta_ms)
  */
 static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, int bottom)
 {
+	/* Turned (three_d.h), the place is drawn elsewhere on the screen. */
+	if (IsViewportTurned(vp)) TurnDirtyRect(left, top, right, bottom);
+
 	/* Rounding wrt. zoom-out level */
 	right += (1 << to_underlying(vp.zoom)) - 1;
 	bottom += (1 << to_underlying(vp.zoom)) - 1;

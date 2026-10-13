@@ -324,7 +324,7 @@ static Rect DrawVehiclePreview(ThreeDPreview &p, bool draw)
 	if (!draw) return r;
 
 	ThreeDModelPicture pic;
-	if (!RenderThreeDVehicle(model, p.zoom, PreviewAzimuth(p), pic)) return r;
+	if (!RenderThreeDVehicle(model, p.zoom, PreviewAzimuth(p), pic, false)) return r;
 	int ax = r.left - p.frame.left, ay = r.top - p.frame.top;
 	BlitPicture(pic, ax + pic.left, ay + pic.top);
 	return r;

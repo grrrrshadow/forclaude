@@ -191,10 +191,13 @@ bool GetThreeDPlantationLayers(const ThreeDPlantationTile &tile, ThreeDPlantatio
 struct ThreeDVehicleModel;
 const ThreeDVehicleModel *GetThreeDVehicleModel(EngineID engine, PaletteID pal);
 ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model);
-bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out);
+bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track);
+const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, bool on_track);
 Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom);
 std::string DescribeThreeDVehicleModel(const ThreeDVehicleModel *model);
 void ClearThreeDVehicleModels();
+struct Vehicle;
+bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom);
 
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);
@@ -234,6 +237,7 @@ void UnturnWorldPoint(double xr, double yr, double &x, double &y);
 void ProjectTurnedF(double x, double y, double z, double &vx, double &vy);
 Point ProjectTurned(int x, int y, int z);
 void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y);
+void TurnDirtyRect(int &left, int &top, int &right, int &bottom);
 Point InverseRemapCoordsTurned(int x, int y, bool clamp_to_map = false);
 
 #endif /* THREE_D_H */

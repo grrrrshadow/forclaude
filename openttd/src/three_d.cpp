@@ -163,6 +163,45 @@ void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y)
 }
 
 /**
+ * Where a rectangle of the view facing north lands in the turned view: the
+ * game marks what to repaint in the coordinates of the view facing north
+ * (MarkAllViewportsDirty(): a vehicle that moved, a tile that changed), and
+ * turned, those places are drawn elsewhere on the screen -- without this a
+ * vehicle far from the pivot moved out of its old picture and was not drawn
+ * at its new place until something else repainted it.
+ *
+ * The flat screen turns with the world: a point of the north view, taken as a
+ * point of the ground, turned about the pivot and projected again. A height
+ * above the ground is not known here; it moves a point by at most twice its
+ * height either way under the turn, so the rectangle grows by that much for
+ * anything up to the heights vehicles fly at.
+ * @param[in,out] left,top,right,bottom the rectangle, virtual screen coordinates (ZoomLevel::Min)
+ */
+void TurnDirtyRect(int &left, int &top, int &right, int &bottom)
+{
+	const double max_height = 256.0; // world units: higher than the ground and the aircraft go
+	double nl = std::numeric_limits<double>::infinity(), nt = nl, nr = -nl, nb = -nl;
+	const double xs[2] = {static_cast<double>(left), static_cast<double>(right)};
+	const double ys[2] = {static_cast<double>(top), static_cast<double>(bottom)};
+	for (double vx : xs) {
+		for (double vy : ys) {
+			/* The ground point the north view draws here (the inverse of RemapCoords() at z = 0). */
+			double sum = vy / ZOOM_BASE, diff = vx / (2.0 * ZOOM_BASE);
+			double x = (sum - diff) / 2, y = (sum + diff) / 2;
+			double tx, ty;
+			ProjectTurnedF(x, y, 0, tx, ty);
+			nl = std::min(nl, tx); nr = std::max(nr, tx);
+			nt = std::min(nt, ty); nb = std::max(nb, ty);
+		}
+	}
+	const double margin = 2 * max_height * ZOOM_BASE;
+	left = static_cast<int>(std::floor(nl - margin));
+	right = static_cast<int>(std::ceil(nr + margin));
+	top = static_cast<int>(std::floor(nt - margin));
+	bottom = static_cast<int>(std::ceil(nb + margin));
+}
+
+/**
  * The world point under a virtual screen coordinate of the turned view, with
  * the height of the ground taken in, the way InverseRemapCoords2() does it for
  * the view facing north: walk down from the top of the world and stop where

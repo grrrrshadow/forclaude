@@ -8696,12 +8696,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* "okna": the whole screen with the windows, as the crash log takes it (SC_VIEWPORT hides the windows); the
 		 * screen is drawn first, since the null driver only draws between ticks. The file goes where the crash log's would. */
 		bool windows = argv.size() > 3 && argv[3] == "okna";
+		/* "obrazovka": the screen as it is, only the blocks marked dirty drawn since -- what the player really sees
+		 * after the vehicles moved (a dirty block in the wrong place leaves the old picture standing). */
+		bool as_is = argv.size() > 3 && argv[3] == "obrazovka";
 		if (windows) {
 			UndrawMouseCursor();
 			MarkWholeScreenDirty(); // a viewport screenshot before left the windows undrawn
 			DrawDirtyBlocks();
+		} else if (as_is) {
+			UndrawMouseCursor();
+			DrawDirtyBlocks();
 		}
-		bool ok = MakeScreenshot(windows ? SC_CRASHLOG : SC_VIEWPORT, std::string(argv[2]));
+		bool ok = MakeScreenshot(windows || as_is ? SC_CRASHLOG : SC_VIEWPORT, std::string(argv[2]));
 		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: snimek {} {}", argv[2], ok ? "zapsan" : "ODMITNUTO - nezapsan");
 	} else if (what == "cas") {
 		/* How long the whole screen takes to draw, ten times over, at the angle set. */
@@ -8719,10 +8725,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		TurnedTimingsPrint();
 		return true;
 	} else if (what == "vozidla") {
+		/* Every front, with the tile under it (its type: 1 is plain rail, 5 a station) and the number of parts: the rig picks one on plain track from this. */
+		int seen = 0;
 		for (const Vehicle *v : Vehicle::Iterate()) {
 			if (!v->IsPrimaryVehicle()) continue;
-			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} smer {} {}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
-					v->x_pos / (int)TILE_SIZE, v->y_pos / (int)TILE_SIZE, to_underlying(v->direction), v->vehstatus.Test(VehState::Hidden) ? "skryte" : "videt");
+			int parts = 0;
+			for (const Vehicle *u = v; u != nullptr; u = u->Next()) parts++;
+			TileIndex vt = TileVirtXY(v->x_pos, v->y_pos);
+			bool hidden = v->vehstatus.Test(VehState::Hidden);
+			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} typu {} smer {} dilu {} {}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
+					TileX(vt), TileY(vt), to_underlying(GetTileType(vt)), to_underlying(v->direction), parts, hidden ? "skryte" : "videt",
+					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
+					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "");
+			if (!hidden) seen++;
 		}
 		return true;
 	} else if (what == "vozidlo") {

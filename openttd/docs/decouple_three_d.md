@@ -47,10 +47,26 @@ tree in an old game does.
   in the savegame, not in the config; every game starts facing north. Only
   the main view turns; the extra viewports and the ones in vehicle windows
   keep facing north.
-- Vehicles show the picture of the direction they face **as seen from the
-  turn**: a train heading north on a view turned by 90 degrees shows its
-  westward picture and runs along what is now a horizontal track. Between two
-  of the eight directions the nearer one is shown.
+- Vehicles turn with the map: a train heading north on a view turned by 90
+  degrees runs along what is now a horizontal track and looks west. Turned,
+  a vehicle is drawn as its **3D likeness made from its eight sprites** (the
+  section on the likeness below, the same one the purchase preview turns),
+  at the angle of its direction plus the turn, so it lies along the track at
+  every degree in between the eight directions instead of standing still
+  while the map turns under it and jumping at the next direction (the
+  player: "they go the other way than the map and then jerk round"). A
+  vehicle a set draws turned round (an engine coupled backwards, a piece a
+  set draws reversed) is turned round here too. An articulated vehicle --
+  a truck with its trailer, a locomotive of three pieces -- is one likeness
+  drawn from its first piece to its last, so a long vehicle keeps its length
+  (on a curve it is drawn straight for now); each wagon is its own. A
+  vehicle whose likeness cannot be made (no sprites in the set, a crashed
+  one, an 8bpp blitter) shows the sprite of the nearer of the eight
+  directions as seen from the turn, as before.
+- Game Options: the fences along the rails are **off by default** (the
+  setting the game already had, under the graphics options, to be turned
+  back on at will), since turned they are billboards and stand about the
+  track at every angle but north.
 
 ## How it is drawn
 
@@ -58,12 +74,17 @@ The world is turned, not the camera. A world point is turned about the pivot
 (the ground point under the middle of the screen when the turn began) by the
 angle, and then drawn by the game's own projection, `RemapCoords()`. So the
 main viewport goes on being a plain viewport of a world that happens to be
-turned: the scroll position, the zoom and the dirty blocks mean what they
-always did, and only the two directions world -> screen (`ProjectTurned()`)
-and screen -> world (`InverseRemapCoordsTurned()`, which walks down the line
-of sight to the ground like `InverseRemapCoords2()`) know the angle. Turning
-moves the pivot to the point under the middle and shifts the scroll position
-so that the point stays put.
+turned: the scroll position and the zoom mean what they always did, and only
+the two directions world -> screen (`ProjectTurned()`) and screen -> world
+(`InverseRemapCoordsTurned()`, which walks down the line of sight to the
+ground like `InverseRemapCoords2()`) know the angle. Turning moves the pivot
+to the point under the middle and shifts the scroll position so that the
+point stays put. What the game marks for repainting (a vehicle that moved, a
+tile that changed) it marks in the coordinates of the view facing north; a
+turned viewport puts that rectangle through the turn first
+(`TurnDirtyRect()`: its corners taken as ground points, turned and projected
+again, grown by twice the height things can have, which the rectangle does
+not know), so a vehicle far from the pivot is repainted where it is drawn.
 
 For a block of the screen the second renderer takes the same lists the usual
 path takes -- what every tile's draw procedure and every vehicle says to draw
@@ -86,11 +107,22 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    over from the ground beside it, since the building no longer covers it
    exactly.
 2. **Everything standing** -- trees, foundations' walls, bridges, station
-   roofs, vehicles, houses without a table -- is a billboard: the sprite as it
+   roofs, houses without a table -- is a billboard: the sprite as it
    is, hung from its anchor point turned (`ParentSpriteToDraw::ax, ay, az`,
    the world point `AddSortableSpriteToDraw()` was given), drawn far to near
-   by the turned depth of its bounding box. A vehicle's sprite is the one of
-   its turned direction. The game's own sprite sorter is not used here.
+   by the turned depth of its bounding box. The game's own sprite sorter is
+   not used here. **A vehicle** is its 3D likeness from its eight sprites
+   (`AddThreeDVehicleToViewport()` in `src/three_d_vehicle.cpp`, called from
+   `DoDrawVehicle()` in place of the sprite when the view is turned): the
+   likeness rendered at the angle of the vehicle's direction plus the turn,
+   foreshortened along itself between the directions the way the sprites of
+   the track directions are (`on_track`), kept per whole degree, and hung
+   from the middle of the vehicle (of its first and last piece, for an
+   articulated one) with its bounding box the union of the pieces', sorted
+   with the rest by turned depth (`box_kind` 5, `AddTurnedVehiclePicture()`
+   in `viewport.cpp`). The pieces after the first add nothing; a dual-headed
+   engine's rear half is part of the front's likeness. A vehicle without a
+   likeness is a billboard of the sprite of its turned direction, as before.
 3. **The houses of the original graphics with a hand table**
    (`table/three_d_houses.h`, 26 temperate houses read off their one sprite
    by hand: a few boxes each with flat, gable or hip roofs) are boxes. The
@@ -166,7 +198,13 @@ and the hut's girls as renders of their own (the buildings turn without them
 for now, in the map and in the preview), the plantation in the preview, boxes
 for the houses of the other climates, the proper sorting of long things
 against each other, the smaller textures of the zoomed-out view, the seams at
-the edges of the map. Facing north nothing of this runs.
+the edges of the map. The platforms and buildings of a station stand as
+billboards (their rails turn as ground under them, the platform sprites do
+not), so a station looks wrong at any angle but the eight -- the player:
+test vehicles on plain track, away from stations. An articulated vehicle is
+drawn straight on a curve. The first likeness of a vehicle type is made when
+it is first drawn turned, a second or two in which the game waits. Facing
+north nothing of this runs.
 
 ## The previews that turn
 
@@ -248,7 +286,9 @@ outline covers the sprites' at 0.93 to 0.98. The last four models are kept
 screen is a buffer drawn for real): `test3d uhel <degrees>` turns the main
 view, `test3d stred <x> <y>` puts a tile under the middle, `test3d zoom
 <level>` sets the zoom, `test3d vozidlo [n]` puts the n-th visible vehicle
-under the middle (`test3d vozidla` lists them), `test3d snimek <name>` writes
+under the middle (`test3d vozidla` lists them all, with the tile under each
+and its type -- 1 plain rail, 5 a station -- its pieces, whether it is
+stopped or coupled turned round), `test3d snimek <name>` writes
 the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole
 screen and says where the time went, `test3d ladeni <x> <y>` writes out how
@@ -271,7 +311,12 @@ likeness writes its eight views with the hull's outline over them as
 `three_d_render_<engine>_<angle>.ppm`), `test3d okna` lists every window, and `test3d snimek <name> okna` writes the
 whole screen with the windows (the plain `snimek` is the viewport alone; the
 world generation still counts as in progress at the first tick, which would
-leave every other window undrawn, so the rig calls it over). Screenshots asked for under the null driver are made on the
+leave every other window undrawn, so the rig calls it over). `test3d snimek
+<name> obrazovka` writes the screen as it stands, only the blocks marked
+dirty since drawn, which is what the player sees: with `testpauza` and
+`testzatik <ticks> test3d snimek ...` it shows whether a vehicle that moved
+was repainted where the turned view draws it (an `obrazovka` snapshot and a
+plain one at the same tick must be the same picture). Screenshots asked for under the null driver are made on the
 spot (`MakeScreenshot()`), since that driver never drains the main-thread
 queue.
 

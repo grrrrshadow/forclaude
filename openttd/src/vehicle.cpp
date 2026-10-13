@@ -15,6 +15,7 @@
 #include "timetable.h"
 #include "viewport_func.h"
 #include "three_d.h"
+#include "blitter/factory.hpp"
 #include "news_func.h"
 #include "command_func.h"
 #include "company_func.h"
@@ -1214,14 +1215,26 @@ static void DoDrawVehicle(const Vehicle *v)
 		if (to != TransparencyOption::Invalid && (IsTransparencySet(to) || IsInvisibilitySet(to))) return;
 	}
 
-	/* In the turned view (three_d.h) the vehicle shows the picture of the
-	 * direction it faces as seen from there: so many of the eight directions
-	 * back as the view is turned forward. */
+	/* In the turned view (three_d.h) the vehicle is its 3D likeness made from its eight sprites, drawn at the
+	 * angle of the view (three_d_vehicle.cpp): the whole articulated vehicle, or both heads of a double-headed
+	 * engine, from its first part; the other parts are in it. Without a likeness (a set whose chain gives no
+	 * picture for some direction) it shows the sprite of the direction it faces as seen from there: so many of
+	 * the eight directions back as the view is turned forward. */
 	const VehicleSpriteSeq *seq = &v->sprite_cache.sprite_seq;
 	VehicleSpriteSeq turned;
-	int step = TurnedDirectionStep();
-	if (step != 0 && v->direction != Direction::Invalid && (v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship ||
-			(v->type == VehicleType::Aircraft && Aircraft::From(v)->IsNormalAircraft()))) {
+	int step = ViewportDrawingTurned() ? TurnedDirectionStep() : 0;
+	bool turnable = v->direction != Direction::Invalid && (v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship ||
+			(v->type == VehicleType::Aircraft && Aircraft::From(v)->IsNormalAircraft()));
+	if (ViewportDrawingTurned() && turnable && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && !v->vehstatus.Test(VehState::Crashed) && !shadowed) {
+		/* A part drawn with its first: nothing of its own. */
+		if (v->IsArticulatedPart()) return;
+		if (v->type == VehicleType::Train && Train::From(v)->IsRearDualheaded()) {
+			const Train *front = Train::From(v)->other_multiheaded_part;
+			if (front != nullptr && !front->vehstatus.Test(VehState::Crashed)) return;
+		}
+		if (AddThreeDVehicleToViewport(v, pal, _cur_dpi->zoom)) return;
+	}
+	if (step != 0 && turnable) {
 		v->GetImage(static_cast<Direction>((to_underlying(v->direction) - step) & 7), EngineImageType::OnMap, &turned);
 		if (turned.IsValid()) seq = &turned;
 	}
@@ -2006,6 +2019,16 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 	new_coord.top    += pt.y;
 	new_coord.right  += pt.x + 2 * ZOOM_BASE;
 	new_coord.bottom += pt.y + 2 * ZOOM_BASE;
+
+	/* Turned (three_d.h), the vehicle is drawn as its likeness, which may reach further than this sprite does
+	 * (the whole articulated vehicle from its first part, at its true length): room for that. */
+	if (IsViewTurned()) {
+		int w = new_coord.right - new_coord.left, h = new_coord.bottom - new_coord.top;
+		new_coord.left -= w + 8 * ZOOM_BASE;
+		new_coord.right += w + 8 * ZOOM_BASE;
+		new_coord.top -= h + 8 * ZOOM_BASE;
+		new_coord.bottom += h + 8 * ZOOM_BASE;
+	}
 
 	extern bool _draw_bounding_boxes;
 	if (_draw_bounding_boxes) {
