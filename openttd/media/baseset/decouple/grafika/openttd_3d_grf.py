@@ -61,9 +61,16 @@ MODELS = [
     ("socha_bronz", "industry_variant", "IT_STATUE", "socha/osm_smeru_zin16", "socha_bronz"),
     ("automat", "industry", "IT_WEED_MACHINE", "automat/osm_smeru_zin16", "automat"),
     ("chatka", "industry", "IT_COFFEESHOP", "chatka/osm_smeru_zin16", "chatka"),
+    # the marijuana plantation, a tile at a time: layers laid on one tile by the game (industry_cmd.cpp,
+    # GetThreeDPlantationTile()); the folder holds a directory a direction, the file name has no direction
+] + [
+    (f"pole_{name}", "layer", "0", "pole/osm_smeru_zin16/d{d}", name) for name in (
+        "mari_zaklad", "mari_male", "mari_vzrostle", "cesta", "bouda", "seno", "holky_sz", "holky_jv",
+        "prace_real_f2", "prace_sedi_f2", "prace_punk_f2", "prace_pubg_f2", "prace_char16_f2", "prace_chill_f2",
+        "prace_real_f3", "prace_sedi_f3", "prace_punk_f3", "prace_pubg_f3", "prace_char16_f3", "prace_chill_f3")
 ]
 
-KIND_ENUM = {"house": "ThreeDModelKind::House", "industry": "ThreeDModelKind::Industry", "industry_variant": "ThreeDModelKind::IndustryVariant"}
+KIND_ENUM = {"house": "ThreeDModelKind::House", "industry": "ThreeDModelKind::Industry", "industry_variant": "ThreeDModelKind::IndustryVariant", "layer": "ThreeDModelKind::Layer"}
 
 
 def depth_png(src: Path, dst: Path) -> int:
@@ -82,7 +89,7 @@ def depth_png(src: Path, dst: Path) -> int:
 def read_model(grrrrf: Path, name, kind, ident, folder, prefix):
     views = []
     for d in range(8):
-        base = grrrrf / folder / f"{prefix}_d{d}_zin16"
+        base = grrrrf / folder.format(d=d) / (f"{prefix}_zin16" if "{d}" in folder else f"{prefix}_d{d}_zin16")
         j = json.loads((base.parent / (base.name + ".json")).read_text())
         h = j["hloubka"]
         if h["stred"] != 32768 or abs(h["jednotka_m"] - 0.001) > 1e-9:

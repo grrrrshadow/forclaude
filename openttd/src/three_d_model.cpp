@@ -427,13 +427,16 @@ struct ThreeDSplat {
  * @param sight the line of sight in the model's frame
  * @param weight the render's weight at the angle
  * @param[out] out the splat
+ * @param clear whether to start the splat afresh (the first layer) or add to it
  */
-static void SplatView(const ThreeDViewLevel &level, const ThreeDViewMap &map, int left, int top, int width, int height, const double sight[3], float weight, ThreeDSplat &out)
+static void SplatView(const ThreeDViewLevel &level, const ThreeDViewMap &map, int left, int top, int width, int height, const double sight[3], float weight, ThreeDSplat &out, bool clear)
 {
 	size_t n = static_cast<size_t>(width) * height;
-	out.depth.assign(n, INFINITY);
-	out.colour.assign(n, 0);
-	out.weight.assign(n, 0.0f);
+	if (clear) {
+		out.depth.assign(n, INFINITY);
+		out.colour.assign(n, 0);
+		out.weight.assign(n, 0.0f);
+	}
 	const float sx = static_cast<float>(sight[0]), sy = static_cast<float>(sight[1]), sz = static_cast<float>(sight[2]);
 	for (int J = 0; J < level.height; J++) {
 		const uint16_t *drow = &level.depth[static_cast<size_t>(J) * level.width];
@@ -480,22 +483,45 @@ const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLe
 	return GetThreeDModelPictureAt(model, zoom, GetViewYaw(), _pictures);
 }
 
-/**
- * The picture of a model turned by any angle, at a zoom, for the previews
- * (three_d_preview_gui.cpp) and for the map: the world turned by the angle
- * about the model's origin and drawn by the game's projection, from the two
- * renders either side of the angle.
- * @param model the model
- * @param zoom the zoom
- * @param yaw the angle, degrees, the way the map view counts it
- * @param cache where the picture is kept, one a model, by the angle and zoom last asked for
- * @return the picture, or nullptr when the renders are not there
- */
+/** The picture of layers laid on one tile at the angle the view is turned to (GetThreeDLayersPictureAt()). */
+const ThreeDModelPicture *GetThreeDLayersPicture(std::span<const ThreeDModel *const> layers, ZoomLevel zoom)
+{
+	return GetThreeDLayersPictureAt(layers, zoom, GetViewYaw(), _pictures);
+}
+
+/** The picture of one model turned by any angle: GetThreeDLayersPictureAt() with the one layer. */
 const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache)
 {
-	uint index = GetThreeDModelIndex(model);
-	auto kept = cache.find(index);
-	if (kept != cache.end() && kept->second.yaw == yaw && kept->second.zoom == zoom) return &kept->second.picture;
+	const ThreeDModel *const one[1] = {model};
+	return GetThreeDLayersPictureAt(one, zoom, yaw, cache);
+}
+
+/**
+ * The picture of a model, or of layers laid on one tile, turned by any
+ * angle, at a zoom, for the map and for the previews (three_d_preview_gui.cpp):
+ * the world turned by the angle about the origin and drawn by the game's
+ * projection, from the two renders either side of the angle; the layers'
+ * points all go into the same picture, the nearest winning each pixel, so
+ * the plants stand on the soil and a girl among the plants.
+ * @param layers the models, all with the same origin (the plantation's tile layers)
+ * @param zoom the zoom
+ * @param yaw the angle, degrees, the way the map view counts it
+ * @param cache where the picture is kept, one a set of layers, by the angle and zoom last asked for
+ * @return the picture, or nullptr when the renders are not there
+ */
+const ThreeDModelPicture *GetThreeDLayersPictureAt(std::span<const ThreeDModel *const> layers, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache)
+{
+	if (layers.empty()) return nullptr;
+	const ThreeDModel *model = layers[0];
+	std::vector<uint> indices;
+	uint64_t key = 0;
+	for (size_t i = 0; i < layers.size(); i++) {
+		uint index = GetThreeDModelIndex(layers[i]);
+		indices.push_back(index);
+		key = key * 131 + index + 1;
+	}
+	auto kept = cache.find(key);
+	if (kept != cache.end() && kept->second.yaw == yaw && kept->second.zoom == zoom && kept->second.layers == indices) return &kept->second.picture;
 
 	/* The projection of the world turned by the angle: a world point (x, y, z) about the origin goes to
 	 * (c x - s y, s x + c y, z) and then through RemapCoords() (TurnWorldPoint(), ProjectTurnedF()); it is linear,
@@ -544,28 +570,32 @@ const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, Zoom
 	int views[2] = {k0, k1};
 	float weights[2] = {static_cast<float>(1.0 - t), static_cast<float>(t)};
 
-	/* The levels of the two, and the picture's extent: their corners at the least and the most depth. */
+	/* The levels of the two renders of every layer, and the picture's extent: their corners at the least and the most depth. */
 	int shift = to_underlying(zoom);
-	const ThreeDViewLevel *levels[2] = {nullptr, nullptr};
-	ThreeDViewMap maps[2];
+	std::vector<const ThreeDViewLevel *> levels(2 * layers.size(), nullptr);
+	std::vector<ThreeDViewMap> maps(2 * layers.size());
 	double minx = INFINITY, maxx = -INFINITY, miny = INFINITY, maxy = -INFINITY;
-	for (int s = 0; s < 2; s++) {
-		if (views[s] < 0) continue;
-		levels[s] = GetViewLevel(model, views[s], shift);
-		if (levels[s] == nullptr) return nullptr;
-		maps[s] = MapView(model->views[views[s]], *levels[s], frame, axis, sight);
-		for (int corner = 0; corner < 8; corner++) {
-			double I = (corner & 1) ? levels[s]->width : 0, J = (corner & 2) ? levels[s]->height : 0;
-			double z = (corner & 4) ? levels[s]->depth_max : levels[s]->depth_min;
-			double px = maps[s].x0 + maps[s].xi * I + maps[s].xj * J + maps[s].xz * z;
-			double py = maps[s].y0 + maps[s].yi * I + maps[s].yj * J + maps[s].yz * z;
-			minx = std::min(minx, px); maxx = std::max(maxx, px);
-			miny = std::min(miny, py); maxy = std::max(maxy, py);
+	for (size_t l = 0; l < layers.size(); l++) {
+		for (int s = 0; s < 2; s++) {
+			if (views[s] < 0) continue;
+			size_t i = 2 * l + s;
+			levels[i] = GetViewLevel(layers[l], views[s], shift);
+			if (levels[i] == nullptr) return nullptr;
+			maps[i] = MapView(layers[l]->views[views[s]], *levels[i], frame, axis, sight);
+			for (int corner = 0; corner < 8; corner++) {
+				double I = (corner & 1) ? levels[i]->width : 0, J = (corner & 2) ? levels[i]->height : 0;
+				double z = (corner & 4) ? levels[i]->depth_max : levels[i]->depth_min;
+				double px = maps[i].x0 + maps[i].xi * I + maps[i].xj * J + maps[i].xz * z;
+				double py = maps[i].y0 + maps[i].yi * I + maps[i].yj * J + maps[i].yz * z;
+				minx = std::min(minx, px); maxx = std::max(maxx, px);
+				miny = std::min(miny, py); maxy = std::max(maxy, py);
+			}
 		}
 	}
-	ThreeDPictureEntry &entry = cache[index];
+	ThreeDPictureEntry &entry = cache[key];
 	entry.yaw = yaw;
 	entry.zoom = zoom;
+	entry.layers = indices;
 	ThreeDModelPicture &pic = entry.picture;
 	pic.left = static_cast<int>(std::floor(minx)) - 2;
 	pic.top = static_cast<int>(std::floor(miny)) - 2;
@@ -577,15 +607,17 @@ const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, Zoom
 		return nullptr;
 	}
 
-	/* Each render splat, then the two put together. */
+	/* Each render of each layer splat, the layers into the same buffers, then the two renders put together. */
 	static ThreeDSplat splats[2];
 	for (int s = 0; s < 2; s++) {
-		if (levels[s] == nullptr) continue;
-		SplatView(*levels[s], maps[s], pic.left, pic.top, pic.width, pic.height, sight, weights[s], splats[s]);
+		if (views[s] < 0) continue;
+		for (size_t l = 0; l < layers.size(); l++) {
+			SplatView(*levels[2 * l + s], maps[2 * l + s], pic.left, pic.top, pic.width, pic.height, sight, weights[s], splats[s], l == 0);
+		}
 	}
 	size_t n = static_cast<size_t>(pic.width) * pic.height;
 	pic.pixels.assign(n, 0);
-	if (levels[1] == nullptr) {
+	if (views[1] < 0) {
 		for (size_t o = 0; o < n; o++) {
 			if (splats[0].depth[o] != INFINITY) pic.pixels[o] = splats[0].colour[o];
 		}

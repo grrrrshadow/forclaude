@@ -149,12 +149,24 @@ block is clipped away. The block is first cleared black, which also tells the
 faces are written straight into it, the billboards through the blitter as
 always. It needs a 32bpp blitter: with an 8bpp one the angle stays 0.
 
+   **The marijuana plantation** is laid a tile at a time from layers rendered
+   the same way (`ThreeDModelKind::Layer`, found by name): a field tile is
+   the soil with the plants of the stage and, when the girls are there, the
+   girl at work on it (the six of them, as `DrawMarijuanaPlantationTile()`
+   puts them); from the field tile before the field road comes the road tile
+   behind it, each thing on it its own: the road, flat, sorted before
+   whatever stands on it, the shed and the haystack at its end, the pairs of
+   girls by its edges. All the layers of a tile go into one picture, the
+   nearest point winning each pixel, so a girl stands among the plants
+   (`GetThreeDLayersPicture()`, `GetThreeDPlantationTile()` in
+   `industry_cmd.cpp`).
+
 What is not there yet: the girls about the school, the machine and the statue
 and the hut's girls as renders of their own (the buildings turn without them
-for now, in the map and in the preview), the plantation, boxes for the houses
-of the other climates, the proper sorting of long things against each other,
-the smaller textures of the zoomed-out view, the seams at the edges of the
-map. Facing north nothing of this runs.
+for now, in the map and in the preview), the plantation in the preview, boxes
+for the houses of the other climates, the proper sorting of long things
+against each other, the smaller textures of the zoomed-out view, the seams at
+the edges of the map. Facing north nothing of this runs.
 
 ## The previews that turn
 

@@ -44,8 +44,10 @@
 #include "engine_type.h"
 #include "window_type.h"
 #include "zoom_type.h"
+#include "tile_type.h"
 
 #include <map>
+#include <span>
 
 struct Viewport;
 
@@ -83,6 +85,7 @@ enum class ThreeDModelKind : uint8_t {
 	House,           ///< a house of the original graphics; id is the HouseID of its north tile
 	Industry,        ///< one of the game's own industries; id is its IndustryType
 	IndustryVariant, ///< the same industry with bit 0 of its random bits set (the statue of bronze)
+	Layer,           ///< a layer of a tile laid with others by the game, found by its name (the marijuana plantation: GetThreeDPlantationTile())
 };
 
 /**
@@ -136,18 +139,41 @@ struct ThreeDModelPicture {
 	std::vector<uint32_t> pixels; ///< Colour::data, alpha 0 where there is nothing
 };
 
-/** A model's picture at an angle and zoom (ThreeDPictureCache: one a model, the last asked for). */
+/** A picture of a model, or of layers laid on one tile, at an angle and zoom (ThreeDPictureCache: one a model or set of layers, the last asked for). */
 struct ThreeDPictureEntry {
 	float yaw;
 	ZoomLevel zoom;
+	std::vector<uint> layers; ///< the models laid together, by index
 	ThreeDModelPicture picture;
 };
-using ThreeDPictureCache = std::map<uint, ThreeDPictureEntry>;
+using ThreeDPictureCache = std::map<uint64_t, ThreeDPictureEntry>;
 
 const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLevel zoom);
+const ThreeDModelPicture *GetThreeDLayersPicture(std::span<const ThreeDModel *const> layers, ZoomLevel zoom);
 const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache);
+const ThreeDModelPicture *GetThreeDLayersPictureAt(std::span<const ThreeDModel *const> layers, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache);
 std::string DescribeThreeDModel(const ThreeDModel *model);
 void ClearThreeDModelCache();
+
+/**
+ * A tile of the marijuana plantation as the turned view lays it from the
+ * layers (ThreeDModelKind::Layer): the field's soil, the plants of the
+ * stage, a girl at work; and from the field tile before the field road, the
+ * road tile behind it with the shed, the haystack and the girls by the road
+ * (GetThreeDPlantationTile() in industry_cmd.cpp, after DrawMarijuanaPlantationTile()).
+ */
+struct ThreeDPlantationTile {
+	uint8_t stage;     ///< 0 bare, 1 small plants, 2 grown
+	int8_t worker;     ///< the girl at work on this tile, 0 to 5, or -1
+	bool girls;        ///< whether the girls are there at all
+	bool road_behind;  ///< whether the tile behind this one (y + 1) is the field road this tile holds
+	uint8_t x;         ///< the tile's place along X in the plantation
+	bool shed;         ///< the road tile behind has the shed and the haystack
+	bool girls_nw;     ///< the road tile behind has the pair of girls by its north-west edge
+	bool girls_se;     ///< and by its south-east edge
+};
+bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out);
+const char *ThreeDPlantationWorkerName(int worker);
 
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);

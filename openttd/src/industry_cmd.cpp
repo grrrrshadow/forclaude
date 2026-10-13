@@ -63,6 +63,8 @@
 #include "table/industry_land.h"
 #include "table/build_industry.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 /** Whether this player's industry windows show how much of the building is left. */
@@ -1104,6 +1106,40 @@ static void DrawMarijuanaPlantationTile(const TileInfo *ti, const Industry *ind)
 		if (girls && x == PLANTATION_ROAD_GIRLS_NW_X) AddSortableSpriteToDraw(SPR_MARIJUANA_ROAD_GIRLS_NW, PAL_NONE, ti->x, road_y, road_z, BY_NW_EDGE_BOUNDS, transparent);
 		if (girls && x == PLANTATION_ROAD_GIRLS_SE_X) AddSortableSpriteToDraw(SPR_MARIJUANA_ROAD_GIRLS_SE, PAL_NONE, ti->x, road_y, road_z, BY_SE_EDGE_BOUNDS, transparent);
 	}
+}
+
+/**
+ * A tile of the marijuana plantation for the turned view (three_d.h,
+ * ThreeDPlantationTile): what DrawMarijuanaPlantationTile() would lay on it
+ * and on the road tile behind it, as layers to put together.
+ * @param tile the tile
+ * @param[out] out the tile's layers
+ * @return whether the tile is a finished tile of a plantation
+ */
+bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out)
+{
+	if (!IsTileType(tile, TileType::Industry) || !IsIndustryCompleted(tile)) return false;
+	const Industry *ind = Industry::GetByTile(tile);
+	if (ind->type != IT_MARIJUANA_PLANTATION) return false;
+	uint x = TileX(tile) - TileX(ind->location.tile);
+	uint y = TileY(tile) - TileY(ind->location.tile);
+	PlantationStage stage = MarijuanaPlantationStage(ind);
+	out.stage = stage == PlantationStage::Grown ? 2 : stage == PlantationStage::Small ? 1 : 0;
+	out.girls = HasGirls(ind);
+	out.worker = static_cast<int8_t>(out.girls && out.stage != 0 ? PlantationWorkerAt(x, y) : -1);
+	out.x = static_cast<uint8_t>(x);
+	out.road_behind = y + 1 == PLANTATION_ROAD_ROW && x < PLANTATION_WIDTH;
+	out.shed = out.road_behind && x == 0;
+	out.girls_nw = out.road_behind && out.girls && x == PLANTATION_ROAD_GIRLS_NW_X;
+	out.girls_se = out.road_behind && out.girls && x == PLANTATION_ROAD_GIRLS_SE_X;
+	return true;
+}
+
+/** The name of a girl at work on the plantation, 0 to 5, the order of SPR_MARIJUANA_WORKER_SMALL: her layer is pole_prace_<name>_f2 or _f3 (table/three_d_models.h). */
+const char *ThreeDPlantationWorkerName(int worker)
+{
+	static const char *const names[PLANTATION_WORKER_COUNT] = {"real", "sedi", "punk", "pubg", "char16", "chill"};
+	return worker >= 0 && worker < static_cast<int>(PLANTATION_WORKER_COUNT) ? names[worker] : "";
 }
 
 /**

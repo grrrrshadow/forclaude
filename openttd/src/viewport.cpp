@@ -101,6 +101,7 @@
 #include <chrono>
 #include <cmath>
 #include <forward_list>
+#include <optional>
 #include <stack>
 
 #include "widgets/vehicle_widget.h"
@@ -2469,18 +2470,34 @@ static void DrawTurnedGenericBox(const DrawPixelInfo &frame, const ParentSpriteT
 }
 
 /**
- * One of the game's buildings rendered from eight directions (box_kind 3,
- * ThreeDModel): its picture at the angle, made from the two renders either
- * side of it (GetThreeDModelPicture()), laid at its origin, the north corner of
- * its north tile at the ground. The building is drawn once, whole; the sprites
- * of its tiles are left out (box_kind 4).
+ * A thing the turned view draws from renders (box_kind 3): one of the game's
+ * buildings rendered from eight directions (ThreeDModel), or the layers of a
+ * tile of the plantation laid together, at an origin on the map.
+ */
+struct TurnedModel {
+	std::vector<const ThreeDModel *> layers; ///< the model, or the layers laid on the tile
+	TileIndex origin;                        ///< the north tile of the building, or the tile the layers lie on
+	int z;                                   ///< the ground there
+	int near_bias;                           ///< added to the depth it is sorted by: the flat road of the plantation goes before what stands on it
+};
+/** The things of ViewportDoDrawTurned() drawn from renders, for the block being drawn; ParentSpriteToDraw::box_dx is the index. */
+static std::vector<TurnedModel> _turned_models;
+
+/**
+ * One of the game's buildings rendered from eight directions, or a tile of
+ * the plantation from its layers (box_kind 3): the picture at the angle, made
+ * from the two renders either side of it (GetThreeDLayersPicture()), laid at
+ * its origin, the north corner of the tile at the ground. A building is drawn
+ * once, whole; the sprites of its tiles are left out (box_kind 4).
  */
 static void DrawTurnedModel(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
-	const ThreeDModel *model = GetThreeDModel(ps.box_dx);
+	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_models.size()) return;
+	const TurnedModel &tm = _turned_models[ps.box_dx];
+	const ThreeDModel *model = tm.layers.empty() ? nullptr : tm.layers[0];
 	if (model == nullptr) return;
 	double t0 = TurnedNow();
-	const ThreeDModelPicture *pic = GetThreeDModelPicture(model, frame.zoom);
+	const ThreeDModelPicture *pic = GetThreeDLayersPicture(tm.layers, frame.zoom);
 	bool debug = _turned_debug_tile != INVALID_TILE && TileXY(ps.box_ox / TILE_SIZE, ps.box_oy / TILE_SIZE) == _turned_debug_tile;
 	if (debug && pic == nullptr) IConsolePrint(CC_DEFAULT, "ladeni: model {} has no picture", model->name);
 	if (pic != nullptr) {
@@ -2644,13 +2661,31 @@ static void ViewportDoDrawTurned()
 	}
 	std::sort(tiles.begin(), tiles.end(), [](const TurnedTile &a, const TurnedTile &b) { return a.near < b.near; });
 
-	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile. */
-	struct TurnedModel {
-		const ThreeDModel *model;
-		TileIndex origin;
-		int z;
+	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile, and the tiles of the plantation from their layers. */
+	std::vector<TurnedModel> &models = _turned_models;
+	models.clear();
+	/* The plantation's layers, looked up once. */
+	struct PlantationModels {
+		const ThreeDModel *soil, *small, *grown, *road, *shed, *hay, *girls_nw, *girls_se;
+		const ThreeDModel *worker[2][6];
 	};
-	std::vector<TurnedModel> models;
+	static std::optional<PlantationModels> plantation;
+	if (!plantation.has_value()) {
+		PlantationModels pm;
+		pm.soil = GetThreeDModelByName("pole_mari_zaklad");
+		pm.small = GetThreeDModelByName("pole_mari_male");
+		pm.grown = GetThreeDModelByName("pole_mari_vzrostle");
+		pm.road = GetThreeDModelByName("pole_cesta");
+		pm.shed = GetThreeDModelByName("pole_bouda");
+		pm.hay = GetThreeDModelByName("pole_seno");
+		pm.girls_nw = GetThreeDModelByName("pole_holky_sz");
+		pm.girls_se = GetThreeDModelByName("pole_holky_jv");
+		for (int w = 0; w < 6; w++) {
+			pm.worker[0][w] = GetThreeDModelByName(fmt::format("pole_prace_{}_f2", ThreeDPlantationWorkerName(w)));
+			pm.worker[1][w] = GetThreeDModelByName(fmt::format("pole_prace_{}_f3", ThreeDPlantationWorkerName(w)));
+		}
+		plantation = pm;
+	}
 
 	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. */
 	_vd.dpi = cdpi;
@@ -2734,8 +2769,30 @@ static void ViewportDoDrawTurned()
 				for (const TurnedModel &tm : models) {
 					if (tm.origin == origin) known = true;
 				}
-				if (!known) models.push_back({model, origin, _cur_ti.z});
+				if (!known) models.push_back({{model}, origin, _cur_ti.z, 0});
 				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: model {} by tile {},{}, z {}{}", model->name, TileX(origin), TileY(origin), _cur_ti.z, known ? " (known)" : "");
+			}
+			/* A tile of the marijuana plantation: its layers laid together on the tile, and from the tile before
+			 * the field road the road tile behind with the road, the shed and the haystack and the girls by the
+			 * road, each its own thing to sort (the road flat and first, under the cars). */
+			ThreeDPlantationTile pt;
+			if (tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries) && plantation->soil != nullptr && GetThreeDPlantationTile(_cur_ti.tile, pt)) {
+				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+				TurnedModel field{{plantation->soil}, _cur_ti.tile, _cur_ti.z, 0};
+				if (pt.stage == 1 && plantation->small != nullptr) field.layers.push_back(plantation->small);
+				if (pt.stage == 2 && plantation->grown != nullptr) field.layers.push_back(plantation->grown);
+				if (pt.worker >= 0 && pt.stage != 0 && plantation->worker[pt.stage - 1][pt.worker] != nullptr) field.layers.push_back(plantation->worker[pt.stage - 1][pt.worker]);
+				models.push_back(field);
+				if (pt.road_behind) {
+					TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
+					int road_z = GetTilePixelZ(road_tile);
+					if (plantation->road != nullptr) models.push_back({{plantation->road}, road_tile, road_z, -4 * static_cast<int>(TILE_HEIGHT)});
+					if (pt.shed && plantation->shed != nullptr) models.push_back({{plantation->shed}, road_tile, road_z, 0});
+					if (pt.shed && plantation->hay != nullptr) models.push_back({{plantation->hay}, road_tile, road_z, 0});
+					if (pt.girls_nw && plantation->girls_nw != nullptr) models.push_back({{plantation->girls_nw}, road_tile, road_z, 0});
+					if (pt.girls_se && plantation->girls_se != nullptr) models.push_back({{plantation->girls_se}, road_tile, road_z, 0});
+				}
+				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: plantation tile x {} stage {} worker {} road behind {}: {} layers", pt.x, pt.stage, pt.worker, pt.road_behind, field.layers.size());
 			}
 		}
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
@@ -2788,15 +2845,16 @@ static void ViewportDoDrawTurned()
 	}
 	_turned_times.collect += t_collect;
 
-	/* Each building with eight renders is one thing to draw among the standing ones, by the box of its plot. */
-	for (const TurnedModel &tm : models) {
+	/* Each building with eight renders, and each tile of the plantation, is one thing to draw among the standing ones, by the box of its plot. */
+	for (size_t m = 0; m < models.size(); m++) {
+		const TurnedModel &tm = models[m];
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
 		int ox = TileX(tm.origin) * TILE_SIZE, oy = TileY(tm.origin) * TILE_SIZE;
 		ps.xmin = ox;
-		ps.xmax = ox + tm.model->tiles_x * TILE_SIZE - 1;
+		ps.xmax = ox + tm.layers[0]->tiles_x * TILE_SIZE - 1;
 		ps.ymin = oy;
-		ps.ymax = oy + tm.model->tiles_y * TILE_SIZE - 1;
-		ps.zmin = tm.z;
+		ps.ymax = oy + tm.layers[0]->tiles_y * TILE_SIZE - 1;
+		ps.zmin = tm.z + tm.near_bias;
 		ps.zmax = tm.z + MAX_BUILDING_PIXELS;
 		ps.x = ps.y = ps.left = ps.top = 0;
 		ps.image = SPR_EMPTY_BOUNDING_BOX;
@@ -2811,7 +2869,7 @@ static void ViewportDoDrawTurned()
 		ps.box_ox = ox;
 		ps.box_oy = oy;
 		ps.box_oz = tm.z;
-		ps.box_dx = static_cast<int16_t>(GetThreeDModelIndex(tm.model));
+		ps.box_dx = static_cast<int16_t>(m);
 		ps.box_dy = 0;
 		ps.box_kind = 3;
 	}

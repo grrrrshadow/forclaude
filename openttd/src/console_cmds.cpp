@@ -8494,6 +8494,7 @@ static bool ConTestVehicleConfig(std::span<std::string_view> argv)
  * a pixel of the screen, 'test3d stav' prints the angle.
  */
 void ShowIndustryViewWindow(IndustryID industry);
+bool HasGirls(const Industry *ind);
 
 static bool ConTest3D(std::span<std::string_view> argv)
 {
@@ -8533,6 +8534,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const Industry *ind : Industry::Iterate()) {
 			const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
 			if (model != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{}{}", model->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), IsIndustryCompleted(ind->location.tile) ? "" : " (being built)");
+			ThreeDPlantationTile pt;
+			if (ind->type == IT_MARIJUANA_PLANTATION && GetThreeDPlantationTile(ind->location.tile, pt)) {
+				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
+			}
 		}
 	} else if (what == "postav" && argv.size() > 4) {
 		/* Put a building with eight renders on the map, by its model's name: a house or one of the game's own industries. */
@@ -8588,6 +8593,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
+	} else if (what == "plantaz" && argv.size() > 4) {
+		/* The state of a marijuana plantation, for the rig: 'plantaz <x> <y> <care> [holky]' -- care 0 bare, 1 small plants, 28 grown; holky brings the girls. */
+		auto x = number(2), y = number(3), care = number(4);
+		if (!x.has_value() || !y.has_value() || !care.has_value() || !IsTileType(TileXY(*x, *y), TileType::Industry)) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d plantaz <x> <y> <care> [holky]' on a tile of a plantation.");
+			return true;
+		}
+		Industry *ind = Industry::GetByTile(TileXY(*x, *y));
+		if (ind->type != IT_MARIJUANA_PLANTATION) {
+			IConsolePrint(CC_ERROR, "test3d: no plantation at {},{}", *x, *y);
+			return true;
+		}
+		ind->plantation_care = static_cast<uint8_t>(Clamp(*care, 0, 60));
+		ind->plantation_days_left = 180;
+		if (argv.size() > 5 && argv[5] == "holky") {
+			CargoType cargo = GetCargoTypeByLabel(CT_STUDENTKY);
+			auto it = IsValidCargoType(cargo) ? ind->GetCargoAccepted(cargo) : std::end(ind->accepted);
+			if (it != std::end(ind->accepted)) it->last_accepted = TimerGameEconomy::date;
+		}
+		for (TileIndex t : ind->location) {
+			if (IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index) MarkTileDirtyByTile(t);
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: care {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), ind->plantation_care, HasGirls(ind) ? "yes" : "no");
 	} else if (what == "nahledy") {
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
 	} else if (what == "okna") {
