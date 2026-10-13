@@ -1470,6 +1470,8 @@ OpenGLSprite::OpenGLSprite(SpriteType sprite_type, const SpriteLoader::SpriteCol
 	/* Upload texture data. */
 	for (ZoomLevel zoom = ZoomLevel::Min; zoom <= (sprite_type == SpriteType::Font ? ZoomLevel::Min : ZoomLevel::Max); ++zoom) {
 		const auto &src_sprite = sprite[zoom];
+		/* A level with its size alone and no pixels (the 16x of ResizeSprites() when 16x is off) is left undefined. */
+		if (src_sprite.data == nullptr) continue;
 		this->Update(src_sprite.width, src_sprite.height, to_underlying(zoom), src_sprite.data);
 	}
 

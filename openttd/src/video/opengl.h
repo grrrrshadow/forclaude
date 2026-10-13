@@ -112,6 +112,9 @@ public:
 
 	bool Is32BppSupported() override { return true; }
 	uint GetSpriteAlignment() override { return 1u << to_underlying(ZoomLevel::Max); }
+	/* The cursor sprites are textures with a mip level for every zoom level from 16x down, so the 16x
+	 * level must have its pixels even while 16x is off (ResizeSprites() gives it its size alone otherwise). */
+	bool NeedsRootPixels() const override { return true; }
 	Sprite *Encode(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
 };
 
