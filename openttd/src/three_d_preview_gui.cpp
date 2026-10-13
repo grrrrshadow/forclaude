@@ -8,10 +8,10 @@
 /**
  * @file three_d_preview_gui.cpp The 3D previews that turn (three_d.h,
  * gui.three_d): beside the purchase window the vehicle chosen there, big, in
- * the company's colours, turning by itself through its eight directions; and
- * beside the window of one of the game's own industries the building from its
- * eight renders (ThreeDModel), turning smoothly, degree by degree, drawn the
- * way the map draws it.
+ * the company's colours, turning smoothly as its 3D likeness made from its
+ * eight sprites (three_d_vehicle.cpp); and beside the window of one of the
+ * game's own industries the building from its eight renders (ThreeDModel),
+ * turning smoothly, degree by degree, drawn the way the map draws it.
  *
  * There is no window: the preview is a picture on a see-through background,
  * drawn over the map beside the window it belongs to (the player: a window
@@ -20,6 +20,13 @@
  * MainWindow::OnPaint()), a timer turns it and marks the screen under it
  * dirty, and it goes when its window goes. Any window over it is drawn over
  * it, as over the map.
+ *
+ * Each preview turns about its own axis: a frame is found once, the
+ * rectangle its pictures at every angle fit in about the axis (the middle of
+ * a vehicle, the middle of a building's plot), the frame is placed beside
+ * the window, and every picture is drawn at the axis within it; so the thing
+ * turns on the spot and the frame never moves (the player: the turning was
+ * off its axis).
  */
 
 #include "stdafx.h"
@@ -48,13 +55,13 @@
 
 /** How often the previews are looked at: turned on, and their window checked. */
 static constexpr int PREVIEW_TICK_MS = 50;
-/** A vehicle shows the next of its eight directions this often. */
+/** A vehicle without a 3D likeness shows the next of its eight sprites this often. */
 static constexpr int PREVIEW_VEHICLE_STEP_MS = 400;
-/** A building turns this many degrees a second. */
-static constexpr float PREVIEW_BUILDING_DEG_PER_S = 30.0f;
+/** A preview turns this many degrees a second. */
+static constexpr float PREVIEW_DEG_PER_S = 30.0f;
 /** The gap between the window and its preview, pixels. */
 static constexpr int PREVIEW_GAP = 40; // the player: the things turning almost touched the purchase window
-/** A preview wider or taller than this is drawn at the next coarser zoom (the player: a long wagon at 2x, not 4x). */
+/** A preview whose frame is wider or taller than this is drawn at the next coarser zoom (the player: a long wagon at 2x, not 4x). */
 static constexpr int PREVIEW_MAX_SIZE = 360;
 
 /** A preview beside a window. */
@@ -63,9 +70,13 @@ struct ThreeDPreview {
 	WindowNumber parent;        ///< the window it belongs to: the purchase window's number, or the industry
 	EngineID engine = EngineID::Invalid(); ///< the vehicle shown
 	float yaw = 0.0f;           ///< the angle it is turned by, degrees, the way the map counts it
-	int elapsed = 0;            ///< milliseconds since the vehicle last turned on
+	int elapsed = 0;            ///< milliseconds since a vehicle without a likeness last turned on
 	Rect drawn{};               ///< where it was last drawn on the screen, to mark dirty
 	bool was_drawn = false;
+	bool frame_ok = false;      ///< the frame is known
+	Rect frame{};               ///< the rectangle the pictures fit in, about the axis
+	ZoomLevel zoom = ZoomLevel::Normal; ///< the zoom the pictures are drawn at
+	EngineID frame_engine = EngineID::Invalid(); ///< the engine the frame is for
 };
 
 static std::vector<ThreeDPreview> _previews;
@@ -82,6 +93,30 @@ static void DirtyPreview(ThreeDPreview &p)
 {
 	if (!p.was_drawn) return;
 	AddDirtyBlock(p.drawn.left, p.drawn.top, p.drawn.right, p.drawn.bottom);
+}
+
+/** Draw a picture with its alpha onto the screen, through the clipping of the window being drawn. */
+static void BlitPicture(const ThreeDModelPicture &pic, int px, int py)
+{
+	const DrawPixelInfo *dpi = _cur_dpi;
+	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
+	int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
+	int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
+	for (int y = y0; y < y1; y++) {
+		const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
+		uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+		for (int x = x0; x < x1; x++, dst++) {
+			Colour sc(src[x - px]);
+			if (sc.a == 0) continue;
+			if (sc.a == 255) {
+				*dst = Colour(sc.r, sc.g, sc.b).data;
+			} else {
+				Colour d(*dst);
+				uint al = sc.a, na = 255 - al;
+				*dst = Colour(static_cast<uint8_t>((sc.r * al + d.r * na + 127) / 255), static_cast<uint8_t>((sc.g * al + d.g * na + 127) / 255), static_cast<uint8_t>((sc.b * al + d.b * na + 127) / 255)).data;
+			}
+		}
+	}
 }
 
 /** The vehicle's sprites for the direction, as the map draws it (the purchase icon of a set is often one picture whatever the direction). */
@@ -140,11 +175,20 @@ static void PreviewHeadOffsets(Direction dir, ZoomLevel zoom, int &fx, int &fy)
 	fy = static_cast<int>(std::lround((wy + wx) * ZOOM_BASE * scale));
 }
 
-/** The direction a vehicle preview shows: the map view's, turned on by its own turning. */
+/** The direction a vehicle without a likeness shows: the map view's, turned on by its own turning. */
 static Direction PreviewDirection(const ThreeDPreview &p)
 {
 	int steps = static_cast<int>(std::lround(p.yaw / 45.0f));
 	return static_cast<Direction>((to_underlying(Direction::W) - TurnedDirectionStep() + steps) & 7);
+}
+
+/**
+ * The angle a vehicle's likeness is drawn at: the sprite of direction d shows at
+ * 90 - 45 d degrees, the map view's turn and the preview's own on top.
+ */
+static float PreviewAzimuth(const ThreeDPreview &p)
+{
+	return std::fmod(180.0f + GetViewYaw() - p.yaw + 720.0f, 360.0f);
 }
 
 /**
@@ -192,8 +236,22 @@ static Rect PreviewPlace(const ThreeDPreview &p, int width, int height)
 	return {x, y, x + width, y + height};
 }
 
-/** Draw a vehicle preview; returns where it was drawn. */
-static Rect DrawVehiclePreview(const ThreeDPreview &p, bool draw)
+/** The palette a vehicle preview is drawn in: the company's colours. */
+static PaletteID PreviewPalette(const ThreeDPreview &p)
+{
+	return GetEnginePalette(p.engine, _local_company);
+}
+
+/** The likeness of the vehicle shown, when the blitter can draw it and the engine has its eight pictures. */
+static const ThreeDVehicleModel *PreviewVehicleModel(const ThreeDPreview &p)
+{
+	if (p.engine == EngineID::Invalid() || !Engine::IsValidID(p.engine)) return nullptr;
+	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return nullptr;
+	return GetThreeDVehicleModel(p.engine, PreviewPalette(p));
+}
+
+/** Draw a vehicle without a likeness: its sprite of the direction; returns where it was drawn. */
+static Rect DrawVehicleSprites(const ThreeDPreview &p, bool draw)
 {
 	VehicleSpriteSeq front, rear;
 	bool two;
@@ -220,7 +278,7 @@ static Rect DrawVehiclePreview(const ThreeDPreview &p, bool draw)
 	if (r.right <= r.left) return {};
 	if (!draw) return r;
 
-	PaletteID pal = GetEnginePalette(p.engine, _local_company);
+	PaletteID pal = PreviewPalette(p);
 	int x = r.left - bounds.left, y = r.top - bounds.top + pitch;
 	auto draw_seq = [&](const VehicleSpriteSeq &seq, int sx, int sy) {
 		for (uint i = 0; i < seq.count; i++) {
@@ -239,34 +297,66 @@ static Rect DrawVehiclePreview(const ThreeDPreview &p, bool draw)
 	return r;
 }
 
-/** Draw an industry preview: the building's picture at the preview's angle, as the map draws it; returns where. */
-static Rect DrawIndustryPreview(const ThreeDPreview &p, bool draw)
+/** Draw a vehicle preview: its likeness at the angle, turning about its middle; returns where it was drawn. */
+static Rect DrawVehiclePreview(ThreeDPreview &p, bool draw)
 {
-	IndustryID id = static_cast<IndustryID>(p.parent);
-	if (!Industry::IsValidID(id)) return {};
-	const Industry *ind = Industry::Get(id);
-	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return {};
+	const ThreeDVehicleModel *model = PreviewVehicleModel(p);
+	if (model == nullptr) return DrawVehicleSprites(p, draw);
 
-	/* The angle: the map view's, and the preview's own turn on top of it. */
-	float yaw = std::fmod(GetViewYaw() + p.yaw, 360.0f);
+	if (!p.frame_ok || p.frame_engine != p.engine) {
+		/* The zoom: 4x, or coarser until the frame fits. */
+		ZoomLevel zoom = std::max(ZoomLevel::In4x, ThreeDVehicleModelZoom(model));
+		for (;;) {
+			Rect frame = ThreeDVehicleFrame(model, zoom);
+			if (frame.right <= frame.left) return {};
+			if ((frame.right - frame.left <= PREVIEW_MAX_SIZE && frame.bottom - frame.top <= PREVIEW_MAX_SIZE) || zoom >= ZoomLevel::Normal) {
+				p.frame = frame;
+				p.zoom = zoom;
+				break;
+			}
+			++zoom;
+		}
+		p.frame_ok = true;
+		p.frame_engine = p.engine;
+	}
+	Rect r = PreviewPlace(p, p.frame.right - p.frame.left, p.frame.bottom - p.frame.top);
+	if (r.right <= r.left) return {};
+	if (!draw) return r;
 
-	/* The pictures and where each goes, pixels about the industry's north corner: a building is one, the
-	 * plantation one a tile, laid at the tiles' corners as the map lays them, far first. */
-	struct Piece {
-		const ThreeDModelPicture *pic;
-		int dx, dy;
-		double near;
-	};
-	std::vector<Piece> pieces;
+	ThreeDModelPicture pic;
+	if (!RenderThreeDVehicle(model, p.zoom, PreviewAzimuth(p), pic)) return r;
+	int ax = r.left - p.frame.left, ay = r.top - p.frame.top;
+	BlitPicture(pic, ax + pic.left, ay + pic.top);
+	return r;
+}
+
+/** A piece of an industry preview: a picture and where it goes, pixels about the industry's north corner. */
+struct IndustryPiece {
+	const ThreeDModelPicture *pic;
+	int dx, dy;
+	double near;
+};
+
+/**
+ * The pieces of an industry preview at an angle: a building is one picture, the plantation one a tile, laid at the
+ * tiles' corners as the map lays them, far first.
+ * @param[out] axis where the middle of the plot is at the angle, pixels about the north corner
+ * @return whether there is anything to draw
+ */
+static bool IndustryPieces(const Industry *ind, float yaw, ZoomLevel &zoom, std::vector<IndustryPiece> &pieces, Point &axis)
+{
+	pieces.clear();
 	double a = yaw * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
-	ZoomLevel zoom;
 	const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
+	int tiles_x = ind->location.w, tiles_y = ind->location.h;
 	if (model != nullptr) {
 		const ThreeDModelView &v = model->views[0];
 		zoom = PreviewZoomFor(v.width, v.height);
 		const ThreeDModelPicture *pic = GetThreeDModelPictureAt(model, zoom, yaw, _preview_pictures);
-		if (pic == nullptr || pic->width <= 0) return {};
+		if (pic == nullptr || pic->width <= 0) return false;
 		pieces.push_back({pic, 0, 0, 0.0});
+		tiles_x = model->tiles_x;
+		tiles_y = model->tiles_y;
 	} else if (ind->type == IT_MARIJUANA_PLANTATION) {
 		zoom = ZoomLevel::In2x;
 		double scale = 1.0 / (1 << to_underlying(zoom));
@@ -287,52 +377,71 @@ static Rect DrawIndustryPreview(const ThreeDPreview &p, bool draw)
 				for (const auto &item : pl.road) place(TileAddXY(tile, 0, 1), item);
 			}
 		}
-		if (pieces.empty()) return {};
-		std::sort(pieces.begin(), pieces.end(), [](const Piece &l, const Piece &r) { return l.near < r.near; });
+		if (pieces.empty()) return false;
+		std::sort(pieces.begin(), pieces.end(), [](const IndustryPiece &l, const IndustryPiece &r) { return l.near < r.near; });
 	} else {
-		return {};
+		return false;
 	}
 
-	int left = INT32_MAX, top = INT32_MAX, right = INT32_MIN, bottom = INT32_MIN;
-	for (const Piece &pc : pieces) {
-		left = std::min(left, pc.dx + pc.pic->left);
-		top = std::min(top, pc.dy + pc.pic->top);
-		right = std::max(right, pc.dx + pc.pic->left + pc.pic->width);
-		bottom = std::max(bottom, pc.dy + pc.pic->top + pc.pic->height);
-	}
-	Rect r = PreviewPlace(p, right - left, bottom - top);
-	if (r.right <= r.left) return {};
-	if (!draw) return r;
+	/* The axis: the middle of the plot, turned with it. */
+	double scale = 1.0 / (1 << to_underlying(zoom));
+	double cx = tiles_x * TILE_SIZE / 2.0, cy = tiles_y * TILE_SIZE / 2.0;
+	double xr = c * cx - s * cy, yr = s * cx + c * cy;
+	axis = {static_cast<int>(std::lround((yr - xr) * 2 * ZOOM_BASE * scale)), static_cast<int>(std::lround((yr + xr) * ZOOM_BASE * scale))};
+	return true;
+}
 
-	/* The pixels, with their alpha, into the screen through the clipping of the window being drawn. */
-	const DrawPixelInfo *dpi = _cur_dpi;
-	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
-	for (const Piece &pc : pieces) {
-		const ThreeDModelPicture *pic = pc.pic;
-		int px = r.left + pc.dx + pc.pic->left - left, py = r.top + pc.dy + pc.pic->top - top;
-		int x0 = std::max(px, dpi->left), x1 = std::min(px + pic->width, dpi->left + dpi->width);
-		int y0 = std::max(py, dpi->top), y1 = std::min(py + pic->height, dpi->top + dpi->height);
-		for (int y = y0; y < y1; y++) {
-			const uint32_t *src = &pic->pixels[static_cast<size_t>(y - py) * pic->width];
-			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
-			for (int x = x0; x < x1; x++, dst++) {
-				Colour sc(src[x - px]);
-				if (sc.a == 0) continue;
-				if (sc.a == 255) {
-					*dst = Colour(sc.r, sc.g, sc.b).data;
-				} else {
-					Colour d(*dst);
-					uint al = sc.a, na = 255 - al;
-					*dst = Colour(static_cast<uint8_t>((sc.r * al + d.r * na + 127) / 255), static_cast<uint8_t>((sc.g * al + d.g * na + 127) / 255), static_cast<uint8_t>((sc.b * al + d.b * na + 127) / 255)).data;
-				}
-			}
-		}
+/** The rectangle pieces fill, about the axis. */
+static Rect PiecesRect(const std::vector<IndustryPiece> &pieces, Point axis)
+{
+	Rect r{INT32_MAX, INT32_MAX, INT32_MIN, INT32_MIN};
+	for (const IndustryPiece &pc : pieces) {
+		r.left = std::min(r.left, pc.dx + pc.pic->left - axis.x);
+		r.top = std::min(r.top, pc.dy + pc.pic->top - axis.y);
+		r.right = std::max(r.right, pc.dx + pc.pic->left + pc.pic->width - axis.x);
+		r.bottom = std::max(r.bottom, pc.dy + pc.pic->top + pc.pic->height - axis.y);
 	}
 	return r;
 }
 
+/** Draw an industry preview: the building's picture at the preview's angle, turning about the middle of its plot; returns where. */
+static Rect DrawIndustryPreview(ThreeDPreview &p, bool draw)
+{
+	IndustryID id = static_cast<IndustryID>(p.parent);
+	if (!Industry::IsValidID(id)) return {};
+	const Industry *ind = Industry::Get(id);
+	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return {};
+
+	std::vector<IndustryPiece> pieces;
+	Point axis;
+	ZoomLevel zoom;
+	if (!p.frame_ok) {
+		/* The frame: the pictures of eight angles about the axis. */
+		Rect frame{INT32_MAX, INT32_MAX, INT32_MIN, INT32_MIN};
+		for (int i = 0; i < 8; i++) {
+			if (!IndustryPieces(ind, i * 45.0f + 22.5f, zoom, pieces, axis)) return {};
+			Rect r = PiecesRect(pieces, axis);
+			frame.left = std::min(frame.left, r.left); frame.top = std::min(frame.top, r.top);
+			frame.right = std::max(frame.right, r.right); frame.bottom = std::max(frame.bottom, r.bottom);
+		}
+		p.frame = frame;
+		p.zoom = zoom;
+		p.frame_ok = true;
+	}
+	Rect r = PreviewPlace(p, p.frame.right - p.frame.left, p.frame.bottom - p.frame.top);
+	if (r.right <= r.left) return {};
+	if (!draw) return r;
+
+	/* The angle: the map view's, and the preview's own turn on top of it. */
+	float yaw = std::fmod(GetViewYaw() + p.yaw, 360.0f);
+	if (!IndustryPieces(ind, yaw, zoom, pieces, axis)) return r;
+	int ax = r.left - p.frame.left - axis.x, ay = r.top - p.frame.top - axis.y;
+	for (const IndustryPiece &pc : pieces) BlitPicture(*pc.pic, ax + pc.dx + pc.pic->left, ay + pc.dy + pc.pic->top);
+	return r;
+}
+
 /** Where a preview is now, without drawing it. */
-static Rect PreviewRect(const ThreeDPreview &p)
+static Rect PreviewRect(ThreeDPreview &p)
 {
 	return p.vehicle ? DrawVehiclePreview(p, false) : DrawIndustryPreview(p, false);
 }
@@ -352,21 +461,28 @@ static void PreviewTick()
 			EngineID engine = GetBuildVehicleSelectedEngine(p.parent);
 			if (engine != p.engine) {
 				p.engine = engine;
+				p.frame_ok = false;
 				changed = true;
 			}
-			p.elapsed += PREVIEW_TICK_MS;
-			if (p.elapsed >= PREVIEW_VEHICLE_STEP_MS || changed) {
-				p.elapsed = 0;
-				/* The next direction that has a picture, so a set with only the four along the track still turns. */
-				for (int tries = 0; tries < 8; tries++) {
-					if (p.elapsed == 0 && tries == 0 && changed && PreviewVehicleHasPicture(p.engine, PreviewDirection(p))) break;
-					p.yaw = std::fmod(p.yaw + 45.0f, 360.0f);
-					if (PreviewVehicleHasPicture(p.engine, PreviewDirection(p))) break;
-				}
+			if (PreviewVehicleModel(p) != nullptr) {
+				p.yaw = std::fmod(p.yaw + PREVIEW_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f, 360.0f);
 				changed = true;
+			} else {
+				p.elapsed += PREVIEW_TICK_MS;
+				if (p.elapsed >= PREVIEW_VEHICLE_STEP_MS || changed) {
+					p.elapsed = 0;
+					/* The next direction that has a picture, so a set with only the four along the track still turns. */
+					p.yaw = 45.0f * std::lround(p.yaw / 45.0f);
+					for (int tries = 0; tries < 8; tries++) {
+						if (p.elapsed == 0 && tries == 0 && changed && PreviewVehicleHasPicture(p.engine, PreviewDirection(p))) break;
+						p.yaw = std::fmod(p.yaw + 45.0f, 360.0f);
+						if (PreviewVehicleHasPicture(p.engine, PreviewDirection(p))) break;
+					}
+					changed = true;
+				}
 			}
 		} else {
-			p.yaw = std::fmod(p.yaw + PREVIEW_BUILDING_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f, 360.0f);
+			p.yaw = std::fmod(p.yaw + PREVIEW_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f, 360.0f);
 			changed = true;
 		}
 		Rect now = PreviewRect(p);
@@ -433,14 +549,26 @@ void ThreeDPreviewsTick()
 	PreviewTick();
 }
 
+/** Rig: turn every preview to an angle, and have it drawn anew. */
+void SetThreeDPreviewYaw(float yaw)
+{
+	for (ThreeDPreview &p : _previews) {
+		p.yaw = std::fmod(yaw + 720.0f, 360.0f);
+		DirtyPreview(p);
+		Rect now = PreviewRect(p);
+		if (now.right > now.left) AddDirtyBlock(now.left, now.top, now.right, now.bottom);
+	}
+}
+
 /** Rig: the previews there are, where they are drawn. */
 std::string DescribeThreeDPreviews()
 {
 	std::string s;
-	for (const ThreeDPreview &p : _previews) {
+	for (ThreeDPreview &p : _previews) {
 		Rect r = PreviewRect(p);
-		s += fmt::format("{}{} at {},{}..{},{} yaw {:.0f}; ", p.vehicle ? "vehicle " : "industry ", p.vehicle ? static_cast<int32_t>(p.engine.base()) : static_cast<int32_t>(p.parent), r.left, r.top, r.right, r.bottom, p.yaw);
+		s += fmt::format("{}{} at {},{}..{},{} yaw {:.0f} zoom {}; ", p.vehicle ? "vehicle " : "industry ", p.vehicle ? static_cast<int32_t>(p.engine.base()) : static_cast<int32_t>(p.parent), r.left, r.top, r.right, r.bottom, p.yaw, to_underlying(p.zoom));
 		if (p.vehicle && p.engine != EngineID::Invalid()) {
+			s += fmt::format("model: {}; ", DescribeThreeDVehicleModel(PreviewVehicleModel(p)));
 			/* The sprites of every direction, with their size: a set whose chain needs a vehicle gives empty ones. */
 			for (int d = 0; d < 8; d++) {
 				VehicleSpriteSeq front, rear;

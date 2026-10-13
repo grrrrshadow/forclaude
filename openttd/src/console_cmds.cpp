@@ -8539,6 +8539,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
 			}
 		}
+	} else if (what == "mesta") {
+		/* Where the towns are, for the rig: the game's own industries must be built in one. */
+		for (const Town *t : Town::Iterate()) IConsolePrint(CC_DEFAULT, "test3d: town {} at {},{} population {}", t->GetCachedName(), TileX(t->xy), TileY(t->xy), t->cache.population);
 	} else if (what == "postav" && argv.size() > 4) {
 		/* Put a building with eight renders on the map, by its model's name: a house or one of the game's own industries. */
 		auto x = number(2), y = number(3);
@@ -8564,7 +8567,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		cur_company.Restore();
 		if (cost.Failed()) {
-			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", model->name, *x, *y, GetString(cost.GetErrorMessage()));
+			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", model->name, *x, *y, cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("no reason given") : GetString(cost.GetErrorMessage()));
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", model->name, *x, *y);
 		}
@@ -8635,6 +8638,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ThreeDPreviewsTick();
 	} else if (what == "nahledy") {
 		ThreeDPreviewsTick();
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
+	} else if (what == "nahled" && argv.size() > 3 && argv[2] == "uhel") {
+		/* Turn every preview to an angle (rig: the frames of a turn). */
+		SetThreeDPreviewYaw(std::strtof(std::string(argv[3]).c_str(), nullptr));
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */

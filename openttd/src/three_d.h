@@ -42,6 +42,7 @@
 #include "house_type.h"
 #include "industry_type.h"
 #include "engine_type.h"
+#include "gfx_type.h"
 #include "window_type.h"
 #include "zoom_type.h"
 #include "tile_type.h"
@@ -182,12 +183,26 @@ struct ThreeDPlantationLayers {
 };
 bool GetThreeDPlantationLayers(const ThreeDPlantationTile &tile, ThreeDPlantationLayers &out);
 
+/**
+ * The 3D likeness of a vehicle made from its eight sprites (three_d_vehicle.cpp):
+ * the surface of the visual hull of the eight outlines, each point with its colour
+ * in every view, drawn at any angle for the preview beside the purchase window.
+ */
+struct ThreeDVehicleModel;
+const ThreeDVehicleModel *GetThreeDVehicleModel(EngineID engine, PaletteID pal);
+ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model);
+bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out);
+Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom);
+std::string DescribeThreeDVehicleModel(const ThreeDVehicleModel *model);
+void ClearThreeDVehicleModels();
+
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);
 void ShowThreeDIndustryPreview(IndustryID industry);
 void DrawThreeDPreviews();
 std::string DescribeThreeDPreviews();
 void ThreeDPreviewsTick();
+void SetThreeDPreviewYaw(float yaw);
 EngineID GetBuildVehicleSelectedEngine(WindowNumber number);
 bool SelectBuildVehicleEngine(WindowNumber number, EngineID engine);
 

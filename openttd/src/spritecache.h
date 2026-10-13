@@ -26,6 +26,7 @@ protected:
 void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator = nullptr, SpriteEncoder *encoder = nullptr);
 bool SpriteExists(SpriteID sprite);
 bool ReadRawSprite16x(SpriteID sprite, std::vector<uint32_t> &pixels, int &width, int &height, int &x_offs, int &y_offs);
+ZoomLevels ReadRawSprite(SpriteID sprite, SpriteLoader::SpriteCollection &collection, bool &is_32bpp);
 
 SpriteType GetSpriteType(SpriteID sprite);
 SpriteFile *GetOriginFile(SpriteID sprite);

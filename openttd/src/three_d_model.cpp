@@ -167,6 +167,7 @@ void ClearThreeDModelCache()
 	_view_lru.clear();
 	_view_bytes = 0;
 	_pictures.clear();
+	ClearThreeDVehicleModels();
 }
 
 /**

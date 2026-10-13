@@ -48,9 +48,9 @@ const ThreeDPart *GetThreeDHouseParts(const ThreeDHouse *house)
 
 /**
  * The angle the map view is turned to, in degrees, -180 to 180: 0 is north
- * up, the game as it was; positive to the right. The view turns no further
- * than half a turn either way (the player: no spinning round and round), so
- * a drag past 180 stops there.
+ * up, the game as it was; positive to the right. Past 180 it goes on at -180:
+ * the view turns round and round without a stop (the player: the stops at
+ * 180 either way were in the way).
  */
 static float _view_yaw = 0.0f;
 /** Cosine and sine of the yaw, the turn of the world about the pivot. */
@@ -208,7 +208,7 @@ void SetViewYaw(float degrees)
 	if (!ThreeDEnabled() || BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) degrees = 0.0f;
 	float yaw = std::fmod(degrees, 360.0f);
 	if (yaw > 180.0f) yaw -= 360.0f;
-	if (yaw < -180.0f) yaw += 360.0f; // -180 stays -180: the stop to the left (the player: it was gone on one side)
+	if (yaw < -180.0f) yaw += 360.0f;
 	if (std::abs(yaw) < 0.1f) yaw = 0.0f;
 	if (yaw == _view_yaw) return;
 
@@ -245,7 +245,7 @@ void SetViewYaw(float degrees)
 void RotateView(float degrees)
 {
 	if (!ThreeDEnabled()) return;
-	SetViewYaw(Clamp(_view_yaw + degrees, -180.0f, 180.0f));
+	SetViewYaw(_view_yaw + degrees);
 }
 
 /**

@@ -14,7 +14,7 @@
 #include "engine_type.h"
 
 uint CountArticulatedParts(EngineID engine_type);
-std::vector<EngineID> GetArticulatedPartEngines(EngineID engine_type);
+std::vector<EngineID> GetArticulatedPartEngines(EngineID engine_type, std::vector<bool> *mirrored = nullptr);
 CargoArray GetCapacityOfArticulatedParts(EngineID engine);
 CargoTypes GetCargoTypesOfArticulatedParts(EngineID engine);
 void AddArticulatedParts(Vehicle *first);

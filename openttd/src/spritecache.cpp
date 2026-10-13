@@ -1798,6 +1798,33 @@ void GfxClearSpriteCache()
  * @param[out] x_offs,y_offs its offsets
  * @return whether the sprite has a 32bpp level of 16x
  */
+/**
+ * Read a sprite's pixels straight from its file, every zoom level it has: the
+ * 32bpp ones when it has them, else the 8bpp ones with the palette index in m
+ * (the 3D likeness of a vehicle, three_d_vehicle.cpp). The data of the
+ * collection lives until the next sprite is read this way.
+ * @param sprite the sprite
+ * @param[out] collection its levels
+ * @param[out] is_32bpp whether the levels are 32bpp
+ * @return the levels read, none when the sprite cannot be read
+ */
+ZoomLevels ReadRawSprite(SpriteID sprite, SpriteLoader::SpriteCollection &collection, bool &is_32bpp)
+{
+	is_32bpp = false;
+	if (!SpriteExists(sprite)) return {};
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->file == nullptr || sc->type != SpriteType::Normal || sc->file_pos == SIZE_MAX) return {};
+
+	SpriteLoaderGrf loader(sc->file->GetContainerVersion());
+	ZoomLevels avail_8bpp, avail_32bpp;
+	ZoomLevels loaded = loader.LoadSprite(collection, *sc->file, sc->file_pos, SpriteType::Normal, true, sc->control_flags, avail_8bpp, avail_32bpp);
+	if (loaded.Any()) {
+		is_32bpp = true;
+		return loaded;
+	}
+	return loader.LoadSprite(collection, *sc->file, sc->file_pos, SpriteType::Normal, false, sc->control_flags, avail_8bpp, avail_32bpp);
+}
+
 bool ReadRawSprite16x(SpriteID sprite, std::vector<uint32_t> &pixels, int &width, int &height, int &x_offs, int &y_offs)
 {
 	if (!SpriteExists(sprite)) return false;

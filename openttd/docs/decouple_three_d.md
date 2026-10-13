@@ -35,9 +35,9 @@ tree in an old game does.
   for; Ctrl+, and Ctrl+. do the same. Y and N are the only two letters no
   window of the game binds (`rotate_view_left`, `rotate_view_right`,
   `rotate_view_left_45`, `rotate_view_right_45`, `rotate_view_north` in the
-  hotkeys file, under the global ones). The view turns no further than half
-  a turn either way, 180 degrees to the right or to the left: no spinning
-  round and round (the player's word).
+  hotkeys file, under the global ones). The view turns round and round
+  without a stop; the angle is counted from -180 to 180 and goes on past
+  either end (the player: the stops at 180 were in the way).
 - The view turns about the ground point under the middle of the screen, which
   stays where it is. Scrolling, zooming, clicking on tiles, the town and
   station names, the floating texts all work turned. Turned, the view may
@@ -175,21 +175,72 @@ on a see-through background, drawn over the map beside the window it belongs
 to (the player: a window and buttons are not needed, it starts turning on a
 transparent background). The main window draws it after its viewport, a timer
 turns it and marks the screen under it dirty, and it goes when its window
-goes; any window over it is drawn over it, as over the map. Beside the
-**purchase window** it is the vehicle chosen there, in the company's colours,
-turning by itself through its eight directions, the pictures the map draws it
-with (the purchase icon of a set is often one picture whatever the
-direction); a multiheaded engine shows both heads one behind the other. It
-works for the sets of the original kind too, with their one picture a
-direction. Beside the **window of one of the game's own industries** that has
-eight renders (the school, the machine, the statue, the hut) it is the
-building, turning smoothly, drawn from its renders the way the map draws it,
-starting from the direction the map view is turned to. The size: four times
-the normal for what fits 360 pixels, else twice, else the normal (the player:
-a long wagon at 2x, not 4x). Off (the setting), neither appears. The icons of
-the vehicles facing any direction are `GetTrainIcon()`, `GetRoadVehIcon()`,
-`GetShipIcon()`, `GetAircraftIcon()` (`engine_gui.h`); the purchase list goes
-on using the ones facing west.
+goes; any window over it is drawn over it, as over the map. Each preview
+turns about its own axis, the middle of a vehicle or the middle of a
+building's plot: a frame is found once, the rectangle its pictures at every
+angle fit in about the axis, the frame is placed beside the window and stays,
+and every picture is drawn at the axis within it (the player: the turning was
+off its axis). Beside the **purchase window** it is the vehicle chosen there,
+in the company's colours, turning smoothly as its **3D likeness made from its
+eight sprites** (below); a set whose chain gives no picture for some
+direction gets the old preview, the eight sprites one after another. Beside
+the **window of one of the game's own industries** that has eight renders
+(the school, the machine, the statue, the hut) and of the plantation it is
+the building, turning smoothly, drawn from its renders the way the map draws
+it, starting from the direction the map view is turned to. The size: four
+times the normal for what fits 360 pixels, else twice, else the normal (the
+player: a long wagon at 2x, not 4x). Off (the setting), neither appears. The
+icons of the vehicles facing any direction are `GetTrainIcon()`,
+`GetRoadVehIcon()`, `GetShipIcon()`, `GetAircraftIcon()` (`engine_gui.h`); the
+purchase list goes on using the ones facing west.
+
+### The 3D likeness of a vehicle from its eight sprites
+
+`src/three_d_vehicle.cpp` (`ThreeDVehicleModel`). The buildings come with
+renders that carry depth; a vehicle has only its eight sprites, so its depth
+is made from the eight outlines, the way it was tried outside the game on
+Sergej and on figures and settled with the player (the depth from the
+colleague is the luxury on top; without it everything with eight pictures
+turns this way):
+
+1. **The eight views**: the sprites of every part of the vehicle (the
+   articulated parts, the two heads of a double-headed engine) for a
+   direction, laid together as the map lays them (`Train::UpdateDeltaXY()`,
+   `Train::CalcNextVehicleOffset()`, the road vehicles', ships' and aircraft's
+   own boxes), at the finest zoom the sprites have, in the company's colours
+   (the recolouring the blitter would do). The anchor is the track point
+   under the middle of the chain. A sprite of 4x4 or less is the empty one a
+   set gives a direction a part has no picture of (Sergej's head and tail in
+   the directions along the diagonal track, where the middle part draws the
+   whole engine).
+2. **The camera of the sprites**: orthographic, 30 degrees above the horizon,
+   48.8 pixels to a metre at 16x, the game's own projection as the sets of
+   this game render it; direction d has the vehicle turned `90 - 45 d`
+   degrees, and in the four directions along the track its sprite is
+   foreshortened by `1/sqrt 2`, as the sets draw vehicles.
+3. **The visual hull**: a grid of voxels, about a pixel each (at most about
+   six million), cut away wherever a voxel falls outside the outline (alpha
+   40 and more) in any view. The sets are drawn by hand and a sprite may sit
+   a few pixels off the others (the player's set has its N and S pictures 16
+   pixels to the right of the rest at 16x), so the first hull is cut with the
+   outlines widened by 16 pixels, each view's anchor is moved to where the
+   middle of that hull's outline meets the middle of the sprite's, and the
+   hull is cut again and the anchors refined by a pixel or two to where the
+   outline covers the sprite's best. Then an opening of a voxel takes the
+   specks off.
+4. **The surface** of the hull, each point with the colour the sprite gives
+   it in every view that sees it (a z-buffer), weighted by how squarely the
+   camera looks at it; a point no view sees takes its neighbours' colour.
+5. **A picture at any angle**: the points, turned, drawn as 2x2 dots with a
+   z-buffer at twice the size and shrunk with their alpha, so the outline is
+   soft as a sprite's; the colour of a point is a mix of the two sprites
+   nearest the angle, so in a sprite's own direction it is the sprite's
+   pixels, and between two there is no jump.
+
+Sergej (13/8 tiles, three parts, zin16): a million voxels, 70 thousand
+points, under two seconds to build, a few milliseconds a picture; the hull's
+outline covers the sprites' at 0.93 to 0.98. The last four models are kept
+(`GetThreeDVehicleModel()`); the sprites reloaded, they go.
 
 ## The rig
 
@@ -211,7 +262,13 @@ game's own industries, which must be in a town). For the previews:
 `test3d okno nakup <auto|vlak|lod|letadlo>` opens the purchase window (with a
 company made for it, since the null driver's game starts as a spectator),
 `test3d okno prumysl <x> <y>` the window of the industry on that tile,
-`test3d okna` lists every window, and `test3d snimek <name> okna` writes the
+`test3d motor <name>` chooses the engine whose name has the text in the
+purchase window, `test3d nahledy` describes the previews (where, the angle,
+the vehicle's likeness: its fit to each sprite), `test3d nahled uhel
+<degrees>` turns them to an angle (the frames of a turn; with `-d misc=5` the
+likeness writes its eight views with the hull's outline over them as
+`three_d_view_<engine>_<d>.ppm`, with `misc=6` every picture drawn as
+`three_d_render_<engine>_<angle>.ppm`), `test3d okna` lists every window, and `test3d snimek <name> okna` writes the
 whole screen with the windows (the plain `snimek` is the viewport alone; the
 world generation still counts as in progress at the first tick, which would
 leave every other window undrawn, so the rig calls it over). Screenshots asked for under the null driver are made on the

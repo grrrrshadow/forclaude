@@ -91,9 +91,10 @@ uint CountArticulatedParts(EngineID engine_type)
 /**
  * The engines the articulated parts of an engine are built from, in order.
  * @param engine_type the front engine
+ * @param[out] mirrored for each part, whether it is turned round (the 3D likeness of a vehicle lays its sprites the other way)
  * @return the parts' engines, empty for an engine that is not articulated
  */
-std::vector<EngineID> GetArticulatedPartEngines(EngineID engine_type)
+std::vector<EngineID> GetArticulatedPartEngines(EngineID engine_type, std::vector<bool> *mirrored)
 {
 	std::vector<EngineID> parts;
 	if (!EngInfo(engine_type)->callback_mask.Test(VehicleCallbackMask::ArticEngine)) return parts;
@@ -103,9 +104,11 @@ std::vector<EngineID> GetArticulatedPartEngines(EngineID engine_type)
 	v.owner = _current_company;
 
 	for (uint i = 1; i < MAX_ARTICULATED_PARTS; i++) {
-		EngineID part = GetNextArticulatedPart(i, engine_type, &v);
+		bool flipped = false;
+		EngineID part = GetNextArticulatedPart(i, engine_type, &v, &flipped);
 		if (part == EngineID::Invalid()) break;
 		parts.push_back(part);
+		if (mirrored != nullptr) mirrored->push_back(flipped);
 	}
 	return parts;
 }

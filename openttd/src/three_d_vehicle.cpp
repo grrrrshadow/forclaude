@@ -1,0 +1,1041 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/**
+ * @file three_d_vehicle.cpp The 3D likeness of a vehicle made from its eight
+ * sprites (ThreeDVehicleModel, three_d.h), for the preview beside the
+ * purchase window that turns smoothly (three_d_preview_gui.cpp). The
+ * buildings of this game come with renders that carry depth; a vehicle has
+ * only its eight sprites, so its depth is made here, from the eight outlines,
+ * the way it was tried outside the game on Sergej (M62) and on figures and
+ * settled with the player:
+ *
+ * 1. The eight views: the sprites of every part of the vehicle (articulated
+ *    parts, the two heads of a double-headed engine) for a direction, laid
+ *    together as the map lays them (Train::UpdateDeltaXY(),
+ *    Train::CalcNextVehicleOffset()), at the finest zoom the sprites have, in
+ *    the company's colours. The anchor is the track point under the middle
+ *    of the chain.
+ * 2. The camera of the sprites: orthographic, 30 degrees above the horizon,
+ *    48.8 pixels to a metre at 16x; direction d has the vehicle turned
+ *    90 - 45 d degrees, and in the four directions along the track its
+ *    sprite is foreshortened by 1/sqrt 2, as the sets draw vehicles.
+ * 3. The visual hull: a grid of voxels (a pixel each), cut away wherever a
+ *    voxel falls outside the outline in any of the eight views (outline:
+ *    alpha 40 and more). The anchor of each view is first moved by up to a
+ *    few pixels to where the hull's outline fits the sprite's best.
+ * 4. The surface of the hull, each point with the colour the sprite gives it
+ *    in every view that sees it (a z-buffer), weighted by how squarely the
+ *    camera looks at it.
+ * 5. A picture at any angle: the points, turned, drawn as 2x2 dots from the
+ *    farthest in, at twice the size and shrunk with their alpha, so the
+ *    outline is soft as a sprite's; the colour of a point is a mix of the
+ *    two sprites nearest the angle, so in a sprite's own direction it is the
+ *    sprite's pixels, and between two there is no jump.
+ */
+
+#include "stdafx.h"
+#include "three_d.h"
+#include "articulated_vehicles.h"
+#include "engine_base.h"
+#include "engine_gui.h"
+#include "newgrf_engine.h"
+#include "newgrf_properties.h"
+#include "newgrf_callbacks.h"
+#include "spritecache.h"
+#include "spriteloader/spriteloader.hpp"
+#include "landscape.h"
+#include "zoom_func.h"
+#include "palette_func.h"
+#include "vehicle_type.h"
+#include "vehicle_base.h"
+#include "direction_func.h"
+#include "fileio_type.h"
+#include "core/math_func.hpp"
+#include "debug.h"
+
+#include "table/sprites.h"
+
+#include <chrono>
+#include <cmath>
+#include <map>
+
+#include "safeguards.h"
+
+/** Pixels to a metre of a sprite at 16x: the sets of this game draw a metre as 48.8 pixels there (24.4 at 8x). */
+static constexpr float PXM_16X = 48.8f;
+/** The camera of the sprites: 30 degrees above the horizon. */
+static constexpr float CAM_SIN = 0.5f;
+static constexpr float CAM_COS = 0.86602540f;
+/** A pixel is part of the outline from this alpha on (thin parts were cut off at 128). */
+static constexpr uint8_t OUTLINE_ALPHA = 40;
+/** The outline the hull is fitted to when the views are aligned: the firmer pixels. */
+static constexpr uint8_t FIT_ALPHA = 128;
+/** The voxel grid is kept to about this many voxels. */
+static constexpr double MAX_VOXELS = 6e6;
+/** How far a view's anchor may be moved to fit, pixels. */
+static constexpr int FIT_SHIFT = 16;
+/** The pictures are drawn at this many times the size and shrunk. */
+static constexpr int SUPERSAMPLE = 2;
+/** The models kept: the last few engines looked at. */
+static constexpr size_t MODELS_KEPT = 4;
+
+/** One of the eight views of a vehicle: its sprites of a direction composed as the map draws them, about the anchor. */
+struct ThreeDVehicleView {
+	int width = 0;
+	int height = 0;
+	int anchor_x = 0; ///< the track point under the middle of the chain, pixels from the left
+	int anchor_y = 0; ///< and from the top
+	int shift_x = 0;  ///< the move of the anchor that fits the hull to the sprite (BuildVehicleModel())
+	int shift_y = 0;
+	std::vector<Colour> pixels;
+
+	Colour At(int x, int y) const
+	{
+		if (x < 0 || y < 0 || x >= this->width || y >= this->height) return Colour(0, 0, 0, 0);
+		return this->pixels[static_cast<size_t>(y) * this->width + x];
+	}
+};
+
+/** The 3D likeness of a vehicle: the surface points of its hull with their colours in every view. */
+struct ThreeDVehicleModel {
+	EngineID engine = EngineID::Invalid();
+	PaletteID pal = PAL_NONE;
+	ZoomLevel zoom = ZoomLevel::Normal; ///< the views' zoom
+	float pxm = 0.0f;                   ///< pixels to a metre at that zoom
+	float vox = 0.0f;                   ///< the voxel, metres
+	bool squeeze = true;                ///< the sprites of the directions along the track are foreshortened 1/sqrt 2
+	size_t count = 0;                   ///< surface points
+	std::vector<float> xyz;             ///< three to a point, metres: x forward, y to the left, z up, the anchor at the origin
+	std::vector<uint8_t> col8;          ///< r, g, b of the point in each of the eight views, 24 to a point
+	std::vector<uint8_t> w8;            ///< the weight of each view's colour, eight to a point (0: the view does not see the point)
+	std::vector<Colour> fallback;       ///< the colour where neither of the two views nearest the angle sees the point
+	std::map<ZoomLevel, Rect> frames;   ///< the union of the picture's rectangles over the angles, about the anchor, by zoom (ThreeDVehicleFrame())
+	int build_ms = 0;
+	int voxels = 0;
+	std::string note;                   ///< what the rig says about it
+};
+
+static std::vector<std::unique_ptr<ThreeDVehicleModel>> _vehicle_models;
+
+/** The game's unit step of a direction (Direction: N, NE, E, SE, S, SW, W, NW), world units. */
+static const int8_t DIR_DX[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
+static const int8_t DIR_DY[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
+
+/** The angle the vehicle is turned by in a view, degrees: the front points along +x of the model at 90. */
+static inline float ViewAzimuth(int d)
+{
+	return 90.0f - 45.0f * d;
+}
+
+/**
+ * Where a part's sprite goes against the part's position: bounds.origin plus
+ * bounds.offset of the vehicle's UpdateDeltaXY() for a part of a length, world units.
+ */
+static Point SpriteAnchor(VehicleType type, int length, Direction dir)
+{
+	int d = to_underlying(dir);
+	switch (type) {
+		case VehicleType::Train:
+			if (!IsDiagonalDirection(dir)) {
+				/* N, E, S, W: the box moved to the middle of the vehicle. */
+				static const int8_t sx[8] = {-1, 0, -1, 0, 1, 0, 1, 0};
+				static const int8_t sy[8] = {-1, 0, 1, 0, 1, 0, -1, 0};
+				int hs = (static_cast<int>(VEHICLE_LENGTH) - length) / 2;
+				return {-1 - hs * sx[d], -1 - hs * sy[d]};
+			}
+			switch (dir) {
+				case Direction::NE: return {-(length + 1) / 2 + 1, -1};
+				case Direction::NW: return {-1, -(length + 1) / 2 + 1};
+				case Direction::SW: return {-length / 2 + 1 - (static_cast<int>(VEHICLE_LENGTH) - length), -1};
+				default:            return {-1, -length / 2 + 1 - (static_cast<int>(VEHICLE_LENGTH) - length)}; // SE
+			}
+
+		case VehicleType::Road:
+			/* RoadVehicle::UpdateDeltaXY(): the box of a whole vehicle, whatever the length. */
+			switch (dir) {
+				case Direction::NE: case Direction::SW: return {-2, -1};
+				case Direction::NW: case Direction::SE: return {-1, -2};
+				default: return {-1, -1};
+			}
+
+		case VehicleType::Ship: {
+			static const Point bounds[8] = {{-3, -3}, {-16, -3}, {-3, -3}, {-3, -16}, {-3, -3}, {-16, -3}, {-3, -3}, {-3, -16}};
+			return bounds[d];
+		}
+
+		default:
+			return {-1, -1};
+	}
+}
+
+/** A part of a vehicle as the purchase window knows it: its engine, its length, and whether its sprite faces the other way. */
+struct VehiclePart {
+	EngineID engine;
+	bool mirrored; ///< an articulated part turned round
+	bool rear;     ///< the rear head of a double-headed engine
+	int length;    ///< eighths of a tile
+};
+
+/** The length of an engine's part for the purchase window, eighths of a tile: its shortening property or callback. */
+static int PartLength(const Engine *e)
+{
+	int shorten = 0;
+	if (e->type == VehicleType::Train) {
+		shorten = e->VehInfo<RailVehicleInfo>().shorten_factor;
+		if (e->info.callback_mask.Test(VehicleCallbackMask::Length)) {
+			uint16_t cb = GetVehicleCallback(CBID_VEHICLE_LENGTH, 0, 0, e->index, nullptr);
+			if (cb != CALLBACK_FAILED && cb < VEHICLE_LENGTH) shorten = cb;
+		}
+		shorten = GetEngineProperty(e->index, PROP_TRAIN_SHORTEN_FACTOR, shorten);
+	} else if (e->type == VehicleType::Road) {
+		shorten = e->VehInfo<RoadVehicleInfo>().shorten_factor;
+		if (e->info.callback_mask.Test(VehicleCallbackMask::Length)) {
+			uint16_t cb = GetVehicleCallback(CBID_VEHICLE_LENGTH, 0, 0, e->index, nullptr);
+			if (cb != CALLBACK_FAILED && cb < VEHICLE_LENGTH) shorten = cb;
+		}
+		shorten = GetEngineProperty(e->index, PROP_ROADVEH_SHORTEN_FACTOR, shorten);
+	}
+	return static_cast<int>(VEHICLE_LENGTH) - Clamp(shorten, 0, static_cast<int>(VEHICLE_LENGTH) - 1);
+}
+
+/** The parts of an engine, front first. */
+static std::vector<VehiclePart> VehicleParts(EngineID engine)
+{
+	const Engine *e = Engine::Get(engine);
+	std::vector<VehiclePart> parts;
+	parts.push_back({engine, false, false, PartLength(e)});
+	if (e->type == VehicleType::Train && e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Multihead) {
+		parts.push_back({engine, false, true, PartLength(e)});
+		return parts;
+	}
+	std::vector<bool> mirrored;
+	std::vector<EngineID> engines = GetArticulatedPartEngines(engine, &mirrored);
+	for (size_t i = 0; i < engines.size(); i++) {
+		if (!Engine::IsValidID(engines[i])) continue;
+		parts.push_back({engines[i], i < mirrored.size() && mirrored[i], false, PartLength(Engine::Get(engines[i]))});
+	}
+	return parts;
+}
+
+/** The sprites of a part for a direction, as the map draws it. */
+static bool PartSprites(const VehiclePart &part, VehicleType type, Direction dir, VehicleSpriteSeq &seq)
+{
+	Direction d = (part.mirrored || part.rear) ? ReverseDir(dir) : dir;
+	int pitch = 0;
+	seq.Clear();
+	switch (type) {
+		case VehicleType::Train:    GetTrainIcon(part.engine, part.rear, d, pitch, EngineImageType::OnMap, &seq); break;
+		case VehicleType::Road:     GetRoadVehIcon(part.engine, d, EngineImageType::OnMap, &seq); break;
+		case VehicleType::Ship:     GetShipIcon(part.engine, d, EngineImageType::OnMap, &seq); break;
+		case VehicleType::Aircraft: GetAircraftIcon(part.engine, d, EngineImageType::OnMap, &seq); break;
+		default: return false;
+	}
+	return seq.IsValid();
+}
+
+/** A pixel of a sprite as the blitter would draw it: the company's colours put in, the palette looked up. */
+static inline Colour PixelColour(const SpriteLoader::CommonPixel &px, bool is_32bpp, const uint8_t *remap)
+{
+	if (!is_32bpp) {
+		if (px.m == 0) return Colour(0, 0, 0, 0);
+		Colour c = _cur_palette.palette[remap != nullptr ? remap[px.m] : px.m];
+		c.a = 255;
+		return c;
+	}
+	if (px.m == 0 || remap == nullptr) return Colour(px.r, px.g, px.b, px.a);
+	uint8_t brightness = std::max({px.r, px.g, px.b});
+	if (brightness == 0) brightness = DEFAULT_BRIGHTNESS;
+	Colour c = AdjustBrightness(_cur_palette.palette[remap[px.m]], brightness);
+	c.a = px.a;
+	return c;
+}
+
+/** A sprite's pixels at its finest zoom, with its offsets at that zoom. */
+struct RawPiece {
+	ZoomLevel zoom;
+	int width = 0, height = 0;
+	int x_offs = 0, y_offs = 0;
+	std::vector<Colour> pixels;
+	int world_x = 0, world_y = 0; ///< where it goes, world units from the anchor
+	int order = 0;                ///< drawn in this order: the farther first
+};
+
+/** Shrink a piece's pixels to a coarser zoom, 2x2 means weighted by alpha, as the game makes its coarser levels. */
+static void ShrinkPiece(RawPiece &piece, ZoomLevel to)
+{
+	while (piece.zoom < to) {
+		int w = (piece.width + 1) / 2, h = (piece.height + 1) / 2;
+		std::vector<Colour> out(static_cast<size_t>(w) * h);
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) {
+				uint r = 0, g = 0, b = 0, a = 0, n = 0;
+				for (int dy = 0; dy < 2; dy++) {
+					for (int dx = 0; dx < 2; dx++) {
+						int sx = 2 * x + dx, sy = 2 * y + dy;
+						if (sx >= piece.width || sy >= piece.height) continue;
+						Colour c = piece.pixels[static_cast<size_t>(sy) * piece.width + sx];
+						r += c.r * c.a; g += c.g * c.a; b += c.b * c.a; a += c.a; n++;
+					}
+				}
+				out[static_cast<size_t>(y) * w + x] = a == 0 ? Colour(0, 0, 0, 0) : Colour(r / a, g / a, b / a, a / std::max(n, 1u));
+			}
+		}
+		piece.pixels = std::move(out);
+		piece.width = w;
+		piece.height = h;
+		piece.x_offs = piece.x_offs >= 0 ? piece.x_offs / 2 : -((-piece.x_offs + 1) / 2);
+		piece.y_offs = piece.y_offs >= 0 ? piece.y_offs / 2 : -((-piece.y_offs + 1) / 2);
+		++piece.zoom;
+	}
+}
+
+/**
+ * Compose the eight views of an engine: every part's sprite of the direction at the finest zoom they all have.
+ * @return whether there is a picture in every direction
+ */
+static bool ComposeVehicleViews(EngineID engine, PaletteID pal, std::array<ThreeDVehicleView, 8> &views, ZoomLevel &zoom, std::string &note)
+{
+	const Engine *e = Engine::Get(engine);
+	std::vector<VehiclePart> parts = VehicleParts(engine);
+
+	/* The parts along the chain: the first at 0, each next one behind by Train::CalcNextVehicleOffset(); the middle at the anchor. */
+	std::vector<double> pos(parts.size(), 0.0);
+	for (size_t i = 1; i < parts.size(); i++) pos[i] = pos[i - 1] - (parts[i - 1].length / 2 + (parts[i].length + 1) / 2);
+	double middle = (pos.front() + pos.back()) / 2.0;
+
+	const uint8_t *remap_engine = pal == PAL_NONE ? nullptr : GetNonSprite(GB(pal, 0, PALETTE_WIDTH), SpriteType::Recolour) + 1;
+
+	std::array<std::vector<RawPiece>, 8> pieces;
+	zoom = ZoomLevel::Min;
+	for (int d = 0; d < 8; d++) {
+		Direction dir = static_cast<Direction>(d);
+		for (size_t i = 0; i < parts.size(); i++) {
+			VehicleSpriteSeq seq;
+			if (!PartSprites(parts[i], e->type, dir, seq)) continue;
+			/* Where the part stands, rounded the way the game rounds. */
+			int along = static_cast<int>(std::lround(pos[i] - middle));
+			Point anchor = SpriteAnchor(e->type, parts[i].length, dir);
+			int wx = along * DIR_DX[d] + anchor.x, wy = along * DIR_DY[d] + anchor.y;
+			for (uint k = 0; k < seq.count; k++) {
+				SpriteLoader::SpriteCollection collection;
+				bool is_32bpp;
+				ZoomLevels levels = ReadRawSprite(seq.seq[k].sprite & SPRITE_MASK, collection, is_32bpp);
+				if (levels.None()) continue;
+				ZoomLevel finest = ZoomLevel::End;
+				for (ZoomLevel z : levels) {
+					finest = z;
+					break;
+				}
+				if (finest == ZoomLevel::End) continue;
+				const SpriteLoader::Sprite &s = collection[finest];
+				if (s.width <= 4 && s.height <= 4) continue; // the empty sprite a set gives a direction it has no picture for
+				PaletteID p = (pal == PALETTE_CRASH || seq.seq[k].pal == PAL_NONE) ? pal : seq.seq[k].pal;
+				const uint8_t *remap = p == pal ? remap_engine : (p == PAL_NONE ? nullptr : GetNonSprite(GB(p, 0, PALETTE_WIDTH), SpriteType::Recolour) + 1);
+				RawPiece piece;
+				piece.zoom = finest;
+				piece.width = s.width;
+				piece.height = s.height;
+				piece.x_offs = s.x_offs;
+				piece.y_offs = s.y_offs;
+				piece.pixels.resize(static_cast<size_t>(s.width) * s.height);
+				for (size_t j = 0; j < piece.pixels.size(); j++) piece.pixels[j] = PixelColour(s.data[j], is_32bpp, remap);
+				piece.world_x = wx;
+				piece.world_y = wy;
+				piece.order = wx + wy;
+				if (finest > zoom) zoom = finest;
+				pieces[d].push_back(std::move(piece));
+			}
+		}
+		if (pieces[d].empty()) {
+			note = fmt::format("no picture for direction {}", d);
+			return false;
+		}
+	}
+
+	/* Lay them on a canvas, the farther first, about the anchor. */
+	for (int d = 0; d < 8; d++) {
+		std::sort(pieces[d].begin(), pieces[d].end(), [](const RawPiece &a, const RawPiece &b) { return a.order < b.order; });
+		int left = INT32_MAX, top = INT32_MAX, right = INT32_MIN, bottom = INT32_MIN;
+		std::vector<Point> at;
+		for (RawPiece &piece : pieces[d]) {
+			ShrinkPiece(piece, zoom);
+			Point screen = RemapCoords(piece.world_x, piece.world_y, 0);
+			int px = UnScaleByZoom(screen.x, zoom) + piece.x_offs, py = UnScaleByZoom(screen.y, zoom) + piece.y_offs;
+			at.push_back({px, py});
+			left = std::min(left, px);
+			top = std::min(top, py);
+			right = std::max(right, px + piece.width);
+			bottom = std::max(bottom, py + piece.height);
+		}
+		ThreeDVehicleView &v = views[d];
+		v.width = right - left;
+		v.height = bottom - top;
+		v.anchor_x = -left;
+		v.anchor_y = -top;
+		v.pixels.assign(static_cast<size_t>(v.width) * v.height, Colour(0, 0, 0, 0));
+		for (size_t i = 0; i < pieces[d].size(); i++) {
+			const RawPiece &piece = pieces[d][i];
+			for (int y = 0; y < piece.height; y++) {
+				for (int x = 0; x < piece.width; x++) {
+					Colour s = piece.pixels[static_cast<size_t>(y) * piece.width + x];
+					if (s.a == 0) continue;
+					Colour &dst = v.pixels[static_cast<size_t>(at[i].y - top + y) * v.width + (at[i].x - left + x)];
+					if (s.a == 255 || dst.a == 0) {
+						dst = s;
+					} else {
+						uint al = s.a, na = 255 - al;
+						dst = Colour((s.r * al + dst.r * na + 127) / 255, (s.g * al + dst.g * na + 127) / 255, (s.b * al + dst.b * na + 127) / 255, std::max(s.a, dst.a));
+					}
+				}
+			}
+		}
+	}
+	return true;
+}
+
+/** The projection of a view: the vehicle turned and foreshortened, the camera 30 degrees up. */
+struct ViewCamera {
+	float c, s;  ///< cosine and sine of the azimuth
+	float sq;    ///< the foreshortening along the vehicle
+	float cam[3]; ///< the direction to the camera in the model's frame
+
+	void Set(int d, bool squeeze)
+	{
+		float f = ViewAzimuth(d) * static_cast<float>(M_PI) / 180.0f;
+		this->c = std::cos(f);
+		this->s = std::sin(f);
+		this->sq = (squeeze && (d & 1)) ? 0.70710678f : 1.0f;
+		this->cam[0] = -this->s * CAM_COS;
+		this->cam[1] = -this->c * CAM_COS;
+		this->cam[2] = CAM_SIN;
+	}
+
+	/** A model point to the view's pixel about the anchor (x right, y down) and its depth (the smaller the nearer). */
+	inline void Project(float x, float y, float z, float pxm, float &sx, float &sy, float &depth) const
+	{
+		float px = x * this->sq;
+		float xr = px * this->c - y * this->s;
+		float yr = px * this->s + y * this->c;
+		sx = xr * pxm;
+		sy = (-yr * CAM_SIN - z * CAM_COS) * pxm;
+		depth = yr * CAM_COS - z * CAM_SIN;
+	}
+};
+
+/** The voxel grid of the hull. */
+struct VoxelGrid {
+	int nx, ny, nz;
+	float x0, y0, z0, vox;
+	std::vector<uint8_t> occ;
+
+	inline size_t Index(int x, int y, int z) const { return (static_cast<size_t>(z) * this->ny + y) * this->nx + x; }
+	inline bool At(int x, int y, int z) const
+	{
+		if (x < 0 || y < 0 || z < 0 || x >= this->nx || y >= this->ny || z >= this->nz) return false;
+		return this->occ[this->Index(x, y, z)] != 0;
+	}
+	inline float X(int i) const { return this->x0 + (i + 0.5f) * this->vox; }
+	inline float Y(int i) const { return this->y0 + (i + 0.5f) * this->vox; }
+	inline float Z(int i) const { return this->z0 + (i + 0.5f) * this->vox; }
+};
+
+/** A view's outline widened by r pixels (a box), so a sprite a few pixels off the others cuts nothing it should not. */
+static std::vector<uint8_t> WidenedOutline(const ThreeDVehicleView &v, int r)
+{
+	std::vector<uint8_t> a(static_cast<size_t>(v.width) * v.height, 0), b(a.size(), 0);
+	for (size_t i = 0; i < a.size(); i++) a[i] = v.pixels[i].a >= OUTLINE_ALPHA;
+	for (int y = 0; y < v.height; y++) {
+		for (int x = 0; x < v.width; x++) {
+			uint8_t any = 0;
+			for (int dx = -r; dx <= r && !any; dx++) {
+				int xx = x + dx;
+				if (xx >= 0 && xx < v.width) any = a[static_cast<size_t>(y) * v.width + xx];
+			}
+			b[static_cast<size_t>(y) * v.width + x] = any;
+		}
+	}
+	for (int y = 0; y < v.height; y++) {
+		for (int x = 0; x < v.width; x++) {
+			uint8_t any = 0;
+			for (int dy = -r; dy <= r && !any; dy++) {
+				int yy = y + dy;
+				if (yy >= 0 && yy < v.height) any = b[static_cast<size_t>(yy) * v.width + x];
+			}
+			a[static_cast<size_t>(y) * v.width + x] = any;
+		}
+	}
+	return a;
+}
+
+/**
+ * Cut the grid to the hull: a voxel stays where every view has it inside the outline.
+ * @param widened the views' outlines widened (WidenedOutline()), or nullptr for the outlines as they are
+ */
+static void CarveHull(VoxelGrid &g, const std::array<ThreeDVehicleView, 8> &views, const std::array<ViewCamera, 8> &cams, float pxm, const std::array<std::vector<uint8_t>, 8> *widened)
+{
+	g.occ.assign(static_cast<size_t>(g.nx) * g.ny * g.nz, 1);
+	for (int d = 0; d < 8; d++) {
+		const ThreeDVehicleView &v = views[d];
+		const ViewCamera &cam = cams[d];
+		const std::vector<uint8_t> *wide = widened != nullptr ? &(*widened)[d] : nullptr;
+		float ax = v.anchor_x + v.shift_x + 0.5f, ay = v.anchor_y + v.shift_y + 0.5f;
+		for (int iz = 0; iz < g.nz; iz++) {
+			float z = g.Z(iz);
+			for (int iy = 0; iy < g.ny; iy++) {
+				float y = g.Y(iy);
+				uint8_t *row = &g.occ[g.Index(0, iy, iz)];
+				for (int ix = 0; ix < g.nx; ix++) {
+					if (row[ix] == 0) continue;
+					float sx, sy, depth;
+					cam.Project(g.X(ix), y, z, pxm, sx, sy, depth);
+					int px = static_cast<int>(std::floor(ax + sx)), py = static_cast<int>(std::floor(ay + sy));
+					bool inside;
+					if (wide != nullptr) {
+						inside = px >= 0 && py >= 0 && px < v.width && py < v.height && (*wide)[static_cast<size_t>(py) * v.width + px] != 0;
+					} else {
+						inside = v.At(px, py).a >= OUTLINE_ALPHA;
+					}
+					if (!inside) row[ix] = 0;
+				}
+			}
+		}
+	}
+}
+
+/** The outline of the hull as a view sees it, closed by a pixel, to fit it to the sprite. */
+static std::vector<uint8_t> HullOutline(const VoxelGrid &g, const ThreeDVehicleView &v, const ViewCamera &cam, float pxm)
+{
+	std::vector<uint8_t> mask(static_cast<size_t>(v.width) * v.height, 0);
+	float ax = v.anchor_x + 0.5f, ay = v.anchor_y + 0.5f;
+	for (int iz = 0; iz < g.nz; iz++) {
+		for (int iy = 0; iy < g.ny; iy++) {
+			const uint8_t *row = &g.occ[g.Index(0, iy, iz)];
+			for (int ix = 0; ix < g.nx; ix++) {
+				if (row[ix] == 0) continue;
+				float sx, sy, depth;
+				cam.Project(g.X(ix), g.Y(iy), g.Z(iz), pxm, sx, sy, depth);
+				int px = static_cast<int>(std::floor(ax + sx)), py = static_cast<int>(std::floor(ay + sy));
+				if (px >= 0 && py >= 0 && px < v.width && py < v.height) mask[static_cast<size_t>(py) * v.width + px] = 1;
+			}
+		}
+	}
+	/* Closing: dilate, then erode, 3x3. */
+	auto pass = [&](const std::vector<uint8_t> &in, bool grow) {
+		std::vector<uint8_t> out(in.size(), 0);
+		for (int y = 0; y < v.height; y++) {
+			for (int x = 0; x < v.width; x++) {
+				bool any = false, all = true;
+				for (int dy = -1; dy <= 1; dy++) {
+					for (int dx = -1; dx <= 1; dx++) {
+						int xx = x + dx, yy = y + dy;
+						bool s = xx >= 0 && yy >= 0 && xx < v.width && yy < v.height && in[static_cast<size_t>(yy) * v.width + xx] != 0;
+						any |= s;
+						all &= s;
+					}
+				}
+				out[static_cast<size_t>(y) * v.width + x] = grow ? any : all;
+			}
+		}
+		return out;
+	};
+	return pass(pass(mask, true), false);
+}
+
+/** How well the hull's outline, moved by (tx, ty), covers the sprite's: intersection over union. */
+static float OutlineFit(const std::vector<uint8_t> &mask, const ThreeDVehicleView &v, int tx, int ty)
+{
+	uint both = 0, either = 0;
+	for (int y = 0; y < v.height; y++) {
+		for (int x = 0; x < v.width; x++) {
+			bool sprite = v.pixels[static_cast<size_t>(y) * v.width + x].a >= FIT_ALPHA;
+			int mx = x - tx, my = y - ty;
+			bool hull = mx >= 0 && my >= 0 && mx < v.width && my < v.height && mask[static_cast<size_t>(my) * v.width + mx] != 0;
+			both += sprite && hull;
+			either += sprite || hull;
+		}
+	}
+	return either == 0 ? 0.0f : static_cast<float>(both) / either;
+}
+
+/** Erode and dilate the hull by a voxel (6 neighbours), taking off the specks a lone outline leaves. */
+static void OpenHull(VoxelGrid &g)
+{
+	auto pass = [&](bool grow) {
+		std::vector<uint8_t> out(g.occ.size(), 0);
+		for (int z = 0; z < g.nz; z++) {
+			for (int y = 0; y < g.ny; y++) {
+				for (int x = 0; x < g.nx; x++) {
+					bool c = g.At(x, y, z);
+					bool n = g.At(x - 1, y, z) || g.At(x + 1, y, z) || g.At(x, y - 1, z) || g.At(x, y + 1, z) || g.At(x, y, z - 1) || g.At(x, y, z + 1);
+					bool a = g.At(x - 1, y, z) && g.At(x + 1, y, z) && g.At(x, y - 1, z) && g.At(x, y + 1, z) && g.At(x, y, z - 1) && g.At(x, y, z + 1);
+					out[g.Index(x, y, z)] = grow ? (c || n) : (c && a);
+				}
+			}
+		}
+		g.occ = std::move(out);
+	};
+	pass(false);
+	pass(true);
+}
+
+/**
+ * Build the likeness of an engine from its eight sprites.
+ * @return the model, or nothing when the engine has no picture in some direction
+ */
+static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, PaletteID pal)
+{
+	auto t0 = std::chrono::steady_clock::now();
+	auto model = std::make_unique<ThreeDVehicleModel>();
+	model->engine = engine;
+	model->pal = pal;
+
+	std::array<ThreeDVehicleView, 8> views;
+	if (!ComposeVehicleViews(engine, pal, views, model->zoom, model->note)) return nullptr;
+	for (const VehiclePart &part : VehicleParts(engine)) model->note += fmt::format("part {}{}{} len {}; ", part.engine.base(), part.mirrored ? " mirrored" : "", part.rear ? " rear" : "", part.length);
+	for (int d = 0; d < 8; d++) model->note += fmt::format("v{} {}x{} anchor {},{}; ", d, views[d].width, views[d].height, views[d].anchor_x, views[d].anchor_y);
+	model->pxm = PXM_16X / (1 << to_underlying(model->zoom));
+	const float pxm = model->pxm;
+
+	std::array<ViewCamera, 8> cams;
+	for (int d = 0; d < 8; d++) cams[d].Set(d, model->squeeze);
+
+	/* The grid from the views' extents: the length from the views along the screen (E, W), the width from
+	 * those along the depth (N, S), the height from the tallest. */
+	auto extent = [&](int d, float &lo, float &hi, float &top, float &bottom) {
+		const ThreeDVehicleView &v = views[d];
+		int x0 = INT32_MAX, x1 = INT32_MIN, y0 = INT32_MAX, y1 = INT32_MIN;
+		for (int y = 0; y < v.height; y++) {
+			for (int x = 0; x < v.width; x++) {
+				if (v.pixels[static_cast<size_t>(y) * v.width + x].a < OUTLINE_ALPHA) continue;
+				x0 = std::min(x0, x); x1 = std::max(x1, x);
+				y0 = std::min(y0, y); y1 = std::max(y1, y);
+			}
+		}
+		if (x0 > x1) { lo = hi = top = bottom = 0.0f; return; }
+		lo = (x0 - v.anchor_x) / pxm;
+		hi = (x1 + 1 - v.anchor_x) / pxm;
+		top = (v.anchor_y - y0) / pxm;
+		bottom = (v.anchor_y - (y1 + 1)) / pxm;
+	};
+	float lo, hi, top, bottom;
+	float xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmax = 0, zmin = 0;
+	extent(2, lo, hi, top, bottom); xmin = std::min(xmin, lo); xmax = std::max(xmax, hi); zmax = std::max(zmax, top); zmin = std::min(zmin, bottom);
+	extent(6, lo, hi, top, bottom); xmin = std::min(xmin, -hi); xmax = std::max(xmax, -lo); zmax = std::max(zmax, top); zmin = std::min(zmin, bottom);
+	extent(0, lo, hi, top, bottom); ymin = std::min(ymin, -hi); ymax = std::max(ymax, -lo); zmax = std::max(zmax, top); zmin = std::min(zmin, bottom);
+	extent(4, lo, hi, top, bottom); ymin = std::min(ymin, lo); ymax = std::max(ymax, hi); zmax = std::max(zmax, top); zmin = std::min(zmin, bottom);
+	for (int d = 1; d < 8; d += 2) { extent(d, lo, hi, top, bottom); zmax = std::max(zmax, top); zmin = std::min(zmin, bottom); }
+	const float margin = 0.3f;
+	VoxelGrid g;
+	float x0 = xmin - margin, x1 = xmax + margin, y0 = ymin - margin, y1 = ymax + margin;
+	float z0 = std::min(-0.2f, zmin / CAM_COS - 0.1f), z1 = zmax / CAM_COS + margin;
+	double volume = static_cast<double>(x1 - x0) * (y1 - y0) * (z1 - z0);
+	float vox = std::max(1.0f / pxm, static_cast<float>(std::cbrt(volume / MAX_VOXELS)));
+	g.vox = vox;
+	g.x0 = x0; g.y0 = y0; g.z0 = z0;
+	g.nx = std::max(1, static_cast<int>(std::ceil((x1 - x0) / vox)));
+	g.ny = std::max(1, static_cast<int>(std::ceil((y1 - y0) / vox)));
+	g.nz = std::max(1, static_cast<int>(std::ceil((z1 - z0) / vox)));
+	model->vox = vox;
+
+	/* The extents of an outline, pixels about the anchor. */
+	auto extents = [&](const std::vector<uint8_t> &mask, const ThreeDVehicleView &v, int &x0, int &y0, int &x1, int &y1) {
+		x0 = INT32_MAX; y0 = INT32_MAX; x1 = INT32_MIN; y1 = INT32_MIN;
+		for (int y = 0; y < v.height; y++) {
+			for (int x = 0; x < v.width; x++) {
+				if (mask[static_cast<size_t>(y) * v.width + x] == 0) continue;
+				x0 = std::min(x0, x - v.anchor_x); x1 = std::max(x1, x - v.anchor_x);
+				y0 = std::min(y0, y - v.anchor_y); y1 = std::max(y1, y - v.anchor_y);
+			}
+		}
+	};
+
+	/* First a loose hull, the outlines widened by FIT_SHIFT, so that a sprite that sits a few pixels off the
+	 * others (the sets are drawn by hand; the player's set has its N and S pictures 16 pixels to the right of
+	 * the rest at 16x) cuts nothing it should not; each view's anchor is then moved so that the middle of the
+	 * hull's outline is at the middle of the sprite's. */
+	std::array<std::vector<uint8_t>, 8> widened;
+	for (int d = 0; d < 8; d++) widened[d] = WidenedOutline(views[d], FIT_SHIFT);
+	CarveHull(g, views, cams, pxm, &widened);
+	for (int d = 0; d < 8; d++) {
+		ThreeDVehicleView &v = views[d];
+		std::vector<uint8_t> mask = HullOutline(g, v, cams[d], pxm);
+		std::vector<uint8_t> sprite(mask.size(), 0);
+		for (size_t i = 0; i < sprite.size(); i++) sprite[i] = v.pixels[i].a >= FIT_ALPHA;
+		int hx0, hy0, hx1, hy1, sx0, sy0, sx1, sy1;
+		extents(mask, v, hx0, hy0, hx1, hy1);
+		extents(sprite, v, sx0, sy0, sx1, sy1);
+		if (hx0 > hx1 || sx0 > sx1) continue;
+		v.shift_x = Clamp(((sx0 + sx1) - (hx0 + hx1)) / 2, -FIT_SHIFT, FIT_SHIFT);
+		v.shift_y = Clamp(((sy0 + sy1) - (hy0 + hy1)) / 2, -FIT_SHIFT, FIT_SHIFT);
+	}
+
+	/* Then the hull from the outlines as they are, each anchor refined by a pixel or two to where the hull's
+	 * outline covers the sprite's best. */
+	CarveHull(g, views, cams, pxm, nullptr);
+	for (int d = 0; d < 8; d++) {
+		ThreeDVehicleView &v = views[d];
+		std::vector<uint8_t> mask = HullOutline(g, v, cams[d], pxm);
+		int best_x = v.shift_x, best_y = v.shift_y;
+		float best = -1.0f;
+		for (int step : {2, 1}) {
+			int cx = best_x, cy = best_y, range = step * 2;
+			for (int ty = cy - range; ty <= cy + range; ty += step) {
+				for (int tx = cx - range; tx <= cx + range; tx += step) {
+					float fit = OutlineFit(mask, v, tx, ty);
+					if (fit > best) { best = fit; best_x = tx; best_y = ty; }
+				}
+			}
+		}
+		v.shift_x = best_x;
+		v.shift_y = best_y;
+		{
+			/* The extents of the sprite's outline and the hull's, pixels about the anchor (the rig). */
+			std::vector<uint8_t> sprite(mask.size(), 0);
+			for (size_t i = 0; i < sprite.size(); i++) sprite[i] = v.pixels[i].a >= FIT_ALPHA;
+			int hx0, hy0, hx1, hy1, sx0, sy0, sx1, sy1;
+			extents(mask, v, hx0, hy0, hx1, hy1);
+			extents(sprite, v, sx0, sy0, sx1, sy1);
+			model->note += fmt::format("d{} fit {:.3f} shift {},{} sprite {}..{},{}..{} hull {}..{},{}..{}; ", d, best, v.shift_x, v.shift_y, sx0, sx1, sy0, sy1, hx0 + v.shift_x, hx1 + v.shift_x, hy0 + v.shift_y, hy1 + v.shift_y);
+		}
+		if (_debug_misc_level >= 5) {
+			/* The rig: the view and the hull's outline over it, as a PPM in the working directory. */
+			std::string name = fmt::format("three_d_view_{}_{}.ppm", engine.base(), d);
+			auto f = FileHandle::Open(name, "wb");
+			if (f.has_value()) {
+				std::string head = fmt::format("P6\n{} {}\n255\n", v.width, v.height);
+				fwrite(head.data(), 1, head.size(), *f);
+				for (int y = 0; y < v.height; y++) {
+					for (int x = 0; x < v.width; x++) {
+						Colour c = v.pixels[static_cast<size_t>(y) * v.width + x];
+						uint8_t rgb[3] = {c.r, c.g, c.b};
+						if (c.a < OUTLINE_ALPHA) { rgb[0] = 40; rgb[1] = 40; rgb[2] = 40; }
+						int mx = x - best_x, my = y - best_y; // the hull's outline moved by the shift onto the sprite
+						bool hull = mx >= 0 && my >= 0 && mx < v.width && my < v.height && mask[static_cast<size_t>(my) * v.width + mx] != 0;
+						if (hull) { rgb[0] = static_cast<uint8_t>((rgb[0] + 255) / 2); rgb[1] = rgb[1] / 2; rgb[2] = rgb[2] / 2; }
+						if (x == v.anchor_x || y == v.anchor_y) { rgb[0] = 0; rgb[1] = 255; rgb[2] = 0; }
+						fwrite(rgb, 1, 3, *f);
+					}
+				}
+			}
+		}
+	}
+	CarveHull(g, views, cams, pxm, nullptr);
+	OpenHull(g);
+	int voxels = 0;
+	for (uint8_t o : g.occ) voxels += o;
+	model->voxels = voxels;
+	if (voxels == 0) {
+		model->note += "empty hull";
+		return nullptr;
+	}
+
+	/* The surface: voxels with an empty neighbour; the normal towards the empty side. */
+	std::vector<int32_t> point_at(g.occ.size(), -1);
+	std::vector<float> nrm;
+	for (int z = 0; z < g.nz; z++) {
+		for (int y = 0; y < g.ny; y++) {
+			for (int x = 0; x < g.nx; x++) {
+				if (!g.At(x, y, z)) continue;
+				if (g.At(x - 1, y, z) && g.At(x + 1, y, z) && g.At(x, y - 1, z) && g.At(x, y + 1, z) && g.At(x, y, z - 1) && g.At(x, y, z + 1)) continue;
+				float nx = 0, ny = 0, nz = 0;
+				for (int dz = -2; dz <= 2; dz++) {
+					for (int dy = -2; dy <= 2; dy++) {
+						for (int dx = -2; dx <= 2; dx++) {
+							if (dx == 0 && dy == 0 && dz == 0) continue;
+							if (g.At(x + dx, y + dy, z + dz)) continue;
+							nx += dx; ny += dy; nz += dz;
+						}
+					}
+				}
+				float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+				if (len < 1e-6f) { nx = 0; ny = 0; nz = 1; len = 1; }
+				point_at[g.Index(x, y, z)] = static_cast<int32_t>(model->count);
+				model->xyz.push_back(g.X(x)); model->xyz.push_back(g.Y(y)); model->xyz.push_back(g.Z(z));
+				nrm.push_back(nx / len); nrm.push_back(ny / len); nrm.push_back(nz / len);
+				model->count++;
+			}
+		}
+	}
+	const size_t n = model->count;
+	model->col8.assign(n * 24, 0);
+	model->w8.assign(n * 8, 0);
+	std::vector<float> wsum(n, 0.0f), rsum(n, 0.0f), gsum(n, 0.0f), bsum(n, 0.0f);
+
+	/* The colour of each point in each view that sees it. */
+	std::vector<float> sx(n), sy(n), depth(n);
+	for (int d = 0; d < 8; d++) {
+		const ThreeDVehicleView &v = views[d];
+		const ViewCamera &cam = cams[d];
+		float ax = v.anchor_x + v.shift_x + 0.5f, ay = v.anchor_y + v.shift_y + 0.5f;
+		std::vector<float> zb(static_cast<size_t>(v.width) * v.height, std::numeric_limits<float>::infinity());
+		for (size_t i = 0; i < n; i++) {
+			cam.Project(model->xyz[i * 3], model->xyz[i * 3 + 1], model->xyz[i * 3 + 2], pxm, sx[i], sy[i], depth[i]);
+			int px = static_cast<int>(std::floor(ax + sx[i])), py = static_cast<int>(std::floor(ay + sy[i]));
+			if (px < 0 || py < 0 || px >= v.width || py >= v.height) continue;
+			float &z = zb[static_cast<size_t>(py) * v.width + px];
+			if (depth[i] < z) z = depth[i];
+		}
+		for (size_t i = 0; i < n; i++) {
+			int px = static_cast<int>(std::floor(ax + sx[i])), py = static_cast<int>(std::floor(ay + sy[i]));
+			if (px < 0 || py < 0 || px >= v.width || py >= v.height) continue;
+			if (depth[i] > zb[static_cast<size_t>(py) * v.width + px] + 2.5f * vox) continue;
+			Colour c = v.pixels[static_cast<size_t>(py) * v.width + px];
+			if (c.a < OUTLINE_ALPHA) continue;
+			float facing = nrm[i * 3] * cam.cam[0] + nrm[i * 3 + 1] * cam.cam[1] + nrm[i * 3 + 2] * cam.cam[2];
+			if (facing < 0) facing = 0;
+			float w = (facing * facing + 0.02f) * (c.a / 255.0f);
+			model->col8[i * 24 + d * 3] = c.r;
+			model->col8[i * 24 + d * 3 + 1] = c.g;
+			model->col8[i * 24 + d * 3 + 2] = c.b;
+			model->w8[i * 8 + d] = static_cast<uint8_t>(Clamp(static_cast<int>(std::lround(w * 250.0f)), 1, 255));
+			wsum[i] += w; rsum[i] += w * c.r; gsum[i] += w * c.g; bsum[i] += w * c.b;
+		}
+	}
+
+	/* The colour where no view sees a point: the mean of the views that do, else the neighbours'. */
+	model->fallback.assign(n, Colour(90, 90, 90, 255));
+	std::vector<uint8_t> coloured(n, 0);
+	size_t uncoloured = 0;
+	for (size_t i = 0; i < n; i++) {
+		if (wsum[i] > 0) {
+			model->fallback[i] = Colour(static_cast<uint8_t>(rsum[i] / wsum[i] + 0.5f), static_cast<uint8_t>(gsum[i] / wsum[i] + 0.5f), static_cast<uint8_t>(bsum[i] / wsum[i] + 0.5f));
+			coloured[i] = 1;
+		} else {
+			uncoloured++;
+		}
+	}
+	for (int round = 0; round < 16 && uncoloured > 0; round++) {
+		std::vector<uint8_t> now = coloured;
+		for (int z = 0; z < g.nz; z++) {
+			for (int y = 0; y < g.ny; y++) {
+				for (int x = 0; x < g.nx; x++) {
+					int32_t i = point_at[g.Index(x, y, z)];
+					if (i < 0 || coloured[i]) continue;
+					uint r = 0, gg = 0, b = 0, cnt = 0;
+					for (int dz = -1; dz <= 1; dz++) {
+						for (int dy = -1; dy <= 1; dy++) {
+							for (int dx = -1; dx <= 1; dx++) {
+								int xx = x + dx, yy = y + dy, zz = z + dz;
+								if (xx < 0 || yy < 0 || zz < 0 || xx >= g.nx || yy >= g.ny || zz >= g.nz) continue;
+								int32_t j = point_at[g.Index(xx, yy, zz)];
+								if (j < 0 || !coloured[j]) continue;
+								r += model->fallback[j].r; gg += model->fallback[j].g; b += model->fallback[j].b; cnt++;
+							}
+						}
+					}
+					if (cnt == 0) continue;
+					model->fallback[i] = Colour(r / cnt, gg / cnt, b / cnt);
+					now[i] = 1;
+					uncoloured--;
+				}
+			}
+		}
+		coloured = std::move(now);
+	}
+
+	if (_debug_misc_level >= 5) {
+		/* The rig: how many points each view colours and the mean of its colours. */
+		for (int d = 0; d < 8; d++) {
+			size_t seen = 0; uint64_t r = 0, gg = 0, b = 0;
+			for (size_t i = 0; i < n; i++) {
+				if (model->w8[i * 8 + d] == 0) continue;
+				seen++; r += model->col8[i * 24 + d * 3]; gg += model->col8[i * 24 + d * 3 + 1]; b += model->col8[i * 24 + d * 3 + 2];
+			}
+			model->note += fmt::format("c{} seen {} mean {},{},{}; ", d, seen, seen ? r / seen : 0, seen ? gg / seen : 0, seen ? b / seen : 0);
+		}
+		uint64_t r = 0, gg = 0, b = 0;
+		for (const Colour &c : model->fallback) { r += c.r; gg += c.g; b += c.b; }
+		model->note += fmt::format("fallback mean {},{},{}; ", r / n, gg / n, b / n);
+	}
+	model->build_ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count());
+	model->note = fmt::format("zoom {} pxm {:.1f} vox {:.3f} grid {}x{}x{} voxels {} points {} unseen {} built in {} ms; ", to_underlying(model->zoom), model->pxm, model->vox, g.nx, g.ny, g.nz, voxels, n, uncoloured, model->build_ms) + model->note;
+	Debug(misc, 1, "3D vehicle model of engine {}: {}", engine.base(), model->note);
+	return model;
+}
+
+/**
+ * The likeness of an engine in a palette: built the first time it is asked for, kept for a while.
+ * @return the model, or nullptr when the engine has no picture in some direction
+ */
+const ThreeDVehicleModel *GetThreeDVehicleModel(EngineID engine, PaletteID pal)
+{
+	for (auto it = _vehicle_models.begin(); it != _vehicle_models.end(); ++it) {
+		if ((*it)->engine == engine && (*it)->pal == pal) {
+			std::unique_ptr<ThreeDVehicleModel> model = std::move(*it);
+			_vehicle_models.erase(it);
+			_vehicle_models.push_back(std::move(model));
+			return _vehicle_models.back()->count == 0 ? nullptr : _vehicle_models.back().get();
+		}
+	}
+	if (engine == EngineID::Invalid() || !Engine::IsValidID(engine)) return nullptr;
+	std::unique_ptr<ThreeDVehicleModel> model = BuildVehicleModel(engine, pal);
+	if (model == nullptr) {
+		/* Remember that there is none, so it is not tried at every frame. */
+		model = std::make_unique<ThreeDVehicleModel>();
+		model->engine = engine;
+		model->pal = pal;
+	}
+	while (_vehicle_models.size() >= MODELS_KEPT) _vehicle_models.erase(_vehicle_models.begin());
+	_vehicle_models.push_back(std::move(model));
+	return _vehicle_models.back()->count == 0 ? nullptr : _vehicle_models.back().get();
+}
+
+/** Forget the models (the sprites are reloaded). */
+void ClearThreeDVehicleModels()
+{
+	_vehicle_models.clear();
+}
+
+/** The zoom a model's views are at. */
+ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model)
+{
+	return model->zoom;
+}
+
+/**
+ * Draw a model at an angle and zoom.
+ * @param azimuth degrees; ViewAzimuth(d) shows the vehicle as its sprite of direction d does
+ * @param out the picture, its left and top from the anchor
+ * @return whether there is a picture
+ */
+bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out)
+{
+	out = {};
+	if (model == nullptr || model->count == 0) return false;
+	const size_t n = model->count;
+	const int ss = SUPERSAMPLE;
+	float pxm = PXM_16X / (1 << to_underlying(zoom)) * ss;
+	float f = azimuth * static_cast<float>(M_PI) / 180.0f;
+	float c = std::cos(f), s = std::sin(f);
+
+	/* The mix of the two views nearest the angle. */
+	float k[8];
+	for (int d = 0; d < 8; d++) {
+		float du = std::fabs(std::fmod(azimuth - ViewAzimuth(d) + 540.0f, 360.0f) - 180.0f);
+		k[d] = du < 45.0f ? 1.0f - du / 45.0f : 0.0f;
+	}
+
+	/* Where the points land. */
+	std::vector<float> sx(n), sy(n), depth(n);
+	float minx = std::numeric_limits<float>::infinity(), miny = minx, maxx = -minx, maxy = -minx;
+	for (size_t i = 0; i < n; i++) {
+		float x = model->xyz[i * 3], y = model->xyz[i * 3 + 1], z = model->xyz[i * 3 + 2];
+		float xr = x * c - y * s, yr = x * s + y * c;
+		sx[i] = xr * pxm;
+		sy[i] = (-yr * CAM_SIN - z * CAM_COS) * pxm;
+		depth[i] = yr * CAM_COS - z * CAM_SIN;
+		minx = std::min(minx, sx[i]); maxx = std::max(maxx, sx[i]);
+		miny = std::min(miny, sy[i]); maxy = std::max(maxy, sy[i]);
+	}
+	int left = static_cast<int>(std::floor(minx)), top = static_cast<int>(std::floor(miny));
+	left -= ((left % ss) + ss) % ss;
+	top -= ((top % ss) + ss) % ss;
+	int width = static_cast<int>(std::ceil(maxx)) - left + 2, height = static_cast<int>(std::ceil(maxy)) - top + 2;
+	width += (ss - width % ss) % ss;
+	height += (ss - height % ss) % ss;
+	if (width <= 0 || height <= 0 || static_cast<size_t>(width) * height > 64u * 1024 * 1024) return false;
+
+	std::vector<float> zb(static_cast<size_t>(width) * height, std::numeric_limits<float>::infinity());
+	std::vector<Colour> buf(static_cast<size_t>(width) * height, Colour(0, 0, 0, 0));
+	for (size_t i = 0; i < n; i++) {
+		/* The colour at this angle. */
+		float wsum = 0, r = 0, g = 0, b = 0;
+		for (int d = 0; d < 8; d++) {
+			if (k[d] == 0.0f) continue;
+			float w = model->w8[i * 8 + d] * k[d];
+			if (w == 0.0f) continue;
+			wsum += w;
+			r += w * model->col8[i * 24 + d * 3];
+			g += w * model->col8[i * 24 + d * 3 + 1];
+			b += w * model->col8[i * 24 + d * 3 + 2];
+		}
+		Colour col = wsum > 0 ? Colour(static_cast<uint8_t>(r / wsum + 0.5f), static_cast<uint8_t>(g / wsum + 0.5f), static_cast<uint8_t>(b / wsum + 0.5f)) : model->fallback[i];
+		int px = static_cast<int>(std::lround(sx[i])) - left, py = static_cast<int>(std::lround(sy[i])) - top;
+		for (int dy = 0; dy < 2; dy++) {
+			for (int dx = 0; dx < 2; dx++) {
+				int xx = px + dx, yy = py + dy;
+				if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+				size_t at = static_cast<size_t>(yy) * width + xx;
+				if (depth[i] < zb[at]) {
+					zb[at] = depth[i];
+					buf[at] = col;
+				}
+			}
+		}
+	}
+
+	/* Shrink: the mean of the dots' colours, the alpha from how many of the subpixels have one. */
+	out.width = width / ss;
+	out.height = height / ss;
+	out.left = left / ss;
+	out.top = top / ss;
+	out.pixels.assign(static_cast<size_t>(out.width) * out.height, 0);
+	for (int y = 0; y < out.height; y++) {
+		for (int x = 0; x < out.width; x++) {
+			uint r = 0, g = 0, b = 0, cnt = 0;
+			for (int dy = 0; dy < ss; dy++) {
+				for (int dx = 0; dx < ss; dx++) {
+					Colour cc = buf[static_cast<size_t>(y * ss + dy) * width + (x * ss + dx)];
+					if (cc.a == 0) continue;
+					r += cc.r; g += cc.g; b += cc.b; cnt++;
+				}
+			}
+			if (cnt == 0) continue;
+			out.pixels[static_cast<size_t>(y) * out.width + x] = Colour(r / cnt, g / cnt, b / cnt, static_cast<uint8_t>(cnt * 255 / (ss * ss))).data;
+		}
+	}
+	if (_debug_misc_level >= 6) {
+		/* The rig: the picture as a PPM in the working directory. */
+		auto f = FileHandle::Open(fmt::format("three_d_render_{}_{}.ppm", model->engine.base(), static_cast<int>(azimuth)), "wb");
+		if (f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", out.width, out.height);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (uint32_t p : out.pixels) {
+				Colour c(p);
+				uint8_t rgb[3] = {c.r, c.g, c.b};
+				if (c.a == 0) { rgb[0] = 40; rgb[1] = 40; rgb[2] = 40; }
+				fwrite(rgb, 1, 3, *f);
+			}
+		}
+	}
+	return true;
+}
+
+/** The rectangle the pictures of a model at a zoom all fit in, about the anchor: the union over eight angles. */
+Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom)
+{
+	ThreeDVehicleModel *m = const_cast<ThreeDVehicleModel *>(model);
+	auto it = m->frames.find(zoom);
+	if (it != m->frames.end()) return it->second;
+	Rect frame{INT32_MAX, INT32_MAX, INT32_MIN, INT32_MIN};
+	ThreeDModelPicture pic;
+	for (int i = 0; i < 8; i++) {
+		if (!RenderThreeDVehicle(model, zoom, i * 45.0f + 22.5f, pic)) continue;
+		frame.left = std::min(frame.left, pic.left);
+		frame.top = std::min(frame.top, pic.top);
+		frame.right = std::max(frame.right, pic.left + pic.width);
+		frame.bottom = std::max(frame.bottom, pic.top + pic.height);
+	}
+	for (int i = 0; i < 8; i++) {
+		if (!RenderThreeDVehicle(model, zoom, i * 45.0f, pic)) continue;
+		frame.left = std::min(frame.left, pic.left);
+		frame.top = std::min(frame.top, pic.top);
+		frame.right = std::max(frame.right, pic.left + pic.width);
+		frame.bottom = std::max(frame.bottom, pic.top + pic.height);
+	}
+	if (frame.right <= frame.left) frame = {};
+	m->frames[zoom] = frame;
+	return frame;
+}
+
+/** What the rig says about a model. */
+std::string DescribeThreeDVehicleModel(const ThreeDVehicleModel *model)
+{
+	if (model == nullptr) return "no model";
+	return model->note;
+}
