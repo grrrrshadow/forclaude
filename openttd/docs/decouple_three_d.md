@@ -373,11 +373,10 @@ perspective rasterizer and a depth buffer in place of the turned projection:
   texture at the normal zoom, and every tile is laid as four triangles meeting
   in its middle, each corner at its height, with the texture pixel of the
   world point -- in perspective, 1/depth and the texture pixel over depth
-  changing linearly across the picture (`CabRasterTriangle()`); between the
-  four nearest texture pixels the colour is mixed where all four have one,
-  so the ground and the sprites up close are smooth, not big squares, and
-  their edges stay sharp. The black under a building is grown over as in the
-  turned view. Where a road or rail is levelled on a slope, its ground lies
+  changing linearly across the picture (`CabRasterTriangle()`), each pixel
+  the texture's nearest one: sharp pixels as the game's sprites have them
+  (the player: smooth textures would look like the other cab view, not
+  ours). The black under a building is grown over as in the turned view. Where a road or rail is levelled on a slope, its ground lies
   on the foundation as the foundation's children: drawn into the texture
   too, at the foundation's top, with the foundation's sides as walls of its
   sprite.
@@ -434,8 +433,8 @@ perspective rasterizer and a depth buffer in place of the turned projection:
   sprites' textures are kept between frames (`_cab_textures`, up to 4096).
 
 What is not there yet: the catenary as wires of their own, the own vehicle's
-nose or cab, finer patterns of the ground near the eye (smooth now, but
-still the normal zoom's few pixels), the buildings with eight renders and the
+nose or cab, finer ground near the eye (the normal zoom's pixels, big up
+close), the buildings with eight renders and the
 new 3D objects (billboards and boxes for now). A bridge's thin lines (the
 cables of a suspension bridge) stand as rows of the sprite's pixels.
 

@@ -5420,24 +5420,6 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 				}
 			}
 			if (p == 0) continue;
-			if (tw > 1 && th > 1) {
-				/* Smooth between the four nearest texture pixels where all four have something, so a sprite seen up
-				 * close is no grid of big squares; at its edges it stays sharp. */
-				double uf = uw * inv - 0.5, vf = vw * inv - 0.5;
-				int u0 = static_cast<int>(std::floor(uf)), v0 = static_cast<int>(std::floor(vf));
-				double fu = uf - u0, fv = vf - v0;
-				int u1 = std::clamp(u0 + 1, 0, tw - 1), v1 = std::clamp(v0 + 1, 0, th - 1);
-				u0 = std::clamp(u0, 0, tw - 1);
-				v0 = std::clamp(v0, 0, th - 1);
-				uint32_t q00 = tex[static_cast<size_t>(v0) * tw + u0], q10 = tex[static_cast<size_t>(v0) * tw + u1];
-				uint32_t q01 = tex[static_cast<size_t>(v1) * tw + u0], q11 = tex[static_cast<size_t>(v1) * tw + u1];
-				if (q00 != 0 && q10 != 0 && q01 != 0 && q11 != 0) {
-					Colour c00(q00), c10(q10), c01(q01), c11(q11);
-					double w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
-					auto mix = [&](uint8_t a, uint8_t b, uint8_t c, uint8_t d) { return static_cast<uint8_t>(a * w00 + b * w10 + c * w01 + d * w11 + 0.5); };
-					p = Colour(mix(c00.r, c10.r, c01.r, c11.r), mix(c00.g, c10.g, c01.g, c11.g), mix(c00.b, c10.b, c01.b, c11.b)).data;
-				}
-			}
 			row[x] = p;
 			zrow[x] = static_cast<float>(iw);
 		}
