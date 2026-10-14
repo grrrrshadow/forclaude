@@ -794,7 +794,9 @@ static Track TrainPiece(const Vehicle *v)
 {
 	if (v == nullptr || v->type != VehicleType::Train) return Track::Invalid;
 	const Train *t = Train::From(v);
-	if (t->track.Test(Track::Wormhole) || t->track.Test(Track::Depot)) return Track::Invalid;
+	/* Only plain rail has its pieces in the map (GetTrackBits()): a piece of the train still in a station, on a
+	 * level crossing or on a bridge's ramp is none (the colleague's crash report, a train leaving a station). */
+	if (t->track.Test(Track::Wormhole) || t->track.Test(Track::Depot) || !IsPlainRailTile(v->tile)) return Track::Invalid;
 	for (Track tr : t->track) {
 		if (GetTrackBits(v->tile).Test(tr)) return tr;
 		break;
