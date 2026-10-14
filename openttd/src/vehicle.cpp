@@ -1595,10 +1595,12 @@ void CheckVehicleBreakdown(Vehicle *v)
 	 * breaking down as it runs, so leaving it out is what keeps one as good as
 	 * it was new. It still breaks down -- at the rate a new one does, which is
 	 * what was paid for, and not never. */
-	int rel, rel_old;
 	if (!_settings_game.vehicle.engine_care) {
-		v->reliability = rel = std::max((rel_old = v->reliability) - v->reliability_spd_dec, 0);
-		if ((rel_old >> 8) != (rel >> 8)) SetWindowDirty(WindowClass::VehicleDetails, v->index);
+		/* Never better than the model is worth now (upstream #15879): a model past its prime pulls its vehicles down
+		 * with it. Not with the upkeep paid for, where the best a vehicle has ever been is what it keeps. */
+		int rel_old = v->reliability;
+		v->reliability = Clamp(rel_old - v->reliability_spd_dec, 0, Engine::Get(v->engine_type)->reliability);
+		if ((rel_old >> 8) != (v->reliability >> 8)) SetWindowDirty(WindowClass::VehicleDetails, v->index);
 	}
 
 	/* Some vehicles lose reliability but won't break down. */
@@ -1639,7 +1641,7 @@ void CheckVehicleBreakdown(Vehicle *v)
 	v->breakdown_chance = ClampTo<uint8_t>(v->breakdown_chance + grow);
 
 	/* Calculate reliability value to use in comparison. */
-	rel = v->reliability;
+	int rel = v->reliability;
 	if (v->type == VehicleType::Ship) rel += 0x6666;
 
 	/* Reduce the chance if the player has chosen the Reduced setting. */

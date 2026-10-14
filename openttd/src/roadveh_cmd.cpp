@@ -444,6 +444,7 @@ void RoadVehicle::MarkDirty()
 		v->colourmap = PAL_NONE;
 		v->UpdateViewport(true, false);
 	}
+	RoadVehUpdateCache(this, true);
 	this->CargoChanged();
 }
 
