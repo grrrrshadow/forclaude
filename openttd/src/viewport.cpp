@@ -5668,6 +5668,45 @@ static const CabTexture *CabSpriteTexture(const ParentSpriteToDraw &ps)
 }
 
 /**
+ * The rig: a sprite as it is drawn at the normal zoom, written as a PPM in the working directory (test3d sprite);
+ * where it has nothing, magenta. Says the sprite's size and offsets in the game's virtual units.
+ */
+std::string WriteSpritePPM(SpriteID image, const std::string &name)
+{
+	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return "not a 32bpp blitter";
+	const Sprite *spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
+	int w = UnScaleByZoom(spr->width, ZoomLevel::Normal), h = UnScaleByZoom(spr->height, ZoomLevel::Normal);
+	if (w <= 0 || h <= 0) return "empty sprite";
+	std::vector<uint32_t> px(static_cast<size_t>(w) * h, 0);
+	int mask = ScaleByZoom(-1, ZoomLevel::Normal);
+	DrawPixelInfo tdpi{
+		.dst_ptr = px.data(),
+		.left = spr->x_offs & mask,
+		.top = spr->y_offs & mask,
+		.width = ScaleByZoom(w, ZoomLevel::Normal),
+		.height = ScaleByZoom(h, ZoomLevel::Normal),
+		.pitch = w,
+		.zoom = ZoomLevel::Normal
+	};
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+		DrawSpriteViewport(image, PAL_NONE, 0, 0, nullptr);
+	}
+	auto f = FileHandle::Open(name, "wb");
+	if (!f.has_value()) return "cannot write " + name;
+	std::string head = fmt::format("P6\n{} {}\n255\n", w, h);
+	fwrite(head.data(), 1, head.size(), *f);
+	for (uint32_t p : px) {
+		Colour c(p);
+		uint8_t rgb[3] = {c.r, c.g, c.b};
+		if (p == 0) rgb[0] = rgb[2] = 255, rgb[1] = 0;
+		fwrite(rgb, 1, 3, *f);
+	}
+	return fmt::format("{}: {}x{} px, offsets {},{} (virtual), origin {},{}", name, w, h, spr->x_offs, spr->y_offs, tdpi.left, tdpi.top);
+}
+
+/**
  * A sprite as a box in perspective: its bounding box, the sprite's pixels laid over the top and the two walls the
  * sprite shows (facing south-west and south-east), and over the two it never shows mirrored from those -- as the
  * turned view does it (DrawTurnedBoxes()), but at any angle. Every face's corner takes the texture pixel of the

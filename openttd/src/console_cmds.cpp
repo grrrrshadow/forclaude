@@ -8521,6 +8521,33 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		SetViewYaw(degrees);
 		/* The turn moved the scroll position to keep the middle in place; the view follows at the next tick, here now. */
 		UpdateViewportPosition(w, 0);
+	} else if (what == "sprite") {
+		/* The rig: a sprite as drawn, as a PPM: 'test3d sprite <id> [name]'. */
+		extern std::string WriteSpritePPM(SpriteID image, const std::string &name);
+		if (argv.size() > 3 && argv[2] == "auto") {
+			/* 'test3d sprite auto <unit>': every part's picture of a road vehicle, as it is now. */
+			auto unit = number(3);
+			for (const Vehicle *u : Vehicle::Iterate()) {
+				if (!u->IsPrimaryVehicle() || u->type != VehicleType::Road || !unit.has_value() || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+				int k = 0;
+				for (const Vehicle *part = u; part != nullptr; part = part->Next(), k++) {
+					if (part->sprite_cache.sprite_seq.count == 0) continue;
+					SpriteID image = part->sprite_cache.sprite_seq.seq[0].sprite;
+					IConsolePrint(CC_DEFAULT, "test3d: sprite auto {} dil {} (vozidlo {} na {},{} smer {} sprite {}) {}", *unit, k, part->index, part->x_pos, part->y_pos, to_underlying(part->direction), image & SPRITE_MASK, WriteSpritePPM(image, fmt::format("sprite_auto{}_{}.ppm", *unit, k)));
+				}
+				return true;
+			}
+			IConsolePrint(CC_ERROR, "test3d sprite auto: no such road vehicle.");
+			return true;
+		}
+		auto id = number(2);
+		if (!id.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d sprite needs a sprite id, or 'auto <unit>'.");
+			return true;
+		}
+		std::string name = argv.size() > 3 ? std::string(argv[3]) : fmt::format("sprite_{}.ppm", *id);
+		IConsolePrint(CC_DEFAULT, "test3d: sprite {}", WriteSpritePPM(static_cast<SpriteID>(*id), name));
+		return true;
 	} else if (what == "obal") {
 		/* The rig: whether articulated road vehicles are drawn whole as one hull (vehicle.cpp), 'test3d obal 0|1'. */
 		extern bool _draw_road_consists_whole;

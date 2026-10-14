@@ -1243,24 +1243,34 @@ static void DrawRoadVehicleWhole(const Vehicle *first)
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
 		RevalidateVehicleSprite(u);
 		if (u->sprite_cache.sprite_seq.count == 0) continue;
+		/* A part with no picture to speak of (a set's dummy of a nose, a bumper, a trailer not shown: a pixel) adds
+		 * nothing to the hull. Turning round at a road's end, a lorry has such parts still in the other lane, and
+		 * they would stretch the hull into the lane of the lorry behind it, which was then drawn under it. */
+		const Sprite *spr = GetSprite(u->sprite_cache.sprite_seq.seq[0].sprite & SPRITE_MASK, SpriteType::Normal);
+		bool picture = spr->width > static_cast<int>(ZOOM_BASE) || spr->height > static_cast<int>(ZOOM_BASE);
 		int x = u->x_pos + u->bounds.origin.x, y = u->y_pos + u->bounds.origin.y, z = u->z_pos + u->bounds.origin.z;
-		if (IsDiagonalDirection(u->direction)) {
-			xmin = std::min(xmin, x);
-			ymin = std::min(ymin, y);
-			xmax = std::max(xmax, x + u->bounds.extent.x - 1);
-			ymax = std::max(ymax, y + u->bounds.extent.y - 1);
-		} else {
-			/* Turning (one of the four directions between the roads' own), the part's box is only three units
-			 * square (RoadVehicle::UpdateDeltaXY()), far less than its picture: a lorry turning round at the end
-			 * of a road was drawn under the lorry behind it, whose box reached further along the road. The box of
-			 * a whole vehicle about the part, as the part is long. */
-			xmin = std::min(xmin, u->x_pos - static_cast<int>(VEHICLE_LENGTH) / 2);
-			ymin = std::min(ymin, u->y_pos - static_cast<int>(VEHICLE_LENGTH) / 2);
-			xmax = std::max(xmax, u->x_pos + static_cast<int>(VEHICLE_LENGTH) / 2 - 1);
-			ymax = std::max(ymax, u->y_pos + static_cast<int>(VEHICLE_LENGTH) / 2 - 1);
+		if (picture) {
+			if (IsDiagonalDirection(u->direction)) {
+				/* Along the road the picture reaches past the box (the sets' lorries are longer than a part): the
+				 * box is stretched that much, so two lorries nose to nose in neighbouring lanes overlap along the
+				 * road and the lane decides which is in front, as it does when they pass side by side. */
+				const int reach = VEHICLE_LENGTH / 4;
+				bool along_x = DiagDirToAxis(DirToDiagDir(u->direction)) == Axis::X;
+				xmin = std::min(xmin, x - (along_x ? reach : 0));
+				ymin = std::min(ymin, y - (along_x ? 0 : reach));
+				xmax = std::max(xmax, x + u->bounds.extent.x - 1 + (along_x ? reach : 0));
+				ymax = std::max(ymax, y + u->bounds.extent.y - 1 + (along_x ? 0 : reach));
+			} else {
+				/* Turning (one of the four directions between the roads' own), the part's box is only three units
+				 * square (RoadVehicle::UpdateDeltaXY()), far less than its picture: the box of a whole vehicle about it. */
+				xmin = std::min(xmin, u->x_pos - static_cast<int>(VEHICLE_LENGTH) / 2);
+				ymin = std::min(ymin, u->y_pos - static_cast<int>(VEHICLE_LENGTH) / 2);
+				xmax = std::max(xmax, u->x_pos + static_cast<int>(VEHICLE_LENGTH) / 2 - 1);
+				ymax = std::max(ymax, u->y_pos + static_cast<int>(VEHICLE_LENGTH) / 2 - 1);
+			}
+			zmin = std::min(zmin, z);
+			zmax = std::max(zmax, z + u->bounds.extent.z - 1);
 		}
-		zmin = std::min(zmin, z);
-		zmax = std::max(zmax, z + u->bounds.extent.z - 1);
 		Point pt = RemapCoords(x + u->bounds.offset.x, y + u->bounds.offset.y, z + u->bounds.offset.z);
 		pt.x += u->draw_offs.x;
 		pt.y += u->draw_offs.y;
@@ -1273,6 +1283,16 @@ static void DrawRoadVehicleWhole(const Vehicle *first)
 		parts.push_back({u, pt, x + u->bounds.offset.x + y + u->bounds.offset.y});
 	}
 	if (parts.empty()) return;
+	if (xmin > xmax) {
+		/* Nothing with a picture: the hull of the first part's own box. */
+		const Vehicle *u = parts.front().v;
+		xmin = u->x_pos + u->bounds.origin.x;
+		ymin = u->y_pos + u->bounds.origin.y;
+		zmin = u->z_pos + u->bounds.origin.z;
+		xmax = xmin + u->bounds.extent.x - 1;
+		ymax = ymin + u->bounds.extent.y - 1;
+		zmax = zmin + u->bounds.extent.z - 1;
+	}
 	std::stable_sort(parts.begin(), parts.end(), [](const Part &a, const Part &b) { return a.near < b.near; });
 	const Part &anchor = parts.front();
 	int ax = anchor.v->x_pos + anchor.v->bounds.origin.x + anchor.v->bounds.offset.x;
