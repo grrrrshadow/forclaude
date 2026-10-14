@@ -7272,6 +7272,14 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 			ps.y = pt.y;
 			ps.left = pt.x + spr->x_offs;
 			ps.top = pt.y + spr->y_offs;
+			/* Its box, the vehicle's: an empty one (all 0) read as a fence piece, a point under a tall sprite, and the
+			 * vehicles around were not drawn at all (the player: "I don't see the cars around from the cab"). */
+			ps.xmin = u->x_pos + u->bounds.origin.x;
+			ps.ymin = u->y_pos + u->bounds.origin.y;
+			ps.zmin = u->z_pos + u->bounds.origin.z;
+			ps.xmax = ps.xmin + std::max<int>(u->bounds.extent.x, 2) - 1;
+			ps.ymax = ps.ymin + std::max<int>(u->bounds.extent.y, 2) - 1;
+			ps.zmax = ps.zmin + std::max<int>(u->bounds.extent.z, 5) - 1;
 			bills.push_back({c.f, static_cast<double>(u->x_pos), static_cast<double>(u->y_pos), static_cast<double>(u->z_pos), 0, 0.0, 0.0, ps});
 		}
 	}
