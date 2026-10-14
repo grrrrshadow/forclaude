@@ -8521,6 +8521,83 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		SetViewYaw(degrees);
 		/* The turn moved the scroll position to keep the middle in place; the view follows at the next tick, here now. */
 		UpdateViewportPosition(w, 0);
+	} else if (what == "objekty") {
+		/* The rig: the buildings that are real 3D objects (three_d_objects.h), as read. */
+		extern std::string DescribeThreeDObjects();
+		std::string all = DescribeThreeDObjects();
+		for (size_t at = 0; at < all.size();) {
+			size_t end = all.find('\n', at);
+			if (end == std::string::npos) end = all.size();
+			IConsolePrint(CC_DEFAULT, "test3d: {}", all.substr(at, end - at));
+			at = end + 1;
+		}
+		return true;
+	} else if (what == "mesto") {
+		/* The rig: the middle of the view on the n-th town. */
+		auto n = number(2);
+		int want = n.value_or(0), seen = 0;
+		for (const Town *t : Town::Iterate()) {
+			if (seen++ != want) continue;
+			ScrollMainWindowToTile(t->xy, true);
+			UpdateViewportPosition(w, 0);
+			IConsolePrint(CC_DEFAULT, "test3d: mesto {} '{}' u {},{}, {} domu", want, GetString(STR_TOWN_NAME, t->index), TileX(t->xy), TileY(t->xy), t->cache.num_houses);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: mesto {} neni.", want);
+		return true;
+	} else if (what == "autobusmesto") {
+		/* The rig: a bus let loose in the n-th town, from a depot built beside a straight piece of its road. */
+		auto n = number(2);
+		int want = n.value_or(0), seen = 0;
+		const Town *town = nullptr;
+		for (const Town *t : Town::Iterate()) {
+			if (seen++ == want) town = t;
+		}
+		if (town == nullptr || _game_mode != GameMode::Normal) {
+			IConsolePrint(CC_ERROR, "test3d: autobusmesto: no town {} or no game.", want);
+			return true;
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) return true;
+			SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		TileIndex depot = INVALID_TILE;
+		for (int r = 1; r <= 8 && depot == INVALID_TILE; r++) {
+			for (int dy = -r; dy <= r && depot == INVALID_TILE; dy++) {
+				for (int dx = -r; dx <= r && depot == INVALID_TILE; dx++) {
+					TileIndex t = TileAddWrap(town->xy, dx, dy);
+					if (t == INVALID_TILE || !IsNormalRoadTile(t)) continue;
+					RoadBits bits = GetRoadBits(t, RoadTramType::Road);
+					if (bits != ROAD_X && bits != ROAD_Y) continue;
+					for (DiagDirection side : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+						if (DiagDirToRoadBits(side).Any(bits)) continue; // along the road, not beside it
+						TileIndex beside = TileAddByDiagDir(t, side);
+						if (!IsValidTile(beside) || !IsTileType(beside, TileType::Clear) || GetTileSlope(beside) != SLOPE_FLAT) continue;
+						if (Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, beside, ROADTYPE_ROAD, ReverseDiagDir(side)).Failed()) continue;
+						Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, t, DiagDirToRoadBits(side), ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+						depot = beside;
+						break;
+					}
+				}
+			}
+		}
+		if (depot == INVALID_TILE) {
+			IConsolePrint(CC_ERROR, "test3d: autobusmesto: no place for a depot in {}.", GetString(STR_TOWN_NAME, town->index));
+			return true;
+		}
+		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+			if (!e->company_avail.Test(_local_company) || RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) continue;
+			auto [cost, veh, ua, ub, uc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Failed() || veh == VehicleID::Invalid()) continue;
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+			IConsolePrint(CC_DEFAULT, "test3d: autobus {} vyjizdi v meste {} z depa na {},{}", Vehicle::Get(veh)->unitnumber, GetString(STR_TOWN_NAME, town->index), TileX(depot), TileY(depot));
+			break;
+		}
+		return true;
 	} else if (what == "modely") {
 		/* The buildings with eight renders (ThreeDModel) and whether their sprites are there. */
 		for (uint i = 0; i < GetThreeDModelCount(); i++) IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDModel(GetThreeDModel(i)));

@@ -229,6 +229,44 @@ the edges of the map. The first likeness of a vehicle's look is made when it
 is first drawn turned, a second or two in which the game waits. Facing north
 nothing of this runs.
 
+## Buildings as real 3D objects
+
+`src/three_d_objects.h`, `.cpp`. The player (13. 10.): "the next houses will
+be real 3D objects, not eight renders, to save megabytes"; the colleague made
+every temperate house of the original game so (grrrrf `hra/3d/objekty/`, the
+format in `hra/3d/OBJEKTY-3D.md`), 31 files for the 21 houses and their colour
+variants, 3.5 MB in all. They lie in `media/baseset/decouple/objekty/mirne/`
+with their index `objekty.json` (CMake copies every set under
+`decouple/objekty/` into the game's `baseset/`), and the game reads them from
+`baseset/decouple/objekty/<set>/` the first time one is wanted.
+
+- **The file.** glTF binary (`.glb`): the JSON and the buffer; the first
+  mesh's triangles, their corners' positions and texture coordinates, the
+  node's transform applied; glTF's Y is up and its Z points along the game's
+  -y (Blender writes x, z, -y); metres to units, a tile 14.83765 m as the
+  renders have it and a height level 3 m. The base colour's texture is a PNG
+  in the buffer, read by libpng into the blitter's colours the first time the
+  object is drawn (an alpha under half is transparent), halved into levels of
+  detail down to a pixel.
+- **The index** says which house of the original game each object is
+  (`nahrazuje_house`, the house of its north tile), its size in tiles and
+  which colour variants (`varianty`, the slot `TileHash2Bit()` of the tile
+  picks in `_town_draw_tile_data`); a variant whose sprite is another shape
+  has an object of its own. An object reaching out of its plot is said in
+  the log (`-d misc=1`).
+- **Where.** A finished house of the original game (not a NewGRF's, not one
+  being built, houses not see-through) whose north tile's variant has an
+  object, and that has no eight renders (those keep them): in the **turned
+  view** it is drawn once, whole, among the standing things by the box of its
+  plot (`box_kind` 7, `DrawTurnedObject()`): its triangles turned with the
+  view, far first by their middles, as the faces of the boxes, each filled
+  with its texture at the level of the zoom -- the texture's full width for a
+  tile at the closest zoom, halved with every zoom level out; the sprites of
+  its tiles are left out. In the **cab view** its triangles go through the
+  perspective rasterizer and the depth buffer with the texture's level for
+  about a texture pixel to a pixel of the picture. The view facing north keeps
+  the sprites, pixel for pixel.
+
 ## The previews that turn
 
 `src/three_d_preview_gui.cpp`. There is no window: the preview is a picture
@@ -501,7 +539,11 @@ train, 1 road, 2 ship, 3 aircraft; with `testletadlo <x> <y>` after a
 company exists, an aircraft in the air; with `testlod`, a ship in a shed),
 `test3d smer <type> <unit> <direction 0..7 | 255>` steers a vehicle from its
 cab as the window's buttons do (a road vehicle takes the turn instead: 0
-straight on, 2 right, 6 left), `test3d jizda <type> <unit> <op> [times]`
+straight on, 2 right, 6 left), `test3d objekty` lists the buildings that are 3D objects as read (their
+house, variants, triangles, height), `test3d mesto [n]` puts the n-th town
+under the middle of the view, `test3d autobusmesto [n]` lets a bus loose in
+it from a depot built beside its road (for the cab view among the houses),
+`test3d jizda <type> <unit> <op> [times]`
 drives it freely (op 0 off the road, 1 a step left, 2 a step right, 3 back to
 the orders, 4 stop or start it; with `-d misc=5` it says where it is back on
 the road or its course; `test3d vozidla` shows a free vehicle's heading) (with `-d misc=5` the ship says why it stays

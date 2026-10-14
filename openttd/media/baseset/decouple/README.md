@@ -50,3 +50,17 @@ nor switch it off, and no other set can switch it off. A `.grf` under
 `grafika/` is a static set of the game's own graphics instead: in every game
 and savegame, unseen in the NewGRF window, never saved, and it may not change
 game state.
+
+## objekty/ – budovy jako skutečné 3D objekty
+
+Každá podsložka `objekty/<sada>/` je sada budov jako 3D objektů (glTF `.glb`,
+formát v grrrrf `hra/3d/OBJEKTY-3D.md`) se seznamem `objekty.json`, který říká,
+který dům původní hry a které jeho barevné varianty každý objekt nahrazuje.
+Hra je čte z `baseset/decouple/objekty/<sada>/` a kreslí je v otočeném pohledu
+a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
+
+- `mirne/` – všech 21 domů mírného klimatu původní hry, 31 souborů (od kolegy,
+  grrrrf `hra/3d/objekty/mirne/`, textury z OpenGFX 7.1, GPL-2.0).
+- Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje.
+
+Kód: `src/three_d_objects.cpp`, popis v `docs/decouple_three_d.md`.

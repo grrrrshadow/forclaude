@@ -542,6 +542,8 @@ add_files(
     three_d.cpp
     three_d.h
     three_d_model.cpp
+    three_d_objects.cpp
+    three_d_objects.h
     three_d_preview_gui.cpp
     cab_drive.h
     cab_view.h

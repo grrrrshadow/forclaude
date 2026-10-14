@@ -98,6 +98,7 @@
 #include "framerate_type.h"
 #include "viewport_cmd.h"
 #include "three_d.h"
+#include "three_d_objects.h"
 #include "cab_view.h"
 #include "cab_drive.h"
 
@@ -2640,6 +2641,61 @@ static void DrawTurnedModel(const DrawPixelInfo &frame, const ParentSpriteToDraw
 	_turned_times.models += TurnedNow() - t0;
 }
 
+/** A building of the turned view as a real 3D object (box_kind 7, three_d_objects.h), at the north corner of its north tile on the ground. */
+struct TurnedObject {
+	const ThreeDObject *obj;
+	TileIndex origin;
+	int z;
+};
+/** The objects of the block being drawn; ParentSpriteToDraw::box_dx is the index. */
+static std::vector<TurnedObject> _turned_objects;
+
+/**
+ * Draw a building as a real 3D object (box_kind 7): its triangles turned with the view, far first, each filled
+ * with its texture at the level of detail of the zoom -- the texture's 1024 pixels for a tile's width at the
+ * closest zoom, halved with every zoom level out. Drawn once, whole; the sprites of its tiles are left out
+ * (box_kind 4).
+ */
+static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_objects.size()) return;
+	const TurnedObject &to = _turned_objects[ps.box_dx];
+	const ThreeDObject &o = *to.obj;
+	double t0 = TurnedNow();
+	const ThreeDObjectTexture *tex = o.GetTexture(to_underlying(frame.zoom));
+	const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE, oz = to.z;
+	const double scale = 1.0 / (1 << to_underlying(frame.zoom));
+	const size_t corners = o.pos.size() / 3;
+	static std::vector<TurnedVertex> verts;
+	verts.resize(corners);
+	for (size_t i = 0; i < corners; i++) {
+		double vx, vy;
+		ProjectTurnedF(ox + o.pos[i * 3], oy + o.pos[i * 3 + 1], oz + o.pos[i * 3 + 2], vx, vy);
+		verts[i] = {(vx - frame.left) * scale, (vy - frame.top) * scale, o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h};
+	}
+	/* Far first: by the middle of each triangle, as the faces of the boxes. */
+	static std::vector<std::pair<double, size_t>> order;
+	order.clear();
+	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+		double sx = 0, sy = 0, sz = 0;
+		for (int k = 0; k < 3; k++) {
+			sx += o.pos[o.tri[t + k] * 3];
+			sy += o.pos[o.tri[t + k] * 3 + 1];
+			sz += o.pos[o.tri[t + k] * 3 + 2];
+		}
+		double xr, yr;
+		TurnWorldPoint(ox + sx / 3, oy + sy / 3, xr, yr);
+		order.emplace_back(xr + yr + 2 * sz / 3, t);
+	}
+	std::sort(order.begin(), order.end());
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	for (const auto &[near, t] : order) {
+		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o.tri[t]], verts[o.tri[t + 1]], verts[o.tri[t + 2]]);
+	}
+	_turned_times.models += TurnedNow() - t0;
+}
+
 /**
  * Lay the ground of a plain tile (no foundation) from the block's north-up
  * texture (ViewportDoDrawTurned()) over its four corners where the turned view
@@ -2774,6 +2830,7 @@ static void ViewportDoDrawTurned()
 	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile, and the tiles of the plantation from their layers. */
 	std::vector<TurnedModel> &models = _turned_models;
 	models.clear();
+	_turned_objects.clear();
 	_turned_vehicle_pictures.clear();
 	AutoRestoreBackup drawing_turned(_drawing_turned, true);
 
@@ -2846,6 +2903,23 @@ static void ViewportDoDrawTurned()
 		}
 		t_collect += TurnedNow() - tc0;
 
+		/* A house of the original game made a real 3D object (three_d_objects.h): drawn once, whole, by its
+		 * triangles (DrawTurnedObject()), in place of the sprites of its tiles. One with eight renders keeps them. */
+		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses) && IsHouseCompleted(_cur_ti.tile)) {
+			HouseID north = GetHouseType(_cur_ti.tile);
+			if (north < NEW_HOUSE_OFFSET) {
+				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
+				const ThreeDObject *obj = GetThreeDHouseModel(north) == nullptr ? GetThreeDHouseObject(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+				if (obj != nullptr) {
+					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+					bool known = false;
+					for (const TurnedObject &to : _turned_objects) {
+						if (to.origin == origin) known = true;
+					}
+					if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+				}
+			}
+		}
 		/* One of the game's buildings rendered from eight directions (ThreeDModel): drawn once, whole, from the
 		 * two renders either side of the angle (DrawTurnedModel()), in place of the sprites of its tiles. */
 		if (_cur_ti.tile != INVALID_TILE) {
@@ -2994,6 +3068,35 @@ static void ViewportDoDrawTurned()
 		ps.box_kind = 3;
 	}
 
+	/* Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot. */
+	for (size_t m = 0; m < _turned_objects.size(); m++) {
+		const TurnedObject &to = _turned_objects[m];
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
+		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
+		ps.xmin = ox;
+		ps.xmax = ox + to.obj->tiles_x * TILE_SIZE - 1;
+		ps.ymin = oy;
+		ps.ymax = oy + to.obj->tiles_y * TILE_SIZE - 1;
+		ps.zmin = to.z;
+		ps.zmax = to.z + std::max(1, static_cast<int>(std::ceil(to.obj->top)));
+		ps.x = ps.y = ps.left = ps.top = 0;
+		ps.image = SPR_EMPTY_BOUNDING_BOX;
+		ps.pal = PAL_NONE;
+		ps.sub = nullptr;
+		ps.first_child = -1;
+		ps.order = 0;
+		ps.ax = ox;
+		ps.ay = oy;
+		ps.az = to.z;
+		ps.box = nullptr;
+		ps.box_ox = ox;
+		ps.box_oy = oy;
+		ps.box_oz = to.z;
+		ps.box_dx = static_cast<int16_t>(m);
+		ps.box_dy = 0;
+		ps.box_kind = 7;
+	}
+
 	/* The ground of the whole block, north-up, in one texture: the plain tiles' sprites drawn as the game draws
 	 * them, so neighbouring tiles fit together and the edges of the warped tiles meet at any zoom. A tile with a
 	 * foundation is drawn by itself (DrawTurnedTileGround()), since its raised ground and walls would lie over
@@ -3123,6 +3226,10 @@ static void ViewportDoDrawTurned()
 		}
 		if (ps->box_kind == 6) {
 			DrawTurnedSlab(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 7) {
+			DrawTurnedObject(frame, *ps);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
@@ -6305,6 +6412,13 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	 * bridge's ramp, 5 nothing (a tunnel's portal, built anew). */
 	_cab_bridge_sprites.clear();
 	std::vector<TileIndex> ramps, tunnel_ends;
+	/* The houses that are real 3D objects (three_d_objects.h): drawn by their triangles, their sprites left out. */
+	struct CabObject {
+		const ThreeDObject *obj;
+		TileIndex origin;
+		int z;
+	};
+	std::vector<CabObject> objects;
 	AutoRestoreBackup collecting_backup(_cab_collecting, true);
 	for (CabTile &t : tiles) {
 		_cur_ti.x = t.x * TILE_SIZE;
@@ -6345,6 +6459,21 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		uint8_t kind = (tile_type == TileType::House || tile_type == TileType::Industry || tile_type == TileType::Object) ? 1 : (tile_type == TileType::Station ? 2 : 0);
 		if (ramp) kind = 4;
 		if (tunnel_end) kind = 5;
+		if (tile_type == TileType::House && IsHouseCompleted(_cur_ti.tile)) {
+			HouseID north = GetHouseType(_cur_ti.tile);
+			if (north < NEW_HOUSE_OFFSET) {
+				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
+				const ThreeDObject *obj = GetThreeDHouseModel(north) == nullptr ? GetThreeDHouseObject(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+				if (obj != nullptr) {
+					kind = 5;
+					bool known = false;
+					for (const CabObject &co : objects) {
+						if (co.origin == origin) known = true;
+					}
+					if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+				}
+			}
+		}
 		ps_kind.resize(_vd.parent_sprites_to_draw.size(), kind);
 		/* A bridge over the tile is built from its own sprites. */
 		for (auto it = _cab_bridge_sprites.rbegin(); it != _cab_bridge_sprites.rend() && it->from >= first_parent; ++it) {
@@ -6480,6 +6609,28 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		CabDrawDressed(cv, eye, found, {same(x0, y1, z0), same(x1, y1, z0), same(x1, y1, z1), same(x0, y1, z1)}, false);
 		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x1, y0, z0), at(x0, y1, z0, x1, y1, z0), at(x0, y1, z1, x1, y1, z1), at(x0, y0, z1, x1, y0, z1)}, false);
 		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x0, y1, z0), at(x1, y0, z0, x1, y1, z0), at(x1, y0, z1, x1, y1, z1), at(x0, y0, z1, x0, y1, z1)}, false);
+	}
+	/* The houses that are real 3D objects: their triangles with their texture, at the level of detail of their
+	 * distance -- about a texture pixel to a pixel of the picture. */
+	for (const CabObject &co : objects) {
+		const ThreeDObject &o = *co.obj;
+		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+		CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
+		if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y)) continue;
+		const ThreeDObjectTexture *full = o.GetTexture(0);
+		double texels_per_unit = full->w / static_cast<double>(TILE_SIZE);
+		double pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
+		int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
+		const ThreeDObjectTexture *tex = o.GetTexture(level);
+		for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+			std::vector<CabPoint> poly;
+			for (int k = 0; k < 3; k++) {
+				uint32_t i = o.tri[t + k];
+				poly.push_back(CabToEye(eye, ox + o.pos[i * 3], oy + o.pos[i * 3 + 1], oz + o.pos[i * 3 + 2], o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h));
+			}
+			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false);
+		}
+		camera.billboards++;
 	}
 	for (const CabBridgeSprites &bs : _cab_bridge_sprites) {
 		std::vector<const ParentSpriteToDraw *> list;

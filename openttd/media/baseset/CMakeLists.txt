@@ -113,6 +113,27 @@ foreach(BUILTIN_GRAPHICS_FILE IN LISTS BASESET_BUILTIN_GRAPHICS_FILES)
     list(APPEND BASESET_BINARY_FILES ${BUILTIN_GRAPHICS_BINARY_FILE})
 endforeach()
 
+# Buildings as real 3D objects (src/three_d_objects.h): every object set in
+# decouple/objekty/<set>/ -- its .glb files and its index objekty.json -- is
+# read by the game from baseset/decouple/objekty/<set>/, drawn in the 3D views.
+file(GLOB BASESET_OBJECT_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.glb ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/objekty.json)
+foreach(OBJECT_FILE IN LISTS BASESET_OBJECT_FILES)
+    file(RELATIVE_PATH OBJECT_RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${OBJECT_FILE}")
+    get_filename_component(OBJECT_DIR "${OBJECT_RELATIVE}" DIRECTORY)
+    set(OBJECT_BINARY_FILE "${CMAKE_BINARY_DIR}/baseset/${OBJECT_RELATIVE}")
+
+    add_custom_command_timestamp(OUTPUT ${OBJECT_BINARY_FILE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/baseset/${OBJECT_DIR}
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    ${OBJECT_FILE}
+                    ${OBJECT_BINARY_FILE}
+            MAIN_DEPENDENCY ${OBJECT_FILE}
+            COMMENT "Copying ${OBJECT_RELATIVE}, a building as a 3D object"
+    )
+
+    list(APPEND BASESET_BINARY_FILES ${OBJECT_BINARY_FILE})
+endforeach()
+
 # Create a new target which generates all baseset metadata files
 add_custom_target_timestamp(baseset_files
         DEPENDS
