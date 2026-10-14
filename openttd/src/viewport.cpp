@@ -3388,13 +3388,14 @@ static void ViewportDoDrawTurned()
 			}
 		}
 
-		/* A house of the original game made a real 3D object (three_d_objects.h): drawn once, whole, by its
-		 * triangles (DrawTurnedObject()), in place of the sprites of its tiles. One with eight renders keeps them. */
+		/* A house made a real 3D object (three_d_objects.h) -- of the original game, or of a set the objects name, the
+		 * Mars houses: drawn once, whole, by its triangles (DrawTurnedObject()), in place of the sprites of its tiles.
+		 * One with eight renders keeps them. */
 		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses) && IsHouseCompleted(_cur_ti.tile)) {
 			HouseID north = GetHouseType(_cur_ti.tile);
-			if (north < NEW_HOUSE_OFFSET) {
+			{
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = GetThreeDHouseModel(north) == nullptr ? GetThreeDHouseObject(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+				const ThreeDObject *obj = (north >= NEW_HOUSE_OFFSET || GetThreeDHouseModel(north) == nullptr) ? GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
 				if (obj != nullptr) {
 					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
 					bool known = false;
@@ -6999,9 +7000,10 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		if (tunnel_end) kind = 5;
 		if (tile_type == TileType::House && IsHouseCompleted(_cur_ti.tile)) {
 			HouseID north = GetHouseType(_cur_ti.tile);
-			if (north < NEW_HOUSE_OFFSET) {
+			{
+				/* An original house or a set's the objects name (the Mars houses). */
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = GetThreeDHouseModel(north) == nullptr ? GetThreeDHouseObject(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+				const ThreeDObject *obj = (north >= NEW_HOUSE_OFFSET || GetThreeDHouseModel(north) == nullptr) ? GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
 				if (obj != nullptr) {
 					kind = 5;
 					bool known = false;

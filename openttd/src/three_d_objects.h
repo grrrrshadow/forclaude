@@ -36,7 +36,9 @@ struct ThreeDObjectTexture {
 struct ThreeDObject {
 	std::string name;         ///< its name in the index
 	std::string file;         ///< the .glb it came from
-	HouseID house = UINT16_MAX; ///< the house of the original game it is (its north tile's)
+	HouseID house = UINT16_MAX; ///< the house of the original game it is (its north tile's); UINT16_MAX for a set's house
+	uint32_t grfid = 0;       ///< a house of a set (NewGRF): the set's id as the game keeps it, 0 for an original house
+	uint16_t grf_house = 0;   ///< and the house's number in the set (its Action 0 id, the north tile's)
 	uint8_t variants = 0x0F;  ///< the colour variants (bit per slot, TileHash2Bit()) it is
 	int tiles_x = 1;          ///< its size in tiles
 	int tiles_y = 1;
@@ -51,6 +53,7 @@ struct ThreeDObject {
 };
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);
+const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot);
 std::string DescribeThreeDObjects();
 
 #endif /* THREE_D_OBJECTS_H */

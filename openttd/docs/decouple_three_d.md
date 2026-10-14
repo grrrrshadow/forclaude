@@ -327,8 +327,17 @@ too.
   picks in `_town_draw_tile_data`); a variant whose sprite is another shape
   has an object of its own. An object reaching out of its plot is said in
   the log (`-d misc=1`).
-- **Where.** A finished house of the original game (not a NewGRF's, not one
-  being built, houses not see-through) whose north tile's variant has an
+- **A set's houses.** An object may be a house of a set (NewGRF) instead:
+  `nahrazuje_grf`, the set's id as the game prints it, and
+  `nahrazuje_house_grf`, the house's number in the set (its Action 0 id) --
+  the colleague's `mars/` (14. 10., 12 objects, 2.9 MB): the seven houses of
+  (Fixed) OpenGFX Mars Houses, `524A450B`, the set the game fetches itself
+  and builds its Mars towns of (`mars_houses.h`), two looks by the colour
+  slot for five of them. `GetThreeDHouseObjectAny()` finds an original house
+  by its number and a set's by the set and its number.
+- **Where.** A finished house of the original game or of a set the objects
+  name (not one being built, houses not see-through) whose north tile's
+  variant has an
   object, and that has no eight renders (those keep them): in the **turned
   view** it is drawn once, whole, among the standing things by the box of its
   plot (`box_kind` 7, `DrawTurnedObject()`): its triangles turned with the

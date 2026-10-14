@@ -13,6 +13,8 @@
 #include "fileio_func.h"
 #include "gfx_type.h"
 #include "tile_type.h"
+#include "house.h"
+#include "core/string_consumer.hpp"
 #include "3rdparty/nlohmann/json.hpp"
 
 #include <array>
@@ -20,6 +22,7 @@
 #include <cmath>
 #include <filesystem>
 #include <map>
+#include <tuple>
 
 #ifdef WITH_PNG
 #include <png.h>
@@ -37,6 +40,8 @@ static std::vector<ThreeDObject> _three_d_objects;
 static bool _three_d_objects_read = false;
 /** The objects by house and colour slot: the index into _three_d_objects. */
 static std::map<std::pair<HouseID, uint>, size_t> _three_d_house_objects;
+/** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
+static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
 
 /** A file's bytes, or nothing when it cannot be read. */
 static std::vector<uint8_t> ReadWholeFile(const std::string &path)
@@ -241,10 +246,29 @@ static void ReadThreeDObjects()
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
-				if (e.value("druh", std::string("dum")) != "dum" || !e.contains("nahrazuje_house")) continue;
+				if (e.value("druh", std::string("dum")) != "dum") continue;
 				ThreeDObject obj;
 				obj.file = e.at("soubor").get<std::string>();
 				obj.name = e.value("jmeno", obj.file);
+				if (e.contains("nahrazuje_grf") && e.contains("nahrazuje_house_grf")) {
+					/* A house of a set (NewGRF): the set's id as the game prints it ("524A450B", the Mars houses, the
+					 * colleague's hra/3d/objekty/mars/) and the house's number in the set. */
+					std::string text = e.at("nahrazuje_grf").get<std::string>();
+					auto printed = ParseInteger<uint32_t>(text, 16);
+					if (!printed.has_value()) continue;
+					obj.grfid = std::byteswap(*printed);
+					obj.grf_house = static_cast<uint16_t>(e.at("nahrazuje_house_grf").get<int>());
+					obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
+					obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
+					if (e.contains("varianty")) {
+						obj.variants = 0;
+						for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
+					}
+					if (!ReadGlb(folder + obj.file, obj)) continue;
+					_three_d_objects.push_back(std::move(obj));
+					continue;
+				}
+				if (!e.contains("nahrazuje_house")) continue;
 				/* The house it is: a number, or a list -- a sub-arctic house below the snow line and the same one above
 				 * it, the second dressed in the snowy texture named by "snih" beside the .glb, over the same UVs
 				 * (the colleague's hra/3d/ODPOVED-OBJEKTY.md, the other climates). */
@@ -283,7 +307,12 @@ static void ReadThreeDObjects()
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
 		for (uint slot = 0; slot < 4; slot++) {
-			if (o.variants & (1 << slot)) _three_d_house_objects.emplace(std::make_pair(o.house, slot), i);
+			if (!(o.variants & (1 << slot))) continue;
+			if (o.grfid != 0) {
+				_three_d_grf_house_objects.emplace(std::make_tuple(o.grfid, o.grf_house, slot), i);
+			} else {
+				_three_d_house_objects.emplace(std::make_pair(o.house, slot), i);
+			}
 		}
 	}
 	Debug(misc, 1, "3D objects: {} read from {} index(es)", _three_d_objects.size(), indices.size());
@@ -299,6 +328,22 @@ const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot)
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	auto it = _three_d_house_objects.find(std::make_pair(north_house, colour_slot & 3));
 	return it == _three_d_house_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The 3D object of any house, an original's or a set's (NewGRF): a set's house by the set's id and its number in
+ * the set (the Mars houses, the game's own Mars towns).
+ * @param north_house the house of its north tile
+ * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
+ */
+const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot)
+{
+	if (north_house < NEW_HOUSE_OFFSET) return GetThreeDHouseObject(north_house, colour_slot);
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	const HouseSpec *hs = HouseSpec::Get(north_house);
+	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return nullptr;
+	auto it = _three_d_grf_house_objects.find(std::make_tuple(hs->grf_prop.grfid, hs->grf_prop.local_id, colour_slot & 3));
+	return it == _three_d_grf_house_objects.end() ? nullptr : &_three_d_objects[it->second];
 }
 
 /**
@@ -370,7 +415,8 @@ std::string DescribeThreeDObjects()
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	std::string out = fmt::format("{} objects", _three_d_objects.size());
 	for (const ThreeDObject &o : _three_d_objects) {
-		out += fmt::format("\n  {} house {:#04x} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes", o.name, o.house, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size());
+		std::string which = o.grfid != 0 ? fmt::format("grf {:08X} house {}", std::byteswap(o.grfid), o.grf_house) : fmt::format("house {:#04x}", o.house);
+		out += fmt::format("\n  {} {} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes", o.name, which, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size());
 	}
 	return out;
 }
