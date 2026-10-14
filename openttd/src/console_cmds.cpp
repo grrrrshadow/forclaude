@@ -8920,9 +8920,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ShowCabViewWindow(found);
 		IConsolePrint(CC_DEFAULT, "test3d: kabina vozidla {} (typ {}) otevrena", found->unitnumber, to_underlying(found->type));
 	} else if (what == "motory") {
-		/* The rig: every rail engine whose name has the text (all without), with what 'zatacka' asks of it. */
+		/* The rig: every rail engine whose name has the text (all without), with what 'zatacka' asks of it;
+		 * 'test3d motory auta [text]' the road vehicles instead, with their parts. */
 		std::string want = argv.size() > 2 ? std::string(argv[2]) : "";
 		std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return std::tolower(c); });
+		if (want == "auta") {
+			std::string text = argv.size() > 3 ? std::string(argv[3]) : "";
+			std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return std::tolower(c); });
+			for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+				std::string name = GetString(STR_ENGINE_NAME, e->index);
+				std::string lower = name;
+				std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+				if (!text.empty() && lower.find(text) == std::string::npos) continue;
+				IConsolePrint(CC_DEFAULT, "test3d: auto {} '{}' dilu {} roadtype {} dostupne {}", e->index.base(), name, CountArticulatedParts(e->index) + 1, RoadVehInfo(e->index)->roadtype, Company::IsValidID(_local_company) && e->company_avail.Test(_local_company) ? "ano" : "ne");
+			}
+			return true;
+		}
 		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 			std::string name = GetString(STR_ENGINE_NAME, e->index);
 			std::string lower = name;
@@ -9164,6 +9177,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		UpdateSignalsInBuffer();
+		/* 'test3d silnice [text] [count]': so many road vehicles whose name has the text (the first road vehicle
+		 * without), let loose on the grid with no orders, to see them pass each other. */
+		std::string want_name = (!rail && argv.size() > 2) ? std::string(argv[2]) : "";
+		std::transform(want_name.begin(), want_name.end(), want_name.begin(), [](unsigned char c) { return std::tolower(c); });
+		int count = (!rail && argv.size() > 3) ? number(3).value_or(1) : 1;
 		EngineID eid = EngineID::Invalid();
 		for (const Engine *e : Engine::IterateType(vtype)) {
 			if (!e->company_avail.Test(_local_company)) continue;
@@ -9173,6 +9191,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			} else if (RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) {
 				continue;
 			}
+			if (!want_name.empty()) {
+				std::string name = GetString(STR_ENGINE_NAME, e->index);
+				std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+				if (name.find(want_name) == std::string::npos) continue;
+			}
 			eid = e->index;
 			break;
 		}
@@ -9180,12 +9203,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d {}: no vehicle to build.", what);
 			return true;
 		}
-		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid, true, INVALID_CARGO, ClientID::Invalid);
-		if (cost.Failed() || veh == VehicleID::Invalid()) {
-			IConsolePrint(CC_ERROR, "test3d {}: {} could not be built: {}.", what, GetString(STR_ENGINE_NAME, eid), err(cost));
-			return true;
+		VehicleID veh = VehicleID::Invalid();
+		for (int k = 0; k < std::max(1, count); k++) {
+			auto [cost, built, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Failed() || built == VehicleID::Invalid()) {
+				IConsolePrint(CC_ERROR, "test3d {}: {} could not be built: {}.", what, GetString(STR_ENGINE_NAME, eid), err(cost));
+				if (veh == VehicleID::Invalid()) return true;
+				break;
+			}
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, built, false);
+			if (veh == VehicleID::Invalid()) veh = built;
 		}
-		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
 		const Vehicle *v = Vehicle::Get(veh);
 		ScrollMainWindowToTile(depot, true);
 		UpdateViewportPosition(w, 0);

@@ -2563,6 +2563,52 @@ void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int 
 	_vd.last_child = LAST_CHILD_NONE;
 }
 
+/**
+ * A parent sprite with no picture of its own for a whole articulated road vehicle (vehicle.cpp, DrawRoadVehicleWhole()):
+ * its box is the hull of the boxes of all the parts, so other vehicles and buildings sort against the whole
+ * consist; the parts' pictures come as its children, far to near. The screen rectangle given is the union of the
+ * parts' pictures: the entry is clipped by it, not by the box, since the pictures reach past the box (that is why
+ * the consist is drawn this way).
+ * @param xmin,ymin,zmin,xmax,ymax,zmax the hull, world units (inclusive)
+ * @param ax,ay,az the point of the consist (its first part's)
+ * @param anchor where that point is on the screen (RemapCoords() plus the picture's shift): the children hang from it
+ * @param screen the union of the parts' pictures on the screen
+ * @return whether the entry was added (within the block being drawn): the children may follow
+ */
+bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int ax, int ay, int az, Point anchor, const Rect &screen)
+{
+	_vd.last_child = LAST_CHILD_NONE;
+	if (screen.left >= _vd.dpi.left + _vd.dpi.width || screen.right <= _vd.dpi.left || screen.top >= _vd.dpi.top + _vd.dpi.height || screen.bottom <= _vd.dpi.top) return false;
+	ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
+	ps.x = anchor.x;
+	ps.y = anchor.y;
+	ps.left = screen.left;
+	ps.top = screen.top;
+	ps.image = SPR_EMPTY_BOUNDING_BOX;
+	ps.pal = PAL_NONE;
+	ps.sub = nullptr;
+	ps.xmin = xmin;
+	ps.xmax = xmax;
+	ps.ymin = ymin;
+	ps.ymax = ymax;
+	ps.zmin = zmin;
+	ps.zmax = zmax;
+	ps.first_child = LAST_CHILD_NONE;
+	ps.order = 0;
+	ps.ax = ax;
+	ps.ay = ay;
+	ps.az = az;
+	ps.box = nullptr;
+	ps.box_ox = ax;
+	ps.box_oy = ay;
+	ps.box_oz = az;
+	ps.box_dx = 0;
+	ps.box_dy = 0;
+	ps.box_kind = 0;
+	_vd.last_child = LAST_CHILD_PARENT;
+	return true;
+}
+
 /** Draw a vehicle's likeness (box_kind 5): the picture hung from its point, turned. */
 static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {

@@ -1199,6 +1199,85 @@ void CallVehicleTicks()
  */
 bool _show_sprite_anchor = false;
 
+/** A vehicle's sprite brought up to date before it is drawn, when a change was noted (ViewportAddVehicles()). */
+static void RevalidateVehicleSprite(const Vehicle *v)
+{
+	if (!v->sprite_cache.revalidate_before_draw) return;
+	VehicleSpriteSeq seq;
+	v->GetImage(v->direction, EngineImageType::OnMap, &seq);
+	if (seq.IsValid() && v->sprite_cache.sprite_seq != seq) {
+		v->sprite_cache.sprite_seq = seq;
+		/* A sprite change may also result in a bounding box change, so the box is updated too; the viewport hash
+		 * is left as it is, since it cannot be changed from here. */
+		v->UpdateBoundingBoxCoordinates(false);
+	}
+	v->sprite_cache.revalidate_before_draw = false;
+}
+
+/** The articulated road vehicles drawn whole in the block being drawn (DrawRoadVehicleWhole()): their first parts. */
+static std::vector<VehicleID> _road_consists_drawn;
+
+/**
+ * Draw an articulated road vehicle whole: one entry to sort, the hull of the boxes of all its parts, with the parts'
+ * pictures as its children from the farthest to the nearest. The colleague's request (grrrrf
+ * hra/razeni-dlouhych-aut, 12. 10.): the sets' lorries are long -- a Tatra with its trailer, a tractor with its
+ * semi-trailer, the Terrno -- and the picture of a part reaches past the part's own box, so a neighbouring part or
+ * another vehicle whose box is nearer the viewer was drawn over it though it is behind: the back of a lorry over its
+ * front. Sorted as one hull, nothing of another vehicle lands between the parts, and within the consist the parts
+ * come in a fixed order. The player: "the vehicles are long, we will not shrink them, we must find a solution".
+ * @param first the first part; every part is drawn, the hidden ones (in a tunnel, a depot) left out
+ */
+static void DrawRoadVehicleWhole(const Vehicle *first)
+{
+	struct Part {
+		const Vehicle *v;
+		Point pt;   ///< where its picture hangs on the screen
+		int near;   ///< the sum of its coordinates: the bigger the nearer the viewer
+	};
+	std::vector<Part> parts;
+	int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
+	Rect screen{INT32_MAX, INT32_MAX, INT32_MIN, INT32_MIN};
+	for (const Vehicle *u = first; u != nullptr; u = u->Next()) {
+		if (u->vehstatus.Test(VehState::Hidden)) continue;
+		RevalidateVehicleSprite(u);
+		if (u->sprite_cache.sprite_seq.count == 0) continue;
+		int x = u->x_pos + u->bounds.origin.x, y = u->y_pos + u->bounds.origin.y, z = u->z_pos + u->bounds.origin.z;
+		xmin = std::min(xmin, x);
+		ymin = std::min(ymin, y);
+		zmin = std::min(zmin, z);
+		xmax = std::max(xmax, x + u->bounds.extent.x - 1);
+		ymax = std::max(ymax, y + u->bounds.extent.y - 1);
+		zmax = std::max(zmax, z + u->bounds.extent.z - 1);
+		Point pt = RemapCoords(x + u->bounds.offset.x, y + u->bounds.offset.y, z + u->bounds.offset.z);
+		pt.x += u->draw_offs.x;
+		pt.y += u->draw_offs.y;
+		Rect r;
+		u->sprite_cache.sprite_seq.GetBounds(&r);
+		screen.left = std::min(screen.left, pt.x + r.left);
+		screen.top = std::min(screen.top, pt.y + r.top);
+		screen.right = std::max(screen.right, pt.x + r.right + 1);
+		screen.bottom = std::max(screen.bottom, pt.y + r.bottom + 1);
+		parts.push_back({u, pt, x + u->bounds.offset.x + y + u->bounds.offset.y});
+	}
+	if (parts.empty()) return;
+	std::stable_sort(parts.begin(), parts.end(), [](const Part &a, const Part &b) { return a.near < b.near; });
+	const Part &anchor = parts.front();
+	int ax = anchor.v->x_pos + anchor.v->bounds.origin.x + anchor.v->bounds.offset.x;
+	int ay = anchor.v->y_pos + anchor.v->bounds.origin.y + anchor.v->bounds.offset.y;
+	int az = anchor.v->z_pos + anchor.v->bounds.origin.z + anchor.v->bounds.offset.z;
+	if (!AddVehicleHullToDraw(xmin, ymin, zmin, xmax, ymax, zmax, ax, ay, az, anchor.pt, screen)) return;
+	for (const Part &p : parts) {
+		PaletteID pal = PAL_NONE;
+		if (p.v->vehstatus.Test(VehState::DefaultPalette)) pal = GetVehiclePalette(p.v);
+		const VehicleSpriteSeq &seq = p.v->sprite_cache.sprite_seq;
+		for (uint i = 0; i < seq.count; ++i) {
+			PaletteID pal2 = seq.seq[i].pal;
+			if (!pal2) pal2 = pal;
+			AddChildSpriteScreen(seq.seq[i].sprite, pal2, p.pt.x - anchor.pt.x, p.pt.y - anchor.pt.y, false, nullptr, false, false);
+		}
+	}
+}
+
 static void DoDrawVehicle(const Vehicle *v)
 {
 	PaletteID pal = PAL_NONE;
@@ -1213,6 +1292,19 @@ static void DoDrawVehicle(const Vehicle *v)
 		 * However, transparent smoke and bubbles look weird, so always hide them. */
 		TransparencyOption to = EffectVehicle::From(v)->GetTransparencyOption();
 		if (to != TransparencyOption::Invalid && (IsTransparencySet(to) || IsInvisibilitySet(to))) return;
+	}
+
+	/* An articulated road vehicle facing north is drawn whole, its parts in a fixed order within one hull
+	 * (DrawRoadVehicleWhole()), once however many of its parts the block holds. Turned, each part is its own
+	 * cut of the likeness below; crashed, the parts lie as they fell. */
+	if (v->type == VehicleType::Road && !ViewportDrawingTurned() && !v->vehstatus.Test(VehState::Crashed) && !v->IsWrecked()) {
+		const Vehicle *first = v->First();
+		if (first->HasArticulatedPart()) {
+			if (std::find(_road_consists_drawn.begin(), _road_consists_drawn.end(), first->index) != _road_consists_drawn.end()) return;
+			_road_consists_drawn.push_back(first->index);
+			DrawRoadVehicleWhole(first);
+			return;
+		}
 	}
 
 	/* In the turned view (three_d.h) the vehicle is its 3D likeness made from its eight sprites, drawn at the
@@ -1261,6 +1353,8 @@ static void DoDrawVehicle(const Vehicle *v)
  */
 void ViewportAddVehicles(DrawPixelInfo *dpi)
 {
+	_road_consists_drawn.clear();
+
 	/* The bounding rectangle */
 	const int l = dpi->left;
 	const int r = dpi->left + dpi->width;
@@ -1308,27 +1402,7 @@ void ViewportAddVehicles(DrawPixelInfo *dpi)
 					 * This vehicle can potentially be drawn as part of this viewport and
 					 * needs to be revalidated, as the sprite may not be correct.
 					 */
-					if (v->sprite_cache.revalidate_before_draw) {
-						VehicleSpriteSeq seq;
-						v->GetImage(v->direction, EngineImageType::OnMap, &seq);
-
-						if (seq.IsValid() && v->sprite_cache.sprite_seq != seq) {
-							v->sprite_cache.sprite_seq = seq;
-							/*
-							 * A sprite change may also result in a bounding box change,
-							 * so we need to update the bounding box again before we
-							 * check to see if the vehicle should be drawn. Note that
-							 * we can't interfere with the viewport hash at this point,
-							 * so we keep the original hash on the assumption there will
-							 * not be a significant change in the top and left coordinates
-							 * of the vehicle.
-							 */
-							v->UpdateBoundingBoxCoordinates(false);
-
-						}
-
-						v->sprite_cache.revalidate_before_draw = false;
-					}
+					RevalidateVehicleSprite(v);
 
 					if (l <= v->coord.right &&
 						t <= v->coord.bottom &&

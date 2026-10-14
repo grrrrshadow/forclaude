@@ -56,6 +56,7 @@ void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z,
 struct ThreeDModelPicture;
 void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax);
 bool ViewportDrawingTurned();
+bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int ax, int ay, int az, Point anchor, const Rect &screen);
 void AddChildSpriteScreen(SpriteID image, PaletteID pal, int x, int y, bool transparent = false, const SubSprite *sub = nullptr, bool scale = true, bool relative = true);
 std::string *ViewportAddString(const DrawPixelInfo *dpi, const ViewportSign *sign, ViewportStringFlags flags, Colours colour);
 
