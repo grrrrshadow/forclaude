@@ -9282,6 +9282,25 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowToTile(depot, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: {} u {},{}: {} (vozidlo {} typu {}) vyjizdi z depa na {},{}", what, x0, y0, GetString(STR_ENGINE_NAME, eid), v->unitnumber, to_underlying(v->type), TileX(depot), TileY(depot));
+	} else if (what == "typsilnice" && argv.size() > 2) {
+		/* The rig: every road of the map made a road type by its label, 'test3d typsilnice RT14' (CZTR's first-class
+		 * country road), to see a set's road in the cab view and the turned map. */
+		std::string_view text = argv[2];
+		if (text.size() != 4) {
+			IConsolePrint(CC_ERROR, "test3d typsilnice: a road type's label is four letters.");
+			return true;
+		}
+		RoadTypeLabel label{static_cast<uint32_t>(static_cast<uint8_t>(text[0])) << 24 | static_cast<uint32_t>(static_cast<uint8_t>(text[1])) << 16 |
+				static_cast<uint32_t>(static_cast<uint8_t>(text[2])) << 8 | static_cast<uint8_t>(text[3])};
+		RoadType rt = GetRoadTypeByLabel(label, false);
+		if (rt == INVALID_ROADTYPE) {
+			IConsolePrint(CC_ERROR, "test3d typsilnice: no road type '{}'.", text);
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		CommandCost r = Command<Commands::ConvertRoad>::Do(DoCommandFlag::Execute, TileXY(Map::MaxX() - 1, Map::MaxY() - 1), TileXY(1, 1), rt, false);
+		IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: typsilnice {} (typ {}): {}", text, to_underlying(rt), r.Succeeded() ? "prevedeno" : "NEJDE");
+		return true;
 	} else if (what == "ladeni") {
 		extern TileIndex _turned_debug_tile;
 		auto x = number(2), y = number(3);
