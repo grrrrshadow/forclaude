@@ -446,14 +446,22 @@ we are 3D, drive in every direction ... trees it drives through, at houses it
 stops ... the ship too, turning gently by small angles"). **Off road** puts a
 road vehicle off the road: from there **< Left** and **Right >** turn its
 heading by small angles (an eleventh-and-a-quarter degrees a press), and it
-drives straight along it across the land at half its speed -- over grass,
+drives straight along it across the land at half its speed (and none of the
+slowing for a corner, there being no corners) -- over grass,
 fields, rough land and through trees, across roads and level crossings --
 and stands where it may not go: a house or any building, water, rails but at
 a crossing, a steep slope, a bridge's end, a tunnel, a depot, the map's edge;
 it turns there and goes on. A ship goes freely with its first press of left
 or right, on open water and past buoys, and stands at a bank, a lock, a dock.
-Single road vehicles only (no trams, none with trailers), not in a depot, a
-tunnel or a bay. The heading is `Vehicle::cab_yaw` in 128ths of a turn and the
+Road vehicles but trams, not in a depot, a tunnel or a bay; a lorry's
+trailers come after it (the player: "let the trailers off the road too"):
+every piece is driven freely, each sitting the length of the piece before it
+behind that piece on the line to it and pointing at it (`RoadVehPullChain()`,
+whole numbers again), so the trailer swings round behind the lorry as a
+towed one does, and nothing of the ground stops a trailer. Back on the road
+the trailers are laid behind the lorry along the road it came onto
+(`RoadVehLayChainBehind()`, the same as behind a road stop a lorry is put
+at). The heading is `Vehicle::cab_yaw` in 128ths of a turn and the
 position `cab_px`, `cab_py` in 256ths of a unit, moved a unit along the
 heading for every step the speed gives, in whole numbers from a table of
 cosines (`CabCos()`), so every computer of a network game moves it alike; the

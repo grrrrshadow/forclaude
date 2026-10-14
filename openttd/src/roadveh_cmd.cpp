@@ -535,7 +535,8 @@ inline int RoadVehicle::GetCurrentMaxSpeed() const
 			if (this->state <= RVSB_TRACKDIR_MASK && IsReversingRoadTrackdir(static_cast<Trackdir>(this->state))) {
 				max_speed = this->gcache.cached_max_track_speed / 2;
 				break;
-			} else if (!IsDiagonalDirection(u->direction)) {
+			} else if (!IsDiagonalDirection(u->direction) && !u->cab_free) {
+				/* Round a corner; not off the road, driven freely at any heading (cab_drive.h). */
 				max_speed = this->gcache.cached_max_track_speed * 3 / 4;
 			}
 		}
@@ -1221,6 +1222,8 @@ bool RoadVehLeaveDepot(RoadVehicle *v, bool first)
  * @param tile the road stop tile
  * @param into the direction of travel into the stop, a straight trackdir
  */
+static void RoadVehLayChainBehind(RoadVehicle *v, TileIndex tile, DiagDirection behind);
+
 void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir into)
 {
 	assert(IsStationRoadStopTile(tile));
@@ -1246,20 +1249,25 @@ void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir int
 	v->UpdatePosition();
 	v->UpdateInclination(true, true);
 	v->UpdateViewport(true, true);
+	RoadVehLayChainBehind(v, tile, ReverseDiagDir(TrackdirToExitdir(into)));
+}
 
-	/* A trailer goes behind its lorry, on the road the lorry is driving in
-	 * from. Each piece of a road vehicle drives on from wherever it stands and
-	 * by its own frame, so pieces left on top of each other would stay on top
-	 * of each other for good; they have to be laid out with the gaps they are
-	 * to keep. Frames are a pixel apart and a tile is TILE_SIZE of them, so a
-	 * piece that belongs D pixels behind the entrance stands D pixels back
-	 * along that road, however many tiles back that is.
-	 *
-	 * Where there is no road to stand on -- nothing promises there is any
-	 * behind a stop -- the chain stays folded into the lorry. That is the one
-	 * thing this cannot get right, and it comes apart again as the lorry
-	 * drives away from anything it meets on the way. */
-	DiagDirection behind = ReverseDiagDir(TrackdirToExitdir(into));
+/**
+ * Lay the trailers of a lorry behind it along the road it is driving in from (a road stop it was put at, a road it
+ * comes back onto from the fields). Each piece of a road vehicle drives on from wherever it stands and by its own
+ * frame, so pieces left on top of each other would stay on top of each other for good; they have to be laid out
+ * with the gaps they are to keep. Frames are a pixel apart and a tile is TILE_SIZE of them, so a piece that belongs
+ * D pixels behind the entrance stands D pixels back along that road, however many tiles back that is.
+ *
+ * Where there is no road to stand on -- nothing promises there is any behind a stop -- the chain stays folded into
+ * the lorry. That is the one thing this cannot get right, and it comes apart again as the lorry drives away from
+ * anything it meets on the way.
+ * @param v the lorry, placed on its tile already
+ * @param tile its tile
+ * @param behind the way from the tile to where the chain is to lie
+ */
+static void RoadVehLayChainBehind(RoadVehicle *v, TileIndex tile, DiagDirection behind)
+{
 	Trackdir along = DiagDirToDiagTrackdir(ReverseDiagDir(behind));
 	const RoadDriveEntry *back_rdp = _road_drive_data[GetRoadTramType(v->roadtype)][(to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE) + to_underlying(along)];
 	TileIndexDiffC step = TileIndexDiffCByDiagDir(behind);
@@ -1872,12 +1880,69 @@ static bool RoadVehRejoinRoad(RoadVehicle *v, TileIndex tile, DiagDirection ente
 	v->y_pos = TileY(tile) * TILE_SIZE + (rdp[v->frame].y & 0xF);
 	v->UpdatePosition();
 	RoadZPosAffectSpeed(v, v->UpdateInclination(true, true));
+	/* Its trailers behind it on the road it comes onto, on the road again themselves. */
+	for (RoadVehicle *u = v->Next(); u != nullptr; u = u->Next()) {
+		u->cab_free = false;
+		u->cab_rejoin = false;
+	}
+	RoadVehLayChainBehind(v, tile, ReverseDiagDir(enterdir));
 	Debug(misc, 5, "road vehicle {} back on the road at {},{} trackdir {}", v->unitnumber, TileX(tile), TileY(tile), to_underlying(td));
 	return true;
 }
 
 /**
- * A unit along the heading of a road vehicle driven freely from its cab (cab_drive.h).
+ * The trailers of a lorry driven freely from its cab (cab_drive.h), pulled after it: each piece sits the length of
+ * the piece before it behind that piece's position, on the line to it, and points at it (the player: "let the
+ * trailers off the road too"). Nothing of the ground stops a trailer; it goes where its lorry went.
+ */
+static void RoadVehPullChain(RoadVehicle *v)
+{
+	for (RoadVehicle *u = v->Next(); u != nullptr; u = u->Next()) {
+		const RoadVehicle *prev = RoadVehicle::From(u->Previous());
+		/* Moved by the game in the meantime: the exact position anew. */
+		if (u->cab_px / CAB_SUBUNIT != u->x_pos || u->cab_py / CAB_SUBUNIT != u->y_pos) {
+			u->cab_px = u->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			u->cab_py = u->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+		}
+		int64_t dx = static_cast<int64_t>(prev->cab_px) - u->cab_px, dy = static_cast<int64_t>(prev->cab_py) - u->cab_py;
+		int64_t sq = dx * dx + dy * dy;
+		if (sq == 0) continue;
+		int64_t want = static_cast<int64_t>(prev->gcache.cached_veh_length) * CAB_SUBUNIT;
+		if (sq > static_cast<int64_t>(UINT32_MAX)) {
+			/* Far apart (a piece the game put elsewhere): snapped to the piece ahead. */
+			u->cab_px = prev->cab_px;
+			u->cab_py = prev->cab_py;
+		} else {
+			int64_t len = IntSqrt(static_cast<uint32_t>(sq));
+			if (len == 0) continue;
+			u->cab_px = static_cast<int32_t>(prev->cab_px - dx * want / len);
+			u->cab_py = static_cast<int32_t>(prev->cab_py - dy * want / len);
+			/* Pointing at the piece ahead: the heading whose step goes furthest along the line to it. */
+			int best = u->cab_yaw;
+			int64_t best_dot = INT64_MIN;
+			for (int yaw = 0; yaw < CAB_YAW_TURN; yaw++) {
+				int64_t dot = dx * CabCos(yaw) + dy * CabSin(yaw);
+				if (dot > best_dot) {
+					best_dot = dot;
+					best = yaw;
+				}
+			}
+			u->cab_yaw = static_cast<uint8_t>(best);
+			u->direction = CabYawToDirection(best);
+		}
+		int x = Clamp(u->cab_px / CAB_SUBUNIT, 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
+		int y = Clamp(u->cab_py / CAB_SUBUNIT, 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
+		u->tile = TileVirtXY(x, y);
+		u->x_pos = x;
+		u->y_pos = y;
+		u->UpdatePosition();
+		u->UpdateInclination(true, true);
+		u->UpdateViewport(true, true);
+	}
+}
+
+/**
+ * A unit along the heading of a road vehicle driven freely from its cab (cab_drive.h), its trailers after it.
  * @return false when it may not go on: it stands, and may turn
  */
 static bool RoadVehFreeStep(RoadVehicle *v)
@@ -1904,6 +1969,7 @@ static bool RoadVehFreeStep(RoadVehicle *v)
 	v->y_pos = y;
 	v->UpdatePosition();
 	RoadZPosAffectSpeed(v, v->UpdateInclination(true, true));
+	RoadVehPullChain(v);
 	return true;
 }
 

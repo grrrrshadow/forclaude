@@ -1370,8 +1370,8 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 	if (v->type == VehicleType::Road) {
 		const RoadVehicle *rv = RoadVehicle::From(v);
 		if (what == CabDriveOp::Free) {
-			/* A single vehicle, on the road: not a tram, not a vehicle with trailers, not in its depot, a tunnel or a bay. */
-			if (rv->HasArticulatedPart() || RoadTypeIsTram(rv->roadtype)) return CMD_ERROR;
+			/* On the road: not a tram, not in its depot, a tunnel or a bay; its trailers come after it (RoadVehPullChain()). */
+			if (RoadTypeIsTram(rv->roadtype)) return CMD_ERROR;
 			if (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried()) return CMD_ERROR;
 			if (v->cab_free) return CommandCost();
 		} else if (!v->cab_free) {
@@ -1386,13 +1386,16 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		auto start = [v]() {
-			v->cab_free = true;
-			v->cab_rejoin = false;
-			v->cab_turn = Vehicle::CAB_TURN_NONE;
-			v->cab_heading = Direction::Invalid;
-			v->cab_yaw = static_cast<uint8_t>(DirectionToCabYaw(v->direction));
-			v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
-			v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			/* Every piece: the trailers of a lorry go after it, off the road themselves (RoadVehPullChain()). */
+			for (Vehicle *u = v; u != nullptr; u = u->Next()) {
+				u->cab_free = true;
+				u->cab_rejoin = false;
+				u->cab_turn = Vehicle::CAB_TURN_NONE;
+				u->cab_heading = Direction::Invalid;
+				u->cab_yaw = static_cast<uint8_t>(DirectionToCabYaw(u->direction));
+				u->cab_px = u->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+				u->cab_py = u->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			}
 			if (v->type == VehicleType::Road) RoadVehicle::From(v)->path.clear();
 			if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
 		};

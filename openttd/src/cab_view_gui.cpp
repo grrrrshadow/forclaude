@@ -143,11 +143,11 @@ struct CabViewWindow : Window {
 		this->SetWidgetDisabledState(WID_CV_LEFT, !steerable);
 		this->SetWidgetDisabledState(WID_CV_RIGHT, !steerable);
 		this->SetWidgetDisabledState(WID_CV_AUTO, !steerable || !v->IsCabSteered() || (v->cab_free && v->cab_rejoin));
-		/* Off the road: a single road vehicle on the road, not a tram, not in its depot, a tunnel or a bay (CmdCabDrive()). */
+		/* Off the road: a road vehicle on the road, its trailers with it, not a tram, not in its depot, a tunnel or a bay (CmdCabDrive()). */
 		bool can_leave_road = false;
 		if (v->type == VehicleType::Road && !v->cab_free) {
 			const RoadVehicle *rv = RoadVehicle::From(v);
-			can_leave_road = !rv->HasArticulatedPart() && !RoadTypeIsTram(rv->roadtype) && !rv->IsInDepot() && rv->state != RVSB_WORMHOLE && !IsBayRoadStopTile(rv->tile) && !rv->IsCarried();
+			can_leave_road = !RoadTypeIsTram(rv->roadtype) && !rv->IsInDepot() && rv->state != RVSB_WORMHOLE && !IsBayRoadStopTile(rv->tile) && !rv->IsCarried();
 		}
 		this->SetWidgetDisabledState(WID_CV_OFFROAD, !can_leave_road);
 		this->DrawWidgets();
