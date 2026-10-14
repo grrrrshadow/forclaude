@@ -69,6 +69,8 @@
 
 #include "road_on_rail.h"
 
+#include "round_track.h"
+
 #include "safeguards.h"
 
 /** @{
@@ -1360,7 +1362,10 @@ static void DoDrawVehicle(const Vehicle *v)
 	bool turnable = v->direction != Direction::Invalid && (v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship ||
 			(v->type == VehicleType::Aircraft && Aircraft::From(v)->IsNormalAircraft()));
 	if (ViewportDrawingTurned() && turnable && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && !v->vehstatus.Test(VehState::Crashed) && !shadowed) {
-		if (AddThreeDVehicleToViewport(v, pal, _cur_dpi->zoom)) return;
+		/* A train's piece on a round curve (round_track.h): on the arc, turned along it. */
+		RoundTrackPose round_pose;
+		bool on_round = GetRoundTrackPose(v, round_pose);
+		if (AddThreeDVehicleToViewport(v, pal, _cur_dpi->zoom, on_round ? &round_pose : nullptr)) return;
 	}
 	if (step != 0 && turnable) {
 		v->GetImage(static_cast<Direction>((to_underlying(v->direction) - step) & 7), EngineImageType::OnMap, &turned);

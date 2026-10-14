@@ -103,6 +103,7 @@
 #include "three_d_objects.h"
 #include "cab_view.h"
 #include "cab_drive.h"
+#include "round_track.h"
 
 extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, off while the 3D views collect
 #include "fileio_type.h"
@@ -3625,6 +3626,8 @@ static void ViewportDoDrawTurned()
 				}
 			}
 		}
+		/* The round curves of rails along their arcs, into the ground's picture (round_track.h). */
+		DrawRoundTrackStrips(bigdpi);
 		double t1 = TurnedNow();
 		_turned_times.texture += t1 - t0;
 		/* The black under a building, grown over from the ground beside it: on the rows of that tile. */
@@ -3755,6 +3758,8 @@ static void ViewportDoDrawTurned()
 
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
+	/* The round curves of rails (round_track.h), only in the turned view: facing north the player builds, the curves are as always. */
+	RoundTrackPass round_track_pass(IsViewportTurned(vp));
 	_vd.dpi.zoom = vp.zoom;
 	int mask = ScaleByZoom(-1, vp.zoom);
 

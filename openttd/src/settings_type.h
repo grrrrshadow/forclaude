@@ -254,6 +254,7 @@ struct GUISettings {
 	uint32_t sprite_cache_size_mb; ///< Memory for the sprite cache in MB with a 32bpp blitter (a quarter of it with 8bpp), the player's to set: more sets and finer zoom want more, else the game loads sprites over and over.
 	bool sprite_mitchell; ///< The 8x and the 4x a 32bpp set has not got made straight from its finest level with Mitchell's filter (DownscaleMitchell()), not by halves with a 2x2 mean: sharper, and about twice the time to load a sprite.
 	bool three_d; ///< The 3D of this game (three_d.h): the previews that turn and the map view turned to any angle. Off, nothing of it is there.
+	bool round_track_curves; ///< In the turned view a curve of rails drawn as a round arc, the trains on it turned along it (round_track.h). Off, the curves are as they always were.
 	uint32_t autosave_interval; ///< how often should we do autosaves?
 	bool threaded_saves; ///< should we do threaded saves?
 	bool keep_all_autosave; ///< name the autosave in a different way

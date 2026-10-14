@@ -41,6 +41,8 @@
 #include "table/railtypes.h"
 #include "table/track_land.h"
 
+#include "round_track.h"
+
 #include "safeguards.h"
 
 /** Helper type for lists/vectors of trains */
@@ -2514,6 +2516,13 @@ static void DrawTrackBits(TileInfo *ti, TrackBits track)
 {
 	const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
 
+	/* Part of a round curve (round_track.h): the ground only; the track is drawn along its arc after the ground. */
+	if (RoundTrackDrawing() && IsRoundTrackTile(ti->tile)) {
+		DrawRoundTrackGround(ti->tile);
+		RegisterRoundTrackTile(ti->tile);
+		return;
+	}
+
 	if (rti->UsesOverlay()) {
 		DrawTrackBitsOverlay(ti, track, rti);
 		return;
@@ -2750,7 +2759,8 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		if (_display_opt.Test(DisplayOption::FullDetail)) DrawTrackDetails(ti, rti, pal);
 
-		if (HasRailCatenaryDrawn(GetRailType(ti->tile))) DrawRailCatenary(ti);
+		/* Not over a round curve: its wires would hang over the straight pieces, not the arc. */
+		if (HasRailCatenaryDrawn(GetRailType(ti->tile)) && !(RoundTrackDrawing() && IsRoundTrackTile(ti->tile))) DrawRailCatenary(ti);
 
 		if (HasSignals(ti->tile)) DrawSignals(ti->tile, rails, rti);
 

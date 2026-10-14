@@ -198,7 +198,8 @@ Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom);
 std::string DescribeThreeDVehicleModel(const ThreeDVehicleModel *model);
 void ClearThreeDVehicleModels();
 struct Vehicle;
-bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom);
+struct RoundTrackPose;
+bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom, const RoundTrackPose *pose = nullptr);
 
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);

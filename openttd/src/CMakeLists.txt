@@ -400,6 +400,8 @@ add_files(
     rail.cpp
     rail.h
     rail_cmd.cpp
+    round_track.cpp
+    round_track.h
     rail_cmd.h
     rail_gui.cpp
     rail_gui.h

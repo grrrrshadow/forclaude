@@ -9298,6 +9298,24 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowToTile(depot, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: {} u {},{}: {} (vozidlo {} typu {}) vyjizdi z depa na {},{}", what, x0, y0, GetString(STR_ENGINE_NAME, eid), v->unitnumber, to_underlying(v->type), TileX(depot), TileY(depot));
+	} else if (what == "kolej" && argv.size() > 4) {
+		/* The rig: one piece of rail, 'test3d kolej <x> <y> <track 0..5>' (X, Y, upper, lower, left, right), to lay
+		 * the curves the round curves of rails are seen on (round_track.h). */
+		auto x = number(2), y = number(3), tr = number(4);
+		if (!x.has_value() || !y.has_value() || !tr.has_value() || *tr < 0 || *tr > 5) {
+			IConsolePrint(CC_ERROR, "test3d kolej needs a tile x and y and a track 0..5.");
+			return true;
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(*x, *y), RAILTYPE_RAIL, static_cast<Track>(*tr), false);
+		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
+		return true;
 	} else if (what == "typsilnice" && argv.size() > 2) {
 		/* The rig: every road of the map made a road type by its label, 'test3d typsilnice RT14' (CZTR's first-class
 		 * country road), to see a set's road in the cab view and the turned map. */

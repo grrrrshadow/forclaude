@@ -451,6 +451,12 @@ static void ThreeDChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
+/** The round curves of rails switched on or off (round_track.h): every view drawn anew. */
+static void RoundTrackCurvesChanged(int32_t)
+{
+	MarkWholeScreenDirty();
+}
+
 /**
  * Update any possible saveload window and delete any newgrf dialogue as
  * its widget parts might change. Reinit all windows as it allows access to the

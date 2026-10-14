@@ -349,6 +349,37 @@ too.
   about a texture pixel to a pixel of the picture. The view facing north keeps
   the sprites, pixel for pixel.
 
+## Round curves of rails
+
+`src/round_track.cpp`, the setting *Round curves of rails*
+(`gui.round_track_curves`, off by default, graphics page). Only how it looks,
+and **only in the turned view**: the player builds facing north ("angle 0 is
+for building, turning is for looking"), and there, as in every other viewport,
+the curves are vanilla to the pixel.
+
+- The rails of a tile are six pieces (two straight, four on the diagonal), all
+  meeting at the midpoints of the tile edges, so a curve is only ever a corner
+  of 45 degrees where a straight piece meets a diagonal one. At each corner the
+  centre line is a circular arc tangent to both pieces, starting a tile at most
+  before the corner (half the run to the next corner when they are close). Two
+  corners turning the same way a short run apart (straight, diagonal, straight)
+  are one arc of 90 degrees over about two tiles. A long diagonal stays
+  straight; only its ends are rounded. Nothing is precomputed: the curves of
+  the tiles in view are worked out from the track while drawing.
+- Rounded is plain rail on flat ground, one piece or two parallel ones, without
+  signals; a junction, a slope, a station or a change of height ends a curve.
+- Drawing: such a tile draws only its ground (`DrawTrackBits()`), and after the
+  ground of the view is composed (into the turned view's picture of the ground,
+  before it is turned) each pixel near the arc takes the pixel of the picture of
+  the straight track of its rail type at the same place along and across the
+  arc. Which pixels of that picture are track: for a set's rail type what its
+  overlay covers; for the game's own rails, whose picture includes the grass,
+  the pixels not of the grass's colours within the band of the ballast. No
+  catenary over a round curve.
+- A train's piece on the arc is its 3D likeness at the arc's point, turned
+  along its tangent (`GetRoundTrackPose()`). Building, the pathfinder and the
+  trains' movement are untouched.
+
 ## The previews that turn
 
 `src/three_d_preview_gui.cpp`. There is no window: the preview is a picture
@@ -610,7 +641,9 @@ the curve scene -- a shed, four tiles of straight track, a quarter turn
 and five more, levelled first, on the first flat clear square of the map
 when x and y are 0 -- and sends an articulated engine along it (the first
 there is, or the one whose name has the text; the curve under the middle of
-the view), `test3d motory [text]` lists the rail engines with their pieces
+the view), `test3d kolej <x> <y> <track 0..5>` lays one piece of rail (X,
+Y, upper, lower, left, right) to build other curves for the round curves of
+rails, `test3d motory [text]` lists the rail engines with their pieces
 and whether the company may build them, `test3d kabina [n]` opens the cab
 view of the n-th visible vehicle (`test3d kabina cas` says how long its last
 picture took and what was in it; with `-d misc=5` the tall things, the boxes

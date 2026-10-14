@@ -62,6 +62,7 @@
 #include "core/math_func.hpp"
 #include "core/backup_type.hpp"
 #include "debug.h"
+#include "round_track.h"
 
 #include "table/sprites.h"
 
@@ -1304,9 +1305,11 @@ const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *mo
  * @param v the vehicle, or any piece of one
  * @param pal the palette of its sprites (the company's colours)
  * @param zoom the zoom of the view
+ * @param pose where and at what angle to draw it instead of its position and direction: a train on a round curve
+ *             (round_track.h), on the arc and along it; nullptr as always
  * @return whether it was put there (a piece drawn with another of its part counts); else the caller draws the sprites
  */
-bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom)
+bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom, const RoundTrackPose *pose)
 {
 	if (v->direction == Direction::Invalid) return false;
 
@@ -1353,10 +1356,18 @@ bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom)
 
 	/* The angle: the sprite of direction d shows at ViewAzimuth(d); the map, turned, shows the direction so many
 	 * steps back, so the angle goes on by the view's turn. */
-	float azimuth = ViewAzimuth(to_underlying(v->direction)) + GetViewYaw();
+	float azimuth = (pose != nullptr ? pose->azimuth : ViewAzimuth(to_underlying(v->direction))) + GetViewYaw();
 	const ThreeDModelPicture *pic = GetThreeDVehiclePictureAt(model, zoom, azimuth, true, part);
 	if (pic == nullptr) return false;
-	AddTurnedVehiclePicture(pic, v->x_pos, v->y_pos, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
+	int ax = v->x_pos, ay = v->y_pos;
+	if (pose != nullptr) {
+		/* On the arc: hung from its point there, the box moved with it. */
+		int nx = static_cast<int>(std::lround(pose->x)), ny = static_cast<int>(std::lround(pose->y));
+		xmin += nx - ax; xmax += nx - ax; ymin += ny - ay; ymax += ny - ay;
+		ax = nx;
+		ay = ny;
+	}
+	AddTurnedVehiclePicture(pic, ax, ay, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
 	return true;
 }
 
