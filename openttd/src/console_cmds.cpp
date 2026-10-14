@@ -8521,6 +8521,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		SetViewYaw(degrees);
 		/* The turn moved the scroll position to keep the middle in place; the view follows at the next tick, here now. */
 		UpdateViewportPosition(w, 0);
+	} else if (what == "obal") {
+		/* The rig: whether articulated road vehicles are drawn whole as one hull (vehicle.cpp), 'test3d obal 0|1'. */
+		extern bool _draw_road_consists_whole;
+		auto on = number(2);
+		if (on.has_value()) {
+			_draw_road_consists_whole = *on != 0;
+			MarkWholeScreenDirty();
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: obal {}", _draw_road_consists_whole ? "zapnuty" : "vypnuty");
+		return true;
 	} else if (what == "objekty") {
 		/* The rig: the buildings that are real 3D objects (three_d_objects.h), as read. */
 		extern std::string DescribeThreeDObjects();

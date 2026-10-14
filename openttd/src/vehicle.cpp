@@ -1216,6 +1216,8 @@ static void RevalidateVehicleSprite(const Vehicle *v)
 
 /** The articulated road vehicles drawn whole in the block being drawn (DrawRoadVehicleWhole()): their first parts. */
 static std::vector<VehicleID> _road_consists_drawn;
+/** Whether articulated road vehicles are drawn whole (the rig turns it off to compare: test3d obal 0). */
+bool _draw_road_consists_whole = true;
 
 /**
  * Draw an articulated road vehicle whole: one entry to sort, the hull of the boxes of all its parts, with the parts'
@@ -1242,11 +1244,22 @@ static void DrawRoadVehicleWhole(const Vehicle *first)
 		RevalidateVehicleSprite(u);
 		if (u->sprite_cache.sprite_seq.count == 0) continue;
 		int x = u->x_pos + u->bounds.origin.x, y = u->y_pos + u->bounds.origin.y, z = u->z_pos + u->bounds.origin.z;
-		xmin = std::min(xmin, x);
-		ymin = std::min(ymin, y);
+		if (IsDiagonalDirection(u->direction)) {
+			xmin = std::min(xmin, x);
+			ymin = std::min(ymin, y);
+			xmax = std::max(xmax, x + u->bounds.extent.x - 1);
+			ymax = std::max(ymax, y + u->bounds.extent.y - 1);
+		} else {
+			/* Turning (one of the four directions between the roads' own), the part's box is only three units
+			 * square (RoadVehicle::UpdateDeltaXY()), far less than its picture: a lorry turning round at the end
+			 * of a road was drawn under the lorry behind it, whose box reached further along the road. The box of
+			 * a whole vehicle about the part, as the part is long. */
+			xmin = std::min(xmin, u->x_pos - static_cast<int>(VEHICLE_LENGTH) / 2);
+			ymin = std::min(ymin, u->y_pos - static_cast<int>(VEHICLE_LENGTH) / 2);
+			xmax = std::max(xmax, u->x_pos + static_cast<int>(VEHICLE_LENGTH) / 2 - 1);
+			ymax = std::max(ymax, u->y_pos + static_cast<int>(VEHICLE_LENGTH) / 2 - 1);
+		}
 		zmin = std::min(zmin, z);
-		xmax = std::max(xmax, x + u->bounds.extent.x - 1);
-		ymax = std::max(ymax, y + u->bounds.extent.y - 1);
 		zmax = std::max(zmax, z + u->bounds.extent.z - 1);
 		Point pt = RemapCoords(x + u->bounds.offset.x, y + u->bounds.offset.y, z + u->bounds.offset.z);
 		pt.x += u->draw_offs.x;
@@ -1265,6 +1278,15 @@ static void DrawRoadVehicleWhole(const Vehicle *first)
 	int ax = anchor.v->x_pos + anchor.v->bounds.origin.x + anchor.v->bounds.offset.x;
 	int ay = anchor.v->y_pos + anchor.v->bounds.origin.y + anchor.v->bounds.offset.y;
 	int az = anchor.v->z_pos + anchor.v->bounds.origin.z + anchor.v->bounds.offset.z;
+	if (_debug_misc_level >= 6) {
+		std::string list;
+		for (const Part &p : parts) {
+			Rect r;
+			p.v->sprite_cache.sprite_seq.GetBounds(&r);
+			list += fmt::format(" [{} at {},{} dir {} near {} sprite {} rect {},{}..{},{}]", p.v->index, p.v->x_pos, p.v->y_pos, to_underlying(p.v->direction), p.near, p.v->sprite_cache.sprite_seq.count > 0 ? p.v->sprite_cache.sprite_seq.seq[0].sprite & SPRITE_MASK : 0, p.pt.x + r.left, p.pt.y + r.top, p.pt.x + r.right + 1, p.pt.y + r.bottom + 1);
+		}
+		Debug(misc, 6, "road consist {} hull x {}..{} y {}..{} z {}..{} screen {},{}..{},{}:{}", first->unitnumber, xmin, xmax, ymin, ymax, zmin, zmax, screen.left, screen.top, screen.right, screen.bottom, list);
+	}
 	if (!AddVehicleHullToDraw(xmin, ymin, zmin, xmax, ymax, zmax, ax, ay, az, anchor.pt, screen)) return;
 	for (const Part &p : parts) {
 		PaletteID pal = PAL_NONE;
@@ -1297,7 +1319,7 @@ static void DoDrawVehicle(const Vehicle *v)
 	/* An articulated road vehicle facing north is drawn whole, its parts in a fixed order within one hull
 	 * (DrawRoadVehicleWhole()), once however many of its parts the block holds. Turned, each part is its own
 	 * cut of the likeness below; crashed, the parts lie as they fell. */
-	if (v->type == VehicleType::Road && !ViewportDrawingTurned() && !v->vehstatus.Test(VehState::Crashed) && !v->IsWrecked()) {
+	if (_draw_road_consists_whole && v->type == VehicleType::Road && !ViewportDrawingTurned() && !v->vehstatus.Test(VehState::Crashed) && !v->IsWrecked()) {
 		const Vehicle *first = v->First();
 		if (first->HasArticulatedPart()) {
 			if (std::find(_road_consists_drawn.begin(), _road_consists_drawn.end(), first->index) != _road_consists_drawn.end()) return;
