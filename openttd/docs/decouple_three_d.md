@@ -487,8 +487,16 @@ building's plot: a frame is found once, the rectangle its pictures at every
 angle fit in about the axis, the frame is placed beside the window and stays,
 and every picture is drawn at the axis within it (the player: the turning was
 off its axis). Beside the **purchase window** it is the vehicle chosen there,
-in the company's colours, turning smoothly as its **3D likeness made from its
-eight sprites** (below); a set whose chain gives no picture for some
+in the company's colours, as its **3D likeness made from its eight sprites**
+(below), but in the eight directions of its sprites **the set's own
+pictures** (the player: "use the pictures you have, the drawn ones only where
+you have not got that angle"): it stays 1.5 s in each of them and turns to the
+next at 60 degrees a second, the likeness only while it turns, foreshortened
+on the track as the map draws it so that the pictures fit the likeness. The
+eight views the likeness is made from are kept with it for this, at 4x
+(`ThreeDVehicleModel::views`); the turned map likewise draws a vehicle's own
+sprites when the view is turned by a multiple of 45 degrees, the likeness
+only at the angles between. A set whose chain gives no picture for some
 direction gets the old preview, the eight sprites one after another. Beside
 the **window of one of the game's own industries** that has eight renders
 (the school, the machine, the statue, the hut) and of the plantation it is

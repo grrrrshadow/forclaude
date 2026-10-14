@@ -92,6 +92,10 @@ static constexpr int SUPERSAMPLE = 2;
 static constexpr size_t MODEL_POINTS_KEPT = 2000000;
 /** The pictures kept (GetThreeDVehiclePictureAt()): the vehicles on the turned map ask for the same few over and over. */
 static constexpr size_t PICTURES_KEPT = 2048;
+/** The views are kept this fine (the purchase preview's zoom), not finer: a 16x view is many megabytes. */
+static constexpr ZoomLevel VIEWS_KEPT_ZOOM = ZoomLevel::In4x;
+/** A picture this near the angle of a sprite's direction, degrees, is the sprite's own (RenderThreeDVehicle()). */
+static constexpr float VIEW_ANGLE_SNAP = 0.5f;
 /** How finely the angle of a cached picture is counted, degrees. */
 static constexpr float PICTURE_ANGLE_STEP = 1.0f;
 
@@ -135,6 +139,12 @@ struct ThreeDVehicleModel {
 	int build_ms = 0;
 	int voxels = 0;
 	std::string note;                   ///< what the rig says about it
+	/** The eight views the likeness was made from, the set's own pictures, kept at VIEWS_KEPT_ZOOM (or the views'
+	 * zoom when coarser): in its own direction a picture is the set's (RenderThreeDVehicle()), the likeness only
+	 * between. Their origin: where the anchor lands, pixels from the top left, the fitting's shift in. */
+	std::array<ThreeDVehicleView, 8> views;
+	ZoomLevel views_zoom = ZoomLevel::Normal;
+	float view_ox[8] = {}, view_oy[8] = {};
 };
 
 static std::vector<std::unique_ptr<ThreeDVehicleModel>> _vehicle_models;
@@ -1071,6 +1081,38 @@ static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, Pa
 	model->note = fmt::format("zoom {} pxm {:.1f} vox {:.3f} grid {}x{}x{} voxels {} points {} unseen {} built in {} ms; ", to_underlying(model->zoom), model->pxm, model->vox, g.nx, g.ny, g.nz, voxels, n, uncoloured, model->build_ms) + model->note;
 	Debug(misc, 4, "three_d vehicle model of engine {} pal {:#x} look {:#x}: {}", engine.base(), pal, model->look, model->note);
 	Debug(misc, 1, "3D vehicle model of engine {}: {}", engine.base(), model->note);
+
+	/* The views kept, shrunk to VIEWS_KEPT_ZOOM (the player: "in the rotation use the pictures you have, the drawn
+	 * ones only where you have not got that angle"). */
+	model->views_zoom = std::max(model->zoom, VIEWS_KEPT_ZOOM);
+	for (int d = 0; d < 8; d++) {
+		ThreeDVehicleView &v = views[d];
+		float ox = v.anchor_x + v.shift_x + 0.5f, oy = v.anchor_y + v.shift_y + 0.5f;
+		for (ZoomLevel z = model->zoom; z < model->views_zoom; ++z) {
+			int w = (v.width + 1) / 2, h = (v.height + 1) / 2;
+			std::vector<Colour> out(static_cast<size_t>(w) * h);
+			for (int y = 0; y < h; y++) {
+				for (int x = 0; x < w; x++) {
+					uint r = 0, g = 0, b = 0, a = 0;
+					for (int dy = 0; dy < 2; dy++) {
+						for (int dx = 0; dx < 2; dx++) {
+							Colour c = v.At(2 * x + dx, 2 * y + dy);
+							r += c.r * c.a; g += c.g * c.a; b += c.b * c.a; a += c.a;
+						}
+					}
+					out[static_cast<size_t>(y) * w + x] = a == 0 ? Colour(0, 0, 0, 0) : Colour(r / a, g / a, b / a, a / 4);
+				}
+			}
+			v.pixels = std::move(out);
+			v.width = w;
+			v.height = h;
+			ox /= 2;
+			oy /= 2;
+		}
+		model->view_ox[d] = ox;
+		model->view_oy[d] = oy;
+		model->views[d] = std::move(v);
+	}
 	return model;
 }
 
@@ -1139,6 +1181,37 @@ bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float 
 {
 	out = {};
 	if (model == nullptr || model->count == 0) return false;
+
+	/* In a sprite's own direction the set's own picture, kept (the player: "use the pictures you have, the drawn ones
+	 * only where you have not got that angle"): the whole vehicle, on the track as the sprites are, not finer than kept. */
+	if (part < 0 && on_track && zoom >= model->views_zoom) {
+		for (int d = 0; d < 8; d++) {
+			float du = std::fabs(std::fmod(azimuth - ViewAzimuth(d) + 540.0f, 360.0f) - 180.0f);
+			if (du > VIEW_ANGLE_SNAP) continue;
+			const ThreeDVehicleView &v = model->views[d];
+			if (v.width <= 0 || v.height <= 0) break;
+			int k = 1 << (to_underlying(zoom) - to_underlying(model->views_zoom));
+			out.width = (v.width + k - 1) / k;
+			out.height = (v.height + k - 1) / k;
+			out.left = -static_cast<int>(std::lround(model->view_ox[d] / k));
+			out.top = -static_cast<int>(std::lround(model->view_oy[d] / k));
+			out.pixels.assign(static_cast<size_t>(out.width) * out.height, 0);
+			for (int y = 0; y < out.height; y++) {
+				for (int x = 0; x < out.width; x++) {
+					uint r = 0, g = 0, b = 0, a = 0;
+					for (int dy = 0; dy < k; dy++) {
+						for (int dx = 0; dx < k; dx++) {
+							Colour c = v.At(x * k + dx, y * k + dy);
+							r += c.r * c.a; g += c.g * c.a; b += c.b * c.a; a += c.a;
+						}
+					}
+					if (a == 0) continue;
+					out.pixels[static_cast<size_t>(y) * out.width + x] = Colour(r / a, g / a, b / a, static_cast<uint8_t>(a / (k * k))).data;
+				}
+			}
+			return true;
+		}
+	}
 	const size_t n = model->count;
 	const int ss = SUPERSAMPLE;
 	float pxm = PXM_16X / (1 << to_underlying(zoom)) * ss;
@@ -1285,6 +1358,13 @@ Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom)
 		frame.right = std::max(frame.right, pic.left + pic.width);
 		frame.bottom = std::max(frame.bottom, pic.top + pic.height);
 	}
+	for (int i = 0; i < 8; i++) {
+		if (!RenderThreeDVehicle(model, zoom, ViewAzimuth(i), pic, true)) continue;
+		frame.left = std::min(frame.left, pic.left);
+		frame.top = std::min(frame.top, pic.top);
+		frame.right = std::max(frame.right, pic.left + pic.width);
+		frame.bottom = std::max(frame.bottom, pic.top + pic.height);
+	}
 	if (frame.right <= frame.left) frame = {};
 	m->frames[zoom] = frame;
 	return frame;
@@ -1386,6 +1466,9 @@ bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom,
 	/* The angle: the sprite of direction d shows at ViewAzimuth(d); the map, turned, shows the direction so many
 	 * steps back, so the angle goes on by the view's turn. */
 	float azimuth = (pose != nullptr ? pose->azimuth : ViewAzimuth(to_underlying(v->direction))) + GetViewYaw();
+	/* The map turned so that a sprite's direction shows: the set's own sprites (DoDrawVehicle() draws them), the
+	 * likeness only between (the player: "use the pictures you have"). */
+	if (pose == nullptr && std::fabs(std::fmod(azimuth + 720.0f, 45.0f) - 22.5f) > 22.5f - VIEW_ANGLE_SNAP) return false;
 	const ThreeDModelPicture *pic = GetThreeDVehiclePictureAt(model, zoom, azimuth, true, part);
 	if (pic == nullptr) return false;
 	int ax = v->x_pos, ay = v->y_pos;

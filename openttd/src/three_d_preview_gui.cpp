@@ -59,6 +59,11 @@ static constexpr int PREVIEW_TICK_MS = 50;
 static constexpr int PREVIEW_VEHICLE_STEP_MS = 400;
 /** A preview turns this many degrees a second. */
 static constexpr float PREVIEW_DEG_PER_S = 30.0f;
+/** A vehicle's preview stays this long in each direction the set has a picture for, showing that picture, and
+ * turns between them this fast showing the likeness (the player: "use the pictures you have, the drawn ones only
+ * where you have not got that angle"). */
+static constexpr int PREVIEW_HOLD_MS = 1500;
+static constexpr float PREVIEW_TURN_DEG_PER_S = 60.0f;
 /** The gap between the window and its preview, pixels. */
 static constexpr int PREVIEW_GAP = 40; // the player: the things turning almost touched the purchase window
 /** A preview whose frame is wider or taller than this is drawn at the next coarser zoom (the player: a long wagon at 2x, not 4x). */
@@ -71,6 +76,7 @@ struct ThreeDPreview {
 	EngineID engine = EngineID::Invalid(); ///< the vehicle shown
 	float yaw = 0.0f;           ///< the angle it is turned by, degrees, the way the map counts it
 	int elapsed = 0;            ///< milliseconds since a vehicle without a likeness last turned on
+	int hold = 0;               ///< milliseconds a vehicle stays yet in the direction of a picture of its set
 	Rect drawn{};               ///< where it was last drawn on the screen, to mark dirty
 	bool was_drawn = false;
 	bool frame_ok = false;      ///< the frame is known
@@ -324,7 +330,8 @@ static Rect DrawVehiclePreview(ThreeDPreview &p, bool draw)
 	if (!draw) return r;
 
 	ThreeDModelPicture pic;
-	if (!RenderThreeDVehicle(model, p.zoom, PreviewAzimuth(p), pic, false)) return r;
+	/* On the track as the map draws it, so that the set's own pictures, shown in their directions, fit the likeness between. */
+	if (!RenderThreeDVehicle(model, p.zoom, PreviewAzimuth(p), pic, true)) return r;
 	int ax = r.left - p.frame.left, ay = r.top - p.frame.top;
 	BlitPicture(pic, ax + pic.left, ay + pic.top);
 	return r;
@@ -465,8 +472,22 @@ static void PreviewTick()
 				changed = true;
 			}
 			if (PreviewVehicleModel(p) != nullptr) {
-				p.yaw = std::fmod(p.yaw + PREVIEW_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f, 360.0f);
-				changed = true;
+				/* Held in each direction of a sprite (its own picture), turned on to the next (the likeness). The
+				 * angle drawn falls as the preview turns, so the next direction is the multiple of 45 below it. */
+				if (p.hold > 0) {
+					p.hold -= PREVIEW_TICK_MS;
+				} else {
+					float turn = PREVIEW_TURN_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f;
+					float off = std::fmod(PreviewAzimuth(p), 45.0f);
+					float to_next = off < 0.01f ? 45.0f : off;
+					if (turn >= to_next - 0.01f) {
+						p.yaw = std::fmod(p.yaw + to_next, 360.0f);
+						p.hold = PREVIEW_HOLD_MS;
+					} else {
+						p.yaw = std::fmod(p.yaw + turn, 360.0f);
+					}
+					changed = true;
+				}
 			} else {
 				p.elapsed += PREVIEW_TICK_MS;
 				if (p.elapsed >= PREVIEW_VEHICLE_STEP_MS || changed) {
