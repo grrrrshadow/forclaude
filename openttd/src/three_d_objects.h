@@ -28,6 +28,7 @@
 #include "engine_type.h"
 #include "vehicle_type.h"
 
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -67,10 +68,31 @@ struct ThreeDObject {
 struct ThreeDVehicleShape {
 	std::vector<float> pos;    ///< x, y, z of each corner, metres
 	std::vector<float> nrm;    ///< its normal; empty when the file has none (drawn unlit)
-	std::vector<float> uv;     ///< u, v of each corner in the texture
+	std::vector<float> uv;     ///< u, v of each corner in its texture
 	std::vector<uint32_t> tri; ///< three corners a triangle
-	std::vector<uint8_t> png;  ///< the file's texture, as it is in the file
+	std::vector<uint8_t> tri_tex; ///< the texture of each triangle: 0 the body's (the one painted, "textura", and the one the paint mask is for), then the others of the file and of the wheels
+	std::vector<std::vector<uint8_t>> pngs; ///< the textures, as they are in the files
+	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
+};
+
+/** The paint of a vehicle object ("lak"): which pixels of the body's texture are paint, how they fade with age, a colour by number. */
+struct ThreeDVehiclePaint {
+	std::string mask_file;      ///< "maska": a grey PNG of the body's texture's layout, 255 where it is paint
+	bool fades = false;         ///< "cil" given: the paint fades to it with age
+	uint32_t target = 0;        ///< "cil": the colour it fades to (Colour::data)
+	int years = 20;             ///< "let": in so many years it is the target's
+	int step = 1;               ///< "krok": a step of fading every so many years
+	bool coloured = false;      ///< "barva" given: the paint is that colour, at the lightness of the texture
+	uint32_t colour = 0;        ///< "barva" (Colour::data)
+	int start = 0;              ///< "zacatek": the texture's lightness the colour is at its own (0: the brightest of the mask)
+};
+
+/** Wheels of a vehicle object from a file of their own ("kola"): one wheel, at every place it is. */
+struct ThreeDVehicleWheels {
+	std::string file;           ///< "soubor": the wheel, its centre at the origin, its axle along y, its outer face to +y (the left)
+	std::vector<std::array<float, 3>> at; ///< "polohy": the centres, metres in the vehicle's frame
+	bool both_sides = true;     ///< "oba_boky": each also mirrored to the other side
 };
 
 /**
@@ -89,13 +111,18 @@ struct ThreeDVehicleObject {
 	int anchor = 0;                 ///< the piece it is drawn by: the middle one ("kotva": "stred")
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	float cab[3] = {};              ///< x, y, z, metres
+	ThreeDVehiclePaint paint;       ///< "lak"
+	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 
 	const ThreeDVehicleShape *GetShape() const;
-	const ThreeDObjectTexture *GetTexture(int level) const;
+	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
+	const ThreeDObjectTexture *GetPaintMask(int level) const;
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
-	mutable std::vector<ThreeDObjectTexture> levels;         ///< the texture, halved for each level of detail
+	mutable std::vector<std::vector<ThreeDObjectTexture>> levels; ///< the textures, each halved for each level of detail
+	mutable std::vector<ThreeDObjectTexture> mask_levels;         ///< the paint mask likewise (its grey in the red)
+	mutable bool mask_tried = false;
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);

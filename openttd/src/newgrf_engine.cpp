@@ -1195,7 +1195,7 @@ Direction _resolve_vehicle_direction = Direction::Invalid;
 static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result, bool on_map = false)
 {
 	/* An engine with a 3D object is drawn from it, not from its set's sprites (three_d_vehicle_object.h). */
-	if (GetThreeDVehicleObjectSprite(engine, direction, image_type, result)) return;
+	if (GetThreeDVehicleObjectSprite(engine, v, direction, image_type, result)) return;
 
 	VehicleResolverObject object(engine, v, VehicleResolverObject::WagonOverride::Cached, false, CBID_NO_CALLBACK);
 	/* Without a vehicle the resolver takes the purchase list's sprite group, often one picture whatever the

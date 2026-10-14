@@ -151,6 +151,8 @@
 #include "widgets/toolbar_widget.h"
 #include <thread>
 
+#include "timer/timer_game_calendar.h"
+
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -8569,6 +8571,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: {}", all.substr(at, end - at));
 			at = end + 1;
 		}
+		return true;
+	} else if (what == "stari" && argv.size() > 2) {
+		/* The rig: every vehicle so many years old, 'test3d stari <years>' (the paint of a 3D object fades with age). */
+		auto years = number(2);
+		if (!years.has_value() || *years < 0) {
+			IConsolePrint(CC_ERROR, "test3d stari needs a number of years.");
+			return true;
+		}
+		for (Vehicle *u : Vehicle::Iterate()) u->age = TimerGameCalendar::Date{*years * CalendarTime::DAYS_IN_YEAR};
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: every vehicle {} years old", *years);
 		return true;
 	} else if (what == "vozidla3d") {
 		/* The rig: the vehicles that are 3D objects (three_d_vehicle_object.h), as read, and their sprites made. */

@@ -45,7 +45,7 @@ static std::map<std::pair<HouseID, uint>, size_t> _three_d_house_objects;
 /** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
 static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
 
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels);
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0);
 
 /** The vehicles as objects (three_d_objects.h), and whether their indices were read yet. */
 static std::vector<ThreeDVehicleObject> _vehicle_objects;
@@ -80,22 +80,33 @@ static uint32_t ReadU32(const std::vector<uint8_t> &d, size_t at)
 	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
 }
 
-/** The first mesh of a .glb as read: metres, in the game's axes (x, y, z up), normals when the file has them. */
+/** A texture of a .glb: the PNG as it is in the file, or a plain colour where a material has none. */
+struct GlbTexture {
+	std::vector<uint8_t> png;
+	uint32_t flat = 0; ///< the material's base colour factor (Colour::data) when it has no picture
+};
+
+/** The meshes of a .glb as read: metres, in the game's axes (x, y, z up), normals when the file has them. */
 struct GlbMesh {
 	std::vector<float> pos;    ///< x, y, z of each corner
 	std::vector<float> nrm;    ///< its normal, or empty
 	std::vector<float> uv;     ///< u, v of each corner
 	std::vector<uint32_t> tri; ///< three corners a triangle
-	std::vector<uint8_t> png;  ///< the base colour's texture as it is in the file
+	std::vector<uint8_t> tri_tex;      ///< the texture of each triangle, an index into textures
+	std::vector<GlbTexture> textures;  ///< the textures of the materials
+	std::vector<uint8_t> png;  ///< the first material's texture as it is in the file (a building's one texture)
 };
 
 /**
- * Read the first mesh of a .glb: its triangles, their corners' positions, normals and texture coordinates, the
- * node's transform applied, turned from glTF's axes (Y up, as Blender writes x, z, -y) into the game's, in metres;
- * and the PNG of its base colour texture, kept as it is until the object is drawn.
+ * Read the meshes of a .glb: their triangles, their corners' positions, normals and texture coordinates, the
+ * nodes' transforms applied, turned from glTF's axes (Y up, as Blender writes x, z, -y) into the game's, in metres;
+ * and the PNG of each material's base colour texture, kept as it is until the object is drawn.
+ * @param all_nodes every node of the scene, its children with their parents' transforms, one mesh as often as
+ *                  nodes name it (a vehicle: one wheel in the file, at every place it is; Blender's linked
+ *                  duplicates); else the first node with a mesh only (a building, as it always was read)
  * @return whether there is something to draw
  */
-static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh)
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false)
 {
 	std::vector<uint8_t> d = ReadWholeFile(path);
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
@@ -112,6 +123,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh)
 		if (type == 0x004E4942) bin.assign(d.begin() + at + 8, d.begin() + at + 8 + len);
 		at += 8 + ((len + 3) & ~3u);
 	}
+	using Matrix = std::array<double, 16>; // column-major
 	try {
 		nlohmann::json j = nlohmann::json::parse(json_text);
 		const auto &accessors = j.at("accessors");
@@ -144,100 +156,177 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh)
 			}
 		};
 
-		/* The node's transform: a matrix, or translation, rotation and scale. */
-		std::array<double, 16> m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; // column-major
-		int mesh_index = 0;
-		if (j.contains("nodes")) {
-			for (const auto &node : j.at("nodes")) {
-				if (!node.contains("mesh")) continue;
-				mesh_index = node.at("mesh").get<int>();
-				if (node.contains("matrix")) {
-					for (int k = 0; k < 16; k++) m[k] = node.at("matrix").at(k).get<double>();
-				} else {
-					double t[3] = {0, 0, 0}, s[3] = {1, 1, 1}, q[4] = {0, 0, 0, 1};
-					if (node.contains("translation")) for (int k = 0; k < 3; k++) t[k] = node.at("translation").at(k).get<double>();
-					if (node.contains("scale")) for (int k = 0; k < 3; k++) s[k] = node.at("scale").at(k).get<double>();
-					if (node.contains("rotation")) for (int k = 0; k < 4; k++) q[k] = node.at("rotation").at(k).get<double>();
-					double x = q[0], y = q[1], z = q[2], w = q[3];
-					double r[9] = {
-						1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w),
-						2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w),
-						2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y),
-					};
-					for (int col = 0; col < 3; col++) {
-						for (int row = 0; row < 3; row++) m[col * 4 + row] = r[col * 3 + row] * s[col];
-					}
-					m[12] = t[0];
-					m[13] = t[1];
-					m[14] = t[2];
-				}
-				break;
+		/* A node's own transform: a matrix, or translation, rotation and scale. */
+		auto local = [](const nlohmann::json &node) {
+			Matrix m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+			if (node.contains("matrix")) {
+				for (int k = 0; k < 16; k++) m[k] = node.at("matrix").at(k).get<double>();
+				return m;
 			}
-		}
+			double t[3] = {0, 0, 0}, s[3] = {1, 1, 1}, q[4] = {0, 0, 0, 1};
+			if (node.contains("translation")) for (int k = 0; k < 3; k++) t[k] = node.at("translation").at(k).get<double>();
+			if (node.contains("scale")) for (int k = 0; k < 3; k++) s[k] = node.at("scale").at(k).get<double>();
+			if (node.contains("rotation")) for (int k = 0; k < 4; k++) q[k] = node.at("rotation").at(k).get<double>();
+			double x = q[0], y = q[1], z = q[2], w = q[3];
+			double r[9] = {
+				1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w),
+				2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w),
+				2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y),
+			};
+			for (int col = 0; col < 3; col++) {
+				for (int row = 0; row < 3; row++) m[col * 4 + row] = r[col * 3 + row] * s[col];
+			}
+			m[12] = t[0];
+			m[13] = t[1];
+			m[14] = t[2];
+			return m;
+		};
+		auto multiply = [](const Matrix &a, const Matrix &b) {
+			Matrix c{};
+			for (int col = 0; col < 4; col++) {
+				for (int row = 0; row < 4; row++) {
+					double sum = 0;
+					for (int k = 0; k < 4; k++) sum += a[k * 4 + row] * b[col * 4 + k];
+					c[col * 4 + row] = sum;
+				}
+			}
+			return c;
+		};
 
-		const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
-		int material = -1;
-		bool normals = true;
-		for (const auto &p : prims) {
-			if (p.value("mode", 4) != 4) continue; // triangles only
-			std::vector<double> pos, nrm, uv, idx;
-			read(p.at("attributes").at("POSITION").get<int>(), 3, pos);
-			if (p.at("attributes").contains("TEXCOORD_0")) read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
-			if (p.at("attributes").contains("NORMAL")) read(p.at("attributes").at("NORMAL").get<int>(), 3, nrm);
-			size_t corners = pos.size() / 3;
-			if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
-			if (nrm.size() != corners * 3) normals = false;
-			if (p.contains("indices")) {
-				read(p.at("indices").get<int>(), 1, idx);
-			} else {
-				for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
-			}
-			if (material < 0 && p.contains("material")) material = p.at("material").get<int>();
-			uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
-			for (size_t i = 0; i < corners; i++) {
-				double X = pos[i * 3], Y = pos[i * 3 + 1], Z = pos[i * 3 + 2];
-				double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
-				double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
-				double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
-				/* glTF's Y is up and its Z points back along the game's -y. */
-				mesh.pos.push_back(static_cast<float>(gx));
-				mesh.pos.push_back(static_cast<float>(-gz));
-				mesh.pos.push_back(static_cast<float>(gy));
-				mesh.uv.push_back(static_cast<float>(uv[i * 2]));
-				mesh.uv.push_back(static_cast<float>(uv[i * 2 + 1]));
-				if (normals) {
-					double nx = nrm[i * 3], ny = nrm[i * 3 + 1], nz = nrm[i * 3 + 2];
-					double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
-					double l = std::sqrt(hx * hx + hy * hy + hz * hz);
-					if (l > 0) { hx /= l; hy /= l; hz /= l; }
-					mesh.nrm.push_back(static_cast<float>(hx));
-					mesh.nrm.push_back(static_cast<float>(-hz));
-					mesh.nrm.push_back(static_cast<float>(hy));
+		/* The textures, by the material: a picture in the buffer, or the material's colour. */
+		std::map<int, uint8_t> material_texture;
+		auto texture_of = [&](int material) -> uint8_t {
+			auto it = material_texture.find(material);
+			if (it != material_texture.end()) return it->second;
+			GlbTexture t;
+			t.flat = Colour(150, 150, 150).data;
+			if (material >= 0 && j.contains("materials")) {
+				const auto &mat = j.at("materials").at(material);
+				if (mat.contains("pbrMetallicRoughness")) {
+					const auto &pbr = mat.at("pbrMetallicRoughness");
+					if (pbr.contains("baseColorFactor")) {
+						const auto &f = pbr.at("baseColorFactor");
+						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f.at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+						t.flat = Colour(c(0), c(1), c(2)).data;
+					}
+					if (pbr.contains("baseColorTexture") && j.contains("textures") && j.contains("images")) {
+						int tex = pbr.at("baseColorTexture").at("index").get<int>();
+						int image = j.at("textures").at(tex).at("source").get<int>();
+						const auto &img = j.at("images").at(image);
+						if (img.contains("bufferView")) {
+							const auto &v = views.at(img.at("bufferView").get<int>());
+							size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
+							if (offset + len <= bin.size()) t.png.assign(bin.begin() + offset, bin.begin() + offset + len);
+						}
+					}
 				}
 			}
-			for (size_t i = 0; i + 2 < idx.size(); i += 3) {
-				uint32_t a = static_cast<uint32_t>(idx[i]), b = static_cast<uint32_t>(idx[i + 1]), c = static_cast<uint32_t>(idx[i + 2]);
-				if (a >= corners || b >= corners || c >= corners) continue;
-				mesh.tri.push_back(base + a);
-				mesh.tri.push_back(base + b);
-				mesh.tri.push_back(base + c);
+			uint8_t index = static_cast<uint8_t>(std::min<size_t>(mesh.textures.size(), 255));
+			if (mesh.textures.size() < 255) mesh.textures.push_back(std::move(t));
+			material_texture.emplace(material, index);
+			return index;
+		};
+
+		bool normals = true;
+		int first_material = -1;
+		/* One mesh's primitives, transformed. */
+		auto add_mesh = [&](int mesh_index, const Matrix &m) {
+			const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
+			for (const auto &p : prims) {
+				if (p.value("mode", 4) != 4) continue; // triangles only
+				std::vector<double> pos, nrm, uv, idx;
+				read(p.at("attributes").at("POSITION").get<int>(), 3, pos);
+				if (p.at("attributes").contains("TEXCOORD_0")) read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
+				if (p.at("attributes").contains("NORMAL")) read(p.at("attributes").at("NORMAL").get<int>(), 3, nrm);
+				size_t corners = pos.size() / 3;
+				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
+				if (nrm.size() != corners * 3) normals = false;
+				if (p.contains("indices")) {
+					read(p.at("indices").get<int>(), 1, idx);
+				} else {
+					for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
+				}
+				int material = p.value("material", -1);
+				if (first_material < 0 && material >= 0) first_material = material;
+				uint8_t tex = texture_of(material);
+				uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
+				for (size_t i = 0; i < corners; i++) {
+					double X = pos[i * 3], Y = pos[i * 3 + 1], Z = pos[i * 3 + 2];
+					double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
+					double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
+					double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
+					/* glTF's Y is up and its Z points back along the game's -y. */
+					mesh.pos.push_back(static_cast<float>(gx));
+					mesh.pos.push_back(static_cast<float>(-gz));
+					mesh.pos.push_back(static_cast<float>(gy));
+					mesh.uv.push_back(static_cast<float>(uv[i * 2]));
+					mesh.uv.push_back(static_cast<float>(uv[i * 2 + 1]));
+					if (normals) {
+						double nx = nrm[i * 3], ny = nrm[i * 3 + 1], nz = nrm[i * 3 + 2];
+						double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+						double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+						if (l > 0) { hx /= l; hy /= l; hz /= l; }
+						mesh.nrm.push_back(static_cast<float>(hx));
+						mesh.nrm.push_back(static_cast<float>(-hz));
+						mesh.nrm.push_back(static_cast<float>(hy));
+					}
+				}
+				for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+					uint32_t a = static_cast<uint32_t>(idx[i]), b = static_cast<uint32_t>(idx[i + 1]), c = static_cast<uint32_t>(idx[i + 2]);
+					if (a >= corners || b >= corners || c >= corners) continue;
+					mesh.tri.push_back(base + a);
+					mesh.tri.push_back(base + b);
+					mesh.tri.push_back(base + c);
+					mesh.tri_tex.push_back(tex);
+				}
 			}
+		};
+
+		const Matrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+		if (all_nodes && j.contains("nodes")) {
+			/* The scene's nodes, each with its parents' transforms; a node only reached as a child is not a root. */
+			const auto &nodes = j.at("nodes");
+			std::vector<int> roots;
+			if (j.contains("scenes") && !j.at("scenes").empty()) {
+				const auto &scene = j.at("scenes").at(j.value("scene", 0));
+				if (scene.contains("nodes")) for (const auto &n : scene.at("nodes")) roots.push_back(n.get<int>());
+			} else {
+				std::vector<bool> child(nodes.size(), false);
+				for (const auto &n : nodes) {
+					if (n.contains("children")) for (const auto &c : n.at("children")) child[c.get<int>()] = true;
+				}
+				for (size_t i = 0; i < nodes.size(); i++) if (!child[i]) roots.push_back(static_cast<int>(i));
+			}
+			std::vector<std::pair<int, Matrix>> todo;
+			for (int r : roots) todo.emplace_back(r, identity);
+			size_t visited = 0;
+			while (!todo.empty() && visited++ < 100000) {
+				auto [n, parent] = todo.back();
+				todo.pop_back();
+				const auto &node = nodes.at(n);
+				Matrix m = multiply(parent, local(node));
+				if (node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m);
+				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m);
+			}
+		} else {
+			/* The first node with a mesh, its own transform. */
+			Matrix m = identity;
+			int mesh_index = 0;
+			if (j.contains("nodes")) {
+				for (const auto &node : j.at("nodes")) {
+					if (!node.contains("mesh")) continue;
+					mesh_index = node.at("mesh").get<int>();
+					m = local(node);
+					break;
+				}
+			}
+			add_mesh(mesh_index, m);
 		}
 		if (!normals || mesh.nrm.size() != mesh.pos.size()) mesh.nrm.clear();
-
-		/* The base colour's picture, a PNG in the buffer. */
-		if (material >= 0 && j.contains("materials") && j.contains("textures") && j.contains("images")) {
-			const auto &mat = j.at("materials").at(material);
-			if (mat.contains("pbrMetallicRoughness") && mat.at("pbrMetallicRoughness").contains("baseColorTexture")) {
-				int tex = mat.at("pbrMetallicRoughness").at("baseColorTexture").at("index").get<int>();
-				int image = j.at("textures").at(tex).at("source").get<int>();
-				const auto &img = j.at("images").at(image);
-				if (img.contains("bufferView")) {
-					const auto &v = views.at(img.at("bufferView").get<int>());
-					size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
-					if (offset + len <= bin.size()) mesh.png.assign(bin.begin() + offset, bin.begin() + offset + len);
-				}
-			}
+		/* A building's one texture: the first material's. */
+		if (first_material >= 0) {
+			auto it = material_texture.find(first_material);
+			if (it != material_texture.end() && it->second < mesh.textures.size()) mesh.png = mesh.textures[it->second].png;
 		}
 	} catch (const std::exception &e) {
 		Debug(misc, 0, "3D object {}: {}", path, e.what());
@@ -467,6 +556,64 @@ static void ReadThreeDVehicleObjects()
 					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
 					obj.has_cab = true;
 				}
+				/* The paint: its mask, how it fades with age, a colour by number. */
+				if (e.contains("lak") && e.at("lak").is_object()) {
+					const auto &lak = e.at("lak");
+					if (lak.contains("maska") && lak.at("maska").is_string()) obj.paint.mask_file = folder + lak.at("maska").get<std::string>();
+					auto colour = [](const nlohmann::json &v) -> std::optional<uint32_t> {
+						if (!v.is_string()) return std::nullopt;
+						std::string t = v.get<std::string>();
+						if (t.starts_with("#")) t = t.substr(1);
+						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+						if (!n.has_value()) return std::nullopt;
+						return Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+					};
+					if (lak.contains("cil")) {
+						auto c = colour(lak.at("cil"));
+						if (c.has_value()) {
+							obj.paint.fades = true;
+							obj.paint.target = *c;
+						}
+					}
+					obj.paint.years = std::max(1, lak.value("let", 20));
+					obj.paint.step = std::clamp(lak.value("krok", 1), 1, obj.paint.years);
+					obj.paint.start = std::clamp(lak.value("zacatek", 0), 0, 255);
+					if (lak.contains("barva")) {
+						auto c = colour(lak.at("barva"));
+						if (c.has_value()) {
+							obj.paint.coloured = true;
+							obj.paint.colour = *c;
+						}
+					}
+					if (obj.paint.mask_file.empty()) obj.paint.fades = obj.paint.coloured = false;
+				}
+				if (e.contains("barva") && !obj.paint.mask_file.empty()) {
+					/* The colour by number may stand beside "lak" too. */
+					const auto &v = e.at("barva");
+					if (v.is_string()) {
+						std::string t = v.get<std::string>();
+						if (t.starts_with("#")) t = t.substr(1);
+						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+						if (n.has_value()) {
+							obj.paint.coloured = true;
+							obj.paint.colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+						}
+					}
+				}
+				/* Wheels from a file of their own: one wheel at every place, mirrored to the other side. */
+				if (e.contains("kola") && e.at("kola").is_array()) {
+					for (const auto &k : e.at("kola")) {
+						if (!k.is_object() || !k.contains("soubor") || !k.contains("polohy")) continue;
+						ThreeDVehicleWheels w;
+						w.file = folder + k.at("soubor").get<std::string>();
+						w.both_sides = k.value("oba_boky", true);
+						for (const auto &p : k.at("polohy")) {
+							if (!p.is_array() || p.size() != 3) continue;
+							w.at.push_back({p.at(0).get<float>(), p.at(1).get<float>(), p.at(2).get<float>()});
+						}
+						if (!w.at.empty()) obj.wheels.push_back(std::move(w));
+					}
+				}
 				_vehicle_objects.push_back(std::move(obj));
 			}
 		} catch (const std::exception &ex) {
@@ -499,7 +646,7 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	return &_vehicle_objects[it->second.first];
 }
 
-/** The shapes read, by their file: the paints of a vehicle share one. */
+/** The shapes read, by their file and wheels: the paints of a vehicle share one. */
 static std::map<std::string, std::shared_ptr<const ThreeDVehicleShape>> _vehicle_shapes;
 
 /** The object's shape, read from its .glb the first time; nullptr when it cannot be. */
@@ -507,19 +654,69 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 {
 	if (this->shape != nullptr || this->shape_tried) return this->shape.get();
 	this->shape_tried = true;
-	auto it = _vehicle_shapes.find(this->file);
+	std::string key = this->file;
+	for (const ThreeDVehicleWheels &w : this->wheels) {
+		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
+		for (const auto &at : w.at) key += fmt::format(",{},{},{}", at[0], at[1], at[2]);
+	}
+	auto it = _vehicle_shapes.find(key);
 	if (it != _vehicle_shapes.end()) {
 		this->shape = it->second;
 		return this->shape.get();
 	}
 	GlbMesh mesh;
-	if (!ReadGlbMesh(this->file, mesh)) return nullptr;
+	if (!ReadGlbMesh(this->file, mesh, true)) return nullptr;
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
 	made->uv = std::move(mesh.uv);
 	made->tri = std::move(mesh.tri);
-	made->png = std::move(mesh.png);
+	made->tri_tex = std::move(mesh.tri_tex);
+	for (GlbTexture &t : mesh.textures) {
+		made->pngs.push_back(std::move(t.png));
+		made->flats.push_back(t.flat);
+	}
+	/* The wheels of their own files: each place a copy, the other side mirrored (y the other way, its normals too). */
+	size_t wheel_triangles = 0;
+	for (const ThreeDVehicleWheels &w : this->wheels) {
+		GlbMesh wheel;
+		if (!ReadGlbMesh(w.file, wheel, true)) {
+			Debug(misc, 0, "3D vehicle {}: the wheel {} cannot be read", this->name, w.file);
+			continue;
+		}
+		const bool lit = !made->nrm.empty() && !wheel.nrm.empty();
+		if (!lit) made->nrm.clear();
+		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
+		for (GlbTexture &t : wheel.textures) {
+			if (made->pngs.size() >= 255) break;
+			made->pngs.push_back(t.png);
+			made->flats.push_back(t.flat);
+		}
+		for (const auto &at : w.at) {
+			for (int side = 0; side < (w.both_sides && std::abs(at[1]) > 0.001f ? 2 : 1); side++) {
+				const float sy = side == 0 ? 1.0f : -1.0f;
+				uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
+				for (size_t i = 0; i < wheel.pos.size(); i += 3) {
+					made->pos.push_back(at[0] + wheel.pos[i]);
+					made->pos.push_back(sy * (at[1] + wheel.pos[i + 1]));
+					made->pos.push_back(at[2] + wheel.pos[i + 2]);
+					if (lit) {
+						made->nrm.push_back(wheel.nrm[i]);
+						made->nrm.push_back(sy * wheel.nrm[i + 1]);
+						made->nrm.push_back(wheel.nrm[i + 2]);
+					}
+				}
+				made->uv.insert(made->uv.end(), wheel.uv.begin(), wheel.uv.end());
+				for (size_t t = 0; t < wheel.tri.size(); t += 3) {
+					made->tri.push_back(base + wheel.tri[t]);
+					made->tri.push_back(base + wheel.tri[t + 1]);
+					made->tri.push_back(base + wheel.tri[t + 2]);
+					made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + wheel.tri_tex[t / 3])));
+					wheel_triangles++;
+				}
+			}
+		}
+	}
 	made->x0 = made->y0 = made->z0 = 1e9f;
 	made->x1 = made->y1 = made->z1 = -1e9f;
 	for (size_t i = 0; i < made->pos.size(); i += 3) {
@@ -527,26 +724,48 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
 		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 	}
-	Debug(misc, 1, "3D vehicle {}: {} triangles, {} corners{}, {:.2f} x {:.2f} x {:.2f} m", this->name, made->tri.size() / 3, made->pos.size() / 3,
-			made->nrm.empty() ? " without normals" : "", made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
+	Debug(misc, 1, "3D vehicle {}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name, made->tri.size() / 3, wheel_triangles,
+			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
 	this->shape = made;
-	_vehicle_shapes.emplace(this->file, made);
+	_vehicle_shapes.emplace(key, made);
 	return this->shape.get();
 }
 
-/** The object's texture at a level of detail: its paint ("textura") or the file's, read the first time. */
-const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level) const
+/**
+ * One of the object's textures at a level of detail, read the first time: the body's (0) is the paint
+ * ("textura") when there is one, else the file's; the others the file's and the wheels'.
+ */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index) const
 {
-	if (this->levels.empty()) {
+	const ThreeDVehicleShape *s = this->GetShape();
+	size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
+	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
+	if (this->levels.size() < count) this->levels.resize(count);
+	std::vector<ThreeDObjectTexture> &lv = this->levels[index];
+	if (lv.empty()) {
 		std::vector<uint8_t> png;
-		if (!this->paint_file.empty()) png = ReadWholeFile(this->paint_file);
-		if (png.empty()) {
-			const ThreeDVehicleShape *s = this->GetShape();
-			if (s != nullptr) png = s->png;
+		uint32_t flat = 0;
+		if (index == 0 && !this->paint_file.empty()) png = ReadWholeFile(this->paint_file);
+		if (png.empty() && s != nullptr && static_cast<size_t>(index) < s->pngs.size()) {
+			png = s->pngs[index];
+			flat = s->flats[index];
 		}
-		DecodeTextureLevels(png, this->levels);
+		DecodeTextureLevels(png, lv, flat);
 	}
-	return &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)];
+	return &lv[std::clamp<int>(level, 0, static_cast<int>(lv.size()) - 1)];
+}
+
+/** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
+{
+	if (this->paint.mask_file.empty()) return nullptr;
+	if (!this->mask_tried) {
+		this->mask_tried = true;
+		std::vector<uint8_t> png = ReadWholeFile(this->paint.mask_file);
+		if (!png.empty()) DecodeTextureLevels(png, this->mask_levels, Colour(0, 0, 0).data);
+	}
+	if (this->mask_levels.empty()) return nullptr;
+	return &this->mask_levels[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels.size()) - 1)];
 }
 
 /** The rig: the vehicle objects of the indices, a line each. */
@@ -600,7 +819,7 @@ const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slo
  * a pixel transparent when most of its four are). A texture that cannot be read is a plain grey, so the shape still
  * shows.
  */
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels)
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat)
 {
 	ThreeDObjectTexture t;
 #ifdef WITH_PNG
@@ -625,8 +844,9 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 	}
 #endif /* WITH_PNG */
 	if (t.px.empty()) {
+		/* No picture: the material's colour, or a plain grey, so the shape still shows. */
 		t.w = t.h = 1;
-		t.px.assign(1, Colour(150, 150, 150).data);
+		t.px.assign(1, flat != 0 ? flat : Colour(150, 150, 150).data);
 	}
 	levels.push_back(std::move(t));
 	while (levels.back().w > 1 || levels.back().h > 1) {

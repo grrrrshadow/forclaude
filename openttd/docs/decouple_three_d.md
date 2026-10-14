@@ -360,7 +360,8 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   (`media/baseset/decouple/objekty/vozidla/`): `soubor` (.glb), `typ` (`vlak`,
   `auto`, `lod`, `letadlo`), `grf` (the set's id: four characters as in the set,
   `"MAXb"`, or eight hex digits as the game prints it), `clanky` (the engines'
-  numbers in the set, Action 0, front first; or `motor` alone), `kotva`
+  numbers in the set, Action 0, front first; or `motor` alone), `lak` and `kola`
+  (below), `kotva`
   (`stred`, the middle piece, by default; `prvni`; or a number), `textura` (a
   paint: a PNG over the same UV instead of the file's texture), `kabina`
   (x, y, z of the cab's eye, metres; read, not used yet). `meritko` is not
@@ -407,8 +408,25 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   the colleague's two sets have it. Ships and aircraft keep their sets'
   lengths. The lengths depend on the object files: every player of a network
   game must have the same.
-- Not yet: the paint mask (fading, colour by number), the crew and the glass,
-  levels of detail, the cab's eye, wheels and bogies of their own.
+- **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the
+  body's texture's layout (the texture of the file, or `textura`), 255 where it
+  is paint; `cil` RRGGBB the colour it fades to in `let` years, a step every
+  `krok` years, by the vehicle's age; `barva` RRGGBB a colour by number, the
+  paint that colour at the texture's lightness, its own where the texture is
+  `zacatek` light. Done per pixel while drawing (no texture copies); a sprite and
+  a picture of the turned view for each step of fading, made when a vehicle
+  that old is first drawn. Rig: `test3d stari <years>` makes every vehicle so old.
+- **Wheels of their own** (the player: "one wheel will do for an eight-wheeled
+  car"): a .glb is read with all the nodes of its scene, a mesh as often as
+  nodes name it (Blender's linked duplicates: one wheel in the file, at every
+  place, the other side mirrored by a negative scale), with every material's
+  texture (or its base colour); and `"kola"` of the index adds a wheel from a
+  file of its own -- `soubor` (its centre at the origin, its axle along y, its
+  outer face to +y), `polohy` (the centres in the vehicle's frame), `oba_boky`
+  (each also on the other side, mirrored; by default) -- so one wheel file
+  serves many vehicles. They are drawn as the rest of the object, not turning.
+- Not yet: the crew and the glass, levels of detail, the cab's eye, wheels that
+  turn and bogies that swing on a curve.
 - Cost: Sergej, 95 thousand triangles, takes 55 to 170 ms a direction for the
   sprite at 16x (once, while the sprite is in the cache) and 15 to 20 ms a
   picture of the turned view at 4x (once a degree and direction).
