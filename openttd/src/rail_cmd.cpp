@@ -2759,8 +2759,8 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		if (_display_opt.Test(DisplayOption::FullDetail)) DrawTrackDetails(ti, rti, pal);
 
-		/* Not over a round curve: its wires would hang over the straight pieces, not the arc. */
-		if (HasRailCatenaryDrawn(GetRailType(ti->tile)) && !(RoundTrackDrawing() && IsRoundTrackTile(ti->tile))) DrawRailCatenary(ti);
+		/* Not over a round curve: its wires would hang over the straight pieces, not the arc (a switch keeps them, over its straight way). */
+		if (HasRailCatenaryDrawn(GetRailType(ti->tile)) && !(RoundTrackDrawing() && RoundTrackHidesCatenary(ti->tile))) DrawRailCatenary(ti);
 
 		if (HasSignals(ti->tile)) DrawSignals(ti->tile, rails, rti);
 

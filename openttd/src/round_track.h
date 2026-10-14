@@ -21,7 +21,9 @@
  * Only in the turned view (three_d.h). The player: "at angle 0 it is off, angle 0 is for building, turning is for
  * looking" -- facing north, and in every other viewport, the curves are as they always were.
  *
- * Only plain rail on flat ground, without signals and junctions, is rounded; a curve ends where such a tile is.
+ * Only plain rail on flat ground without signals is rounded; a curve ends where another tile is. At a switch the
+ * straight way stays straight and the way branching off it is round, drawn on over the straight way as far as its arc
+ * goes there.
  */
 
 #ifndef ROUND_TRACK_H
@@ -35,6 +37,7 @@ struct DrawPixelInfo;
 bool RoundTrackEnabled();
 bool RoundTrackDrawing();
 bool IsRoundTrackTile(TileIndex tile);
+bool RoundTrackHidesCatenary(TileIndex tile);
 void RegisterRoundTrackTile(TileIndex tile);
 void DrawRoundTrackGround(TileIndex tile);
 void DrawRoundTrackStrips(const DrawPixelInfo &dpi);

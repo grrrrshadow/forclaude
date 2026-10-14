@@ -366,16 +366,26 @@ the curves are vanilla to the pixel.
   are one arc of 90 degrees over about two tiles. A long diagonal stays
   straight; only its ends are rounded. Nothing is precomputed: the curves of
   the tiles in view are worked out from the track while drawing.
-- Rounded is plain rail on flat ground, one piece or two parallel ones, without
-  signals; a junction, a slope, a station or a change of height ends a curve.
+- Rounded is plain rail on flat ground without signals; a slope, a station,
+  signals or a change of height end a curve.
+- Switches: walking the track, the way goes straight on through a switch where
+  it can, so the straight way stays straight and only the way branching off is
+  round. Its arc starts on the straight way, at most the one piece before the
+  switch, and that piece of the branch is drawn on over it as far as the arc
+  goes there; a tile so reached is drawn by the strips too. Where two pieces
+  overlap, each pixel takes the nearest piece whose track is there, so both
+  are drawn. A train's piece on the straight way next to the switch is on the
+  branch's arc while the piece before or after it in the train is on the
+  branch. Where the track can only turn, either way, a curve ends.
 - Drawing: such a tile draws only its ground (`DrawTrackBits()`), and after the
   ground of the view is composed (into the turned view's picture of the ground,
   before it is turned) each pixel near the arc takes the pixel of the picture of
   the straight track of its rail type at the same place along and across the
   arc. Which pixels of that picture are track: for a set's rail type what its
-  overlay covers; for the game's own rails, whose picture includes the grass,
-  the pixels not of the grass's colours within the band of the ballast. No
-  catenary over a round curve.
+  overlay covers (so a set's rails, CZTR's too, bend as they are); for the
+  game's own rails, whose picture includes the grass, the pixels not of the
+  grass's colours within the band of the ballast. No catenary over a tile
+  whose pieces are all round; a switch keeps it.
 - A train's piece on the arc is its 3D likeness at the arc's point, turned
   along its tangent (`GetRoundTrackPose()`). Building, the pathfinder and the
   trains' movement are untouched.

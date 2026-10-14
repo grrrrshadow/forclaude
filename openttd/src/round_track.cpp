@@ -38,6 +38,8 @@ static constexpr double ROUND_TANGENT_MAX = TILE_SIZE;
 static constexpr double ROUND_HALF_WIDTH = 7.5;
 /** The strip of a tile is drawn this far past its edges, world units. */
 static constexpr double ROUND_EDGE = 1.0;
+/** A pixel this much further from a piece than straight across from it is past the piece's end, world units. */
+static constexpr double ROUND_BESIDE = 0.5;
 /** The turn at a corner of the game's track. */
 static const double ROUND_PHI = M_PI / 4;
 
@@ -103,23 +105,17 @@ DiagDirection OtherEdge(Track t, DiagDirection e)
 	return e == a ? b : a;
 }
 
-/** A tile whose track may be part of a round curve: plain rail on flat ground, no signals, no junction or crossing. */
+/** A tile whose track may be part of a round curve: plain rail on flat ground, no signals; switches too. */
 bool IsSimpleTile(TileIndex t)
 {
 	if (!IsValidTile(t) || !IsTileType(t, TileType::Railway) || !IsPlainRail(t)) return false;
-	if (HasSignals(t) || GetTileSlope(t) != SLOPE_FLAT) return false;
-	TrackBits tb = GetTrackBits(t);
-	return tb.Count() == 1 || tb == TRACK_BIT_HORZ || tb == TRACK_BIT_VERT;
+	return !HasSignals(t) && GetTileSlope(t) == SLOPE_FLAT;
 }
 
-/** The piece of a simple tile reaching the midpoint of an edge, or Track::Invalid. */
-Track PieceAtEdge(TileIndex t, DiagDirection e)
+/** The way along a piece from one of its edges to the other, world units. */
+Vec PieceVector(Track t, DiagDirection from)
 {
-	for (Track tr : GetTrackBits(t)) {
-		auto [a, b] = PieceEdges(tr);
-		if (a == e || b == e) return tr;
-	}
-	return Track::Invalid;
+	return EdgeMid(OtherEdge(t, from)) - EdgeMid(from);
 }
 
 TileIndex Neighbour(TileIndex t, DiagDirection e)
@@ -135,31 +131,6 @@ TileIndex Neighbour(TileIndex t, DiagDirection e)
 	return TileXY(x, y);
 }
 
-/** A piece of track walked over: from one edge of its tile to the other. */
-struct Step {
-	TileIndex tile;
-	Track track;
-	DiagDirection from;
-
-	Vec Vector() const { return EdgeMid(OtherEdge(this->track, this->from)) - EdgeMid(this->from); }
-	Step Reversed() const { return {this->tile, this->track, OtherEdge(this->track, this->from)}; }
-	/** The world point of the edge it leaves by. */
-	Vec End() const { return Vec{static_cast<double>(TileX(this->tile) * TILE_SIZE), static_cast<double>(TileY(this->tile) * TILE_SIZE)} + EdgeMid(OtherEdge(this->track, this->from)); }
-};
-
-/** The piece after a piece walked over, on the next simple tile at the same height. */
-bool NextStep(const Step &s, Step &next)
-{
-	DiagDirection out = OtherEdge(s.track, s.from);
-	TileIndex n = Neighbour(s.tile, out);
-	if (n == INVALID_TILE || !IsSimpleTile(n) || TilePixelHeight(n) != TilePixelHeight(s.tile)) return false;
-	DiagDirection in = ReverseDiagDir(out);
-	Track tr = PieceAtEdge(n, in);
-	if (tr == Track::Invalid) return false;
-	next = {n, tr, in};
-	return true;
-}
-
 enum class Turn { Straight, Corner, Other };
 
 Turn TurnBetween(Vec a, Vec b)
@@ -168,6 +139,61 @@ Turn TurnBetween(Vec a, Vec b)
 	if (c > 0.999) return Turn::Straight;
 	if (std::abs(c - std::cos(ROUND_PHI)) < 0.01) return Turn::Corner;
 	return Turn::Other;
+}
+
+/**
+ * Whether a tile has a piece entered at an edge that goes on the way given: the straight way through a switch.
+ * @param tile the tile
+ * @param edge the edge it is entered at
+ * @param dir the way, world units
+ */
+bool GoesStraightOn(TileIndex tile, DiagDirection edge, Vec dir)
+{
+	for (Track tr : GetTrackBits(tile)) {
+		auto [a, b] = PieceEdges(tr);
+		if ((a == edge || b == edge) && TurnBetween(dir, PieceVector(tr, edge)) == Turn::Straight) return true;
+	}
+	return false;
+}
+
+/** A piece of track walked over: from one edge of its tile to the other. */
+struct Step {
+	TileIndex tile;
+	Track track;
+	DiagDirection from;
+
+	Vec Vector() const { return PieceVector(this->track, this->from); }
+	Step Reversed() const { return {this->tile, this->track, OtherEdge(this->track, this->from)}; }
+	/** The world point of the edge it leaves by. */
+	Vec End() const { return Vec{static_cast<double>(TileX(this->tile) * TILE_SIZE), static_cast<double>(TileY(this->tile) * TILE_SIZE)} + EdgeMid(OtherEdge(this->track, this->from)); }
+};
+
+/**
+ * The piece after a piece walked over, on the next simple tile at the same height. At a switch the way goes straight
+ * on where it can: the straight way of a switch stays straight, only the way branching off it is round. Where it can
+ * only turn, and either way, the walk ends.
+ */
+bool NextStep(const Step &s, Step &next)
+{
+	DiagDirection out = OtherEdge(s.track, s.from);
+	TileIndex n = Neighbour(s.tile, out);
+	if (n == INVALID_TILE || !IsSimpleTile(n) || TilePixelHeight(n) != TilePixelHeight(s.tile)) return false;
+	DiagDirection in = ReverseDiagDir(out);
+	Track found = Track::Invalid;
+	int ways = 0;
+	for (Track tr : GetTrackBits(n)) {
+		auto [a, b] = PieceEdges(tr);
+		if (a != in && b != in) continue;
+		if (TurnBetween(s.Vector(), PieceVector(tr, in)) == Turn::Straight) {
+			next = {n, tr, in};
+			return true;
+		}
+		found = tr;
+		ways++;
+	}
+	if (ways != 1) return false;
+	next = {n, found, in};
+	return true;
 }
 
 /** Which way a corner turns: +1 or -1, as the path is walked forward. */
@@ -185,6 +211,7 @@ struct Side {
 	bool corner = false; ///< it ends at another corner of 45 degrees
 	int sign = 0;        ///< which way that corner turns, the path walked forward
 	Vec dir;             ///< the direction of the path past that corner, the path walked forward
+	Step last{};         ///< the last piece of the straight, walked the same way as the side
 	Step beyond{};       ///< the piece past that corner, walked the same way as the side
 };
 
@@ -213,6 +240,7 @@ Side WalkSide(Step first, bool backward)
 			int walked = TurnSign(dir, n.Vector());
 			side.sign = backward ? -walked : walked;
 			side.dir = backward ? n.Vector() * -1.0 : n.Vector();
+			side.last = s;
 			side.beyond = n;
 		}
 		return side;
@@ -268,6 +296,7 @@ struct Curve {
 	Vec v0;           ///< the midpoint of its first edge, world units
 	Vec dir;          ///< its direction
 	double len = 0;   ///< its length
+	double lo = 0, hi = 0; ///< how far it is drawn: the piece, and on a switch past it over the straight way, as far as its arc goes there
 	std::vector<Zone> zones;
 
 	/** The point of the centre line a way along the piece, and its direction there. */
@@ -314,9 +343,9 @@ struct Curve {
 		};
 		/* The straight parts: the piece but its arcs. */
 		std::vector<std::pair<double, double>> cut;
-		for (const Zone &z : this->zones) cut.emplace_back(std::max(0.0, z.lo), std::min(this->len, z.hi));
+		for (const Zone &z : this->zones) cut.emplace_back(std::max(this->lo, z.lo), std::min(this->hi, z.hi));
 		std::sort(cut.begin(), cut.end());
-		double from = 0;
+		double from = this->lo;
 		auto straight = [&](double a, double b) {
 			if (b <= a) return;
 			consider(std::clamp(Dot(p - this->v0, this->dir), a, b));
@@ -325,10 +354,10 @@ struct Curve {
 			straight(from, a);
 			from = std::max(from, b);
 		}
-		straight(from, this->len);
+		straight(from, this->hi);
 		/* The arcs. */
 		for (const Zone &z : this->zones) {
-			double lo = std::max(0.0, z.lo), hi = std::min(this->len, z.hi);
+			double lo = std::max(this->lo, z.lo), hi = std::min(this->hi, z.hi);
 			if (hi <= lo) continue;
 			double ang = std::atan2(p.y - z.c.y, p.x - z.c.x) - z.a0;
 			while (ang > M_PI) ang -= 2 * M_PI;
@@ -339,6 +368,25 @@ struct Curve {
 		return best;
 	}
 };
+
+/** At a corner between two pieces walked forward: the tile past it goes straight on the way of the piece coming to it -- that way is the straight way of a switch. */
+bool SwitchBehind(const Step &to, const Step &from)
+{
+	return GoesStraightOn(from.tile, from.from, to.Vector());
+}
+
+/** At a corner between two pieces walked forward: the tile before it goes straight on the way of the piece leaving it, walked back. */
+bool SwitchAhead(const Step &to, const Step &from)
+{
+	return GoesStraightOn(to.tile, OtherEdge(to.track, to.from), from.Vector() * -1.0);
+}
+
+/** A side of a corner along the straight way of a switch: only its piece at the switch, and no corner past it. */
+void KeepToPiece(Side &side, const Step &piece)
+{
+	side.run = std::min(side.run, Length(piece.Vector()));
+	side.corner = false;
+}
 
 /** A corner of the path around a piece: where it is along the piece, and the pieces either side of it, walked forward. */
 struct PathCorner {
@@ -354,12 +402,19 @@ struct PathCorner {
  * diagonal between them, one quarter circle tangent to the straights either side, a tile from where they meet).
  * Everything is decided from the corner's own surroundings, so every piece it reaches gets the same arc.
  */
-bool CornerZone(const PathCorner &pc, Zone &zone)
+bool CornerZone(const PathCorner &pc, Zone &zone, bool *main_back = nullptr, bool *main_fwd = nullptr)
 {
 	Vec a = Unit(pc.to.Vector()), b = Unit(pc.from.Vector());
 	int sign = TurnSign(a, b);
 	Side back = WalkSide(pc.to.Reversed(), true);
 	Side fwd = WalkSide(pc.from, false);
+	/* A switch: the straight way through it stays straight, so an arc branching off it reaches no further along it
+	 * than the piece at the switch, and makes no arc with a corner beyond that. */
+	bool behind = SwitchBehind(pc.to, pc.from), ahead = SwitchAhead(pc.to, pc.from);
+	if (main_back != nullptr) *main_back = behind;
+	if (main_fwd != nullptr) *main_fwd = ahead;
+	if (behind) KeepToPiece(back, pc.to);
+	if (ahead) KeepToPiece(fwd, pc.from);
 	int pref = Preference(back, fwd, sign);
 	if (pref == 1) {
 		/* The next corner: one arc with it if it would have this one too. */
@@ -368,6 +423,7 @@ bool CornerZone(const PathCorner &pc, Zone &zone)
 		w_back.corner = true;
 		w_back.sign = sign;
 		Side w_fwd = WalkSide(fwd.beyond, false);
+		if (SwitchAhead(fwd.last, fwd.beyond)) KeepToPiece(w_fwd, fwd.beyond);
 		if (Preference(w_back, w_fwd, sign) == -1) {
 			double d = fwd.run, h = d / std::sqrt(2.0);
 			Vec meet = pc.pos + a * h; // where the straights either side meet
@@ -381,6 +437,7 @@ bool CornerZone(const PathCorner &pc, Zone &zone)
 		u_fwd.corner = true;
 		u_fwd.sign = sign;
 		Side u_back = WalkSide(back.beyond, true);
+		if (SwitchBehind(back.beyond.Reversed(), back.last.Reversed())) KeepToPiece(u_back, back.beyond);
 		if (Preference(u_back, u_fwd, sign) == 1) {
 			double d = back.run, h = d / std::sqrt(2.0);
 			Vec meet = pc.pos - b * h;
@@ -406,6 +463,8 @@ Curve BuildCurve(TileIndex tile, Track track)
 	Vec d = EdgeMid(e1) - EdgeMid(e0);
 	c.len = Length(d);
 	c.dir = Unit(d);
+	c.lo = 0;
+	c.hi = c.len;
 
 	/* The path around the piece, walked forward, and its corners. An arc reaches at most a tile and a little
 	 * past the corners of the widest curve it rounds as one, so this far either way is enough. */
@@ -438,8 +497,13 @@ Curve BuildCurve(TileIndex tile, Track track)
 	}
 	for (const PathCorner &pc : corners) {
 		Zone z;
-		if (!CornerZone(pc, z)) continue;
+		bool main_back = false, main_fwd = false;
+		if (!CornerZone(pc, z, &main_back, &main_fwd)) continue;
 		if (z.hi <= 0 || z.lo >= c.len) continue; // does not reach this piece
+		/* Where the piece branches off the straight way of a switch at its edge, it is drawn on over that way as far
+		 * as its arc goes there: that piece is straight, not round. */
+		if (main_back && pc.s <= 0.01) c.lo = std::min(c.lo, z.lo);
+		if (main_fwd && pc.s >= c.len - 0.01) c.hi = std::max(c.hi, z.hi);
 		bool known = false;
 		for (const Zone &o : c.zones) {
 			if (std::abs(o.lo - z.lo) < 0.01 && std::abs(o.hi - z.hi) < 0.01) known = true;
@@ -594,16 +658,55 @@ const Reference &ReferenceOf(TileIndex tile, ZoomLevel zoom)
 	return ref;
 }
 
+/** The pieces of the neighbouring tiles joining a piece across its edges (all of them at a switch). */
+void JoiningPieces(TileIndex tile, Track track, std::vector<std::pair<TileIndex, Track>> &out)
+{
+	auto [a, b] = PieceEdges(track);
+	for (DiagDirection e : {a, b}) {
+		TileIndex n = Neighbour(tile, e);
+		if (n == INVALID_TILE || !IsSimpleTile(n) || TilePixelHeight(n) != TilePixelHeight(tile)) continue;
+		DiagDirection in = ReverseDiagDir(e);
+		for (Track tr : GetTrackBits(n)) {
+			auto [na, nb] = PieceEdges(tr);
+			if (na == in || nb == in) out.emplace_back(n, tr);
+		}
+	}
+}
+
+/** Whether a piece of a neighbouring tile is drawn on over this tile: it branches off a switch at the edge between them. */
+bool ReachesOver(TileIndex tile, TileIndex n, Track ntr)
+{
+	const Curve &c = CurveOf(n, ntr);
+	if (c.lo >= 0 && c.hi <= c.len) return false;
+	auto [e0, e1] = PieceEdges(ntr);
+	return (c.lo < 0 && Neighbour(n, e0) == tile) || (c.hi > c.len && Neighbour(n, e1) == tile);
+}
+
 } // namespace
 
-/** Whether the track of a tile is drawn round: a simple tile with a piece an arc reaches. */
+/** Whether the track of a tile is drawn round: a simple tile with a piece an arc reaches, or one a round piece branching off a switch goes on over. */
 bool IsRoundTrackTile(TileIndex tile)
 {
 	if (!RoundTrackEnabled() || !IsSimpleTile(tile)) return false;
 	for (Track tr : GetTrackBits(tile)) {
 		if (!CurveOf(tile, tr).zones.empty()) return true;
 	}
+	std::vector<std::pair<TileIndex, Track>> joining;
+	for (Track tr : GetTrackBits(tile)) JoiningPieces(tile, tr, joining);
+	for (const auto &[n, ntr] : joining) {
+		if (ReachesOver(tile, n, ntr)) return true;
+	}
 	return false;
+}
+
+/** Whether a round tile is drawn without its catenary: all its pieces are round; one keeping a straight piece, at a switch, keeps it. */
+bool RoundTrackHidesCatenary(TileIndex tile)
+{
+	if (!IsRoundTrackTile(tile)) return false;
+	for (Track tr : GetTrackBits(tile)) {
+		if (CurveOf(tile, tr).zones.empty()) return false;
+	}
+	return true;
 }
 
 /** The track of a tile is drawn after the ground, as a strip along its curve (DrawRoundTrackStrips()). */
@@ -638,17 +741,15 @@ void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
 		const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE, z = TilePixelHeight(tile);
 
 		/* The pieces a pixel of the tile may be on: its own, and those joining it across an edge. */
-		std::vector<const Curve *> pieces;
+		std::vector<std::pair<TileIndex, Track>> joining;
 		for (Track tr : GetTrackBits(tile)) {
-			pieces.push_back(&CurveOf(tile, tr));
-			auto [a, b] = PieceEdges(tr);
-			for (DiagDirection e : {a, b}) {
-				TileIndex n = Neighbour(tile, e);
-				if (n == INVALID_TILE || !IsSimpleTile(n) || TilePixelHeight(n) != static_cast<uint>(z)) continue;
-				Track ntr = PieceAtEdge(n, ReverseDiagDir(e));
-				if (ntr != Track::Invalid) pieces.push_back(&CurveOf(n, ntr));
-			}
+			joining.emplace_back(tile, tr);
+			JoiningPieces(tile, tr, joining);
 		}
+		std::sort(joining.begin(), joining.end());
+		joining.erase(std::unique(joining.begin(), joining.end()), joining.end());
+		std::vector<const Curve *> pieces;
+		for (const auto &[pt, ptr] : joining) pieces.push_back(&CurveOf(pt, ptr));
 		const Reference &ref = ReferenceOf(tile, dpi.zoom);
 
 		/* The tile's pixels in the block. */
@@ -666,48 +767,76 @@ void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
 				/* The tile and a little past its edges: the ground of the tile drawn after its neighbour covers the
 				 * neighbour's pixels on the edge, and the track goes on there. */
 				if (p.x < x0 - ROUND_EDGE || p.x >= x0 + TILE_SIZE + ROUND_EDGE || p.y < y0 - ROUND_EDGE || p.y >= y0 + TILE_SIZE + ROUND_EDGE) continue;
-				double best = 1e18, bs = 0, bd = 0;
-				const Curve *on = nullptr;
+				/* Of the pieces the pixel is beside (not past their ends), the nearest whose track is there: where two
+				 * overlap, at a switch, both are drawn. Along a piece the picture of the straight track goes on tile
+				 * after tile, also where a piece is drawn on past its edge. */
+				double best = 1e18;
+				uint32_t colour = 0;
 				for (const Curve *c : pieces) {
 					double cs = 0, cd = 0;
 					double dist = c->Nearest(p, cs, cd);
-					if (dist < best) {
-						best = dist;
-						bs = cs;
-						bd = cd;
-						on = c;
-					}
+					if (dist >= best || std::abs(cd) > ROUND_HALF_WIDTH || dist > std::abs(cd) + ROUND_BESIDE) continue;
+					double along = std::fmod(cs, c->len);
+					if (along < 0) along += c->len;
+					uint32_t found = ref.At(along / c->len * TILE_SIZE, TILE_SIZE / 2.0 + cd);
+					if (found == 0) continue;
+					best = dist;
+					colour = found;
 				}
-				if (on == nullptr || std::abs(bd) > ROUND_HALF_WIDTH) continue;
-				uint32_t colour = ref.At(bs / on->len * TILE_SIZE, TILE_SIZE / 2.0 + bd);
 				if (colour != 0) dst[static_cast<size_t>(py) * dpi.pitch + px] = colour;
 			}
 		}
 	}
 }
 
+/** The piece of track a train's piece is on, or Track::Invalid. */
+static Track TrainPiece(const Vehicle *v)
+{
+	if (v == nullptr || v->type != VehicleType::Train) return Track::Invalid;
+	const Train *t = Train::From(v);
+	if (t->track.Test(Track::Wormhole) || t->track.Test(Track::Depot)) return Track::Invalid;
+	for (Track tr : t->track) {
+		if (GetTrackBits(v->tile).Test(tr)) return tr;
+		break;
+	}
+	return Track::Invalid;
+}
+
 /**
  * Where a train's piece on a round curve is drawn: on the arc, turned along it. Not where its piece is straight:
- * there it is drawn as always.
+ * there it is drawn as always -- but on the straight way of a switch next to a round piece branching off it, while
+ * the train's piece before or after it is on that round piece, it is on that round piece's arc.
  */
 bool GetRoundTrackPose(const Vehicle *v, RoundTrackPose &pose)
 {
 	if (!RoundTrackDrawing() || v->type != VehicleType::Train || v->direction == Direction::Invalid) return false;
-	const Train *t = Train::From(v);
-	if (t->track.Test(Track::Wormhole) || t->track.Test(Track::Depot)) return false;
 	if (!IsSimpleTile(v->tile)) return false;
-	Track track = Track::Invalid;
-	for (Track tr : t->track) {
-		track = tr;
-		break;
+	Track track = TrainPiece(v);
+	if (track == Track::Invalid) return false;
+	const Vec at{static_cast<double>(v->x_pos), static_cast<double>(v->y_pos)};
+	const Curve *c = &CurveOf(v->tile, track);
+	double s = std::clamp(Dot(at - c->v0, c->dir), 0.0, c->len);
+	if (!c->InZone(s)) {
+		const Curve &own = *c;
+		c = nullptr;
+		for (const Vehicle *u : {v->Previous(), v->Next()}) {
+			Track utr = TrainPiece(u);
+			if (utr == Track::Invalid || u->tile == v->tile || !IsSimpleTile(u->tile) || !ReachesOver(v->tile, u->tile, utr)) continue;
+			const Curve &uc = CurveOf(u->tile, utr);
+			/* How far along the way it is: past the edge between the tiles by as much as it is along its piece. */
+			bool before = Neighbour(u->tile, PieceEdges(utr).first) == v->tile;
+			Vec edge = before ? uc.v0 : uc.v0 + uc.dir * uc.len;
+			double past = std::abs(Dot(at - edge, own.dir));
+			double us = std::clamp(before ? -past : uc.len + past, uc.lo, uc.hi);
+			if (!uc.InZone(us)) continue;
+			c = &uc;
+			s = us;
+			break;
+		}
+		if (c == nullptr) return false;
 	}
-	if (track == Track::Invalid || !GetTrackBits(v->tile).Test(track)) return false;
-	const Curve &c = CurveOf(v->tile, track);
-	if (c.zones.empty()) return false;
-	double s = std::clamp(Dot(Vec{static_cast<double>(v->x_pos), static_cast<double>(v->y_pos)} - c.v0, c.dir), 0.0, c.len);
-	if (!c.InZone(s)) return false;
 	Vec q, tg;
-	c.Eval(s, q, tg);
+	c->Eval(s, q, tg);
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	int di = to_underlying(v->direction) & 7;

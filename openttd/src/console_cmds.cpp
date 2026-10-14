@@ -9314,6 +9314,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
 		AutoRestoreBackup cur_company(_current_company, _local_company);
 		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(*x, *y), RAILTYPE_RAIL, static_cast<Track>(*tr), false);
+		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
 		return true;
 	} else if (what == "typsilnice" && argv.size() > 2) {
