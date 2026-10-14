@@ -91,6 +91,8 @@
 #include "tunnelbridge_map.h"
 #include "rail.h"
 #include "rail_map.h"
+#include "road_map.h"
+#include "water_map.h"
 #include "newgrf_railtype.h"
 #include "company_base.h"
 #include "command_func.h"
@@ -2391,11 +2393,23 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 	Point c = RemapCoords(ps.ax, ps.ay, ps.az), t = ProjectTurned(ps.ax, ps.ay, ps.az);
 	int shift_x = t.x - c.x, shift_y = t.y - c.y;
 	int sx = ps.x - shift_x, sy = ps.y - shift_y, sleft = ps.left - shift_x, stop = ps.top - shift_y;
+	/* The texture holds the sprite and its children: a depot's door frame, drawn apart from the shed. */
+	int bleft = sleft, btop = stop, bright = sleft + spr->width, bbottom = stop + spr->height;
+	for (int child_idx = ps.first_child; child_idx >= 0;) {
+		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+		child_idx = cs.next;
+		const Sprite *cspr = GetSprite(cs.image & SPRITE_MASK, SpriteType::Normal);
+		int cx = (cs.relative ? sleft : sx) + cs.x + cspr->x_offs, cy = (cs.relative ? stop : sy) + cs.y + cspr->y_offs;
+		bleft = std::min(bleft, cx);
+		btop = std::min(btop, cy);
+		bright = std::max(bright, cx + cspr->width);
+		bbottom = std::max(bbottom, cy + cspr->height);
+	}
 	const int margin = TILE_HEIGHT * ZOOM_BASE;
-	int tleft = (sleft - margin) & mask;
-	int ttop = (stop - margin) & mask;
-	int twidth = (sleft + spr->width + margin - tleft + ~mask) & mask;
-	int theight = (stop + spr->height + margin - ttop + ~mask) & mask;
+	int tleft = (bleft - margin) & mask;
+	int ttop = (btop - margin) & mask;
+	int twidth = (bright + margin - tleft + ~mask) & mask;
+	int theight = (bbottom + margin - ttop + ~mask) & mask;
 	int tw = UnScaleByZoom(twidth, zoom), th = UnScaleByZoom(theight, zoom);
 	if (tw <= 0 || th <= 0) return false;
 	double t0 = TurnedNow();
@@ -2740,6 +2754,143 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
 	}
 	for (const ParentSpriteToDraw &r : railings) _vd.parent_sprites_to_draw.push_back(r);
 	if (!railings.empty()) _vd.last_child = LAST_CHILD_NONE;
+}
+
+/*
+ * A depot in the turned view (the player: "the depots do not turn with the map"): its sprites stood north-up as
+ * billboards. A depot draws its shed as one sprite and the frame of its door as another, each with a thin box
+ * along a wall so a vehicle inside is drawn between them; neither box is the shed's. So the depot is one box over
+ * its tile, the depot's kind telling its shape -- a train shed with a ridge along the track, a road depot and a
+ * ship depot flat-topped -- as high as the sprite reaches above it, dressed in the shed's sprite with the door's
+ * frame drawn into it (box_kind 12). Any set's depot, a road type's (CZTR's) or a rail type's, is drawn so: the
+ * box comes from the tile, the height and the pictures from its sprites. It never snaps: the door stays on the
+ * side the track or the road comes in by.
+ */
+
+/** The kind of a depot drawn turned (ParentSpriteToDraw::box_dx, low bits). */
+enum TurnedDepotKind : uint8_t { TURNED_DEPOT_RAIL = 0, TURNED_DEPOT_ROAD = 1, TURNED_DEPOT_SHIP = 2 };
+
+/** The footprint of a depot's box on its tile, world units: along the depot's axis and across it. */
+static void TurnedDepotFootprint(TurnedDepotKind kind, double &a0, double &a1, double &c0, double &c1)
+{
+	switch (kind) {
+		case TURNED_DEPOT_RAIL: a0 = 2; a1 = 15; c0 = 2; c1 = 14; break; // the walls of the original sheds
+		case TURNED_DEPOT_SHIP: a0 = 0; a1 = TILE_SIZE; c0 = 0.5; c1 = TILE_SIZE - 0.5; break; // a shed over two tiles
+		default: a0 = 0.5; a1 = TILE_SIZE - 0.5; c0 = 0.5; c1 = TILE_SIZE - 0.5; break;
+	}
+}
+
+/** The depot's box in the tile's frame: along and across its axis to x and y. */
+static ThreeDPart TurnedDepotPart(TurnedDepotKind kind, Axis axis, int height)
+{
+	double a0, a1, c0, c1;
+	TurnedDepotFootprint(kind, a0, a1, c0, c1);
+	ThreeDPart part = BridgePart(axis, a0, a1, c0, c1, height);
+	if (kind == TURNED_DEPOT_RAIL) {
+		/* A ridge along the track: about two fifths of the height the roof, the rest the walls. */
+		float rise = static_cast<float>(height * 2 / 5);
+		part.h = static_cast<float>(height) - rise;
+		part.rise = rise;
+		part.roof = axis == Axis::X ? ThreeDRoof::GableX : ThreeDRoof::GableY;
+	}
+	return part;
+}
+
+/** A depot (box_kind 12): one box over its tile, its sprites laid over it (TurnedDepot()). */
+static void DrawTurnedDepot(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	const TurnedDepotKind kind = static_cast<TurnedDepotKind>(ps.box_dx & 0x0F);
+	const Axis axis = static_cast<Axis>((ps.box_dx >> 4) & 1);
+	ThreeDPart part = TurnedDepotPart(kind, axis, ps.box_dy);
+	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, (part.x0 + part.x1) / 2.0, (part.y0 + part.y1) / 2.0, 360.0);
+}
+
+/** The sprites of a depot on its tile given their box for the turned view: the tallest the shed, the rest drawn into it. */
+static void TurnedDepot(TileIndex tile, size_t first_parent)
+{
+	TurnedDepotKind kind;
+	Axis axis;
+	if (IsRailDepotTile(tile)) {
+		kind = TURNED_DEPOT_RAIL;
+		axis = DiagDirToAxis(GetRailDepotDirection(tile));
+	} else if (IsRoadDepotTile(tile)) {
+		kind = TURNED_DEPOT_ROAD;
+		axis = DiagDirToAxis(GetRoadDepotDirection(tile));
+	} else if (IsShipDepotTile(tile)) {
+		kind = TURNED_DEPOT_SHIP;
+		axis = GetShipDepotAxis(tile);
+	} else {
+		return;
+	}
+	/* The shed: the sprite reaching highest. */
+	size_t body = SIZE_MAX;
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+		if (body == SIZE_MAX || ps.top < _vd.parent_sprites_to_draw[body].top) body = i;
+	}
+	if (body == SIZE_MAX) return;
+
+	/* The rest -- the door's frame -- drawn into the shed's texture, where the game draws them. */
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		if (i == body || ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+		ParentSpriteToDraw &shed = _vd.parent_sprites_to_draw[body];
+		int idx = static_cast<int>(_vd.child_screen_sprites_to_draw.size());
+		_vd.child_screen_sprites_to_draw.push_back({ps.image, ps.pal, ps.sub, ps.x - shed.x, ps.y - shed.y, false, -1});
+		if (shed.first_child < 0) {
+			shed.first_child = idx;
+		} else {
+			int last = shed.first_child;
+			while (_vd.child_screen_sprites_to_draw[last].next >= 0) last = _vd.child_screen_sprites_to_draw[last].next;
+			_vd.child_screen_sprites_to_draw[last].next = idx;
+		}
+		/* Its own children too, after it. */
+		for (int c = ps.first_child; c >= 0;) {
+			ChildScreenSpriteToDraw cs = _vd.child_screen_sprites_to_draw[c];
+			c = cs.next;
+			if (!cs.relative) {
+				cs.x += ps.x - shed.x;
+				cs.y += ps.y - shed.y;
+			} else {
+				cs.x += ps.left - shed.left;
+				cs.y += ps.top - shed.top;
+			}
+			cs.next = -1;
+			int cidx = static_cast<int>(_vd.child_screen_sprites_to_draw.size());
+			_vd.child_screen_sprites_to_draw.push_back(cs);
+			int last = shed.first_child;
+			while (_vd.child_screen_sprites_to_draw[last].next >= 0) last = _vd.child_screen_sprites_to_draw[last].next;
+			_vd.child_screen_sprites_to_draw[last].next = cidx;
+		}
+		ps.box_kind = 4;
+	}
+
+	ParentSpriteToDraw &shed = _vd.parent_sprites_to_draw[body];
+	const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE, z = shed.zmin;
+	double a0, a1, c0, c1;
+	TurnedDepotFootprint(kind, a0, a1, c0, c1);
+	double fx0 = axis == Axis::X ? a0 : c0, fy0 = axis == Axis::X ? c0 : a0;
+	double fx1 = axis == Axis::X ? a1 : c1, fy1 = axis == Axis::X ? c1 : a1;
+	/* How high: the top of the sprite over the north corner of the box, where the top of a box is highest on the
+	 * screen; a ship depot's far half shows only a part of the shed, so it is as high as a ship depot is. */
+	int height = static_cast<int>(std::lround(x0 + fx0 + y0 + fy0 - static_cast<double>(shed.top) / ZOOM_BASE)) - z;
+	if (kind == TURNED_DEPOT_SHIP) height = std::max<int>(height, 4 * TILE_HEIGHT);
+	height = Clamp(height, 2, 8 * static_cast<int>(TILE_HEIGHT));
+
+	shed.box_kind = 12;
+	shed.box = nullptr;
+	shed.box_ox = x0;
+	shed.box_oy = y0;
+	shed.box_oz = z;
+	shed.box_dx = static_cast<int16_t>(kind | (to_underlying(axis) << 4));
+	shed.box_dy = static_cast<int16_t>(height);
+	shed.xmin = x0 + static_cast<int>(fx0);
+	shed.xmax = x0 + static_cast<int>(std::ceil(fx1)) - 1;
+	shed.ymin = y0 + static_cast<int>(fy0);
+	shed.ymax = y0 + static_cast<int>(std::ceil(fy1)) - 1;
+	shed.zmin = z;
+	shed.zmax = z + height - 1;
 }
 
 /** The sprites of a bridge's end on its tile: the ramp and whatever lies on it (a road, rails) as the rising deck (box_kind 10). */
@@ -3231,6 +3382,10 @@ static void ViewportDoDrawTurned()
 			}
 			_cab_bridge_sprites.clear();
 			if (tile_type == TileType::TunnelBridge && IsBridge(_cur_ti.tile)) TurnedBridgeHead(_cur_ti.tile, first_parent);
+			/* A depot: one box over its tile (TurnedDepot()); see-through, its sprites as they are. */
+			if ((tile_type == TileType::Railway || tile_type == TileType::Road || tile_type == TileType::Water) && !IsTransparencySet(TransparencyOption::Buildings)) {
+				TurnedDepot(_cur_ti.tile, first_parent);
+			}
 		}
 
 		/* A house of the original game made a real 3D object (three_d_objects.h): drawn once, whole, by its
@@ -3576,6 +3731,10 @@ static void ViewportDoDrawTurned()
 		}
 		if (ps->box_kind == 11) {
 			DrawTurnedBridgePillar(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 12) {
+			DrawTurnedDepot(frame, *ps);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);

@@ -86,6 +86,12 @@ tree in an old game does.
   cables on them, the pillars columns where their pixels stand, and each
   end's ramp a deck rising from the ground to the bridge in the ramp's
   sprite; none of it ever snaps.
+- Depots turn too (the player: "the depots do not turn with the map"): a
+  train shed is a box over its tile with a ridge along the track, a road and
+  a ship depot a flat-topped one, as high as the depot's sprite reaches,
+  dressed in the shed's sprite with the door's frame drawn into it; any
+  set's depot, a road type's or a rail type's, the same way. It never
+  snaps, so the door stays on the side the track or the road comes in by.
 - Game Options: the fences along the rails are **off by default** (the
   setting the game already had, under the graphics options, to be turned
   back on at will), since turned they are billboards and stand about the
