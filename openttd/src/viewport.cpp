@@ -87,6 +87,11 @@
 #include "town_kdtree.h"
 #include "viewport_sprite_sorter.h"
 #include "bridge_map.h"
+#include "tunnel_map.h"
+#include "tunnelbridge_map.h"
+#include "rail.h"
+#include "rail_map.h"
+#include "newgrf_railtype.h"
 #include "company_base.h"
 #include "command_func.h"
 #include "network/network_func.h"
@@ -5277,7 +5282,12 @@ static constexpr double CAB_PX_UP = 0.408;
 static constexpr double CAB_NEAR = 2.0;        ///< world units ahead of the eye: nearer is cut off
 static constexpr int CAB_RANGE_TILES = 20;     ///< how far the view reaches, tiles
 static constexpr double CAB_FOV_TAN = 1.0;     ///< the tangent of half the horizontal field of view (90 degrees)
-static constexpr int CAB_EYE_Z = 14;           ///< the eye this many units of z above the vehicle's position
+/** The eye this many units of height above the vehicle's position, by the vehicle's type; it bows lower under a low bridge (CabEyeHeight()). */
+static constexpr int CAB_EYE_Z_TRAIN = 9;
+static constexpr int CAB_EYE_Z_ROAD = 7;
+static constexpr int CAB_EYE_Z_SHIP = 9;
+static constexpr int CAB_EYE_Z_AIRCRAFT = 14;
+static constexpr double CAB_EYE_Z_LOWEST = 3.0; ///< the eye bows no lower than this
 static constexpr double CAB_EYE_AHEAD = 5.0;   ///< the eye this far ahead of the vehicle's position, world units
 static constexpr double CAB_TURN_RATE = 0.22;  ///< how much of the way to the vehicle's direction the eye turns a frame
 static constexpr double CAB_HAZE_FROM = 6.0 * TILE_SIZE; ///< the haze begins this far away
@@ -5410,6 +5420,24 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 				}
 			}
 			if (p == 0) continue;
+			if (tw > 1 && th > 1) {
+				/* Smooth between the four nearest texture pixels where all four have something, so a sprite seen up
+				 * close is no grid of big squares; at its edges it stays sharp. */
+				double uf = uw * inv - 0.5, vf = vw * inv - 0.5;
+				int u0 = static_cast<int>(std::floor(uf)), v0 = static_cast<int>(std::floor(vf));
+				double fu = uf - u0, fv = vf - v0;
+				int u1 = std::clamp(u0 + 1, 0, tw - 1), v1 = std::clamp(v0 + 1, 0, th - 1);
+				u0 = std::clamp(u0, 0, tw - 1);
+				v0 = std::clamp(v0, 0, th - 1);
+				uint32_t q00 = tex[static_cast<size_t>(v0) * tw + u0], q10 = tex[static_cast<size_t>(v0) * tw + u1];
+				uint32_t q01 = tex[static_cast<size_t>(v1) * tw + u0], q11 = tex[static_cast<size_t>(v1) * tw + u1];
+				if (q00 != 0 && q10 != 0 && q01 != 0 && q11 != 0) {
+					Colour c00(q00), c10(q10), c01(q01), c11(q11);
+					double w00 = (1 - fu) * (1 - fv), w10 = fu * (1 - fv), w01 = (1 - fu) * fv, w11 = fu * fv;
+					auto mix = [&](uint8_t a, uint8_t b, uint8_t c, uint8_t d) { return static_cast<uint8_t>(a * w00 + b * w10 + c * w01 + d * w11 + 0.5); };
+					p = Colour(mix(c00.r, c10.r, c01.r, c11.r), mix(c00.g, c10.g, c01.g, c11.g), mix(c00.b, c10.b, c01.b, c11.b)).data;
+				}
+			}
 			row[x] = p;
 			zrow[x] = static_cast<float>(iw);
 		}
@@ -5540,6 +5568,566 @@ struct CabBillboard {
 	ParentSpriteToDraw ps;
 };
 
+/** The picture being drawn: its pixels and their depths. */
+struct CabCanvas {
+	uint32_t *dst;
+	float *zb;
+	int w, h;
+};
+
+/** A polygon of world points (z in the game's units) in one colour. */
+static void CabDrawSolid(const CabCanvas &cv, const CabEye &eye, std::initializer_list<std::array<double, 3>> pts, Colour colour)
+{
+	uint32_t px = colour.data;
+	std::vector<CabPoint> poly;
+	for (const auto &p : pts) poly.push_back(CabToEye(eye, p[0], p[1], p[2], 0.5, 0.5));
+	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, &px, 1, 1, std::move(poly), eye, false);
+}
+
+/** A colour darker or lighter: each part times the factor. */
+static Colour CabShade(Colour c, double f)
+{
+	auto part = [f](uint8_t v) { return static_cast<uint8_t>(std::clamp(v * f, 0.0, 255.0)); };
+	return Colour(part(c.r), part(c.g), part(c.b));
+}
+
+/** Paint a sprite with its children into the current DrawPixelInfo, as the viewport draws it. */
+static void CabPaintParent(const ParentSpriteToDraw &ps)
+{
+	DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+	int child_idx = ps.first_child;
+	while (child_idx >= 0) {
+		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+		child_idx = cs.next;
+		if (cs.relative) {
+			DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+		} else {
+			DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+		}
+	}
+}
+
+/**
+ * Sprites painted together into one texture, in the order given, each with its children: the pieces of a bridge seen
+ * the way the north-up view shows them, to be laid over its deck and sides.
+ * @param[out] t the texture; empty when nothing is painted
+ */
+static void CabCompositeTexture(CabTexture &t, const std::vector<const ParentSpriteToDraw *> &list)
+{
+	t.w = t.h = 0;
+	t.px.clear();
+	int l = INT32_MAX, tp = INT32_MAX, r = INT32_MIN, b = INT32_MIN;
+	auto add = [&](SpriteID image, int x, int y) {
+		const Sprite *spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
+		l = std::min(l, x + spr->x_offs);
+		tp = std::min(tp, y + spr->y_offs);
+		r = std::max(r, x + spr->x_offs + spr->width);
+		b = std::max(b, y + spr->y_offs + spr->height);
+	};
+	for (const ParentSpriteToDraw *ps : list) {
+		add(ps->image, ps->x, ps->y);
+		for (int child_idx = ps->first_child; child_idx >= 0;) {
+			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+			child_idx = cs.next;
+			if (cs.relative) {
+				add(cs.image, ps->left + cs.x, ps->top + cs.y);
+			} else {
+				add(cs.image, ps->x + cs.x, ps->y + cs.y);
+			}
+		}
+	}
+	if (l >= r || tp >= b) return;
+	const int mask = ScaleByZoom(-1, ZoomLevel::Normal);
+	t.ox = l & mask;
+	t.oy = tp & mask;
+	t.w = UnScaleByZoom(r - t.ox, ZoomLevel::Normal) + 1;
+	t.h = UnScaleByZoom(b - t.oy, ZoomLevel::Normal) + 1;
+	if (static_cast<size_t>(t.w) * t.h > 4u * 1024 * 1024) {
+		t.w = t.h = 0;
+		return;
+	}
+	t.px.assign(static_cast<size_t>(t.w) * t.h, 0);
+	DrawPixelInfo tdpi{
+		.dst_ptr = t.px.data(),
+		.left = t.ox,
+		.top = t.oy,
+		.width = ScaleByZoom(t.w, ZoomLevel::Normal),
+		.height = ScaleByZoom(t.h, ZoomLevel::Normal),
+		.pitch = t.w,
+		.zoom = ZoomLevel::Normal
+	};
+	AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+	AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+	for (const ParentSpriteToDraw *ps : list) CabPaintParent(*ps);
+}
+
+/** The average colour of what a texture has, or the fallback when it has nothing. */
+static Colour CabAverage(const CabTexture &t, Colour fallback)
+{
+	uint64_t r = 0, g = 0, b = 0, n = 0;
+	for (uint32_t p : t.px) {
+		if (p == 0) continue;
+		Colour c(p);
+		r += c.r;
+		g += c.g;
+		b += c.b;
+		n++;
+	}
+	if (n == 0) return fallback;
+	return Colour(static_cast<uint8_t>(r / n), static_cast<uint8_t>(g / n), static_cast<uint8_t>(b / n));
+}
+
+/**
+ * A quad of world points dressed in a texture of the north-up view: every corner takes the texture pixel where the
+ * game draws the world point given with it (its own place, or a mirrored one for a face the view never shows).
+ * @param pts the corners: where they are, and where their picture is
+ * @param fill_holes take the nearest pixel where the texture has none (a surface), or leave a hole (a railing)
+ */
+static void CabDrawDressed(const CabCanvas &cv, const CabEye &eye, const CabTexture &tex, std::initializer_list<std::array<double, 6>> pts, bool fill_holes)
+{
+	if (tex.w <= 0 || tex.h <= 0) return;
+	const double scale = 1.0 / ZOOM_BASE;
+	std::vector<CabPoint> poly;
+	for (const auto &p : pts) {
+		double cx, cy;
+		RemapCoordsF(p[3], p[4], p[5], cx, cy);
+		poly.push_back(CabToEye(eye, p[0], p[1], p[2], (cx - tex.ox) * scale, (cy - tex.oy) * scale));
+	}
+	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex.px.data(), tex.w, tex.h, std::move(poly), eye, fill_holes);
+}
+
+/** How thick the deck of a bridge is, in units of height below the track: thin, as a vehicle passes a level under it. */
+static constexpr int CAB_DECK = 2;
+
+/**
+ * Where along and across a bridge or tunnel a point of a tile is, in world units: along its axis and across it.
+ * @param axis the bridge's or tunnel's axis
+ */
+static inline void CabAlongAcross(Axis axis, int x0, int y0, double a, double c, double &wx, double &wy)
+{
+	if (axis == Axis::X) {
+		wx = x0 + a;
+		wy = y0 + c;
+	} else {
+		wx = x0 + c;
+		wy = y0 + a;
+	}
+}
+
+/**
+ * The part of a bridge over a tile, built from the sprites the game draws for it: the deck at the bridge's height
+ * dressed in the floor sprite, the railings standing on its edges in the sprites of the far and the near side, the
+ * deck's edges and its underside, and the pillars as columns where the game draws them.
+ * @param tile the tile under the bridge
+ * @param sprites the bridge's sprites on that tile (DrawBridgeMiddle())
+ */
+static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileIndex tile, const std::vector<const ParentSpriteToDraw *> &sprites)
+{
+	const Axis axis = GetBridgeAxis(tile);
+	const int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+	const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE;
+	std::vector<const ParentSpriteToDraw *> back, front, pillars;
+	for (const ParentSpriteToDraw *ps : sprites) {
+		if (ps->image == SPR_EMPTY_BOUNDING_BOX) continue;
+		int c_min = axis == Axis::X ? ps->ymin - y0 : ps->xmin - x0;
+		int c_ext = axis == Axis::X ? ps->ymax - ps->ymin + 1 : ps->xmax - ps->xmin + 1;
+		if (ps->zmin < bz - CAB_DECK) {
+			pillars.push_back(ps);
+		} else if (c_ext <= 2 && c_min >= TILE_SIZE / 2) {
+			front.push_back(ps);
+		} else {
+			back.push_back(ps);
+		}
+	}
+	static CabTexture back_tex, front_tex;
+	CabCompositeTexture(back_tex, back);
+	CabCompositeTexture(front_tex, front);
+
+	/* Corners: along a, across c, height z; dressed in the pixel of (a, tc, tz). */
+	auto pt = [&](double a, double c, double z, double tc, double tz) {
+		std::array<double, 6> p;
+		CabAlongAcross(axis, x0, y0, a, c, p[0], p[1]);
+		p[2] = z;
+		CabAlongAcross(axis, x0, y0, a, tc, p[3], p[4]);
+		p[5] = tz;
+		return p;
+	};
+	const double c_far = 1, c_near = TILE_SIZE - 1, top = bz + 40, under = bz - CAB_DECK;
+	/* The near railing first: on its plane the deck's edge only fills what the railing leaves. */
+	CabDrawDressed(cv, eye, front_tex, {pt(0, c_near, under, c_near, under), pt(TILE_SIZE, c_near, under, c_near, under), pt(TILE_SIZE, c_near, top, c_near, top), pt(0, c_near, top, c_near, top)}, false);
+	CabDrawDressed(cv, eye, back_tex, {pt(0, c_near, under, c_near, under), pt(TILE_SIZE, c_near, under, c_near, under), pt(TILE_SIZE, c_near, bz, c_near, bz), pt(0, c_near, bz, c_near, bz)}, true);
+	/* The deck. */
+	CabDrawDressed(cv, eye, back_tex, {pt(0, c_far, bz, c_far, bz), pt(TILE_SIZE, c_far, bz, c_far, bz), pt(TILE_SIZE, c_near, bz, c_near, bz), pt(0, c_near, bz, c_near, bz)}, true);
+	/* The far railing, and the deck's far edge in the near one's picture. */
+	CabDrawDressed(cv, eye, back_tex, {pt(0, c_far, bz, c_far, bz), pt(TILE_SIZE, c_far, bz, c_far, bz), pt(TILE_SIZE, c_far, top, c_far, top), pt(0, c_far, top, c_far, top)}, false);
+	CabDrawDressed(cv, eye, back_tex, {pt(0, c_far, under, c_near, under), pt(TILE_SIZE, c_far, under, c_near, under), pt(TILE_SIZE, c_far, bz, c_near, bz), pt(0, c_far, bz, c_near, bz)}, true);
+	/* The underside, in the shadow. */
+	Colour below = CabShade(CabAverage(back_tex, Colour(110, 100, 90)), 0.45);
+	std::array<double, 2> u[4];
+	CabAlongAcross(axis, x0, y0, 0, c_far, u[0][0], u[0][1]);
+	CabAlongAcross(axis, x0, y0, TILE_SIZE, c_far, u[1][0], u[1][1]);
+	CabAlongAcross(axis, x0, y0, TILE_SIZE, c_near, u[2][0], u[2][1]);
+	CabAlongAcross(axis, x0, y0, 0, c_near, u[3][0], u[3][1]);
+	CabDrawSolid(cv, eye, {{u[0][0], u[0][1], under - 0.01}, {u[1][0], u[1][1], under - 0.01}, {u[2][0], u[2][1], under - 0.01}, {u[3][0], u[3][1], under - 0.01}}, below);
+
+	/* The pillars: a column where the sprite's pixels are, along the bridge, as thick as the pillar's box across it. */
+	for (const ParentSpriteToDraw *ps : pillars) {
+		const CabTexture *tex = CabSpriteTexture(*ps);
+		if (tex == nullptr) continue;
+		double sum = 0;
+		int n = 0;
+		for (int ty = 0; ty < tex->h; ty++) {
+			for (int tx = 0; tx < tex->w; tx++) {
+				if (tex->px[static_cast<size_t>(ty) * tex->w + tx] == 0) continue;
+				sum += tex->ox + (tx + 0.5) * ZOOM_BASE;
+				n++;
+			}
+		}
+		if (n == 0) continue;
+		double vx = sum / n;
+		/* On the plane across the middle of the pillar's box: x - y = -vx / 8 there. */
+		double c_mid = axis == Axis::X ? (ps->ymin + ps->ymax + 1) * 0.5 : (ps->xmin + ps->xmax + 1) * 0.5;
+		double a_world = axis == Axis::X ? c_mid - vx / (2.0 * ZOOM_BASE) : c_mid + vx / (2.0 * ZOOM_BASE);
+		double half = 1.25;
+		double cx0 = c_mid - 1.25, cx1 = c_mid + 1.25;
+		double z0 = ps->zmin, z1 = ps->zmax + 1;
+		double bx0, by0, bx1, by1;
+		if (axis == Axis::X) {
+			bx0 = a_world - half; bx1 = a_world + half; by0 = cx0; by1 = cx1;
+		} else {
+			bx0 = cx0; bx1 = cx1; by0 = a_world - half; by1 = a_world + half;
+		}
+		auto same = [&](double x, double y, double z) { return std::array<double, 6>{x, y, z, x, y, z}; };
+		auto at = [&](double x, double y, double z, double tx, double ty, double tz) { return std::array<double, 6>{x, y, z, tx, ty, tz}; };
+		/* The two faces the sprite shows, the two others mirrored, as CabDrawBox() does. */
+		CabDrawDressed(cv, eye, *tex, {same(bx1, by0, z0), same(bx1, by1, z0), same(bx1, by1, z1), same(bx1, by0, z1)}, true);
+		CabDrawDressed(cv, eye, *tex, {same(bx0, by1, z0), same(bx1, by1, z0), same(bx1, by1, z1), same(bx0, by1, z1)}, true);
+		CabDrawDressed(cv, eye, *tex, {at(bx0, by0, z0, bx1, by0, z0), at(bx0, by1, z0, bx1, by1, z0), at(bx0, by1, z1, bx1, by1, z1), at(bx0, by0, z1, bx1, by0, z1)}, true);
+		CabDrawDressed(cv, eye, *tex, {at(bx0, by0, z0, bx0, by1, z0), at(bx1, by0, z0, bx1, by1, z0), at(bx1, by0, z1, bx1, by1, z1), at(bx0, by0, z1, bx0, by1, z1)}, true);
+	}
+}
+
+/**
+ * The ramp of a bridge: the deck rising from the ground to the bridge (or level with it on a foundation), dressed
+ * in the ramp's sprite, with its sides down to the ground and its end under the bridge.
+ * @param head the bridge's end
+ * @param sprites what the game draws standing on it
+ */
+static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex head, const std::vector<const ParentSpriteToDraw *> &sprites)
+{
+	if (sprites.empty()) return;
+	const DiagDirection dir = GetTunnelBridgeDirection(head);
+	const Axis axis = DiagDirToAxis(dir);
+	const int bz = GetBridgePixelHeight(head);
+	const int x0 = TileX(head) * TILE_SIZE, y0 = TileY(head) * TILE_SIZE;
+	/* Along the axis: the end towards the bridge (inner) and the one towards the road or rail (outer). */
+	const bool inner_low = dir == DiagDirection::NE || dir == DiagDirection::NW;
+	const double a_in = inner_low ? 0 : TILE_SIZE, a_out = inner_low ? TILE_SIZE : 0;
+	double sx, sy;
+	CabAlongAcross(axis, x0, y0, inner_low ? TILE_SIZE - 1 : 0, TILE_SIZE / 2, sx, sy);
+	int z_out = GetSlopePixelZ(static_cast<int>(sx), static_cast<int>(sy), true);
+	const double deck_out = (bz - z_out >= TILE_HEIGHT / 2) ? bz - TILE_HEIGHT : bz;
+	const double deck_in = bz;
+	auto ground = [&](double a, double c) {
+		double wx, wy;
+		CabAlongAcross(axis, x0, y0, std::clamp(a, 0.0, TILE_SIZE - 1.0), std::clamp(c, 0.0, TILE_SIZE - 1.0), wx, wy);
+		return static_cast<double>(GetSlopePixelZ(static_cast<int>(wx), static_cast<int>(wy), false));
+	};
+	static CabTexture tex;
+	CabCompositeTexture(tex, sprites);
+	auto pt = [&](double a, double c, double z, double tc, double tz) {
+		std::array<double, 6> p;
+		CabAlongAcross(axis, x0, y0, a, c, p[0], p[1]);
+		p[2] = z;
+		CabAlongAcross(axis, x0, y0, a, tc, p[3], p[4]);
+		p[5] = tz;
+		return p;
+	};
+	const double c_far = 1, c_near = TILE_SIZE - 1;
+	/* The deck. */
+	CabDrawDressed(cv, eye, tex, {pt(a_out, c_far, deck_out, c_far, deck_out), pt(a_in, c_far, deck_in, c_far, deck_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_out, c_near, deck_out, c_near, deck_out)}, true);
+	/* Its sides down to the ground: the near one as the sprite shows it, the far one mirrored. */
+	for (double c : {c_near, c_far}) {
+		double g_out = std::min(ground(a_out, c), deck_out), g_in = std::min(ground(a_in, c), deck_in - CAB_DECK);
+		CabDrawDressed(cv, eye, tex, {pt(a_out, c, g_out, c_near, g_out), pt(a_in, c, g_in, c_near, g_in), pt(a_in, c, deck_in, c_near, deck_in), pt(a_out, c, deck_out, c_near, deck_out)}, true);
+	}
+	/* The end under the bridge, in the shadow; and the outer end when the ramp stands on a foundation. */
+	Colour wall = CabShade(CabAverage(tex, Colour(120, 110, 96)), 0.6);
+	double w[4][2];
+	CabAlongAcross(axis, x0, y0, a_in, c_far, w[0][0], w[0][1]);
+	CabAlongAcross(axis, x0, y0, a_in, c_near, w[1][0], w[1][1]);
+	CabAlongAcross(axis, x0, y0, a_out, c_far, w[2][0], w[2][1]);
+	CabAlongAcross(axis, x0, y0, a_out, c_near, w[3][0], w[3][1]);
+	double gi = std::min(ground(a_in, c_far), ground(a_in, c_near));
+	CabDrawSolid(cv, eye, {{w[0][0], w[0][1], gi}, {w[1][0], w[1][1], gi}, {w[1][0], w[1][1], deck_in}, {w[0][0], w[0][1], deck_in}}, wall);
+	double go = std::min(ground(a_out, c_far), ground(a_out, c_near));
+	if (deck_out > go + 1) CabDrawSolid(cv, eye, {{w[2][0], w[2][1], go}, {w[3][0], w[3][1], go}, {w[3][0], w[3][1], deck_out}, {w[2][0], w[2][1], deck_out}}, wall);
+}
+
+/** A tunnel in the cab view: its two ends and where its portals stand. */
+struct CabTunnel {
+	TileIndex a, b;   ///< its two ends
+	Axis axis;        ///< which way it runs
+	int z;            ///< the height of its floor
+	double s_lo, s_hi; ///< the planes of its portals along the axis, world units
+	double c_mid;     ///< the middle across it, world units
+	bool rail;        ///< a railway tunnel (else a road one)
+};
+
+/** Half the width of a tunnel's floor, world units. */
+static constexpr double CAB_TUNNEL_HALF = 6.0;
+/** The height of a tunnel's walls and of its vault, units of height above its floor. */
+static constexpr double CAB_TUNNEL_WALL = 10.0;
+static constexpr double CAB_TUNNEL_TOP = 20.5;
+/** The height of a portal's face above the floor; and how far it reaches beside the opening, world units. */
+static constexpr double CAB_PORTAL_TOP = 24.0;
+static constexpr double CAB_PORTAL_HALF = 10.0;
+/** The cross-section of a tunnel: across from its middle (world units), up from its floor (units of height). */
+static const std::array<std::array<double, 2>, 9> _cab_tunnel_profile = {{
+	{-CAB_TUNNEL_HALF, 0}, {-CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {-5.2, 15.0}, {-3.0, 19.0}, {0.0, CAB_TUNNEL_TOP},
+	{3.0, 19.0}, {5.2, 15.0}, {CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {CAB_TUNNEL_HALF, 0},
+}};
+
+/** The tunnel with an end on the tile, if there is one. */
+static std::optional<CabTunnel> CabTunnelAt(TileIndex tile)
+{
+	if (!IsValidTile(tile) || !IsTileType(tile, TileType::TunnelBridge) || !IsTunnel(tile)) return std::nullopt;
+	CabTunnel t;
+	t.a = tile;
+	t.b = GetOtherTunnelEnd(tile);
+	t.axis = DiagDirToAxis(GetTunnelBridgeDirection(tile));
+	t.z = GetTilePixelZ(tile);
+	t.rail = GetTunnelBridgeTransportType(tile) == TransportType::Rail;
+	/* A portal stands on the edge of its end tile towards the other end, where the hill starts. */
+	auto plane = [&](TileIndex end) {
+		DiagDirection d = GetTunnelBridgeDirection(end);
+		int base = (t.axis == Axis::X ? TileX(end) : TileY(end)) * TILE_SIZE;
+		return (d == DiagDirection::NE || d == DiagDirection::NW) ? static_cast<double>(base) : static_cast<double>(base + TILE_SIZE);
+	};
+	double pa = plane(t.a), pb = plane(t.b);
+	t.s_lo = std::min(pa, pb);
+	t.s_hi = std::max(pa, pb);
+	t.c_mid = (t.axis == Axis::X ? TileY(tile) : TileX(tile)) * TILE_SIZE + TILE_SIZE / 2.0;
+	return t;
+}
+
+/** A world point of a tunnel: along its axis s, across c from its middle, dz above its floor. */
+static inline std::array<double, 3> CabTunnelPoint(const CabTunnel &t, double s, double c, double dz)
+{
+	if (t.axis == Axis::X) return {s, t.c_mid + c, t.z + dz};
+	return {t.c_mid + c, s, t.z + dz};
+}
+
+/** The stones of portals and of the walls beside the way into a tunnel, 4 texture pixels to a world unit. */
+static const CabTexture &CabStoneTexture()
+{
+	static CabTexture stone;
+	if (!stone.px.empty()) return stone;
+	stone.w = 96;
+	stone.h = 48;
+	stone.px.resize(static_cast<size_t>(stone.w) * stone.h);
+	uint32_t seed = 12345;
+	for (int y = 0; y < stone.h; y++) {
+		int course = y / 6;
+		for (int x = 0; x < stone.w; x++) {
+			seed = seed * 1103515245 + 12345;
+			int noise = static_cast<int>((seed >> 16) % 21) - 10;
+			bool joint = (y % 6) == 5 || ((x + (course & 1) * 6) % 12) == 11;
+			int base = joint ? 82 : 128 + ((course * 7 + (x + (course & 1) * 6) / 12 * 13) % 17) - 8;
+			stone.px[static_cast<size_t>(y) * stone.w + x] = Colour(static_cast<uint8_t>(std::clamp(base + noise + 6, 0, 255)), static_cast<uint8_t>(std::clamp(base + noise, 0, 255)), static_cast<uint8_t>(std::clamp(base + noise - 10, 0, 255))).data;
+		}
+	}
+	return stone;
+}
+
+/** A quad of world points dressed in the stones: (x, y, z, tu, tv) at each corner, the texture's pixels. */
+static void CabDrawStone(const CabCanvas &cv, const CabEye &eye, std::initializer_list<std::array<double, 5>> pts)
+{
+	const CabTexture &stone = CabStoneTexture();
+	std::vector<CabPoint> poly;
+	for (const auto &p : pts) poly.push_back(CabToEye(eye, p[0], p[1], p[2], std::clamp(p[3], 0.0, stone.w - 0.01), std::clamp(p[4], 0.0, stone.h - 0.01)));
+	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, stone.px.data(), stone.w, stone.h, std::move(poly), eye, false);
+}
+
+/**
+ * A portal of a tunnel: a face of stones on the edge of its end tile, around an opening as tall as the tunnel, and
+ * walls of stones beside the way into it, up to the hill on either side.
+ * @param end the tunnel's end the portal is on
+ */
+static void CabDrawPortal(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, TileIndex end)
+{
+	DiagDirection d = GetTunnelBridgeDirection(end);
+	int base = (t.axis == Axis::X ? TileX(end) : TileY(end)) * TILE_SIZE;
+	bool into_low = d == DiagDirection::NE || d == DiagDirection::NW;
+	double s = into_low ? base : base + TILE_SIZE;
+	double s_out = into_low ? base + TILE_SIZE : base;
+	const double k = 4.0; // texture pixels to a world unit
+	auto face = [&](double c, double dz) {
+		std::array<double, 3> p = CabTunnelPoint(t, s, c, dz);
+		return std::array<double, 5>{p[0], p[1], p[2], (c + CAB_PORTAL_HALF) * k, (CAB_PORTAL_TOP - dz) * CAB_Z_SCALE * k};
+	};
+	/* Beside the opening, and over it along the vault. */
+	CabDrawStone(cv, eye, {face(-CAB_PORTAL_HALF, 0), face(-CAB_TUNNEL_HALF, 0), face(-CAB_TUNNEL_HALF, CAB_PORTAL_TOP), face(-CAB_PORTAL_HALF, CAB_PORTAL_TOP)});
+	CabDrawStone(cv, eye, {face(CAB_TUNNEL_HALF, 0), face(CAB_PORTAL_HALF, 0), face(CAB_PORTAL_HALF, CAB_PORTAL_TOP), face(CAB_TUNNEL_HALF, CAB_PORTAL_TOP)});
+	for (size_t i = 1; i + 2 < _cab_tunnel_profile.size(); i++) {
+		const auto &p = _cab_tunnel_profile[i], &q = _cab_tunnel_profile[i + 1];
+		CabDrawStone(cv, eye, {face(p[0], p[1]), face(q[0], q[1]), face(q[0], CAB_PORTAL_TOP), face(p[0], CAB_PORTAL_TOP)});
+	}
+	/* The walls beside the way in: from the floor up to where the slope of the end tile was, on both sides. */
+	for (double c : {-(TILE_SIZE / 2.0), TILE_SIZE / 2.0}) {
+		std::array<double, 3> p0 = CabTunnelPoint(t, s_out, c, 0), p1 = CabTunnelPoint(t, s, c, 0), p2 = CabTunnelPoint(t, s, c, TILE_HEIGHT);
+		CabDrawStone(cv, eye, {{p0[0], p0[1], p0[2], 0, 10}, {p1[0], p1[1], p1[2], TILE_SIZE * k, 10}, {p2[0], p2[1], p2[2], TILE_SIZE * k, 10 - TILE_HEIGHT * CAB_Z_SCALE * k}});
+	}
+}
+
+/**
+ * The inside of a tunnel from one plane along it to another: walls and vault in pieces, lit from its ends and dark
+ * inside with lamps along the walls, the track or the road on its floor.
+ * @param s0,s1 where the piece begins and ends along the tunnel
+ */
+static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, double s0, double s1)
+{
+	const double step = 4.0;
+	const Colour vault(112, 104, 92), floor = t.rail ? Colour(92, 84, 74) : Colour(78, 78, 80), rail(176, 176, 182), lamp(255, 228, 150);
+	int k = 0;
+	for (double sa = s0; sa < s1 - 0.01; sa += step, k++) {
+		double sb = std::min(s1, sa + step);
+		double sm = (sa + sb) * 0.5;
+		/* Daylight from the nearer portal fades into the dark. */
+		double from_end = std::min(std::abs(sm - t.s_lo), std::abs(t.s_hi - sm));
+		double light = 0.10 + 0.90 * std::exp(-from_end / 10.0);
+		if ((static_cast<int>(std::floor(sm / step)) & 1) != 0) light *= 0.85;
+		Colour wall = CabShade(vault, light);
+		for (size_t i = 0; i + 1 < _cab_tunnel_profile.size(); i++) {
+			const auto &p = _cab_tunnel_profile[i], &q = _cab_tunnel_profile[i + 1];
+			auto a = CabTunnelPoint(t, sa, p[0], p[1]), b = CabTunnelPoint(t, sb, p[0], p[1]), c = CabTunnelPoint(t, sb, q[0], q[1]), d = CabTunnelPoint(t, sa, q[0], q[1]);
+			CabDrawSolid(cv, eye, {a, b, c, d}, wall);
+		}
+		auto f0 = CabTunnelPoint(t, sa, -CAB_TUNNEL_HALF, 0), f1 = CabTunnelPoint(t, sb, -CAB_TUNNEL_HALF, 0), f2 = CabTunnelPoint(t, sb, CAB_TUNNEL_HALF, 0), f3 = CabTunnelPoint(t, sa, CAB_TUNNEL_HALF, 0);
+		CabDrawSolid(cv, eye, {f0, f1, f2, f3}, CabShade(floor, light));
+		if (t.rail) {
+			/* The rails, catching the light longer than the stones. */
+			for (double c : {-1.6, 1.6}) {
+				auto r0 = CabTunnelPoint(t, sa, c - 0.2, 0.6), r1 = CabTunnelPoint(t, sb, c - 0.2, 0.6), r2 = CabTunnelPoint(t, sb, c + 0.2, 0.6), r3 = CabTunnelPoint(t, sa, c + 0.2, 0.6);
+				CabDrawSolid(cv, eye, {r0, r1, r2, r3}, CabShade(rail, std::min(1.0, light * 1.8 + 0.15)));
+			}
+		} else if ((k & 1) == 0) {
+			/* The line down the middle of the road. */
+			auto l0 = CabTunnelPoint(t, sa, -0.15, 0.3), l1 = CabTunnelPoint(t, sa + step * 0.5, -0.15, 0.3), l2 = CabTunnelPoint(t, sa + step * 0.5, 0.15, 0.3), l3 = CabTunnelPoint(t, sa, 0.15, 0.3);
+			CabDrawSolid(cv, eye, {l0, l1, l2, l3}, CabShade(Colour(220, 220, 200), std::min(1.0, light * 1.5 + 0.2)));
+		}
+		/* A lamp on each wall every few pieces. */
+		if (static_cast<int>(std::floor(sm / step)) % 6 == 0) {
+			for (double c : {-CAB_TUNNEL_HALF + 0.05, CAB_TUNNEL_HALF - 0.05}) {
+				auto m0 = CabTunnelPoint(t, sm - 0.6, c, 8.0), m1 = CabTunnelPoint(t, sm + 0.6, c, 8.0), m2 = CabTunnelPoint(t, sm + 0.6, c, 9.5), m3 = CabTunnelPoint(t, sm - 0.6, c, 9.5);
+				CabDrawSolid(cv, eye, {m0, m1, m2, m3}, lamp);
+			}
+		}
+	}
+}
+
+/**
+ * A tunnel seen from outside, through the opening of a portal: its tube as far as the view reaches and the daylight
+ * at its other end, only where the opening is seen. Drawn into a picture of its own first and put where the opening
+ * shows, as the opening's plane, so the hill over a tunnel never shows in it -- a hill a level high is lower than
+ * the vault -- and the vault never shows out of the hill.
+ * @param end the tunnel's end whose portal is seen
+ */
+static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, TileIndex end)
+{
+	DiagDirection d = GetTunnelBridgeDirection(end);
+	int base = (t.axis == Axis::X ? TileX(end) : TileY(end)) * TILE_SIZE;
+	bool into_low = d == DiagDirection::NE || d == DiagDirection::NW;
+	double s = into_low ? base : base + TILE_SIZE;
+	double s_eye = t.axis == Axis::X ? eye.x : eye.y;
+	if (into_low ? s_eye <= s : s_eye >= s) return; // not in front of this portal
+	const size_t n = static_cast<size_t>(cv.w) * cv.h;
+	static std::vector<uint32_t> tube_px, open_px;
+	static std::vector<float> tube_z, open_z;
+	tube_px.assign(n, 0);
+	tube_z.assign(n, 0.0f);
+	open_px.assign(n, 0);
+	open_z.assign(n, 0.0f);
+	/* The opening: where it is seen, and how near. */
+	const CabCanvas open{open_px.data(), open_z.data(), cv.w, cv.h};
+	std::vector<CabPoint> hole;
+	for (const auto &p : _cab_tunnel_profile) {
+		auto w = CabTunnelPoint(t, s, p[0], p[1]);
+		hole.push_back(CabToEye(eye, w[0], w[1], w[2], 0.5, 0.5));
+	}
+	uint32_t one = 1;
+	CabDrawPolygon(open.dst, open.zb, open.w, open.h, &one, 1, 1, hole, eye, false);
+	/* The tube, as far as the view reaches, and the daylight in the far portal. */
+	const CabCanvas tube{tube_px.data(), tube_z.data(), cv.w, cv.h};
+	double reach = CAB_RANGE_TILES * TILE_SIZE;
+	double far = into_low ? t.s_lo : t.s_hi;
+	if (into_low) {
+		CabDrawTube(tube, eye, t, std::max(t.s_lo, s - reach), s);
+	} else {
+		CabDrawTube(tube, eye, t, s, std::min(t.s_hi, s + reach));
+	}
+	if (std::abs(far - s) <= reach) {
+		std::vector<CabPoint> light;
+		for (const auto &p : _cab_tunnel_profile) {
+			auto w = CabTunnelPoint(t, far, p[0], p[1]);
+			light.push_back(CabToEye(eye, w[0], w[1], w[2], 0.5, 0.5));
+		}
+		uint32_t day = Colour(205, 225, 240).data;
+		CabDrawPolygon(tube.dst, tube.zb, tube.w, tube.h, &day, 1, 1, light, eye, false);
+	}
+	for (size_t i = 0; i < n; i++) {
+		if (open_z[i] <= 0.0f || open_z[i] < cv.zb[i] || tube_px[i] == 0) continue;
+		cv.dst[i] = tube_px[i];
+		cv.zb[i] = open_z[i];
+	}
+}
+
+/** The cab view collects the sprites of a tile; DrawBridgeMiddle() says which of them are a bridge's. */
+static bool _cab_collecting = false;
+/** The sprites of the bridges over the tiles collected: the tile, and the first and the end of their parent sprites. */
+struct CabBridgeSprites {
+	TileIndex tile;
+	size_t from, to;
+};
+static std::vector<CabBridgeSprites> _cab_bridge_sprites;
+
+/**
+ * DrawBridgeMiddle() tells where the sprites of a bridge over a tile begin and end, for the cab view to build the
+ * bridge from them. Nothing else when the cab view is not collecting.
+ */
+void MarkCabBridgeSprites(TileIndex tile, bool begin)
+{
+	if (!_cab_collecting) return;
+	if (begin) {
+		_cab_bridge_sprites.push_back({tile, _vd.parent_sprites_to_draw.size(), SIZE_MAX});
+	} else if (!_cab_bridge_sprites.empty() && _cab_bridge_sprites.back().to == SIZE_MAX) {
+		_cab_bridge_sprites.back().to = _vd.parent_sprites_to_draw.size();
+	}
+}
+
+/**
+ * The ground of a tunnel's end as it is in the tunnel: level, with the track or the road straight on it, instead
+ * of the slope with the portal painted on it.
+ */
+static void CabTunnelGround(TileIndex tile, int z)
+{
+	const Axis axis = DiagDirToAxis(GetTunnelBridgeDirection(tile));
+	Point pt = RemapCoords(TileX(tile) * TILE_SIZE, TileY(tile) * TILE_SIZE, z);
+	auto add = [&](SpriteID image) { _vd.tile_sprites_to_draw.push_back({image, PAL_NONE, nullptr, pt.x, pt.y}); };
+	if (GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
+		const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(tile));
+		if (rti->UsesOverlay()) {
+			add(SPR_FLAT_GRASS_TILE);
+			SpriteID ground = GetCustomRailSprite(rti, tile, RailSpriteType::Ground);
+			if (ground != 0) add(ground + (axis == Axis::X ? RTO_X : RTO_Y));
+		} else {
+			add(rti->base_sprites.track_y + (axis == Axis::X ? 1 : 0));
+		}
+	} else {
+		add(axis == Axis::X ? SPR_ROAD_X : SPR_ROAD_Y);
+	}
+}
+
 /**
  * Draw the view from the cab of a vehicle.
  * @param v the vehicle (its first piece)
@@ -5579,7 +6167,30 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	eye.ry = -eye.fx;
 	eye.x = v->x_pos + eye.fx * CAB_EYE_AHEAD;
 	eye.y = v->y_pos + eye.fy * CAB_EYE_AHEAD;
-	eye.z = v->z_pos + CAB_EYE_Z;
+	{
+		/* The eye's height over the vehicle: as the type has it, bowed under a low bridge just ahead, so it passes
+		 * under the deck, which is only a level over the road or the rails. */
+		double want = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
+		bool close = false;
+		for (int k = -1; k <= 3; k++) {
+			double px = v->x_pos + eye.fx * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0), py = v->y_pos + eye.fy * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0);
+			if (px < 0 || py < 0 || px >= Map::SizeX() * TILE_SIZE || py >= Map::SizeY() * TILE_SIZE) continue;
+			TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
+			if (!IsBridgeAbove(tile)) continue;
+			int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+			if (bz <= v->z_pos + 4) continue; // on the bridge, not under it
+			want = std::min(want, std::max(CAB_EYE_Z_LOWEST, bz - CAB_DECK - 1.5 - v->z_pos));
+			if (k <= 1) close = true;
+		}
+		if (camera.eye_dz < 0) {
+			camera.eye_dz = want;
+		} else if (want < camera.eye_dz) {
+			camera.eye_dz = close ? want : camera.eye_dz + (want - camera.eye_dz) * 0.5;
+		} else {
+			camera.eye_dz += (want - camera.eye_dz) * 0.2;
+		}
+	}
+	eye.z = v->z_pos + camera.eye_dz;
 	eye.focal = (width / 2.0) / CAB_FOV_TAN;
 	eye.cx = width / 2.0;
 	eye.cy = height * 0.5;
@@ -5597,8 +6208,24 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		std::fill_n(dst + static_cast<size_t>(y) * width, width, c.data);
 	}
 
-	/* In a tunnel (hidden): the dark, with the light at its end. */
-	if (v->vehstatus.Test(VehState::Hidden)) {
+	/* A tunnel the eye is in: its tube is drawn round the eye, and the hill over it is left out. */
+	std::optional<CabTunnel> in_tunnel;
+	{
+		std::vector<TileIndex> near{v->tile};
+		if (eye.x >= 0 && eye.y >= 0 && eye.x < Map::SizeX() * TILE_SIZE && eye.y < Map::SizeY() * TILE_SIZE) near.push_back(TileVirtXY(static_cast<int>(eye.x), static_cast<int>(eye.y)));
+		for (TileIndex tile : near) {
+			std::optional<CabTunnel> t = CabTunnelAt(tile);
+			if (!t.has_value()) continue;
+			double s_e = t->axis == Axis::X ? eye.x : eye.y, c_e = (t->axis == Axis::X ? eye.y : eye.x) - t->c_mid;
+			if (s_e > t->s_lo && s_e < t->s_hi && std::abs(c_e) < TILE_SIZE / 2.0 && eye.z < t->z + CAB_PORTAL_TOP) {
+				in_tunnel = t;
+				break;
+			}
+		}
+	}
+
+	/* Hidden elsewhere than in a tunnel (a depot): the dark, with the light of the door. */
+	if (v->vehstatus.Test(VehState::Hidden) && !in_tunnel.has_value() && !CabTunnelAt(v->tile).has_value()) {
 		std::fill(out.pixels.begin(), out.pixels.end(), Colour(8, 8, 10).data);
 		int lw = std::max(4, width / 14), lh = std::max(3, height / 14);
 		int lx = width / 2 - lw / 2, ly = static_cast<int>(eye.cy) - lh / 2;
@@ -5617,6 +6244,7 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		int z;
 		size_t first, end;
 		bool building;
+		bool foundation; ///< its ground lies on a foundation, as the foundation's children
 	};
 	std::vector<CabTile> tiles;
 	int tcx = v->x_pos / static_cast<int>(TILE_SIZE), tcy = v->y_pos / static_cast<int>(TILE_SIZE);
@@ -5626,7 +6254,13 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 			CabPoint c = CabToEye(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, eye.z, 0, 0);
 			if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE) continue;
 			if (std::abs(c.r) > c.f * CAB_FOV_TAN + 3.0 * TILE_SIZE) continue;
-			tiles.push_back({tx, ty, c.f, SLOPE_FLAT, 0, 0, 0, false});
+			if (in_tunnel.has_value()) {
+				/* Inside a tunnel the hill over it would stick into the vault. */
+				const CabTunnel &t = *in_tunnel;
+				int along = t.axis == Axis::X ? tx : ty, across = t.axis == Axis::X ? ty : tx;
+				if (across * static_cast<int>(TILE_SIZE) + static_cast<int>(TILE_SIZE) / 2 == static_cast<int>(t.c_mid) && along * TILE_SIZE >= t.s_lo && (along + 1) * TILE_SIZE <= t.s_hi) continue;
+			}
+			tiles.push_back({tx, ty, c.f, SLOPE_FLAT, 0, 0, 0, false, false});
 		}
 	}
 	camera.tiles = static_cast<int>(tiles.size());
@@ -5679,6 +6313,11 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	/* The fences along the rails too: lines of the north-up view, posts or ribbons from here. */
 	AutoRestoreBackup fences_backup(_settings_client.gui.show_rail_fences, false);
 	AutoRestoreBackup field_fences_backup(_draw_fences, false);
+	/* What stands on a tile: 0 a billboard, 1 a building's box, 2 a station's box, 3 a bridge over the tile, 4 a
+	 * bridge's ramp, 5 nothing (a tunnel's portal, built anew). */
+	_cab_bridge_sprites.clear();
+	std::vector<TileIndex> ramps, tunnel_ends;
+	AutoRestoreBackup collecting_backup(_cab_collecting, true);
 	for (CabTile &t : tiles) {
 		_cur_ti.x = t.x * TILE_SIZE;
 		_cur_ti.y = t.y * TILE_SIZE;
@@ -5697,6 +6336,18 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		t.slope = _cur_ti.tileh;
 		t.z = _cur_ti.z;
 		t.building = tile_type == TileType::House || tile_type == TileType::Industry;
+		t.foundation = _vd.foundation[FoundationPart::Normal] != -1 || _vd.foundation[FoundationPart::Halftile] != -1;
+		bool tunnel_end = tile_type == TileType::TunnelBridge && IsTunnel(_cur_ti.tile);
+		bool ramp = tile_type == TileType::TunnelBridge && !tunnel_end;
+		if (tunnel_end) {
+			/* Level, with the track or road into the portal, which is built anew. */
+			_vd.tile_sprites_to_draw.resize(t.first);
+			CabTunnelGround(_cur_ti.tile, _cur_ti.z);
+			t.end = _vd.tile_sprites_to_draw.size();
+			t.slope = SLOPE_FLAT;
+			tunnel_ends.push_back(_cur_ti.tile);
+		}
+		if (ramp) ramps.push_back(_cur_ti.tile);
 		is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
 		for (int part = 0; part < 2; part++) {
 			int idx = _vd.foundation[static_cast<FoundationPart>(part)];
@@ -5704,7 +6355,14 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		}
 		/* What stands on the tile is a box of its sprite on a house, industry, object or station tile (a tree is a billboard). */
 		uint8_t kind = (tile_type == TileType::House || tile_type == TileType::Industry || tile_type == TileType::Object) ? 1 : (tile_type == TileType::Station ? 2 : 0);
+		if (ramp) kind = 4;
+		if (tunnel_end) kind = 5;
 		ps_kind.resize(_vd.parent_sprites_to_draw.size(), kind);
+		/* A bridge over the tile is built from its own sprites. */
+		for (auto it = _cab_bridge_sprites.rbegin(); it != _cab_bridge_sprites.rend() && it->from >= first_parent; ++it) {
+			if (it->to == SIZE_MAX) it->to = _vd.parent_sprites_to_draw.size();
+			for (size_t i = it->from; i < it->to && i < ps_kind.size(); i++) ps_kind[i] = 3;
+		}
 	}
 	is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
 	ps_kind.resize(_vd.parent_sprites_to_draw.size(), 0);
@@ -5732,6 +6390,13 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		bh = UnScaleByZoom(bigdpi.height, zoom);
 	}
 	const double scale = 1.0 / (1 << to_underlying(zoom));
+	if (_debug_misc_level >= 6) {
+		int mnx = INT32_MAX, mxx = INT32_MIN, mny = INT32_MAX, mxy = INT32_MIN;
+		for (const CabTile &t : tiles) {
+			mnx = std::min(mnx, t.x); mxx = std::max(mxx, t.x); mny = std::min(mny, t.y); mxy = std::max(mxy, t.y);
+		}
+		Debug(misc, 6, "cab ground texture {}x{} from {},{} tiles {} x {}..{} y {}..{} eye {:.0f},{:.0f} heading {:.2f}", bw, bh, bigdpi.left, bigdpi.top, tiles.size(), mnx, mxx, mny, mxy, eye.x, eye.y, camera.heading);
+	}
 	if (bw > 0 && bh > 0 && static_cast<size_t>(bw) * bh <= 24u * 1024 * 1024) {
 		_cab_big.assign(static_cast<size_t>(bw) * bh, 0);
 		bigdpi.dst_ptr = _cab_big.data();
@@ -5743,6 +6408,21 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 				for (size_t i = t.first; i < t.end; i++) {
 					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 					DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+				}
+			}
+			/* On a foundation (a road or rail levelled on a slope) the ground is drawn as children of the foundation's
+			 * sprite, on its top: the ground of the tile, which lies there (the tile's slope and height are the top's). */
+			for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
+				if (!is_foundation[i]) continue;
+				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+				for (int child_idx = ps.first_child; child_idx >= 0;) {
+					const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+					child_idx = cs.next;
+					if (cs.relative) {
+						DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+					} else {
+						DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+					}
 				}
 			}
 		}
@@ -5758,12 +6438,25 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 			FillTurnedFootprint(_cab_big.data(), bw, x0, y0, x1, y1);
 		}
 
+		if (_debug_misc_level >= 7) {
+			/* The rig: the ground texture as a PPM in the working directory. */
+			auto f = FileHandle::Open(std::string("cab_ground.ppm"), "wb");
+			if (f.has_value()) {
+				std::string head = fmt::format("P6\n{} {}\n255\n", bw, bh);
+				fwrite(head.data(), 1, head.size(), *f);
+				for (uint32_t p : _cab_big) {
+					Colour c(p);
+					uint8_t rgb[3] = {c.r, c.g, c.b};
+					fwrite(rgb, 1, 3, *f);
+				}
+			}
+		}
 		/* 4. The ground in perspective: each tile four triangles meeting in its middle, so slopes keep their folds. */
 		static const Corner corners[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
 		static const int cxs[4] = {0, 0, TILE_SIZE, TILE_SIZE};
 		static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
 		for (const CabTile &t : tiles) {
-			if (t.first >= t.end) continue;
+			if (t.first >= t.end && !t.foundation) continue;
 			Slope s = RemoveHalftileSlope(t.slope);
 			CabPoint p[5];
 			for (int i = 0; i < 5; i++) {
@@ -5780,11 +6473,63 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		}
 	}
 
+	/* 4b. Bridges and tunnels as things of their own: decks, ramps and pillars from the bridges' sprites; portals of
+	 * stones, and the tube of the tunnel the eye is in. */
+	const CabCanvas cv{dst, zb, width, height};
+	/* The sides of foundations: walls round the box of the foundation's sprite, dressed in it where it shows them
+	 * (the two it never shows mirrored), open where the sprite has nothing -- where the slope stands higher. */
+	for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
+		if (!is_foundation[i]) continue;
+		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		CabPoint c = CabToEye(eye, (ps.xmin + ps.xmax + 1) * 0.5, (ps.ymin + ps.ymax + 1) * 0.5, ps.zmin, 0, 0);
+		if (c.f < -TILE_SIZE * 1.0) continue;
+		static CabTexture found;
+		CabCompositeTexture(found, {&ps});
+		const double x0 = ps.xmin, x1 = ps.xmax + 1, y0 = ps.ymin, y1 = ps.ymax + 1, z0 = ps.zmin, z1 = ps.zmax + 1;
+		auto same = [&](double x, double y, double z) { return std::array<double, 6>{x, y, z, x, y, z}; };
+		auto at = [&](double x, double y, double z, double tx, double ty, double tz) { return std::array<double, 6>{x, y, z, tx, ty, tz}; };
+		CabDrawDressed(cv, eye, found, {same(x1, y0, z0), same(x1, y1, z0), same(x1, y1, z1), same(x1, y0, z1)}, false);
+		CabDrawDressed(cv, eye, found, {same(x0, y1, z0), same(x1, y1, z0), same(x1, y1, z1), same(x0, y1, z1)}, false);
+		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x1, y0, z0), at(x0, y1, z0, x1, y1, z0), at(x0, y1, z1, x1, y1, z1), at(x0, y0, z1, x1, y0, z1)}, false);
+		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x0, y1, z0), at(x1, y0, z0, x1, y1, z0), at(x1, y0, z1, x1, y1, z1), at(x0, y0, z1, x0, y1, z1)}, false);
+	}
+	for (const CabBridgeSprites &bs : _cab_bridge_sprites) {
+		std::vector<const ParentSpriteToDraw *> list;
+		for (size_t i = bs.from; i < bs.to && i < _vd.parent_sprites_to_draw.size(); i++) list.push_back(&_vd.parent_sprites_to_draw[i]);
+		CabDrawBridgeMiddle(cv, eye, bs.tile, list);
+	}
+	for (TileIndex head : ramps) {
+		/* The ramp's own sprites: those of its tile that are not of a bridge over it. */
+		std::vector<const ParentSpriteToDraw *> list;
+		int hx = TileX(head) * TILE_SIZE, hy = TileY(head) * TILE_SIZE;
+		for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
+			const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+			if (ps_kind[i] != 4 || is_foundation[i] || ps.image == SPR_EMPTY_BOUNDING_BOX) continue;
+			if (ps.xmin < hx || ps.xmin >= hx + static_cast<int>(TILE_SIZE) || ps.ymin < hy || ps.ymin >= hy + static_cast<int>(TILE_SIZE)) continue;
+			list.push_back(&ps);
+		}
+		CabDrawBridgeRamp(cv, eye, head, list);
+	}
+	for (TileIndex end : tunnel_ends) {
+		std::optional<CabTunnel> t = CabTunnelAt(end);
+		if (!t.has_value()) continue;
+		CabDrawPortal(cv, eye, *t, end);
+		if (in_tunnel.has_value() && (in_tunnel->a == t->a || in_tunnel->a == t->b)) continue;
+		/* Seen from outside: the tube through the opening only. */
+		CabDrawTunnelSeenIn(cv, eye, *t, end);
+	}
+	if (in_tunnel.has_value()) {
+		const CabTunnel &t = *in_tunnel;
+		double s_e = t.axis == Axis::X ? eye.x : eye.y;
+		double reach = CAB_RANGE_TILES * TILE_SIZE;
+		CabDrawTube(cv, eye, t, std::max(t.s_lo, s_e - reach), std::min(t.s_hi, s_e + reach));
+	}
+
 	/* 5. Everything standing as a billboard facing the eye, far first: the tiles' sprites, then the other vehicles. */
 	std::vector<CabBillboard> bills;
 	for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
 		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
-		if (ps.image == SPR_EMPTY_BOUNDING_BOX || is_foundation[i]) continue;
+		if (ps.image == SPR_EMPTY_BOUNDING_BOX || is_foundation[i] || ps_kind[i] >= 3) continue;
 		double bx = (ps.xmin + ps.xmax + 1) * 0.5, by = (ps.ymin + ps.ymax + 1) * 0.5;
 		CabPoint c = CabToEye(eye, bx, by, ps.zmin, 0, 0);
 		if (c.f < CAB_NEAR * 0.5) continue;
@@ -5814,7 +6559,11 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	const Vehicle *own = v->First();
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		if (u->First() == own) continue;
-		if (u->vehstatus.Test(VehState::Hidden)) continue;
+		if (u->vehstatus.Test(VehState::Hidden)) {
+			/* Hidden in the tunnel the eye is in: seen there. */
+			bool same_tunnel = in_tunnel.has_value() && (u->type == VehicleType::Train || u->type == VehicleType::Road) && (u->tile == in_tunnel->a || u->tile == in_tunnel->b);
+			if (!same_tunnel) continue;
+		}
 		if (u->type == VehicleType::Effect && u->sprite_cache.sprite_seq.count == 0) continue;
 		CabPoint c = CabToEye(eye, u->x_pos, u->y_pos, u->z_pos, 0, 0);
 		if (c.f < CAB_NEAR * 0.5 || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > c.f * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
@@ -5895,7 +6644,7 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 
 	/* 6. The haze: the far fades into the sky at the horizon. */
 	const double haze_to = CAB_RANGE_TILES * TILE_SIZE;
-	for (size_t i = 0; i < out.pixels.size(); i++) {
+	for (size_t i = 0; i < out.pixels.size() && !in_tunnel.has_value(); i++) {
 		float z = zb[i];
 		if (z <= 0.0f) continue;
 		double dist = 1.0 / z;
@@ -5907,6 +6656,16 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 
 	if (_debug_misc_level >= 6) {
 		/* The rig: the picture as a PPM in the working directory. */
+		auto fz = FileHandle::Open(std::string("cab_depth.pgm"), "wb");
+		if (fz.has_value()) {
+			/* The depth too: black where nothing is drawn, the nearer the lighter. */
+			std::string head = fmt::format("P5\n{} {}\n255\n", width, height);
+			fwrite(head.data(), 1, head.size(), *fz);
+			for (float z : _cab_depth) {
+				uint8_t v = z <= 0.0f ? 0 : static_cast<uint8_t>(std::clamp(255.0 - 255.0 * std::log2(1.0 / z) / 9.0, 1.0, 255.0));
+				fwrite(&v, 1, 1, *fz);
+			}
+		}
 		auto f = FileHandle::Open(std::string("cab_picture.ppm"), "wb");
 		if (f.has_value()) {
 			std::string head = fmt::format("P6\n{} {}\n255\n", width, height);

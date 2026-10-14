@@ -40,6 +40,7 @@ struct CabViewPicture {
 struct CabViewCamera {
 	double heading = 0.0; ///< radians, the world direction the eye looks along (atan2 of the direction's y, x)
 	bool valid = false;   ///< whether heading is set
+	double eye_dz = -1.0; ///< how high the eye is over the vehicle, units of height: it bows under a low bridge; -1 not yet
 	double ms = 0.0;      ///< rig: how long the last picture took, milliseconds
 	int tiles = 0;        ///< rig: tiles drawn in the last picture
 	int billboards = 0;   ///< rig: billboards drawn in the last picture

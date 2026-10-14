@@ -332,17 +332,37 @@ The heading is `Vehicle::cab_heading` (the command `SetCabHeading`, not
 saved); a ship with one leaves its shed for it without orders, or with an
 order that names that very shed, and on every tile it takes the track whose
 direction is nearest the heading (`ChooseShipTrack()`); a dead end turns it
-round as always. The panel says "steered by hand". Trains, road vehicles and
-aircraft follow their rails, roads and routes: for them the three buttons are
-greyed out. The button beside the pin puts the window over the whole screen
-and back (the player drives from the phone).
+round as always. The panel says "steered by hand".
+
+**A road vehicle can be steered too** (the player: "press right on a car and
+it turns right at the next junction"): **< Left** and **Right >** ask for the
+turn it takes at the next junction, like a blinker -- the other one takes the
+asked turn back to straight on. It is `Vehicle::cab_turn` (a `DirDiff`, the
+same command `SetCabHeading`, not saved): `RoadFindPathToDest()` takes the road
+of that turn on the next tile with a choice (a bend is no junction: the turn
+waits for one), and straight on from there; where the asked way is not to be
+had it goes straight on and keeps the turn for the next junction, and where
+straight on is not to be had either, round the corner on the side the
+vehicles keep to. A steered road vehicle leaves its depot even when its order
+is that very depot. The panel says "by hand: next right / next left /
+straight".
+
+**Back to the orders.** **As ordered** takes the steering off: the ship's or
+the road vehicle's cached path is cleared and it finds its way to its order
+anew. Closing the cab window does the same: whoever steers from the cab lets
+go when leaving it. Trains and aircraft follow their rails and routes: for
+them the three buttons are greyed out. The button beside the pin puts the
+window over the whole screen and back (the player drives from the phone).
 
 The picture is made by the same means as the turned map view, with a
 perspective rasterizer and a depth buffer in place of the turned projection:
 
 - **The eye** is at the front of the vehicle, a few units ahead of its
-  position and above it, looking along its direction; it turns towards a new
-  direction over a few frames, so a curve is a swing, not a jump. True 3D is
+  position and above it (a train's and a ship's 9 units of height, a road
+  vehicle's 7, an aircraft's 14), looking along its direction; it turns
+  towards a new direction over a few frames, so a curve is a swing, not a
+  jump. Under a low bridge -- its deck only a level over the road or the
+  rails -- the eye bows to pass under the deck, and rises again behind it. True 3D is
   taken from the game's projection: a tile is 16 units square, a unit of
   height (z) is 0.408 of a unit of x and y (a height level of 8 stands 3.27
   units tall), a pixel of a sprite at the normal zoom is 0.354 units across
@@ -353,8 +373,40 @@ perspective rasterizer and a depth buffer in place of the turned projection:
   texture at the normal zoom, and every tile is laid as four triangles meeting
   in its middle, each corner at its height, with the texture pixel of the
   world point -- in perspective, 1/depth and the texture pixel over depth
-  changing linearly across the picture (`CabRasterTriangle()`). The black
-  under a building is grown over as in the turned view.
+  changing linearly across the picture (`CabRasterTriangle()`); between the
+  four nearest texture pixels the colour is mixed where all four have one,
+  so the ground and the sprites up close are smooth, not big squares, and
+  their edges stay sharp. The black under a building is grown over as in the
+  turned view. Where a road or rail is levelled on a slope, its ground lies
+  on the foundation as the foundation's children: drawn into the texture
+  too, at the foundation's top, with the foundation's sides as walls of its
+  sprite.
+- **Bridges** are built from the sprites the game draws for them
+  (`DrawBridgeMiddle()` tells the cab view which they are,
+  `MarkCabBridgeSprites()`): over every tile the deck at the bridge's height,
+  dressed in the floor sprite (the track or the road on it), the far railing
+  standing on the deck's far edge in the same sprite, the near railing in the
+  sprite of the near side, the deck's edges and its underside in the shadow,
+  and the pillars as columns where the sprite's pixels are
+  (`CabDrawBridgeMiddle()`); a ramp is a deck rising from the ground to the
+  bridge (level on a foundation), its sides down to the ground and its end
+  under the bridge (`CabDrawBridgeRamp()`). "Dressed" is the boxes' way: a
+  point of the surface takes the pixel where the north-up view draws it. A
+  vehicle on a bridge looks from the deck; one under it sees the underside
+  and the girders.
+- **Tunnels.** A tunnel's end is level, with the track or the road straight
+  on it, instead of the slope with the portal painted on it
+  (`CabTunnelGround()`); on its edge where the hill starts stands a portal of
+  stones round an opening as tall as the tunnel, with walls of stones beside
+  the way in up to the slope that was there (`CabDrawPortal()`). Seen from
+  outside, the tunnel shows only through the opening: its tube is drawn into
+  a picture of its own and put where the opening is seen, as the opening's
+  plane (`CabDrawTunnelSeenIn()`), so a hill a level high -- lower than the
+  vault -- never shows in it, nor the vault out of the hill. With the eye in
+  the tunnel the tube is drawn round it and the hill over it left out: walls
+  and vault in pieces, lit from the ends and dark inside, lamps along the
+  walls, the rails or the line of the road on the floor, the daylight of the
+  other end, and the vehicles in the same tunnel (`CabDrawTube()`).
 - **Everything standing** is drawn far to near with the depth test: what
   stands on a house, industry, object or station tile with a footprint is a
   **box** of its sprite (`CabDrawBox()`: the sprite's pixels over the top and
@@ -375,16 +427,17 @@ perspective rasterizer and a depth buffer in place of the turned projection:
   long low box of any tile (a fence of a farm or a station) is skipped.
 - **The sky** is a gradient down to the horizon in the middle of the
   picture, the far ground a plain green under it; what is drawn fades into
-  the haze colour from 6 tiles out to the edge of reach. In a tunnel the
-  picture is dark with the light at its end.
+  the haze colour from 6 tiles out to the edge of reach (not in a tunnel).
+  Hidden elsewhere than in a tunnel (in a depot) the picture is dark with
+  the light of the door.
 - A picture of 450x300 takes about 4 ms (427 tiles, 400 billboards); the
   sprites' textures are kept between frames (`_cab_textures`, up to 4096).
 
-What is not there yet: bridges (their pieces are billboards; the vehicle on
-one sees the ground below it), the inside of a tunnel for real, the catenary
-as wires of their own, the own vehicle's nose or cab, finer textures of the
-ground near the eye (the normal zoom, blocky up close), the buildings with
-eight renders and the new 3D objects (billboards and boxes for now).
+What is not there yet: the catenary as wires of their own, the own vehicle's
+nose or cab, finer patterns of the ground near the eye (smooth now, but
+still the normal zoom's few pixels), the buildings with eight renders and the
+new 3D objects (billboards and boxes for now). A bridge's thin lines (the
+cables of a suspension bridge) stand as rows of the sprite's pixels.
 
 ## The rig
 
@@ -405,11 +458,20 @@ view of the n-th visible vehicle (`test3d kabina cas` says how long its last
 picture took and what was in it; with `-d misc=5` the tall things, the boxes
 and the walls drawn are listed, with `misc=6` the picture and the sprites'
 textures are written as `cab_picture.ppm` and `cab_tex_<sprite>.ppm`),
+`test3d trat [bridge type]` builds the cab view's railway -- a shed, a
+bridge over a dip (of the type asked, else the first that can be built), a
+tunnel through a hill a level high, a road under the bridge where it is a
+level low with a bus on it -- and sends an engine along it, `test3d silnice`
+a grid of roads with junctions and a bus (with `-d misc=5` a steered road
+vehicle says the turn it takes at each junction; with `misc=6` the cab
+view's depth is written as `cab_depth.pgm` too, with `misc=7` its ground
+texture as `cab_ground.ppm`),
 `test3d jed <type> <unit>` starts a vehicle that stands in its shed (type 0
 train, 1 road, 2 ship, 3 aircraft; with `testletadlo <x> <y>` after a
 company exists, an aircraft in the air; with `testlod`, a ship in a shed),
 `test3d smer <type> <unit> <direction 0..7 | 255>` steers a vehicle from its
-cab as the window's buttons do (with `-d misc=5` the ship says why it stays
+cab as the window's buttons do (a road vehicle takes the turn instead: 0
+straight on, 2 right, 6 left) (with `-d misc=5` the ship says why it stays
 in its shed or that it leaves), `test3d snimek <name>` writes
 the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole

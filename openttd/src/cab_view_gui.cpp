@@ -27,6 +27,8 @@
 #include "viewport_func.h"
 #include "command_func.h"
 #include "vehicle_cmd.h"
+#include "openttd.h"
+#include "company_func.h"
 #include "order_base.h"
 #include "direction_func.h"
 #include "gfx_func.h"
@@ -91,6 +93,16 @@ struct CabViewWindow : Window {
 		if (v != nullptr) this->owner = v->owner;
 	}
 
+	void Close(int data = 0) override
+	{
+		/* Whoever steers from the cab lets go when leaving it: a ship or a road vehicle goes back to its orders. */
+		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
+		if (_game_mode == GameMode::Normal && v != nullptr && v->owner == _local_company && v->IsCabSteered()) {
+			Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+		}
+		this->Window::Close(data);
+	}
+
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
@@ -111,11 +123,11 @@ struct CabViewWindow : Window {
 			this->Close();
 			return;
 		}
-		/* Only a ship can be steered: the rest follow their roads, rails and routes. */
-		bool steerable = v->type == VehicleType::Ship;
+		/* A ship and a road vehicle can be steered: a train follows its rails, an aircraft its route. */
+		bool steerable = v->type == VehicleType::Ship || v->type == VehicleType::Road;
 		this->SetWidgetDisabledState(WID_CV_LEFT, !steerable);
 		this->SetWidgetDisabledState(WID_CV_RIGHT, !steerable);
-		this->SetWidgetDisabledState(WID_CV_AUTO, !steerable || v->cab_heading == Direction::Invalid);
+		this->SetWidgetDisabledState(WID_CV_AUTO, !steerable || !v->IsCabSteered());
 		this->DrawWidgets();
 	}
 
@@ -237,7 +249,15 @@ struct CabViewWindow : Window {
 			DrawString(note_x, sright, state_y, limit, TextColour::FromString);
 			note_x += GetStringBoundingBox(limit).width + 8;
 		}
-		if (v->cab_heading != Direction::Invalid) DrawString(note_x, sright, state_y, GetString(STR_CAB_VIEW_STEERED), TextColour::FromString);
+		if (v->cab_turn != Vehicle::CAB_TURN_NONE) {
+			/* A road vehicle: the turn it takes at the next junction. */
+			StringID turn = STR_CAB_VIEW_STEERED_STRAIGHT;
+			if (v->cab_turn == to_underlying(DirDiff::Right90)) turn = STR_CAB_VIEW_STEERED_RIGHT;
+			if (v->cab_turn == to_underlying(DirDiff::Left90)) turn = STR_CAB_VIEW_STEERED_LEFT;
+			DrawString(note_x, sright, state_y, GetString(turn), TextColour::FromString);
+		} else if (v->cab_heading != Direction::Invalid) {
+			DrawString(note_x, sright, state_y, GetString(STR_CAB_VIEW_STEERED), TextColour::FromString);
+		}
 
 		/* The load, as a figure and a bar. */
 		int percent = LoadPercent(v);
@@ -280,7 +300,16 @@ struct CabViewWindow : Window {
 			}
 			case WID_CV_LEFT:
 			case WID_CV_RIGHT: {
-				/* Steer: an eighth of a turn from the heading so far, or from the way it goes now. */
+				if (v->type == VehicleType::Road) {
+					/* A road vehicle: the turn at the next junction, like a blinker; the other way back to straight on. */
+					DirDiff now = v->cab_turn != Vehicle::CAB_TURN_NONE ? static_cast<DirDiff>(v->cab_turn) : DirDiff::Same;
+					DirDiff asked = widget == WID_CV_LEFT ? DirDiff::Left90 : DirDiff::Right90;
+					DirDiff opposite = widget == WID_CV_LEFT ? DirDiff::Right90 : DirDiff::Left90;
+					DirDiff next = now == opposite ? DirDiff::Same : asked;
+					Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(to_underlying(next)));
+					break;
+				}
+				/* A ship: an eighth of a turn from the heading so far, or from the way it goes now. */
 				if (v->type != VehicleType::Ship) break;
 				Direction from = v->cab_heading != Direction::Invalid ? v->cab_heading : v->direction;
 				if (from == Direction::Invalid) break;

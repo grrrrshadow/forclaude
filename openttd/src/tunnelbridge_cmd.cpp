@@ -1631,6 +1631,14 @@ void DrawBridgeMiddle(const TileInfo *ti, BridgePillarFlags blocked_pillars)
 
 	if (!IsBridgeAbove(ti->tile)) return;
 
+	/* The cab view (viewport.cpp) tells the sprites of the bridge from those of the tile under it. */
+	extern void MarkCabBridgeSprites(TileIndex tile, bool begin);
+	struct CabBridgeMark {
+		TileIndex tile;
+		explicit CabBridgeMark(TileIndex tile) : tile(tile) { MarkCabBridgeSprites(tile, true); }
+		~CabBridgeMark() { MarkCabBridgeSprites(this->tile, false); }
+	} cab_mark(ti->tile);
+
 	TileIndex rampnorth = GetNorthernBridgeEnd(ti->tile);
 	TileIndex rampsouth = GetSouthernBridgeEnd(ti->tile);
 	TransportType transport_type = GetTunnelBridgeTransportType(rampsouth);

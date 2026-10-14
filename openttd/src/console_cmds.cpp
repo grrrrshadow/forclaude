@@ -116,6 +116,7 @@
 #include "industrytype.h"
 #include "industry_cmd.h"
 #include "terraform_cmd.h"
+#include "tunnelbridge_cmd.h"
 #include "waypoint_cmd.h"
 #include "waypoint_base.h"
 #include "waypoint_func.h"
@@ -8937,6 +8938,158 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowToTile(TileXY(x0 + 6, y0 + 1), true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: zatacka u {},{}: {} (vozidlo {}, {} clanku) vyjizdi z depa na {},{} po X a zahyba na Y u {},{}", x0, y0, GetString(STR_ENGINE_NAME, eid), v->unitnumber, pieces, x0 + 1, y0 + 1, x0 + 6, y0 + 1);
+	} else if (what == "trat" || what == "silnice") {
+		/* The rig's ways for the cab view: 'trat' a railway along x through a bridge over a dip and a tunnel through
+		 * a hill, with an engine sent along it; 'silnice' a grid of roads with junctions and a bus. Both on the first
+		 * flat clear piece of land big enough. */
+		if (_game_mode != GameMode::Normal) {
+			IConsolePrint(CC_ERROR, "test3d {}: only in a running game.", what);
+			return true;
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) {
+				IConsolePrint(CC_ERROR, "test3d {}: no company to build as.", what);
+				return true;
+			}
+			SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		const bool rail = what == "trat";
+		const uint need_x = rail ? 34 : 18, need_y = rail ? 10 : 18;
+		uint x0 = 0, y0 = 0;
+		bool found = false;
+		for (uint ty = 2; ty + need_y + 2 < Map::SizeY() && !found; ty++) {
+			for (uint tx = 2; tx + need_x + 2 < Map::SizeX() && !found; tx++) {
+				int h = TileHeight(TileXY(tx, ty));
+				bool good = h >= 1;
+				for (uint dy = 0; dy < need_y && good; dy++) {
+					for (uint dx = 0; dx < need_x && good; dx++) {
+						TileIndex t = TileXY(tx + dx, ty + dy);
+						if (!(IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) || TileHeight(t) < h || TileHeight(t) > h + 1) good = false;
+					}
+				}
+				if (good) {
+					x0 = tx;
+					y0 = ty;
+					found = true;
+				}
+			}
+		}
+		if (!found) {
+			IConsolePrint(CC_ERROR, "test3d {}: no flat clear piece of land {}x{} on the map.", what, need_x, need_y);
+			return true;
+		}
+		auto err = [](const CommandCost &r) { return r.GetErrorMessage() == INVALID_STRING_ID ? std::string("?") : GetString(r.GetErrorMessage()); };
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 1, y0 + need_y - 1), TileXY(x0, y0), false, LevelMode::Level);
+		std::string failed;
+		TileIndex depot;
+		VehicleType vtype;
+		if (rail) {
+			const uint ry = y0 + 4;
+			/* A hill a level high for the tunnel; a dip a level deep under the bridge. */
+			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 22, y0 + need_y - 1), TileXY(x0 + 16, y0), false, LevelMode::Raise);
+			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 10, ry + 2), TileXY(x0 + 8, ry - 2), false, LevelMode::Lower);
+			depot = TileXY(x0 + 1, ry);
+			CommandCost r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW);
+			if (r.Failed()) failed = fmt::format("depot: {}", err(r));
+			auto track = [&](uint from, uint to) {
+				for (uint i = from; i <= to && failed.empty(); i++) {
+					CommandCost rr = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + i, ry), RAILTYPE_RAIL, Track::X, false);
+					if (rr.Failed()) failed = fmt::format("rail at {},{}: {}", x0 + i, ry, err(rr));
+				}
+			};
+			track(2, 5);
+			if (failed.empty()) {
+				CommandCost best = CMD_ERROR;
+				/* The bridge's type as asked ('test3d trat <type>'), else the first of these that can be built. */
+				std::vector<BridgeType> types{5, 4, 3, 2, 1, 0};
+				if (auto asked = number(2); asked.has_value()) types = {static_cast<BridgeType>(*asked)};
+				for (BridgeType b : types) {
+					best = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(x0 + 13, ry), TileXY(x0 + 6, ry), TransportType::Rail, b, RAILTYPE_RAIL, INVALID_ROADTYPE);
+					if (best.Succeeded()) {
+						IConsolePrint(CC_DEFAULT, "test3d: most typu {} z {},{} na {},{}", b, x0 + 6, ry, x0 + 13, ry);
+						break;
+					}
+				}
+				if (best.Failed()) failed = fmt::format("bridge: {}", err(best));
+			}
+			track(14, 14);
+			if (failed.empty()) {
+				CommandCost r2 = Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, TileXY(x0 + 15, ry), TransportType::Rail, RAILTYPE_RAIL, INVALID_ROADTYPE);
+				if (r2.Failed()) failed = fmt::format("tunnel at {},{}: {}", x0 + 15, ry, err(r2));
+			}
+			track(24, need_x - 2);
+			/* A road under the bridge where the ground is not lowered, a level under the deck, with a bus: the eye
+			 * bows under it. */
+			if (failed.empty()) {
+				CommandCost rr = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 7, y0 + need_y - 1), TileXY(x0 + 7, y0 + 1), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
+				if (rr.Failed()) IConsolePrint(CC_ERROR, "test3d trat: the road under the bridge: {}", err(rr));
+				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 7, y0 + 1), RoadBits{RoadBit::NW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				TileIndex bus_depot = TileXY(x0 + 7, y0);
+				if (Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, bus_depot, ROADTYPE_ROAD, DiagDirection::SE).Succeeded()) {
+					for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+						if (!e->company_avail.Test(_local_company) || RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) continue;
+						auto [bcost, bus, ba, bb, bc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, bus_depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+						if (bcost.Succeeded() && bus != VehicleID::Invalid()) {
+							Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, bus, false);
+							IConsolePrint(CC_DEFAULT, "test3d: autobus {} pod mostem u {},{}", Vehicle::Get(bus)->unitnumber, x0 + 7, ry);
+						}
+						break;
+					}
+				}
+			}
+			vtype = VehicleType::Train;
+		} else {
+			/* Roads along x at rows 4 and 12, along y at columns 4, 9 and 14; the depot at the end of the first column. */
+			for (uint row : {4u, 12u}) {
+				CommandCost r = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 2, y0 + row), TileXY(x0 + 1, y0 + row), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+				if (r.Failed() && failed.empty()) failed = fmt::format("road row {}: {}", row, err(r));
+			}
+			for (uint col : {4u, 9u, 14u}) {
+				CommandCost r = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + col, y0 + need_y - 2), TileXY(x0 + col, y0 + 1), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
+				if (r.Failed() && failed.empty()) failed = fmt::format("road column {}: {}", col, err(r));
+			}
+			depot = TileXY(x0 + 4, y0); // at the north end of the first column, its door onto the road
+			CommandCost r = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot, ROADTYPE_ROAD, DiagDirection::SE);
+			if (r.Failed() && failed.empty()) failed = fmt::format("depot: {}", err(r));
+			/* A long road's first tile has only its half towards the rest: the half to the depot's door too. */
+			Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 4, y0 + 1), RoadBits{RoadBit::NW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+			vtype = VehicleType::Road;
+		}
+		if (!failed.empty()) {
+			IConsolePrint(CC_ERROR, "test3d {}: could not be built: {}.", what, failed);
+			return true;
+		}
+		UpdateSignalsInBuffer();
+		EngineID eid = EngineID::Invalid();
+		for (const Engine *e : Engine::IterateType(vtype)) {
+			if (!e->company_avail.Test(_local_company)) continue;
+			if (vtype == VehicleType::Train) {
+				const RailVehicleInfo *rvi = RailVehInfo(e->index);
+				if (rvi->railveh_type == RailVehicleType::Wagon || !rvi->railtypes.Test(RAILTYPE_RAIL)) continue;
+			} else if (RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) {
+				continue;
+			}
+			eid = e->index;
+			break;
+		}
+		if (eid == EngineID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d {}: no vehicle to build.", what);
+			return true;
+		}
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, eid, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed() || veh == VehicleID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d {}: {} could not be built: {}.", what, GetString(STR_ENGINE_NAME, eid), err(cost));
+			return true;
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+		const Vehicle *v = Vehicle::Get(veh);
+		ScrollMainWindowToTile(depot, true);
+		UpdateViewportPosition(w, 0);
+		IConsolePrint(CC_DEFAULT, "test3d: {} u {},{}: {} (vozidlo {} typu {}) vyjizdi z depa na {},{}", what, x0, y0, GetString(STR_ENGINE_NAME, eid), v->unitnumber, to_underlying(v->type), TileX(depot), TileY(depot));
 	} else if (what == "ladeni") {
 		extern TileIndex _turned_debug_tile;
 		auto x = number(2), y = number(3);

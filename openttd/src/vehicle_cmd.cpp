@@ -1307,22 +1307,40 @@ CommandCost CmdSetCabSpeedLimit(DoCommandFlags flags, VehicleID veh_id, uint16_t
 }
 
 /**
- * Steer a vehicle from its cab (cab_view.h): the direction it is to go in. A ship minds it: it leaves its shed
- * for it and takes the track nearest to it on every tile, until the heading is taken off again.
+ * Steer a vehicle from its cab (cab_view.h). A ship takes a heading: it leaves its shed for it and takes the track
+ * nearest to it on every tile. A road vehicle takes a turn: the road it takes at the next junction, and straight on
+ * after it. Until the steering is taken off again: then the vehicle finds its way to its orders anew.
  * @param flags type of operation
  * @param veh_id the vehicle
- * @param heading the Direction, or 0xFF for none: the vehicle goes as its orders say
+ * @param heading a ship: the Direction; a road vehicle: the turn, a DirDiff (Same, Right90 or Left90); or 0xFF for
+ *                none, the vehicle goes as its orders say
  */
 CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t heading)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle()) return CMD_ERROR;
-	if (heading != 0xFF && heading >= 8) return CMD_ERROR;
+	if (heading != 0xFF) {
+		switch (v->type) {
+			case VehicleType::Ship:
+				if (heading >= 8) return CMD_ERROR;
+				break;
+			case VehicleType::Road:
+				if (heading != to_underlying(DirDiff::Same) && heading != to_underlying(DirDiff::Right90) && heading != to_underlying(DirDiff::Left90)) return CMD_ERROR;
+				break;
+			default:
+				return CMD_ERROR;
+		}
+	}
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		v->cab_heading = heading == 0xFF ? Direction::Invalid : static_cast<Direction>(heading);
+		if (v->type == VehicleType::Road) {
+			v->cab_turn = heading;
+			RoadVehicle::From(v)->path.clear();
+		} else {
+			v->cab_heading = heading == 0xFF ? Direction::Invalid : static_cast<Direction>(heading);
+		}
 		if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
 		SetWindowDirty(WindowClass::CabView, v->index);
 		SetWindowDirty(WindowClass::VehicleView, v->index);

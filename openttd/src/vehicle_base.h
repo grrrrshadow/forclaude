@@ -305,6 +305,20 @@ public:
 	 * track nearest to it on every tile. Not saved.
 	 */
 	Direction cab_heading = Direction::Invalid;
+	/** No turn asked for from the cab: the vehicle goes as its orders say (#cab_turn). */
+	static constexpr uint8_t CAB_TURN_NONE = 0xFF;
+	/**
+	 * The turn the player asks a road vehicle to take at the next junction from its cab (cab_view.h): a DirDiff,
+	 * DirDiff::Same straight on, DirDiff::Right90 or DirDiff::Left90; after the turn it goes straight on. Or
+	 * #CAB_TURN_NONE when it goes as its orders say. Not saved.
+	 */
+	uint8_t cab_turn = CAB_TURN_NONE;
+
+	/** Whether the player steers the vehicle from its cab, instead of its orders. */
+	inline bool IsCabSteered() const
+	{
+		return this->cab_heading != Direction::Invalid || this->cab_turn != CAB_TURN_NONE;
+	}
 
 	/** The cab's speed limit in the vehicle's own units of speed, or no limit at all. */
 	inline int CabSpeedLimitInternal() const
