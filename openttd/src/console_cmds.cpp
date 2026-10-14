@@ -127,6 +127,7 @@
 #include "settings_gui.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
+#include "widgets/cab_view_widget.h"
 #include "widgets/misc_widget.h"
 #include "widgets/order_widget.h"
 #include "widgets/town_widget.h"
@@ -8938,6 +8939,32 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string DescribeCabViews();
 		if (argv.size() > 2 && argv[2] == "cas") {
 			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCabViews());
+			return true;
+		}
+		if (argv.size() > 3 && argv[2] == "klik") {
+			/* A click on a button of the cab view open: 'test3d kabina klik <vlevo|vpravo|auto|mimo|stop|brzda|plyn|cely>',
+			 * the way the player steers from it (the player: "the car cannot be steered from the cab any more"). */
+			static const std::pair<std::string_view, WidgetID> buttons[] = {
+				{"vlevo", WID_CV_LEFT}, {"vpravo", WID_CV_RIGHT}, {"auto", WID_CV_AUTO}, {"mimo", WID_CV_OFFROAD},
+				{"stop", WID_CV_STOP}, {"brzda", WID_CV_BRAKE}, {"plyn", WID_CV_THROTTLE}, {"cely", WID_CV_FULL},
+			};
+			WidgetID id = -1;
+			for (const auto &[name, wid] : buttons) if (argv[3] == name) id = wid;
+			Window *cw = FindWindowByClass(WindowClass::CabView);
+			if (id < 0 || cw == nullptr) {
+				IConsolePrint(CC_ERROR, "test3d kabina klik: no such button, or no cab view open.");
+				return true;
+			}
+			{
+				/* As the player's click: the local company is the current one (the rig's timer runs inside the tick, where nobody is). */
+				AutoRestoreBackup cur_company(_current_company, _local_company);
+				cw->OnClick({}, id, 1);
+			}
+			const Vehicle *cv = Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number));
+			if (cv != nullptr) {
+				IConsolePrint(CC_DEFAULT, "test3d: kabina klik {}: vozidlo {} na {},{} smer {} zatoceni {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {}", argv[3], cv->unitnumber, cv->x_pos, cv->y_pos,
+						to_underlying(cv->direction), cv->cab_turn, to_underlying(cv->cab_heading), cv->cab_free, cv->cab_rejoin, cv->cab_yaw, cw->IsWidgetDisabled(id) ? "ano" : "ne");
+			}
 			return true;
 		}
 		auto n = number(2);
