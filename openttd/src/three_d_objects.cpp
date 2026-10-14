@@ -232,6 +232,9 @@ static void ReadThreeDObjects()
 		}
 		if (!indices.empty()) break; // the first place that has them
 	}
+	/* In the same order on every computer: a house in two folders (the colleague's 04, the same block below the snow
+	 * in mirne/ and in subarkticke/) is the first folder's. */
+	std::sort(indices.begin(), indices.end());
 	for (const std::string &index : indices) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
@@ -242,7 +245,18 @@ static void ReadThreeDObjects()
 				ThreeDObject obj;
 				obj.file = e.at("soubor").get<std::string>();
 				obj.name = e.value("jmeno", obj.file);
-				obj.house = static_cast<HouseID>(e.at("nahrazuje_house").get<int>());
+				/* The house it is: a number, or a list -- a sub-arctic house below the snow line and the same one above
+				 * it, the second dressed in the snowy texture named by "snih" beside the .glb, over the same UVs
+				 * (the colleague's hra/3d/ODPOVED-OBJEKTY.md, the other climates). */
+				std::vector<HouseID> houses;
+				const auto &which = e.at("nahrazuje_house");
+				if (which.is_array()) {
+					for (const auto &h : which) houses.push_back(static_cast<HouseID>(h.get<int>()));
+				} else {
+					houses.push_back(static_cast<HouseID>(which.get<int>()));
+				}
+				if (houses.empty()) continue;
+				obj.house = houses.front();
 				obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
 				obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
 				if (e.contains("varianty")) {
@@ -250,6 +264,16 @@ static void ReadThreeDObjects()
 					for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
 				}
 				if (!ReadGlb(folder + obj.file, obj)) continue;
+				std::vector<uint8_t> snow;
+				if (houses.size() > 1 && e.contains("snih")) snow = ReadWholeFile(folder + e.at("snih").get<std::string>());
+				for (size_t k = 1; k < houses.size(); k++) {
+					/* The same shape for the next house of the list; the last ones (above the snow) in the snowy texture. */
+					ThreeDObject other = obj;
+					other.house = houses[k];
+					other.name = obj.name + (snow.empty() ? "" : " snih");
+					if (!snow.empty()) other.png = snow;
+					_three_d_objects.push_back(std::move(other));
+				}
 				_three_d_objects.push_back(std::move(obj));
 			}
 		} catch (const std::exception &ex) {

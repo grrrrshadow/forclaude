@@ -114,15 +114,17 @@ foreach(BUILTIN_GRAPHICS_FILE IN LISTS BASESET_BUILTIN_GRAPHICS_FILES)
 endforeach()
 
 # Buildings as real 3D objects (src/three_d_objects.h): every object set in
-# decouple/objekty/<set>/ -- its .glb files and its index objekty.json -- is
+# decouple/objekty/<set>/ -- its .glb files, the snowy textures beside them and its index objekty.json -- is
 # read by the game from baseset/decouple/objekty/<set>/, drawn in the 3D views.
-file(GLOB BASESET_OBJECT_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.glb ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/objekty.json)
+file(GLOB BASESET_OBJECT_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.glb ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.png ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/objekty.json)
 foreach(OBJECT_FILE IN LISTS BASESET_OBJECT_FILES)
     file(RELATIVE_PATH OBJECT_RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${OBJECT_FILE}")
     get_filename_component(OBJECT_DIR "${OBJECT_RELATIVE}" DIRECTORY)
     set(OBJECT_BINARY_FILE "${CMAKE_BINARY_DIR}/baseset/${OBJECT_RELATIVE}")
 
-    add_custom_command_timestamp(OUTPUT ${OBJECT_BINARY_FILE}
+    # A plain command, not add_custom_command_timestamp(): that one names its stamp by the file's name alone, and
+    # every set has an objekty.json -- all but the first set's index were left out of the build.
+    add_custom_command(OUTPUT ${OBJECT_BINARY_FILE}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/baseset/${OBJECT_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy
                     ${OBJECT_FILE}

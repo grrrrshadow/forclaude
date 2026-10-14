@@ -8659,6 +8659,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "mesta") {
 		/* Where the towns are, for the rig: the game's own industries must be built in one. */
 		for (const Town *t : Town::Iterate()) IConsolePrint(CC_DEFAULT, "test3d: town {} at {},{} population {}", t->GetCachedName(), TileX(t->xy), TileY(t->xy), t->cache.population);
+	} else if (what == "postav" && argv.size() > 5 && argv[4] == "dum") {
+		/* An original house by its number, of any climate: 'test3d postav <x> <y> dum <number>' (0x4e a desert house in a
+		 * temperate game), to see the houses of the other climates as 3D objects. */
+		auto x = number(2), y = number(3);
+		std::string_view num = argv[5];
+		bool hex = num.starts_with("0x") || num.starts_with("0X");
+		auto house = ParseInteger(hex ? num.substr(2) : num, hex ? 16 : 10);
+		if (!x.has_value() || !y.has_value() || !house.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> dum <house number>'.");
+			return true;
+		}
+		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
+		CommandCost cost = Command<Commands::PlaceHouse>::Do(DoCommandFlag::Execute, TileXY(*x, *y), static_cast<HouseID>(*house), false, true);
+		cur_company.Restore();
+		IConsolePrint(cost.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: dum {:#04x} na {},{}: {}", *house, *x, *y,
+				cost.Succeeded() ? std::string("postaven") : (cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("NEJDE") : GetString(cost.GetErrorMessage())));
 	} else if (what == "postav" && argv.size() > 4) {
 		/* Put a building with eight renders on the map, by its model's name: a house or one of the game's own industries. */
 		auto x = number(2), y = number(3);

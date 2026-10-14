@@ -301,7 +301,14 @@ format in `hra/3d/OBJEKTY-3D.md`), 31 files for the 21 houses and their colour
 variants, 3.5 MB in all. They lie in `media/baseset/decouple/objekty/mirne/`
 with their index `objekty.json` (CMake copies every set under
 `decouple/objekty/` into the game's `baseset/`), and the game reads them from
-`baseset/decouple/objekty/<set>/` the first time one is wanted.
+`baseset/decouple/objekty/<set>/` the first time one is wanted, the folders
+in the order of their names. The houses of the sub-arctic and sub-tropical
+climates followed (14. 10.; the player: "he has those houses done, take them
+in"): `subarkticke/` (19 objects, 4.6 MB) and `subtropicke/` (15, 1.5 MB). A
+house is found by its number whatever the climate played, so the houses of
+another climate in a themed town of the temperate one ("Houses from" in the
+town window, the settings of desert and arctic towns) are drawn as objects
+too.
 
 - **The file.** glTF binary (`.glb`): the JSON and the buffer; the first
   mesh's triangles, their corners' positions and texture coordinates, the
@@ -312,7 +319,10 @@ with their index `objekty.json` (CMake copies every set under
   object is drawn (an alpha under half is transparent), halved into levels of
   detail down to a pixel.
 - **The index** says which house of the original game each object is
-  (`nahrazuje_house`, the house of its north tile), its size in tiles and
+  (`nahrazuje_house`, the house of its north tile; or a list of them, a
+  sub-arctic house below the snow line and the same one above it, the later
+  ones dressed in the snowy texture `snih` names, a PNG beside the `.glb`
+  over the same UVs), its size in tiles and
   which colour variants (`varianty`, the slot `TileHash2Bit()` of the tile
   picks in `_town_draw_tile_data`); a variant whose sprite is another shape
   has an object of its own. An object reaching out of its plot is said in

@@ -61,6 +61,15 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
 
 - `mirne/` – všech 21 domů mírného klimatu původní hry, 31 souborů (od kolegy,
   grrrrf `hra/3d/objekty/mirne/`, textury z OpenGFX 7.1, GPL-2.0).
-- Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje.
+- `subarkticke/` – 19 objektů, domy subarktického klimatu (od kolegy, grrrrf
+  `hra/3d/objekty/subarkticke/`). Dům pod sněžnou čárou a tentýž nad ní je jeden
+  objekt: `nahrazuje_house` je seznam `[pod sněhem, nad sněhem]` a `snih` jméno
+  PNG vedle `.glb` se zasněženou texturou přes tytéž UV.
+- `subtropicke/` – 15 objektů, domy subtropického klimatu (od kolegy, grrrrf
+  `hra/3d/objekty/subtropicke/`).
+- Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
+  mírného klimatu, které staví arktické nebo pouštní domy („Domy z“).
+- Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje
+  (`.glb`, `.png` a `objekty.json`).
 
 Kód: `src/three_d_objects.cpp`, popis v `docs/decouple_three_d.md`.

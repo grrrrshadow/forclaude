@@ -1,0 +1,260 @@
+[
+ {
+  "soubor": "dum_4e_domy.glb",
+  "jmeno": "dum_4e_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 78,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11ee; roky 0–; 2 díly, shoda obrysu 0.969; 24 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_4f_domy.glb",
+  "jmeno": "dum_4f_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 79,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f1; roky 0–; 2 díly, shoda obrysu 0.979; 24 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_50_domy.glb",
+  "jmeno": "dum_50_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 80,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f4; roky 0–; 2 díly, shoda obrysu 0.929; 24 trojúhelníků, textura 512×512"
+ },
+ {
+  "soubor": "dum_51_domy_0.glb",
+  "jmeno": "dum_51_domy_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   0
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f5, barevné sloty 0; roky 0–; 2 díly, shoda obrysu 0.985; 24 trojúhelníků, textura 512×512"
+ },
+ {
+  "soubor": "dum_51_domy_1.glb",
+  "jmeno": "dum_51_domy_1",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   1
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f6, barevné sloty 1; roky 0–; 2 díly, shoda obrysu 0.942; 24 trojúhelníků, textura 512×512"
+ },
+ {
+  "soubor": "dum_51_domy_2.glb",
+  "jmeno": "dum_51_domy_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   2
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f7, barevné sloty 2; roky 0–; 2 díly, shoda obrysu 0.986; 24 trojúhelníků, textura 512×512"
+ },
+ {
+  "soubor": "dum_51_domy_3.glb",
+  "jmeno": "dum_51_domy_3",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f8, barevné sloty 3; roky 0–; 2 díly, shoda obrysu 0.987; 24 trojúhelníků, textura 512×512"
+ },
+ {
+  "soubor": "dum_52_byty.glb",
+  "jmeno": "dum_52_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 82,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x11fb; roky 0–; 1 díly, shoda obrysu 0.939; 10 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_53_kostel.glb",
+  "jmeno": "dum_53_kostel",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 83,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Kostel, sprite 0x11fc; roky 0–; 1 díly, shoda obrysu 0.918; 10 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_54_domy.glb",
+  "jmeno": "dum_54_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 84,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11ff; roky 0–; 2 díly, shoda obrysu 0.967; 24 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_55_byty.glb",
+  "jmeno": "dum_55_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 85,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x1202; přebarvení pink, red, yellow má texturu slotu 0; roky 1973–; 1 díly, shoda obrysu 0.966; 14 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_56_byty.glb",
+  "jmeno": "dum_56_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 86,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x1205; přebarvení pink, red, yellow má texturu slotu 0; roky 1962–; 1 díly, shoda obrysu 0.949; 14 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_57_vysoky.glb",
+  "jmeno": "dum_57_vysoky",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 87,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Vysoký kancelářský blok, sprity 0x120a 0x120b; roky 1984–; 4 díly, shoda obrysu 0.955; 40 trojúhelníků, textura 1024×1024"
+ },
+ {
+  "soubor": "dum_59_byty.glb",
+  "jmeno": "dum_59_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 89,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x120e; roky 0–; 1 díly, shoda obrysu 0.987; 14 trojúhelníků, textura 1024×512"
+ },
+ {
+  "soubor": "dum_5a_vysoky.glb",
+  "jmeno": "dum_5a_vysoky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 90,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Vysoký kancelářský blok, sprite 0x1211; roky 1993–; 2 díly, shoda obrysu 0.905; 20 trojúhelníků, textura 1024×1024"
+ }
+]
