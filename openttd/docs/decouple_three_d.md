@@ -322,23 +322,22 @@ top speed the vehicle goes as its orders say again. The speed it is held to is
 network game stays in step), in the units the vehicle shows, and every kind
 of vehicle minds it where it works out its speed (`Train::GetCurrentMaxSpeed()`,
 `RoadVehicle::GetCurrentMaxSpeed()`, `Ship::GetCurrentMaxSpeed()` and
-`ShipAccelerate()`, `UpdateAircraftSpeed()`); it is not saved.
+`ShipAccelerate()`, `UpdateAircraftSpeed()`); it is saved (below).
 
 **A ship can be steered** (the player: "I want to drive the ship left and
-right", and it would not leave its dock without orders): **< Left** and
-**Right >** turn the heading an eighth of a turn from the heading so far (or
-from the way it goes now), **As ordered** lets it go as its orders say again.
-The heading is `Vehicle::cab_heading` (the command `SetCabHeading`, not
-saved); a ship with one leaves its shed for it without orders, or with an
-order that names that very shed, and on every tile it takes the track whose
-direction is nearest the heading (`ChooseShipTrack()`); a dead end turns it
-round as always. The panel says "steered by hand".
+right", and it would not leave its dock without orders; then "turning gently
+by small angles"): **< Left** and **Right >** drive it freely, a small angle a
+press (below), and a ship steered so leaves its shed for it without orders,
+or with an order that names that very shed, the way out nearer its heading.
+The first way of it, a heading in eighths of a turn taken on every tile as
+the track nearest to it (`Vehicle::cab_heading`, the command `SetCabHeading`,
+`ChooseShipTrack()`), is still there for the rig (`test3d smer`).
 
 **A road vehicle can be steered too** (the player: "press right on a car and
 it turns right at the next junction"): **< Left** and **Right >** ask for the
 turn it takes at the next junction, like a blinker -- the other one takes the
 asked turn back to straight on. It is `Vehicle::cab_turn` (a `DirDiff`, the
-same command `SetCabHeading`, not saved): `RoadFindPathToDest()` takes the road
+same command `SetCabHeading`): `RoadFindPathToDest()` takes the road
 of that turn on the next tile with a choice (a bend is no junction: the turn
 waits for one), and straight on from there; where the asked way is not to be
 had it goes straight on and keeps the turn for the next junction, and where
@@ -346,6 +345,38 @@ straight on is not to be had either, round the corner on the side the
 vehicles keep to. A steered road vehicle leaves its depot even when its order
 is that very depot. The panel says "by hand: next right / next left /
 straight".
+
+**Driving freely** (`cab_drive.h`; the player: "can a car leave the road?
+we are 3D, drive in every direction ... trees it drives through, at houses it
+stops ... the ship too, turning gently by small angles"). **Off road** puts a
+road vehicle off the road: from there **< Left** and **Right >** turn its
+heading by small angles (an eleventh-and-a-quarter degrees a press), and it
+drives straight along it across the land at half its speed -- over grass,
+fields, rough land and through trees, across roads and level crossings --
+and stands where it may not go: a house or any building, water, rails but at
+a crossing, a steep slope, a bridge's end, a tunnel, a depot, the map's edge;
+it turns there and goes on. A ship goes freely with its first press of left
+or right, on open water and past buoys, and stands at a bank, a lock, a dock.
+Single road vehicles only (no trams, none with trailers), not in a depot, a
+tunnel or a bay. The heading is `Vehicle::cab_yaw` in 128ths of a turn and the
+position `cab_px`, `cab_py` in 256ths of a unit, moved a unit along the
+heading for every step the speed gives, in whole numbers from a table of
+cosines (`CabCos()`), so every computer of a network game moves it alike; the
+command is `CabDrive` (`CmdCabDrive()`). Its orders wait meanwhile (no
+loading, no servicing). **As ordered** sends it back: it drives on until it
+comes onto a road by a road's end -- a ship onto water with a course across
+it -- and goes on from there into the lane, or along the course, its orders
+choose (`RoadVehRejoinRoad()`, `ShipRejoinCourse()`). The panel says "by
+hand: free" and "back to the orders". Closing the window asks it back too;
+a road vehicle out in the fields then stops, not to wander off without anyone
+at the wheel.
+
+**Saved.** The cab's steering moves the vehicle, so it is the game's state:
+the speed held, the heading, the turn, the free drive (savegame version
+`CabDriving`), and a game loaded or joined over the network goes on alike. A
+road vehicle off the road loads where it stands; the road type under it is
+its own there (`RoadVehicle::GetRoadTypeUnder()`, for the NewGRF variables and
+the road's speed limit).
 
 **Back to the orders.** **As ordered** takes the steering off: the ship's or
 the road vehicle's cached path is cleared and it finds its way to its order
@@ -470,7 +501,10 @@ train, 1 road, 2 ship, 3 aircraft; with `testletadlo <x> <y>` after a
 company exists, an aircraft in the air; with `testlod`, a ship in a shed),
 `test3d smer <type> <unit> <direction 0..7 | 255>` steers a vehicle from its
 cab as the window's buttons do (a road vehicle takes the turn instead: 0
-straight on, 2 right, 6 left) (with `-d misc=5` the ship says why it stays
+straight on, 2 right, 6 left), `test3d jizda <type> <unit> <op> [times]`
+drives it freely (op 0 off the road, 1 a step left, 2 a step right, 3 back to
+the orders, 4 stop or start it; with `-d misc=5` it says where it is back on
+the road or its course; `test3d vozidla` shows a free vehicle's heading) (with `-d misc=5` the ship says why it stays
 in its shed or that it leaves), `test3d snimek <name>` writes
 the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole

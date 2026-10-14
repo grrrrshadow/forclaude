@@ -21,9 +21,10 @@ enum CabViewWidgets : WidgetID {
 	WID_CV_BRAKE,   ///< Hold the vehicle to a lower speed.
 	WID_CV_THROTTLE, ///< Let it go faster again.
 	WID_CV_FULL,    ///< The window over the whole screen, and back.
-	WID_CV_LEFT,    ///< Steer to the left (a ship).
+	WID_CV_LEFT,    ///< Steer to the left (a ship, a road vehicle).
 	WID_CV_AUTO,    ///< Go as the orders say again.
-	WID_CV_RIGHT,   ///< Steer to the right (a ship).
+	WID_CV_OFFROAD, ///< Leave the road and drive freely (a road vehicle).
+	WID_CV_RIGHT,   ///< Steer to the right (a ship, a road vehicle).
 };
 
 #endif /* WIDGETS_CAB_VIEW_WIDGET_H */

@@ -40,6 +40,9 @@
 #include "roadveh_cmd.h"
 #include "train_cmd.h"
 #include "ship_cmd.h"
+#include "cab_drive.h"
+#include "station_map.h"
+#include "road.h"
 #include <charconv>
 
 #include "table/strings.h"
@@ -1342,6 +1345,70 @@ CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t hea
 			v->cab_heading = heading == 0xFF ? Direction::Invalid : static_cast<Direction>(heading);
 		}
 		if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
+		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}
+
+/**
+ * Drive a vehicle freely from its cab (cab_drive.h): a road vehicle off the road and a ship anywhere on the water, at
+ * any angle, a step left or right at a time; asked back to its orders it goes on as usual from the next tile it can.
+ * @param flags type of operation
+ * @param veh_id the vehicle
+ * @param op what to do, a CabDriveOp
+ */
+CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
+{
+	Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Rejoin)) return CMD_ERROR;
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+	const CabDriveOp what = static_cast<CabDriveOp>(op);
+
+	if (v->type == VehicleType::Road) {
+		const RoadVehicle *rv = RoadVehicle::From(v);
+		if (what == CabDriveOp::Free) {
+			/* A single vehicle, on the road: not a tram, not a vehicle with trailers, not in its depot, a tunnel or a bay. */
+			if (rv->HasArticulatedPart() || RoadTypeIsTram(rv->roadtype)) return CMD_ERROR;
+			if (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried()) return CMD_ERROR;
+			if (v->cab_free) return CommandCost();
+		} else if (!v->cab_free) {
+			return CMD_ERROR; // on the road, left and right are the next junction's turn (CmdSetCabHeading())
+		}
+	} else if (v->type == VehicleType::Ship) {
+		if (what == CabDriveOp::Free) return CMD_ERROR; // a ship goes freely with its first turn
+		if (what == CabDriveOp::Rejoin && !v->cab_free) return CMD_ERROR;
+	} else {
+		return CMD_ERROR;
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		auto start = [v]() {
+			v->cab_free = true;
+			v->cab_rejoin = false;
+			v->cab_turn = Vehicle::CAB_TURN_NONE;
+			v->cab_heading = Direction::Invalid;
+			v->cab_yaw = static_cast<uint8_t>(DirectionToCabYaw(v->direction));
+			v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			if (v->type == VehicleType::Road) RoadVehicle::From(v)->path.clear();
+			if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
+		};
+		switch (what) {
+			case CabDriveOp::Free:
+				start();
+				break;
+			case CabDriveOp::Left:
+			case CabDriveOp::Right:
+				if (!v->cab_free) start();
+				v->cab_yaw = static_cast<uint8_t>((v->cab_yaw + (what == CabDriveOp::Left ? CAB_YAW_STEP : -CAB_YAW_STEP)) & (CAB_YAW_TURN - 1));
+				break;
+			case CabDriveOp::Rejoin:
+				v->cab_rejoin = true;
+				break;
+		}
 		SetWindowDirty(WindowClass::CabView, v->index);
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 	}

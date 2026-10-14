@@ -494,8 +494,10 @@ void AfterLoadVehiclesPhase2(bool part_of_load)
 						u->roadtype = rv->roadtype;
 						u->compatible_roadtypes = rv->compatible_roadtypes;
 						/* A vehicle riding on a rail wagon is on the wagon's
-						 * tile, which has no road at all (road_on_rail.h). */
-						if (!rv->IsCarried() && GetRoadType(u->tile, rtt) == INVALID_ROADTYPE) SlErrorCorrupt("Road vehicle on invalid road type");
+						 * tile, which has no road at all (road_on_rail.h); one
+						 * driven freely from its cab may be off the road
+						 * (cab_drive.h). */
+						if (!rv->IsCarried() && !rv->cab_free && GetRoadType(u->tile, rtt) == INVALID_ROADTYPE) SlErrorCorrupt("Road vehicle on invalid road type");
 					}
 
 					RoadVehUpdateCache(rv);
@@ -729,6 +731,15 @@ public:
 		SLE_CONDARR(Vehicle, config_options, VarTypes::U8, 4, SaveLoadVersion::VehicleConfigOptions, SaveLoadVersion::VehicleConfigEight),
 		SLE_CONDARR(Vehicle, config_options, VarTypes::U8, 8, SaveLoadVersion::VehicleConfigEight, SaveLoadVersion::VehicleConfigPerWagon),
 		SLE_CONDARR(Vehicle, config_options, VarTypes::U8, 16, SaveLoadVersion::VehicleConfigPerWagon, SaveLoadVersion::MaxVersion),
+		/* The steering from the cab (cab_view.h, cab_drive.h): it moves the vehicle, so it is the game's state. */
+		SLE_CONDVAR(Vehicle, cab_speed_limit, VarTypes::U16, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_heading, VarTypes::U8, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_turn, VarTypes::U8, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_free, VarTypes::BOOL, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_rejoin, VarTypes::BOOL, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_yaw, VarTypes::U8, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_px, VarTypes::I32, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_py, VarTypes::I32, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
 		SLEG_CONDVAR("cargo_days", _cargo_periods, VarTypes::U8, SaveLoadVersion::MinVersion, SaveLoadVersion::CargoPackets),
 		SLEG_CONDVAR("cargo_source", _cargo_source, VarFileType::U8 | VarMemType::U16, SaveLoadVersion::MinVersion, SaveLoadVersion::LargerCargoSource),
 		SLEG_CONDVAR("cargo_source", _cargo_source, VarTypes::U16, SaveLoadVersion::LargerCargoSource, SaveLoadVersion::CargoPackets),

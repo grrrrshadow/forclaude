@@ -41,6 +41,8 @@
 #include "effectvehicle_func.h"
 #include "train.h"
 
+#include "cab_drive.h"
+
 #include "table/strings.h"
 
 #include <unordered_set>
@@ -221,6 +223,8 @@ static const Depot *FindClosestShipDepot(const Vehicle *v, uint max_distance)
 
 static void CheckIfShipNeedsService(Vehicle *v)
 {
+	/* Driven freely from the cab: no course to a depot from there (cab_drive.h). */
+	if (v->cab_free) return;
 	if (Company::Get(v->owner)->settings.vehicle.servint_ships == 0 || !v->NeedsAutomaticServicing()) return;
 	if (v->IsChainInDepot()) {
 		VehicleServiceInDepot(v);
@@ -398,7 +402,7 @@ static bool CheckShipStayInDepot(Ship *v)
 	 * it is standing in would otherwise step out and back in for ever, and
 	 * the player's rule is that a ship in a shed can be sent -- so while the
 	 * errand is on, the shed lets go. */
-	if (v->raid_target == INVALID_TILE && v->cab_heading == Direction::Invalid && v->current_order.IsType(OT_GOTO_DEPOT) &&
+	if (v->raid_target == INVALID_TILE && !v->IsCabSteered() && v->current_order.IsType(OT_GOTO_DEPOT) &&
 			IsShipDepotTile(v->tile) && GetDepotIndex(v->tile) == v->current_order.GetDestination()) {
 		Debug(misc, 5, "ship {} stays in the shed: its order is this shed", v->unitnumber);
 		VehicleEnterDepot(v);
@@ -406,7 +410,7 @@ static bool CheckShipStayInDepot(Ship *v)
 	}
 
 	/* Don't leave depot if no destination set -- unless the player steers it from its cab (cab_view.h). */
-	if (v->dest_tile == INVALID_TILE && v->cab_heading == Direction::Invalid) {
+	if (v->dest_tile == INVALID_TILE && !v->IsCabSteered()) {
 		Debug(misc, 5, "ship {} stays in the shed: no destination", v->unitnumber);
 		return true;
 	}
@@ -423,9 +427,10 @@ static bool CheckShipStayInDepot(Ship *v)
 
 	assert(v->GetVehicleTrackdir() == Trackdir::X_NE || v->GetVehicleTrackdir() == Trackdir::Y_NW);
 	v->direction = DiagDirToDir(TrackdirToExitdir(v->GetVehicleTrackdir()));
-	if (v->cab_heading != Direction::Invalid) {
+	if (v->cab_heading != Direction::Invalid || v->cab_free) {
 		/* Steered from its cab: out of the shed the way nearer the heading. */
-		if (DirDifference(v->direction, v->cab_heading) > DirDiff::Right90 && DirDifference(v->direction, v->cab_heading) < DirDiff::Left90) v->direction = ReverseDir(v->direction);
+		Direction heading = v->cab_free ? CabYawToDirection(v->cab_yaw) : v->cab_heading;
+		if (DirDifference(v->direction, heading) > DirDiff::Right90 && DirDifference(v->direction, heading) < DirDiff::Left90) v->direction = ReverseDir(v->direction);
 	} else if (CheckReverseShip(v)) {
 		v->direction = ReverseDir(v->direction);
 	}
@@ -882,6 +887,100 @@ static void ShipRaidController(Ship *v)
 	v->SetDestTile(v->raid_sail_to);
 }
 
+/**
+ * The course across a tile along a direction: a ship driven freely keeps one that goes its way, so the way it goes
+ * reads right wherever it is asked (Ship::GetVehicleTrackdir(), the pathfinder as it comes back to its orders).
+ */
+static Track ShipTrackAlong(Direction d)
+{
+	switch (d) {
+		case Direction::NE: case Direction::SW: return Track::X;
+		case Direction::SE: case Direction::NW: return Track::Y;
+		case Direction::E: case Direction::W: return Track::Upper;
+		default: return Track::Left; // north, south
+	}
+}
+
+/** Whether a ship driven freely from its cab (cab_drive.h) may go onto a tile: open water and buoys; not a bank, a lock, a dock or a shed. */
+static bool ShipFreeCanEnter(TileIndex tile)
+{
+	if (IsTileType(tile, TileType::Water)) return IsWater(tile);
+	return IsBuoyTile(tile);
+}
+
+/**
+ * A ship driven freely and asked back to its orders comes onto a tile with a course across it: onto the course its
+ * orders choose there, at the tile's edge, as if it had come along it.
+ * @return whether it is on its course again
+ */
+static bool ShipRejoinCourse(Ship *v, TileIndex tile, DiagDirection enterdir, int x, int y)
+{
+	const TrackBits tracks = GetAvailShipTracks(tile, enterdir);
+	if (tracks.None()) return false;
+	/* Coming in straight across the edge, as the pathfinder sets out from. */
+	v->direction = DiagDirToDir(enterdir);
+	v->state = ShipTrackAlong(v->direction);
+	v->cab_free = false;
+	v->cab_rejoin = false;
+	v->cab_heading = Direction::Invalid;
+	v->path.clear();
+	Track track = ChooseShipTrack(v, tile, tracks, enterdir);
+	if (!IsValidTrack(track)) track = FindFirstTrack(tracks);
+	GetNewVehiclePosResult gp{x, y, v->tile, tile};
+	Direction dir = VehicleEnterTileCoordinates(gp, enterdir, track);
+	v->tile = tile;
+	v->state = track;
+	v->x_pos = gp.x;
+	v->y_pos = gp.y;
+	v->direction = v->rotation = dir;
+	v->UpdatePosition();
+	v->UpdateViewport(true, true);
+	Debug(misc, 5, "ship {} back on its course at {},{} track {}", v->unitnumber, TileX(tile), TileY(tile), to_underlying(track));
+	return true;
+}
+
+/**
+ * A tick of a ship driven freely from its cab (cab_drive.h): as far along its heading as its speed takes it, standing
+ * at a bank. Its orders wait.
+ */
+static void ShipFreeController(Ship *v)
+{
+	if (v->cab_px / CAB_SUBUNIT != v->x_pos || v->cab_py / CAB_SUBUNIT != v->y_pos) {
+		v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+		v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+	}
+	v->ShowVisualEffect();
+	const uint number_of_steps = ShipAccelerate(v);
+	for (uint i = 0; i < number_of_steps; ++i) {
+		int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+		int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
+		bool blocked = px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
+				x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE);
+		TileIndex tile = blocked ? v->tile : TileVirtXY(x, y);
+		if (!blocked && tile != v->tile) {
+			DiagDirection enterdir = DiagdirBetweenTiles(v->tile, tile);
+			if (v->cab_rejoin && enterdir != DiagDirection::Invalid && ShipRejoinCourse(v, tile, enterdir, x, y)) return;
+			blocked = !ShipFreeCanEnter(tile);
+		}
+		if (blocked) {
+			/* At a bank: it stands, and turns there. */
+			v->cur_speed = 0;
+			v->subspeed = 0;
+			break;
+		}
+		v->tile = tile;
+		v->cab_px = px;
+		v->cab_py = py;
+		v->direction = v->rotation = CabYawToDirection(v->cab_yaw);
+		v->state = ShipTrackAlong(v->direction);
+		v->x_pos = x;
+		v->y_pos = y;
+		v->z_pos = GetSlopePixelZ(x, y);
+		v->UpdatePosition();
+		v->UpdateViewport(true, true);
+	}
+}
+
 static void ShipController(Ship *v)
 {
 	v->tick_counter++;
@@ -890,6 +989,9 @@ static void ShipController(Ship *v)
 	if (v->HandleBreakdown()) return;
 
 	if (v->vehstatus.Test(VehState::Stopped)) return;
+
+	/* Driven freely from the cab: anywhere on the water, at any angle (cab_drive.h). */
+	if (v->cab_free && !v->IsInDepot() && v->state != Track::Wormhole) return ShipFreeController(v);
 
 	if (ProcessOrders(v) && CheckReverseShip(v)) return ReverseShip(v);
 

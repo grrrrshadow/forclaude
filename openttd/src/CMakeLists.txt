@@ -543,6 +543,7 @@ add_files(
     three_d.h
     three_d_model.cpp
     three_d_preview_gui.cpp
+    cab_drive.h
     cab_view.h
     cab_view_gui.cpp
     three_d_vehicle.cpp

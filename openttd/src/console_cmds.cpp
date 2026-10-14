@@ -8736,10 +8736,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			for (const Vehicle *u = v; u->HasArticulatedPart(); u = u->GetNextArticulatedPart()) pieces++;
 			TileIndex vt = TileVirtXY(v->x_pos, v->y_pos);
 			bool hidden = v->vehstatus.Test(VehState::Hidden);
-			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} typu {} smer {} dilu {} clanku {} {}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
+			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} typu {} smer {} dilu {} clanku {} {}{}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
 					TileX(vt), TileY(vt), to_underlying(GetTileType(vt)), to_underlying(v->direction), parts, pieces, hidden ? "skryte" : "videt",
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
-					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "");
+					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "",
+					v->cab_free ? fmt::format(" volne yaw {} rychlost {}{}", v->cab_yaw, v->cur_speed, v->cab_rejoin ? " zpet" : "") : "");
 			if (!hidden) seen++;
 		}
 		return true;
@@ -8796,6 +8797,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: smer {} {}: takove vozidlo neni.", *type, *unit);
+	} else if (what == "jizda") {
+		/* The rig: drive a vehicle freely from its cab, 'test3d jizda <type> <unit> <op> [times]': op 0 off the road,
+		 * 1 a step left, 2 a step right, 3 back to the orders (cab_drive.h). */
+		auto type = number(2), unit = number(3), op = number(4), times = number(5);
+		if (!type.has_value() || !unit.has_value() || !op.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d jizda needs a vehicle type, a unit number and an op (0 off road, 1 left, 2 right, 3 back to the orders, 4 stop or start).");
+			return true;
+		}
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			AutoRestoreBackup cur_company(_current_company, u->owner);
+			CommandCost r = CommandCost();
+			if (*op == 4) {
+				/* The rig: stop it, or start it again, where it is. */
+				r = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, u->index, false);
+			} else {
+				for (int i = 0; i < times.value_or(1) && r.Succeeded(); i++) r = Command<Commands::CabDrive>::Do(DoCommandFlag::Execute, u->index, static_cast<uint8_t>(*op));
+			}
+			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: jizda {} {} op {}: {} (na {},{} smer {} yaw {} volne {} zpet {})", *type, *unit, *op, r.Succeeded() ? "ano" : "NEJDE", u->x_pos, u->y_pos, to_underlying(u->direction), u->cab_yaw, u->cab_free, u->cab_rejoin);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: jizda {} {}: takove vozidlo neni.", *type, *unit);
 	} else if (what == "kabina") {
 		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
 		extern std::string DescribeCabViews();

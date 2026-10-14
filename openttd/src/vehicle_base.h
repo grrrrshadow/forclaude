@@ -296,13 +296,14 @@ public:
 	uint16_t cur_speed = 0; ///< current speed
 	/**
 	 * A speed the player holds the vehicle to from its cab (cab_view.h: the brake and the throttle there), in the
-	 * units the vehicle shows (GetDisplaySpeed()); 0 none. Not saved: a loaded game drives as the orders say.
+	 * units the vehicle shows (GetDisplaySpeed()); 0 none. Saved, as all the cab's steering is
+	 * (SaveLoadVersion::CabDriving), so a loaded game or one joined over the network goes on alike.
 	 */
 	uint16_t cab_speed_limit = 0;
 	/**
 	 * The direction the player steers the vehicle in from its cab (cab_view.h: the left and right there), or
 	 * Direction::Invalid when it goes as its orders say. A ship minds it: it leaves its shed for it and takes the
-	 * track nearest to it on every tile. Not saved.
+	 * track nearest to it on every tile.
 	 */
 	Direction cab_heading = Direction::Invalid;
 	/** No turn asked for from the cab: the vehicle goes as its orders say (#cab_turn). */
@@ -310,14 +311,23 @@ public:
 	/**
 	 * The turn the player asks a road vehicle to take at the next junction from its cab (cab_view.h): a DirDiff,
 	 * DirDiff::Same straight on, DirDiff::Right90 or DirDiff::Left90; after the turn it goes straight on. Or
-	 * #CAB_TURN_NONE when it goes as its orders say. Not saved.
+	 * #CAB_TURN_NONE when it goes as its orders say.
 	 */
 	uint8_t cab_turn = CAB_TURN_NONE;
+	/** Driven freely from the cab (cab_drive.h): a road vehicle off the road, a ship anywhere on the water. */
+	bool cab_free = false;
+	/** Driven freely and asked back to its orders: it goes on as usual from the next tile it can (cab_drive.h). */
+	bool cab_rejoin = false;
+	/** The heading when driven freely, 128ths of a turn: 0 along +x (south-west), 32 along +y (south-east). */
+	uint8_t cab_yaw = 0;
+	/** The exact position when driven freely, 256ths of a unit (x_pos and y_pos are its whole units). */
+	int32_t cab_px = 0;
+	int32_t cab_py = 0;
 
 	/** Whether the player steers the vehicle from its cab, instead of its orders. */
 	inline bool IsCabSteered() const
 	{
-		return this->cab_heading != Direction::Invalid || this->cab_turn != CAB_TURN_NONE;
+		return this->cab_heading != Direction::Invalid || this->cab_turn != CAB_TURN_NONE || this->cab_free;
 	}
 
 	/** The cab's speed limit in the vehicle's own units of speed, or no limit at all. */

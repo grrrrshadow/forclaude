@@ -600,7 +600,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				}
 
 				case VehicleType::Road: {
-					RoadType rt = GetRoadType(v->tile, GetRoadTramType(RoadVehicle::From(v)->roadtype));
+					RoadType rt = RoadVehicle::From(v)->GetRoadTypeUnder();
 					const RoadTypeInfo *rti = GetRoadTypeInfo(rt);
 					return (rti->flags.Test(RoadTypeFlag::Catenary) ? 0x200 : 0) |
 						0x100 |
@@ -722,7 +722,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 					RoadTramType rtt = GetRoadTramType(RoadVehicle::From(v)->roadtype);
 					RoadType param_type = GetRoadTypeTranslation(rtt, parameter, object->ro.grffile);
 					if (param_type == INVALID_ROADTYPE) return 0x00;
-					RoadType tile_type = GetRoadType(v->tile, rtt);
+					RoadType tile_type = RoadVehicle::From(v)->GetRoadTypeUnder();
 					if (tile_type == param_type) return 0x0F;
 					return (HasPowerOnRoad(param_type, tile_type) ? 0x06 : 0x00) |
 							0x01;
@@ -753,7 +753,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				return GetBadgeVariableResult(*object->ro.grffile, GetRailTypeInfo(rt)->badges, parameter);
 			}
 			if (v->type == VehicleType::Road) {
-				RoadType rt = GetRoadType(v->tile, GetRoadTramType(RoadVehicle::From(v)->roadtype));
+				RoadType rt = RoadVehicle::From(v)->GetRoadTypeUnder();
 				return GetBadgeVariableResult(*object->ro.grffile, GetRoadTypeInfo(rt)->badges, parameter);
 			}
 			return UINT_MAX;

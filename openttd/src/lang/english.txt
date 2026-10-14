@@ -2230,14 +2230,18 @@ STR_CAB_VIEW_LIMIT                                              :{YELLOW}held to
 STR_CAB_VIEW_STEERED                                            :{YELLOW}steered by hand
 STR_CAB_VIEW_STEERED_STRAIGHT                                   :{YELLOW}by hand: straight
 STR_CAB_VIEW_STEERED_RIGHT                                      :{YELLOW}by hand: next right
+STR_CAB_VIEW_OFFROAD                                            :{BLACK}Off road
+STR_CAB_VIEW_OFFROAD_TOOLTIP                                    :{BLACK}Leave the road and drive freely across the land: left and right then turn by small angles; it drives through trees and stops at buildings, water and rails. As ordered takes it back onto the next road it comes onto
+STR_CAB_VIEW_FREE                                               :{YELLOW}by hand: free
+STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}back to the orders
 STR_CAB_VIEW_STEERED_LEFT                                       :{YELLOW}by hand: next left
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}The view over the whole screen, and back
 STR_CAB_VIEW_LEFT                                               :{BLACK}< Left
-STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Steer to the left: a ship an eighth of a turn, and it leaves its depot for it without orders; a road vehicle turns left at the next junction
+STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Steer to the left: a ship and a road vehicle off the road by a small angle (a ship leaves its depot for it without orders); a road vehicle on the road turns left at the next junction
 STR_CAB_VIEW_RIGHT                                              :{BLACK}Right >
-STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Steer to the right: a ship an eighth of a turn; a road vehicle turns right at the next junction
+STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Steer to the right: a ship and a road vehicle off the road by a small angle; a road vehicle on the road turns right at the next junction
 STR_CAB_VIEW_AUTO                                               :{BLACK}As ordered
-STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go as its orders say again: it finds its way back to them
+STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go as its orders say again: it finds its way back to them; off the road from the next road it comes onto
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
 STR_CAB_VIEW_NEXT_STOP                                          :Next stop: {STATION}

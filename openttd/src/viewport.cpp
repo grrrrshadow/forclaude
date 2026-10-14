@@ -99,6 +99,7 @@
 #include "viewport_cmd.h"
 #include "three_d.h"
 #include "cab_view.h"
+#include "cab_drive.h"
 
 extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, off while the 3D views collect
 #include "fileio_type.h"
@@ -6134,7 +6135,12 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	double target = camera.valid ? camera.heading : std::atan2(-1.0, -1.0);
-	if (v->direction != Direction::Invalid) target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)]));
+	if (v->cab_free) {
+		/* Driven freely (cab_drive.h): its own heading, finer than the eight directions. */
+		target = v->cab_yaw * (2 * M_PI / CAB_YAW_TURN);
+	} else if (v->direction != Direction::Invalid) {
+		target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)]));
+	}
 	if (!camera.valid) {
 		camera.heading = target;
 		camera.valid = true;

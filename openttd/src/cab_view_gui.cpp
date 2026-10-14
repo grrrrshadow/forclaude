@@ -29,6 +29,11 @@
 #include "vehicle_cmd.h"
 #include "openttd.h"
 #include "company_func.h"
+#include "cab_drive.h"
+#include "roadveh.h"
+#include "road.h"
+#include "station_map.h"
+#include "tile_map.h"
 #include "order_base.h"
 #include "direction_func.h"
 #include "gfx_func.h"
@@ -66,6 +71,7 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_LEFT), SetStringTip(STR_CAB_VIEW_LEFT, STR_CAB_VIEW_LEFT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_AUTO), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_OFFROAD), SetStringTip(STR_CAB_VIEW_OFFROAD, STR_CAB_VIEW_OFFROAD_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_RIGHT), SetStringTip(STR_CAB_VIEW_RIGHT, STR_CAB_VIEW_RIGHT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
@@ -97,8 +103,17 @@ struct CabViewWindow : Window {
 	{
 		/* Whoever steers from the cab lets go when leaving it: a ship or a road vehicle goes back to its orders. */
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (_game_mode == GameMode::Normal && v != nullptr && v->owner == _local_company && v->IsCabSteered()) {
-			Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+		if (_game_mode == GameMode::Normal && !_exit_game && _switch_mode == SwitchMode::None && v != nullptr && v->owner == _local_company && v->IsCabSteered()) {
+			if (v->cab_free) {
+				/* Driven freely: back to the orders from the next road or course; a road vehicle out in the fields
+				 * stops there, not to wander off without anyone at the wheel. */
+				if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
+				if (v->type == VehicleType::Road && !IsTileType(v->tile, TileType::Road) && !v->vehstatus.Test(VehState::Stopped)) {
+					Command<Commands::StartStopVehicle>::Post(v->tile, v->index, false);
+				}
+			} else {
+				Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+			}
 		}
 		this->Window::Close(data);
 	}
@@ -127,7 +142,14 @@ struct CabViewWindow : Window {
 		bool steerable = v->type == VehicleType::Ship || v->type == VehicleType::Road;
 		this->SetWidgetDisabledState(WID_CV_LEFT, !steerable);
 		this->SetWidgetDisabledState(WID_CV_RIGHT, !steerable);
-		this->SetWidgetDisabledState(WID_CV_AUTO, !steerable || !v->IsCabSteered());
+		this->SetWidgetDisabledState(WID_CV_AUTO, !steerable || !v->IsCabSteered() || (v->cab_free && v->cab_rejoin));
+		/* Off the road: a single road vehicle on the road, not a tram, not in its depot, a tunnel or a bay (CmdCabDrive()). */
+		bool can_leave_road = false;
+		if (v->type == VehicleType::Road && !v->cab_free) {
+			const RoadVehicle *rv = RoadVehicle::From(v);
+			can_leave_road = !rv->HasArticulatedPart() && !RoadTypeIsTram(rv->roadtype) && !rv->IsInDepot() && rv->state != RVSB_WORMHOLE && !IsBayRoadStopTile(rv->tile) && !rv->IsCarried();
+		}
+		this->SetWidgetDisabledState(WID_CV_OFFROAD, !can_leave_road);
 		this->DrawWidgets();
 	}
 
@@ -249,7 +271,10 @@ struct CabViewWindow : Window {
 			DrawString(note_x, sright, state_y, limit, TextColour::FromString);
 			note_x += GetStringBoundingBox(limit).width + 8;
 		}
-		if (v->cab_turn != Vehicle::CAB_TURN_NONE) {
+		if (v->cab_free) {
+			/* Driven freely: so, or on the way back to the orders. */
+			DrawString(note_x, sright, state_y, GetString(v->cab_rejoin ? STR_CAB_VIEW_FREE_BACK : STR_CAB_VIEW_FREE), TextColour::FromString);
+		} else if (v->cab_turn != Vehicle::CAB_TURN_NONE) {
 			/* A road vehicle: the turn it takes at the next junction. */
 			StringID turn = STR_CAB_VIEW_STEERED_STRAIGHT;
 			if (v->cab_turn == to_underlying(DirDiff::Right90)) turn = STR_CAB_VIEW_STEERED_RIGHT;
@@ -300,6 +325,11 @@ struct CabViewWindow : Window {
 			}
 			case WID_CV_LEFT:
 			case WID_CV_RIGHT: {
+				if (v->cab_free || v->type == VehicleType::Ship) {
+					/* Driven freely, or a ship: the heading a small angle left or right (cab_drive.h). */
+					Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(widget == WID_CV_LEFT ? CabDriveOp::Left : CabDriveOp::Right));
+					break;
+				}
 				if (v->type == VehicleType::Road) {
 					/* A road vehicle: the turn at the next junction, like a blinker; the other way back to straight on. */
 					DirDiff now = v->cab_turn != Vehicle::CAB_TURN_NONE ? static_cast<DirDiff>(v->cab_turn) : DirDiff::Same;
@@ -318,7 +348,15 @@ struct CabViewWindow : Window {
 				break;
 			}
 			case WID_CV_AUTO:
-				Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+				if (v->cab_free) {
+					/* Back to the orders from the next road or course it comes onto. */
+					Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
+				} else {
+					Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+				}
+				break;
+			case WID_CV_OFFROAD:
+				Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Free));
 				break;
 			case WID_CV_BRAKE:
 			case WID_CV_THROTTLE: {

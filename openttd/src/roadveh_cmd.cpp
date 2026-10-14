@@ -41,6 +41,9 @@
 #include "newgrf_roadstop.h"
 #include "road_on_rail.h"
 
+#include "cab_drive.h"
+#include "object_map.h"
+
 #include "table/strings.h"
 
 #include "green_load.h"
@@ -543,6 +546,8 @@ inline int RoadVehicle::GetCurrentMaxSpeed() const
 		}
 	}
 
+	/* Off the road, driven freely from the cab (cab_drive.h): half the speed over the fields. */
+	if (this->cab_free && !IsTileType(this->tile, TileType::Road) && !IsTileType(this->tile, TileType::Station)) max_speed /= 2;
 	return std::min<int>({max_speed, this->current_order.GetMaxSpeed() * 2, this->CabSpeedLimitInternal()});
 }
 
@@ -1814,6 +1819,128 @@ again:
 	return true;
 }
 
+/**
+ * Whether a road vehicle driven freely from its cab (cab_drive.h) may go onto a tile: land, fields, trees (it drives
+ * through them) and roads; not a house or any building (it stops there, the player), water, rails but at a level
+ * crossing, a steep slope, a bridge's end, a tunnel or a depot.
+ */
+static bool RoadVehFreeCanEnter(TileIndex tile)
+{
+	switch (GetTileType(tile)) {
+		case TileType::Clear:
+		case TileType::Trees:
+			return !IsSteepSlope(GetTileSlope(tile));
+		case TileType::Road:
+			return (IsNormalRoad(tile) || IsLevelCrossing(tile)) && HasTileRoadType(tile, RoadTramType::Road);
+		case TileType::Station:
+			return IsDriveThroughStopTile(tile) && HasTileRoadType(tile, RoadTramType::Road);
+		case TileType::Object:
+			return IsObjectType(tile, OBJECT_OWNED_LAND);
+		default:
+			return false;
+	}
+}
+
+/**
+ * A road vehicle driven freely and asked back to its orders comes onto a road's end: into the lane its orders choose
+ * there, at the tile's edge, as if it had come along that road.
+ * @param tile the tile it comes onto
+ * @param enterdir the way it comes onto it
+ * @return whether it is on the road again
+ */
+static bool RoadVehRejoinRoad(RoadVehicle *v, TileIndex tile, DiagDirection enterdir)
+{
+	if (!IsTileType(tile, TileType::Road) || !(IsNormalRoad(tile) || IsLevelCrossing(tile))) return false;
+	if (!GetAnyRoadBits(tile, RoadTramType::Road).Any(DiagDirToRoadBits(ReverseDiagDir(enterdir)))) return false;
+	TrackdirBits reachable = GetTileTrackStatus(tile, TransportType::Road, RoadTramType::Road).trackdirs & DiagdirReachesTrackdirs(enterdir);
+	if (reachable.None()) return false;
+
+	v->cab_free = false;
+	v->cab_rejoin = false;
+	v->cab_turn = Vehicle::CAB_TURN_NONE;
+	v->path.clear();
+	Trackdir td = RoadFindPathToDest(v, tile, enterdir);
+	if (td == Trackdir::Invalid || !reachable.Test(td)) td = reachable.GetNthSetBit(0).value();
+
+	v->tile = tile;
+	v->direction = DiagDirToDir(enterdir);
+	v->state = to_underlying(td);
+	v->frame = RVC_DEFAULT_START_FRAME;
+	v->overtaking = 0;
+	const RoadDriveEntry *rdp = _road_drive_data[GetRoadTramType(v->roadtype)][(to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE) + to_underlying(td)];
+	v->x_pos = TileX(tile) * TILE_SIZE + (rdp[v->frame].x & 0xF);
+	v->y_pos = TileY(tile) * TILE_SIZE + (rdp[v->frame].y & 0xF);
+	v->UpdatePosition();
+	RoadZPosAffectSpeed(v, v->UpdateInclination(true, true));
+	Debug(misc, 5, "road vehicle {} back on the road at {},{} trackdir {}", v->unitnumber, TileX(tile), TileY(tile), to_underlying(td));
+	return true;
+}
+
+/**
+ * A unit along the heading of a road vehicle driven freely from its cab (cab_drive.h).
+ * @return false when it may not go on: it stands, and may turn
+ */
+static bool RoadVehFreeStep(RoadVehicle *v)
+{
+	int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+	int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
+	/* Not off the map, nor onto its outer tiles. */
+	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
+			x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE)) {
+		return false;
+	}
+	TileIndex tile = TileVirtXY(x, y);
+	bool new_tile = tile != v->tile;
+	if (new_tile) {
+		DiagDirection enterdir = DiagdirBetweenTiles(v->tile, tile);
+		if (v->cab_rejoin && enterdir != DiagDirection::Invalid && RoadVehRejoinRoad(v, tile, enterdir)) return true;
+		if (!RoadVehFreeCanEnter(tile)) return false;
+		v->tile = tile;
+	}
+	v->cab_px = px;
+	v->cab_py = py;
+	v->direction = CabYawToDirection(v->cab_yaw);
+	v->x_pos = x;
+	v->y_pos = y;
+	v->UpdatePosition();
+	RoadZPosAffectSpeed(v, v->UpdateInclination(true, true));
+	return true;
+}
+
+/**
+ * A tick of a road vehicle driven freely from its cab (cab_drive.h): as far along its heading as its speed takes it,
+ * standing where it may not go. Its orders wait.
+ */
+static void RoadVehFreeController(RoadVehicle *v)
+{
+	/* Moved by the game in the meantime (out of its depot, a game of an older version): the exact position anew. */
+	if (v->cab_px / CAB_SUBUNIT != v->x_pos || v->cab_py / CAB_SUBUNIT != v->y_pos) {
+		v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+		v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+	}
+	v->ShowVisualEffect();
+	int j = v->UpdateSpeed();
+	int adv_spd = v->GetAdvanceDistance();
+	bool blocked = false;
+	while (j >= adv_spd) {
+		j -= adv_spd;
+		if (!RoadVehFreeStep(v)) {
+			blocked = true;
+			break;
+		}
+		if (!v->cab_free) break; // back on the road
+		adv_spd = v->GetAdvanceDistance();
+	}
+	if (blocked) {
+		/* At a house, the water, the rails: it stands, and turns there. */
+		v->cur_speed = 0;
+		v->subspeed = 0;
+	}
+	v->SetLastSpeed();
+	v->UpdateViewport(false, false);
+	if (v->progress == 0) v->progress = blocked ? adv_spd - 1 : j;
+}
+
 static bool RoadVehController(RoadVehicle *v)
 {
 	/* decrease counters */
@@ -1829,6 +1956,12 @@ static bool RoadVehController(RoadVehicle *v)
 	if (v->HandleBreakdown()) return true;
 	if (v->vehstatus.Test(VehState::Stopped)) {
 		v->SetLastSpeed();
+		return true;
+	}
+
+	/* Driven freely from the cab: off the road, at any angle (cab_drive.h). */
+	if (v->cab_free && !v->IsInDepot() && v->state != RVSB_WORMHOLE) {
+		RoadVehFreeController(v);
 		return true;
 	}
 
@@ -1927,6 +2060,8 @@ void RoadVehicle::SetDestTile(TileIndex tile)
 
 static void CheckIfRoadVehNeedsService(RoadVehicle *v)
 {
+	/* Driven freely off the road from the cab: no way to a depot from there (cab_drive.h). */
+	if (v->cab_free) return;
 	/* If we already got a slot at a stop, use that FIRST, and go to a depot later */
 	if (Company::Get(v->owner)->settings.vehicle.servint_roadveh == 0 || !v->NeedsAutomaticServicing()) return;
 	if (v->IsChainInDepot()) {

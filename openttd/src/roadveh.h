@@ -154,6 +154,18 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VehicleType::Road> 
 	/** Is this vehicle riding on a train rather than standing on a road? */
 	inline bool IsCarried() const { return this->First()->carried_by != VehicleID::Invalid(); }
 
+	/** Whether the tile under the vehicle has a road of its kind (road or tram): not so off the road, driven freely from the cab (cab_drive.h). */
+	inline bool IsOnOwnRoadType() const
+	{
+		return MayHaveRoad(this->tile) && HasTileRoadType(this->tile, GetRoadTramType(this->roadtype));
+	}
+
+	/** The road type under the vehicle, or its own off the road (driven freely from the cab, cab_drive.h). */
+	inline RoadType GetRoadTypeUnder() const
+	{
+		return this->IsOnOwnRoadType() ? GetRoadType(this->tile, GetRoadTramType(this->roadtype)) : this->roadtype;
+	}
+
 	int GetCurrentMaxSpeed() const override;
 	int UpdateSpeed();
 	void SetDestTile(TileIndex tile) override;
@@ -291,10 +303,13 @@ protected: // These functions should not be called outside acceleration code.
 	inline uint16_t GetMaxTrackSpeed() const
 	{
 		/* On a rail wagon there is no road under the vehicle to ask, and no
-		 * road limit either (road_on_rail.h). */
+		 * road limit either (road_on_rail.h); nor off the road, driven freely
+		 * from the cab (cab_drive.h). */
 		if (this->IsCarried()) return 0;
+		if (this->cab_free && !this->IsOnOwnRoadType()) return 0;
 		return GetRoadTypeInfo(GetRoadType(this->tile, GetRoadTramType(this->roadtype)))->max_speed;
 	}
+
 
 	/**
 	 * Checks if the vehicle is at a tile that can be sloped.
