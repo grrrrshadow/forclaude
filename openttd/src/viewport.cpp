@@ -1901,8 +1901,11 @@ struct TurnedVertex {
  * texture pixel of the same world point. Both maps are affine within a
  * triangle, so the texture coordinate changes linearly across it. Pixels the
  * texture has nothing for (value 0) are left as they are.
+ * @param fill whether a pixel the texture has nothing for takes the nearest drawn pixel within three (the edges of
+ *             the ground's diamonds and of solid things); not for a thing of thin lines on nothing, a bridge's
+ *             cables, which it would fill into a sheet
  */
-static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c)
+static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true)
 {
 	double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 	if (std::abs(area) < 1e-9) return;
@@ -1941,7 +1944,7 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 			int iu = static_cast<int>(std::floor(u)), iv = static_cast<int>(std::floor(v));
 			if (iu < 0 || iv < 0 || iu >= tw || iv >= th) continue;
 			uint32_t p = tex[iv * tw + iu];
-			if (p == 0) {
+			if (p == 0 && fill) {
 				/* The edge of a face falls on the outermost pixels of its diamond, whose sides step two pixels at a
 				 * time and whose tips are four apart: the nearest drawn pixel within three is the right one then. */
 				static const int near[24][2] = {
@@ -2367,7 +2370,18 @@ static std::vector<BoxFace> _box_faces; ///< The faces of the house being drawn.
  * @param centre_x,centre_y the middle of the thing in its frame, which the boxes snap about
  * @param period the turn after which the front comes round again: 90 degrees for a square thing, 180 for a longer one
  */
-static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, const ThreeDPart *parts, uint count, bool cut, double cx0, double cx1, double cy0, double cy1, double centre_x, double centre_y, double period)
+/** Where the sprite of a standing thing lies, drawn north-up into _turned_texture (MakeTurnedTexture()). */
+struct TurnedTexture {
+	int left, top;     ///< its top left corner, virtual pixels
+	int width, height; ///< its size, pixels at the frame's zoom
+};
+
+/**
+ * Draw the sprite of a standing thing, with its children, north-up into _turned_texture, for its pixels to be laid
+ * over faces (DrawTurnedFaces()).
+ * @return whether there is anything to lay
+ */
+static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, TurnedTexture &tex)
 {
 	ZoomLevel zoom = frame.zoom;
 	int mask = ScaleByZoom(-1, zoom);
@@ -2383,7 +2397,7 @@ static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw
 	int twidth = (sleft + spr->width + margin - tleft + ~mask) & mask;
 	int theight = (stop + spr->height + margin - ttop + ~mask) & mask;
 	int tw = UnScaleByZoom(twidth, zoom), th = UnScaleByZoom(theight, zoom);
-	if (tw <= 0 || th <= 0) return;
+	if (tw <= 0 || th <= 0) return false;
 	double t0 = TurnedNow();
 	_turned_texture.assign(static_cast<size_t>(tw) * th, 0);
 	DrawPixelInfo tdpi{
@@ -2411,11 +2425,21 @@ static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw
 		}
 	}
 	_turned_times.texture += TurnedNow() - t0;
+	tex = {tleft, ttop, tw, th};
+	return true;
+}
 
-	/* The faces of the boxes. */
-	_box_faces.clear();
-	for (uint i = 0; i < count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy);
-	std::sort(_box_faces.begin(), _box_faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
+/**
+ * Lay the texture of a standing thing (MakeTurnedTexture()) over faces turned with the view, far to near.
+ * @param faces the faces in the frame of the thing (tile units from box_ox, box_oy; pixels up from box_oz), sorted far to near
+ * @param centre_x,centre_y the middle of the thing in its frame, which the faces snap about
+ * @param period the turn after which the front comes round again: 90 degrees for a square thing, 180 for a longer one, 360 for one that never snaps
+ * @param fill whether gaps in the texture are filled from the pixels about them (DrawTexturedTriangle())
+ */
+static void DrawTurnedFaces(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, const std::vector<BoxFace> &faces, double centre_x, double centre_y, double period, const TurnedTexture &tex, bool fill = true)
+{
+	ZoomLevel zoom = frame.zoom;
+	const int tleft = tex.left, ttop = tex.top, tw = tex.width, th = tex.height;
 
 	/* The front turns by up to half the period either way; past that the boxes snap back about the middle. */
 	double yaw = GetViewYaw();
@@ -2446,15 +2470,27 @@ static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw
 	};
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
-	const uint32_t *tex = _turned_texture.data();
+	const uint32_t *pixels = _turned_texture.data();
 	double t1 = TurnedNow();
-	for (const BoxFace &face : _box_faces) {
+	for (const BoxFace &face : faces) {
 		TurnedVertex a = vertex(face.v[0]);
 		for (size_t i = 1; i + 1 < face.v.size(); i++) {
-			DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, a, vertex(face.v[i]), vertex(face.v[i + 1]));
+			DrawTexturedTriangle(dst, frame.pitch, fw, fh, pixels, tw, th, a, vertex(face.v[i]), vertex(face.v[i + 1]), fill);
 		}
 	}
 	_turned_times.warp += TurnedNow() - t1;
+}
+
+static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, const ThreeDPart *parts, uint count, bool cut, double cx0, double cx1, double cy0, double cy1, double centre_x, double centre_y, double period, bool fill = true)
+{
+	TurnedTexture tex;
+	if (!MakeTurnedTexture(frame, ps, tex)) return;
+
+	/* The faces of the boxes. */
+	_box_faces.clear();
+	for (uint i = 0; i < count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy);
+	std::sort(_box_faces.begin(), _box_faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
+	DrawTurnedFaces(frame, ps, _box_faces, centre_x, centre_y, period, tex, fill);
 }
 
 /** A house sprite of the turned view as the boxes of its hand table (box_kind 1): this tile's share of them, from this tile's sprite. */
@@ -2491,6 +2527,238 @@ static void DrawTurnedSlab(const DrawPixelInfo &frame, const ParentSpriteToDraw 
 	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, ps.box_dx / 2.0, ps.box_dy / 2.0, 360.0);
 }
 
+/*
+ * A bridge in the turned view (the player: "the bridges fall apart when the view turns"): drawn as billboards, the
+ * pieces of the deck over each tile stood north-up at their turned tiles and never joined up. So a bridge is built
+ * from the sprites the game draws for it, as the cab view builds it (CabDrawBridgeMiddle()): over each tile the
+ * deck as a slab at the bridge's height with the floor sprite's pixels on top (box_kind 8), the far and the near
+ * railings as thin walls along the deck's edges with the sprites' pylons and cables on them (9), the pillars as
+ * columns where the sprites' pixels stand (11), and each end's ramp as a deck rising from the ground to the
+ * bridge, dressed in the ramp's sprite (10). None of them ever snaps: a bridge turns for real at every angle.
+ */
+
+/** How thick the deck of a bridge is drawn in the turned view, units of height below the track. */
+static constexpr int TURNED_DECK = 2;
+
+/** A box of a bridge over a tile, given along the bridge's axis and across it, in the tile's frame. */
+static inline ThreeDPart BridgePart(Axis axis, double a0, double a1, double c0, double c1, double h)
+{
+	if (axis == Axis::X) return {static_cast<float>(a0), static_cast<float>(a1), static_cast<float>(c0), static_cast<float>(c1), static_cast<float>(h), ThreeDRoof::Flat, 0.0f};
+	return {static_cast<float>(c0), static_cast<float>(c1), static_cast<float>(a0), static_cast<float>(a1), static_cast<float>(h), ThreeDRoof::Flat, 0.0f};
+}
+
+/** The deck of a bridge over a tile (box_kind 8): a slab across the tile at the bridge's height, its top the floor sprite's. */
+static void DrawTurnedBridgeDeck(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	ThreeDPart part = BridgePart(static_cast<Axis>(ps.box_dx), 0, TILE_SIZE, 1, TILE_SIZE - 1, TURNED_DECK);
+	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, TILE_SIZE / 2.0, TILE_SIZE / 2.0, 360.0);
+}
+
+/**
+ * A railing of a bridge over a tile (box_kind 9): a thin wall along an edge of the deck, the sprite's pylons and
+ * cables on it, the gaps between the cables left open (they filled into a sheet with the gaps filled).
+ */
+static void DrawTurnedBridgeRailing(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	int c_min = static_cast<int8_t>(ps.box_dy & 0xFF), c_ext = std::max(1, ps.box_dy >> 8);
+	ThreeDPart part = BridgePart(static_cast<Axis>(ps.box_dx), 0, TILE_SIZE, c_min, c_min + c_ext, ps.zmax - ps.zmin + 1);
+	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, TILE_SIZE / 2.0, TILE_SIZE / 2.0, 360.0, false);
+}
+
+/** A piece of a bridge's pillar (box_kind 11): a column a level high where the sprite's pixels stand (box_dx, box_dy: sixteenths of a tile unit). */
+static void DrawTurnedBridgePillar(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	const double half = 1.25, fx = ps.box_dx / 16.0, fy = ps.box_dy / 16.0;
+	ThreeDPart part{static_cast<float>(fx - half), static_cast<float>(fx + half), static_cast<float>(fy - half), static_cast<float>(fy + half), static_cast<float>(TILE_HEIGHT), ThreeDRoof::Flat, 0.0f};
+	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, fx, fy, 90.0);
+}
+
+/**
+ * The ramp of a bridge (box_kind 10): the deck rising from the ground at its outer end to the bridge's height at
+ * the inner one (or level with it, on a slope or a foundation), dressed in the ramp's sprite, its sides down to
+ * the ground, the far one in the near one's pixels, the end under the bridge in them too. The road or the rails
+ * laid on the ramp come the same way, each its own sprite over the same slope.
+ */
+static void DrawTurnedBridgeRamp(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	TileIndex head = TileXY(ps.box_ox / TILE_SIZE, ps.box_oy / TILE_SIZE);
+	if (!IsValidTile(head) || !IsBridgeTile(head)) return;
+	const DiagDirection dir = GetTunnelBridgeDirection(head);
+	const Axis axis = DiagDirToAxis(dir);
+	const int bz = GetBridgePixelHeight(head);
+	const int x0 = ps.box_ox, y0 = ps.box_oy;
+	/* Along the axis: the end towards the bridge (inner) and the one towards the road or rail (outer). */
+	const bool inner_low = dir == DiagDirection::NE || dir == DiagDirection::NW;
+	const double a_in = inner_low ? 0 : TILE_SIZE, a_out = inner_low ? TILE_SIZE : 0;
+	auto world = [&](double a, double c, double &wx, double &wy) {
+		if (axis == Axis::X) {
+			wx = a;
+			wy = c;
+		} else {
+			wx = c;
+			wy = a;
+		}
+	};
+	double sx, sy;
+	world(inner_low ? TILE_SIZE - 1 : 0, TILE_SIZE / 2, sx, sy);
+	int z_out = GetSlopePixelZ(x0 + static_cast<int>(sx), y0 + static_cast<int>(sy), true);
+	const double deck_out = (bz - z_out >= static_cast<int>(TILE_HEIGHT) / 2) ? bz - static_cast<int>(TILE_HEIGHT) : bz, deck_in = bz;
+	auto ground = [&](double a, double c) {
+		double wx, wy;
+		world(std::clamp(a, 0.0, TILE_SIZE - 1.0), std::clamp(c, 0.0, TILE_SIZE - 1.0), wx, wy);
+		return static_cast<double>(GetSlopePixelZ(x0 + static_cast<int>(wx), y0 + static_cast<int>(wy), false));
+	};
+	/* A corner: along a, across c, height z (absolute: the frame's box_oz is 0); dressed in the pixel of (a, tc, tz). */
+	auto pt = [&](double a, double c, double z, double tc, double tz) {
+		BoxVertex v;
+		world(a, c, v.x, v.y);
+		v.z = z;
+		world(a, tc, v.tx, v.ty);
+		v.tz = tz;
+		return v;
+	};
+	TurnedTexture tex;
+	if (!MakeTurnedTexture(frame, ps, tex)) return;
+	std::vector<BoxFace> faces;
+	auto add = [&](std::vector<BoxVertex> poly) {
+		double cx = 0, cy = 0, cz = 0;
+		for (const BoxVertex &v : poly) {
+			cx += v.x;
+			cy += v.y;
+			cz += v.z;
+		}
+		double xr, yr;
+		TurnWorldPoint(x0 + cx / poly.size(), y0 + cy / poly.size(), xr, yr);
+		faces.push_back({std::move(poly), xr + yr + 2 * cz / poly.size()});
+	};
+	const double c_far = 1, c_near = TILE_SIZE - 1;
+	/* The deck. */
+	add({pt(a_out, c_far, deck_out, c_far, deck_out), pt(a_in, c_far, deck_in, c_far, deck_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_out, c_near, deck_out, c_near, deck_out)});
+	/* Its sides down to the ground: the near one as the sprite shows it, the far one in the near one's pixels. */
+	for (double c : {c_near, c_far}) {
+		double g_out = std::min(ground(a_out, c), deck_out), g_in = std::min(ground(a_in, c), deck_in - TURNED_DECK);
+		add({pt(a_out, c, g_out, c_near, g_out), pt(a_in, c, g_in, c_near, g_in), pt(a_in, c, deck_in, c_near, deck_in), pt(a_out, c, deck_out, c_near, deck_out)});
+	}
+	/* The end under the bridge, in the near side's pixels. */
+	double g_in = std::min({ground(a_in, c_far), ground(a_in, c_near), deck_in - TURNED_DECK});
+	add({pt(a_in, c_far, g_in, c_near, g_in), pt(a_in, c_near, g_in, c_near, g_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_in, c_far, deck_in, c_near, deck_in)});
+	std::sort(faces.begin(), faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
+	DrawTurnedFaces(frame, ps, faces, TILE_SIZE / 2.0, TILE_SIZE / 2.0, 360.0, tex);
+}
+
+/**
+ * The sprites of a bridge over a tile (DrawBridgeMiddle(), marked by MarkCabBridgeSprites()) given their boxes for
+ * the turned view: the floor sprite is the deck, a slab over the whole tile, and its far railing besides, as an
+ * entry of its own at the far edge so it sorts there against what stands on the deck; the near part is the near
+ * railing; a surface laid on the deck (a rail type's deck, a reservation) a slab a step above it; a pillar piece a
+ * column where its pixels stand; anything else of the bridge a box of its bounding box.
+ */
+static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
+{
+	const Axis axis = GetBridgeAxis(tile);
+	const int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+	const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE;
+	const int corner_x = RemapCoords(x0, y0, 0).x;
+	std::vector<ParentSpriteToDraw> railings;
+	for (size_t i = from; i < to && i < _vd.parent_sprites_to_draw.size(); i++) {
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+		int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1;
+		int c_min = axis == Axis::X ? ps.ymin - y0 : ps.xmin - x0;
+		int c_ext = axis == Axis::X ? ey : ex;
+		ps.box = nullptr;
+		if (ps.zmin < bz - TURNED_DECK) {
+			/* A piece of a pillar. Its box tells only whether it is the near pillar (on the tile) or the far one (the game
+			 * draws that one so many units back that its pixels land at the far edge); where along the bridge it stands is
+			 * read off the sprite's middle, the pillar standing a few units in from the deck's edge. */
+			const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
+			double sx_c = ps.left + spr->width / 2.0 - corner_x;
+			double c = c_min >= 0 ? TILE_SIZE - 3.0 : 3.0;
+			double a = axis == Axis::X ? c - sx_c / (2.0 * ZOOM_BASE) : c + sx_c / (2.0 * ZOOM_BASE);
+			a = std::clamp(a, 1.0, TILE_SIZE - 1.0);
+			ps.box_kind = 11;
+			ps.box_ox = x0;
+			ps.box_oy = y0;
+			ps.box_oz = ps.zmax + 1 - static_cast<int>(TILE_HEIGHT);
+			ps.box_dx = static_cast<int16_t>(std::lround((axis == Axis::X ? a : c) * 16));
+			ps.box_dy = static_cast<int16_t>(std::lround((axis == Axis::X ? c : a) * 16));
+			continue;
+		}
+		if (ex >= static_cast<int>(TILE_SIZE) && ey >= static_cast<int>(TILE_SIZE)) {
+			/* A surface laid on the deck: a slab a step above it, sorted under what runs on it. */
+			ps.box_kind = 6;
+			ps.box_ox = ps.xmin;
+			ps.box_oy = ps.ymin;
+			ps.box_oz = ps.zmin;
+			ps.box_dx = static_cast<int16_t>(ex);
+			ps.box_dy = static_cast<int16_t>(ey);
+			ps.zmax = ps.zmin;
+			ps.zmin--;
+			continue;
+		}
+		if (c_ext <= 2) {
+			int16_t across = static_cast<int16_t>((c_min & 0xFF) | (c_ext << 8));
+			if (c_min >= static_cast<int>(TILE_SIZE) / 2) {
+				/* The near railing. */
+				ps.box_kind = 9;
+				ps.box_ox = x0;
+				ps.box_oy = y0;
+				ps.box_oz = ps.zmin;
+				ps.box_dx = static_cast<int16_t>(axis);
+				ps.box_dy = across;
+				continue;
+			}
+			/* The floor with the far railing: the railing as an entry of its own at the far edge, the deck here over the whole tile. */
+			ParentSpriteToDraw railing = ps;
+			railing.box_kind = 9;
+			railing.box_ox = x0;
+			railing.box_oy = y0;
+			railing.box_oz = ps.zmin;
+			railing.box_dx = static_cast<int16_t>(axis);
+			railing.box_dy = across;
+			railings.push_back(railing);
+			ps.box_kind = 8;
+			ps.box_ox = x0;
+			ps.box_oy = y0;
+			ps.box_oz = bz - TURNED_DECK;
+			ps.box_dx = static_cast<int16_t>(axis);
+			ps.box_dy = 0;
+			ps.xmin = x0;
+			ps.xmax = x0 + TILE_SIZE - 1;
+			ps.ymin = y0;
+			ps.ymax = y0 + TILE_SIZE - 1;
+			ps.zmin = bz - TURNED_DECK;
+			continue;
+		}
+		/* Anything else of the bridge: a box of its bounding box. */
+		ps.box_kind = 2;
+		ps.box_ox = ps.xmin;
+		ps.box_oy = ps.ymin;
+		ps.box_oz = ps.zmin;
+		ps.box_dx = static_cast<int16_t>(std::max(2, ex));
+		ps.box_dy = static_cast<int16_t>(std::max(2, ey));
+	}
+	for (const ParentSpriteToDraw &r : railings) _vd.parent_sprites_to_draw.push_back(r);
+	if (!railings.empty()) _vd.last_child = LAST_CHILD_NONE;
+}
+
+/** The sprites of a bridge's end on its tile: the ramp and whatever lies on it (a road, rails) as the rising deck (box_kind 10). */
+static void TurnedBridgeHead(TileIndex head, size_t first_parent)
+{
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+		if (ps.xmax - ps.xmin + 1 < static_cast<int>(TILE_SIZE) || ps.ymax - ps.ymin + 1 < static_cast<int>(TILE_SIZE)) continue;
+		ps.box_kind = 10;
+		ps.box = nullptr;
+		ps.box_ox = TileX(head) * TILE_SIZE;
+		ps.box_oy = TileY(head) * TILE_SIZE;
+		ps.box_oz = 0;
+		ps.box_dx = 0;
+		ps.box_dy = 0;
+	}
+}
+
 /**
  * A thing the turned view draws from renders (box_kind 3): one of the game's
  * buildings rendered from eight directions (ThreeDModel), or the layers of a
@@ -2509,6 +2777,12 @@ static std::vector<TurnedModel> _turned_models;
 static std::vector<const ThreeDModelPicture *> _turned_vehicle_pictures;
 /** Whether the turned renderer is collecting what to draw (ViewportDoDrawTurned()): the vehicles then come as their likeness. */
 static bool _drawing_turned = false;
+/** The sprites of the bridges over the tiles collected (MarkCabBridgeSprites()): the tile, and the first and the end of their parent sprites. */
+struct CabBridgeSprites {
+	TileIndex tile;
+	size_t from, to;
+};
+static std::vector<CabBridgeSprites> _cab_bridge_sprites;
 
 bool ViewportDrawingTurned()
 {
@@ -2878,6 +3152,7 @@ static void ViewportDoDrawTurned()
 	models.clear();
 	_turned_objects.clear();
 	_turned_vehicle_pictures.clear();
+	_cab_bridge_sprites.clear();
 	AutoRestoreBackup drawing_turned(_drawing_turned, true);
 
 	/* Their draw procedures, in that order: what each says to draw is collected, and remembered per tile. The
@@ -2948,6 +3223,15 @@ static void ViewportDoDrawTurned()
 			}
 		}
 		t_collect += TurnedNow() - tc0;
+
+		/* A bridge over the tile, and a bridge's end on it: built from their sprites (TurnedBridgeOverTile()). */
+		if (_cur_ti.tile != INVALID_TILE) {
+			for (const CabBridgeSprites &bs : _cab_bridge_sprites) {
+				if (bs.tile == _cur_ti.tile && bs.to != SIZE_MAX) TurnedBridgeOverTile(_cur_ti.tile, bs.from, bs.to);
+			}
+			_cab_bridge_sprites.clear();
+			if (tile_type == TileType::TunnelBridge && IsBridge(_cur_ti.tile)) TurnedBridgeHead(_cur_ti.tile, first_parent);
+		}
 
 		/* A house of the original game made a real 3D object (three_d_objects.h): drawn once, whole, by its
 		 * triangles (DrawTurnedObject()), in place of the sprites of its tiles. One with eight renders keeps them. */
@@ -3276,6 +3560,22 @@ static void ViewportDoDrawTurned()
 		}
 		if (ps->box_kind == 7) {
 			DrawTurnedObject(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 8) {
+			DrawTurnedBridgeDeck(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 9) {
+			DrawTurnedBridgeRailing(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 10) {
+			DrawTurnedBridgeRamp(frame, *ps);
+			continue;
+		}
+		if (ps->box_kind == 11) {
+			DrawTurnedBridgePillar(frame, *ps);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
@@ -6259,20 +6559,14 @@ static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const Ca
 
 /** The cab view collects the sprites of a tile; DrawBridgeMiddle() says which of them are a bridge's. */
 static bool _cab_collecting = false;
-/** The sprites of the bridges over the tiles collected: the tile, and the first and the end of their parent sprites. */
-struct CabBridgeSprites {
-	TileIndex tile;
-	size_t from, to;
-};
-static std::vector<CabBridgeSprites> _cab_bridge_sprites;
 
 /**
- * DrawBridgeMiddle() tells where the sprites of a bridge over a tile begin and end, for the cab view to build the
- * bridge from them. Nothing else when the cab view is not collecting.
+ * DrawBridgeMiddle() tells where the sprites of a bridge over a tile begin and end, for the cab view and the turned
+ * view to build the bridge from them. Nothing else when neither is collecting.
  */
 void MarkCabBridgeSprites(TileIndex tile, bool begin)
 {
-	if (!_cab_collecting) return;
+	if (!_cab_collecting && !_drawing_turned) return;
 	if (begin) {
 		_cab_bridge_sprites.push_back({tile, _vd.parent_sprites_to_draw.size(), SIZE_MAX});
 	} else if (!_cab_bridge_sprites.empty() && _cab_bridge_sprites.back().to == SIZE_MAX) {
