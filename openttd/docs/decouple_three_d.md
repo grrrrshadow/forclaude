@@ -349,6 +349,72 @@ too.
   about a texture pixel to a pixel of the picture. The view facing north keeps
   the sprites, pixel for pixel.
 
+## Vehicles as real 3D objects
+
+`src/three_d_vehicle_object.h`, `.cpp`, the reading in `src/three_d_objects.cpp`.
+The player (14. 10.): "we will never render anything again; vehicles go into
+the game as objects, like the houses". The colleague's request and format:
+grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
+
+- **Index**: entries `"druh": "vozidlo"` of any `objekty/<set>/objekty.json`
+  (`media/baseset/decouple/objekty/vozidla/`): `soubor` (.glb), `typ` (`vlak`,
+  `auto`, `lod`, `letadlo`), `grf` (the set's id: four characters as in the set,
+  `"MAXb"`, or eight hex digits as the game prints it), `clanky` (the engines'
+  numbers in the set, Action 0, front first; or `motor` alone), `kotva`
+  (`stred`, the middle piece, by default; `prvni`; or a number), `textura` (a
+  paint: a PNG over the same UV instead of the file's texture), `kabina`
+  (x, y, z of the cab's eye, metres; read, not used yet). `meritko` is not
+  read: the objects are in true metres and their size is the setting below.
+  The index is read the first time an engine is looked up, a .glb the first time
+  its vehicle is drawn.
+- **The object**: one mesh, metres, the vehicle's frame -- x forward, y to its
+  left, z up, the origin in the middle of the vehicle on the top of the rail --
+  `POSITION`, `NORMAL`, `TEXCOORD_0`, one base colour texture, no baked light.
+- **The sprites**: an engine of an object gets no sprites from its set at all
+  (`GetCustomEngineSprite()` asks `GetThreeDVehicleObjectSprite()` first). The
+  game draws the object into a sprite of the sprite cache of its own
+  (`AllocateDerivedSpriteID()`, `SpriteCache::object_sprite`), made when it is
+  first read (`ReadSprite()` -> `MakeThreeDVehicleObjectSprite()`): at 16x with
+  the camera of the sprites (`RasterObject()`: 30 degrees above the horizon,
+  48.8 px/m, direction d turned 90 - 45 d degrees, trains and road vehicles
+  foreshortened 1/sqrt 2 along themselves in the four directions of straight
+  track, as the sets draw), triangles through a depth buffer, the texture
+  nearest, twice the size and shrunk; the coarser levels are made from it as
+  from a set's zin16. Lit from the normals by one light fixed to the world, the
+  colleague's: brightness 0.55 + 0.45 max(0, n . L), L = (-0.55, 0.35, 0.75) in
+  the world's axes. So the map facing north, the depot, the lists, the purchase
+  window and the turning preview (made from these sprites) all draw it.
+- **One rigid object over the pieces**: on the map, in the depot and the lists
+  the anchor piece draws the whole object about the middle of the chain (its
+  sprite moved from the piece's position by the pieces' spacing,
+  `ThreeDChainPositions()`, and the game's sprite anchor, `ThreeDSpriteAnchor()`);
+  the other pieces draw an empty picture. In the purchase window and the news,
+  where only the first piece is drawn, the first piece draws it all.
+- **The turned view**: the object itself at the angle of the view
+  (`AddThreeDVehicleObjectToViewport()`, before the 3D likeness), foreshortened
+  smoothly between the directions as the likeness is, hung from the middle of
+  the chain (on a round curve from its point on the arc), sorted by the box of
+  its pieces; the pictures are kept by object, zoom and degree.
+- **Size and length, the setting** *Vehicles from 3D objects at the original
+  game's size* (`vehicle.object_original_size`, new game, off): the original
+  game's size as the bigger sets draw (BRYLE), 1.2, or CZTR's scale, 1 -- one
+  file for both (the player: "the game can make it bigger"). The length of the
+  pieces on the track is the object's (the player: "do it from the object"):
+  its length at that size, a step of the chain to a step of diagonal track,
+  shared by the pieces in the proportions of the set, each at most a whole
+  vehicle (`ThreeDVehicleObjectPieceLength()` in `Train::ConsistChanged()`,
+  `GetRoadVehLength()`); Sergej, 17.69 m, is 13 eighths small and 16 big, as
+  the colleague's two sets have it. Ships and aircraft keep their sets'
+  lengths. The lengths depend on the object files: every player of a network
+  game must have the same.
+- Not yet: the paint mask (fading, colour by number), the crew and the glass,
+  levels of detail, the cab's eye, wheels and bogies of their own.
+- Cost: Sergej, 95 thousand triangles, takes 55 to 170 ms a direction for the
+  sprite at 16x (once, while the sprite is in the cache) and 15 to 20 ms a
+  picture of the turned view at 4x (once a degree and direction).
+- Rig: `test3d vozidla3d` lists the objects, the engines they are and the
+  sprites made; `-d sprite=3` logs each sprite made, `sprite=4` each picture.
+
 ## Round curves of rails
 
 `src/round_track.cpp`, the setting *Round curves of rails*

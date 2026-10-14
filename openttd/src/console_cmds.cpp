@@ -8570,6 +8570,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			at = end + 1;
 		}
 		return true;
+	} else if (what == "vozidla3d") {
+		/* The rig: the vehicles that are 3D objects (three_d_vehicle_object.h), as read, and their sprites made. */
+		extern std::string DescribeThreeDVehicleObjects();
+		extern std::string DescribeThreeDVehicleObjectSprites();
+		std::string all = DescribeThreeDVehicleObjects() + "\n" + DescribeThreeDVehicleObjectSprites();
+		for (size_t at = 0; at < all.size();) {
+			size_t end = all.find('\n', at);
+			if (end == std::string::npos) end = all.size();
+			IConsolePrint(CC_DEFAULT, "test3d: {}", all.substr(at, end - at));
+			at = end + 1;
+		}
+		return true;
 	} else if (what == "mesto") {
 		/* The rig: the middle of the view on the n-th town. */
 		auto n = number(2);

@@ -23,6 +23,7 @@
 #include "true_colour.h"
 #include "cargo_cutout.h"
 #include "layer_shift.h"
+#include "three_d_vehicle_object.h"
 #include "three_d.h"
 
 #include "table/sprites.h"
@@ -1048,7 +1049,17 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 
 	SpriteLoader::SpriteCollection sprite;
 	bool read_32bpp = false;
-	ZoomLevels sprite_avail = LoadSpriteAsDrawn(sc, sprite_type, encoder, sprite, read_32bpp);
+	ZoomLevels sprite_avail;
+	if (sc->object_sprite != 0) {
+		/* A vehicle drawn from its 3D object: made now, at 16x (three_d_vehicle_object.cpp). */
+		sprite_avail = MakeThreeDVehicleObjectSprite(sc->object_sprite, sprite);
+		read_32bpp = true;
+		if (!encoder->Is32BppSupported()) {
+			for (ZoomLevel zoom : sprite_avail) Convert32bppTo8bpp(sprite[zoom]);
+		}
+	} else {
+		sprite_avail = LoadSpriteAsDrawn(sc, sprite_type, encoder, sprite, read_32bpp);
+	}
 
 	if (sprite_avail.None()) {
 		if (sprite_type == SpriteType::MapGen) return nullptr;
@@ -1334,6 +1345,7 @@ bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id)
 	sc->cutout_texture = 0;
 	sc->shift_x = 0;
 	sc->shift_y = 0;
+	sc->object_sprite = 0;
 
 	return true;
 }
@@ -1358,6 +1370,36 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr)
 	scnew->cutout_y = scold->cutout_y;
 	scnew->shift_x = scold->shift_x;
 	scnew->shift_y = scold->shift_y;
+	scnew->object_sprite = scold->object_sprite;
+}
+
+/**
+ * Make a sprite the picture of a vehicle drawn from its 3D object (three_d_vehicle_object.h): no file, made when
+ * it is read (MakeThreeDVehicleObjectSprite()), and made again when the cache has let it go.
+ * @param sprite the sprite to make (AllocateDerivedSpriteID())
+ * @param request what to draw, counted from 1
+ * @return whether it was made
+ */
+bool SetThreeDVehicleObjectSprite(SpriteID sprite, uint32_t request)
+{
+	if (sprite == 0 || request == 0) return false;
+	SpriteCache *sc = AllocateSpriteCache(sprite);
+	sc->file = nullptr;
+	sc->file_pos = 1; // SpriteExists()
+	sc->ClearSpriteData();
+	sc->length = 0;
+	sc->lru = 0;
+	sc->id = 0;
+	sc->type = SpriteType::Normal;
+	sc->warned = false;
+	sc->control_flags = {};
+	sc->green_load_empty = 0;
+	sc->true_colours = 0;
+	sc->cutout_texture = 0;
+	sc->shift_x = 0;
+	sc->shift_y = 0;
+	sc->object_sprite = request;
+	return true;
 }
 
 /**
@@ -1794,6 +1836,7 @@ void GfxInitSpriteMem()
 	ResetTrueColourSprites();
 	ResetCutoutSprites();
 	ResetShiftedSprites();
+	ResetThreeDVehicleObjectSprites();
 	ClearThreeDModelCache();
 }
 
@@ -1837,6 +1880,10 @@ ZoomLevels ReadRawSprite(SpriteID sprite, SpriteLoader::SpriteCollection &collec
 	is_32bpp = false;
 	if (!SpriteExists(sprite)) return {};
 	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->object_sprite != 0) {
+		is_32bpp = true;
+		return MakeThreeDVehicleObjectSprite(sc->object_sprite, collection);
+	}
 	if (sc->file == nullptr || sc->type != SpriteType::Normal || sc->file_pos == SIZE_MAX) return {};
 
 	return LoadSpriteAsDrawn(sc, SpriteType::Normal, BlitterFactory::GetCurrentBlitter(), collection, is_32bpp);

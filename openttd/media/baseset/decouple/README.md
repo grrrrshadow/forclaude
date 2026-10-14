@@ -71,9 +71,16 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   `524A450B`), ze které hra staví marsovská města (od kolegy, grrrrf
   `hra/3d/objekty/mars/`). Dům ze sady se hledá podle `nahrazuje_grf` (id sady,
   jak ho hra vypisuje) a `nahrazuje_house_grf` (číslo domu v sadě).
+- `vozidla/` – vozidla jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/vozidla/`):
+  první je Sergej (M62, `sergej.glb`, Chicken cutlet, CC BY 4.0) ve třech nátěrech
+  (`textura`). Vozidlo se hledá podle `grf` (id sady) a `clanky` (čísla motorů
+  v sadě); hra pak sprity sady nepoužije a kreslí vozidlo z objektu sama, i na
+  sever, v depu a v nákupu. Velikost (původní hry, nebo menší v měřítku CZTR)
+  a s ní délka na koleji jsou nastavení hry.
 - Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
   mírného klimatu, které staví arktické nebo pouštní domy („Domy z“).
 - Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje
   (`.glb`, `.png` a `objekty.json`).
+- Hra je kreslí v otočeném pohledu a v pohledu z kabiny; vozidla i na sever.
 
 Kód: `src/three_d_objects.cpp`, popis v `docs/decouple_three_d.md`.

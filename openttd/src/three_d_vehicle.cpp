@@ -63,6 +63,7 @@
 #include "core/backup_type.hpp"
 #include "debug.h"
 #include "round_track.h"
+#include "three_d_vehicle_object.h"
 
 #include "table/sprites.h"
 
@@ -219,8 +220,8 @@ struct VehiclePart {
 	const Vehicle *veh = nullptr; ///< the piece itself when the model is made from a vehicle on the map: its sprites are the vehicle's own
 };
 
-/** The length of an engine's part for the purchase window, eighths of a tile: its shortening property or callback. */
-static int PartLength(const Engine *e)
+/** The length of an engine's part as its set says, eighths of a tile: its shortening property or callback. */
+static int PartLengthOfSet(const Engine *e)
 {
 	int shorten = 0;
 	if (e->type == VehicleType::Train) {
@@ -239,6 +240,12 @@ static int PartLength(const Engine *e)
 		shorten = GetEngineProperty(e->index, PROP_ROADVEH_SHORTEN_FACTOR, shorten);
 	}
 	return static_cast<int>(VEHICLE_LENGTH) - Clamp(shorten, 0, static_cast<int>(VEHICLE_LENGTH) - 1);
+}
+
+/** The length of an engine's part for the purchase window, eighths of a tile: the set's, or its 3D object's (three_d_vehicle_object.h). */
+static int PartLength(const Engine *e)
+{
+	return ThreeDVehicleObjectPieceLength(e->index, PartLengthOfSet(e));
 }
 
 /** The parts of an engine, front first. */
@@ -290,6 +297,18 @@ static std::vector<VehiclePart> VehiclePiecesOf(const Vehicle *v)
 	return parts;
 }
 
+/** For the vehicles drawn as objects (three_d_vehicle_object.cpp): an engine's length as its set says, eighths of a tile. */
+int ThreeDEngineLength(EngineID engine)
+{
+	return PartLengthOfSet(Engine::Get(engine));
+}
+
+/** And where a piece's sprite goes against the piece's position (SpriteAnchor()). */
+Point ThreeDSpriteAnchor(VehicleType type, int length, Direction dir)
+{
+	return SpriteAnchor(type, length, dir);
+}
+
 /**
  * What a vehicle on the map looks like, as a number: its pieces' sprites of two directions, so two vehicles of
  * one engine that a set draws alike share a model and two it draws differently (a load, a livery) do not. The
@@ -331,6 +350,14 @@ static double PartPositions(VehicleType type, const std::vector<VehiclePart> &pa
 		pos[i] = pos[i - 1] - behind;
 	}
 	return (pos.front() + pos.back()) / 2.0;
+}
+
+/** For the vehicles drawn as objects: the pieces' positions along a chain of these lengths (PartPositions()), and its middle. */
+double ThreeDChainPositions(VehicleType type, const std::vector<int> &lengths, std::vector<double> &pos)
+{
+	std::vector<VehiclePart> parts;
+	for (int l : lengths) parts.push_back({EngineID::Invalid(), false, false, l});
+	return PartPositions(type, parts, pos);
 }
 
 /** Where a piece ends along the chain, behind its position: a train's half its length (rounded down), a road vehicle's its whole length. */
@@ -1312,6 +1339,8 @@ const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *mo
 bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom, const RoundTrackPose *pose)
 {
 	if (v->direction == Direction::Invalid) return false;
+	/* A vehicle drawn from its 3D object: the object itself at the angle (three_d_vehicle_object.h). */
+	if (AddThreeDVehicleObjectToViewport(v, zoom, pose)) return true;
 
 	/* The vehicle this is a piece of, and which piece: the chain of the front and its articulated parts, then
 	 * the rear head of a double-headed engine (VehiclePiecesOf()). */

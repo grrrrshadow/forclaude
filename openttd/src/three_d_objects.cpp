@@ -14,6 +14,7 @@
 #include "gfx_type.h"
 #include "tile_type.h"
 #include "house.h"
+#include "engine_base.h"
 #include "core/string_consumer.hpp"
 #include "3rdparty/nlohmann/json.hpp"
 
@@ -23,6 +24,7 @@
 #include <filesystem>
 #include <map>
 #include <tuple>
+#include <unordered_map>
 
 #ifdef WITH_PNG
 #include <png.h>
@@ -42,6 +44,20 @@ static bool _three_d_objects_read = false;
 static std::map<std::pair<HouseID, uint>, size_t> _three_d_house_objects;
 /** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
 static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
+
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels);
+
+/** The vehicles as objects (three_d_objects.h), and whether their indices were read yet. */
+static std::vector<ThreeDVehicleObject> _vehicle_objects;
+static bool _vehicle_objects_read = false;
+/** The vehicle objects by the set's id, the vehicle type and the engine's number in the set: the object and which of its pieces. */
+static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pieces;
+
+/** The key of an engine of a set in _vehicle_object_pieces. */
+static inline uint64_t VehiclePieceKey(uint32_t grfid, VehicleType type, uint16_t local_id)
+{
+	return (static_cast<uint64_t>(grfid) << 24) | (static_cast<uint64_t>(to_underlying(type)) << 16) | local_id;
+}
 
 /** A file's bytes, or nothing when it cannot be read. */
 static std::vector<uint8_t> ReadWholeFile(const std::string &path)
@@ -64,13 +80,22 @@ static uint32_t ReadU32(const std::vector<uint8_t> &d, size_t at)
 	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
 }
 
+/** The first mesh of a .glb as read: metres, in the game's axes (x, y, z up), normals when the file has them. */
+struct GlbMesh {
+	std::vector<float> pos;    ///< x, y, z of each corner
+	std::vector<float> nrm;    ///< its normal, or empty
+	std::vector<float> uv;     ///< u, v of each corner
+	std::vector<uint32_t> tri; ///< three corners a triangle
+	std::vector<uint8_t> png;  ///< the base colour's texture as it is in the file
+};
+
 /**
- * Read one .glb into an object: its first mesh's triangles, their corners' positions and texture coordinates, the
- * node's transform applied, turned from glTF's axes (Y up, as Blender writes x, z, -y) into the game's and from
- * metres into units; and the PNG of its base colour texture, kept as it is until the object is drawn.
+ * Read the first mesh of a .glb: its triangles, their corners' positions, normals and texture coordinates, the
+ * node's transform applied, turned from glTF's axes (Y up, as Blender writes x, z, -y) into the game's, in metres;
+ * and the PNG of its base colour texture, kept as it is until the object is drawn.
  * @return whether there is something to draw
  */
-static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh)
 {
 	std::vector<uint8_t> d = ReadWholeFile(path);
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
@@ -152,41 +177,53 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 
 		const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
 		int material = -1;
+		bool normals = true;
 		for (const auto &p : prims) {
 			if (p.value("mode", 4) != 4) continue; // triangles only
-			std::vector<double> pos, uv, idx;
+			std::vector<double> pos, nrm, uv, idx;
 			read(p.at("attributes").at("POSITION").get<int>(), 3, pos);
 			if (p.at("attributes").contains("TEXCOORD_0")) read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
+			if (p.at("attributes").contains("NORMAL")) read(p.at("attributes").at("NORMAL").get<int>(), 3, nrm);
 			size_t corners = pos.size() / 3;
 			if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
+			if (nrm.size() != corners * 3) normals = false;
 			if (p.contains("indices")) {
 				read(p.at("indices").get<int>(), 1, idx);
 			} else {
 				for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
 			}
 			if (material < 0 && p.contains("material")) material = p.at("material").get<int>();
-			uint32_t base = static_cast<uint32_t>(obj.pos.size() / 3);
+			uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
 			for (size_t i = 0; i < corners; i++) {
 				double X = pos[i * 3], Y = pos[i * 3 + 1], Z = pos[i * 3 + 2];
 				double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
 				double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
 				double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
 				/* glTF's Y is up and its Z points back along the game's -y. */
-				obj.pos.push_back(static_cast<float>(gx * OBJECT_UNITS_PER_METRE));
-				obj.pos.push_back(static_cast<float>(-gz * OBJECT_UNITS_PER_METRE));
-				obj.pos.push_back(static_cast<float>(gy * OBJECT_HEIGHT_PER_METRE));
-				obj.top = std::max(obj.top, static_cast<float>(gy * OBJECT_HEIGHT_PER_METRE));
-				obj.uv.push_back(static_cast<float>(uv[i * 2]));
-				obj.uv.push_back(static_cast<float>(uv[i * 2 + 1]));
+				mesh.pos.push_back(static_cast<float>(gx));
+				mesh.pos.push_back(static_cast<float>(-gz));
+				mesh.pos.push_back(static_cast<float>(gy));
+				mesh.uv.push_back(static_cast<float>(uv[i * 2]));
+				mesh.uv.push_back(static_cast<float>(uv[i * 2 + 1]));
+				if (normals) {
+					double nx = nrm[i * 3], ny = nrm[i * 3 + 1], nz = nrm[i * 3 + 2];
+					double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+					double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+					if (l > 0) { hx /= l; hy /= l; hz /= l; }
+					mesh.nrm.push_back(static_cast<float>(hx));
+					mesh.nrm.push_back(static_cast<float>(-hz));
+					mesh.nrm.push_back(static_cast<float>(hy));
+				}
 			}
 			for (size_t i = 0; i + 2 < idx.size(); i += 3) {
 				uint32_t a = static_cast<uint32_t>(idx[i]), b = static_cast<uint32_t>(idx[i + 1]), c = static_cast<uint32_t>(idx[i + 2]);
 				if (a >= corners || b >= corners || c >= corners) continue;
-				obj.tri.push_back(base + a);
-				obj.tri.push_back(base + b);
-				obj.tri.push_back(base + c);
+				mesh.tri.push_back(base + a);
+				mesh.tri.push_back(base + b);
+				mesh.tri.push_back(base + c);
 			}
 		}
+		if (!normals || mesh.nrm.size() != mesh.pos.size()) mesh.nrm.clear();
 
 		/* The base colour's picture, a PNG in the buffer. */
 		if (material >= 0 && j.contains("materials") && j.contains("textures") && j.contains("images")) {
@@ -198,7 +235,7 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 				if (img.contains("bufferView")) {
 					const auto &v = views.at(img.at("bufferView").get<int>());
 					size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
-					if (offset + len <= bin.size()) obj.png.assign(bin.begin() + offset, bin.begin() + offset + len);
+					if (offset + len <= bin.size()) mesh.png.assign(bin.begin() + offset, bin.begin() + offset + len);
 				}
 			}
 		}
@@ -206,7 +243,27 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		Debug(misc, 0, "3D object {}: {}", path, e.what());
 		return false;
 	}
-	if (obj.tri.empty()) return false;
+	return !mesh.tri.empty();
+}
+
+/**
+ * Read one .glb into a building: its mesh (ReadGlbMesh()) from metres into units, the texture kept as it is.
+ * @return whether there is something to draw
+ */
+static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+{
+	GlbMesh mesh;
+	if (!ReadGlbMesh(path, mesh)) return false;
+	obj.pos.reserve(mesh.pos.size());
+	for (size_t i = 0; i < mesh.pos.size(); i += 3) {
+		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	obj.uv = std::move(mesh.uv);
+	obj.tri = std::move(mesh.tri);
+	obj.png = std::move(mesh.png);
 
 	/* It should lie on its plot: say so in the log when it does not. */
 	float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f, z0 = 1e9f;
@@ -222,10 +279,13 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 	return true;
 }
 
-/** Look for the objects under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
-static void ReadThreeDObjects()
+/**
+ * The indices baseset/decouple/objekty/<set>/objekty.json, from the first place the game reads its data from that
+ * has them, in the same order on every computer: a house in two folders (the colleague's 04, the same block below
+ * the snow in mirne/ and in subarkticke/) is the first folder's.
+ */
+static std::vector<std::string> FindObjectIndices()
 {
-	_three_d_objects_read = true;
 	std::vector<std::string> indices;
 	for (Searchpath sp : _valid_searchpaths) {
 		std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP "objekty";
@@ -235,11 +295,17 @@ static void ReadThreeDObjects()
 			std::string index = FS2OTTD(entry.path().native()) + PATHSEP "objekty.json";
 			if (std::filesystem::is_regular_file(OTTD2FS(index), ec)) indices.push_back(index);
 		}
-		if (!indices.empty()) break; // the first place that has them
+		if (!indices.empty()) break;
 	}
-	/* In the same order on every computer: a house in two folders (the colleague's 04, the same block below the snow
-	 * in mirne/ and in subarkticke/) is the first folder's. */
 	std::sort(indices.begin(), indices.end());
+	return indices;
+}
+
+/** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
+static void ReadThreeDObjects()
+{
+	_three_d_objects_read = true;
+	std::vector<std::string> indices = FindObjectIndices();
 	for (const std::string &index : indices) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
@@ -319,6 +385,189 @@ static void ReadThreeDObjects()
 }
 
 /**
+ * A set's id as the index writes it: four characters as in the set ("MAXb", the colleague's Sergej) or eight hex
+ * digits as the game prints it ("524A450B"), into the id as the game keeps it (read from the set little-endian).
+ */
+static std::optional<uint32_t> ParseIndexGrfId(const std::string &text)
+{
+	if (text.size() == 8) {
+		auto printed = ParseInteger<uint32_t>(text, 16);
+		if (printed.has_value()) return std::byteswap(*printed);
+	}
+	if (text.size() == 4) {
+		return static_cast<uint32_t>(static_cast<uint8_t>(text[0])) | (static_cast<uint32_t>(static_cast<uint8_t>(text[1])) << 8) |
+				(static_cast<uint32_t>(static_cast<uint8_t>(text[2])) << 16) | (static_cast<uint32_t>(static_cast<uint8_t>(text[3])) << 24);
+	}
+	return std::nullopt;
+}
+
+/** A number of the index: a JSON number, or a string in decimal or "0x" hex ("0x0100", an engine's number in its set). */
+static std::optional<uint32_t> ParseIndexNumber(const nlohmann::json &value)
+{
+	if (value.is_number_integer()) return value.get<uint32_t>();
+	if (!value.is_string()) return std::nullopt;
+	std::string text = value.get<std::string>();
+	if (text.starts_with("0x") || text.starts_with("0X")) return ParseInteger<uint32_t>(std::string_view(text).substr(2), 16);
+	return ParseInteger<uint32_t>(text, 10);
+}
+
+/** The vehicle type an index names: "vlak", "auto", "lod", "letadlo" (or the game's own words). */
+static VehicleType ParseIndexVehicleType(const std::string &text)
+{
+	if (text == "vlak" || text == "train") return VehicleType::Train;
+	if (text == "auto" || text == "silnicni" || text == "road") return VehicleType::Road;
+	if (text == "lod" || text == "ship") return VehicleType::Ship;
+	if (text == "letadlo" || text == "aircraft") return VehicleType::Aircraft;
+	return VehicleType::Invalid;
+}
+
+/** Read the vehicles of the indices ("druh": "vozidlo"); their .glb are read when they are first drawn. */
+static void ReadThreeDVehicleObjects()
+{
+	_vehicle_objects_read = true;
+	for (const std::string &index : FindObjectIndices()) {
+		std::vector<uint8_t> text = ReadWholeFile(index);
+		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
+		try {
+			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+			for (const auto &e : list) {
+				if (e.value("druh", std::string("dum")) != "vozidlo") continue;
+				ThreeDVehicleObject obj;
+				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
+				obj.file = folder + e.at("soubor").get<std::string>();
+				obj.type = ParseIndexVehicleType(e.value("typ", std::string("vlak")));
+				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
+				if (obj.type == VehicleType::Invalid || !grfid.has_value()) {
+					Debug(misc, 0, "3D vehicle {}: no type or set", obj.name);
+					continue;
+				}
+				obj.grfid = *grfid;
+				if (e.contains("clanky")) {
+					for (const auto &piece : e.at("clanky")) {
+						auto n = ParseIndexNumber(piece);
+						if (n.has_value()) obj.pieces.push_back(static_cast<uint16_t>(*n));
+					}
+				}
+				if (obj.pieces.empty() && e.contains("motor")) {
+					auto n = ParseIndexNumber(e.at("motor"));
+					if (n.has_value()) obj.pieces.push_back(static_cast<uint16_t>(*n));
+				}
+				if (obj.pieces.empty()) {
+					Debug(misc, 0, "3D vehicle {}: no engine", obj.name);
+					continue;
+				}
+				/* The piece it hangs from: the middle one, the first, or the one named. */
+				std::string anchor = e.contains("kotva") && e.at("kotva").is_string() ? e.at("kotva").get<std::string>() : "stred";
+				obj.anchor = anchor == "prvni" || anchor == "predni" ? 0 : (static_cast<int>(obj.pieces.size()) - 1) / 2;
+				if (e.contains("kotva") && e.at("kotva").is_number_integer()) obj.anchor = std::clamp(e.at("kotva").get<int>(), 0, static_cast<int>(obj.pieces.size()) - 1);
+				/* No "meritko": the object is in true metres, and the size it is drawn at is the game's setting for
+				 * all of them (the player, 14. 10.: "the game can make it bigger, so there need not be two files"). */
+				if (e.contains("textura") && e.at("textura").is_string()) obj.paint_file = folder + e.at("textura").get<std::string>();
+				if (e.contains("kabina") && e.at("kabina").is_array() && e.at("kabina").size() == 3) {
+					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
+					obj.has_cab = true;
+				}
+				_vehicle_objects.push_back(std::move(obj));
+			}
+		} catch (const std::exception &ex) {
+			Debug(misc, 0, "3D vehicles {}: {}", index, ex.what());
+		}
+	}
+	for (size_t i = 0; i < _vehicle_objects.size(); i++) {
+		const ThreeDVehicleObject &o = _vehicle_objects[i];
+		for (size_t k = 0; k < o.pieces.size(); k++) {
+			_vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
+		}
+	}
+	Debug(misc, 1, "3D vehicles: {} in the indices", _vehicle_objects.size());
+}
+
+/**
+ * The 3D object an engine is drawn as, if there is one.
+ * @param engine the engine (of a piece)
+ * @param[out] piece which of the object's pieces it is
+ */
+const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (_vehicle_object_pieces.empty()) return nullptr;
+	const Engine *e = Engine::GetIfValid(engine);
+	if (e == nullptr || e->grf_prop.grffile == nullptr) return nullptr;
+	auto it = _vehicle_object_pieces.find(VehiclePieceKey(e->grf_prop.grfid, e->type, e->grf_prop.local_id));
+	if (it == _vehicle_object_pieces.end()) return nullptr;
+	if (piece != nullptr) *piece = it->second.second;
+	return &_vehicle_objects[it->second.first];
+}
+
+/** The shapes read, by their file: the paints of a vehicle share one. */
+static std::map<std::string, std::shared_ptr<const ThreeDVehicleShape>> _vehicle_shapes;
+
+/** The object's shape, read from its .glb the first time; nullptr when it cannot be. */
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
+{
+	if (this->shape != nullptr || this->shape_tried) return this->shape.get();
+	this->shape_tried = true;
+	auto it = _vehicle_shapes.find(this->file);
+	if (it != _vehicle_shapes.end()) {
+		this->shape = it->second;
+		return this->shape.get();
+	}
+	GlbMesh mesh;
+	if (!ReadGlbMesh(this->file, mesh)) return nullptr;
+	auto made = std::make_shared<ThreeDVehicleShape>();
+	made->pos = std::move(mesh.pos);
+	made->nrm = std::move(mesh.nrm);
+	made->uv = std::move(mesh.uv);
+	made->tri = std::move(mesh.tri);
+	made->png = std::move(mesh.png);
+	made->x0 = made->y0 = made->z0 = 1e9f;
+	made->x1 = made->y1 = made->z1 = -1e9f;
+	for (size_t i = 0; i < made->pos.size(); i += 3) {
+		made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
+		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
+		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
+	}
+	Debug(misc, 1, "3D vehicle {}: {} triangles, {} corners{}, {:.2f} x {:.2f} x {:.2f} m", this->name, made->tri.size() / 3, made->pos.size() / 3,
+			made->nrm.empty() ? " without normals" : "", made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
+	this->shape = made;
+	_vehicle_shapes.emplace(this->file, made);
+	return this->shape.get();
+}
+
+/** The object's texture at a level of detail: its paint ("textura") or the file's, read the first time. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level) const
+{
+	if (this->levels.empty()) {
+		std::vector<uint8_t> png;
+		if (!this->paint_file.empty()) png = ReadWholeFile(this->paint_file);
+		if (png.empty()) {
+			const ThreeDVehicleShape *s = this->GetShape();
+			if (s != nullptr) png = s->png;
+		}
+		DecodeTextureLevels(png, this->levels);
+	}
+	return &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)];
+}
+
+/** The rig: the vehicle objects of the indices, a line each. */
+std::string DescribeThreeDVehicleObjects()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	std::string out = fmt::format("{} vehicle objects", _vehicle_objects.size());
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		std::string pieces;
+		for (uint16_t p : o.pieces) pieces += fmt::format(" {:#06x}", p);
+		std::string engines;
+		for (uint16_t p : o.pieces) {
+			EngineID id = _engine_mngr.GetID(o.type, p, o.grfid);
+			engines += id == EngineID::Invalid() ? " -" : fmt::format(" {}", id.base());
+		}
+		out += fmt::format("\n  {} grf {:08X} type {} pieces{} (engines{}) anchor {}{}", o.name, std::byteswap(o.grfid), to_underlying(o.type), pieces, engines, o.anchor, o.paint_file.empty() ? "" : " paint");
+	}
+	return out;
+}
+
+/**
  * The 3D object of a house of the original game, if there is one.
  * @param north_house the house of its north tile
  * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
@@ -347,65 +596,69 @@ const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slo
 }
 
 /**
- * The object's texture at a level of detail: level 0 as in the file, every next one halved (the colour of the
- * pixels that have one, a pixel transparent when most of its four are). Read from the PNG the first time.
+ * A texture's levels of detail: level 0 as in the PNG, every next one halved (the colour of the pixels that have one,
+ * a pixel transparent when most of its four are). A texture that cannot be read is a plain grey, so the shape still
+ * shows.
  */
-const ThreeDObjectTexture *ThreeDObject::GetTexture(int level) const
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels)
 {
-	if (this->levels.empty()) {
-		ThreeDObjectTexture t;
+	ThreeDObjectTexture t;
 #ifdef WITH_PNG
-		if (!this->png.empty()) {
-			png_image image{};
-			image.version = PNG_IMAGE_VERSION;
-			if (png_image_begin_read_from_memory(&image, this->png.data(), this->png.size())) {
-				image.format = PNG_FORMAT_RGBA;
-				std::vector<uint8_t> rgba(PNG_IMAGE_SIZE(image));
-				if (png_image_finish_read(&image, nullptr, rgba.data(), 0, nullptr)) {
-					t.w = image.width;
-					t.h = image.height;
-					t.px.resize(static_cast<size_t>(t.w) * t.h);
-					for (size_t i = 0; i < t.px.size(); i++) {
-						const uint8_t *p = &rgba[i * 4];
-						t.px[i] = p[3] >= 128 ? Colour(p[0], p[1], p[2]).data : 0;
-					}
-				} else {
-					png_image_free(&image);
+	if (!png.empty()) {
+		png_image image{};
+		image.version = PNG_IMAGE_VERSION;
+		if (png_image_begin_read_from_memory(&image, png.data(), png.size())) {
+			image.format = PNG_FORMAT_RGBA;
+			std::vector<uint8_t> rgba(PNG_IMAGE_SIZE(image));
+			if (png_image_finish_read(&image, nullptr, rgba.data(), 0, nullptr)) {
+				t.w = image.width;
+				t.h = image.height;
+				t.px.resize(static_cast<size_t>(t.w) * t.h);
+				for (size_t i = 0; i < t.px.size(); i++) {
+					const uint8_t *p = &rgba[i * 4];
+					t.px[i] = p[3] >= 128 ? Colour(p[0], p[1], p[2]).data : 0;
 				}
+			} else {
+				png_image_free(&image);
 			}
-		}
-#endif /* WITH_PNG */
-		if (t.px.empty()) {
-			/* No picture: a plain grey, so the shape still shows. */
-			t.w = t.h = 1;
-			t.px.assign(1, Colour(150, 150, 150).data);
-		}
-		this->levels.push_back(std::move(t));
-		while (this->levels.back().w > 1 || this->levels.back().h > 1) {
-			const ThreeDObjectTexture &a = this->levels.back();
-			ThreeDObjectTexture b;
-			b.w = std::max(1, a.w / 2);
-			b.h = std::max(1, a.h / 2);
-			b.px.resize(static_cast<size_t>(b.w) * b.h);
-			for (int y = 0; y < b.h; y++) {
-				for (int x = 0; x < b.w; x++) {
-					uint r = 0, g = 0, bl = 0, n = 0;
-					for (int k = 0; k < 4; k++) {
-						int sx = std::min(a.w - 1, x * 2 + (k & 1)), sy = std::min(a.h - 1, y * 2 + (k >> 1));
-						uint32_t p = a.px[static_cast<size_t>(sy) * a.w + sx];
-						if (p == 0) continue;
-						Colour c(p);
-						r += c.r;
-						g += c.g;
-						bl += c.b;
-						n++;
-					}
-					b.px[static_cast<size_t>(y) * b.w + x] = n >= 2 ? Colour(r / n, g / n, bl / n).data : 0;
-				}
-			}
-			this->levels.push_back(std::move(b));
 		}
 	}
+#endif /* WITH_PNG */
+	if (t.px.empty()) {
+		t.w = t.h = 1;
+		t.px.assign(1, Colour(150, 150, 150).data);
+	}
+	levels.push_back(std::move(t));
+	while (levels.back().w > 1 || levels.back().h > 1) {
+		const ThreeDObjectTexture &a = levels.back();
+		ThreeDObjectTexture b;
+		b.w = std::max(1, a.w / 2);
+		b.h = std::max(1, a.h / 2);
+		b.px.resize(static_cast<size_t>(b.w) * b.h);
+		for (int y = 0; y < b.h; y++) {
+			for (int x = 0; x < b.w; x++) {
+				uint r = 0, g = 0, bl = 0, n = 0;
+				for (int k = 0; k < 4; k++) {
+					int sx = std::min(a.w - 1, x * 2 + (k & 1)), sy = std::min(a.h - 1, y * 2 + (k >> 1));
+					uint32_t p = a.px[static_cast<size_t>(sy) * a.w + sx];
+					if (p == 0) continue;
+					Colour c(p);
+					r += c.r;
+					g += c.g;
+					bl += c.b;
+					n++;
+				}
+				b.px[static_cast<size_t>(y) * b.w + x] = n >= 2 ? Colour(r / n, g / n, bl / n).data : 0;
+			}
+		}
+		levels.push_back(std::move(b));
+	}
+}
+
+/** The object's texture at a level of detail (DecodeTextureLevels()), read from the PNG the first time. */
+const ThreeDObjectTexture *ThreeDObject::GetTexture(int level) const
+{
+	if (this->levels.empty()) DecodeTextureLevels(this->png, this->levels);
 	return &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)];
 }
 

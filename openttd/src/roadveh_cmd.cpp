@@ -48,6 +48,8 @@
 
 #include "green_load.h"
 
+#include "three_d_vehicle_object.h"
+
 #include "safeguards.h"
 
 static const uint16_t _roadveh_images[] = {
@@ -252,7 +254,8 @@ static uint GetRoadVehLength(const RoadVehicle *v)
 		length -= Clamp(veh_len, 0, VEHICLE_LENGTH - 1);
 	}
 
-	return length;
+	/* A road vehicle drawn from its 3D object is as long as the object (three_d_vehicle_object.h). */
+	return ThreeDVehicleObjectPieceLength(v->engine_type, length);
 }
 
 /**

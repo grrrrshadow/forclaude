@@ -551,6 +551,8 @@ add_files(
     cab_view.h
     cab_view_gui.cpp
     three_d_vehicle.cpp
+    three_d_vehicle_object.cpp
+    three_d_vehicle_object.h
     tile_cmd.h
     tile_map.cpp
     tile_map.h
