@@ -430,8 +430,18 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   outer face to +y), `polohy` (the centres in the vehicle's frame), `oba_boky`
   (each also on the other side, mirrored; by default) -- so one wheel file
   serves many vehicles. They are drawn as the rest of the object, not turning.
-- Not yet: the crew and the glass, levels of detail, the cab's eye, wheels that
-  turn and bogies that swing on a curve.
+- **Figures and the crew** (the player: "the girls as objects"): entries
+  `"druh": "postava"` of any index (`objekty/postavy/`) are figures, `jmeno`
+  their name, `soubor` the .glb (the origin between the feet on the ground,
+  facing +x, metres). `"posadka"` of a vehicle puts figures into it --
+  `postava` (the name), `poloha` (x, y, z in the vehicle's frame), `otoceni`
+  (degrees about z) -- merged into its shape, so the driver is in every sprite
+  and picture of the vehicle (seen through the cut windows). At the bus stops
+  with the girls the turned view draws them as figures
+  (`AddThreeDFigureToViewport()`, twice their size, as the stops' sprites draw
+  people); facing north the sprites stay.
+- Not yet: the glass, levels of detail, the cab's eye, wheels that turn and
+  bogies that swing on a curve.
 - Cost: Sergej, 95 thousand triangles, takes 55 to 170 ms a direction for the
   sprite at 16x (once, while the sprite is in the cache) and 15 to 20 ms a
   picture of the turned view at 4x (once a degree and direction).

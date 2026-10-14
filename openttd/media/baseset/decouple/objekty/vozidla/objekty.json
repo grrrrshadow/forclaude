@@ -1,32 +1,66 @@
 [
  {
   "soubor": "sergej.glb",
-  "jmeno": "sergej_zeleny_MAXb",
+  "jmeno": "sergej_zeleny",
   "druh": "vozidlo",
   "typ": "vlak",
   "grf": "MAXb",
-  "motor": "0x0100",
   "clanky": [
    "0x0100",
    "0x0101",
    "0x0102"
   ],
   "kotva": "stred",
-  "meritko": 1.0,
-  "smer": "+x",
   "rozmer_m": {
-   "delka": 17.69,
-   "sirka": 3.32,
-   "vyska": 4.87
+   "delka": 17.689,
+   "sirka": 3.321,
+   "vyska": 4.862
   },
-  "textura": null,
   "lak": {
    "maska": "sergej_lak.png",
-   "zacatek": 119,
    "cil": "8FA68F",
    "let": 20,
-   "krok": 1
+   "krok": 1,
+   "zacatek": 119
   },
+  "kola": [
+   {
+    "soubor": "kolo_m62.glb",
+    "polohy": [
+     [
+      -6.33,
+      0.79,
+      0.525
+     ],
+     [
+      -4.49,
+      0.79,
+      0.525
+     ],
+     [
+      -2.65,
+      0.79,
+      0.525
+     ],
+     [
+      2.65,
+      0.79,
+      0.525
+     ],
+     [
+      4.49,
+      0.79,
+      0.525
+     ],
+     [
+      6.33,
+      0.79,
+      0.525
+     ]
+    ],
+    "oba_boky": true
+   }
+  ],
   "kabina": [
    7.2,
    0.0,
@@ -34,48 +68,83 @@
   ],
   "posadka": [
    {
-    "postava": "college_girl",
+    "postava": "college_girl_ridicka",
     "poloha": [
      7.2,
      -0.62,
      1.78
     ],
     "otoceni": 0,
-    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu; soubor postavy až po odpovědi hry"
+    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu (+x); soubor objekty/postavy/college_girl_ridicka.glb"
    }
   ],
-  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
+  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), zjednodušený (Blender decimate těla 1:2, podvozky nahrazeny jedním kolem) a převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
   "licence": "CC BY 4.0 (geometrie i textury z modelů CC BY 4.0, uvést Chicken cutlet a Leafia dev.)",
-  "poznamka": "M62 Tamtam tajgy (mezinárodní zelená), malý (měřítko CZTR): GRF M62 Sergej MAXb, hlava 0x0100, střed a zadek za ní; 94957 trojúhelníků (podvozky 64666, tělo 22343), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), bez upečeného světla, s normálami; délka 17.69 m"
+  "poznamka": "M62 Tamtam tajgy (mezinárodní zelená): GRF M62 Sergej MAXb, hlava 0x0100, střed a zadek za ní (MAXc BRÝLE stejná čísla, velikost je přepínač hry); 23256 trojúhelníků (tělo, kabiny, rámy podvozků bez kol), kolo zvlášť kolo_m62.glb (144 trojúhelníků, 6 poloh × 2 boky), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), okna vyříznutá (alfa 0, vidět do kabiny na řidičku), bez upečeného světla, s normálami; délka 17.689 m, interiér strojovny pryč, kabiny zůstaly"
  },
  {
   "soubor": "sergej.glb",
-  "jmeno": "sergej_csd_MAXb",
+  "jmeno": "sergej_csd",
   "druh": "vozidlo",
   "typ": "vlak",
   "grf": "MAXb",
-  "motor": "0x0110",
   "clanky": [
    "0x0110",
    "0x0111",
    "0x0112"
   ],
   "kotva": "stred",
-  "meritko": 1.0,
-  "smer": "+x",
   "rozmer_m": {
-   "delka": 17.69,
-   "sirka": 3.32,
-   "vyska": 4.87
+   "delka": 17.689,
+   "sirka": 3.321,
+   "vyska": 4.862
   },
   "textura": "sergej_csd.png",
   "lak": {
    "maska": "sergej_lak.png",
-   "zacatek": 242,
    "cil": "B86A5E",
    "let": 20,
-   "krok": 1
+   "krok": 1,
+   "zacatek": 242
   },
+  "kola": [
+   {
+    "soubor": "kolo_m62.glb",
+    "polohy": [
+     [
+      -6.33,
+      0.79,
+      0.525
+     ],
+     [
+      -4.49,
+      0.79,
+      0.525
+     ],
+     [
+      -2.65,
+      0.79,
+      0.525
+     ],
+     [
+      2.65,
+      0.79,
+      0.525
+     ],
+     [
+      4.49,
+      0.79,
+      0.525
+     ],
+     [
+      6.33,
+      0.79,
+      0.525
+     ]
+    ],
+    "oba_boky": true
+   }
+  ],
   "kabina": [
    7.2,
    0.0,
@@ -83,48 +152,83 @@
   ],
   "posadka": [
    {
-    "postava": "college_girl",
+    "postava": "college_girl_ridicka",
     "poloha": [
      7.2,
      -0.62,
      1.78
     ],
     "otoceni": 0,
-    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu; soubor postavy až po odpovědi hry"
+    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu (+x); soubor objekty/postavy/college_girl_ridicka.glb"
    }
   ],
-  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
+  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), zjednodušený (Blender decimate těla 1:2, podvozky nahrazeny jedním kolem) a převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
   "licence": "CC BY 4.0 (geometrie i textury z modelů CC BY 4.0, uvést Chicken cutlet a Leafia dev.)",
-  "poznamka": "Sergej ČSD (červená, žlutý pruh), malý (měřítko CZTR): GRF M62 Sergej MAXb, hlava 0x0110, střed a zadek za ní; 94957 trojúhelníků (podvozky 64666, tělo 22343), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), bez upečeného světla, s normálami; délka 17.69 m"
+  "poznamka": "Sergej ČSD (červená, žlutý pruh): GRF M62 Sergej MAXb, hlava 0x0110, střed a zadek za ní (MAXc BRÝLE stejná čísla, velikost je přepínač hry); 23256 trojúhelníků (tělo, kabiny, rámy podvozků bez kol), kolo zvlášť kolo_m62.glb (144 trojúhelníků, 6 poloh × 2 boky), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), okna vyříznutá (alfa 0, vidět do kabiny na řidičku), bez upečeného světla, s normálami; délka 17.689 m, interiér strojovny pryč, kabiny zůstaly"
  },
  {
   "soubor": "sergej.glb",
-  "jmeno": "sergej_rzd_MAXb",
+  "jmeno": "sergej_rzd",
   "druh": "vozidlo",
   "typ": "vlak",
   "grf": "MAXb",
-  "motor": "0x0120",
   "clanky": [
    "0x0120",
    "0x0121",
    "0x0122"
   ],
   "kotva": "stred",
-  "meritko": 1.0,
-  "smer": "+x",
   "rozmer_m": {
-   "delka": 17.69,
-   "sirka": 3.32,
-   "vyska": 4.87
+   "delka": 17.689,
+   "sirka": 3.321,
+   "vyska": 4.862
   },
   "textura": "sergej_rzd.png",
   "lak": {
    "maska": "sergej_lak.png",
-   "zacatek": 223,
    "cil": "B86A5E",
    "let": 20,
-   "krok": 1
+   "krok": 1,
+   "zacatek": 223
   },
+  "kola": [
+   {
+    "soubor": "kolo_m62.glb",
+    "polohy": [
+     [
+      -6.33,
+      0.79,
+      0.525
+     ],
+     [
+      -4.49,
+      0.79,
+      0.525
+     ],
+     [
+      -2.65,
+      0.79,
+      0.525
+     ],
+     [
+      2.65,
+      0.79,
+      0.525
+     ],
+     [
+      4.49,
+      0.79,
+      0.525
+     ],
+     [
+      6.33,
+      0.79,
+      0.525
+     ]
+    ],
+    "oba_boky": true
+   }
+  ],
   "kabina": [
    7.2,
    0.0,
@@ -132,165 +236,18 @@
   ],
   "posadka": [
    {
-    "postava": "college_girl",
+    "postava": "college_girl_ridicka",
     "poloha": [
      7.2,
      -0.62,
      1.78
     ],
     "otoceni": 0,
-    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu; soubor postavy až po odpovědi hry"
+    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu (+x); soubor objekty/postavy/college_girl_ridicka.glb"
    }
   ],
-  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
+  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), zjednodušený (Blender decimate těla 1:2, podvozky nahrazeny jedním kolem) a převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
   "licence": "CC BY 4.0 (geometrie i textury z modelů CC BY 4.0, uvést Chicken cutlet a Leafia dev.)",
-  "poznamka": "Maša РЖД, malý (měřítko CZTR): GRF M62 Sergej MAXb, hlava 0x0120, střed a zadek za ní; 94957 trojúhelníků (podvozky 64666, tělo 22343), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), bez upečeného světla, s normálami; délka 17.69 m"
- },
- {
-  "soubor": "sergej.glb",
-  "jmeno": "sergej_zeleny_MAXc",
-  "druh": "vozidlo",
-  "typ": "vlak",
-  "grf": "MAXc",
-  "motor": "0x0100",
-  "clanky": [
-   "0x0100",
-   "0x0101",
-   "0x0102"
-  ],
-  "kotva": "stred",
-  "meritko": 1.2,
-  "smer": "+x",
-  "rozmer_m": {
-   "delka": 17.69,
-   "sirka": 3.32,
-   "vyska": 4.87
-  },
-  "textura": null,
-  "lak": {
-   "maska": "sergej_lak.png",
-   "zacatek": 119,
-   "cil": "8FA68F",
-   "let": 20,
-   "krok": 1
-  },
-  "kabina": [
-   7.2,
-   0.0,
-   2.6
-  ],
-  "posadka": [
-   {
-    "postava": "college_girl",
-    "poloha": [
-     7.2,
-     -0.62,
-     1.78
-    ],
-    "otoceni": 0,
-    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu; soubor postavy až po odpovědi hry"
-   }
-  ],
-  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
-  "licence": "CC BY 4.0 (geometrie i textury z modelů CC BY 4.0, uvést Chicken cutlet a Leafia dev.)",
-  "poznamka": "M62 Tamtam tajgy (mezinárodní zelená), BRÝLE (original size, o 20 % větší): GRF M62 Sergej MAXc, hlava 0x0100, střed a zadek za ní; 94957 trojúhelníků (podvozky 64666, tělo 22343), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), bez upečeného světla, s normálami; délka 17.69 m"
- },
- {
-  "soubor": "sergej.glb",
-  "jmeno": "sergej_csd_MAXc",
-  "druh": "vozidlo",
-  "typ": "vlak",
-  "grf": "MAXc",
-  "motor": "0x0110",
-  "clanky": [
-   "0x0110",
-   "0x0111",
-   "0x0112"
-  ],
-  "kotva": "stred",
-  "meritko": 1.2,
-  "smer": "+x",
-  "rozmer_m": {
-   "delka": 17.69,
-   "sirka": 3.32,
-   "vyska": 4.87
-  },
-  "textura": "sergej_csd.png",
-  "lak": {
-   "maska": "sergej_lak.png",
-   "zacatek": 242,
-   "cil": "B86A5E",
-   "let": 20,
-   "krok": 1
-  },
-  "kabina": [
-   7.2,
-   0.0,
-   2.6
-  ],
-  "posadka": [
-   {
-    "postava": "college_girl",
-    "poloha": [
-     7.2,
-     -0.62,
-     1.78
-    ],
-    "otoceni": 0,
-    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu; soubor postavy až po odpovědi hry"
-   }
-  ],
-  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
-  "licence": "CC BY 4.0 (geometrie i textury z modelů CC BY 4.0, uvést Chicken cutlet a Leafia dev.)",
-  "poznamka": "Sergej ČSD (červená, žlutý pruh), BRÝLE (original size, o 20 % větší): GRF M62 Sergej MAXc, hlava 0x0110, střed a zadek za ní; 94957 trojúhelníků (podvozky 64666, tělo 22343), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), bez upečeného světla, s normálami; délka 17.69 m"
- },
- {
-  "soubor": "sergej.glb",
-  "jmeno": "sergej_rzd_MAXc",
-  "druh": "vozidlo",
-  "typ": "vlak",
-  "grf": "MAXc",
-  "motor": "0x0120",
-  "clanky": [
-   "0x0120",
-   "0x0121",
-   "0x0122"
-  ],
-  "kotva": "stred",
-  "meritko": 1.2,
-  "smer": "+x",
-  "rozmer_m": {
-   "delka": 17.69,
-   "sirka": 3.32,
-   "vyska": 4.87
-  },
-  "textura": "sergej_rzd.png",
-  "lak": {
-   "maska": "sergej_lak.png",
-   "zacatek": 223,
-   "cil": "B86A5E",
-   "let": 20,
-   "krok": 1
-  },
-  "kabina": [
-   7.2,
-   0.0,
-   2.6
-  ],
-  "posadka": [
-   {
-    "postava": "college_girl",
-    "poloha": [
-     7.2,
-     -0.62,
-     1.78
-    ],
-    "otoceni": 0,
-    "poznamka": "řidička opřená o pult v přední kabině u pravého okna, kouká dopředu; soubor postavy až po odpovědi hry"
-   }
-  ],
-  "autor": "3D model Diesel locomotive M62, Chicken cutlet (Sketchfab, CC BY 4.0), převedený bez renderu (sergej/sergej_glb.py); nátěr ČSD vlastní (nater.py), textury РЖД z Teplovoz-m62 РЖД, Leafia dev. (Sketchfab, CC BY 4.0)",
-  "licence": "CC BY 4.0 (geometrie i textury z modelů CC BY 4.0, uvést Chicken cutlet a Leafia dev.)",
-  "poznamka": "Maša РЖД, BRÝLE (original size, o 20 % větší): GRF M62 Sergej MAXc, hlava 0x0120, střed a zadek za ní; 94957 trojúhelníků (podvozky 64666, tělo 22343), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), bez upečeného světla, s normálami; délka 17.69 m"
+  "poznamka": "Maša РЖД: GRF M62 Sergej MAXb, hlava 0x0120, střed a zadek za ní (MAXc BRÝLE stejná čísla, velikost je přepínač hry); 23256 trojúhelníků (tělo, kabiny, rámy podvozků bez kol), kolo zvlášť kolo_m62.glb (144 trojúhelníků, 6 poloh × 2 boky), textura 2048×1024 (tělo 1024 px, 60 texelů na metr), okna vyříznutá (alfa 0, vidět do kabiny na řidičku), bez upečeného světla, s normálami; délka 17.689 m, interiér strojovny pryč, kabiny zůstaly"
  }
 ]

@@ -76,7 +76,11 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   (`textura`). Vozidlo se hledá podle `grf` (id sady) a `clanky` (čísla motorů
   v sadě); hra pak sprity sady nepoužije a kreslí vozidlo z objektu sama, i na
   sever, v depu a v nákupu. Velikost (původní hry, nebo menší v měřítku CZTR)
-  a s ní délka na koleji jsou nastavení hry.
+  a s ní délka na koleji jsou nastavení hry. Kola mohou být ve vlastním souboru
+  (`kolo_m62.glb`), řidička v kabině je postava z `postavy/` (`posadka`).
+- `postavy/` – postavy jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/postavy/`):
+  College Girl (Rotmill, Sketchfab, CC BY 4.0) stojící a opřená jako řidička.
+  Stojící holky jsou na zastávkách v otočeném pohledu; na sever zůstávají sprity.
 - Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
   mírného klimatu, které staví arktické nebo pouštní domy („Domy z“).
 - Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje

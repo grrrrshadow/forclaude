@@ -1,0 +1,22 @@
+[
+ {
+  "soubor": "college_girl_ridicka.glb",
+  "jmeno": "college_girl_ridicka",
+  "druh": "postava",
+  "vyska_m": 1.57,
+  "poza": "opřená o pult: předklon 35°, kolena 8°, ruce vpředu na pultu 0,95 m, hlava zvednutá (řidička v kabině lokomotivy, kouká dopředu)",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza postavy/postavy.py oprena(), převod bez renderu (hra/3d-z-obrazku/skripty/glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, 11778 trojúhelníků, tři textury 1024 px (tělo, oblečení, hlava), s normálami, bez upečeného světla; nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_stoji.glb",
+  "jmeno": "college_girl_stoji",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "stojí rovně, ruce podél těla (zastávky, nástupiště, u vozidel)",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza postavy/postavy.py nacti_stojici(ruce_dolu), převod bez renderu (glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, 11778 trojúhelníků, tři textury 1024 px, s normálami, bez upečeného světla; nikdy nebledne"
+ }
+]

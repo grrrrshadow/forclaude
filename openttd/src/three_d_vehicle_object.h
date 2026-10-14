@@ -37,6 +37,7 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
 std::string DescribeThreeDVehicleObjectSprites();
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom);
 
 /* three_d_vehicle.cpp */
 int ThreeDEngineLength(EngineID engine);

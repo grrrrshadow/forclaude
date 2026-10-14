@@ -88,6 +88,13 @@ struct ThreeDVehiclePaint {
 	int start = 0;              ///< "zacatek": the texture's lightness the colour is at its own (0: the brightest of the mask)
 };
 
+/** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
+struct ThreeDVehicleCrew {
+	std::string figure;         ///< "postava": the figure's name
+	float at[3] = {};           ///< "poloha": where its feet stand, metres in the vehicle's frame
+	float turn = 0;             ///< "otoceni": degrees about z, 0 facing forward as the vehicle
+};
+
 /** Wheels of a vehicle object from a file of their own ("kola"): one wheel, at every place it is. */
 struct ThreeDVehicleWheels {
 	std::string file;           ///< "soubor": the wheel, its centre at the origin, its axle along y, its outer face to +y (the left)
@@ -113,6 +120,7 @@ struct ThreeDVehicleObject {
 	float cab[3] = {};              ///< x, y, z, metres
 	ThreeDVehiclePaint paint;       ///< "lak"
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
+	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
@@ -126,6 +134,7 @@ struct ThreeDVehicleObject {
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
+const ThreeDVehicleObject *GetThreeDFigure(std::string_view name);
 std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);

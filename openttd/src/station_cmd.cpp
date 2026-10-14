@@ -80,6 +80,8 @@
 
 #include <bitset>
 
+#include "three_d_vehicle_object.h"
+
 #include "safeguards.h"
 
 /**
@@ -3344,8 +3346,19 @@ static void DrawBusStopWithGirls(const TileInfo *ti, const DrawTileSprites *t, i
 		SpriteID girl = 0;
 		if (along_x) girl = (i == 0) ? SPR_BUS_STOP_GIRL_X_FAR : SPR_BUS_STOP_GIRL_X_NEAR;
 		if (!along_x && i == 1) girl = SPR_BUS_STOP_GIRL_Y_FAR;
-		if (girl != 0) AddChildSpriteScreen(girl, PAL_NONE, 0, 0, transparent, nullptr, false, false);
-		if (!along_x && i == 1) AddChildSpriteScreen(SPR_BUS_STOP_GIRL_Y_NEAR, PAL_NONE, 0, 0, transparent, nullptr, false, false);
+		/* In the turned view a girl is her 3D object (three_d_vehicle_object.h) where she has one, standing where
+		 * her sprite has her feet, facing as her render (the colleague's angles: s90, s0, s260, s270), twice her
+		 * size as the sprites; else her sprite. Matylda's object is the colleague's to make. */
+		auto figure = [&](std::string_view name, double fx, double fy, float facing) {
+			if (!ViewportDrawingTurned() || transparent) return false;
+			return AddThreeDFigureToViewport(name, 2.0f, ti->x + static_cast<int>(std::lround(fx)), ti->y + static_cast<int>(std::lround(fy)), ti->z, facing, _cur_dpi->zoom);
+		};
+		bool as_object = false;
+		if (girl == SPR_BUS_STOP_GIRL_X_FAR) as_object = figure("college_girl_stoji", 6.5, 2.2, 90.0f);
+		if (girl == SPR_BUS_STOP_GIRL_Y_FAR) as_object = figure("college_girl_stoji", 2.2, 11.0, 0.0f);
+		if (girl == SPR_BUS_STOP_GIRL_X_NEAR) as_object = figure("college_girl_stoji", 15.0, 15.0, 260.0f);
+		if (girl != 0 && !as_object) AddChildSpriteScreen(girl, PAL_NONE, 0, 0, transparent, nullptr, false, false);
+		if (!along_x && i == 1 && !figure("matylda", 13.4, 5.0, 270.0f)) AddChildSpriteScreen(SPR_BUS_STOP_GIRL_Y_NEAR, PAL_NONE, 0, 0, transparent, nullptr, false, false);
 	}
 }
 

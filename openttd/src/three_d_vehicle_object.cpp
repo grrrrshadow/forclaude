@@ -563,6 +563,30 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	return true;
 }
 
+/**
+ * A figure standing on the turned map (the girls at a bus stop): drawn from its object at the angle of the view,
+ * lit as the vehicles, hung from where its feet stand, sorted by a small box about them.
+ * @param name the figure's name in the index ("druh": "postava")
+ * @param scale its size against true metres (the girls of a stop are drawn twice theirs, as their sprites are)
+ * @param x,y,z where its feet stand, world units
+ * @param facing the way it faces, degrees in the world: 0 along +x, 90 along +y (the colleague's renders' angles)
+ * @param zoom the zoom of the view
+ * @return whether it was drawn so; else the caller draws its sprite
+ */
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom)
+{
+	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
+	const ThreeDVehicleShape *shape = fig != nullptr ? fig->GetShape() : nullptr;
+	if (shape == nullptr) return false;
+	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
+	float world_az = facing - 135.0f;
+	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + GetViewYaw(), world_az, false, 0);
+	if (pic == nullptr) return false;
+	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+	return true;
+}
+
 /** The rig: the objects' sprites made. */
 std::string DescribeThreeDVehicleObjectSprites()
 {

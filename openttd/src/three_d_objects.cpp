@@ -50,6 +50,8 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 /** The vehicles as objects (three_d_objects.h), and whether their indices were read yet. */
 static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
+/** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
+static std::vector<ThreeDVehicleObject> _figure_objects;
 /** The vehicle objects by the set's id, the vehicle type and the engine's number in the set: the object and which of its pieces. */
 static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pieces;
 
@@ -520,6 +522,14 @@ static void ReadThreeDVehicleObjects()
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
+				if (e.value("druh", std::string("dum")) == "postava" && e.contains("soubor")) {
+					/* A figure: metres, the origin between its feet on the ground, facing +x. */
+					ThreeDVehicleObject fig;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
 				if (e.value("druh", std::string("dum")) != "vozidlo") continue;
 				ThreeDVehicleObject obj;
 				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
@@ -600,6 +610,19 @@ static void ReadThreeDVehicleObjects()
 						}
 					}
 				}
+				/* The crew: figures riding in it, never fading. */
+				if (e.contains("posadka") && e.at("posadka").is_array()) {
+					for (const auto &c : e.at("posadka")) {
+						if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
+						ThreeDVehicleCrew crew;
+						crew.figure = c.at("postava").get<std::string>();
+						const auto &at = c.at("poloha");
+						if (!at.is_array() || at.size() != 3) continue;
+						for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
+						crew.turn = c.value("otoceni", 0.0f);
+						obj.crew.push_back(std::move(crew));
+					}
+				}
 				/* Wheels from a file of their own: one wheel at every place, mirrored to the other side. */
 				if (e.contains("kola") && e.at("kola").is_array()) {
 					for (const auto &k : e.at("kola")) {
@@ -626,7 +649,7 @@ static void ReadThreeDVehicleObjects()
 			_vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
 		}
 	}
-	Debug(misc, 1, "3D vehicles: {} in the indices", _vehicle_objects.size());
+	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures", _vehicle_objects.size(), _figure_objects.size());
 }
 
 /**
@@ -646,6 +669,16 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	return &_vehicle_objects[it->second.first];
 }
 
+/** A figure of the indices by its name ("druh": "postava"), or nullptr. */
+const ThreeDVehicleObject *GetThreeDFigure(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDVehicleObject &f : _figure_objects) {
+		if (f.name == name) return &f;
+	}
+	return nullptr;
+}
+
 /** The shapes read, by their file and wheels: the paints of a vehicle share one. */
 static std::map<std::string, std::shared_ptr<const ThreeDVehicleShape>> _vehicle_shapes;
 
@@ -659,6 +692,7 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
 		for (const auto &at : w.at) key += fmt::format(",{},{},{}", at[0], at[1], at[2]);
 	}
+	for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn);
 	auto it = _vehicle_shapes.find(key);
 	if (it != _vehicle_shapes.end()) {
 		this->shape = it->second;
@@ -715,6 +749,41 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 					wheel_triangles++;
 				}
 			}
+		}
+	}
+	/* The crew: each figure's shape turned about z and stood at its place, its textures after the others. */
+	for (const ThreeDVehicleCrew &c : this->crew) {
+		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure);
+		const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
+		if (fs == nullptr) {
+			Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
+			continue;
+		}
+		const bool lit = !made->nrm.empty() && !fs->nrm.empty();
+		if (!lit) made->nrm.clear();
+		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
+		for (size_t t = 0; t < fs->pngs.size() && made->pngs.size() < 255; t++) {
+			made->pngs.push_back(fs->pngs[t]);
+			made->flats.push_back(fs->flats[t]);
+		}
+		const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a);
+		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
+		for (size_t i = 0; i < fs->pos.size(); i += 3) {
+			made->pos.push_back(c.at[0] + fs->pos[i] * ca - fs->pos[i + 1] * sa);
+			made->pos.push_back(c.at[1] + fs->pos[i] * sa + fs->pos[i + 1] * ca);
+			made->pos.push_back(c.at[2] + fs->pos[i + 2]);
+			if (lit) {
+				made->nrm.push_back(fs->nrm[i] * ca - fs->nrm[i + 1] * sa);
+				made->nrm.push_back(fs->nrm[i] * sa + fs->nrm[i + 1] * ca);
+				made->nrm.push_back(fs->nrm[i + 2]);
+			}
+		}
+		made->uv.insert(made->uv.end(), fs->uv.begin(), fs->uv.end());
+		for (size_t t = 0; t < fs->tri.size(); t += 3) {
+			made->tri.push_back(base + fs->tri[t]);
+			made->tri.push_back(base + fs->tri[t + 1]);
+			made->tri.push_back(base + fs->tri[t + 2]);
+			made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + (t / 3 < fs->tri_tex.size() ? fs->tri_tex[t / 3] : 0))));
 		}
 	}
 	made->x0 = made->y0 = made->z0 = 1e9f;
