@@ -793,6 +793,10 @@ std::string DescribeThreeDVehicleObjects()
  */
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot)
 {
+	/* Kept as the first 3D of this game drew it, the boxes of its hand table, in memory of it (the player, 14. 10.:
+	 * "I am nostalgic, the white house of many storeys, tall, I would keep"): the tall office block. */
+	static constexpr HouseID KEPT_AS_HAND_TABLE[] = {0x1c};
+	if (std::ranges::find(KEPT_AS_HAND_TABLE, north_house) != std::end(KEPT_AS_HAND_TABLE)) return nullptr;
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	auto it = _three_d_house_objects.find(std::make_pair(north_house, colour_slot & 3));
 	return it == _three_d_house_objects.end() ? nullptr : &_three_d_objects[it->second];

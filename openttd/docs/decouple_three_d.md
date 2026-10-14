@@ -349,6 +349,11 @@ too.
   about a texture pixel to a pixel of the picture. The view facing north keeps
   the sprites, pixel for pixel.
 
+One house is kept as the first technology drew it, the boxes of its hand
+table, in memory of it: 0x1c, the tall office block (the player: "I am
+nostalgic, the white house of many storeys, tall"); its objects are not used
+(`GetThreeDHouseObject()`).
+
 ## Vehicles as real 3D objects
 
 `src/three_d_vehicle_object.h`, `.cpp`, the reading in `src/three_d_objects.cpp`.
