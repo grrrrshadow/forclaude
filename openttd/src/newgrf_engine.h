@@ -92,6 +92,7 @@ void GetCustomVehicleSprite(const Vehicle *v, Direction direction, EngineImageTy
  */
 extern uint16_t _wagon_exception_forced_slot;
 extern bool _resolve_vehicle_as_empty;
+extern Direction _resolve_vehicle_direction;
 void GetCustomVehicleIcon(EngineID engine, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
 
 void GetCustomRotorSprite(const struct Aircraft *v, EngineImageType image_type, VehicleSpriteSeq *result);

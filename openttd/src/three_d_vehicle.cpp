@@ -60,6 +60,7 @@
 #include "direction_func.h"
 #include "fileio_type.h"
 #include "core/math_func.hpp"
+#include "core/backup_type.hpp"
 #include "debug.h"
 
 #include "table/sprites.h"
@@ -124,8 +125,10 @@ struct ThreeDVehicleModel {
 	std::vector<Colour> fallback;       ///< the colour where neither of the two views nearest the angle sees the point
 	std::vector<uint8_t> rank;          ///< a point's place in a random order, 0..255: a coarser zoom draws the points of the lower ranks only
 	std::map<ZoomLevel, Rect> frames;   ///< the union of the picture's rectangles over the angles, about the anchor, by zoom (ThreeDVehicleFrame())
-	std::vector<float> part_x;          ///< where each piece's position lies along x, metres, front first: the pieces of an articulated vehicle, the two heads of a double-headed engine; one for a vehicle of one piece
-	std::vector<float> part_cut;        ///< the x where piece i ends and piece i+1 begins, one fewer than the pieces
+	std::vector<float> part_x;          ///< where each part's position lies along x, metres, front first: a part is a piece with a picture and the pieces without one that go with it (the cab painted on the piece behind it); one for a vehicle of one part
+	std::vector<float> part_cut;        ///< the x where part i ends and part i+1 begins, one fewer than the parts
+	std::vector<int8_t> piece_part;     ///< the part each piece of the chain belongs to, front first: the pieces of an articulated vehicle, the two heads of a double-headed engine
+	std::vector<int8_t> part_piece;     ///< the piece each part is hung from: the one with the picture
 	uint64_t look = 0;                  ///< the look of the vehicle the model was made from (VehicleLook()): 0 for one made from the engine's own pictures (the purchase window)
 	int build_ms = 0;
 	int voxels = 0;
@@ -288,7 +291,9 @@ static std::vector<VehiclePart> VehiclePiecesOf(const Vehicle *v)
 
 /**
  * What a vehicle on the map looks like, as a number: its pieces' sprites of two directions, so two vehicles of
- * one engine that a set draws alike share a model and two it draws differently (a load, a livery) do not.
+ * one engine that a set draws alike share a model and two it draws differently (a load, a livery) do not. The
+ * set is told the vehicle faces the direction asked (_resolve_vehicle_direction), as when the views are composed,
+ * so the look does not change as the vehicle turns.
  */
 static uint64_t VehicleLook(const Vehicle *v)
 {
@@ -297,6 +302,7 @@ static uint64_t VehicleLook(const Vehicle *v)
 	for (const VehiclePart &part : VehiclePiecesOf(v)) {
 		for (Direction d : {Direction::NE, Direction::E}) {
 			VehicleSpriteSeq seq;
+			AutoRestoreBackup facing(_resolve_vehicle_direction, d);
 			part.veh->GetImage(d, EngineImageType::OnMap, &seq);
 			mix(seq.count);
 			for (uint k = 0; k < seq.count; k++) {
@@ -309,21 +315,44 @@ static uint64_t VehicleLook(const Vehicle *v)
 }
 
 /**
- * The parts along the chain, in steps of the direction: the first at 0, each next one behind by
- * Train::CalcNextVehicleOffset() (half the length of the one before and half, rounded up, of its own).
+ * The pieces along the chain, in steps of the direction, the first at 0, each next one behind as the game
+ * spaces them: a train's by Train::CalcNextVehicleOffset() (half the length of the one before and half, rounded
+ * up, of its own, the pieces being centred on their positions), a road vehicle's by the whole length of the one
+ * before (the next part leaves the shed when the one before has gone its length, IndividualRoadVehicleController()),
+ * so a piece of a road vehicle reaches from its position back to the next piece's.
  * @return the middle of the first and the last, the anchor
  */
-static double PartPositions(const std::vector<VehiclePart> &parts, std::vector<double> &pos)
+static double PartPositions(VehicleType type, const std::vector<VehiclePart> &parts, std::vector<double> &pos)
 {
 	pos.assign(parts.size(), 0.0);
-	for (size_t i = 1; i < parts.size(); i++) pos[i] = pos[i - 1] - (parts[i - 1].length / 2 + (parts[i].length + 1) / 2);
+	for (size_t i = 1; i < parts.size(); i++) {
+		int behind = type == VehicleType::Road ? parts[i - 1].length : parts[i - 1].length / 2 + (parts[i].length + 1) / 2;
+		pos[i] = pos[i - 1] - behind;
+	}
 	return (pos.front() + pos.back()) / 2.0;
 }
 
-/** The sprites of a part for a direction, as the map draws it. */
+/** Where a piece ends along the chain, behind its position: a train's half its length (rounded down), a road vehicle's its whole length. */
+static int PieceEnd(VehicleType type, const VehiclePart &part)
+{
+	return type == VehicleType::Road ? part.length : part.length / 2;
+}
+
+/** A piece's position along the chain, in steps from the anchor, whole: all the pieces rounded the same way, so their spacing stays the game's. */
+static inline int PieceAlong(double pos, double middle)
+{
+	return static_cast<int>(std::floor(pos - middle + 0.5));
+}
+
+/**
+ * The sprites of a part for a direction, as the map draws it. The set is told the vehicle faces that direction
+ * and runs straight (_resolve_vehicle_direction): a set that places a layer by the direction the vehicle really
+ * has -- the player's lorry set shifts the cab so -- gave the picture of one direction the shift of another.
+ */
 static bool PartSprites(const VehiclePart &part, VehicleType type, Direction dir, VehicleSpriteSeq &seq)
 {
 	seq.Clear();
+	AutoRestoreBackup facing(_resolve_vehicle_direction, dir);
 	if (part.veh != nullptr) {
 		/* A piece on the map: its own sprites, as the map draws them (a flipped engine's, a mirror piece's, the rear head's: all inside). */
 		part.veh->GetImage(dir, EngineImageType::OnMap, &seq);
@@ -402,16 +431,18 @@ static void ShrinkPiece(RawPiece &piece, ZoomLevel to)
 
 /**
  * Compose the eight views of an engine: every part's sprite of the direction at the finest zoom they all have.
+ * @param[out] has_picture which of the parts have a picture at all (a set builds a vehicle of pieces and paints some of them on others)
  * @return whether there is a picture in every direction
  */
-static bool ComposeVehicleViews(EngineID engine, PaletteID pal, std::array<ThreeDVehicleView, 8> &views, ZoomLevel &zoom, std::string &note, const Vehicle *veh)
+static bool ComposeVehicleViews(EngineID engine, PaletteID pal, std::array<ThreeDVehicleView, 8> &views, ZoomLevel &zoom, std::string &note, const Vehicle *veh, std::vector<bool> &has_picture)
 {
 	const Engine *e = Engine::Get(engine);
 	std::vector<VehiclePart> parts = veh != nullptr ? VehiclePiecesOf(veh) : VehicleParts(engine);
+	has_picture.assign(parts.size(), false);
 
 	/* The parts along the chain; the middle at the anchor. */
 	std::vector<double> pos;
-	double middle = PartPositions(parts, pos);
+	double middle = PartPositions(e->type, parts, pos);
 
 	const uint8_t *remap_engine = pal == PAL_NONE ? nullptr : GetNonSprite(GB(pal, 0, PALETTE_WIDTH), SpriteType::Recolour) + 1;
 
@@ -422,8 +453,8 @@ static bool ComposeVehicleViews(EngineID engine, PaletteID pal, std::array<Three
 		for (size_t i = 0; i < parts.size(); i++) {
 			VehicleSpriteSeq seq;
 			if (!PartSprites(parts[i], e->type, dir, seq)) continue;
-			/* Where the part stands, rounded the way the game rounds. */
-			int along = static_cast<int>(std::lround(pos[i] - middle));
+			/* Where the part stands, in whole steps. */
+			int along = PieceAlong(pos[i], middle);
 			Point anchor = SpriteAnchor(e->type, parts[i].length, dir);
 			int wx = along * DIR_DX[d] + anchor.x, wy = along * DIR_DY[d] + anchor.y;
 			for (uint k = 0; k < seq.count; k++) {
@@ -472,6 +503,7 @@ static bool ComposeVehicleViews(EngineID engine, PaletteID pal, std::array<Three
 				piece.order = wx + wy;
 				if (finest > zoom) zoom = finest;
 				pieces[d].push_back(std::move(piece));
+				has_picture[i] = true;
 			}
 		}
 		if (pieces[d].empty()) {
@@ -719,22 +751,37 @@ static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, Pa
 	model->look = veh != nullptr ? VehicleLook(veh) : 0;
 
 	std::array<ThreeDVehicleView, 8> views;
-	if (!ComposeVehicleViews(engine, pal, views, model->zoom, model->note, veh)) return nullptr;
+	std::vector<bool> has_picture;
+	if (!ComposeVehicleViews(engine, pal, views, model->zoom, model->note, veh, has_picture)) return nullptr;
 	{
-		/* Where the pieces lie along the likeness, for the map to draw each at its own place (a curve): the chain's
+		/* Where the parts lie along the likeness, for the map to draw each at its own place (a curve): the chain's
 		 * spacing in steps of the direction as the views were composed, a step of the E and W views being four
-		 * pixels at the normal zoom; a piece ends half its length (rounded down) behind its position. */
+		 * pixels at the normal zoom. A part is a piece with a picture and the pieces without one that go with it:
+		 * a set paints the cab on the piece behind the front one, the tail of a trailer over the pieces behind it,
+		 * so a piece without a picture belongs to the piece with one before it, and the pieces before the first
+		 * picture to that one. The likeness is cut where the last piece of a part ends (PieceEnd()). */
+		const VehicleType type = Engine::Get(engine)->type;
 		std::vector<VehiclePart> parts = veh != nullptr ? VehiclePiecesOf(veh) : VehicleParts(engine);
 		std::vector<double> pos;
-		double middle = PartPositions(parts, pos);
+		double middle = PartPositions(type, parts, pos);
 		const float step_m = 64.0f / PXM_16X;
+		int current = -1;
 		for (size_t i = 0; i < parts.size(); i++) {
-			const VehiclePart &part = parts[i];
-			model->note += fmt::format("part {}{}{} len {}; ", part.engine.base(), part.mirrored ? " mirrored" : "", part.rear ? " rear" : "", part.length);
-			int along = static_cast<int>(std::lround(pos[i] - middle));
-			model->part_x.push_back(along * step_m);
-			if (i + 1 < parts.size()) model->part_cut.push_back((along - part.length / 2) * step_m);
+			if (has_picture[i]) {
+				current = static_cast<int>(model->part_x.size());
+				model->part_x.push_back(PieceAlong(pos[i], middle) * step_m);
+				model->part_piece.push_back(static_cast<int8_t>(i));
+			}
+			model->piece_part.push_back(static_cast<int8_t>(current));
 		}
+		for (int8_t &p : model->piece_part) if (p < 0) p = 0;
+		for (size_t i = 0; i + 1 < parts.size(); i++) {
+			const VehiclePart &part = parts[i];
+			model->note += fmt::format("part {}{}{} len {}{}; ", part.engine.base(), part.mirrored ? " mirrored" : "", part.rear ? " rear" : "", part.length, has_picture[i] ? " picture" : "");
+			if (model->piece_part[i] != model->piece_part[i + 1]) model->part_cut.push_back((PieceAlong(pos[i], middle) - PieceEnd(type, part)) * step_m);
+		}
+		const VehiclePart &last = parts.back();
+		model->note += fmt::format("part {}{}{} len {}{}; ", last.engine.base(), last.mirrored ? " mirrored" : "", last.rear ? " rear" : "", last.length, has_picture.back() ? " picture" : "");
 	}
 	for (int d = 0; d < 8; d++) model->note += fmt::format("v{} {}x{} anchor {},{}; ", d, views[d].width, views[d].height, views[d].anchor_x, views[d].anchor_y);
 	model->pxm = PXM_16X / (1 << to_underlying(model->zoom));
@@ -1055,8 +1102,9 @@ ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model)
  * @param on_track foreshorten the vehicle along itself as the map does on straight track, smoothly between
  *                 the directions: in a sprite's own direction the picture is the sprite's size (the preview
  *                 shows the vehicle's true proportions instead)
- * @param part one piece of a vehicle of several (ThreeDVehicleModel::part_x): the points between its cuts, about
- *             its own position, so the map draws each piece where the game has it (a curve); -1 the whole
+ * @param part one part of a vehicle of several (ThreeDVehicleModel::part_x): the points between its cuts, about
+ *             the position of the piece it is hung from, so the map draws each part where the game has it (a
+ *             curve); -1 the whole about the anchor (the purchase preview)
  * @return whether there is a picture
  */
 bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track, int part)
@@ -1075,7 +1123,7 @@ bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float 
 	int coarser = std::max(0, to_underlying(zoom) - to_underlying(model->zoom));
 	int keep = coarser >= 2 ? std::max(1, 256 >> (2 * coarser - 3)) : 256;
 
-	/* One piece of several: the points between its cuts, about its own position. */
+	/* One part of several: the points between its cuts, about the position of its piece. */
 	float x_lo = -std::numeric_limits<float>::infinity(), x_hi = std::numeric_limits<float>::infinity(), x_at = 0.0f;
 	if (part >= 0) {
 		if (static_cast<size_t>(part) >= model->part_x.size()) return false;
@@ -1248,53 +1296,67 @@ const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *mo
 /**
  * Put a vehicle on the turned map as its likeness at the angle of the view (DoDrawVehicle(), viewport.cpp).
  * A vehicle of several pieces -- an articulated one, a double-headed engine -- has one likeness, made from its
- * pieces composed as the purchase window shows them; each piece is drawn as its own cut of that likeness, at
- * its own place and in its own direction, so the vehicle bends on a curve as its sprites do and the two heads
- * of a double-headed engine stand at either end of the train.
+ * pieces composed as the chain spaces them; it is cut into parts, one for each piece that has a picture of its
+ * own (the pieces without one -- a set paints the cab on the piece behind the front one -- go with it), and each
+ * part is drawn about the position of its piece, in that piece's direction, so the vehicle bends on a curve as
+ * its sprites do, the front sits where the game has the front, the trailer where it has the trailer, and the two
+ * heads of a double-headed engine stand at either end of the train.
  * @param v the vehicle, or any piece of one
  * @param pal the palette of its sprites (the company's colours)
  * @param zoom the zoom of the view
- * @return whether it was put there; else the caller draws the sprites
+ * @return whether it was put there (a piece drawn with another of its part counts); else the caller draws the sprites
  */
 bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom)
 {
 	if (v->direction == Direction::Invalid) return false;
 
-	/* The vehicle this is a piece of, and which piece. */
+	/* The vehicle this is a piece of, and which piece: the chain of the front and its articulated parts, then
+	 * the rear head of a double-headed engine (VehiclePiecesOf()). */
 	const Vehicle *front = v;
 	int piece = 0;
 	if (v->type == VehicleType::Train && Train::From(v)->IsRearDualheaded()) {
 		front = Train::From(v)->other_multiheaded_part;
 		if (front == nullptr) return false;
 		piece = 1;
-	}
-	while (front->IsArticulatedPart()) {
-		front = front->Previous();
-		if (front == nullptr) return false;
-		piece++;
+		for (const Vehicle *u = front; u->HasArticulatedPart(); u = u->GetNextArticulatedPart()) piece++;
+	} else {
+		while (front->IsArticulatedPart()) {
+			front = front->Previous();
+			if (front == nullptr) return false;
+			piece++;
+		}
 	}
 	/* The model from the vehicle's own sprites: an engine coupled turned round, a flipped piece drawn as its
 	 * mirror piece, a load, a livery -- all as the map draws them, so the direction is the vehicle's own. */
 	const ThreeDVehicleModel *model = GetThreeDVehicleModel(front->engine_type, pal, front);
 	if (model == nullptr) return false;
-	Direction dir = v->direction;
-	int pieces = static_cast<int>(model->part_x.size());
-	int part = -1;
-	if (pieces > 1) {
-		if (piece >= pieces) return false;
-		part = piece;
-	} else if (piece != 0) {
-		return false;
+	if (static_cast<size_t>(piece) >= model->piece_part.size()) return false;
+	int part = model->piece_part[piece];
+	/* A piece without a picture of its own: drawn with the piece of its part, nothing here. */
+	if (model->part_piece[part] != piece) return true;
+
+	/* The box of the part for the sorting: the boxes of its pieces together. */
+	int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
+	{
+		std::vector<VehiclePart> pieces = VehiclePiecesOf(front);
+		for (size_t i = 0; i < pieces.size() && i < model->piece_part.size(); i++) {
+			if (model->piece_part[i] != part) continue;
+			const Vehicle *u = pieces[i].veh;
+			xmin = std::min(xmin, u->x_pos + u->bounds.origin.x);
+			ymin = std::min(ymin, u->y_pos + u->bounds.origin.y);
+			zmin = std::min(zmin, u->z_pos + u->bounds.origin.z);
+			xmax = std::max(xmax, u->x_pos + u->bounds.origin.x + u->bounds.extent.x - 1);
+			ymax = std::max(ymax, u->y_pos + u->bounds.origin.y + u->bounds.extent.y - 1);
+			zmax = std::max(zmax, u->z_pos + u->bounds.origin.z + u->bounds.extent.z - 1);
+		}
 	}
 
 	/* The angle: the sprite of direction d shows at ViewAzimuth(d); the map, turned, shows the direction so many
 	 * steps back, so the angle goes on by the view's turn. */
-	float azimuth = ViewAzimuth(to_underlying(dir)) + GetViewYaw();
+	float azimuth = ViewAzimuth(to_underlying(v->direction)) + GetViewYaw();
 	const ThreeDModelPicture *pic = GetThreeDVehiclePictureAt(model, zoom, azimuth, true, part);
 	if (pic == nullptr) return false;
-	AddTurnedVehiclePicture(pic, v->x_pos, v->y_pos, v->z_pos,
-			v->x_pos + v->bounds.origin.x, v->y_pos + v->bounds.origin.y, v->z_pos + v->bounds.origin.z,
-			v->x_pos + v->bounds.origin.x + v->bounds.extent.x - 1, v->y_pos + v->bounds.origin.y + v->bounds.extent.y - 1, v->z_pos + v->bounds.origin.z + v->bounds.extent.z - 1);
+	AddTurnedVehiclePicture(pic, v->x_pos, v->y_pos, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
 	return true;
 }
 

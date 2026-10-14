@@ -63,15 +63,29 @@ tree in an old game does.
   its load, its livery, the colours its set paints on it, an engine coupled
   turned round -- so it is the vehicle, not its purchase-list picture. An
   articulated vehicle -- a truck with its trailer, a locomotive of three
-  pieces -- has one likeness made from all its pieces, and each piece is
-  drawn as its own cut of it, at its own place and in its own direction,
-  so the vehicle bends on a curve as its sprites do; the two heads of a
-  double-headed engine stand at either end of the train; each wagon is its
-  own. A vehicle whose likeness cannot be made (no sprites in the set, a
-  crashed one, an 8bpp blitter) shows the sprite of the nearer of the eight
-  directions as seen from the turn, as before.
+  pieces -- has one likeness made from all its pieces, cut into parts, one
+  for each piece that has a picture of its own (a set paints the cab on the
+  piece behind the front one and the tail of a trailer over the pieces
+  behind it; those go with it), and each part is drawn at the place and in
+  the direction of its piece, so the vehicle bends on a curve as its
+  sprites do, the front sits where the game has the front and the trailer
+  where it has the trailer (the player: in build 267 the whole vehicle was
+  one straight likeness, "the front sat as if nailed, the rear did not
+  stay on the road"); the two heads of a double-headed engine stand at
+  either end of the train; each wagon is its own. A vehicle whose likeness
+  cannot be made (no sprites in the set, a crashed one, an 8bpp blitter)
+  shows the sprite of the nearer of the eight directions as seen from the
+  turn, as before.
 - Stations turn too, any set's: the platforms as flat slabs laid over the
   turned tiles, the buildings and roofs as boxes, each from its own sprite.
+- Bridges turn for real (the player: "the bridges fall apart when the view
+  turns" -- drawn as billboards, the pieces of the deck over each tile stood
+  north-up at their turned tiles and never joined up): over each tile the
+  deck is a slab at the bridge's height with the floor sprite's pixels on
+  top, the railings thin walls along its edges with the sprite's pylons and
+  cables on them, the pillars columns where their pixels stand, and each
+  end's ramp a deck rising from the ground to the bridge in the ramp's
+  sprite; none of it ever snaps.
 - Game Options: the fences along the rails are **off by default** (the
   setting the game already had, under the graphics options, to be turned
   back on at will), since turned they are billboards and stand about the
@@ -136,13 +150,56 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    by turned depth (`box_kind` 5, `AddTurnedVehiclePicture()` in
    `viewport.cpp`). A vehicle of several pieces -- an articulated one, a
    double-headed engine -- has one model made from its pieces composed as
-   the chain spaces them, and knows where each piece lies along it
-   (`part_x`, `part_cut`: a piece ends half its length behind its
-   position); each piece is drawn as its own cut of the model about its
-   own position, in its own direction, so the vehicle bends on a curve as
-   its sprites do, and the rear head of a double-headed engine stands at
-   the end of the train. A vehicle without a likeness is a billboard of the
-   sprite of its turned direction, as before.
+   the chain spaces them (`PartPositions()`: a train's pieces centred,
+   each half its length and half the next one's apart; a road vehicle's
+   each the whole length of the one before behind it, as
+   `IndividualRoadVehicleController()` lets them out of the shed), and
+   knows where each part lies along it (`part_x`, `part_cut`,
+   `piece_part`, `part_piece`): a part is a piece with a picture and the
+   pieces without one that go with it (the player's lorry set has a front
+   piece of two eighths with no picture and paints the cab on the piece
+   behind it, the trailer on one piece with two empty ones behind), and
+   the model is cut where the last piece of a part ends (a train's half
+   its length behind its position, a road vehicle's its whole length).
+   Each part is drawn about the position of its piece, in that piece's
+   direction, so the vehicle bends on a curve as its sprites do, and the
+   rear head of a double-headed engine stands at the end of the train.
+   While the pictures of the eight directions are read, the set is told
+   the vehicle faces the direction asked and runs straight
+   (`_resolve_vehicle_direction`, `newgrf_engine.cpp`: variables 9F, 45
+   and the direction part of 62), since a set may place a layer by the
+   direction the vehicle really has -- the player's lorry set shifts the
+   cab by variable 9F -- and read with the vehicle facing another way,
+   the picture of one direction came out with the shift of another, every
+   view different from the next, and the hull carved from them was a few
+   specks scattered along the road (builds 268 to 270). The same is told
+   for the purchase list's pictures, which have no vehicle, so that set
+   gets a direction there instead of none. A vehicle without a likeness is
+   a billboard of the sprite of its turned direction, as before.
+   **A bridge** is built from the sprites `DrawBridgeMiddle()` draws for
+   it, marked by the same hook the cab view uses (`MarkCabBridgeSprites()`,
+   `TurnedBridgeOverTile()`): the floor sprite becomes the deck, a slab
+   two units thick over the whole tile at the bridge's height (`box_kind`
+   8, `DrawTurnedBridgeDeck()`), and besides it the far railing, an entry
+   of its own at the far edge so that it sorts there against what runs on
+   the deck; the near part is the near railing (9,
+   `DrawTurnedBridgeRailing()`): a wall a tile long and forty units high
+   along the edge, the sprite's pylons and cables laid on it with the gaps
+   between the cables left open (`DrawTexturedTriangle()` otherwise fills
+   a pixel the texture has nothing for from the pixels about it, for the
+   edges of the ground's diamonds, and filled the cables into a sheet); a
+   surface laid on the deck (a rail type's own deck, a reservation) is a
+   slab a step above it (6); a piece of a pillar is a column a level high
+   where the sprite's pixels stand (11, `DrawTurnedBridgePillar()`: its
+   box says only whether it is the near or the far pillar, the game draws
+   the far one so many units back that its pixels land at the far edge;
+   where along the bridge it stands is read off the sprite's middle). A
+   bridge's end (`TurnedBridgeHead()`) has its ramp and whatever lies on
+   it drawn as the deck rising from the ground at the outer end to the
+   bridge at the inner one, or level with it on a slope or a foundation,
+   dressed in the sprite, with its sides down to the ground (10,
+   `DrawTurnedBridgeRamp()`, the geometry of the cab view's
+   `CabDrawBridgeRamp()`). None of a bridge ever snaps (period 360).
 3. **The houses of the original graphics with a hand table**
    (`table/three_d_houses.h`, 26 temperate houses read off their one sprite
    by hand: a few boxes each with flat, gable or hip roofs) are boxes. The

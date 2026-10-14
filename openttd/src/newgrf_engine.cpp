@@ -532,6 +532,8 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			 * T - previous wagon to next wagon, 0 in an S-bend
 			 */
 			if (!v->IsGroundVehicle()) return 0;
+			/* Read for the likeness: the chain is straight. */
+			if (_resolve_vehicle_direction != Direction::Invalid) return 0;
 
 			const Vehicle *u_p = v->Previous();
 			const Vehicle *u_n = v->Next();
@@ -684,9 +686,10 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			const Vehicle *u = v->Move(static_cast<int8_t>(parameter));
 			if (u == nullptr) return 0;
 
-			/* Get direction difference. */
+			/* Get direction difference (none when read for the likeness: the chain is straight). */
 			bool prev = static_cast<int8_t>(parameter) < 0;
-			DirDiff dirdiff = prev ? DirDifference(u->direction, v->direction) : DirDifference(v->direction, u->direction);
+			DirDiff dirdiff = _resolve_vehicle_direction != Direction::Invalid ? DirDiff::Same :
+					(prev ? DirDifference(u->direction, v->direction) : DirDifference(v->direction, u->direction));
 			uint32_t ret = to_underlying(dirdiff);
 			if (dirdiff > DirDiff::Reverse) ret |= 0x08;
 
@@ -846,7 +849,10 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case 0x1C: return v->y_pos;
 		case 0x1D: return GB(v->y_pos, 8, 8);
 		case 0x1E: return v->z_pos;
-		case 0x1F: return to_underlying(object->rotor_in_gui ? Direction::W : v->direction); // for rotors the spriteset contains animation frames, so NewGRF need a different way to tell the helicopter orientation.
+		case 0x1F: // for rotors the spriteset contains animation frames, so NewGRF need a different way to tell the helicopter orientation.
+			if (object->rotor_in_gui) return to_underlying(Direction::W);
+			if (_resolve_vehicle_direction != Direction::Invalid) return to_underlying(_resolve_vehicle_direction); // read for the likeness
+			return to_underlying(v->direction);
 		case 0x20: break; // not implemented
 		case 0x21: break; // not implemented
 		case 0x22: break; // not implemented
@@ -1052,6 +1058,9 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 
 			case 0x92: return ClampTo<uint16_t>(TimerGameCalendar::date - CalendarTime::DAYS_TILL_ORIGINAL_BASE_YEAR); // Date of last service
 			case 0x93: return GB(ClampTo<uint16_t>(TimerGameCalendar::date - CalendarTime::DAYS_TILL_ORIGINAL_BASE_YEAR), 8, 8);
+			case 0x9F: // Direction: the one the likeness asks for, else none (the purchase list)
+				if (_resolve_vehicle_direction != Direction::Invalid) return to_underlying(_resolve_vehicle_direction);
+				break;
 			case 0xC4: return (Clamp(TimerGameCalendar::year, CalendarTime::ORIGINAL_BASE_YEAR, CalendarTime::ORIGINAL_MAX_YEAR) - CalendarTime::ORIGINAL_BASE_YEAR).base(); // Build year
 			case 0xC6: return Engine::Get(this->self_type)->grf_prop.local_id;
 			case 0xC7: return GB(Engine::Get(this->self_type)->grf_prop.local_id, 8, 8);
@@ -1168,6 +1177,18 @@ uint16_t _wagon_exception_forced_slot = UINT16_MAX;
  * tells the load from the wagon (GetGreenLayerWagonSprite()).
  */
 bool _resolve_vehicle_as_empty = false;
+
+/**
+ * The direction a set is told a vehicle faces while its pictures of every
+ * direction are read for its 3D likeness (three_d_vehicle.cpp), and that its
+ * chain is straight: a set may place a layer of a picture by the direction the
+ * vehicle really has (the player's lorry set shifts the cab by variable 9F), and
+ * read with the vehicle facing another way, the picture of one direction came
+ * out with the shift of another, every view of the likeness different from the
+ * next and the hull carved from them full of holes. Direction::Invalid: the
+ * vehicle's own, as the map draws it.
+ */
+Direction _resolve_vehicle_direction = Direction::Invalid;
 
 static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result, bool on_map = false)
 {
