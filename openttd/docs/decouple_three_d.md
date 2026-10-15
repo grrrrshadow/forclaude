@@ -369,7 +369,9 @@ too.
   (`AddNorthHouseObject()` after its tile's draw: its sprites `box_kind` 4, the
   object `box_kind` 7 among the sorted sprites, `ViewportDrawParentSprites()`);
   fences, catenary and vehicles stay as they are facing north. *The original
-  pictures* keeps the sprites, pixel for pixel. Only while the main view is at angle 0 (the other views then too),
+  pictures* keeps the sprites, pixel for pixel. A house on a slope keeps the walls of its foundation, the
+  ground on them left out for the object's own plot (`LeaveOutTileSprites()`; the player, 15. 10.: nothing under
+  the houses on a slope, black holes in a screenshot -- on the screen what was drawn there before). Only while the main view is at angle 0 (the other views then too),
   3D on and a 32bpp blitter. A full redraw of a dense town at zoom 1 in the rig:
   44 ms with the objects, 2 ms with the sprites (the turned view 128 ms).
 - **Light and colour by number** (15. 10., the ten houses that were the

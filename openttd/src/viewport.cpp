@@ -1281,7 +1281,7 @@ static int GetViewportY(Point tile)
  */
 static bool _north_house_objects = false;
 static void AddNorthHouseObject(size_t first_parent);
-static void AddIndustryObjects(size_t first_parent);
+static void AddIndustryObjects(size_t first_parent, bool north);
 
 static void ViewportAddLandscape()
 {
@@ -1391,7 +1391,7 @@ static void ViewportAddLandscape()
 				size_t first_parent = _vd.parent_sprites_to_draw.size();
 				_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 				if (_north_house_objects && tile_type == TileType::House) AddNorthHouseObject(first_parent);
-				if (_north_house_objects && tile_type == TileType::Industry) AddIndustryObjects(first_parent);
+				if (_north_house_objects && tile_type == TileType::Industry) AddIndustryObjects(first_parent, true);
 				if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 			}
 		}
@@ -3412,6 +3412,26 @@ static void AddTurnedObjectsToDraw()
 }
 
 /**
+ * Leave out the sprites a tile just added (box_kind 4): its building is drawn as a 3D object instead. Facing north
+ * the walls of the foundation of a tile on a slope stay: without them there was nothing under the house -- black
+ * holes in a screenshot, the player saw; on the screen what was drawn there before.
+ * @param first_parent the first of the sprites the tile added
+ * @param keep_foundation whether the foundation stays (facing north; turned, the ground is laid by itself)
+ */
+static void LeaveOutTileSprites(size_t first_parent, bool keep_foundation)
+{
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+		if (keep_foundation && (static_cast<int>(i) == _vd.foundation[FoundationPart::Normal] || static_cast<int>(i) == _vd.foundation[FoundationPart::Halftile])) {
+			/* Its walls stay; the ground on it goes, black where the building's sprite stood: the object lies there
+			 * with its own plot. */
+			_vd.parent_sprites_to_draw[i].first_child = -1;
+			continue;
+		}
+		_vd.parent_sprites_to_draw[i].box_kind = 4;
+	}
+}
+
+/**
  * One of the game's own industries as a real 3D object (the colleague's objekty/prumysl/): drawn once, whole, as a
  * house; a tile of a field (the marijuana plantation, the potato field) laid from the parts of the fields -- the
  * soil under the plants of the stage and the girl at work, and from the tile before the field road the road tile
@@ -3420,8 +3440,9 @@ static void AddTurnedObjectsToDraw()
  * north as the houses (gui.three_d_north_houses): the potato field, the distillery and the pub have no pictures of
  * their own there.
  * @param first_parent the first of the sprites the tile added
+ * @param north whether the view faces north (the foundations stay, LeaveOutTileSprites())
  */
-static void AddIndustryObjects(size_t first_parent)
+static void AddIndustryObjects(size_t first_parent, bool north)
 {
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries) || !IsIndustryCompleted(_cur_ti.tile)) return;
 	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
@@ -3429,7 +3450,7 @@ static void AddIndustryObjects(size_t first_parent)
 	ThreeDPlantationTile pt;
 	ThreeDFieldTile ft;
 	if (obj != nullptr) {
-		for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+		LeaveOutTileSprites(first_parent, north);
 		const TileIndex origin = ind->location.tile;
 		bool known = false;
 		for (const TurnedObject &to : _turned_objects) {
@@ -3437,7 +3458,7 @@ static void AddIndustryObjects(size_t first_parent)
 		}
 		if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
 	} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
-		for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+		LeaveOutTileSprites(first_parent, north);
 		if (ft.plants != nullptr) {
 			_turned_objects.push_back({ft.plants, _cur_ti.tile, _cur_ti.z, ft.soil, ft.worker});
 		} else {
@@ -3471,7 +3492,7 @@ static void AddNorthHouseObject(size_t first_parent)
 	TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
 	const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
 	if (obj == nullptr) return;
-	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+	LeaveOutTileSprites(first_parent, true);
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.origin == origin) return;
 	}
@@ -3716,7 +3737,7 @@ static void ViewportDoDrawTurned()
 			}
 		}
 		/* One of the game's own industries as a real 3D object (AddIndustryObjects()). */
-		if (tile_type == TileType::Industry) AddIndustryObjects(first_parent);
+		if (tile_type == TileType::Industry) AddIndustryObjects(first_parent, false);
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
 		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses)) {
 			HouseID house = GetHouseType(_cur_ti.tile);

@@ -8837,6 +8837,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* Turn every preview to an angle (rig: the frames of a turn). */
 		SetThreeDPreviewYaw(std::strtof(std::string(argv[3]).c_str(), nullptr));
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
+	} else if (what == "domynasvahu") {
+		/* The houses standing on a slope, on foundations, for the rig: the first n of them. */
+		int left = number(2).value_or(10);
+		for (const auto tile : Map::Iterate()) {
+			if (left <= 0) break;
+			if (!IsTileType(tile, TileType::House) || GetTileSlope(tile) == SLOPE_FLAT) continue;
+			IConsolePrint(CC_DEFAULT, "test3d: dum {:#04x} na svahu {} na {},{}", GetHouseType(tile), to_underlying(GetTileSlope(tile)), TileX(tile), TileY(tile));
+			left--;
+		}
 	} else if (what == "chodec") {
 		/* The view from the first person (first_person_gui.cpp): 'chodec' opens it where the main view looks;
 		 * 'chodec krok <n> <ahead> <aside> <turn> [pitch degrees]' walks n steps as if the keys were held. */
