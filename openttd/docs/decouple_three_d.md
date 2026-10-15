@@ -348,6 +348,22 @@ too.
   perspective rasterizer and the depth buffer with the texture's level for
   about a texture pixel to a pixel of the picture. The view facing north keeps
   the sprites, pixel for pixel.
+- **Light and colour by number** (15. 10., the ten houses that were the
+  renders of `budovy3d_1` to `4`, the colleague's
+  `hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md`): a file with normals is lit by the game
+  as the vehicles are -- each corner 0.55 + 0.45 max(0, n . L), L = (-0.55,
+  0.35, 0.75) in the world's axes, fixed to the world as the sun, so it does
+  not change as the view turns; across a triangle the light goes from corner
+  to corner (`TurnedVertex::l`; in the cab view one light a triangle). A file
+  without normals has its light in its texture and is drawn as it is. And
+  `"barvy"`: parts (`cast`: roof, plaster, fence) with a grey `maska` of the
+  texture's layout, `zacatek` and a `paleta`; each house on the map has for
+  each part a colour of its palette by a hash of its north tile, another bit
+  of it for each part (`ThreeDObject::PaintAt()`), the colleague's "each house
+  another" -- a pixel of the mask that colour at the texture's lightness (its
+  own where the texture is `zacatek` light), as the vehicles' `lak.barva`. The
+  texture so painted is kept by level and colours (at most 192 MB of them,
+  then all are dropped and made again as drawn).
 
 One house is kept as the first technology drew it, the boxes of its hand
 table, in memory of it: 0x1c, the tall office block (the player: "I am
@@ -439,7 +455,25 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   and picture of the vehicle (seen through the cut windows). At the bus stops
   with the girls the turned view draws them as figures
   (`AddThreeDFigureToViewport()`, twice their size, as the stops' sprites draw
-  people); facing north the sprites stay.
+  people): the girl in the turquoise top (`people_girl_stoji`) at the far
+  shelter of both, College Girl smoking (`college_girl_kouri`) from behind at
+  the near one along X, Matylda (`matylda`) on the near pavement along Y; a
+  figure not there falls back to `college_girl_stoji`, then to the sprite.
+  Facing north the sprites stay.
+- **Figures that move** (the player: "the girls move their hands, as if
+  smoking a joint"; the colleague's `hra/3d/PROSBA-POSTAVY-ANIMACE.md`):
+  `"animace": {"uzly": "snimek_", "snimku": 8, "tiku": 9}` -- the frames are
+  nodes of the one file named the prefix and a number, each the whole figure
+  in a pose, the textures once. A node so named is read only into its own
+  frame (with its children); nodes without the prefix into every frame. The
+  turned view draws the frame (tick / tiku + phase) mod snimku of the game's
+  tick counter (it stands still while the game is paused), the phase from the
+  stop's tile, so the girls of a map do not all move at once; each frame a
+  shape and pictures of its own (`ThreeDVehicleObject::GetShape(frame)`), read
+  as drawn. A tile with such a figure is drawn again when the frame changes
+  (a timer of the game's ticks marks it dirty; only the screen). Everywhere
+  else -- the crew, the sprites -- a figure is its first frame. Always round and
+  round (`smycka` is not read); vehicles' frames (`kdy`) not yet.
 - Not yet: the glass, levels of detail, the cab's eye, wheels that turn and
   bogies that swing on a curve.
 - Cost: Sergej, 95 thousand triangles, takes 55 to 170 ms a direction for the
@@ -856,4 +890,7 @@ which a set of the game's own graphics may use for that block. The same
 script writes the table `src/table/three_d_models.h` (which house or
 industry each model is, its plot, and for every direction the camera that
 took the render). The pictures themselves are not kept in the repository,
-only the sets and their `.yagl`.
+only the sets and their `.yagl`. Sets 1 to 4, the ten houses, are gone since
+15. 10.: those houses are 3D objects (`objekty/mirne/`, below); the script
+keeps their places in its list (`AS_OBJECTS`), so the other models' sprites
+keep their numbers and sets 5 to 8 stand as they are.

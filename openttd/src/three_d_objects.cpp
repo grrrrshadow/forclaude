@@ -14,6 +14,8 @@
 #include "gfx_type.h"
 #include "tile_type.h"
 #include "house.h"
+#include "map_func.h"
+#include "core/bitmath_func.hpp"
 #include "engine_base.h"
 #include "core/string_consumer.hpp"
 #include "3rdparty/nlohmann/json.hpp"
@@ -106,9 +108,12 @@ struct GlbMesh {
  * @param all_nodes every node of the scene, its children with their parents' transforms, one mesh as often as
  *                  nodes name it (a vehicle: one wheel in the file, at every place it is; Blender's linked
  *                  duplicates); else the first node with a mesh only (a building, as it always was read)
+ * @param frame_prefix with all_nodes, a figure that moves (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): of the
+ *                     nodes whose names start so, the frames, only the one numbered frame (and its children)
+ * @param frame that frame
  * @return whether there is something to draw
  */
-static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false)
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0)
 {
 	std::vector<uint8_t> d = ReadWholeFile(path);
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
@@ -306,6 +311,13 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 				auto [n, parent] = todo.back();
 				todo.pop_back();
 				const auto &node = nodes.at(n);
+				if (!frame_prefix.empty() && node.contains("name") && node.at("name").is_string()) {
+					std::string name = node.at("name").get<std::string>();
+					if (name.starts_with(frame_prefix)) {
+						auto number = ParseInteger<int>(std::string_view(name).substr(frame_prefix.size()), 10);
+						if (!number.has_value() || *number != frame) continue;
+					}
+				}
 				Matrix m = multiply(parent, local(node));
 				if (node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m);
 				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m);
@@ -355,6 +367,17 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 	obj.uv = std::move(mesh.uv);
 	obj.tri = std::move(mesh.tri);
 	obj.png = std::move(mesh.png);
+	if (!mesh.nrm.empty()) {
+		/* Normals: lit by the game as the vehicles are, by one light fixed to the world (the colleague's
+		 * hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md); its axes are the world's. Without, the light is in the texture. */
+		static const double L[3] = {-0.55, 0.35, 0.75};
+		const double ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+		obj.light.reserve(mesh.nrm.size() / 3);
+		for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) {
+			double d = (mesh.nrm[i] * L[0] + mesh.nrm[i + 1] * L[1] + mesh.nrm[i + 2] * L[2]) / ll;
+			obj.light.push_back(static_cast<uint16_t>(std::lround(256.0 * (0.55 + 0.45 * std::max(0.0, d)))));
+		}
+	}
 
 	/* It should lie on its plot: say so in the log when it does not. */
 	float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f, z0 = 1e9f;
@@ -392,6 +415,27 @@ static std::vector<std::string> FindObjectIndices()
 	return indices;
 }
 
+/** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
+static void ReadColourParts(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
+{
+	if (!e.contains("barvy")) return;
+	for (const auto &b : e.at("barvy")) {
+		ThreeDObjectColourPart part;
+		part.name = b.value("cast", std::string());
+		part.mask_png = ReadWholeFile(folder + b.at("maska").get<std::string>());
+		part.start = std::clamp(b.value("zacatek", 255), 1, 255);
+		for (const auto &c : b.at("paleta")) {
+			auto rgb = ParseInteger<uint32_t>(c.get<std::string>(), 16);
+			if (rgb.has_value()) part.palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
+		}
+		if (part.mask_png.empty() || part.palette.empty()) {
+			Debug(misc, 0, "3D object {}: the colour part {} has no mask or no colours", obj.name, part.name);
+			continue;
+		}
+		if (obj.colours.size() < 7) obj.colours.push_back(std::move(part));
+	}
+}
+
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
 static void ReadThreeDObjects()
 {
@@ -422,6 +466,7 @@ static void ReadThreeDObjects()
 						for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
 					}
 					if (!ReadGlb(folder + obj.file, obj)) continue;
+					ReadColourParts(e, folder, obj);
 					_three_d_objects.push_back(std::move(obj));
 					continue;
 				}
@@ -445,6 +490,7 @@ static void ReadThreeDObjects()
 					for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
 				}
 				if (!ReadGlb(folder + obj.file, obj)) continue;
+				ReadColourParts(e, folder, obj);
 				std::vector<uint8_t> snow;
 				if (houses.size() > 1 && e.contains("snih")) snow = ReadWholeFile(folder + e.at("snih").get<std::string>());
 				for (size_t k = 1; k < houses.size(); k++) {
@@ -527,6 +573,14 @@ static void ReadThreeDVehicleObjects()
 					ThreeDVehicleObject fig;
 					fig.file = folder + e.at("soubor").get<std::string>();
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("animace") && e.at("animace").is_object()) {
+						/* It moves: its frames are nodes of the file, drawn one at a time, a frame every so many ticks. */
+						const auto &a = e.at("animace");
+						fig.frame_prefix = a.value("uzly", std::string("snimek_"));
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+						if (fig.frames < 2) fig.frame_prefix.clear();
+					}
 					_figure_objects.push_back(std::move(fig));
 					continue;
 				}
@@ -682,24 +736,49 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name)
 /** The shapes read, by their file and wheels: the paints of a vehicle share one. */
 static std::map<std::string, std::shared_ptr<const ThreeDVehicleShape>> _vehicle_shapes;
 
-/** The object's shape, read from its .glb the first time; nullptr when it cannot be. */
+/** The frame of a figure that moves at a tick of the game: one every frame_ticks, from phase on, round and round. */
+int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
+{
+	if (this->frames < 2) return 0;
+	return static_cast<int>((tick / this->frame_ticks + phase) % this->frames);
+}
+
+/** The object's shape, read from its .glb the first time; nullptr when it cannot be. A figure that moves: its first frame. */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 {
 	if (this->shape != nullptr || this->shape_tried) return this->shape.get();
 	this->shape_tried = true;
+	this->shape = this->MakeShape(0);
+	return this->shape.get();
+}
+
+/** A frame of a figure that moves (FrameAt()), read the first time it is drawn; the others as GetShape(). */
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
+{
+	if (this->frames < 2 || frame <= 0) return this->GetShape();
+	frame %= this->frames;
+	if (this->frame_shapes.size() < static_cast<size_t>(this->frames)) this->frame_shapes.resize(this->frames);
+	if (this->frame_shapes[frame] == nullptr) {
+		this->frame_shapes[frame] = this->MakeShape(frame);
+		if (this->frame_shapes[frame] == nullptr) return this->GetShape();
+	}
+	return this->frame_shapes[frame].get();
+}
+
+/** Read the object's shape (a frame of it), or the one read already for the same file, wheels, crew and frame. */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame) const
+{
 	std::string key = this->file;
+	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
 	for (const ThreeDVehicleWheels &w : this->wheels) {
 		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
 		for (const auto &at : w.at) key += fmt::format(",{},{},{}", at[0], at[1], at[2]);
 	}
 	for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn);
 	auto it = _vehicle_shapes.find(key);
-	if (it != _vehicle_shapes.end()) {
-		this->shape = it->second;
-		return this->shape.get();
-	}
+	if (it != _vehicle_shapes.end()) return it->second;
 	GlbMesh mesh;
-	if (!ReadGlbMesh(this->file, mesh, true)) return nullptr;
+	if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame)) return nullptr;
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
@@ -793,11 +872,11 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
 		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 	}
-	Debug(misc, 1, "3D vehicle {}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name, made->tri.size() / 3, wheel_triangles,
+	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name,
+			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
 			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
-	this->shape = made;
 	_vehicle_shapes.emplace(key, made);
-	return this->shape.get();
+	return made;
 }
 
 /**
@@ -948,11 +1027,82 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 	}
 }
 
-/** The object's texture at a level of detail (DecodeTextureLevels()), read from the PNG the first time. */
-const ThreeDObjectTexture *ThreeDObject::GetTexture(int level) const
+/** The painted textures kept, bytes; past PAINTED_BUDGET all are dropped and made again as they are drawn. */
+static size_t _painted_bytes = 0;
+static constexpr size_t PAINTED_BUDGET = static_cast<size_t>(192) << 20;
+
+/**
+ * The colours of the house whose north tile is a tile ("barvy", the colleague: "each house another"): for each part
+ * a colour of its palette by a hash of the tile, another bit of it for each part; 0 for a house without parts.
+ * @return the colours' numbers, four bits a part, with the top bit set
+ */
+uint32_t ThreeDObject::PaintAt(TileIndex origin) const
+{
+	if (this->colours.empty()) return 0;
+	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u;
+	uint32_t paint = 1u << 31;
+	for (size_t k = 0; k < this->colours.size(); k++) {
+		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
+		x ^= x >> 15;
+		x *= 0x2C1B3C6Du;
+		x ^= x >> 12;
+		x *= 0x297A2D39u;
+		x ^= x >> 15;
+		paint |= (x % std::min<size_t>(this->colours[k].palette.size(), 16)) << (4 * k);
+	}
+	return paint;
+}
+
+/**
+ * The object's texture at a level of detail (DecodeTextureLevels()), read from the PNG the first time; painted
+ * (PaintAt()) as the vehicles' colour by number: each pixel of a part's mask the part's colour at the texture's
+ * lightness, its own where the texture is "zacatek" light.
+ */
+const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint) const
 {
 	if (this->levels.empty()) DecodeTextureLevels(this->png, this->levels);
-	return &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)];
+	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+	const ThreeDObjectTexture *plain = &this->levels[level];
+	if (paint == 0 || this->colours.empty()) return plain;
+	auto it = this->painted.find({level, paint});
+	if (it != this->painted.end()) return &it->second;
+
+	if (_painted_bytes > PAINTED_BUDGET) {
+		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
+		_painted_bytes = 0;
+	}
+	ThreeDObjectTexture t = *plain;
+	for (size_t k = 0; k < this->colours.size(); k++) {
+		const ThreeDObjectColourPart &part = this->colours[k];
+		if (part.levels.empty()) DecodeTextureLevels(part.mask_png, part.levels);
+		/* The mask's level nearest the texture's, read at the same place. */
+		const ThreeDObjectTexture *mask = &part.levels.back();
+		for (const ThreeDObjectTexture &m : part.levels) {
+			if (m.w <= t.w) {
+				mask = &m;
+				break;
+			}
+		}
+		const Colour colour(part.palette[GB(paint, 4 * k, 4) % part.palette.size()]);
+		const float start = static_cast<float>(part.start);
+		for (int y = 0; y < t.h; y++) {
+			const int my = std::min(mask->h - 1, y * mask->h / t.h);
+			for (int x = 0; x < t.w; x++) {
+				uint32_t &p = t.px[static_cast<size_t>(y) * t.w + x];
+				if (p == 0) continue;
+				const int mx = std::min(mask->w - 1, x * mask->w / t.w);
+				const uint32_t mp = mask->px[static_cast<size_t>(my) * mask->w + mx];
+				const float m = mp == 0 ? 0.0f : Colour(mp).r / 255.0f;
+				if (m <= 0) continue;
+				Colour c(p);
+				float l = std::max({c.r, c.g, c.b}) / start;
+				auto mix = [&](uint8_t own, uint8_t to) { return static_cast<uint8_t>(std::clamp(own + (std::min(255.0f, to * l) - own) * m, 0.0f, 255.0f)); };
+				p = Colour(mix(c.r, colour.r), mix(c.g, colour.g), mix(c.b, colour.b)).data;
+			}
+		}
+	}
+	_painted_bytes += t.px.size() * sizeof(uint32_t);
+	return &this->painted.emplace(std::make_pair(level, paint), std::move(t)).first->second;
 }
 
 /** The rig: the objects read, a line each. */
@@ -962,7 +1112,8 @@ std::string DescribeThreeDObjects()
 	std::string out = fmt::format("{} objects", _three_d_objects.size());
 	for (const ThreeDObject &o : _three_d_objects) {
 		std::string which = o.grfid != 0 ? fmt::format("grf {:08X} house {}", std::byteswap(o.grfid), o.grf_house) : fmt::format("house {:#04x}", o.house);
-		out += fmt::format("\n  {} {} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes", o.name, which, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size());
+		out += fmt::format("\n  {} {} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes{}", o.name, which, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size(), o.light.empty() ? "" : ", lit from its normals");
+		for (const ThreeDObjectColourPart &part : o.colours) out += fmt::format(", colour {} of {}", part.name, part.palette.size());
 	}
 	return out;
 }

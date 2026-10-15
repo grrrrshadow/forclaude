@@ -18,5 +18,41 @@
   "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza postavy/postavy.py nacti_stojici(ruce_dolu), převod bez renderu (glb_pro_hru.py)",
   "licence": "CC BY 4.0 (uvést Rotmill)",
   "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, 11778 trojúhelníků, tři textury 1024 px, s normálami, bez upečeného světla; nikdy nebledne"
+ },
+ {
+  "soubor": "matylda.glb",
+  "jmeno": "matylda",
+  "druh": "postava",
+  "vyska_m": 1.6,
+  "poza": "stojí jak v modelu, kytka v květináči v rukou (Matylda na zastávce u blízkého chodníku podél Y, dosud sprite zastavka_y_vpredu)",
+  "autor": "Matilda, nicolekeane (Sketchfab, CC BY-NC-SA 4.0); převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY-NC-SA 4.0 (nicolekeane): jen nekomerčně, obrázky a soubory s ní pod stejnou licencí a se jménem autorky",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, 24997 trojúhelníků (z 56822, díly spojené a zmenšené), jedna textura 1024 px, s normálami, bez upečeného světla; nikdy nebledne"
+ },
+ {
+  "soubor": "people_girl_stoji.glb",
+  "jmeno": "people_girl_stoji",
+  "druh": "postava",
+  "vyska_m": 1.68,
+  "poza": "stojí jak v modelu, ruka u ucha s telefonem, kabelka (holka v tyrkysovém tílku na vzdáleném kraji obou zastávek, dosud sprity zastavka divka_k2_s0 podél Y a divka_k2_s90 podél X)",
+  "autor": "Character People Girl 001, kiemtruongkts (Sketchfab, CC BY 4.0); převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést kiemtruongkts)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, 20000 trojúhelníků (z 88022), jedna textura 1024 px, s normálami, bez upečeného světla; nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_kouri.glb",
+  "jmeno": "college_girl_kouri",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "animace": {
+   "uzly": "snimek_",
+   "snimku": 8,
+   "tiku": 9,
+   "smycka": true
+  },
+  "poza": "stojí, ruce dolů, pravá ruka jde k puse a zpátky (kouří), 8 snímků jako uzly snimek_00..07 (hra/3d/PROSBA-POSTAVY-ANIMACE.md)",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); pózy postavy/postavy_animace.py (kostra modelu, IK ruky), bez renderu",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi (stejný ve všech snímcích), čelem k +x, metry, 11778 trojúhelníků na snímek, tři textury 1024 px jednou pro všechny snímky, s normálami, bez upečeného světla; nikdy nebledne; pro hru bez animace zůstává college_girl_stoji"
  }
 ]

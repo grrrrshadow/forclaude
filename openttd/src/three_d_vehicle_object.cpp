@@ -24,6 +24,8 @@
 #include "debug.h"
 #include "settings_type.h"
 #include "timer/timer_game_calendar.h"
+#include "timer/timer_game_tick.h"
+#include "timer/timer.h"
 
 #include <chrono>
 #include <cmath>
@@ -73,7 +75,7 @@ struct ObjectPictureEntry {
 	uint64_t used;
 	ThreeDModelPicture picture;
 };
-static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int>, ObjectPictureEntry> _object_pictures;
+static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int>, ObjectPictureEntry> _object_pictures;
 static uint64_t _object_pictures_clock = 0;
 
 /** Forget the sprites made: the sprite cache they were in is gone (GfxInitSpriteMem()). */
@@ -276,9 +278,9 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
  * @param pxm pixels to a metre of the picture
  * @param fade how far its paint has faded to the target (FadeAmount())
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0)
 {
-	const ThreeDVehicleShape *shape = obj.GetShape();
+	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
 	const int ss = SUPERSAMPLE;
 	const float p = pxm * ss;
@@ -464,11 +466,11 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 }
 
 /** A picture of an object in the turned view at an angle and zoom, kept (RasterObject()). */
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade)
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade);
+	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade, frame);
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
 		it->second.used = ++_object_pictures_clock;
@@ -495,7 +497,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	float along = squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f;
 	ObjectRaster r;
 	auto start = std::chrono::steady_clock::now();
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r)) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
@@ -563,27 +565,64 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	return true;
 }
 
+/** A figure that moves drawn on the map: its tile is drawn again when its frame changes (AddThreeDFigureToViewport()). */
+struct MovingFigure {
+	TileIndex tile;
+	int ticks;     ///< the ticks a frame of it is held
+	uint64_t step; ///< the frame's step it was drawn in: the game's tick counter / ticks
+};
+static std::vector<MovingFigure> _moving_figures;
+
+/** Draw the tiles of the figures that move again when their frames change, every tick of the game (only the
+ * screen, nothing of the game); a figure no longer drawn drops out. */
+static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	for (auto it = _moving_figures.begin(); it != _moving_figures.end();) {
+		if (TimerGameTick::counter / it->ticks == it->step) {
+			++it;
+			continue;
+		}
+		MarkTileDirtyByTile(it->tile);
+		it = _moving_figures.erase(it);
+	}
+});
+
 /**
  * A figure standing on the turned map (the girls at a bus stop): drawn from its object at the angle of the view,
- * lit as the vehicles, hung from where its feet stand, sorted by a small box about them.
+ * lit as the vehicles, hung from where its feet stand, sorted by a small box about them. A figure that moves
+ * ("animace") is drawn in its frame of the game's tick, and its tile is drawn again when the frame changes.
  * @param name the figure's name in the index ("druh": "postava")
  * @param scale its size against true metres (the girls of a stop are drawn twice theirs, as their sprites are)
  * @param x,y,z where its feet stand, world units
  * @param facing the way it faces, degrees in the world: 0 along +x, 90 along +y (the colleague's renders' angles)
  * @param zoom the zoom of the view
+ * @param tile the tile it stands on, drawn again when it moves
+ * @param phase how many frames on it is from the others (a hash of its tile: the girls of a map do not all move at once)
  * @return whether it was drawn so; else the caller draws its sprite
  */
-bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom)
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase)
 {
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
-	const ThreeDVehicleShape *shape = fig != nullptr ? fig->GetShape() : nullptr;
+	if (fig == nullptr) return false;
+	int frame = fig->FrameAt(TimerGameTick::counter, phase);
+	const ThreeDVehicleShape *shape = fig->GetShape(frame);
 	if (shape == nullptr) return false;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
 	float world_az = facing - 135.0f;
-	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + GetViewYaw(), world_az, false, 0);
+	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, frame);
 	if (pic == nullptr) return false;
 	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+	if (fig->frames > 1 && tile != INVALID_TILE) {
+		uint64_t step = TimerGameTick::counter / fig->frame_ticks;
+		bool known = false;
+		for (MovingFigure &m : _moving_figures) {
+			if (m.tile != tile) continue;
+			if (m.ticks != fig->frame_ticks) continue;
+			m.step = step;
+			known = true;
+		}
+		if (!known) _moving_figures.push_back({tile, fig->frame_ticks, step});
+	}
 	return true;
 }
 

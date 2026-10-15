@@ -37,7 +37,10 @@ stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
   smějí). **Verze v názvu** (hráč): změněná sada dostane `_V2`, `_V3`… a stará
   z repa zmizí (`--verze=N` generátoru), takže hráč stáhne jen to, co se
   změnilo. Build Windows tyhle sady nebalí (`.github/workflows/build-windows.yml`),
-  hráč je má v `baseset/decouple/grafika/` nainstalované hry.
+  hráč je má v `baseset/decouple/grafika/` nainstalované hry. **Sady 1–4
+  (deset domů) od 15. 10. nejsou**: ty domy jsou 3D objekty v `objekty/mirne/`
+  (hráč: „můžem škrtnout 250 MB“); `budovy3d_1_V1.grf` až `budovy3d_4_V1.grf`
+  může hráč z nainstalované hry smazat. Zůstávají sady 5–8 (průmysl, plantáž).
 - Nový obrázek od kolegy ve 4× a 8× do `openttd.grf`: PNG do `../openttd/`,
   pak `python3 openttd_budovy.py && python3 openttd_yagl.py` tamtéž
   (viz `COMPILING.md`).
@@ -71,6 +74,12 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   `524A450B`), ze které hra staví marsovská města (od kolegy, grrrrf
   `hra/3d/objekty/mars/`). Dům ze sady se hledá podle `nahrazuje_grf` (id sady,
   jak ho hra vypisuje) a `nahrazuje_house_grf` (číslo domu v sadě).
+- Deset domů, které byly rendery v `budovy3d_1`–`4` (hotel, socha, fontána, dva
+  parky, moderní kanceláře, kancelářský blok, cihlové byty, divadlo, obchodní
+  středisko; od kolegy, grrrrf `hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md`), jsou v `mirne/`
+  s normálami (světlo si dělá hra jako u vozidel) a s `barvy`: střecha, omítka
+  a plot mají masku a paletu a každý dům na mapě má barvu podle své dlaždice.
+  Vysoký kancelářský dům 0x1c zůstává na památku ruční tabulkou.
 - `vozidla/` – vozidla jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/vozidla/`):
   první je Sergej (M62, `sergej.glb`, Chicken cutlet, CC BY 4.0) ve třech nátěrech
   (`textura`). Vozidlo se hledá podle `grf` (id sady) a `clanky` (čísla motorů
@@ -79,8 +88,12 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   a s ní délka na koleji jsou nastavení hry. Kola mohou být ve vlastním souboru
   (`kolo_m62.glb`), řidička v kabině je postava z `postavy/` (`posadka`).
 - `postavy/` – postavy jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/postavy/`):
-  College Girl (Rotmill, Sketchfab, CC BY 4.0) stojící a opřená jako řidička.
-  Stojící holky jsou na zastávkách v otočeném pohledu; na sever zůstávají sprity.
+  College Girl (Rotmill, Sketchfab, CC BY 4.0) stojící, kouřící (osm snímků
+  `snimek_00`–`07` v jednom souboru, `animace`) a opřená jako řidička; Matylda
+  (Matilda, nicolekeane, Sketchfab, **CC BY-NC-SA 4.0**: jen nekomerčně, obrázky
+  s ní pod stejnou licencí a se jménem autorky); holka v tyrkysovém tílku
+  (Character People Girl 001, kiemtruongkts, Sketchfab, CC BY 4.0). Jsou na
+  zastávkách v otočeném pohledu; na sever zůstávají sprity.
 - Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
   mírného klimatu, které staví arktické nebo pouštní domy („Domy z“).
 - Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje

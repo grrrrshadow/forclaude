@@ -1897,7 +1897,15 @@ static void ViewportDrawStrings(ZoomLevel zoom, const StringSpriteToDrawVector *
 struct TurnedVertex {
 	double x, y; ///< pixel in the block being drawn
 	double u, v; ///< pixel in the texture
+	double l = 256; ///< the light there, 256 the texture as it is (a 3D object's light from its normals, three_d_objects.h)
 };
+
+/** A pixel of a texture in a light: 256 as it is. */
+static inline uint32_t ShadedPixel(uint32_t p, uint light)
+{
+	Colour c(p);
+	return Colour(static_cast<uint8_t>(std::min<uint>(255, c.r * light >> 8)), static_cast<uint8_t>(std::min<uint>(255, c.g * light >> 8)), static_cast<uint8_t>(std::min<uint>(255, c.b * light >> 8)), c.a).data;
+}
 
 /**
  * Fill a triangle with the pixels of a texture: every pixel inside takes the
@@ -1916,6 +1924,12 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 	double du_dy = ((c.u - a.u) * (b.x - a.x) - (b.u - a.u) * (c.x - a.x)) / area;
 	double dv_dx = ((b.v - a.v) * (c.y - a.y) - (c.v - a.v) * (b.y - a.y)) / area;
 	double dv_dy = ((c.v - a.v) * (b.x - a.x) - (b.v - a.v) * (c.x - a.x)) / area;
+	const bool lit = a.l != 256 || b.l != 256 || c.l != 256;
+	double dl_dx = 0, dl_dy = 0;
+	if (lit) {
+		dl_dx = ((b.l - a.l) * (c.y - a.y) - (c.l - a.l) * (b.y - a.y)) / area;
+		dl_dy = ((c.l - a.l) * (b.x - a.x) - (b.l - a.l) * (c.x - a.x)) / area;
+	}
 	double sign = area > 0 ? 1.0 : -1.0;
 	int y0 = std::max(0, static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
 	int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a.y, b.y, c.y}) - 0.5)));
@@ -1942,8 +1956,9 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 		if (xs > xe) continue;
 		double u = a.u + du_dx * (xs + 0.5 - a.x) + du_dy * (yc - a.y);
 		double v = a.v + dv_dx * (xs + 0.5 - a.x) + dv_dy * (yc - a.y);
+		double l = a.l + dl_dx * (xs + 0.5 - a.x) + dl_dy * (yc - a.y);
 		uint32_t *row = dst + y * pitch;
-		for (int x = xs; x <= xe; x++, u += du_dx, v += dv_dx) {
+		for (int x = xs; x <= xe; x++, u += du_dx, v += dv_dx, l += dl_dx) {
 			int iu = static_cast<int>(std::floor(u)), iv = static_cast<int>(std::floor(v));
 			if (iu < 0 || iv < 0 || iu >= tw || iv >= th) continue;
 			uint32_t p = tex[iv * tw + iu];
@@ -1962,7 +1977,7 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 					if (p != 0) break;
 				}
 			}
-			if (p != 0) row[x] = p;
+			if (p != 0) row[x] = lit ? ShadedPixel(p, static_cast<uint>(std::max(0.0, l))) : p;
 		}
 	}
 }
@@ -3134,7 +3149,8 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 	const TurnedObject &to = _turned_objects[ps.box_dx];
 	const ThreeDObject &o = *to.obj;
 	double t0 = TurnedNow();
-	const ThreeDObjectTexture *tex = o.GetTexture(to_underlying(frame.zoom));
+	const ThreeDObjectTexture *tex = o.GetTexture(to_underlying(frame.zoom), o.PaintAt(to.origin));
+	const bool lit = o.light.size() == o.pos.size() / 3;
 	const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE, oz = to.z;
 	const double scale = 1.0 / (1 << to_underlying(frame.zoom));
 	const size_t corners = o.pos.size() / 3;
@@ -3143,7 +3159,7 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 	for (size_t i = 0; i < corners; i++) {
 		double vx, vy;
 		ProjectTurnedF(ox + o.pos[i * 3], oy + o.pos[i * 3 + 1], oz + o.pos[i * 3 + 2], vx, vy);
-		verts[i] = {(vx - frame.left) * scale, (vy - frame.top) * scale, o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h};
+		verts[i] = {(vx - frame.left) * scale, (vy - frame.top) * scale, o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h, lit ? static_cast<double>(o.light[i]) : 256.0};
 	}
 	/* Far first: by the middle of each triangle, as the faces of the boxes. */
 	static std::vector<std::pair<double, size_t>> order;
@@ -5978,7 +5994,7 @@ static void CabClipNear(std::vector<CabPoint> &poly)
  * triangle is nearer than what is there.
  * @param fill_holes take the nearest drawn pixel of the texture where it has none (the diamonds of the ground)
  */
-static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes)
+static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes, uint light = 256)
 {
 	double area = (b.sx - a.sx) * (c.sy - a.sy) - (b.sy - a.sy) * (c.sx - a.sx);
 	if (std::abs(area) < 1e-9) return;
@@ -6039,14 +6055,14 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 				}
 			}
 			if (p == 0) continue;
-			row[x] = p;
+			row[x] = light == 256 ? p : ShadedPixel(p, light);
 			zrow[x] = static_cast<float>(iw);
 		}
 	}
 }
 
 /** Draw a polygon of the eye's frame, cut to the near plane, as a fan of triangles. */
-static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, bool fill_holes)
+static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, bool fill_holes, uint light = 256)
 {
 	CabClipNear(poly);
 	if (poly.size() < 3) return;
@@ -6054,7 +6070,7 @@ static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_
 	CabVertex prev = CabProject(eye, poly[1]);
 	for (size_t i = 2; i < poly.size(); i++) {
 		CabVertex cur = CabProject(eye, poly[i]);
-		CabRasterTriangle(dst, zb, w, h, tex, tw, th, v0, prev, cur, fill_holes);
+		CabRasterTriangle(dst, zb, w, h, tex, tw, th, v0, prev, cur, fill_holes, light);
 		prev = cur;
 	}
 }
@@ -7166,14 +7182,17 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		double texels_per_unit = full->w / static_cast<double>(TILE_SIZE);
 		double pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 		int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
-		const ThreeDObjectTexture *tex = o.GetTexture(level);
+		const ThreeDObjectTexture *tex = o.GetTexture(level, o.PaintAt(co.origin));
+		const bool lit = o.light.size() == o.pos.size() / 3;
 		for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
 			std::vector<CabPoint> poly;
+			uint light = 0;
 			for (int k = 0; k < 3; k++) {
 				uint32_t i = o.tri[t + k];
 				poly.push_back(CabToEye(eye, ox + o.pos[i * 3], oy + o.pos[i * 3 + 1], oz + o.pos[i * 3 + 2], o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h));
+				light += lit ? o.light[i] : 256;
 			}
-			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false);
+			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false, light / 3);
 		}
 		camera.billboards++;
 	}

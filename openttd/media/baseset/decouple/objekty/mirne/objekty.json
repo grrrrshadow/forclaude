@@ -516,5 +516,502 @@
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
   "poznamka": "Kino (sprite 0x1135), plochá střecha; 10 trojúhelníků, textura 512×512"
+ },
+ {
+  "soubor": "dum_07_hotel.glb",
+  "jmeno": "dum_07_hotel",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 7,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_07_hotel_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_07_hotel_maska_omitka.png",
+    "zacatek": 198,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23960 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
+ },
+ {
+  "soubor": "dum_09_socha.glb",
+  "jmeno": "dum_09_socha",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 9,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_09_socha_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py; socha College Girl, Rotmill (Sketchfab, CC BY 4.0)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura); socha CC BY 4.0, uvést Rotmill",
+  "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17594 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m"
+ },
+ {
+  "soubor": "dum_0a_fontana.glb",
+  "jmeno": "dum_0a_fontana",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 10,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0a_fontana_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 9620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
+ },
+ {
+  "soubor": "dum_0b_park_rybnik.glb",
+  "jmeno": "dum_0b_park_rybnik",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 11,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0b_park_rybnik_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m"
+ },
+ {
+  "soubor": "dum_0c_park_kopec.glb",
+  "jmeno": "dum_0c_park_kopec",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 12,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0c_park_kopec_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m"
+ },
+ {
+  "soubor": "dum_11_kancelare_moderni.glb",
+  "jmeno": "dum_11_kancelare_moderni",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 17,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_11_kancelare_moderni_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_11_kancelare_moderni_maska_omitka.png",
+    "zacatek": 236,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_11_kancelare_moderni_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 18172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
+ },
+ {
+  "soubor": "dum_13_kancelarsky_blok.glb",
+  "jmeno": "dum_13_kancelarsky_blok",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 19,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_13_kancelarsky_blok_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_13_kancelarsky_blok_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14224 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
+ },
+ {
+  "soubor": "dum_1b_byty_cihlove.glb",
+  "jmeno": "dum_1b_byty_cihlove",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 27,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1b_byty_cihlove_maska_strecha.png",
+    "zacatek": 93,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1b_byty_cihlove_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1b_byty_cihlove_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19540 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
+ },
+ {
+  "soubor": "dum_1f_divadlo.glb",
+  "jmeno": "dum_1f_divadlo",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 31,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1f_divadlo_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1f_divadlo_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Divadlo (dům 0x1f původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14112 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.82 m"
+ },
+ {
+  "soubor": "dum_28_obchodni_stredisko.glb",
+  "jmeno": "dum_28_obchodni_stredisko",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 40,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_28_obchodni_stredisko_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_28_obchodni_stredisko_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_28_obchodni_stredisko_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 25288 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
  }
 ]

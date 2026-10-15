@@ -26,9 +26,11 @@
 
 #include "house_type.h"
 #include "engine_type.h"
+#include "tile_type.h"
 #include "vehicle_type.h"
 
 #include <array>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,6 +40,18 @@ struct ThreeDObjectTexture {
 	int w = 0;
 	int h = 0;
 	std::vector<uint32_t> px;
+};
+
+/**
+ * A part of a building painted a colour by number, each house on the map its own ("barvy", the colleague's
+ * hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md): the roof, the plaster, the fence.
+ */
+struct ThreeDObjectColourPart {
+	std::string name;               ///< "cast"
+	std::vector<uint8_t> mask_png;  ///< "maska": a grey PNG of the texture's layout, 255 where it is the part
+	int start = 255;                ///< "zacatek": the texture's lightness the colour is at its own
+	std::vector<uint32_t> palette;  ///< "paleta": the colours it may be (Colour::data), the first as it is built
+	mutable std::vector<ThreeDObjectTexture> levels; ///< the mask, halved for each level of detail (its grey in the red)
 };
 
 /** A building as a 3D object. */
@@ -56,8 +70,12 @@ struct ThreeDObject {
 	float top = 0;            ///< its height, units of height
 	std::vector<uint8_t> png; ///< the texture as it is in the file, read into pixels the first time it is drawn
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the texture, halved for each level of detail
+	std::vector<uint16_t> light; ///< the light of each corner from its normal, 256 for 1 (lit as the vehicles); empty when the file has no normals, its light in its texture
+	std::vector<ThreeDObjectColourPart> colours; ///< "barvy": parts painted a colour by number
+	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 
-	const ThreeDObjectTexture *GetTexture(int level) const;
+	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;
+	uint32_t PaintAt(TileIndex origin) const;
 };
 
 /**
@@ -121,13 +139,22 @@ struct ThreeDVehicleObject {
 	ThreeDVehiclePaint paint;       ///< "lak"
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
+	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none
+	int frames = 0;                 ///< "snimku": how many frames
+	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
 
 	const ThreeDVehicleShape *GetShape() const;
+	const ThreeDVehicleShape *GetShape(int frame) const;
+	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
+	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
+
+private:
+	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame) const;
 	mutable std::vector<std::vector<ThreeDObjectTexture>> levels; ///< the textures, each halved for each level of detail
 	mutable std::vector<ThreeDObjectTexture> mask_levels;         ///< the paint mask likewise (its grey in the red)
 	mutable bool mask_tried = false;

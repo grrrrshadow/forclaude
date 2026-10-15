@@ -70,6 +70,12 @@ MODELS = [
         "prace_real_f3", "prace_sedi_f3", "prace_punk_f3", "prace_pubg_f3", "prace_char16_f3", "prace_chill_f3")
 ]
 
+# The houses made real 3D objects (baseset/decouple/objekty/mirne/, the colleague's hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md,
+# 15. 10.; the player: "we can cut 250 MB"): left out of the table and the sets (budovy3d_1 to 4 are gone), but their
+# place in the list stays, so the sprites of the others keep their numbers (first) and sets 5 to 8 need no new build.
+AS_OBJECTS = {"dum_07_hotel", "dum_09_socha", "dum_0a_fontana", "dum_0b_park", "dum_0c_park", "dum_11_kancelare",
+              "dum_13_blok", "dum_1b_byty", "dum_1f_divadlo", "dum_28_stredisko"}
+
 KIND_ENUM = {"house": "ThreeDModelKind::House", "industry": "ThreeDModelKind::Industry", "industry_variant": "ThreeDModelKind::IndustryVariant", "layer": "ThreeDModelKind::Layer"}
 
 
@@ -135,16 +141,17 @@ def main():
     only = []   # --jen=<name>,<name>: build only these models' sets (a trial, or one set packed again)
     for a in sys.argv:
         if a.startswith("--jen="): only += a.split("=", 1)[1].split(",")
-    first_set = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--sada-od=")), 1)   # the number of the first set written
+    first_set = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--sada-od=")), 5)   # the number of the first set written (1 to 4 were the houses, now objects)
     # --verze=N: the sets are written as budovy3d_<set>_V<N>.grf and older versions of the same set go (the player
     # takes only the sets that changed, by the version in the name)
     version = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--verze=")), 1)
-    models = [read_model(grrrrf, *m) for m in MODELS]
+    models = [{"name": m[0], "as_object": True} if m[0] in AS_OBJECTS else read_model(grrrrf, *m) for m in MODELS]
 
     # the sets: models packed in order, each set under the limit (a model's size is its opaque pixels times 12 bytes)
     sets = []
     for i, m in enumerate(models):
         m["first"] = i * 24
+        if m.get("as_object"): continue
         if only and m["name"] not in only: continue
         size = 0
         for v in m["views"]:
@@ -174,6 +181,7 @@ def main():
              " */", "",
              "static const ThreeDModel _three_d_models[] = {"]
     for m in models:
+        if m.get("as_object"): continue
         lines.append(f"\t{{\"{m['name']}\", {KIND_ENUM[m['kind']]}, {m['id']}, {m['tiles'][0]}, {m['tiles'][1]}, {c_float(m['policko_m'])}, {m['first']}, {{")
         for d, v in enumerate(m["views"]):
             lines.append(f"\t\t{{{c_floats(v['pocatek'])}, {c_floats(v['vpravo'])}, {c_floats(v['dolu'])}, {c_floats(v['pohled'])}, {c_float(v['nula_m'])}, {v['north_x']}, {v['north_y']}, {v['w']}, {v['h']}}}, // d{d}")

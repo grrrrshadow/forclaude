@@ -25,6 +25,7 @@
 #include "direction_type.h"
 #include "vehicle_type.h"
 #include "zoom_type.h"
+#include "tile_type.h"
 #include "spriteloader/spriteloader.hpp"
 
 struct VehicleSpriteSeq;
@@ -37,7 +38,7 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
 std::string DescribeThreeDVehicleObjectSprites();
-bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom);
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0);
 
 /* three_d_vehicle.cpp */
 int ThreeDEngineLength(EngineID engine);
