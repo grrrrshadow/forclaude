@@ -7092,6 +7092,33 @@ static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const Ca
 /** The cab view collects the sprites of a tile; DrawBridgeMiddle() says which of them are a bridge's. */
 static bool _cab_collecting = false;
 
+/** Whether the view from the eyes (a cab's, the walker's) is collecting what to draw. */
+bool ViewportDrawingEye()
+{
+	return _cab_collecting;
+}
+
+/** Whether a 3D view is collecting what to draw: the turned view, facing north with the houses as objects, or the view from the eyes. */
+bool ViewportDrawing3D()
+{
+	return _drawing_turned || _north_house_objects_now || _cab_collecting;
+}
+
+/** A figure standing in the view from the eyes (the clay town's mushrooms, DrawThemedTrees()): a billboard of its picture. */
+struct CabFigure {
+	std::string name; ///< the figure of the indices
+	float size;       ///< its scale
+	int x, y, z;      ///< where it stands, world units
+	float facing;     ///< which way it faces, degrees as the figures count it
+};
+static std::vector<CabFigure> _cab_figures;
+
+/** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
+void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing)
+{
+	_cab_figures.push_back({std::string(name), size, x, y, z, facing});
+}
+
 /**
  * DrawBridgeMiddle() tells where the sprites of a bridge over a tile begin and end, for the cab view and the turned
  * view to build the bridge from them. Nothing else when neither is collecting.
@@ -7415,6 +7442,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	AutoRestoreBackup field_fences_backup(_draw_fences, false);
 	/* What stands on a tile: 0 a billboard, 1 a building's box, 2 a station's box, 3 a bridge over the tile, 4 a
 	 * bridge's ramp, 5 nothing (a tunnel's portal, built anew). */
+	_cab_figures.clear();
 	_cab_bridge_sprites.clear();
 	std::vector<TileIndex> ramps, tunnel_ends;
 	/* The houses and the game's own industries that are real 3D objects (three_d_objects.h): drawn by their triangles,
@@ -7761,6 +7789,29 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			ps.zmax = ps.zmin + std::max<int>(u->bounds.extent.z, 5) - 1;
 			bills.push_back({c.f, static_cast<double>(u->x_pos), static_cast<double>(u->y_pos), static_cast<double>(u->z_pos), 0, 0.0, 0.0, ps});
 		}
+	}
+	/* The figures standing on the tiles (the clay town's mushrooms): billboards of their pictures as the turned map
+	 * shows them, from the eye's side (the angle in steps, so that a few pictures serve every heading). */
+	for (const CabFigure &fg : _cab_figures) {
+		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
+		if (foot.f < CAB_NEAR || foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > foot.f * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);
+		/* Near, a finer picture: about a pixel of it to a pixel of the view. */
+		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : ZoomLevel::Normal);
+		const double per = 1.0 / (1 << (to_underlying(ZoomLevel::Normal) - to_underlying(fine)));
+		const ThreeDModelPicture *pic = GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, 0, side);
+		if (pic == nullptr || pic->width <= 0 || pic->height <= 0) continue;
+		const double left = foot.r + pic->left * CAB_PX_ACROSS * per, right = left + pic->width * CAB_PX_ACROSS * per;
+		const double top = foot.u - pic->top * CAB_PX_UP * per, bottom = top - pic->height * CAB_PX_UP * per;
+		const double tw = pic->width, th = pic->height;
+		std::vector<CabPoint> quad = {
+			{foot.f, left, bottom, 0.0, th},
+			{foot.f, right, bottom, tw, th},
+			{foot.f, right, top, tw, 0.0},
+			{foot.f, left, top, 0.0, 0.0},
+		};
+		CabDrawPolygon(dst, zb, width, height, pic->pixels.data(), pic->width, pic->height, std::move(quad), eye, false);
+		camera.billboards++;
 	}
 	std::sort(bills.begin(), bills.end(), [](const CabBillboard &a, const CabBillboard &b) { return a.f > b.f; });
 	for (const CabBillboard &b : bills) {

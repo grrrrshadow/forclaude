@@ -655,7 +655,8 @@ struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
  */
 static bool DrawThemedTrees(const TileInfo *ti)
 {
-	if (!ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	const TownTheme theme = GetTownThemeAt(ti->tile);
 	if (theme == TownTheme::None) return false;
 	std::span<const std::string> kinds = GetThreeDThemeTrees(to_underlying(theme));
@@ -678,9 +679,16 @@ static bool DrawThemedTrees(const TileInfo *ti)
 			case TreeGrowthStage::Dead: size = 0.85f; break;
 			default: break;
 		}
-		size *= 0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f;
-		const float facing = static_cast<float>(GB(hash, 16, 9) % 360);
-		drawn |= AddThreeDFigureToViewport(kinds[GB(hash, 0, 8) % kinds.size()], size, ti->x + d->x, ti->y + d->y, z, facing, _cur_dpi->zoom, ti->tile);
+		/* A few sizes and turns, so that the trees of the map share a few pictures. */
+		size = std::round(size * (0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f) * 20.0f) / 20.0f;
+		const float facing = static_cast<float>(GB(hash, 16, 9) % 24 * 15);
+		const std::string &kind = kinds[GB(hash, 0, 8) % kinds.size()];
+		if (eye) {
+			AddCabFigure(kind, size, ti->x + d->x, ti->y + d->y, z, facing);
+			drawn = true;
+		} else {
+			drawn |= AddThreeDFigureToViewport(kind, size, ti->x + d->x, ti->y + d->y, z, facing, _cur_dpi->zoom, ti->tile);
+		}
 	}
 	return drawn;
 }

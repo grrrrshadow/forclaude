@@ -31,7 +31,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   město, ve 3D (otočený pohled i na sever s domy jako objekty) jsou hliněné; stromy na území města (zastavěná část
   a 4 dlaždice kolem) jsou houby podle růstu stromu.
 - Kolega teď domy předělává kvůli **svítícím oknům** v noci → vezmu nové soubory, okna napojím na noc.
-- Zbývá: popelavá zem, poušť kolem pouštních tématických měst, houby v pohledu z očí.
+- **Popelavá zem** (hotovo): tráva a hrubá zem na území hliněného města ve 3D šedá (paleta vraků). Houby i v pohledu
+  z očí (plakáty z jejich obrázků, zblízka jemnější).
+- Zbývá: poušť kolem pouštních tématických měst (pouštní zem a stromy z pouštního klimatu).
 
 ## 15. 10. – Morrowind: pohled z první osoby, inventář, noc
 

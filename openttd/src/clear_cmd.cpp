@@ -16,6 +16,7 @@
 #include "core/random_func.hpp"
 #include "newgrf_generic.h"
 #include "landscape_cmd.h"
+#include "town.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -58,9 +59,21 @@ static CommandCost ClearTile_Clear(TileIndex tile, DoCommandFlags flags)
  * @param ti The tile to draw.
  * @param density The density of the dirt -> grass transition to draw.
  */
+/**
+ * The palette of the grass and the rough land of a tile on the land of a themed town in the 3D views
+ * (GetTownThemeAt()): the clay town's is grey ash (the player, 15. 10.: "ash ground", as under the Red Mountain),
+ * the grass drawn in the greys of the wrecks; elsewhere as it is.
+ * @param tile the tile
+ */
+PaletteID GetThemedGroundPalette(TileIndex tile)
+{
+	if (!ViewportDrawing3D()) return PAL_NONE;
+	return GetTownThemeAt(tile) == TownTheme::Clay ? PALETTE_CRASH : PAL_NONE;
+}
+
 void DrawClearLandTile(const TileInfo *ti, uint8_t density)
 {
-	DrawGroundSprite(_clear_land_sprites_grass[density] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+	DrawGroundSprite(_clear_land_sprites_grass[density] + SlopeToSpriteOffset(ti->tileh), GetThemedGroundPalette(ti->tile));
 }
 
 /**
@@ -69,10 +82,11 @@ void DrawClearLandTile(const TileInfo *ti, uint8_t density)
  */
 void DrawRoughLandTile(const TileInfo *ti)
 {
+	const PaletteID pal = GetThemedGroundPalette(ti->tile);
 	if (ti->tileh != SLOPE_FLAT) {
-		DrawGroundSprite(SPR_FLAT_ROUGH_LAND + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		DrawGroundSprite(SPR_FLAT_ROUGH_LAND + SlopeToSpriteOffset(ti->tileh), pal);
 	} else {
-		DrawGroundSprite(_landscape_clear_sprites_rough[GB(TileHash(ti->x, ti->y), 0, 3)], PAL_NONE);
+		DrawGroundSprite(_landscape_clear_sprites_rough[GB(TileHash(ti->x, ti->y), 0, 3)], pal);
 	}
 }
 
