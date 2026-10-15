@@ -25,6 +25,7 @@
 #include "core/backup_type.hpp"
 #include "table/sprites.h"
 
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <unordered_map>
@@ -61,6 +62,10 @@ bool RoundTrackDrawing()
 {
 	return _round_track_drawing && RoundTrackEnabled();
 }
+
+/** Time spent, for the rig (test3d casy): working out curves, drawing the strips; how many curves were worked out. */
+double _round_curve_ms = 0, _round_strip_ms = 0;
+uint64_t _round_curves_built = 0;
 
 namespace {
 
@@ -544,7 +549,11 @@ const Curve &CurveOf(TileIndex tile, Track track)
 	uint64_t key = (static_cast<uint64_t>(tile.base()) << 3) | to_underlying(track);
 	auto it = _curves.find(key);
 	if (it != _curves.end()) return it->second;
-	return _curves.emplace(key, BuildCurve(tile, track)).first->second;
+	auto t0 = std::chrono::steady_clock::now();
+	const Curve &c = _curves.emplace(key, BuildCurve(tile, track)).first->second;
+	_round_curve_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+	_round_curves_built++;
+	return c;
 }
 
 /** The picture of the straight track (along x) of a rail type on its ground, and which of its pixels are track, at a zoom. */
@@ -744,6 +753,93 @@ void DrawRoundTrackGround(TileIndex tile)
 	DrawGroundSprite(PlainGround(tile), PAL_NONE);
 }
 
+/** The track of a round tile as drawn: its pixels about the pixel of the tile's north corner, 0 where none. */
+struct StripPatch {
+	int lx0 = 0, ly0 = 0; ///< its first pixel, from the north corner's
+	int w = 0, h = 0;
+	std::vector<uint32_t> px;
+};
+/** The patches made, by StripKey(); dropped all when they grow past STRIP_PATCH_PIXELS. */
+static std::unordered_map<uint64_t, StripPatch> _strip_patches;
+static size_t _strip_patch_pixels = 0;
+static constexpr size_t STRIP_PATCH_PIXELS = static_cast<size_t>(16) << 20;
+
+/** What a patch depends on: the pieces about the tile (as from its north corner), the picture of its rail, the zoom and the phase of the pixels. */
+static uint64_t StripKey(const std::vector<const Curve *> &pieces, int x0, int y0, const Reference &ref, ZoomLevel zoom, int phx, int phy)
+{
+	uint64_t h = 1469598103934665603ull;
+	auto mix = [&](uint64_t v) { h ^= v; h *= 1099511628211ull; };
+	auto q = [&](double d) { mix(static_cast<uint64_t>(std::llround(d * 1024.0))); };
+	mix(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&ref)));
+	mix(to_underlying(zoom));
+	mix(static_cast<uint64_t>(phx) << 8 | static_cast<uint64_t>(phy));
+	mix(pieces.size());
+	for (const Curve *c : pieces) {
+		q(c->v0.x - x0); q(c->v0.y - y0); q(c->dir.x); q(c->dir.y); q(c->len); q(c->lo); q(c->hi);
+		mix(c->zones.size());
+		for (const Zone &zn : c->zones) {
+			q(zn.lo); q(zn.hi); q(zn.c.x - x0); q(zn.c.y - y0); q(zn.r); q(zn.a0); q(zn.sweep);
+		}
+	}
+	return h;
+}
+
+/**
+ * The track of a round tile as drawn (DrawRoundTrackStrips()): each pixel of the tile near the centre line of one of
+ * its pieces, or of a piece joining it across an edge (an arc crosses the edge off its midpoint), takes the pixel of
+ * the straight track of its rail type the same way along and across that piece. Made the first time, then kept.
+ */
+static const StripPatch &StripPatchOf(const std::vector<const Curve *> &pieces, int x0, int y0, int z, const Reference &ref, ZoomLevel zoom, int scale, int phx, int phy)
+{
+	uint64_t key = StripKey(pieces, x0, y0, ref, zoom, phx, phy);
+	auto it = _strip_patches.find(key);
+	if (it != _strip_patches.end()) return it->second;
+	if (_strip_patch_pixels > STRIP_PATCH_PIXELS) {
+		_strip_patches.clear();
+		_strip_patch_pixels = 0;
+	}
+	StripPatch &patch = _strip_patches[key];
+	/* The tile's pixels about its north corner n: its west and east corners 32 * ZOOM_BASE either side, its south
+	 * corner as far below, and the edge's width on the screen and some (RemapCoords()). */
+	const Point n = RemapCoords(x0, y0, z);
+	const double pad = 4 * ZOOM_BASE, half = 32.0 * ZOOM_BASE;
+	patch.lx0 = static_cast<int>(std::floor((-half - pad + phx) / scale)) - 1;
+	patch.ly0 = static_cast<int>(std::floor((-pad + phy) / scale)) - 1;
+	patch.w = static_cast<int>(std::ceil((half + pad + phx) / scale)) + 1 - patch.lx0 + 1;
+	patch.h = static_cast<int>(std::ceil((half + pad + phy) / scale)) + 1 - patch.ly0 + 1;
+	patch.px.assign(static_cast<size_t>(patch.w) * patch.h, 0);
+	_strip_patch_pixels += patch.px.size();
+	for (int j = 0; j < patch.h; j++) {
+		double vy = n.y - phy + (patch.ly0 + j + 0.5) * scale;
+		for (int i = 0; i < patch.w; i++) {
+			double vx = n.x - phx + (patch.lx0 + i + 0.5) * scale;
+			double X = vx / (2.0 * ZOOM_BASE), Y = vy / ZOOM_BASE + z;
+			Vec p{(Y - X) / 2, (Y + X) / 2};
+			/* The tile and a little past its edges: the ground of the tile drawn after its neighbour covers the
+			 * neighbour's pixels on the edge, and the track goes on there. */
+			if (p.x < x0 - ROUND_EDGE || p.x >= x0 + TILE_SIZE + ROUND_EDGE || p.y < y0 - ROUND_EDGE || p.y >= y0 + TILE_SIZE + ROUND_EDGE) continue;
+			/* Of the pieces the pixel is beside (not past their ends), the nearest whose track is there: where two
+			 * overlap, at a switch, both are drawn. Along a piece the picture of the straight track goes on tile
+			 * after tile, also where a piece is drawn on past its edge. */
+			double best = 1e18;
+			uint32_t colour = 0;
+			for (const Curve *c : pieces) {
+				double cs = 0, cd = 0;
+				double dist = c->Nearest(p, cs, cd);
+				if (dist >= best || std::abs(cd) > ROUND_HALF_WIDTH || dist > std::abs(cd) + ROUND_BESIDE) continue;
+				double along = std::fmod(cs, c->len);
+				if (along < 0) along += c->len;
+				uint32_t found = ref.At(along / c->len * TILE_SIZE, TILE_SIZE / 2.0 + cd);
+				if (found == 0) continue;
+				best = dist;
+				colour = found;
+			}
+			patch.px[static_cast<size_t>(j) * patch.w + i] = colour;
+		}
+	}
+	return patch;
+}
+
 /**
  * Draw the track of the tiles collected this pass along their curves, into a block drawn facing north (the screen,
  * or the turned view's picture of the ground): each pixel of such a tile near the centre line of one of its pieces,
@@ -753,6 +849,8 @@ void DrawRoundTrackGround(TileIndex tile)
 void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
 {
 	if (_round_track_tiles.empty() || !RoundTrackEnabled()) return;
+	auto t0 = std::chrono::steady_clock::now();
+	auto timed = [&]() { _round_strip_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); };
 	const int scale = ScaleByZoom(1, dpi.zoom);
 	const int pw = UnScaleByZoom(dpi.width, dpi.zoom), ph = UnScaleByZoom(dpi.height, dpi.zoom);
 	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
@@ -775,41 +873,25 @@ void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
 		for (const auto &[pt, ptr] : joining) pieces.push_back(&CurveOf(pt, ptr));
 		const Reference &ref = ReferenceOf(tile, dpi.zoom);
 
-		/* The tile's pixels in the block. */
-		Point n = RemapCoords(x0, y0, z), w = RemapCoords(x0 + TILE_SIZE, y0, z), e = RemapCoords(x0, y0 + TILE_SIZE, z), s = RemapCoords(x0 + TILE_SIZE, y0 + TILE_SIZE, z);
-		int vx0 = w.x, vx1 = e.x, vy0 = n.y, vy1 = s.y;
-		const int pad = 4 * ZOOM_BASE; // the edge's width on the screen and some
-		int px0 = std::max(0, (vx0 - pad - dpi.left) / scale - 1), px1 = std::min(pw - 1, (vx1 + pad - dpi.left) / scale + 1);
-		int py0 = std::max(0, (vy0 - pad - dpi.top) / scale - 1), py1 = std::min(ph - 1, (vy1 + pad - dpi.top) / scale + 1);
-		for (int py = py0; py <= py1; py++) {
-			double vy = dpi.top + (py + 0.5) * scale;
-			for (int px = px0; px <= px1; px++) {
-				double vx = dpi.left + (px + 0.5) * scale;
-				double X = vx / (2.0 * ZOOM_BASE), Y = vy / ZOOM_BASE + z;
-				Vec p{(Y - X) / 2, (Y + X) / 2};
-				/* The tile and a little past its edges: the ground of the tile drawn after its neighbour covers the
-				 * neighbour's pixels on the edge, and the track goes on there. */
-				if (p.x < x0 - ROUND_EDGE || p.x >= x0 + TILE_SIZE + ROUND_EDGE || p.y < y0 - ROUND_EDGE || p.y >= y0 + TILE_SIZE + ROUND_EDGE) continue;
-				/* Of the pieces the pixel is beside (not past their ends), the nearest whose track is there: where two
-				 * overlap, at a switch, both are drawn. Along a piece the picture of the straight track goes on tile
-				 * after tile, also where a piece is drawn on past its edge. */
-				double best = 1e18;
-				uint32_t colour = 0;
-				for (const Curve *c : pieces) {
-					double cs = 0, cd = 0;
-					double dist = c->Nearest(p, cs, cd);
-					if (dist >= best || std::abs(cd) > ROUND_HALF_WIDTH || dist > std::abs(cd) + ROUND_BESIDE) continue;
-					double along = std::fmod(cs, c->len);
-					if (along < 0) along += c->len;
-					uint32_t found = ref.At(along / c->len * TILE_SIZE, TILE_SIZE / 2.0 + cd);
-					if (found == 0) continue;
-					best = dist;
-					colour = found;
-				}
-				if (colour != 0) dst[static_cast<size_t>(py) * dpi.pitch + px] = colour;
+		/* The tile's pixels, kept by the shape of its pieces (the same curve elsewhere is the same picture): drawn
+		 * once, then copied. Worked out pixel by pixel each time, a train moving on a round curve took most of
+		 * the time of the turned view (the player: "the picture jerks and goes slowly as 4 km/h"). */
+		Point n = RemapCoords(x0, y0, z);
+		const int offx = n.x - dpi.left, offy = n.y - dpi.top;
+		const int phx = ((offx % scale) + scale) % scale, phy = ((offy % scale) + scale) % scale;
+		const StripPatch &patch = StripPatchOf(pieces, x0, y0, z, ref, dpi.zoom, scale, phx, phy);
+		const int bx = (offx - phx) / scale + patch.lx0, by = (offy - phy) / scale + patch.ly0;
+		for (int j = 0; j < patch.h; j++) {
+			int py = by + j;
+			if (py < 0 || py >= ph) continue;
+			const uint32_t *src = &patch.px[static_cast<size_t>(j) * patch.w];
+			uint32_t *row = dst + static_cast<size_t>(py) * dpi.pitch;
+			for (int i = std::max(0, -bx); i < patch.w && bx + i < pw; i++) {
+				if (src[i] != 0) row[bx + i] = src[i];
 			}
 		}
 	}
+	timed();
 }
 
 /** The piece of track a train's piece is on, or Track::Invalid. */

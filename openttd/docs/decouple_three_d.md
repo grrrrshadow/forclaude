@@ -398,7 +398,11 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   (`PackageIndexScanner`, files in a tar read through `FioFOpenFile()`, their
   paths `tar:` and the name in the tar), and again each time the GRFs are
   loaded anew (`ResetThreeDVehicleObjects()` from `GfxInitSpriteMem()`): the
-  first look, early in the start, comes before the tars are known. The game's
+  first look, early in the start, comes before the tars are known. A package
+  may lie in `baseset/decouple/` too, beside the game's own sets, a folder or a
+  tar (the player: "from the decouple folder, tar"): its GRF is then one of
+  the game's own, in every game (`GRFFileScanner` reads the GRFs of tars there,
+  `IsInBuiltinGRFDir()`), its objects found as those of `newgrf/`. The game's
   own `baseset/decouple/objekty/` holds no vehicles any more, only the houses
   of the game and the figures it draws itself; those sets are read from every
   place the game reads its data from, each set once, the player's own folder
@@ -584,7 +588,14 @@ the curves are vanilla to the pixel.
   overlay covers (so a set's rails, CZTR's too, bend as they are); for the
   game's own rails, whose picture includes the grass, the pixels not of the
   grass's colours within the band of the ballast. No catenary over a tile
-  whose pieces are all round; a switch keeps it.
+  whose pieces are all round; a switch keeps it. A tile's track so drawn is
+  kept (`StripPatchOf()`), by the shape of its pieces about its north corner,
+  its rail type's picture and the zoom, and copied after: worked out pixel by
+  pixel at every drawing, a train on a round curve, redrawing the tiles about
+  it every tick, took most of the time of the turned view (the player: "the
+  picture jerks and goes slowly as 4 km/h"; rig, 700 ticks of Sergej through
+  the curve: 28.7 s, the strips 20.6 s of it; kept, 7.0 s and 0.3 s; without
+  round curves 5.1 s). Rig: `test3d casy` says where the time went.
 - A train's piece on the arc is its 3D likeness at the arc's point, turned
   along its tangent (`GetRoundTrackPose()`). Building, the pathfinder and the
   trains' movement are untouched.
@@ -611,7 +622,13 @@ on the track as the map draws it so that the pictures fit the likeness. The
 eight views the likeness is made from are kept with it for this, at 4x
 (`ThreeDVehicleModel::views`); the turned map likewise draws a vehicle's own
 sprites when the view is turned by a multiple of 45 degrees, the likeness
-only at the angles between. A set whose chain gives no picture for some
+only at the angles between. A vehicle drawn from its **3D object** has no
+pictures of a set to show: it turns on evenly, never stopping, and is drawn
+from the object itself at the angle, as the turned map draws it (the player:
+"the Sergej object stops in the sprites' directions too, a pause added for
+nothing"). On the map nothing stops in time: the turned view draws a
+vehicle's own sprites only at a view turned by a multiple of 45 degrees, and
+a vehicle on a round curve always at its angle. A set whose chain gives no picture for some
 direction gets the old preview, the eight sprites one after another. Beside
 the **window of one of the game's own industries** that has eight renders
 (the school, the machine, the statue, the hut) and of the plantation it is

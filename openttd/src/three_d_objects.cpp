@@ -11,6 +11,8 @@
 #include "three_d_objects.h"
 #include "debug.h"
 #include "fileio_func.h"
+#include "newgrf_config.h"
+#include "tar_type.h"
 #include "gfx_type.h"
 #include "tile_type.h"
 #include "house.h"
@@ -62,6 +64,8 @@ static inline uint64_t VehiclePieceKey(uint32_t grfid, VehicleType type, uint16_
 /** A file's bytes, or nothing when it cannot be read. */
 /** A path of a file in a tar of the NewGRF folders begins so: the rest is its name in the tar (FioFOpenFile()). */
 static constexpr std::string_view IN_TAR = "tar:";
+/** And of one in a tar in baseset/decouple/, beside the game's own sets. */
+static constexpr std::string_view IN_BASESET_TAR = "btar:";
 
 /** A whole file: a path on the disk, or IN_TAR and the name of a file in a tar of the NewGRF folders (a package of a GRF). */
 static std::vector<uint8_t> ReadWholeFile(const std::string &path)
@@ -71,6 +75,8 @@ static std::vector<uint8_t> ReadWholeFile(const std::string &path)
 	std::optional<FileHandle> f;
 	if (path.starts_with(IN_TAR)) {
 		f = FioFOpenFile(std::string_view(path).substr(IN_TAR.size()), "rb", Subdirectory::NewGrf, &len);
+	} else if (path.starts_with(IN_BASESET_TAR)) {
+		f = FioFOpenFile(std::string_view(path).substr(IN_BASESET_TAR.size()), "rb", Subdirectory::Baseset, &len);
 	} else {
 		f = FileHandle::Open(path, "rb");
 		if (f.has_value()) {
@@ -410,16 +416,19 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 class PackageIndexScanner : public FileScanner {
 public:
 	std::vector<std::string> indices;
+	std::string skip;                        ///< the folder of the game's own sets, read as those (baseset/decouple/objekty/)
+	std::string_view in_tar = IN_TAR;        ///< how a file in a tar is named
 
 	bool AddFile(const std::string &filename, size_t, const std::string &tar_filename) override
 	{
+		if (!this->skip.empty() && filename.starts_with(this->skip)) return false;
 		/* .../objekty/<set>/objekty.json */
 		std::string_view name = filename;
 		size_t last = name.find_last_of(PATHSEPCHAR);
 		if (last == std::string_view::npos || name.substr(last + 1) != "objekty.json") return false;
 		size_t set = name.find_last_of(PATHSEPCHAR, last - 1);
 		if (set == std::string_view::npos || set < 7 || name.substr(set - 7, 7) != "objekty" || (set > 7 && name[set - 8] != PATHSEPCHAR)) return false;
-		this->indices.push_back(tar_filename.empty() ? filename : std::string(IN_TAR) + filename);
+		this->indices.push_back(tar_filename.empty() ? filename : std::string(this->in_tar) + filename);
 		return true;
 	}
 };
@@ -452,6 +461,24 @@ static std::vector<std::string> FindObjectIndices()
 	}
 	PackageIndexScanner packages;
 	packages.Scan(".json", Subdirectory::NewGrf);
+	/* And packages in baseset/decouple/ beside the game's own sets, a folder or a tar (the player: "from the decouple
+	 * folder, tar"); a GRF there is one of the game's own (GRFFileScanner). */
+	for (Searchpath sp : _valid_searchpaths) {
+		std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP;
+		if (!FileExists(dir)) continue;
+		PackageIndexScanner here;
+		here.skip = dir + "objekty" PATHSEP;
+		here.Scan(".json", dir);
+		packages.indices.insert(packages.indices.end(), here.indices.begin(), here.indices.end());
+	}
+	{
+		PackageIndexScanner tars;
+		tars.in_tar = IN_BASESET_TAR;
+		for (const auto &[name, entry] : _tar_filelist[Subdirectory::Baseset]) {
+			if (IsInBuiltinGRFDir(entry.tar_filename)) tars.AddFile(name, 0, entry.tar_filename);
+		}
+		packages.indices.insert(packages.indices.end(), tars.indices.begin(), tars.indices.end());
+	}
 	std::sort(packages.indices.begin(), packages.indices.end());
 	Debug(misc, 1, "3D objects: {} sets of the game's own, {} of the packages of GRFs", indices.size(), packages.indices.size());
 	for (const std::string &index : packages.indices) Debug(misc, 2, "3D objects: a package's set {}", index);

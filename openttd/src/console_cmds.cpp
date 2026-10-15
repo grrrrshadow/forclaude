@@ -9355,6 +9355,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
 		return true;
+	} else if (what == "casy") {
+		/* The rig: where the turned view's time went since the last 'casy' (the round curves, the pictures of vehicles). */
+		extern double _round_curve_ms, _round_strip_ms, _object_picture_ms, _likeness_picture_ms;
+		extern uint64_t _round_curves_built, _object_pictures_made, _likeness_pictures_made;
+		IConsolePrint(CC_DEFAULT, "test3d: casy oblouky {:.0f} ms ({} spocitano), pasy koleji {:.0f} ms, obrazky objektu {:.0f} ms ({}), podoby {:.0f} ms ({})",
+				_round_curve_ms, _round_curves_built, _round_strip_ms, _object_picture_ms, _object_pictures_made, _likeness_picture_ms, _likeness_pictures_made);
+		_round_curve_ms = _round_strip_ms = _object_picture_ms = _likeness_picture_ms = 0;
+		_round_curves_built = _object_pictures_made = _likeness_pictures_made = 0;
+		return true;
 	} else if (what == "chodci") {
 		/* The rig: the people walking about the towns (three_d_walkers.h); 'chodci posli' sends one out now in the
 		 * town nearest the middle of the turned view. */

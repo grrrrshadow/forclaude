@@ -935,6 +935,9 @@ SettingsContainer &GetSettingsTree()
 
 		SettingsPage *vehicles = main->Add(new SettingsPage(STR_CONFIG_SETTING_VEHICLES));
 		{
+			/* The size of all the vehicles from 3D objects at once, first on the page (the player: "I want to set all
+			 * our 3D GRFs at once somewhere to the size, original BRYLE bigger or smaller; for vehicles"). */
+			vehicles->Add(new SettingEntry("vehicle.object_original_size"));
 			SettingsPage *physics = vehicles->Add(new SettingsPage(STR_CONFIG_SETTING_VEHICLES_PHYSICS));
 			{
 				physics->Add(new SettingEntry("vehicle.train_acceleration_model"));
@@ -950,7 +953,6 @@ SettingsContainer &GetSettingsTree()
 				physics->Add(new SettingEntry("vehicle.wagon_speed_limits"));
 				physics->Add(new SettingEntry("vehicle.no_engine_cargo"));
 				physics->Add(new SettingEntry("vehicle.freight_trains"));
-				physics->Add(new SettingEntry("vehicle.object_original_size"));
 				physics->Add(new SettingEntry("vehicle.roadveh_acceleration_model"));
 				physics->Add(new SettingEntry("vehicle.roadveh_slope_steepness"));
 				physics->Add(new SettingEntry("vehicle.smoke_amount"));

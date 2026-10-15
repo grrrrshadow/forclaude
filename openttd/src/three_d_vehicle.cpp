@@ -1371,6 +1371,10 @@ Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom)
 }
 
 
+/** Time spent making pictures of likenesses for the turned view, and how many, for the rig (test3d casy). */
+double _likeness_picture_ms = 0;
+uint64_t _likeness_pictures_made = 0;
+
 /**
  * A picture of a model at an angle and zoom, kept: the vehicles of the turned map ask for the same few over
  * and over (eight directions at the one angle of the view), and a turn by a degree asks for them anew.
@@ -1397,7 +1401,10 @@ const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *mo
 	VehiclePictureEntry &e = _vehicle_pictures[key];
 	e.model = model;
 	e.used = ++_vehicle_pictures_clock;
+	auto t0 = std::chrono::steady_clock::now();
 	if (!RenderThreeDVehicle(model, zoom, step * PICTURE_ANGLE_STEP, e.picture, on_track, part)) e.picture = {};
+	_likeness_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+	_likeness_pictures_made++;
 	return e.picture.width > 0 ? &e.picture : nullptr;
 }
 

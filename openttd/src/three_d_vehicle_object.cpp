@@ -468,6 +468,10 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 	return avail;
 }
 
+/** Time spent making pictures of objects for the turned view, and how many, for the rig (test3d casy). */
+double _object_picture_ms = 0;
+uint64_t _object_pictures_made = 0;
+
 /** A picture of an object in the turned view at an angle and zoom, kept (RasterObject()). */
 static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0)
 {
@@ -500,6 +504,8 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	float along = squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f;
 	ObjectRaster r;
 	auto start = std::chrono::steady_clock::now();
+	_object_pictures_made++;
+	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
 	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
@@ -510,6 +516,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 		e.picture.pixels.resize(r.px.size());
 		for (size_t i = 0; i < r.px.size(); i++) e.picture.pixels[i] = r.px[i].a == 0 ? 0 : r.px[i].data;
 	}
+	timed();
 	return e.picture.width > 0 ? &e.picture : nullptr;
 }
 
@@ -566,6 +573,19 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	}
 	AddTurnedVehiclePicture(pic, ax, ay, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
 	return true;
+}
+
+/**
+ * The picture of an engine drawn from its 3D object at an angle, for the turning preview beside the purchase window:
+ * the object itself, as the turned map draws it (not the likeness made from its sprites); nullptr for an engine
+ * without an object.
+ * @param azimuth the angle, as the likeness counts it (ViewAzimuth())
+ */
+const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth)
+{
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
+	if (obj == nullptr) return nullptr;
+	return ObjectPicture(obj, ObjectScale(obj), zoom, azimuth, azimuth, SqueezedType(obj->type), 0);
 }
 
 /** A figure that moves drawn on the map: its tile is drawn again when its frame changes (AddThreeDFigureToViewport()). */

@@ -26,6 +26,7 @@
 #include "newgrf_text.h"
 
 #include "fileio_func.h"
+#include "tar_type.h"
 #include "fios.h"
 
 #include "safeguards.h"
@@ -569,6 +570,22 @@ compatible_grf:
 /** Set this flag to prevent any NewGRF scanning from being done. */
 int _skip_all_newgrf_scanning = 0;
 
+/**
+ * Whether a file lies in baseset/decouple/ of a place the game reads its data from, the game's own sets: there
+ * whatever the case of the letters, as the names in tars are.
+ */
+bool IsInBuiltinGRFDir(const std::string &path)
+{
+	std::string lower = path;
+	strtolower(lower);
+	for (Searchpath sp : _valid_searchpaths) {
+		std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + std::string(BUILTIN_GRF_DIR) + PATHSEP;
+		strtolower(dir);
+		if (lower.starts_with(dir)) return true;
+	}
+	return false;
+}
+
 /** Helper for scanning for files with GRF as extension */
 class GRFFileScanner : FileScanner {
 	std::chrono::steady_clock::time_point next_update; ///< The next moment we do update the screen.
@@ -603,6 +620,12 @@ public:
 			std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + std::string(BUILTIN_GRF_DIR) + PATHSEP;
 			if (FileExists(dir)) ret += fs.Scan(".grf", dir);
 		}
+		/* And in a tar there, a GRF with the objects of its vehicles beside it (the player, 15. 10.: "it does not read
+		 * a tar from the decouple folder"; three_d_objects.h). */
+		for (const auto &[name, entry] : _tar_filelist[Subdirectory::Baseset]) {
+			if (!name.ends_with(".grf") || !IsInBuiltinGRFDir(entry.tar_filename)) continue;
+			if (fs.AddFile(name, 0, entry.tar_filename)) ret++;
+		}
 		fs.builtin = false;
 		ret += fs.Scan(".grf", Subdirectory::NewGrf);
 		/* The number scanned and the number returned may not be the same;
@@ -612,7 +635,7 @@ public:
 	}
 };
 
-bool GRFFileScanner::AddFile(const std::string &filename, size_t basepath_length, const std::string &)
+bool GRFFileScanner::AddFile(const std::string &filename, size_t basepath_length, const std::string &tar_filename)
 {
 	/* Abort if the user stopped the game during a scan. */
 	if (_exit_game) return false;
@@ -622,8 +645,9 @@ bool GRFFileScanner::AddFile(const std::string &filename, size_t basepath_length
 	/* A set under decouple/grafika/ is graphics of the game's own, static in
 	 * every game: read as a static set, so that one that would change game
 	 * state is refused. */
-	bool graphics = this->builtin && name_in_dir.starts_with(std::string(BUILTIN_GRAPHICS_GRF_DIR) + PATHSEP);
-	if (this->builtin) name_in_dir = std::string(BUILTIN_GRF_DIR) + PATHSEP + name_in_dir;
+	bool graphics = this->builtin && tar_filename.empty() && name_in_dir.starts_with(std::string(BUILTIN_GRAPHICS_GRF_DIR) + PATHSEP);
+	/* One in a tar is opened by its name in the tar, as it is. */
+	if (this->builtin && tar_filename.empty()) name_in_dir = std::string(BUILTIN_GRF_DIR) + PATHSEP + name_in_dir;
 	auto c = std::make_unique<GRFConfig>(name_in_dir);
 	c->builtin = this->builtin;
 	c->builtin_graphics = graphics;

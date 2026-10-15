@@ -31,6 +31,8 @@
 
 #include "stdafx.h"
 #include "three_d.h"
+#include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 #include "window_gui.h"
 #include "window_func.h"
 #include "gfx_func.h"
@@ -329,10 +331,15 @@ static Rect DrawVehiclePreview(ThreeDPreview &p, bool draw)
 	if (r.right <= r.left) return {};
 	if (!draw) return r;
 
+	int ax = r.left - p.frame.left, ay = r.top - p.frame.top;
+	/* A vehicle of a 3D object: the object itself at the angle, as the turned map draws it. */
+	if (const ThreeDModelPicture *op = GetThreeDVehicleObjectPreviewPicture(p.engine, p.zoom, PreviewAzimuth(p)); op != nullptr) {
+		BlitPicture(*op, ax + op->left, ay + op->top);
+		return r;
+	}
 	ThreeDModelPicture pic;
 	/* On the track as the map draws it, so that the set's own pictures, shown in their directions, fit the likeness between. */
 	if (!RenderThreeDVehicle(model, p.zoom, PreviewAzimuth(p), pic, true)) return r;
-	int ax = r.left - p.frame.left, ay = r.top - p.frame.top;
 	BlitPicture(pic, ax + pic.left, ay + pic.top);
 	return r;
 }
@@ -474,13 +481,19 @@ static void PreviewTick()
 			if (PreviewVehicleModel(p) != nullptr) {
 				/* Held in each direction of a sprite (its own picture), turned on to the next (the likeness). The
 				 * angle drawn falls as the preview turns, so the next direction is the multiple of 45 below it. */
+				/* A vehicle drawn from its 3D object has no pictures of a set to show: it turns on evenly (the player:
+				 * "the Sergej object stops at the sprites' directions too, a pause added for nothing"). */
+				const bool object = GetThreeDVehicleObject(p.engine) != nullptr;
+				if (object) p.hold = 0;
 				if (p.hold > 0) {
 					p.hold -= PREVIEW_TICK_MS;
 				} else {
 					float turn = PREVIEW_TURN_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f;
 					float off = std::fmod(PreviewAzimuth(p), 45.0f);
 					float to_next = off < 0.01f ? 45.0f : off;
-					if (turn >= to_next - 0.01f) {
+					if (object) {
+						p.yaw = std::fmod(p.yaw + turn, 360.0f);
+					} else if (turn >= to_next - 0.01f) {
 						p.yaw = std::fmod(p.yaw + to_next, 360.0f);
 						p.hold = PREVIEW_HOLD_MS;
 					} else {

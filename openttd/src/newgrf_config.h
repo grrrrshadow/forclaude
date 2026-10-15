@@ -36,6 +36,7 @@ using GRFConfigFlags = EnumBitSet<GRFConfigFlag, uint8_t>;
 
 /** The game's own sets: every NewGRF in this directory of baseset/ goes into every new game (AppendBuiltinGRFs()). */
 static constexpr std::string_view BUILTIN_GRF_DIR = "decouple";
+bool IsInBuiltinGRFDir(const std::string &path);
 /** Under BUILTIN_GRF_DIR: sets of graphics of the game's own, static in every game, savegames included (AppendStaticGRFConfigs()). */
 static constexpr std::string_view BUILTIN_GRAPHICS_GRF_DIR = "grafika";
 
