@@ -34,6 +34,7 @@ struct RoundTrackPose;
 
 int ThreeDVehicleObjectPieceLength(EngineID engine, int set_length);
 bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
+uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineImageType image_type);
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);

@@ -129,6 +129,7 @@
 #include "openttd.h"
 #include "newgrf_config.h"
 #include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 #include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
@@ -8953,6 +8954,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (int i = 0; i < n; i++) StateGameLoop();
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: {} tiku", n);
+	} else if (what == "stavy") {
+		/* 'stavy': each vehicle drawn as a 3D object, the sprite number its GRF picks and the state it means ("stavy"). */
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			int piece = 0;
+			const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
+			if (obj == nullptr || !v->IsPrimaryVehicle()) continue;
+			uint32_t id = GetVehicleSetSpriteLocalID(v->engine_type, v, EngineImageType::OnMap);
+			int state = 0;
+			for (size_t i = 0; i < obj->states.size(); i++) {
+				if (id >= obj->states[i].first && id <= obj->states[i].last) state = static_cast<int>(i) + 1;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: stav vozidla {} ({}): sprite GRF {} stav {} z {}", v->unitnumber, obj->name, id == UINT32_MAX ? -1 : static_cast<int64_t>(id), state, obj->states.size());
+		}
 	} else if (what == "zadni") {
 		/* 'zadni <0|1>': a 3D object's triangles turned away from the view left out (1, as the game draws), or all drawn. */
 		extern bool _turned_cull;

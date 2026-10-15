@@ -497,27 +497,24 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   `Tatra_osobni_3D-v3.tar`): a record `"druh": "auto"` with `grf` is a vehicle as `"vozidlo"` is, `typ` `silnice`
   (a road vehicle) by default; an `auto` without `grf` is a car of the game's own driving about by itself (later).
   Nothing of them is in the game: the GRF and its objects come in its package.
-- **A colour of a palette for each vehicle** (`"barvy": [{"cast": "lak", "maska": ..., "zacatek": 200, "paleta":
-  [...], "nahoda": "vozidlo"}]`): a vehicle's colour is drawn from its number and the year it was built
-  (`FadeStep()`, the third byte), the same all its life; the paint's mask at the texture's lightness, `zacatek`
-  the colour's own, faded after as the paint. The purchase list shows the first colour.
-- **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the
-  body's texture's layout (the texture of the file, or `textura`), 255 where it
-  is paint; `cil` RRGGBB the colour it fades to in `let` years, a step every
-  `krok` years, by the vehicle's age; `barva` RRGGBB a colour by number, the
-  paint that colour at the texture's lightness, its own where the texture is
-  `zacatek` light. Done per pixel while drawing (no texture copies); a sprite and
-  a picture of the turned view for each step of fading, made when a vehicle
-  that old is first drawn. Rig: `test3d stari <years>` makes every vehicle so old.
-- **Rust** (`"rez"`, the colleague's `hra/3d/PROSBA-VOZIDLA-3D.md`; the player:
-  "a few lines of corrosion across the roof, more and more, thicker"): a
-  second grey mask of the body's texture's layout, `cil` the rust's colour,
-  `let`, `krok` as the paint; with `"postupne": {"nabeh": 0.25}` a pixel's
-  value is the moment it starts rusting (1 at once, 255 at the end of `let`,
-  0 never), and in `nabeh` of `let` it goes from bare to all rust; without, it
-  is how much it rusts. Over the faded paint, per pixel while drawing; the step
-  of the rust is the second byte of the vehicle's age step (`FadeStep()`), so a
-  sprite and a picture for each step of both.
+- **The state is the GRF's** (the player, 15. 10.: "the colour, the lid and the beacon the GRF must do, the mod; when
+  it does not, nothing, it is ignored and does not fade"; grrrrf `hra/3d/ROZHRANI-GRF-STAVY.md`): the game decides
+  nothing of how a vehicle looks by itself -- no colour by its number, no fading or rust by its age. The GRF picks a
+  set of its sprites for the vehicle by its own rules as always (random bits, age, breakdown, load, a counter to
+  blink), and `"stavy"` of the record says what a set means: `{"sprity": [first, last], "barva": "RRGGBB", "lak":
+  0..1, "rez": 0..1}`, the set whose first sprite (its number in the GRF, `GetSpriteLocalID()`) is in the range
+  (`GetVehicleSetSpriteLocalID()`, `StateStep()`). Without `stavy`, or a set in no range: the object as it is, the
+  paint new, no rust. A sprite and a picture of the turned view for each state, made when first drawn. Rig:
+  `test3d stavy` prints each vehicle's sprite number and state. (Later: `dily`, a node turned, the lid; `doplnky`,
+  which node of an add-on shows, the beacon.)
+- **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the body's texture's layout (the texture of
+  the file, or `textura`), 255 where it is paint; `cil` RRGGBB the colour it fades to, as far as the state's `lak`
+  says; `barva` RRGGBB a fixed colour by number (a state's `barva` instead), the paint that colour at the texture's
+  lightness, its own where the texture is `zacatek` light. Done per pixel while drawing (no texture copies).
+- **Rust** (`"rez"`, the colleague's `hra/3d/PROSBA-VOZIDLA-3D.md`): a second grey mask of the body's texture's
+  layout, `cil` the rust's colour; with `"postupne": {"nabeh": 0.25}` a pixel's value is the moment it starts
+  rusting (1 at once, 255 at the end, 0 never), and in `nabeh` it goes from bare to all rust; without, it is how much
+  it rusts. How far: the state's `rez`. Over the faded paint, per pixel while drawing.
 - **Wheels of their own** (the player: "one wheel will do for an eight-wheeled
   car"): a .glb is read with all the nodes of its scene, a mesh as often as
   nodes name it (Blender's linked duplicates: one wheel in the file, at every

@@ -839,8 +839,6 @@ static void ReadThreeDVehicleObjects()
 							obj.paint.target = *c;
 						}
 					}
-					obj.paint.years = std::max(1, lak.value("let", 20));
-					obj.paint.step = std::clamp(lak.value("krok", 1), 1, obj.paint.years);
 					obj.paint.start = std::clamp(lak.value("zacatek", 0), 0, 255);
 					if (lak.contains("barva")) {
 						auto c = colour(lak.at("barva"));
@@ -864,22 +862,26 @@ static void ReadThreeDVehicleObjects()
 						}
 					}
 				}
-				/* A colour of a palette for each vehicle ("barvy", the colleague's Tatras, PROSBA-TATRA-613-CIVILNI.md): the
-				 * paint's mask at the texture's lightness, "zacatek" its own colour, faded after as the paint. */
-				if (e.contains("barvy") && e.at("barvy").is_array()) {
-					for (const auto &b : e.at("barvy")) {
-						if (!b.is_object() || !b.contains("paleta") || !b.at("paleta").is_array()) continue;
-						if (obj.paint.mask_file.empty() && b.contains("maska") && b.at("maska").is_string()) obj.paint.mask_file = folder + b.at("maska").get<std::string>();
-						obj.paint.start = std::clamp(b.value("zacatek", obj.paint.start), 0, 255);
-						for (const auto &c : b.at("paleta")) {
-							std::string t = c.is_string() ? c.get<std::string>() : std::string();
+				/* The states its GRF picks by its sprites ("stavy"): a colour of the paint, how far it has faded and rusted. */
+				if (e.contains("stavy") && e.at("stavy").is_array()) {
+					for (const auto &st : e.at("stavy")) {
+						if (!st.is_object() || !st.contains("sprity") || !st.at("sprity").is_array() || st.at("sprity").size() != 2) continue;
+						auto first = ParseIndexNumber(st.at("sprity").at(0)), last = ParseIndexNumber(st.at("sprity").at(1));
+						if (!first.has_value() || !last.has_value() || *last < *first) continue;
+						ThreeDVehicleState state;
+						state.first = *first;
+						state.last = *last;
+						if (st.contains("barva") && st.at("barva").is_string()) {
+							std::string t = st.at("barva").get<std::string>();
 							if (t.starts_with("#")) t = t.substr(1);
 							auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
-							if (n.has_value()) obj.paint.palette.push_back(Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data);
+							if (n.has_value()) state.colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
 						}
-						break;
+						state.fade = std::clamp(st.value("lak", 0.0f), 0.0f, 1.0f);
+						state.rust = std::clamp(st.value("rez", 0.0f), 0.0f, 1.0f);
+						obj.states.push_back(state);
+						if (obj.states.size() >= 255) break;
 					}
-					if (obj.paint.mask_file.empty() || obj.paint.palette.size() > 254) obj.paint.palette.clear();
 				}
 				/* The rust: a second mask over the body's texture, rusting with age after the paint has faded. */
 				if (e.contains("rez") && e.at("rez").is_object()) {
@@ -891,8 +893,6 @@ static void ReadThreeDVehicleObjects()
 						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
 						if (n.has_value()) obj.rust.target = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
 					}
-					obj.rust.years = std::max(1, rez.value("let", 30));
-					obj.rust.step = std::clamp(rez.value("krok", 2), 1, obj.rust.years);
 					if (rez.contains("postupne") && rez.at("postupne").is_object()) {
 						obj.rust.gradual = true;
 						obj.rust.ramp = std::clamp(rez.at("postupne").value("nabeh", 0.25f), 0.01f, 1.0f);
@@ -1239,7 +1239,8 @@ std::string DescribeThreeDVehicleObjects()
 		}
 		out += fmt::format("\n  {} grf {:08X} type {} pieces{} (engines{}) anchor {}{}{}{}", o.name, std::byteswap(o.grfid), to_underlying(o.type), pieces, engines, o.anchor, o.paint_file.empty() ? "" : " paint",
 				o.size.param < 0 ? "" : fmt::format(" size param {}", o.size.param), lengths.empty() ? "" : fmt::format(" lengths{}", lengths));
-		if (!o.paint.mask_file.empty()) out += fmt::format(" paint mask {} fades {} palette {} start {}", o.paint.mask_file.substr(o.paint.mask_file.rfind('/') + 1), o.paint.fades, o.paint.palette.size(), o.paint.start);
+		if (!o.paint.mask_file.empty()) out += fmt::format(" paint mask {} fades {} start {}", o.paint.mask_file.substr(o.paint.mask_file.rfind('/') + 1), o.paint.fades, o.paint.start);
+		if (!o.states.empty()) out += fmt::format(" states {}", o.states.size());
 	}
 	return out;
 }

@@ -126,12 +126,9 @@ struct ThreeDVehiclePaint {
 	std::string mask_file;      ///< "maska": a grey PNG of the body's texture's layout, 255 where it is paint
 	bool fades = false;         ///< "cil" given: the paint fades to it with age
 	uint32_t target = 0;        ///< "cil": the colour it fades to (Colour::data)
-	int years = 20;             ///< "let": in so many years it is the target's
-	int step = 1;               ///< "krok": a step of fading every so many years
 	bool coloured = false;      ///< "barva" given: the paint is that colour, at the lightness of the texture
 	uint32_t colour = 0;        ///< "barva" (Colour::data)
 	int start = 0;              ///< "zacatek": the texture's lightness the colour is at its own (0: the brightest of the mask)
-	std::vector<uint32_t> palette; ///< "barvy": "paleta", the colours (Colour::data) a vehicle draws its paint from, one for its life ("nahoda": "vozidlo")
 };
 
 /**
@@ -141,8 +138,6 @@ struct ThreeDVehiclePaint {
 struct ThreeDVehicleRust {
 	std::string mask_file;      ///< "maska"
 	uint32_t target = 0;        ///< "cil": the rust's colour (Colour::data)
-	int years = 30;             ///< "let": by then all of it that rusts has
-	int step = 2;               ///< "krok": a step every so many years
 	bool gradual = false;       ///< "postupne": a pixel's value is the moment it starts rusting (1 at once, 255 at the end of "let", 0 never), else how much it rusts
 	float ramp = 0.25f;         ///< "postupne": "nabeh", the share of "let" a pixel takes from bare to all rust
 };
@@ -163,6 +158,20 @@ struct ThreeDVehicleSize {
 		}
 		return std::nullopt;
 	}
+};
+
+/**
+ * A state of a vehicle object chosen by its GRF ("stavy", grrrrf hra/3d/ROZHRANI-GRF-STAVY.md): the GRF picks a set of
+ * its sprites for the vehicle by its own rules (random bits, age, breakdown, load …) and a set whose first sprite is
+ * numbered within [first, last] in the GRF draws the object so. The game decides nothing of it by itself (the player,
+ * 15. 10.: "the colour, the lid and the beacon the GRF must do; when it does not, nothing, it does not fade").
+ */
+struct ThreeDVehicleState {
+	uint32_t first = 0;         ///< "sprity": the first ...
+	uint32_t last = 0;          ///< ... and the last sprite number in the GRF
+	uint32_t colour = 0;        ///< "barva": the paint's colour (Colour::data), over its mask; 0 the texture's own
+	float fade = 0;             ///< "lak": how far the paint has faded to its target, 0 to 1
+	float rust = 0;             ///< "rez": how far it has rusted, 0 to 1
 };
 
 /** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
@@ -199,6 +208,7 @@ struct ThreeDVehicleObject {
 	ThreeDVehiclePaint paint;       ///< "lak"
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"
+	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none

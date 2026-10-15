@@ -65,10 +65,10 @@ struct ObjectSpriteRequest {
 	int dir = 0;                              ///< the direction it faces
 	float off_x = 0, off_y = 0;               ///< world units from the point the game draws the sprite about to the object's origin
 	float scale = 1.0f;                       ///< the object's metres to the game's
-	int fade = 0;                             ///< the step of its paint's fading (FadeStep())
+	int fade = 0;                             ///< its state (StateStep())
 };
 static std::vector<ObjectSpriteRequest> _object_sprite_requests;
-/** The sprites made: by the object, the piece it is hung from, the direction, its scale (thousandths) and its age. */
+/** The sprites made: by the object, the piece it is hung from, the direction, its scale (thousandths) and its state (StateStep()). */
 static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int>, SpriteID> _object_sprites;
 static SpriteID _object_empty_sprite = 0;
 
@@ -117,50 +117,46 @@ static float ObjectScale(const ThreeDVehicleObject *obj)
 }
 
 /**
- * How old a vehicle looks, in steps: of its paint's fading ("lak": "krok" years, to the target in "let"), in the low
- * byte, and of its rust ("rez" likewise), the next; 0 new, or without either.
+ * The state of a vehicle's object its GRF picks ("stavy", grrrrf hra/3d/ROZHRANI-GRF-STAVY.md): the state whose range
+ * holds the number in the GRF of the first sprite of the set the GRF chooses for the vehicle, by its own rules.
+ * @return the state's index plus one; 0 none: the object as it is, its paint new, no rust
  */
-static int FadeStep(const ThreeDVehicleObject *obj, const Vehicle *v)
+static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
-	if (v == nullptr) return 0;
-	int years = std::max(0, static_cast<int>(v->age.base() / CalendarTime::DAYS_IN_YEAR));
-	int paint = obj->paint.fades ? std::min(years / obj->paint.step, obj->paint.years / obj->paint.step) : 0;
-	int rust = !obj->rust.mask_file.empty() ? std::min(years / obj->rust.step, obj->rust.years / obj->rust.step) : 0;
-	/* Its colour of the palette, the same all its life: from its number and the year it was built, as its rust. */
-	int colour = 0;
-	if (!obj->paint.palette.empty()) {
-		uint32_t h = v->index.base() * 0x9E3779B1u + static_cast<uint32_t>(v->build_year.base()) * 0x85EBCA6Bu;
-		h ^= h >> 16;
-		h *= 0x7FEB352Du;
-		h ^= h >> 15;
-		h *= 0x846CA68Bu;
-		h ^= h >> 16;
-		colour = 1 + static_cast<int>(h % obj->paint.palette.size());
+	if (obj->states.empty()) return 0;
+	uint32_t id = GetVehicleSetSpriteLocalID(engine, v, image_type);
+	if (id == UINT32_MAX) return 0;
+	for (size_t i = 0; i < obj->states.size(); i++) {
+		if (id >= obj->states[i].first && id <= obj->states[i].last) return static_cast<int>(i) + 1;
 	}
-	return std::min(paint, 255) | std::min(rust, 255) << 8 | colour << 16;
+	return 0;
 }
 
-/** The colour of its palette a vehicle's paint is at a step (FadeStep()): 0 none, the paint's own. */
+/** The state of a step (StateStep()), nullptr for none. */
+static const ThreeDVehicleState *StateOf(const ThreeDVehicleObject *obj, int step)
+{
+	return step > 0 && static_cast<size_t>(step) <= obj->states.size() ? &obj->states[step - 1] : nullptr;
+}
+
+/** The colour of the paint a state gives (StateStep()): 0 none, the texture's own. */
 static uint32_t PaletteColour(const ThreeDVehicleObject *obj, int step)
 {
-	int colour = (step >> 16) & 0xFF;
-	if (obj->paint.palette.empty()) return 0;
-	/* The purchase list and the previews, no vehicle: the first colour. */
-	return obj->paint.palette[colour > 0 ? std::min<size_t>(colour - 1, obj->paint.palette.size() - 1) : 0];
+	const ThreeDVehicleState *s = StateOf(obj, step);
+	return s != nullptr ? s->colour : 0;
 }
 
-/** The fading of the paint at a step: 0 new, 1 the target's colour. */
+/** The fading of the paint in a state: 0 new, 1 the target's colour. */
 static float FadeAmount(const ThreeDVehicleObject *obj, int step)
 {
-	if (!obj->paint.fades) return 0.0f;
-	return std::min(1.0f, static_cast<float>((step & 0xFF) * obj->paint.step) / obj->paint.years);
+	const ThreeDVehicleState *s = StateOf(obj, step);
+	return s != nullptr && obj->paint.fades ? s->fade : 0.0f;
 }
 
-/** How far into its rusting a vehicle is at a step: 0 new, 1 the end of "let". */
+/** How far a state has rusted: 0 new, 1 all of it. */
 static float RustTime(const ThreeDVehicleObject *obj, int step)
 {
-	if (obj->rust.mask_file.empty()) return 0.0f;
-	return std::min(1.0f, static_cast<float>(((step >> 8) & 0xFF) * obj->rust.step) / obj->rust.years);
+	const ThreeDVehicleState *s = StateOf(obj, step);
+	return s != nullptr && !obj->rust.mask_file.empty() ? s->rust : 0.0f;
 }
 
 /** The lengths of the object's pieces as its set says, eighths of a tile; a piece the game has not got counts as a whole vehicle. */
@@ -277,7 +273,7 @@ bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction d
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, &piece);
 	if (obj == nullptr || direction == Direction::Invalid) return false;
 	int from = (image_type == EngineImageType::Purchase || image_type == EngineImageType::Preview) ? 0 : obj->anchor;
-	SpriteID sprite = piece == from ? ObjectSprite(obj, from, to_underlying(direction) & 7, FadeStep(obj, v)) : EmptyObjectSprite();
+	SpriteID sprite = piece == from ? ObjectSprite(obj, from, to_underlying(direction) & 7, StateStep(obj, engine, v, image_type)) : EmptyObjectSprite();
 	if (sprite == 0) return false;
 	result->Set(sprite);
 	return true;
@@ -621,7 +617,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	float scale = ObjectScale(obj);
 	double along = MiddleFromPiece(obj, lengths, piece);
 	float world_az = pose != nullptr ? pose->azimuth + (reversed ? 180.0f : 0.0f) : ViewAzimuth(d);
-	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, SqueezedType(obj->type), FadeStep(obj, v));
+	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, SqueezedType(obj->type), StateStep(obj, v->engine_type, v, EngineImageType::OnMap));
 	if (pic == nullptr) return true;
 
 	/* The box of the pieces for the sorting. */
@@ -659,7 +655,7 @@ const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, 
 {
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
 	if (obj == nullptr) return nullptr;
-	return ObjectPicture(obj, ObjectScale(obj), zoom, azimuth, azimuth, SqueezedType(obj->type), 0);
+	return ObjectPicture(obj, ObjectScale(obj), zoom, azimuth, azimuth, SqueezedType(obj->type), StateStep(obj, engine, nullptr, EngineImageType::Purchase));
 }
 
 /** The huts whose fireworks this drawing of the turned view puts on (QueueThreeDFireworks()). */

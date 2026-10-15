@@ -31,6 +31,7 @@
 #include "ship.h"
 
 #include "three_d_vehicle_object.h"
+#include "spritecache.h"
 
 #include "safeguards.h"
 
@@ -1191,6 +1192,20 @@ bool _resolve_vehicle_as_empty = false;
  * vehicle's own, as the map draws it.
  */
 Direction _resolve_vehicle_direction = Direction::Invalid;
+
+/**
+ * The number in its GRF of the first sprite of the set a vehicle's GRF chooses for it, by the GRF's own rules: what
+ * picks the state of its 3D object ("stavy", three_d_vehicle_object.h). UINT32_MAX when it chooses none.
+ * @param v the vehicle, nullptr for the purchase list
+ */
+uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineImageType image_type)
+{
+	VehicleResolverObject object(engine, v, VehicleResolverObject::WagonOverride::Cached, false, CBID_NO_CALLBACK);
+	object.callback_param1 = to_underlying(image_type);
+	const auto *group = object.Resolve<ResultSpriteGroup>();
+	if (group == nullptr || group->num_sprites == 0) return UINT32_MAX;
+	return GetSpriteLocalID(group->sprite);
+}
 
 static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result, bool on_map = false)
 {
