@@ -96,6 +96,8 @@ struct ThreeDObject {
 	std::vector<ThreeDObjectColourPart> colours; ///< "barvy": parts painted a colour by number
 	std::vector<ThreeDObjectFigure> figures;     ///< "postavy": figures standing on it, drawn among its triangles
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
+	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
+	std::string title_en;     ///< ... and in any other language ("en"); empty for the house's own name
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;
@@ -234,6 +236,7 @@ std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);
 const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot);
+std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();
 
 #endif /* THREE_D_OBJECTS_H */

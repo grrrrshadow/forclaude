@@ -53,6 +53,7 @@
 #include "ai/ai.hpp"
 #include "game/game.hpp"
 #include "town_cmd.h"
+#include "three_d_objects.h"
 #include "landscape_cmd.h"
 #include "road_cmd.h"
 #include "terraform_cmd.h"
@@ -920,6 +921,7 @@ static void GetTileDesc_Town(TileIndex tile, TileDesc &td)
 		td.dparam = td.str;
 		td.str = STR_LAI_TOWN_INDUSTRY_DESCRIPTION_UNDER_CONSTRUCTION;
 	}
+	td.name = GetThreeDHouseTitle(tile);
 
 	if (hs->grf_prop.HasGrfFile()) {
 		const GRFConfig *gc = GetGRFConfig(hs->grf_prop.grfid);

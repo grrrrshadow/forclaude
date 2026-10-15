@@ -56,6 +56,7 @@ struct TileDesc {
 	StringID tramtype{}; ///< Type of tram on the tile.
 	uint16_t tram_speed = 0; ///< Speed limit of tram (bridges and track)
 	std::optional<bool> town_can_upgrade = std::nullopt; ///< Whether the town can upgrade this house during town growth.
+	std::optional<std::string> name = std::nullopt; ///< A name of its own in place of \a str: a house drawn as a 3D object with a name ("nazev", three_d_objects.h).
 };
 
 /**

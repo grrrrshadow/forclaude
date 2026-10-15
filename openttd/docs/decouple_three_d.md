@@ -356,6 +356,9 @@ too.
   triangles go through the
   perspective rasterizer and the depth buffer with the texture's level for
   about a texture pixel to a pixel of the picture.
+- **A name of its own** (`"nazev"`: a string, or `{"cs": ..., "en": ...}`): the land area information shows it
+  for the finished house drawn as that object, 3D on (`GetThreeDHouseTitle()`, `TileDesc::name`): house 0x1F is the
+  ÚV KSČ building (the colleague's `hra/3d/PROSBA-UV-KSC.md`).
 - **Facing north** (the player, 15. 10.: "which houses show at view 0, the
   original houses as today or the same as when we turn; by default the same as
   when we turn"): the setting *Houses when the view faces north* (`gui.three_d_north_houses`,

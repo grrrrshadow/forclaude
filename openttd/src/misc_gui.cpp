@@ -143,7 +143,7 @@ public:
 		this->landinfo_data.clear();
 
 		/* Tiletype */
-		this->landinfo_data.push_back(GetString(td.str, td.dparam));
+		this->landinfo_data.push_back(td.name.has_value() ? *td.name : GetString(td.str, td.dparam));
 
 		/* Up to four owners */
 		for (uint i = 0; i < 4; i++) {

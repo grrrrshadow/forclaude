@@ -21,6 +21,11 @@
 #include "core/bitmath_func.hpp"
 #include "engine_base.h"
 #include "core/string_consumer.hpp"
+#include "three_d.h"
+#include "town.h"
+#include "town_map.h"
+#include "tile_map.h"
+#include "language.h"
 #include "3rdparty/nlohmann/json.hpp"
 
 #include <array>
@@ -546,6 +551,23 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 }
 
 /** The figures standing on a building ("postavy") and its doors ("dvere"). */
+/**
+ * The name of a house that is a 3D object ("nazev"), shown in the land area information instead of the original house's
+ * (the colleague's hra/3d/PROSBA-UV-KSC.md: house 0x1F is the ÚV KSČ building): one name, or one per language.
+ */
+static void ReadBuildingTitle(const nlohmann::json &e, ThreeDObject &obj)
+{
+	if (!e.contains("nazev")) return;
+	const auto &n = e.at("nazev");
+	if (n.is_string()) {
+		obj.title_cs = obj.title_en = n.get<std::string>();
+	} else if (n.is_object()) {
+		obj.title_cs = n.value("cs", std::string());
+		obj.title_en = n.value("en", obj.title_cs);
+		if (obj.title_cs.empty()) obj.title_cs = obj.title_en;
+	}
+}
+
 static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 {
 	if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
@@ -608,6 +630,7 @@ static void ReadThreeDObjects()
 					if (!ReadGlb(folder + obj.file, obj)) continue;
 					ReadColourParts(e, folder, obj);
 					ReadBuildingFigures(e, obj);
+					ReadBuildingTitle(e, obj);
 					_three_d_objects.push_back(std::move(obj));
 					continue;
 				}
@@ -633,6 +656,7 @@ static void ReadThreeDObjects()
 				if (!ReadGlb(folder + obj.file, obj)) continue;
 				ReadColourParts(e, folder, obj);
 				ReadBuildingFigures(e, obj);
+				ReadBuildingTitle(e, obj);
 				std::vector<uint8_t> snow;
 				if (houses.size() > 1 && e.contains("snih")) snow = ReadWholeFile(folder + e.at("snih").get<std::string>());
 				for (size_t k = 1; k < houses.size(); k++) {
@@ -1229,6 +1253,21 @@ const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slo
 	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return nullptr;
 	auto it = _three_d_grf_house_objects.find(std::make_tuple(hs->grf_prop.grfid, hs->grf_prop.local_id, colour_slot & 3));
 	return it == _three_d_grf_house_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The name the land area information shows for a house that is drawn as a 3D object with a name of its own ("nazev"),
+ * in Czech or else in English; none with the 3D off, while it is built, or for a house without.
+ * @param tile a tile of the house
+ */
+std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
+{
+	if (!ThreeDEnabled() || !IsHouseCompleted(tile)) return std::nullopt;
+	HouseID north = GetHouseType(tile);
+	TileIndex origin = tile + GetHouseNorthPart(north);
+	const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+	if (obj == nullptr || obj->title_en.empty()) return std::nullopt;
+	return std::string_view(_current_language->isocode).starts_with("cs") ? obj->title_cs : obj->title_en;
 }
 
 /**

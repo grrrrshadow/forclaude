@@ -74,8 +74,14 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   `524A450B`), ze které hra staví marsovská města (od kolegy, grrrrf
   `hra/3d/objekty/mars/`). Dům ze sady se hledá podle `nahrazuje_grf` (id sady,
   jak ho hra vypisuje) a `nahrazuje_house_grf` (číslo domu v sadě).
+- **Bílé domy kolem roku 1950** (15. 10., od kolegy, grrrrf `hra/3d/PROSBA-DOMY-1950.md`): 19 záznamů, které byly
+  domy z ručních tabulek s texturami OpenGFX (kostel 03, městské domy 06, obchody 0E, 0F, 10, 1D, starý stadion 14,
+  staré domy 18, chalupy 19, domy 1A, kino 27), jsou vlastní modely v kvalitě deseti domů níž: omítky, `barvy`,
+  skutečné `dvere`, kola opřená o zeď, prádlo, kočárky a holky, co tam bydlí (`postavy`).
+- **Dům 0x1F je budova ÚV KSČ** (od kolegy, `PROSBA-UV-KSC.md`) místo divadla; `nazev` dává jméno, které ukáže
+  informace o dlaždici (česky „ÚV KSČ“). Divadlo bude vlastní GRF dům s objektem v balíčku.
 - Deset domů, které byly rendery v `budovy3d_1`–`4` (hotel, socha, fontána, dva
-  parky, moderní kanceláře, kancelářský blok, cihlové byty, divadlo, obchodní
+  parky, moderní kanceláře, kancelářský blok, cihlové byty, divadlo (dnes ÚV KSČ), obchodní
   středisko; od kolegy, grrrrf `hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md`), jsou v `mirne/`
   s normálami (světlo si dělá hra jako u vozidel) a s `barvy`: střecha, omítka
   a plot mají masku a paletu a každý dům na mapě má barvu podle své dlaždice.

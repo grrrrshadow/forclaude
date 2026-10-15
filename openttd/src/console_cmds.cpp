@@ -8879,7 +8879,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				TileIndex origin = t + GetHouseNorthPart(h);
 				if (origin != t) continue;
 				const ThreeDObject *o = GetThreeDHouseObjectAny(h, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
-				IConsolePrint(CC_DEFAULT, "test3d: dum {},{} cislo {:#04x} objekt {}", tx, ty, h, o != nullptr ? o->name : std::string("-"));
+				IConsolePrint(CC_DEFAULT, "test3d: dum {},{} cislo {:#04x} objekt {} jmeno {} postav {}", tx, ty, h, o != nullptr ? o->name : std::string("-"),
+						GetThreeDHouseTitle(t).value_or("-"), o != nullptr ? o->figures.size() : 0);
 			}
 		}
 	} else if (what == "zadni") {
