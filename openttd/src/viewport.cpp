@@ -7098,9 +7098,88 @@ static void CabTunnelGround(TileIndex tile, int z)
  * @param[out] out the picture
  * @return whether there is a picture (a 32bpp blitter)
  */
-bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out)
+/** The height of the ground under a world point, units of height (the walker of the view from the first person stands on it). */
+double FirstPersonGroundZ(double x, double y)
 {
-	if (v == nullptr || width <= 0 || height <= 0) return false;
+	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
+	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
+	return GetSlopePixelZOutsideMap(ix, iy);
+}
+
+/**
+ * The night in the view from an eye (gui.night): the picture darkened as the map is (DrawNight()), and the lights of
+ * the vehicles about -- headlights, red lights at the back, an aircraft's beacon -- as glows the size their distance
+ * makes them, hidden where something nearer stands in front of them (the depth of the picture). From the cab, the
+ * pool of the own headlights on the way ahead.
+ */
+static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int height, uint32_t *dst, const float *zb)
+{
+	for (size_t i = 0; i < static_cast<size_t>(width) * height; i++) {
+		Colour c(dst[i]);
+		dst[i] = Colour(static_cast<uint8_t>(c.r * NIGHT_R >> 8), static_cast<uint8_t>(c.g * NIGHT_G >> 8), static_cast<uint8_t>(c.b * NIGHT_B >> 8)).data;
+	}
+	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash) {
+		CabPoint p = CabToEye(eye, wx, wy, wz, 0, 0);
+		if (p.f < CAB_NEAR) return;
+		CabVertex v = CabProject(eye, p);
+		const int px = static_cast<int>(v.sx), py = static_cast<int>(v.sy);
+		if (px >= 0 && py >= 0 && px < width && py < height) {
+			/* Behind something nearer: not seen. */
+			if (zb[static_cast<size_t>(py) * width + px] > v.iw * 1.05f) return;
+		}
+		const double r = std::max(1.0, radius * eye.focal / p.f);
+		AddNightLight(dst, width, width, height, v.sx, v.sy, r, r * squash, colour, strength);
+	};
+	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
+	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
+	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
+	const double reach = CAB_RANGE_TILES * TILE_SIZE;
+	for (const Vehicle *u : Vehicle::Iterate()) {
+		if (u->vehstatus.Test(VehState::Hidden)) continue;
+		if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship && u->type != VehicleType::Aircraft) continue;
+		if (u->type == VehicleType::Aircraft && !Aircraft::From(u)->IsNormalAircraft()) continue;
+		const bool front = u->Previous() == nullptr, last = u->Next() == nullptr;
+		if (!front && !last) continue;
+		const double dx = u->x_pos - eye.x, dy = u->y_pos - eye.y;
+		if (dx * dx + dy * dy > reach * reach) continue;
+		const int d = to_underlying(u->direction) & 7;
+		double fx = dir_dx[d], fy = dir_dy[d];
+		const double len = std::sqrt(fx * fx + fy * fy);
+		fx /= len;
+		fy /= len;
+		const double sx = -fy, sy = fx;
+		const double z = u->z_pos;
+		const bool mine = own != nullptr && u->First() == own;
+		if (u->type == VehicleType::Aircraft) {
+			glow(u->x_pos + fx * 6, u->y_pos + fy * 6, z + 2, 1.5, lamp, 0.9, 1.0);
+			if ((TimerGameTick::counter + u->index.base() * 7) % 32 < 6) glow(u->x_pos, u->y_pos, z + 6, 1.0, beacon, 1.0, 1.0);
+			continue;
+		}
+		const double half = u->type == VehicleType::Ship ? 6 : 3.5;
+		if (front && (u->type != VehicleType::Train || Train::From(u)->IsEngine() || Train::From(u)->IsFrontEngine())) {
+			if (mine) {
+				/* From the own cab: the pool of the headlights on the way ahead. */
+				for (int k = 1; k <= 4; k++) glow(u->x_pos + fx * (half + 6 * k), u->y_pos + fy * (half + 6 * k), z, 3.0 + k, pool, 0.35, 0.35);
+			} else {
+				glow(u->x_pos + fx * (half + 8), u->y_pos + fy * (half + 8), z, 6, pool, 0.3, 0.4);
+				for (int side = -1; side <= 1; side += 2) glow(u->x_pos + fx * half + sx * side * 1.5, u->y_pos + fy * half + sy * side * 1.5, z + 2, 0.8, lamp, 1.2, 1.0);
+			}
+		}
+		if (last && !mine && u->type != VehicleType::Ship) {
+			for (int side = -1; side <= 1; side += 2) glow(u->x_pos - fx * half + sx * side * 1.5, u->y_pos - fy * half + sy * side * 1.5, z + 2, 0.5, tail, 0.9, 1.0);
+		}
+	}
+}
+
+/**
+ * The view from an eye in perspective: from the cab of a vehicle (cab_view.h), or from the eyes of the walker of the
+ * view from the first person (first_person_gui.cpp, the player: "let's make Morrowind, first person view").
+ * @param v the vehicle, nullptr for the walker
+ * @param walker the walker, when there is no vehicle
+ */
+static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int width, int height, CabViewCamera &camera, CabViewPicture &out)
+{
+	if ((v == nullptr && walker == nullptr) || width <= 0 || height <= 0) return false;
 	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return false;
 	double t0 = TurnedNow();
 	out.width = width;
@@ -7114,7 +7193,11 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	double target = camera.valid ? camera.heading : std::atan2(-1.0, -1.0);
-	if (v->cab_free) {
+	if (walker != nullptr) {
+		/* The walker looks where the player turns it, at once. */
+		target = walker->heading;
+		camera.valid = false;
+	} else if (v->cab_free) {
 		/* Driven freely (cab_drive.h): its own heading, finer than the eight directions. */
 		target = v->cab_yaw * (2 * M_PI / CAB_YAW_TURN);
 	} else if (v->direction != Direction::Invalid) {
@@ -7132,35 +7215,45 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	eye.fy = std::sin(camera.heading);
 	eye.rx = eye.fy;
 	eye.ry = -eye.fx;
-	eye.x = v->x_pos + eye.fx * CAB_EYE_AHEAD;
-	eye.y = v->y_pos + eye.fy * CAB_EYE_AHEAD;
-	{
-		/* The eye's height over the vehicle: as the type has it, bowed under a low bridge just ahead, so it passes
-		 * under the deck, which is only a level over the road or the rails. */
-		double want = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
-		bool close = false;
-		for (int k = -1; k <= 3; k++) {
-			double px = v->x_pos + eye.fx * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0), py = v->y_pos + eye.fy * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0);
-			if (px < 0 || py < 0 || px >= Map::SizeX() * TILE_SIZE || py >= Map::SizeY() * TILE_SIZE) continue;
-			TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
-			if (!IsBridgeAbove(tile)) continue;
-			int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
-			if (bz <= v->z_pos + 4) continue; // on the bridge, not under it
-			want = std::min(want, std::max(CAB_EYE_Z_LOWEST, bz - CAB_DECK - 1.5 - v->z_pos));
-			if (k <= 1) close = true;
+	if (walker != nullptr) {
+		/* The walker's eyes over the ground where it stands. */
+		eye.x = walker->x;
+		eye.y = walker->y;
+		eye.z = FirstPersonGroundZ(walker->x, walker->y) + walker->eye_z;
+	} else {
+		eye.x = v->x_pos + eye.fx * CAB_EYE_AHEAD;
+		eye.y = v->y_pos + eye.fy * CAB_EYE_AHEAD;
+		{
+			/* The eye's height over the vehicle: as the type has it, bowed under a low bridge just ahead, so it passes
+			 * under the deck, which is only a level over the road or the rails. */
+			double want = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
+			bool close = false;
+			for (int k = -1; k <= 3; k++) {
+				double px = v->x_pos + eye.fx * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0), py = v->y_pos + eye.fy * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0);
+				if (px < 0 || py < 0 || px >= Map::SizeX() * TILE_SIZE || py >= Map::SizeY() * TILE_SIZE) continue;
+				TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
+				if (!IsBridgeAbove(tile)) continue;
+				int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+				if (bz <= v->z_pos + 4) continue; // on the bridge, not under it
+				want = std::min(want, std::max(CAB_EYE_Z_LOWEST, bz - CAB_DECK - 1.5 - v->z_pos));
+				if (k <= 1) close = true;
+			}
+			if (camera.eye_dz < 0) {
+				camera.eye_dz = want;
+			} else if (want < camera.eye_dz) {
+				camera.eye_dz = close ? want : camera.eye_dz + (want - camera.eye_dz) * 0.5;
+			} else {
+				camera.eye_dz += (want - camera.eye_dz) * 0.2;
+			}
 		}
-		if (camera.eye_dz < 0) {
-			camera.eye_dz = want;
-		} else if (want < camera.eye_dz) {
-			camera.eye_dz = close ? want : camera.eye_dz + (want - camera.eye_dz) * 0.5;
-		} else {
-			camera.eye_dz += (want - camera.eye_dz) * 0.2;
-		}
+		eye.z = v->z_pos + camera.eye_dz;
 	}
-	eye.z = v->z_pos + camera.eye_dz;
 	eye.focal = (width / 2.0) / CAB_FOV_TAN;
 	eye.cx = width / 2.0;
 	eye.cy = height * 0.5;
+	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
+	 * lines stay upright, as the players of the old shooters knew it). */
+	if (walker != nullptr) eye.cy += std::tan(walker->pitch) * eye.focal;
 
 	/* The sky down to the horizon, the far ground under it. */
 	const Colour haze(165, 200, 240);
@@ -7178,7 +7271,8 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	/* A tunnel the eye is in: its tube is drawn round the eye, and the hill over it is left out. */
 	std::optional<CabTunnel> in_tunnel;
 	{
-		std::vector<TileIndex> near{v->tile};
+		std::vector<TileIndex> near;
+		if (v != nullptr) near.push_back(v->tile);
 		if (eye.x >= 0 && eye.y >= 0 && eye.x < Map::SizeX() * TILE_SIZE && eye.y < Map::SizeY() * TILE_SIZE) near.push_back(TileVirtXY(static_cast<int>(eye.x), static_cast<int>(eye.y)));
 		for (TileIndex tile : near) {
 			std::optional<CabTunnel> t = CabTunnelAt(tile);
@@ -7192,7 +7286,7 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	}
 
 	/* Hidden elsewhere than in a tunnel (a depot): the dark, with the light of the door. */
-	if (v->vehstatus.Test(VehState::Hidden) && !in_tunnel.has_value() && !CabTunnelAt(v->tile).has_value()) {
+	if (v != nullptr && v->vehstatus.Test(VehState::Hidden) && !in_tunnel.has_value() && !CabTunnelAt(v->tile).has_value()) {
 		std::fill(out.pixels.begin(), out.pixels.end(), Colour(8, 8, 10).data);
 		int lw = std::max(4, width / 14), lh = std::max(3, height / 14);
 		int lx = width / 2 - lw / 2, ly = static_cast<int>(eye.cy) - lh / 2;
@@ -7214,7 +7308,7 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 		bool foundation; ///< its ground lies on a foundation, as the foundation's children
 	};
 	std::vector<CabTile> tiles;
-	int tcx = v->x_pos / static_cast<int>(TILE_SIZE), tcy = v->y_pos / static_cast<int>(TILE_SIZE);
+	int tcx = static_cast<int>(v != nullptr ? v->x_pos : eye.x) / static_cast<int>(TILE_SIZE), tcy = static_cast<int>(v != nullptr ? v->y_pos : eye.y) / static_cast<int>(TILE_SIZE);
 	for (int ty = tcy - CAB_RANGE_TILES; ty <= tcy + CAB_RANGE_TILES; ty++) {
 		for (int tx = tcx - CAB_RANGE_TILES; tx <= tcx + CAB_RANGE_TILES; tx++) {
 			if (!IsInsideBS(tx, 0, Map::SizeX()) || !IsInsideBS(ty, 0, Map::SizeY())) continue;
@@ -7571,7 +7665,7 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	/* The other vehicles: their picture of the direction as seen from the eye, as the turned map shows them. */
 	double yaw_deg = camera.heading * 180.0 / M_PI + 135.0;
 	int step = static_cast<int>(std::lround(yaw_deg / 45.0)) & 7;
-	const Vehicle *own = v->First();
+	const Vehicle *own = v != nullptr ? v->First() : nullptr;
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		if (u->First() == own) continue;
 		if (u->vehstatus.Test(VehState::Hidden)) {
@@ -7703,6 +7797,19 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 	_vd.tile_sprites_to_draw.clear();
 	_vd.parent_sprites_to_draw.clear();
 	_vd.child_screen_sprites_to_draw.clear();
+	if (_settings_client.gui.night) DrawEyeNight(eye, own, width, height, dst, zb);
 	camera.ms = TurnedNow() - t0;
 	return true;
+}
+
+/** The view from the cab of a vehicle (cab_view.h). */
+bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out)
+{
+	return v != nullptr && DrawEyeView(v, nullptr, width, height, camera, out);
+}
+
+/** The view from the eyes of the walker of the view from the first person (first_person_gui.cpp). */
+bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out)
+{
+	return DrawEyeView(nullptr, &walker, width, height, camera, out);
 }

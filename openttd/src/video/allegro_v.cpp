@@ -472,6 +472,10 @@ void VideoDriver_Allegro::InputLoop()
 	_dirkeys.Set(DirectionKey::Up, key[KEY_UP]);
 	_dirkeys.Set(DirectionKey::Right, key[KEY_RIGHT]);
 	_dirkeys.Set(DirectionKey::Down, key[KEY_DOWN]);
+	_walkkeys.Set(DirectionKey::Up, key[KEY_W]);
+	_walkkeys.Set(DirectionKey::Left, key[KEY_A]);
+	_walkkeys.Set(DirectionKey::Down, key[KEY_S]);
+	_walkkeys.Set(DirectionKey::Right, key[KEY_D]);
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
 }

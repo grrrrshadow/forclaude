@@ -712,6 +712,29 @@ the curves are vanilla to the pixel.
   along its tangent (`GetRoundTrackPose()`). Building, the pathfinder and the
   trains' movement are untouched.
 
+## The view from the first person
+
+The player (15. 10.), after looking at OpenMW: "let's make Morrowind, the
+inventory, the first person view", "don't forget anything, the lights". The
+map menu has *View from the first person* (`first_person_gui.cpp`): a walker
+stands where the main view looks (on the nearest ground it can stand on) and
+the world is drawn from its eyes, 1.55 m over the ground, as from a cab
+(`DrawEyeView()` in `viewport.cpp`, the cab view's renderer with the eye of a
+vehicle or of the walker; `DrawCabView()` and `DrawFirstPersonView()` call
+it). W and S or the arrows up and down walk (1.6 m/s; Shift or *Run* 6.5 m/s),
+A and D step aside, the arrows left and right turn, the right mouse button
+held looks about -- up and down the horizon moves, the picture sheared as in
+the old shooters. The keys are read as held: the video drivers keep W, A, S
+and D as they keep the arrows (`_walkkeys`), and while the window has the
+focus the arrows walk instead of moving the map. The walker does not go into
+houses, industries' buildings (the fields are walked), stations' buildings
+(platforms and stops are walked), objects or water; along a wall it slides.
+At night the picture is darkened as the map is and the vehicles' lights are
+glows hidden behind what stands in front of them; from a cab, the pool of the
+own headlights lies on the way ahead (`DrawEyeNight()`). Only the picture,
+nothing saved. Rig: `test3d chodec`, `test3d chodec krok <n> <ahead> <aside>
+<turn> [pitch]`.
+
 ## The night
 
 The player (15. 10.): "where the toggle console is there will be a dark mode

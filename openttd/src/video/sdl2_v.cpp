@@ -701,6 +701,10 @@ void VideoDriver_SDL_Base::InputLoop()
 	_dirkeys.Set(DirectionKey::Up, keys[SDL_SCANCODE_UP]);
 	_dirkeys.Set(DirectionKey::Right, keys[SDL_SCANCODE_RIGHT]);
 	_dirkeys.Set(DirectionKey::Down, keys[SDL_SCANCODE_DOWN]);
+	_walkkeys.Set(DirectionKey::Up, keys[SDL_SCANCODE_W]);
+	_walkkeys.Set(DirectionKey::Left, keys[SDL_SCANCODE_A]);
+	_walkkeys.Set(DirectionKey::Down, keys[SDL_SCANCODE_S]);
+	_walkkeys.Set(DirectionKey::Right, keys[SDL_SCANCODE_D]);
 
 	/* And the mouse buttons, for the same reason everything above is read
 	 * rather than remembered: a release can go missing, and then the button is

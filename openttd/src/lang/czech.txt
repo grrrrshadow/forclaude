@@ -601,6 +601,7 @@ STR_MAP_MENU_MAP_OF_WORLD                                       :Mapa světa
 STR_MAP_MENU_EXTRA_VIEWPORT                                     :Další pohled
 STR_MAP_MENU_LINGRAPH_LEGEND                                    :Legenda toku nákladu
 STR_MAP_MENU_SIGN_LIST                                          :Seznam popisků
+STR_MAP_MENU_FIRST_PERSON                                       :Pohled z první osoby
 
 # Town menu
 STR_TOWN_MENU_TOWN_DIRECTORY                                    :Seznam měst
@@ -2338,6 +2339,17 @@ STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Kulaté zatáčky kolejí: {STRING}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :Zatáčka kolejí -- rovně, kus na šikmo, rovně -- se v otočeném pohledu nakreslí jako jeden kulatý oblouk přes asi dvě dlaždice a vlak na ní se nakreslí natočený podél oblouku jako svá 3D podoba. U výhybky se zakulatí odbočka, přímá kolej zůstane rovná. Jen vzhled: kolej se staví a jezdí se po ní jako vždycky. Při pohledu na sever (úhel 0, na stavění) jsou zatáčky jako vždycky. Potřebuje 32bpp blitter. Vypnuto: zatáčky jsou, jaké vždycky byly, do pixelu
+STR_FIRST_PERSON_CAPTION                                        :{WHITE}Pohled z první osoby
+STR_FIRST_PERSON_FULL_TOOLTIP                                   :{BLACK}Pohled přes celou obrazovku a zpět
+STR_FIRST_PERSON_HERE                                           :Sem
+STR_FIRST_PERSON_HERE_TOOLTIP                                   :{BLACK}Postav chodce tam, kam se dívá hlavní pohled
+STR_FIRST_PERSON_CENTRE                                         :Na mapě
+STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Ukaž místo chodce v hlavním pohledu
+STR_FIRST_PERSON_RUN                                            :Běh
+STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat místo chůze (běží se i s podrženým Shiftem)
+STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
+STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh
+STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}
 STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vozidlo
 STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Otevřít okno vozidla

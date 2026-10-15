@@ -362,6 +362,12 @@ enum class WindowClass : uint16_t {
 	CabView,
 
 	/**
+	 * The view from the first person (first_person_gui.cpp); %Window numbers:
+	 *   - 0 = #FirstPersonWidgets
+	 */
+	FirstPerson,
+
+	/**
 	 * Station view; %Window numbers:
 	 *   - #StationID = #StationViewWidgets
 	 */

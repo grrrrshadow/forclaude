@@ -508,6 +508,7 @@ STR_MAP_MENU_MAP_OF_WORLD                                       :Map of world
 STR_MAP_MENU_EXTRA_VIEWPORT                                     :Extra viewport
 STR_MAP_MENU_LINGRAPH_LEGEND                                    :Cargo flow legend
 STR_MAP_MENU_SIGN_LIST                                          :Sign list
+STR_MAP_MENU_FIRST_PERSON                                       :View from the first person
 
 # Town menu
 STR_TOWN_MENU_TOWN_DIRECTORY                                    :Town directory
@@ -2233,6 +2234,17 @@ STR_CONFIG_SETTING_NIGHT                                        :Night: {STRING2
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :The map as at night: darkened, the lights of the vehicles on. Only the picture changes, nothing of the game. Also in the help menu, by the console. Needs the 32bpp blitter
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Round curves of rails: {STRING2}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :A curve of rails -- a straight, a piece on the diagonal, a straight -- is drawn in the turned view as one round arc over about two tiles, and a train on it is drawn turned along the arc as its 3D likeness. At a switch the branch is rounded, the straight way stays straight. Only how it looks: the track is built and run on as always. Facing north (angle 0, for building) the curves are as always. Needs the 32bpp blitter. Off, the curves are as they always were, to the pixel
+STR_FIRST_PERSON_CAPTION                                        :{WHITE}View from the first person
+STR_FIRST_PERSON_FULL_TOOLTIP                                   :{BLACK}The view over the whole screen, and back
+STR_FIRST_PERSON_HERE                                           :Here
+STR_FIRST_PERSON_HERE_TOOLTIP                                   :{BLACK}Put the walker where the main view looks
+STR_FIRST_PERSON_CENTRE                                         :On the map
+STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Show the walker's place in the main view
+STR_FIRST_PERSON_RUN                                            :Run
+STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
+STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
+STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run
+STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Cab view: {VEHICLE}
 STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vehicle
 STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Open the vehicle's window

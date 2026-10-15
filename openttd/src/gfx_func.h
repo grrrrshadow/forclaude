@@ -49,6 +49,7 @@ void GameLoop();
 void CreateConsole();
 
 extern DirectionKeys _dirkeys;
+extern DirectionKeys _walkkeys;
 extern bool _fullscreen;
 extern Support8bpp _support8bpp;
 extern CursorVars _cursor;

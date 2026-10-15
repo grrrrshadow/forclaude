@@ -549,6 +549,7 @@ add_files(
     cab_drive.h
     cab_view.h
     cab_view_gui.cpp
+    first_person_gui.cpp
     three_d_vehicle.cpp
     three_d_vehicle_object.cpp
     three_d_vehicle_object.h

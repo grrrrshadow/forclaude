@@ -33,6 +33,7 @@
 #include "safeguards.h"
 
 DirectionKeys _dirkeys; ///< Pressed direction keys.
+DirectionKeys _walkkeys; ///< The keys W, A, S and D held down (up, left, down, right): the walker of the view from the first person (first_person_gui.cpp).
 bool _fullscreen;
 Support8bpp _support8bpp; ///< State of the support for 8bpp graphics.
 CursorVars _cursor;

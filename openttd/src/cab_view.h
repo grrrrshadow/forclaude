@@ -50,4 +50,18 @@ struct Vehicle;
 bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 void ShowCabViewWindow(const Vehicle *v);
 
+/**
+ * The walker of the view from the first person (first_person_gui.cpp; the player, 15. 10.: "let's make Morrowind,
+ * the inventory, the first person view"): where it stands and where it looks. Only the picture: nothing of the game.
+ */
+struct FirstPersonEye {
+	double x = 0, y = 0;  ///< where it stands, world units
+	double heading = 0;   ///< radians, the world direction it looks along (atan2 of y, x)
+	double pitch = 0;     ///< radians, looking up (positive) or down
+	double eye_z = 0;     ///< its eyes over the ground, units of height
+};
+bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
+double FirstPersonGroundZ(double x, double y);
+void ShowFirstPersonWindow();
+
 #endif /* CAB_VIEW_H */

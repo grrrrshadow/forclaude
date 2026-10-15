@@ -8837,6 +8837,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* Turn every preview to an angle (rig: the frames of a turn). */
 		SetThreeDPreviewYaw(std::strtof(std::string(argv[3]).c_str(), nullptr));
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
+	} else if (what == "chodec") {
+		/* The view from the first person (first_person_gui.cpp): 'chodec' opens it where the main view looks;
+		 * 'chodec krok <n> <ahead> <aside> <turn> [pitch degrees]' walks n steps as if the keys were held. */
+		extern std::string DescribeFirstPerson();
+		extern void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch);
+		if (argv.size() > 6 && argv[2] == "krok") {
+			auto n = number(3), ahead = number(4), aside = number(5), turn = number(6);
+			auto pitch = argv.size() > 7 ? number(7) : std::optional<int>(0);
+			RigFirstPersonWalk(n.value_or(0), ahead.value_or(0), aside.value_or(0), turn.value_or(0), pitch.value_or(0) * M_PI / 180.0);
+		} else {
+			ShowFirstPersonWindow();
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeFirstPerson());
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {

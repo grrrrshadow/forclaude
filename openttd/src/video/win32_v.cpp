@@ -1096,8 +1096,13 @@ void VideoDriver_Win32Base::InputLoop()
 		_dirkeys.Set(DirectionKey::Up, GetAsyncKeyState(VK_UP));
 		_dirkeys.Set(DirectionKey::Right, GetAsyncKeyState(VK_RIGHT));
 		_dirkeys.Set(DirectionKey::Down, GetAsyncKeyState(VK_DOWN));
+		_walkkeys.Set(DirectionKey::Up, GetAsyncKeyState('W'));
+		_walkkeys.Set(DirectionKey::Left, GetAsyncKeyState('A'));
+		_walkkeys.Set(DirectionKey::Down, GetAsyncKeyState('S'));
+		_walkkeys.Set(DirectionKey::Right, GetAsyncKeyState('D'));
 	} else {
 		_dirkeys.Reset();
+		_walkkeys.Reset();
 	}
 
 	/* And the mouse buttons, for the same reason everything above is read

@@ -57,6 +57,7 @@
 #include "story_base.h"
 #include "toolbar_gui.h"
 #include "settings_internal.h"
+#include "cab_view.h"
 #include "framerate_type.h"
 #include "screenshot_gui.h"
 #include "misc_cmd.h"
@@ -487,6 +488,7 @@ enum class MapMenuEntries : uint8_t {
 	ShowSignList, ///< Open sign list window.
 	ShowTownDirectory, ///< Open window with list of towns.
 	ShowIndustryDirectory, ///< Open window with list of industries.
+	ShowFirstPerson, ///< Open the view from the first person (first_person_gui.cpp).
 };
 
 static CallBackFunction ToolbarMapClick(Window *w)
@@ -496,6 +498,7 @@ static CallBackFunction ToolbarMapClick(Window *w)
 	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_EXTRA_VIEWPORT, MapMenuEntries::ShowExtraViewport));
 	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_LINGRAPH_LEGEND, MapMenuEntries::ShowLinkGraph));
 	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_SIGN_LIST, MapMenuEntries::ShowSignList));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_FIRST_PERSON, MapMenuEntries::ShowFirstPerson));
 	PopupMainToolbarMenu(w, WID_TN_SMALL_MAP, std::move(list), 0);
 	return CallBackFunction::None;
 }
@@ -527,6 +530,7 @@ static CallBackFunction MenuClickMap(int index)
 		case MapMenuEntries::ShowSignList: ShowSignList(); break;
 		case MapMenuEntries::ShowTownDirectory: ShowTownDirectory(); break;
 		case MapMenuEntries::ShowIndustryDirectory: ShowIndustryDirectory(); break;
+		case MapMenuEntries::ShowFirstPerson: ShowFirstPersonWindow(); break;
 	}
 	return CallBackFunction::None;
 }
