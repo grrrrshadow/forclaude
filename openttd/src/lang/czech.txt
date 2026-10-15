@@ -142,6 +142,14 @@ STR_CARGO_PLURAL_HEMP_FIBRE                                     :Konopná vlákn
 STR_CARGO_PLURAL_HEMP_FIBRE.gen                                 :Konopných vláken
 STR_CARGO_PLURAL_HEMP_FIBRE.acc                                 :Konopná vlákna
 STR_CARGO_PLURAL_HEMP_FIBRE.big                                 :Konopná vlákna
+STR_CARGO_PLURAL_POTATOES                                       :Brambory
+STR_CARGO_PLURAL_POTATOES.gen                                   :Brambor
+STR_CARGO_PLURAL_POTATOES.acc                                   :Brambory
+STR_CARGO_PLURAL_POTATOES.big                                   :Brambory
+STR_CARGO_PLURAL_ALCOHOL                                        :Alkohol
+STR_CARGO_PLURAL_ALCOHOL.gen                                    :Alkoholu
+STR_CARGO_PLURAL_ALCOHOL.acc                                    :Alkohol
+STR_CARGO_PLURAL_ALCOHOL.big                                    :Alkohol
 STR_CARGO_PLURAL_EXPLOSIVES                                     :Výbušniny
 STR_CARGO_PLURAL_EXPLOSIVES.gen                                 :Výbušnin
 STR_CARGO_PLURAL_EXPLOSIVES.acc                                 :Výbušniny
@@ -186,6 +194,8 @@ STR_CARGO_SINGULAR_ROAD_VEHICLE                                 :Silniční vozi
 STR_CARGO_SINGULAR_MARIJUANA                                    :marihuany
 STR_CARGO_SINGULAR_STUDENTKA                                    :studentka
 STR_CARGO_SINGULAR_HEMP_FIBRE                                   :konopných vláken
+STR_CARGO_SINGULAR_POTATOES                                     :brambor
+STR_CARGO_SINGULAR_ALCOHOL                                      :alkoholu
 STR_CARGO_SINGULAR_EXPLOSIVE                                    :výbušnin
 
 # Quantity of cargo
@@ -225,6 +235,8 @@ STR_QUANTITY_ROAD_VEHICLES                                      :{COMMA}{NBSP}si
 STR_QUANTITY_MARIJUANA                                          :{WEIGHT_LONG} marihuany
 STR_QUANTITY_STUDENTKY                                          :{COMMA}{NBSP}studentk{P a y ek}
 STR_QUANTITY_HEMP_FIBRE                                         :{WEIGHT_LONG} konopných vláken
+STR_QUANTITY_POTATOES                                           :{WEIGHT_LONG} brambor
+STR_QUANTITY_ALCOHOL                                            :{VOLUME_LONG} alkoholu
 STR_QUANTITY_EXPLOSIVES                                         :{COMMA}{NBSP}bed{P na ny en} výbušnin
 STR_QUANTITY_N_A                                                :N/A
 
@@ -265,6 +277,8 @@ STR_ABBREV_ROAD_VEHICLES                                        :SV
 STR_ABBREV_MARIJUANA                                            :MA
 STR_ABBREV_STUDENTKY                                            :SK
 STR_ABBREV_HEMP_FIBRE                                           :KV
+STR_ABBREV_POTATOES                                             :BR
+STR_ABBREV_ALCOHOL                                              :AL
 STR_ABBREV_EXPLOSIVES                                           :VY
 STR_ABBREV_ALL                                                  :VŠE
 

@@ -1077,6 +1077,49 @@ static void OfferExplosivesToArmouredOnly()
 	}
 }
 
+/**
+ * The cargoes of the game's own industries on the game's own wagons and lorries (the player, 15. 10.: "the marijuana
+ * coal wagon will not be in the purchase list once more but will be with the coal one as a refit, to save room in the
+ * 8bpp list"; "marijuana hay, plant, fibres we carry by the coal wagon"; "the oil tanker will be for alcohol"; "potatoes
+ * another refit of goods"): a vehicle of the game (of no set) that carries coal -- or the bulk of a climate without
+ * it -- is refitted to marijuana and hemp fibre too, one for oil (cola) to alcohol, one for goods (sweets) to potatoes.
+ * The marijuana wagons and lorries of their own are no longer offered (ApplyOriginalVehicleSettings()); a coal wagon
+ * with marijuana draws its load green as they did. Done after OfferMarijuanaToShipsAndAircraft(), which takes
+ * marijuana out of every other mask.
+ */
+static void OfferIndustryCargoesToOriginalVehicles()
+{
+	struct Offer {
+		CargoLabel carries;
+		std::array<CargoLabel, 2> also;
+	};
+	static const Offer offers[] = {
+		{CT_COAL,       {CT_MARIJUANA, CT_HEMP_FIBRE}},
+		{CT_COPPER_ORE, {CT_MARIJUANA, CT_HEMP_FIBRE}},
+		{CT_SUGAR,      {CT_MARIJUANA, CT_HEMP_FIBRE}},
+		{CT_OIL,        {CT_ALCOHOL, CT_INVALID}},
+		{CT_COLA,       {CT_ALCOHOL, CT_INVALID}},
+		{CT_GOODS,      {CT_POTATOES, CT_INVALID}},
+		{CT_CANDY,      {CT_POTATOES, CT_INVALID}},
+	};
+	for (Engine *e : Engine::Iterate()) {
+		if (e->GetGRF() != nullptr || (e->type != VehicleType::Train && e->type != VehicleType::Road)) continue;
+		CargoType own = e->GetDefaultCargoType();
+		if (!IsValidCargoType(own)) continue;
+		const CargoLabel label = CargoSpec::Get(own)->label;
+		for (const Offer &o : offers) {
+			if (o.carries != label) continue;
+			for (CargoLabel also : o.also) {
+				CargoType cargo = also == CT_INVALID ? INVALID_CARGO : GetCargoTypeByLabel(also);
+				if (IsValidCargoType(cargo)) e->info.refit_mask.Set(cargo);
+			}
+			/* Potatoes are bulk, but they are a refit of goods (the player), not of the coal wagon too. */
+			CargoType potatoes = GetCargoTypeByLabel(CT_POTATOES);
+			if (IsValidCargoType(potatoes) && o.also[0] == CT_MARIJUANA) e->info.refit_mask.Reset(potatoes);
+		}
+	}
+}
+
 /** Set to use the correct action0 properties for each canal feature */
 static void FinaliseCanals()
 {
@@ -2468,6 +2511,7 @@ static void AfterLoadGRFs()
 	OfferRoadVehiclesToCarriers();
 	OfferMarijuanaToShipsAndAircraft();
 	OfferExplosivesToArmouredOnly();
+	OfferIndustryCargoesToOriginalVehicles();
 
 	/* No NewGRF gets a say in how its trains turn round. */
 	IgnoreNewGRFReversingFlags();

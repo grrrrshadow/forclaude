@@ -998,14 +998,12 @@ void ApplyOriginalVehicleSettings()
 				break;
 		}
 
-		/* The wagons and lorries for marijuana are in the game exactly while the
-		 * game's own industries are (economy.extra_industries), in every climate,
-		 * whatever the setting for the original vehicles says: nothing else
-		 * carries the cargo, since no set knows it. */
+		/* The wagons and lorries for marijuana are no longer offered: the coal
+		 * wagons and lorries of the game are refitted to it instead (the player,
+		 * 15. 10.: "to save room in the 8bpp list", see
+		 * OfferIndustryCargoesToOriginalVehicles()). Those already bought go on. */
 		const EngineInfo &orig = _orig_engine_info[GetOriginalEngineOffset(e->type) + e->grf_prop.local_id];
-		if (IsMarijuanaEngineInfo(orig)) {
-			e->info.climates = _settings_game.economy.extra_industries ? orig.climates : LandscapeTypes{};
-		}
+		if (IsMarijuanaEngineInfo(orig)) e->info.climates = LandscapeTypes{};
 	}
 }
 

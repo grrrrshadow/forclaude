@@ -93,6 +93,10 @@ static constexpr CargoLabel CT_HEMP_FIBRE{'FICR'};
 static constexpr CargoLabel CT_EXPLOSIVES{'BOOM'};
 /** Studentky, of the churches and parks of the original town houses, which take them back like passengers and so does the coffeeshop; with economy.extra_industries. */
 static constexpr CargoLabel CT_STUDENTKY{'STUD'};
+/** Potatoes ("brambory"), of the game's own potato field, to the distillery (the player's sets carry them by this label). */
+static constexpr CargoLabel CT_POTATOES{'BRAM'};
+/** Alcohol, of the game's own distillery, to the pub (FIRS's label for it). */
+static constexpr CargoLabel CT_ALCOHOL{'BEER'};
 
 static constexpr CargoLabel CT_INVALID{UINT32_MAX}; ///< Invalid cargo type.
 

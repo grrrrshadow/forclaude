@@ -1654,6 +1654,8 @@ std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 		labels.push_back(CT_HEMP_FIBRE);
 		labels.push_back(CT_EXPLOSIVES);
 		labels.push_back(CT_STUDENTKY);
+		labels.push_back(CT_POTATOES);
+		labels.push_back(CT_ALCOHOL);
 	}
 	if (IndustryClimatesOn().None()) return labels;
 	auto add = [&labels](const std::vector<CargoLabel> &more) {

@@ -8976,6 +8976,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: {}", all.substr(at, end - at));
 			at = end + 1;
 		}
+	} else if (what == "prestavby") {
+		/* 'prestavby': the game's own wagons and lorries for coal, oil, goods and marijuana: what they refit to, whether offered. */
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->GetGRF() != nullptr || (e->type != VehicleType::Train && e->type != VehicleType::Road)) continue;
+			CargoType own = e->GetDefaultCargoType();
+			if (!IsValidCargoType(own)) continue;
+			CargoLabel l = CargoSpec::Get(own)->label;
+			if (l != CT_COAL && l != CT_OIL && l != CT_GOODS && l != CT_MARIJUANA && l != CT_COPPER_ORE) continue;
+			std::string refits;
+			auto label_text = [](CargoLabel lab) { uint32_t v = lab.base(); return std::string{static_cast<char>(v >> 24), static_cast<char>(v >> 16), static_cast<char>(v >> 8), static_cast<char>(v)}; };
+			for (CargoType c : e->info.refit_mask) refits += " " + label_text(CargoSpec::Get(c)->label);
+			IConsolePrint(CC_DEFAULT, "test3d: prestavba {} '{}': {} v klimatech {:x}, nabizi se {}:{}", e->index.base(), GetString(STR_ENGINE_NAME, e->index), label_text(l), e->info.climates.base(), e->IsEnabled() ? "ano" : "ne", refits);
+		}
 	} else if (what == "zadni") {
 		/* 'zadni <0|1>': a 3D object's triangles turned away from the view left out (1, as the game draws), or all drawn. */
 		extern bool _turned_cull;

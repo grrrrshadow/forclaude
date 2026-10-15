@@ -149,6 +149,15 @@ static const CargoSpec _default_cargo[] = {
 	 * ship and aircraft takes them; they do not count as passengers for the
 	 * town (TownAcceptanceEffect::None). */
 	MK(  59, CT_STUDENTKY,    152,  1, 0x400, 3185,  0,  24, false,       TownAcceptanceEffect::None,    STUDENTKY,    STUDENTKA, STR_QUANTITY_STUDENTKY, CargoClasses({CargoClass::Passengers})),
+
+	/* Potatoes (CT_POTATOES) of the potato field and alcohol (CT_ALCOHOL) the
+	 * distillery makes of them for the pub, with economy.extra_industries,
+	 * placed the way marijuana is (the player, 15. 10.). Potatoes are weighed,
+	 * paid and carried like grain; the player's lorries name them, and of the
+	 * game's own vehicles the goods vans and lorries take them, alcohol the oil
+	 * tankers (OfferIndustryCargoesToOriginalVehicles()). */
+	MK(  58, CT_POTATOES,     191, 16, 0x100, 4778,  4,  40,  true,       TownAcceptanceEffect::None,     POTATOES,     POTATOES,       STR_TONS, CargoClasses({CargoClass::Bulk})),
+	MK(  57, CT_ALCOHOL,       39, 16, 0x100, 5688,  8,  60,  true,       TownAcceptanceEffect::None,      ALCOHOL,      ALCOHOL,     STR_LITERS, CargoClasses({CargoClass::Liquid, CargoClass::Potable})),
 };
 
 
