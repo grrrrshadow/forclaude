@@ -128,6 +128,19 @@ struct ThreeDVehiclePaint {
 	int start = 0;              ///< "zacatek": the texture's lightness the colour is at its own (0: the brightest of the mask)
 };
 
+/**
+ * The rust of a vehicle object ("rez", the colleague's hra/3d/PROSBA-VOZIDLA-3D.md): a second grey mask of the body's
+ * texture's layout, its pixels rusting to a colour with age, over the faded paint.
+ */
+struct ThreeDVehicleRust {
+	std::string mask_file;      ///< "maska"
+	uint32_t target = 0;        ///< "cil": the rust's colour (Colour::data)
+	int years = 30;             ///< "let": by then all of it that rusts has
+	int step = 2;               ///< "krok": a step every so many years
+	bool gradual = false;       ///< "postupne": a pixel's value is the moment it starts rusting (1 at once, 255 at the end of "let", 0 never), else how much it rusts
+	float ramp = 0.25f;         ///< "postupne": "nabeh", the share of "let" a pixel takes from bare to all rust
+};
+
 /** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
 struct ThreeDVehicleCrew {
 	std::string figure;         ///< "postava": the figure's name
@@ -160,6 +173,7 @@ struct ThreeDVehicleObject {
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	float cab[3] = {};              ///< x, y, z, metres
 	ThreeDVehiclePaint paint;       ///< "lak"
+	ThreeDVehicleRust rust;         ///< "rez"
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none
@@ -172,6 +186,7 @@ struct ThreeDVehicleObject {
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
+	const ThreeDObjectTexture *GetRustMask(int level) const;
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
@@ -182,6 +197,8 @@ private:
 	mutable std::vector<std::vector<ThreeDObjectTexture>> levels; ///< the textures, each halved for each level of detail
 	mutable std::vector<ThreeDObjectTexture> mask_levels;         ///< the paint mask likewise (its grey in the red)
 	mutable bool mask_tried = false;
+	mutable std::vector<ThreeDObjectTexture> rust_levels;         ///< the rust mask likewise
+	mutable bool rust_tried = false;
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);

@@ -780,6 +780,24 @@ static void ReadThreeDVehicleObjects()
 						}
 					}
 				}
+				/* The rust: a second mask over the body's texture, rusting with age after the paint has faded. */
+				if (e.contains("rez") && e.at("rez").is_object()) {
+					const auto &rez = e.at("rez");
+					if (rez.contains("maska") && rez.at("maska").is_string()) obj.rust.mask_file = folder + rez.at("maska").get<std::string>();
+					if (rez.contains("cil") && rez.at("cil").is_string()) {
+						std::string t = rez.at("cil").get<std::string>();
+						if (t.starts_with("#")) t = t.substr(1);
+						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+						if (n.has_value()) obj.rust.target = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+					}
+					obj.rust.years = std::max(1, rez.value("let", 30));
+					obj.rust.step = std::clamp(rez.value("krok", 2), 1, obj.rust.years);
+					if (rez.contains("postupne") && rez.at("postupne").is_object()) {
+						obj.rust.gradual = true;
+						obj.rust.ramp = std::clamp(rez.at("postupne").value("nabeh", 0.25f), 0.01f, 1.0f);
+					}
+					if (obj.rust.target == 0) obj.rust.mask_file.clear();
+				}
 				/* The crew: figures riding in it, never fading. */
 				if (e.contains("posadka") && e.at("posadka").is_array()) {
 					for (const auto &c : e.at("posadka")) {
@@ -1039,6 +1057,18 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 }
 
 /** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
+{
+	if (this->rust.mask_file.empty()) return nullptr;
+	if (!this->rust_tried) {
+		this->rust_tried = true;
+		std::vector<uint8_t> png = ReadWholeFile(this->rust.mask_file);
+		if (!png.empty()) DecodeTextureLevels(png, this->rust_levels, Colour(0, 0, 0).data);
+	}
+	if (this->rust_levels.empty()) return nullptr;
+	return &this->rust_levels[std::clamp<int>(level, 0, static_cast<int>(this->rust_levels.size()) - 1)];
+}
+
 const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 {
 	if (this->paint.mask_file.empty()) return nullptr;

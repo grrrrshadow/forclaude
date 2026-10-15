@@ -471,6 +471,15 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   `zacatek` light. Done per pixel while drawing (no texture copies); a sprite and
   a picture of the turned view for each step of fading, made when a vehicle
   that old is first drawn. Rig: `test3d stari <years>` makes every vehicle so old.
+- **Rust** (`"rez"`, the colleague's `hra/3d/PROSBA-VOZIDLA-3D.md`; the player:
+  "a few lines of corrosion across the roof, more and more, thicker"): a
+  second grey mask of the body's texture's layout, `cil` the rust's colour,
+  `let`, `krok` as the paint; with `"postupne": {"nabeh": 0.25}` a pixel's
+  value is the moment it starts rusting (1 at once, 255 at the end of `let`,
+  0 never), and in `nabeh` of `let` it goes from bare to all rust; without, it
+  is how much it rusts. Over the faded paint, per pixel while drawing; the step
+  of the rust is the second byte of the vehicle's age step (`FadeStep()`), so a
+  sprite and a picture for each step of both.
 - **Wheels of their own** (the player: "one wheel will do for an eight-wheeled
   car"): a .glb is read with all the nodes of its scene, a mesh as often as
   nodes name it (Blender's linked duplicates: one wheel in the file, at every
