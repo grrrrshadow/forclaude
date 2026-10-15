@@ -28,12 +28,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   zadní červená, letadla maják). I v pohledu z očí, světla zakrytá tím, co je před nimi.
   Hráč: „nic nezapomeň, světla“ → zbývá: **lampy u silnic a svítící okna** (kolega dodá uzly `noc`/`den`, `svetlo_NN`).
 - **Tatra VB bliká:** rozhoduje GRF (stavy), hra sama ne. Kolega: bliká jen naložená (s 1 osobou). Hotovo u něj.
-- **Inventář** (dělám): hráč: normální inventář jako v Morrowindu. Věci: **velké kladivo** (hráč prošel celý
+- **Inventář** (hotovo `e56699b`, klávesa I v pohledu z první osoby): hráč: normální inventář jako v Morrowindu. Věci: **velké kladivo** (hráč prošel celý
   Morrowind s velkým kladivem, má ho od začátku), zbroj, boty, pivo, cigarety, mari, zboží. Budeme přidávat.
   - ukládá se do savu, **platí se penězi firmy**;
   - pivo v hospodě, mari u automatu a v hulírně, cigarety a zboží v obchodech ve městě;
   - **pivo léčí, mari léčí víc**; ostatní se zatím jen nosí. Oblékání a kouzla později.
   - od kolegy: předměty jako glb `druh: predmet` (kladivo z Example Suite), kladivo v ruce v první osobě.
+  - v pohledu z očí se náš průmysl (hospoda, lihovar, gymnázium…) kreslí objekty jako domy; dřív plakát ve vzduchu.
+- **Build 277: v mírném klimatu nejsou města** (hráč). U mě se města generují (1930, 1950, mapa 256, prázdný
+  config). Podezření: nastavení „dělení měst podle GRF domů“ (`economy.split_house_grfs`, výchozí zapnuto) – když
+  je aktivní jen jedna GRF sada domů, která v ten rok nemá co postavit, nevznikne žádné město. Čekám na hráče:
+  jaké GRF má, jaký rok, jestli hláška.
 - Dál z OpenMW (kolegův `hra/3d/NAVRH-Z-OPENMW.md`): kostra a animace z glTF (135 animací postavy, ruce, sekání),
   interiéry dveřmi, boj zblízka, draci na mapě (`hra/3d/PROSBA-DRACI.md`).
 
@@ -50,7 +55,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 
 ## Otevřené
 
-- Inventář (okno, nákup, použití, uložení), kladivo v ruce.
+- Kladivo v ruce (objekt od kolegy), oblékání, kouzla.
+- Města v mírném klimatu v buildu 277.
 - Lampy a okna v noci.
 - Kostra a animace glTF; draci; interiéry; boj.
 - Klínek sousedního domu přes průčelí (#41). Domy z GRF objektem z balíčku (MAXd, #47). Doplňky (maják) podle stavu GRF.
