@@ -346,6 +346,13 @@ void UpdateTownRadius(Town *t);
 CommandCost CheckIfAuthorityAllowsNewStation(TileIndex tile, DoCommandFlags flags);
 Town *ClosestTownFromTile(TileIndex tile, uint threshold);
 TownTheme GetTownThemeAt(TileIndex tile);
+/** How the land of a themed town looks (GetThemedLand()). */
+enum class ThemedLand : uint8_t {
+	None,   ///< as everywhere
+	Ash,    ///< the clay town's: grey ash, in the 3D views
+	Desert, ///< a town of the desert houses in another climate: the tropics' desert, palms and cacti
+};
+ThemedLand GetThemedLand(TileIndex tile);
 void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags);
 HouseZone GetTownRadiusGroup(const Town *t, TileIndex tile);
 void SetTownRatingTestMode(bool mode);

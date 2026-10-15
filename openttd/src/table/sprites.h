@@ -494,10 +494,19 @@ static constexpr uint16_t CLIMATE_INDUSTRY_SPRITE_COUNT = 4 * CLIMATE_INDUSTRY_S
 /** @} */
 
 /** @{
+ * The desert ground of the tropic climate's own base graphics file -- where the
+ * other climates have the snow (SPR_FLAT_1_QUART_SNOW_DESERT_TILE and on) --
+ * its four densities of 19 slopes each, in every climate: the land of a town
+ * of the desert houses in another climate is desert (GetThemedLand()). */
+static constexpr SpriteID SPR_DESERT_GROUND_BASE = SPR_CLIMATE_INDUSTRY_BASE + CLIMATE_INDUSTRY_SPRITE_COUNT;
+static constexpr uint16_t DESERT_GROUND_SPRITE_COUNT = 4 * 19;
+/** @} */
+
+/** @{
  * The loaded pictures of the marijuana wagons and lorries: the coal truck's
  * and the coal lorries' loaded pictures with the load drawn green, made when
  * read (green_load.h). */
-static constexpr SpriteID SPR_GREEN_LOAD_BASE = SPR_CLIMATE_INDUSTRY_BASE + CLIMATE_INDUSTRY_SPRITE_COUNT;
+static constexpr SpriteID SPR_GREEN_LOAD_BASE = SPR_DESERT_GROUND_BASE + DESERT_GROUND_SPRITE_COUNT;
 static constexpr uint16_t GREEN_LOAD_SPRITE_COUNT = 32;
 /** @} */
 

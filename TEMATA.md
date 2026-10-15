@@ -33,7 +33,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kolega teď domy předělává kvůli **svítícím oknům** v noci → vezmu nové soubory, okna napojím na noc.
 - **Popelavá zem** (hotovo): tráva a hrubá zem na území hliněného města ve 3D šedá (paleta vraků). Houby i v pohledu
   z očí (plakáty z jejich obrázků, zblízka jemnější).
-- Zbývá: poušť kolem pouštních tématických měst (pouštní zem a stromy z pouštního klimatu).
+- **Poušť** (hotovo): pouštní tématické město (staví jen pouštní domy v jiném klimatu) má na svém území písek
+  z pouštního klimatu (načtený zvlášť, v mírném klimatu jsou na jeho místě sněhové sprity) a stromy jako palmy
+  a kaktusy; ve všech pohledech, i ve 2D.
+- Území tématického města: zastavěná část (vnější zóna) a 4 dlaždice kolem, nejbližší město.
 
 ## 15. 10. – Morrowind: pohled z první osoby, inventář, noc
 

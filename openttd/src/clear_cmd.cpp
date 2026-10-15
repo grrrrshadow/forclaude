@@ -60,20 +60,33 @@ static CommandCost ClearTile_Clear(TileIndex tile, DoCommandFlags flags)
  * @param density The density of the dirt -> grass transition to draw.
  */
 /**
- * The palette of the grass and the rough land of a tile on the land of a themed town in the 3D views
- * (GetTownThemeAt()): the clay town's is grey ash (the player, 15. 10.: "ash ground", as under the Red Mountain),
- * the grass drawn in the greys of the wrecks; elsewhere as it is.
- * @param tile the tile
+ * The grass and the rough land of a tile on the land of a themed town (GetThemedLand()): the desert town's is the
+ * tropics' desert (SPR_DESERT_GROUND_BASE), drawn here; the clay town's is grey ash in the 3D views (the player,
+ * 15. 10.: "ash ground", as under the Red Mountain), the grass in the greys of the wrecks.
+ * @param ti the tile
+ * @param[out] pal the palette to draw its grass in
+ * @return whether its ground was drawn here
  */
-PaletteID GetThemedGroundPalette(TileIndex tile)
+static bool DrawThemedGround(const TileInfo *ti, PaletteID &pal)
 {
-	if (!ViewportDrawing3D()) return PAL_NONE;
-	return GetTownThemeAt(tile) == TownTheme::Clay ? PALETTE_CRASH : PAL_NONE;
+	pal = PAL_NONE;
+	switch (GetThemedLand(ti->tile)) {
+		case ThemedLand::Desert:
+			DrawGroundSprite(SPR_DESERT_GROUND_BASE + 3 * 19 + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			return true;
+		case ThemedLand::Ash:
+			if (ViewportDrawing3D()) pal = PALETTE_CRASH;
+			return false;
+		default:
+			return false;
+	}
 }
 
 void DrawClearLandTile(const TileInfo *ti, uint8_t density)
 {
-	DrawGroundSprite(_clear_land_sprites_grass[density] + SlopeToSpriteOffset(ti->tileh), GetThemedGroundPalette(ti->tile));
+	PaletteID pal;
+	if (DrawThemedGround(ti, pal)) return;
+	DrawGroundSprite(_clear_land_sprites_grass[density] + SlopeToSpriteOffset(ti->tileh), pal);
 }
 
 /**
@@ -82,7 +95,8 @@ void DrawClearLandTile(const TileInfo *ti, uint8_t density)
  */
 void DrawRoughLandTile(const TileInfo *ti)
 {
-	const PaletteID pal = GetThemedGroundPalette(ti->tile);
+	PaletteID pal;
+	if (DrawThemedGround(ti, pal)) return;
 	if (ti->tileh != SLOPE_FLAT) {
 		DrawGroundSprite(SPR_FLAT_ROUGH_LAND + SlopeToSpriteOffset(ti->tileh), pal);
 	} else {

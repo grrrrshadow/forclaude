@@ -146,7 +146,12 @@ static void LoadClimateIndustrySprites(const GraphicsSet *set)
 		for (const auto &[first, last] : _landscape_spriteindexes[to_underlying(climate) - 1]) {
 			for (SpriteID sprite = first; sprite <= last; sprite++) {
 				int index = ClimateIndustrySpriteIndex(sprite);
-				LoadNextSprite(index < 0 ? through : own(climate, index), file, file_sprite++);
+				SpriteID to = index < 0 ? through : own(climate, index);
+				/* The tropic file's desert ground, kept in every climate (SPR_DESERT_GROUND_BASE). */
+				if (climate == LandscapeType::Tropic && sprite >= SPR_FLAT_1_QUART_SNOW_DESERT_TILE && sprite < SPR_FLAT_1_QUART_SNOW_DESERT_TILE + DESERT_GROUND_SPRITE_COUNT) {
+					to = SPR_DESERT_GROUND_BASE + (sprite - SPR_FLAT_1_QUART_SNOW_DESERT_TILE);
+				}
+				LoadNextSprite(to, file, file_sprite++);
 			}
 		}
 	}

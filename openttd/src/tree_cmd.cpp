@@ -709,7 +709,13 @@ static void DrawTile_Trees(TileInfo *ti)
 	if (DrawThemedTrees(ti)) return;
 
 	uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);
-	uint index = GB(tmp, 0, 2) + (GetTreeType(ti->tile) << 2);
+	TreeType type = GetTreeType(ti->tile);
+	/* On the land of a desert town (GetThemedLand()), the tropics' trees: palms, and a cactus now and then. */
+	if (type < TREE_RAINFOREST && GetThemedLand(ti->tile) == ThemedLand::Desert) {
+		const uint pick = GB(TileHash(TileX(ti->tile), TileY(ti->tile)), 0, 3);
+		type = pick < 2 ? TREE_CACTUS : static_cast<TreeType>(TREE_SUB_TROPICAL + pick % TREE_COUNT_SUB_TROPICAL);
+	}
+	uint index = GB(tmp, 0, 2) + (type << 2);
 
 	/* different tree styles above one of the grounds */
 	if ((GetTreeGround(ti->tile) == TreeGround::SnowOrDesert || GetTreeGround(ti->tile) == TreeGround::RoughSnow) &&

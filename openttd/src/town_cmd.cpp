@@ -4441,19 +4441,77 @@ static constexpr uint TOWN_THEME_LAND_REACH = 40;
 static constexpr double TOWN_THEME_LAND_MARGIN = 4.0;
 
 /**
- * The theme of the land a tile is on (TownTheme; the player, 15. 10.: "around the themed towns their trees on their
- * land"): the nearest town's, when the tile is within the town's built-up area (its outer zone) or a few tiles
- * around it.
- * @param tile the tile
- * @return the theme of its land, TownTheme::None where it is no themed town's
+ * Whether a town builds only the desert houses where another climate is played (economy.tropic_towns, or the town
+ * window's "Houses from"): a themed town of the desert, its land desert (the player, 15. 10.: "around the houses of
+ * the desert climate desert, as the trees, on the themed town's land").
  */
+static bool IsDesertTown(const Town *t)
+{
+	if (_settings_game.game_creation.landscape == LandscapeType::Tropic || t->num_house_sets == 0) return false;
+	for (uint i = 0; i < t->num_house_sets; i++) {
+		if (t->house_sets[i] != HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Tropic)) return false;
+	}
+	return true;
+}
+
+/** Whether a town has land of its own look: a clay town or a desert town. */
+static bool HasThemedLand(const Town *t)
+{
+	return t->theme != TownTheme::None || IsDesertTown(t);
+}
+
+/** Whether any town of the game has land of its own look; looked at again each tick of the game, so that a map without any asks nothing more. */
+static bool AnyThemedTown()
+{
+	static uint64_t tick = UINT64_MAX;
+	static size_t towns = SIZE_MAX;
+	static bool any = false;
+	if (tick != TimerGameTick::counter || towns != Town::GetNumItems()) {
+		tick = TimerGameTick::counter;
+		towns = Town::GetNumItems();
+		any = false;
+		for (const Town *t : Town::Iterate()) {
+			if (HasThemedLand(t)) {
+				any = true;
+				break;
+			}
+		}
+	}
+	return any;
+}
+
+/**
+ * The themed town whose land a tile is on (the player, 15. 10.: "around the themed towns their trees on their
+ * land"): the nearest town, when it has land of its own look and the tile is within its built-up area (its outer
+ * zone) or a few tiles around it.
+ * @param tile the tile
+ * @return the town, nullptr where the land is no themed town's
+ */
+static const Town *ThemedTownLandAt(TileIndex tile)
+{
+	if (!AnyThemedTown()) return nullptr;
+	const Town *t = ClosestTownFromTile(tile, TOWN_THEME_LAND_REACH);
+	if (t == nullptr || !HasThemedLand(t)) return nullptr;
+	if (IsTileType(tile, TileType::House)) return t;
+	const double r = std::sqrt(static_cast<double>(t->cache.squared_town_zone_radius[to_underlying(HouseZone::TownEdge)])) + TOWN_THEME_LAND_MARGIN;
+	return DistanceSquare(tile, t->xy) <= r * r ? t : nullptr;
+}
+
+/** The theme of the town whose land a tile is on (ThemedTownLandAt()), TownTheme::None where it is no themed town's. */
 TownTheme GetTownThemeAt(TileIndex tile)
 {
-	const Town *t = ClosestTownFromTile(tile, TOWN_THEME_LAND_REACH);
-	if (t == nullptr || t->theme == TownTheme::None) return TownTheme::None;
-	if (IsTileType(tile, TileType::House)) return t->theme;
-	const double r = std::sqrt(static_cast<double>(t->cache.squared_town_zone_radius[to_underlying(HouseZone::TownEdge)])) + TOWN_THEME_LAND_MARGIN;
-	return DistanceSquare(tile, t->xy) <= r * r ? t->theme : TownTheme::None;
+	const Town *t = ThemedTownLandAt(tile);
+	return t != nullptr ? t->theme : TownTheme::None;
+}
+
+/** How the land a tile is on looks (ThemedTownLandAt()): the clay town's ash, the desert town's desert, or as everywhere. */
+ThemedLand GetThemedLand(TileIndex tile)
+{
+	const Town *t = ThemedTownLandAt(tile);
+	if (t == nullptr) return ThemedLand::None;
+	if (t->theme == TownTheme::Clay) return ThemedLand::Ash;
+	if (IsDesertTown(t)) return ThemedLand::Desert;
+	return ThemedLand::None;
 }
 
 static bool _town_rating_test = false; ///< If \c true, town rating is in test-mode.
