@@ -1,0 +1,57 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/**
+ * @file walker_inventory.h The inventory of the walker of the view from the first person (first_person_gui.cpp).
+ *
+ * The player (15. 10.), after Morrowind: "a normal inventory: armour, boots, he will have beer, and cigarettes and
+ * marijuana, we carry those, and he buys goods", "the big hammer, I went through the whole of Morrowind with a big
+ * hammer", "we will add more". It is the company's (CompanyProperties::walker_items), saved with the game, and paid
+ * for with the company's money: beer at the pub, marijuana at the vending machine and the coffeeshop, cigarettes and
+ * goods at a shop of a town (a house that takes goods). Beer heals, marijuana heals more; the rest is carried for now
+ * (dressing and spells later). The hammer is there from the start.
+ */
+
+#ifndef WALKER_INVENTORY_H
+#define WALKER_INVENTORY_H
+
+#include "economy_type.h"
+#include "strings_type.h"
+#include "tile_type.h"
+
+/** The things the walker can carry. Their numbers are saved: new ones go at the end. */
+enum class WalkerItem : uint8_t {
+	Hammer,     ///< the big hammer, from the start
+	Armour,     ///< armour (to put on later)
+	Boots,      ///< boots (to put on later)
+	Beer,       ///< beer: heals
+	Cigarettes, ///< cigarettes
+	Marijuana,  ///< marijuana: heals more
+	Goods,      ///< goods bought in a town
+	End,        ///< the end of the known things
+};
+
+/** The places of the inventory kept and saved: room for the things to come. */
+static constexpr size_t WALKER_ITEM_SLOTS = 32;
+/** The most of one thing carried. */
+static constexpr uint16_t WALKER_ITEM_MAX = 999;
+/** The walker's full health. */
+static constexpr uint8_t WALKER_HEALTH_MAX = 100;
+
+/** What a thing of the inventory is. */
+struct WalkerItemSpec {
+	StringID name;    ///< its name
+	int64_t price;    ///< what it costs, base currency before inflation; 0 not sold
+	uint8_t heal;     ///< the health it gives used, 0 not usable
+};
+
+const WalkerItemSpec &GetWalkerItemSpec(WalkerItem item);
+bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile);
+Money WalkerItemPrice(WalkerItem item);
+StringID WalkerShopName(TileIndex tile);
+
+#endif /* WALKER_INVENTORY_H */

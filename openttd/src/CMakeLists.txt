@@ -550,6 +550,10 @@ add_files(
     cab_view.h
     cab_view_gui.cpp
     first_person_gui.cpp
+    walker_cmd.cpp
+    walker_cmd.h
+    walker_inventory.h
+    walker_inventory_gui.cpp
     three_d_vehicle.cpp
     three_d_vehicle_object.cpp
     three_d_vehicle_object.h

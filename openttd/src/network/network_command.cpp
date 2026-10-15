@@ -51,6 +51,7 @@
 #include "../viewport_cmd.h"
 #include "../water_cmd.h"
 #include "../waypoint_cmd.h"
+#include "../walker_cmd.h"
 #include "../script/script_cmd.h"
 
 #include "../safeguards.h"

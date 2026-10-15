@@ -159,6 +159,8 @@
 
 #include "timer/timer_game_calendar.h"
 
+#include "walker_cmd.h"
+
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -8859,6 +8861,47 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			ShowFirstPersonWindow();
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeFirstPerson());
+	} else if (what == "inventar") {
+		/* The walker's inventory (walker_inventory_gui.cpp): 'inventar' opens it and tells what it holds and what is sold
+		 * near the walker; 'inventar koupit <n>' buys thing n there, 'inventar pouzit <n>' uses it, 'inventar zdravi <n>'
+		 * sets the health -- each as the local company, through the commands. */
+		extern void ShowWalkerInventoryWindow();
+		extern TileIndex FirstPersonShopNearby();
+		extern TileIndex FirstPersonWalkerTile();
+		if (_local_company == COMPANY_SPECTATOR) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = Company::IsValidID(CompanyID::Begin()) ? Company::Get(CompanyID::Begin()) : DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Company *c = Company::GetIfValid(_local_company);
+		if (c == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: inventar: no company");
+			return true;
+		}
+		const TileIndex shop = FirstPersonShopNearby();
+		auto n = number(3);
+		if (argv.size() > 3 && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
+			const WalkerItem item = static_cast<WalkerItem>(*n);
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			CommandCost res;
+			if (argv[2] == "koupit") {
+				res = Command<Commands::BuyWalkerItem>::Do(DoCommandFlag::Execute, shop, item);
+				if (res.Succeeded()) c->money -= res.GetCost();
+			} else if (argv[2] == "pouzit") {
+				res = Command<Commands::UseWalkerItem>::Do(DoCommandFlag::Execute, item);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: inventar {} {}: {} cena {}", argv[2], *n, res.Succeeded() ? "ok" : "chyba", res.GetCost());
+		} else if (argv.size() > 3 && argv[2] == "zdravi" && n.has_value()) {
+			c->walker_health = static_cast<uint8_t>(std::clamp(*n, 0, static_cast<int>(WALKER_HEALTH_MAX)));
+		} else {
+			ShowWalkerInventoryWindow();
+		}
+		std::string items;
+		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) items += fmt::format(" {}", c->walker_items[i]);
+		const TileIndex here = FirstPersonWalkerTile();
+		IConsolePrint(CC_DEFAULT, "test3d: inventar zdravi {} veci{} penize {} chodec {},{} obchod {}", c->walker_health, items, c->money,
+				IsValidTile(here) ? TileX(here) : -1, IsValidTile(here) ? TileY(here) : -1,
+				IsValidTile(shop) ? fmt::format("{},{} {}", TileX(shop), TileY(shop), GetString(WalkerShopName(shop))) : std::string("-"));
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {

@@ -368,6 +368,12 @@ enum class WindowClass : uint16_t {
 	FirstPerson,
 
 	/**
+	 * The inventory of the walker of the view from the first person (walker_inventory_gui.cpp); %Window numbers:
+	 *   - 0 = #WalkerInventoryWidgets
+	 */
+	WalkerInventory,
+
+	/**
 	 * Station view; %Window numbers:
 	 *   - #StationID = #StationViewWidgets
 	 */

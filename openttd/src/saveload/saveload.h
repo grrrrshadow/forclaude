@@ -427,6 +427,7 @@ enum class SaveLoadVersion : uint16_t {
 	VehicleConfigEight, ///< Saveload version: 373\n Eight details a set may offer on a vehicle instead of four, room for the colours of cab, body and radiator (Vehicle::config_options).
 	VehicleConfigPerWagon, ///< Saveload version: 374\n Sixteen details, and a wagon of a train carries its own choices instead of reading its engine's (Vehicle::config_options, VehicleConfigHead()).
 	CabDriving, ///< Saveload version: 375\n The steering from a vehicle's cab: the speed it is held to, the heading or turn asked for, and the free drive's heading and exact position (Vehicle::cab_speed_limit .. cab_py, cab_drive.h).
+	WalkerInventory, ///< Saveload version: 376\n The inventory of the walker of the view from the first person and its health, the company's (CompanyProperties::walker_items, walker_health; walker_inventory.h).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

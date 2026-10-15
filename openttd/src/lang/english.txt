@@ -2243,8 +2243,35 @@ STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Show the
 STR_FIRST_PERSON_RUN                                            :Run
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
+STR_FIRST_PERSON_WHERE_HEALTH                                   :Health {NUM} · near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
 STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run
 STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
+STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
+STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
+STR_FIRST_PERSON_SHOP_HERE                                      :Here: {STRING} · I: the inventory, buy and use
+STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory
+STR_WALKER_NO_COMPANY                                           :A spectator carries nothing: join a company
+STR_WALKER_HEALTH                                               :Health: {NUM}/{NUM}
+STR_WALKER_CARRIED                                              :You carry:
+STR_WALKER_ITEM_COUNT                                           :{STRING} × {NUM}
+STR_WALKER_USE                                                  :[use, +{NUM} health]
+STR_WALKER_FOR_SALE                                             :For sale here ({STRING}):
+STR_WALKER_NOTHING_FOR_SALE                                     :Nothing for sale here. Walk to a pub, a vending machine, a coffeeshop or a shop of a town.
+STR_WALKER_BUY                                                  :[buy for {CURRENCY_LONG}]
+STR_WALKER_SHOP                                                 :Shop
+STR_WALKER_ITEM_HAMMER                                          :Big hammer
+STR_WALKER_ITEM_ARMOUR                                          :Armour
+STR_WALKER_ITEM_BOOTS                                           :Boots
+STR_WALKER_ITEM_BEER                                            :Beer
+STR_WALKER_ITEM_CIGARETTES                                      :Cigarettes
+STR_WALKER_ITEM_MARIJUANA                                       :Marijuana
+STR_WALKER_ITEM_GOODS                                           :Goods
+STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
+STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
+STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here
+STR_ERROR_WALKER_CARRIES_TOO_MANY                               :{WHITE}No more can be carried
+STR_ERROR_WALKER_CANNOT_USE                                     :{WHITE}It can't be used (yet)
+STR_ERROR_WALKER_HAS_NONE                                       :{WHITE}You have none
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Cab view: {VEHICLE}
 STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vehicle
 STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Open the vehicle's window

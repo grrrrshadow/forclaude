@@ -2348,8 +2348,35 @@ STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Ukaž m�
 STR_FIRST_PERSON_RUN                                            :Běh
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat místo chůze (běží se i s podrženým Shiftem)
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
+STR_FIRST_PERSON_WHERE_HEALTH                                   :Zdraví {NUM} · u města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
+STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
+STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
+STR_FIRST_PERSON_SHOP_HERE                                      :Tady: {STRING} · I: inventář, nákup a použití
+STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventář
+STR_WALKER_NO_COMPANY                                           :Divák nic nenese: přidej se k firmě
+STR_WALKER_HEALTH                                               :Zdraví: {NUM}/{NUM}
+STR_WALKER_CARRIED                                              :Neseš:
+STR_WALKER_ITEM_COUNT                                           :{STRING} × {NUM}
+STR_WALKER_USE                                                  :[použít, +{NUM} zdraví]
+STR_WALKER_FOR_SALE                                             :Tady se prodává ({STRING}):
+STR_WALKER_NOTHING_FOR_SALE                                     :Tady se nic neprodává. Dojdi do hospody, k automatu, do hulírny nebo do obchodu ve městě.
+STR_WALKER_BUY                                                  :[koupit za {CURRENCY_LONG}]
+STR_WALKER_SHOP                                                 :Obchod
+STR_WALKER_ITEM_HAMMER                                          :Velké kladivo
+STR_WALKER_ITEM_ARMOUR                                          :Zbroj
+STR_WALKER_ITEM_BOOTS                                           :Boty
+STR_WALKER_ITEM_BEER                                            :Pivo
+STR_WALKER_ITEM_CIGARETTES                                      :Cigarety
+STR_WALKER_ITEM_MARIJUANA                                       :Mari
+STR_WALKER_ITEM_GOODS                                           :Zboží
+STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
+STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
+STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává
+STR_ERROR_WALKER_CARRIES_TOO_MANY                               :{WHITE}Víc už neuneseš
+STR_ERROR_WALKER_CANNOT_USE                                     :{WHITE}To se (zatím) použít nedá
+STR_ERROR_WALKER_HAS_NONE                                       :{WHITE}Nic takového nemáš
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}
 STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vozidlo
 STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Otevřít okno vozidla

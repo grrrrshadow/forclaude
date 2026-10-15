@@ -19,6 +19,7 @@ enum FirstPersonWidgets : WidgetID {
 	WID_FP_HERE,    ///< Put the walker where the main view looks.
 	WID_FP_CENTRE,  ///< Put the main view on the walker.
 	WID_FP_RUN,     ///< Walk or run.
+	WID_FP_INVENTORY, ///< The walker's inventory.
 };
 
 #endif /* WIDGETS_FIRST_PERSON_WIDGET_H */

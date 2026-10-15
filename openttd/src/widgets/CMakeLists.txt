@@ -8,6 +8,7 @@ add_files(
     build_vehicle_widget.h
     cab_view_widget.h
     first_person_widget.h
+    walker_inventory_widget.h
     cheat_widget.h
     company_widget.h
     console_widget.h

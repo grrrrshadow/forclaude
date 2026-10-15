@@ -38,6 +38,9 @@
 #include "timer/timer_window.h"
 #include "blitter/factory.hpp"
 #include "widgets/first_person_widget.h"
+#include "walker_inventory.h"
+#include "company_base.h"
+#include "company_func.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -79,6 +82,7 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_HERE), SetStringTip(STR_FIRST_PERSON_HERE, STR_FIRST_PERSON_HERE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_CENTRE), SetStringTip(STR_FIRST_PERSON_CENTRE, STR_FIRST_PERSON_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_RUN), SetStringTip(STR_FIRST_PERSON_RUN, STR_FIRST_PERSON_RUN_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Brown, WID_FP_INVENTORY), SetStringTip(STR_FIRST_PERSON_INVENTORY, STR_FIRST_PERSON_INVENTORY_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
 };
@@ -108,6 +112,9 @@ static bool FirstPersonWalkable(double x, double y)
 			return true;
 	}
 }
+
+void ShowWalkerInventoryWindow();
+TileIndex FirstPersonShopNearby();
 
 /** The window of the view from the first person; there is one, number 0. */
 struct FirstPersonWindow : Window {
@@ -208,6 +215,11 @@ struct FirstPersonWindow : Window {
 				break;
 		}
 		if (key == 'w' || key == 'a' || key == 's' || key == 'd' || key == 'W' || key == 'A' || key == 'S' || key == 'D') return EventState::Handled;
+		/* I: the inventory (as in Morrowind). */
+		if (key == 'i' || key == 'I') {
+			ShowWalkerInventoryWindow();
+			return EventState::Handled;
+		}
 		return EventState::NotHandled;
 	}
 
@@ -272,10 +284,19 @@ struct FirstPersonWindow : Window {
 				const TileIndex tile = TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y));
 				const Town *town = ClosestTownFromTile(tile, UINT_MAX);
 				const int deg = static_cast<int>(std::lround(std::fmod(this->walker.heading * 180.0 / M_PI + 360.0, 360.0)));
-				if (town != nullptr) {
+				const Company *c = Company::GetIfValid(_local_company);
+				if (town != nullptr && c != nullptr) {
+					DrawString(ir.left, ir.right, ir.top, GetString(STR_FIRST_PERSON_WHERE_HEALTH, c->walker_health, town->index, TileX(tile), TileY(tile), deg), TextColour::White);
+				} else if (town != nullptr) {
 					DrawString(ir.left, ir.right, ir.top, GetString(STR_FIRST_PERSON_WHERE, town->index, TileX(tile), TileY(tile), deg), TextColour::White);
 				}
-				DrawStringMultiLine(ir.left, ir.right, ir.top + GetCharacterHeight(FontSize::Normal) + 2, ir.bottom, STR_FIRST_PERSON_KEYS, TextColour::Silver);
+				/* Near a place that sells things: said instead of the keys. */
+				const StringID shop = WalkerShopName(FirstPersonShopNearby());
+				if (shop != INVALID_STRING_ID) {
+					DrawString(ir.left, ir.right, ir.top + GetCharacterHeight(FontSize::Normal) + 2, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
+				} else {
+					DrawStringMultiLine(ir.left, ir.right, ir.top + GetCharacterHeight(FontSize::Normal) + 2, ir.bottom, STR_FIRST_PERSON_KEYS, TextColour::Silver);
+				}
 				break;
 			}
 			default:
@@ -296,6 +317,9 @@ struct FirstPersonWindow : Window {
 			case WID_FP_RUN:
 				this->running = !this->running;
 				this->SetDirty();
+				break;
+			case WID_FP_INVENTORY:
+				ShowWalkerInventoryWindow();
 				break;
 			case WID_FP_FULL:
 				/* Over the whole screen, and back where it was. */
@@ -330,6 +354,44 @@ static WindowDesc _first_person_desc(
 void ShowFirstPersonWindow()
 {
 	AllocateWindowDescFront<FirstPersonWindow>(_first_person_desc, 0);
+}
+
+/**
+ * Where things are sold near the walker of the view from the first person (walker_inventory.h): the nearest tile
+ * of a pub, a vending machine, a coffeeshop or a shop of a town, within a tile of where it stands.
+ * @return the tile, or INVALID_TILE when there is no walker or nothing is sold near it
+ */
+TileIndex FirstPersonShopNearby()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return INVALID_TILE;
+	TileIndex best = INVALID_TILE;
+	double best_d = 1e18;
+	const int tx = static_cast<int>(w->walker.x) / static_cast<int>(TILE_SIZE), ty = static_cast<int>(w->walker.y) / static_cast<int>(TILE_SIZE);
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			const int x = tx + dx, y = ty + dy;
+			if (x < 0 || y < 0 || x >= static_cast<int>(Map::SizeX()) || y >= static_cast<int>(Map::SizeY())) continue;
+			const TileIndex tile = TileXY(x, y);
+			if (WalkerShopName(tile) == INVALID_STRING_ID) continue;
+			const double cx = (x + 0.5) * TILE_SIZE - w->walker.x, cy = (y + 0.5) * TILE_SIZE - w->walker.y;
+			if (cx * cx + cy * cy < best_d) {
+				best_d = cx * cx + cy * cy;
+				best = tile;
+			}
+		}
+	}
+	return best;
+}
+
+/** The tile the walker of the view from the first person stands on, or INVALID_TILE without the window. */
+TileIndex FirstPersonWalkerTile()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return INVALID_TILE;
+	const int x = static_cast<int>(w->walker.x) / static_cast<int>(TILE_SIZE), y = static_cast<int>(w->walker.y) / static_cast<int>(TILE_SIZE);
+	if (x < 0 || y < 0 || x >= static_cast<int>(Map::SizeX()) || y >= static_cast<int>(Map::SizeY())) return INVALID_TILE;
+	return TileXY(x, y);
 }
 
 /** The rig: the walker of the view from the first person, where it is and how long its last picture took. */

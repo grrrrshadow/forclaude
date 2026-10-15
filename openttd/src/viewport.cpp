@@ -7399,7 +7399,8 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	 * bridge's ramp, 5 nothing (a tunnel's portal, built anew). */
 	_cab_bridge_sprites.clear();
 	std::vector<TileIndex> ramps, tunnel_ends;
-	/* The houses that are real 3D objects (three_d_objects.h): drawn by their triangles, their sprites left out. */
+	/* The houses and the game's own industries that are real 3D objects (three_d_objects.h): drawn by their triangles,
+	 * their sprites left out. */
 	struct CabObject {
 		const ThreeDObject *obj;
 		TileIndex origin;
@@ -7460,6 +7461,20 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 					}
 					if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
 				}
+			}
+		}
+		if (tile_type == TileType::Industry && IsIndustryCompleted(_cur_ti.tile)) {
+			/* One of the game's own industries that is a real 3D object (the pub, the distillery, the gymnasium...): as a house. */
+			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
+			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+			if (obj != nullptr) {
+				kind = 5;
+				const TileIndex origin = ind->location.tile;
+				bool known = false;
+				for (const CabObject &co : objects) {
+					if (co.origin == origin) known = true;
+				}
+				if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
 			}
 		}
 		ps_kind.resize(_vd.parent_sprites_to_draw.size(), kind);
