@@ -1,232 +1,5 @@
 [
  {
-  "soubor": "dum_00_vysoky_0.glb",
-  "jmeno": "dum_00_vysoky_0",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 0,
-  "varianty": [
-   0
-  ],
-  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, varianta 0 (sprite 0x58f, 22,5 m); varianty 1–3 (0x591) mají jiný tvar, zůstávají; 14 trojúhelníků, textura 1024×512",
-  "dvere": [
-   {
-    "poloha": [
-     6.99,
-     14.46,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_00_vysoky_1.glb",
-  "jmeno": "dum_00_vysoky_1",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 0,
-  "varianty": [
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, varianty 1–3 (sprite 0x591; 2 a 3 jsou přebarvení, textura podle slotu 1): blok a boční křídlo; 28 trojúhelníků, textura 1024×1024",
-  "dvere": [
-   {
-    "poloha": [
-     7.12,
-     14.75,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_01_kancelare.glb",
-  "jmeno": "dum_01_kancelare",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 1,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kancelářský blok: věž s plochou střechou a předek se sedlovou; varianty 1–3 jsou přebarvení, textura podle slotu 0; 24 trojúhelníků, textura 1024×1024",
-  "dvere": [
-   {
-    "poloha": [
-     7.05,
-     14.11,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_02_bytovky.glb",
-  "jmeno": "dum_02_bytovky",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 2,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Malé bytovky (sprite 0x598); 14 trojúhelníků, textura 512×256",
-  "dvere": [
-   {
-    "poloha": [
-     6.36,
-     9.82,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_04_velky.glb",
-  "jmeno": "dum_04_velky",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 4,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Velký kancelářský blok (sprite 0x5a2, 20 m), jeden kvádr; 10 trojúhelníků, textura 1024×512",
-  "dvere": [
-   {
-    "poloha": [
-     6.65,
-     13.29,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_0d_kancelare.glb",
-  "jmeno": "dum_0d_kancelare",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 13,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kancelářský blok (sprite 0x5b4), plochá střecha; varianty 1–3 jsou přebarvení, textura podle slotu 0; 10 trojúhelníků, textura 1024×512",
-  "dvere": [
-   {
-    "poloha": [
-     6.59,
-     12.83,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_12_skladiste.glb",
-  "jmeno": "dum_12_skladiste",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 18,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Skladiště (sprite 0x5c3 od rohu obálky 1,2); 14 trojúhelníků, textura 512×512",
-  "dvere": [
-   {
-    "poloha": [
-     6.13,
-     12.61,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
   "soubor": "dum_1c_vysoky_0.glb",
   "jmeno": "dum_1c_vysoky_0",
   "druh": "dum",
@@ -277,105 +50,6 @@
     "poloha": [
      6.66,
      13.6,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_1e_obchody_vysoke.glb",
-  "jmeno": "dum_1e_obchody_vysoke",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 30,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře, vysoké (sprite 0x609, 33 m), jeden kvádr; 10 trojúhelníků, textura 1024×512",
-  "dvere": [
-   {
-    "poloha": [
-     6.19,
-     12.6,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_20_stadion.glb",
-  "jmeno": "dum_20_stadion",
-  "druh": "dum",
-  "dlazdic_x": 2,
-  "dlazdic_y": 2,
-  "klima": "mirne",
-  "nahrazuje_house": 32,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Stadion (novější, 2×2, HouseID 0x20–0x23): zadní tribuna se sedlovou střechou a přední tribuna; hřiště je zem, branky ne (tenké); 24 trojúhelníků, textura 1024×1024",
-  "dvere": [
-   {
-    "poloha": [
-     25.32,
-     28.21,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.5,
-    "odhad": true
-   }
-  ]
- },
- {
-  "soubor": "dum_24_valec.glb",
-  "jmeno": "dum_24_valec",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 36,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
-  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kanceláře, kulatá věž (sprite 0x61d): válec o 24 stěnách a dvě žluté tyče; tyče stojí na zemi, z jednoho spritu nejde poznat, jak daleko od válce jsou; 90 trojúhelníků, textura 1024×1024",
-  "dvere": [
-   {
-    "poloha": [
-     7.35,
-     14.8,
      0.0
     ],
     "smer": [
@@ -2826,6 +2500,7 @@
   "dlazdic_x": 1,
   "dlazdic_y": 1,
   "klima": "mirne",
+  "nazev": "ÚV KSČ",
   "nahrazuje_house": 31,
   "varianty": [
    0,
@@ -2919,5 +2594,1284 @@
   "autor": "grrrrf: vlastní model domy/uv_ksc.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Budova ÚV KSČ s rudou hvězdou na omítce a na střeše (domy/uv_ksc.py, hra/3d/PROSBA-UV-KSC.md); budova ÚV KSČ místo domu 0x1F (hráč 15. 10.: „budova napis uv ksč s rudou hvězdou na omítce a na střeše“); blbosti: tribuna nad vchodem s nápisem ÚV KSČ, rudé prapory, československá a rudá vlajka na stožárech, záhony s rudými květy, lípy, lampy, schody, asfaltové stání pro auto; 25740 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 20.26 m"
+ },
+ {
+  "soubor": "dum_00_vysoky_0.glb",
+  "jmeno": "dum_00_vysoky_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 0,
+  "varianty": [
+   0
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_00_vysoky_0_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_00_vysoky_0_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_00_vysoky_0_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.68,
+     5.98,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     12.37,
+     3.21,
+     0.47
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí u stolku pod slunečníkem na terase kavárny"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     12.98,
+     8.68,
+     0.47
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí u stolku pod slunečníkem na terase kavárny"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.6,
+     7.18,
+     26.23
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na střešní terase"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.57,
+     11.57,
+     25.76
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     10.67,
+     6.58,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří kavárny"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Vysoký kancelářský blok s kavárnou v přízemí a terasou na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna se třemi čtvercovými slunečníky v pruzích a stolky se židlemi a šálky, na střeše terasa s dřevěnou palubou, třemi kulatými slunečníky, stolky a lehátky, květináče, antény, stojan s deštníky u dveří, tabule s nabídkou, tři kola pod převisem, truhlíky s květinami, strom; 20520 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 32.22 m"
+ },
+ {
+  "soubor": "dum_00_vysoky_1.glb",
+  "jmeno": "dum_00_vysoky_1",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 0,
+  "varianty": [
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_00_vysoky_1_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_00_vysoky_1_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_00_vysoky_1_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     13.37,
+     4.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.99
+   },
+   {
+    "poloha": [
+     4.99,
+     13.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     9.58,
+     13.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     6.58,
+     11.79,
+     13.96
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v bistru na střeše křídla"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     10.17,
+     10.55,
+     13.96
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v bistru na střeše křídla"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     12.37,
+     12.96,
+     13.49
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše křídla"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     14.16,
+     5.39,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Vysoký kancelářský blok s nižším křídlem, bistro na střeše křídla, neon DŮM SLUŽEB; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: bistro na střeše křídla se třemi čtvercovými slunečníky, stolky a girlandou žárovek, květináče, neon DŮM SLUŽEB, anténa, markýzy v pruzích nad lahůdkami a papírnictvím, stojan s deštníky, lavička a na ní zapomenutý otevřený deštník, dvě kola; 24840 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 28.88 m"
+ },
+ {
+  "soubor": "dum_01_kancelare.glb",
+  "jmeno": "dum_01_kancelare",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 1,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_01_kancelare_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_01_kancelare_maska_omitka.png",
+    "zacatek": 230,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     7.58,
+     11.97,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.4
+   },
+   {
+    "poloha": [
+     13.57,
+     9.68,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     3.81,
+     13.26,
+     0.47
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na zahrádce cukrárny"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     9.75,
+     13.26,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na zahrádce cukrárny"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     11.87,
+     13.56,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kupuje zmrzlinu u vozíku"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     10.17,
+     6.38,
+     19.3
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u lehátek"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Panelová kancelářská věž s mozaikou, vpředu cukrárna se zahrádkou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: zahrádka cukrárny se třemi slunečníky v pruzích a stolky, vozík se zmrzlinou a slunečníkem, markýza v pruzích, mozaika na čele věže, na střeše plážový slunečník, dvě lehátka, ručník, nádrž na vodu, anténa, stojan s deštníky, kolo, květináče, strom; 16380 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 25.44 m"
+ },
+ {
+  "soubor": "dum_02_bytovky.glb",
+  "jmeno": "dum_02_bytovky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 2,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_02_bytovky_maska_strecha.png",
+    "zacatek": 97,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_02_bytovky_maska_omitka.png",
+    "zacatek": 197,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_02_bytovky_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     6.98,
+     11.37,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.17,
+     5.58,
+     3.91
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí na balkoně u deštníku, co se suší"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.12,
+     5.39,
+     6.7
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na balkoně"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     12.37,
+     5.58,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u pískoviště"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.75,
+     12.96,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na dvorku"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Malá panelová bytovka s balkony a dvorkem s pískovištěm; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: balkony s oranžovými parapety: otevřené deštníky se suší, slunečník se židlí, sušák s prádlem; pískoviště se slunečníkem, kyblíkem a bábovkou, houpačka, prádlo, klepač, stolek se slunečníkem, popelnice, dvě kola, králíkárna, lavička, anténa, muškáty, dva stromy; 18804 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 12.27 m"
+ },
+ {
+  "soubor": "dum_04_velky.glb",
+  "jmeno": "dum_04_velky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 4,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_04_velky_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_04_velky_maska_omitka.png",
+    "zacatek": 231,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_04_velky_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.97,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.19
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.87,
+     6.92,
+     18.55
+    ],
+    "otoceni": 300,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně TERASA na střeše"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     12.19,
+     10.57,
+     18.55
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně TERASA na střeše"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     13.26,
+     6.58,
+     18.08
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     13.51,
+     6.38,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu pod podloubím"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Velký kancelářský dům s prosklenou fasádou, podloubím a kavárnou TERASA na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna TERASA na střeše: pavilon, sedm velkých slunečníků v pruzích se stolky, stromky v květináčích, tři vlajky; v podloubí stojan s deštníky, dvě kola, lavička, truhlíky s květinami; 15624 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.07 m"
+ },
+ {
+  "soubor": "dum_0d_kancelare.glb",
+  "jmeno": "dum_0d_kancelare",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 13,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_0d_kancelare_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_0d_kancelare_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_0d_kancelare_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.97,
+     6.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.6
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     14.36,
+     2.19,
+     0.0
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u okénka stánku se zmrzlinou"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     12.96,
+     8.76,
+     0.47
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem před domem"
+   },
+   {
+    "postava": "pole_chill",
+    "poloha": [
+     6.18,
+     4.39,
+     13.21
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; klečí u bazénku na střeše s telefonem"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     10.17,
+     5.58,
+     13.21
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u plážového slunečníku"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kanceláře se slunolamy, na střeše lehátka a bazének, dole stánek se zmrzlinou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: stánek se zmrzlinou s markýzou v pruzích a velkým kornoutem na střeše, dva stolky se slunečníky, na střeše nafukovací bazének, dva plážové slunečníky, tři lehátka, ručník a tranzistorák, záhony, lavičky, kolo, stojan s deštníky, strom; 14558 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 16.47 m"
+ },
+ {
+  "soubor": "dum_12_skladiste.glb",
+  "jmeno": "dum_12_skladiste",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 18,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_12_skladiste_maska_strecha.png",
+    "zacatek": 147,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_12_skladiste_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_12_skladiste_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.97,
+     6.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 3.39
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     4.29,
+     13.36,
+     1.1
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; na rampě u beden s deštníky"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.95,
+     11.17,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     12.57,
+     10.55,
+     0.47
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Cihlové skladiště deštníků a slunečníků s rampou a vysokozdvižným vozíkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: nakládací rampa se stříškou, bedny a kartony deštníků na paletách, tři otevřené deštníky se suší na rampě, rudl, vysokozdvižný vozík, stoh palet, pytle, sudy, svačina pod velkým slunečníkem se stolkem a termoskou, drátěný plot, lampa; 13412 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.56 m"
+ },
+ {
+  "soubor": "dum_1e_obchody_vysoke.glb",
+  "jmeno": "dum_1e_obchody_vysoke",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 30,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1e_obchody_vysoke_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1e_obchody_vysoke_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     13.37,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.39
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.76,
+     6.58,
+     19.95
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v baru na střeše"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.57,
+     3.41,
+     19.95
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v baru na střeše"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.18,
+     12.57,
+     19.48
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u obřího koktejlu"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     14.16,
+     4.59,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; pod markýzou obchodního domu"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchodní dům s markýzami a vývěsním deštníkem, na střeše bar s obřím koktejlem s paraplíčkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: markýzy v pruzích nad výlohami, vývěsní deštník na konzole, stojan s deštníky; na střeše bar: pavilon s neonem BAR, pult s barovými stoličkami, koktejly s paraplíčky, šest slunečníků se stolky, obří koktejl s paraplíčkem, brčkem, višní a kolečkem pomeranče, květináče; kolo; 29056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 24.37 m"
+ },
+ {
+  "soubor": "dum_20_stadion.glb",
+  "jmeno": "dum_20_stadion",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 32,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_20_stadion_maska_strecha.png",
+    "zacatek": 147,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_20_stadion_maska_omitka.png",
+    "zacatek": 233,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     0.38,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     -1,
+     0
+    ],
+    "sirka": 2.39
+   },
+   {
+    "poloha": [
+     29.3,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.99
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     4.03,
+     11.97,
+     2.41
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na hlavní tribuně"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     3.45,
+     15.96,
+     2.91
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na hlavní tribuně"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     25.38,
+     19.95,
+     1.86
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na přední tribuně mezi deštníky"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     15.46,
+     1.99,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u stánku s občerstvením"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Nový stadion s krytou tribunou, stožáry světel a stánky (2×2, HouseID 0x20–0x23); domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: čtyři stožáry světel, reklamní tabule kolem hřiště, branky, rohové praporky, lavičky střídačů, světelná tabule DOMÁCÍ 1:0 HOSTÉ, deštníky fanoušků na přední tribuně, stánek OBČERSTVENÍ s markýzou, stánek PIVO se čtvercovým slunečníkem, pět stolků se slunečníky, tři kola; 27188 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 21.35 m"
+ },
+ {
+  "soubor": "dum_24_valec.glb",
+  "jmeno": "dum_24_valec",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 36,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_24_valec_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_24_valec_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_24_valec_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.52,
+     5.98,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.6
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.04,
+     9.06,
+     36.47
+    ],
+    "otoceni": 330,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně na střeše věže"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.61,
+     3.89,
+     36.0
+    ],
+    "otoceni": 330,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše věže"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.75,
+     9.37,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na náměstíčku"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     12.57,
+     3.59,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u kašny"
+   }
+  ],
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kulatá kancelářská věž s kavárnou na střeše a dvěma žlutými stožáry; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna na střeše věže: kulatý pavilon, pět slunečníků se stolky, dva žluté příhradové stožáry s červeným světlem; náměstíčko s kašnou, dvěma vlajkami, třemi stolky se slunečníky, stojanem s deštníky, lavičkou, lampami a stromy; 32000 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 44.14 m"
  }
 ]
