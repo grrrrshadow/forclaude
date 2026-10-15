@@ -8853,7 +8853,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * 'chodec krok <n> <ahead> <aside> <turn> [pitch degrees]' walks n steps as if the keys were held. */
 		extern std::string DescribeFirstPerson();
 		extern void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch);
-		if (argv.size() > 6 && argv[2] == "krok") {
+		extern bool RigFirstPersonHold(bool out, float swing);
+		if (argv.size() > 2 && argv[2] == "kladivo") {
+			/* 'chodec kladivo [swing degrees]' the hammer in the hand, swung so far; 'chodec kladivo pryc' put away. */
+			const bool away = argv.size() > 3 && argv[3] == "pryc";
+			auto swing = argv.size() > 3 && !away ? number(3) : std::optional<int>(0);
+			IConsolePrint(CC_DEFAULT, "test3d: kladivo {}", RigFirstPersonHold(!away, static_cast<float>(swing.value_or(0))) ? "v ruce" : "schovane");
+		} else if (argv.size() > 6 && argv[2] == "krok") {
 			auto n = number(3), ahead = number(4), aside = number(5), turn = number(6);
 			auto pitch = argv.size() > 7 ? number(7) : std::optional<int>(0);
 			RigFirstPersonWalk(n.value_or(0), ahead.value_or(0), aside.value_or(0), turn.value_or(0), pitch.value_or(0) * M_PI / 180.0);
@@ -8900,7 +8906,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) items += fmt::format(" {}", c->walker_items[i]);
 		const TileIndex here = FirstPersonWalkerTile();
 		IConsolePrint(CC_DEFAULT, "test3d: inventar zdravi {} veci{} penize {} chodec {},{} obchod {}", c->walker_health, items, c->money,
-				IsValidTile(here) ? TileX(here) : -1, IsValidTile(here) ? TileY(here) : -1,
+				IsValidTile(here) ? static_cast<int>(TileX(here)) : -1, IsValidTile(here) ? static_cast<int>(TileY(here)) : -1,
 				IsValidTile(shop) ? fmt::format("{},{} {}", TileX(shop), TileY(shop), GetString(WalkerShopName(shop))) : std::string("-"));
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */

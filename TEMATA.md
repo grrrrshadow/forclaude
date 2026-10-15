@@ -19,6 +19,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 15. 10. – Morrowind: tématická města
+
+- Hráč: tématická města Morrowind. **Hliněné domy** (dunmerské, s kopulemi) – dělá je kolega. Stromy Morrowindu jen
+  v těch městech. Obecně: kolem každého tématického města jeho stromy na jeho území; Morrowind **popelavá zem**,
+  pouštní tématická města **poušť** na svém území. Jména měst **Drakov, Houbovice, Čarodějov**. Počet přes nastavení
+  tématických měst (jako Mars).
+- Tamriel Rebuilt nebrat: jeho modely smějí jen do modů Morrowindu (licence Bethesdy). Styl napodobit smíme.
+
 ## 15. 10. – Morrowind: pohled z první osoby, inventář, noc
 
 - **Pohled z první osoby** (hotovo, `251b575`, mlha `895258e`): nabídka mapy → *Pohled z první osoby*. Chodec
@@ -33,7 +41,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   - ukládá se do savu, **platí se penězi firmy**;
   - pivo v hospodě, mari u automatu a v hulírně, cigarety a zboží v obchodech ve městě;
   - **pivo léčí, mari léčí víc**; ostatní se zatím jen nosí. Oblékání a kouzla později.
-  - od kolegy: předměty jako glb `druh: predmet` (kladivo z Example Suite), kladivo v ruce v první osobě.
+  - **kladivo v ruce** (hotovo): kolegův model z Example Suite (CC0, `objekty/predmety/`). F tasí a schová (jen když
+    ho chodec nese), levé tlačítko nebo mezerník máchne: nápřah nad hlavu, úder dolů před sebe. Truhla je taky
+    převzatá, zatím nikde nestojí.
   - v pohledu z očí se náš průmysl (hospoda, lihovar, gymnázium…) kreslí objekty jako domy; dřív plakát ve vzduchu.
 - **Build 277: v mírném klimatu nejsou města** (hráč) – vyřešeno: hráč měl aktivní jiný, vadný GRF, který rušil
   domy. Bez něj domy jdou. Slabina kódu zůstává: s nastavením „dělení měst podle GRF domů“ (`economy.split_house_grfs`)
@@ -54,7 +64,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 
 ## Otevřené
 
-- Kladivo v ruce (objekt od kolegy), oblékání, kouzla.
+- Oblékání, kouzla, boj (zásah kladivem).
+- Města Morrowind, území tématických měst (stromy, zem).
 - Vadná sada domů nesmí zrušit všechna města (`split_house_grfs`) – jen když hráč chce.
 - Lampy a okna v noci.
 - Kostra a animace glTF; draci; interiéry; boj.

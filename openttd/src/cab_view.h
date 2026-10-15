@@ -59,6 +59,9 @@ struct FirstPersonEye {
 	double heading = 0;   ///< radians, the world direction it looks along (atan2 of y, x)
 	double pitch = 0;     ///< radians, looking up (positive) or down
 	double eye_z = 0;     ///< its eyes over the ground, units of height
+	std::string held;     ///< the thing in its hands ("predmet" of the indices, the hammer), empty for none
+	float swing = 0;      ///< how far the thing is swung, degrees (DrawThreeDHeldThing())
+	float raise = 0;      ///< how far up in the hand the thing is, 0 put away to 1 held
 };
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);

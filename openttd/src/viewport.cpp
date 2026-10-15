@@ -7854,6 +7854,8 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			}
 		}
 	}
+	/* What the walker holds (the hammer), before the night: the dark is over it too. */
+	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
 	if (_settings_client.gui.night) DrawEyeNight(eye, own, width, height, dst, zb);
 	camera.ms = TurnedNow() - t0;
 	return true;

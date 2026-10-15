@@ -1,0 +1,42 @@
+[
+ {
+  "soubor": "kladivo.glb",
+  "jmeno": "kladivo",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Válečné kladivo",
+   "en": "War Hammer"
+  },
+  "rozmer_m": [
+   0.348,
+   0.215,
+   1.135
+  ],
+  "zdroj": "the_hub/data/meshes/weapons/basic_hammer2h.dae (Basic_Hammer2h)",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/predmety_example_suite.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "válečné kladivo na obě ruce; počátek na spodním konci násady, násada po +z, hlava nahoře, úderné plochy do ±x; kožený úchop spodních 33 cm; model bez materiálu, barvy naše (ocel, tmavší objímka, dřevo, kůže), bez textury; 1146 trojúhelníků, normály z modelu; mávání si dělá hra (hráč: „to si uděla machani kladivem, jen modely potřebujem“)"
+ },
+ {
+  "soubor": "truhla.glb",
+  "jmeno": "truhla",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Truhla",
+   "en": "Chest"
+  },
+  "rozmer_m": [
+   0.582,
+   0.763,
+   0.589
+  ],
+  "stavy": {
+   "zavreno": "víko zavřené",
+   "otevreno": "víko otevřené o 100° kolem pantu vzadu"
+  },
+  "zdroj": "the_hub/data/meshes/containers/Hub_Chest01.dae (Hub_Chest01, „Ammo Chest“)",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/predmety_example_suite.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "dřevěná truhla s kováním a zámkem; dva uzly zavreno a otevreno (celá truhla v každém, hra ukáže jeden); šev víka ve výšce 0.379 m; počátek uprostřed dna, zámek k +x; barvy z modelu (tmavé dřevo, tmavé železo), bez textury; 496 trojúhelníků na uzel, normály z modelu"
+ }
+]

@@ -64,6 +64,23 @@ static constexpr double FIRST_PERSON_MOUSE = 0.005;
 static constexpr double FIRST_PERSON_RADIUS = 1.5;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
+/** How long taking the hammer out or putting it away takes, and a swing of it, seconds. */
+static constexpr double FIRST_PERSON_DRAW_S = 0.35;
+static constexpr double FIRST_PERSON_SWING_S = 0.6;
+/** The thing of the indices the walker holds ("predmet", objekty/predmety/: the colleague's hammer). */
+static constexpr std::string_view FIRST_PERSON_HAMMER = "kladivo";
+
+/**
+ * The angle of a swing of the hammer a time into it, degrees (DrawThreeDHeldThing()): raised back over the shoulder,
+ * struck forward and down, and back to rest.
+ */
+static float SwingAngle(double t)
+{
+	if (t < 0.15) return static_cast<float>(-40.0 * t / 0.15);
+	if (t < 0.27) return static_cast<float>(-40.0 + 110.0 * (t - 0.15) / 0.12);
+	if (t < FIRST_PERSON_SWING_S) return static_cast<float>(70.0 * (1.0 - (t - 0.27) / (FIRST_PERSON_SWING_S - 0.27)));
+	return 0.0f;
+}
 
 static constexpr NWidgetPart _nested_first_person_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
@@ -124,10 +141,13 @@ struct FirstPersonWindow : Window {
 	bool full = false;                    ///< over the whole screen
 	Rect before_full{};                   ///< where it was before that
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
+	bool hammer_out = false;              ///< the hammer taken out (F), in the hand
+	double swing_time = -1;               ///< seconds into a swing of the hammer, -1 when it is not swung
 
 	/* Moves while the keys are held and draws the picture anew, twenty-five times a second. */
 	IntervalTimer<TimerWindow> step{std::chrono::milliseconds(FIRST_PERSON_TICK_MS), [this](auto) {
 		this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
+		this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
 		this->SetWidgetDirty(WID_FP_CANVAS);
 		this->SetWidgetDirty(WID_FP_PANEL);
 	}};
@@ -204,6 +224,35 @@ struct FirstPersonWindow : Window {
 		}
 	}
 
+	/**
+	 * The hammer in the hand (the player, 15. 10.: "I went through the whole of Morrowind with a big hammer"): taken
+	 * out and put away with F, swung with the left button or Space -- as long as the walker carries one.
+	 */
+	void Hold(double dt)
+	{
+		const Company *c = Company::GetIfValid(_local_company);
+		if (c == nullptr || c->walker_items[to_underlying(WalkerItem::Hammer)] == 0) this->hammer_out = false;
+		const float target = this->hammer_out ? 1.0f : 0.0f, step = static_cast<float>(dt / FIRST_PERSON_DRAW_S);
+		float &raise = this->walker.raise;
+		raise = target > raise ? std::min(target, raise + step) : std::max(target, raise - step);
+		this->walker.held = raise > 0 ? std::string(FIRST_PERSON_HAMMER) : std::string();
+		if (this->swing_time >= 0) {
+			this->swing_time += dt;
+			this->walker.swing = SwingAngle(this->swing_time);
+			if (this->swing_time >= FIRST_PERSON_SWING_S) {
+				this->swing_time = -1;
+				this->walker.swing = 0;
+			}
+		}
+	}
+
+	/** A swing of the hammer, when it is in the hand and not swung already. */
+	void Swing()
+	{
+		if (!this->hammer_out || this->walker.raise < 1.0f || this->swing_time >= 0) return;
+		this->swing_time = 0;
+	}
+
 	EventState OnKeyPress(char32_t key, uint16_t keycode) override
 	{
 		/* The walking keys are the walker's, not the toolbar's (they are read as held, Walk()). */
@@ -218,6 +267,15 @@ struct FirstPersonWindow : Window {
 		/* I: the inventory (as in Morrowind). */
 		if (key == 'i' || key == 'I') {
 			ShowWalkerInventoryWindow();
+			return EventState::Handled;
+		}
+		/* F: the hammer out or away (as the weapon in Morrowind); Space: a swing of it. */
+		if (key == 'f' || key == 'F') {
+			this->hammer_out = !this->hammer_out;
+			return EventState::Handled;
+		}
+		if (key == ' ' || (keycode & ~WKC_SPECIAL_KEYS) == WKC_SPACE) {
+			this->Swing();
 			return EventState::Handled;
 		}
 		return EventState::NotHandled;
@@ -307,6 +365,9 @@ struct FirstPersonWindow : Window {
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		switch (widget) {
+			case WID_FP_CANVAS:
+				this->Swing();
+				break;
 			case WID_FP_HERE:
 				this->PutWhereTheMainViewLooks();
 				this->SetDirty();
@@ -402,6 +463,23 @@ std::string DescribeFirstPerson()
 	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}), smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms, {} dlazdic, {} plakatu",
 			w->walker.x, w->walker.y, static_cast<int>(w->walker.x) / TILE_SIZE, static_cast<int>(w->walker.y) / TILE_SIZE,
 			w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.tiles, w->camera.billboards);
+}
+
+/**
+ * The rig: the hammer in the hand at once, swung so far (degrees), or put away.
+ * @return whether the walker has it out
+ */
+bool RigFirstPersonHold(bool out, float swing)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return false;
+	w->hammer_out = out;
+	w->Hold(0);
+	w->walker.raise = w->hammer_out ? 1.0f : 0.0f;
+	w->walker.held = w->hammer_out ? std::string(FIRST_PERSON_HAMMER) : std::string();
+	w->walker.swing = swing;
+	w->SetDirty();
+	return w->hammer_out;
 }
 
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
