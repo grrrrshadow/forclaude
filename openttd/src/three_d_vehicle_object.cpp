@@ -21,6 +21,7 @@
 #include "viewport_func.h"
 #include "direction_func.h"
 #include "round_track.h"
+#include "climate_industries.h"
 #include "debug.h"
 #include "settings_type.h"
 #include "timer/timer_game_calendar.h"
@@ -294,8 +295,9 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
  * @param pxm pixels to a metre of the picture
  * @param fade how far its paint has faded to the target (FadeAmount())
  * @param rust_time how far into its rusting it is (RustTime())
+ * @param tint the colour of the material an effect is coloured in ("barvy"), 0 none
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
@@ -349,6 +351,12 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	/* The rust, after the paint has faded (the colleague: the paint fades, the rust grows over it). */
 	const ThreeDObjectTexture *rust_mask = rust_time > 0 ? obj.GetRustMask(level) : nullptr;
 	const Colour rust_colour(obj.rust.target);
+	/* The textures an effect is coloured in: those of its material ("barvy"), the texture times the colour. */
+	const Colour tint_colour(tint);
+	std::vector<bool> tinted(texs.size(), false);
+	if (tint != 0) {
+		for (size_t i = 0; i < texs.size() && i < shape->tex_names.size(); i++) tinted[i] = shape->tex_names[i] == obj.tint_material;
+	}
 
 	std::vector<float> zb(static_cast<size_t>(width) * height, std::numeric_limits<float>::infinity());
 	std::vector<Colour> buf(static_cast<size_t>(width) * height, Colour(0, 0, 0, 0));
@@ -403,6 +411,11 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 							cb += (target.b - cb) * f;
 						}
 					}
+				}
+				if (tint != 0 && static_cast<size_t>(ti) < tinted.size() && tinted[ti]) {
+					cr = cr * tint_colour.r / 255.0f;
+					cg = cg * tint_colour.g / 255.0f;
+					cb = cb * tint_colour.b / 255.0f;
 				}
 				if (tri_rust != nullptr) {
 					int rx = std::min(tri_rust->w - 1, static_cast<int>(u * tri_rust->w)), ry = std::min(tri_rust->h - 1, static_cast<int>(v * tri_rust->h));
@@ -502,11 +515,12 @@ double _object_picture_ms = 0;
 uint64_t _object_pictures_made = 0;
 
 /** A picture of an object in the turned view at an angle and zoom, kept (RasterObject()). */
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0)
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade, frame);
+	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade, frame | (tint_index + 1) << 16);
+	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
 		it->second.used = ++_object_pictures_clock;
@@ -535,7 +549,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade))) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
@@ -615,6 +629,42 @@ const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, 
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
 	if (obj == nullptr) return nullptr;
 	return ObjectPicture(obj, ObjectScale(obj), zoom, azimuth, azimuth, SqueezedType(obj->type), 0);
+}
+
+/** The huts whose fireworks this drawing of the turned view puts on (QueueThreeDFireworks()). */
+static std::vector<TileIndex> _turned_fireworks;
+
+/** A hut's fireworks to be drawn as the 3D object, after the tiles of the turned view (they would go with the hut's own sprites, left out where the hut is drawn from its renders). */
+void QueueThreeDFireworks(TileIndex hut_front)
+{
+	if (std::ranges::find(_turned_fireworks, hut_front) == _turned_fireworks.end()) _turned_fireworks.push_back(hut_front);
+}
+
+/**
+ * Put the fireworks over the huts of this drawing on the turned view, from the colleague's object (the player: "and
+ * then fireworks 3D, use the changes of colour of one and the same object, let it be all colours"): the launch and the
+ * three phases of the ball as its frames, the phase as the hut's sprites go (HutFireworkPhase()), each phase of each
+ * firework its colour of the palette; over the middle of the hut's front tile, at true size, unlit (it glows).
+ */
+void AddThreeDEffectsToViewport(ZoomLevel zoom)
+{
+	const ThreeDVehicleObject *fx = _turned_fireworks.empty() ? nullptr : GetThreeDEffect("ohnostroj");
+	for (TileIndex tile : _turned_fireworks) {
+		if (fx == nullptr) break;
+		uint part = 0;
+		uint32_t hash = 0;
+		if (!HutFireworkPhase(tile, TimerGameTick::counter, part, hash) || part >= 4) continue;
+		int frame = fx->frames > 0 ? static_cast<int>(std::min<uint>(part, fx->frames - 1)) : 0;
+		int tint = part == 0 || fx->tint_palette.empty() ? -1 : static_cast<int>(hash % fx->tint_palette.size());
+		const ThreeDVehicleShape *shape = fx->GetShape(frame);
+		if (shape == nullptr) continue;
+		const ThreeDModelPicture *pic = ObjectPicture(fx, 1.0f, zoom, GetViewYaw(), 0.0f, false, 0, frame, tint);
+		if (pic == nullptr) continue;
+		int x = TileX(tile) * TILE_SIZE + TILE_SIZE / 2, y = TileY(tile) * TILE_SIZE + TILE_SIZE / 2, z = GetTileMaxPixelZ(tile);
+		int height = std::max(1, static_cast<int>(std::lround(shape->z1 * 8.0 / 3.0)));
+		AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+	}
+	_turned_fireworks.clear();
 }
 
 /** A figure that moves drawn on the map: its tile is drawn again when its frame changes (AddThreeDFigureToViewport()). */

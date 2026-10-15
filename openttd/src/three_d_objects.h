@@ -113,6 +113,7 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> tri_tex; ///< the texture of each triangle: 0 the body's (the one painted, "textura", and the one the paint mask is for), then the others of the file and of the wheels
 	std::vector<std::vector<uint8_t>> pngs; ///< the textures, as they are in the files
 	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
+	std::vector<std::string> tex_names; ///< for each texture, the name of its material
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
 };
 
@@ -180,6 +181,8 @@ struct ThreeDVehicleObject {
 	int frames = 0;                 ///< "snimku": how many frames
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
 	float walk_step = 0;            ///< "chuze": "krok_m", metres a round of its frames walks; 0 when it does not walk
+	std::string tint_material;      ///< an effect's "barvy": the material the game colours ("material")
+	std::vector<uint32_t> tint_palette; ///< and the colours it may be ("paleta", Colour::data)
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
@@ -203,6 +206,7 @@ private:
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 void ResetThreeDVehicleObjects();
 std::string DescribeThreeDVehicleObjects();
 

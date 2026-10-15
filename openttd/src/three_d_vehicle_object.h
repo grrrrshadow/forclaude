@@ -40,6 +40,8 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
 std::string DescribeThreeDVehicleObjectSprites();
+void QueueThreeDFireworks(TileIndex hut_front);
+void AddThreeDEffectsToViewport(ZoomLevel zoom);
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0, int frame = -1);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1);

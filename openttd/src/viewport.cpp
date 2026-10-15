@@ -3704,8 +3704,9 @@ static void ViewportDoDrawTurned()
 	_turned_times.drawn += static_cast<int>(tiles.size());
 
 	ViewportAddVehicles(&cdpi);
-	/* The people walking about the towns (three_d_walkers.h). */
+	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */
 	AddThreeDWalkersToViewport(zoom);
+	AddThreeDEffectsToViewport(zoom);
 
 	/* The signs and the floating texts: collected north-up, then each moved to where the ground under it is drawn turned. */
 	size_t first_string = _vd.string_sprites_to_draw.size();

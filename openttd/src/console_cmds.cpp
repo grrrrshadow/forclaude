@@ -15261,7 +15261,7 @@ static bool ConTestHut(std::span<std::string_view> argv)
 			}
 			fireworks += " " + seen;
 		}
-		IConsolePrint(CC_DEFAULT, "testhulirna: hulirna {} {}x{},{} holky {}{} ohnostroj {}", id, i->location.w, i->location.h, tiles, GIRLS[to_underlying(girls)],
+		IConsolePrint(CC_DEFAULT, "testhulirna: hulirna {} u {},{} {}x{},{} holky {}{} ohnostroj {}", id, TileX(i->location.tile), TileY(i->location.tile), i->location.w, i->location.h, tiles, GIRLS[to_underlying(girls)],
 				girls == HutGirls::None ? "" : fmt::format(" (+{})", (girls == HutGirls::Sitting ? SPR_HUT_GIRLS_SITTING : SPR_HUT_GIRLS_STANDING) - SPR_OPENTTD_BASE), fireworks);
 		ScrollMainWindowToTile(i->location.tile, true);
 	}

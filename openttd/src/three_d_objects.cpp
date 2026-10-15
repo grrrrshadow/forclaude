@@ -52,6 +52,8 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+/** The effects of the indices ("druh": "efekt"): the fireworks over the hut. */
+static std::vector<ThreeDVehicleObject> _effect_objects;
 /** The vehicle objects by the set's id, the vehicle type and the engine's number in the set: the object and which of its pieces. */
 static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pieces;
 
@@ -100,6 +102,7 @@ static uint32_t ReadU32(const std::vector<uint8_t> &d, size_t at)
 
 /** A texture of a .glb: the PNG as it is in the file, or a plain colour where a material has none. */
 struct GlbTexture {
+	std::string name;          ///< the material's name
 	std::vector<uint8_t> png;
 	uint32_t flat = 0; ///< the material's base colour factor (Colour::data) when it has no picture
 };
@@ -223,6 +226,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 			t.flat = Colour(150, 150, 150).data;
 			if (material >= 0 && j.contains("materials")) {
 				const auto &mat = j.at("materials").at(material);
+				t.name = mat.value("name", std::string());
 				if (mat.contains("pbrMetallicRoughness")) {
 					const auto &pbr = mat.at("pbrMetallicRoughness");
 					if (pbr.contains("baseColorFactor")) {
@@ -681,6 +685,32 @@ static void ReadThreeDVehicleObjects()
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
+				if (e.value("druh", std::string("dum")) == "efekt" && e.contains("soubor")) {
+					/* An effect (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md, the fireworks): frames as a figure's,
+					 * metres, unlit when it has no normals; a material of it coloured from a palette by the game. */
+					ThreeDVehicleObject fx;
+					fx.package = package;
+					fx.file = folder + e.at("soubor").get<std::string>();
+					fx.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("animace") && e.at("animace").is_object()) {
+						const auto &a = e.at("animace");
+						fx.frame_prefix = a.value("uzly", std::string("snimek_"));
+						fx.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						if (fx.frames < 2) fx.frame_prefix.clear();
+					}
+					if (e.contains("barvy") && e.at("barvy").is_array() && !e.at("barvy").empty()) {
+						const auto &b = e.at("barvy").at(0);
+						fx.tint_material = b.value("material", std::string());
+						if (b.contains("paleta") && b.at("paleta").is_array()) {
+							for (const auto &c : b.at("paleta")) {
+								auto n = c.is_string() ? ParseInteger<uint32_t>(c.get<std::string>(), 16) : std::nullopt;
+								if (n.has_value()) fx.tint_palette.push_back(Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data);
+							}
+						}
+					}
+					_effect_objects.push_back(std::move(fx));
+					continue;
+				}
 				if (e.value("druh", std::string("dum")) == "postava" && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. */
 					ThreeDVehicleObject fig;
@@ -866,8 +896,19 @@ void ResetThreeDVehicleObjects()
 {
 	_vehicle_objects.clear();
 	_figure_objects.clear();
+	_effect_objects.clear();
 	_vehicle_object_pieces.clear();
 	_vehicle_objects_read = false;
+}
+
+/** An effect of the indices by its name ("druh": "efekt"), or nullptr. */
+const ThreeDVehicleObject *GetThreeDEffect(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDVehicleObject &f : _effect_objects) {
+		if (f.name == name) return &f;
+	}
+	return nullptr;
 }
 
 /** A figure of the indices by its name ("druh": "postava"), or nullptr; one of the package given first (a vehicle's crew). */
@@ -941,6 +982,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	for (GlbTexture &t : mesh.textures) {
 		made->pngs.push_back(std::move(t.png));
 		made->flats.push_back(t.flat);
+		made->tex_names.push_back(std::move(t.name));
 	}
 	/* The wheels of their own files: each place a copy, the other side mirrored (y the other way, its normals too). */
 	size_t wheel_triangles = 0;
@@ -957,6 +999,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			if (made->pngs.size() >= 255) break;
 			made->pngs.push_back(t.png);
 			made->flats.push_back(t.flat);
+			made->tex_names.push_back(t.name);
 		}
 		for (const auto &at : w.at) {
 			for (int side = 0; side < (w.both_sides && std::abs(at[1]) > 0.001f ? 2 : 1); side++) {
@@ -997,6 +1040,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		for (size_t t = 0; t < fs->pngs.size() && made->pngs.size() < 255; t++) {
 			made->pngs.push_back(fs->pngs[t]);
 			made->flats.push_back(fs->flats[t]);
+			made->tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
 		}
 		const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a);
 		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);

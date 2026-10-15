@@ -86,6 +86,9 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   `<balíček>/<jméno>.grf`, `<balíček>/objekty/vozidla/objekty.json` s jeho `.glb`
   a PNG, `<balíček>/objekty/postavy/` s posádkou. Hra je najde sama; žádný build.
   První je kolegův `M62_Sergej_3D-v1.tar` (GRF `MAX3`, Sergej ve třech nátěrech).
+- `efekty/` – efekty jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/efekty/`): ohňostroj
+  nad chatkou (`ohnostroj.glb`, start a tři fáze koule, barva číslem z palety pro každou
+  fázi), v otočeném pohledu; na sever zůstávají sprity.
 - Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
   `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
   nový dům nepotřebuje build.

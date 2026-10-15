@@ -517,6 +517,20 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   (a timer of the game's ticks marks it dirty; only the screen). Everywhere
   else -- the crew, the sprites -- a figure is its first frame. Always round and
   round (`smycka` is not read); vehicles' frames (`kdy`) not yet.
+- **Effects** (`"druh": "efekt"`, the game's own `objekty/efekty/`; the
+  player: "and then fireworks 3D, use the changes of colour of one and the
+  same object, let it be all colours"): the colleague's `ohnostroj.glb`, four
+  frames -- the launch (golden trails, its own material) and the three phases
+  of the ball -- one material, `jiskry`, white, coloured by the game: each
+  phase of each firework a colour of the palette of `barvy` (the texture
+  times it), by the hash the hut's sprites pick their three colours by
+  (`HutFireworkPhase()`), so the turned view's fireworks change as the
+  sprites do; no normals, unlit (it glows). Drawn in the turned view over
+  the middle of the hut's front tile at true size, after the tiles
+  (`QueueThreeDFireworks()`, `AddThreeDEffectsToViewport()`: with the hut's own
+  sprites they would be left out where the hut is drawn from its renders);
+  facing north the sprites stay. A material's name is kept with its texture
+  (`ThreeDVehicleShape::tex_names`).
 - **People walking** (`src/three_d_walkers.cpp`; the player, 15. 10.: "Mat
   will walk about the town along the edge of the road tiles, there is the
   pavement in a town, and out of the town he will not walk; only from a door,

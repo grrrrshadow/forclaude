@@ -64,6 +64,8 @@
 #include "table/build_industry.h"
 
 #include "three_d.h"
+#include "three_d_vehicle_object.h"
+#include "three_d_objects.h"
 
 #include "safeguards.h"
 
@@ -905,19 +907,34 @@ static const uint FIREWORK_CYCLE = 24 + 10 + 14 + 20 + 32;
  */
 SpriteID HutFireworkSprite(TileIndex tile, uint64_t tick)
 {
+	uint part;
+	uint32_t h;
+	HutFireworkPhase(tile, tick, part, h);
+	if (part == 0) return SPR_FIREWORK_START;
+	if (part == 4) return 0;
+	uint colour = h % 3;
+	return SPR_FIREWORK_BALL + colour * 3 + (part - 1);
+}
+
+/**
+ * The part of the fireworks over a hut at a tick (HutFireworkSprite()): 0 the launch, 1 to 3 the phases of the ball,
+ * 4 the dark sky; and the hash of the tile, the firework and the phase its colour is picked by -- of three sprites,
+ * or of the palette of the 3D object (three_d_vehicle_object.h).
+ * @return true
+ */
+bool HutFireworkPhase(TileIndex tile, uint64_t tick, uint &part, uint32_t &hash)
+{
 	uint64_t t = tick + tile.base() * 37ULL;
 	uint64_t firework = t / FIREWORK_CYCLE;
 	uint at = static_cast<uint>(t % FIREWORK_CYCLE);
-	uint part = 0;
+	part = 0;
 	while (at >= FIREWORK_TICKS[part]) at -= FIREWORK_TICKS[part++];
-	if (part == 0) return SPR_FIREWORK_START;
-	if (part == 4) return 0;
 	uint32_t h = static_cast<uint32_t>(tile.base()) * 2654435761U ^ static_cast<uint32_t>(firework) * 40503U ^ part * 0x9E3779B9U ^ static_cast<uint32_t>(firework >> 32);
 	h ^= h >> 15;
 	h *= 0x2C1B3C6DU;
 	h ^= h >> 12;
-	uint colour = h % 3;
-	return SPR_FIREWORK_BALL + colour * 3 + (part - 1);
+	hash = h;
+	return true;
 }
 
 /**
@@ -2098,8 +2115,13 @@ static void DrawTile_Industry(TileInfo *ti)
 			/* The fireworks over the yard, after the girls; the tile is
 			 * animated while they go on (AnimateTile_Industry()). */
 			if (HutHasFireworks(ind)) {
-				SpriteID firework = HutFireworkSprite(ti->tile, TimerGameTick::counter);
-				if (firework != 0) AddChildSpriteScreen(firework, PAL_NONE, 0, 0, IsTransparencySet(TransparencyOption::Industries), nullptr, false, false);
+				/* In the turned view the 3D object, when the game has it (three_d_vehicle_object.h). */
+				if (ViewportDrawingTurned() && !IsTransparencySet(TransparencyOption::Industries) && GetThreeDEffect("ohnostroj") != nullptr) {
+					QueueThreeDFireworks(ti->tile);
+				} else {
+					SpriteID firework = HutFireworkSprite(ti->tile, TimerGameTick::counter);
+					if (firework != 0) AddChildSpriteScreen(firework, PAL_NONE, 0, 0, IsTransparencySet(TransparencyOption::Industries), nullptr, false, false);
+				}
 			}
 		}
 
