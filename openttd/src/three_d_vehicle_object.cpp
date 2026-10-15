@@ -599,10 +599,10 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
  * @param phase how many frames on it is from the others (a hash of its tile: the girls of a map do not all move at once)
  * @return whether it was drawn so; else the caller draws its sprite
  */
-bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase)
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
 {
 	int height = 0;
-	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height);
+	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height, frame);
 	if (pic == nullptr) return false;
 	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
 	return true;
@@ -613,13 +613,15 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * building, drawn among its triangles): its frame of the game's tick when it moves, its tile then drawn again as the
  * frame changes.
  * @param[out] height how tall it is, units of height
+ * @param frame the frame to draw (one walking: by the way walked, three_d_walkers.h); -1 by the game's tick
  * @return the picture, or nullptr when the figure is not there
  */
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height)
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame)
 {
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
 	if (fig == nullptr) return nullptr;
-	int frame = fig->FrameAt(TimerGameTick::counter, phase);
+	const bool by_tick = frame < 0;
+	if (by_tick) frame = fig->FrameAt(TimerGameTick::counter, phase);
 	const ThreeDVehicleShape *shape = fig->GetShape(frame);
 	if (shape == nullptr) return nullptr;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
@@ -627,7 +629,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, frame);
 	if (pic == nullptr) return nullptr;
 	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
-	if (fig->frames > 1 && tile != INVALID_TILE) {
+	if (by_tick && fig->frames > 1 && tile != INVALID_TILE) {
 		uint64_t step = TimerGameTick::counter / fig->frame_ticks;
 		bool known = false;
 		for (MovingFigure &m : _moving_figures) {

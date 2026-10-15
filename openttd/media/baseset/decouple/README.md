@@ -93,7 +93,11 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   (Matilda, nicolekeane, Sketchfab, **CC BY-NC-SA 4.0**: jen nekomerčně, obrázky
   s ní pod stejnou licencí a se jménem autorky); holka v tyrkysovém tílku
   (Character People Girl 001, kiemtruongkts, Sketchfab, CC BY 4.0). Jsou na
-  zastávkách v otočeném pohledu; na sever zůstávají sprity.
+  zastávkách v otočeném pohledu; na sever zůstávají sprity. Mat opravář (model
+  Armored Wave, Sketchfab, CC BY 4.0; postavička ze seriálu Pat a Mat, Lubomír
+  Beneš / Patmat Film, fanouškovský model, nekomerčně) chodí v otočeném pohledu
+  po chodnících měst ode dveří domů ke dveřím (`dvere` v `mirne/objekty.json`).
+  Na střeše hotelu stojí kouřící College Girl u slunečníků (`postavy` u hotelu).
 - Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
   mírného klimatu, které staví arktické nebo pouštní domy („Domy z“).
 - Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje

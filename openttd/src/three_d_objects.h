@@ -67,6 +67,13 @@ struct ThreeDObjectFigure {
 	float scale = 1;      ///< "meritko": its size against true metres; the building is in true metres
 };
 
+/** A door of a building ("dvere"): people come out of it and go in (three_d_walkers.h). */
+struct ThreeDObjectDoor {
+	float at[2] = {};     ///< "poloha": where it is, metres in the building's frame
+	float out[2] = {};    ///< "smer": the way out of it
+	float width = 1;      ///< "sirka": metres
+};
+
 /** A building as a 3D object. */
 struct ThreeDObject {
 	std::string name;         ///< its name in the index
@@ -86,6 +93,7 @@ struct ThreeDObject {
 	std::vector<uint16_t> light; ///< the light of each corner from its normal, 256 for 1 (lit as the vehicles); empty when the file has no normals, its light in its texture
 	std::vector<ThreeDObjectColourPart> colours; ///< "barvy": parts painted a colour by number
 	std::vector<ThreeDObjectFigure> figures;     ///< "postavy": figures standing on it, drawn among its triangles
+	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;
@@ -156,6 +164,7 @@ struct ThreeDVehicleObject {
 	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none
 	int frames = 0;                 ///< "snimku": how many frames
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
+	float walk_step = 0;            ///< "chuze": "krok_m", metres a round of its frames walks; 0 when it does not walk
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;

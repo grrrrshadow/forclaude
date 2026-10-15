@@ -483,6 +483,29 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   (a timer of the game's ticks marks it dirty; only the screen). Everywhere
   else -- the crew, the sprites -- a figure is its first frame. Always round and
   round (`smycka` is not read); vehicles' frames (`kdy`) not yet.
+- **People walking** (`src/three_d_walkers.cpp`; the player, 15. 10.: "Mat
+  will walk about the town along the edge of the road tiles, there is the
+  pavement in a town, and out of the town he will not walk; only from a door,
+  and he disappears elsewhere at a door he gets to"): Mat the repairman, the
+  colleague's `mat.glb`, eight frames, `"chuze": {"krok_m": 1.1}`. Each town
+  within 40 tiles of the middle of the turned main view gets its Mat: out of a
+  door (`"dvere"` of a house's index entry: `poloha`, `smer` out, `sirka`) of a
+  house drawn as a 3D object whose way out leads onto a road of the town, to
+  the door of another house, by the town's roads -- a plain road tile of the
+  town's zone (not its edge) with a pavement, paved by the game or of a road
+  type towns build (CZTR's town roads; the player: "that is another road, the
+  town's"), each step joined both ways (BFS) -- keeping 5.5 units from the
+  middle of the road, on the side of the door he came out of, crossing at the
+  end when the other door is across. In at the door, he comes out somewhere
+  else 150 to 600 ticks later. His frame is by the way walked (a round of the
+  frames every krok_m), his pace twice the frames' own (`WALK_PACE`; at theirs
+  a tile took fifteen seconds), his size the vehicles' (1 or 1.2). Only the
+  screen: the client's, moved by the game's ticks while the main view is
+  turned, never saved, with the interactive random numbers. Rig: `test3d
+  chodci` (the walkers and the doors of the town nearest the view), `chodci
+  posli` (one out now), `chodci stred` (the view on him), `chodci domy
+  <house>` (that house on up to three tiles whose next tile along +x is a road
+  of the town).
 - Not yet: the glass, levels of detail, the cab's eye, wheels that turn and
   bogies that swing on a curve.
 - Cost: Sergej, 95 thousand triangles, takes 55 to 170 ms a direction for the

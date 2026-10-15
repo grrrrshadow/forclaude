@@ -102,6 +102,7 @@
 #include "three_d.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_walkers.h"
 #include "cab_view.h"
 #include "cab_drive.h"
 #include "round_track.h"
@@ -3703,6 +3704,8 @@ static void ViewportDoDrawTurned()
 	_turned_times.drawn += static_cast<int>(tiles.size());
 
 	ViewportAddVehicles(&cdpi);
+	/* The people walking about the towns (three_d_walkers.h). */
+	AddThreeDWalkersToViewport(zoom);
 
 	/* The signs and the floating texts: collected north-up, then each moved to where the ground under it is drawn turned. */
 	size_t first_string = _vd.string_sprites_to_draw.size();

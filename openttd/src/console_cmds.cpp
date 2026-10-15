@@ -65,6 +65,7 @@
 #include "fontcache.h"
 #include "screenshot.h"
 #include "three_d.h"
+#include "three_d_walkers.h"
 #include "cab_view.h"
 #include "progress.h"
 #include "genworld.h"
@@ -9353,6 +9354,60 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(*x, *y), RAILTYPE_RAIL, static_cast<Track>(*tr), false);
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
+		return true;
+	} else if (what == "chodci") {
+		/* The rig: the people walking about the towns (three_d_walkers.h); 'chodci posli' sends one out now in the
+		 * town nearest the middle of the turned view. */
+		if (argv.size() > 2 && argv[2] == "posli") IConsolePrint(CC_DEFAULT, "test3d: chodec {}", SendThreeDWalker() ? "vysel" : "NEVYSEL");
+		int wx, wy, wz;
+		if (argv.size() > 2 && argv[2] == "stred" && ThreeDWalkerAt(wx, wy, wz)) {
+			/* The view's middle on the first walker. */
+			ScrollMainWindowTo(wx, wy, wz, true);
+			UpdateViewportPosition(w, 0);
+		}
+		if (argv.size() > 3 && argv[2] == "domy") {
+			/* 'chodci domy <house>': that house (one whose door looks out to +x, 0x13) on up to three clear flat tiles
+			 * of the town nearest the view whose next tile that way is a road of the town to walk on. */
+			auto house = ParseInteger(argv[3].starts_with("0x") ? argv[3].substr(2) : argv[3], argv[3].starts_with("0x") ? 16 : 10);
+			Point mid = TranslateXYToTileCoord(*vp, vp->left + vp->width / 2, vp->top + vp->height / 2, true);
+			TileIndex middle = TileVirtXY(mid.x, mid.y);
+			const Town *town = nullptr;
+			for (const Town *t : Town::Iterate()) {
+				if (town == nullptr || DistanceManhattan(t->xy, middle) < DistanceManhattan(town->xy, middle)) town = t;
+			}
+			int built = 0;
+			if (town != nullptr && house.has_value()) {
+				for (int r = 0; r <= 10 && built < 3; r++) {
+					for (int dy = -r; dy <= r && built < 3; dy++) {
+						for (int dx = -r; dx <= r && built < 3; dx++) {
+							if (std::max(std::abs(dx), std::abs(dy)) != r) continue;
+							int x = TileX(town->xy) + dx, y = TileY(town->xy) + dy;
+							if (x < 1 || y < 1 || x + 1 >= static_cast<int>(Map::MaxX()) || y >= static_cast<int>(Map::MaxY())) continue;
+							TileIndex t = TileXY(x, y);
+							/* Clear land, or a house of one tile the new one takes the place of. */
+							bool small_house = IsTileType(t, TileType::House) && HouseSpec::Get(GetHouseType(t))->building_flags.Test(BuildingFlag::Size1x1);
+							if (!(IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees) || small_house) || IsSteepSlope(GetTileSlope(t))) continue;
+							if (!IsThreeDWalkway(TileXY(x + 1, y), town)) continue;
+							Backup<CompanyID> deity(_current_company, OWNER_DEITY);
+							CommandCost cost = Command<Commands::PlaceHouse>::Do(DoCommandFlag::Execute, t, static_cast<HouseID>(*house), false, true);
+							deity.Restore();
+							if (cost.Succeeded()) {
+								built++;
+								IConsolePrint(CC_DEFAULT, "test3d: chodci dum {:#x} na {},{}", *house, x, y);
+							}
+						}
+					}
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: chodci domy postaveno {}", built);
+		}
+		std::string all = DescribeThreeDWalkers();
+		for (size_t at = 0; at < all.size();) {
+			size_t end = all.find('\n', at);
+			if (end == std::string::npos) end = all.size();
+			IConsolePrint(CC_DEFAULT, "test3d: {}", all.substr(at, end - at));
+			at = end + 1;
+		}
 		return true;
 	} else if (what == "oblouky") {
 		/* The rig: quarter turns from X to Y with the diagonal between their corners 1, 3, 5, 7 and 9 pieces long, side

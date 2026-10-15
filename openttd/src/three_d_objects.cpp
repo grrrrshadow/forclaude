@@ -431,11 +431,10 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 	}
 }
 
-/** The figures standing on a building ("postavy"). */
+/** The figures standing on a building ("postavy") and its doors ("dvere"). */
 static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 {
-	if (!e.contains("postavy") || !e.at("postavy").is_array()) return;
-	for (const auto &f : e.at("postavy")) {
+	if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
 		if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) continue;
 		const auto &at = f.at("poloha");
 		if (!at.is_array() || at.size() != 3) continue;
@@ -445,6 +444,21 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 		fig.facing = f.value("otoceni", 0.0f);
 		fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
 		obj.figures.push_back(std::move(fig));
+	}
+	/* Its doors (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): people come out and go in there. */
+	if (e.contains("dvere") && e.at("dvere").is_array()) {
+		for (const auto &d : e.at("dvere")) {
+			if (!d.is_object() || !d.contains("poloha") || !d.contains("smer")) continue;
+			const auto &at = d.at("poloha"), &out = d.at("smer");
+			if (!at.is_array() || at.size() < 2 || !out.is_array() || out.size() < 2) continue;
+			ThreeDObjectDoor door;
+			for (int k = 0; k < 2; k++) {
+				door.at[k] = at.at(k).get<float>();
+				door.out[k] = out.at(k).get<float>();
+			}
+			door.width = d.value("sirka", 1.0f);
+			obj.doors.push_back(door);
+		}
 	}
 }
 
@@ -594,6 +608,7 @@ static void ReadThreeDVehicleObjects()
 						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
 						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
 						if (fig.frames < 2) fig.frame_prefix.clear();
+						if (a.contains("chuze") && a.at("chuze").is_object()) fig.walk_step = std::clamp(a.at("chuze").value("krok_m", 0.0f), 0.0f, 10.0f);
 					}
 					_figure_objects.push_back(std::move(fig));
 					continue;

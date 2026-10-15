@@ -553,6 +553,8 @@ add_files(
     three_d_vehicle.cpp
     three_d_vehicle_object.cpp
     three_d_vehicle_object.h
+    three_d_walkers.cpp
+    three_d_walkers.h
     tile_cmd.h
     tile_map.cpp
     tile_map.h
