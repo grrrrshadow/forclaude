@@ -71,6 +71,9 @@
 #include "signs_base.h"
 #include "signs_func.h"
 #include "vehicle_base.h"
+#include "aircraft.h"
+#include "train.h"
+#include "timer/timer_game_tick.h"
 #include "vehicle_gui.h"
 #include "blitter/factory.hpp"
 #include "strings_func.h"
@@ -3962,6 +3965,119 @@ static void ViewportDoDrawTurned()
 	_turned_times.standing += TurnedNow() - tb0;
 }
 
+/** The night's moonlight (gui.night): how much of red, green and blue stays, 256ths. */
+static constexpr uint NIGHT_R = 70, NIGHT_G = 82, NIGHT_B = 128;
+
+/**
+ * Add a light to the pixels of the block being drawn: a soft spot, round or flat as the ground shows a circle, its
+ * colour times its strength falling off to its edge, added to what is there.
+ * @param cx,cy its middle, pixels of the block
+ * @param rx,ry its half width and height, pixels
+ */
+static void AddNightLight(uint32_t *dst, int pitch, int w, int h, double cx, double cy, double rx, double ry, Colour colour, double strength)
+{
+	if (rx < 0.5 || ry < 0.5) return;
+	const int x0 = std::max(0, static_cast<int>(std::floor(cx - rx))), x1 = std::min(w - 1, static_cast<int>(std::ceil(cx + rx)));
+	const int y0 = std::max(0, static_cast<int>(std::floor(cy - ry))), y1 = std::min(h - 1, static_cast<int>(std::ceil(cy + ry)));
+	for (int y = y0; y <= y1; y++) {
+		uint32_t *row = dst + static_cast<size_t>(y) * pitch;
+		const double dy = (y + 0.5 - cy) / ry;
+		for (int x = x0; x <= x1; x++) {
+			const double dx = (x + 0.5 - cx) / rx;
+			const double d2 = dx * dx + dy * dy;
+			if (d2 >= 1.0) continue;
+			const double f = strength * (1.0 - d2) * (1.0 - d2);
+			Colour c(row[x]);
+			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f))).data;
+		}
+	}
+}
+
+/**
+ * The night (gui.night, the player: "a dark mode, and it will make night, as if it were night, and the cars will
+ * shine"): the block just drawn darkened as under the moon, and the lights of the vehicles in it -- two headlights at
+ * the front of a road vehicle, a train or a ship, with the pool of their light on the way ahead; the red lights at
+ * the back of its last part; an aircraft's landing light and its red beacon blinking. Only the picture, at 32bpp;
+ * the vehicles' boxes have room for the lights (Vehicle::UpdateBoundingBoxCoordinates()).
+ * @param turned whether the block was drawn turned (three_d.h)
+ */
+static void DrawNight(bool turned)
+{
+	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return;
+	const DrawPixelInfo &dpi = _vd.dpi;
+	const int w = UnScaleByZoom(dpi.width, dpi.zoom), h = UnScaleByZoom(dpi.height, dpi.zoom);
+	if (w <= 0 || h <= 0) return;
+	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, NIGHT_R, NIGHT_G, NIGHT_B);
+
+	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
+	const double scale = 1.0 / (1 << to_underlying(dpi.zoom));
+	auto project = [&](double x, double y, double z, double &px, double &py) {
+		double vx, vy;
+		if (turned) {
+			ProjectTurnedF(x, y, z, vx, vy);
+		} else {
+			RemapCoordsF(x, y, z, vx, vy);
+		}
+		px = (vx - dpi.left) * scale;
+		py = (vy - dpi.top) * scale;
+	};
+	/* A unit of the world along the ground, in pixels of the block (as wide as the map draws it). */
+	const double unit = 2 * ZOOM_BASE * scale;
+	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
+	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
+	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
+	for (const Vehicle *v : Vehicle::Iterate()) {
+		if (v->vehstatus.Test(VehState::Hidden)) continue;
+		const bool front = v->Previous() == nullptr;
+		const bool last = v->Next() == nullptr;
+		if (v->type != VehicleType::Road && v->type != VehicleType::Train && v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) continue;
+		if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft()) continue;
+		if (!front && !last) continue;
+		double cx, cy;
+		project(v->x_pos, v->y_pos, v->z_pos, cx, cy);
+		const double margin = 60 * unit;
+		if (cx < -margin || cy < -margin || cx > w + margin || cy > h + margin) continue;
+		const int d = to_underlying(v->direction) & 7;
+		double fx = dir_dx[d], fy = dir_dy[d];
+		const double len = std::sqrt(fx * fx + fy * fy);
+		fx /= len;
+		fy /= len;
+		const double sx = -fy, sy = fx; // to its side
+		const double z = v->z_pos;
+		if (v->type == VehicleType::Aircraft) {
+			/* Its landing light ahead, and the red beacon on its back, blinking. */
+			double px, py;
+			project(v->x_pos + fx * 6, v->y_pos + fy * 6, z + 2, px, py);
+			AddNightLight(dst, dpi.pitch, w, h, px, py, 3 * unit, 3 * unit, lamp, 0.9);
+			if ((TimerGameTick::counter + v->index.base() * 7) % 32 < 6) {
+				project(v->x_pos, v->y_pos, z + 6, px, py);
+				AddNightLight(dst, dpi.pitch, w, h, px, py, 2 * unit, 2 * unit, beacon, 1.0);
+			}
+			continue;
+		}
+		const double half = v->type == VehicleType::Ship ? 6 : 3.5; // half its length, units
+		if (front && (v->type != VehicleType::Train || Train::From(v)->IsEngine() || Train::From(v)->IsFrontEngine())) {
+			/* The pool of the light on the way ahead, then the two lamps. */
+			double px, py;
+			project(v->x_pos + fx * (half + 9), v->y_pos + fy * (half + 9), z, px, py);
+			AddNightLight(dst, dpi.pitch, w, h, px, py, 9 * unit, 4.5 * unit, pool, 0.45);
+			project(v->x_pos + fx * (half + 4), v->y_pos + fy * (half + 4), z, px, py);
+			AddNightLight(dst, dpi.pitch, w, h, px, py, 5 * unit, 2.5 * unit, pool, 0.5);
+			for (int side = -1; side <= 1; side += 2) {
+				project(v->x_pos + fx * half + sx * side * 1.5, v->y_pos + fy * half + sy * side * 1.5, z + 2, px, py);
+				AddNightLight(dst, dpi.pitch, w, h, px, py, 1.6 * unit, 1.6 * unit, lamp, 1.2);
+			}
+		}
+		if (last && v->type != VehicleType::Ship) {
+			for (int side = -1; side <= 1; side += 2) {
+				double px, py;
+				project(v->x_pos - fx * half + sx * side * 1.5, v->y_pos - fy * half + sy * side * 1.5, z + 2, px, py);
+				AddNightLight(dst, dpi.pitch, w, h, px, py, 1.0 * unit, 1.0 * unit, tail, 0.9);
+			}
+		}
+	}
+}
+
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
 	/* The round curves of rails (round_track.h), only in the turned view: facing north the player builds, the curves are as always. */
@@ -4010,6 +4126,9 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		if (_draw_bounding_boxes) ViewportDrawBoundingBoxes(&_vd.parent_sprites_to_sort);
 		if (_draw_dirty_blocks) ViewportDrawDirtyBlocks();
 	}
+
+	/* The night over it all but the signs (gui.night). */
+	if (_settings_client.gui.night) DrawNight(IsViewportTurned(vp));
 
 	DrawPixelInfo dp = _vd.dpi;
 	ZoomLevel zoom = _vd.dpi.zoom;

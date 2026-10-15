@@ -56,6 +56,7 @@
 #include "goal_gui.h"
 #include "story_base.h"
 #include "toolbar_gui.h"
+#include "settings_internal.h"
 #include "framerate_type.h"
 #include "screenshot_gui.h"
 #include "misc_cmd.h"
@@ -1137,20 +1138,39 @@ static CallBackFunction PlaceLandBlockInfo()
 	}
 }
 
+/** The help menu's item of the night (gui.night), after the console's: its value, past the others. */
+static constexpr int HELP_MENU_NIGHT = 11;
+
 static CallBackFunction ToolbarHelpClick(Window *w)
 {
-	if (_settings_client.gui.newgrf_developer_tools) {
-		PopupMainToolbarMenu(w, _game_mode == GameMode::Editor ? (WidgetID)WID_TE_HELP : (WidgetID)WID_TN_HELP, {STR_ABOUT_MENU_LAND_BLOCK_INFO,
-				STR_ABOUT_MENU_HELP, STR_NULL, STR_ABOUT_MENU_TOGGLE_CONSOLE, STR_ABOUT_MENU_AI_DEBUG,
-				STR_ABOUT_MENU_SCREENSHOT, STR_ABOUT_MENU_SHOW_FRAMERATE, STR_ABOUT_MENU_ABOUT_OPENTTD,
-				STR_ABOUT_MENU_SPRITE_ALIGNER, STR_ABOUT_MENU_TOGGLE_BOUNDING_BOXES, STR_ABOUT_MENU_TOGGLE_DIRTY_BLOCKS,
-				STR_ABOUT_MENU_TOGGLE_WIDGET_OUTLINES});
-	} else {
-		PopupMainToolbarMenu(w, _game_mode == GameMode::Editor ? (WidgetID)WID_TE_HELP : (WidgetID)WID_TN_HELP, {STR_ABOUT_MENU_LAND_BLOCK_INFO,
-				STR_ABOUT_MENU_HELP, STR_NULL, STR_ABOUT_MENU_TOGGLE_CONSOLE, STR_ABOUT_MENU_AI_DEBUG,
-				STR_ABOUT_MENU_SCREENSHOT, STR_ABOUT_MENU_SHOW_FRAMERATE, STR_ABOUT_MENU_ABOUT_OPENTTD});
+	/* As the strings' menu, with the night (the player: "where the toggle console is, a dark mode too") ticked when on. */
+	DropDownList list;
+	int i = 0;
+	auto add = [&](StringID string) {
+		if (string == STR_NULL) {
+			list.push_back(MakeDropDownListDividerItem());
+		} else {
+			list.push_back(MakeDropDownListStringItem(string, i++));
+		}
+		if (string == STR_ABOUT_MENU_TOGGLE_CONSOLE) list.push_back(MakeDropDownListCheckedItem(_settings_client.gui.night, STR_ABOUT_MENU_NIGHT, HELP_MENU_NIGHT));
+	};
+	for (StringID string : {STR_ABOUT_MENU_LAND_BLOCK_INFO, STR_ABOUT_MENU_HELP, STR_NULL, STR_ABOUT_MENU_TOGGLE_CONSOLE, STR_ABOUT_MENU_AI_DEBUG,
+			STR_ABOUT_MENU_SCREENSHOT, STR_ABOUT_MENU_SHOW_FRAMERATE, STR_ABOUT_MENU_ABOUT_OPENTTD}) {
+		add(string);
 	}
+	if (_settings_client.gui.newgrf_developer_tools) {
+		for (StringID string : {STR_ABOUT_MENU_SPRITE_ALIGNER, STR_ABOUT_MENU_TOGGLE_BOUNDING_BOXES, STR_ABOUT_MENU_TOGGLE_DIRTY_BLOCKS, STR_ABOUT_MENU_TOGGLE_WIDGET_OUTLINES}) {
+			add(string);
+		}
+	}
+	PopupMainToolbarMenu(w, _game_mode == GameMode::Editor ? (WidgetID)WID_TE_HELP : (WidgetID)WID_TN_HELP, std::move(list), 0);
 	return CallBackFunction::None;
+}
+
+/** The night on or off (gui.night), as the settings window would. */
+static void ToggleNight()
+{
+	SetSettingValue(GetSettingFromName("gui.night")->AsIntSetting(), _settings_client.gui.night ? 0 : 1);
 }
 
 /**
@@ -1241,6 +1261,7 @@ static CallBackFunction MenuClickHelp(int index)
 		case  8: ToggleBoundingBoxes();            break;
 		case  9: ToggleDirtyBlocks();              break;
 		case 10: ToggleWidgetOutlines();           break;
+		case HELP_MENU_NIGHT: ToggleNight();       break;
 	}
 	return CallBackFunction::None;
 }

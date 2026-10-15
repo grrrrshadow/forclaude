@@ -113,6 +113,16 @@ public:
 	virtual void DrawRect(void *video, int width, int height, PixelColour colour) = 0;
 
 	/**
+	 * Darken a rectangle of the screen, each colour channel to so many 256ths of itself (the night, gui.night):
+	 * what a blitter of the palette cannot, it leaves as it is.
+	 * @param video The destination pointer (video-buffer).
+	 * @param width The width of the rectangle.
+	 * @param height The height of the rectangle.
+	 * @param r,g,b How much of each channel stays, 256ths.
+	 */
+	virtual void DarkenRect([[maybe_unused]] void *video, [[maybe_unused]] int width, [[maybe_unused]] int height, [[maybe_unused]] uint r, [[maybe_unused]] uint g, [[maybe_unused]] uint b) {}
+
+	/**
 	 * Draw a line with a given colour.
 	 * @param video The destination pointer (video-buffer).
 	 * @param x The x coordinate from where the line starts.

@@ -457,6 +457,13 @@ static void ThreeDNorthHousesChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
+/** The night switched on or off: every view drawn anew, the vehicles' boxes made room for their lights. */
+static void NightChanged(int32_t)
+{
+	for (const Vehicle *v : Vehicle::Iterate()) v->UpdateBoundingBoxCoordinates(true);
+	MarkWholeScreenDirty();
+}
+
 /** The round curves of rails switched on or off (round_track.h): every view drawn anew. */
 static void RoundTrackCurvesChanged(int32_t)
 {

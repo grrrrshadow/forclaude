@@ -349,6 +349,23 @@ void Blitter_32bppAnim::DrawLine(void *video, int x, int y, int x2, int y2, int 
 	}
 }
 
+void Blitter_32bppAnim::DarkenRect(void *video, int width, int height, uint r, uint g, uint b)
+{
+	Blitter_32bppBase::DarkenRect(video, width, height, r, g, b);
+	if (_screen_disable_anim) return;
+	/* The pixels of the palette's animation are drawn again from the palette with their brightness: darkened too,
+	 * by the channels' mean, or the water would light up at the next step of the animation. */
+	const uint mean = (r + g + b) / 3;
+	uint16_t *anim_line = this->ScreenToAnimOffset(static_cast<uint32_t *>(video)) + this->anim_buf;
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			uint16_t &a = anim_line[x];
+			if (GB(a, 0, 8) >= PALETTE_ANIM_START) SB(a, 8, 8, GB(a, 8, 8) * mean >> 8);
+		}
+		anim_line += this->anim_buf_pitch;
+	}
+}
+
 void Blitter_32bppAnim::DrawRect(void *video, int width, int height, PixelColour colour)
 {
 	if (_screen_disable_anim) {

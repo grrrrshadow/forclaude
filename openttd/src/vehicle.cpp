@@ -2147,6 +2147,15 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 		new_coord.bottom += h + 8 * ZOOM_BASE;
 	}
 
+	/* At night (gui.night) its lights shine beyond it, a tile and a half ahead: room for them (DrawNight()). */
+	if (_settings_client.gui.night) {
+		const int reach = 48 * ZOOM_BASE;
+		new_coord.left -= reach;
+		new_coord.right += reach;
+		new_coord.top -= reach / 2;
+		new_coord.bottom += reach / 2;
+	}
+
 	extern bool _draw_bounding_boxes;
 	if (_draw_bounding_boxes) {
 		int x = this->x_pos + this->bounds.origin.x;

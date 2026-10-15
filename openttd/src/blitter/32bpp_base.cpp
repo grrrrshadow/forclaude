@@ -31,6 +31,16 @@ void Blitter_32bppBase::DrawLine(void *video, int x, int y, int x2, int y2, int 
 	});
 }
 
+void Blitter_32bppBase::DarkenRect(void *video, int width, int height, uint r, uint g, uint b)
+{
+	for (int y = 0; y < height; y++) {
+		Colour *dst = static_cast<Colour *>(video) + static_cast<size_t>(y) * _screen.pitch;
+		for (int x = 0; x < width; x++) {
+			dst[x] = Colour(static_cast<uint8_t>(dst[x].r * r >> 8), static_cast<uint8_t>(dst[x].g * g >> 8), static_cast<uint8_t>(dst[x].b * b >> 8), dst[x].a);
+		}
+	}
+}
+
 void Blitter_32bppBase::DrawRect(void *video, int width, int height, PixelColour colour)
 {
 	Colour colour32 = LookupColourInPalette(colour.p);

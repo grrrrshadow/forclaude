@@ -662,6 +662,7 @@ STR_NEWS_MENU_DELETE_ALL_MESSAGES                               :Smazat všechny
 STR_ABOUT_MENU_LAND_BLOCK_INFO                                  :Informace o zemi
 STR_ABOUT_MENU_HELP                                             :Nápověda a příručky
 STR_ABOUT_MENU_TOGGLE_CONSOLE                                   :Zobrazit nebo skrýt konzoli
+STR_ABOUT_MENU_NIGHT                                            :Noc
 STR_ABOUT_MENU_AI_DEBUG                                         :Ladění AI / herních skriptů
 STR_ABOUT_MENU_SCREENSHOT                                       :Screenshot
 STR_ABOUT_MENU_SHOW_FRAMERATE                                   :Zobrazit počet snímků za sekundu
@@ -2333,6 +2334,8 @@ STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Domy a průmysl
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :Jak vypadají domy a průmysl hry (gymnázium, socha, plantáž, bramborové pole, lihovar, hospoda…), které mají 3D objekt, když je herní plocha natočená na sever (úhel 0, jako při stavění): jako 3D objekty, stejně jako při otáčení; nebo jejich obrázky (sprity), jak je hra kreslila dřív. Ty bez 3D objektu mají svoje obrázky vždycky. Potřebuje zapnuté 3D a 32bpp blitter
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, stejně jako při otáčení
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :původní obrázky
+STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
+STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Kulaté zatáčky kolejí: {STRING}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :Zatáčka kolejí -- rovně, kus na šikmo, rovně -- se v otočeném pohledu nakreslí jako jeden kulatý oblouk přes asi dvě dlaždice a vlak na ní se nakreslí natočený podél oblouku jako svá 3D podoba. U výhybky se zakulatí odbočka, přímá kolej zůstane rovná. Jen vzhled: kolej se staví a jezdí se po ní jako vždycky. Při pohledu na sever (úhel 0, na stavění) jsou zatáčky jako vždycky. Potřebuje 32bpp blitter. Vypnuto: zatáčky jsou, jaké vždycky byly, do pixelu
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}

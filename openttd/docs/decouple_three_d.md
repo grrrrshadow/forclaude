@@ -712,6 +712,24 @@ the curves are vanilla to the pixel.
   along its tangent (`GetRoundTrackPose()`). Building, the pathfinder and the
   trains' movement are untouched.
 
+## The night
+
+The player (15. 10.): "where the toggle console is there will be a dark mode
+too, and it will make night, as if it were night, and the cars will shine".
+The help menu has **Night** right under *Toggle console*, ticked when on; it
+is the setting `gui.night` (Graphics, kept in the config, never in a save).
+Only the picture changes: every block of the map drawn (facing north or
+turned) is darkened to the moonlight -- red, green and blue to 70, 82 and 128
+256ths (`DrawNight()`, the blitter's `DarkenRect()`; the 32bpp-anim blitter
+darkens the brightness of the palette's animated pixels too, or the water
+would light up at its next step) -- before the signs, which stay as they are.
+Then the vehicles' lights are added: two white headlights at the front of a
+road vehicle, a train's engine or a ship with the pool of their light on the
+way ahead, two red lights at the back of its last part, an aircraft's landing
+light and its red beacon blinking. A vehicle's box has room for them at night
+(`Vehicle::UpdateBoundingBoxCoordinates()`), so its lights go with it. At
+32bpp only; the 8bpp blitter keeps the day.
+
 ## The previews that turn
 
 `src/three_d_preview_gui.cpp`. There is no window: the preview is a picture
