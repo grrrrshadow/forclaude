@@ -150,9 +150,12 @@ struct GlbMesh {
  * @param frame_prefix with all_nodes, a figure that moves (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): of the
  *                     nodes whose names start so, the frames, only the one numbered frame (and its children)
  * @param frame that frame
+ * @param only_node with all_nodes, only the meshes of the node so named and its children (a building's "noc")
+ * @param point_prefix with all_nodes and points, the nodes whose names start so are places: their origins go to points
+ * @param points where the places go, metres in the game's axes as the corners
  * @return whether there is something to draw
  */
-static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0)
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr)
 {
 	std::vector<uint8_t> d = ReadWholeFile(path);
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
@@ -345,13 +348,15 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 				}
 				for (size_t i = 0; i < nodes.size(); i++) if (!child[i]) roots.push_back(static_cast<int>(i));
 			}
-			std::vector<std::pair<int, Matrix>> todo;
-			for (int r : roots) todo.emplace_back(r, identity);
+			std::vector<std::tuple<int, Matrix, bool>> todo;
+			for (int r : roots) todo.emplace_back(r, identity, only_node.empty());
 			size_t visited = 0;
 			while (!todo.empty() && visited++ < 100000) {
-				auto [n, parent] = todo.back();
+				auto [n, parent, inside] = todo.back();
 				todo.pop_back();
 				const auto &node = nodes.at(n);
+				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+				if (!only_node.empty() && node_name == only_node) inside = true;
 				if (!frame_prefix.empty() && node.contains("name") && node.at("name").is_string()) {
 					std::string name = node.at("name").get<std::string>();
 					if (name.starts_with(frame_prefix)) {
@@ -360,8 +365,14 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 					}
 				}
 				Matrix m = multiply(parent, local(node));
-				if (node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m);
-				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m);
+				if (points != nullptr && !point_prefix.empty() && node_name.starts_with(point_prefix)) {
+					/* A place: its origin, turned from glTF's axes as the corners are. */
+					points->push_back(static_cast<float>(m[12]));
+					points->push_back(static_cast<float>(-m[14]));
+					points->push_back(static_cast<float>(m[13]));
+				}
+				if (inside && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m);
+				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m, inside);
 			}
 		} else {
 			/* The first node with a mesh, its own transform. */
@@ -431,6 +442,22 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 	obj.uv = std::move(mesh.uv);
 	obj.tri = std::move(mesh.tri);
 	obj.png = std::move(mesh.png);
+	/* Its night: the node "noc" (the lit windows) and the places "svetlo_NN" (the glows), when it has them. */
+	GlbMesh night;
+	std::vector<float> lights;
+	ReadGlbMesh(path, night, true, {}, 0, "noc", "svetlo_", &lights);
+	for (size_t i = 0; i + 2 < night.pos.size(); i += 3) {
+		obj.night_pos.push_back(static_cast<float>(night.pos[i] * OBJECT_UNITS_PER_METRE));
+		obj.night_pos.push_back(static_cast<float>(night.pos[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.night_pos.push_back(static_cast<float>(night.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	obj.night_uv = std::move(night.uv);
+	obj.night_tri = std::move(night.tri);
+	for (size_t i = 0; i + 2 < lights.size(); i += 3) {
+		obj.lights.push_back(static_cast<float>(lights[i] * OBJECT_UNITS_PER_METRE));
+		obj.lights.push_back(static_cast<float>(lights[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.lights.push_back(static_cast<float>(lights[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
 	if (!mesh.nrm.empty()) {
 		/* Normals: lit by the game as the vehicles are, by one light fixed to the world (the colleague's
 		 * hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md); its axes are the world's. Without, the light is in the texture. */

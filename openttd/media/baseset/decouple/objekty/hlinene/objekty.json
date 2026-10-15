@@ -82,6 +82,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 5,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (300 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_04 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dvě kulaté hliněné chýše s kopulemi, dvorek se zídkou, pec, džbány, obří houba; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x18 mírného klimatu v hliněném městě; 10348 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 7.45 m"
@@ -171,6 +177,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 5,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (300 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_04 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dvě kulaté hliněné chýše s kopulemi, dvorek se zídkou, pec, džbány, obří houba; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x19 mírného klimatu v hliněném městě; 10348 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 7.45 m"
@@ -258,6 +270,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 5,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (300 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_04 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dvě kulaté hliněné chýše s kopulemi, dvorek se zídkou, pec, džbány, obří houba; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1A mírného klimatu v hliněném městě; 10348 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 7.45 m"
@@ -335,6 +353,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (324 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_06 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Patrový hliněný dům s přístavkem, venkovní schody na terasu, látková stříška a koberce na střeše; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x06 mírného klimatu v hliněném městě; 11214 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -410,6 +434,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (324 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_06 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Patrový hliněný dům s přístavkem, venkovní schody na terasu, látková stříška a koberce na střeše; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x18 mírného klimatu v hliněném městě; 11214 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -485,6 +515,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (324 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_06 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Patrový hliněný dům s přístavkem, venkovní schody na terasu, látková stříška a koberce na střeše; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1A mírného klimatu v hliněném městě; 11214 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -574,6 +610,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (700 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_12 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x02 mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
@@ -661,6 +703,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (700 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_12 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x04 mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
@@ -750,6 +798,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (700 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_12 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0D mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
@@ -839,6 +893,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (700 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_12 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x13 mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
@@ -928,6 +988,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (700 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_12 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1B mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
@@ -1003,6 +1069,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 33,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1532 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_32 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x00 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
@@ -1080,6 +1152,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 33,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1532 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_32 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x01 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
@@ -1155,6 +1233,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 33,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1532 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_32 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x04 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
@@ -1232,6 +1316,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 33,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1532 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_32 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x10 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
@@ -1309,6 +1399,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 33,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1532 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_32 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1C mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
@@ -1396,6 +1492,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 28,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1600 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_27 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x00 mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
@@ -1485,6 +1587,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 28,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1600 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_27 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x11 mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
@@ -1574,6 +1682,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 28,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1600 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_27 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1E mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
@@ -1663,6 +1777,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 28,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1600 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_27 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x24 mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
@@ -1700,7 +1820,7 @@
    {
     "cast": "omitka",
     "maska": "hl_trznice_maska_omitka.png",
-    "zacatek": 224,
+    "zacatek": 223,
     "paleta": [
      "CCA474",
      "D8C49C",
@@ -1740,6 +1860,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (528 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_11 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0E mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -1777,7 +1903,7 @@
    {
     "cast": "omitka",
     "maska": "hl_trznice_maska_omitka.png",
-    "zacatek": 224,
+    "zacatek": 223,
     "paleta": [
      "CCA474",
      "D8C49C",
@@ -1817,6 +1943,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (528 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_11 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0F mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -1854,7 +1986,7 @@
    {
     "cast": "omitka",
     "maska": "hl_trznice_maska_omitka.png",
-    "zacatek": 224,
+    "zacatek": 223,
     "paleta": [
      "CCA474",
      "D8C49C",
@@ -1894,6 +2026,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (528 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_11 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1D mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -1931,7 +2069,7 @@
    {
     "cast": "omitka",
     "maska": "hl_trznice_maska_omitka.png",
-    "zacatek": 224,
+    "zacatek": 223,
     "paleta": [
      "CCA474",
      "D8C49C",
@@ -1971,6 +2109,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (528 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_11 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x27 mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
@@ -2048,6 +2192,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 25,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1260 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_24 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněný chrám s bubnem a velkou kopulí, štíhlá věž s ochozem, nádvoří s nádrží; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x03 mírného klimatu v hliněném městě; 13676 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 15.81 m"
@@ -2111,6 +2261,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_03 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hliněný sklad s vraty a otevřeným přístřeškem z trámů, velké džbány, pytle, bedny, vozík; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x12 mírného klimatu v hliněném městě; 5192 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 6.03 m"
@@ -2149,6 +2305,12 @@
   ],
   "dvere": [],
   "interier": false,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 3,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (228 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_02 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Park: háj obřích hub na mechu, pěšina, hliněné lavice, jezírko, lucerny; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0B mírného klimatu v hliněném městě; 18088 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 10.06 m"
@@ -2187,6 +2349,12 @@
   ],
   "dvere": [],
   "interier": false,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 3,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (228 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_02 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Park: háj obřích hub na mechu, pěšina, hliněné lavice, jezírko, lucerny; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0C mírného klimatu v hliněném městě; 18088 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 10.06 m"
@@ -2364,6 +2532,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 34,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (1656 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_33 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hostinec kolem dvora s podloubím a branou s nápisem HOSTINEC, studna a houba na dvoře (1×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x07 mírného klimatu v hliněném městě; 19596 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.03 m"
@@ -2415,6 +2589,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 14,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (616 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_13 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Kulatá hliněná aréna se stupni, oblouky, čtyřmi branami a prapory (2×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x14 mírného klimatu v hliněném městě; 10580 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.48 m"
@@ -2466,6 +2646,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 14,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (616 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_13 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Kulatá hliněná aréna se stupni, oblouky, čtyřmi branami a prapory (2×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x20 mírného klimatu v hliněném městě; 10580 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.48 m"
@@ -2543,6 +2729,12 @@
    }
   ],
   "interier": true,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 38,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna a lucerny těsně před tmavými (2136 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_00 až svetlo_37 jsou místa pro záři (svítící okno, lucerna)"
+  },
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Velký bazar s pěti kopulemi, rohovými věžičkami, oblouky a krámky na náměstí (2×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x28 mírného klimatu v hliněném městě; 26444 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 12.5 m"

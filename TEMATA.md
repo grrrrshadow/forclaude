@@ -30,7 +30,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   nastavení „Hliněná města“ (výchozí 3), první tři Drakov, Houbovice, Čarodějov. Staví domy mírného klimatu jako každé
   město, ve 3D (otočený pohled i na sever s domy jako objekty) jsou hliněné; stromy na území města (zastavěná část
   a 4 dlaždice kolem) jsou houby podle růstu stromu.
-- Kolega teď domy předělává kvůli **svítícím oknům** v noci → vezmu nové soubory, okna napojím na noc.
+- **Svítící okna** (hotovo): kolega dal do hliněných domů uzel `noc` (svítící okna a lucerny), prázdný `den`
+  a body `svetlo_NN`. Hra v noci kreslí `noc` přes dům a nechá ho svítit (noc ho nezatmí), u `svetlo_NN` přidá
+  teplou záři; na mapě i v pohledu z očí. Další domy (1950, ÚV KSČ) kolega dodá stejně.
 - **Popelavá zem** (hotovo): tráva a hrubá zem na území hliněného města ve 3D šedá (paleta vraků). Houby i v pohledu
   z očí (plakáty z jejich obrázků, zblízka jemnější).
 - **Poušť** (hotovo): pouštní tématické město (staví jen pouštní domy v jiném klimatu) má na svém území písek
@@ -78,6 +80,6 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Oblékání, kouzla, boj (zásah kladivem).
 - Města Morrowind, území tématických měst (stromy, zem).
 - Vadná sada domů nesmí zrušit všechna města (`split_house_grfs`) – jen když hráč chce.
-- Lampy a okna v noci.
+- Lampy u silnic v noci; svítící okna dalších domů (až je kolega dodá, hra je umí).
 - Kostra a animace glTF; draci; interiéry; boj.
 - Klínek sousedního domu přes průčelí (#41). Domy z GRF objektem z balíčku (MAXd, #47). Doplňky (maják) podle stavu GRF.

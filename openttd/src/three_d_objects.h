@@ -91,6 +91,12 @@ struct ThreeDObject {
 	int tiles_x = 1;          ///< its size in tiles
 	int tiles_y = 1;
 	std::vector<float> pos;   ///< x, y, z of each corner: world units along x and y from the north corner, units of height up
+	/* Its night (the colleague's node "noc", hra/3d/PROSBA-MESTO-HLINENE.md): the lit windows and lanterns, drawn over
+	 * it at night (gui.night) and not darkened, in its texture; and where a glow is ("svetlo_NN"). As pos and uv. */
+	std::vector<float> night_pos;
+	std::vector<float> night_uv;
+	std::vector<uint32_t> night_tri;
+	std::vector<float> lights; ///< x, y, z of each light, as pos
 	std::vector<float> uv;    ///< u, v of each corner in the texture, 0..1
 	std::vector<uint32_t> tri; ///< three corners a triangle
 	std::vector<int8_t> facing; ///< of each triangle, its outer side: 1 as its corners go round (counter-clockwise seen from outside), -1 the other way, 0 seen from both sides

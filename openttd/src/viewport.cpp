@@ -1945,7 +1945,16 @@ static inline uint32_t ShadedPixel(uint32_t p, uint light)
  *             cables, which it would fill into a sheet
  * @param zb a depth buffer as large as the pixels, or nullptr: a pixel is drawn only where it is nearer than what is there
  */
-static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true, float *zb = nullptr)
+/**
+ * The night's lit pixels of the block being drawn (the windows of the houses, a 3D object's "noc"): where each is and
+ * the colour it was drawn in, kept bright when the night darkens the block (DrawNight()) -- unless something drawn
+ * later covered it. And the places of the glows (its "svetlo_NN"), world units. Only while the night is drawn.
+ */
+static bool _night_windows_now = false;
+static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
+static std::vector<std::array<double, 3>> _night_glows;
+
+static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true, float *zb = nullptr, std::vector<std::pair<uint32_t *, uint32_t>> *lit_pixels = nullptr)
 {
 	double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 	if (std::abs(area) < 1e-9) return;
@@ -2018,6 +2027,7 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 			if (p == 0) continue;
 			row[x] = lit ? ShadedPixel(p, static_cast<uint>(std::max(0.0, l))) : p;
 			if (zrow != nullptr) zrow[x] = static_cast<float>(d);
+			if (lit_pixels != nullptr) lit_pixels->emplace_back(&row[x], row[x]);
 		}
 	}
 }
@@ -3319,6 +3329,26 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 		}
 		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o->tri[t]], verts[o->tri[t + 1]], verts[o->tri[t + 2]], true, zb.data());
 	}
+	/* At night its lit windows over it, kept bright (DrawNight()), and the places of its glows. */
+	if (_night_windows_now && o != nullptr && tex != nullptr && !o->night_tri.empty()) {
+		static std::vector<TurnedVertex> night;
+		const size_t corners = o->night_pos.size() / 3;
+		night.resize(corners);
+		for (size_t i = 0; i < corners; i++) {
+			double sx, sy, xr, yr;
+			lay.Project(ox + o->night_pos[i * 3], oy + o->night_pos[i * 3 + 1], oz + o->night_pos[i * 3 + 2], sx, sy);
+			lay.Turn(ox + o->night_pos[i * 3], oy + o->night_pos[i * 3 + 1], xr, yr);
+			night[i] = {sx, sy, o->night_uv[i * 2] * tex->w, o->night_uv[i * 2 + 1] * tex->h, 256.0, xr + yr + 2 * o->night_pos[i * 3 + 2]};
+		}
+		for (size_t t = 0; t + 2 < o->night_tri.size(); t += 3) {
+			const TurnedVertex &a = night[o->night_tri[t]], &b = night[o->night_tri[t + 1]], &c = night[o->night_tri[t + 2]];
+			if (std::max({a.x, b.x, c.x}) < 0 || std::min({a.x, b.x, c.x}) >= fw || std::max({a.y, b.y, c.y}) < 0 || std::min({a.y, b.y, c.y}) >= fh) continue;
+			DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, a, b, c, false, zb.data(), &_night_lit);
+		}
+	}
+	if (_night_windows_now && o != nullptr) {
+		for (size_t i = 0; i + 2 < o->lights.size(); i += 3) _night_glows.push_back({ox + o->lights[i], oy + o->lights[i + 1], oz + o->lights[i + 2]});
+	}
 }
 
 /**
@@ -4044,7 +4074,10 @@ static void DrawNight(bool turned)
 	const DrawPixelInfo &dpi = _vd.dpi;
 	const int w = UnScaleByZoom(dpi.width, dpi.zoom), h = UnScaleByZoom(dpi.height, dpi.zoom);
 	if (w <= 0 || h <= 0) return;
+	/* The lit windows that are still as they were drawn: nothing came over them since. */
+	std::erase_if(_night_lit, [](const auto &p) { return *p.first != p.second; });
 	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, NIGHT_R, NIGHT_G, NIGHT_B);
+	for (const auto &[at, colour] : _night_lit) *at = colour;
 
 	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
 	const double scale = 1.0 / (1 << to_underlying(dpi.zoom));
@@ -4063,6 +4096,14 @@ static void DrawNight(bool turned)
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
+	/* The glows of the houses' lights (their "svetlo_NN"): small and warm. */
+	const Colour window(255, 200, 110);
+	for (const auto &g : _night_glows) {
+		double px, py;
+		project(g[0], g[1], g[2], px, py);
+		if (px < -8 * unit || py < -8 * unit || px > w + 8 * unit || py > h + 8 * unit) continue;
+		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit, 1.4 * unit, window, 0.35);
+	}
 	for (const Vehicle *v : Vehicle::Iterate()) {
 		if (v->vehstatus.Test(VehState::Hidden)) continue;
 		const bool front = v->Previous() == nullptr;
@@ -4128,6 +4169,10 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.height = (bottom - top) & mask;
 	_vd.dpi.left = left & mask;
 	_vd.dpi.top = top & mask;
+	/* The lit windows of the houses, when the night is drawn on 32 bpp (DrawNight()). */
+	_night_lit.clear();
+	_night_glows.clear();
+	_night_windows_now = _settings_client.gui.night && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
 	_vd.dpi.pitch = _cur_dpi->pitch;
 	_vd.last_child = LAST_CHILD_NONE;
 
@@ -4168,6 +4213,9 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 
 	/* The night over it all but the signs (gui.night). */
 	if (_settings_client.gui.night) DrawNight(IsViewportTurned(vp));
+	_night_lit.clear();
+	_night_glows.clear();
+	_night_windows_now = false;
 
 	DrawPixelInfo dp = _vd.dpi;
 	ZoomLevel zoom = _vd.dpi.zoom;
@@ -7925,7 +7973,37 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	}
 	/* What the walker holds (the hammer), before the night: the dark is over it too. */
 	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
-	if (_settings_client.gui.night) DrawEyeNight(eye, own, width, height, dst, zb);
+	if (_settings_client.gui.night) {
+		DrawEyeNight(eye, own, width, height, dst, zb);
+		/* The lit windows of the houses (their "noc") over the dark, as they were drawn, and the glows of their
+		 * lights ("svetlo_NN"): seen where nothing nearer is in front of them. */
+		const Colour window(255, 200, 110);
+		for (const CabObject &co : objects) {
+			const ThreeDObject &o = *co.obj;
+			if (o.night_tri.empty() && o.lights.empty()) continue;
+			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+			const CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
+			if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y) || c.f > CAB_RANGE_TILES * TILE_SIZE) continue;
+			const ThreeDObjectTexture *tex = o.GetTexture(0, o.PaintAt(co.origin));
+			for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
+				std::vector<CabPoint> poly;
+				for (int k = 0; k < 3; k++) {
+					const uint32_t i = o.night_tri[t + k];
+					poly.push_back(CabToEye(eye, ox + o.night_pos[i * 3], oy + o.night_pos[i * 3 + 1], oz + o.night_pos[i * 3 + 2], o.night_uv[i * 2] * tex->w, o.night_uv[i * 2 + 1] * tex->h));
+				}
+				CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false);
+			}
+			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) {
+				const CabPoint p = CabToEye(eye, ox + o.lights[i], oy + o.lights[i + 1], oz + o.lights[i + 2], 0, 0);
+				if (p.f < CAB_NEAR) continue;
+				const CabVertex v = CabProject(eye, p);
+				const int px = static_cast<int>(v.sx), py = static_cast<int>(v.sy);
+				if (px >= 0 && py >= 0 && px < width && py < height && zb[static_cast<size_t>(py) * width + px] > v.iw * 1.05f) continue;
+				const double r = std::max(1.0, 1.2 * eye.focal / p.f);
+				AddNightLight(dst, width, width, height, v.sx, v.sy, r, r, window, 0.35);
+			}
+		}
+	}
 	camera.ms = TurnedNow() - t0;
 	return true;
 }
