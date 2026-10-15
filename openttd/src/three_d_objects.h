@@ -88,6 +88,7 @@ struct ThreeDObject {
 	std::vector<float> pos;   ///< x, y, z of each corner: world units along x and y from the north corner, units of height up
 	std::vector<float> uv;    ///< u, v of each corner in the texture, 0..1
 	std::vector<uint32_t> tri; ///< three corners a triangle
+	std::vector<int8_t> facing; ///< of each triangle, its outer side: 1 as its corners go round (counter-clockwise seen from outside), -1 the other way, 0 seen from both sides
 	float top = 0;            ///< its height, units of height
 	std::vector<uint8_t> png; ///< the texture as it is in the file, read into pixels the first time it is drawn
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the texture, halved for each level of detail

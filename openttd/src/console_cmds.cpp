@@ -8865,6 +8865,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d: picture at {} degrees, zoom {}: {}x{} at {},{} from the origin, {} pixels filled, made in {:.1f} ms", GetViewYaw(), to_underlying(vp->zoom), pic->width, pic->height, pic->left, pic->top, filled, ms);
 		}
+	} else if (what == "domy3d") {
+		/* 'domy3d <x> <y> <r>': the houses within r tiles that are drawn as 3D objects, by their north tile. */
+		auto x = number(2), y = number(3), r = number(4);
+		if (!x.has_value() || !y.has_value()) return true;
+		int rr = r.value_or(4);
+		for (int ty = *y - rr; ty <= *y + rr; ty++) {
+			for (int tx = *x - rr; tx <= *x + rr; tx++) {
+				if (tx < 0 || ty < 0 || tx > static_cast<int>(Map::MaxX()) || ty > static_cast<int>(Map::MaxY())) continue;
+				TileIndex t = TileXY(tx, ty);
+				if (!IsTileType(t, TileType::House)) continue;
+				HouseID h = GetHouseType(t);
+				TileIndex origin = t + GetHouseNorthPart(h);
+				if (origin != t) continue;
+				const ThreeDObject *o = GetThreeDHouseObjectAny(h, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+				IConsolePrint(CC_DEFAULT, "test3d: dum {},{} cislo {:#04x} objekt {}", tx, ty, h, o != nullptr ? o->name : std::string("-"));
+			}
+		}
+	} else if (what == "zadni") {
+		/* 'zadni <0|1>': a 3D object's triangles turned away from the view left out (1, as the game draws), or all drawn. */
+		extern bool _turned_cull;
+		_turned_cull = argv.size() < 3 || argv[2] != "0";
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: zadni steny {}", _turned_cull ? "vynechane" : "kreslene");
 	} else if (what == "stred") {
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) {

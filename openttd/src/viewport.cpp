@@ -1276,6 +1276,9 @@ static int GetViewportY(Point tile)
 /**
  * Add the landscape to the viewport, i.e. all ground tiles and buildings.
  */
+static bool _north_house_objects = false;
+static void AddNorthHouseObject(size_t first_parent);
+
 static void ViewportAddLandscape()
 {
 	assert(_vd.dpi.top <= _vd.dpi.top + _vd.dpi.height);
@@ -1381,7 +1384,9 @@ static void ViewportAddLandscape()
 				_vd.last_foundation_child[FoundationPart::Normal] = LAST_CHILD_NONE;
 				_vd.last_foundation_child[FoundationPart::Halftile] = LAST_CHILD_NONE;
 
+				size_t first_parent = _vd.parent_sprites_to_draw.size();
 				_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
+				if (_north_house_objects && tile_type == TileType::House) AddNorthHouseObject(first_parent);
 				if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 			}
 		}
@@ -1785,9 +1790,18 @@ static void ViewportSortParentSprites(ParentSpriteToSortVector *psdv)
 }
 
 
+static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps);
+
 static void ViewportDrawParentSprites(const ParentSpriteToSortVector *psd, const ChildScreenSpriteToDrawVector *csstdv)
 {
 	for (const ParentSpriteToDraw *ps : *psd) {
+		/* Facing north, a house that is a 3D object as in the turned view (gui.three_d_north_houses): the object
+		 * once, whole, in place of the sprites of its tiles (AddNorthHouseObject()). */
+		if (ps->box_kind == 4) continue;
+		if (ps->box_kind == 7) {
+			DrawTurnedObject(*_cur_dpi, *ps);
+			continue;
+		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
 
 		int child_idx = ps->first_child;
@@ -3144,6 +3158,8 @@ struct TurnedObject {
 };
 /** The objects of the block being drawn; ParentSpriteToDraw::box_dx is the index. */
 static std::vector<TurnedObject> _turned_objects;
+/** Whether a 3D object's triangles turned away from the view are left out (the rig: 'test3d zadni 0' draws them all). */
+bool _turned_cull = true;
 
 /**
  * Draw a building as a real 3D object (box_kind 7): its triangles turned with the view, far first, each filled
@@ -3172,7 +3188,18 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 	/* Far first: by the middle of each triangle, as the faces of the boxes. */
 	static std::vector<std::pair<double, size_t>> order;
 	order.clear();
+	const double frame_w = UnScaleByZoom(frame.width, frame.zoom), frame_h = UnScaleByZoom(frame.height, frame.zoom);
 	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+		const TurnedVertex &a = verts[o.tri[t]], &b = verts[o.tri[t + 1]], &c = verts[o.tri[t + 2]];
+		/* Not in the block being drawn: nothing to do (an object is drawn again for each block it is in). */
+		if (std::max({a.x, b.x, c.x}) < 0 || std::min({a.x, b.x, c.x}) >= frame_w || std::max({a.y, b.y, c.y}) < 0 || std::min({a.y, b.y, c.y}) >= frame_h) continue;
+		/* A triangle turned away from the view is a back wall: left out, else drawn by the middle it could come
+		 * through a front one. On the screen (y down) a triangle seen from outside goes round clockwise. */
+		const int8_t facing = _turned_cull && t / 3 < o.facing.size() ? o.facing[t / 3] : 0;
+		if (facing != 0) {
+			double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+			if (area * facing >= 0) continue;
+		}
 		double sx = 0, sy = 0, sz = 0;
 		for (int k = 0; k < 3; k++) {
 			sx += o.pos[o.tri[t + k] * 3];
@@ -3214,6 +3241,59 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o.tri[t]], verts[o.tri[t + 1]], verts[o.tri[t + 2]]);
 	}
 	_turned_times.models += TurnedNow() - t0;
+}
+
+/** Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot (box_kind 7). */
+static void AddTurnedObjectsToDraw()
+{
+	for (size_t m = 0; m < _turned_objects.size(); m++) {
+		const TurnedObject &to = _turned_objects[m];
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
+		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
+		ps.xmin = ox;
+		ps.xmax = ox + to.obj->tiles_x * TILE_SIZE - 1;
+		ps.ymin = oy;
+		ps.ymax = oy + to.obj->tiles_y * TILE_SIZE - 1;
+		ps.zmin = to.z;
+		ps.zmax = to.z + std::max(1, static_cast<int>(std::ceil(to.obj->top)));
+		ps.x = ps.y = ps.left = ps.top = 0;
+		ps.image = SPR_EMPTY_BOUNDING_BOX;
+		ps.pal = PAL_NONE;
+		ps.sub = nullptr;
+		ps.first_child = -1;
+		ps.order = 0;
+		ps.ax = ox;
+		ps.ay = oy;
+		ps.az = to.z;
+		ps.box = nullptr;
+		ps.box_ox = ox;
+		ps.box_oy = oy;
+		ps.box_oz = to.z;
+		ps.box_dx = static_cast<int16_t>(m);
+		ps.box_dy = 0;
+		ps.box_kind = 7;
+	}
+}
+
+/**
+ * Facing north, a house that is a real 3D object drawn as in the turned view (the player, 15. 10.: "which houses show
+ * at view 0, the original houses as today or the same as when we turn; by default the same as when we turn",
+ * gui.three_d_north_houses): the sprites the house's tile just added are left out (box_kind 4) and its object is
+ * drawn once, whole, among the standing things (box_kind 7, ViewportDrawParentSprites()).
+ * @param first_parent the first of the sprites the tile added
+ */
+static void AddNorthHouseObject(size_t first_parent)
+{
+	if (_cur_ti.tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Houses) || !IsHouseCompleted(_cur_ti.tile)) return;
+	HouseID north = GetHouseType(_cur_ti.tile);
+	TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
+	const ThreeDObject *obj = (north >= NEW_HOUSE_OFFSET || GetThreeDHouseModel(north) == nullptr) ? GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+	if (obj == nullptr) return;
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+	for (const TurnedObject &to : _turned_objects) {
+		if (to.origin == origin) return;
+	}
+	_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
 }
 
 /**
@@ -3603,34 +3683,7 @@ static void ViewportDoDrawTurned()
 		ps.box_kind = 3;
 	}
 
-	/* Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot. */
-	for (size_t m = 0; m < _turned_objects.size(); m++) {
-		const TurnedObject &to = _turned_objects[m];
-		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
-		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
-		ps.xmin = ox;
-		ps.xmax = ox + to.obj->tiles_x * TILE_SIZE - 1;
-		ps.ymin = oy;
-		ps.ymax = oy + to.obj->tiles_y * TILE_SIZE - 1;
-		ps.zmin = to.z;
-		ps.zmax = to.z + std::max(1, static_cast<int>(std::ceil(to.obj->top)));
-		ps.x = ps.y = ps.left = ps.top = 0;
-		ps.image = SPR_EMPTY_BOUNDING_BOX;
-		ps.pal = PAL_NONE;
-		ps.sub = nullptr;
-		ps.first_child = -1;
-		ps.order = 0;
-		ps.ax = ox;
-		ps.ay = oy;
-		ps.az = to.z;
-		ps.box = nullptr;
-		ps.box_ox = ox;
-		ps.box_oy = oy;
-		ps.box_oz = to.z;
-		ps.box_dx = static_cast<int16_t>(m);
-		ps.box_dy = 0;
-		ps.box_kind = 7;
-	}
+	AddTurnedObjectsToDraw();
 
 	/* The ground of the whole block, north-up, in one texture: the plain tiles' sprites drawn as the game draws
 	 * them, so neighbouring tiles fit together and the edges of the warped tiles meet at any zoom. A tile with a
@@ -3833,7 +3886,10 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
 		ViewportDoDrawTurned();
 	} else {
+		_north_house_objects = ThreeDEnabled() && _settings_client.gui.three_d_north_houses == 0 && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
+		_turned_objects.clear();
 		ViewportAddLandscape();
+		if (_north_house_objects) AddTurnedObjectsToDraw();
 		ViewportAddVehicles(&_vd.dpi);
 
 		ViewportAddKdtreeSigns(&_vd.dpi);

@@ -348,10 +348,25 @@ too.
   view, far first by their middles, as the faces of the boxes, each filled
   with its texture at the level of the zoom -- the texture's full width for a
   tile at the closest zoom, halved with every zoom level out; the sprites of
-  its tiles are left out. In the **cab view** its triangles go through the
+  its tiles are left out. A triangle turned away from the view is left out
+  (`ThreeDObject::facing`: its outer side by its corners' order, or by its
+  normals where they disagree; a `doubleSided` material is drawn from both
+  sides), so a back wall never comes through a front one; a triangle outside
+  the block being drawn is skipped before sorting. In the **cab view** its
+  triangles go through the
   perspective rasterizer and the depth buffer with the texture's level for
-  about a texture pixel to a pixel of the picture. The view facing north keeps
-  the sprites, pixel for pixel.
+  about a texture pixel to a pixel of the picture.
+- **Facing north** (the player, 15. 10.: "which houses show at view 0, the
+  original houses as today or the same as when we turn; by default the same as
+  when we turn"): the setting *Houses when the view faces north* (`gui.three_d_north_houses`,
+  Graphics, under 3D): *3D, the same as when turning* (default) draws such a
+  house in the game's usual north renderer by the same object
+  (`AddNorthHouseObject()` after its tile's draw: its sprites `box_kind` 4, the
+  object `box_kind` 7 among the sorted sprites, `ViewportDrawParentSprites()`);
+  fences, catenary and vehicles stay as they are facing north. *The original
+  pictures* keeps the sprites, pixel for pixel. Only while the main view is at angle 0 (the other views then too),
+  3D on and a 32bpp blitter. A full redraw of a dense town at zoom 1 in the rig:
+  44 ms with the objects, 2 ms with the sprites (the turned view 128 ms).
 - **Light and colour by number** (15. 10., the ten houses that were the
   renders of `budovy3d_1` to `4`, the colleague's
   `hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md`): a file with normals is lit by the game

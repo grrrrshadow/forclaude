@@ -106,6 +106,7 @@ struct GlbTexture {
 	std::string name;          ///< the material's name
 	std::vector<uint8_t> png;
 	uint32_t flat = 0; ///< the material's base colour factor (Colour::data) when it has no picture
+	bool double_sided = false; ///< the material's "doubleSided": its triangles are seen from behind too
 };
 
 /** The meshes of a .glb as read: metres, in the game's axes (x, y, z up), normals when the file has them. */
@@ -228,6 +229,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 			if (material >= 0 && j.contains("materials")) {
 				const auto &mat = j.at("materials").at(material);
 				t.name = mat.value("name", std::string());
+				t.double_sided = mat.value("doubleSided", false);
 				if (mat.contains("pbrMetallicRoughness")) {
 					const auto &pbr = mat.at("pbrMetallicRoughness");
 					if (pbr.contains("baseColorFactor")) {
@@ -382,6 +384,29 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
 		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
 		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	/* Which side of each triangle faces out: its corners' order, or the other when its normals say so (a mirrored
+	 * node); neither for a material seen from both sides. Drawn, the side facing away is left out, so the back
+	 * walls never come through the front ones (DrawTurnedObject()). */
+	obj.facing.reserve(mesh.tri.size() / 3);
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		size_t k = t / 3;
+		bool both = k < mesh.tri_tex.size() && mesh.tri_tex[k] < mesh.textures.size() && mesh.textures[mesh.tri_tex[k]].double_sided;
+		const float *a = &mesh.pos[mesh.tri[t] * 3], *b = &mesh.pos[mesh.tri[t + 1] * 3], *c = &mesh.pos[mesh.tri[t + 2] * 3];
+		double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+		int8_t f = 1;
+		if (both || gx * gx + gy * gy + gz * gz < 1e-12) {
+			f = 0;
+		} else if (!mesh.nrm.empty()) {
+			double s = 0;
+			for (int i = 0; i < 3; i++) {
+				const float *n = &mesh.nrm[mesh.tri[t + i] * 3];
+				s += gx * n[0] + gy * n[1] + gz * n[2];
+			}
+			f = s > 0 ? 1 : (s < 0 ? -1 : 0);
+		}
+		obj.facing.push_back(f);
 	}
 	obj.uv = std::move(mesh.uv);
 	obj.tri = std::move(mesh.tri);

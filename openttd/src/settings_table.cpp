@@ -451,6 +451,12 @@ static void ThreeDChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
+/** The houses facing north as 3D objects or their sprites (gui.three_d_north_houses): every view drawn anew. */
+static void ThreeDNorthHousesChanged(int32_t)
+{
+	MarkWholeScreenDirty();
+}
+
 /** The round curves of rails switched on or off (round_track.h): every view drawn anew. */
 static void RoundTrackCurvesChanged(int32_t)
 {

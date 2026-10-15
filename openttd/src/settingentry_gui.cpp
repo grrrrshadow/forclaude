@@ -800,6 +800,7 @@ SettingsContainer &GetSettingsTree()
 			graphics->Add(new SettingEntry("gui.sprite_cache_size_mb"));
 			graphics->Add(new SettingEntry("gui.sprite_mitchell"));
 			graphics->Add(new SettingEntry("gui.three_d"));
+			graphics->Add(new SettingEntry("gui.three_d_north_houses"));
 			graphics->Add(new SettingEntry("gui.round_track_curves"));
 			graphics->Add(new SettingEntry("gui.smallmap_land_colour"));
 			graphics->Add(new SettingEntry("gui.linkgraph_colours"));

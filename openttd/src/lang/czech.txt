@@ -2315,6 +2315,10 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 
 STR_CONFIG_SETTING_THREE_D                                      :3D: náhledy a otáčení herní plochy: {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vozidla (vlaky, auta, lodě, letadla) ve velikosti původní hry, větší (BRÝLE); vypnuto menší (CZTR): {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Všechna vozidla, která hra kreslí z jejich 3D objektu (GRF s objekty, ne z obrázků), najednou: velikost původní hry jako větší sady (BRÝLE), o 20 % větší; vypnuto menší, v měřítku CZTR. Délku vlaků a aut určuje objekt, takže vlak je dlouhý, jak vypadá. Pro novou hru: nastav v hlavním menu před založením hry
+STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Domy při pohledu na sever (úhel 0): {STRING}
+STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :Jak vypadají domy, které mají 3D objekt, když je herní plocha natočená na sever (úhel 0, jako při stavění): jako 3D objekty, stejně jako při otáčení; nebo původní obrázky domů (sprity), jak je hra kreslila dřív. Domy bez 3D objektu mají svoje obrázky vždycky. Potřebuje zapnuté 3D a 32bpp blitter
+STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, stejně jako při otáčení
+STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :původní obrázky
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Kulaté zatáčky kolejí: {STRING}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :Zatáčka kolejí -- rovně, kus na šikmo, rovně -- se v otočeném pohledu nakreslí jako jeden kulatý oblouk přes asi dvě dlaždice a vlak na ní se nakreslí natočený podél oblouku jako svá 3D podoba. U výhybky se zakulatí odbočka, přímá kolej zůstane rovná. Jen vzhled: kolej se staví a jezdí se po ní jako vždycky. Při pohledu na sever (úhel 0, na stavění) jsou zatáčky jako vždycky. Potřebuje 32bpp blitter. Vypnuto: zatáčky jsou, jaké vždycky byly, do pixelu
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}
