@@ -92,6 +92,11 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
 - `efekty/` – efekty jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/efekty/`): ohňostroj
   nad chatkou (`ohnostroj.glb`, start a tři fáze koule, barva číslem z palety pro každou
   fázi), v otočeném pohledu; na sever zůstávají sprity.
+- `hlinene/` – **hliněné město** (od kolegy, grrrrf `hra/3d/objekty/hlinene/`, `PROSBA-MESTO-HLINENE.md`): 13 vlastních
+  modelů hliněných domů s kopulemi jako vesnice Morrowindu (34 záznamů, `tema: "hlinene"`, `nahrazuje_house` jako
+  `mirne`) a 4 obří houby (`druh: "strom"`). Hliněné město (`Town::theme`, nastavení „Hliněná města“, první tři Drakov,
+  Houbovice, Čarodějov) staví domy mírného klimatu jako každé město; ve 3D pohledech je hra kreslí hliněnými modely
+  a stromy na jeho území houbami. Tamriel Rebuilt jen vzor stylu, nic z něj.
 - `predmety/` – předměty chodce v pohledu z první osoby (od kolegy, grrrrf `hra/3d/objekty/predmety/`,
   `PROSBA-PREDMETY-KLADIVO-TRUHLA.md`): válečné kladivo a truhla z OpenMW Example Suite
   (gitlab.com/OpenMW/example-suite, modely **CC0**, volné dílo), `druh: "predmet"`. Kladivo chodec nese v inventáři

@@ -87,6 +87,7 @@ struct ThreeDObject {
 	uint32_t grfid = 0;       ///< a house of a set (NewGRF): the set's id as the game keeps it, 0 for an original house
 	uint16_t grf_house = 0;   ///< and the house's number in the set (its Action 0 id, the north tile's)
 	uint8_t variants = 0x0F;  ///< the colour variants (bit per slot, TileHash2Bit()) it is
+	uint8_t theme = 0;        ///< the towns it is drawn in ("tema", TownTheme): 0 every town, else only the towns of that theme
 	int tiles_x = 1;          ///< its size in tiles
 	int tiles_y = 1;
 	std::vector<float> pos;   ///< x, y, z of each corner: world units along x and y from the north corner, units of height up
@@ -266,7 +267,7 @@ void ResetThreeDVehicleObjects();
 const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid);
 std::string DescribeThreeDVehicleObjects();
 
-const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);
+const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, uint8_t theme = 0);
 const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
@@ -298,7 +299,9 @@ struct ThreeDObjectPlacement {
 };
 struct ThreeDModelPicture;
 bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, float yaw, ZoomLevel zoom, ThreeDModelPicture &out);
-const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot);
+const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme = 0);
+const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin);
+std::span<const std::string> GetThreeDThemeTrees(uint8_t theme);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();
 

@@ -1,0 +1,2594 @@
+[
+ {
+  "soubor": "hl_chyse.glb",
+  "jmeno": "hl_chyse_18",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 24,
+  "varianty": [
+   0,
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_chyse_maska_strecha.png",
+    "zacatek": 215,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_chyse_maska_omitka.png",
+    "zacatek": 225,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_chyse_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     8.63,
+     5.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     9.58,
+     12.23,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dvě kulaté hliněné chýše s kopulemi, dvorek se zídkou, pec, džbány, obří houba; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x18 mírného klimatu v hliněném městě; 10348 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 7.45 m"
+ },
+ {
+  "soubor": "hl_chyse.glb",
+  "jmeno": "hl_chyse_19",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 25,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_chyse_maska_strecha.png",
+    "zacatek": 215,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_chyse_maska_omitka.png",
+    "zacatek": 225,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_chyse_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     8.63,
+     5.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     9.58,
+     12.23,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dvě kulaté hliněné chýše s kopulemi, dvorek se zídkou, pec, džbány, obří houba; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x19 mírného klimatu v hliněném městě; 10348 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 7.45 m"
+ },
+ {
+  "soubor": "hl_chyse.glb",
+  "jmeno": "hl_chyse_1a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 26,
+  "varianty": [
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_chyse_maska_strecha.png",
+    "zacatek": 215,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_chyse_maska_omitka.png",
+    "zacatek": 225,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_chyse_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     8.63,
+     5.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     9.58,
+     12.23,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dvě kulaté hliněné chýše s kopulemi, dvorek se zídkou, pec, džbány, obří houba; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1A mírného klimatu v hliněném městě; 10348 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 7.45 m"
+ },
+ {
+  "soubor": "hl_dvojdum.glb",
+  "jmeno": "hl_dvojdum_06",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 6,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_dvojdum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_dvojdum_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_dvojdum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     10.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.3
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Patrový hliněný dům s přístavkem, venkovní schody na terasu, látková stříška a koberce na střeše; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x06 mírného klimatu v hliněném městě; 11214 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_dvojdum.glb",
+  "jmeno": "hl_dvojdum_18",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 24,
+  "varianty": [
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_dvojdum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_dvojdum_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_dvojdum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     10.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.3
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Patrový hliněný dům s přístavkem, venkovní schody na terasu, látková stříška a koberce na střeše; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x18 mírného klimatu v hliněném městě; 11214 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_dvojdum.glb",
+  "jmeno": "hl_dvojdum_1a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 26,
+  "varianty": [
+   0,
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_dvojdum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_dvojdum_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_dvojdum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     10.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.3
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Patrový hliněný dům s přístavkem, venkovní schody na terasu, látková stříška a koberce na střeše; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1A mírného klimatu v hliněném městě; 11214 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_terasy.glb",
+  "jmeno": "hl_terasy_02",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 2,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_terasy_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_terasy_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_terasy_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.88,
+     6.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.3
+   },
+   {
+    "poloha": [
+     9.97,
+     11.88,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x02 mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
+ },
+ {
+  "soubor": "hl_terasy.glb",
+  "jmeno": "hl_terasy_04",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 4,
+  "varianty": [
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_terasy_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_terasy_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_terasy_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.88,
+     6.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.3
+   },
+   {
+    "poloha": [
+     9.97,
+     11.88,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x04 mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
+ },
+ {
+  "soubor": "hl_terasy.glb",
+  "jmeno": "hl_terasy_0d",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 13,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_terasy_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_terasy_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_terasy_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.88,
+     6.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.3
+   },
+   {
+    "poloha": [
+     9.97,
+     11.88,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0D mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
+ },
+ {
+  "soubor": "hl_terasy.glb",
+  "jmeno": "hl_terasy_13",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 19,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_terasy_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_terasy_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_terasy_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.88,
+     6.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.3
+   },
+   {
+    "poloha": [
+     9.97,
+     11.88,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x13 mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
+ },
+ {
+  "soubor": "hl_terasy.glb",
+  "jmeno": "hl_terasy_1b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 27,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_terasy_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_terasy_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_terasy_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.88,
+     6.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.3
+   },
+   {
+    "poloha": [
+     9.97,
+     11.88,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Stupňovitý hliněný dům o třech patrech s terasami, schody, žebříky, kopulí a houbou na terase; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1B mírného klimatu v hliněném městě; 12026 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 11.52 m"
+ },
+ {
+  "soubor": "hl_vez.glb",
+  "jmeno": "hl_vez_00",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 0,
+  "varianty": [
+   0,
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_vez_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_vez_maska_omitka.png",
+    "zacatek": 223,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_vez_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.28,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.4
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x00 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
+ },
+ {
+  "soubor": "hl_vez.glb",
+  "jmeno": "hl_vez_01",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 1,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_vez_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_vez_maska_omitka.png",
+    "zacatek": 223,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_vez_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.28,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.4
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x01 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
+ },
+ {
+  "soubor": "hl_vez.glb",
+  "jmeno": "hl_vez_04",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 4,
+  "varianty": [
+   0,
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_vez_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_vez_maska_omitka.png",
+    "zacatek": 223,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_vez_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.28,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.4
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x04 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
+ },
+ {
+  "soubor": "hl_vez.glb",
+  "jmeno": "hl_vez_10",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 16,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_vez_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_vez_maska_omitka.png",
+    "zacatek": 223,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_vez_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.28,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.4
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x10 mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
+ },
+ {
+  "soubor": "hl_vez.glb",
+  "jmeno": "hl_vez_1c",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 28,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_vez_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_vez_maska_omitka.png",
+    "zacatek": 223,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_vez_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.28,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.4
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněná věž o pěti patrech s ochozem, bubnem a kopulí na širokém přízemním domě; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1C mírného klimatu v hliněném městě; 13768 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 22.64 m"
+ },
+ {
+  "soubor": "hl_houbovy_dum.glb",
+  "jmeno": "hl_houbovy_dum_00",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 0,
+  "varianty": [
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_houbovy_dum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_houbovy_dum_maska_omitka.png",
+    "zacatek": 226,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_houbovy_dum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.22,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     13.88,
+     2.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x00 mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
+ },
+ {
+  "soubor": "hl_houbovy_dum.glb",
+  "jmeno": "hl_houbovy_dum_11",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 17,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_houbovy_dum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_houbovy_dum_maska_omitka.png",
+    "zacatek": 226,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_houbovy_dum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.22,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     13.88,
+     2.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x11 mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
+ },
+ {
+  "soubor": "hl_houbovy_dum.glb",
+  "jmeno": "hl_houbovy_dum_1e",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 30,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_houbovy_dum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_houbovy_dum_maska_omitka.png",
+    "zacatek": 226,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_houbovy_dum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.22,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     13.88,
+     2.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1E mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
+ },
+ {
+  "soubor": "hl_houbovy_dum.glb",
+  "jmeno": "hl_houbovy_dum_24",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 36,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_houbovy_dum_maska_strecha.png",
+    "zacatek": 213,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_houbovy_dum_maska_omitka.png",
+    "zacatek": 226,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_houbovy_dum_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.22,
+     7.18,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.2
+   },
+   {
+    "poloha": [
+     13.88,
+     2.59,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dům vyrostlý v obří houbě: okna v třeni, klobouk jako střecha, balkony z chorošů, vedle menší houbová věž; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x24 mírného klimatu v hliněném městě; 17056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 18.85 m"
+ },
+ {
+  "soubor": "hl_trznice.glb",
+  "jmeno": "hl_trznice_0e",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 14,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_trznice_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_trznice_maska_omitka.png",
+    "zacatek": 224,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_trznice_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     13.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0E mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_trznice.glb",
+  "jmeno": "hl_trznice_0f",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 15,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_trznice_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_trznice_maska_omitka.png",
+    "zacatek": 224,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_trznice_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     13.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0F mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_trznice.glb",
+  "jmeno": "hl_trznice_1d",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 29,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_trznice_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_trznice_maska_omitka.png",
+    "zacatek": 224,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_trznice_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     13.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x1D mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_trznice.glb",
+  "jmeno": "hl_trznice_27",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 39,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_trznice_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_trznice_maska_omitka.png",
+    "zacatek": 224,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_trznice_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     4.99,
+     13.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněný dům se třemi krámky pod látkovými stříškami, koše ovoce, džbány, pytle, koberce; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x27 mírného klimatu v hliněném městě; 8828 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 8.83 m"
+ },
+ {
+  "soubor": "hl_chram.glb",
+  "jmeno": "hl_chram_03",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 3,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_chram_maska_strecha.png",
+    "zacatek": 217,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_chram_maska_omitka.png",
+    "zacatek": 225,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_chram_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.09,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněný chrám s bubnem a velkou kopulí, štíhlá věž s ochozem, nádvoří s nádrží; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x03 mírného klimatu v hliněném městě; 13676 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 15.81 m"
+ },
+ {
+  "soubor": "hl_sklad.glb",
+  "jmeno": "hl_sklad_12",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 18,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_sklad_maska_omitka.png",
+    "zacatek": 224,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_sklad_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.48,
+     4.39,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.59
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hliněný sklad s vraty a otevřeným přístřeškem z trámů, velké džbány, pytle, bedny, vozík; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x12 mírného klimatu v hliněném městě; 5192 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 6.03 m"
+ },
+ {
+  "soubor": "hl_haj.glb",
+  "jmeno": "hl_haj_0b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 11,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_haj_maska_omitka.png",
+    "zacatek": 172,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park: háj obřích hub na mechu, pěšina, hliněné lavice, jezírko, lucerny; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0B mírného klimatu v hliněném městě; 18088 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 10.06 m"
+ },
+ {
+  "soubor": "hl_haj.glb",
+  "jmeno": "hl_haj_0c",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 12,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_haj_maska_omitka.png",
+    "zacatek": 172,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park: háj obřích hub na mechu, pěšina, hliněné lavice, jezírko, lucerny; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0C mírného klimatu v hliněném městě; 18088 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 10.06 m"
+ },
+ {
+  "soubor": "hl_studna.glb",
+  "jmeno": "hl_studna_09",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 9,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_studna_maska_omitka.png",
+    "zacatek": 207,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_studna_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Náměstíčko se studnou a nádrží, obří houba dává stín, stánek s ovocem; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x09 mírného klimatu v hliněném městě; 7324 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.67 m"
+ },
+ {
+  "soubor": "hl_studna.glb",
+  "jmeno": "hl_studna_0a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 10,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_studna_maska_omitka.png",
+    "zacatek": 207,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_studna_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Náměstíčko se studnou a nádrží, obří houba dává stín, stánek s ovocem; hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x0A mírného klimatu v hliněném městě; 7324 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.67 m"
+ },
+ {
+  "soubor": "hl_hostinec.glb",
+  "jmeno": "hl_hostinec_07",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 7,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_hostinec_maska_strecha.png",
+    "zacatek": 214,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_hostinec_maska_omitka.png",
+    "zacatek": 221,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_hostinec_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     13.22,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.59
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hostinec kolem dvora s podloubím a branou s nápisem HOSTINEC, studna a houba na dvoře (1×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x07 mírného klimatu v hliněném městě; 19596 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.03 m"
+ },
+ {
+  "soubor": "hl_arena.glb",
+  "jmeno": "hl_arena_14",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 20,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_arena_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     27.97,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 3.19
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kulatá hliněná aréna se stupni, oblouky, čtyřmi branami a prapory (2×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x14 mírného klimatu v hliněném městě; 10580 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.48 m"
+ },
+ {
+  "soubor": "hl_arena.glb",
+  "jmeno": "hl_arena_20",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 32,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "omitka",
+    "maska": "hl_arena_maska_omitka.png",
+    "zacatek": 208,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     27.97,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 3.19
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kulatá hliněná aréna se stupni, oblouky, čtyřmi branami a prapory (2×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x20 mírného klimatu v hliněném městě; 10580 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 9.48 m"
+ },
+ {
+  "soubor": "hl_bazar.glb",
+  "jmeno": "hl_bazar_28",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "tema": "hlinene",
+  "nahrazuje_house": 40,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "hl_bazar_maska_strecha.png",
+    "zacatek": 216,
+    "paleta": [
+     "D6B486",
+     "ECE4D2",
+     "5E9AA8",
+     "B8604A",
+     "8E6E9E",
+     "C8A070",
+     "4E7A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "hl_bazar_maska_omitka.png",
+    "zacatek": 225,
+    "paleta": [
+     "CCA474",
+     "D8C49C",
+     "B8784E",
+     "ECE4D2",
+     "D8A88A",
+     "C2AA84",
+     "A87248",
+     "E0C088"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "hl_bazar_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "8A5C34",
+     "6E4A30",
+     "4A3424",
+     "A07850",
+     "5A4030"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     21.88,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.19
+   }
+  ],
+  "interier": true,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py; vzor jen styl hliněných domů a obřích hub z Morrowindu a Tamriel Rebuilt, nic odtud), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Velký bazar s pěti kopulemi, rohovými věžičkami, oblouky a krámky na náměstí (2×2); hliněné město (hráč 15. 10.: „vem si tamriel rebuild jako příklad a udělej domy hliněné houby jako stromy, tematické město“), za dům 0x28 mírného klimatu v hliněném městě; 26444 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy: omitka = hliněné zdi, strecha = kopule, plot = dřevo), výška 12.5 m"
+ },
+ {
+  "soubor": "houba_slunecnik.glb",
+  "jmeno": "houba_slunecnik",
+  "druh": "strom",
+  "tema": "hlinene",
+  "vyska_m": 9.06,
+  "polomer_m": 3.98,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "obří houba se štíhlým bledým třeněm a širokým plochým okrovým kloboukem, prstenem na třeni; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 744 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+ },
+ {
+  "soubor": "houba_bedla.glb",
+  "jmeno": "houba_bedla",
+  "druh": "strom",
+  "tema": "hlinene",
+  "vyska_m": 6.3,
+  "polomer_m": 2.92,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "obří houba se silným třeněm a kulatým červeným kloboukem s bílými puntíky; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 1096 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+ },
+ {
+  "soubor": "houba_trs.glb",
+  "jmeno": "houba_trs",
+  "druh": "strom",
+  "tema": "hlinene",
+  "vyska_m": 3.03,
+  "polomer_m": 2.01,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "trs pěti menších hub (okrová, červená s puntíky, fialová, modrozelená); houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 4184 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+ },
+ {
+  "soubor": "houba_chorose.glb",
+  "jmeno": "houba_chorose",
+  "druh": "strom",
+  "tema": "hlinene",
+  "vyska_m": 8.48,
+  "polomer_m": 1.61,
+  "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "vysoký kmen houby s choroši jako policemi a malým hnědým kloboukem; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 2456 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+ }
+]

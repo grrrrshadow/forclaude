@@ -27,6 +27,8 @@
 #include "tree_cmd.h"
 #include "landscape_cmd.h"
 #include "climate_industries.h"
+#include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 
 #include "table/strings.h"
 #include "table/tree_land.h"
@@ -643,6 +645,46 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
 
 /** @copydoc DrawTileProc */
+/**
+ * The trees of a tile on the land of a themed town (GetTownThemeAt(); the clay town's giant mushrooms, the
+ * colleague's hra/3d/PROSBA-MESTO-HLINENE.md) as the theme's trees, 3D figures, in the turned view and facing north
+ * among the houses drawn as objects: one where each tree stands, its kind by the tile and the tree, as big as the
+ * tree has grown.
+ * @param ti the tile
+ * @return whether they were drawn so, the tree sprites then left out
+ */
+static bool DrawThemedTrees(const TileInfo *ti)
+{
+	if (!ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	const TownTheme theme = GetTownThemeAt(ti->tile);
+	if (theme == TownTheme::None) return false;
+	std::span<const std::string> kinds = GetThreeDThemeTrees(to_underlying(theme));
+	if (kinds.empty()) return false;
+
+	const uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);
+	const Coord2D<uint8_t> *d = _tree_layout_xy[GB(tmp, 2, 2)];
+	const uint trees = GetTreeCount(ti->tile);
+	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
+	bool drawn = false;
+	for (uint i = 0; i < trees; i++, d++) {
+		const uint32_t hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 40503u) ^ (i * 2246822519u) ^ GetTreeType(ti->tile);
+		/* The last tree of a tile is the one growing (or dying), the others are grown. */
+		const TreeGrowthStage growth = i == trees - 1 ? GetTreeGrowth(ti->tile) : TreeGrowthStage::Grown;
+		float size = 1.0f;
+		switch (growth) {
+			case TreeGrowthStage::Growing1: size = 0.4f; break;
+			case TreeGrowthStage::Growing2: size = 0.6f; break;
+			case TreeGrowthStage::Growing3: size = 0.8f; break;
+			case TreeGrowthStage::Dead: size = 0.85f; break;
+			default: break;
+		}
+		size *= 0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f;
+		const float facing = static_cast<float>(GB(hash, 16, 9) % 360);
+		drawn |= AddThreeDFigureToViewport(kinds[GB(hash, 0, 8) % kinds.size()], size, ti->x + d->x, ti->y + d->y, z, facing, _cur_dpi->zoom, ti->tile);
+	}
+	return drawn;
+}
+
 static void DrawTile_Trees(TileInfo *ti)
 {
 	switch (GetTreeGround(ti->tile)) {
@@ -654,6 +696,9 @@ static void DrawTile_Trees(TileInfo *ti)
 
 	/* Do not draw trees when the invisible trees setting is set */
 	if (IsInvisibilitySet(TransparencyOption::Trees)) return;
+
+	/* On the land of a themed town, the theme's trees (the clay town's mushrooms). */
+	if (DrawThemedTrees(ti)) return;
 
 	uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);
 	uint index = GB(tmp, 0, 2) + (GetTreeType(ti->tile) << 2);

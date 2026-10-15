@@ -1796,6 +1796,7 @@ static void ViewportSortParentSprites(ParentSpriteToSortVector *psdv)
 
 
 static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps);
+static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps);
 
 static void ViewportDrawParentSprites(const ParentSpriteToSortVector *psd, const ChildScreenSpriteToDrawVector *csstdv)
 {
@@ -1805,6 +1806,11 @@ static void ViewportDrawParentSprites(const ParentSpriteToSortVector *psd, const
 		if (ps->box_kind == 4) continue;
 		if (ps->box_kind == 7) {
 			DrawTurnedObject(*_cur_dpi, *ps);
+			continue;
+		}
+		/* A figure among them as its likeness (the clay town's mushrooms, ViewportDrawingNorthObjects()). */
+		if (ps->box_kind == 5) {
+			DrawTurnedVehicle(*_cur_dpi, *ps);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
@@ -2976,6 +2982,16 @@ bool ViewportDrawingTurned()
 	return _drawing_turned;
 }
 
+static bool _north_house_objects_now = false;
+/**
+ * Whether the view facing north being collected draws the houses that are 3D objects as objects
+ * (gui.three_d_north_houses): the figures standing among them then come as their likeness too.
+ */
+bool ViewportDrawingNorthObjects()
+{
+	return _north_house_objects_now;
+}
+
 /**
  * A vehicle of the turned view as its likeness (three_d_vehicle.cpp): the picture at the angle of the view,
  * hung from a world point, sorted by the box of the vehicle's parts.
@@ -3490,7 +3506,7 @@ static void AddNorthHouseObject(size_t first_parent)
 	if (_cur_ti.tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Houses) || !IsHouseCompleted(_cur_ti.tile)) return;
 	HouseID north = GetHouseType(_cur_ti.tile);
 	TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-	const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+	const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
 	if (obj == nullptr) return;
 	LeaveOutTileSprites(first_parent, true);
 	for (const TurnedObject &to : _turned_objects) {
@@ -3725,7 +3741,7 @@ static void ViewportDoDrawTurned()
 			HouseID north = GetHouseType(_cur_ti.tile);
 			{
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+				const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
 				if (obj != nullptr) {
 					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
 					bool known = false;
@@ -4127,6 +4143,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	} else {
 		_north_house_objects = ThreeDEnabled() && _settings_client.gui.three_d_north_houses == 0 && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
 		_turned_objects.clear();
+		_turned_vehicle_pictures.clear();
+		AutoRestoreBackup north_objects_backup(_north_house_objects_now, _north_house_objects);
 		ViewportAddLandscape();
 		if (_north_house_objects) AddTurnedObjectsToDraw();
 		ViewportAddVehicles(&_vd.dpi);
@@ -7452,7 +7470,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			{
 				/* An original house or a set's the objects name (the Mars houses). */
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+				const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
 				if (obj != nullptr) {
 					kind = 5;
 					bool known = false;

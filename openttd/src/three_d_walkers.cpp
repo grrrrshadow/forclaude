@@ -161,7 +161,7 @@ Point2 Middle(TileIndex t)
 const ThreeDObject *HouseObject(TileIndex origin)
 {
 	HouseID north = GetHouseType(origin);
-	return GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+	return GetThreeDHouseObjectAt(north, origin);
 }
 
 /** The doors of the town's houses looking out onto its roads. */

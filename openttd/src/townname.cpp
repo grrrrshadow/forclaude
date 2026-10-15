@@ -999,3 +999,19 @@ std::optional<std::string> GetMarsTownName(const TownNames &used)
 	}
 	return std::nullopt;
 }
+
+/**
+ * A name for a clay town (economy.clay_towns, TownTheme::Clay) that no town has yet, the player's names (15. 10.):
+ * the same in every language, as they are the towns' own. There are three; a clay town after those is named as any
+ * other town.
+ * @param used the names the towns have already
+ * @return the name, or std::nullopt when all three are taken
+ */
+std::optional<std::string> GetClayTownName(const TownNames &used)
+{
+	static const std::string_view NAMES[] = {"Drakov", "Houbovice", "Čarodějov"};
+	for (std::string_view name : NAMES) {
+		if (!used.contains(std::string{name})) return std::string{name};
+	}
+	return std::nullopt;
+}

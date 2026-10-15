@@ -26,6 +26,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   pouštní tématická města **poušť** na svém území. Jména měst **Drakov, Houbovice, Čarodějov**. Počet přes nastavení
   tématických měst (jako Mars).
 - Tamriel Rebuilt nebrat: jeho modely smějí jen do modů Morrowindu (licence Bethesdy). Styl napodobit smíme.
+- **Hotovo:** kolega udělal 13 hliněných domů a 4 houby (`objekty/hlinene/`). Ve hře: téma města (`Town::theme`, v savu),
+  nastavení „Hliněná města“ (výchozí 3), první tři Drakov, Houbovice, Čarodějov. Staví domy mírného klimatu jako každé
+  město, ve 3D (otočený pohled i na sever s domy jako objekty) jsou hliněné; stromy na území města (zastavěná část
+  a 4 dlaždice kolem) jsou houby podle růstu stromu.
+- Kolega teď domy předělává kvůli **svítícím oknům** v noci → vezmu nové soubory, okna napojím na noc.
+- Zbývá: popelavá zem, poušť kolem pouštních tématických měst, houby v pohledu z očí.
 
 ## 15. 10. – Morrowind: pohled z první osoby, inventář, noc
 

@@ -46,8 +46,18 @@
 /** Every object read, and whether they were looked for yet. */
 static std::vector<ThreeDObject> _three_d_objects;
 static bool _three_d_objects_read = false;
-/** The objects by house and colour slot: the index into _three_d_objects. */
-static std::map<std::pair<HouseID, uint>, size_t> _three_d_house_objects;
+/** The objects by the town theme (TownTheme, 0 every town), the house and the colour slot: the index into _three_d_objects. */
+static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objects;
+/** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
+
+/** The town theme an index names ("tema"): "hlinene" the clay town (TownTheme::Clay), 0 none or one the game does not know. */
+static uint8_t ParseIndexTheme(const nlohmann::json &e)
+{
+	const std::string theme = e.value("tema", std::string());
+	if (theme == "hlinene") return to_underlying(TownTheme::Clay);
+	return 0;
+}
 /** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
 static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
 /** The game's own industries' objects by the industry and the variant (-1 any), and the parts of the fields by their name ("dil"). */
@@ -763,6 +773,7 @@ static void ReadThreeDObjects()
 				}
 				if (houses.empty()) continue;
 				obj.house = houses.front();
+				obj.theme = ParseIndexTheme(e);
 				obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
 				obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
 				if (e.contains("varianty")) {
@@ -806,7 +817,7 @@ static void ReadThreeDObjects()
 				first = added;
 				drawn = it->second;
 			} else {
-				auto [it, added] = _three_d_house_objects.emplace(std::make_pair(o.house, slot), i);
+				auto [it, added] = _three_d_house_objects.emplace(std::make_tuple(o.theme, o.house, slot), i);
 				first = added;
 				drawn = it->second;
 			}
@@ -891,7 +902,7 @@ static void ReadThreeDVehicleObjects()
 					continue;
 				}
 				const std::string figure_kind = e.value("druh", std::string("dum"));
-				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet") && e.contains("soubor")) {
+				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom") && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
 					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
 					 * its file in the lists of plants ("rostliny"). */
@@ -937,6 +948,14 @@ static void ReadThreeDVehicleObjects()
 						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
 						fig.frame_ticks = std::clamp(std::max(1, fig.spin_ticks) * std::max(1, a.value("otocek", 1)), 1, 1000000);
 						if (fig.frames < 2) fig.frame_prefix.clear();
+					}
+					/* A tree of a town theme (the clay town's mushrooms): among the trees the theme's towns have on their land. */
+					if (figure_kind == "strom") {
+						const uint8_t theme = ParseIndexTheme(e);
+						if (theme != 0) {
+							auto &trees = _three_d_theme_trees[theme];
+							if (std::ranges::find(trees, fig.name) == trees.end()) trees.push_back(fig.name);
+						}
 					}
 					_figure_objects.push_back(std::move(fig));
 					continue;
@@ -1173,6 +1192,7 @@ void ResetThreeDVehicleObjects()
 	_effect_objects.clear();
 	_driving_objects.clear();
 	_vehicle_object_pieces.clear();
+	_three_d_theme_trees.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -1501,14 +1521,24 @@ bool GetThreeDFieldTile(const ThreeDPlantationTile &tile, ThreeDFieldTile &out)
 	return true;
 }
 
-const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot)
+/**
+ * The 3D object of an original house.
+ * @param north_house the house of its north tile
+ * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
+ * @param theme the theme of its town (TownTheme): its own object where the theme has one, else the house's as in every town
+ */
+const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, uint8_t theme)
 {
 	/* Kept as the first 3D of this game drew it, the boxes of its hand table, in memory of it (the player, 14. 10.:
 	 * "I am nostalgic, the white house of many storeys, tall, I would keep"): the tall office block. */
 	static constexpr HouseID KEPT_AS_HAND_TABLE[] = {0x1c};
 	if (std::ranges::find(KEPT_AS_HAND_TABLE, north_house) != std::end(KEPT_AS_HAND_TABLE)) return nullptr;
 	if (!_three_d_objects_read) ReadThreeDObjects();
-	auto it = _three_d_house_objects.find(std::make_pair(north_house, colour_slot & 3));
+	if (theme != 0) {
+		auto themed = _three_d_house_objects.find(std::make_tuple(theme, north_house, colour_slot & 3));
+		if (themed != _three_d_house_objects.end()) return &_three_d_objects[themed->second];
+	}
+	auto it = _three_d_house_objects.find(std::make_tuple(static_cast<uint8_t>(0), north_house, colour_slot & 3));
 	return it == _three_d_house_objects.end() ? nullptr : &_three_d_objects[it->second];
 }
 
@@ -1518,14 +1548,38 @@ const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot)
  * @param north_house the house of its north tile
  * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
  */
-const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot)
+const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme)
 {
-	if (north_house < NEW_HOUSE_OFFSET) return GetThreeDHouseObject(north_house, colour_slot);
+	if (north_house < NEW_HOUSE_OFFSET) return GetThreeDHouseObject(north_house, colour_slot, theme);
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	const HouseSpec *hs = HouseSpec::Get(north_house);
 	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return nullptr;
 	auto it = _three_d_grf_house_objects.find(std::make_tuple(hs->grf_prop.grfid, hs->grf_prop.local_id, colour_slot & 3));
 	return it == _three_d_grf_house_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The 3D object of the house standing on a tile, as its town looks (Town::theme): the clay town's clay house.
+ * @param north_house the house of its north tile
+ * @param origin its north tile
+ */
+const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin)
+{
+	uint8_t theme = 0;
+	if (IsTileType(origin, TileType::House)) {
+		const Town *t = Town::GetIfValid(GetTownIndex(origin));
+		if (t != nullptr) theme = to_underlying(t->theme);
+	}
+	return GetThreeDHouseObjectAny(north_house, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE), theme);
+}
+
+/** The trees of a town theme (TownTheme, "druh": "strom" with its "tema"): the names of their figures, none for the plain towns. */
+std::span<const std::string> GetThreeDThemeTrees(uint8_t theme)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_theme_trees.find(theme);
+	if (it == _three_d_theme_trees.end()) return {};
+	return it->second;
 }
 
 /**
@@ -1538,7 +1592,7 @@ std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
 	if (!ThreeDEnabled() || !IsHouseCompleted(tile)) return std::nullopt;
 	HouseID north = GetHouseType(tile);
 	TileIndex origin = tile + GetHouseNorthPart(north);
-	const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+	const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
 	if (obj == nullptr || obj->title_en.empty()) return std::nullopt;
 	return std::string_view(_current_language->isocode).starts_with("cs") ? obj->title_cs : obj->title_en;
 }

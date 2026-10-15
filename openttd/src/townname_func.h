@@ -18,5 +18,6 @@ std::string GetTownName(const Town *t);
 bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names = nullptr);
 bool GenerateTownName(Randomizer &randomizer, uint32_t *townnameparts, TownNames *town_names = nullptr);
 std::optional<std::string> GetMarsTownName(const TownNames &used);
+std::optional<std::string> GetClayTownName(const TownNames &used);
 
 #endif /* TOWNNAME_FUNC_H */

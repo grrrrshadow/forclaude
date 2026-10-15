@@ -2565,6 +2565,24 @@ bool GenerateTowns(TownLayout layout, std::optional<uint> number)
 		std::vector<uint32_t> sources = AvailableHouseSources();
 		if (std::ranges::find(sources, MARS_HOUSES_GRFID) != sources.end()) themed.emplace_back(MARS_HOUSES_GRFID, _settings_game.economy.mars_towns);
 
+		/* The clay towns (economy.clay_towns, TownTheme::Clay; the player: "themed towns, Morrowind"): towns of the
+		 * temperate houses, drawn in the 3D views as the colleague's clay houses, the trees on their land as giant
+		 * mushrooms; the first three are named for them. */
+		for (uint i = 0; i < _settings_game.economy.clay_towns; i++) {
+			if (!GenerateTownName(_random, &townnameparts, &town_names)) continue;
+			Town *t = CreateRandomTown(20, townnameparts, TownSize::Small, false, layout, HOUSE_SOURCE_CLIMATE + to_underlying(LandscapeType::Temperate));
+			if (t == nullptr) continue;
+			current_number++;
+			t->theme = TownTheme::Clay;
+			std::optional<std::string> name = GetClayTownName(town_names);
+			if (name.has_value()) {
+				t->name = *name;
+				t->cached_name.clear();
+				t->UpdateVirtCoord();
+				town_names.insert(*name);
+			}
+		}
+
 		for (const auto &[source, count] : themed) {
 			for (uint i = 0; i < count; i++) {
 				if (!GenerateTownName(_random, &townnameparts, &town_names)) continue;
@@ -4415,6 +4433,27 @@ Town *ClosestTownFromTile(TileIndex tile, uint threshold)
 		default:
 			return CalcClosestTownFromTile(tile, threshold);
 	}
+}
+
+/** How far from the nearest town's middle a tile is looked at for its land at all, tiles (Manhattan). */
+static constexpr uint TOWN_THEME_LAND_REACH = 40;
+/** How far around the built-up area of a themed town its land goes, tiles. */
+static constexpr double TOWN_THEME_LAND_MARGIN = 4.0;
+
+/**
+ * The theme of the land a tile is on (TownTheme; the player, 15. 10.: "around the themed towns their trees on their
+ * land"): the nearest town's, when the tile is within the town's built-up area (its outer zone) or a few tiles
+ * around it.
+ * @param tile the tile
+ * @return the theme of its land, TownTheme::None where it is no themed town's
+ */
+TownTheme GetTownThemeAt(TileIndex tile)
+{
+	const Town *t = ClosestTownFromTile(tile, TOWN_THEME_LAND_REACH);
+	if (t == nullptr || t->theme == TownTheme::None) return TownTheme::None;
+	if (IsTileType(tile, TileType::House)) return t->theme;
+	const double r = std::sqrt(static_cast<double>(t->cache.squared_town_zone_radius[to_underlying(HouseZone::TownEdge)])) + TOWN_THEME_LAND_MARGIN;
+	return DistanceSquare(tile, t->xy) <= r * r ? t->theme : TownTheme::None;
 }
 
 static bool _town_rating_test = false; ///< If \c true, town rating is in test-mode.

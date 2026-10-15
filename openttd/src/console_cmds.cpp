@@ -8687,7 +8687,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 	} else if (what == "mesta") {
 		/* Where the towns are, for the rig: the game's own industries must be built in one. */
-		for (const Town *t : Town::Iterate()) IConsolePrint(CC_DEFAULT, "test3d: town {} at {},{} population {}", t->GetCachedName(), TileX(t->xy), TileY(t->xy), t->cache.population);
+		for (const Town *t : Town::Iterate()) IConsolePrint(CC_DEFAULT, "test3d: town {} at {},{} population {}{}", t->GetCachedName(), TileX(t->xy), TileY(t->xy), t->cache.population, t->theme == TownTheme::Clay ? " hlinene" : "");
 	} else if (what == "postav" && argv.size() > 5 && argv[4] == "dum") {
 		/* An original house by its number, of any climate: 'test3d postav <x> <y> dum <number>' (0x4e a desert house in a
 		 * temperate game), to see the houses of the other climates as 3D objects. */
@@ -8926,7 +8926,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				HouseID h = GetHouseType(t);
 				TileIndex origin = t + GetHouseNorthPart(h);
 				if (origin != t) continue;
-				const ThreeDObject *o = GetThreeDHouseObjectAny(h, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
+				const ThreeDObject *o = GetThreeDHouseObjectAt(h, origin);
 				IConsolePrint(CC_DEFAULT, "test3d: dum {},{} cislo {:#04x} objekt {} jmeno {} postav {}", tx, ty, h, o != nullptr ? o->name : std::string("-"),
 						GetThreeDHouseTitle(t).value_or("-"), o != nullptr ? o->figures.size() : 0);
 			}

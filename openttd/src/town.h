@@ -69,6 +69,17 @@ static constexpr int TOWN_VIEW_INVALIDATE_HOUSE_SETS = 7;
 /** A house set that is not a GRF: the original houses of a climate, + LandscapeType. */
 static constexpr uint32_t HOUSE_SOURCE_CLIMATE = 0xFFFFFF00;
 
+/**
+ * How a town looks (the player, 15. 10.: "themed towns, Morrowind"): its houses are the houses it builds, as any
+ * town's, drawn in the 3D views by the objects of its theme ("tema" of the indices, the colleague's
+ * hra/3d/PROSBA-MESTO-HLINENE.md), and the trees on its land as the theme's trees.
+ */
+enum class TownTheme : uint8_t {
+	None = 0, ///< as every town
+	Clay = 1, ///< the clay town ("hlinene"): clay houses with domes, mushrooms for trees, as the villages of Morrowind
+	End,
+};
+
 /** Town data structure. */
 struct Town : TownPool::PoolItem<&_town_pool> {
 	TileIndex xy = INVALID_TILE; ///< town center tile
@@ -217,6 +228,7 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	 */
 	std::array<uint32_t, TOWN_HOUSE_SETS> house_sets{};
 	uint8_t num_house_sets = 0; ///< How many of #house_sets are chosen.
+	TownTheme theme = TownTheme::None; ///< how its houses and the trees on its land look in the 3D views
 
 	bool show_zone = false; ///< NOSAVE: mark town to show the local authority zone in the viewports
 
@@ -333,6 +345,7 @@ void UpdateTownMaxPass(Town *t);
 void UpdateTownRadius(Town *t);
 CommandCost CheckIfAuthorityAllowsNewStation(TileIndex tile, DoCommandFlags flags);
 Town *ClosestTownFromTile(TileIndex tile, uint threshold);
+TownTheme GetTownThemeAt(TileIndex tile);
 void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags);
 HouseZone GetTownRadiusGroup(const Town *t, TileIndex tile);
 void SetTownRatingTestMode(bool mode);

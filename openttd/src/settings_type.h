@@ -710,6 +710,7 @@ struct EconomySettings {
 	uint8_t tropic_towns; ///< how many small towns of the desert houses a new map gets (0 in the tropics itself)
 	uint8_t toyland_towns; ///< how many small towns of the toyland houses a new map gets (0 in toyland itself)
 	uint8_t mars_towns; ///< how many small towns of the Mars houses a new map gets, see mars_houses.h
+	uint8_t clay_towns; ///< how many clay towns a new map gets (TownTheme::Clay)
 	bool split_house_grfs; ///< every ordinary town of a new map builds from one house GRF only, the GRFs taking turns
 	bool newgrf_side_by_side; ///< Load NewGRFs that refuse one another side by side, each hidden from the other's check (LoadNewGRF()).
 	bool industries_temperate; ///< The original industries of the temperate climate in every climate, kept whatever sets do (IndustryClimatesOn()).
