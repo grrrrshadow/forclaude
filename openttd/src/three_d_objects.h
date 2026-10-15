@@ -35,6 +35,11 @@
 #include <string>
 #include <vector>
 
+/** World units along x and y to a metre of the objects: a tile, 16 units, is 14.83765 m (the renders' scale). */
+static constexpr double OBJECT_UNITS_PER_METRE = 16.0 / 14.83765;
+/** Units of height to a metre: a height level, 8 units, is 3 m (hra/3d/OBJEKTY-3D.md). */
+static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
+
 /** A texture of an object at one level of detail: 32bpp pixels in the blitter's colours, 0 where it is transparent. */
 struct ThreeDObjectTexture {
 	int w = 0;
@@ -52,6 +57,14 @@ struct ThreeDObjectColourPart {
 	int start = 255;                ///< "zacatek": the texture's lightness the colour is at its own
 	std::vector<uint32_t> palette;  ///< "paleta": the colours it may be (Colour::data), the first as it is built
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the mask, halved for each level of detail (its grey in the red)
+};
+
+/** A figure standing on a building ("postavy" of a house): College Girl smoking by the parasols of the hotel's roof. */
+struct ThreeDObjectFigure {
+	std::string figure;   ///< "postava": a figure of the indices
+	float at[3] = {};     ///< "poloha": where its feet stand, metres in the building's frame (from its north corner, z up)
+	float facing = 0;     ///< "otoceni": degrees in the world, 0 along +x, 90 along +y
+	float scale = 1;      ///< "meritko": its size against true metres; the building is in true metres
 };
 
 /** A building as a 3D object. */
@@ -72,6 +85,7 @@ struct ThreeDObject {
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the texture, halved for each level of detail
 	std::vector<uint16_t> light; ///< the light of each corner from its normal, 256 for 1 (lit as the vehicles); empty when the file has no normals, its light in its texture
 	std::vector<ThreeDObjectColourPart> colours; ///< "barvy": parts painted a colour by number
+	std::vector<ThreeDObjectFigure> figures;     ///< "postavy": figures standing on it, drawn among its triangles
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;

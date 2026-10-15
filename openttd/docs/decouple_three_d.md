@@ -364,6 +364,11 @@ too.
   own where the texture is `zacatek` light), as the vehicles' `lak.barva`. The
   texture so painted is kept by level and colours (at most 192 MB of them,
   then all are dropped and made again as drawn).
+- **Figures on a building** (`"postavy"` of a house: `postava`, `poloha` in
+  metres of the building's frame, `otoceni` degrees in the world, `meritko`):
+  drawn among its triangles by the middle of their height, so a parapet in
+  front hides their feet (`DrawTurnedObject()`). The player (15. 10.): College
+  Girl smoking by the parasols on the roof of the hotel (0x07), true size.
 
 One house is kept as the first technology drew it, the boxes of its hand
 table, in memory of it: 0x1c, the tall office block (the player: "I am

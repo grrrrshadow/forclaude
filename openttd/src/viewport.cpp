@@ -101,6 +101,7 @@
 #include "viewport_cmd.h"
 #include "three_d.h"
 #include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 #include "cab_view.h"
 #include "cab_drive.h"
 #include "round_track.h"
@@ -3050,13 +3051,12 @@ bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int 
 	return true;
 }
 
-/** Draw a vehicle's likeness (box_kind 5): the picture hung from its point, turned. */
-static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+/** Draw a picture of the turned view hung from a world point (a vehicle's likeness, a figure). */
+static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPicture &picture, double wx, double wy, double wz)
 {
-	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
-	const ThreeDModelPicture *pic = _turned_vehicle_pictures[ps.box_dx];
+	const ThreeDModelPicture *pic = &picture;
 	double vx, vy;
-	ProjectTurnedF(ps.box_ox, ps.box_oy, ps.box_oz, vx, vy);
+	ProjectTurnedF(wx, wy, wz, vx, vy);
 	double scale = 1.0 / (1 << to_underlying(frame.zoom));
 	int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + pic->left;
 	int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + pic->top;
@@ -3079,6 +3079,13 @@ static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDr
 			}
 		}
 	}
+}
+
+/** Draw a vehicle's likeness (box_kind 5): the picture hung from its point, turned. */
+static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
+	BlitTurnedPicture(frame, *_turned_vehicle_pictures[ps.box_dx], ps.box_ox, ps.box_oy, ps.box_oz);
 }
 
 /**
@@ -3175,10 +3182,34 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 		TurnWorldPoint(ox + sx / 3, oy + sy / 3, xr, yr);
 		order.emplace_back(xr + yr + 2 * sz / 3, t);
 	}
+	/* The figures standing on it (College Girl by the parasols of the hotel's roof): among the triangles by the middle
+	 * of their height, so what stands in front of them hides them. */
+	struct OnIt {
+		const ThreeDModelPicture *pic;
+		double x, y, z;
+	};
+	static std::vector<OnIt> on_it;
+	on_it.clear();
+	for (const ThreeDObjectFigure &f : o.figures) {
+		double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+		TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
+		int height = 0;
+		const ThreeDModelPicture *pic = GetThreeDFigurePicture(f.figure, f.scale, f.facing, frame.zoom, on, TileX(to.origin) * 7 + TileY(to.origin) * 13 + static_cast<uint32_t>(on_it.size()), &height);
+		if (pic == nullptr) continue;
+		double xr, yr;
+		TurnWorldPoint(wx, wy, xr, yr);
+		order.emplace_back(xr + yr + 2 * (wz - oz + height / 2.0), SIZE_MAX - on_it.size());
+		on_it.push_back({pic, wx, wy, wz});
+	}
 	std::sort(order.begin(), order.end());
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
 	for (const auto &[near, t] : order) {
+		if (t >= o.tri.size()) {
+			const OnIt &f = on_it[SIZE_MAX - t];
+			BlitTurnedPicture(frame, *f.pic, f.x, f.y, f.z);
+			continue;
+		}
 		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o.tri[t]], verts[o.tri[t + 1]], verts[o.tri[t + 2]]);
 	}
 	_turned_times.models += TurnedNow() - t0;

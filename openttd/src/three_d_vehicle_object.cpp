@@ -601,17 +601,32 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
  */
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase)
 {
+	int height = 0;
+	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height);
+	if (pic == nullptr) return false;
+	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+	return true;
+}
+
+/**
+ * The picture of a figure of the turned map at the angle of the view (AddThreeDFigureToViewport(); a figure on a
+ * building, drawn among its triangles): its frame of the game's tick when it moves, its tile then drawn again as the
+ * frame changes.
+ * @param[out] height how tall it is, units of height
+ * @return the picture, or nullptr when the figure is not there
+ */
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height)
+{
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
-	if (fig == nullptr) return false;
+	if (fig == nullptr) return nullptr;
 	int frame = fig->FrameAt(TimerGameTick::counter, phase);
 	const ThreeDVehicleShape *shape = fig->GetShape(frame);
-	if (shape == nullptr) return false;
+	if (shape == nullptr) return nullptr;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
 	float world_az = facing - 135.0f;
 	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, frame);
-	if (pic == nullptr) return false;
-	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
-	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+	if (pic == nullptr) return nullptr;
+	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	if (fig->frames > 1 && tile != INVALID_TILE) {
 		uint64_t step = TimerGameTick::counter / fig->frame_ticks;
 		bool known = false;
@@ -623,7 +638,7 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 		}
 		if (!known) _moving_figures.push_back({tile, fig->frame_ticks, step});
 	}
-	return true;
+	return pic;
 }
 
 /** The rig: the objects' sprites made. */

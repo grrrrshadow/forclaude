@@ -34,11 +34,6 @@
 
 #include "safeguards.h"
 
-/** World units along x and y to a metre of the objects: a tile, 16 units, is 14.83765 m (the renders' scale). */
-static constexpr double OBJECT_UNITS_PER_METRE = 16.0 / 14.83765;
-/** Units of height to a metre: a height level, 8 units, is 3 m (hra/3d/OBJEKTY-3D.md). */
-static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
-
 /** Every object read, and whether they were looked for yet. */
 static std::vector<ThreeDObject> _three_d_objects;
 static bool _three_d_objects_read = false;
@@ -436,6 +431,23 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 	}
 }
 
+/** The figures standing on a building ("postavy"). */
+static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
+{
+	if (!e.contains("postavy") || !e.at("postavy").is_array()) return;
+	for (const auto &f : e.at("postavy")) {
+		if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) continue;
+		const auto &at = f.at("poloha");
+		if (!at.is_array() || at.size() != 3) continue;
+		ThreeDObjectFigure fig;
+		fig.figure = f.at("postava").get<std::string>();
+		for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
+		fig.facing = f.value("otoceni", 0.0f);
+		fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
+		obj.figures.push_back(std::move(fig));
+	}
+}
+
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
 static void ReadThreeDObjects()
 {
@@ -467,6 +479,7 @@ static void ReadThreeDObjects()
 					}
 					if (!ReadGlb(folder + obj.file, obj)) continue;
 					ReadColourParts(e, folder, obj);
+					ReadBuildingFigures(e, obj);
 					_three_d_objects.push_back(std::move(obj));
 					continue;
 				}
@@ -491,6 +504,7 @@ static void ReadThreeDObjects()
 				}
 				if (!ReadGlb(folder + obj.file, obj)) continue;
 				ReadColourParts(e, folder, obj);
+				ReadBuildingFigures(e, obj);
 				std::vector<uint8_t> snow;
 				if (houses.size() > 1 && e.contains("snih")) snow = ReadWholeFile(folder + e.at("snih").get<std::string>());
 				for (size_t k = 1; k < houses.size(); k++) {
@@ -1114,6 +1128,7 @@ std::string DescribeThreeDObjects()
 		std::string which = o.grfid != 0 ? fmt::format("grf {:08X} house {}", std::byteswap(o.grfid), o.grf_house) : fmt::format("house {:#04x}", o.house);
 		out += fmt::format("\n  {} {} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes{}", o.name, which, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size(), o.light.empty() ? "" : ", lit from its normals");
 		for (const ThreeDObjectColourPart &part : o.colours) out += fmt::format(", colour {} of {}", part.name, part.palette.size());
+		for (const ThreeDObjectFigure &f : o.figures) out += fmt::format(", {} at {:.1f},{:.1f},{:.1f}", f.figure, f.at[0], f.at[1], f.at[2]);
 	}
 	return out;
 }

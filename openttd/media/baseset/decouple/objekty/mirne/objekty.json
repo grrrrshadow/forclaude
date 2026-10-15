@@ -565,9 +565,36 @@
     ]
    }
   ],
+  "dvere": [
+   {
+    "poloha": [
+     10.57,
+     14.81,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.99
+   }
+  ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23960 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
+  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23960 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m",
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.47,
+     18.05,
+     15.71
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: kouřící holka u slunečníků na střeše hotelu (terasa před bazénem, slunečníky x 9,9, y 20,4 až 25,8)"
+   }
+  ]
  },
  {
   "soubor": "dum_09_socha.glb",
@@ -600,6 +627,7 @@
     ]
    }
   ],
+  "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py; socha College Girl, Rotmill (Sketchfab, CC BY 4.0)",
   "licence": "GPL-2.0 (vlastní geometrie i textura); socha CC BY 4.0, uvést Rotmill",
   "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17594 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m"
@@ -635,6 +663,7 @@
     ]
    }
   ],
+  "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 9620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
@@ -670,6 +699,7 @@
     ]
    }
   ],
+  "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m"
@@ -705,6 +735,7 @@
     ]
    }
   ],
+  "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m"
@@ -772,6 +803,20 @@
     ]
    }
   ],
+  "dvere": [
+   {
+    "poloha": [
+     11.27,
+     6.08,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.39
+   }
+  ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 18172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
@@ -822,6 +867,20 @@
      "F0C8B0",
      "D8E4EC"
     ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.97,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
    }
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
@@ -891,6 +950,20 @@
     ]
    }
   ],
+  "dvere": [
+   {
+    "poloha": [
+     3.39,
+     10.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.4
+   }
+  ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19540 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
@@ -941,6 +1014,44 @@
      "F0C8B0",
      "D8E4EC"
     ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.67,
+     4.39,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
+   },
+   {
+    "poloha": [
+     12.67,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
+   },
+   {
+    "poloha": [
+     12.67,
+     10.37,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
    }
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
@@ -1008,6 +1119,20 @@
      "A05A3C",
      "7A8A9A"
     ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     27.93,
+     14.81,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 5.19
    }
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",

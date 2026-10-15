@@ -54,5 +54,24 @@
   "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); pózy postavy/postavy_animace.py (kostra modelu, IK ruky), bez renderu",
   "licence": "CC BY 4.0 (uvést Rotmill)",
   "poznamka": "počátek mezi chodidly na zemi (stejný ve všech snímcích), čelem k +x, metry, 11778 trojúhelníků na snímek, tři textury 1024 px jednou pro všechny snímky, s normálami, bez upečeného světla; nikdy nebledne; pro hru bez animace zůstává college_girl_stoji"
+ },
+ {
+  "soubor": "mat.glb",
+  "jmeno": "mat",
+  "druh": "postava",
+  "vyska_m": 1.7,
+  "animace": {
+   "uzly": "snimek_",
+   "snimku": 8,
+   "tiku": 6,
+   "smycka": true,
+   "chuze": {
+    "krok_m": 1.1
+   }
+  },
+  "poza": "jde: 8 snímků chůze jako uzly snimek_00..07 (stehna kývají, koleno nohy ve švihu pokrčené, ruce proti nohám, nejnižší noha vždy na zemi); jeden cyklus = dva kroky, asi 1,1 m",
+  "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); pózy postavy/postavy_animace.py (kostra modelu), bez renderu",
+  "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
+  "poznamka": "Mat, opravář (muž, ne holka): hráč: 'mat bude chodit ze dveří do dveří po městě, mat je opravář'. Počátek uprostřed těla na zemi (chodidla se hýbou), čelem k +x, metry, 34 288 trojúhelníků na snímek, sedm materiálů jen barvou bez textur, s normálami; nikdy nebledne"
  }
 ]
