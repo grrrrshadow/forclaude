@@ -7797,6 +7797,27 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	_vd.tile_sprites_to_draw.clear();
 	_vd.parent_sprites_to_draw.clear();
 	_vd.child_screen_sprites_to_draw.clear();
+	/* The haze far off (as OpenMW's fog): from half the reach the picture fades into the colour of the horizon, and
+	 * the far ground under it is all haze, so the view ends softly where the tiles drawn end. */
+	{
+		const double fog_near = CAB_RANGE_TILES * TILE_SIZE * 0.45, fog_far = CAB_RANGE_TILES * TILE_SIZE * 0.95;
+		const Colour far_haze(150, 178, 205);
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				const size_t i = static_cast<size_t>(y) * width + x;
+				double f;
+				if (zb[i] <= 0.0f) {
+					if (y < eye.cy) continue; // the sky
+					f = 1.0;
+				} else {
+					f = std::clamp((1.0 / zb[i] - fog_near) / (fog_far - fog_near), 0.0, 1.0);
+					if (f <= 0.0) continue;
+				}
+				Colour c(dst[i]);
+				dst[i] = Colour(static_cast<uint8_t>(c.r + (far_haze.r - c.r) * f), static_cast<uint8_t>(c.g + (far_haze.g - c.g) * f), static_cast<uint8_t>(c.b + (far_haze.b - c.b) * f)).data;
+			}
+		}
+	}
 	if (_settings_client.gui.night) DrawEyeNight(eye, own, width, height, dst, zb);
 	camera.ms = TurnedNow() - t0;
 	return true;
