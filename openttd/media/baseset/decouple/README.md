@@ -92,6 +92,9 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   `<balíček>/<jméno>.grf`, `<balíček>/objekty/vozidla/objekty.json` s jeho `.glb`
   a PNG, `<balíček>/objekty/postavy/` s posádkou. Hra je najde sama; žádný build.
   První je kolegův `M62_Sergej_3D-v1.tar` (GRF `MAX3`, Sergej ve třech nátěrech).
+- `auta/` – auta hry, která jezdí sama (od kolegy, grrrrf `hra/3d/objekty/auta/`, `ODPOVED-MODY-A-HRA.md`): Tatra 613 VB
+  jezdí v otočeném pohledu po silnicích od stání jedné budovy ÚV KSČ ke stání jiné (`jizda`, `stani` u domu), postojí
+  a jede dál. Je to výzdoba hry jako holky a Mat, ne vozidlo GRF; Tatry jako vozidla (`MAXt`) jsou mód ve svém balíčku.
 - `efekty/` – efekty jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/efekty/`): ohňostroj
   nad chatkou (`ohnostroj.glb`, start a tři fáze koule, barva číslem z palety pro každou
   fázi), v otočeném pohledu; na sever zůstávají sprity.

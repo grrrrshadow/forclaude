@@ -31,5 +31,7 @@ bool SendThreeDWalker();
 struct Town;
 bool IsThreeDWalkway(TileIndex t, const Town *town);
 bool ThreeDWalkerAt(int &x, int &y, int &z);
+void AddThreeDDriversToViewport(ZoomLevel zoom);
+std::string DescribeThreeDDrivers();
 
 #endif /* THREE_D_WALKERS_H */

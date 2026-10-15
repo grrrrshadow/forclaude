@@ -3759,6 +3759,7 @@ static void ViewportDoDrawTurned()
 	ViewportAddVehicles(&cdpi);
 	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */
 	AddThreeDWalkersToViewport(zoom);
+	AddThreeDDriversToViewport(zoom);
 	AddThreeDEffectsToViewport(zoom);
 
 	/* The signs and the floating texts: collected north-up, then each moved to where the ground under it is drawn turned. */

@@ -98,6 +98,9 @@ struct ThreeDObject {
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
 	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
 	std::string title_en;     ///< ... and in any other language ("en"); empty for the house's own name
+	bool has_stop = false;    ///< "stani": where a car of the game's own that drives to it stops (ThreeDVehicleObject::drive_house)
+	float stop[3] = {};       ///< there, world units along x and y from the north corner, units of height up
+	float stop_turn = 0;      ///< facing, degrees, 0 along +x
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;
@@ -209,6 +212,9 @@ struct ThreeDVehicleObject {
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
+	HouseID drive_house = UINT16_MAX; ///< a car of the game's own ("auto" with "jizda"): drives between the houses of this original house, from stop ("stani") to stop
+	float drive_kmh = 60;           ///< "rychlost_kmh"
+	int drive_stand = 400;          ///< "stoji_tiku": ticks it stands at a stop
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none
@@ -241,6 +247,7 @@ private:
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
+const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars();
 void ResetThreeDVehicleObjects();
 const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid);
 std::string DescribeThreeDVehicleObjects();

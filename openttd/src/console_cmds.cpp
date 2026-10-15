@@ -8967,6 +8967,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d: stav vozidla {} ({}): sprite GRF {} stav {} z {}", v->unitnumber, obj->name, id == UINT32_MAX ? -1 : static_cast<int64_t>(id), state, obj->states.size());
 		}
+	} else if (what == "auta3d") {
+		/* 'auta3d': the cars of the game's own driving about (three_d_walkers.h) and the stops near the view. */
+		std::string all = DescribeThreeDDrivers();
+		for (size_t at = 0; at < all.size();) {
+			size_t end = all.find('\n', at);
+			if (end == std::string::npos) end = all.size();
+			IConsolePrint(CC_DEFAULT, "test3d: {}", all.substr(at, end - at));
+			at = end + 1;
+		}
 	} else if (what == "zadni") {
 		/* 'zadni <0|1>': a 3D object's triangles turned away from the view left out (1, as the game draws), or all drawn. */
 		extern bool _turned_cull;

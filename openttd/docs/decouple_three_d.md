@@ -497,6 +497,13 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   `Tatra_osobni_3D-v3.tar`): a record `"druh": "auto"` with `grf` is a vehicle as `"vozidlo"` is, `typ` `silnice`
   (a road vehicle) by default; an `auto` without `grf` is a car of the game's own driving about by itself (later).
   Nothing of them is in the game: the GRF and its objects come in its package.
+- **Cars of the game's own** (the player, 15. 10.: "the Tatra will be in the game like the girls at the stops and
+  Mat", "it will drive like Mat, from one ÚV KSČ to another"): a record `"druh": "auto"` without `grf` and with
+  `"jizda": {"k": "dum", "nahrazuje_house": 31, "rychlost_kmh": 60, "stoji_tiku": 400}` in the game's set
+  (`objekty/auta/`) is a car that drives by itself in the turned view (three_d_walkers.cpp, `_drivers_timer`): from the
+  stop (`"stani": {"poloha", "otoceni"}` of a house's record) of one such house near the view to another the roads
+  lead to (a search over road tiles, `RoadRoute()`), keeping to the side of the road the game drives on, stands so
+  many ticks and drives on. One of each such record; only the screen, never saved. Rig: `test3d auta3d`.
 - **The state is the GRF's** (the player, 15. 10.: "the colour, the lid and the beacon the GRF must do, the mod; when
   it does not, nothing, it is ignored and does not fade"; grrrrf `hra/3d/ROZHRANI-GRF-STAVY.md`): the game decides
   nothing of how a vehicle looks by itself -- no colour by its number, no fading or rust by its age. The GRF picks a

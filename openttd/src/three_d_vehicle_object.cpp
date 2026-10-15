@@ -728,6 +728,23 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
  * @param phase how many frames on it is from the others (a hash of its tile: the girls of a map do not all move at once)
  * @return whether it was drawn so; else the caller draws its sprite
  */
+/**
+ * A vehicle object of no vehicle on the turned map (a car of the game's own driving about, three_d_walkers.h): at a
+ * place, facing a way (degrees, 0 along +x), sorted by a box about it as long as it is.
+ */
+bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom)
+{
+	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
+	if (shape == nullptr) return false;
+	float world_az = facing - 135.0f;
+	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0);
+	if (pic == nullptr) return false;
+	int half = std::max(1, static_cast<int>(std::lround(std::max(shape->x1 - shape->x0, shape->y1 - shape->y0) * scale * OBJECT_UNITS_PER_METRE / 2)));
+	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+	AddTurnedVehiclePicture(pic, x, y, z, x - half, y - half, z, x + half, y + half, z + height);
+	return true;
+}
+
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
 {
 	int height = 0;

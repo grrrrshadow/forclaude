@@ -38,6 +38,7 @@
 #include "settings_type.h"
 #include "transparency.h"
 #include "debug.h"
+#include "gfx_type.h"
 
 #include <cmath>
 #include <map>
@@ -403,7 +404,276 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 	}
 });
 
+/*
+ * The cars of the game's own driving about by themselves (the player, 15. 10.: "the Tatra will be in the game like the
+ * girls at the stops and Mat"; "it will drive like Mat, from one ÚV KSČ to another ÚV KSČ"): a car of the index with
+ * "jizda" drives on the roads between the houses it names, from the stop ("stani") of one to the stop of another,
+ * keeping to its side of the road, stands a while and drives on. Only the screen, as the walkers.
+ */
+
+/** How far from the middle of the road the cars drive, world units. */
+constexpr double LANE = 3.0;
+/** The stops looked for within this far of the middle of the view (tiles, Manhattan). */
+constexpr uint STOP_REACH = 64;
+/** How many road tiles the way between two stops is looked for over. */
+constexpr size_t DRIVE_SEARCH = 20000;
+/** Ticks of the game a second. */
+constexpr double TICKS_A_SECOND = 1000.0 / MILLISECONDS_PER_TICK;
+
+/** A stop of a house to drive to: where the car stands, and the road tile nearest it. */
+struct Stop {
+	TileIndex house;
+	TileIndex road;
+	Point2 at;
+	float facing;
+};
+
+/** One car driving. */
+struct Driver {
+	const ThreeDVehicleObject *car = nullptr;
+	std::vector<Point2> path;
+	std::vector<double> at;
+	double driven = 0;
+	TileIndex house = INVALID_TILE;  ///< the house it stands at or drives to
+	uint64_t stand_until = 0;        ///< standing until then (the game's tick counter); 0 driving
+	TileIndex tile = INVALID_TILE;
+	double x = 0, y = 0;
+	int z = 0;
+	float facing = 0;
+};
+
+std::vector<Driver> _drivers;
+
+/** The stops of the houses a car drives between, near the middle of the view. */
+std::vector<Stop> HouseStops(HouseID house, TileIndex middle)
+{
+	std::vector<Stop> stops;
+	for (const Town *town : Town::Iterate()) {
+		if (DistanceManhattan(town->xy, middle) > STOP_REACH) continue;
+		const int cx = TileX(town->xy), cy = TileY(town->xy);
+		for (int y = std::max(0, cy - DOOR_SEARCH); y <= std::min<int>(Map::MaxY(), cy + DOOR_SEARCH); y++) {
+			for (int x = std::max(0, cx - DOOR_SEARCH); x <= std::min<int>(Map::MaxX(), cx + DOOR_SEARCH); x++) {
+				TileIndex t = TileXY(x, y);
+				if (!IsTileType(t, TileType::House) || GetHouseType(t) != house || !IsHouseCompleted(t)) continue;
+				if (std::ranges::any_of(stops, [t](const Stop &s) { return s.house == t; })) continue; // two towns about it
+				HouseID north = GetHouseType(t);
+				if (GetHouseNorthPart(north) != 0) continue;
+				const ThreeDObject *obj = HouseObject(t);
+				if (obj == nullptr || !obj->has_stop) continue;
+				Stop s;
+				s.house = t;
+				s.at = {x * TILE_SIZE + obj->stop[0], y * TILE_SIZE + obj->stop[1]};
+				s.facing = obj->stop_turn;
+				/* The road tile nearest the stop, about the plot. */
+				s.road = INVALID_TILE;
+				double best = 1e18;
+				for (int dy = -2; dy <= obj->tiles_y + 1; dy++) {
+					for (int dx = -2; dx <= obj->tiles_x + 1; dx++) {
+						if (x + dx < 0 || y + dy < 0 || x + dx > static_cast<int>(Map::MaxX()) || y + dy > static_cast<int>(Map::MaxY())) continue;
+						TileIndex r = TileXY(x + dx, y + dy);
+						if (!IsNormalRoadTile(r) || !HasTileRoadType(r, RoadTramType::Road) || GetRoadBits(r, RoadTramType::Road).None()) continue;
+						Point2 m = Middle(r);
+						double d = std::hypot(m.x - s.at.x, m.y - s.at.y);
+						if (d < best) {
+							best = d;
+							s.road = r;
+						}
+					}
+				}
+				if (s.road != INVALID_TILE) stops.push_back(s);
+			}
+		}
+	}
+	return stops;
+}
+
+/** The road tiles from one to another over the roads, both ends with; empty when there is no way. */
+std::vector<TileIndex> RoadRoute(TileIndex from, TileIndex to)
+{
+	std::unordered_map<TileIndex, TileIndex> came;
+	std::vector<TileIndex> queue{from};
+	came[from] = from;
+	for (size_t i = 0; i < queue.size() && came.size() < DRIVE_SEARCH; i++) {
+		TileIndex t = queue[i];
+		if (t == to) break;
+		for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+			TileIndex n = Next(t, d);
+			if (n == INVALID_TILE || came.contains(n)) continue;
+			if (!IsNormalRoadTile(n) || !HasTileRoadType(n, RoadTramType::Road) || !Joined(t, n, d)) continue;
+			came[n] = t;
+			queue.push_back(n);
+		}
+	}
+	if (!came.contains(to)) return {};
+	std::vector<TileIndex> route{to};
+	while (route.back() != from) route.push_back(came[route.back()]);
+	std::reverse(route.begin(), route.end());
+	return route;
+}
+
+/** The way from one stop to another over a route of road tiles, keeping to the side of the road the game drives on. */
+std::vector<Point2> DrivePath(const Stop &from, const Stop &to, const std::vector<TileIndex> &route)
+{
+	auto dir = [&](size_t i) {
+		Point2 a = Middle(route[i]), b = Middle(route[i + 1]);
+		double l = std::hypot(b.x - a.x, b.y - a.y);
+		return Point2{(b.x - a.x) / l, (b.y - a.y) / l};
+	};
+	auto left = [](Point2 d) { return Point2{-d.y, d.x}; };
+	/* Seen from above (z up), the left of a way along d is (-d.y, d.x); the right is the other side. */
+	const double side = _settings_game.vehicle.road_side == RoadVehicleDrivingSide::Right ? -LANE : LANE;
+	std::vector<Point2> path{from.at};
+	if (route.size() < 2) {
+		path.push_back(Middle(route.front()));
+	} else {
+		Point2 d0 = dir(0), l0 = left(d0), c0 = Middle(route[0]);
+		path.push_back({c0.x + side * l0.x, c0.y + side * l0.y});
+		for (size_t i = 1; i + 1 < route.size(); i++) {
+			Point2 a = dir(i - 1), b = dir(i);
+			if (std::abs(a.x - b.x) < 1e-6 && std::abs(a.y - b.y) < 1e-6) continue; // straight on
+			Point2 c = Middle(route[i]), la = left(a), lb = left(b);
+			path.push_back({c.x + side * (la.x + lb.x), c.y + side * (la.y + lb.y)});
+		}
+		Point2 dn = dir(route.size() - 2), ln = left(dn), cn = Middle(route.back());
+		path.push_back({cn.x + side * ln.x, cn.y + side * ln.y});
+	}
+	path.push_back(to.at);
+	return path;
+}
+
+/** Put a car where it is along its way, facing along it. */
+void PlaceCar(Driver &d)
+{
+	size_t i = 1;
+	while (i + 1 < d.path.size() && d.at[i] < d.driven) i++;
+	const Point2 &a = d.path[i - 1], &b = d.path[i];
+	double len = d.at[i] - d.at[i - 1];
+	double f = len > 0 ? std::clamp((d.driven - d.at[i - 1]) / len, 0.0, 1.0) : 1.0;
+	d.x = a.x + (b.x - a.x) * f;
+	d.y = a.y + (b.y - a.y) * f;
+	if (len > 0) d.facing = static_cast<float>(std::atan2(b.y - a.y, b.x - a.x) * 180.0 / M_PI);
+	int ix = std::clamp<int>(static_cast<int>(d.x), 0, Map::MaxX() * TILE_SIZE), iy = std::clamp<int>(static_cast<int>(d.y), 0, Map::MaxY() * TILE_SIZE);
+	d.z = GetSlopePixelZ(ix, iy);
+	d.tile = TileVirtXY(ix, iy);
+}
+
+/** The tiles about a car drawn again: it is longer than a tile's quarter. */
+void MarkCarDirty(TileIndex t)
+{
+	if (t == INVALID_TILE) return;
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			TileIndex n = AddTileIndexDiffCWrap(t, {static_cast<int16_t>(dx), static_cast<int16_t>(dy)});
+			if (n != INVALID_TILE) MarkTileDirtyByTile(n);
+		}
+	}
+}
+
+/** Send a car from the stop it stands at (or any, the first time) to another one the roads lead to; whether it went. */
+bool Drive(Driver &d, TileIndex middle)
+{
+	std::vector<Stop> stops = HouseStops(d.car->drive_house, middle);
+	if (stops.size() < 2) return false;
+	const Stop *from = nullptr;
+	for (const Stop &s : stops) {
+		if (s.house == d.house) from = &s;
+	}
+	if (from == nullptr) from = &stops[InteractiveRandomRange(static_cast<uint32_t>(stops.size()))];
+	std::vector<const Stop *> others;
+	for (const Stop &s : stops) {
+		if (s.house != from->house) others.push_back(&s);
+	}
+	while (!others.empty()) {
+		size_t pick = InteractiveRandomRange(static_cast<uint32_t>(others.size()));
+		std::vector<TileIndex> route = RoadRoute(from->road, others[pick]->road);
+		if (route.empty()) {
+			others.erase(others.begin() + pick);
+			continue;
+		}
+		d.path = DrivePath(*from, *others[pick], route);
+		d.at.assign(1, 0.0);
+		for (size_t i = 1; i < d.path.size(); i++) d.at.push_back(d.at.back() + std::hypot(d.path[i].x - d.path[i - 1].x, d.path[i].y - d.path[i - 1].y));
+		d.driven = 0;
+		d.house = others[pick]->house;
+		d.stand_until = 0;
+		MarkCarDirty(d.tile);
+		PlaceCar(d);
+		Debug(misc, 1, "3D car {}: from the house at {},{} to the one at {},{}, {} road tiles", d.car->name, TileX(from->house), TileY(from->house), TileX(d.house), TileY(d.house), route.size());
+		return true;
+	}
+	return false;
+}
+
+/** Every tick: the cars drive on, stand at their stops and drive on again. */
+const IntervalTimer<TimerGameTick> _drivers_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	TileIndex middle = TurnedViewMiddle();
+	const std::vector<ThreeDVehicleObject> &cars = GetThreeDDrivingCars();
+	if (middle == INVALID_TILE || cars.empty()) {
+		for (const Driver &d : _drivers) MarkCarDirty(d.tile);
+		_drivers.clear();
+		return;
+	}
+	const uint64_t now = TimerGameTick::counter;
+	/* One of each car of the index. */
+	if (_drivers.size() != cars.size()) {
+		for (const Driver &d : _drivers) MarkCarDirty(d.tile);
+		_drivers.clear();
+		for (const ThreeDVehicleObject &car : cars) {
+			Driver d;
+			d.car = &car;
+			d.stand_until = now + InteractiveRandomRange(100);
+			_drivers.push_back(std::move(d));
+		}
+	}
+	const double units_per_metre = OBJECT_UNITS_PER_METRE;
+	for (Driver &d : _drivers) {
+		if (d.stand_until != 0) {
+			if (now < d.stand_until) continue;
+			/* Off again, or stand a while longer when there is nowhere to go. */
+			if (!Drive(d, middle)) d.stand_until = now + 500;
+			continue;
+		}
+		if (d.path.empty()) continue;
+		d.driven += d.car->drive_kmh / 3.6 / TICKS_A_SECOND * units_per_metre * WalkerScale();
+		TileIndex was = d.tile;
+		if (d.driven >= d.at.back()) {
+			d.driven = d.at.back();
+			d.stand_until = now + std::max(1, d.car->drive_stand);
+		}
+		PlaceCar(d);
+		MarkCarDirty(was);
+		if (d.tile != was) MarkCarDirty(d.tile);
+	}
+});
+
 } // namespace
+
+/** Put the cars of the game's own driving about on the turned view being drawn (after its vehicles). */
+void AddThreeDDriversToViewport(ZoomLevel zoom)
+{
+	if (_drivers.empty()) return;
+	const float scale = WalkerScale();
+	for (const Driver &d : _drivers) {
+		if (d.path.empty() || d.tile == INVALID_TILE) continue;
+		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom);
+	}
+}
+
+/** The rig: the cars driving, a line each. */
+std::string DescribeThreeDDrivers()
+{
+	std::string out = fmt::format("{} cars of {}", _drivers.size(), GetThreeDDrivingCars().size());
+	for (const Driver &d : _drivers) {
+		out += fmt::format("\n  {} at {:.1f},{:.1f},{} facing {:.0f}, {:.0f} of {:.0f} driven, {}", d.car->name, d.x, d.y, d.z, d.facing, d.driven, d.at.empty() ? 0.0 : d.at.back(), d.stand_until != 0 ? "standing" : "driving");
+	}
+	TileIndex middle = TurnedViewMiddle();
+	if (middle != INVALID_TILE && !GetThreeDDrivingCars().empty()) {
+		std::vector<Stop> stops = HouseStops(GetThreeDDrivingCars().front().drive_house, middle);
+		out += fmt::format("\n  {} stops near the view", stops.size());
+		for (const Stop &s : stops) out += fmt::format("\n    house {},{} stop {:.1f},{:.1f} road {},{}", TileX(s.house), TileY(s.house), s.at.x, s.at.y, TileX(s.road), TileY(s.road));
+	}
+	return out;
+}
 
 /** Put the walkers on the turned view being drawn (after its vehicles; ViewportDoDrawTurned()). */
 void AddThreeDWalkersToViewport(ZoomLevel zoom)

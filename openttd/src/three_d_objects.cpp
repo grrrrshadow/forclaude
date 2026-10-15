@@ -60,6 +60,8 @@ static bool _vehicle_objects_read = false;
 static std::vector<ThreeDVehicleObject> _figure_objects;
 /** The effects of the indices ("druh": "efekt"): the fireworks over the hut. */
 static std::vector<ThreeDVehicleObject> _effect_objects;
+/** Cars of the game's own that drive about by themselves ("auto" with "jizda", three_d_walkers.h): the ÚV KSČ Tatra. */
+static std::vector<ThreeDVehicleObject> _driving_objects;
 /** The vehicle objects by the set's id, the vehicle type and the engine's number in the set: the object and which of its pieces. */
 static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pieces;
 
@@ -557,6 +559,15 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
  */
 static void ReadBuildingTitle(const nlohmann::json &e, ThreeDObject &obj)
 {
+	/* Where a car of the game's own driving to it stops ("stani", the ÚV KSČ building), metres in the house's frame. */
+	if (e.contains("stani") && e.at("stani").is_object() && e.at("stani").contains("poloha") && e.at("stani").at("poloha").is_array() && e.at("stani").at("poloha").size() == 3) {
+		const auto &st = e.at("stani");
+		obj.stop[0] = st.at("poloha").at(0).get<float>() * OBJECT_UNITS_PER_METRE;
+		obj.stop[1] = st.at("poloha").at(1).get<float>() * OBJECT_UNITS_PER_METRE;
+		obj.stop[2] = st.at("poloha").at(2).get<float>() * OBJECT_HEIGHT_PER_METRE;
+		obj.stop_turn = st.value("otoceni", 0.0f);
+		obj.has_stop = true;
+	}
 	if (!e.contains("nazev")) return;
 	const auto &n = e.at("nazev");
 	if (n.is_string()) {
@@ -782,25 +793,36 @@ static void ReadThreeDVehicleObjects()
 				/* A vehicle of a set: "vozidlo", or "auto" (the colleague's Tatras, hra/3d/PROSBA-TATRA-613-CIVILNI.md) with
 				 * the set's id; an "auto" without one is a car of the game's own that drives about by itself (later). */
 				const std::string kind = e.value("druh", std::string("dum"));
-				if (kind != "vozidlo" && !(kind == "auto" && e.contains("grf"))) continue;
+				const bool driving = kind == "auto" && !e.contains("grf") && e.contains("jizda") && e.at("jizda").is_object();
+				if (kind != "vozidlo" && !(kind == "auto" && e.contains("grf")) && !driving) continue;
 				ThreeDVehicleObject obj;
 				obj.package = package;
 				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
 				obj.file = folder + e.at("soubor").get<std::string>();
 				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : "vlak")));
 				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
-				if (obj.type == VehicleType::Invalid || !grfid.has_value()) {
+				if (obj.type == VehicleType::Invalid || (!grfid.has_value() && !driving)) {
 					Debug(misc, 0, "3D vehicle {}: no type or set", obj.name);
 					continue;
 				}
-				obj.grfid = *grfid;
+				if (driving) {
+					/* A car of the game's own, no set's: it drives by itself between the houses named, stop to stop. */
+					const auto &j = e.at("jizda");
+					if (j.value("k", std::string()) != "dum" || !j.contains("nahrazuje_house")) continue;
+					obj.drive_house = static_cast<HouseID>(j.at("nahrazuje_house").get<int>());
+					obj.drive_kmh = std::clamp(j.value("rychlost_kmh", 60.0f), 5.0f, 200.0f);
+					obj.drive_stand = std::clamp(j.value("stoji_tiku", 400), 0, 100000);
+					obj.pieces.push_back(0);
+				} else {
+					obj.grfid = *grfid;
+				}
 				if (e.contains("clanky")) {
 					for (const auto &piece : e.at("clanky")) {
 						auto n = ParseIndexNumber(piece);
 						if (n.has_value()) obj.pieces.push_back(static_cast<uint16_t>(*n));
 					}
 				}
-				if (obj.pieces.empty() && e.contains("motor")) {
+				if (!driving && obj.pieces.empty() && e.contains("motor")) {
 					auto n = ParseIndexNumber(e.at("motor"));
 					if (n.has_value()) obj.pieces.push_back(static_cast<uint16_t>(*n));
 				}
@@ -938,7 +960,11 @@ static void ReadThreeDVehicleObjects()
 						if (!w.at.empty()) obj.wheels.push_back(std::move(w));
 					}
 				}
-				_vehicle_objects.push_back(std::move(obj));
+				if (driving) {
+					_driving_objects.push_back(std::move(obj));
+				} else {
+					_vehicle_objects.push_back(std::move(obj));
+				}
 			}
 		} catch (const std::exception &ex) {
 			Debug(misc, 0, "3D vehicles {}: {}", index, ex.what());
@@ -994,11 +1020,19 @@ void ResetThreeDVehicleObjects()
 	_vehicle_objects.clear();
 	_figure_objects.clear();
 	_effect_objects.clear();
+	_driving_objects.clear();
 	_vehicle_object_pieces.clear();
 	_vehicle_objects_read = false;
 }
 
 /** An effect of the indices by its name ("druh": "efekt"), or nullptr. */
+/** The cars of the game's own that drive about by themselves (three_d_walkers.h). */
+const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _driving_objects;
+}
+
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
