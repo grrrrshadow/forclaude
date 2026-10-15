@@ -35,10 +35,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   - **pivo léčí, mari léčí víc**; ostatní se zatím jen nosí. Oblékání a kouzla později.
   - od kolegy: předměty jako glb `druh: predmet` (kladivo z Example Suite), kladivo v ruce v první osobě.
   - v pohledu z očí se náš průmysl (hospoda, lihovar, gymnázium…) kreslí objekty jako domy; dřív plakát ve vzduchu.
-- **Build 277: v mírném klimatu nejsou města** (hráč). U mě se města generují (1930, 1950, mapa 256, prázdný
-  config). Podezření: nastavení „dělení měst podle GRF domů“ (`economy.split_house_grfs`, výchozí zapnuto) – když
-  je aktivní jen jedna GRF sada domů, která v ten rok nemá co postavit, nevznikne žádné město. Čekám na hráče:
-  jaké GRF má, jaký rok, jestli hláška.
+- **Build 277: v mírném klimatu nejsou města** (hráč) – vyřešeno: hráč měl aktivní jiný, vadný GRF, který rušil
+  domy. Bez něj domy jdou. Slabina kódu zůstává: s nastavením „dělení měst podle GRF domů“ (`economy.split_house_grfs`)
+  může jedna vadná sada domů zrušit všechna města – nabídl jsem, že se město pak postaví ze všech domů.
 - Dál z OpenMW (kolegův `hra/3d/NAVRH-Z-OPENMW.md`): kostra a animace z glTF (135 animací postavy, ruce, sekání),
   interiéry dveřmi, boj zblízka, draci na mapě (`hra/3d/PROSBA-DRACI.md`).
 
@@ -56,7 +55,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 ## Otevřené
 
 - Kladivo v ruce (objekt od kolegy), oblékání, kouzla.
-- Města v mírném klimatu v buildu 277.
+- Vadná sada domů nesmí zrušit všechna města (`split_house_grfs`) – jen když hráč chce.
 - Lampy a okna v noci.
 - Kostra a animace glTF; draci; interiéry; boj.
 - Klínek sousedního domu přes průčelí (#41). Domy z GRF objektem z balíčku (MAXd, #47). Doplňky (maják) podle stavu GRF.
