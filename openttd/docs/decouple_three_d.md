@@ -386,8 +386,29 @@ The player (14. 10.): "we will never render anything again; vehicles go into
 the game as objects, like the houses". The colleague's request and format:
 grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
 
+- **With the GRF, not in the game** (the player, 15. 10.: "objects must be as
+  independent as GRFs: whether I give the Sergej object or not, the game cannot
+  carry it, it is to be with the GRF"; the colleague's
+  `hra/3d/PROSBA-OBJEKTY-U-GRF.md`): a vehicle comes in a package beside its
+  GRF anywhere in the NewGRF folders, a folder or a tar, as GRFs come --
+  `<package>/<name>.grf` and `<package>/objekty/<set>/objekty.json` with the
+  files it names, the figures of its crew in `objekty/postavy/` of the same
+  package (found there first, then among the game's). The game looks through
+  the NewGRF folders and their tars for `objekty/<set>/objekty.json`
+  (`PackageIndexScanner`, files in a tar read through `FioFOpenFile()`, their
+  paths `tar:` and the name in the tar), and again each time the GRFs are
+  loaded anew (`ResetThreeDVehicleObjects()` from `GfxInitSpriteMem()`): the
+  first look, early in the start, comes before the tars are known. The game's
+  own `baseset/decouple/objekty/` holds no vehicles any more, only the houses
+  of the game and the figures it draws itself; those sets are read from every
+  place the game reads its data from, each set once, the player's own folder
+  first (`Documents/OpenTTD/baseset/decouple/objekty/<set>/`), so a set there
+  needs no build either. Tried with the colleague's `M62_Sergej_3D-v1.tar`
+  (GRF `MAX3`, every sprite empty): as a tar and unpacked, Sergej on the map,
+  in the depot, the purchase list and the turned view, its driver from the
+  package.
 - **Index**: entries `"druh": "vozidlo"` of any `objekty/<set>/objekty.json`
-  (`media/baseset/decouple/objekty/vozidla/`): `soubor` (.glb), `typ` (`vlak`,
+  of a package: `soubor` (.glb), `typ` (`vlak`,
   `auto`, `lod`, `letadlo`), `grf` (the set's id: four characters as in the set,
   `"MAXb"`, or eight hex digits as the game prints it), `clanky` (the engines'
   numbers in the set, Action 0, front first; or `motor` alone), `lak` and `kola`

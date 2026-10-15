@@ -150,6 +150,7 @@ struct ThreeDVehicleWheels {
  */
 struct ThreeDVehicleObject {
 	std::string name;               ///< its name in the index
+	std::string package;            ///< the folder of the sets it was read from: the game's own, or a GRF's package
 	std::string file;               ///< the .glb, its path
 	std::string paint_file;         ///< a texture over the same layout instead of the file's ("textura"), its path; empty for the file's
 	VehicleType type = VehicleType::Invalid;
@@ -184,7 +185,8 @@ private:
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
-const ThreeDVehicleObject *GetThreeDFigure(std::string_view name);
+const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+void ResetThreeDVehicleObjects();
 std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);

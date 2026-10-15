@@ -85,6 +85,9 @@ void ResetThreeDVehicleObjectSprites()
 	_object_sprites.clear();
 	_object_empty_sprite = 0;
 	_object_pictures.clear();
+	/* The GRFs are loaded anew: their packages read again the next time they are looked at, one put into the NewGRF
+	 * folders meanwhile among them (three_d_objects.h). */
+	ResetThreeDVehicleObjects();
 }
 
 /** Whether a vehicle of the type is foreshortened along itself on straight track, as the sets draw trains and road vehicles. */

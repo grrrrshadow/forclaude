@@ -80,13 +80,15 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   s normálami (světlo si dělá hra jako u vozidel) a s `barvy`: střecha, omítka
   a plot mají masku a paletu a každý dům na mapě má barvu podle své dlaždice.
   Vysoký kancelářský dům 0x1c zůstává na památku ruční tabulkou.
-- `vozidla/` – vozidla jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/vozidla/`):
-  první je Sergej (M62, `sergej.glb`, Chicken cutlet, CC BY 4.0) ve třech nátěrech
-  (`textura`). Vozidlo se hledá podle `grf` (id sady) a `clanky` (čísla motorů
-  v sadě); hra pak sprity sady nepoužije a kreslí vozidlo z objektu sama, i na
-  sever, v depu a v nákupu. Velikost (původní hry, nebo menší v měřítku CZTR)
-  a s ní délka na koleji jsou nastavení hry. Kola mohou být ve vlastním souboru
-  (`kolo_m62.glb`), řidička v kabině je postava z `postavy/` (`posadka`).
+- **Vozidla tu nejsou** (hráč, 15. 10.: „objekty musí být stejně nezávislé jako GRF,
+  to nemůže nést hra, to má být u GRF“): vozidlo jako 3D objekt přijde v balíčku u
+  svého GRF v hráčově `newgrf/` (složka nebo tar, jako každý GRF):
+  `<balíček>/<jméno>.grf`, `<balíček>/objekty/vozidla/objekty.json` s jeho `.glb`
+  a PNG, `<balíček>/objekty/postavy/` s posádkou. Hra je najde sama; žádný build.
+  První je kolegův `M62_Sergej_3D-v1.tar` (GRF `MAX3`, Sergej ve třech nátěrech).
+- Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
+  `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
+  nový dům nepotřebuje build.
 - `postavy/` – postavy jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/postavy/`):
   College Girl (Rotmill, Sketchfab, CC BY 4.0) stojící, kouřící (osm snímků
   `snimek_00`–`07` v jednom souboru, `animace`) a opřená jako řidička; Matylda

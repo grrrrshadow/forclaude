@@ -25,6 +25,7 @@
 #include <cmath>
 #include <filesystem>
 #include <map>
+#include <set>
 #include <tuple>
 #include <unordered_map>
 
@@ -59,15 +60,27 @@ static inline uint64_t VehiclePieceKey(uint32_t grfid, VehicleType type, uint16_
 }
 
 /** A file's bytes, or nothing when it cannot be read. */
+/** A path of a file in a tar of the NewGRF folders begins so: the rest is its name in the tar (FioFOpenFile()). */
+static constexpr std::string_view IN_TAR = "tar:";
+
+/** A whole file: a path on the disk, or IN_TAR and the name of a file in a tar of the NewGRF folders (a package of a GRF). */
 static std::vector<uint8_t> ReadWholeFile(const std::string &path)
 {
 	std::vector<uint8_t> data;
-	auto f = FileHandle::Open(path, "rb");
-	if (!f.has_value()) return data;
-	fseek(*f, 0, SEEK_END);
-	long len = ftell(*f);
-	fseek(*f, 0, SEEK_SET);
-	if (len <= 0 || len > 64 * 1024 * 1024) return data;
+	size_t len = 0;
+	std::optional<FileHandle> f;
+	if (path.starts_with(IN_TAR)) {
+		f = FioFOpenFile(std::string_view(path).substr(IN_TAR.size()), "rb", Subdirectory::NewGrf, &len);
+	} else {
+		f = FileHandle::Open(path, "rb");
+		if (f.has_value()) {
+			fseek(*f, 0, SEEK_END);
+			long end = ftell(*f);
+			fseek(*f, 0, SEEK_SET);
+			len = end > 0 ? static_cast<size_t>(end) : 0;
+		}
+	}
+	if (!f.has_value() || len == 0 || len > 64 * 1024 * 1024) return data;
 	data.resize(len);
 	if (fread(data.data(), len, 1, *f) != 1) data.clear();
 	return data;
@@ -389,25 +402,69 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 }
 
 /**
- * The indices baseset/decouple/objekty/<set>/objekty.json, from the first place the game reads its data from that
- * has them, in the same order on every computer: a house in two folders (the colleague's 04, the same block below
- * the snow in mirne/ and in subarkticke/) is the first folder's.
+ * The indices of the packages of GRFs (the player, 15. 10.: "objects must be as independent as GRFs: whether I give
+ * the Sergej object or not, the game cannot carry it, it is to be with the GRF"; the colleague's
+ * hra/3d/PROSBA-OBJEKTY-U-GRF.md): <package>/objekty/<set>/objekty.json beside a GRF anywhere in the NewGRF folders,
+ * a folder or a tar, as the game finds GRFs.
+ */
+class PackageIndexScanner : public FileScanner {
+public:
+	std::vector<std::string> indices;
+
+	bool AddFile(const std::string &filename, size_t, const std::string &tar_filename) override
+	{
+		/* .../objekty/<set>/objekty.json */
+		std::string_view name = filename;
+		size_t last = name.find_last_of(PATHSEPCHAR);
+		if (last == std::string_view::npos || name.substr(last + 1) != "objekty.json") return false;
+		size_t set = name.find_last_of(PATHSEPCHAR, last - 1);
+		if (set == std::string_view::npos || set < 7 || name.substr(set - 7, 7) != "objekty" || (set > 7 && name[set - 8] != PATHSEPCHAR)) return false;
+		this->indices.push_back(tar_filename.empty() ? filename : std::string(IN_TAR) + filename);
+		return true;
+	}
+};
+
+/**
+ * The indices of the objects: the game's own, baseset/decouple/objekty/<set>/objekty.json (the houses of the game and
+ * the figures it draws), each set from the first place the game reads its data from that has it -- the player's own
+ * folder before the game's, so a set there needs no build of the game; then the packages of the GRFs. In the same
+ * order on every computer: a house in two folders (the colleague's 04, the same block below the snow in mirne/ and
+ * in subarkticke/) is the first folder's.
  */
 static std::vector<std::string> FindObjectIndices()
 {
 	std::vector<std::string> indices;
+	std::set<std::string> sets;
 	for (Searchpath sp : _valid_searchpaths) {
 		std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP "objekty";
 		std::error_code ec;
 		if (!std::filesystem::is_directory(OTTD2FS(dir), ec)) continue;
+		std::vector<std::string> here;
 		for (const auto &entry : std::filesystem::directory_iterator(OTTD2FS(dir), ec)) {
+			std::string set = FS2OTTD(entry.path().filename().native());
 			std::string index = FS2OTTD(entry.path().native()) + PATHSEP "objekty.json";
-			if (std::filesystem::is_regular_file(OTTD2FS(index), ec)) indices.push_back(index);
+			if (sets.contains(set) || !std::filesystem::is_regular_file(OTTD2FS(index), ec)) continue;
+			sets.insert(set);
+			here.push_back(index);
 		}
-		if (!indices.empty()) break;
+		std::sort(here.begin(), here.end());
+		indices.insert(indices.end(), here.begin(), here.end());
 	}
-	std::sort(indices.begin(), indices.end());
+	PackageIndexScanner packages;
+	packages.Scan(".json", Subdirectory::NewGrf);
+	std::sort(packages.indices.begin(), packages.indices.end());
+	Debug(misc, 1, "3D objects: {} sets of the game's own, {} of the packages of GRFs", indices.size(), packages.indices.size());
+	for (const std::string &index : packages.indices) Debug(misc, 2, "3D objects: a package's set {}", index);
+	indices.insert(indices.end(), packages.indices.begin(), packages.indices.end());
 	return indices;
+}
+
+/** The package an index is of: the folder its set's folder is in (.../objekty/), the figures of a vehicle found there first. */
+static std::string PackageOf(const std::string &index)
+{
+	size_t last = index.find_last_of(PATHSEPCHAR);
+	size_t set = last == std::string::npos || last == 0 ? std::string::npos : index.find_last_of(PATHSEPCHAR, last - 1);
+	return set == std::string::npos ? std::string() : index.substr(0, set + 1);
 }
 
 /** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
@@ -593,12 +650,14 @@ static void ReadThreeDVehicleObjects()
 	for (const std::string &index : FindObjectIndices()) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
+		std::string package = PackageOf(index);
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
 				if (e.value("druh", std::string("dum")) == "postava" && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. */
 					ThreeDVehicleObject fig;
+					fig.package = package;
 					fig.file = folder + e.at("soubor").get<std::string>();
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					if (e.contains("animace") && e.at("animace").is_object()) {
@@ -615,6 +674,7 @@ static void ReadThreeDVehicleObjects()
 				}
 				if (e.value("druh", std::string("dum")) != "vozidlo") continue;
 				ThreeDVehicleObject obj;
+				obj.package = package;
 				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
 				obj.file = folder + e.at("soubor").get<std::string>();
 				obj.type = ParseIndexVehicleType(e.value("typ", std::string("vlak")));
@@ -752,10 +812,29 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	return &_vehicle_objects[it->second.first];
 }
 
-/** A figure of the indices by its name ("druh": "postava"), or nullptr. */
-const ThreeDVehicleObject *GetThreeDFigure(std::string_view name)
+/**
+ * Forget the vehicles and figures read from the indices, to read them again the next time one is looked for: the
+ * GRFs are loaded anew (GfxInitSpriteMem()), and the packages beside them may have come or gone since -- read the
+ * first time early, before the game had looked through the tars of the NewGRF folders, they had none.
+ */
+void ResetThreeDVehicleObjects()
+{
+	_vehicle_objects.clear();
+	_figure_objects.clear();
+	_vehicle_object_pieces.clear();
+	_vehicle_objects_read = false;
+}
+
+/** A figure of the indices by its name ("druh": "postava"), or nullptr; one of the package given first (a vehicle's crew). */
+const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	/* A vehicle's crew from its own package first (the package of a GRF carries its driver). */
+	if (!package.empty()) {
+		for (const ThreeDVehicleObject &f : _figure_objects) {
+			if (f.name == name && f.package == package) return &f;
+		}
+	}
 	for (const ThreeDVehicleObject &f : _figure_objects) {
 		if (f.name == name) return &f;
 	}
@@ -861,7 +940,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	}
 	/* The crew: each figure's shape turned about z and stood at its place, its textures after the others. */
 	for (const ThreeDVehicleCrew &c : this->crew) {
-		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure);
+		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
 		const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
 		if (fs == nullptr) {
 			Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
