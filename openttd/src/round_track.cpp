@@ -607,8 +607,8 @@ const Reference &ReferenceOf(TileIndex tile, ZoomLevel zoom)
 	Reference &ref = _references[key];
 	int mask = ScaleByZoom(-1, zoom);
 	ref.scale = ScaleByZoom(1, zoom);
-	ref.left = (-40 * ZOOM_BASE) & mask;
-	ref.top = (-24 * ZOOM_BASE) & mask;
+	ref.left = (-40 * static_cast<int>(ZOOM_BASE)) & mask;
+	ref.top = (-24 * static_cast<int>(ZOOM_BASE)) & mask;
 	int width = ((40 * ZOOM_BASE - ref.left) + ~mask) & mask;
 	int height = ((48 * ZOOM_BASE - ref.top) + ~mask) & mask;
 	ref.w = UnScaleByZoom(width, zoom);

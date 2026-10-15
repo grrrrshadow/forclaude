@@ -1112,7 +1112,7 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint) c
 				break;
 			}
 		}
-		const Colour colour(part.palette[GB(paint, 4 * k, 4) % part.palette.size()]);
+		const Colour colour(part.palette[GB(paint, static_cast<uint8_t>(4 * k), 4) % part.palette.size()]);
 		const float start = static_cast<float>(part.start);
 		for (int y = 0; y < t.h; y++) {
 			const int my = std::min(mask->h - 1, y * mask->h / t.h);

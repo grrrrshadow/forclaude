@@ -140,7 +140,7 @@ static std::vector<int> PieceLengths(const ThreeDVehicleObject *obj)
 	const ThreeDVehicleShape *shape = SqueezedType(obj->type) ? obj->GetShape() : nullptr;
 	if (shape == nullptr || lengths.empty() || shape->x1 - shape->x0 < 0.1f) return lengths;
 	const int n = static_cast<int>(lengths.size()), most = static_cast<int>(VEHICLE_LENGTH);
-	int total = static_cast<int>(std::lround((shape->x1 - shape->x0) * ObjectScale(obj) * UNITS_PER_METRE / M_SQRT2));
+	int total = static_cast<int>(std::lround((shape->x1 - shape->x0) * ObjectScale(obj) * UNITS_PER_METRE / std::sqrt(2.0)));
 	total = std::clamp(total, n, n * most);
 	int set_total = 0;
 	for (int l : lengths) set_total += l;
