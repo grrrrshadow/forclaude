@@ -62,6 +62,8 @@ constexpr int DOOR_SEARCH = 20;
  * fifteen seconds, true to the vehicles but slow to watch; faster, the legs swing faster, the feet still do not slide.
  */
 constexpr double WALK_PACE = 2.0;
+/** How far about a door (tiles, each way) the road to it may be when it does not look out onto one: over a fence. */
+constexpr int THROUGH_REACH = 3;
 /** How many road tiles the way to a door is looked for over. */
 constexpr size_t ROUTE_SEARCH = 3000;
 
@@ -198,13 +200,31 @@ void TownDoors(const Town *town, std::vector<Door> &doors)
 				if (sy > 0) door.edge.y = oy + h;
 				if (sy < 0) door.edge.y = oy;
 				const int rx = static_cast<int>(std::floor((door.edge.x + sx * 0.5) / TILE_SIZE)), ry = static_cast<int>(std::floor((door.edge.y + sy * 0.5) / TILE_SIZE));
-				if (rx < 0 || ry < 0 || rx > static_cast<int>(Map::MaxX()) || ry > static_cast<int>(Map::MaxY())) continue;
-				door.road = TileXY(rx, ry);
-				if (!IsWalkway(door.road, town)) {
-					Debug(misc, 3, "3D walker: the door of the house at {},{} looks out onto {},{}, no road of the town to walk on", x, y, rx, ry);
+				/* The road of the town before the door; else the nearest one about it: Mat is a repairman, he goes
+				 * to a door over a fence or whatever is in the way (the player). */
+				door.road = INVALID_TILE;
+				double best = 1e18;
+				for (int ny = ry - THROUGH_REACH; ny <= ry + THROUGH_REACH; ny++) {
+					for (int nx = rx - THROUGH_REACH; nx <= rx + THROUGH_REACH; nx++) {
+						if (nx < 0 || ny < 0 || nx > static_cast<int>(Map::MaxX()) || ny > static_cast<int>(Map::MaxY())) continue;
+						TileIndex n = TileXY(nx, ny);
+						if (!IsWalkway(n, town)) continue;
+						Point2 c = Middle(n);
+						double dist = std::hypot(c.x - door.edge.x, c.y - door.edge.y) + (n == TileXY(std::max(rx, 0), std::max(ry, 0)) ? -TILE_SIZE : 0);
+						if (dist < best) {
+							best = dist;
+							door.road = n;
+						}
+					}
+				}
+				if (door.road == INVALID_TILE) {
+					Debug(misc, 3, "3D walker: no road of the town about the door of the house at {},{}", x, y);
 					continue;
 				}
-				door.pavement = {door.edge.x + sx * (TILE_SIZE / 2.0 - PAVEMENT), door.edge.y + sy * (TILE_SIZE / 2.0 - PAVEMENT)};
+				/* On the pavement of that road tile, on the side of the door: the nearest point of the square the
+				 * pavement goes round. */
+				const Point2 c = Middle(door.road);
+				door.pavement = {c.x + std::clamp(door.edge.x - c.x, -PAVEMENT, PAVEMENT), c.y + std::clamp(door.edge.y - c.y, -PAVEMENT, PAVEMENT)};
 				doors.push_back(door);
 			}
 		}

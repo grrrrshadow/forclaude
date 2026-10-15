@@ -490,7 +490,10 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   colleague's `mat.glb`, eight frames, `"chuze": {"krok_m": 1.1}`. Each town
   within 40 tiles of the middle of the turned main view gets its Mat: out of a
   door (`"dvere"` of a house's index entry: `poloha`, `smer` out, `sirka`) of a
-  house drawn as a 3D object whose way out leads onto a road of the town, to
+  house drawn as a 3D object -- out to the edge of its plot, then onto the road
+  of the town before it, or, where there is none, the nearest one within three
+  tiles, straight over whatever is between (the player: "Mat is a repairman,
+  he may go to the doors through a fence or whatever is in the way") -- to
   the door of another house, by the town's roads -- a plain road tile of the
   town's zone (not its edge) with a pavement, paved by the game or of a road
   type towns build (CZTR's town roads; the player: "that is another road, the
