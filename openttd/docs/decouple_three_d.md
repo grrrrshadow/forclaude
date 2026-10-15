@@ -493,6 +493,14 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   (`NewGRFWindow::ToggleObjectSize()`, `WID_NS_ACTIVE_FRAME`); it shows the first
   such set, or the setting. In a game it changes only with the parameters (the
   NewGRF developer tools) and is applied as they are.
+- **Road vehicles of a package too** (15. 10., the colleague's Tatras 613, 613 VB and 603, GRF `MAXt`,
+  `Tatra_osobni_3D-v3.tar`): a record `"druh": "auto"` with `grf` is a vehicle as `"vozidlo"` is, `typ` `silnice`
+  (a road vehicle) by default; an `auto` without `grf` is a car of the game's own driving about by itself (later).
+  Nothing of them is in the game: the GRF and its objects come in its package.
+- **A colour of a palette for each vehicle** (`"barvy": [{"cast": "lak", "maska": ..., "zacatek": 200, "paleta":
+  [...], "nahoda": "vozidlo"}]`): a vehicle's colour is drawn from its number and the year it was built
+  (`FadeStep()`, the third byte), the same all its life; the paint's mask at the texture's lightness, `zacatek`
+  the colour's own, faded after as the paint. The purchase list shows the first colour.
 - **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the
   body's texture's layout (the texture of the file, or `textura`), 255 where it
   is paint; `cil` RRGGBB the colour it fades to in `let` years, a step every

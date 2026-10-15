@@ -126,6 +126,7 @@
 #include "querystring_gui.h"
 #include "cheat_func.h"
 #include "settings_gui.h"
+#include "openttd.h"
 #include "newgrf_config.h"
 #include "three_d_objects.h"
 #include "widgets/newgrf_widget.h"
@@ -8656,12 +8657,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d: autobusmesto: no place for a depot in {}.", GetString(STR_TOWN_NAME, town->index));
 			return true;
 		}
+		/* 'autobusmesto <n> [jmeno] [pocet]': so many of the engine whose name has the text in it (3D cars of a GRF package). */
+		std::string wanted = argv.size() > 3 ? std::string(argv[3]) : std::string();
+		int count = std::clamp(number(4).value_or(1), 1, 16);
 		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
 			if (!e->company_avail.Test(_local_company) || RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) continue;
-			auto [cost, veh, ua, ub, uc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
-			if (cost.Failed() || veh == VehicleID::Invalid()) continue;
-			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
-			IConsolePrint(CC_DEFAULT, "test3d: autobus {} vyjizdi v meste {} z depa na {},{}", Vehicle::Get(veh)->unitnumber, GetString(STR_TOWN_NAME, town->index), TileX(depot), TileY(depot));
+			if (!wanted.empty() && GetString(STR_ENGINE_NAME, e->index).find(wanted) == std::string::npos) continue;
+			for (int k = 0; k < count; k++) {
+				auto [cost, veh, ua, ub, uc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+				if (cost.Failed() || veh == VehicleID::Invalid()) continue;
+				Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+				IConsolePrint(CC_DEFAULT, "test3d: autobus {} vyjizdi v meste {} z depa na {},{}", Vehicle::Get(veh)->unitnumber, GetString(STR_TOWN_NAME, town->index), TileX(depot), TileY(depot));
+			}
 			break;
 		}
 		return true;
@@ -8883,6 +8890,69 @@ static bool ConTest3D(std::span<std::string_view> argv)
 						GetThreeDHouseTitle(t).value_or("-"), o != nullptr ? o->figures.size() : 0);
 			}
 		}
+	} else if (what == "auta" && argv.size() > 2) {
+		/* 'auta <jmeno> [pocet] [x y]': a straight road along x with a shed at each end and so many road vehicles of the
+		 * first engine whose name has the text in it, driving between them (3D cars of a GRF package). */
+		std::string wanted(argv[2]);
+		int count = std::clamp(number(3).value_or(4), 1, 16);
+		uint x0 = static_cast<uint>(number(4).value_or(static_cast<int>(Map::SizeX() / 2) - 8)), y0 = static_cast<uint>(number(5).value_or(static_cast<int>(Map::SizeY() / 2)));
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			DoStartupNewCompany(false, CompanyID::Invalid());
+		}
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "test3d: auta: no company");
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+		Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
+		/* Flat: levelled to the height of the first tile, a strip at a time (a command levels so much). */
+		for (uint x = x0; x <= x0 + 16; x += 4) {
+			CommandCost level = std::get<0>(Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(std::min(x + 3, x0 + 16), y0 + 1), TileXY(x0, y0 - 1), false, LevelMode::Level));
+			if (level.Failed() && x == x0) IConsolePrint(CC_DEFAULT, "test3d: auta: rovnani {}", RefusalReason(level));
+		}
+		CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 1, y0), TileXY(x0 + 15, y0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+		TileIndex depot_a = TileXY(x0, y0), depot_b = TileXY(x0 + 16, y0);
+		CommandCost da = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot_a, ROADTYPE_ROAD, DiagDirection::SW);
+		CommandCost db = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot_b, ROADTYPE_ROAD, DiagDirection::NE);
+		if (road.Failed() || da.Failed() || db.Failed()) {
+			IConsolePrint(CC_ERROR, "test3d: auta: silnice {} depa {} {}", RefusalReason(road), RefusalReason(da), RefusalReason(db));
+			return true;
+		}
+		const Engine *engine = nullptr;
+		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+			if (GetString(STR_ENGINE_NAME, e->index).find(wanted) != std::string::npos) {
+				engine = e;
+				break;
+			}
+		}
+		if (engine == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: auta: zadne auto '{}'", wanted);
+			return true;
+		}
+		int bought = 0;
+		for (int k = 0; k < count; k++) {
+			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, k % 2 == 0 ? depot_a : depot_b, engine->index, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Failed()) continue;
+			Order there{};
+			there.MakeGoToDepot(DestinationID(Depot::GetByTile(k % 2 == 0 ? depot_b : depot_a)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, there);
+			Order back{};
+			back.MakeGoToDepot(DestinationID(Depot::GetByTile(k % 2 == 0 ? depot_a : depot_b)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, back);
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+			bought++;
+		}
+		ScrollMainWindowToTile(TileXY(x0 + 8, y0), true);
+		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, x0 + 16, y0);
+	} else if (what == "tiky") {
+		/* 'tiky <n>': run the game n ticks now (the rig's scripts run their commands at once). */
+		int n = std::clamp(number(2).value_or(10), 1, 100000);
+		/* The world's generation is still the modal progress when the game's start script runs: the game would not tick. */
+		if (HasModalProgress()) SetModalProgress(false);
+		for (int i = 0; i < n; i++) StateGameLoop();
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: {} tiku", n);
 	} else if (what == "zadni") {
 		/* 'zadni <0|1>': a 3D object's triangles turned away from the view left out (1, as the game draws), or all drawn. */
 		extern bool _turned_cull;

@@ -131,6 +131,7 @@ struct ThreeDVehiclePaint {
 	bool coloured = false;      ///< "barva" given: the paint is that colour, at the lightness of the texture
 	uint32_t colour = 0;        ///< "barva" (Colour::data)
 	int start = 0;              ///< "zacatek": the texture's lightness the colour is at its own (0: the brightest of the mask)
+	std::vector<uint32_t> palette; ///< "barvy": "paleta", the colours (Colour::data) a vehicle draws its paint from, one for its life ("nahoda": "vozidlo")
 };
 
 /**

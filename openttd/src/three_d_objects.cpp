@@ -718,7 +718,7 @@ static std::optional<uint32_t> ParseIndexNumber(const nlohmann::json &value)
 static VehicleType ParseIndexVehicleType(const std::string &text)
 {
 	if (text == "vlak" || text == "train") return VehicleType::Train;
-	if (text == "auto" || text == "silnicni" || text == "road") return VehicleType::Road;
+	if (text == "auto" || text == "silnice" || text == "silnicni" || text == "road") return VehicleType::Road;
 	if (text == "lod" || text == "ship") return VehicleType::Ship;
 	if (text == "letadlo" || text == "aircraft") return VehicleType::Aircraft;
 	return VehicleType::Invalid;
@@ -779,12 +779,15 @@ static void ReadThreeDVehicleObjects()
 					_figure_objects.push_back(std::move(fig));
 					continue;
 				}
-				if (e.value("druh", std::string("dum")) != "vozidlo") continue;
+				/* A vehicle of a set: "vozidlo", or "auto" (the colleague's Tatras, hra/3d/PROSBA-TATRA-613-CIVILNI.md) with
+				 * the set's id; an "auto" without one is a car of the game's own that drives about by itself (later). */
+				const std::string kind = e.value("druh", std::string("dum"));
+				if (kind != "vozidlo" && !(kind == "auto" && e.contains("grf"))) continue;
 				ThreeDVehicleObject obj;
 				obj.package = package;
 				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
 				obj.file = folder + e.at("soubor").get<std::string>();
-				obj.type = ParseIndexVehicleType(e.value("typ", std::string("vlak")));
+				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : "vlak")));
 				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
 				if (obj.type == VehicleType::Invalid || !grfid.has_value()) {
 					Debug(misc, 0, "3D vehicle {}: no type or set", obj.name);
@@ -860,6 +863,23 @@ static void ReadThreeDVehicleObjects()
 							obj.paint.colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
 						}
 					}
+				}
+				/* A colour of a palette for each vehicle ("barvy", the colleague's Tatras, PROSBA-TATRA-613-CIVILNI.md): the
+				 * paint's mask at the texture's lightness, "zacatek" its own colour, faded after as the paint. */
+				if (e.contains("barvy") && e.at("barvy").is_array()) {
+					for (const auto &b : e.at("barvy")) {
+						if (!b.is_object() || !b.contains("paleta") || !b.at("paleta").is_array()) continue;
+						if (obj.paint.mask_file.empty() && b.contains("maska") && b.at("maska").is_string()) obj.paint.mask_file = folder + b.at("maska").get<std::string>();
+						obj.paint.start = std::clamp(b.value("zacatek", obj.paint.start), 0, 255);
+						for (const auto &c : b.at("paleta")) {
+							std::string t = c.is_string() ? c.get<std::string>() : std::string();
+							if (t.starts_with("#")) t = t.substr(1);
+							auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+							if (n.has_value()) obj.paint.palette.push_back(Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data);
+						}
+						break;
+					}
+					if (obj.paint.mask_file.empty() || obj.paint.palette.size() > 254) obj.paint.palette.clear();
 				}
 				/* The rust: a second mask over the body's texture, rusting with age after the paint has faded. */
 				if (e.contains("rez") && e.at("rez").is_object()) {
@@ -1219,6 +1239,7 @@ std::string DescribeThreeDVehicleObjects()
 		}
 		out += fmt::format("\n  {} grf {:08X} type {} pieces{} (engines{}) anchor {}{}{}{}", o.name, std::byteswap(o.grfid), to_underlying(o.type), pieces, engines, o.anchor, o.paint_file.empty() ? "" : " paint",
 				o.size.param < 0 ? "" : fmt::format(" size param {}", o.size.param), lengths.empty() ? "" : fmt::format(" lengths{}", lengths));
+		if (!o.paint.mask_file.empty()) out += fmt::format(" paint mask {} fades {} palette {} start {}", o.paint.mask_file.substr(o.paint.mask_file.rfind('/') + 1), o.paint.fades, o.paint.palette.size(), o.paint.start);
 	}
 	return out;
 }

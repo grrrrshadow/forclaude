@@ -126,7 +126,27 @@ static int FadeStep(const ThreeDVehicleObject *obj, const Vehicle *v)
 	int years = std::max(0, static_cast<int>(v->age.base() / CalendarTime::DAYS_IN_YEAR));
 	int paint = obj->paint.fades ? std::min(years / obj->paint.step, obj->paint.years / obj->paint.step) : 0;
 	int rust = !obj->rust.mask_file.empty() ? std::min(years / obj->rust.step, obj->rust.years / obj->rust.step) : 0;
-	return std::min(paint, 255) | std::min(rust, 255) << 8;
+	/* Its colour of the palette, the same all its life: from its number and the year it was built, as its rust. */
+	int colour = 0;
+	if (!obj->paint.palette.empty()) {
+		uint32_t h = v->index.base() * 0x9E3779B1u + static_cast<uint32_t>(v->build_year.base()) * 0x85EBCA6Bu;
+		h ^= h >> 16;
+		h *= 0x7FEB352Du;
+		h ^= h >> 15;
+		h *= 0x846CA68Bu;
+		h ^= h >> 16;
+		colour = 1 + static_cast<int>(h % obj->paint.palette.size());
+	}
+	return std::min(paint, 255) | std::min(rust, 255) << 8 | colour << 16;
+}
+
+/** The colour of its palette a vehicle's paint is at a step (FadeStep()): 0 none, the paint's own. */
+static uint32_t PaletteColour(const ThreeDVehicleObject *obj, int step)
+{
+	int colour = (step >> 16) & 0xFF;
+	if (obj->paint.palette.empty()) return 0;
+	/* The purchase list and the previews, no vehicle: the first colour. */
+	return obj->paint.palette[colour > 0 ? std::min<size_t>(colour - 1, obj->paint.palette.size() - 1) : 0];
 }
 
 /** The fading of the paint at a step: 0 new, 1 the target's colour. */
@@ -140,7 +160,7 @@ static float FadeAmount(const ThreeDVehicleObject *obj, int step)
 static float RustTime(const ThreeDVehicleObject *obj, int step)
 {
 	if (obj->rust.mask_file.empty()) return 0.0f;
-	return std::min(1.0f, static_cast<float>((step >> 8) * obj->rust.step) / obj->rust.years);
+	return std::min(1.0f, static_cast<float>(((step >> 8) & 0xFF) * obj->rust.step) / obj->rust.years);
 }
 
 /** The lengths of the object's pieces as its set says, eighths of a tile; a piece the game has not got counts as a whole vehicle. */
@@ -305,8 +325,9 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
  * @param fade how far its paint has faded to the target (FadeAmount())
  * @param rust_time how far into its rusting it is (RustTime())
  * @param tint the colour of the material an effect is coloured in ("barvy"), 0 none
+ * @param paint_colour the vehicle's colour of its palette ("barvy", PaletteColour()), 0 the paint's own
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
@@ -354,8 +375,9 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	for (size_t i = 0; i < texs.size(); i++) texs[i] = obj.GetTexture(level, static_cast<int>(i));
 	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6). */
 	const ThreeDVehiclePaint &paint = obj.paint;
-	const ThreeDObjectTexture *mask = (paint.fades || paint.coloured) ? obj.GetPaintMask(level) : nullptr;
-	const Colour target(paint.target), colour(paint.colour);
+	const bool coloured = paint.coloured || paint_colour != 0;
+	const ThreeDObjectTexture *mask = (paint.fades || coloured) ? obj.GetPaintMask(level) : nullptr;
+	const Colour target(paint.target), colour(paint_colour != 0 ? paint_colour : paint.colour);
 	const float start = paint.start > 0 ? static_cast<float>(paint.start) : 255.0f;
 	/* The rust, after the paint has faded (the colleague: the paint fades, the rust grows over it). */
 	const ThreeDObjectTexture *rust_mask = rust_time > 0 ? obj.GetRustMask(level) : nullptr;
@@ -406,7 +428,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 					int mx = std::min(tri_mask->w - 1, static_cast<int>(u * tri_mask->w)), my = std::min(tri_mask->h - 1, static_cast<int>(v * tri_mask->h));
 					float m = Colour(tri_mask->px[static_cast<size_t>(my) * tri_mask->w + mx]).r / 255.0f;
 					if (m > 0) {
-						if (paint.coloured) {
+						if (coloured) {
 							/* The colour at the texture's lightness: its own where the texture is "zacatek" light. */
 							float l = std::max({cr, cg, cb}) / start;
 							cr += (std::min(255.0f, colour.r * l) - cr) * m;
@@ -487,7 +509,7 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 	if (req != nullptr && req->obj != nullptr) {
 		float along = (SqueezedType(req->obj->type) && (req->dir & 1)) ? SQUEEZE : 1.0f;
 		float az = ViewAzimuth(req->dir);
-		drawn = RasterObject(*req->obj, req->scale, az, az, along, PXM_16X, FadeAmount(req->obj, req->fade), r, 0, RustTime(req->obj, req->fade)) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
+		drawn = RasterObject(*req->obj, req->scale, az, az, along, PXM_16X, FadeAmount(req->obj, req->fade), r, 0, RustTime(req->obj, req->fade), 0, PaletteColour(req->obj, req->fade)) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
 	}
 	if (!drawn) {
 		/* The empty picture, or an object that cannot be drawn: a transparent pixel. */
@@ -558,7 +580,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint)) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade))) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
