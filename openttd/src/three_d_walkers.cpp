@@ -117,15 +117,15 @@ double RoundLength(const ThreeDVehicleObject *fig)
 }
 
 /**
- * A road of the town to walk on: a plain road tile (not a crossing, a stop or a depot) of the town's zone (the
- * outskirts in, the edge of a town is the country), with a pavement -- one the game paves, or of a road type of the
+ * A road of the town to walk on: a plain road tile (not a crossing, a stop or a depot) within the town (its
+ * outermost zone; past it is the country), with a pavement -- one the game paves, or of a road type of the
  * towns (the player: "that is another road, the town's": CZTR's town roads draw their own pavements).
  */
 bool IsWalkway(TileIndex t, const Town *town)
 {
 	if (!IsValidTile(t) || !IsNormalRoadTile(t) || !HasTileRoadType(t, RoadTramType::Road)) return false;
 	if (GetRoadBits(t, RoadTramType::Road).None()) return false;
-	if (GetTownRadiusGroup(town, t) == HouseZone::TownEdge) return false;
+	if (DistanceSquare(t, town->xy) >= town->cache.squared_town_zone_radius[to_underlying(HouseZone::TownEdge)]) return false;
 	switch (GetRoadside(t)) {
 		case Roadside::Paved:
 		case Roadside::StreetLights:

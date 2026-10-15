@@ -15,7 +15,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11ee; roky 0–; 2 díly, shoda obrysu 0.969; 24 trojúhelníků, textura 1024×512"
+  "poznamka": "Domy, sprite 0x11ee; roky 0–; 2 díly, shoda obrysu 0.969; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.19,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_4f_domy.glb",
@@ -33,7 +48,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11f1; roky 0–; 2 díly, shoda obrysu 0.979; 24 trojúhelníků, textura 1024×512"
+  "poznamka": "Domy, sprite 0x11f1; roky 0–; 2 díly, shoda obrysu 0.979; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.19,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_50_domy.glb",
@@ -51,7 +81,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11f4; roky 0–; 2 díly, shoda obrysu 0.929; 24 trojúhelníků, textura 512×512"
+  "poznamka": "Domy, sprite 0x11f4; roky 0–; 2 díly, shoda obrysu 0.929; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.19,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_51_domy_0.glb",
@@ -66,7 +111,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11f5, barevné sloty 0; roky 0–; 2 díly, shoda obrysu 0.985; 24 trojúhelníků, textura 512×512"
+  "poznamka": "Domy, sprite 0x11f5, barevné sloty 0; roky 0–; 2 díly, shoda obrysu 0.985; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.4,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_51_domy_1.glb",
@@ -81,7 +141,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11f6, barevné sloty 1; roky 0–; 2 díly, shoda obrysu 0.942; 24 trojúhelníků, textura 512×512"
+  "poznamka": "Domy, sprite 0x11f6, barevné sloty 1; roky 0–; 2 díly, shoda obrysu 0.942; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.28,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_51_domy_2.glb",
@@ -96,7 +171,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11f7, barevné sloty 2; roky 0–; 2 díly, shoda obrysu 0.986; 24 trojúhelníků, textura 512×512"
+  "poznamka": "Domy, sprite 0x11f7, barevné sloty 2; roky 0–; 2 díly, shoda obrysu 0.986; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.63,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_51_domy_3.glb",
@@ -111,7 +201,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11f8, barevné sloty 3; roky 0–; 2 díly, shoda obrysu 0.987; 24 trojúhelníků, textura 512×512"
+  "poznamka": "Domy, sprite 0x11f8, barevné sloty 3; roky 0–; 2 díly, shoda obrysu 0.987; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.4,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_52_byty.glb",
@@ -129,7 +234,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Byty, sprite 0x11fb; roky 0–; 1 díly, shoda obrysu 0.939; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Byty, sprite 0x11fb; roky 0–; 1 díly, shoda obrysu 0.939; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.86,
+     13.18,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_53_kostel.glb",
@@ -147,7 +267,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kostel, sprite 0x11fc; roky 0–; 1 díly, shoda obrysu 0.918; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Kostel, sprite 0x11fc; roky 0–; 1 díly, shoda obrysu 0.918; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.52,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_54_domy.glb",
@@ -165,7 +300,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, sprite 0x11ff; roky 0–; 2 díly, shoda obrysu 0.967; 24 trojúhelníků, textura 1024×512"
+  "poznamka": "Domy, sprite 0x11ff; roky 0–; 2 díly, shoda obrysu 0.967; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.96,
+     14.15,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_55_byty.glb",
@@ -183,7 +333,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Byty, sprite 0x1202; přebarvení pink, red, yellow má texturu slotu 0; roky 1973–; 1 díly, shoda obrysu 0.966; 14 trojúhelníků, textura 1024×512"
+  "poznamka": "Byty, sprite 0x1202; přebarvení pink, red, yellow má texturu slotu 0; roky 1973–; 1 díly, shoda obrysu 0.966; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     8.44,
+     14.69,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_56_byty.glb",
@@ -201,7 +366,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Byty, sprite 0x1205; přebarvení pink, red, yellow má texturu slotu 0; roky 1962–; 1 díly, shoda obrysu 0.949; 14 trojúhelníků, textura 1024×512"
+  "poznamka": "Byty, sprite 0x1205; přebarvení pink, red, yellow má texturu slotu 0; roky 1962–; 1 díly, shoda obrysu 0.949; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.69,
+     14.69,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_57_vysoky.glb",
@@ -219,7 +399,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, sprity 0x120a 0x120b; roky 1984–; 4 díly, shoda obrysu 0.955; 40 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok, sprity 0x120a 0x120b; roky 1984–; 4 díly, shoda obrysu 0.955; 40 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     17.0,
+     14.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_59_byty.glb",
@@ -237,7 +432,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Byty, sprite 0x120e; roky 0–; 1 díly, shoda obrysu 0.987; 14 trojúhelníků, textura 1024×512"
+  "poznamka": "Byty, sprite 0x120e; roky 0–; 1 díly, shoda obrysu 0.987; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.86,
+     14.69,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_5a_vysoky.glb",
@@ -255,6 +465,21 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, sprite 0x1211; roky 1993–; 2 díly, shoda obrysu 0.905; 20 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok, sprite 0x1211; roky 1993–; 2 díly, shoda obrysu 0.905; 20 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     4.51,
+     14.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  }
 ]

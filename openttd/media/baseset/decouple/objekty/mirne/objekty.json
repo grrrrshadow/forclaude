@@ -12,7 +12,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, varianta 0 (sprite 0x58f, 22,5 m); varianty 1–3 (0x591) mají jiný tvar, zůstávají; 14 trojúhelníků, textura 1024×512"
+  "poznamka": "Vysoký kancelářský blok, varianta 0 (sprite 0x58f, 22,5 m); varianty 1–3 (0x591) mají jiný tvar, zůstávají; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.99,
+     14.46,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_00_vysoky_1.glb",
@@ -29,7 +44,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, varianty 1–3 (sprite 0x591; 2 a 3 jsou přebarvení, textura podle slotu 1): blok a boční křídlo; 28 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok, varianty 1–3 (sprite 0x591; 2 a 3 jsou přebarvení, textura podle slotu 1): blok a boční křídlo; 28 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.12,
+     14.75,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_01_kancelare.glb",
@@ -47,7 +77,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kancelářský blok: věž s plochou střechou a předek se sedlovou; varianty 1–3 jsou přebarvení, textura podle slotu 0; 24 trojúhelníků, textura 1024×1024"
+  "poznamka": "Kancelářský blok: věž s plochou střechou a předek se sedlovou; varianty 1–3 jsou přebarvení, textura podle slotu 0; 24 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.05,
+     14.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_02_bytovky.glb",
@@ -65,7 +110,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Malé bytovky (sprite 0x598); 14 trojúhelníků, textura 512×256"
+  "poznamka": "Malé bytovky (sprite 0x598); 14 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.36,
+     9.82,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_03_kostel.glb",
@@ -83,7 +143,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kostel: věž s valbovou střechou, loď a dvě křídla; varianty 1–3 jsou přebarvení, textura podle slotu 0; 56 trojúhelníků, textura 512×512"
+  "poznamka": "Kostel: věž s valbovou střechou, loď a dvě křídla; varianty 1–3 jsou přebarvení, textura podle slotu 0; 56 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.94,
+     14.11,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_04_velky.glb",
@@ -101,7 +176,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Velký kancelářský blok (sprite 0x5a2, 20 m), jeden kvádr; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Velký kancelářský blok (sprite 0x5a2, 20 m), jeden kvádr; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.65,
+     13.29,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_06_mestske_0.glb",
@@ -117,7 +207,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Městské domy (Town houses), sprite 0x5a6; varianty 2 a 3 (0x5e2) jsou jiný tvar, zůstávají; 14 trojúhelníků, textura 256×256"
+  "poznamka": "Městské domy (Town houses), sprite 0x5a6; varianty 2 a 3 (0x5e2) jsou jiný tvar, zůstávají; 14 trojúhelníků, textura 256×256",
+  "dvere": [
+   {
+    "poloha": [
+     8.21,
+     11.33,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_06_mestske_2.glb",
@@ -133,7 +238,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Městské domy, varianty 2 a 3 (sprite 0x5e2): přízemní dům do L, dvě křídla se sedlovou střechou; 28 trojúhelníků, textura 512×256"
+  "poznamka": "Městské domy, varianty 2 a 3 (sprite 0x5e2): přízemní dům do L, dvě křídla se sedlovou střechou; 28 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     5.8,
+     12.16,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_0d_kancelare.glb",
@@ -151,7 +271,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kancelářský blok (sprite 0x5b4), plochá střecha; varianty 1–3 jsou přebarvení, textura podle slotu 0; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Kancelářský blok (sprite 0x5b4), plochá střecha; varianty 1–3 jsou přebarvení, textura podle slotu 0; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.59,
+     12.83,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_0e_obchody.glb",
@@ -169,7 +304,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře (sprite 0x5b7 od rohu obálky 1,3), jeden kvádr; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Obchody a kanceláře (sprite 0x5b7 od rohu obálky 1,3), jeden kvádr; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.99,
+     14.46,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_0f_obchody_kridlo.glb",
@@ -187,7 +337,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře (sprite 0x5ba od rohu obálky 3,1): blok s plochou střechou a křídlo se sedlovou; 24 trojúhelníků, textura 1024×512"
+  "poznamka": "Obchody a kanceláře (sprite 0x5ba od rohu obálky 3,1): blok s plochou střechou a křídlo se sedlovou; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     10.64,
+     14.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_10_obchody_vez.glb",
@@ -205,7 +370,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře s věží (sprite 0x5bd od rohu obálky 2,0): věž, křídlo a přízemí; varianty 2 a 3 jsou přebarvení, textura podle slotu 0; od 14. 10. opravený posun (13. 10. byla věž o 2 jednotky užší); 34 trojúhelníků, textura 1024×1024"
+  "poznamka": "Obchody a kanceláře s věží (sprite 0x5bd od rohu obálky 2,0): věž, křídlo a přízemí; varianty 2 a 3 jsou přebarvení, textura podle slotu 0; od 14. 10. opravený posun (13. 10. byla věž o 2 jednotky užší); 34 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.05,
+     14.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_12_skladiste.glb",
@@ -223,7 +403,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Skladiště (sprite 0x5c3 od rohu obálky 1,2); 14 trojúhelníků, textura 512×512"
+  "poznamka": "Skladiště (sprite 0x5c3 od rohu obálky 1,2); 14 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.13,
+     12.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_14_stadion_stary.glb",
@@ -241,7 +436,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Stadion (starý, 2×2, HouseID 0x14–0x17): dvě tribuny a dvě zdi; hřiště je zem, branky ne; 48 trojúhelníků, textura 1024×512"
+  "poznamka": "Stadion (starý, 2×2, HouseID 0x14–0x17): dvě tribuny a dvě zdi; hřiště je zem, branky ne; 48 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     13.64,
+     29.14,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_18_stare_0.glb",
@@ -256,7 +466,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Staré domy (Old houses), varianta 0 (sprite 0x5d4): valbová střecha a přístavek; varianty 1–3 zůstávají; 28 trojúhelníků, textura 512×256"
+  "poznamka": "Staré domy (Old houses), varianta 0 (sprite 0x5d4): valbová střecha a přístavek; varianty 1–3 zůstávají; 28 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     7.75,
+     11.33,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_18_stare_1.glb",
@@ -271,7 +496,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Staré domy, varianta 1 (sprite 0x5d6): kamenný dům se sedlovou střechou; 14 trojúhelníků, textura 512×256"
+  "poznamka": "Staré domy, varianta 1 (sprite 0x5d6): kamenný dům se sedlovou střechou; 14 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.45,
+     8.46,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_18_stare_2.glb",
@@ -286,7 +526,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Staré domy, varianta 2 (sprite 0x5d0): cihlový dům se sedlovou střechou; 14 trojúhelníků, textura 256×256"
+  "poznamka": "Staré domy, varianta 2 (sprite 0x5d0): cihlový dům se sedlovou střechou; 14 trojúhelníků, textura 256×256",
+  "dvere": [
+   {
+    "poloha": [
+     9.0,
+     10.31,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_18_stare_3.glb",
@@ -301,7 +556,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Staré domy, varianta 3 (sprite 0x5d2): kamenný dům se sedlovou střechou; 14 trojúhelníků, textura 256×256"
+  "poznamka": "Staré domy, varianta 3 (sprite 0x5d2): kamenný dům se sedlovou střechou; 14 trojúhelníků, textura 256×256",
+  "dvere": [
+   {
+    "poloha": [
+     7.03,
+     11.7,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_19_chatky.glb",
@@ -319,7 +589,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Chatky (sprite 0x5d8); 14 trojúhelníků, textura 256×256"
+  "poznamka": "Chatky (sprite 0x5d8); 14 trojúhelníků, textura 256×256",
+  "dvere": [
+   {
+    "poloha": [
+     5.9,
+     7.75,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1a_domy_0.glb",
@@ -334,7 +619,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (Houses), varianta 0 (sprite 0x5dc): dům se sedlovou střechou, přístavek s plochou střechou, komín; varianty 1–3 jsou jiné domky, zůstávají; 34 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (Houses), varianta 0 (sprite 0x5dc): dům se sedlovou střechou, přístavek s plochou střechou, komín; varianty 1–3 jsou jiné domky, zůstávají; 34 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.54,
+     9.25,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1a_domy_1.glb",
@@ -349,7 +649,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (Houses), varianta 1 (sprite 0x627): dům s valbovou střechou a nízký přístavek vlevo vpředu; 24 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (Houses), varianta 1 (sprite 0x627): dům s valbovou střechou a nízký přístavek vlevo vpředu; 24 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     4.19,
+     8.74,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1a_domy_2.glb",
@@ -364,7 +679,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, varianta 2 (sprite 0x5e8): dům se sedlovou střechou a nízký přístavek vpravo; 24 trojúhelníků, textura 512×256"
+  "poznamka": "Domy, varianta 2 (sprite 0x5e8): dům se sedlovou střechou a nízký přístavek vpravo; 24 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     4.88,
+     9.85,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1a_domy_3.glb",
@@ -379,7 +709,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy, varianta 3 (sprite 0x5ee): dům se sedlovou střechou a nízký přístavek vpravo vpředu; 24 trojúhelníků, textura 512×256"
+  "poznamka": "Domy, varianta 3 (sprite 0x5ee): dům se sedlovou střechou a nízký přístavek vpravo vpředu; 24 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     3.49,
+     11.24,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1c_vysoky_0.glb",
@@ -395,7 +740,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, nižší (sprite 0x5ff, 32 m); varianty 2 a 3 (0x60f, 36 m) zůstávají; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Vysoký kancelářský blok, nižší (sprite 0x5ff, 32 m); varianty 2 a 3 (0x60f, 36 m) zůstávají; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.71,
+     13.52,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1c_vysoky_2.glb",
@@ -411,7 +771,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok, vyšší (sprite 0x60f), jeden kvádr; 14 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok, vyšší (sprite 0x60f), jeden kvádr; 14 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     6.66,
+     13.6,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1d_obchody_0.glb",
@@ -427,7 +802,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře, sprite 0x601 (varianta 1 je přebarvení na bílou, textura podle slotu 0); varianty 2 a 3 (0x603) zůstávají; 14 trojúhelníků, textura 1024×512"
+  "poznamka": "Obchody a kanceláře, sprite 0x601 (varianta 1 je přebarvení na bílou, textura podle slotu 0); varianty 2 a 3 (0x603) zůstávají; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.99,
+     14.46,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1d_obchody_2.glb",
@@ -443,7 +833,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře, varianty 2 a 3 (sprite 0x603; 3 je přebarvení na beton, textura podle slotu 2): vysoký blok s valbovou střechou vzadu a nižší přední dům se sedlovou; 28 trojúhelníků, textura 1024×1024"
+  "poznamka": "Obchody a kanceláře, varianty 2 a 3 (sprite 0x603; 3 je přebarvení na beton, textura podle slotu 2): vysoký blok s valbovou střechou vzadu a nižší přední dům se sedlovou; 28 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.15,
+     14.71,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_1e_obchody_vysoke.glb",
@@ -461,7 +866,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře, vysoké (sprite 0x609, 33 m), jeden kvádr; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Obchody a kanceláře, vysoké (sprite 0x609, 33 m), jeden kvádr; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.19,
+     12.6,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_20_stadion.glb",
@@ -479,7 +899,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Stadion (novější, 2×2, HouseID 0x20–0x23): zadní tribuna se sedlovou střechou a přední tribuna; hřiště je zem, branky ne (tenké); 24 trojúhelníků, textura 1024×1024"
+  "poznamka": "Stadion (novější, 2×2, HouseID 0x20–0x23): zadní tribuna se sedlovou střechou a přední tribuna; hřiště je zem, branky ne (tenké); 24 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     25.32,
+     28.21,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_24_valec.glb",
@@ -497,7 +932,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kanceláře, kulatá věž (sprite 0x61d): válec o 24 stěnách a dvě žluté tyče; tyče stojí na zemi, z jednoho spritu nejde poznat, jak daleko od válce jsou; 90 trojúhelníků, textura 1024×1024"
+  "poznamka": "Kanceláře, kulatá věž (sprite 0x61d): válec o 24 stěnách a dvě žluté tyče; tyče stojí na zemi, z jednoho spritu nejde poznat, jak daleko od válce jsou; 90 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.35,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_27_kino.glb",
@@ -515,7 +965,22 @@
   ],
   "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kino (sprite 0x1135), plochá střecha; 10 trojúhelníků, textura 512×512"
+  "poznamka": "Kino (sprite 0x1135), plochá střecha; 10 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.75,
+     11.44,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_07_hotel.glb",
@@ -582,6 +1047,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23960 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m",
+  "interier": true,
   "postavy": [
    {
     "postava": "college_girl_kouri",
@@ -630,7 +1096,8 @@
   "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py; socha College Girl, Rotmill (Sketchfab, CC BY 4.0)",
   "licence": "GPL-2.0 (vlastní geometrie i textura); socha CC BY 4.0, uvést Rotmill",
-  "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17594 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m"
+  "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17594 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m",
+  "interier": false
  },
  {
   "soubor": "dum_0a_fontana.glb",
@@ -666,7 +1133,8 @@
   "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 9620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
+  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 9620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m",
+  "interier": false
  },
  {
   "soubor": "dum_0b_park_rybnik.glb",
@@ -702,7 +1170,8 @@
   "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m"
+  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m",
+  "interier": false
  },
  {
   "soubor": "dum_0c_park_kopec.glb",
@@ -738,7 +1207,8 @@
   "dvere": [],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m"
+  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m",
+  "interier": false
  },
  {
   "soubor": "dum_11_kancelare_moderni.glb",
@@ -819,7 +1289,8 @@
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 18172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
+  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 18172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m",
+  "interier": true
  },
  {
   "soubor": "dum_13_kancelarsky_blok.glb",
@@ -885,7 +1356,8 @@
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14224 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
+  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14224 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m",
+  "interier": true
  },
  {
   "soubor": "dum_1b_byty_cihlove.glb",
@@ -966,7 +1438,8 @@
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19540 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
+  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19540 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m",
+  "interier": true
  },
  {
   "soubor": "dum_1f_divadlo.glb",
@@ -1056,7 +1529,8 @@
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Divadlo (dům 0x1f původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14112 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.82 m"
+  "poznamka": "Divadlo (dům 0x1f původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14112 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.82 m",
+  "interier": true
  },
  {
   "soubor": "dum_28_obchodni_stredisko.glb",
@@ -1137,6 +1611,7 @@
   ],
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 25288 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
+  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 25288 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m",
+  "interier": true
  }
 ]

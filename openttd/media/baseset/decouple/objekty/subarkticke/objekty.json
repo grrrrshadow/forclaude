@@ -19,7 +19,22 @@
   "snih": "dum_04_05_velky_snih.png",
   "autor": "grrrrf (dum_glb.py z ruční tabulky objemů, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Velký kancelářský blok pod sněhem 04 (tentýž tvar jako v mírném, ruční tabulka dum_04) a nad sněhem 05, sněhová textura vedle; roky 1975–; 1 díly, shoda obrysu 0.956; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Velký kancelářský blok pod sněhem 04 (tentýž tvar jako v mírném, ruční tabulka dum_04) a nad sněhem 05, sněhová textura vedle; roky 1975–; 1 díly, shoda obrysu 0.956; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.65,
+     13.29,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_25_domy_0.glb",
@@ -39,7 +54,22 @@
   "snih": "dum_25_domy_0_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 25, nad sněhem 26, sněhová textura vedle), sprite 0x61f, barevné sloty 0,1; přebarvení struct_white má texturu slotu 0; roky 0–1960; 2 díly, shoda obrysu 0.934; 24 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (pod sněhem 25, nad sněhem 26, sněhová textura vedle), sprite 0x61f, barevné sloty 0,1; přebarvení struct_white má texturu slotu 0; roky 0–1960; 2 díly, shoda obrysu 0.934; 24 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.47,
+     8.56,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_25_domy_1.glb",
@@ -59,7 +89,22 @@
   "snih": "dum_25_domy_1_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 25, nad sněhem 26, sněhová textura vedle), sprite 0x621, barevné sloty 2,3; přebarvení cream má texturu slotu 2; roky 0–1960; 1 díly, shoda obrysu 0.977; 14 trojúhelníků, textura 256×256"
+  "poznamka": "Domy (pod sněhem 25, nad sněhem 26, sněhová textura vedle), sprite 0x621, barevné sloty 2,3; přebarvení cream má texturu slotu 2; roky 0–1960; 1 díly, shoda obrysu 0.977; 14 trojúhelníků, textura 256×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.13,
+     7.98,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_2c_byty.glb",
@@ -81,7 +126,22 @@
   "snih": "dum_2c_byty_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Byty (pod sněhem 2c, nad sněhem 2d, sněhová textura vedle), sprite 0x1146; roky 0–; 1 díly, shoda obrysu 0.875; 14 trojúhelníků, textura 256×256"
+  "poznamka": "Byty (pod sněhem 2c, nad sněhem 2d, sněhová textura vedle), sprite 0x1146; roky 0–; 1 díly, shoda obrysu 0.875; 14 trojúhelníků, textura 256×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.59,
+     11.9,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_2e_domy.glb",
@@ -103,7 +163,22 @@
   "snih": "dum_2e_domy_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 2e, nad sněhem 2f, sněhová textura vedle), sprite 0x114a; roky 0–; 2 díly, shoda obrysu 0.944; 28 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (pod sněhem 2e, nad sněhem 2f, sněhová textura vedle), sprite 0x114a; roky 0–; 2 díly, shoda obrysu 0.944; 28 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     5.78,
+     13.88,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_30_domy.glb",
@@ -125,7 +200,22 @@
   "snih": "dum_30_domy_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 30, nad sněhem 31, sněhová textura vedle), sprite 0x1150; přebarvení cream, dark_green, pink má texturu slotu 0; roky 0–1963; 2 díly, shoda obrysu 0.95; 28 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (pod sněhem 30, nad sněhem 31, sněhová textura vedle), sprite 0x1150; přebarvení cream, dark_green, pink má texturu slotu 0; roky 0–1963; 2 díly, shoda obrysu 0.95; 28 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     4.97,
+     11.91,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_32_vysoky.glb",
@@ -147,7 +237,22 @@
   "snih": "dum_32_vysoky_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok (pod sněhem 32, nad sněhem 33, sněhová textura vedle), sprite 0x1155; přebarvení dark_green, grey, red má texturu slotu 0; roky 1966–; 1 díly, shoda obrysu 0.981; 14 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok (pod sněhem 32, nad sněhem 33, sněhová textura vedle), sprite 0x1155; přebarvení dark_green, grey, red má texturu slotu 0; roky 1966–; 1 díly, shoda obrysu 0.981; 14 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     5.9,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_34_vysoky.glb",
@@ -169,7 +274,22 @@
   "snih": "dum_34_vysoky_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok (pod sněhem 34, nad sněhem 35, sněhová textura vedle), sprite 0x1159; přebarvení cream, dark_green, yellow má texturu slotu 0; roky 1970–; 2 díly, shoda obrysu 0.928; 20 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok (pod sněhem 34, nad sněhem 35, sněhová textura vedle), sprite 0x1159; přebarvení cream, dark_green, yellow má texturu slotu 0; roky 1970–; 2 díly, shoda obrysu 0.928; 20 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.63,
+     13.64,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_36_vysoky.glb",
@@ -191,7 +311,22 @@
   "snih": "dum_36_vysoky_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok (pod sněhem 36, nad sněhem 37, sněhová textura vedle), sprite 0x115d; přebarvení brown, orange, red má texturu slotu 0; roky 1974–; 3 díly, shoda obrysu 0.955; 30 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok (pod sněhem 36, nad sněhem 37, sněhová textura vedle), sprite 0x115d; přebarvení brown, orange, red má texturu slotu 0; roky 1974–; 3 díly, shoda obrysu 0.955; 30 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     13.3,
+     13.64,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_38_domy_0.glb",
@@ -211,7 +346,22 @@
   "snih": "dum_38_domy_0_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 38, nad sněhem 39, sněhová textura vedle), sprite 0x1162, barevné sloty 0,1; roky 0–; 1 díly, shoda obrysu 0.938; 14 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (pod sněhem 38, nad sněhem 39, sněhová textura vedle), sprite 0x1162, barevné sloty 0,1; roky 0–; 1 díly, shoda obrysu 0.938; 14 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     6.71,
+     12.14,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_38_domy_1.glb",
@@ -231,7 +381,22 @@
   "snih": "dum_38_domy_1_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 38, nad sněhem 39, sněhová textura vedle), sprite 0x1168, barevné sloty 2,3; roky 0–; 1 díly, shoda obrysu 0.963; 14 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (pod sněhem 38, nad sněhem 39, sněhová textura vedle), sprite 0x1168, barevné sloty 2,3; roky 0–; 1 díly, shoda obrysu 0.963; 14 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     3.93,
+     10.75,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_3a_obchody.glb",
@@ -253,7 +418,22 @@
   "snih": "dum_3a_obchody_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře (pod sněhem 3a, nad sněhem 3b, sněhová textura vedle), sprite 0x116d; roky 0–; 2 díly, shoda obrysu 0.982; 28 trojúhelníků, textura 1024×512"
+  "poznamka": "Obchody a kanceláře (pod sněhem 3a, nad sněhem 3b, sněhová textura vedle), sprite 0x116d; roky 0–; 2 díly, shoda obrysu 0.982; 28 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.17,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_3c_kostel.glb",
@@ -275,7 +455,22 @@
   "snih": "dum_3c_kostel_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Kostel (pod sněhem 3c, nad sněhem 3d, sněhová textura vedle), sprite 0x1171; roky 0–; 1 díly, shoda obrysu 0.892; 14 trojúhelníků, textura 512×512"
+  "poznamka": "Kostel (pod sněhem 3c, nad sněhem 3d, sněhová textura vedle), sprite 0x1171; roky 0–; 1 díly, shoda obrysu 0.892; 14 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.59,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_3e_domy.glb",
@@ -297,7 +492,22 @@
   "snih": "dum_3e_domy_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Domy (pod sněhem 3e, nad sněhem 3f, sněhová textura vedle), sprite 0x1175; přebarvení brown, cream, grey má texturu slotu 0; roky 0–; 2 díly, shoda obrysu 0.941; 28 trojúhelníků, textura 512×256"
+  "poznamka": "Domy (pod sněhem 3e, nad sněhem 3f, sněhová textura vedle), sprite 0x1175; přebarvení brown, cream, grey má texturu slotu 0; roky 0–; 2 díly, shoda obrysu 0.941; 28 trojúhelníků, textura 512×256",
+  "dvere": [
+   {
+    "poloha": [
+     5.55,
+     12.49,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_40_obchody.glb",
@@ -319,7 +529,22 @@
   "snih": "dum_40_obchody_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře (pod sněhem 40, nad sněhem 41, sněhová textura vedle), sprite 0x1176; přebarvení struct_brown má texturu slotu 0; roky 0–1960; 2 díly, shoda obrysu 0.991; 24 trojúhelníků, textura 1024×512"
+  "poznamka": "Obchody a kanceláře (pod sněhem 40, nad sněhem 41, sněhová textura vedle), sprite 0x1176; přebarvení struct_brown má texturu slotu 0; roky 0–1960; 2 díly, shoda obrysu 0.991; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.05,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_42_hotel.glb",
@@ -341,7 +566,22 @@
   "snih": "dum_42_hotel_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Hotel (pod sněhem 42, nad sněhem 44, sněhová textura vedle), sprity 0x117b 0x117c; roky 1972–; 1 díly, shoda obrysu 0.896; 14 trojúhelníků, textura 1024×512"
+  "poznamka": "Hotel (pod sněhem 42, nad sněhem 44, sněhová textura vedle), sprity 0x117b 0x117c; roky 1972–; 1 díly, shoda obrysu 0.896; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     8.44,
+     29.37,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_46_obchody.glb",
@@ -363,7 +603,22 @@
   "snih": "dum_46_obchody_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Obchody a kanceláře (pod sněhem 46, nad sněhem 47, sněhová textura vedle), sprite 0x117f; přebarvení struct_brown, struct_white má texturu slotu 0; roky 1963–; 2 díly, shoda obrysu 0.972; 24 trojúhelníků, textura 1024×1024"
+  "poznamka": "Obchody a kanceláře (pod sněhem 46, nad sněhem 47, sněhová textura vedle), sprite 0x117f; přebarvení struct_brown, struct_white má texturu slotu 0; roky 1963–; 2 díly, shoda obrysu 0.972; 24 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.17,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_48_vysoky.glb",
@@ -385,7 +640,22 @@
   "snih": "dum_48_vysoky_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok (pod sněhem 48, nad sněhem 49, sněhová textura vedle), sprite 0x1184; přebarvení brown, dark_green, grey, orange má texturu slotu 0; roky 1978–; 1 díly, shoda obrysu 0.953; 10 trojúhelníků, textura 1024×512"
+  "poznamka": "Vysoký kancelářský blok (pod sněhem 48, nad sněhem 49, sněhová textura vedle), sprite 0x1184; přebarvení brown, dark_green, grey, orange má texturu slotu 0; roky 1978–; 1 díly, shoda obrysu 0.953; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.17,
+     13.07,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  },
  {
   "soubor": "dum_4a_vysoky.glb",
@@ -407,6 +677,21 @@
   "snih": "dum_4a_vysoky_snih.png",
   "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
   "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
-  "poznamka": "Vysoký kancelářský blok (pod sněhem 4a, nad sněhem 4c, sněhová textura vedle), sprity 0x118b 0x118c; roky 1967–; 1 díly, shoda obrysu 0.995; 14 trojúhelníků, textura 1024×1024"
+  "poznamka": "Vysoký kancelářský blok (pod sněhem 4a, nad sněhem 4c, sněhová textura vedle), sprity 0x118b 0x118c; roky 1967–; 1 díly, shoda obrysu 0.995; 14 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     12.03,
+     13.76,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
  }
 ]
