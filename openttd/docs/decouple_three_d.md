@@ -461,9 +461,16 @@ the curves are vanilla to the pixel.
   of 45 degrees where a straight piece meets a diagonal one. At each corner the
   centre line is a circular arc tangent to both pieces, starting a tile at most
   before the corner (half the run to the next corner when they are close). Two
-  corners turning the same way a short run apart (straight, diagonal, straight)
-  are one arc of 90 degrees over about two tiles. A long diagonal stays
-  straight; only its ends are rounded. Nothing is precomputed: the curves of
+  corners turning the same way up to seven pieces of diagonal apart (straight,
+  diagonal, straight; the player: "when it is four long and not two, it is
+  straight") are one arc of 90 degrees: the circle nearest to the track, its
+  tangent 1.5 times the way from a corner to where the straights either side
+  meet, as near to the corners as to the middle of the diagonal (about a
+  twelfth of that way), so it starts before the first corner on the straight;
+  where the straights either side are too short for it or it would leave the
+  track by more than 5 units, each corner is round alone. A longer diagonal
+  stays straight; only its ends are rounded. `test3d oblouky` lays quarter
+  turns with diagonals of 1, 3, 5, 7 and 9 pieces. Nothing is precomputed: the curves of
   the tiles in view are worked out from the track while drawing.
 - Rounded is plain rail on flat ground without signals; a slope, a station,
   signals or a change of height end a curve.
@@ -760,7 +767,8 @@ when x and y are 0 -- and sends an articulated engine along it (the first
 there is, or the one whose name has the text; the curve under the middle of
 the view), `test3d kolej <x> <y> <track 0..5>` lays one piece of rail (X,
 Y, upper, lower, left, right) to build other curves for the round curves of
-rails, `test3d motory [text]` lists the rail engines with their pieces
+rails, `test3d oblouky` levels clear land and lays quarter turns with 1 to 9
+pieces of diagonal side by side, `test3d motory [text]` lists the rail engines with their pieces
 and whether the company may build them, `test3d kabina [n]` opens the cab
 view of the n-th visible vehicle (`test3d kabina cas` says how long its last
 picture took and what was in it; with `-d misc=5` the tall things, the boxes

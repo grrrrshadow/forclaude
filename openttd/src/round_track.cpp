@@ -202,8 +202,16 @@ int TurnSign(Vec a, Vec b)
 	return Cross(a, b) > 0 ? 1 : -1;
 }
 
-/** Two corners turning the same way with a straight between them no longer than this are one arc: the plain curve of the game and the next wider ones. */
-static const double ROUND_MERGE_RUN = 34.0;
+/**
+ * Two corners turning the same way with a straight between them no longer than this may be one arc: the plain curve
+ * of the game and the wider ones, up to seven pieces of diagonal between the corners (the player: "when it is four
+ * long and not two, it is straight").
+ */
+static const double ROUND_MERGE_RUN = 80.0;
+/** The tangent of one arc of two corners, as a share of how far they are from where their straights meet: the circle nearest to the track, as near to its corners as to the middle of the straight between them. */
+static const double ROUND_MERGE_TANGENT = 1.5;
+/** One arc of two corners keeps at most this far from the track's centre line, world units; further, each corner is round alone. */
+static const double ROUND_MERGE_DEVIATION = 5.0;
 
 /** The straight from a corner along one side, up to where the path turns or the round curve ends. */
 struct Side {
@@ -226,7 +234,7 @@ Side WalkSide(Step first, bool backward)
 	Vec dir = first.Vector();
 	Step s = first;
 	side.run = Length(dir);
-	for (int i = 0; i < 12 && side.run < 64; i++) {
+	for (int i = 0; i < 12 && side.run <= ROUND_MERGE_RUN; i++) {
 		Step n;
 		if (!NextStep(s, n)) return side;
 		Turn turn = TurnBetween(dir, n.Vector());
@@ -388,6 +396,23 @@ void KeepToPiece(Side &side, const Step &piece)
 	side.corner = false;
 }
 
+/**
+ * The tangent of the one arc of two corners, a quarter turn: as far as the straights either side let it, and whether
+ * the arc keeps near enough to the track -- to the middle of the straight between the corners and to the corners.
+ * @param h how far the corners are from where the straights either side meet
+ * @param more_back, more_fwd how far the arc may reach past the corners along the straights either side
+ * @param[out] t the tangent
+ */
+bool MergedTangent(double h, double more_back, double more_fwd, double &t)
+{
+	t = std::max(h, std::min({std::max(ROUND_TANGENT_MAX, ROUND_MERGE_TANGENT * h), h + more_back, h + more_fwd}));
+	/* Where the straights meet, the radius is t: the arc is (sqrt 2 - 1) t from that point, the straight between the
+	 * corners h / sqrt 2; a corner is h from it along one straight, the arc's centre (t, t). */
+	double middle = std::abs(h / std::sqrt(2.0) - (std::sqrt(2.0) - 1) * t);
+	double corner = std::hypot(t - h, t) - t;
+	return std::max(middle, corner) <= ROUND_MERGE_DEVIATION;
+}
+
 /** A corner of the path around a piece: where it is along the piece, and the pieces either side of it, walked forward. */
 struct PathCorner {
 	double s;  ///< along the piece from its first edge
@@ -424,10 +449,9 @@ bool CornerZone(const PathCorner &pc, Zone &zone, bool *main_back = nullptr, boo
 		w_back.sign = sign;
 		Side w_fwd = WalkSide(fwd.beyond, false);
 		if (SwitchAhead(fwd.last, fwd.beyond)) KeepToPiece(w_fwd, fwd.beyond);
-		if (Preference(w_back, w_fwd, sign) == -1) {
-			double d = fwd.run, h = d / std::sqrt(2.0);
+		double d = fwd.run, h = d / std::sqrt(2.0), t;
+		if (Preference(w_back, w_fwd, sign) == -1 && MergedTangent(h, Avail(back), Avail(w_fwd), t)) {
 			Vec meet = pc.pos + a * h; // where the straights either side meet
-			double t = std::max(h, std::min({std::max(ROUND_TANGENT_MAX, h), h + Avail(back), h + Avail(w_fwd)}));
 			zone = MakeZone(meet, a, fwd.dir, t, 2 * ROUND_PHI, pc.s - (t - h), pc.s + d + (t - h));
 			return true;
 		}
@@ -438,10 +462,9 @@ bool CornerZone(const PathCorner &pc, Zone &zone, bool *main_back = nullptr, boo
 		u_fwd.sign = sign;
 		Side u_back = WalkSide(back.beyond, true);
 		if (SwitchBehind(back.beyond.Reversed(), back.last.Reversed())) KeepToPiece(u_back, back.beyond);
-		if (Preference(u_back, u_fwd, sign) == 1) {
-			double d = back.run, h = d / std::sqrt(2.0);
+		double d = back.run, h = d / std::sqrt(2.0), t;
+		if (Preference(u_back, u_fwd, sign) == 1 && MergedTangent(h, Avail(u_back), Avail(fwd), t)) {
 			Vec meet = pc.pos - b * h;
-			double t = std::max(h, std::min({std::max(ROUND_TANGENT_MAX, h), h + Avail(u_back), h + Avail(fwd)}));
 			zone = MakeZone(meet, back.dir, b, t, 2 * ROUND_PHI, pc.s - d - (t - h), pc.s + (t - h));
 			return true;
 		}

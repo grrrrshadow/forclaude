@@ -9342,6 +9342,57 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
 		return true;
+	} else if (what == "oblouky") {
+		/* The rig: quarter turns from X to Y with the diagonal between their corners 1, 3, 5, 7 and 9 pieces long, side
+		 * by side on levelled land (the player: "when it is four long and not two, it is straight"), to see which are
+		 * one round arc. Each: three tiles of X, the diagonal, three tiles of Y. */
+		static const uint W = 46, H = 10;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		uint x0 = 0, y0 = 0;
+		for (uint ty = 2; ty + H + 2 < Map::SizeY() && x0 == 0; ty++) {
+			for (uint tx = 2; tx + W + 2 < Map::SizeX() && x0 == 0; tx++) {
+				bool good = true;
+				for (uint dy = 0; dy < H && good; dy++) {
+					for (uint dx = 0; dx < W && good; dx++) {
+						TileIndex t = TileXY(tx + dx, ty + dy);
+						if (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) good = false;
+					}
+				}
+				if (good) {
+					x0 = tx;
+					y0 = ty;
+				}
+			}
+		}
+		if (x0 == 0) {
+			IConsolePrint(CC_ERROR, "test3d oblouky: no clear land of {} by {} tiles on the map.", W, H);
+			return true;
+		}
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + W - 1, y0 + H - 1), TileXY(x0, y0), false, LevelMode::Level);
+		int failed = 0;
+		auto lay = [&](uint x, uint y, Track tr) {
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x, y), RAILTYPE_RAIL, tr, false).Failed()) failed++;
+		};
+		uint ox = x0;
+		std::string where;
+		for (uint n = 1; n <= 9; n += 2) {
+			for (uint i = 0; i < 3; i++) lay(ox + i, y0, Track::X);
+			const uint a = ox + 3, b = y0;
+			for (uint j = 0; j < n; j++) lay(a + j / 2, b + (j + 1) / 2, j % 2 == 0 ? Track::Right : Track::Left);
+			const uint yx = a + (n - 1) / 2, yy = b + (n - 1) / 2;
+			for (uint i = 1; i <= 3; i++) lay(yx, yy + i, Track::Y);
+			where += fmt::format(" {}:{},{}", n, yx, b);
+			ox = yx + 3;
+		}
+		UpdateSignalsInBuffer();
+		IConsolePrint(failed == 0 ? CC_DEFAULT : CC_ERROR, "test3d: oblouky u {},{}, diagonala dilu:roh{}; nepostaveno {}", x0, y0, where, failed);
+		return true;
 	} else if (what == "typsilnice" && argv.size() > 2) {
 		/* The rig: every road of the map made a road type by its label, 'test3d typsilnice RT14' (CZTR's first-class
 		 * country road), to see a set's road in the cab view and the turned map. */
