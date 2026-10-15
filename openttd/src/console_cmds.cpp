@@ -8730,7 +8730,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", model->name, *x, *y);
 		}
 	} else if (what == "okno" && argv.size() > 2) {
-		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'. */
+		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'; or
+		 * 'okno vystavba', the construction toolbar of rails, which puts the view back to north (ThreeDViewForBuilding()). */
+		if (argv[2] == "vystavba") {
+			if (_local_company == COMPANY_SPECTATOR) {
+				extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+				Company *made = Company::IsValidID(CompanyID::Begin()) ? Company::Get(CompanyID::Begin()) : DoStartupNewCompany(false, CompanyID::Invalid());
+				if (made != nullptr) SetLocalCompany(made->index);
+			}
+			float before = GetViewYaw();
+			Window *tb = ShowBuildRailToolbar(RAILTYPE_RAIL);
+			IConsolePrint(CC_DEFAULT, "test3d: vystavba {}, uhel {} -> {}", tb != nullptr ? "otevrena" : "NEOTEVRENA", before, GetViewYaw());
+			return true;
+		}
 		if (argv[2] == "nakup") {
 			/* The purchase window needs a company; the null driver's game starts as a spectator. */
 			if (_local_company == COMPANY_SPECTATOR) {

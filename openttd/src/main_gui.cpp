@@ -76,6 +76,8 @@ bool HandlePlacePushButton(Window *w, WidgetID widget, CursorID cursor, HighLigh
 
 	SetObjectToPlace(cursor, PAL_NONE, mode, w->window_class, w->window_number);
 	w->LowerWidget(widget);
+	/* A tool of a construction toolbar picked: building is done facing north (three_d.h). */
+	ThreeDViewForBuilding();
 	return true;
 }
 

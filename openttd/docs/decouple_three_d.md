@@ -33,7 +33,11 @@ tree in an old game does.
   free), put the view back to north; a single click does nothing, so
   pressing the button to turn never resets the view. The turned view is for
   looking; building is done facing north, in 2D, and the help text of the
-  setting says so. The keys
+  setting says so. So opening a construction toolbar (rails, roads, water,
+  airports, landscaping, trees, and the editor's) or picking one of their tools
+  puts the view back to north too (`ThreeDViewForBuilding()`; the player,
+  15. 10.: "when he clicks construction, straighten the view to 0 so he can
+  build"); rig: `test3d okno vystavba`. The keys
   **Y** and **N** turn by 15 degrees to the left and to the right, with
   **Ctrl** by 45, the next of the eight directions vehicles have pictures
   for; Ctrl+, and Ctrl+. do the same. Y and N are the only two letters no

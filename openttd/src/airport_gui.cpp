@@ -40,6 +40,8 @@
 
 #include "table/strings.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 
@@ -234,6 +236,7 @@ static WindowDesc _air_toolbar_desc(
 Window *ShowBuildAirToolbar()
 {
 	if (!Company::IsValidID(_local_company)) return nullptr;
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 
 	CloseWindowByClass(WindowClass::BuildToolbar);
 	return AllocateWindowDescFront<BuildAirToolbarWindow>(_air_toolbar_desc, TransportType::Air);

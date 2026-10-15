@@ -44,6 +44,8 @@
 
 #include "table/strings.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 void CcTerraform(Commands, const CommandCost &result, Money, TileIndex tile)
@@ -431,6 +433,7 @@ static WindowDesc _terraform_desc(
 Window *ShowTerraformToolbar(Window *link)
 {
 	if (!Company::IsValidID(_local_company)) return nullptr;
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 
 	/* Delete the terraform toolbar to place it again. */
 	CloseWindowById(WindowClass::ScenarioGenerateLandscape, 0, true);
@@ -831,5 +834,6 @@ static WindowDesc _scen_edit_land_gen_desc(
  */
 Window *ShowEditorTerraformToolbar()
 {
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 	return AllocateWindowDescFront<ScenarioEditorLandscapeGenerationWindow>(_scen_edit_land_gen_desc, 0);
 }

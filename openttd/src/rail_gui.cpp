@@ -51,6 +51,8 @@
 
 #include "table/strings.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 
@@ -1005,6 +1007,7 @@ Window *ShowBuildRailToolbar(RailType railtype)
 {
 	if (!Company::IsValidID(_local_company)) return nullptr;
 	if (!ValParamRailType(railtype)) return nullptr;
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 
 	_cur_railtype = railtype;
 	Window *w = BringWindowToFrontById(WindowClass::BuildToolbar, TransportType::Rail);

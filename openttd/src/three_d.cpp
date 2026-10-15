@@ -309,3 +309,13 @@ void ResetViewYaw()
 	if (_view_yaw == 0.0f) return;
 	SetViewYaw(0.0f);
 }
+
+/**
+ * A construction toolbar opened or one of its tools picked: the view goes back to north, where the player builds
+ * (the player, 15. 10.: "when he clicks construction, put the view straight to 0 so he can build"; angle 0 is for
+ * building, turning is for looking). Nothing when the view faces north already.
+ */
+void ThreeDViewForBuilding()
+{
+	if (IsViewTurned()) ResetViewYaw();
+}

@@ -233,6 +233,7 @@ void RotateView(float degrees);
 void SetViewYaw(float degrees);
 void RotateViewByDrag(int pixels);
 void ResetViewYaw();
+void ThreeDViewForBuilding();
 
 void TurnWorldPoint(double x, double y, double &xr, double &yr);
 void UnturnWorldPoint(double xr, double yr, double &x, double &y);

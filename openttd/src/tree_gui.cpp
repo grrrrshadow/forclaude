@@ -27,6 +27,8 @@
 #include "table/strings.h"
 #include "table/tree_land.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 void PlaceTreesRandomly();
@@ -321,5 +323,6 @@ static WindowDesc _build_trees_desc(
 void ShowBuildTreesToolbar()
 {
 	if (_game_mode != GameMode::Editor && !Company::IsValidID(_local_company)) return;
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 	AllocateWindowDescFront<BuildTreesWindow>(_build_trees_desc, 0);
 }

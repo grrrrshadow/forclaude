@@ -50,6 +50,8 @@
 
 #include "table/strings.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 static void ShowRVStationPicker(Window *parent, RoadStopType rs);
@@ -1082,6 +1084,7 @@ Window *ShowBuildRoadToolbar(RoadType roadtype)
 {
 	if (!Company::IsValidID(_local_company)) return nullptr;
 	if (!ValParamRoadType(roadtype)) return nullptr;
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 
 	if (GetRoadTramType(roadtype) == GetRoadTramType(_cur_roadtype)) {
 		Window *w = BringWindowToFrontById(WindowClass::BuildToolbar, TransportType::Road);
@@ -1183,6 +1186,7 @@ static WindowDesc _build_tramway_scen_desc(
  */
 Window *ShowBuildRoadScenToolbar(RoadType roadtype)
 {
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 	CloseWindowById(WindowClass::ScenarioBuildToolbar, TransportType::Road);
 	_cur_roadtype = roadtype;
 

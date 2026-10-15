@@ -38,6 +38,8 @@
 #include "table/sprites.h"
 #include "table/strings.h"
 
+#include "three_d.h"
+
 #include "safeguards.h"
 
 static void ShowBuildDockStationPicker(Window *parent);
@@ -375,6 +377,7 @@ static WindowDesc _build_docks_toolbar_desc(
 Window *ShowBuildDocksToolbar()
 {
 	if (!Company::IsValidID(_local_company)) return nullptr;
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 
 	CloseWindowByClass(WindowClass::BuildToolbar);
 	return AllocateWindowDescFront<BuildDocksToolbarWindow>(_build_docks_toolbar_desc, TransportType::Water);
@@ -415,6 +418,7 @@ static WindowDesc _build_docks_scen_toolbar_desc(
  */
 Window *ShowBuildDocksScenToolbar()
 {
+	ThreeDViewForBuilding(); // building is done facing north (three_d.h)
 	return AllocateWindowDescFront<BuildDocksToolbarWindow>(_build_docks_scen_toolbar_desc, TransportType::Water);
 }
 
