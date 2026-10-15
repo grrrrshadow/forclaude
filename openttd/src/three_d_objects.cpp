@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 #include "debug.h"
 #include "fileio_func.h"
 #include "newgrf_config.h"
@@ -759,8 +760,9 @@ static void ReadThreeDVehicleObjects()
 				std::string anchor = e.contains("kotva") && e.at("kotva").is_string() ? e.at("kotva").get<std::string>() : "stred";
 				obj.anchor = anchor == "prvni" || anchor == "predni" ? 0 : (static_cast<int>(obj.pieces.size()) - 1) / 2;
 				if (e.contains("kotva") && e.at("kotva").is_number_integer()) obj.anchor = std::clamp(e.at("kotva").get<int>(), 0, static_cast<int>(obj.pieces.size()) - 1);
-				/* No "meritko": the object is in true metres, and the size it is drawn at is the game's setting for
-				 * all of them (the player, 14. 10.: "the game can make it bigger, so there need not be two files"). */
+				/* No "meritko": the object is in true metres, and the size it is drawn at is its set's parameter
+				 * ("velikost") or else the game's setting (the player, 14. 10.: "the game can make it bigger, so there
+				 * need not be two files"). */
 				if (e.contains("textura") && e.at("textura").is_string()) obj.paint_file = folder + e.at("textura").get<std::string>();
 				if (e.contains("kabina") && e.at("kabina").is_array() && e.at("kabina").size() == 3) {
 					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
@@ -828,6 +830,18 @@ static void ReadThreeDVehicleObjects()
 					}
 					if (obj.rust.target == 0) obj.rust.mask_file.clear();
 				}
+				/* The size as a parameter of its set: each value the scale it draws at; else the game's setting. */
+				if (e.contains("velikost") && e.at("velikost").is_object()) {
+					const auto &size = e.at("velikost");
+					auto param = size.contains("parametr") ? ParseIndexNumber(size.at("parametr")) : std::nullopt;
+					if (param.has_value() && *param < 0x80 && size.contains("hodnoty") && size.at("hodnoty").is_object()) {
+						for (const auto &[value, scale] : size.at("hodnoty").items()) {
+							auto v = ParseInteger<uint32_t>(value, 10);
+							if (v.has_value() && scale.is_number() && scale.get<float>() > 0.1f) obj.size.values.emplace_back(*v, std::clamp(scale.get<float>(), 0.25f, 4.0f));
+						}
+						if (!obj.size.values.empty()) obj.size.param = static_cast<int>(*param);
+					}
+				}
 				/* The crew: figures riding in it, never fading. */
 				if (e.contains("posadka") && e.at("posadka").is_array()) {
 					for (const auto &c : e.at("posadka")) {
@@ -868,6 +882,20 @@ static void ReadThreeDVehicleObjects()
 		}
 	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures", _vehicle_objects.size(), _figure_objects.size());
+}
+
+/**
+ * The size of a set's vehicle objects as its parameter ("velikost"), the first of its objects that has one.
+ * @param grfid the set's id
+ * @return nullptr when none of its objects has it
+ */
+const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		if (o.grfid == grfid && o.size.param >= 0) return &o.size;
+	}
+	return nullptr;
 }
 
 /**
@@ -1134,11 +1162,14 @@ std::string DescribeThreeDVehicleObjects()
 		std::string pieces;
 		for (uint16_t p : o.pieces) pieces += fmt::format(" {:#06x}", p);
 		std::string engines;
+		std::string lengths;
 		for (uint16_t p : o.pieces) {
 			EngineID id = _engine_mngr.GetID(o.type, p, o.grfid);
 			engines += id == EngineID::Invalid() ? " -" : fmt::format(" {}", id.base());
+			if (id != EngineID::Invalid()) lengths += fmt::format(" {}", ThreeDVehicleObjectPieceLength(id, 8));
 		}
-		out += fmt::format("\n  {} grf {:08X} type {} pieces{} (engines{}) anchor {}{}", o.name, std::byteswap(o.grfid), to_underlying(o.type), pieces, engines, o.anchor, o.paint_file.empty() ? "" : " paint");
+		out += fmt::format("\n  {} grf {:08X} type {} pieces{} (engines{}) anchor {}{}{}{}", o.name, std::byteswap(o.grfid), to_underlying(o.type), pieces, engines, o.anchor, o.paint_file.empty() ? "" : " paint",
+				o.size.param < 0 ? "" : fmt::format(" size param {}", o.size.param), lengths.empty() ? "" : fmt::format(" lengths{}", lengths));
 	}
 	return out;
 }

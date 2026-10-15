@@ -24,6 +24,7 @@
 #include "climate_industries.h"
 #include "debug.h"
 #include "settings_type.h"
+#include "newgrf/newgrf_internal.h"
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_tick.h"
 #include "timer/timer.h"
@@ -67,8 +68,8 @@ struct ObjectSpriteRequest {
 	int fade = 0;                             ///< the step of its paint's fading (FadeStep())
 };
 static std::vector<ObjectSpriteRequest> _object_sprite_requests;
-/** The sprites made: by the object, the piece it is hung from and the direction. */
-static std::map<std::tuple<const ThreeDVehicleObject *, int, int, bool, int>, SpriteID> _object_sprites;
+/** The sprites made: by the object, the piece it is hung from, the direction, its scale (thousandths) and its age. */
+static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int>, SpriteID> _object_sprites;
 static SpriteID _object_empty_sprite = 0;
 
 /** A picture of an object in the turned view, kept. */
@@ -98,12 +99,20 @@ static inline bool SqueezedType(VehicleType type)
 }
 
 /**
- * The scale the objects are drawn at, all of them: the size of the setting -- the original game's, as the bigger
- * sets draw (BRYLE), 1.2, or CZTR's, 1 (the player, 14. 10.: "the game can make the object bigger, so there need
- * not be two files"). The objects are in true metres.
+ * The scale an object is drawn at: what its set's size parameter makes ("velikost": the player sets it, all the 3D
+ * sets at once, at the bottom of the active list of the NewGRF window), else the size of the game's setting -- the
+ * original game's, as the bigger sets draw (BRYLE), 1.2, or CZTR's, 1 (the player, 14. 10.: "the game can make the
+ * object bigger, so there need not be two files"). The objects are in true metres.
  */
-static float ObjectScale(const ThreeDVehicleObject *)
+static float ObjectScale(const ThreeDVehicleObject *obj)
 {
+	if (obj != nullptr && obj->size.param >= 0) {
+		const GRFFile *file = GetFileByGRFID(obj->grfid);
+		if (file != nullptr) {
+			auto scale = obj->size.ScaleOf(file->GetParam(obj->size.param));
+			if (scale.has_value()) return *scale;
+		}
+	}
 	return _settings_game.vehicle.object_original_size ? 1.2f : 1.0f;
 }
 
@@ -213,7 +222,7 @@ static SpriteID EmptyObjectSprite()
 /** The sprite of an object facing a direction, hung from one of its pieces: made when it is first drawn. */
 static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir, int fade)
 {
-	auto key = std::make_tuple(obj, piece, dir, _settings_game.vehicle.object_original_size, fade);
+	auto key = std::make_tuple(obj, piece, dir, static_cast<int>(std::lround(ObjectScale(obj) * 1000)), fade);
 	auto it = _object_sprites.find(key);
 	if (it != _object_sprites.end()) return it->second;
 

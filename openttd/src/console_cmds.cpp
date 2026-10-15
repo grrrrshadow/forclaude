@@ -126,6 +126,9 @@
 #include "querystring_gui.h"
 #include "cheat_func.h"
 #include "settings_gui.h"
+#include "newgrf_config.h"
+#include "three_d_objects.h"
+#include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
 #include "widgets/cab_view_widget.h"
@@ -8733,6 +8736,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "okno" && argv.size() > 2) {
 		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'; or
 		 * 'okno vystavba', the construction toolbar of rails, which puts the view back to north (ThreeDViewForBuilding()). */
+		if (argv[2] == "newgrf") {
+			/* 'okno newgrf [klik]': the NewGRF window of a new game; with "klik" a click on the size of the 3D vehicle
+			 * sets on the bottom line of the active list's frame. */
+			Window *w = FindWindowById(WindowClass::GameOptions, GameOptionsWindowNumber::NewGRFState);
+			if (w == nullptr) {
+				ShowNewGRFSettings(true, true, false, _grfconfig_newgame);
+				w = FindWindowById(WindowClass::GameOptions, GameOptionsWindowNumber::NewGRFState);
+			}
+			if (w == nullptr) {
+				IConsolePrint(CC_ERROR, "test3d: okno newgrf NEOTEVRENO");
+				return true;
+			}
+			for (const auto &c : _grfconfig_newgame) {
+				const ThreeDVehicleSize *size = GetThreeDVehicleSize(c->ident.grfid);
+				if (size != nullptr) IConsolePrint(CC_DEFAULT, "test3d: newgrf {} velikost parametr {} hodnot {}", c->filename, size->param, size->values.size());
+			}
+			bool before = _settings_newgame.vehicle.object_original_size;
+			if (argv.size() > 3 && argv[3] == "klik") {
+				Rect frame = w->GetWidget<NWidgetBase>(WID_NS_ACTIVE_FRAME)->GetCurrentRect();
+				w->OnClick({frame.left + WidgetDimensions::scaled.frametext.left + 2, frame.bottom - 2}, WID_NS_ACTIVE_FRAME, 1);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: okno newgrf otevreno, nastaveni puvodni velikosti {} -> {}", before, _settings_newgame.vehicle.object_original_size);
+			return true;
+		}
 		if (argv[2] == "vystavba") {
 			if (_local_company == COMPANY_SPECTATOR) {
 				extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);

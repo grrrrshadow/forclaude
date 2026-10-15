@@ -32,6 +32,7 @@
 #include "timer/timer_window.h"
 #include "zoom_func.h"
 #include "core/string_consumer.hpp"
+#include "three_d_objects.h"
 
 #include "widgets/newgrf_widget.h"
 #include "widgets/misc_widget.h"
@@ -593,6 +594,19 @@ static void ShowSavePresetWindow(std::string_view initial_text);
 /**
  * Window for showing NewGRF files
  */
+/** How tall the size of the 3D vehicle sets is on the bottom line of the active list's frame: a line of text or the toggle. */
+static int ObjectSizeLineHeight()
+{
+	return std::max<int>(GetCharacterHeight(FontSize::Normal), SETTING_BUTTON_HEIGHT);
+}
+
+/** The value of a set's size parameter ("velikost") that makes its biggest scale, or its smallest. */
+static uint32_t ObjectSizeValue(const ThreeDVehicleSize &size, bool biggest)
+{
+	auto by_scale = [](const auto &a, const auto &b) { return a.second < b.second; };
+	return (biggest ? std::ranges::max_element(size.values, by_scale) : std::ranges::min_element(size.values, by_scale))->first;
+}
+
 struct NewGRFWindow : public Window, NewGRFScanCallback {
 	typedef GUIList<const GRFConfig *, std::nullptr_t, StringFilter &> GUIGRFConfigList;
 
@@ -683,6 +697,121 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 		return -1;
 	}
 
+	/** Whether the window is of the NewGRFs of a new game, so the game's setting of the size is that of a new game. */
+	bool ForNewGame() const
+	{
+		return &this->orig_list == &_grfconfig_newgame;
+	}
+
+	/**
+	 * Whether the vehicles drawn from 3D objects are at the original game's size (the player, 15. 10.: "all our 3D
+	 * GRFs at once, original size BRYLE bigger, or smaller"): the first active set with a size parameter
+	 * ("velikost") at its biggest scale, else the game's setting.
+	 */
+	bool ObjectSizeOriginal() const
+	{
+		for (const auto &c : this->actives) {
+			const ThreeDVehicleSize *size = GetThreeDVehicleSize(c->ident.grfid);
+			if (size == nullptr) continue;
+			uint32_t value = static_cast<size_t>(size->param) < c->param.size() ? c->param[size->param] : 0;
+			return value == ObjectSizeValue(*size, true);
+		}
+		return (this->ForNewGame() ? _settings_newgame : _settings_game).vehicle.object_original_size;
+	}
+
+	/** Whether the size can be changed here: an editable list, of a new game or with a set with a size parameter. */
+	bool ObjectSizeClickable() const
+	{
+		if (!this->editable) return false;
+		if (this->ForNewGame()) return true;
+		return std::ranges::any_of(this->actives, [](const auto &c) { return GetThreeDVehicleSize(c->ident.grfid) != nullptr; });
+	}
+
+	/** The other size for all of them at once: each active set's size parameter, and for a new game the game's setting. */
+	void ToggleObjectSize()
+	{
+		bool original = !this->ObjectSizeOriginal();
+		bool changed = false;
+		for (auto &c : this->actives) {
+			const ThreeDVehicleSize *size = GetThreeDVehicleSize(c->ident.grfid);
+			if (size == nullptr) continue;
+			if (c->param.size() <= static_cast<size_t>(size->param)) c->param.resize(size->param + 1);
+			c->param[size->param] = ObjectSizeValue(*size, original);
+			changed = true;
+		}
+		if (this->ForNewGame()) {
+			_settings_newgame.vehicle.object_original_size = original;
+			SetWindowClassesDirty(WindowClass::GameOptions);
+		}
+		SetWindowClassesDirty(WindowClass::NewGRFParameters);
+		if (changed) this->InvalidateData(GOID_NEWGRF_CHANGES_MADE);
+		this->SetDirty();
+	}
+
+	/** Where the size of the 3D vehicle sets is: on the bottom line of the active list's frame, as its caption on the top. */
+	Rect ObjectSizeRect(const Rect &frame) const
+	{
+		const int sep = WidgetDimensions::scaled.hsep_normal;
+		int width = GetStringBoundingBox(STR_NEWGRF_SETTINGS_OBJECT_SIZE).width + sep + SETTING_BUTTON_WIDTH + sep +
+				GetStringBoundingBox(this->ObjectSizeOriginal() ? STR_NEWGRF_SETTINGS_OBJECT_SIZE_ORIGINAL : STR_NEWGRF_SETTINGS_OBJECT_SIZE_SMALLER).width;
+		Rect r = {frame.left + WidgetDimensions::scaled.frametext.left, frame.bottom - ObjectSizeLineHeight() + 1, frame.right - WidgetDimensions::scaled.frametext.right, frame.bottom};
+		return r.WithWidth(std::min(width, r.Width()), _current_text_dir == TD_RTL);
+	}
+
+	/**
+	 * The bottom line of the active list's frame, half-way through the size of the 3D vehicle sets (the player: "instead
+	 * of the frame's line our text size and a toggle"), and the size itself.
+	 * @param r the frame
+	 */
+	void DrawObjectSize(const Rect &r) const
+	{
+		const Colours colour = this->GetWidget<NWidgetCore>(WID_NS_ACTIVE_FRAME)->colour;
+		const PixelColour c1 = GetColourGradient(colour, Shade::Dark);
+		const PixelColour c2 = GetColourGradient(colour, Shade::Lightest);
+		const Rect label = this->ObjectSizeRect(r);
+
+		/* As DrawFrame(), the bottom line moved up to the middle of the label. */
+		Rect inner = r.Shrink(ScaleGUITrad(1));
+		inner.top = r.top + GetCharacterHeight(FontSize::Normal) / 2;
+		inner.bottom = r.bottom - ObjectSizeLineHeight() / 2;
+		const Rect outer = inner.Expand(WidgetDimensions::scaled.bevel);
+		const Rect inside = inner.Shrink(WidgetDimensions::scaled.bevel);
+
+		GfxFillRect(r.left, inside.bottom + 1, r.right, r.bottom, GetColourGradient(colour, Shade::Light));
+		GfxFillRect(outer.left, inner.top, inner.left - 1, inner.bottom, c1);
+		GfxFillRect(inner.left, inside.top, inside.left - 1, inside.bottom, c2);
+		GfxFillRect(inside.right + 1, inner.top, inner.right, inside.bottom, c1);
+		GfxFillRect(inner.right + 1, outer.top, outer.right, inner.bottom, c2);
+
+		const int gap_left = label.left - WidgetDimensions::scaled.bevel.left - 1;
+		const int gap_right = label.right + WidgetDimensions::scaled.bevel.right + 1;
+		GfxFillRect(inner.left, inside.bottom + 1, gap_left, inner.bottom, c1);
+		GfxFillRect(outer.left, inner.bottom + 1, gap_left, outer.bottom, c2);
+		GfxFillRect(gap_right, inside.bottom + 1, inner.right, inner.bottom, c1);
+		GfxFillRect(gap_right, inner.bottom + 1, outer.right, outer.bottom, c2);
+
+		const bool rtl = _current_text_dir == TD_RTL;
+		const bool clickable = this->ObjectSizeClickable();
+		const bool original = this->ObjectSizeOriginal();
+		const TextColour text = clickable ? TextColour::White : TextColour::Grey;
+		const int sep = WidgetDimensions::scaled.hsep_normal;
+		const int name_width = GetStringBoundingBox(STR_NEWGRF_SETTINGS_OBJECT_SIZE).width;
+		const int text_y = CentreBounds(label.top, label.bottom, GetCharacterHeight(FontSize::Normal));
+
+		Rect name = label.WithWidth(name_width, rtl);
+		DrawString(name.left, name.right, text_y, STR_NEWGRF_SETTINGS_OBJECT_SIZE, text);
+		Rect button = label.Indent(name_width + sep, rtl).WithWidth(SETTING_BUTTON_WIDTH, rtl);
+		DrawBoolButton(button.left, CentreBounds(label.top, label.bottom, SETTING_BUTTON_HEIGHT), Colours::Yellow, colour, original, clickable);
+		Rect state = label.Indent(name_width + sep + SETTING_BUTTON_WIDTH + sep, rtl);
+		DrawString(state.left, state.right, text_y, original ? STR_NEWGRF_SETTINGS_OBJECT_SIZE_ORIGINAL : STR_NEWGRF_SETTINGS_OBJECT_SIZE_SMALLER, text);
+	}
+
+	/** Whether a point of the window is on the size of the 3D vehicle sets. */
+	bool OnObjectSize(Point pt) const
+	{
+		return this->ObjectSizeRect(this->GetWidget<NWidgetBase>(WID_NS_ACTIVE_FRAME)->GetCurrentRect()).Contains(pt);
+	}
+
 	/**
 	 * Test whether the currently active set of NewGRFs can be upgraded with the available NewGRFs.
 	 * @return Whether an upgrade is possible.
@@ -767,6 +896,15 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 				break;
 			}
 
+			case WID_NS_OBJECT_SIZE: {
+				/* Room for the size of the 3D vehicle sets on the frame's bottom line, as its caption has on the top. */
+				const int sep = WidgetDimensions::scaled.hsep_normal;
+				int state = std::max(GetStringBoundingBox(STR_NEWGRF_SETTINGS_OBJECT_SIZE_ORIGINAL).width, GetStringBoundingBox(STR_NEWGRF_SETTINGS_OBJECT_SIZE_SMALLER).width);
+				size.width = std::max<uint>(size.width, GetStringBoundingBox(STR_NEWGRF_SETTINGS_OBJECT_SIZE).width + sep + SETTING_BUTTON_WIDTH + sep + state);
+				size.height = std::max(1, ObjectSizeLineHeight() + WidgetDimensions::scaled.frametext.top / 2 - WidgetDimensions::scaled.frametext.bottom - WidgetDimensions::scaled.vsep_wide);
+				break;
+			}
+
 			case WID_NS_CONTENT_DOWNLOAD:
 			case WID_NS_CONTENT_DOWNLOAD2: {
 				Dimension d = GetStringBoundingBox(STR_NEWGRF_SETTINGS_FIND_MISSING_CONTENT_BUTTON);
@@ -776,6 +914,13 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 				break;
 			}
 		}
+	}
+
+	bool OnTooltip(Point pt, WidgetID widget, TooltipCloseCondition close_cond) override
+	{
+		if ((widget != WID_NS_ACTIVE_FRAME && widget != WID_NS_OBJECT_SIZE) || !this->OnObjectSize(pt)) return false;
+		GuiShowTooltips(this, GetEncodedString(STR_NEWGRF_SETTINGS_OBJECT_SIZE_TOOLTIP), close_cond);
+		return true;
 	}
 
 	void OnResize() override
@@ -905,6 +1050,10 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 				break;
 			}
 
+			case WID_NS_ACTIVE_FRAME:
+				this->DrawObjectSize(r);
+				break;
+
 			case WID_NS_NEWGRF_INFO_TITLE: {
 				/* Create the nice darker rectangle at the details top. */
 				GfxFillRect(r.Shrink(WidgetDimensions::scaled.bevel), GetColourGradient(Colours::Mauve, Shade::Normal));
@@ -933,6 +1082,11 @@ struct NewGRFWindow : public Window, NewGRFScanCallback {
 		}
 
 		switch (widget) {
+			case WID_NS_ACTIVE_FRAME:
+			case WID_NS_OBJECT_SIZE:
+				if (this->OnObjectSize(pt) && this->ObjectSizeClickable()) this->ToggleObjectSize();
+				break;
+
 			case WID_NS_PRESET_LIST: {
 				DropDownList list;
 
@@ -1781,7 +1935,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_newgrf_actives_widge
 			EndContainer(),
 		EndContainer(),
 
-		NWidget(WWT_FRAME, Colours::Mauve), SetStringTip(STR_NEWGRF_SETTINGS_ACTIVE_LIST), SetPIP(0, WidgetDimensions::unscaled.vsep_wide, 0),
+		NWidget(WWT_FRAME, Colours::Mauve, WID_NS_ACTIVE_FRAME), SetStringTip(STR_NEWGRF_SETTINGS_ACTIVE_LIST), SetPIP(0, WidgetDimensions::unscaled.vsep_wide, 0),
 			/* Left side, active grfs. */
 			NWidget(NWID_HORIZONTAL),
 				NWidget(WWT_PANEL, Colours::Mauve),
@@ -1814,6 +1968,9 @@ static constexpr std::initializer_list<NWidgetPart> _nested_newgrf_actives_widge
 							SetStringTip(STR_INTRO_ONLINE_CONTENT, STR_INTRO_TOOLTIP_ONLINE_CONTENT),
 				EndContainer(),
 			EndContainer(),
+
+			/* Room for the size of the 3D vehicle sets, drawn on the frame's bottom line. */
+			NWidget(WWT_EMPTY, Colours::Invalid, WID_NS_OBJECT_SIZE), SetFill(1, 0), SetResize(1, 0),
 		EndContainer(),
 	EndContainer(),
 };

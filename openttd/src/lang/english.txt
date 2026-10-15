@@ -3827,6 +3827,10 @@ STR_NEWGRF_SETTINGS_CAPTION                                     :{WHITE}NewGRF S
 STR_NEWGRF_SETTINGS_INFO_TITLE                                  :{WHITE}Detailed NewGRF information
 STR_NEWGRF_SETTINGS_ACTIVE_LIST                                 :{WHITE}I handle every industry GRF at once, 128 cargoes
 STR_NEWGRF_SETTINGS_INACTIVE_LIST                               :{WHITE}Inactive NewGRF files
+STR_NEWGRF_SETTINGS_OBJECT_SIZE                                 :Size of the 3D vehicles:
+STR_NEWGRF_SETTINGS_OBJECT_SIZE_ORIGINAL                        :original, bigger (BRYLE)
+STR_NEWGRF_SETTINGS_OBJECT_SIZE_SMALLER                         :smaller (CZTR)
+STR_NEWGRF_SETTINGS_OBJECT_SIZE_TOOLTIP                         :{BLACK}The size of every vehicle drawn from a 3D object (trains, road vehicles, ships, aircraft), of all the 3D NewGRFs at once: the original game's, bigger as BRYLE, or smaller as CZTR. Sets the size parameter of each active 3D NewGRF that has one, and for a new game the game's setting too
 STR_NEWGRF_SETTINGS_SELECT_PRESET                               :{ORANGE}Select preset:
 STR_NEWGRF_FILTER_TITLE                                         :{ORANGE}Filter:
 STR_NEWGRF_SETTINGS_PRESET_LIST_TOOLTIP                         :{BLACK}Load the selected preset

@@ -60,6 +60,8 @@ enum NewGRFStateWidgets : WidgetID {
 	WID_NS_SHOW_REMOVE,       ///< Select active list buttons (0 = normal, 1 = simple layout).
 	WID_NS_SHOW_EDIT,         ///< Select display of the buttons below the 'details'.
 	WID_NS_SHOW_APPLY,        ///< Select display of the apply button.
+	WID_NS_ACTIVE_FRAME,      ///< Frame of the active list; its bottom line carries the size of the 3D vehicle sets.
+	WID_NS_OBJECT_SIZE,       ///< Room in that frame above the size of the 3D vehicle sets.
 };
 
 /** Widgets of the #SavePresetWindow class. */

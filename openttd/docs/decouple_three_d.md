@@ -463,6 +463,18 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   the colleague's two sets have it. Ships and aircraft keep their sets'
   lengths. The lengths depend on the object files: every player of a network
   game must have the same.
+- **Size as a parameter of the set** (`"velikost": {"parametr": 0, "hodnoty":
+  {"0": 1.2, "1": 1.0}}`, the colleague's Sergej v3): an object with it is drawn
+  at the scale its set's parameter makes (`GRFFile::GetParam()`), the setting
+  only for those without it. **All the 3D sets at once** (the player, 15. 10.:
+  "instead of the frame's line our text size and a toggle"): on the bottom line
+  of the frame of the active list in the NewGRF window, as its caption on the top,
+  *Size of the 3D vehicles* and a toggle, original (bigger, BRYLE) or smaller
+  (CZTR): a click sets every active set with `velikost` to the value of its
+  biggest or smallest scale, and in the window of a new game the setting too
+  (`NewGRFWindow::ToggleObjectSize()`, `WID_NS_ACTIVE_FRAME`); it shows the first
+  such set, or the setting. In a game it changes only with the parameters (the
+  NewGRF developer tools) and is applied as they are.
 - **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the
   body's texture's layout (the texture of the file, or `textura`), 255 where it
   is paint; `cil` RRGGBB the colour it fades to in `let` years, a step every

@@ -32,6 +32,7 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -142,6 +143,24 @@ struct ThreeDVehicleRust {
 	float ramp = 0.25f;         ///< "postupne": "nabeh", the share of "let" a pixel takes from bare to all rust
 };
 
+/**
+ * The size a set's vehicle objects are drawn at as a parameter of the set ("velikost", grrrrf PROSBA-VOZIDLA-3D.md):
+ * a value of the parameter, the scale it makes. Without it the game's setting decides.
+ */
+struct ThreeDVehicleSize {
+	int param = -1;             ///< "parametr": the set's parameter; -1 for none
+	std::vector<std::pair<uint32_t, float>> values; ///< "hodnoty": a value of the parameter and the scale it draws at
+
+	/** The scale a value of the parameter makes, if it names one. */
+	std::optional<float> ScaleOf(uint32_t value) const
+	{
+		for (const auto &[v, scale] : this->values) {
+			if (v == value) return scale;
+		}
+		return std::nullopt;
+	}
+};
+
 /** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
 struct ThreeDVehicleCrew {
 	std::string figure;         ///< "postava": the figure's name
@@ -175,6 +194,7 @@ struct ThreeDVehicleObject {
 	float cab[3] = {};              ///< x, y, z, metres
 	ThreeDVehiclePaint paint;       ///< "lak"
 	ThreeDVehicleRust rust;         ///< "rez"
+	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none
@@ -208,6 +228,7 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = 
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 void ResetThreeDVehicleObjects();
+const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid);
 std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);
