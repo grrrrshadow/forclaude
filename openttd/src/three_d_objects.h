@@ -232,6 +232,9 @@ struct ThreeDVehicleObject {
 	int frames = 0;                 ///< "snimku": how many frames
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
 	float walk_step = 0;            ///< "chuze": "krok_m", metres a round of its frames walks; 0 when it does not walk
+	int spin_ticks = 0;             ///< a thing that turns ("predmet" with "otaceni", the spit of the pub): game ticks a turn ("tiku_na_otacku"), 0 for none
+	float spin_axis[3] = {1, 0, 0}; ///< "osa": the axis it turns about, in its frame
+	float spin_centre[3] = {};      ///< "stred": a point of the axis, metres
 	std::string tint_material;      ///< an effect's "barvy": the material the game colours ("material")
 	std::vector<uint32_t> tint_palette; ///< and the colours it may be ("paleta", Colour::data)
 

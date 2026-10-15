@@ -890,7 +890,8 @@ static void ReadThreeDVehicleObjects()
 					_effect_objects.push_back(std::move(fx));
 					continue;
 				}
-				if ((e.value("druh", std::string("dum")) == "postava" || e.value("druh", std::string("dum")) == "rostlina") && e.contains("soubor")) {
+				const std::string figure_kind = e.value("druh", std::string("dum"));
+				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet") && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
 					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
 					 * its file in the lists of plants ("rostliny"). */
@@ -910,6 +911,32 @@ static void ReadThreeDVehicleObjects()
 						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
 						if (fig.frames < 2) fig.frame_prefix.clear();
 						if (a.contains("chuze") && a.at("chuze").is_object()) fig.walk_step = std::clamp(a.at("chuze").value("krok_m", 0.0f), 0.0f, 10.0f);
+					}
+					/* A thing that turns (the colleague's hra/3d/PROSBA-HOSPODA.md, the spit: "we will turn it"): about an
+					 * axis through a point, a turn in so many ticks, smoothly; and its frames ("stridani", the pig, the
+					 * calf and the lamb) one after another, each for so many turns. */
+					if (e.contains("otaceni") && e.at("otaceni").is_object()) {
+						const auto &o = e.at("otaceni");
+						fig.spin_ticks = std::clamp(o.value("tiku_na_otacku", 0), 0, 100000);
+						if (o.contains("osa") && o.at("osa").is_array() && o.at("osa").size() == 3) {
+							for (int k = 0; k < 3; k++) fig.spin_axis[k] = o.at("osa").at(k).get<float>();
+						}
+						if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
+							for (int k = 0; k < 3; k++) fig.spin_centre[k] = o.at("stred").at(k).get<float>();
+						}
+						const float len = std::sqrt(fig.spin_axis[0] * fig.spin_axis[0] + fig.spin_axis[1] * fig.spin_axis[1] + fig.spin_axis[2] * fig.spin_axis[2]);
+						if (len < 1e-6f) {
+							fig.spin_ticks = 0;
+						} else {
+							for (float &c : fig.spin_axis) c /= len;
+						}
+					}
+					if (e.contains("stridani") && e.at("stridani").is_object()) {
+						const auto &a = e.at("stridani");
+						fig.frame_prefix = a.value("uzly", std::string("snimek_"));
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(std::max(1, fig.spin_ticks) * std::max(1, a.value("otocek", 1)), 1, 1000000);
+						if (fig.frames < 2) fig.frame_prefix.clear();
 					}
 					_figure_objects.push_back(std::move(fig));
 					continue;

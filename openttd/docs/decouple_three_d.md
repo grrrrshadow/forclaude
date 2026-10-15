@@ -431,6 +431,13 @@ too.
   so the hundreds of plants of a field share a few pictures; baked into the
   building they would be up to 360 000 triangles (the hut) and 125 000 a
   tile of the grown field.
+- **Things that turn** (`"druh": "predmet"` of the figures' index, the pub's
+  spit): `otaceni` -- `osa` the axis in the thing's frame, `stred` a point of
+  it, `tiku_na_otacku` the game ticks a turn -- and `stridani` -- `uzly` the
+  nodes of its frames, `snimku` how many, `otocek` the turns each is shown
+  (the pig, the calf and the lamb). Drawn as a figure, its picture turned in
+  24 steps a turn (`SPIN_STEPS`, the vertices and normals turned about the
+  axis, `RasterObject()`), its tile drawn again at every step.
 
 One house is kept as the first technology drew it, the boxes of its hand
 table, in memory of it: 0x1c, the tall office block (the player: "I am
