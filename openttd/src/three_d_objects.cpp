@@ -654,6 +654,8 @@ static IndustryType IndexIndustryType(std::string_view name)
 	if (name == "IT_WEED_MACHINE") return IT_WEED_MACHINE;
 	if (name == "IT_COFFEESHOP") return IT_COFFEESHOP;
 	if (name == "IT_MARIJUANA_PLANTATION") return IT_MARIJUANA_PLANTATION;
+	if (name == "lihovar" || name == "IT_DISTILLERY") return IT_DISTILLERY;
+	if (name == "hospoda" || name == "IT_PUB") return IT_PUB;
 	return 0xFF;
 }
 
@@ -1446,7 +1448,7 @@ bool GetThreeDFieldTile(const ThreeDPlantationTile &tile, ThreeDFieldTile &out)
 	out = {};
 	out.soil = GetThreeDFieldPart("zem");
 	if (out.soil == nullptr) return false;
-	const int crop = 0; // marijuana
+	const int crop = tile.crop & 1;
 	static const char *const small[2] = {"mari_male", "brambory_male"};
 	static const char *const grown[2] = {"mari_vzrostle", "brambory_vzrostle"};
 	if (tile.stage == 1) out.plants = GetThreeDFieldPart(small[crop]);

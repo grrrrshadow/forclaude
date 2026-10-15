@@ -413,7 +413,16 @@ too.
   `pole_<name>`, twice the size), and from the tile before the field road the
   road `cesta` (flat, sorted first, under the cars), the shed `bouda` and the
   haystack `seno` on its first tile and the girls by its edges (`u_cesty`,
-  `okraj` `sz`/`jv`), each its own thing to sort.
+  `okraj` `sz`/`jv`), each its own thing to sort. The potato field (`IT_POTATO_FIELD`,
+  15. 10., the player: "the potato field like the marijuana one, and the same") is laid
+  the same way with `brambory_male`/`brambory_vzrostle` and the soil's `prace`
+  `brambory`; the distillery (`lihovar`, `IT_DISTILLERY`, 3x3, potatoes to alcohol)
+  and the pub (`hospoda`, `IT_PUB`, in a town, alcohol to passengers) are drawn
+  from their objects. Facing north the game's own industries are drawn from
+  their objects too, as the houses (`gui.three_d_north_houses`,
+  `AddIndustryObjects()`): the potatoes, the distillery and the pub have no
+  pictures of their own (without the objects: the soil, a warehouse in a
+  concrete yard, an old house).
 - **Plants** (`"rostliny"` of a building or a part: `soubor` a record
   `"druh": "rostlina"`, its foot at the origin and 1 m high, `poloha`,
   `otoceni`, `meritko` [x, y, z] metres): drawn as figures, a picture of the

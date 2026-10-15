@@ -2329,8 +2329,8 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 
 STR_CONFIG_SETTING_THREE_D                                      :3D: náhledy a otáčení herní plochy: {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vozidla (vlaky, auta, lodě, letadla) ve velikosti původní hry, větší (BRÝLE); vypnuto menší (CZTR): {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Všechna vozidla, která hra kreslí z jejich 3D objektu (GRF s objekty, ne z obrázků), najednou: velikost původní hry jako větší sady (BRÝLE), o 20 % větší; vypnuto menší, v měřítku CZTR. Délku vlaků a aut určuje objekt, takže vlak je dlouhý, jak vypadá. Pro novou hru: nastav v hlavním menu před založením hry
-STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Domy při pohledu na sever (úhel 0): {STRING}
-STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :Jak vypadají domy, které mají 3D objekt, když je herní plocha natočená na sever (úhel 0, jako při stavění): jako 3D objekty, stejně jako při otáčení; nebo původní obrázky domů (sprity), jak je hra kreslila dřív. Domy bez 3D objektu mají svoje obrázky vždycky. Potřebuje zapnuté 3D a 32bpp blitter
+STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Domy a průmysl hry při pohledu na sever (úhel 0): {STRING}
+STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :Jak vypadají domy a průmysl hry (gymnázium, socha, plantáž, bramborové pole, lihovar, hospoda…), které mají 3D objekt, když je herní plocha natočená na sever (úhel 0, jako při stavění): jako 3D objekty, stejně jako při otáčení; nebo jejich obrázky (sprity), jak je hra kreslila dřív. Ty bez 3D objektu mají svoje obrázky vždycky. Potřebuje zapnuté 3D a 32bpp blitter
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, stejně jako při otáčení
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :původní obrázky
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Kulaté zatáčky kolejí: {STRING}
@@ -6448,6 +6448,18 @@ STR_INDUSTRY_NAME_STATUE                                        :{G=f}Socha Karl
 STR_INDUSTRY_NAME_STATUE.gen                                    :sochy Karla Máchy
 STR_INDUSTRY_NAME_STATUE.loc                                    :u sochy Karla Máchy
 STR_INDUSTRY_NAME_STATUE.small                                  :socha Karla Máchy
+STR_INDUSTRY_NAME_POTATO_FIELD                                  :{G=n}Bramborové pole
+STR_INDUSTRY_NAME_POTATO_FIELD.gen                              :bramborového pole
+STR_INDUSTRY_NAME_POTATO_FIELD.loc                              :na bramborovém poli
+STR_INDUSTRY_NAME_POTATO_FIELD.small                            :bramborové pole
+STR_INDUSTRY_NAME_DISTILLERY                                    :{G=m}Lihovar
+STR_INDUSTRY_NAME_DISTILLERY.gen                                :lihovaru
+STR_INDUSTRY_NAME_DISTILLERY.loc                                :v lihovaru
+STR_INDUSTRY_NAME_DISTILLERY.small                              :lihovar
+STR_INDUSTRY_NAME_PUB                                           :{G=f}Hospoda
+STR_INDUSTRY_NAME_PUB.gen                                       :hospody
+STR_INDUSTRY_NAME_PUB.loc                                       :v hospodě
+STR_INDUSTRY_NAME_PUB.small                                     :hospoda
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

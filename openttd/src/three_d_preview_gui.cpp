@@ -380,7 +380,7 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		top = static_cast<int>(std::ceil(obj->top));
 		return true;
 	}
-	if (ind->type != IT_MARIJUANA_PLANTATION) return false;
+	if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) return false;
 	const double a = yaw * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
 	std::vector<std::pair<double, ThreeDObjectPlacement>> laid;
 	for (TileIndex tile : ind->location) {
@@ -620,7 +620,7 @@ void ShowThreeDIndustryPreview(IndustryID industry)
 {
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
-	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) == nullptr && (ind->type != IT_MARIJUANA_PLANTATION || GetThreeDFieldPart("zem") == nullptr)) return;
+	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) == nullptr && ((ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) || GetThreeDFieldPart("zem") == nullptr)) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
 }
 

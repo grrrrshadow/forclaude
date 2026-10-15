@@ -63,6 +63,15 @@ static const IndustryType IT_GYMNASIUM = NUM_INDUSTRYTYPES - 4;
 static const IndustryType IT_WEED_MACHINE = NUM_INDUSTRYTYPES - 3;
 /** The statue of Karel Macha, in a town or out of one (economy.extra_industries): takes studentky and tourists. */
 static const IndustryType IT_STATUE = NUM_INDUSTRYTYPES - 5;
+/**
+ * The potato field (economy.extra_industries): the marijuana plantation's shape and life -- bare until studentky
+ * come, growing while they tend it -- growing potatoes (the player: "the potato field like the marijuana one").
+ */
+static const IndustryType IT_POTATO_FIELD = NUM_INDUSTRYTYPES - 6;
+/** The distillery (lihovar), 3x3 (economy.extra_industries): makes alcohol of the potatoes it is given. */
+static const IndustryType IT_DISTILLERY = NUM_INDUSTRYTYPES - 7;
+/** The pub (hospoda), one tile in a town (economy.extra_industries): takes alcohol, gives passengers, its guests. */
+static const IndustryType IT_PUB = NUM_INDUSTRYTYPES - 8;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -98,8 +107,15 @@ static const IndustryGfx  GFX_STATUE = NUM_INDUSTRYTILES - 8;
  */
 static const IndustryGfx  GFX_HUT_BACK = NUM_INDUSTRYTILES - 9;
 static const IndustryGfx  GFX_HUT_FRONT = NUM_INDUSTRYTILES - 10;
+/** The tile of the potato field (IT_POTATO_FIELD), laid as the marijuana plantation's. */
+static const IndustryGfx  GFX_POTATO_FIELD = NUM_INDUSTRYTILES - 11;
+/** The tiles of the distillery (IT_DISTILLERY): its yard, and its building in the middle. */
+static const IndustryGfx  GFX_DISTILLERY_YARD = NUM_INDUSTRYTILES - 12;
+static const IndustryGfx  GFX_DISTILLERY = NUM_INDUSTRYTILES - 13;
+/** The tile of the pub (IT_PUB). */
+static const IndustryGfx  GFX_PUB = NUM_INDUSTRYTILES - 14;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_HUT_FRONT;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_PUB;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

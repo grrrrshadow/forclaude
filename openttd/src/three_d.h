@@ -106,6 +106,7 @@ struct ThreeDPlantationTile {
 	bool shed;         ///< the road tile behind has the shed and the haystack
 	bool girls_nw;     ///< the road tile behind has the pair of girls by its north-west edge
 	bool girls_se;     ///< and by its south-east edge
+	uint8_t crop = 0;  ///< what grows: 0 marijuana (the plantation), 1 potatoes (the potato field)
 };
 bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out);
 const char *ThreeDPlantationWorkerName(int worker);

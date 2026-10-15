@@ -33,7 +33,11 @@
  * plantation is laid from the player's tiles too, and lives by the girls:
  * bare until studentky come, growing while they tend it, bare again and
  * yielding nothing half a year after they stopped coming
- * (MarijuanaPlantationStage()).
+ * (MarijuanaPlantationStage()). The player's chain of potatoes (15. 10.): the
+ * potato field (IT_POTATO_FIELD), the plantation's shape and life growing
+ * potatoes (CT_POTATOES), the distillery (IT_DISTILLERY) making alcohol
+ * (CT_ALCOHOL) of them and the pub in a town (IT_PUB) taking it and giving
+ * passengers, its guests.
  */
 
 #ifndef CLIMATE_INDUSTRIES_H

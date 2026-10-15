@@ -1278,6 +1278,7 @@ static int GetViewportY(Point tile)
  */
 static bool _north_house_objects = false;
 static void AddNorthHouseObject(size_t first_parent);
+static void AddIndustryObjects(size_t first_parent);
 
 static void ViewportAddLandscape()
 {
@@ -1387,6 +1388,7 @@ static void ViewportAddLandscape()
 				size_t first_parent = _vd.parent_sprites_to_draw.size();
 				_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 				if (_north_house_objects && tile_type == TileType::House) AddNorthHouseObject(first_parent);
+				if (_north_house_objects && tile_type == TileType::Industry) AddIndustryObjects(first_parent);
 				if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 			}
 		}
@@ -3407,6 +3409,52 @@ static void AddTurnedObjectsToDraw()
 }
 
 /**
+ * One of the game's own industries as a real 3D object (the colleague's objekty/prumysl/): drawn once, whole, as a
+ * house; a tile of a field (the marijuana plantation, the potato field) laid from the parts of the fields -- the
+ * soil under the plants of the stage and the girl at work, and from the tile before the field road the road tile
+ * behind it with the road (flat and first, under the cars), the shed and the haystack and the girls by its edges,
+ * each its own thing. The sprites the tile just added are left out (box_kind 4). In the turned view, and facing
+ * north as the houses (gui.three_d_north_houses): the potato field, the distillery and the pub have no pictures of
+ * their own there.
+ * @param first_parent the first of the sprites the tile added
+ */
+static void AddIndustryObjects(size_t first_parent)
+{
+	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries) || !IsIndustryCompleted(_cur_ti.tile)) return;
+	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
+	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+	ThreeDPlantationTile pt;
+	ThreeDFieldTile ft;
+	if (obj != nullptr) {
+		for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+		const TileIndex origin = ind->location.tile;
+		bool known = false;
+		for (const TurnedObject &to : _turned_objects) {
+			if (to.origin == origin && to.obj == obj) known = true;
+		}
+		if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+	} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
+		for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+		if (ft.plants != nullptr) {
+			_turned_objects.push_back({ft.plants, _cur_ti.tile, _cur_ti.z, ft.soil, ft.worker});
+		} else {
+			_turned_objects.push_back({ft.soil, _cur_ti.tile, _cur_ti.z, nullptr, ft.worker});
+		}
+		if (ft.road != nullptr) {
+			const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
+			const int road_z = GetTilePixelZ(road_tile);
+			_turned_objects.push_back({ft.road, road_tile, road_z, nullptr, {}, -4 * static_cast<int>(TILE_HEIGHT)});
+			if (ft.shed != nullptr) _turned_objects.push_back({ft.shed, road_tile, road_z});
+			if (ft.hay != nullptr) _turned_objects.push_back({ft.hay, road_tile, road_z});
+			for (int edge = 0; edge < 2; edge++) {
+				if (!ft.girls[edge].empty()) _turned_objects.push_back({nullptr, road_tile, road_z, nullptr, ft.girls[edge]});
+			}
+		}
+		if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: field tile x {} stage {} worker {} road behind {}: plants {}, worker {}", pt.x, pt.stage, pt.worker, pt.road_behind, ft.plants != nullptr ? ft.plants->name : "none", ft.worker.size());
+	}
+}
+
+/**
  * Facing north, a house that is a real 3D object drawn as in the turned view (the player, 15. 10.: "which houses show
  * at view 0, the original houses as today or the same as when we turn; by default the same as when we turn",
  * gui.three_d_north_houses): the sprites the house's tile just added are left out (box_kind 4) and its object is
@@ -3664,43 +3712,8 @@ static void ViewportDoDrawTurned()
 				}
 			}
 		}
-		/* One of the game's own industries as a real 3D object (the colleague's objekty/prumysl/): drawn once, whole,
-		 * as a house; a tile of the plantation laid from the parts of the fields -- the soil under the plants of the
-		 * stage and the girl at work, and from the tile before the field road the road tile behind it with the road
-		 * (flat and first, under the cars), the shed and the haystack and the girls by its edges, each its own thing. */
-		if (tile_type == TileType::Industry && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Industries) && IsIndustryCompleted(_cur_ti.tile)) {
-			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
-			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
-			ThreeDPlantationTile pt;
-			ThreeDFieldTile ft;
-			if (obj != nullptr) {
-				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
-				const TileIndex origin = ind->location.tile;
-				bool known = false;
-				for (const TurnedObject &to : _turned_objects) {
-					if (to.origin == origin && to.obj == obj) known = true;
-				}
-				if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
-			} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
-				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
-				if (ft.plants != nullptr) {
-					_turned_objects.push_back({ft.plants, _cur_ti.tile, _cur_ti.z, ft.soil, ft.worker});
-				} else {
-					_turned_objects.push_back({ft.soil, _cur_ti.tile, _cur_ti.z, nullptr, ft.worker});
-				}
-				if (ft.road != nullptr) {
-					const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
-					const int road_z = GetTilePixelZ(road_tile);
-					_turned_objects.push_back({ft.road, road_tile, road_z, nullptr, {}, -4 * static_cast<int>(TILE_HEIGHT)});
-					if (ft.shed != nullptr) _turned_objects.push_back({ft.shed, road_tile, road_z});
-					if (ft.hay != nullptr) _turned_objects.push_back({ft.hay, road_tile, road_z});
-					for (int edge = 0; edge < 2; edge++) {
-						if (!ft.girls[edge].empty()) _turned_objects.push_back({nullptr, road_tile, road_z, nullptr, ft.girls[edge]});
-					}
-				}
-				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: field tile x {} stage {} worker {} road behind {}: plants {}, worker {}", pt.x, pt.stage, pt.worker, pt.road_behind, ft.plants != nullptr ? ft.plants->name : "none", ft.worker.size());
-			}
-		}
+		/* One of the game's own industries as a real 3D object (AddIndustryObjects()). */
+		if (tile_type == TileType::Industry) AddIndustryObjects(first_parent);
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
 		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses)) {
 			HouseID house = GetHouseType(_cur_ti.tile);

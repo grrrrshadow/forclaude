@@ -726,16 +726,16 @@ static int WhoCanServiceIndustry(Industry *ind);
  * plantation's changes the fruit plantation only; and to a set asking about
  * it the plantation is a fruit plantation.
  */
-static void SetupMarijuanaPlantation()
+static void SetupField(IndustryType type, IndustryGfx gfx)
 {
 	const IndustrySpec &fruit = _origin_industry_specs[IT_FRUIT_PLANTATION];
 	const IndustryGfx fruit_tile = fruit.layouts.front().front().gfx;
 
-	IndustryTileSpec &tile = _industry_tile_specs[GFX_MARIJUANA_PLANTATION];
+	IndustryTileSpec &tile = _industry_tile_specs[gfx];
 	tile = _origin_industry_tile_specs[fruit_tile];
 	tile.grf_prop.subst_id = fruit_tile;
 
-	IndustrySpec &spec = _industry_specs[IT_MARIJUANA_PLANTATION];
+	IndustrySpec &spec = _industry_specs[type];
 	spec = fruit;
 	/* The fruit plantation's one shape, PLANTATION_WIDTH tiles along x and
 	 * PLANTATION_HEIGHT along y, with the row of the field road left out.
@@ -749,24 +749,74 @@ static void SetupMarijuanaPlantation()
 	for (uint y = 0; y < PLANTATION_HEIGHT; y++) {
 		if (y == PLANTATION_ROAD_ROW) continue;
 		for (uint x = 0; x < PLANTATION_WIDTH; x++) {
-			layout.push_back({TileIndexDiffC{static_cast<int16_t>(x), static_cast<int16_t>(y)}, GFX_MARIJUANA_PLANTATION});
+			layout.push_back({TileIndexDiffC{static_cast<int16_t>(x), static_cast<int16_t>(y)}, gfx});
 		}
 	}
 	spec.layouts = {layout};
+	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
+	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
+	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), fruit.appear_ingame[to_underlying(LandscapeType::Tropic)]);
+	std::fill(std::begin(spec.appear_creation), std::end(spec.appear_creation), fruit.appear_creation[to_underlying(LandscapeType::Tropic)]);
+	spec.grf_prop.subst_id = IT_FRUIT_PLANTATION;
+	spec.enabled = true;
+}
+
+/**
+ * Put the marijuana plantation (economy.extra_industries) and its tile in
+ * their places, the last industry type and the last industry tile (SetupField()).
+ */
+static void SetupMarijuanaPlantation()
+{
+	SetupField(IT_MARIJUANA_PLANTATION, GFX_MARIJUANA_PLANTATION);
+	IndustrySpec &spec = _industry_specs[IT_MARIJUANA_PLANTATION];
 	spec.produced_cargo_label[0] = CT_MARIJUANA;
 	/* And hemp fibre from the same plants, as much again: the player's chain
 	 * to explosives starts here (the oil refinery takes it, see
 	 * ResolveExtraIndustryCargoes()). */
 	spec.produced_cargo_label[1] = CT_HEMP_FIBRE;
 	spec.production_rate[1] = spec.production_rate[0];
-	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
-	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
-	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), fruit.appear_ingame[to_underlying(LandscapeType::Tropic)]);
-	std::fill(std::begin(spec.appear_creation), std::end(spec.appear_creation), fruit.appear_creation[to_underlying(LandscapeType::Tropic)]);
 	spec.map_colour = PixelColour{0x54};
 	spec.name = STR_INDUSTRY_NAME_MARIJUANA_PLANTATION;
-	spec.grf_prop.subst_id = IT_FRUIT_PLANTATION;
-	spec.enabled = true;
+}
+
+/**
+ * Put the player's chain of potatoes (economy.extra_industries) in its places: the potato field, as big as the
+ * marijuana plantation and living as it does -- nothing grows until the studentky come (the player: "the potato
+ * field BRAM like the marijuana one, and the same; for something to grow the studentky have to come") -- the
+ * distillery, 3x3, making alcohol of the potatoes, and the pub in a town, taking the alcohol and giving
+ * passengers, its guests (the colleague's hra/3d/PROSBA-PRUMYSL-3D.md). Facing north, without the 3D objects,
+ * the field is its soil and the girls, the distillery a warehouse in a concrete yard, the pub an old house.
+ */
+static void SetupTownIndustry(IndustryType type, const IndustryTileLayout &layout, StringID name, uint8_t map_colour);
+
+static void SetupPotatoChain()
+{
+	SetupField(IT_POTATO_FIELD, GFX_POTATO_FIELD);
+	IndustrySpec &field = _industry_specs[IT_POTATO_FIELD];
+	field.produced_cargo_label[0] = CT_POTATOES;
+	field.map_colour = PixelColour{0x3D};
+	field.name = STR_INDUSTRY_NAME_POTATO_FIELD;
+
+	IndustryTileLayout yard;
+	for (int16_t y = 0; y < 3; y++) {
+		for (int16_t x = 0; x < 3; x++) {
+			yard.push_back({TileIndexDiffC{x, y}, x == 1 && y == 1 ? GFX_DISTILLERY : GFX_DISTILLERY_YARD});
+		}
+	}
+	SetupTownIndustry(IT_DISTILLERY, yard, STR_INDUSTRY_NAME_DISTILLERY, 0xC2);
+	IndustrySpec &distillery = _industry_specs[IT_DISTILLERY];
+	distillery.behaviour.Reset(IndustryBehaviour::OnlyInTown);
+	distillery.life_type = IndustryLifeType::Processing;
+	/* Made of what it is given, all of it: the potatoes (its first input) to alcohol (its first output). */
+	distillery.produced_cargo_label[0] = CT_ALCOHOL;
+	distillery.production_rate[0] = 0;
+	distillery.input_cargo_multiplier[0][0] = 256;
+
+	SetupTownIndustry(IT_PUB, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_PUB}}, STR_INDUSTRY_NAME_PUB, 0xB8);
+	IndustrySpec &pub = _industry_specs[IT_PUB];
+	pub.produced_cargo_label[0] = CT_PASSENGERS;
+	pub.production_rate[0] = 0;
+	pub.input_cargo_multiplier[0][0] = 256;
 }
 
 /**
@@ -788,6 +838,13 @@ static_assert(std::size(_coffeeshop_draw_tile_data) == INDUSTRY_COMPLETED + 1);
 		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
 		{ {{0, 0, 0}, {16, 16, height}, {}}, { SPR_FLAT_GRASS_TILE, PAL_NONE }, { building, PAL_NONE }, 0 }, \
 	}
+/** The same on other ground than grass (the distillery's concrete yard). */
+#define OWN_TILE_ON(ground, building, height) { \
+		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
+		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
+		{ {{0, 0, 0}, {16, 16, 0}, {}}, { SPR_FLAT_BARE_LAND, PAL_NONE }, { 0, PAL_NONE }, 0 }, \
+		{ {{0, 0, 0}, {16, 16, height}, {}}, { ground, PAL_NONE }, { building, PAL_NONE }, 0 }, \
+	}
 
 /**
  * The tiles of the girls' grammar school, north, west, east and south, and of
@@ -806,12 +863,17 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE(SPR_STATUE_STONE, 40),     // GFX_STATUE
 	OWN_TILE(SPR_HUT_BACK, 40),         // GFX_HUT_BACK
 	OWN_TILE(SPR_HUT_FRONT, 40),        // GFX_HUT_FRONT
+	OWN_TILE(0, 30),                    // GFX_POTATO_FIELD: laid as the plantation's, DrawMarijuanaPlantationTile()
+	OWN_TILE_ON(SPR_CONCRETE_GROUND, 0, 0),      // GFX_DISTILLERY_YARD
+	OWN_TILE_ON(SPR_CONCRETE_GROUND, 0x5C3, 31), // GFX_DISTILLERY: the warehouse (house 0x12)
+	OWN_TILE(0x5D4, 22),                // GFX_PUB: the old house (house 0x18)
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
 /** A tile of the marijuana plantation: bare land while it is built; finished, it is laid from its pictures by DrawMarijuanaPlantationTile(), nothing from here. */
 static const DrawBuildingsTileStruct _marijuana_plantation_draw_tile_data[] = OWN_TILE(0, 30);
 #undef OWN_TILE
+#undef OWN_TILE_ON
 
 /**
  * How a tile of the game's own industries that is not drawn as an original
@@ -971,7 +1033,7 @@ PlantationStage MarijuanaPlantationStage(const Industry *ind)
  */
 static void TendMarijuanaPlantations()
 {
-	for (IndustryID id : Industry::industries[IT_MARIJUANA_PLANTATION]) {
+	for (IndustryType type : {IT_MARIJUANA_PLANTATION, IT_POTATO_FIELD}) for (IndustryID id : Industry::industries[type]) {
 		Industry *i = Industry::Get(id);
 		if (HasGirls(i)) {
 			i->plantation_care = static_cast<uint8_t>(std::min<uint>(i->plantation_care + 1, PLANTATION_CARE_MAX));
@@ -1045,7 +1107,7 @@ bool IsMarijuanaPlantationRoad(TileIndex tile)
 {
 	if (TileY(tile) < PLANTATION_ROAD_ROW) return false;
 	TileIndex behind = TileAddXY(tile, 0, -1);
-	if (!IsTileType(behind, TileType::Industry) || GetIndustryGfx(behind) != GFX_MARIJUANA_PLANTATION) return false;
+	if (!IsTileType(behind, TileType::Industry) || (GetIndustryGfx(behind) != GFX_MARIJUANA_PLANTATION && GetIndustryGfx(behind) != GFX_POTATO_FIELD)) return false;
 	const Industry *ind = Industry::GetByTile(behind);
 	return TileY(tile) == TileY(ind->location.tile) + PLANTATION_ROAD_ROW && TileX(tile) - TileX(ind->location.tile) < PLANTATION_WIDTH;
 }
@@ -1105,7 +1167,8 @@ static void DrawMarijuanaPlantationTile(const TileInfo *ti, const Industry *ind)
 	AddSortableSpriteToDraw(SPR_MARIJUANA_SOIL, PAL_NONE, ti->x, ti->y, ti->z, FIELD_BOUNDS, transparent);
 	if (stage != PlantationStage::Bare) {
 		bool grown = stage == PlantationStage::Grown;
-		AddChildSpriteScreen(grown ? SPR_MARIJUANA_PLANTS_GROWN : SPR_MARIJUANA_PLANTS_SMALL, PAL_NONE, 0, 0, transparent, nullptr, false, false);
+		/* The potatoes have no pictures of their own facing north: their soil, and the girls at work on it. */
+		if (ind->type == IT_MARIJUANA_PLANTATION) AddChildSpriteScreen(grown ? SPR_MARIJUANA_PLANTS_GROWN : SPR_MARIJUANA_PLANTS_SMALL, PAL_NONE, 0, 0, transparent, nullptr, false, false);
 		int worker = PlantationWorkerAt(x, y);
 		if (girls && worker >= 0) {
 			AddChildSpriteScreen((grown ? SPR_MARIJUANA_WORKER_GROWN : SPR_MARIJUANA_WORKER_SMALL) + worker, PAL_NONE, 0, 0, transparent, nullptr, false, false);
@@ -1137,7 +1200,8 @@ bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out)
 {
 	if (!IsTileType(tile, TileType::Industry) || !IsIndustryCompleted(tile)) return false;
 	const Industry *ind = Industry::GetByTile(tile);
-	if (ind->type != IT_MARIJUANA_PLANTATION) return false;
+	if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) return false;
+	out.crop = ind->type == IT_POTATO_FIELD ? 1 : 0;
 	uint x = TileX(tile) - TileX(ind->location.tile);
 	uint y = TileY(tile) - TileY(ind->location.tile);
 	PlantationStage stage = MarijuanaPlantationStage(ind);
@@ -1194,6 +1258,7 @@ SpriteID GameOwnIndustryTileSprite(TileIndex tile)
 	const DrawBuildingsTileStruct *dits = GameOwnIndustryDrawTile(gfx, INDUSTRY_COMPLETED);
 	if (dits == nullptr || !IsIndustryCompleted(tile)) return 0;
 	if (gfx == GFX_MARIJUANA_PLANTATION) return MarijuanaPlantationSprite(Industry::GetByTile(tile));
+	if (gfx == GFX_POTATO_FIELD) return SPR_MARIJUANA_SOIL;
 	return GameOwnIndustrySprite(Industry::GetByTile(tile), gfx, dits->building.sprite);
 }
 
@@ -1204,7 +1269,7 @@ SpriteID GameOwnIndustryTileSprite(TileIndex tile)
  */
 void MarkGameOwnIndustryDirty(const Industry *ind)
 {
-	if (ind->type != IT_GYMNASIUM && ind->type != IT_WEED_MACHINE && ind->type != IT_STATUE && ind->type != IT_COFFEESHOP && ind->type != IT_MARIJUANA_PLANTATION) return;
+	if (ind->type != IT_GYMNASIUM && ind->type != IT_WEED_MACHINE && ind->type != IT_STATUE && ind->type != IT_COFFEESHOP && ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) return;
 	for (TileIndex tile : ind->location) {
 		if (IsTileType(tile, TileType::Industry) && GetIndustryIndex(tile) == ind->index) MarkTileDirtyByTile(tile);
 	}
@@ -1232,8 +1297,14 @@ static const std::array<CargoLabel, 1> WEED_MACHINE_CARGOES{CT_MARIJUANA};
 /** What the statue of Karel Macha takes: studentky and tourists. */
 static const std::array<CargoLabel, 2> STATUE_CARGOES{CT_STUDENTKY, CargoLabel{'TOUR'}};
 
-/** What the marijuana plantation takes: the studentky who tend it (TendMarijuanaPlantations()). */
+/** What the marijuana plantation and the potato field take: the studentky who tend them (TendMarijuanaPlantations()). */
 static const std::array<CargoLabel, 1> PLANTATION_CARGOES{CT_STUDENTKY};
+
+/** What the distillery takes: the potatoes it makes alcohol of. */
+static const std::array<CargoLabel, 1> DISTILLERY_CARGOES{CT_POTATOES};
+
+/** What the pub takes: the alcohol its guests drink. */
+static const std::array<CargoLabel, 1> PUB_CARGOES{CT_ALCOHOL};
 
 /** How many studentky the girls' grammar school makes, as an industry's production rate. */
 static const uint8_t GYMNASIUM_PRODUCTION_RATE = 10;
@@ -1412,7 +1483,8 @@ void UpdateExtraIndustryCargoes()
 {
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
-		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE) continue;
+		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE &&
+				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -1477,6 +1549,9 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_WEED_MACHINE, WEED_MACHINE_CARGOES);
 	ResolveTownIndustryCargoes(IT_STATUE, STATUE_CARGOES);
 	ResolveTownIndustryCargoes(IT_MARIJUANA_PLANTATION, PLANTATION_CARGOES);
+	ResolveTownIndustryCargoes(IT_POTATO_FIELD, PLANTATION_CARGOES);
+	ResolveTownIndustryCargoes(IT_DISTILLERY, DISTILLERY_CARGOES);
+	ResolveTownIndustryCargoes(IT_PUB, PUB_CARGOES);
 }
 
 /**
@@ -1503,6 +1578,7 @@ void ResetIndustries()
 		SetupMarijuanaPlantation();
 		SetupCoffeeshop();
 		SetupGymnasium();
+		SetupPotatoChain();
 	}
 
 	/* Reset any overrides that have been set. */
@@ -2094,7 +2170,7 @@ static void DrawTile_Industry(TileInfo *ti)
 	if (IsInvisibilitySet(TransparencyOption::Industries)) return;
 
 	/* The plantation is laid from its own pictures. */
-	if (gfx == GFX_MARIJUANA_PLANTATION && stage == INDUSTRY_COMPLETED) {
+	if ((gfx == GFX_MARIJUANA_PLANTATION || gfx == GFX_POTATO_FIELD) && stage == INDUSTRY_COMPLETED) {
 		DrawMarijuanaPlantationTile(ti, ind);
 		return;
 	}
@@ -2959,7 +3035,7 @@ static void ProduceIndustryGoods(Industry *i)
 		/* Handle non-callback cargo production. A bare marijuana plantation
 		 * -- no girls have tended it, or none for half a year -- yields
 		 * nothing (MarijuanaPlantationStage()). */
-		bool bare_plantation = i->type == IT_MARIJUANA_PLANTATION && MarijuanaPlantationStage(i) == PlantationStage::Bare;
+		bool bare_plantation = (i->type == IT_MARIJUANA_PLANTATION || i->type == IT_POTATO_FIELD) && MarijuanaPlantationStage(i) == PlantationStage::Bare;
 		if (!indsp->callback_mask.Test(IndustryCallbackMask::Production256Ticks) && !bare_plantation) ProduceIndustryGoodsHelper(i, true);
 
 		IndustryBehaviours indbehav = indsp->behaviour;
@@ -3444,8 +3520,8 @@ static CommandCost CheckIfIndustryIsAllowed(TileIndex tile, IndustryType type, c
 	 * (SetupMarijuanaPlantation()): that row has to be flat open land, bare
 	 * or with trees, which go when the plantation is built, so that the road
 	 * picture drawn over it lies on the ground and the player can lay a road
-	 * there. */
-	if (type == IT_MARIJUANA_PLANTATION) {
+	 * there. The potato field's the same. */
+	if (type == IT_MARIJUANA_PLANTATION || type == IT_POTATO_FIELD) {
 		for (uint x = 0; x < PLANTATION_WIDTH; x++) {
 			TileIndex road_tile = TileAddWrap(tile, x, PLANTATION_ROAD_ROW);
 			if (!IsValidTile(road_tile) || !IsTileFlat(road_tile) || IsBridgeAbove(road_tile) ||
@@ -3849,7 +3925,7 @@ static void DoCreateNewIndustry(Industry *i, TileIndex tile, IndustryType type, 
 
 	/* The plantation's field road: the trees on the row left to the player
 	 * go, the row itself stays the player's (CheckIfIndustryIsAllowed()). */
-	if (type == IT_MARIJUANA_PLANTATION) {
+	if (type == IT_MARIJUANA_PLANTATION || type == IT_POTATO_FIELD) {
 		for (uint x = 0; x < PLANTATION_WIDTH; x++) {
 			TileIndex road_tile = TileAddXY(tile, x, PLANTATION_ROAD_ROW);
 			if (IsTileType(road_tile, TileType::Trees)) {

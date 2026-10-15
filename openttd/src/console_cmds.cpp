@@ -8679,7 +8679,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
 			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{}{}", obj->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), IsIndustryCompleted(ind->location.tile) ? "" : " (being built)");
 			ThreeDPlantationTile pt;
-			if (ind->type == IT_MARIJUANA_PLANTATION && GetThreeDPlantationTile(ind->location.tile, pt)) {
+			if ((ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDPlantationTile(ind->location.tile, pt)) {
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
 			}
 		}
@@ -8707,14 +8707,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * lists them): the statue's object of bronze builds it of bronze. */
 		auto x = number(2), y = number(3);
 		const ThreeDObject *obj = GetThreeDObjectByName(argv[4]);
-		if (!x.has_value() || !y.has_value() || obj == nullptr || obj->industry == 0xFF) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object>' (test3d objekty lists them).");
+		/* The fields have no object of their own, only parts: by their names. */
+		IndustryType type = obj != nullptr ? obj->industry : argv[4] == "plantaz" ? IT_MARIJUANA_PLANTATION : argv[4] == "brambory" ? IT_POTATO_FIELD : IT_INVALID;
+		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory>' (test3d objekty lists them).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
 		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
-		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, obj->industry, 0, true, 0);
-		if (cost.Succeeded() && IsTileType(tile, TileType::Industry)) {
+		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, 0, true, 0);
+		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && obj != nullptr) {
 			Industry *ind = Industry::GetByTile(tile);
 			SB(ind->random, 0, 1, obj->industry_variant == 1 ? 1 : 0);
 			for (TileIndex t : ind->location) {
@@ -8723,9 +8725,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		cur_company.Restore();
 		if (cost.Failed()) {
-			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", obj->name, *x, *y, cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("no reason given") : GetString(cost.GetErrorMessage()));
+			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", argv[4], *x, *y, cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("no reason given") : GetString(cost.GetErrorMessage()));
 		} else {
-			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", obj->name, *x, *y);
+			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", argv[4], *x, *y);
 		}
 	} else if (what == "okno" && argv.size() > 2) {
 		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'; or
@@ -8796,7 +8798,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		Industry *ind = Industry::GetByTile(TileXY(*x, *y));
-		if (ind->type != IT_MARIJUANA_PLANTATION) {
+		if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) {
 			IConsolePrint(CC_ERROR, "test3d: no plantation at {},{}", *x, *y);
 			return true;
 		}
