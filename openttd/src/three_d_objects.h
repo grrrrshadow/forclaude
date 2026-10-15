@@ -25,14 +25,17 @@
 #define THREE_D_OBJECTS_H
 
 #include "house_type.h"
+#include "industry_type.h"
 #include "engine_type.h"
 #include "tile_type.h"
 #include "vehicle_type.h"
+#include "zoom_type.h"
 
 #include <array>
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -66,6 +69,7 @@ struct ThreeDObjectFigure {
 	float at[3] = {};     ///< "poloha": where its feet stand, metres in the building's frame (from its north corner, z up)
 	float facing = 0;     ///< "otoceni": degrees in the world, 0 along +x, 90 along +y
 	float scale = 1;      ///< "meritko": its size against true metres; the building is in true metres
+	float stretch = 1;    ///< its height against its width (a plant's "meritko" [x, y, z]: z / x)
 };
 
 /** A door of a building ("dvere"): people come out of it and go in (three_d_walkers.h). */
@@ -95,6 +99,7 @@ struct ThreeDObject {
 	std::vector<uint16_t> light; ///< the light of each corner from its normal, 256 for 1 (lit as the vehicles); empty when the file has no normals, its light in its texture
 	std::vector<ThreeDObjectColourPart> colours; ///< "barvy": parts painted a colour by number
 	std::vector<ThreeDObjectFigure> figures;     ///< "postavy": figures standing on it, drawn among its triangles
+	std::vector<ThreeDObjectFigure> plants;      ///< "rostliny": plants standing on it ("druh": "rostlina" of the index, a figure 1 m high), drawn so too
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
 	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
 	std::string title_en;     ///< ... and in any other language ("en"); empty for the house's own name
@@ -102,6 +107,12 @@ struct ThreeDObject {
 	float stop[3] = {};       ///< there, world units along x and y from the north corner, units of height up
 	float stop_turn = 0;      ///< facing, degrees, 0 along +x
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
+	IndustryType industry = 0xFF; ///< "prumysl" ("druh": "prumysl"): the game's own industry it is, 0xFF none or one the game has not yet
+	std::string industry_name; ///< "prumysl" as the index writes it ("IT_GYMNASIUM", "lihovar")
+	int8_t industry_variant = -1; ///< "varianta": the statue of stone 0 ("kamen") or bronze 1 ("bronz", the industry's random bit 0); -1 any
+	std::string field_part;    ///< "dil" of a field ("druh": "pole"): "zem", "cesta", "bouda", "seno", "mari_male", "brambory_vzrostle", ...
+	std::array<std::vector<ThreeDObjectFigure>, 2> work;    ///< "prace" of the soil: the girls at work on a tile of marijuana [0], of potatoes [1]
+	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;
 	uint32_t PaintAt(TileIndex origin) const;
@@ -253,6 +264,37 @@ const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid);
 std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot);
+const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant);
+const ThreeDObject *GetThreeDFieldPart(std::string_view part);
+const ThreeDObject *GetThreeDObjectByName(std::string_view name);
+
+struct ThreeDPlantationTile;
+/**
+ * A tile of a field laid from the parts of the fields (GetThreeDFieldPart(), the colleague's
+ * hra/3d/PROSBA-PRUMYSL-3D.md): the soil with the plants of the stage on it and the girl at work, and from the tile
+ * before the field road the road tile behind it with the road, the shed and the haystack and the girls by its edges.
+ */
+struct ThreeDFieldTile {
+	const ThreeDObject *soil = nullptr;     ///< the soil ("zem")
+	const ThreeDObject *plants = nullptr;   ///< the plants of the stage, nullptr bare
+	std::span<const ThreeDObjectFigure> worker; ///< the girl at work on it, of the soil's "prace"
+	const ThreeDObject *road = nullptr;     ///< on the road tile behind: the field road ("cesta"), nullptr no road tile behind
+	const ThreeDObject *shed = nullptr;     ///< the shed ("bouda")
+	const ThreeDObject *hay = nullptr;      ///< the haystack ("seno")
+	std::span<const ThreeDObjectFigure> girls[2]; ///< the girls by the road's north-west edge and its south-east one
+};
+bool GetThreeDFieldTile(const ThreeDPlantationTile &tile, ThreeDFieldTile &out);
+
+/** A 3D object laid in a picture (RenderThreeDObjectsPicture()): where, world units from the picture's origin, and what stands on it besides. */
+struct ThreeDObjectPlacement {
+	const ThreeDObject *obj = nullptr;      ///< nullptr: only the figures
+	const ThreeDObject *ground = nullptr;   ///< drawn first under it, whole
+	std::span<const ThreeDObjectFigure> more; ///< figures besides its own
+	double x = 0, y = 0, z = 0;             ///< its north corner
+	uint32_t paint = 0;                     ///< its colours by number (ThreeDObject::PaintAt())
+};
+struct ThreeDModelPicture;
+bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, float yaw, ZoomLevel zoom, ThreeDModelPicture &out);
 const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();

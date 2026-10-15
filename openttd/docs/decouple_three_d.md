@@ -238,9 +238,11 @@ path takes -- what every tile's draw procedure and every vehicle says to draw
    building, a roof -- is a box as above. The rails under the platforms are
    ground and turn with the tile as they did.
 4. **The buildings rendered from eight directions with depth and normals**
-   (`src/three_d_model.cpp`, the table `table/three_d_models.h`: ten
+   are gone since 15. 10.: every one of them is a real 3D object now (the
+   houses in `objekty/mirne/`, our industry in `objekty/prumysl/`, below).
+   What they were: (`src/three_d_model.cpp`, the table `table/three_d_models.h`: ten
    houses of the temperate climate, the school, the statue of stone and of
-   bronze, the machine and the hut) turn for real. Every pixel of a render
+   bronze, the machine and the hut) turned for real. Every pixel of a render
    is a world point -- the camera that took it says where, the depth
    sprite says how far along the line of sight -- so the eight renders are
    eight point clouds in one frame, the building's. At any angle the two
@@ -391,6 +393,35 @@ too.
   drawn among its triangles by the middle of their height, so a parapet in
   front hides their feet (`DrawTurnedObject()`). The player (15. 10.): College
   Girl smoking by the parasols on the roof of the hotel (0x07), true size.
+- **Depth inside an object** (15. 10.): the triangles of an object, its figures
+  and plants go through a depth buffer over the pixels it covers
+  (`DrawObjectInto()`; nearness xr + yr + 2 z of the turned world, a figure as
+  near as its middle), still far first -- so the flags of the ÚV KSČ building
+  no longer show through its front, nor the grass of the field road through
+  the road laid a few centimetres over it.
+- **Our industry as 3D objects** (15. 10., the colleague's `objekty/prumysl/`,
+  `hra/3d/PROSBA-PRUMYSL-3D.md`; the sets `budovy3d_5`–`8`, 176 MB of renders,
+  gone): records `"druh": "prumysl"` with `prumysl` the industry
+  (`IT_GYMNASIUM`, `IT_STATUE` with `varianta` `kamen`/`bronz` by the
+  industry's random bit 0, `IT_WEED_MACHINE`, `IT_COFFEESHOP`; `lihovar` and
+  `hospoda` are read and wait for their industries), drawn once, whole, at
+  the industry's north corner (`GetThreeDIndustryObject()`). The plantation is
+  laid tile by tile from the parts of the fields (`"druh": "pole"`, `dil`,
+  `GetThreeDFieldTile()`): the soil `zem` under the plants of the stage
+  (`mari_male`, `mari_vzrostle`; the potatoes' parts wait for the potato
+  field), the girl at work on the tile from the soil's `prace` (her name
+  `pole_<name>`, twice the size), and from the tile before the field road the
+  road `cesta` (flat, sorted first, under the cars), the shed `bouda` and the
+  haystack `seno` on its first tile and the girls by its edges (`u_cesty`,
+  `okraj` `sz`/`jv`), each its own thing to sort.
+- **Plants** (`"rostliny"` of a building or a part: `soubor` a record
+  `"druh": "rostlina"`, its foot at the origin and 1 m high, `poloha`,
+  `otoceni`, `meritko` [x, y, z] metres): drawn as figures, a picture of the
+  plant at the view's angle (`GetThreeDPlantPicture()`), the angles to the
+  view and to the light in steps of 10 degrees and the sizes in twentieths,
+  so the hundreds of plants of a field share a few pictures; baked into the
+  building they would be up to 360 000 triangles (the hut) and 125 000 a
+  tile of the grown field.
 
 One house is kept as the first technology drew it, the boxes of its hand
 table, in memory of it: 0x1c, the tall office block (the player: "I am
@@ -695,9 +726,10 @@ nothing"). On the map nothing stops in time: the turned view draws a
 vehicle's own sprites only at a view turned by a multiple of 45 degrees, and
 a vehicle on a round curve always at its angle. A set whose chain gives no picture for some
 direction gets the old preview, the eight sprites one after another. Beside
-the **window of one of the game's own industries** that has eight renders
+the **window of one of the game's own industries** drawn as a 3D object
 (the school, the machine, the statue, the hut) and of the plantation it is
-the building, turning smoothly, drawn from its renders the way the map draws
+the building, turning smoothly, drawn from its object (the plantation from the
+parts of the fields, `RenderThreeDObjectsPicture()`) the way the map draws
 it, starting from the direction the map view is turned to. The size: four
 times the normal for what fits 360 pixels, else twice, else the normal (the
 player: a long wagon at 2x, not 4x). Off (the setting), neither appears. The
@@ -975,12 +1007,11 @@ the screen to `screenshot/<name>.png`, `test3d mys <x> <y>` says which tile
 the game finds under a pixel, `test3d cas [n]` times n redraws of the whole
 screen and says where the time went, `test3d ladeni <x> <y>` writes out how
 that tile is drawn (its sprites, walls, corners) and its texture as
-`textura.ppm`. For the buildings with eight renders: `test3d modely` lists
-them and whether their sprites are there, `test3d model <name>` reads the
-first render and makes the picture at the angle and zoom of the view, saying
-how long each took, `test3d budovy` says where such buildings stand on the
-map, `test3d postav <x> <y> <name>` puts one there (a house, or one of the
-game's own industries, which must be in a town). For the previews:
+`textura.ppm`. For the game's own industries drawn as 3D objects: `test3d objekty`
+lists every object read, `test3d budovy` says where such industries stand on the
+map, `test3d postav <x> <y> <object>` puts one there by its object's name
+(gymnazium, socha_kamen, socha_bronz, automat, chatka; it must be in a town), `test3d plantaz <x> <y> <care> [holky]`
+sets a plantation's stage. For the previews:
 `test3d okno nakup <auto|vlak|lod|letadlo>` opens the purchase window (with a
 company made for it, since the null driver's game starts as a spectator),
 `test3d okno prumysl <x> <y>` the window of the industry on that tile,
@@ -1017,8 +1048,8 @@ laid over openttd.grf's sprites with Action A: a set of the game's own
 graphics may replace any sprite loaded so far, openttd.grf's included
 (`SpriteReplace()` in `src/newgrf/newgrf_acta.cpp`, `GRFConfig::builtin_graphics`).
 
-The renders of the buildings that turn are the sets `budovy3d_<set>_V<version>.grf`
-there, each under 100 MB, made by `grafika/openttd_3d_grf.py` from the
+The renders of the buildings that turned were the sets `budovy3d_<set>_V<version>.grf`
+there (all gone since 15. 10., the buildings are 3D objects; the block of sprites stays for the game's own sets), each under 100 MB, made by `grafika/openttd_3d_grf.py` from the
 colleague's renders (grrrrf); a set made again gets the next version in its
 name and the old one goes, so the player takes only the sets that changed
 (the Windows build leaves them out; the player keeps them in the installed

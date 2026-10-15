@@ -1837,7 +1837,6 @@ void GfxInitSpriteMem()
 	ResetCutoutSprites();
 	ResetShiftedSprites();
 	ResetThreeDVehicleObjectSprites();
-	ClearThreeDModelCache();
 }
 
 /**
@@ -1850,7 +1849,6 @@ void GfxClearSpriteCache()
 	for (SpriteCache &sc : _spritecache) {
 		if (sc.ptr != nullptr) sc.ClearSpriteData();
 	}
-	ClearThreeDModelCache();
 
 	VideoDriver::GetInstance()->ClearSystemSprites();
 }

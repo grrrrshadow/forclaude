@@ -1152,7 +1152,7 @@ bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out)
 	return true;
 }
 
-/** The name of a girl at work on the plantation, 0 to 5, the order of SPR_MARIJUANA_WORKER_SMALL: her layer is pole_prace_<name>_f2 or _f3 (table/three_d_models.h). */
+/** The name of a girl at work on the plantation, 0 to 5, the order of SPR_MARIJUANA_WORKER_SMALL: she is the figure pole_<name> of the soil's "prace" (GetThreeDFieldTile(), three_d_objects.h). */
 const char *ThreeDPlantationWorkerName(int worker)
 {
 	static const char *const names[PLANTATION_WORKER_COUNT] = {"real", "sedi", "punk", "pubg", "char16", "chill"};

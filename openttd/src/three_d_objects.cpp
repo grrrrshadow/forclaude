@@ -50,6 +50,9 @@ static bool _three_d_objects_read = false;
 static std::map<std::pair<HouseID, uint>, size_t> _three_d_house_objects;
 /** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
 static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
+/** The game's own industries' objects by the industry and the variant (-1 any), and the parts of the fields by their name ("dil"). */
+static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objects;
+static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0);
 
@@ -552,7 +555,34 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 	}
 }
 
-/** The figures standing on a building ("postavy") and its doors ("dvere"). */
+/**
+ * The plants standing on a building or a field ("rostliny", the colleague's hra/3d/PROSBA-PRUMYSL-3D.md): a plant's
+ * file ("druh": "rostlina" of the index, its foot at the origin, 1 m high) at every place of the list -- "poloha"
+ * metres in the building's frame, "otoceni" degrees about z, "meritko" [x, y, z] its size in metres. Drawn as the
+ * figures, a picture of the plant at the view's angle kept for every one alike: baked into the building they would
+ * be hundreds of thousands of triangles a tile.
+ */
+static void ReadPlants(const nlohmann::json &e, ThreeDObject &obj)
+{
+	if (!e.contains("rostliny") || !e.at("rostliny").is_array()) return;
+	for (const auto &p : e.at("rostliny")) {
+		if (!p.is_object() || !p.contains("soubor") || !p.contains("poloha") || !p.at("poloha").is_array() || p.at("poloha").size() != 3) continue;
+		ThreeDObjectFigure plant;
+		plant.figure = p.at("soubor").get<std::string>();
+		if (plant.figure.ends_with(".glb")) plant.figure.resize(plant.figure.size() - 4);
+		for (int k = 0; k < 3; k++) plant.at[k] = p.at("poloha").at(k).get<float>();
+		plant.facing = p.value("otoceni", 0.0f);
+		if (p.contains("meritko") && p.at("meritko").is_array() && p.at("meritko").size() == 3) {
+			const float sx = p.at("meritko").at(0).get<float>(), sy = p.at("meritko").at(1).get<float>(), sz = p.at("meritko").at(2).get<float>();
+			plant.scale = std::clamp((sx + sy) / 2, 0.05f, 50.0f);
+			plant.stretch = std::clamp(sz / plant.scale, 0.1f, 10.0f);
+		} else if (p.contains("meritko") && p.at("meritko").is_number()) {
+			plant.scale = std::clamp(p.at("meritko").get<float>(), 0.05f, 50.0f);
+		}
+		obj.plants.push_back(std::move(plant));
+	}
+}
+
 /**
  * The name of a house that is a 3D object ("nazev"), shown in the land area information instead of the original house's
  * (the colleague's hra/3d/PROSBA-UV-KSC.md: house 0x1F is the ÚV KSČ building): one name, or one per language.
@@ -579,18 +609,25 @@ static void ReadBuildingTitle(const nlohmann::json &e, ThreeDObject &obj)
 	}
 }
 
+/** The figures standing on a building ("postavy") and its doors ("dvere"). */
+/** A figure of a list ("postava", "poloha", "otoceni", "meritko"); whether it is one. */
+static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
+{
+	if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) return false;
+	const auto &at = f.at("poloha");
+	if (!at.is_array() || at.size() != 3) return false;
+	fig.figure = f.at("postava").get<std::string>();
+	for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
+	fig.facing = f.value("otoceni", 0.0f);
+	fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
+	return true;
+}
+
 static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 {
 	if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
-		if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) continue;
-		const auto &at = f.at("poloha");
-		if (!at.is_array() || at.size() != 3) continue;
 		ThreeDObjectFigure fig;
-		fig.figure = f.at("postava").get<std::string>();
-		for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
-		fig.facing = f.value("otoceni", 0.0f);
-		fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
-		obj.figures.push_back(std::move(fig));
+		if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
 	}
 	/* Its doors (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): people come out and go in there. */
 	if (e.contains("dvere") && e.at("dvere").is_array()) {
@@ -609,6 +646,67 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 	}
 }
 
+/** The game's own industry an index names ("prumysl"): its constant's name; 0xFF for one the game has not (yet). */
+static IndustryType IndexIndustryType(std::string_view name)
+{
+	if (name == "IT_GYMNASIUM") return IT_GYMNASIUM;
+	if (name == "IT_STATUE") return IT_STATUE;
+	if (name == "IT_WEED_MACHINE") return IT_WEED_MACHINE;
+	if (name == "IT_COFFEESHOP") return IT_COFFEESHOP;
+	if (name == "IT_MARIJUANA_PLANTATION") return IT_MARIJUANA_PLANTATION;
+	return 0xFF;
+}
+
+/**
+ * One of the game's own industries as a 3D object ("druh": "prumysl", the colleague's hra/3d/PROSBA-PRUMYSL-3D.md):
+ * "prumysl" the industry, "varianta" the statue's stone ("kamen") or bronze ("bronz"); or a part of a field ("druh":
+ * "pole", "dil") the game lays tile by tile: the soil with the girls at work on it ("prace", of marijuana and of
+ * potatoes), the field road with the girls by it ("u_cesty"), the shed, the haystack, the plants of each stage (only
+ * "rostliny", no file of its own).
+ */
+static void ReadIndustryObject(const nlohmann::json &e, const std::string &folder, bool field)
+{
+	ThreeDObject obj;
+	obj.file = e.value("soubor", std::string());
+	obj.name = e.value("jmeno", obj.file);
+	obj.variants = 0; // no house's
+	obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
+	obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
+	if (!obj.file.empty() && !ReadGlb(folder + obj.file, obj)) return;
+	ReadColourParts(e, folder, obj);
+	ReadBuildingFigures(e, obj);
+	ReadBuildingTitle(e, obj);
+	ReadPlants(e, obj);
+	if (field) {
+		obj.field_part = e.value("dil", std::string());
+		if (obj.field_part.empty()) return;
+		if (e.contains("prace") && e.at("prace").is_object()) {
+			static const char *const crops[2] = {"marihuana", "brambory"};
+			for (int k = 0; k < 2; k++) {
+				if (!e.at("prace").contains(crops[k]) || !e.at("prace").at(crops[k]).is_array()) continue;
+				for (const auto &f : e.at("prace").at(crops[k])) {
+					ThreeDObjectFigure fig;
+					if (ReadFigure(f, fig)) obj.work[k].push_back(std::move(fig));
+				}
+			}
+		}
+		if (e.contains("u_cesty") && e.at("u_cesty").is_array()) {
+			for (const auto &f : e.at("u_cesty")) {
+				ThreeDObjectFigure fig;
+				if (ReadFigure(f, fig)) obj.by_road[f.value("okraj", std::string("sz")) == "jv" ? 1 : 0].push_back(std::move(fig));
+			}
+		}
+	} else {
+		obj.industry_name = e.value("prumysl", std::string());
+		obj.industry = IndexIndustryType(obj.industry_name);
+		const std::string variant = e.value("varianta", std::string());
+		obj.industry_variant = variant == "kamen" ? 0 : variant == "bronz" ? 1 : -1;
+		if (obj.industry == 0xFF) Debug(misc, 1, "3D object {}: the game has no industry {} (yet)", obj.name, obj.industry_name);
+	}
+	if (obj.tri.empty() && obj.plants.empty()) return;
+	_three_d_objects.push_back(std::move(obj));
+}
+
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
 static void ReadThreeDObjects()
 {
@@ -620,7 +718,12 @@ static void ReadThreeDObjects()
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
-				if (e.value("druh", std::string("dum")) != "dum") continue;
+				const std::string kind = e.value("druh", std::string("dum"));
+				if (kind == "prumysl" || kind == "pole") {
+					ReadIndustryObject(e, folder, kind == "pole");
+					continue;
+				}
+				if (kind != "dum") continue;
 				ThreeDObject obj;
 				obj.file = e.at("soubor").get<std::string>();
 				obj.name = e.value("jmeno", obj.file);
@@ -686,13 +789,26 @@ static void ReadThreeDObjects()
 	}
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
+		if (o.industry != 0xFF && !_three_d_industry_objects.emplace(std::make_pair(o.industry, o.industry_variant), i).second) {
+			Debug(misc, 0, "3D objects: industry {} variant {} has two records, {} is not drawn", o.industry_name, o.industry_variant, o.name);
+		}
+		if (!o.field_part.empty()) _three_d_field_parts.emplace(o.field_part, i);
 		for (uint slot = 0; slot < 4; slot++) {
 			if (!(o.variants & (1 << slot))) continue;
+			/* One building on a house and variant, the first record of the index (the colleague's
+			 * hra/3d/PROSBA-0x1F-JEDEN-DUM.md): a second one is told of, never drawn over it. */
+			bool first;
+			size_t drawn;
 			if (o.grfid != 0) {
-				_three_d_grf_house_objects.emplace(std::make_tuple(o.grfid, o.grf_house, slot), i);
+				auto [it, added] = _three_d_grf_house_objects.emplace(std::make_tuple(o.grfid, o.grf_house, slot), i);
+				first = added;
+				drawn = it->second;
 			} else {
-				_three_d_house_objects.emplace(std::make_pair(o.house, slot), i);
+				auto [it, added] = _three_d_house_objects.emplace(std::make_pair(o.house, slot), i);
+				first = added;
+				drawn = it->second;
 			}
+			if (!first) Debug(misc, 0, "3D objects: house {:#04x} variant {} has two records, {} is drawn and {} not", o.grfid != 0 ? o.grf_house : o.house, slot, _three_d_objects[drawn].name, o.name);
 		}
 	}
 	Debug(misc, 1, "3D objects: {} read from {} index(es)", _three_d_objects.size(), indices.size());
@@ -772,12 +888,18 @@ static void ReadThreeDVehicleObjects()
 					_effect_objects.push_back(std::move(fx));
 					continue;
 				}
-				if (e.value("druh", std::string("dum")) == "postava" && e.contains("soubor")) {
-					/* A figure: metres, the origin between its feet on the ground, facing +x. */
+				if ((e.value("druh", std::string("dum")) == "postava" || e.value("druh", std::string("dum")) == "rostlina") && e.contains("soubor")) {
+					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
+					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
+					 * its file in the lists of plants ("rostliny"). */
 					ThreeDVehicleObject fig;
 					fig.package = package;
 					fig.file = folder + e.at("soubor").get<std::string>();
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.value("druh", std::string()) == "rostlina") {
+						fig.name = e.at("soubor").get<std::string>();
+						if (fig.name.ends_with(".glb")) fig.name.resize(fig.name.size() - 4);
+					}
 					if (e.contains("animace") && e.at("animace").is_object()) {
 						/* It moves: its frames are nodes of the file, drawn one at a time, a frame every so many ticks. */
 						const auto &a = e.at("animace");
@@ -1284,6 +1406,72 @@ std::string DescribeThreeDVehicleObjects()
  * @param north_house the house of its north tile
  * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
  */
+/**
+ * The 3D object of one of the game's own industries ("druh": "prumysl"), or nullptr.
+ * @param variant the statue of bronze (the industry's random bit 0), else of stone
+ */
+const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_industry_objects.find(std::make_pair(type, static_cast<int8_t>(variant ? 1 : 0)));
+	if (it == _three_d_industry_objects.end()) it = _three_d_industry_objects.find(std::make_pair(type, static_cast<int8_t>(-1)));
+	return it == _three_d_industry_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** A building's object by its name in the index ("jmeno"), for the rig; nullptr when there is none. */
+const ThreeDObject *GetThreeDObjectByName(std::string_view name)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.name == name) return &o;
+	}
+	return nullptr;
+}
+
+/** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */
+const ThreeDObject *GetThreeDFieldPart(std::string_view part)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_field_parts.find(part);
+	return it == _three_d_field_parts.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * A tile of the marijuana plantation (and the potato field) laid from the parts of the fields: what
+ * GetThreeDPlantationTile() says is on it and on the road tile behind it.
+ * @return whether the fields have their parts at all (the soil)
+ */
+bool GetThreeDFieldTile(const ThreeDPlantationTile &tile, ThreeDFieldTile &out)
+{
+	out = {};
+	out.soil = GetThreeDFieldPart("zem");
+	if (out.soil == nullptr) return false;
+	const int crop = 0; // marijuana
+	static const char *const small[2] = {"mari_male", "brambory_male"};
+	static const char *const grown[2] = {"mari_vzrostle", "brambory_vzrostle"};
+	if (tile.stage == 1) out.plants = GetThreeDFieldPart(small[crop]);
+	if (tile.stage == 2) out.plants = GetThreeDFieldPart(grown[crop]);
+	if (tile.worker >= 0 && tile.stage != 0) {
+		const std::string name = std::string("pole_") + ThreeDPlantationWorkerName(tile.worker);
+		const std::vector<ThreeDObjectFigure> &work = out.soil->work[crop];
+		for (size_t i = 0; i < work.size(); i++) {
+			if (work[i].figure == name) out.worker = std::span(work).subspan(i, 1);
+		}
+	}
+	if (tile.road_behind) {
+		out.road = GetThreeDFieldPart("cesta");
+		if (tile.shed) {
+			out.shed = GetThreeDFieldPart("bouda");
+			out.hay = GetThreeDFieldPart("seno");
+		}
+		if (out.road != nullptr) {
+			if (tile.girls_nw) out.girls[0] = out.road->by_road[0];
+			if (tile.girls_se) out.girls[1] = out.road->by_road[1];
+		}
+	}
+	return true;
+}
+
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot)
 {
 	/* Kept as the first 3D of this game drew it, the boxes of its hand table, in memory of it (the player, 14. 10.:
@@ -1475,6 +1663,9 @@ std::string DescribeThreeDObjects()
 		out += fmt::format("\n  {} {} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes{}", o.name, which, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size(), o.light.empty() ? "" : ", lit from its normals");
 		for (const ThreeDObjectColourPart &part : o.colours) out += fmt::format(", colour {} of {}", part.name, part.palette.size());
 		for (const ThreeDObjectFigure &f : o.figures) out += fmt::format(", {} at {:.1f},{:.1f},{:.1f}", f.figure, f.at[0], f.at[1], f.at[2]);
+		if (!o.industry_name.empty()) out += fmt::format(", industry {} ({}) variant {}", o.industry_name, o.industry, o.industry_variant);
+		if (!o.field_part.empty()) out += fmt::format(", field part {}, {} + {} at work, {} + {} by the road", o.field_part, o.work[0].size(), o.work[1].size(), o.by_road[0].size(), o.by_road[1].size());
+		if (!o.plants.empty()) out += fmt::format(", {} plants", o.plants.size());
 	}
 	return out;
 }

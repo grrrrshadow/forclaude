@@ -8673,21 +8673,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			break;
 		}
 		return true;
-	} else if (what == "modely") {
-		/* The buildings with eight renders (ThreeDModel) and whether their sprites are there. */
-		for (uint i = 0; i < GetThreeDModelCount(); i++) IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDModel(GetThreeDModel(i)));
 	} else if (what == "budovy") {
-		/* Where the buildings with eight renders stand on the map. */
-		for (const auto tile : Map::Iterate()) {
-			if (!IsTileType(tile, TileType::House)) continue;
-			HouseID house = GetHouseType(tile);
-			if (house >= NEW_HOUSE_OFFSET || GetHouseNorthPart(house) != 0) continue;
-			const ThreeDModel *model = GetThreeDHouseModel(house);
-			if (model != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (house {:#x}) at {},{}{}", model->name, house, TileX(tile), TileY(tile), IsHouseCompleted(tile) ? "" : " (being built)");
-		}
+		/* Where the game's own industries drawn as 3D objects stand on the map, and the plantations. */
 		for (const Industry *ind : Industry::Iterate()) {
-			const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
-			if (model != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{}{}", model->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), IsIndustryCompleted(ind->location.tile) ? "" : " (being built)");
+			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{}{}", obj->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), IsIndustryCompleted(ind->location.tile) ? "" : " (being built)");
 			ThreeDPlantationTile pt;
 			if (ind->type == IT_MARIJUANA_PLANTATION && GetThreeDPlantationTile(ind->location.tile, pt)) {
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
@@ -8713,33 +8703,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(cost.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: dum {:#04x} na {},{}: {}", *house, *x, *y,
 				cost.Succeeded() ? std::string("postaven") : (cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("NEJDE") : GetString(cost.GetErrorMessage())));
 	} else if (what == "postav" && argv.size() > 4) {
-		/* Put a building with eight renders on the map, by its model's name: a house or one of the game's own industries. */
+		/* Put one of the game's own industries drawn as a 3D object on the map, by its object's name (test3d objekty
+		 * lists them): the statue's object of bronze builds it of bronze. */
 		auto x = number(2), y = number(3);
-		const ThreeDModel *model = GetThreeDModelByName(argv[4]);
-		if (!x.has_value() || !y.has_value() || model == nullptr) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <model>' (test3d modely lists them).");
+		const ThreeDObject *obj = GetThreeDObjectByName(argv[4]);
+		if (!x.has_value() || !y.has_value() || obj == nullptr || obj->industry == 0xFF) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object>' (test3d objekty lists them).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
 		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
-		CommandCost cost;
-		if (model->kind == ThreeDModelKind::House) {
-			cost = Command<Commands::PlaceHouse>::Do(DoCommandFlag::Execute, tile, static_cast<HouseID>(model->id), false, true);
-		} else {
-			cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, static_cast<IndustryType>(model->id), 0, true, 0);
-			if (cost.Succeeded() && IsTileType(tile, TileType::Industry)) {
-				Industry *ind = Industry::GetByTile(tile);
-				SB(ind->random, 0, 1, model->kind == ThreeDModelKind::IndustryVariant ? 1 : 0);
-				for (TileIndex t : ind->location) {
-					if (IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index) MarkTileDirtyByTile(t);
-				}
+		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, obj->industry, 0, true, 0);
+		if (cost.Succeeded() && IsTileType(tile, TileType::Industry)) {
+			Industry *ind = Industry::GetByTile(tile);
+			SB(ind->random, 0, 1, obj->industry_variant == 1 ? 1 : 0);
+			for (TileIndex t : ind->location) {
+				if (IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index) MarkTileDirtyByTile(t);
 			}
 		}
 		cur_company.Restore();
 		if (cost.Failed()) {
-			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", model->name, *x, *y, cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("no reason given") : GetString(cost.GetErrorMessage()));
+			IConsolePrint(CC_ERROR, "test3d: {} at {},{} could not be built: {}", obj->name, *x, *y, cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("no reason given") : GetString(cost.GetErrorMessage()));
 		} else {
-			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", model->name, *x, *y);
+			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", obj->name, *x, *y);
 		}
 	} else if (what == "okno" && argv.size() > 2) {
 		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'; or
@@ -8853,25 +8839,6 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {
 			IConsolePrint(CC_DEFAULT, "test3d: window class {} number {} at {},{} size {}x{}", to_underlying(w->window_class), static_cast<int32_t>(w->window_number), w->left, w->top, w->width, w->height);
-		}
-	} else if (what == "model" && argv.size() > 2) {
-		const ThreeDModel *model = GetThreeDModelByName(argv[2]);
-		if (model == nullptr) {
-			IConsolePrint(CC_ERROR, "test3d: no model '{}' (test3d modely lists them).", argv[2]);
-			return true;
-		}
-		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDModel(model));
-		auto t0 = std::chrono::steady_clock::now();
-		const ThreeDModelPicture *pic = GetThreeDModelPicture(model, vp->zoom);
-		double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-		if (pic == nullptr) {
-			IConsolePrint(CC_DEFAULT, "test3d: no picture at {} degrees, zoom {}", GetViewYaw(), to_underlying(vp->zoom));
-		} else {
-			size_t filled = 0;
-			for (uint32_t p : pic->pixels) {
-				if (Colour(p).a != 0) filled++;
-			}
-			IConsolePrint(CC_DEFAULT, "test3d: picture at {} degrees, zoom {}: {}x{} at {},{} from the origin, {} pixels filled, made in {:.1f} ms", GetViewYaw(), to_underlying(vp->zoom), pic->width, pic->height, pic->left, pic->top, filled, ms);
 		}
 	} else if (what == "domy3d") {
 		/* 'domy3d <x> <y> <r>': the houses within r tiles that are drawn as 3D objects, by their north tile. */

@@ -77,7 +77,7 @@ struct ObjectPictureEntry {
 	uint64_t used;
 	ThreeDModelPicture picture;
 };
-static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int>, ObjectPictureEntry> _object_pictures;
+static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int, int>, ObjectPictureEntry> _object_pictures;
 static uint64_t _object_pictures_clock = 0;
 
 /** Forget the sprites made: the sprite cache they were in is gone (GfxInitSpriteMem()). */
@@ -322,8 +322,9 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
  * @param rust_time how far into its rusting it is (RustTime())
  * @param tint the colour of the material an effect is coloured in ("barvy"), 0 none
  * @param paint_colour the vehicle's colour of its palette ("barvy", PaletteColour()), 0 the paint's own
+ * @param stretch its height against its width (a plant of a list, "meritko" [x, y, z])
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
@@ -341,7 +342,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	std::vector<float> sx(n), sy(n), depth(n), light(n, 1.0f);
 	float minx = std::numeric_limits<float>::infinity(), miny = minx, maxx = -minx, maxy = -minx;
 	for (size_t i = 0; i < n; i++) {
-		float x = shape->pos[i * 3] * scale * along, y = shape->pos[i * 3 + 1] * scale, z = shape->pos[i * 3 + 2] * scale;
+		float x = shape->pos[i * 3] * scale * along, y = shape->pos[i * 3 + 1] * scale, z = shape->pos[i * 3 + 2] * scale * stretch;
 		float xr = x * ca - y * sa, yr = x * sa + y * ca;
 		sx[i] = xr * p;
 		sy[i] = (-yr * CAM_SIN - z * CAM_COS) * p;
@@ -542,11 +543,11 @@ double _object_picture_ms = 0;
 uint64_t _object_pictures_made = 0;
 
 /** A picture of an object in the turned view at an angle and zoom, kept (RasterObject()). */
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1)
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade, frame | (tint_index + 1) << 16);
+	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade, frame | (tint_index + 1) << 16, static_cast<int>(std::lround(stretch * 1000)));
 	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
@@ -576,7 +577,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade))) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
@@ -760,10 +761,12 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * frame changes.
  * @param[out] height how tall it is, units of height
  * @param frame the frame to draw (one walking: by the way walked, three_d_walkers.h); -1 by the game's tick
+ * @param yaw the angle of the view it is seen from (the preview beside an industry's window), NaN the map's
  * @return the picture, or nullptr when the figure is not there
  */
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame)
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw)
 {
+	if (std::isnan(yaw)) yaw = GetViewYaw();
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
 	if (fig == nullptr) return nullptr;
 	const bool by_tick = frame < 0;
@@ -772,7 +775,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	if (shape == nullptr) return nullptr;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
 	float world_az = facing - 135.0f;
-	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, frame);
+	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame);
 	if (pic == nullptr) return nullptr;
 	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	if (by_tick && fig->frames > 1 && tile != INVALID_TILE) {
@@ -786,6 +789,33 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 		}
 		if (!known) _moving_figures.push_back({tile, fig->frame_ticks, step});
 	}
+	return pic;
+}
+
+/**
+ * The picture of a plant standing on a building or a field ("rostliny", three_d_objects.h) at the angle of the view:
+ * a figure that never moves, its angles to the view and to the light in steps of PLANT_STEP degrees, so that the
+ * hundreds of plants of a field share a few pictures (a plant looks about the same from a few degrees aside).
+ * @param stretch its height against its width
+ * @param[out] height how tall it is, units of height
+ * @param yaw the angle of the view it is seen from, NaN the map's
+ */
+const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw)
+{
+	static constexpr float PLANT_STEP = 10.0f;
+	const ThreeDVehicleObject *plant = GetThreeDFigure(name);
+	if (plant == nullptr) return nullptr;
+	const ThreeDVehicleShape *shape = plant->GetShape(0);
+	if (shape == nullptr) return nullptr;
+	if (std::isnan(yaw)) yaw = GetViewYaw();
+	float world_az = std::round((facing - 135.0f) / PLANT_STEP) * PLANT_STEP;
+	float cam_az = std::round((facing - 135.0f + yaw) / PLANT_STEP) * PLANT_STEP;
+	/* Sizes in steps of a twentieth: the plants of a list are each a little other. */
+	scale = std::max(0.05f, std::round(scale * 20.0f) / 20.0f);
+	stretch = std::max(0.05f, std::round(stretch * 20.0f) / 20.0f);
+	const ThreeDModelPicture *pic = ObjectPicture(plant, scale, zoom, cam_az, world_az, false, 0, 0, -1, stretch);
+	if (pic == nullptr) return nullptr;
+	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * stretch * 8.0 / 3.0)));
 	return pic;
 }
 

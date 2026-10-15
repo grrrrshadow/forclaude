@@ -73,5 +73,142 @@
   "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); pózy postavy/postavy_animace.py (kostra modelu), bez renderu",
   "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
   "poznamka": "Mat, opravář (muž, ne holka): hráč: 'mat bude chodit ze dveří do dveří po městě, mat je opravář'. Počátek uprostřed těla na zemi (chodidla se hýbou), čelem k +x, metry, 34 288 trojúhelníků na snímek, sedm materiálů jen barvou bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "mat_toci.glb",
+  "jmeno": "mat_toci",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "Mat točí pivo: pravá ruka na páce pípy, levá drží půllitr pod výtokem, hlava otočená doprava k holce, která si pro pivo přišla (hráč: „ten moment jak tocí pivo, kouka na holku ktera natuhuje ruce pro to pivo“, „se nehejbe jen ten moment“); jedna póza",
+  "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_toci (kostra modelu, IK obou rukou, hlava k holce), půllitr vlastní, bez renderu",
+  "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry; pípa (tělo) 0,30 m před ním, 0,06 m vpravo, 0,95 m vysoko, půllitr v ruce dnem 0,25 m před ním ve výšce 0,76 m (pultík a pípu staví domy/hospoda.py podle toho); 34 tisíc trojúhelníků, barvy bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_pro_pivo.glb",
+  "jmeno": "college_girl_pro_pivo",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "natahuje obě ruce pro pivo (0,48 m před sebe ve výšce 1 m), mírně předkloněná, krok",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza postavy/postavy.py _stoj (kostra modelu), převod bez renderu",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, 11778 trojúhelníků, tři textury 1024 px, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_sedi.glb",
+  "jmeno": "college_girl_sedi",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "sedí, stehna dopředu, lýtka dolů, ruce podél těla a dlaně na stehnech",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza postavy/postavy.py sedici (kostra modelu), převod bez renderu",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole): poloha z = výška sedáku (lavice hospody 0,47 m), čelem k +x, metry, 11778 trojúhelníků, tři textury 1024 px, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "people_girl_sedi.glb",
+  "jmeno": "people_girl_sedi",
+  "druh": "postava",
+  "vyska_m": 1.68,
+  "poza": "sedí (nohy ohnuté v kolenou), ruka u ucha s telefonem, kabelka",
+  "autor": "Character People Girl 001, kiemtruongkts (Sketchfab, CC BY 4.0); póza postavy/postavy.py sedici (ohnutí nohou), glb_zmensi.py na 20000 trojúhelníků, převod bez renderu",
+  "licence": "CC BY 4.0 (uvést kiemtruongkts)",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole): poloha z = výška sedáku (lavice hospody 0,47 m), čelem k +x, metry, 20000 trojúhelníků, jedna textura 1024 px, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "rozen.glb",
+  "jmeno": "rozen",
+  "druh": "predmet",
+  "otaceni": {
+   "osa": [
+    1,
+    0,
+    0
+   ],
+   "stred": [
+    0,
+    0,
+    0
+   ],
+   "tiku_na_otacku": 120
+  },
+  "stridani": {
+   "uzly": "snimek_",
+   "snimku": 3,
+   "otocek": 4
+  },
+  "poza": "rožeň se zvířetem nad grilem, otáčí ho hra plynule kolem osy rožně (hráč: „budem otáčet :)“): uzel snimek_00 čuník (prase z V3S, upečené), snimek_01 kravička (tele, kráva z V3S menší), snimek_02 ovečka (jehně, nové); po čtyřech otočkách další zvíře (hráč: „to se mužou střidat na roštu“, „rožeň se bude točit?“)",
+  "autor": "grrrrf: vlastní model domy/rozen.py (zvířata ze stavebnice v3s/render_v3s.py, ovečka nová), nic z 3D Warehouse",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "počátek na ose rožně uprostřed, rožeň podél +x (klika na +x), osa ve výšce 0: poloha z = výška rožně (u grilu hospody 0,95 m); asi 900 až 1400 trojúhelníků na zvíře, barvy bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "galaxia_stoji.glb",
+  "jmeno": "galaxia_stoji",
+  "druh": "postava",
+  "vyska_m": 1.58,
+  "poza": "stojí, ruce podél těla (u polní cesty)",
+  "autor": "Galaxia anime girl, Tatenashi (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést Tatenashi)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "pole_real.glb",
+  "jmeno": "pole_real",
+  "druh": "postava",
+  "vyska_m": 1.11,
+  "poza": "klečí u kytky (pole, pracuje)",
+  "autor": "Real Girl, zalomskij (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést zalomskij)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "pole_sedi.glb",
+  "jmeno": "pole_sedi",
+  "druh": "postava",
+  "vyska_m": 1.043,
+  "poza": "na bobku u kytky (pole, pracuje)",
+  "autor": "girl sitting, planetrey.com (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést planetrey.com)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "pole_punk.glb",
+  "jmeno": "pole_punk",
+  "druh": "postava",
+  "vyska_m": 0.82,
+  "poza": "sedí na zemi nohama ke kytce (pole, pracuje)",
+  "autor": "Teenage Punk girl, YØD (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést YØD)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "pole_pubg.glb",
+  "jmeno": "pole_pubg",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "vkleče s rukama u kytky (pole, pracuje)",
+  "autor": "pubg Girl Pose T, iysif (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést iysif)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "pole_char16.glb",
+  "jmeno": "pole_char16",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "vkleče s rukama u kytky (pole, pracuje)",
+  "autor": "character girl #16 (FBX), BELAZ (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést BELAZ)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "pole_chill.glb",
+  "jmeno": "pole_chill",
+  "druh": "postava",
+  "vyska_m": 1.65,
+  "poza": "vkleče s telefonem v rukou (pole, pauza)",
+  "autor": "Chill girl, tr.onurdk1 (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
+  "licence": "CC BY 4.0 (uvést tr.onurdk1)",
+  "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
  }
 ]

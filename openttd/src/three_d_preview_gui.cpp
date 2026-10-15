@@ -10,7 +10,7 @@
  * gui.three_d): beside the purchase window the vehicle chosen there, big, in
  * the company's colours, turning smoothly as its 3D likeness made from its
  * eight sprites (three_d_vehicle.cpp); and beside the window of one of the
- * game's own industries the building from its eight renders (ThreeDModel),
+ * game's own industries the building as its 3D object (three_d_objects.h),
  * turning smoothly, degree by degree, drawn the way the map draws it.
  *
  * There is no window: the preview is a picture on a see-through background,
@@ -53,6 +53,9 @@
 
 #include "table/sprites.h"
 
+#include <map>
+#include <tuple>
+
 #include "safeguards.h"
 
 /** How often the previews are looked at: turned on, and their window checked. */
@@ -88,7 +91,6 @@ struct ThreeDPreview {
 };
 
 static std::vector<ThreeDPreview> _previews;
-static ThreeDPictureCache _preview_pictures; ///< the buildings' pictures at the angles the previews are at
 static std::unique_ptr<IntervalTimer<TimerWindow>> _preview_timer;
 
 static Window *PreviewParent(const ThreeDPreview &p)
@@ -351,9 +353,73 @@ struct IndustryPiece {
 	double near;
 };
 
+/** The pictures of the industries' objects at the angles the previews were at, by the industry, the angle (tenths of a degree) and the zoom. */
+static std::map<std::tuple<uint, int, int>, ThreeDModelPicture> _preview_object_pictures;
+
 /**
- * The pieces of an industry preview at an angle: a building is one picture, the plantation one a tile, laid at the
- * tiles' corners as the map lays them, far first.
+ * The 3D objects an industry of the game's own is laid from at an angle (three_d_objects.h): its building, or the
+ * plantation's tiles from the parts of the fields, far first, world units about its north corner.
+ * @param[out] tiles_x,tiles_y the size of its plot
+ * @param[out] top how tall it is, units of height
+ * @return whether it has objects
+ */
+static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<ThreeDObjectPlacement> &parts, int &tiles_x, int &tiles_y, int &top)
+{
+	parts.clear();
+	tiles_x = ind->location.w;
+	tiles_y = ind->location.h;
+	top = 0;
+	const int base_z = GetTileMaxPixelZ(ind->location.tile);
+	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+	if (obj != nullptr) {
+		ThreeDObjectPlacement &p = parts.emplace_back();
+		p.obj = obj;
+		p.paint = obj->PaintAt(ind->location.tile);
+		tiles_x = obj->tiles_x;
+		tiles_y = obj->tiles_y;
+		top = static_cast<int>(std::ceil(obj->top));
+		return true;
+	}
+	if (ind->type != IT_MARIJUANA_PLANTATION) return false;
+	const double a = yaw * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	std::vector<std::pair<double, ThreeDObjectPlacement>> laid;
+	for (TileIndex tile : ind->location) {
+		ThreeDPlantationTile pt;
+		ThreeDFieldTile ft;
+		if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != ind->index || !GetThreeDPlantationTile(tile, pt) || !GetThreeDFieldTile(pt, ft)) continue;
+		auto lay = [&](TileIndex at, const ThreeDObject *o, const ThreeDObject *ground, std::span<const ThreeDObjectFigure> more, double bias) {
+			ThreeDObjectPlacement p;
+			p.obj = o;
+			p.ground = ground;
+			p.more = more;
+			p.x = (static_cast<int>(TileX(at)) - static_cast<int>(TileX(ind->location.tile))) * TILE_SIZE;
+			p.y = (static_cast<int>(TileY(at)) - static_cast<int>(TileY(ind->location.tile))) * TILE_SIZE;
+			p.z = GetTilePixelZ(at) - base_z;
+			double mx = p.x + TILE_SIZE / 2.0, my = p.y + TILE_SIZE / 2.0;
+			laid.emplace_back((c * mx - s * my) + (s * mx + c * my) + bias, p);
+			if (o != nullptr) top = std::max(top, static_cast<int>(std::ceil(o->top)));
+		};
+		lay(tile, ft.plants != nullptr ? ft.plants : ft.soil, ft.plants != nullptr ? ft.soil : nullptr, ft.worker, 0);
+		if (ft.road != nullptr) {
+			const TileIndex road_tile = TileAddXY(tile, 0, 1);
+			lay(road_tile, ft.road, nullptr, {}, -TILE_SIZE);
+			if (ft.shed != nullptr) lay(road_tile, ft.shed, nullptr, {}, 0);
+			if (ft.hay != nullptr) lay(road_tile, ft.hay, nullptr, {}, 0);
+			for (int edge = 0; edge < 2; edge++) {
+				if (!ft.girls[edge].empty()) lay(road_tile, nullptr, nullptr, ft.girls[edge], 0.5);
+			}
+		}
+	}
+	if (laid.empty()) return false;
+	std::stable_sort(laid.begin(), laid.end(), [](const auto &l, const auto &r) { return l.first < r.first; });
+	for (const auto &[near, p] : laid) parts.push_back(p);
+	top = std::max(top, 2 * static_cast<int>(TILE_HEIGHT));
+	return true;
+}
+
+/**
+ * The pieces of an industry preview at an angle: its 3D objects laid in one picture (RenderThreeDObjectsPicture()),
+ * about the industry's north corner.
  * @param[out] axis where the middle of the plot is at the angle, pixels about the north corner
  * @return whether there is anything to draw
  */
@@ -361,41 +427,22 @@ static bool IndustryPieces(const Industry *ind, float yaw, ZoomLevel &zoom, std:
 {
 	pieces.clear();
 	double a = yaw * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
-	const ThreeDModel *model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
-	int tiles_x = ind->location.w, tiles_y = ind->location.h;
-	if (model != nullptr) {
-		const ThreeDModelView &v = model->views[0];
-		zoom = PreviewZoomFor(v.width, v.height);
-		const ThreeDModelPicture *pic = GetThreeDModelPictureAt(model, zoom, yaw, _preview_pictures);
-		if (pic == nullptr || pic->width <= 0) return false;
-		pieces.push_back({pic, 0, 0, 0.0});
-		tiles_x = model->tiles_x;
-		tiles_y = model->tiles_y;
-	} else if (ind->type == IT_MARIJUANA_PLANTATION) {
-		zoom = ZoomLevel::In2x;
-		double scale = 1.0 / (1 << to_underlying(zoom));
-		auto place = [&](TileIndex tile, std::span<const ThreeDModel *const> layers) {
-			const ThreeDModelPicture *pic = GetThreeDLayersPictureAt(layers, zoom, yaw, _preview_pictures);
-			if (pic == nullptr || pic->width <= 0) return;
-			double x = (static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile))) * TILE_SIZE;
-			double y = (static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile))) * TILE_SIZE;
-			double xr = c * x - s * y, yr = s * x + c * y;
-			pieces.push_back({pic, static_cast<int>(std::lround((yr - xr) * 2 * ZOOM_BASE * scale)), static_cast<int>(std::lround((yr + xr) * ZOOM_BASE * scale)), xr + yr});
-		};
-		for (TileIndex tile : ind->location) {
-			ThreeDPlantationTile pt;
-			ThreeDPlantationLayers pl;
-			if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != ind->index || !GetThreeDPlantationTile(tile, pt) || !GetThreeDPlantationLayers(pt, pl)) continue;
-			place(tile, pl.field);
-			if (pt.road_behind) {
-				for (const auto &item : pl.road) place(TileAddXY(tile, 0, 1), item);
-			}
-		}
-		if (pieces.empty()) return false;
-		std::sort(pieces.begin(), pieces.end(), [](const IndustryPiece &l, const IndustryPiece &r) { return l.near < r.near; });
-	} else {
-		return false;
+	std::vector<ThreeDObjectPlacement> parts;
+	int tiles_x, tiles_y, top;
+	if (!IndustryPlacements(ind, yaw, parts, tiles_x, tiles_y, top)) return false;
+	/* The zoom it fits the preview at: its plot across, and its height. */
+	const int span = (tiles_x + tiles_y) * TILE_SIZE;
+	zoom = PreviewZoomFor(span * 2 * ZOOM_BASE, (span + top) * ZOOM_BASE);
+	const auto key = std::make_tuple(ind->index.base(), static_cast<int>(std::lround(std::fmod(yaw + 720.0f, 360.0f) * 10)), to_underlying(zoom));
+	auto it = _preview_object_pictures.find(key);
+	if (it == _preview_object_pictures.end()) {
+		if (_preview_object_pictures.size() > 64) _preview_object_pictures.clear();
+		ThreeDModelPicture pic;
+		RenderThreeDObjectsPicture(parts, yaw, zoom, pic);
+		it = _preview_object_pictures.emplace(key, std::move(pic)).first;
 	}
+	if (it->second.width <= 0) return false;
+	pieces.push_back({&it->second, 0, 0, 0.0});
 
 	/* The axis: the middle of the plot, turned with it. */
 	double scale = 1.0 / (1 << to_underlying(zoom));
@@ -566,14 +613,14 @@ void ShowThreeDVehiclePreview(WindowNumber parent_number)
 
 /**
  * Show the preview beside an industry's window, when the 3D is on and the
- * industry is one of the game's own with eight renders.
+ * industry is one of the game's own drawn as a 3D object.
  * @param industry the industry
  */
 void ShowThreeDIndustryPreview(IndustryID industry)
 {
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
-	if (GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0)) == nullptr && ind->type != IT_MARIJUANA_PLANTATION) return;
+	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) == nullptr && (ind->type != IT_MARIJUANA_PLANTATION || GetThreeDFieldPart("zem") == nullptr)) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
 }
 

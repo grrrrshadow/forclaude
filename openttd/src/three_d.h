@@ -81,57 +81,7 @@ struct ThreeDHouse {
 const ThreeDHouse *GetThreeDHouse(HouseID house);
 const ThreeDPart *GetThreeDHouseParts(const ThreeDHouse *house);
 
-/** What of the game a ThreeDModel is. */
-enum class ThreeDModelKind : uint8_t {
-	House,           ///< a house of the original graphics; id is the HouseID of its north tile
-	Industry,        ///< one of the game's own industries; id is its IndustryType
-	IndustryVariant, ///< the same industry with bit 0 of its random bits set (the statue of bronze)
-	Layer,           ///< a layer of a tile laid with others by the game, found by its name (the marijuana plantation: GetThreeDPlantationTile())
-};
-
-/**
- * One of the eight renders of a ThreeDModel: the camera that took it, so that
- * every pixel with a depth is a world point. The model's frame is the
- * colleague's: metres, z up, the plot's north corner at the origin, the game's
- * Y along +x (to the east corner) and the game's X along -y (to the west).
- */
-struct ThreeDModelView {
-	float pocatek[3]; ///< the world point of the picture's top-left corner: pixel (i, j) at depth z is pocatek + (i + 0.5) vpravo + (j + 0.5) dolu + z pohled
-	float vpravo[3];  ///< a pixel to the right
-	float dolu[3];    ///< a pixel down
-	float pohled[3];  ///< the line of sight, unit, away from the camera
-	float nula_m;     ///< the depth, in metres along the line of sight, that the value 32768 of the depth sprite stands for: z = nula_m + (value - 32768) / 1000
-	int16_t north_x;  ///< the plot's north corner in the picture, pixels from the left (it may lie outside)
-	int16_t north_y;  ///< and from the top
-	uint16_t width;   ///< the picture's size, 16x pixels
-	uint16_t height;
-};
-
-/**
- * A building of the game rendered from eight directions with depth and normals
- * (table/three_d_models.h): in the turned view it is drawn from the two renders
- * either side of the angle, every pixel of a render being a world point, so
- * the picture between two renders is exact (three_d_model.cpp).
- */
-struct ThreeDModel {
-	const char *name;
-	ThreeDModelKind kind;
-	uint16_t id;        ///< HouseID or IndustryType, by the kind
-	uint8_t tiles_x;    ///< the plot, tiles along X
-	uint8_t tiles_y;    ///< and along Y
-	float tile_m;       ///< a tile in the model's metres
-	uint16_t first;     ///< its first sprite: SPR_DECOUPLE_3D_BASE + first + direction * 3 + (0 the colour, 1 the depth, 2 the normals), 16x only
-	ThreeDModelView views[8]; ///< direction d: the building turned d * 45 degrees clockwise, seen from above, against d0, the game's own view
-};
-
-const ThreeDModel *GetThreeDHouseModel(HouseID house);
-const ThreeDModel *GetThreeDIndustryModel(IndustryType type, bool variant);
-const ThreeDModel *GetThreeDModelByName(std::string_view name);
-const ThreeDModel *GetThreeDModel(uint index);
-uint GetThreeDModelIndex(const ThreeDModel *model);
-uint GetThreeDModelCount();
-
-/** A model drawn at the angle the view is turned to and at a zoom (GetThreeDModelPicture()). */
+/** A picture of the turned view at an angle and a zoom: a vehicle or a figure drawn from its object, the preview of an industry. */
 struct ThreeDModelPicture {
 	int width = 0;
 	int height = 0;
@@ -140,28 +90,12 @@ struct ThreeDModelPicture {
 	std::vector<uint32_t> pixels; ///< Colour::data, alpha 0 where there is nothing
 };
 
-/** A picture of a model, or of layers laid on one tile, at an angle and zoom (ThreeDPictureCache: one a model or set of layers, the last asked for). */
-struct ThreeDPictureEntry {
-	float yaw;
-	ZoomLevel zoom;
-	std::vector<uint> layers; ///< the models laid together, by index
-	ThreeDModelPicture picture;
-};
-using ThreeDPictureCache = std::map<uint64_t, ThreeDPictureEntry>;
-
-const ThreeDModelPicture *GetThreeDModelPicture(const ThreeDModel *model, ZoomLevel zoom);
-const ThreeDModelPicture *GetThreeDLayersPicture(std::span<const ThreeDModel *const> layers, ZoomLevel zoom);
-const ThreeDModelPicture *GetThreeDModelPictureAt(const ThreeDModel *model, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache);
-const ThreeDModelPicture *GetThreeDLayersPictureAt(std::span<const ThreeDModel *const> layers, ZoomLevel zoom, float yaw, ThreeDPictureCache &cache);
-std::string DescribeThreeDModel(const ThreeDModel *model);
-void ClearThreeDModelCache();
-
 /**
- * A tile of the marijuana plantation as the turned view lays it from the
- * layers (ThreeDModelKind::Layer): the field's soil, the plants of the
- * stage, a girl at work; and from the field tile before the field road, the
- * road tile behind it with the shed, the haystack and the girls by the road
- * (GetThreeDPlantationTile() in industry_cmd.cpp, after DrawMarijuanaPlantationTile()).
+ * A tile of the marijuana plantation as the turned view lays it from the parts
+ * of the fields (GetThreeDFieldTile(), three_d_objects.h): the field's soil, the
+ * plants of the stage, a girl at work; and from the field tile before the field
+ * road, the road tile behind it with the shed, the haystack and the girls by the
+ * road (GetThreeDPlantationTile() in industry_cmd.cpp, after DrawMarijuanaPlantationTile()).
  */
 struct ThreeDPlantationTile {
 	uint8_t stage;     ///< 0 bare, 1 small plants, 2 grown
@@ -175,13 +109,6 @@ struct ThreeDPlantationTile {
 };
 bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out);
 const char *ThreeDPlantationWorkerName(int worker);
-
-/** The layers a tile of the plantation is laid from (GetThreeDPlantationLayers()). */
-struct ThreeDPlantationLayers {
-	std::vector<const ThreeDModel *> field;                  ///< on the field tile: the soil, the plants, the girl at work
-	std::vector<std::vector<const ThreeDModel *>> road;      ///< on the road tile behind it, each its own thing: the road first, then the shed, the haystack, the girls by the edges
-};
-bool GetThreeDPlantationLayers(const ThreeDPlantationTile &tile, ThreeDPlantationLayers &out);
 
 /**
  * The 3D likeness of a vehicle made from its eight sprites (three_d_vehicle.cpp):
@@ -236,6 +163,7 @@ void ResetViewYaw();
 void ThreeDViewForBuilding();
 
 void TurnWorldPoint(double x, double y, double &xr, double &yr);
+void GetViewTurn(double &c, double &s, double &px, double &py);
 void UnturnWorldPoint(double xr, double yr, double &x, double &y);
 void ProjectTurnedF(double x, double y, double z, double &vx, double &vy);
 Point ProjectTurned(int x, int y, int z);

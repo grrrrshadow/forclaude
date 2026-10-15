@@ -28,6 +28,8 @@
 #include "tile_type.h"
 #include "spriteloader/spriteloader.hpp"
 
+#include <cmath>
+
 struct VehicleSpriteSeq;
 struct Vehicle;
 struct RoundTrackPose;
@@ -46,7 +48,8 @@ void AddThreeDEffectsToViewport(ZoomLevel zoom);
 bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom);
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0, int frame = -1);
 struct ThreeDModelPicture;
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1);
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1, float yaw = NAN);
+const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN);
 
 /* three_d_vehicle.cpp */
 int ThreeDEngineLength(EngineID engine);

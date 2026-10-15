@@ -118,6 +118,15 @@ void TurnWorldPoint(double x, double y, double &xr, double &yr)
 	yr = _pivot_y + _turn_s * dx + _turn_c * dy;
 }
 
+/** The turn of the view: its cosine and sine, and the world point it turns about (TurnWorldPoint()). */
+void GetViewTurn(double &c, double &s, double &px, double &py)
+{
+	c = _turn_c;
+	s = _turn_s;
+	px = _pivot_x;
+	py = _pivot_y;
+}
+
 /**
  * Turn a point of the turned world back: the inverse of TurnWorldPoint().
  * @param xr,yr the point of the turned world

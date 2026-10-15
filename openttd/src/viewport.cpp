@@ -1914,6 +1914,7 @@ struct TurnedVertex {
 	double x, y; ///< pixel in the block being drawn
 	double u, v; ///< pixel in the texture
 	double l = 256; ///< the light there, 256 the texture as it is (a 3D object's light from its normals, three_d_objects.h)
+	double d = 0;   ///< how near it is, for a depth buffer (a 3D object, DrawObjectInto()): larger nearer
 };
 
 /** A pixel of a texture in a light: 256 as it is. */
@@ -1931,8 +1932,9 @@ static inline uint32_t ShadedPixel(uint32_t p, uint light)
  * @param fill whether a pixel the texture has nothing for takes the nearest drawn pixel within three (the edges of
  *             the ground's diamonds and of solid things); not for a thing of thin lines on nothing, a bridge's
  *             cables, which it would fill into a sheet
+ * @param zb a depth buffer as large as the pixels, or nullptr: a pixel is drawn only where it is nearer than what is there
  */
-static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true)
+static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true, float *zb = nullptr)
 {
 	double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 	if (std::abs(area) < 1e-9) return;
@@ -1945,6 +1947,11 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 	if (lit) {
 		dl_dx = ((b.l - a.l) * (c.y - a.y) - (c.l - a.l) * (b.y - a.y)) / area;
 		dl_dy = ((c.l - a.l) * (b.x - a.x) - (b.l - a.l) * (c.x - a.x)) / area;
+	}
+	double dd_dx = 0, dd_dy = 0;
+	if (zb != nullptr) {
+		dd_dx = ((b.d - a.d) * (c.y - a.y) - (c.d - a.d) * (b.y - a.y)) / area;
+		dd_dy = ((c.d - a.d) * (b.x - a.x) - (b.d - a.d) * (c.x - a.x)) / area;
 	}
 	double sign = area > 0 ? 1.0 : -1.0;
 	int y0 = std::max(0, static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
@@ -1973,8 +1980,12 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 		double u = a.u + du_dx * (xs + 0.5 - a.x) + du_dy * (yc - a.y);
 		double v = a.v + dv_dx * (xs + 0.5 - a.x) + dv_dy * (yc - a.y);
 		double l = a.l + dl_dx * (xs + 0.5 - a.x) + dl_dy * (yc - a.y);
+		double d = a.d + dd_dx * (xs + 0.5 - a.x) + dd_dy * (yc - a.y);
 		uint32_t *row = dst + y * pitch;
-		for (int x = xs; x <= xe; x++, u += du_dx, v += dv_dx, l += dl_dx) {
+		float *zrow = zb != nullptr ? zb + static_cast<size_t>(y) * w : nullptr;
+		for (int x = xs; x <= xe; x++, u += du_dx, v += dv_dx, l += dl_dx, d += dd_dx) {
+			/* Behind what is there already, by more than a hair (a road laid over the grass a few centimetres up). */
+			if (zrow != nullptr && d < zrow[x] - 0.05) continue;
 			int iu = static_cast<int>(std::floor(u)), iv = static_cast<int>(std::floor(v));
 			if (iu < 0 || iv < 0 || iu >= tw || iv >= th) continue;
 			uint32_t p = tex[iv * tw + iu];
@@ -1993,7 +2004,9 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 					if (p != 0) break;
 				}
 			}
-			if (p != 0) row[x] = lit ? ShadedPixel(p, static_cast<uint>(std::max(0.0, l))) : p;
+			if (p == 0) continue;
+			row[x] = lit ? ShadedPixel(p, static_cast<uint>(std::max(0.0, l))) : p;
+			if (zrow != nullptr) zrow[x] = static_cast<float>(d);
 		}
 	}
 }
@@ -2016,7 +2029,7 @@ struct TurnedTimes {
 	double warp = 0;    ///< laying the textures over the faces
 	double collect = 0; ///< the tiles' draw procedures
 	double standing = 0; ///< the billboards
-	double models = 0;  ///< the buildings with eight renders: their pictures made and laid
+	double models = 0;  ///< the buildings that are 3D objects: drawn
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
 };
@@ -2942,20 +2955,6 @@ static void TurnedBridgeHead(TileIndex head, size_t first_parent)
 	}
 }
 
-/**
- * A thing the turned view draws from renders (box_kind 3): one of the game's
- * buildings rendered from eight directions (ThreeDModel), or the layers of a
- * tile of the plantation laid together, at an origin on the map.
- */
-struct TurnedModel {
-	std::vector<const ThreeDModel *> layers; ///< the model, or the layers laid on the tile
-	TileIndex origin;                        ///< the north tile of the building, or the tile the layers lie on
-	int z;                                   ///< the ground there
-	int near_bias;                           ///< added to the depth it is sorted by: the flat road of the plantation goes before what stands on it
-};
-/** The things of ViewportDoDrawTurned() drawn from renders, for the block being drawn; ParentSpriteToDraw::box_dx is the index. */
-static std::vector<TurnedModel> _turned_models;
-
 /** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index. */
 static std::vector<const ThreeDModelPicture *> _turned_vehicle_pictures;
 /** Whether the turned renderer is collecting what to draw (ViewportDoDrawTurned()): the vehicles then come as their likeness. */
@@ -3104,143 +3103,272 @@ static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDr
 }
 
 /**
- * One of the game's buildings rendered from eight directions, or a tile of
- * the plantation from its layers (box_kind 3): the picture at the angle, made
- * from the two renders either side of it (GetThreeDLayersPicture()), laid at
- * its origin, the north corner of the tile at the ground. A building is drawn
- * once, whole; the sprites of its tiles are left out (box_kind 4).
+ * A building of the turned view as a real 3D object (box_kind 7, three_d_objects.h), at the north corner of its north
+ * tile on the ground; or a part of a field (the soil under the plants, the field road, the girls by it).
  */
-static void DrawTurnedModel(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
-{
-	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_models.size()) return;
-	const TurnedModel &tm = _turned_models[ps.box_dx];
-	const ThreeDModel *model = tm.layers.empty() ? nullptr : tm.layers[0];
-	if (model == nullptr) return;
-	double t0 = TurnedNow();
-	const ThreeDModelPicture *pic = GetThreeDLayersPicture(tm.layers, frame.zoom);
-	bool debug = _turned_debug_tile != INVALID_TILE && TileXY(ps.box_ox / TILE_SIZE, ps.box_oy / TILE_SIZE) == _turned_debug_tile;
-	if (debug && pic == nullptr) IConsolePrint(CC_DEFAULT, "ladeni: model {} has no picture", model->name);
-	if (pic != nullptr) {
-		double vx, vy;
-		ProjectTurnedF(ps.box_ox, ps.box_oy, ps.box_oz, vx, vy);
-		double scale = 1.0 / (1 << to_underlying(frame.zoom));
-		int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + pic->left;
-		int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + pic->top;
-		int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
-		int x0 = std::max(0, -ox), x1 = std::min(pic->width, fw - ox);
-		int y0 = std::max(0, -oy), y1 = std::min(pic->height, fh - oy);
-		if (debug) IConsolePrint(CC_DEFAULT, "ladeni: model {} at {},{},{}: picture {}x{} at {},{} of the block {}x{} (rows {}..{}, columns {}..{})", model->name, ps.box_ox, ps.box_oy, ps.box_oz, pic->width, pic->height, ox, oy, fw, fh, y0, y1, x0, x1);
-		uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
-		for (int y = y0; y < y1; y++) {
-			const uint32_t *src = &pic->pixels[static_cast<size_t>(y) * pic->width];
-			uint32_t *row = dst + static_cast<size_t>(oy + y) * frame.pitch + ox;
-			for (int x = x0; x < x1; x++) {
-				Colour s(src[x]);
-				if (s.a == 0) continue;
-				if (s.a == 255) {
-					row[x] = Colour(s.r, s.g, s.b).data;
-				} else {
-					Colour d(row[x]);
-					uint a = s.a, na = 255 - a;
-					row[x] = Colour(static_cast<uint8_t>((s.r * a + d.r * na + 127) / 255), static_cast<uint8_t>((s.g * a + d.g * na + 127) / 255), static_cast<uint8_t>((s.b * a + d.b * na + 127) / 255)).data;
-				}
-			}
-		}
-	}
-	_turned_times.models += TurnedNow() - t0;
-}
-
-/** A building of the turned view as a real 3D object (box_kind 7, three_d_objects.h), at the north corner of its north tile on the ground. */
 struct TurnedObject {
-	const ThreeDObject *obj;
+	const ThreeDObject *obj;   ///< nullptr: only the figures of more
 	TileIndex origin;
 	int z;
+	const ThreeDObject *ground = nullptr;     ///< drawn first under it, whole (the soil of a field under its plants)
+	std::span<const ThreeDObjectFigure> more; ///< figures on it besides its own (the girl at work, the girls by the road)
+	int sort_z = 0;                           ///< added to the bottom of its box (the field road flat and first, under the cars)
+
+	TurnedObject(const ThreeDObject *obj, TileIndex origin, int z, const ThreeDObject *ground = nullptr, std::span<const ThreeDObjectFigure> more = {}, int sort_z = 0) :
+			obj(obj), origin(origin), z(z), ground(ground), more(more), sort_z(sort_z) {}
 };
 /** The objects of the block being drawn; ParentSpriteToDraw::box_dx is the index. */
 static std::vector<TurnedObject> _turned_objects;
 /** Whether a 3D object's triangles turned away from the view are left out (the rig: 'test3d zadni 0' draws them all). */
 bool _turned_cull = true;
 
+/** How a 3D object is laid on a picture: turned about a pivot as the view is, projected as the map, scaled to the zoom's pixels. */
+struct ObjectLay {
+	double c = 1, s = 0;       ///< the turn
+	double px = 0, py = 0;     ///< about this world point
+	double left = 0, top = 0;  ///< the picture's corner, virtual screen coordinates
+	double scale = 1;          ///< pixels of the picture to a virtual one
+	float yaw = 0;             ///< the angle of the view, for the pictures of the figures
+	ZoomLevel zoom = ZoomLevel::Min;
+
+	void Turn(double x, double y, double &xr, double &yr) const
+	{
+		double dx = x - this->px, dy = y - this->py;
+		xr = this->px + this->c * dx - this->s * dy;
+		yr = this->py + this->s * dx + this->c * dy;
+	}
+	void Project(double x, double y, double z, double &sx, double &sy) const
+	{
+		double xr, yr;
+		this->Turn(x, y, xr, yr);
+		sx = ((yr - xr) * 2 * ZOOM_BASE - this->left) * this->scale;
+		sy = ((yr + xr - z) * ZOOM_BASE - this->top) * this->scale;
+	}
+};
+
+/** The lay of the turned map for a block being drawn. */
+static ObjectLay MapLay(const DrawPixelInfo &frame)
+{
+	ObjectLay lay;
+	GetViewTurn(lay.c, lay.s, lay.px, lay.py);
+	lay.left = frame.left;
+	lay.top = frame.top;
+	lay.scale = 1.0 / (1 << to_underlying(frame.zoom));
+	lay.yaw = GetViewYaw();
+	lay.zoom = frame.zoom;
+	return lay;
+}
+
 /**
- * Draw a building as a real 3D object (box_kind 7): its triangles turned with the view, far first, each filled
- * with its texture at the level of detail of the zoom -- the texture's 1024 pixels for a tile's width at the
- * closest zoom, halved with every zoom level out. Drawn once, whole; the sprites of its tiles are left out
- * (box_kind 4).
+ * Draw a 3D object into pixels: its triangles turned with the view, far first, each filled with its texture at the
+ * level of detail of the zoom -- the texture's 1024 pixels for a tile's width at the closest zoom, halved with every
+ * zoom level out -- and the figures and plants standing on it among them by the middle of their height.
+ * @param o the object, nullptr for only the figures of more
+ * @param ox,oy,oz its north corner, world units
+ * @param more figures on it besides its own
+ */
+static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const ObjectLay &lay, const ThreeDObject *o, double ox, double oy, double oz, uint32_t paint, std::span<const ThreeDObjectFigure> more)
+{
+	static std::vector<TurnedVertex> verts;
+	static std::vector<std::pair<double, size_t>> order;
+	order.clear();
+	verts.clear();
+	const ThreeDObjectTexture *tex = nullptr;
+	if (o != nullptr && !o->tri.empty()) {
+		tex = o->GetTexture(to_underlying(lay.zoom), paint);
+		const bool lit = o->light.size() == o->pos.size() / 3;
+		const size_t corners = o->pos.size() / 3;
+		verts.resize(corners);
+		for (size_t i = 0; i < corners; i++) {
+			double sx, sy, xr, yr;
+			lay.Project(ox + o->pos[i * 3], oy + o->pos[i * 3 + 1], oz + o->pos[i * 3 + 2], sx, sy);
+			lay.Turn(ox + o->pos[i * 3], oy + o->pos[i * 3 + 1], xr, yr);
+			verts[i] = {sx, sy, o->uv[i * 2] * tex->w, o->uv[i * 2 + 1] * tex->h, lit ? static_cast<double>(o->light[i]) : 256.0, xr + yr + 2 * o->pos[i * 3 + 2]};
+		}
+		/* Far first: by the middle of each triangle, as the faces of the boxes. */
+		for (size_t t = 0; t + 2 < o->tri.size(); t += 3) {
+			const TurnedVertex &a = verts[o->tri[t]], &b = verts[o->tri[t + 1]], &c = verts[o->tri[t + 2]];
+			/* Not in the block being drawn: nothing to do (an object is drawn again for each block it is in). */
+			if (std::max({a.x, b.x, c.x}) < 0 || std::min({a.x, b.x, c.x}) >= fw || std::max({a.y, b.y, c.y}) < 0 || std::min({a.y, b.y, c.y}) >= fh) continue;
+			/* A triangle turned away from the view is a back wall: left out, else drawn by the middle it could come
+			 * through a front one. On the screen (y down) a triangle seen from outside goes round clockwise. */
+			const int8_t facing = _turned_cull && t / 3 < o->facing.size() ? o->facing[t / 3] : 0;
+			if (facing != 0) {
+				double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+				if (area * facing >= 0) continue;
+			}
+			double sx = 0, sy = 0, sz = 0;
+			for (int k = 0; k < 3; k++) {
+				sx += o->pos[o->tri[t + k] * 3];
+				sy += o->pos[o->tri[t + k] * 3 + 1];
+				sz += o->pos[o->tri[t + k] * 3 + 2];
+			}
+			double xr, yr;
+			lay.Turn(ox + sx / 3, oy + sy / 3, xr, yr);
+			order.emplace_back(xr + yr + 2 * sz / 3, t);
+		}
+	}
+	/* The figures standing on it (College Girl by the parasols of the hotel's roof) and its plants: among the
+	 * triangles by the middle of their height, so what stands in front of them hides them. */
+	struct OnIt {
+		const ThreeDModelPicture *pic;
+		double x, y, z;
+		float near;
+	};
+	static std::vector<OnIt> on_it;
+	on_it.clear();
+	const size_t tris = o != nullptr ? o->tri.size() : 0;
+	const TileIndex origin = TileXY(std::clamp<int>(static_cast<int>(ox) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(oy) / TILE_SIZE, 0, Map::MaxY()));
+	auto stand = [&](const ThreeDObjectFigure &f, bool plant) {
+		double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+		int height = 0;
+		const ThreeDModelPicture *pic;
+		if (plant) {
+			pic = GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw);
+		} else {
+			TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
+			pic = GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(on_it.size()), &height, -1, lay.yaw);
+		}
+		if (pic == nullptr) return;
+		double xr, yr;
+		lay.Turn(wx, wy, xr, yr);
+		const double near = xr + yr + 2 * (wz - oz + height / 2.0);
+		order.emplace_back(near, SIZE_MAX - on_it.size());
+		on_it.push_back({pic, wx, wy, wz, static_cast<float>(near)});
+	};
+	if (o != nullptr) {
+		for (const ThreeDObjectFigure &f : o->figures) stand(f, false);
+		for (const ThreeDObjectFigure &f : o->plants) stand(f, true);
+	}
+	for (const ThreeDObjectFigure &f : more) stand(f, false);
+	std::sort(order.begin(), order.end());
+	/* The depth of its pixels (#45 of the player's list: the flags of the ÚV KSČ building through its front, the
+	 * field road through the grass under it): over the rectangle it covers, nothing there yet. */
+	static std::vector<float> zb;
+	if (zb.size() < static_cast<size_t>(fw) * fh) zb.resize(static_cast<size_t>(fw) * fh);
+	int zx0 = fw, zy0 = fh, zx1 = -1, zy1 = -1;
+	auto cover = [&](double x0, double y0, double x1, double y1) {
+		zx0 = std::min(zx0, std::max(0, static_cast<int>(std::floor(x0)) - 1));
+		zy0 = std::min(zy0, std::max(0, static_cast<int>(std::floor(y0)) - 1));
+		zx1 = std::max(zx1, std::min(fw - 1, static_cast<int>(std::ceil(x1)) + 1));
+		zy1 = std::max(zy1, std::min(fh - 1, static_cast<int>(std::ceil(y1)) + 1));
+	};
+	for (const auto &[near, t] : order) {
+		if (t >= tris) {
+			const OnIt &f = on_it[SIZE_MAX - t];
+			double sx, sy;
+			lay.Project(f.x, f.y, f.z, sx, sy);
+			cover(sx + f.pic->left, sy + f.pic->top, sx + f.pic->left + f.pic->width, sy + f.pic->top + f.pic->height);
+		} else {
+			const TurnedVertex &a = verts[o->tri[t]], &b = verts[o->tri[t + 1]], &c = verts[o->tri[t + 2]];
+			cover(std::min({a.x, b.x, c.x}), std::min({a.y, b.y, c.y}), std::max({a.x, b.x, c.x}), std::max({a.y, b.y, c.y}));
+		}
+	}
+	if (zx1 < zx0 || zy1 < zy0) return;
+	for (int y = zy0; y <= zy1; y++) std::fill_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, -std::numeric_limits<float>::infinity());
+	for (const auto &[near, t] : order) {
+		if (t >= tris) {
+			const OnIt &f = on_it[SIZE_MAX - t];
+			double sx, sy;
+			lay.Project(f.x, f.y, f.z, sx, sy);
+			const ThreeDModelPicture &pic = *f.pic;
+			int px = static_cast<int>(std::lround(sx)) + pic.left, py = static_cast<int>(std::lround(sy)) + pic.top;
+			int x0 = std::max(0, -px), x1 = std::min(pic.width, fw - px);
+			int y0 = std::max(0, -py), y1 = std::min(pic.height, fh - py);
+			for (int y = y0; y < y1; y++) {
+				const uint32_t *src = &pic.pixels[static_cast<size_t>(y) * pic.width];
+				uint32_t *row = dst + static_cast<size_t>(py + y) * pitch + px;
+				float *zrow = &zb[static_cast<size_t>(py + y) * fw + px];
+				for (int x = x0; x < x1; x++) {
+					Colour c(src[x]);
+					if (c.a == 0) continue;
+					/* The figure as a whole as near as its middle: behind a wall nearer than that, hidden. */
+					if (f.near < zrow[x] - 0.05f) continue;
+					if (c.a == 255) {
+						row[x] = Colour(c.r, c.g, c.b).data;
+					} else {
+						Colour d(row[x]);
+						uint a = c.a, na = 255 - a;
+						row[x] = Colour(static_cast<uint8_t>((c.r * a + d.r * na + 127) / 255), static_cast<uint8_t>((c.g * a + d.g * na + 127) / 255), static_cast<uint8_t>((c.b * a + d.b * na + 127) / 255)).data;
+					}
+					if (c.a >= 128) zrow[x] = f.near;
+				}
+			}
+			continue;
+		}
+		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o->tri[t]], verts[o->tri[t + 1]], verts[o->tri[t + 2]], true, zb.data());
+	}
+}
+
+/**
+ * Draw a building as a real 3D object (box_kind 7, DrawObjectInto()): once, whole; the sprites of its tiles are left
+ * out (box_kind 4). A field's soil is drawn whole first, under its plants.
  */
 static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
 	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_objects.size()) return;
 	const TurnedObject &to = _turned_objects[ps.box_dx];
-	const ThreeDObject &o = *to.obj;
 	double t0 = TurnedNow();
-	const ThreeDObjectTexture *tex = o.GetTexture(to_underlying(frame.zoom), o.PaintAt(to.origin));
-	const bool lit = o.light.size() == o.pos.size() / 3;
-	const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE, oz = to.z;
-	const double scale = 1.0 / (1 << to_underlying(frame.zoom));
-	const size_t corners = o.pos.size() / 3;
-	static std::vector<TurnedVertex> verts;
-	verts.resize(corners);
-	for (size_t i = 0; i < corners; i++) {
-		double vx, vy;
-		ProjectTurnedF(ox + o.pos[i * 3], oy + o.pos[i * 3 + 1], oz + o.pos[i * 3 + 2], vx, vy);
-		verts[i] = {(vx - frame.left) * scale, (vy - frame.top) * scale, o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h, lit ? static_cast<double>(o.light[i]) : 256.0};
-	}
-	/* Far first: by the middle of each triangle, as the faces of the boxes. */
-	static std::vector<std::pair<double, size_t>> order;
-	order.clear();
-	const double frame_w = UnScaleByZoom(frame.width, frame.zoom), frame_h = UnScaleByZoom(frame.height, frame.zoom);
-	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
-		const TurnedVertex &a = verts[o.tri[t]], &b = verts[o.tri[t + 1]], &c = verts[o.tri[t + 2]];
-		/* Not in the block being drawn: nothing to do (an object is drawn again for each block it is in). */
-		if (std::max({a.x, b.x, c.x}) < 0 || std::min({a.x, b.x, c.x}) >= frame_w || std::max({a.y, b.y, c.y}) < 0 || std::min({a.y, b.y, c.y}) >= frame_h) continue;
-		/* A triangle turned away from the view is a back wall: left out, else drawn by the middle it could come
-		 * through a front one. On the screen (y down) a triangle seen from outside goes round clockwise. */
-		const int8_t facing = _turned_cull && t / 3 < o.facing.size() ? o.facing[t / 3] : 0;
-		if (facing != 0) {
-			double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-			if (area * facing >= 0) continue;
-		}
-		double sx = 0, sy = 0, sz = 0;
-		for (int k = 0; k < 3; k++) {
-			sx += o.pos[o.tri[t + k] * 3];
-			sy += o.pos[o.tri[t + k] * 3 + 1];
-			sz += o.pos[o.tri[t + k] * 3 + 2];
-		}
-		double xr, yr;
-		TurnWorldPoint(ox + sx / 3, oy + sy / 3, xr, yr);
-		order.emplace_back(xr + yr + 2 * sz / 3, t);
-	}
-	/* The figures standing on it (College Girl by the parasols of the hotel's roof): among the triangles by the middle
-	 * of their height, so what stands in front of them hides them. */
-	struct OnIt {
-		const ThreeDModelPicture *pic;
-		double x, y, z;
-	};
-	static std::vector<OnIt> on_it;
-	on_it.clear();
-	for (const ThreeDObjectFigure &f : o.figures) {
-		double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
-		TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
-		int height = 0;
-		const ThreeDModelPicture *pic = GetThreeDFigurePicture(f.figure, f.scale, f.facing, frame.zoom, on, TileX(to.origin) * 7 + TileY(to.origin) * 13 + static_cast<uint32_t>(on_it.size()), &height);
-		if (pic == nullptr) continue;
-		double xr, yr;
-		TurnWorldPoint(wx, wy, xr, yr);
-		order.emplace_back(xr + yr + 2 * (wz - oz + height / 2.0), SIZE_MAX - on_it.size());
-		on_it.push_back({pic, wx, wy, wz});
-	}
-	std::sort(order.begin(), order.end());
+	const ObjectLay lay = MapLay(frame);
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
-	for (const auto &[near, t] : order) {
-		if (t >= o.tri.size()) {
-			const OnIt &f = on_it[SIZE_MAX - t];
-			BlitTurnedPicture(frame, *f.pic, f.x, f.y, f.z);
-			continue;
-		}
-		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o.tri[t]], verts[o.tri[t + 1]], verts[o.tri[t + 2]]);
-	}
+	const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
+	if (to.ground != nullptr) DrawObjectInto(dst, frame.pitch, fw, fh, lay, to.ground, ox, oy, to.z, to.ground->PaintAt(to.origin), {});
+	DrawObjectInto(dst, frame.pitch, fw, fh, lay, to.obj, ox, oy, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more);
 	_turned_times.models += TurnedNow() - t0;
+}
+
+/**
+ * A picture of 3D objects laid together (the preview beside an industry's window): at an angle of the view and a
+ * zoom, its left and top about where the world origin of the placements is drawn, the first placement drawn first.
+ * @return whether there is anything in it
+ */
+bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, float yaw, ZoomLevel zoom, ThreeDModelPicture &out)
+{
+	ObjectLay lay;
+	const double a = yaw * M_PI / 180.0;
+	lay.c = std::cos(a);
+	lay.s = std::sin(a);
+	lay.scale = 1.0 / (1 << to_underlying(zoom));
+	lay.yaw = yaw;
+	lay.zoom = zoom;
+	/* Its extent: every corner, and a tall figure's height over every placement. */
+	double x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
+	auto grow = [&](double x, double y, double z) {
+		double sx, sy;
+		lay.Project(x, y, z, sx, sy);
+		x0 = std::min(x0, sx); x1 = std::max(x1, sx);
+		y0 = std::min(y0, sy); y1 = std::max(y1, sy);
+	};
+	for (const ThreeDObjectPlacement &p : parts) {
+		for (const ThreeDObject *o : {p.ground, p.obj}) {
+			if (o == nullptr) continue;
+			for (size_t i = 0; i + 2 < o->pos.size(); i += 3) grow(p.x + o->pos[i], p.y + o->pos[i + 1], p.z + o->pos[i + 2]);
+			grow(p.x, p.y, p.z + 6 * OBJECT_HEIGHT_PER_METRE);
+		}
+		grow(p.x, p.y, p.z);
+		grow(p.x + TILE_SIZE, p.y + TILE_SIZE, p.z + 6 * OBJECT_HEIGHT_PER_METRE);
+	}
+	if (x0 > x1) return false;
+	const int left = static_cast<int>(std::floor(x0)) - 4, top = static_cast<int>(std::floor(y0)) - 4;
+	const int width = static_cast<int>(std::ceil(x1)) - left + 8, height = static_cast<int>(std::ceil(y1)) - top + 8;
+	if (width <= 0 || height <= 0 || static_cast<size_t>(width) * height > 16u * 1024 * 1024) return false;
+	lay.left = left / lay.scale;
+	lay.top = top / lay.scale;
+	out.width = width;
+	out.height = height;
+	out.left = left;
+	out.top = top;
+	out.pixels.assign(static_cast<size_t>(width) * height, 0);
+	for (const ThreeDObjectPlacement &p : parts) {
+		if (p.ground != nullptr) DrawObjectInto(out.pixels.data(), width, width, height, lay, p.ground, p.x, p.y, p.z, p.paint, {});
+		DrawObjectInto(out.pixels.data(), width, width, height, lay, p.obj, p.x, p.y, p.z, p.paint, p.more);
+	}
+	/* The pixels drawn are whole; the rest stays nothing. */
+	for (uint32_t &px : out.pixels) {
+		if (px != 0) px = Colour(Colour(px).r, Colour(px).g, Colour(px).b, 255).data;
+	}
+	return true;
 }
 
 /** Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot (box_kind 7). */
@@ -3250,12 +3378,15 @@ static void AddTurnedObjectsToDraw()
 		const TurnedObject &to = _turned_objects[m];
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
 		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
+		/* Only figures (the girls by the field road): the box of the tile, as tall as a girl twice the size. */
+		const int tiles_x = to.obj != nullptr ? to.obj->tiles_x : 1, tiles_y = to.obj != nullptr ? to.obj->tiles_y : 1;
+		const int top = to.obj != nullptr ? static_cast<int>(std::ceil(to.obj->top)) : 2 * TILE_HEIGHT;
 		ps.xmin = ox;
-		ps.xmax = ox + to.obj->tiles_x * TILE_SIZE - 1;
+		ps.xmax = ox + tiles_x * TILE_SIZE - 1;
 		ps.ymin = oy;
-		ps.ymax = oy + to.obj->tiles_y * TILE_SIZE - 1;
-		ps.zmin = to.z;
-		ps.zmax = to.z + std::max(1, static_cast<int>(std::ceil(to.obj->top)));
+		ps.ymax = oy + tiles_y * TILE_SIZE - 1;
+		ps.zmin = to.z + to.sort_z;
+		ps.zmax = to.z + to.sort_z + std::max(1, top);
 		ps.x = ps.y = ps.left = ps.top = 0;
 		ps.image = SPR_EMPTY_BOUNDING_BOX;
 		ps.pal = PAL_NONE;
@@ -3287,7 +3418,7 @@ static void AddNorthHouseObject(size_t first_parent)
 	if (_cur_ti.tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Houses) || !IsHouseCompleted(_cur_ti.tile)) return;
 	HouseID north = GetHouseType(_cur_ti.tile);
 	TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-	const ThreeDObject *obj = (north >= NEW_HOUSE_OFFSET || GetThreeDHouseModel(north) == nullptr) ? GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+	const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
 	if (obj == nullptr) return;
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
 	for (const TurnedObject &to : _turned_objects) {
@@ -3427,9 +3558,7 @@ static void ViewportDoDrawTurned()
 	}
 	std::sort(tiles.begin(), tiles.end(), [](const TurnedTile &a, const TurnedTile &b) { return a.near < b.near; });
 
-	/* The buildings with eight renders among them (ThreeDModel), each once, by its north tile, and the tiles of the plantation from their layers. */
-	std::vector<TurnedModel> &models = _turned_models;
-	models.clear();
+	/* The buildings that are 3D objects among them, each once, by its north tile, and the tiles of the fields from their parts. */
 	_turned_objects.clear();
 	_turned_vehicle_pictures.clear();
 	_cab_bridge_sprites.clear();
@@ -3524,7 +3653,7 @@ static void ViewportDoDrawTurned()
 			HouseID north = GetHouseType(_cur_ti.tile);
 			{
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = (north >= NEW_HOUSE_OFFSET || GetThreeDHouseModel(north) == nullptr) ? GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+				const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
 				if (obj != nullptr) {
 					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
 					bool known = false;
@@ -3535,49 +3664,41 @@ static void ViewportDoDrawTurned()
 				}
 			}
 		}
-		/* One of the game's buildings rendered from eight directions (ThreeDModel): drawn once, whole, from the
-		 * two renders either side of the angle (DrawTurnedModel()), in place of the sprites of its tiles. */
-		if (_cur_ti.tile != INVALID_TILE) {
-			const ThreeDModel *model = nullptr;
-			TileIndex origin = INVALID_TILE;
-			if (tile_type == TileType::House && !IsTransparencySet(TransparencyOption::Houses) && IsHouseCompleted(_cur_ti.tile)) {
-				HouseID house = GetHouseType(_cur_ti.tile);
-				if (house < NEW_HOUSE_OFFSET) {
-					HouseID north = house;
-					origin = _cur_ti.tile + GetHouseNorthPart(north);
-					model = GetThreeDHouseModel(north);
-				}
-			} else if (tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries) && IsIndustryCompleted(_cur_ti.tile)) {
-				const Industry *ind = Industry::GetByTile(_cur_ti.tile);
-				model = GetThreeDIndustryModel(ind->type, HasBit(ind->random, 0));
-				origin = ind->location.tile;
-			}
-			if (model != nullptr) {
-				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
-				bool known = false;
-				for (const TurnedModel &tm : models) {
-					if (tm.origin == origin) known = true;
-				}
-				if (!known) models.push_back({{model}, origin, _cur_ti.z, 0});
-				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: model {} by tile {},{}, z {}{}", model->name, TileX(origin), TileY(origin), _cur_ti.z, known ? " (known)" : "");
-			}
-			/* A tile of the marijuana plantation: its layers laid together on the tile, and from the tile before
-			 * the field road the road tile behind with the road, the shed and the haystack and the girls by the
-			 * road, each its own thing to sort (the road flat and first, under the cars). */
+		/* One of the game's own industries as a real 3D object (the colleague's objekty/prumysl/): drawn once, whole,
+		 * as a house; a tile of the plantation laid from the parts of the fields -- the soil under the plants of the
+		 * stage and the girl at work, and from the tile before the field road the road tile behind it with the road
+		 * (flat and first, under the cars), the shed and the haystack and the girls by its edges, each its own thing. */
+		if (tile_type == TileType::Industry && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Industries) && IsIndustryCompleted(_cur_ti.tile)) {
+			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
+			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
 			ThreeDPlantationTile pt;
-			ThreeDPlantationLayers pl;
-			if (tile_type == TileType::Industry && !IsTransparencySet(TransparencyOption::Industries) && GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDPlantationLayers(pt, pl)) {
+			ThreeDFieldTile ft;
+			if (obj != nullptr) {
 				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
-				models.push_back({pl.field, _cur_ti.tile, _cur_ti.z, 0});
-				if (pt.road_behind) {
-					TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
-					int road_z = GetTilePixelZ(road_tile);
-					for (size_t r = 0; r < pl.road.size(); r++) {
-						/* The road itself, first, flat and sorted before whatever stands on it; the rest each its own. */
-						models.push_back({pl.road[r], road_tile, road_z, r == 0 ? -4 * static_cast<int>(TILE_HEIGHT) : 0});
+				const TileIndex origin = ind->location.tile;
+				bool known = false;
+				for (const TurnedObject &to : _turned_objects) {
+					if (to.origin == origin && to.obj == obj) known = true;
+				}
+				if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+			} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
+				for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
+				if (ft.plants != nullptr) {
+					_turned_objects.push_back({ft.plants, _cur_ti.tile, _cur_ti.z, ft.soil, ft.worker});
+				} else {
+					_turned_objects.push_back({ft.soil, _cur_ti.tile, _cur_ti.z, nullptr, ft.worker});
+				}
+				if (ft.road != nullptr) {
+					const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
+					const int road_z = GetTilePixelZ(road_tile);
+					_turned_objects.push_back({ft.road, road_tile, road_z, nullptr, {}, -4 * static_cast<int>(TILE_HEIGHT)});
+					if (ft.shed != nullptr) _turned_objects.push_back({ft.shed, road_tile, road_z});
+					if (ft.hay != nullptr) _turned_objects.push_back({ft.hay, road_tile, road_z});
+					for (int edge = 0; edge < 2; edge++) {
+						if (!ft.girls[edge].empty()) _turned_objects.push_back({nullptr, road_tile, road_z, nullptr, ft.girls[edge]});
 					}
 				}
-				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: plantation tile x {} stage {} worker {} road behind {}: {} layers, {} things on the road", pt.x, pt.stage, pt.worker, pt.road_behind, pl.field.size(), pl.road.size());
+				if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: field tile x {} stage {} worker {} road behind {}: plants {}, worker {}", pt.x, pt.stage, pt.worker, pt.road_behind, ft.plants != nullptr ? ft.plants->name : "none", ft.worker.size());
 			}
 		}
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
@@ -3653,35 +3774,6 @@ static void ViewportDoDrawTurned()
 		}
 	}
 	_turned_times.collect += t_collect;
-
-	/* Each building with eight renders, and each tile of the plantation, is one thing to draw among the standing ones, by the box of its plot. */
-	for (size_t m = 0; m < models.size(); m++) {
-		const TurnedModel &tm = models[m];
-		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
-		int ox = TileX(tm.origin) * TILE_SIZE, oy = TileY(tm.origin) * TILE_SIZE;
-		ps.xmin = ox;
-		ps.xmax = ox + tm.layers[0]->tiles_x * TILE_SIZE - 1;
-		ps.ymin = oy;
-		ps.ymax = oy + tm.layers[0]->tiles_y * TILE_SIZE - 1;
-		ps.zmin = tm.z + tm.near_bias;
-		ps.zmax = tm.z + MAX_BUILDING_PIXELS;
-		ps.x = ps.y = ps.left = ps.top = 0;
-		ps.image = SPR_EMPTY_BOUNDING_BOX;
-		ps.pal = PAL_NONE;
-		ps.sub = nullptr;
-		ps.first_child = -1;
-		ps.order = 0;
-		ps.ax = ox;
-		ps.ay = oy;
-		ps.az = tm.z;
-		ps.box = nullptr;
-		ps.box_ox = ox;
-		ps.box_oy = oy;
-		ps.box_oz = tm.z;
-		ps.box_dx = static_cast<int16_t>(m);
-		ps.box_dy = 0;
-		ps.box_kind = 3;
-	}
 
 	AddTurnedObjectsToDraw();
 
@@ -3809,11 +3901,7 @@ static void ViewportDoDrawTurned()
 			DrawTurnedGenericBox(frame, *ps);
 			continue;
 		}
-		if (ps->box_kind == 3) {
-			DrawTurnedModel(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 4) continue; // a tile of a building with eight renders: drawn whole above
+		if (ps->box_kind == 4) continue; // a tile of a building that is a 3D object: drawn whole (box_kind 7)
 		if (ps->box_kind == 5) {
 			DrawTurnedVehicle(frame, *ps);
 			continue;
@@ -7116,7 +7204,7 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 			{
 				/* An original house or a set's the objects name (the Mars houses). */
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = (north >= NEW_HOUSE_OFFSET || GetThreeDHouseModel(north) == nullptr) ? GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE)) : nullptr;
+				const ThreeDObject *obj = GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
 				if (obj != nullptr) {
 					kind = 5;
 					bool known = false;

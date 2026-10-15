@@ -28,19 +28,13 @@ stejně jako ty, které si hráč zapíše do `[newgrf-static]`).
   (zin16) jdou sem, každý GRF se zdroji v podsložce svého jména a postavený
   yaglem (`yagl -e <abs>/jmeno.grf <abs>/jmeno`), pod 100 MB kvůli GitHubu:
   `zastavka.grf` – holky na zastávce v 16× přes sprity `openttd.grf`
-  (Action A, `zastavka/README.md`); `budovy3d_<sada>_V<verze>.grf` – rendery
-  budov z osmi směrů s hloubkou a normálami pro otočený pohled
-  (`docs/decouple_three_d.md`), staví je `openttd_3d_grf.py` z kolegových
-  renderů (grrrrf), tabulku pro hru píše do `src/table/three_d_models.h`;
-  zdrojové PNG se tu nedrží, jen `.yagl`. Sprity jdou do bloku hry
-  `SPR_DECOUPLE_3D_BASE` přes Action A s čísly od 0x8000 (jen sady grafiky hry
-  smějí). **Verze v názvu** (hráč): změněná sada dostane `_V2`, `_V3`… a stará
-  z repa zmizí (`--verze=N` generátoru), takže hráč stáhne jen to, co se
-  změnilo. Build Windows tyhle sady nebalí (`.github/workflows/build-windows.yml`),
-  hráč je má v `baseset/decouple/grafika/` nainstalované hry. **Sady 1–4
-  (deset domů) od 15. 10. nejsou**: ty domy jsou 3D objekty v `objekty/mirne/`
-  (hráč: „můžem škrtnout 250 MB“); `budovy3d_1_V1.grf` až `budovy3d_4_V1.grf`
-  může hráč z nainstalované hry smazat. Zůstávají sady 5–8 (průmysl, plantáž).
+  (Action A, `zastavka/README.md`). Sprity sad grafiky hry smějí i do bloku
+  hry `SPR_DECOUPLE_3D_BASE` přes Action A s čísly od 0x8000. **Rendery budov
+  z osmi směrů (`budovy3d_1`–`8`) od 15. 10. nejsou**: domy i náš průmysl
+  (gymnázium, sochy, automat, chatka, plantáž z dílů pole) jsou 3D objekty
+  v `objekty/mirne/` a `objekty/prumysl/` (hráč: „můžem škrtnout 250 MB“,
+  kolega: 40 MB místo 176 MB). Soubory `budovy3d_*.grf` může hráč
+  z `baseset/decouple/grafika/` nainstalované hry smazat.
 - Nový obrázek od kolegy ve 4× a 8× do `openttd.grf`: PNG do `../openttd/`,
   pak `python3 openttd_budovy.py && python3 openttd_yagl.py` tamtéž
   (viz `COMPILING.md`).

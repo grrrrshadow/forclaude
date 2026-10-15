@@ -543,7 +543,6 @@ add_files(
     thread.h
     three_d.cpp
     three_d.h
-    three_d_model.cpp
     three_d_objects.cpp
     three_d_objects.h
     three_d_preview_gui.cpp

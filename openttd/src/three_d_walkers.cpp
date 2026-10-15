@@ -161,7 +161,6 @@ Point2 Middle(TileIndex t)
 const ThreeDObject *HouseObject(TileIndex origin)
 {
 	HouseID north = GetHouseType(origin);
-	if (north < NEW_HOUSE_OFFSET && GetThreeDHouseModel(north) != nullptr) return nullptr;
 	return GetThreeDHouseObjectAny(north, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE));
 }
 
