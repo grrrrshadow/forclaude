@@ -37,6 +37,7 @@
 #include <set>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <atomic>
 #include <thread>
 
@@ -1775,19 +1776,22 @@ int ThreeDShapeLevel(double pixels_per_metre, double shift)
  * the texture, are one corner: in the middle of them, their texture's place and light their average. A seam of the
  * texture stays, its corners at different places of it; a triangle with two of its corners in one cell has no area
  * and goes, and so does one already there.
- * @param level 0 its own shape, else simplified: made the first time (not on several cores at once)
+ * @param level 0 its own shape, else simplified: made the first time (not on several cores at once but by
+ *              PrepareThreeDObjectShapes())
  */
 ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 {
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
-	if (level == 0) return {this->pos, this->uv, this->light, this->tri, this->facing};
+	/* Its own: wanted so, or too many corners to count the triangles below. */
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
 	if (this->shapes[level] == nullptr) {
 		const size_t corners = this->pos.size() / 3;
 		const bool lit = this->light.size() == corners;
 		const double cell_xy = ShapeCellMetres(level) * OBJECT_UNITS_PER_METRE;
 		const double cell_z = ShapeCellMetres(level) * OBJECT_HEIGHT_PER_METRE;
-		/* A texture about a tile across: a corner's place in it moves as far as the corner. */
-		const double cell_uv = cell_xy / TILE_SIZE;
+		/* A texture about a tile across: a corner's place in it moves as far as the corner; but never more than a
+		 * 48th of it, so the parts of the texture (a wall, a roof) do not run into each other. */
+		const double cell_uv = std::min(cell_xy / TILE_SIZE, 1.0 / 48);
 		auto cell = [](double v, double size, int bits) {
 			const int64_t half = int64_t{1} << (bits - 1);
 			return static_cast<uint64_t>(std::clamp<int64_t>(static_cast<int64_t>(std::floor(v / size)) + half, 0, 2 * half - 1));
@@ -1821,13 +1825,13 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 			shape->uv.insert(shape->uv.end(), {static_cast<float>(sum.u / sum.n), static_cast<float>(sum.v / sum.n)});
 			if (lit) shape->light.push_back(static_cast<uint16_t>(sum.l / sum.n + 0.5));
 		}
-		std::set<std::array<uint32_t, 3>> had;
+		std::unordered_set<uint64_t> had;
 		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
 			std::array<uint32_t, 3> c = {to[this->tri[t]], to[this->tri[t + 1]], to[this->tri[t + 2]]};
 			if (c[0] == c[1] || c[1] == c[2] || c[0] == c[2]) continue;
-			/* The same triangle however its corners are counted round. */
+			/* The same triangle however its corners are counted round (fewer than 2^21 corners). */
 			std::ranges::rotate(c, std::ranges::min_element(c));
-			if (!had.insert(c).second) continue;
+			if (!had.insert(static_cast<uint64_t>(c[0]) | static_cast<uint64_t>(c[1]) << 21 | static_cast<uint64_t>(c[2]) << 42).second) continue;
 			shape->tri.insert(shape->tri.end(), c.begin(), c.end());
 			shape->facing.push_back(t / 3 < this->facing.size() ? this->facing[t / 3] : 0);
 		}
@@ -1835,6 +1839,31 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 	}
 	const ThreeDObjectShape &s = *this->shapes[level];
 	return {s.pos, s.uv, s.light, s.tri, s.facing};
+}
+
+/**
+ * Make the shapes of objects about to be drawn on every core at once, as their textures
+ * (PrepareThreeDObjectTextures()): a town seen for the first time from afar wanted thirty of them.
+ * @param wanted the shapes: object and level
+ */
+void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted)
+{
+	std::vector<std::pair<const ThreeDObject *, int>> jobs;
+	for (const auto &[o, level] : wanted) {
+		if (o == nullptr || level <= 0 || level >= THREE_D_SHAPE_LEVELS || o->shapes[level] != nullptr) continue;
+		if (std::ranges::find(jobs, std::make_pair(o, level)) == jobs.end()) jobs.emplace_back(o, level);
+	}
+	if (jobs.empty()) return;
+	const size_t threads = std::min<size_t>(jobs.size(), std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16));
+	std::atomic<size_t> next = 0;
+	auto work = [&] {
+		/* Each its own object and level: a slot of shapes no other thread touches. */
+		for (size_t j; (j = next++) < jobs.size();) jobs[j].first->GetShape(jobs[j].second);
+	};
+	std::vector<std::thread> pool;
+	for (size_t i = 1; i < threads; i++) pool.emplace_back(work);
+	work();
+	for (std::thread &t : pool) t.join();
 }
 
 /**

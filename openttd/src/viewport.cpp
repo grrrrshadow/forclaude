@@ -96,6 +96,8 @@
 #include "rail_map.h"
 #include "road_map.h"
 #include "water_map.h"
+#include "clear_map.h"
+#include "tree_map.h"
 #include "newgrf_railtype.h"
 #include "company_base.h"
 #include "command_func.h"
@@ -7875,6 +7877,208 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 	}
 }
 
+/** How far the far land reaches (DrawEyeFarLand()), tiles. */
+static constexpr int CAB_FAR_TILES = 96;
+/** How far the houses and industries that are 3D objects are drawn on it, tiles. */
+static constexpr int CAB_FAR_OBJECT_TILES = 64;
+
+/** The average colour of a sprite at the normal zoom, made the first time (the far land's colours). */
+static Colour CabSpriteColour(SpriteID image, PaletteID pal, Colour fallback)
+{
+	static std::map<std::pair<SpriteID, PaletteID>, Colour> kept;
+	auto it = kept.find({image, pal});
+	if (it != kept.end()) return it->second;
+	const Sprite *spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
+	const int mask = ScaleByZoom(-1, ZoomLevel::Normal);
+	const int left = spr->x_offs & mask, top = spr->y_offs & mask;
+	const int w = UnScaleByZoom(spr->x_offs + spr->width - left, ZoomLevel::Normal) + 1, h = UnScaleByZoom(spr->y_offs + spr->height - top, ZoomLevel::Normal) + 1;
+	CabTexture t;
+	t.w = w;
+	t.h = h;
+	t.px.assign(static_cast<size_t>(w) * h, 0);
+	DrawPixelInfo tdpi{
+		.dst_ptr = t.px.data(),
+		.left = left,
+		.top = top,
+		.width = ScaleByZoom(w, ZoomLevel::Normal),
+		.height = ScaleByZoom(h, ZoomLevel::Normal),
+		.pitch = w,
+		.zoom = ZoomLevel::Normal
+	};
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+		DrawSpriteViewport(image, pal, 0, 0, nullptr);
+	}
+	const Colour c = CabAverage(t, fallback);
+	kept.emplace(std::make_pair(image, pal), c);
+	return c;
+}
+
+/** The colour of a tile from afar (the far land): the sprite of its ground, averaged; its trees, roads and houses as their colours. */
+static Colour CabFarColour(TileIndex tile)
+{
+	auto mix = [](Colour a, Colour b, int b_part) {
+		auto m = [&](uint8_t x, uint8_t y) { return static_cast<uint8_t>((x * (256 - b_part) + y * b_part) >> 8); };
+		return Colour(m(a.r, b.r), m(a.g, b.g), m(a.b, b.b));
+	};
+	static const SpriteID grass[4] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE};
+	static const SpriteID snow_desert[4] = {SPR_FLAT_1_QUART_SNOW_DESERT_TILE, SPR_FLAT_2_QUART_SNOW_DESERT_TILE, SPR_FLAT_3_QUART_SNOW_DESERT_TILE, SPR_FLAT_SNOW_DESERT_TILE};
+	const Colour green = CabSpriteColour(SPR_FLAT_GRASS_TILE, PAL_NONE, Colour(90, 130, 50));
+	/* The land of a themed town (GetThemedLand()): its ash or its sand. */
+	auto themed = [&](Colour own) {
+		switch (GetThemedLand(tile)) {
+			case ThemedLand::Ash: return CabSpriteColour(SPR_FLAT_GRASS_TILE, PALETTE_CRASH, Colour(90, 90, 90));
+			case ThemedLand::Desert: return CabSpriteColour(SPR_DESERT_GROUND_BASE + 3 * 19, PAL_NONE, Colour(200, 180, 120));
+			default: return own;
+		}
+	};
+	switch (GetTileType(tile)) {
+		case TileType::Clear: {
+			if (IsSnowTile(tile)) return CabSpriteColour(snow_desert[GetClearDensity(tile) & 3], PAL_NONE, Colour(230, 230, 240));
+			switch (GetClearGround(tile)) {
+				case ClearGround::Grass: return themed(CabSpriteColour(grass[GetClearDensity(tile) & 3], PAL_NONE, green));
+				case ClearGround::Rough: return themed(CabSpriteColour(SPR_FLAT_ROUGH_LAND, PAL_NONE, green));
+				case ClearGround::Rocks: return CabSpriteColour(SPR_FLAT_ROCKY_LAND_1, PAL_NONE, Colour(130, 125, 115));
+				case ClearGround::Fields: return CabSpriteColour(SPR_FARMLAND_STATE_3, PAL_NONE, Colour(150, 130, 70));
+				case ClearGround::Desert: return CabSpriteColour(snow_desert[GetClearDensity(tile) & 3], PAL_NONE, Colour(210, 190, 130));
+				default: return green;
+			}
+		}
+		case TileType::Trees: {
+			Colour ground = green;
+			switch (GetTreeGround(tile)) {
+				case TreeGround::SnowOrDesert: case TreeGround::RoughSnow: ground = CabSpriteColour(SPR_FLAT_SNOW_DESERT_TILE, PAL_NONE, Colour(230, 230, 240)); break;
+				case TreeGround::Shore: ground = CabSpriteColour(SPR_FLAT_WATER_TILE, PAL_NONE, Colour(60, 90, 160)); break;
+				default: break;
+			}
+			ground = themed(ground);
+			Colour crown(52, 84, 38);
+			if (GetThemedLand(tile) == ThemedLand::Ash) crown = Colour(120, 86, 96); // the mushrooms
+			else if (GetTreeType(tile) == TREE_CACTUS || GetThemedLand(tile) == ThemedLand::Desert) crown = Colour(110, 140, 70);
+			else if (GetTreeType(tile) >= TREE_SUB_ARCTIC && GetTreeType(tile) < TREE_RAINFOREST) crown = Colour(40, 70, 50);
+			return mix(ground, crown, 96 + 32 * static_cast<int>(GetTreeCount(tile)));
+		}
+		case TileType::Water: return CabSpriteColour(SPR_FLAT_WATER_TILE, PAL_NONE, Colour(60, 90, 160));
+		case TileType::Road: return Colour(112, 112, 108);
+		case TileType::Railway: return Colour(122, 108, 92);
+		case TileType::House: return Colour(150, 132, 118);
+		case TileType::Station: return Colour(128, 124, 118);
+		case TileType::Industry: return Colour(128, 112, 96);
+		case TileType::TunnelBridge: return Colour(120, 112, 100);
+		default: return themed(green);
+	}
+}
+
+/**
+ * The far land (as OpenMW's distant land): beyond the tiles drawn, the land to the horizon in blocks of tiles, the
+ * larger the farther -- a tile up to 26 tiles away, 2 to 40, 4 to 80, then 8 -- each with the heights of its
+ * corners and the colour of its tiles from afar, lit by its slope; the hills on the horizon stand against the sky.
+ * Each block hangs a skirt from its edges: where a larger block meets smaller ones the edges differ, and the skirt
+ * fills the slit. The tiles drawn (near) are left to them. The houses and industries that are 3D objects within
+ * CAB_FAR_OBJECT_TILES are given to far_object, drawn as the near ones, simplified (ThreeDShapeLevel()).
+ * @param near whether a tile is drawn as the tiles are
+ * @param far_object a 3D object standing on the far land: the object and its north tile
+ */
+static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int width, int height, const std::function<bool(int, int)> &near, const std::function<void(const ThreeDObject *, TileIndex)> &far_object)
+{
+	struct Block {
+		int x, y, size;
+	};
+	std::vector<Block> blocks;
+	const double ex = eye.x / TILE_SIZE, ey = eye.y / TILE_SIZE;
+	auto visible = [&](int x, int y, int size) {
+		const double half = size * TILE_SIZE / 2.0;
+		CabPoint c = CabToEye(eye, x * TILE_SIZE + half, y * TILE_SIZE + half, eye.z, 0, 0);
+		const double radius = half * M_SQRT2;
+		return c.f > -radius && std::abs(c.r) <= std::max(c.f, 0.0) * CAB_FOV_TAN + radius + TILE_SIZE;
+	};
+	std::function<void(int, int, int)> split = [&](int x, int y, int size) {
+		if (x >= static_cast<int>(Map::SizeX()) || y >= static_cast<int>(Map::SizeY()) || x + size <= 0 || y + size <= 0) return;
+		if (!visible(x, y, size)) return;
+		const double d = std::hypot(x + size / 2.0 - ex, y + size / 2.0 - ey);
+		if (d - size * M_SQRT2 / 2 > CAB_FAR_TILES) return;
+		const double split_within = size == 8 ? 80 : size == 4 ? 40 : 26;
+		if (size > 1 && d < split_within) {
+			const int half = size / 2;
+			for (int k = 0; k < 4; k++) split(x + (k & 1) * half, y + (k >> 1) * half, half);
+			return;
+		}
+		if (size == 1 && near(x, y)) return;
+		blocks.push_back({x, y, size});
+	};
+	const int x0 = (static_cast<int>(ex) - CAB_FAR_TILES) & ~7, y0 = (static_cast<int>(ey) - CAB_FAR_TILES) & ~7;
+	for (int y = y0; y <= static_cast<int>(ey) + CAB_FAR_TILES; y += 8) {
+		for (int x = x0; x <= static_cast<int>(ex) + CAB_FAR_TILES; x += 8) split(x, y, 8);
+	}
+	if (blocks.empty()) return;
+
+	/* The colours, a pixel each of a texture a row high. */
+	std::vector<uint32_t> colours(blocks.size());
+	const uint max_x = Map::MaxX(), max_y = Map::MaxY();
+	auto height_at = [&](int x, int y) {
+		return static_cast<double>(TileHeight(TileXY(std::clamp<int>(x, 0, max_x), std::clamp<int>(y, 0, max_y))) * TILE_HEIGHT);
+	};
+	/* The light from the north-west, high, as the game's slopes are lit. */
+	const double lx = 0.0, ly = -0.55, lz = 0.835;
+	CabBatchScope batch;
+	for (size_t k = 0; k < blocks.size(); k++) {
+		const Block &b = blocks[k];
+		/* The houses and industries on it that are 3D objects: the towns on the horizon. */
+		if (std::hypot(b.x + b.size / 2.0 - ex, b.y + b.size / 2.0 - ey) < CAB_FAR_OBJECT_TILES) {
+			for (int ty = std::max(0, b.y); ty < std::min<int>(b.y + b.size, max_y + 1); ty++) {
+				for (int tx = std::max(0, b.x); tx < std::min<int>(b.x + b.size, max_x + 1); tx++) {
+					const TileIndex tile = TileXY(tx, ty);
+					if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
+						HouseID north = GetHouseType(tile);
+						if (GetHouseNorthPart(north) != 0) continue;
+						const ThreeDObject *obj = GetThreeDHouseObjectAt(north, tile);
+						if (obj != nullptr) far_object(obj, tile);
+					} else if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
+						const Industry *ind = Industry::GetByTile(tile);
+						if (ind->location.tile != tile) continue;
+						const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+						if (obj != nullptr) far_object(obj, tile);
+					}
+				}
+			}
+		}
+		uint r = 0, g = 0, bl = 0, n = 0;
+		const int step = std::max(1, b.size / 4);
+		for (int ty = b.y; ty < b.y + b.size; ty += step) {
+			for (int tx = b.x; tx < b.x + b.size; tx += step) {
+				if (tx < 0 || ty < 0 || static_cast<uint>(tx) > max_x || static_cast<uint>(ty) > max_y) continue;
+				const Colour c = CabFarColour(TileXY(tx, ty));
+				r += c.r;
+				g += c.g;
+				bl += c.b;
+				n++;
+			}
+		}
+		if (n == 0) continue;
+		colours[k] = Colour(static_cast<uint8_t>(r / n), static_cast<uint8_t>(g / n), static_cast<uint8_t>(bl / n)).data;
+		const double h00 = height_at(b.x, b.y), h10 = height_at(b.x + b.size, b.y), h11 = height_at(b.x + b.size, b.y + b.size), h01 = height_at(b.x, b.y + b.size);
+		/* Its slope's light: the normal against the light, flat as it is. */
+		const double span = b.size * TILE_SIZE;
+		const double dzdx = ((h10 + h11) - (h00 + h01)) / 2 / span * CAB_Z_SCALE, dzdy = ((h01 + h11) - (h00 + h10)) / 2 / span * CAB_Z_SCALE;
+		const double len = std::sqrt(dzdx * dzdx + dzdy * dzdy + 1);
+		const double lit = (-dzdx * lx - dzdy * ly + lz) / len / lz;
+		const uint light = static_cast<uint>(std::clamp(256.0 * (0.45 + 0.55 * lit), 110.0, 300.0));
+		const double tu = k + 0.5, tv = 0.5;
+		const double wx0 = b.x * TILE_SIZE, wy0 = b.y * TILE_SIZE, wx1 = wx0 + span, wy1 = wy0 + span;
+		auto at = [&](double x, double y, double z) { return CabToEye(eye, x, y, z, tu, tv); };
+		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx0, wy0, h00), at(wx1, wy0, h10), at(wx1, wy1, h11), at(wx0, wy1, h01)}, eye, false, light);
+		if (b.size == 1) continue;
+		/* The skirt: down from each edge. */
+		const double drop = b.size * TILE_HEIGHT;
+		const uint dark = light * 3 / 4;
+		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx0, wy0, h00), at(wx1, wy0, h10), at(wx1, wy0, h10 - drop), at(wx0, wy0, h00 - drop)}, eye, false, dark);
+		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx1, wy0, h10), at(wx1, wy1, h11), at(wx1, wy1, h11 - drop), at(wx1, wy0, h10 - drop)}, eye, false, dark);
+		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx1, wy1, h11), at(wx0, wy1, h01), at(wx0, wy1, h01 - drop), at(wx1, wy1, h11 - drop)}, eye, false, dark);
+		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx0, wy1, h01), at(wx0, wy0, h00), at(wx0, wy0, h00 - drop), at(wx0, wy1, h01 - drop)}, eye, false, dark);
+	}
+}
+
 /**
  * The view from an eye in perspective: from the cab of a vehicle (cab_view.h), or from the eyes of the walker of the
  * view from the first person (first_person_gui.cpp, the player: "let's make Morrowind, first person view").
@@ -8289,6 +8493,20 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			}
 		}
 	}
+	/* 4a. The far land beyond them, to the horizon (DrawEyeFarLand()); not in a tunnel. */
+	if (!in_tunnel.has_value()) {
+		DrawEyeFarLand(eye, dst, zb, width, height, [&](int tx, int ty) {
+			/* As the tiles ahead are chosen (1. above). */
+			if (std::abs(tx - tcx) > CAB_RANGE_TILES || std::abs(ty - tcy) > CAB_RANGE_TILES) return false;
+			CabPoint c = CabToEye(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, eye.z, 0, 0);
+			return c.f >= -2.0 * TILE_SIZE && c.f <= CAB_RANGE_TILES * TILE_SIZE && std::abs(c.r) <= c.f * CAB_FOV_TAN + 3.0 * TILE_SIZE;
+		}, [&](const ThreeDObject *obj, TileIndex origin) {
+			for (const CabObject &co : objects) {
+				if (co.origin == origin) return;
+			}
+			objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+		});
+	}
 
 	eye_stage(3);
 	/* 4b. Bridges and tunnels as things of their own: decks, ramps and pillars from the bridges' sprites; portals of
@@ -8321,6 +8539,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		int level;
 		uint32_t paint;
 		const ThreeDObjectTexture *tex;
+		int shape_level;
 		ThreeDObjectShapeView shape;
 	};
 	std::vector<ObjectJob> jobs;
@@ -8337,12 +8556,18 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		/* Its shape as simple as its nearest part allows (ThreeDShapeLevel()). */
 		const double reach = TILE_SIZE * std::hypot(o.tiles_x, o.tiles_y) / 2 + o.top * CAB_Z_SCALE;
 		const double near_pixels_per_unit = eye.focal / std::max(c.f - reach, CAB_NEAR * 4);
-		const ThreeDObjectShapeView shape = o.GetShape(ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5));
-		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape});
+		const int shape_level = ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5);
+		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}});
 		wanted.push_back({&o, level, jobs.back().paint});
 	}
 	PrepareThreeDObjectTextures(wanted);
-	for (ObjectJob &j : jobs) j.tex = j.o->GetTexture(j.level, j.paint);
+	std::vector<std::pair<const ThreeDObject *, int>> shapes;
+	for (const ObjectJob &j : jobs) shapes.emplace_back(j.o, j.shape_level);
+	PrepareThreeDObjectShapes(shapes);
+	for (ObjectJob &j : jobs) {
+		j.tex = j.o->GetTexture(j.level, j.paint);
+		j.shape = j.o->GetShape(j.shape_level);
+	}
 	/* Each object on a core of its own: every corner to the eye once, the triangles turned away left out (as the
 	 * engines do), those wholly before the eye straight to its list, the others cut at the near plane; then the lists
 	 * drawn by bands of rows (CabRasterLists()). */
@@ -8590,15 +8815,16 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	}
 
 	eye_stage(5);
-	/* 6. The haze: the far fades into the sky at the horizon (a stripe of rows a core). */
-	const double haze_to = CAB_RANGE_TILES * TILE_SIZE;
+	/* 6. The haze: the far fades into the sky at the horizon, the more the farther, to the far land's end (a stripe
+	 * of rows a core). */
+	const double haze_depth = CAB_FAR_TILES * TILE_SIZE * 0.4;
 	if (!in_tunnel.has_value()) ParallelRows(height, [&](int lo, int hi) {
 		for (size_t i = static_cast<size_t>(lo) * width; i < static_cast<size_t>(hi) * width; i++) {
 			float z = zb[i];
 			if (z <= 0.0f) continue;
 			double dist = 1.0 / z;
 			if (dist <= CAB_HAZE_FROM) continue;
-			double t = std::min(1.0, (dist - CAB_HAZE_FROM) / (haze_to - CAB_HAZE_FROM)) * 0.75;
+			double t = (1.0 - std::exp(-(dist - CAB_HAZE_FROM) / haze_depth)) * 0.8;
 			Colour c(out.pixels[i]);
 			out.pixels[i] = Colour(static_cast<uint8_t>(c.r + (haze.r - c.r) * t), static_cast<uint8_t>(c.g + (haze.g - c.g) * t), static_cast<uint8_t>(c.b + (haze.b - c.b) * t)).data;
 		}
@@ -8630,10 +8856,10 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	_vd.tile_sprites_to_draw.clear();
 	_vd.parent_sprites_to_draw.clear();
 	_vd.child_screen_sprites_to_draw.clear();
-	/* The haze far off (as OpenMW's fog): from half the reach the picture fades into the colour of the horizon, and
-	 * the far ground under it is all haze, so the view ends softly where the tiles drawn end. */
+	/* The haze far off (as OpenMW's fog): from 60 % of the far land's reach the picture fades into the colour of the
+	 * horizon, and the ground beyond it (past the map's edge) is all haze, so the view ends softly. */
 	{
-		const double fog_near = CAB_RANGE_TILES * TILE_SIZE * 0.45, fog_far = CAB_RANGE_TILES * TILE_SIZE * 0.95;
+		const double fog_near = CAB_FAR_TILES * TILE_SIZE * 0.6, fog_far = CAB_FAR_TILES * TILE_SIZE * 0.98;
 		const Colour far_haze(150, 178, 205);
 		ParallelRows(height, [&](int lo, int hi) {
 		for (int y = lo; y < hi; y++) {
@@ -8666,8 +8892,12 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			if (o.night_tri.empty() && o.lights.empty()) continue;
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
 			const CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
-			if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y) || c.f > CAB_RANGE_TILES * TILE_SIZE) continue;
-			const ThreeDObjectTexture *tex = o.GetTexture(0, o.PaintAt(co.origin));
+			/* Near and on the far land: the lights of the towns on the horizon. */
+			if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y) || c.f > CAB_FAR_OBJECT_TILES * TILE_SIZE) continue;
+			/* The texture at the level of detail of its distance, as the house (4b. above). */
+			const double texels_per_unit = o.GetTexture(0)->w / static_cast<double>(TILE_SIZE), pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
+			const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
+			const ThreeDObjectTexture *tex = o.GetTexture(level, o.PaintAt(co.origin));
 			for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
 				std::vector<CabPoint> poly;
 				for (int k = 0; k < 3; k++) {

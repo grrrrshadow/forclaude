@@ -356,6 +356,7 @@ struct ThreeDTextureWanted {
 	uint32_t paint;
 };
 void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted);
+void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted);
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();
