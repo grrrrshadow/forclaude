@@ -2075,6 +2075,81 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 	return this->shape.get();
 }
 
+/**
+ * A simpler shape of this one for a model drawn small (the view from the eyes; the player, 16. 10.: "save when they
+ * are far, it need not be drawn in detail far"): its corners joined in cells of about the size asked for -- 2, 4,
+ * ... 64 cm, made the first time each is asked for -- each cell's corners one at their middle, at the place in the
+ * texture of the first of them, the triangles left with three corners kept. A cell joins only corners facing much
+ * the same way and of the same texture, so the edges of a body stay. The lights and the textures stay the shape's.
+ * @param cell_m the size of a cell asked for, metres of the model; below 2 cm the shape itself
+ */
+const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
+{
+	if (!(cell_m >= 0.02) || this->tri.size() < 3 * 512) return this;
+	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
+	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
+	if (made != nullptr) return made.get();
+	const double cell = 0.02 * (1 << level);
+	const size_t corners = this->pos.size() / 3;
+	const bool has_nrm = this->nrm.size() == this->pos.size(), has_uv = this->uv.size() == corners * 2;
+	/* Each corner's texture: its first triangle's. */
+	std::vector<uint8_t> material(corners, 0);
+	for (size_t t = this->tri.size(); t >= 3; t -= 3) {
+		const uint8_t m = (t - 3) / 3 < this->tri_tex.size() ? this->tri_tex[(t - 3) / 3] : 0;
+		for (int k = 0; k < 3; k++) material[this->tri[t - 3 + k]] = m;
+	}
+	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
+	auto key_of = [&](size_t i) {
+		uint64_t k = 0;
+		for (int a = 0; a < 3; a++) k = k * 4096 + static_cast<uint64_t>(static_cast<int64_t>(std::floor(this->pos[i * 3 + a] / cell)) & 4095);
+		int face = 0;
+		if (has_nrm) {
+			const float nx = this->nrm[i * 3], ny = this->nrm[i * 3 + 1], nz = this->nrm[i * 3 + 2];
+			const float ax = std::abs(nx), ay = std::abs(ny), az = std::abs(nz);
+			face = ax >= ay && ax >= az ? (nx < 0 ? 1 : 2) : (ay >= az ? (ny < 0 ? 3 : 4) : (nz < 0 ? 5 : 6));
+		}
+		return (k * 8 + face) * 256 + material[i];
+	};
+	auto out = std::make_shared<ThreeDVehicleShape>();
+	std::unordered_map<uint64_t, uint32_t> cells;
+	std::vector<uint32_t> joined(corners);
+	std::vector<uint32_t> count;
+	for (size_t i = 0; i < corners; i++) {
+		auto [it, added] = cells.emplace(key_of(i), static_cast<uint32_t>(count.size()));
+		joined[i] = it->second;
+		if (added) {
+			count.push_back(0);
+			out->pos.insert(out->pos.end(), 3, 0.0f);
+			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
+			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
+		}
+		const uint32_t c = it->second;
+		count[c]++;
+		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] += this->pos[i * 3 + a];
+		if (has_nrm) for (int a = 0; a < 3; a++) out->nrm[c * 3 + a] += this->nrm[i * 3 + a];
+		/* The place in the texture of its first corner: a middle of two places of a texture may be neither. */
+		if (has_uv && added) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] = this->uv[i * 2 + a];
+	}
+	for (size_t c = 0; c < count.size(); c++) {
+		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] /= count[c];
+		if (has_nrm) {
+			float *n = &out->nrm[c * 3];
+			const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (l > 0) for (int a = 0; a < 3; a++) n[a] /= l;
+		}
+	}
+	for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
+		const uint32_t a = joined[this->tri[t]], b = joined[this->tri[t + 1]], c = joined[this->tri[t + 2]];
+		if (a == b || b == c || a == c) continue;
+		out->tri.insert(out->tri.end(), {a, b, c});
+		out->tri_tex.push_back(t / 3 < this->tri_tex.size() ? this->tri_tex[t / 3] : 0);
+	}
+	out->x0 = this->x0; out->x1 = this->x1; out->y0 = this->y0; out->y1 = this->y1; out->z0 = this->z0; out->z1 = this->z1;
+	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, this->tri.size() / 3);
+	made = std::move(out);
+	return made.get();
+}
+
 /** A frame of a figure that moves (FrameAt()), read the first time it is drawn; the others as GetShape(). */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 {
@@ -2133,6 +2208,16 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 		made->pngs.push_back(t.png);
 		made->flats.push_back(t.flat);
 		made->tex_names.push_back(t.name);
+	}
+	/* Its extent as posed (how big it is in the view from the eyes, CabFigure). */
+	if (!made->pos.empty()) {
+		made->x0 = made->y0 = made->z0 = std::numeric_limits<float>::infinity();
+		made->x1 = made->y1 = made->z1 = -std::numeric_limits<float>::infinity();
+		for (size_t i = 0; i + 2 < made->pos.size(); i += 3) {
+			made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
+			made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
+			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
+		}
 	}
 	_vehicle_shapes.emplace(key, made);
 	return made;

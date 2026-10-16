@@ -47,6 +47,8 @@
 
 #include "safeguards.h"
 
+bool FirstPersonWalkerAt(double &x, double &y);
+
 namespace {
 
 /** The figure that walks. */
@@ -372,9 +374,25 @@ TileIndex TurnedViewMiddle()
 	return TileVirtXY(p.x, p.y);
 }
 
+/**
+ * Where the life of the towns goes on (the walkers, the cars of the game's own): about the walker of the view from the
+ * first person while it is out (the player, 16. 10.: "Mat was not seen at all, I came out beside him"), else about
+ * the middle of the main view when it is turned; else nowhere.
+ */
+static TileIndex LifeMiddle()
+{
+	double x, y;
+	if (_game_mode == GameMode::Normal && FirstPersonWalkerAt(x, y)) {
+		const int tx = std::clamp(static_cast<int>(x / TILE_SIZE), 0, static_cast<int>(Map::SizeX()) - 1);
+		const int ty = std::clamp(static_cast<int>(y / TILE_SIZE), 0, static_cast<int>(Map::SizeY()) - 1);
+		return TileXY(tx, ty);
+	}
+	return TurnedViewMiddle();
+}
+
 /** Every tick: the walkers walk on; at their doors they go in; the towns near the view get theirs. */
 const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None, 1}, [](auto) {
-	TileIndex middle = TurnedViewMiddle();
+	TileIndex middle = LifeMiddle();
 	const ThreeDVehicleObject *fig = middle != INVALID_TILE ? WalkerFigure() : nullptr;
 	if (fig == nullptr) {
 		for (const Walker &w : _walkers) MarkTileDirtyByTile(w.tile);
@@ -612,7 +630,7 @@ bool Drive(Driver &d, TileIndex middle)
 
 /** Every tick: the cars drive on, stand at their stops and drive on again. */
 const IntervalTimer<TimerGameTick> _drivers_timer({TimerGameTick::Priority::None, 1}, [](auto) {
-	TileIndex middle = TurnedViewMiddle();
+	TileIndex middle = LifeMiddle();
 	const std::vector<ThreeDVehicleObject> &cars = GetThreeDDrivingCars();
 	if (middle == INVALID_TILE || cars.empty()) {
 		for (const Driver &d : _drivers) MarkCarDirty(d, d.tile);
@@ -662,6 +680,16 @@ void AddThreeDDriversToViewport(ZoomLevel zoom)
 	for (const Driver &d : _drivers) {
 		if (d.path.empty() || d.tile == INVALID_TILE) continue;
 		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, IsNightNow());
+	}
+}
+
+/** The cars of the game's own driving about in the view from the eyes: their objects among its figures (AddCabCar()). */
+void AddThreeDDriversToEye()
+{
+	const float scale = WalkerScale();
+	for (const Driver &d : _drivers) {
+		if (d.path.empty() || d.tile == INVALID_TILE) continue;
+		AddCabCar(d.car, scale, d.x, d.y, d.z, d.facing, IsNightNow());
 	}
 }
 
@@ -716,10 +744,19 @@ void AddThreeDWalkersToViewport(ZoomLevel zoom)
 	}
 }
 
-/** Send a walker out now in the town nearest the middle of the turned view (the rig); whether one went. */
+/** The walkers in the view from the eyes, among its figures at their true size (AddCabFigure()). */
+void AddThreeDWalkersToEye(float scale)
+{
+	if (_walkers.empty()) return;
+	for (const Walker &w : _walkers) {
+		AddCabFigure(WALKER_FIGURE, scale, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, w.facing, std::max(0, w.frame));
+	}
+}
+
+/** Send a walker out now in the town nearest the middle of the turned view or the walker of the view from the first person (the rig); whether one went. */
 bool SendThreeDWalker()
 {
-	TileIndex middle = TurnedViewMiddle();
+	TileIndex middle = LifeMiddle();
 	const ThreeDVehicleObject *fig = WalkerFigure();
 	if (middle == INVALID_TILE || fig == nullptr) return false;
 	const Town *best = nullptr;

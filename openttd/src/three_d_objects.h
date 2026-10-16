@@ -188,6 +188,23 @@ struct ThreeDVehicleShape {
 	std::vector<float> back_lights;     ///< x, y, z of each red light at the back, metres
 	bool paint_whole = false;           ///< the body's texture (the first) painted all over in the state's colour, without a mask (a car of BeamNG)
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }
+
+	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
+	static constexpr int SIMPLER_LEVELS = 6;
+	const ThreeDVehicleShape *Simpler(double cell_m) const;
+private:
+	/** Its simpler shapes, made the first time each is asked for; a copy of the shape has none of its own yet. */
+	struct SimplerShapes {
+		mutable std::array<std::shared_ptr<const ThreeDVehicleShape>, SIMPLER_LEVELS> shapes;
+		SimplerShapes() = default;
+		SimplerShapes(const SimplerShapes &) {}
+		SimplerShapes &operator=(const SimplerShapes &)
+		{
+			this->shapes = {};
+			return *this;
+		}
+	};
+	SimplerShapes simpler;
 };
 
 /** The paint of a vehicle object ("lak"): which pixels of the body's texture are paint, how they fade with age, a colour by number. */

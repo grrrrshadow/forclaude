@@ -29,6 +29,7 @@
 #include "timer/timer_game_tick.h"
 #include "timer/timer.h"
 
+#include <array>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -83,8 +84,10 @@ struct ObjectPictureEntry {
 	uint64_t used;
 	ThreeDModelPicture picture;
 };
-static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int, int>, ObjectPictureEntry> _object_pictures;
+static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int, int, int>, ObjectPictureEntry> _object_pictures;
 static uint64_t _object_pictures_clock = 0;
+
+static void ForgetEyePainted();
 
 /** Forget the sprites made: the sprite cache they were in is gone (GfxInitSpriteMem()). */
 void ResetThreeDVehicleObjectSprites()
@@ -93,6 +96,7 @@ void ResetThreeDVehicleObjectSprites()
 	_object_sprites.clear();
 	_object_empty_sprite = 0;
 	_object_pictures.clear();
+	ForgetEyePainted();
 	/* The GRFs are loaded anew: their packages read again the next time they are looked at, one put into the NewGRF
 	 * folders meanwhile among them (three_d_objects.h). */
 	ResetThreeDVehicleObjects();
@@ -348,6 +352,72 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 }
 
 /**
+ * The paint of a state over the body's texture (texture 0) of an object: its colour by number, faded with age, then
+ * rusted (the colleague's points 6 and 7) -- each texel as RasterObject() draws it and as the view from the eyes
+ * paints the texture (GetThreeDVehicleObjectStateTexture()).
+ */
+struct ObjectPaintOfState {
+	const ThreeDVehicleObject *obj = nullptr;
+	const ThreeDObjectTexture *mask = nullptr;      ///< the paint's mask, nullptr: none (or all of it, whole)
+	const ThreeDObjectTexture *rust_mask = nullptr; ///< the rust's mask, nullptr: none
+	bool coloured = false, whole = false;
+	Colour colour, target, rust_colour;
+	float start = 255.0f, fade = 0, rust_time = 0;
+
+	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour) : obj(&obj), fade(fade), rust_time(rust_time)
+	{
+		const ThreeDVehiclePaint &paint = obj.paint;
+		this->coloured = paint.coloured || paint_colour != 0;
+		this->mask = (paint.fades || this->coloured) ? obj.GetPaintMask(level) : nullptr;
+		this->whole = this->coloured && shape.paint_whole;
+		this->target = Colour(paint.target);
+		this->colour = Colour(paint_colour != 0 ? paint_colour : paint.colour);
+		this->start = paint.start > 0 ? static_cast<float>(paint.start) : 255.0f;
+		this->rust_mask = rust_time > 0 ? obj.GetRustMask(level) : nullptr;
+		this->rust_colour = Colour(obj.rust.target);
+	}
+
+	/** The paint at u, v of the body's texture over its colour: coloured at the texture's lightness, faded. */
+	inline void Paint(float u, float v, float &cr, float &cg, float &cb) const
+	{
+		if (this->mask == nullptr && !this->whole) return;
+		float m = 1.0f;
+		if (this->mask != nullptr) {
+			int mx = std::min(this->mask->w - 1, static_cast<int>(u * this->mask->w)), my = std::min(this->mask->h - 1, static_cast<int>(v * this->mask->h));
+			m = Colour(this->mask->px[static_cast<size_t>(my) * this->mask->w + mx]).r / 255.0f;
+		}
+		if (m <= 0) return;
+		if (this->coloured) {
+			/* The colour at the texture's lightness: its own where the texture is "zacatek" light. */
+			float l = std::max({cr, cg, cb}) / this->start;
+			cr += (std::min(255.0f, this->colour.r * l) - cr) * m;
+			cg += (std::min(255.0f, this->colour.g * l) - cg) * m;
+			cb += (std::min(255.0f, this->colour.b * l) - cb) * m;
+		}
+		if (this->fade > 0) {
+			float f = this->fade * m;
+			cr += (this->target.r - cr) * f;
+			cg += (this->target.g - cg) * f;
+			cb += (this->target.b - cb) * f;
+		}
+	}
+
+	/** The rust at u, v of the body's texture over its colour. */
+	inline void Rust(float u, float v, float &cr, float &cg, float &cb) const
+	{
+		if (this->rust_mask == nullptr) return;
+		int rx = std::min(this->rust_mask->w - 1, static_cast<int>(u * this->rust_mask->w)), ry = std::min(this->rust_mask->h - 1, static_cast<int>(v * this->rust_mask->h));
+		float m = Colour(this->rust_mask->px[static_cast<size_t>(ry) * this->rust_mask->w + rx]).r;
+		if (m <= 0) return;
+		/* Gradual: the value is the moment it starts, from nothing to all rust in "nabeh"; else how much. */
+		float f = this->obj->rust.gradual ? std::clamp((this->rust_time - (m - 1) / 254.0f) / this->obj->rust.ramp, 0.0f, 1.0f) : m / 255.0f * this->rust_time;
+		cr += (this->rust_colour.r - cr) * f;
+		cg += (this->rust_colour.g - cg) * f;
+		cb += (this->rust_colour.b - cb) * f;
+	}
+};
+
+/**
  * Draw an object with the camera of the sprites, turned: the triangles through a depth buffer, each pixel the
  * texture's, lit from the corners' normals by one light fixed to the world (the colleague's: from the left above
  * as the sprites of the original game and the sets, the brightness 0.55 + 0.45 max(0, n . L), L = (-0.55, 0.35,
@@ -446,16 +516,9 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	for (float d = TexelsPerMetre(obj, *shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
 	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, shape->pngs.size()));
 	for (size_t i = 0; i < texs.size(); i++) texs[i] = obj.GetTexture(level, static_cast<int>(i));
-	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6). */
-	const ThreeDVehiclePaint &paint = obj.paint;
-	const bool coloured = paint.coloured || paint_colour != 0;
-	const ThreeDObjectTexture *mask = (paint.fades || coloured) ? obj.GetPaintMask(level) : nullptr;
-	const bool whole = coloured && shape->paint_whole;
-	const Colour target(paint.target), colour(paint_colour != 0 ? paint_colour : paint.colour);
-	const float start = paint.start > 0 ? static_cast<float>(paint.start) : 255.0f;
-	/* The rust, after the paint has faded (the colleague: the paint fades, the rust grows over it). */
-	const ThreeDObjectTexture *rust_mask = rust_time > 0 ? obj.GetRustMask(level) : nullptr;
-	const Colour rust_colour(obj.rust.target);
+	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6); the rust after
+	 * the paint has faded (the colleague: the paint fades, the rust grows over it). */
+	const ObjectPaintOfState painted(obj, *shape, level, fade, rust_time, paint_colour);
 	/* The textures an effect is coloured in: those of its material ("barvy"), the texture times the colour. */
 	const Colour tint_colour(tint);
 	std::vector<bool> tinted(texs.size(), false);
@@ -469,8 +532,6 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
 		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
-		const ThreeDObjectTexture *tri_mask = ti == 0 ? mask : nullptr;
-		const ThreeDObjectTexture *tri_rust = ti == 0 ? rust_mask : nullptr;
 		const float ax = sx[a] - left, ay = sy[a] - top, bx = sx[b] - left, by = sy[b] - top, cx = sx[c] - left, cy = sy[c] - top;
 		const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 		if (std::abs(area) < 1e-6f) continue;
@@ -498,44 +559,13 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				float k = w0 * light[a] + w1 * light[b] + w2 * light[c];
 				Colour col(texel);
 				float cr = col.r, cg = col.g, cb = col.b;
-				if (tri_mask != nullptr || (whole && ti == 0)) {
-					float m = 1.0f;
-					if (tri_mask != nullptr) {
-						int mx = std::min(tri_mask->w - 1, static_cast<int>(u * tri_mask->w)), my = std::min(tri_mask->h - 1, static_cast<int>(v * tri_mask->h));
-						m = Colour(tri_mask->px[static_cast<size_t>(my) * tri_mask->w + mx]).r / 255.0f;
-					}
-					if (m > 0) {
-						if (coloured) {
-							/* The colour at the texture's lightness: its own where the texture is "zacatek" light. */
-							float l = std::max({cr, cg, cb}) / start;
-							cr += (std::min(255.0f, colour.r * l) - cr) * m;
-							cg += (std::min(255.0f, colour.g * l) - cg) * m;
-							cb += (std::min(255.0f, colour.b * l) - cb) * m;
-						}
-						if (fade > 0) {
-							float f = fade * m;
-							cr += (target.r - cr) * f;
-							cg += (target.g - cg) * f;
-							cb += (target.b - cb) * f;
-						}
-					}
-				}
+				if (ti == 0) painted.Paint(u, v, cr, cg, cb);
 				if (tint != 0 && static_cast<size_t>(ti) < tinted.size() && tinted[ti]) {
 					cr = cr * tint_colour.r / 255.0f;
 					cg = cg * tint_colour.g / 255.0f;
 					cb = cb * tint_colour.b / 255.0f;
 				}
-				if (tri_rust != nullptr) {
-					int rx = std::min(tri_rust->w - 1, static_cast<int>(u * tri_rust->w)), ry = std::min(tri_rust->h - 1, static_cast<int>(v * tri_rust->h));
-					float m = Colour(tri_rust->px[static_cast<size_t>(ry) * tri_rust->w + rx]).r;
-					if (m > 0) {
-						/* Gradual: the value is the moment it starts, from nothing to all rust in "nabeh"; else how much. */
-						float f = obj.rust.gradual ? std::clamp((rust_time - (m - 1) / 254.0f) / obj.rust.ramp, 0.0f, 1.0f) : m / 255.0f * rust_time;
-						cr += (rust_colour.r - cr) * f;
-						cg += (rust_colour.g - cg) * f;
-						cb += (rust_colour.b - cb) * f;
-					}
-				}
+				if (ti == 0) painted.Rust(u, v, cr, cg, cb);
 				zb[at] = dz;
 				buf[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr * k)), static_cast<uint8_t>(std::min(255.0f, cg * k)), static_cast<uint8_t>(std::min(255.0f, cb * k)));
 			}
@@ -712,13 +742,13 @@ void PinThreeDPictures(bool pin)
 	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
 }
 
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0)
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0, float along_given = 0.0f)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
 	pitch = std::clamp(pitch, -60, 60);
 	roll = std::clamp(roll, -60, 60);
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)));
+	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)));
 	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
@@ -744,7 +774,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	e.used = ++_object_pictures_clock;
 	/* On the track foreshortened along itself as the map does, smoothly between the directions (as the likeness, RenderThreeDVehicle()). */
 	float f = cam_step * static_cast<float>(M_PI) / 180.0f;
-	float along = squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f;
+	float along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
 	ObjectRaster r;
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
@@ -905,19 +935,114 @@ bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundT
 	return true;
 }
 
-/**
- * The lights of a vehicle drawn as an object whose model has them, in the world (the view from the eyes): where its
- * lamps are, its object turned as it faces and as big as it is drawn; the pool of its headlights on the way ahead.
- * @return whether its lights are its model's (none, for a piece drawn with its anchor piece); false: about its box as always
- */
-bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights)
+/** The view from the eyes: how far back on its way a vehicle's heading is taken from (EyeFacing()), world units. */
+static constexpr double EYE_TRAIL_UNITS = 3.0;
+/** And how much of the way to that heading it turns a tick: smooth, not in the steps of its way's points. */
+static constexpr double EYE_TURN_A_TICK = 0.5;
+
+/** Where a vehicle drawn from its object has been, for the way it faces in the view from the eyes (EyeFacing()). */
+struct EyeTrail {
+	std::array<std::pair<int, int>, 8> at{}; ///< its last places, the newest last
+	int count = 0;
+	double target = 0;  ///< the heading its way gives, radians in the world, 0 along +x
+	double facing = 0;  ///< the heading it is drawn at, turning towards the target
+	uint64_t tick = 0;  ///< the game's tick of the last turn
+};
+static std::map<VehicleID, EyeTrail> _eye_trails;
+
+/** The angle of a direction in the world, radians, 0 along +x, pi / 2 along +y. */
+static inline double DirectionAngle(int d)
 {
-	lights.clear();
+	return std::atan2(static_cast<double>(DIR_DY[d]), static_cast<double>(DIR_DX[d]));
+}
+
+/** A step of the chain along a heading, world units: 1 along x or y, the square root of 2 on the diagonal (DIR_DX[]). */
+static inline double ChainStep(double facing)
+{
+	return 1.0 / std::max(std::abs(std::cos(facing)), std::abs(std::sin(facing)));
+}
+
+/** The foreshortening along a vehicle facing a heading, as the game spaces its vehicles: SQUEEZE along x or y, none on the diagonal. */
+static inline float SqueezeAt(double facing)
+{
+	return 1.0f - (1.0f - SQUEEZE) * static_cast<float>(std::abs(std::cos(2.0 * facing)));
+}
+
+/**
+ * The way a vehicle drawn from its object faces in the view from the eyes, finer than its eight directions (the player,
+ * 16. 10.: "the car has the 45 degrees of the sprites although it is an object, it drives oddly"): an object over
+ * several pieces from its last piece to its first, as a body on its bogies; one of a single piece as its way goes,
+ * from where it was a few units back, turning to it smoothly. Never more than 60 degrees off its direction (a turn
+ * in a depot, a vehicle that jumped): then its direction.
+ * @param by_direction its direction's angle, radians (turned round when its object faces backwards)
+ */
+static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *last, double by_direction)
+{
+	auto off = [&](double a) { return std::abs(std::remainder(a - by_direction, 2 * M_PI)); };
+	auto ahead = [&](double a) { return off(a) > M_PI / 2 ? a + M_PI : a; };
+	if (front != last) {
+		const double dx = front->x_pos - last->x_pos, dy = front->y_pos - last->y_pos;
+		if (dx * dx + dy * dy < 4.0) return by_direction;
+		const double a = ahead(std::atan2(dy, dx));
+		return off(a) <= M_PI / 3 ? a : by_direction;
+	}
+	const uint64_t now = TimerGameTick::counter;
+	EyeTrail &e = _eye_trails[v->index];
+	const std::pair<int, int> here{v->x_pos, v->y_pos};
+	if (e.count == 0 || std::hypot(here.first - e.at[e.count - 1].first, here.second - e.at[e.count - 1].second) > 2.0 * TILE_SIZE) {
+		/* Seen first, or far from where it was (another vehicle of the number, one out of a depot). */
+		e = {};
+		e.at[0] = here;
+		e.count = 1;
+		e.target = e.facing = by_direction;
+		e.tick = now;
+		return by_direction;
+	}
+	if (e.at[e.count - 1] != here) {
+		if (e.count == static_cast<int>(e.at.size())) {
+			std::move(e.at.begin() + 1, e.at.end(), e.at.begin());
+			e.count--;
+		}
+		e.at[e.count++] = here;
+	}
+	/* The heading from the newest place far enough back. */
+	bool found = false;
+	for (int i = e.count - 2; i >= 0; i--) {
+		const double dx = here.first - e.at[i].first, dy = here.second - e.at[i].second;
+		if (dx * dx + dy * dy < EYE_TRAIL_UNITS * EYE_TRAIL_UNITS) continue;
+		const double a = ahead(std::atan2(dy, dx));
+		e.target = off(a) <= M_PI / 3 ? a : by_direction;
+		found = true;
+		break;
+	}
+	if (!found && off(e.target) > M_PI / 3) e.target = by_direction;
+	if (off(e.facing) > M_PI / 3) {
+		e.facing = e.target;
+	} else if (now != e.tick) {
+		const double k = std::min(1.0, (now - e.tick) * EYE_TURN_A_TICK);
+		e.facing = std::remainder(e.facing + std::remainder(e.target - e.facing, 2 * M_PI) * k, 2 * M_PI);
+	}
+	e.tick = now;
+	/* The trails of vehicles gone, now and then. */
+	if (now % 512 == 0 && _eye_trails.size() > 64) {
+		std::erase_if(_eye_trails, [&](const auto &kv) { return now - kv.second.tick > 2048; });
+	}
+	return e.facing;
+}
+
+/**
+ * A vehicle drawn from its object in the view from the eyes: the object itself in its place, at its scale, facing
+ * the way it goes (EyeFacing()), foreshortened along as the game spaces its vehicles (as the map draws it), its state
+ * and its lights -- not its sprites of eight directions, which are only for what is drawn from them.
+ * @param[out] out where and how; out.obj nullptr for a piece drawn with its anchor piece (nothing of its own)
+ * @return whether the vehicle is drawn from its object
+ */
+bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
+{
+	out = {};
 	int piece = 0;
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
-	if (obj == nullptr) return false;
-	const ThreeDVehicleShape *shape = obj->GetShape();
-	if (shape == nullptr || !shape->HasLights()) return false;
+	if (obj == nullptr || obj->GetShape() == nullptr) return false;
 	if (piece != obj->anchor) return true;
 	bool reversed = false;
 	if (v->type == VehicleType::Train) {
@@ -929,21 +1054,41 @@ bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorld
 	while (front->IsArticulatedPart() && front->Previous() != nullptr) front = front->Previous();
 	const Vehicle *last = front;
 	while (last->HasArticulatedPart()) last = last->GetNextArticulatedPart();
-	const int on = VehicleObjectLightsOn(obj, front, last, reversed);
-	if (on == 0) return true;
-
 	const int d = to_underlying(reversed ? ReverseDir(v->direction) : v->direction) & 7;
-	const float scale = ObjectScale(obj);
-	const double along = MiddleFromPiece(obj, PieceLengths(obj), piece);
-	const double ax = v->x_pos + along * DIR_DX[d], ay = v->y_pos + along * DIR_DY[d];
+	const double facing = EyeFacing(v, reversed ? last : front, reversed ? front : last, DirectionAngle(d));
+
+	out.obj = obj;
+	out.scale = ObjectScale(obj);
+	out.along = SqueezedType(obj->type) ? SqueezeAt(facing) : 1.0f;
+	/* Hung from the middle of the chain, as on the map: from the anchor piece that many steps along. */
+	const double along = MiddleFromPiece(obj, PieceLengths(obj), piece) * ChainStep(facing);
+	out.x = v->x_pos + along * std::cos(facing);
+	out.y = v->y_pos + along * std::sin(facing);
+	out.z = v->z_pos;
+	out.facing = static_cast<float>(facing * 180.0 / M_PI);
+	out.state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
+	out.lights = VehicleObjectLightsOn(obj, front, last, reversed);
+	return true;
+}
+
+/**
+ * The lights of an object drawn in the view from the eyes, in the world (a vehicle of the game, GetThreeDEyeVehicle(),
+ * or a car of the game's own driving about): where its lamps are, its object turned as it faces and as big as it is
+ * drawn; the pool of its headlights on the way ahead.
+ */
+void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights)
+{
+	lights.clear();
+	const ThreeDVehicleShape *shape = ev.obj != nullptr ? ev.obj->GetShape() : nullptr;
+	if (shape == nullptr || ev.lights == 0) return;
 	/* The object's front and left in the world, as RasterObject() lights it. */
-	const double wa = (ViewAzimuth(d) + 135.0) * M_PI / 180.0;
+	const double wa = ev.facing * M_PI / 180.0;
 	const double fx = std::cos(wa), fy = std::sin(wa), lx = -fy, ly = fx;
 	auto add = [&](float px, float py, float pz, ThreeDPictureLight::Kind kind) {
-		const double x = px * scale * UNITS_PER_METRE, y = py * scale * UNITS_PER_METRE;
-		lights.push_back({ax + x * fx + y * lx, ay + x * fy + y * ly, v->z_pos + pz * scale * OBJECT_HEIGHT_PER_METRE, kind});
+		const double x = px * ev.scale * ev.along * UNITS_PER_METRE, y = py * ev.scale * UNITS_PER_METRE;
+		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind});
 	};
-	if ((on & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
+	if ((ev.lights & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
 		float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
 		const size_t n = shape->front_lights.size() / 3;
 		for (size_t i = 0; i < n; i++) {
@@ -954,10 +1099,89 @@ bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorld
 		add(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
 		add(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
 	}
-	if ((on & LIGHTS_BACK) != 0) {
+	if ((ev.lights & LIGHTS_BACK) != 0) {
 		for (size_t i = 0; i + 2 < shape->back_lights.size(); i += 3) add(shape->back_lights[i], shape->back_lights[i + 1], shape->back_lights[i + 2], ThreeDPictureLight::Kind::Back);
 	}
+}
+
+/**
+ * The lights of a vehicle drawn as an object whose model has them, in the world (the view from the eyes,
+ * GetThreeDEyeObjectLights()).
+ * @return whether its lights are its model's (none, for a piece drawn with its anchor piece); false: about its box as always
+ */
+bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights)
+{
+	lights.clear();
+	ThreeDEyeVehicle ev;
+	if (!GetThreeDEyeVehicle(v, ev)) return false;
+	if (ev.obj == nullptr) return true;
+	const ThreeDVehicleShape *shape = ev.obj->GetShape();
+	if (shape == nullptr || !shape->HasLights()) return false;
+	GetThreeDEyeObjectLights(ev, lights);
 	return true;
+}
+
+/** The body's textures painted as their states have them, for the view from the eyes (GetThreeDEyeVehicleTexture()). */
+static std::map<std::tuple<const ThreeDVehicleObject *, int, int>, ThreeDObjectTexture> _eye_painted;
+
+/** The objects are read anew: their painted textures go with them. */
+static void ForgetEyePainted()
+{
+	_eye_painted.clear();
+	_eye_trails.clear();
+}
+
+/**
+ * A texture of an object as the view from the eyes draws it by its triangles: the body's (0) painted as its state has
+ * it -- its colour, faded, rusted, as RasterObject() paints it (ObjectPaintOfState) --, the others as they are; at the
+ * level of detail of a texel to a pixel.
+ * @param pixels_per_metre how big a metre of the object is on the picture
+ */
+const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index)
+{
+	const ThreeDVehicleShape *shape = obj->GetShape();
+	if (shape == nullptr) return nullptr;
+	int level = 0;
+	for (double d = TexelsPerMetre(*obj, *shape); d >= 2.0 * pixels_per_metre && level < 12; d /= 2.0) level++;
+	const ThreeDObjectTexture *raw = obj->GetTexture(level, index);
+	if (index != 0 || state == 0 || raw == nullptr) return raw;
+	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
+	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr) return raw;
+	ThreeDObjectTexture &t = _eye_painted[{obj, state, level}];
+	if (!t.px.empty()) return &t;
+	t.w = raw->w;
+	t.h = raw->h;
+	t.px.resize(raw->px.size());
+	for (int y = 0; y < raw->h; y++) {
+		const float v = (y + 0.5f) / raw->h;
+		for (int x = 0; x < raw->w; x++) {
+			const size_t at = static_cast<size_t>(y) * raw->w + x;
+			const uint32_t texel = raw->px[at];
+			if (texel == 0) continue; // a hole in the texture
+			const float u = (x + 0.5f) / raw->w;
+			const Colour col(texel);
+			float cr = col.r, cg = col.g, cb = col.b;
+			painted.Paint(u, v, cr, cg, cb);
+			painted.Rust(u, v, cr, cg, cb);
+			t.px[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr)), static_cast<uint8_t>(std::min(255.0f, cg)), static_cast<uint8_t>(std::min(255.0f, cb)), col.a).data;
+		}
+	}
+	return &t;
+}
+
+/**
+ * The picture of an object far in the view from the eyes, standing there as a billboard: at the angle the eye sees it
+ * at (both angles in steps of 5 degrees, so that a few pictures serve a vehicle as it goes), foreshortened as it is
+ * drawn near, in its state, its lights on.
+ * @param yaw the angle the eye looks at it from, as GetThreeDFigurePicture() counts it
+ */
+const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev, ZoomLevel zoom, float yaw)
+{
+	if (ev.obj == nullptr) return nullptr;
+	const float world_az = std::round((ev.facing - 135.0f) / 5.0f) * 5.0f;
+	const float cam = std::round(yaw / 5.0f) * 5.0f;
+	const float along = std::round(ev.along * 20.0f) / 20.0f;
+	return ObjectPicture(ev.obj, ev.scale, zoom, world_az + cam, world_az, false, ev.state, 0, -1, 1.0f, 0, 0, 0, ev.lights, along);
 }
 
 /**

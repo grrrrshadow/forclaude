@@ -48,8 +48,24 @@ struct ThreeDPictureLight;
 bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, std::vector<ThreeDPictureLight> &lights, int &ax, int &ay, int &az);
 struct ThreeDWorldLight;
 bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights);
+
+/** A vehicle (or a car of the game's own) drawn from its object in the view from the eyes (GetThreeDEyeVehicle()). */
+struct ThreeDEyeVehicle {
+	const struct ThreeDVehicleObject *obj = nullptr; ///< nullptr: a piece drawn with its anchor piece, nothing of its own
+	float scale = 1.0f;         ///< its metres to the game's
+	float along = 1.0f;         ///< its length foreshortened as the game spaces its vehicles
+	double x = 0, y = 0, z = 0; ///< its origin, world units
+	float facing = 0;           ///< degrees in the world, 0 along +x, 90 along +y, finer than the eight directions
+	int state = 0;              ///< its state its GRF picks (paint, fading, rust), 0 none
+	int lights = 0;             ///< its lights on at night (front 1, back 2)
+};
+bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
+void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights);
+struct ThreeDObjectTexture;
+const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
+const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev, ZoomLevel zoom, float yaw);
 std::string DescribeThreeDVehicleObjectSprites();
 void QueueThreeDFireworks(TileIndex hut_front);
 void AddThreeDEffectsToViewport(ZoomLevel zoom);

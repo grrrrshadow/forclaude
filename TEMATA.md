@@ -66,6 +66,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   zahazovaly, takže při snímku 100 ms šel chodec 0,64 m/s místo 1,6 m/s, při 200 ms 0,32 m/s. Teď se udělají všechny
   zmeškané kroky (každý zvlášť proti zdem) a pak jeden obrázek. V rigu 40, 100 i 200 ms na snímek: 1,60 m/s. Rychlost
   sama zůstává 1,6 m/s chůze a 6,5 m/s běh (Shift); jestli je i tak pomalá, hráč řekne.
+- Hráč: „auto je při first person vidět, ale má úhly 45° spritu, i když je to objekt, jezdí divně; 45° ze spritů jen
+  tam, kde dokreslujeme z 2D“, „Mat nebyl vidět vůbec, spawnul jsem se vedle něj“, „draka taky zblízka a šetři, když
+  jsou daleko“, „všechno, je to stejný princip“. Hotovo jedním pravidlem pro všechno z modelů v pohledu z očí (holky,
+  Mat, draci, vozidla, okrasná auta): velké na obrázku (od 28 px) = skutečné trojúhelníky v pravém úhlu, menší =
+  obrázek, nad 14 dlaždic hrubší obrázek. Trojúhelníky tak podrobné, jak je model velký (slučování vrcholů po 2–64 cm),
+  textury podle vzdálenosti. Vozidla se natáčejí plynule podle toho, kudy jedou (dlouhý model od posledního dílu k
+  prvnímu). Lak, blednutí, rez, v noci sklo světel a kužely. Mat a okrasné Tatry žijí kolem chodce (dřív jen u otočené
+  mapy) a jsou v pohledu z očí vidět. Při tom opraveno: draci zblízka byli obrázek (posazený tvar neměl rozměr) a
+  příkaz rigu `auta` stavěl silnici bez spojení s depy. V rigu: Volga i Tatra 613 projíždí zatáčkou, Mat vedle
+  chodce, drak zblízka, noc. Dvě Volgy zblízka 27 ms na snímek (bez zjednodušení 52).
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 

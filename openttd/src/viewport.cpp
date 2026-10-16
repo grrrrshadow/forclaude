@@ -7843,20 +7843,77 @@ bool ViewportDrawing3D()
 struct CabFigure {
 	std::string name; ///< the figure of the indices
 	float size;       ///< its scale
-	int x, y, z;      ///< where it stands, world units
+	double x, y, z;   ///< where it stands, world units
 	float facing;     ///< which way it faces, degrees as the figures count it
 	int frame;        ///< its frame (a dragon's), 0 for one that does not move
 	float stretch = 1.0f; ///< its height against its width (a plant's)
 	bool plant = false;   ///< a plant of a field: a picture of a few angles and sizes shared by all of its kind (GetThreeDPlantPicture())
+	const ThreeDVehicleObject *obj = nullptr; ///< a vehicle's object instead of a figure of the indices (AddCabVehicle())
+	float along = 1.0f;   ///< a vehicle's length foreshortened as the game spaces its vehicles
+	int state = 0;        ///< a vehicle's state (its paint)
+	int lights = 0;       ///< a vehicle's lights on at night
+	bool own_car = false; ///< a car of the game's own driving about (its lights are not a vehicle's of the game)
+	bool solid = false;   ///< drawn by its triangles this picture (not as a picture of it)
 };
 static std::vector<CabFigure> _cab_figures;
+/** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
+double _cab_detail_pixels = 2.0;
+/** The rig: 'test3d detail <px> textura': its textures at their full size, whatever its distance. */
+bool _cab_full_textures = false;
 /** The size of the figures standing on the buildings and fields in the view from the eyes: true, as they are (twice it outside). */
 static constexpr float CAB_FIGURE_SCALE = 1.0f;
 
 /** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
 void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame)
 {
-	_cab_figures.push_back({std::string(name), size, x, y, z, facing, frame});
+	_cab_figures.push_back({std::string(name), size, static_cast<double>(x), static_cast<double>(y), static_cast<double>(z), facing, frame});
+}
+
+/**
+ * A vehicle drawn from its object in the view from the eyes (GetThreeDEyeVehicle()), or a car of the game's own driving
+ * about: among the figures, by its triangles near and as a picture at the angle the eye sees it farther.
+ */
+static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
+{
+	CabFigure f{std::string(), ev.scale, ev.x, ev.y, ev.z, ev.facing, 0};
+	f.obj = ev.obj;
+	f.along = ev.along;
+	f.state = ev.state;
+	f.lights = ev.lights;
+	f.own_car = own_car;
+	_cab_figures.push_back(std::move(f));
+}
+
+/** A car of the game's own driving about (three_d_walkers.h) in the view from the eyes. */
+void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit)
+{
+	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
+	if (shape == nullptr) return;
+	ThreeDEyeVehicle ev;
+	ev.obj = obj;
+	ev.scale = scale;
+	ev.x = x;
+	ev.y = y;
+	ev.z = z;
+	ev.facing = facing;
+	ev.lights = lit && shape->HasLights() ? 3 : 0;
+	AddCabVehicle(ev, true);
+}
+
+/** The vehicle a figure of the view from the eyes is (AddCabVehicle()). */
+static ThreeDEyeVehicle CabFigureVehicle(const CabFigure &fg)
+{
+	ThreeDEyeVehicle ev;
+	ev.obj = fg.obj;
+	ev.scale = fg.size;
+	ev.along = fg.along;
+	ev.x = fg.x;
+	ev.y = fg.y;
+	ev.z = fg.z;
+	ev.facing = fg.facing;
+	ev.state = fg.state;
+	ev.lights = fg.lights;
+	return ev;
 }
 
 /**
@@ -7866,22 +7923,33 @@ void AddCabFigure(std::string_view name, float size, int x, int y, int z, float 
  */
 static void AddCabPlant(std::string_view name, float scale, float stretch, double x, double y, double z, float facing)
 {
-	_cab_figures.push_back({std::string(name), scale, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, 0, stretch, true});
+	_cab_figures.push_back({std::string(name), scale, x, y, z, facing, 0, stretch, true});
 }
 
 static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const CabFigure &fg)
 {
-	const ThreeDVehicleObject *fig = GetThreeDFigure(fg.name);
+	const ThreeDVehicleObject *fig = fg.obj != nullptr ? fg.obj : GetThreeDFigure(fg.name);
 	if (fig == nullptr) return false;
-	const ThreeDVehicleShape *shape = fig->GetShape(fg.frame);
-	if (shape == nullptr || shape->tri.empty()) return false;
+	const ThreeDVehicleShape *whole = fig->GetShape(fg.frame);
+	if (whole == nullptr || whole->tri.empty()) return false;
 	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
 	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * fg.stretch * OBJECT_HEIGHT_PER_METRE;
+	/* As detailed as it is big on the picture: its corners joined about two pixels apart (Simpler()). */
+	const CabPoint mid = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
+	const double pixels_per_metre = eye.focal * across / std::max(mid.f, CAB_NEAR);
+	const ThreeDVehicleShape *shape = whole->Simpler(_cab_detail_pixels / pixels_per_metre);
+	/* A vehicle foreshortened along itself as the game spaces its vehicles. */
+	const double length = across * fg.along;
 	const bool lit = shape->nrm.size() == shape->pos.size();
 	/* The light from above, a little from the south-east of the map, as the houses have it. */
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
-	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, shape->pngs.size()));
-	for (size_t i = 0; i < texs.size(); i++) texs[i] = fig->GetTexture(0, static_cast<int>(i));
+	/* The textures at the detail of its distance, a texel to a pixel (the player, 16. 10.: "save when they are far");
+	 * a vehicle's body painted as its state has it. */
+	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, whole->pngs.size()));
+	for (size_t i = 0; i < texs.size(); i++) {
+		texs[i] = GetThreeDEyeVehicleTexture(fig, fg.state, _cab_full_textures ? 1e9 : pixels_per_metre, static_cast<int>(i));
+		if (texs[i] == nullptr) texs[i] = fig->GetTexture(0, static_cast<int>(i));
+	}
 	/* Every corner to the eye once, with its light (a plant of thousands of triangles at the walker's feet). */
 	const size_t corners = shape->pos.size() / 3;
 	static std::vector<CabPoint> pts;
@@ -7892,7 +7960,7 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 	lights.resize(corners);
 	for (size_t i = 0; i < corners; i++) {
 		const double px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
-		pts[i] = CabToEye(eye, fg.x + (px * ca - py * sa) * across, fg.y + (px * sa + py * ca) * across, fg.z + pz * up, shape->uv[i * 2], shape->uv[i * 2 + 1]);
+		pts[i] = CabToEye(eye, fg.x + px * length * ca - py * across * sa, fg.y + px * length * sa + py * across * ca, fg.z + pz * up, shape->uv[i * 2], shape->uv[i * 2 + 1]);
 		if (pts[i].f >= CAB_NEAR) scr[i] = CabProject(eye, pts[i]);
 		if (lit) {
 			const double nx = shape->nrm[i * 3] * ca - shape->nrm[i * 3 + 1] * sa, ny = shape->nrm[i * 3] * sa + shape->nrm[i * 3 + 1] * ca, nz = shape->nrm[i * 3 + 2];
@@ -7982,8 +8050,15 @@ double FirstPersonGroundZ(double x, double y)
 	return GetSlopePixelZOutsideMap(ix, iy);
 }
 
-/** Nearer than this to the eye (world units) a figure is drawn by its triangles, not as a billboard. */
-static constexpr double CAB_FIGURE_SOLID = 3.0 * TILE_SIZE;
+/**
+ * Everything standing in the view from the eyes from a model -- a girl, Mat, a dragon, a vehicle, a car of the game's
+ * own -- by one rule (the player, 16. 10.: "the dragon too from near, and save when they are far"; "it is the same
+ * principle"): as big on the picture as this many pixels (its longest side) or bigger, the model itself by its
+ * triangles, at the angle it really stands at; smaller, a picture of it at about that angle. The rig: 'test3d plnost <px>'.
+ */
+double _cab_solid_pixels = 28.0;
+/** Farther than this a picture of a model is made at half the detail. */
+static constexpr double CAB_COARSE = 14.0 * TILE_SIZE;
 /** And a plant of a field (AddCabPlant()): only those at the walker's feet, the field has hundreds. */
 static constexpr double CAB_PLANT_SOLID = 0.6 * TILE_SIZE;
 /** The wheat of the farm's fields is drawn this many tiles about the eye; farther, the field's ground. */
@@ -8124,6 +8199,22 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
 	const double reach = CAB_RANGE_TILES * TILE_SIZE;
 	std::vector<ThreeDWorldLight> model_lights;
+	auto shine = [&](const std::vector<ThreeDWorldLight> &lights) {
+		for (const ThreeDWorldLight &l : lights) {
+			switch (l.kind) {
+				case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0); break;
+				case ThreeDPictureLight::Kind::Back: glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0); break;
+				case ThreeDPictureLight::Kind::PoolNear: glow(l.x, l.y, l.z, 3, pool, 0.3, 0.4); break;
+				case ThreeDPictureLight::Kind::Pool: glow(l.x, l.y, l.z, 6, pool, 0.3, 0.4); break;
+			}
+		}
+	};
+	/* The cars of the game's own driving about (three_d_walkers.h): their lights as the vehicles' of their models. */
+	for (const CabFigure &fg : _cab_figures) {
+		if (!fg.own_car || fg.lights == 0) continue;
+		GetThreeDEyeObjectLights(CabFigureVehicle(fg), model_lights);
+		shine(model_lights);
+	}
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
 		if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship && u->type != VehicleType::Aircraft) continue;
@@ -8135,14 +8226,7 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 		 * colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md). Not the own one's, seen from inside. */
 		const bool own_one = own != nullptr && u->First() == own;
 		if (!own_one && ThreeDEnabled() && !u->vehstatus.Test(VehState::Crashed) && u->direction != Direction::Invalid && GetThreeDVehicleObjectWorldLights(u, model_lights)) {
-			for (const ThreeDWorldLight &l : model_lights) {
-				switch (l.kind) {
-					case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0); break;
-					case ThreeDPictureLight::Kind::Back: glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0); break;
-					case ThreeDPictureLight::Kind::PoolNear: glow(l.x, l.y, l.z, 3, pool, 0.3, 0.4); break;
-					case ThreeDPictureLight::Kind::Pool: glow(l.x, l.y, l.z, 6, pool, 0.3, 0.4); break;
-				}
-			}
+			shine(model_lights);
 			continue;
 		}
 		if (!front && !last) continue;
@@ -8171,6 +8255,42 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 		}
 		if (last && !mine && u->type != VehicleType::Ship) {
 			for (int side = -1; side <= 1; side += 2) glow(u->x_pos - fx * half + sx * side * 1.5, u->y_pos - fy * half + sy * side * 1.5, z + 2, 0.5, tail, 0.9, 1.0);
+		}
+	}
+}
+
+/**
+ * At night the glass of the lights that are on of the vehicles drawn by their triangles (CabDrawFigure(); the
+ * colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): over the dark at full brightness, in its material's colour, a
+ * few centimetres towards the eye (it lies on the lamp), hidden behind what is nearer.
+ */
+static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int width, int height)
+{
+	for (const CabFigure &fg : _cab_figures) {
+		if (fg.obj == nullptr || fg.lights == 0 || !fg.solid) continue;
+		const ThreeDVehicleShape *shape = fg.obj->GetShape();
+		if (shape == nullptr || shape->night_tri.empty()) continue;
+		const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
+		const double across = fg.size * OBJECT_UNITS_PER_METRE, length = across * fg.along, up = fg.size * OBJECT_HEIGHT_PER_METRE;
+		const size_t corners = shape->night_pos.size() / 3;
+		for (size_t t = 0; t + 2 < shape->night_tri.size(); t += 3) {
+			const size_t tn = t / 3;
+			if ((fg.lights & (tn < shape->night_back.size() && shape->night_back[tn] ? 2 : 1)) == 0) continue;
+			uint32_t glass = tn < shape->night_colour.size() ? shape->night_colour[tn] : Colour(255, 244, 216).data;
+			std::vector<CabPoint> poly;
+			for (int k = 0; k < 3; k++) {
+				const uint32_t i = shape->night_tri[t + k];
+				if (i >= corners) break;
+				const double px = shape->night_pos[i * 3], py = shape->night_pos[i * 3 + 1], pz = shape->night_pos[i * 3 + 2];
+				double wx = fg.x + px * length * ca - py * across * sa, wy = fg.y + px * length * sa + py * across * ca;
+				const double wz = fg.z + pz * up;
+				/* A few centimetres towards the eye. */
+				const double dx = eye.x - wx, dy = eye.y - wy, d = std::max(std::hypot(dx, dy), 1e-6), lift = 0.05 * OBJECT_UNITS_PER_METRE;
+				wx += dx / d * lift;
+				wy += dy / d * lift;
+				poly.push_back(CabToEye(eye, wx, wy, wz, 0, 0));
+			}
+			if (poly.size() == 3) CabDrawPolygon(dst, zb, width, height, &glass, 1, 1, std::move(poly), eye, false);
 		}
 	}
 }
@@ -8992,8 +9112,11 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		for (const ThreeDObjectFigure &f : co.obj->figures) add(f);
 		for (const ThreeDObjectFigure &f : co.more) add(f);
 	}
-	/* The dragons about (three_d_dragons.h), among the figures. */
+	/* The dragons about (three_d_dragons.h), among the figures; Mat walking in the town and the cars of the game's own
+	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
 	AddThreeDDragonsToEye();
+	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);
+	AddThreeDDriversToEye();
 
 	eye_stage(1);
 	/* 3. The ground of all of them, north-up, in one texture at the normal zoom. */
@@ -9304,7 +9427,15 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		}
 		if (u->type == VehicleType::Effect && u->sprite_cache.sprite_seq.count == 0) continue;
 		CabPoint c = CabToEye(eye, u->x_pos, u->y_pos, u->z_pos, 0, 0);
-		if (c.f < CAB_NEAR * 0.5 || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > c.f * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		/* A vehicle drawn from its object: the object itself among the figures, at the angle it stands at -- the
+		 * sprites of its eight directions are only for what is drawn from them (the player, 16. 10.). */
+		ThreeDEyeVehicle ev;
+		if (ThreeDEnabled() && u->type != VehicleType::Effect && u->direction != Direction::Invalid && !u->vehstatus.Test(VehState::Crashed) && GetThreeDEyeVehicle(u, ev)) {
+			if (ev.obj != nullptr) AddCabVehicle(ev, false);
+			continue;
+		}
+		if (c.f < CAB_NEAR * 0.5) continue;
 		VehicleSpriteSeq seq;
 		if (u->type == VehicleType::Effect || u->direction == Direction::Invalid) {
 			seq = u->sprite_cache.sprite_seq;
@@ -9342,25 +9473,33 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	 * so that a few pictures serve every heading). */
 	/* All of them drawn at once on every core after the loop: their pictures kept till then (PinThreeDPictures()). */
 	PinThreeDPictures(true);
-	for (const CabFigure &fg : _cab_figures) {
+	for (CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
-		if (foot.f < (fg.plant ? CAB_PLANT_SOLID : CAB_FIGURE_SOLID)) {
+		/* How big it is: its longest side, world units (a field's plant: hundreds of them, only at the walker's feet). */
+		const ThreeDVehicleObject *model = fg.obj != nullptr ? fg.obj : (fg.plant ? nullptr : GetThreeDFigure(fg.name));
+		const ThreeDVehicleShape *model_shape = model != nullptr ? model->GetShape(fg.frame) : nullptr;
+		const double extent = model_shape == nullptr ? 0.0 : std::max({(model_shape->x1 - model_shape->x0) * fg.along, model_shape->y1 - model_shape->y0, model_shape->z1 - model_shape->z0}) * fg.size * OBJECT_UNITS_PER_METRE;
+		if (foot.f < -extent) continue; // all of it behind the eye
+		fg.solid = fg.plant ? foot.f < CAB_PLANT_SOLID : extent * eye.focal >= _cab_solid_pixels * std::max(foot.f, CAB_NEAR);
+		if (fg.solid) {
 			/* Its textures stay: collected, drawn on every core after the billboards (the depth sorts them out). */
 			_cab_batching = true;
-			const bool solid = CabDrawFigure(dst, zb, width, height, eye, fg);
+			fg.solid = CabDrawFigure(dst, zb, width, height, eye, fg);
 			_cab_batching = false;
-			if (solid) {
+			if (fg.solid) {
 				camera.billboards++;
 				continue;
 			}
 		}
 		if (foot.f < CAB_NEAR) continue;
 		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);
-		/* Near, a finer picture: about a pixel of it to a pixel of the view. */
-		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : ZoomLevel::Normal);
-		const double per = 1.0 / (1 << (to_underlying(ZoomLevel::Normal) - to_underlying(fine)));
-		const ThreeDModelPicture *pic = fg.plant ? GetThreeDPlantPicture(fg.name, fg.size, fg.stretch, fg.facing, fine, nullptr, side) : GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, fg.frame, side);
+		/* Near, a finer picture: about a pixel of it to a pixel of the view; a big one far, a coarser one. */
+		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : (foot.f > CAB_COARSE ? ZoomLevel::Out2x : ZoomLevel::Normal));
+		const double per = std::pow(2.0, to_underlying(fine) - to_underlying(ZoomLevel::Normal));
+		/* A vehicle at the angle the eye sees it at, in steps of 5 degrees (GetThreeDEyeVehiclePicture()). */
+		const ThreeDModelPicture *pic = fg.obj != nullptr ? GetThreeDEyeVehiclePicture(CabFigureVehicle(fg), fine, static_cast<float>(yaw_deg)) :
+				fg.plant ? GetThreeDPlantPicture(fg.name, fg.size, fg.stretch, fg.facing, fine, nullptr, side) : GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, fg.frame, side);
 		if (pic == nullptr || pic->width <= 0 || pic->height <= 0) continue;
 		const double left = foot.r + pic->left * CAB_PX_ACROSS * per, right = left + pic->width * CAB_PX_ACROSS * per;
 		const double top = foot.u - pic->top * CAB_PX_UP * per, bottom = top - pic->height * CAB_PX_UP * per;
@@ -9509,6 +9648,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
 	if (IsNightNow()) {
 		DrawEyeNight(eye, own, width, height, dst, zb);
+		DrawEyeVehicleGlass(eye, dst, zb, width, height);
 		/* The lamps and lit windows of the houses lighting what is about them (DrawEyeLampLight()). */
 		std::vector<std::array<double, 3>> lamps;
 		for (const CabObject &co : objects) {

@@ -801,6 +801,53 @@ nothing saved. Rig: `test3d chodec`, `test3d chodec krok <n> <ahead> <aside>
 <turn> [pitch]`, `test3d chodec drzeni <frame ms> <frames>` (W held so many
 frames so long each, the metres walked).
 
+**What stands from a model, by one rule** (16. 10., the player: "the car has
+the 45 degrees of the sprites although it is an object, it drives oddly; the 45
+of the sprites are for where we draw from 2D"; "the dragon too from near, and
+save when they are far"; "it is the same principle"). Everything of the view
+from the eyes drawn from a model -- the girls, Mat, the dragons, the vehicles
+drawn from their objects, the cars of the game's own -- is a figure
+(`CabFigure`): as big on the picture as `_cab_solid_pixels` (28) or bigger
+(its longest side), the model itself by its triangles at the angle it really
+stands at; smaller, a picture of it at about that angle (a picture of the map's
+camera, 30 degrees from above: near it would show the roof), farther than 14
+tiles at half the detail. Drawn by its triangles it is as detailed as it is
+big: `ThreeDVehicleShape::Simpler()` joins its corners in cells of 2, 4, ... 64
+cm, about two pixels apart (`CAB_DETAIL_PIXELS`), each cell only corners facing
+much the same way and of the same texture -- the Volga of 110 000 triangles is
+48 000 at 4 cm and 25 000 at 8 cm, and two of them near the walker cost 27 ms a
+picture instead of 52 -- and its textures at the level of a texel to a pixel.
+The plants of the fields keep their own rule (hundreds of them; only those at
+the walker's feet by their triangles).
+
+- **The vehicles drawn from their objects** (`GetThreeDEyeVehicle()`): not
+  their sprites of eight directions but the object, facing the way it goes,
+  finer than the eight directions -- an object over several pieces from its
+  last piece to its first (a body on its bogies), one of a single piece as its
+  way goes (`EyeFacing()`: from where it was 3 units back, turning to it by
+  half a tick, never more than 60 degrees off its direction), hung from the
+  middle of its chain as on the map, foreshortened along as the game spaces
+  its vehicles (`SqueezeAt()`: as the map, 0.71 along x or y, whole on the
+  diagonal), its state's paint, faded and rusted, painted into its texture
+  (`GetThreeDEyeVehicleTexture()`, `ObjectPaintOfState` shared with
+  `RasterObject()`). At night the glass of its lights that are on is drawn over
+  the dark (`DrawEyeVehicleGlass()`) and the lights and pools of its model's
+  lights go with it (`GetThreeDEyeObjectLights()`). So also in the view from a
+  cab.
+- **Mat and the cars of the game's own** (the player: "Mat was not seen at
+  all, I came out beside him"): they were only on the turned map, and lived
+  only while the main view was turned. Now they live about the walker of the
+  view from the first person while it is out (`LifeMiddle()`) and are drawn in
+  the view from the eyes (`AddThreeDWalkersToEye()`, `AddThreeDDriversToEye()`),
+  Mat at his true size, the cars at the vehicles' size.
+- The posed shapes of the creatures (`MakePosedShape()`) know their extent.
+
+Rig: `test3d auta <jmeno> [pocet] [x y] zatacka` (a road with a bend to drive
+through; the sheds are built before the roads, else a long road leaves their
+ways off), `test3d plnost <px>`, `test3d detail <px> [textura]` (0 the whole
+shape; with `textura` the textures at their full size), `test3d vozidla`
+(also the speed, the order and the state of a road vehicle).
+
 ## The night
 
 The player (15. 10.): "where the toggle console is there will be a dark mode

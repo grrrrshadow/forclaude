@@ -27,12 +27,14 @@
 #include <string>
 
 void AddThreeDWalkersToViewport(ZoomLevel zoom);
+void AddThreeDWalkersToEye(float scale);
 std::string DescribeThreeDWalkers();
 bool SendThreeDWalker();
 struct Town;
 bool IsThreeDWalkway(TileIndex t, const Town *town);
 bool ThreeDWalkerAt(int &x, int &y, int &z);
 void AddThreeDDriversToViewport(ZoomLevel zoom);
+void AddThreeDDriversToEye();
 struct ThreeDPictureLight;
 void ForEachThreeDDriverLight(ZoomLevel zoom, const std::function<void(int x, int y, int z, const ThreeDPictureLight &light)> &fn);
 std::string DescribeThreeDDrivers();

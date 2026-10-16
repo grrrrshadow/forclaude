@@ -9021,9 +9021,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 	} else if (what == "auta" && argv.size() > 2) {
-		/* 'auta <jmeno> [pocet] [x y]': a straight road along x with a shed at each end and so many road vehicles of the
-		 * first engine whose name has the text in it, driving between them (3D cars of a GRF package). */
+		/* 'auta <jmeno> [pocet] [x y] [zatacka]': a straight road along x with a shed at each end and so many road vehicles
+		 * of the first engine whose name has the text in it, driving between them (3D cars of a GRF package); with
+		 * 'zatacka' the road turns along y halfway, a bend to drive through. */
 		std::string wanted(argv[2]);
+		const bool bend = argv.size() > 6 && argv[6] == "zatacka";
 		int count = std::clamp(number(3).value_or(4), 1, 16);
 		uint x0 = static_cast<uint>(number(4).value_or(static_cast<int>(Map::SizeX() / 2) - 8)), y0 = static_cast<uint>(number(5).value_or(static_cast<int>(Map::SizeY() / 2)));
 		if (!Company::IsValidID(CompanyID::Begin())) {
@@ -9041,10 +9043,27 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			CommandCost level = std::get<0>(Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(std::min(x + 3, x0 + 16), y0 + 1), TileXY(x0, y0 - 1), false, LevelMode::Level));
 			if (level.Failed() && x == x0) IConsolePrint(CC_DEFAULT, "test3d: auta: rovnani {}", RefusalReason(level));
 		}
-		CommandCost road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 1, y0), TileXY(x0 + 15, y0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
-		TileIndex depot_a = TileXY(x0, y0), depot_b = TileXY(x0 + 16, y0);
+		/* The sheds first, then the bend's corner, then the roads: a long road lays its first and last tile whole only
+		 * where they meet something to join (CmdBuildLongRoad()); laid before the sheds, it left their ways off and
+		 * the cars turned round in the sheds. */
+		CommandCost road;
+		TileIndex depot_a = TileXY(x0, y0), depot_b = bend ? TileXY(x0 + 8, y0 + 8) : TileXY(x0 + 16, y0);
+		if (bend) {
+			/* Levelled to the height of the road along x, a strip at a time from the one before. */
+			for (uint y = y0; y <= y0 + 8; y += 4) {
+				CommandCost level = std::get<0>(Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 9, std::min(y + 3, y0 + 9)), TileXY(x0 + 7, y - 1), false, LevelMode::Level));
+				if (level.Failed()) IConsolePrint(CC_DEFAULT, "test3d: auta: rovnani zatacky u {} {}", y, RefusalReason(level));
+			}
+		}
 		CommandCost da = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot_a, ROADTYPE_ROAD, DiagDirection::SW);
-		CommandCost db = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot_b, ROADTYPE_ROAD, DiagDirection::NE);
+		CommandCost db = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot_b, ROADTYPE_ROAD, bend ? DiagDirection::NW : DiagDirection::NE);
+		if (bend) {
+			road = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 8, y0), ROAD_E, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+			if (road.Succeeded()) road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 7, y0), TileXY(x0 + 1, y0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+			if (road.Succeeded()) road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 8, y0 + 7), TileXY(x0 + 8, y0 + 1), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
+		} else {
+			road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 15, y0), TileXY(x0 + 1, y0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+		}
 		if (road.Failed() || da.Failed() || db.Failed()) {
 			IConsolePrint(CC_ERROR, "test3d: auta: silnice {} depa {} {}", RefusalReason(road), RefusalReason(da), RefusalReason(db));
 			return true;
@@ -9074,7 +9093,24 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			bought++;
 		}
 		ScrollMainWindowToTile(TileXY(x0 + 8, y0), true);
-		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, x0 + 16, y0);
+		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, TileX(depot_b), TileY(depot_b), bend ? " se zatackou" : "");
+	} else if (what == "detail") {
+		/* 'detail <px> [textura]': how many pixels apart the corners of a model of the view from the eyes are (0 the
+		 * whole shape); with 'textura' its textures at their full size. */
+		extern double _cab_detail_pixels;
+		extern bool _cab_full_textures;
+		extern void RedrawFirstPersonPicture();
+		_cab_detail_pixels = std::max(0, number(2).value_or(2));
+		_cab_full_textures = argv.size() > 3 && argv[3] == "textura";
+		RedrawFirstPersonPicture();
+		IConsolePrint(CC_DEFAULT, "test3d: detail {} px{}", _cab_detail_pixels, _cab_full_textures ? ", textury cele" : "");
+	} else if (what == "plnost") {
+		/* 'plnost <px>': how big on the picture (pixels) a model of the view from the eyes is drawn by its triangles. */
+		extern double _cab_solid_pixels;
+		extern void RedrawFirstPersonPicture();
+		_cab_solid_pixels = std::max(1, number(2).value_or(28));
+		RedrawFirstPersonPicture();
+		IConsolePrint(CC_DEFAULT, "test3d: plnost {} px", _cab_solid_pixels);
 	} else if (what == "tiky") {
 		/* 'tiky <n>': run the game n ticks now (the rig's scripts run their commands at once). */
 		int n = std::clamp(number(2).value_or(10), 1, 100000);
@@ -9418,6 +9454,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
 					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "",
 					v->cab_free ? fmt::format(" volne yaw {} rychlost {}{}", v->cab_yaw, v->cur_speed, v->cab_rejoin ? " zpet" : "") : "");
+			if (v->type == VehicleType::Road) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} stav {:#x} snimek {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), RoadVehicle::From(v)->state, RoadVehicle::From(v)->frame);
 			if (!hidden) seen++;
 		}
 		return true;
