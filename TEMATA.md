@@ -32,6 +32,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   ale i skoro svítání“): Nastavení → Grafika, pod Nocí: tmavá noc (jako dosud), měsíc, úplněk, jasný úplněk, skoro
   svítání. Platí na mapě i v pohledu z očí a z kabiny, čím světleji, tím míň hvězd.
 - 3D částice z OpenLoco: odloženo (hráč: „bojujeme se zpomalením hry, po buildu ti řeknu“).
+- Windows build 278 spadl na `M_SQRT2` (MSVC ho nezná) – opraveno (`91c7b4d`). Při tom tři skutečné chyby z
+  `-TILE_SIZE` (neznaménkové, vyšlo přes 4 miliardy): stěny základů v pohledu z očí se nekreslily, Mat nevybíral
+  chodník u dveří, polní cesta v náhledu průmyslu ležela navrchu.
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 
