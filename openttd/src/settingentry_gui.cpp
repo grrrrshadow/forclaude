@@ -945,6 +945,7 @@ SettingsContainer &GetSettingsTree()
 				physics->Add(new SettingEntry("vehicle.train_acceleration_model"));
 				physics->Add(new SettingEntry("vehicle.train_rescue_towing"));
 				physics->Add(new SettingEntry("vehicle.train_slow_for_level_crossing"));
+				physics->Add(new SettingEntry("vehicle.train_brake_for_curves"));
 				physics->Add(new SettingEntry("vehicle.train_braking"));
 				physics->Add(new BrakeTableEntry());
 				physics->Add(new SettingEntry("vehicle.train_stop_brake_weaker"));

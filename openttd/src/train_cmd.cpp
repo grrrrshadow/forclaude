@@ -1201,6 +1201,88 @@ static bool PathBeyondSignalTaken(const Train *v, TileIndex tile, Trackdir td)
 	return false;
 }
 
+/** The way a train goes along a piece of track, as a vehicle's direction. */
+static Direction TrackdirTravelDirection(Trackdir td)
+{
+	switch (td) {
+		case Trackdir::X_NE: return Direction::NE;
+		case Trackdir::Y_SE: return Direction::SE;
+		case Trackdir::Upper_E: case Trackdir::Lower_E: return Direction::E;
+		case Trackdir::Left_S: case Trackdir::Right_S: return Direction::S;
+		case Trackdir::X_SW: return Direction::SW;
+		case Trackdir::Y_NW: return Direction::NW;
+		case Trackdir::Upper_W: case Trackdir::Lower_W: return Direction::W;
+		default: return Direction::N; // Left_N, Right_N
+	}
+}
+
+/** A bend of the line: how far it is from the train's leading end, pixels (in the train below nought), and which way it turns. */
+struct LineBend {
+	int px;
+	DirDiff turn;
+};
+
+/**
+ * The game's own speed limit for a bend of the line (Train::GetCurveSpeedLimit()) from its figure: the rail type's
+ * advantage in curves, a tilting train's, the train's own modifier -- the same steps as the game takes.
+ * @param v the train, its head
+ * @param raw the figure of the bend: 61, 88, or the one of the straight between two bends
+ */
+static int CurveLimitOf(const Train *v, int raw)
+{
+	int max_speed = raw;
+	const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(v->tile));
+	max_speed += (max_speed / 2) * rti->curve_speed;
+	if (v->tcache.cached_tilt) max_speed += max_speed / 5;
+	max_speed += (max_speed * v->tcache.cached_curve_speed_mod) / 256;
+	return Clamp(max_speed, 2, static_cast<int>(UINT16_MAX));
+}
+
+/**
+ * Ask the braking ceiling for the curves the train is in and those ahead of it (vehicle.train_brake_for_curves):
+ * the speed the game will hold it to there (Train::GetCurveSpeedLimit()), from where the curve begins. The game
+ * reads a curve off the train's own parts, so it holds the train only once two bends are in it, and brakes it then
+ * hard; the driver sees the bends coming and brakes for them by the braking table, to come in at that speed.
+ *
+ * As the game counts: two bends of 45 degrees the same way, the straight between them in lengths of a vehicle
+ * (the shorter, the slower: 88 for the game's own curve, more for a gentle one); two within a vehicle's length
+ * either way, 88; a bend of 90 degrees, 61; an S with more between its bends, nothing. Only bends the train is long
+ * enough to have both of in it at once -- a short train the game never holds in a curve.
+ * @param v the train, its head
+ * @param bends the bends, in the train and ahead of it; sorted here
+ * @param ask the braking ceiling's ask(target, pixels)
+ */
+template <typename Ask>
+static void AskCurves(const Train *v, std::vector<LineBend> &bends, Ask ask)
+{
+	std::sort(bends.begin(), bends.end(), [](const LineBend &a, const LineBend &b) { return a.px < b.px; });
+	const int length = v->gcache.cached_total_length;
+	auto quarter = [](DirDiff d) { return d == DirDiff::Left45 || d == DirDiff::Right45; };
+	for (size_t i = 0; i < bends.size(); i++) {
+		const LineBend &b = bends[i];
+		if (b.turn == DirDiff::Left90 || b.turn == DirDiff::Right90) {
+			if (length > static_cast<int>(VEHICLE_LENGTH)) ask(CurveLimitOf(v, 61), std::max(b.px, 0));
+			continue;
+		}
+		if (!quarter(b.turn) || i + 1 >= bends.size()) continue;
+		const LineBend &n = bends[i + 1];
+		if (!quarter(n.turn)) continue;
+		const int between = n.px - b.px;
+		/* Both in the train at once: a part before the first, one between, one past the second. */
+		if (between >= length - static_cast<int>(VEHICLE_LENGTH)) continue;
+		int raw;
+		if (between <= static_cast<int>(VEHICLE_LENGTH)) {
+			raw = 88;
+		} else if (n.turn == b.turn) {
+			const int lengths = Clamp(CeilDiv(between, VEHICLE_LENGTH), 1, 12);
+			raw = 232 - (13 - lengths) * (13 - lengths);
+		} else {
+			continue;
+		}
+		ask(CurveLimitOf(v, raw), std::max(b.px, 0));
+	}
+}
+
 static int BrakingCeiling(const Train *v, const Train *moving_front)
 {
 	if (moving_front->track == Track::Depot) return INT32_MAX;
@@ -1267,6 +1349,24 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 	/* The crossing is the player's to switch off (the setting the flat ceiling
 	 * in GetCurrentMaxSpeed() answers to); the stops are not. */
 	bool slow_for_crossing = _settings_game.vehicle.train_slow_for_level_crossing;
+
+	/* The bends of the curves the train is in, from its parts, the way the game reads them; those ahead are added
+	 * as the line is read. */
+	const bool curves = _settings_game.vehicle.train_brake_for_curves;
+	static std::vector<LineBend> bends;
+	bends.clear();
+	if (curves) {
+		const bool backwards = moving_front != v;
+		int pos = 0;
+		for (const Train *u = moving_front;;) {
+			const Train *w = backwards ? u->Previous() : u->Next();
+			if (w == nullptr) break;
+			pos += u->gcache.cached_veh_length;
+			DirDiff turn = DirDifference(u->direction, w->direction);
+			if (turn != DirDiff::Same) bends.push_back({-pos, turn});
+			u = w;
+		}
+	}
 
 	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
 	int entered_at = 0; // distance at which the tile the walk is on was entered
@@ -1407,6 +1507,11 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		if (onward.Count() != 1) break;
 		Trackdir next_td = FindFirstTrackdir(onward);
 
+		if (curves) {
+			DirDiff turn = DirDifference(TrackdirTravelDirection(next_td), TrackdirTravelDirection(td));
+			if (turn != DirDiff::Same) bends.push_back({px, turn});
+		}
+
 		if (slow_for_crossing && IsLevelCrossingTile(ft.new_tile)) {
 			/* At the crossing speed by the tile before the crossing. */
 			ask(crossing_speed, entered_at);
@@ -1462,6 +1567,7 @@ static int BrakingCeiling(const Train *v, const Train *moving_front)
 		tile = ft.new_tile;
 		td = next_td;
 	}
+	if (curves) AskCurves(v, bends, ask);
 	return ceiling;
 }
 

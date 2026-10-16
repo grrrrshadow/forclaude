@@ -641,6 +641,7 @@ struct VehicleSettings {
 	uint8_t smoke_amount; ///< amount of smoke/sparks locomotives produce
 	AccelerationModel train_acceleration_model; ///< realistic acceleration for trains
 	bool train_slow_for_level_crossing; ///< trains ease off before a level crossing
+	bool train_brake_for_curves; ///< trains brake ahead of a curve, so as to come into it at its speed limit (BrakingCeiling())
 	bool train_rescue_towing; ///< broken-down and crashed trains wait to be towed away instead of sorting themselves out
 	uint16_t rescue_wait_days; ///< how many days a broken-down or crashed train waits to be fetched before it mends itself the vanilla way
 	uint8_t train_braking; ///< "brake, fail to brake and crash" and how far the driver sees: 0 = off, the driver sees as far as braking needs; 1..4 = on, he sees 5, 10, 15, 20 tiles
