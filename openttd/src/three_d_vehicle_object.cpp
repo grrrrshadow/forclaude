@@ -768,7 +768,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
  */
 static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed)
 {
-	if (!_settings_client.gui.night || reversed) return 0;
+	if (!IsNightNow() || reversed) return 0;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return 0;
 	int lights = 0;
@@ -865,7 +865,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
  */
 bool ThreeDVehicleObjectLitAtNight(const Vehicle *v)
 {
-	if (!_settings_client.gui.night) return false;
+	if (!IsNightNow()) return false;
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type);
 	if (obj == nullptr) return false;
 	const ThreeDVehicleShape *shape = obj->GetShape();

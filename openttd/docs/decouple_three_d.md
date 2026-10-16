@@ -821,6 +821,37 @@ day.
   zoom, turned 30 degrees, a train of 20 wagons and two cars: by day 15.9 ms a
   frame and 145 000 pixels drawn; at night 28.7 ms and 298 000 before, 20.0 ms
   and 189 000 now; no ghosts.
+- **The title screen's day and night** (the player, 16. 10.: "a long day and
+  then a while of night, round and round"): behind the main menu a minute of
+  day, four seconds of dusk, fifteen of night and four of dawn, again and
+  again (`SelectGameWindow::AdvanceDayAndNight()`, `TITLE_DAY_MS` ...). It is
+  the title's own night, `_title_night` from 0 to 1, not the player's: on the
+  title screen `IsNightNow()` asks it instead of `gui.night`, and in the dusk
+  and the dawn `GetNightLight()` goes from the day's light to the night's as
+  set (`gui.night_light`). Drawn anew only when its step of 1/32 changes.
+
+## The title game
+
+The title game of 16.0-beta2 (`media/baseset/opntitle.dat`) is arctic, that of
+15.3 the toyland; the player (16. 10.): "we put temperate there", "make it
+yourself, with the camera". It is a new temperate game of 256 by 256, 1960,
+flat land, Czech town names, no breakdowns, no disasters, no growth of towns
+(so no road across the track), made by the rig: `scena`-like settings and
+`test3d uvodnihra`, then `test3d tiky 1500` and `save`. The command finds the
+place around the towns where an octagon of track (straights of 18 and 8, its
+corners diagonals of 5 pieces) lies on clear land or trees only, with the most
+houses near it and the fewest slopes -- seed 7: round the town Kamenné
+Pražiště -- builds it, a station of four in the middle of each long straight,
+semaphores every twelfth piece, and from a depot inside, joined for the while
+by a piece of curve, the fastest steam engine with three carriages and the
+fastest diesel with four coal wagons, each out on its way before the next;
+then the depot goes. Buses (`autobusmesto`) in that town and in the biggest
+other. The camera's signs (`T<n> P 12`): round the octagon, from the right of
+it, below, the left and above, panning twelve seconds each, so that the town
+and the trains are seen beside the menu, which hides the middle of the
+screen. Only the game's own vehicles and graphics: no GRF is in the save.
+In 20 000 ticks no vehicle came to grief. Rig: `test3d titulnoc <ms>` on the
+title screen (from `autoexec.scr`) moves its camera and its day and night on.
 
 ## The previews that turn
 

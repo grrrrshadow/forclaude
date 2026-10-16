@@ -40,8 +40,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Simtrains: vůz a mašina byly natlačené do sebe. Příčina: hra dává vozidlu nejvýš 8/8 (asi 10,5 m), model 750 má
   16,24 m a B 598 24,2 m, takže se kreslily přes sebe. Teď GRF podle `Size` z .eng/.wag udělá dlouhé vozidlo kloubové
   (750 ze 2 dílů, B 598 ze 3) a model se kreslí přes všechny díly. V rigu jsou mezi vozy mezery.
-- Úvodní hra (pozadí menu) je v 16.0-beta2 arktická, 15.3 měla toyland. Hráč chce mírné klima. Ptám se, jestli dá
-  vlastní save, nebo ji mám postavit sám.
+- Úvodní hra (pozadí menu) byla v 16.0-beta2 arktická, 15.3 měla toyland. Hráč: „udělej ji sám, mírné klima, s
+  kamerou; dlouhý den, pak chvilku noc a dokola“. Hotovo: nová mírná mapa 256×256 (1960, české názvy, bez poruch,
+  katastrof a růstu měst) postavená příkazem `test3d uvodnihra`. Kolem města Kamenné Pražiště je osmiúhelník trati se
+  2 stanicemi a návěstidly, jezdí parní vlak s vozy a motorák s uhlím, ve 2 městech autobusy. Kamera krouží kolem
+  okruhu, aby město a vlaky byly vidět vedle menu. Pozadí menu: minuta den, 4 s soumrak, 15 s noc, 4 s svítání,
+  dokola; noc menu je vlastní, hráčovo nastavení noci nemění. Za 20 000 tiků se nic nesrazilo.
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 

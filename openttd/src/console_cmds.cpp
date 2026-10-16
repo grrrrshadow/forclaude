@@ -114,6 +114,7 @@
 #include "misc_cmd.h"
 #include "rail_cmd.h"
 #include "landscape_cmd.h"
+#include "signs_cmd.h"
 #include "industrytype.h"
 #include "industry_cmd.h"
 #include "terraform_cmd.h"
@@ -8519,7 +8520,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_HELP, "Rig: the turned map view. Usage: 'test3d uhel <degrees>', 'test3d stred <x> <y>', 'test3d zoom <level>', 'test3d snimek <name>', 'test3d mys <x> <y>', 'test3d stav'.");
 		return true;
 	}
-	if (_game_mode != GameMode::Normal) {
+	/* On the title screen only its pictures and its day and night ('titulnoc'). */
+	const bool title_ok = _game_mode == GameMode::Menu && (argv[1] == "snimek" || argv[1] == "titulnoc");
+	if (_game_mode != GameMode::Normal && !title_ok) {
 		IConsolePrint(CC_ERROR, "test3d: only in a running game.");
 		return true;
 	}
@@ -9235,6 +9238,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (!DoZoomInOutWindow(vp->zoom > want ? ZOOM_IN : ZOOM_OUT, w)) break;
 		}
 		UpdateViewportPosition(w, 0);
+	} else if (what == "titulnoc") {
+		/* 'titulnoc <ms>': the title screen's day and night that much on (intro_gui.cpp), for its pictures. */
+		extern void AdvanceTitleDayAndNight(uint delta_ms);
+		AdvanceTitleDayAndNight(std::max(0, number(2).value_or(0)));
+		IConsolePrint(CC_DEFAULT, "test3d: titulnoc {:.2f}", _title_night);
 	} else if (what == "snimek" && argv.size() > 2) {
 		/* The world generation progress window is still up at the first tick of a new game, and the last screenshot's message too. */
 		CloseWindowByClass(WindowClass::ModalProgress);
@@ -9950,6 +9958,235 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: ace {}x{}, pruhlednych {}", w, h, transparent);
 		}
 		return true;
+	} else if (what == "uvodnihra") {
+		/* 'uvodnihra': the title game (opntitle.dat, the player, 16. 10.: "make it, temperate, with the camera") built
+		 * on the map of a new game: an octagon of track by the town that has the most houses beside it, two stations,
+		 * semaphores, two trains out of a depot that goes again when they are out, buses let loose in two towns, and
+		 * the signs the title screen's camera goes by (intro_gui.cpp: 'T<n> <flags> <seconds>'). Then 'tiky' and
+		 * 'save'; the save is media/baseset/opntitle.dat. */
+		if (_game_mode != GameMode::Normal) return true;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) return true;
+			SetLocalCompany(made->index);
+		}
+		if (HasModalProgress()) SetModalProgress(false);
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+
+		/* The octagon's moves: straight along x, a diagonal, straight along y, ... back where it began. */
+		const int LX = 18, LY = 8, D = 5;
+		std::vector<DiagDirection> moves;
+		auto run = [&](DiagDirection d, int n) { for (int i = 0; i < n; i++) moves.push_back(d); };
+		auto stair = [&](DiagDirection a, DiagDirection b, int n) { for (int i = 0; i < n; i++) moves.push_back(i % 2 == 0 ? a : b); };
+		run(DiagDirection::SW, LX); stair(DiagDirection::SE, DiagDirection::SW, D);
+		run(DiagDirection::SE, LY); stair(DiagDirection::NE, DiagDirection::SE, D);
+		run(DiagDirection::NE, LX); stair(DiagDirection::NW, DiagDirection::NE, D);
+		run(DiagDirection::NW, LY); stair(DiagDirection::SW, DiagDirection::NW, D);
+		const int N = static_cast<int>(moves.size());
+		auto step = [](DiagDirection d) -> std::pair<int, int> {
+			switch (d) {
+				case DiagDirection::NE: return {-1, 0};
+				case DiagDirection::SE: return {0, 1};
+				case DiagDirection::SW: return {1, 0};
+				default: return {0, -1};
+			}
+		};
+		auto track_of = [](DiagDirection a, DiagDirection b) {
+			auto has = [&](DiagDirection x) { return a == x || b == x; };
+			if (has(DiagDirection::NE) && has(DiagDirection::SW)) return Track::X;
+			if (has(DiagDirection::NW) && has(DiagDirection::SE)) return Track::Y;
+			if (has(DiagDirection::NW) && has(DiagDirection::NE)) return Track::Upper;
+			if (has(DiagDirection::SW) && has(DiagDirection::SE)) return Track::Lower;
+			if (has(DiagDirection::NW) && has(DiagDirection::SW)) return Track::Left;
+			return Track::Right;
+		};
+		struct Piece { int dx, dy; Track track; };
+		std::vector<Piece> path;
+		int px = 0, py = 0, minx = 0, miny = 0, maxx = 0, maxy = 0;
+		for (int k = 0; k < N; k++) {
+			path.push_back({px, py, track_of(ReverseDiagDir(moves[(k + N - 1) % N]), moves[k])});
+			auto [sx, sy] = step(moves[k]);
+			px += sx;
+			py += sy;
+			minx = std::min(minx, px); miny = std::min(miny, py); maxx = std::max(maxx, px); maxy = std::max(maxy, py);
+		}
+
+		/* Where: around the towns, the place with the most houses near the track whose every piece can be built on
+		 * clear land or trees (no road, so no level crossing a bus could stand on), the flatter the better. */
+		int best_score = INT_MIN, bx = 0, by = 0;
+		const Town *best_town = nullptr;
+		for (const Town *t : Town::Iterate()) {
+			const int tx = TileX(t->xy), ty = TileY(t->xy);
+			for (int oy = ty - 22; oy <= ty + 22; oy++) {
+				for (int ox = tx - 30; ox <= tx + 30; ox++) {
+					if (ox + minx < 3 || oy + miny < 3 || ox + maxx + 3 >= static_cast<int>(Map::SizeX()) || oy + maxy + 3 >= static_cast<int>(Map::SizeY())) continue;
+					bool good = true;
+					int slopes = 0;
+					for (const Piece &pc : path) {
+						TileIndex tile = TileXY(ox + pc.dx, oy + pc.dy);
+						if (!IsTileType(tile, TileType::Clear) && !IsTileType(tile, TileType::Trees)) { good = false; break; }
+						if (GetTileSlope(tile) != SLOPE_FLAT) slopes++;
+					}
+					if (!good) continue;
+					int houses = 0;
+					for (int y = oy + miny - 3; y <= oy + maxy + 3; y++) {
+						for (int x = ox + minx - 3; x <= ox + maxx + 3; x++) {
+							if (IsTileType(TileXY(x, y), TileType::House)) houses++;
+						}
+					}
+					const int score = houses * 4 - slopes * 3;
+					if (score <= best_score) continue;
+					for (const Piece &pc : path) {
+						if (Command<Commands::BuildRail>::Do(DoCommandFlags{}, TileXY(ox + pc.dx, oy + pc.dy), RAILTYPE_RAIL, pc.track, false).Failed()) { good = false; break; }
+					}
+					if (!good) continue;
+					best_score = score;
+					bx = ox;
+					by = oy;
+					best_town = t;
+				}
+			}
+		}
+		if (best_town == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d uvodnihra: no place for the track.");
+			return true;
+		}
+		int failed = 0;
+		for (const Piece &pc : path) {
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(bx + pc.dx, by + pc.dy), RAILTYPE_RAIL, pc.track, false).Failed()) failed++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: uvodnihra: track at {},{} by {}, score {}, not built {}", bx, by, best_town->GetCachedName(), best_score, failed);
+
+		/* The stations: four tiles in the middle of each straight along x, else as near it as they go. */
+		std::vector<bool> station_piece(N, false);
+		std::vector<TileIndex> stations;
+		for (int first : {0, LX + D + LY + D}) {
+			const int middle = first + (LX - 4) / 2;
+			for (int shift = 0; shift <= LX - 4; shift++) {
+				const int a = middle + ((shift & 1) ? (shift + 1) / 2 : -(shift / 2));
+				if (a < first || a + 3 > first + LX - 1) continue;
+				int lowest = a;
+				for (int k = a; k < a + 4; k++) if (path[k].dx < path[lowest].dx) lowest = k;
+				TileIndex org = TileXY(bx + path[lowest].dx, by + path[lowest].dy);
+				if (Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, org, RAILTYPE_RAIL, Axis::X, 1, 4, STAT_CLASS_DFLT, 0, NEW_STATION, false).Failed()) continue;
+				for (int k = a; k < a + 4; k++) station_piece[k] = true;
+				stations.push_back(TileXY(bx + path[a + 1].dx, by + path[a + 1].dy));
+				break;
+			}
+		}
+
+		/* The depot by the first straight, inside the octagon, joined to it by a piece of curve. */
+		TileIndex depot = INVALID_TILE, joint = INVALID_TILE;
+		Track link = Track::Lower;
+		for (int k = 1; k < LX - 1 && depot == INVALID_TILE; k++) {
+			if (station_piece[k] || station_piece[k - 1] || station_piece[k + 1]) continue;
+			TileIndex at = TileXY(bx + path[k].dx, by + path[k].dy), beside = TileXY(bx + path[k].dx, by + path[k].dy + 1);
+			if (!IsTileType(beside, TileType::Clear) && !IsTileType(beside, TileType::Trees)) continue;
+			if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, beside, RAILTYPE_RAIL, DiagDirection::NW).Failed()) continue;
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at, RAILTYPE_RAIL, link, false).Failed()) {
+				Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, beside);
+				continue;
+			}
+			depot = beside;
+			joint = at;
+		}
+
+		/* The semaphores: every twelfth piece, not on a station nor next to one, nor where the depot joins. */
+		int signals = 0;
+		for (int k = 6; k < N; k += 12) {
+			for (int d = 0; d < 4; d++) {
+				const int i = (k + d) % N;
+				if (station_piece[i] || station_piece[(i + 1) % N] || station_piece[(i + N - 1) % N]) continue;
+				TileIndex tile = TileXY(bx + path[i].dx, by + path[i].dy);
+				if (tile == joint) continue;
+				if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, tile, path[i].track, SignalType::Block, SignalVariant::Semaphore, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Succeeded()) {
+					signals++;
+					break;
+				}
+			}
+		}
+
+		/* The trains: a steam engine with carriages and a diesel with coal wagons, the fastest of each there is. */
+		std::vector<VehicleID> trains;
+		if (depot != INVALID_TILE) {
+			const Engine *steam = nullptr, *diesel = nullptr, *carriage = nullptr, *coal = nullptr;
+			for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+				if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company) || !HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL)) continue;
+				const RailVehicleInfo &rvi = e->VehInfo<RailVehicleInfo>();
+				if (rvi.railveh_type == RailVehicleType::Wagon) {
+					if (!IsValidCargoType(e->GetDefaultCargoType())) continue;
+					const CargoLabel label = CargoSpec::Get(e->GetDefaultCargoType())->label;
+					if (label == CT_PASSENGERS && carriage == nullptr) carriage = e;
+					if (label == CT_COAL && coal == nullptr) coal = e;
+				} else if (rvi.engclass == EngineClass::Steam) {
+					if (steam == nullptr || e->GetDisplayMaxSpeed() > steam->GetDisplayMaxSpeed()) steam = e;
+				} else if (rvi.engclass == EngineClass::Diesel) {
+					if (diesel == nullptr || e->GetDisplayMaxSpeed() > diesel->GetDisplayMaxSpeed()) diesel = e;
+				}
+			}
+			const std::pair<const Engine *, std::pair<const Engine *, int>> consists[] = {{steam, {carriage, 3}}, {diesel, {coal, 4}}};
+			for (const auto &[engine, wagons] : consists) {
+				if (engine == nullptr) continue;
+				auto [cost, train, ua, ub, uc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, engine->index, true, INVALID_CARGO, ClientID::Invalid);
+				if (cost.Failed() || train == VehicleID::Invalid()) continue;
+				for (int i = 0; i < wagons.second && wagons.first != nullptr; i++) {
+					auto [wcost, wagon, wa, wb, wc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, wagons.first->index, true, INVALID_CARGO, ClientID::Invalid);
+					if (wcost.Succeeded()) Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, wagon, train, false);
+				}
+				Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, train, false);
+				trains.push_back(train);
+				UpdateSignalsInBuffer();
+				/* Out of the depot and on its way before the next starts. */
+				for (int i = 0; i < 3000; i++) {
+					StateGameLoop();
+					const Train *t = Train::Get(train);
+					if (DistanceManhattan(t->tile, depot) > 12 && DistanceManhattan(t->Last()->tile, depot) > 4) break;
+				}
+			}
+			/* The depot goes when the trains are out. */
+			for (int i = 0; i < 20; i++) {
+				if (Command<Commands::RemoveRail>::Do(DoCommandFlag::Execute, joint, link).Succeeded()) {
+					Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, depot);
+					UpdateSignalsInBuffer();
+					break;
+				}
+				UpdateSignalsInBuffer();
+				for (int k = 0; k < 50; k++) StateGameLoop();
+			}
+		}
+
+		/* Buses let loose in the town and in the next biggest. */
+		int index = 0, town_index = 0, other_index = -1;
+		const Town *other = nullptr;
+		for (const Town *t : Town::Iterate()) {
+			if (t == best_town) {
+				town_index = index;
+			} else if (other == nullptr || t->cache.population > other->cache.population) {
+				other = t;
+				other_index = index;
+			}
+			index++;
+		}
+		IConsoleCmdExec(fmt::format("test3d autobusmesto {} Bus 3", town_index));
+		if (other != nullptr) IConsoleCmdExec(fmt::format("test3d autobusmesto {} Bus 2", other_index));
+		/* The camera: round the octagon, the town in it seen beside the menu (which hides the middle of the screen):
+		 * a tile along y is half a tile's width to the right on the screen, along x to the left, so from right of
+		 * it, below it, left of it and back, panning (the title screen's 'P') twelve seconds each. */
+		const int cx = bx + (minx + maxx) / 2, cy = by + (miny + maxy) / 2;
+		std::vector<std::pair<TileIndex, std::string>> signs;
+		static constexpr std::pair<int, int> CAMERA[] = {{-10, 2}, {-2, 10}, {10, -2}, {2, -10}};
+		for (auto [dx, dy] : CAMERA) {
+			signs.emplace_back(TileXY(Clamp(cx + dx, 1, static_cast<int>(Map::MaxX()) - 1), Clamp(cy + dy, 1, static_cast<int>(Map::MaxY()) - 1)), "P 12");
+		}
+		int n = 1;
+		for (const auto &[tile, text] : signs) {
+			const std::string name = fmt::format("T{} {}", n++, text);
+			Command<Commands::PlaceSign>::Do(DoCommandFlag::Execute, tile, name);
+			IConsolePrint(CC_DEFAULT, "test3d: uvodnihra: sign '{}' at {},{}", name, TileX(tile), TileY(tile));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: uvodnihra: {} stations, {} signals, {} trains, depot {}", stations.size(), signals, trains.size(), depot == INVALID_TILE ? "none" : "gone");
 	} else if (what == "obloukjizda" && argv.size() > 4) {
 		/* 'obloukjizda <n> <wagons> <ticks>': a train of the fastest engine and so many wagons out of a depot, along
 		 * twenty tiles of X, a quarter turn with n pieces of diagonal between its corners (as 'oblouky') and twelve

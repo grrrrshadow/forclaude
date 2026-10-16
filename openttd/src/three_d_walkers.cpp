@@ -661,7 +661,7 @@ void AddThreeDDriversToViewport(ZoomLevel zoom)
 	const float scale = WalkerScale();
 	for (const Driver &d : _drivers) {
 		if (d.path.empty() || d.tile == INVALID_TILE) continue;
-		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, _settings_client.gui.night);
+		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, IsNightNow());
 	}
 }
 

@@ -121,6 +121,9 @@ void SetViewportWaypointRect(const Waypoint *wp, bool sel);
 void SetViewportCatchmentTown(const Town *t, bool sel);
 void MarkCatchmentTilesDirty();
 
+extern float _title_night;
+bool IsNightNow();
+
 template <class T>
 void SetViewportCatchmentSpecializedStation(const T *st, bool sel);
 

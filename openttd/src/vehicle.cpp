@@ -2161,7 +2161,7 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 	 * and the back (DrawNight()); an aircraft's landing light further ahead. The pool of the headlights on the way
 	 * ahead is marked by itself where it is (MarkVehicleLightPoolDirty()): not a tile and a half round every part of
 	 * every train, all drawn again at every step (the player: "make the night lights up close cheaper"). */
-	if (_settings_client.gui.night && (this->Previous() == nullptr || this->Next() == nullptr)) {
+	if (IsNightNow() && (this->Previous() == nullptr || this->Next() == nullptr)) {
 		const int reach = (this->type == VehicleType::Aircraft ? 24 : 6) * ZOOM_BASE;
 		new_coord.left -= reach;
 		new_coord.right += reach;
@@ -2218,7 +2218,7 @@ static std::unordered_map<uint32_t, std::array<int, 4>> _light_pools;
  */
 static void MarkVehicleLightPoolDirty(const Vehicle *v)
 {
-	const bool lit = _settings_client.gui.night && v->Previous() == nullptr && v->direction != Direction::Invalid &&
+	const bool lit = IsNightNow() && v->Previous() == nullptr && v->direction != Direction::Invalid &&
 			(v->type == VehicleType::Road || v->type == VehicleType::Ship || (v->type == VehicleType::Train && (Train::From(v)->IsEngine() || Train::From(v)->IsFrontEngine())));
 	auto it = _light_pools.find(v->index.base());
 	if (!lit) {

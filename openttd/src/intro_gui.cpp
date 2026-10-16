@@ -33,6 +33,7 @@
 #include "signs_base.h"
 #include "viewport_func.h"
 #include "vehicle_base.h"
+#include <cmath>
 #include <regex>
 
 #include "widgets/intro_widget.h"
@@ -85,7 +86,13 @@ struct IntroGameViewportCommand {
 };
 
 
+/** The title screen's day and night (the player, 16. 10.: "a long day and then a while of night, and round and round
+ * between the day and the night"), milliseconds: the day, the dusk, the night and the dawn. */
+static constexpr uint TITLE_DAY_MS = 60000, TITLE_DUSK_MS = 4000, TITLE_NIGHT_MS = 15000, TITLE_DAWN_MS = 4000;
+
 struct SelectGameWindow : public Window {
+	/** Where in the title screen's day and night it is, milliseconds (TITLE_DAY_MS ...). */
+	uint day_night_time = 0;
 	/** Vector of viewport commands parsed. */
 	std::vector<IntroGameViewportCommand> intro_viewport_commands{};
 	/** Index of currently active viewport command. */
@@ -171,10 +178,40 @@ struct SelectGameWindow : public Window {
 		this->OnInvalidateData();
 
 		this->ReadIntroGameViewportCommand();
+		_title_night = 0;
+	}
+
+	/**
+	 * The title screen's day and night on: the night drawn (IsNightNow()) as far as it is come, in steps, so the
+	 * screen is drawn anew only in the dusk and the dawn; the vehicles' boxes made room for their lights.
+	 */
+	void AdvanceDayAndNight(uint delta_ms)
+	{
+		static constexpr uint CYCLE = TITLE_DAY_MS + TITLE_DUSK_MS + TITLE_NIGHT_MS + TITLE_DAWN_MS;
+		this->day_night_time = (this->day_night_time + delta_ms) % CYCLE;
+		const uint t = this->day_night_time;
+		float night = 1;
+		if (t < TITLE_DAY_MS) {
+			night = 0;
+		} else if (t < TITLE_DAY_MS + TITLE_DUSK_MS) {
+			night = static_cast<float>(t - TITLE_DAY_MS) / TITLE_DUSK_MS;
+		} else if (t >= TITLE_DAY_MS + TITLE_DUSK_MS + TITLE_NIGHT_MS) {
+			night = 1 - static_cast<float>(t - TITLE_DAY_MS - TITLE_DUSK_MS - TITLE_NIGHT_MS) / TITLE_DAWN_MS;
+		}
+		night = std::round(night * 32) / 32;
+		if (night == _title_night) return;
+		const bool was = _title_night > 0;
+		_title_night = night;
+		if (was != (night > 0)) {
+			for (const Vehicle *v : Vehicle::Iterate()) v->UpdateBoundingBoxCoordinates(true);
+		}
+		MarkWholeScreenDirty();
 	}
 
 	void OnRealtimeTick(uint delta_ms) override
 	{
+		this->AdvanceDayAndNight(delta_ms);
+
 		/* Move the main game viewport according to intro viewport commands. */
 
 		if (intro_viewport_commands.empty()) return;
@@ -382,6 +419,13 @@ static constexpr std::initializer_list<NWidgetPart> _nested_select_game_widgets 
 };
 
 /** Window definition for the select game window. */
+/** The title screen that much on, its camera and its day and night, as if that much time went by (the rig: 'test3d titulnoc'). */
+void AdvanceTitleDayAndNight(uint delta_ms)
+{
+	SelectGameWindow *w = static_cast<SelectGameWindow *>(FindWindowByClass(WindowClass::SelectGame));
+	if (w != nullptr) w->OnRealtimeTick(delta_ms);
+}
+
 static WindowDesc _select_game_desc(
 	WindowPosition::Center, {}, 0, 0,
 	WindowClass::SelectGame, WindowClass::None,

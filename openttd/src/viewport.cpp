@@ -4258,7 +4258,26 @@ static NightLight GetNightLight()
 		{152, 162, 194}, // a bright full moon
 		{188, 180, 200}, // nearly the dawn
 	};
-	return LEVELS[std::min<size_t>(_settings_client.gui.night_light, std::size(LEVELS) - 1)];
+	NightLight light = LEVELS[std::min<size_t>(_settings_client.gui.night_light, std::size(LEVELS) - 1)];
+	if (_game_mode == GameMode::Menu && _title_night < 1) {
+		/* The title screen's dusk and dawn: from the day's light to the night's. */
+		auto towards = [](uint night) { return static_cast<uint>(std::lround(256 - (256 - static_cast<int>(night)) * _title_night)); };
+		light = {towards(light.r), towards(light.g), towards(light.b)};
+	}
+	return light;
+}
+
+/**
+ * How far the night of the title screen is come (SelectGameWindow, the player, 16. 10.: "a long day and then a
+ * while of night, round and round"): 0 the day, 1 the night, between them the dusk and the dawn.
+ */
+float _title_night = 0;
+
+/** Whether the night is drawn: the player's (gui.night) in a game, on the title screen its own day and night. */
+bool IsNightNow()
+{
+	if (_game_mode == GameMode::Menu) return _title_night > 0;
+	return _settings_client.gui.night;
 }
 
 /**
@@ -4462,7 +4481,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	/* The lit windows of the houses, when the night is drawn on 32 bpp (DrawNight()). */
 	_night_lit.clear();
 	_night_glows.clear();
-	_night_windows_now = _settings_client.gui.night && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
+	_night_windows_now = IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
 	_vd.dpi.pitch = _cur_dpi->pitch;
 	_vd.last_child = LAST_CHILD_NONE;
 
@@ -4503,7 +4522,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	}
 
 	/* The night over it all but the signs (gui.night). */
-	if (_settings_client.gui.night) DrawNight(IsViewportTurned(vp));
+	if (IsNightNow()) DrawNight(IsViewportTurned(vp));
 	_night_lit.clear();
 	_night_glows.clear();
 	_night_windows_now = false;
@@ -9295,7 +9314,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	}
 
 	/* 5b. The sun's shadows of the buildings about the eye, by day (DrawEyeShadows()). */
-	if (!in_tunnel.has_value() && !_settings_client.gui.night && _cab_shadows) {
+	if (!in_tunnel.has_value() && !IsNightNow() && _cab_shadows) {
 		std::vector<CabShadowCaster> casters;
 		for (const CabObject &co : objects) {
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
@@ -9372,7 +9391,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	}
 	/* What the walker holds (the hammer), before the night: the dark is over it too. */
 	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
-	if (_settings_client.gui.night) {
+	if (IsNightNow()) {
 		DrawEyeNight(eye, own, width, height, dst, zb);
 		/* The lamps and lit windows of the houses lighting what is about them (DrawEyeLampLight()). */
 		std::vector<std::array<double, 3>> lamps;
