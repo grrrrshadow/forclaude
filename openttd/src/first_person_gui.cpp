@@ -171,9 +171,23 @@ struct FirstPersonWindow : Window {
 	 * the window (the map under it marks the screen dirty as its vehicles move, in several pieces a frame) puts the
 	 * picture made on the screen and nothing more.
 	 */
-	IntervalTimer<TimerWindow> step{std::chrono::milliseconds(FIRST_PERSON_TICK_MS), [this](auto) {
-		this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
-		this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
+	IntervalTimer<TimerWindow> step{std::chrono::milliseconds(FIRST_PERSON_TICK_MS), [this](uint count) { this->Step(count); }};
+
+	/**
+	 * The steps of the walker since the last picture, and the picture. A frame of the game longer than a step (the
+	 * picture itself taking 30 to 200 ms, the map, the vehicles) is so many steps: each is taken, against the walls
+	 * on its own, and one picture after them -- not one step a frame, which walked the walker (the player, 16. 10.:
+	 * "walking is slow") as many times slower as a frame was longer than a step. At most a second of them at once (a
+	 * save, the window dragged).
+	 * @param count the steps since the last picture
+	 */
+	void Step(uint count)
+	{
+		const uint steps = std::min(count, 1000u / FIRST_PERSON_TICK_MS);
+		for (uint i = 0; i < steps; i++) {
+			this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
+			this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
+		}
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
 		if (c != nullptr && c->walker_health == 0) {
@@ -187,10 +201,10 @@ struct FirstPersonWindow : Window {
 			this->hurt_steps = 6;
 		}
 		this->MakePicture();
-		if (this->hurt_steps > 0) this->hurt_steps--;
+		this->hurt_steps = std::max(0, this->hurt_steps - static_cast<int>(steps));
 		this->SetWidgetDirty(WID_FP_CANVAS);
 		this->SetWidgetDirty(WID_FP_PANEL);
-	}};
+	}
 
 	FirstPersonWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
@@ -617,7 +631,6 @@ double RigFirstPersonMeasure(int times, int threads)
 	return total / times;
 }
 
-/** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
 /** The picture from the eyes made again at once, as it is drawn only as the walker steps (a setting of the night changed). */
 void RedrawFirstPersonPicture()
 {
@@ -627,6 +640,7 @@ void RedrawFirstPersonPicture()
 	w->SetDirty();
 }
 
+/** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
@@ -645,4 +659,26 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 	}
 	w->MakePicture();
 	w->SetDirty();
+}
+
+/**
+ * The rig: W held so many frames of the game, each so many milliseconds long, the steps counted as the window's timer
+ * counts them (IntervalTimer<TimerWindow>::Elapsed()); the metres walked.
+ */
+double RigFirstPersonHoldW(int frame_ms, int frames)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || frame_ms <= 0) return 0;
+	SetFocusedWindow(w);
+	const double x = w->walker.x, y = w->walker.y;
+	_walkkeys.Set(DirectionKey::Up);
+	int elapsed = 0;
+	for (int i = 0; i < frames; i++) {
+		elapsed += frame_ms;
+		const uint count = elapsed / FIRST_PERSON_TICK_MS;
+		elapsed %= FIRST_PERSON_TICK_MS;
+		if (count > 0) w->Step(count);
+	}
+	_walkkeys.Reset(DirectionKey::Up);
+	return std::hypot(w->walker.x - x, w->walker.y - y) / OBJECT_UNITS_PER_METRE;
 }

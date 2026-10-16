@@ -789,11 +789,17 @@ and D as they keep the arrows (`_walkkeys`), and while the window has the
 focus the arrows walk instead of moving the map. The walker does not go into
 houses, industries' buildings (the fields are walked), stations' buildings
 (platforms and stops are walked), objects or water; along a wall it slides.
-At night the picture is darkened as the map is and the vehicles' lights are
+It steps 25 times a second of real time whatever the frames: a frame of the
+game longer than a step (the picture itself takes 30 to 200 ms) takes all the
+steps missed, each against the walls, and one picture after them, at most a
+second of them (`FirstPersonWindow::Step()`; the player, 16. 10.: "walking
+is slow" -- one step a frame had walked it as many times slower as a frame
+was longer than a step). At night the picture is darkened as the map is and the vehicles' lights are
 glows hidden behind what stands in front of them; from a cab, the pool of the
 own headlights lies on the way ahead (`DrawEyeNight()`). Only the picture,
 nothing saved. Rig: `test3d chodec`, `test3d chodec krok <n> <ahead> <aside>
-<turn> [pitch]`.
+<turn> [pitch]`, `test3d chodec drzeni <frame ms> <frames>` (W held so many
+frames so long each, the metres walked).
 
 ## The night
 

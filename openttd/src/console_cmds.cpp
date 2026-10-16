@@ -8893,7 +8893,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch);
 		extern bool RigFirstPersonHold(bool out, float swing);
 		extern double RigFirstPersonMeasure(int times, int threads);
-		if (argv.size() > 2 && argv[2] == "mereni") {
+		extern double RigFirstPersonHoldW(int frame_ms, int frames);
+		if (argv.size() > 4 && argv[2] == "drzeni") {
+			/* 'chodec drzeni <frame ms> <frames>': W held so many frames of the game so long each; how far it walked. */
+			const int frame_ms = number(3).value_or(40), frames = number(4).value_or(25);
+			const double metres = RigFirstPersonHoldW(frame_ms, frames);
+			IConsolePrint(CC_DEFAULT, "test3d: drzeni W {} snimku po {} ms ({:.2f} s): usel {:.2f} m, {:.2f} m/s", frames, frame_ms, frames * frame_ms / 1000.0, metres, metres / (frames * frame_ms / 1000.0));
+		} else if (argv.size() > 2 && argv[2] == "mereni") {
 			/* 'chodec mereni <times> <threads>': how long a picture from the eyes takes, on so many threads (0 all). */
 			const int times = number(3).value_or(10), threads = number(4).value_or(0);
 			IConsolePrint(CC_DEFAULT, "test3d: obraz z oci {:.1f} ms na {} vlaknech", RigFirstPersonMeasure(times, threads), threads == 0 ? std::thread::hardware_concurrency() : static_cast<uint>(threads));
