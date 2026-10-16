@@ -3995,8 +3995,8 @@ STR_NEWGRF_SETTINGS_INFO_TITLE                                  :{WHITE}Podrobn�
 STR_NEWGRF_SETTINGS_ACTIVE_LIST                                 :{WHITE}zvládnu všechny grf průmyslu najednou, 128 nákladů
 STR_NEWGRF_SETTINGS_INACTIVE_LIST                               :{WHITE}Neaktivní grafiky
 STR_NEWGRF_SETTINGS_OBJECT_SIZE                                 :Velikost 3D vozidel:
-STR_NEWGRF_SETTINGS_OBJECT_SIZE_ORIGINAL                        :původní, větší (BRÝLE)
-STR_NEWGRF_SETTINGS_OBJECT_SIZE_SMALLER                         :menší (CZTR)
+STR_NEWGRF_SETTINGS_OBJECT_SIZE_ORIGINAL                        :zvětšené
+STR_NEWGRF_SETTINGS_OBJECT_SIZE_SMALLER                         :zmenšené
 STR_NEWGRF_SETTINGS_OBJECT_SIZE_TOOLTIP                         :{BLACK}Velikost všech vozidel z 3D objektů (vlaky, auta, lodě, letadla), všech 3D grafik najednou: původní hry, větší jako BRÝLE, nebo menší jako CZTR. Nastaví parametr velikosti každé aktivní 3D grafiky, která ho má, a pro novou hru i nastavení hry
 STR_NEWGRF_SETTINGS_SELECT_PRESET                               :{ORANGE}Vybrat předvolbu:
 STR_NEWGRF_FILTER_TITLE                                         :{ORANGE}Filtrovat podle:
