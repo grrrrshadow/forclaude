@@ -39,6 +39,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   vagony `.wag` (`132ae28`) – osobní vůz veze cestující podle PassengerCapacity, nákladní cokoli kromě cestujících.
   Hráč poslal na pokusy vůz ČD B 598 (skutečné DXT1 textury) – jede za 750. Nečte se: náklad (freightanim),
   světla, zvuky.
+- Kde hra vlaky hledá (`ef4e8ac`, hráč: „ať hledá obvyklou složku simtrains modelů“ + „v newgrf simtrains taky“):
+  Trains/Trainset MSTS (registr, Open Rails, obvyklé cesty), `simtrains_path` v `[misc]` openttd.cfg a
+  `newgrf/simtrains` pro hráče bez MSTS. GRF s čísly jdou do `newgrf/simtrains/`. Hráč se ptal na šíření: modely
+  ani GRF nesmí ven; save a obrázky jsou v pořádku.
 - Hráč: bez okna pískoviště je myš cukavá a všechno zpomalené. Příčina (`d608a9f`): otočený pohled při každém
   pohybu čehokoli (vlak, Mat, holky, auto VB) překresloval skoro celou obrazovku, protože nevěděl, v jaké výšce
   věc je. Teď každé označení nese místo ve světě. Rig 1000×700: vlak 670 000 → 61 000 px na snímek, město
