@@ -9934,12 +9934,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (uint j = 0; j < D; j++) lay(a + j / 2, b + (j + 1) / 2, j % 2 == 0 ? Track::Right : Track::Left);
 		const uint yx = a + (D - 1) / 2, yy = b + (D - 1) / 2;
 		for (uint i = 1; i <= LY; i++) lay(yx, yy + i, Track::Y);
-		/* The fastest engine for plain rail, and any wagon. */
+		/* The fastest engine for plain rail, and any wagon; or the engine asked for by its GRF's id ("53542680"). */
 		const Engine *engine = nullptr, *wagon = nullptr;
+		std::optional<uint32_t> want_grf;
+		if (argv.size() > 5 && argv[5].size() == 8) {
+			auto v = ParseInteger<uint32_t>(argv[5], 16);
+			if (v.has_value()) want_grf = (*v >> 24) | ((*v >> 8) & 0xFF00) | ((*v << 8) & 0xFF0000) | (*v << 24);
+		}
 		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
 			if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company) || !HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL)) continue;
 			if (e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon) {
 				if (wagon == nullptr) wagon = e;
+			} else if (want_grf.has_value()) {
+				if (e->grf_prop.grfid == *want_grf) engine = e;
 			} else if (engine == nullptr || e->GetDisplayMaxSpeed() > engine->GetDisplayMaxSpeed()) {
 				engine = e;
 			}

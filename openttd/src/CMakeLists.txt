@@ -462,6 +462,8 @@ add_files(
     signs_cmd.cpp
     signs_cmd.h
     signs_func.h
+    simtrains.cpp
+    simtrains.h
     signs_gui.cpp
     signs_type.h
     slider.cpp

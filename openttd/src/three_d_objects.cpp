@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "three_d_objects.h"
+#include "simtrains.h"
 #include "three_d_vehicle_object.h"
 #include "debug.h"
 #include "fileio_func.h"
@@ -74,6 +75,8 @@ static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objec
 static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0);
+/** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
+static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
 
 /** The vehicles as objects (three_d_objects.h), and whether their indices were read yet. */
 static std::vector<ThreeDVehicleObject> _vehicle_objects;
@@ -1641,6 +1644,22 @@ static void ReadThreeDVehicleObjects()
 			Debug(misc, 0, "3D vehicles {}: {}", index, ex.what());
 		}
 	}
+	/* The engines of MSTS the player put in newgrf/simtrains/ (simtrains.h): each the one engine of the GRF made of
+	 * it, drawn from its model. */
+	for (const SimtrainsEngine &e : FindSimtrainsEngines()) {
+		ThreeDVehicleObject obj;
+		obj.name = e.name;
+		obj.package = e.folder;
+		obj.file = e.shape;
+		obj.type = VehicleType::Train;
+		obj.grfid = e.grfid;
+		obj.pieces.push_back(SIMTRAINS_ENGINE_ID);
+		if (e.has_cab) {
+			std::copy(std::begin(e.cab), std::end(e.cab), obj.cab);
+			obj.has_cab = true;
+		}
+		_vehicle_objects.push_back(std::move(obj));
+	}
 	for (size_t i = 0; i < _vehicle_objects.size(); i++) {
 		const ThreeDVehicleObject &o = _vehicle_objects[i];
 		for (size_t k = 0; k < o.pieces.size(); k++) {
@@ -1863,7 +1882,30 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	auto it = _vehicle_shapes.find(key);
 	if (it != _vehicle_shapes.end()) return it->second;
 	GlbMesh mesh;
-	if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame)) return nullptr;
+	if (this->file.ends_with(".s") || this->file.ends_with(".S")) {
+		/* A model of MSTS (simtrains.h): its textures as they are, RGBA, marked so (DecodeTextureLevels()). */
+		SimtrainsMesh msts;
+		if (!ReadSimtrainsShape(this->file, msts)) return nullptr;
+		mesh.pos = std::move(msts.pos);
+		mesh.nrm = std::move(msts.nrm);
+		mesh.uv = std::move(msts.uv);
+		mesh.tri = std::move(msts.tri);
+		mesh.tri_tex = std::move(msts.tri_tex);
+		for (SimtrainsMesh::Texture &t : msts.textures) {
+			GlbTexture g;
+			g.name = t.name;
+			if (!t.rgba.empty()) {
+				g.png.assign(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
+				for (uint32_t v : {static_cast<uint32_t>(t.w), static_cast<uint32_t>(t.h)}) {
+					for (int k = 0; k < 4; k++) g.png.push_back(static_cast<uint8_t>(v >> (8 * k)));
+				}
+				g.png.insert(g.png.end(), t.rgba.begin(), t.rgba.end());
+			}
+			mesh.textures.push_back(std::move(g));
+		}
+	} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame)) {
+		return nullptr;
+	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
@@ -2202,8 +2244,21 @@ std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat)
 {
 	ThreeDObjectTexture t;
+	if (png.size() >= RAW_TEXTURE_MARK.size() + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), png.begin())) {
+		/* Pixels as they are (a texture of MSTS, simtrains.h): the mark, the width and the height, then RGBA. */
+		auto u32 = [&png](size_t p) { return png[p] | png[p + 1] << 8 | png[p + 2] << 16 | static_cast<uint32_t>(png[p + 3]) << 24; };
+		const size_t at = RAW_TEXTURE_MARK.size();
+		const uint32_t w = u32(at), h = u32(at + 4);
+		if (w > 0 && h > 0 && w <= 8192 && h <= 8192 && png.size() >= at + 8 + static_cast<size_t>(w) * h * 4) {
+			t.w = static_cast<int>(w);
+			t.h = static_cast<int>(h);
+			t.px.resize(static_cast<size_t>(w) * h);
+			const uint8_t *src = png.data() + at + 8;
+			for (size_t i = 0; i < t.px.size(); i++, src += 4) t.px[i] = src[3] >= 128 ? Colour(src[0], src[1], src[2]).data : 0;
+		}
+	}
 #ifdef WITH_PNG
-	if (!png.empty()) {
+	if (!png.empty() && t.px.empty()) {
 		png_image image{};
 		image.version = PNG_IMAGE_VERSION;
 		if (png_image_begin_read_from_memory(&image, png.data(), png.size())) {

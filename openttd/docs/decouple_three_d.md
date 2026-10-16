@@ -1125,3 +1125,36 @@ only the sets and their `.yagl`. Sets 1 to 4, the ten houses, are gone since
 15. 10.: those houses are 3D objects (`objekty/mirne/`, below); the script
 keeps their places in its list (`AS_OBJECTS`), so the other models' sprites
 keep their numbers and sets 5 to 8 stand as they are.
+
+## Trains of Microsoft Train Simulator (simtrains)
+
+The player puts trains of Microsoft Train Simulator (MSTS), as he downloaded
+them, in a folder `simtrains` anywhere in the NewGRF folders, for example
+`newgrf/simtrains/Trains/Trainset/<vehicle>/`. Each engine there (an `.eng`
+with its model, `WagonShape`) becomes a new vehicle of the game:
+
+- Before the NewGRFs are looked for (`PrepareSimtrainsGrfs()`), the game
+  writes beside the `.eng` a NewGRF of one engine, `<vehicle>.grf`, from the
+  figures of the `.eng`: `Name`, `Type` (diesel, electric, steam),
+  `MaxPower`, `MaxVelocity`, `Mass`, `MaxForce` (the tractive effort, at most
+  the original engines' 0.3). Introduced in 1920 and never retired, every
+  climate, the prices of the original diesel of the same power. Its id is
+  `ST` and a number of the `.eng`'s name, the same on every computer; it is
+  written again only when it changes. The player switches it on among the
+  NewGRFs as "Simtrains: <name>".
+- The engine is drawn from its model (`ReadSimtrainsShape()`): the binary
+  `.s`, the nearest of its distances, every part through its matrix and those
+  above it, turned into the frame of the vehicle objects (x forward, y left,
+  z up); the textures `.ace` (uncompressed, the first of their sizes no
+  bigger than 1024). `PassengerCabinHeadPos` is the eye of the cab view.
+- Not read yet: text models (`JINX0s1t`), compressed textures (DXT), wagons
+  (`.wag`), the freight animation, lights and sounds.
+
+Nothing of these files is ever the game's. They are the player's own download
+and their authors'; the readmes forbid spreading the models or their textures,
+to other simulators too. So they are never put in the repository, in grrrrf or
+in a build of the game, and the GRF the game writes holds only the figures of
+the `.eng`, no part of the model.
+
+The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid>` buys the engine of
+that GRF (`53542680`, the ŽSSK 750 031).

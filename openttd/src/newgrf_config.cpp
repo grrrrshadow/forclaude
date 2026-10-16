@@ -28,6 +28,7 @@
 #include "fileio_func.h"
 #include "tar_type.h"
 #include "fios.h"
+#include "simtrains.h"
 
 #include "safeguards.h"
 
@@ -686,6 +687,8 @@ void DoScanNewGRFFiles(NewGRFScanCallback *callback)
 
 	Debug(grf, 1, "Scanning for NewGRFs");
 	CrashTrace("newgrf scan");
+	/* The trains of MSTS in newgrf/simtrains/: a GRF beside each, found by the scan as any other (simtrains.h). */
+	PrepareSimtrainsGrfs();
 	uint num = GRFFileScanner::DoScan();
 
 	Debug(grf, 1, "Scan complete, found {} files", num);
