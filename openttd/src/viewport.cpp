@@ -7221,6 +7221,99 @@ double FirstPersonGroundZ(double x, double y)
 }
 
 /**
+ * The night sky in the view from an eye (the player, 15. 10.: "only the night sky", as OpenMW has it): the stars, fixed
+ * in the sky so that they go round as the eye turns, a little twinkling, and the moon with its glow -- made by the
+ * game, nothing to license. Only where the sky is, nothing drawn there.
+ */
+static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, const float *zb)
+{
+	struct Star {
+		float az, el;   ///< its direction: round from the world's x, up from the horizon, radians
+		uint8_t bright; ///< how bright it is
+		uint8_t warm;   ///< how yellow (or, below 128, how blue) it is
+		float phase;    ///< its twinkling
+	};
+	static std::vector<Star> stars;
+	if (stars.empty()) {
+		uint32_t seed = 0x5EED5u;
+		auto next = [&seed]() {
+			seed = seed * 1664525u + 1013904223u;
+			return (seed >> 8) / static_cast<float>(1 << 24);
+		};
+		for (int i = 0; i < 1400; i++) {
+			Star st;
+			st.az = next() * 2.0f * static_cast<float>(M_PI);
+			st.el = std::asin(0.03f + 0.97f * next()); // evenly over the dome
+			const float b = next();
+			st.bright = static_cast<uint8_t>(b < 0.85f ? 70 + b * 110 : 170 + (b - 0.85f) * 560);
+			st.warm = static_cast<uint8_t>(next() * 255);
+			st.phase = next() * 6.28f;
+			stars.push_back(st);
+		}
+	}
+	auto sky = [&](int x, int y) {
+		return x >= 0 && y >= 0 && x < width && y < height && y < eye.cy && zb[static_cast<size_t>(y) * width + x] <= 0.0f;
+	};
+	auto put = [&](int x, int y, Colour c, uint a) {
+		if (!sky(x, y)) return;
+		uint32_t &d = dst[static_cast<size_t>(y) * width + x];
+		Colour o(d);
+		d = Colour(static_cast<uint8_t>(std::min(255u, o.r + c.r * a / 255)), static_cast<uint8_t>(std::min(255u, o.g + c.g * a / 255)), static_cast<uint8_t>(std::min(255u, o.b + c.b * a / 255))).data;
+	};
+	/* Where a direction of the sky is on the picture: ahead of the eye only. */
+	auto place = [&](double az, double el, double &sx, double &sy) {
+		const double h = std::cos(el), dx = std::cos(az) * h, dy = std::sin(az) * h;
+		const double f = dx * eye.fx + dy * eye.fy, r = dx * eye.rx + dy * eye.ry, u = std::sin(el);
+		if (f <= 0.05) return false;
+		sx = eye.cx + r * eye.focal / f;
+		sy = eye.cy - u * eye.focal / f;
+		return true;
+	};
+	const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
+	for (const Star &st : stars) {
+		double sx, sy;
+		if (!place(st.az, st.el, sx, sy)) continue;
+		const int x = static_cast<int>(sx), y = static_cast<int>(sy);
+		const uint a = static_cast<uint>(st.bright * (0.8 + 0.2 * std::sin(t + st.phase)));
+		const Colour c = st.warm > 200 ? Colour(255, 235, 200) : (st.warm < 60 ? Colour(200, 215, 255) : Colour(240, 240, 255));
+		put(x, y, c, a);
+		if (st.bright > 200) {
+			/* A bright one: a little cross. */
+			put(x - 1, y, c, a / 3);
+			put(x + 1, y, c, a / 3);
+			put(x, y - 1, c, a / 3);
+			put(x, y + 1, c, a / 3);
+		}
+	}
+	/* The moon, low in the south-east of the map, its glow round it and a few darker seas on it. */
+	double mx, my;
+	if (place(0.6, 0.42, mx, my)) {
+		const double rad = std::max(3.0, 0.035 * eye.focal);
+		const int x0 = static_cast<int>(mx - rad * 4), x1 = static_cast<int>(mx + rad * 4);
+		const int y0 = static_cast<int>(my - rad * 4), y1 = static_cast<int>(my + rad * 4);
+		static const double seas[][3] = {{-0.30, -0.20, 0.32}, {0.25, -0.35, 0.22}, {0.10, 0.30, 0.28}, {-0.35, 0.35, 0.15}};
+		for (int y = std::max(0, y0); y <= std::min(height - 1, y1); y++) {
+			for (int x = std::max(0, x0); x <= std::min(width - 1, x1); x++) {
+				if (!sky(x, y)) continue;
+				const double dx = (x + 0.5 - mx) / rad, dy = (y + 0.5 - my) / rad, d2 = dx * dx + dy * dy;
+				if (d2 <= 1.0) {
+					double k = 0.75 + 0.25 * std::sqrt(1.0 - d2); // darker towards its edge
+					for (const auto &sea : seas) {
+						const double ex = dx - sea[0], ey = dy - sea[1];
+						if (ex * ex + ey * ey < sea[2] * sea[2]) k *= 0.82;
+					}
+					dst[static_cast<size_t>(y) * width + x] = Colour(static_cast<uint8_t>(240 * k), static_cast<uint8_t>(236 * k), static_cast<uint8_t>(218 * k)).data;
+				} else {
+					/* The glow, fading away from it. */
+					const double g = std::max(0.0, 1.0 - (std::sqrt(d2) - 1.0) / 3.0);
+					if (g > 0) put(x, y, Colour(150, 165, 200), static_cast<uint>(g * g * 90));
+				}
+			}
+		}
+	}
+}
+
+/**
  * The night in the view from an eye (gui.night): the picture darkened as the map is (DrawNight()), and the lights of
  * the vehicles about -- headlights, red lights at the back, an aircraft's beacon -- as glows the size their distance
  * makes them, hidden where something nearer stands in front of them (the depth of the picture). From the cab, the
@@ -7975,6 +8068,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
 	if (_settings_client.gui.night) {
 		DrawEyeNight(eye, own, width, height, dst, zb);
+		DrawEyeSky(eye, width, height, dst, zb);
 		/* The lit windows of the houses (their "noc") over the dark, as they were drawn, and the glows of their
 		 * lights ("svetlo_NN"): seen where nothing nearer is in front of them. */
 		const Colour window(255, 200, 110);

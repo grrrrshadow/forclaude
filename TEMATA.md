@@ -27,7 +27,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   mírné domy (ověřeno v rigu).
 - Draci od kolegy (`objekty/tvorove/`) mají animace jako snímky v uzlech (klid, chůze, útok, smrt, let) – boj jde
   udělat hned, bez kostry.
-- Čekám na odpovědi hráče (kde draci, co uvnitř domů, spánek a čas, úkoly).
+- Hráč: interiéry zatím nejsou – plánované jako samostatný objekt, kam se chodec přesune vstupem do dveří. Draci
+  občas přilétnou kamkoli, útočí na chodce, za zabití nic (hráč má draky rád). Zdraví 0 → konec pohledu z první
+  osoby, zpět na mapu. Pohled z první osoby přes celou obrazovku (hotovo `ba62032`, obraz jen jednou za krok).
+- **Noční obloha** (hotovo): hvězdy (pevně na obloze, mihotají se) a měsíc se září, dělá je hra sama (Example Suite
+  tu nemám, stahovat z nového webu nechci).
+- Čeká na odpověď hráče: spánek a čas, kdo dává úkoly, tráva a kytky.
 
 ## 15. 10. – Morrowind: tématická města
 
