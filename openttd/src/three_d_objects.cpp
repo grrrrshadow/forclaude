@@ -27,6 +27,8 @@
 #include "tile_map.h"
 #include "language.h"
 #include "3rdparty/nlohmann/json.hpp"
+#include "timer/timer.h"
+#include "timer/timer_window.h"
 
 #include <algorithm>
 #include <array>
@@ -78,6 +80,15 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+
+/** The clock of the objects, seconds (ForgetUnusedThreeDObjects()): what was drawn when. */
+static uint32_t _three_d_clock = 1;
+
+/** Mark a thing drawn now; from the threads making textures too, so as an atomic. */
+static inline void MarkThreeDUsed(uint32_t &used)
+{
+	std::atomic_ref<uint32_t>(used).store(_three_d_clock, std::memory_order_relaxed);
+}
 /** The effects of the indices ("druh": "efekt"): the fireworks over the hut. */
 static std::vector<ThreeDVehicleObject> _effect_objects;
 /** Cars of the game's own that drive about by themselves ("auto" with "jizda", three_d_walkers.h): the ÚV KSČ Tatra. */
@@ -1705,6 +1716,9 @@ const ThreeDVehicleObject *GetThreeDEffect(std::string_view name)
 }
 
 /** A figure of the indices by its name ("druh": "postava"), or nullptr; one of the package given first (a vehicle's crew). */
+/** The passages of the creatures from one animation to the next, made as they are asked for (GetThreeDFigure()). */
+static std::map<std::string, std::unique_ptr<ThreeDVehicleObject>, std::less<>> _passages;
+
 /** How many ticks a creature passes from one animation to the next (GetThreeDFigure()). */
 static constexpr int CREATURE_BLEND_TICKS = 8;
 
@@ -1714,9 +1728,8 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 	/* A creature's passage from one animation to another: "<jmeno>/<from>@<frame>><to>", made the first time. */
 	const size_t at = name.find('@'), to_at = name.find('>');
 	if (at != std::string_view::npos && to_at != std::string_view::npos && at < to_at) {
-		static std::map<std::string, std::unique_ptr<ThreeDVehicleObject>, std::less<>> passages;
-		auto it = passages.find(name);
-		if (it != passages.end()) return it->second.get();
+		auto it = _passages.find(name);
+		if (it != _passages.end()) return it->second.get();
 		const size_t slash = name.find('/');
 		const auto frame = ParseInteger<int>(name.substr(at + 1, to_at - at - 1), 10);
 		if (slash == std::string_view::npos || slash > at || !frame.has_value()) return nullptr;
@@ -1739,7 +1752,7 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 		passage->frame_ticks = 1;
 		passage->loop = to->loop;
 		passage->walk_step = to->walk_step;
-		return passages.emplace(std::string(name), std::move(passage)).first->second.get();
+		return _passages.emplace(std::string(name), std::move(passage)).first->second.get();
 	}
 	/* A vehicle's crew from its own package first (the package of a GRF carries its driver). */
 	if (!package.empty()) {
@@ -1766,6 +1779,7 @@ int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
 /** The object's shape, read from its .glb the first time; nullptr when it cannot be. A figure that moves: its first frame. */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 {
+	MarkThreeDUsed(this->used);
 	if (this->shape != nullptr || this->shape_tried) return this->shape.get();
 	this->shape_tried = true;
 	this->shape = this->MakeShape(0);
@@ -1775,6 +1789,7 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 /** A frame of a figure that moves (FrameAt()), read the first time it is drawn; the others as GetShape(). */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 {
+	MarkThreeDUsed(this->used);
 	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) return this->GetShape();
 	frame = std::max(frame, 0);
 	frame %= this->frames;
@@ -1958,6 +1973,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
  */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index) const
 {
+	MarkThreeDUsed(this->used);
 	const ThreeDVehicleShape *s = this->GetShape();
 	size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
@@ -2295,6 +2311,7 @@ int ThreeDShapeLevel(double pixels_per_metre, double shift)
  */
 ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 {
+	MarkThreeDUsed(this->used);
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	/* Its own: wanted so, or too many corners to count the triangles below. */
 	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
@@ -2531,6 +2548,7 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  */
 const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, bool may_drop) const
 {
+	MarkThreeDUsed(this->used);
 	if (this->levels.empty()) DecodeTextureLevels(this->png, this->levels);
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
 	const ThreeDObjectTexture *plain = &this->levels[level];
@@ -2631,4 +2649,95 @@ std::string DescribeThreeDObjects()
 		if (!o.plants.empty()) out += fmt::format(", {} plants", o.plants.size());
 	}
 	return out;
+}
+
+/** Forget what was made of the building to draw it -- its textures, painted or not, its simplified shapes -- to be made again when it is drawn. */
+void ThreeDObject::Forget() const
+{
+	this->levels.clear();
+	this->levels.shrink_to_fit();
+	size_t painted = 0;
+	for (const auto &[key, t] : this->painted) painted += t.px.size() * sizeof(uint32_t);
+	this->painted.clear();
+	_painted_bytes -= std::min<size_t>(painted, _painted_bytes);
+	for (const ThreeDObjectColourPart &part : this->colours) {
+		part.levels.clear();
+		part.levels.shrink_to_fit();
+	}
+	for (auto &shape : this->shapes) shape.reset();
+}
+
+/** Forget what was made of the vehicle or figure to draw it: its textures and the shapes of its frames (a dragon's poses). */
+void ThreeDVehicleObject::Forget() const
+{
+	this->levels.clear();
+	this->mask_levels.clear();
+	this->mask_tried = false;
+	this->rust_levels.clear();
+	this->rust_tried = false;
+	this->frame_shapes.clear();
+	this->frame_shapes.shrink_to_fit();
+	this->shape.reset();
+	this->shape_tried = false;
+}
+
+/** How long a thing not drawn keeps what was made of it, seconds. */
+static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
+
+/**
+ * Forget what was made to draw the things not drawn for two minutes (the technologies of OpenMW, the player, 16. 10.:
+ * what is far from the player is let go of): the textures and the simplified shapes of the buildings, the textures and
+ * the poses of the figures and the creatures, the passages between their animations, the shapes no one keeps. A big
+ * map walked over kept all of it before. Between the frames, never while they are drawn.
+ */
+static void ForgetUnusedThreeDObjects()
+{
+	_three_d_clock += 15;
+	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
+	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
+	size_t forgotten = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.used >= before || (o.levels.empty() && o.painted.empty() && std::ranges::all_of(o.shapes, [](const auto &p) { return p == nullptr; }))) continue;
+		o.Forget();
+		forgotten++;
+	}
+	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+		for (const ThreeDVehicleObject &v : *list) {
+			if (v.used >= before || v.frame_shapes.empty()) continue;
+			v.Forget();
+			forgotten++;
+		}
+	}
+	for (auto it = _passages.begin(); it != _passages.end();) {
+		if (it->second->used < before) {
+			it = _passages.erase(it);
+			forgotten++;
+		} else {
+			++it;
+		}
+	}
+	/* The shapes read that nothing keeps any more (the poses of a passage gone, a vehicle's frames). */
+	for (auto it = _vehicle_shapes.begin(); it != _vehicle_shapes.end();) {
+		if (it->second.use_count() == 1) {
+			it = _vehicle_shapes.erase(it);
+		} else {
+			++it;
+		}
+	}
+	if (forgotten > 0) Debug(misc, 1, "3D objects: {} not drawn for {} s forgotten", forgotten, THREE_D_FORGET_AFTER);
+}
+
+/** The clock of the objects goes on in real time, every fifteen seconds (ForgetUnusedThreeDObjects()). */
+static IntervalTimer<TimerWindow> _forget_timer(std::chrono::seconds(15), [](auto) { ForgetUnusedThreeDObjects(); });
+
+/** The rig: the clock of the objects on by so many seconds, and what is not drawn since forgotten. */
+std::string RigForgetThreeDObjects(uint seconds)
+{
+	for (uint s = 0; s < seconds; s += 15) ForgetUnusedThreeDObjects();
+	size_t textures = 0, shapes = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (!o.levels.empty()) textures++;
+		for (const auto &p : o.shapes) shapes += p != nullptr;
+	}
+	return fmt::format("hodiny {} s, domu s texturou {}, zjednodusenych tvaru {}, prechodu {}, tvaru vozidel {}", _three_d_clock, textures, shapes, _passages.size(), _vehicle_shapes.size());
 }

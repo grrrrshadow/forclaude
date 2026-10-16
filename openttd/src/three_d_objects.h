@@ -150,6 +150,9 @@ struct ThreeDObject {
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	ThreeDObjectShapeView GetShape(int level) const;
 	bool Blocks(double x, double y) const;
+	void Forget() const;
+
+	mutable uint32_t used = 0;              ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
 
 	mutable std::vector<uint8_t> footprint; ///< what of it stands as high as a body, cells of a 32nd of a tile (Blocks()), made the first time
 	mutable int footprint_w = 0;            ///< the cells across x, 0 not made yet
@@ -289,6 +292,9 @@ struct ThreeDVehicleObject {
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
+	void Forget() const;
+
+	mutable uint32_t used = 0;      ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;

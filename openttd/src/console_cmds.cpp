@@ -9146,6 +9146,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d:   {}", line);
 		}
+	} else if (what == "zapomen") {
+		/* 'zapomen [seconds]': the clock of the 3D objects on by so many seconds (120 without), what was not drawn since forgotten. */
+		extern std::string RigForgetThreeDObjects(uint seconds);
+		IConsolePrint(CC_DEFAULT, "test3d: {}", RigForgetThreeDObjects(static_cast<uint>(number(2).value_or(120))));
 	} else if (what == "pole") {
 		/* 'pole': where the fields are (the marijuana plantations, the potato fields), their north tiles. */
 		std::string text;
