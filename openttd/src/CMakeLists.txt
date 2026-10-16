@@ -561,6 +561,8 @@ add_files(
     three_d_walkers.h
     three_d_dragons.cpp
     three_d_dragons.h
+    three_d_navigation.cpp
+    three_d_navigation.h
     tile_cmd.h
     tile_map.cpp
     tile_map.h

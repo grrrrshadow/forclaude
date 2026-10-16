@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "three_d_dragons.h"
 #include "three_d_objects.h"
+#include "three_d_navigation.h"
 #include "three_d_vehicle_object.h"
 #include "cab_view.h"
 #include "openttd.h"
@@ -76,6 +77,10 @@ struct Dragon {
 	bool swooped = false;  ///< a flyer's swoop dealt
 	int frame = 0;
 	int z = 0;             ///< height units, drawn at
+	std::vector<NavPoint> way; ///< the way it walks round what stands between (NavFindWay()), world units
+	size_t way_at = 0;     ///< the point of it it walks to
+	double way_tx = 0, way_ty = 0; ///< where the way goes
+	uint64_t way_made = 0; ///< when it was found
 };
 
 std::vector<Dragon> _dragons;
@@ -169,15 +174,38 @@ bool StepTo(Dragon &d, double tx, double ty, double speed_m)
 	return false;
 }
 
-/** A place to walk to, within a few tiles. */
+/**
+ * Walk towards a point by the way round the houses, the water and the steep slopes (NavFindWay(), the technologies
+ * of OpenMW, the player, 16. 10.), found again when the point has moved a tile or now and then.
+ * @return whether it got there, or as near as it can
+ */
+bool WalkTo(Dragon &d, double tx, double ty, double speed_m, uint64_t now)
+{
+	if (d.way.empty() || std::hypot(tx - d.way_tx, ty - d.way_ty) > TILE_SIZE || now - d.way_made > 74) {
+		d.way = NavFindWay(d.x, d.y, tx, ty);
+		d.way_at = 0;
+		d.way_tx = tx;
+		d.way_ty = ty;
+		d.way_made = now;
+		if (d.way.empty()) return true;
+	}
+	if (d.way_at >= d.way.size()) return true;
+	const auto [wx, wy] = d.way[d.way_at];
+	if (!StepTo(d, wx, wy, speed_m)) return false;
+	d.way_at++;
+	return d.way_at >= d.way.size();
+}
+
+/** A place to walk to, within a few tiles, where it can stand. */
 void PickWander(Dragon &d)
 {
 	for (int tries = 0; tries < 8; tries++) {
 		const double a = InteractiveRandomRange(360) * M_PI / 180.0, r = (2 + InteractiveRandomRange(5)) * TILE_SIZE;
-		const double x = d.x + std::cos(a) * r, y = d.y + std::sin(a) * r;
-		if (!OnMap(x, y)) continue;
+		double x = d.x + std::cos(a) * r, y = d.y + std::sin(a) * r;
+		if (!OnMap(x, y) || !NavNearestWalkable(x, y, 2) || !OnMap(x, y)) continue;
 		d.tx = x;
 		d.ty = y;
+		d.way.clear();
 		return;
 	}
 	d.tx = d.x;
@@ -221,7 +249,7 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 			SetAnim(d, "chuze", now, 1.5);
 			if (fights && dist_m < CHASE_M) {
 				d.state = State::Chase;
-			} else if (StepTo(d, d.tx, d.ty, Speed(d, "chuze", 0.02))) {
+			} else if (WalkTo(d, d.tx, d.ty, Speed(d, "chuze", 0.02), now)) {
 				d.state = State::Idle;
 				d.until = now + 100 + InteractiveRandomRange(200);
 			}
@@ -238,7 +266,7 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 				d.struck = false;
 				SetAnim(d, "utok", now, 1.0, true);
 			} else {
-				StepTo(d, wx, wy, Speed(d, "chuze", 0.02));
+				WalkTo(d, wx, wy, Speed(d, "chuze", 0.02), now);
 			}
 			break;
 
@@ -466,8 +494,10 @@ bool SendThreeDDragon(std::string_view kind, double x, double y)
 		d.health = FLYER_HEALTH;
 		SetAnim(d, "let", now);
 	} else {
+		/* Down where it can stand: not on a house or in the water. */
 		d.x = x;
 		d.y = y;
+		NavNearestWalkable(d.x, d.y, 6);
 		d.lift = LAND_M;
 		d.state = State::Arrive;
 		d.health = HEALTH;

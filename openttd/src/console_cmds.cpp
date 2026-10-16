@@ -130,6 +130,7 @@
 #include "newgrf_config.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_navigation.h"
 #include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
@@ -8895,6 +8896,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				wx = p.x;
 				wy = p.y;
 			}
+		}
+		if (argv.size() > 6 && argv[2] == "cesta") {
+			/* 'draci cesta <x1> <y1> <x2> <y2>': the way a dragon walks between two tiles (NavFindWay()). */
+			auto x1 = number(3), y1 = number(4), x2 = number(5), y2 = number(6);
+			if (!x1.has_value() || !y1.has_value() || !x2.has_value() || !y2.has_value()) return true;
+			const auto way = NavFindWay((*x1 + 0.5) * TILE_SIZE, (*y1 + 0.5) * TILE_SIZE, (*x2 + 0.5) * TILE_SIZE, (*y2 + 0.5) * TILE_SIZE);
+			std::string text;
+			for (const auto &[x, y] : way) text += fmt::format(" {:.1f},{:.1f}", x / TILE_SIZE, y / TILE_SIZE);
+			IConsolePrint(CC_DEFAULT, "test3d: cesta {} bodu{}{}", way.size(), text, NavStraight((*x1 + 0.5) * TILE_SIZE, (*y1 + 0.5) * TILE_SIZE, (*x2 + 0.5) * TILE_SIZE, (*y2 + 0.5) * TILE_SIZE) ? " (rovne)" : "");
+			return true;
 		}
 		if (argv.size() > 2 && argv[2] == "posli") {
 			/* 'draci posli [jmeno] [dlazdic]': so many tiles ahead of the walker (4 without it). */
