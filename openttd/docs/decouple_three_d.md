@@ -640,8 +640,8 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   under the eye, `PART_DRIVER`), the near plane a few centimetres off; the eye turns as the model faces.
 - **The first texture is the file's first material**: the paint is for texture 0; a vehicle's nodes were read last
   first, and the V3S's glass came first.
-- In the view from the eyes the girls drawn bigger than they are (`meritko`) are at their true size again, each about
-  where its feet stand or it sits (`corner_crew`, `crew_feet`).
+- The girls drawn bigger than they are (`meritko`) stay that big in the view from the eyes too: the benches of the
+  students' V3S are built for girls twice as big, on purpose (the player: never shrink them).
 - **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the body's texture's layout (the texture of
   the file, or `textura`), 255 where it is paint; `cil` RRGGBB the colour it fades to, as far as the state's `lak`
   says; `barva` RRGGBB a fixed colour by number (a state's `barva` instead), the paint that colour at the texture's

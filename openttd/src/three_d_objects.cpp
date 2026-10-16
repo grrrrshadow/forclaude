@@ -2199,9 +2199,9 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 			part[this->tri[t - 3 + k]] = p;
 		}
 	}
-	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, their figure. */
+	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel. */
 	auto apart_of = [&](size_t i) {
-		return static_cast<uint32_t>(part[i]) | (i < this->corner_wheel.size() ? this->corner_wheel[i] : 0u) << 8 | (i < this->corner_crew.size() ? this->corner_crew[i] : 0u) << 16;
+		return static_cast<uint32_t>(part[i]) | (i < this->corner_wheel.size() ? this->corner_wheel[i] : 0u) << 8;
 	};
 	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
 	auto key_of = [&](size_t i) {
@@ -2222,7 +2222,7 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 	std::unordered_map<std::pair<uint64_t, uint32_t>, uint32_t, CellHash> cells;
 	std::vector<uint32_t> joined(corners);
 	std::vector<uint32_t> count;
-	const bool wheels = !this->corner_wheel.empty(), crew = !this->corner_crew.empty();
+	const bool wheels = !this->corner_wheel.empty();
 	for (size_t i = 0; i < corners; i++) {
 		auto [it, added] = cells.emplace(std::make_pair(key_of(i), apart_of(i)), static_cast<uint32_t>(count.size()));
 		joined[i] = it->second;
@@ -2232,7 +2232,6 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
 			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
 			if (wheels) out->corner_wheel.push_back(this->corner_wheel[i]);
-			if (crew) out->corner_crew.push_back(i < this->corner_crew.size() ? this->corner_crew[i] : 0);
 		}
 		const uint32_t c = it->second;
 		count[c]++;
@@ -2257,7 +2256,6 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 		if (!this->tri_part.empty()) out->tri_part.push_back(t / 3 < this->tri_part.size() ? this->tri_part[t / 3] : 0);
 	}
 	out->tex_addon = this->tex_addon;
-	out->crew_feet = this->crew_feet;
 	out->glass_alpha = this->glass_alpha;
 	out->x0 = this->x0; out->x1 = this->x1; out->y0 = this->y0; out->y1 = this->y1; out->z0 = this->z0; out->z1 = this->z1;
 	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, this->tri.size() / 3);
@@ -2524,8 +2522,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		}
 	}
 	/* The crew: each figure's shape sized, turned about z and stood at its place, its textures after the others. The
-	 * driver -- the one sitting at the eye of the cab -- is not drawn from that eye; a figure bigger than it is is
-	 * marked, for the view from the eyes to draw it at its true size. */
+	 * driver -- the one sitting at the eye of the cab -- is not drawn from that eye. A figure bigger than it is ("meritko")
+	 * stays that big everywhere, the view from the eyes too. */
 	auto add_crew = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
 		const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
@@ -2554,11 +2552,6 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 				made->nrm.push_back(fs->nrm[i] * sa + fs->nrm[i + 1] * ca);
 				made->nrm.push_back(fs->nrm[i + 2]);
 			}
-		}
-		if (s != 1.0f && made->crew_feet.size() < 254) {
-			made->crew_feet.push_back({c.at[0], c.at[1], c.at[2], s});
-			made->corner_crew.resize(base, 0);
-			made->corner_crew.resize(made->pos.size() / 3, static_cast<uint8_t>(made->crew_feet.size()));
 		}
 		made->uv.insert(made->uv.end(), fs->uv.begin(), fs->uv.end());
 		for (size_t t = 0; t < fs->tri.size(); t += 3) {
@@ -2617,7 +2610,6 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			mark_part(part, first_triangle);
 		}
 	}
-	if (!made->corner_crew.empty()) made->corner_crew.resize(made->pos.size() / 3, 0);
 	if (!made->corner_wheel.empty()) made->corner_wheel.resize(made->pos.size() / 3, 0);
 	if (!made->tex_addon.empty()) made->tex_addon.resize(made->pngs.size(), -1);
 	if (!made->tri_part.empty()) made->tri_part.resize(made->tri.size() / 3, 0);

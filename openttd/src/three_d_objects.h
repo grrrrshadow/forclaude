@@ -195,8 +195,6 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> tri_part;      ///< each triangle's part: 0 always, n the part n of the object's states (ThreeDVehicleObject::part_names), or PART_*; empty all 0
 	std::vector<int8_t> tex_addon;      ///< each texture's add-on (ThreeDVehicleObject::addons), -1 none
 	std::vector<uint8_t> corner_wheel;  ///< each corner's wheel that turns, n the wheel n - 1 of ThreeDVehicleObject::model_wheels, 0 none; empty none
-	std::vector<uint8_t> corner_crew;   ///< each corner's figure of the crew drawn bigger than it is, n crew_feet[n - 1], 0 none; empty none
-	std::vector<std::array<float, 4>> crew_feet; ///< such a figure: where its feet stand (x, y, z) and how much bigger it is
 	float glass_alpha = 0.15f;          ///< how much of the glass's colour a layer of it lays over
 	bool HasPart(uint8_t part) const { return std::ranges::find(this->tri_part, part) != this->tri_part.end(); }
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }

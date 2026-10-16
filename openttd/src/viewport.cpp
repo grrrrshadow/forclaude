@@ -8004,7 +8004,7 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 			wheel_turn.push_back({{w.centre[0], w.centre[1], w.centre[2]}, std::cos(turn), std::sin(turn), std::cos(steer), std::sin(steer)});
 		}
 	}
-	/* A corner where it is drawn: its wheel turned, a figure of the crew drawn bigger elsewhere at its true size. */
+	/* A corner where it is drawn: its wheel turned. */
 	auto place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
 		px = shape->pos[i * 3]; py = shape->pos[i * 3 + 1]; pz = shape->pos[i * 3 + 2];
 		if (lit) { nx = shape->nrm[i * 3]; ny = shape->nrm[i * 3 + 1]; nz = shape->nrm[i * 3 + 2]; }
@@ -8024,13 +8024,6 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 				ny = mx * w.ts + ny * w.tc;
 				nz = mz;
 			}
-		}
-		const uint8_t ck = i < shape->corner_crew.size() ? shape->corner_crew[i] : 0;
-		if (ck != 0 && ck <= shape->crew_feet.size()) {
-			const auto &f = shape->crew_feet[ck - 1];
-			px = f[0] + (px - f[0]) / f[3];
-			py = f[1] + (py - f[1]) / f[3];
-			pz = f[2] + (pz - f[2]) / f[3];
 		}
 	};
 	/* The corners to the eye as the triangles drawn ask for them, each once, with its light (an add-on not shown, a
