@@ -62,6 +62,8 @@ struct Dragon {
 	State state = State::Idle;
 	std::string anim;      ///< the animation it is in
 	uint64_t anim_start = 0;
+	std::string from_anim; ///< the animation it was in before, its pose passing over into this one's (with bones)
+	int from_frame = 0;    ///< the frame of it it left
 	double pace = 1;       ///< how fast the animation goes (chasing: faster)
 	uint64_t until = 0;    ///< when its state ends
 	uint64_t born = 0;
@@ -92,10 +94,13 @@ const ThreeDVehicleObject *Anim(const Dragon &d, std::string_view anim)
 	return GetThreeDFigure(d.kind + "/" + std::string(anim));
 }
 
-void SetAnim(Dragon &d, std::string_view anim, uint64_t now, double pace = 1.0)
+/** Go into an animation (again from its start with restart), passing over from the one it is in. */
+void SetAnim(Dragon &d, std::string_view anim, uint64_t now, double pace = 1.0, bool restart = false)
 {
 	d.pace = pace;
-	if (d.anim == anim) return;
+	if (d.anim == anim && !restart) return;
+	d.from_anim = d.anim;
+	d.from_frame = d.frame;
 	d.anim = anim;
 	d.anim_start = now;
 }
@@ -231,8 +236,7 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 				d.heading = std::atan2(wy - d.y, wx - d.x);
 				d.state = State::Attack;
 				d.struck = false;
-				d.anim.clear();
-				SetAnim(d, "utok", now);
+				SetAnim(d, "utok", now, 1.0, true);
 			} else {
 				StepTo(d, wx, wy, Speed(d, "chuze", 0.02));
 			}
@@ -343,6 +347,24 @@ const IntervalTimer<TimerGameTick> _dragons_timer({TimerGameTick::Priority::None
 	}
 });
 
+/**
+ * The figure of its pose and the frame of it: its animation's, or a passage into it from the one before
+ * (GetThreeDFigure()), mixing the two poses bone by bone over its first ticks -- the technologies of OpenMW, the
+ * player, 16. 10.: the animations blend into each other.
+ */
+std::string Figure(const Dragon &d, int &frame)
+{
+	frame = d.frame;
+	const std::string own = d.kind + "/" + d.anim;
+	if (d.from_anim.empty() || d.from_anim == d.anim) return own;
+	const uint64_t since = TimerGameTick::counter - d.anim_start;
+	const std::string passage = fmt::format("{}/{}@{}>{}", d.kind, d.from_anim, d.from_frame, d.anim);
+	const ThreeDVehicleObject *p = GetThreeDFigure(passage);
+	if (p == nullptr || p->blend_from == nullptr || since >= static_cast<uint64_t>(p->blend_ticks)) return own;
+	frame = d.frame * p->blend_ticks + static_cast<int>(since);
+	return passage;
+}
+
 /** Which way it faces as the figures count it, in steps (a few pictures for every turn). */
 float Facing(const Dragon &d)
 {
@@ -355,7 +377,9 @@ float Facing(const Dragon &d)
 void AddThreeDDragonsToViewport(ZoomLevel zoom)
 {
 	for (const Dragon &d : _dragons) {
-		AddThreeDFigureToViewport(d.kind + "/" + d.anim, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, d.frame);
+		int frame;
+		const std::string figure = Figure(d, frame);
+		AddThreeDFigureToViewport(figure, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, frame);
 	}
 }
 
@@ -363,7 +387,9 @@ void AddThreeDDragonsToViewport(ZoomLevel zoom)
 void AddThreeDDragonsToEye()
 {
 	for (const Dragon &d : _dragons) {
-		AddCabFigure(d.kind + "/" + d.anim, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), d.frame);
+		int frame;
+		const std::string figure = Figure(d, frame);
+		AddCabFigure(figure, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), frame);
 	}
 }
 
@@ -392,8 +418,7 @@ bool HitThreeDDragon(double x, double y, double heading, double reach_m)
 			d.swooped = true;
 		} else if (c != nullptr && c->Has("smrt")) {
 			d.state = State::Dying;
-			d.anim.clear();
-			SetAnim(d, "smrt", now);
+			SetAnim(d, "smrt", now, 1.0, true);
 		} else {
 			d.state = State::Leave;
 		}
@@ -462,6 +487,12 @@ std::string DescribeThreeDDragons()
 	for (const Dragon &d : _dragons) {
 		out += fmt::format("\n  {} {} na {:.1f},{:.1f} vyska {:.1f} m, smer {:.0f}, {} snimek {}, zdravi {}", d.kind, STATES[static_cast<int>(d.state)],
 				d.x / TILE_SIZE, d.y / TILE_SIZE, d.lift, d.heading * 180.0 / M_PI, d.anim, d.frame, d.health);
+		/* The figure drawn: a passage from the animation before while it lasts (Figure()). */
+		int frame;
+		const std::string figure = Figure(d, frame);
+		const ThreeDVehicleObject *f = GetThreeDFigure(figure);
+		if (f != nullptr && f->blend_from != nullptr) out += fmt::format(", prechod {} snimek {}", figure, frame);
+		if (f != nullptr && !f->skeleton_file.empty() && f->GetShape(frame) != nullptr) out += fmt::format(", kostra ({} snimku)", f->frames);
 	}
 	return out;
 }

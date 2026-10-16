@@ -33,6 +33,7 @@
 #include <bit>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <set>
 #include <tuple>
@@ -405,6 +406,415 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 		return false;
 	}
 	return !mesh.tri.empty();
+}
+
+/*
+ * The bones of a creature (the technologies of OpenMW, the player, 16. 10.: skinning and blending): the colleague's
+ * "kostra" of a creature (hra/3d/objekty/tvorove, drak_*_kostra.glb) is its mesh with a skeleton and its animations
+ * by the same names as its frames. Its frames are posed from them a tick each, not a frame every eight ticks, and from
+ * one animation to the next the poses pass over (GetThreeDFigure("<jmeno>/<a>@<snimek>><b>")).
+ */
+
+/** A matrix of the bones, column-major as glTF writes it. */
+using BoneMatrix = std::array<double, 16>;
+
+static BoneMatrix BoneMultiply(const BoneMatrix &a, const BoneMatrix &b)
+{
+	BoneMatrix c{};
+	for (int col = 0; col < 4; col++) {
+		for (int row = 0; row < 4; row++) {
+			double sum = 0;
+			for (int k = 0; k < 4; k++) sum += a[k * 4 + row] * b[col * 4 + k];
+			c[col * 4 + row] = sum;
+		}
+	}
+	return c;
+}
+
+/** A bone's place against its parent: moved, turned (a quaternion x, y, z, w) and scaled. */
+struct BonePose {
+	double t[3] = {0, 0, 0};
+	double r[4] = {0, 0, 0, 1};
+	double s[3] = {1, 1, 1};
+
+	BoneMatrix Matrix() const
+	{
+		const double x = this->r[0], y = this->r[1], z = this->r[2], w = this->r[3];
+		const double m[9] = {
+			1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w),
+			2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w),
+			2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y),
+		};
+		BoneMatrix out{};
+		for (int col = 0; col < 3; col++) {
+			for (int row = 0; row < 3; row++) out[col * 4 + row] = m[col * 3 + row] * this->s[col];
+		}
+		out[12] = this->t[0];
+		out[13] = this->t[1];
+		out[14] = this->t[2];
+		out[15] = 1;
+		return out;
+	}
+
+	/** Between this one (0) and another (1): moved and scaled in a line, turned the short way round. */
+	BonePose Mix(const BonePose &o, double k) const
+	{
+		BonePose p;
+		for (int i = 0; i < 3; i++) {
+			p.t[i] = this->t[i] + (o.t[i] - this->t[i]) * k;
+			p.s[i] = this->s[i] + (o.s[i] - this->s[i]) * k;
+		}
+		double dot = 0;
+		for (int i = 0; i < 4; i++) dot += this->r[i] * o.r[i];
+		const double sign = dot < 0 ? -1 : 1;
+		double len = 0;
+		for (int i = 0; i < 4; i++) {
+			p.r[i] = this->r[i] + (sign * o.r[i] - this->r[i]) * k;
+			len += p.r[i] * p.r[i];
+		}
+		len = std::sqrt(len);
+		if (len > 0) for (int i = 0; i < 4; i++) p.r[i] /= len;
+		return p;
+	}
+};
+
+/** A creature's mesh with its bones and its animations (ReadGlbSkeleton()). */
+struct GlbSkeleton {
+	struct Node {
+		int parent = -1;
+		bool has_matrix = false; ///< its place a matrix (not animated)
+		BoneMatrix matrix{};
+		BonePose rest;
+	};
+	struct Channel {
+		int node = 0;
+		int path = 0;            ///< 0 moved, 1 turned, 2 scaled
+		bool step = false;       ///< "STEP": held until the next key, else in a line between them
+		bool cubic = false;      ///< "CUBICSPLINE": its keys with their tangents (read as in a line)
+		std::vector<float> times;
+		std::vector<float> values;
+	};
+	struct Animation {
+		std::string name;
+		double start = 0, end = 0; ///< seconds
+		std::vector<Channel> channels;
+	};
+	std::vector<Node> nodes;
+	std::vector<int> joints;               ///< the nodes of the joints
+	std::vector<BoneMatrix> inverse_bind;  ///< and their matrices from the mesh to them
+	std::vector<double> pos, nrm, uv;      ///< the mesh, glTF's axes
+	std::vector<uint32_t> tri;
+	std::vector<uint8_t> tri_tex;
+	std::vector<std::array<uint16_t, 4>> joint_of; ///< each corner's joints (indices into joints)
+	std::vector<std::array<float, 4>> weight_of;   ///< and how much each moves it
+	std::vector<GlbTexture> textures;
+	std::vector<Animation> animations;
+
+	const Animation *Find(std::string_view name) const
+	{
+		for (const Animation &a : this->animations) {
+			if (a.name == name) return &a;
+		}
+		return nullptr;
+	}
+
+	/** Every bone's place against its parent in an animation at a time, seconds (none: at rest). */
+	std::vector<BonePose> Pose(const Animation *anim, double time) const
+	{
+		std::vector<BonePose> pose;
+		pose.reserve(this->nodes.size());
+		for (const Node &n : this->nodes) pose.push_back(n.rest);
+		if (anim == nullptr) return pose;
+		for (const Channel &c : anim->channels) {
+			if (c.node < 0 || static_cast<size_t>(c.node) >= pose.size() || c.times.empty()) continue;
+			const int comps = c.path == 1 ? 4 : 3;
+			const size_t keys = c.times.size();
+			auto value = [&](size_t key, int comp) {
+				return static_cast<double>(c.values[(c.cubic ? key * 3 + 1 : key) * comps + comp]);
+			};
+			size_t hi = std::upper_bound(c.times.begin(), c.times.end(), static_cast<float>(time)) - c.times.begin();
+			size_t lo = hi == 0 ? 0 : hi - 1;
+			if (hi >= keys) hi = keys - 1;
+			double k = 0;
+			if (!c.step && hi != lo && c.times[hi] > c.times[lo]) k = std::clamp((time - c.times[lo]) / (c.times[hi] - c.times[lo]), 0.0, 1.0);
+			BonePose a = pose[c.node], b = pose[c.node];
+			double *pa = c.path == 0 ? a.t : c.path == 1 ? a.r : a.s;
+			double *pb = c.path == 0 ? b.t : c.path == 1 ? b.r : b.s;
+			for (int i = 0; i < comps; i++) {
+				pa[i] = value(lo, i);
+				pb[i] = value(hi, i);
+			}
+			pose[c.node] = a.Mix(b, k);
+		}
+		return pose;
+	}
+
+	/**
+	 * The mesh in a pose: each corner moved by its joints, as much as each weighs; turned from glTF's axes into the
+	 * game's (x, -z, y), metres.
+	 */
+	void Skin(const std::vector<BonePose> &pose, std::vector<float> &out_pos, std::vector<float> &out_nrm) const
+	{
+		std::vector<BoneMatrix> global(this->nodes.size());
+		std::vector<bool> done(this->nodes.size(), false);
+		std::function<const BoneMatrix &(int)> place = [&](int i) -> const BoneMatrix & {
+			if (!done[i]) {
+				const Node &n = this->nodes[i];
+				const BoneMatrix own = n.has_matrix ? n.matrix : pose[i].Matrix();
+				global[i] = n.parent >= 0 ? BoneMultiply(place(n.parent), own) : own;
+				done[i] = true;
+			}
+			return global[i];
+		};
+		std::vector<BoneMatrix> joint(this->joints.size());
+		for (size_t k = 0; k < this->joints.size(); k++) joint[k] = BoneMultiply(place(this->joints[k]), this->inverse_bind[k]);
+		const size_t corners = this->pos.size() / 3;
+		out_pos.resize(corners * 3);
+		out_nrm.resize(this->nrm.size() == corners * 3 ? corners * 3 : 0);
+		for (size_t i = 0; i < corners; i++) {
+			BoneMatrix m{};
+			for (int k = 0; k < 4; k++) {
+				const float w = this->weight_of[i][k];
+				if (w == 0 || this->joint_of[i][k] >= joint.size()) continue;
+				const BoneMatrix &j = joint[this->joint_of[i][k]];
+				for (int e = 0; e < 16; e++) m[e] += j[e] * w;
+			}
+			const double X = this->pos[i * 3], Y = this->pos[i * 3 + 1], Z = this->pos[i * 3 + 2];
+			const double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
+			const double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
+			const double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
+			out_pos[i * 3] = static_cast<float>(gx);
+			out_pos[i * 3 + 1] = static_cast<float>(-gz);
+			out_pos[i * 3 + 2] = static_cast<float>(gy);
+			if (out_nrm.empty()) continue;
+			const double nx = this->nrm[i * 3], ny = this->nrm[i * 3 + 1], nz = this->nrm[i * 3 + 2];
+			double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+			const double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+			if (l > 0) {
+				hx /= l;
+				hy /= l;
+				hz /= l;
+			}
+			out_nrm[i * 3] = static_cast<float>(hx);
+			out_nrm[i * 3 + 1] = static_cast<float>(-hz);
+			out_nrm[i * 3 + 2] = static_cast<float>(hy);
+		}
+	}
+};
+
+/** An accessor's elements of a glTF binary as numbers: the floats, or the whole numbers (normalised ones as they are stored). */
+static void ReadGlbAccessor(const nlohmann::json &j, const std::vector<uint8_t> &bin, int index, int comps, std::vector<double> &out)
+{
+	const auto &a = j.at("accessors").at(index);
+	const auto &v = j.at("bufferViews").at(a.at("bufferView").get<int>());
+	const size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
+	const int type = a.at("componentType").get<int>();
+	const size_t count = a.at("count").get<size_t>();
+	const size_t size = type == 5126 || type == 5125 ? 4 : type == 5123 || type == 5122 ? 2 : 1;
+	size_t stride = v.value("byteStride", 0);
+	if (stride == 0) stride = size * comps;
+	out.resize(count * comps);
+	for (size_t i = 0; i < count; i++) {
+		for (int c = 0; c < comps; c++) {
+			const size_t at = offset + i * stride + c * size;
+			if (at + size > bin.size()) throw std::out_of_range("accessor past the buffer");
+			double value;
+			switch (type) {
+				case 5126: value = std::bit_cast<float>(ReadU32(bin, at)); break;
+				case 5125: value = ReadU32(bin, at); break;
+				case 5123: value = bin[at] | (bin[at + 1] << 8); break;
+				case 5121: value = bin[at]; break;
+				default: throw std::invalid_argument("component type");
+			}
+			out[i * comps + c] = value;
+		}
+	}
+}
+
+/**
+ * Read a creature's mesh with its bones and animations (its "kostra"), kept for the next asking.
+ * @return nullptr when the file has no mesh with a skin
+ */
+static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
+{
+	static std::map<std::string, std::unique_ptr<GlbSkeleton>> kept;
+	auto found = kept.find(path);
+	if (found != kept.end()) return found->second.get();
+	std::unique_ptr<GlbSkeleton> &slot = kept[path];
+
+	std::vector<uint8_t> d = ReadWholeFile(path);
+	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
+		Debug(misc, 0, "3D skeleton {}: not a glTF binary", path);
+		return nullptr;
+	}
+	std::string json_text;
+	std::vector<uint8_t> bin;
+	for (size_t at = 12; at + 8 <= d.size();) {
+		uint32_t len = ReadU32(d, at), type = ReadU32(d, at + 4);
+		if (at + 8 + len > d.size()) break;
+		if (type == 0x4E4F534A) json_text.assign(reinterpret_cast<const char *>(&d[at + 8]), len);
+		if (type == 0x004E4942) bin.assign(d.begin() + at + 8, d.begin() + at + 8 + len);
+		at += 8 + ((len + 3) & ~3u);
+	}
+	auto sk = std::make_unique<GlbSkeleton>();
+	try {
+		nlohmann::json j = nlohmann::json::parse(json_text);
+		const auto &nodes = j.at("nodes");
+		sk->nodes.resize(nodes.size());
+		for (size_t i = 0; i < nodes.size(); i++) {
+			const auto &n = nodes.at(i);
+			GlbSkeleton::Node &node = sk->nodes[i];
+			if (n.contains("matrix")) {
+				node.has_matrix = true;
+				for (int k = 0; k < 16; k++) node.matrix[k] = n.at("matrix").at(k).get<double>();
+			}
+			if (n.contains("translation")) for (int k = 0; k < 3; k++) node.rest.t[k] = n.at("translation").at(k).get<double>();
+			if (n.contains("rotation")) for (int k = 0; k < 4; k++) node.rest.r[k] = n.at("rotation").at(k).get<double>();
+			if (n.contains("scale")) for (int k = 0; k < 3; k++) node.rest.s[k] = n.at("scale").at(k).get<double>();
+		}
+		for (size_t i = 0; i < nodes.size(); i++) {
+			if (!nodes.at(i).contains("children")) continue;
+			for (const auto &c : nodes.at(i).at("children")) {
+				const size_t child = c.get<size_t>();
+				if (child < sk->nodes.size()) sk->nodes[child].parent = static_cast<int>(i);
+			}
+		}
+		/* The first node with a mesh and a skin. */
+		int mesh_index = -1, skin_index = -1;
+		for (const auto &n : nodes) {
+			if (n.contains("mesh") && n.contains("skin")) {
+				mesh_index = n.at("mesh").get<int>();
+				skin_index = n.at("skin").get<int>();
+				break;
+			}
+		}
+		if (mesh_index < 0) {
+			Debug(misc, 0, "3D skeleton {}: no mesh with a skin", path);
+			return nullptr;
+		}
+		const auto &skin = j.at("skins").at(skin_index);
+		for (const auto &jn : skin.at("joints")) sk->joints.push_back(jn.get<int>());
+		sk->inverse_bind.assign(sk->joints.size(), BoneMatrix{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+		if (skin.contains("inverseBindMatrices")) {
+			std::vector<double> m;
+			ReadGlbAccessor(j, bin, skin.at("inverseBindMatrices").get<int>(), 16, m);
+			for (size_t k = 0; k < sk->joints.size() && (k + 1) * 16 <= m.size(); k++) std::copy_n(&m[k * 16], 16, sk->inverse_bind[k].begin());
+		}
+		/* The textures by the material: the picture in the buffer, else its colour. */
+		std::map<int, uint8_t> material_texture;
+		auto texture_of = [&](int material) -> uint8_t {
+			auto it = material_texture.find(material);
+			if (it != material_texture.end()) return it->second;
+			GlbTexture t;
+			t.flat = Colour(150, 150, 150).data;
+			if (material >= 0 && j.contains("materials")) {
+				const auto &mat = j.at("materials").at(material);
+				t.name = mat.value("name", std::string());
+				if (mat.contains("pbrMetallicRoughness")) {
+					const auto &pbr = mat.at("pbrMetallicRoughness");
+					if (pbr.contains("baseColorTexture") && j.contains("textures") && j.contains("images")) {
+						const int image = j.at("textures").at(pbr.at("baseColorTexture").at("index").get<int>()).at("source").get<int>();
+						const auto &img = j.at("images").at(image);
+						if (img.contains("bufferView")) {
+							const auto &v = j.at("bufferViews").at(img.at("bufferView").get<int>());
+							const size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
+							if (offset + len <= bin.size()) t.png.assign(bin.begin() + offset, bin.begin() + offset + len);
+						}
+					}
+				}
+			}
+			const uint8_t index = static_cast<uint8_t>(std::min<size_t>(sk->textures.size(), 255));
+			if (sk->textures.size() < 255) sk->textures.push_back(std::move(t));
+			material_texture.emplace(material, index);
+			return index;
+		};
+		for (const auto &p : j.at("meshes").at(mesh_index).at("primitives")) {
+			if (p.value("mode", 4) != 4) continue;
+			const auto &attr = p.at("attributes");
+			if (!attr.contains("JOINTS_0") || !attr.contains("WEIGHTS_0")) continue;
+			std::vector<double> pos, nrm, uv, idx, jn, wt;
+			ReadGlbAccessor(j, bin, attr.at("POSITION").get<int>(), 3, pos);
+			if (attr.contains("NORMAL")) ReadGlbAccessor(j, bin, attr.at("NORMAL").get<int>(), 3, nrm);
+			if (attr.contains("TEXCOORD_0")) ReadGlbAccessor(j, bin, attr.at("TEXCOORD_0").get<int>(), 2, uv);
+			ReadGlbAccessor(j, bin, attr.at("JOINTS_0").get<int>(), 4, jn);
+			ReadGlbAccessor(j, bin, attr.at("WEIGHTS_0").get<int>(), 4, wt);
+			const size_t corners = pos.size() / 3;
+			if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
+			if (jn.size() != corners * 4 || wt.size() != corners * 4) continue;
+			/* Weights stored as whole numbers are fractions of their largest. */
+			const int wtype = j.at("accessors").at(attr.at("WEIGHTS_0").get<int>()).at("componentType").get<int>();
+			const double wscale = wtype == 5121 ? 1.0 / 255 : wtype == 5123 ? 1.0 / 65535 : 1.0;
+			if (p.contains("indices")) {
+				ReadGlbAccessor(j, bin, p.at("indices").get<int>(), 1, idx);
+			} else {
+				for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
+			}
+			const uint8_t tex = texture_of(p.value("material", -1));
+			const uint32_t base = static_cast<uint32_t>(sk->pos.size() / 3);
+			const bool normals = nrm.size() == corners * 3 && (sk->pos.empty() || !sk->nrm.empty());
+			if (!normals) sk->nrm.clear();
+			sk->pos.insert(sk->pos.end(), pos.begin(), pos.end());
+			if (normals) sk->nrm.insert(sk->nrm.end(), nrm.begin(), nrm.end());
+			sk->uv.insert(sk->uv.end(), uv.begin(), uv.end());
+			for (size_t i = 0; i < corners; i++) {
+				std::array<uint16_t, 4> js;
+				std::array<float, 4> ws;
+				float sum = 0;
+				for (int k = 0; k < 4; k++) {
+					js[k] = static_cast<uint16_t>(jn[i * 4 + k]);
+					ws[k] = static_cast<float>(wt[i * 4 + k] * wscale);
+					sum += ws[k];
+				}
+				if (sum > 0) for (float &w : ws) w /= sum;
+				sk->joint_of.push_back(js);
+				sk->weight_of.push_back(ws);
+			}
+			for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+				for (int k = 0; k < 3; k++) sk->tri.push_back(base + static_cast<uint32_t>(idx[t + k]));
+				sk->tri_tex.push_back(tex);
+			}
+		}
+		if (j.contains("animations")) {
+			for (const auto &a : j.at("animations")) {
+				GlbSkeleton::Animation anim;
+				anim.name = a.value("name", std::string());
+				anim.start = 1e18;
+				anim.end = -1e18;
+				const auto &samplers = a.at("samplers");
+				for (const auto &c : a.at("channels")) {
+					const auto &target = c.at("target");
+					if (!target.contains("node")) continue;
+					const std::string path_name = target.at("path").get<std::string>();
+					const int path_kind = path_name == "translation" ? 0 : path_name == "rotation" ? 1 : path_name == "scale" ? 2 : -1;
+					if (path_kind < 0) continue; // the weights of morph targets: none here
+					const auto &s = samplers.at(c.at("sampler").get<int>());
+					GlbSkeleton::Channel ch;
+					ch.node = target.at("node").get<int>();
+					ch.path = path_kind;
+					const std::string interp = s.value("interpolation", std::string("LINEAR"));
+					ch.step = interp == "STEP";
+					ch.cubic = interp == "CUBICSPLINE";
+					std::vector<double> times, values;
+					ReadGlbAccessor(j, bin, s.at("input").get<int>(), 1, times);
+					ReadGlbAccessor(j, bin, s.at("output").get<int>(), path_kind == 1 ? 4 : 3, values);
+					if (times.empty() || values.size() < times.size() * (path_kind == 1 ? 4 : 3) * (ch.cubic ? 3 : 1)) continue;
+					ch.times.assign(times.begin(), times.end());
+					ch.values.assign(values.begin(), values.end());
+					anim.start = std::min(anim.start, times.front());
+					anim.end = std::max(anim.end, times.back());
+					anim.channels.push_back(std::move(ch));
+				}
+				if (!anim.channels.empty()) sk->animations.push_back(std::move(anim));
+			}
+		}
+	} catch (const std::exception &e) {
+		Debug(misc, 0, "3D skeleton {}: {}", path, e.what());
+		return nullptr;
+	}
+	if (sk->tri.empty()) return nullptr;
+	Debug(misc, 1, "3D skeleton {}: {} joints, {} corners, {} animations", path, sk->joints.size(), sk->pos.size() / 3, sk->animations.size());
+	slot = std::move(sk);
+	return slot.get();
 }
 
 /**
@@ -955,6 +1365,18 @@ static void ReadThreeDVehicleObjects()
 						fig.loop = a.value("smycka", true);
 						fig.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
 						if (fig.frames < 2) fig.frame_prefix.clear();
+						/* With its bones ("kostra") and an animation of the same name there: a frame a tick, the round
+						 * as long as the frames' was. */
+						if (e.contains("kostra") && e.at("kostra").is_string() && fig.frames >= 2) {
+							const std::string bones = folder + e.at("kostra").get<std::string>();
+							const GlbSkeleton *sk = ReadGlbSkeleton(bones);
+							if (sk != nullptr && sk->Find(anim) != nullptr) {
+								fig.skeleton_file = bones;
+								fig.skeleton_anim = anim;
+								fig.frames = std::min(fig.frames * fig.frame_ticks, 4096);
+								fig.frame_ticks = 1;
+							}
+						}
 						_figure_objects.push_back(std::move(fig));
 						creature.animations.push_back(anim);
 					}
@@ -1274,9 +1696,42 @@ const ThreeDVehicleObject *GetThreeDEffect(std::string_view name)
 }
 
 /** A figure of the indices by its name ("druh": "postava"), or nullptr; one of the package given first (a vehicle's crew). */
+/** How many ticks a creature passes from one animation to the next (GetThreeDFigure()). */
+static constexpr int CREATURE_BLEND_TICKS = 8;
+
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	/* A creature's passage from one animation to another: "<jmeno>/<from>@<frame>><to>", made the first time. */
+	const size_t at = name.find('@'), to_at = name.find('>');
+	if (at != std::string_view::npos && to_at != std::string_view::npos && at < to_at) {
+		static std::map<std::string, std::unique_ptr<ThreeDVehicleObject>, std::less<>> passages;
+		auto it = passages.find(name);
+		if (it != passages.end()) return it->second.get();
+		const size_t slash = name.find('/');
+		const auto frame = ParseInteger<int>(name.substr(at + 1, to_at - at - 1), 10);
+		if (slash == std::string_view::npos || slash > at || !frame.has_value()) return nullptr;
+		const ThreeDVehicleObject *from = GetThreeDFigure(name.substr(0, at), package);
+		const ThreeDVehicleObject *to = GetThreeDFigure(std::string(name.substr(0, slash + 1)) + std::string(name.substr(to_at + 1)), package);
+		if (from == nullptr || to == nullptr || from->skeleton_file.empty() || from->skeleton_file != to->skeleton_file) return to;
+		auto passage = std::make_unique<ThreeDVehicleObject>();
+		passage->name = std::string(name);
+		passage->package = to->package;
+		passage->file = to->file;
+		passage->paint_file = to->paint_file;
+		passage->type = to->type;
+		passage->skeleton_file = to->skeleton_file;
+		passage->skeleton_anim = to->skeleton_anim;
+		passage->blend_from = from;
+		passage->blend_to = to;
+		passage->blend_from_frame = std::clamp(*frame, 0, std::max(0, from->frames - 1));
+		passage->blend_ticks = CREATURE_BLEND_TICKS;
+		passage->frames = std::max(1, to->frames) * CREATURE_BLEND_TICKS;
+		passage->frame_ticks = 1;
+		passage->loop = to->loop;
+		passage->walk_step = to->walk_step;
+		return passages.emplace(std::string(name), std::move(passage)).first->second.get();
+	}
 	/* A vehicle's crew from its own package first (the package of a GRF carries its driver). */
 	if (!package.empty()) {
 		for (const ThreeDVehicleObject &f : _figure_objects) {
@@ -1311,7 +1766,8 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 /** A frame of a figure that moves (FrameAt()), read the first time it is drawn; the others as GetShape(). */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 {
-	if (this->frames < 2 || frame <= 0) return this->GetShape();
+	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) return this->GetShape();
+	frame = std::max(frame, 0);
 	frame %= this->frames;
 	if (this->frame_shapes.size() < static_cast<size_t>(this->frames)) this->frame_shapes.resize(this->frames);
 	if (this->frame_shapes[frame] == nullptr) {
@@ -1321,9 +1777,58 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 	return this->frame_shapes[frame].get();
 }
 
+/**
+ * A frame of a creature with bones (skeleton_file): the mesh posed by its animation at the frame's time -- a round of
+ * the frames is the animation from its first key to its last; one that does not go round ends on its last. A
+ * passage (blend_from) mixes the pose it comes from and the one it goes to, bone by bone, more of the latter each
+ * tick. Kept for the creatures of the same bones (the brown and the black dragon).
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(int frame) const
+{
+	std::string key = fmt::format("{}#{}#{}/{}{}", this->skeleton_file, this->skeleton_anim, frame, this->frames, this->loop ? "o" : "-");
+	if (this->blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", this->blend_from->skeleton_anim, this->blend_from_frame, this->blend_from->frames, this->blend_ticks);
+	auto it = _vehicle_shapes.find(key);
+	if (it != _vehicle_shapes.end()) return it->second;
+	const GlbSkeleton *sk = ReadGlbSkeleton(this->skeleton_file);
+	if (sk == nullptr) return nullptr;
+	/* The time of a frame of a figure, seconds. */
+	auto time_of = [](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
+		if (a == nullptr) return 0.0;
+		if (f.frames < 2) return a->start;
+		const double phase = f.loop ? static_cast<double>(fr) / f.frames : static_cast<double>(fr) / (f.frames - 1);
+		return a->start + (a->end - a->start) * std::clamp(phase, 0.0, 1.0);
+	};
+	std::vector<BonePose> pose;
+	if (this->blend_from != nullptr && this->blend_to != nullptr && this->blend_ticks > 0) {
+		const int own = frame / this->blend_ticks, tick = frame % this->blend_ticks;
+		const GlbSkeleton::Animation *from = sk->Find(this->blend_from->skeleton_anim), *to = sk->Find(this->blend_to->skeleton_anim);
+		const std::vector<BonePose> a = sk->Pose(from, time_of(*this->blend_from, from, this->blend_from_frame));
+		const std::vector<BonePose> b = sk->Pose(to, time_of(*this->blend_to, to, own));
+		const double k = (tick + 1.0) / (this->blend_ticks + 1.0);
+		pose.reserve(a.size());
+		for (size_t i = 0; i < a.size(); i++) pose.push_back(a[i].Mix(b[i], k));
+	} else {
+		const GlbSkeleton::Animation *anim = sk->Find(this->skeleton_anim);
+		pose = sk->Pose(anim, time_of(*this, anim, frame));
+	}
+	auto made = std::make_shared<ThreeDVehicleShape>();
+	sk->Skin(pose, made->pos, made->nrm);
+	made->uv.assign(sk->uv.begin(), sk->uv.end());
+	made->tri = sk->tri;
+	made->tri_tex = sk->tri_tex;
+	for (const GlbTexture &t : sk->textures) {
+		made->pngs.push_back(t.png);
+		made->flats.push_back(t.flat);
+		made->tex_names.push_back(t.name);
+	}
+	_vehicle_shapes.emplace(key, made);
+	return made;
+}
+
 /** Read the object's shape (a frame of it), or the one read already for the same file, wheels, crew and frame. */
 std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame) const
 {
+	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
 	std::string key = this->file;
 	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
 	for (const ThreeDVehicleWheels &w : this->wheels) {

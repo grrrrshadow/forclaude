@@ -101,7 +101,8 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   CC BY 3.0 – autoři v `objekty.json`): `druh: "tvor"`, každá animace (klid, chůze, útok, smrt, let) jako snímky
   v uzlech. Občas přiletí kamkoli na mapu, s otevřeným pohledem z první osoby spíš k chodci; hnědý a černý přistanou,
   chodí, jdou po chodci a útočí, kladivem padnou; ledový a čínský přelétají a jednou se snesou (`three_d_dragons.cpp`).
-  Soubory `_kostra.glb` hra zatím nepotřebuje, nejsou tu.
+  Soubory `_kostra.glb` (síť s kostrou a animacemi pod stejnými jmény, klíč `kostra`): hra z nich pózuje draka
+  každý tik místo snímků a mezi animacemi pózy 8 tiků prolíná; bez kostry (čínský drak) zůstávají snímky.
 - `predmety/` – předměty chodce v pohledu z první osoby (od kolegy, grrrrf `hra/3d/objekty/predmety/`,
   `PROSBA-PREDMETY-KLADIVO-TRUHLA.md`): válečné kladivo a truhla z OpenMW Example Suite
   (gitlab.com/OpenMW/example-suite, modely **CC0**, volné dílo), `druh: "predmet"`. Kladivo chodec nese v inventáři

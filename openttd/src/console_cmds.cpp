@@ -9080,6 +9080,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_cull = argv.size() < 3 || argv[2] != "0";
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: zadni steny {}", _turned_cull ? "vynechane" : "kreslene");
+	} else if (what == "postava" && argv.size() > 3) {
+		/* 'postava <figure> <frame> [file]': the picture of a figure at a frame (a dragon's pose with its bones, a
+		 * passage "<jmeno>/<a>@<snimek>><b>"), facing the view at the closest zoom, as a PPM in the working folder. */
+		const auto frame = number(3);
+		const ThreeDModelPicture *pic = frame.has_value() ? GetThreeDFigurePicture(argv[2], 1.0f, 90.0f, ZoomLevel::In4x, INVALID_TILE, 0, nullptr, *frame, 0.0f) : nullptr;
+		if (pic == nullptr || pic->width <= 0 || pic->height <= 0) {
+			IConsolePrint(CC_ERROR, "test3d: postava {} snimek {} nema obrazek", argv[2], argv[3]);
+			return true;
+		}
+		const std::string file = argv.size() > 4 ? std::string(argv[4]) : "postava.ppm";
+		auto f = FileHandle::Open(file, "wb");
+		if (f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", pic->width, pic->height);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (uint32_t p : pic->pixels) {
+				const Colour c(p);
+				const uint a = c.a;
+				uint8_t rgb[3] = {static_cast<uint8_t>((c.r * a + 255 * (255 - a)) / 255), static_cast<uint8_t>((c.g * a + 255 * (255 - a)) / 255), static_cast<uint8_t>((c.b * a + 255 * (255 - a)) / 255)};
+				fwrite(rgb, 1, 3, *f);
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: postava {} snimek {}: {}x{} do {}", argv[2], *frame, pic->width, pic->height, file);
 	} else if (what == "mezipamet") {
 		/* 'mezipamet <0|1>': the buildings of the turned view drawn once and kept (1, as the game draws), or drawn each time. */
 		extern bool _turned_object_pictures_on;

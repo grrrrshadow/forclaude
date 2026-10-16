@@ -270,6 +270,12 @@ struct ThreeDVehicleObject {
 	int spin_ticks = 0;             ///< a thing that turns ("predmet" with "otaceni", the spit of the pub): game ticks a turn ("tiku_na_otacku"), 0 for none
 	float spin_axis[3] = {1, 0, 0}; ///< "osa": the axis it turns about, in its frame
 	float spin_centre[3] = {};      ///< "stred": a point of the axis, metres
+	std::string skeleton_file;      ///< a creature's "kostra": its mesh with bones and animations; its frames are posed from them, a frame a tick
+	std::string skeleton_anim;      ///< the animation of it this figure is
+	const ThreeDVehicleObject *blend_from = nullptr; ///< a passage from another animation of the creature (GetThreeDFigure("<jmeno>/<a>@<snimek>><b>")): the figure it comes from ...
+	const ThreeDVehicleObject *blend_to = nullptr;   ///< ... and the one it goes to
+	int blend_from_frame = 0;       ///< the frame of the one it comes from
+	int blend_ticks = 0;            ///< the passage's ticks: a frame of a passage is the frame of the one it goes to times them, plus its tick
 	std::string tint_material;      ///< an effect's "barvy": the material the game colours ("material")
 	std::vector<uint32_t> tint_palette; ///< and the colours it may be ("paleta", Colour::data)
 
@@ -286,6 +292,7 @@ struct ThreeDVehicleObject {
 
 private:
 	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame) const;
+	std::shared_ptr<const ThreeDVehicleShape> MakePosedShape(int frame) const;
 	mutable std::vector<std::vector<ThreeDObjectTexture>> levels; ///< the textures, each halved for each level of detail
 	mutable std::vector<ThreeDObjectTexture> mask_levels;         ///< the paint mask likewise (its grey in the red)
 	mutable bool mask_tried = false;
