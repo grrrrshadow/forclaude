@@ -40,6 +40,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   z mapy, barva z průměru skutečných spritů (tráva, voda, pole, poušť, popel, lesy), sukně proti škvírám. Domy
   a průmysl jako 3D objekty do 64 dlaždic (zjednodušené), v noci jim svítí okna – města na obzoru. Opar plynule
   s dálkou, mlha od 60 % dosahu.
+- **4. Kostra a prolínání** (hotovo `9f83df2`, `e6f4c28`): kolegovy `drak_*_kostra.glb` (klouby, váhy, animace)
+  – póza draka se počítá každý tik (chůze 64 snímků místo 8), při přechodu chůze → útok → smrt se pózy 8 tiků
+  prolínají kost po kosti. Čínský drak (bez kostry) zůstává na snímcích. Rig: `test3d postava <figura> <snimek>`.
 - Rig (4 vlákna): pohled z očí v městě 116/61 ms → 70/32 ms (1/4 vlákna); otočená mapa nejvíc oddálená
   102 → 68 ms. Na víc jádrech u hráče to bude rychlejší.
 
