@@ -19,6 +19,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
+
+- Hráč kolegovi řekl, ať jsou holky v hospodě větší. Kolega proto zvětšil celou hospodu na 2×2 (hráč: „zvětšil
+  hospodu na 2x2“). Ve hře hotovo (`86440b3`): nová hospoda zabírá 2×2 (dům a zahrádka). Stará hospoda 1×1 ze
+  starých her zůstává malá a kreslí se spritem.
+- Holky u průmyslu po dovozu: socha, gymnázium a automat 30 dní po studentkách (u automatu po marihuaně). U chatky
+  stojí po studentkách a sedí, když přijde i marihuana. Platí na mapě, v náhledu průmyslu i v pohledu z očí. V den,
+  kdy odejdou, se průmysl překreslí. Rig: `test3d dovoz`.
+- Svítící okna v noci teď mají i gymnázium, lihovar, automat a hospoda (girlanda nad zahrádkou). Holky domů
+  mírného klimatu jsou dvakrát větší. Všechny klimaty a Mars mají noční okna.
+- V pohledu z očí mají postavy na budovách a polích skutečnou velikost, předmět (rožeň) zůstává velký jako budova.
+  Proti dvakrát větší hospodě proto holky vypadají malé – kolegovi jsem to napsal, ať řekne, jestli to chce jinak.
+- Tatra v6 (kolega): ověřeno v `newgrf/` i v `baseset/decouple/`, stavy se najdou. Když leží dvě verze vedle sebe,
+  bere se balíček u načteného GRF. Když GRF kreslí prázdné obrázky a balíček chybí, hra to jednou zapíše do logu
+  (s tím, kde hledala). Odpověď kolegovi: `hra/3d/ODPOVED-PRUMYSL-HOLKY-TATRA-V6.md`.
+- Čeká: víko motoru a maják VB (`dily`, `doplnky`) podle stavu z GRF; 3D částice (OpenLoco) – čekám na hráčovo
+  ano a na to, jestli zlevnit i světla v noci zblízka.
+
 ## 16. 10. – OpenLoco, luk, průjezd obloukem
 
 - OpenLoco je MIT: jeho kód smí do hry (s poznámkou MIT), původní obrázky z Locomotion ne. Hráč vybral:
