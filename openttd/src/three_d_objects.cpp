@@ -28,6 +28,7 @@
 #include "language.h"
 #include "3rdparty/nlohmann/json.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -1747,6 +1748,92 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 		paint |= (x % std::min<size_t>(this->colours[k].palette.size(), 16)) << (4 * k);
 	}
 	return paint;
+}
+
+/** The size of a cell of a level of the shapes (ThreeDObject::GetShape()): metres. */
+static double ShapeCellMetres(int level)
+{
+	return 0.05 * (1 << (level - 1));
+}
+
+/**
+ * The level of the shape of a building seen so near (the technologies of OpenMW, the player, 16. 10.: what is far
+ * away it draws simpler): the corners merged while they move by at most a pixel and a half. A town of clay houses was
+ * half a million triangles, most of them smaller than a pixel.
+ * @param pixels_per_metre how many pixels of the picture a metre of the building's nearest part takes
+ */
+int ThreeDShapeLevel(double pixels_per_metre)
+{
+	int level = 0;
+	while (level + 1 < THREE_D_SHAPE_LEVELS && ShapeCellMetres(level + 1) * pixels_per_metre <= 1.5) level++;
+	return level;
+}
+
+/**
+ * The shape of a building at a level of detail. Its corners in a cell of the level's size, at about the same place in
+ * the texture, are one corner: in the middle of them, their texture's place and light their average. A seam of the
+ * texture stays, its corners at different places of it; a triangle with two of its corners in one cell has no area
+ * and goes, and so does one already there.
+ * @param level 0 its own shape, else simplified: made the first time (not on several cores at once)
+ */
+ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
+{
+	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
+	if (level == 0) return {this->pos, this->uv, this->light, this->tri, this->facing};
+	if (this->shapes[level] == nullptr) {
+		const size_t corners = this->pos.size() / 3;
+		const bool lit = this->light.size() == corners;
+		const double cell_xy = ShapeCellMetres(level) * OBJECT_UNITS_PER_METRE;
+		const double cell_z = ShapeCellMetres(level) * OBJECT_HEIGHT_PER_METRE;
+		/* A texture about a tile across: a corner's place in it moves as far as the corner. */
+		const double cell_uv = 4 * cell_xy / TILE_SIZE;
+		auto cell = [](double v, double size, int bits) {
+			const int64_t half = int64_t{1} << (bits - 1);
+			return static_cast<uint64_t>(std::clamp<int64_t>(static_cast<int64_t>(std::floor(v / size)) + half, 0, 2 * half - 1));
+		};
+		struct Sum {
+			double x = 0, y = 0, z = 0, u = 0, v = 0, l = 0;
+			uint32_t n = 0;
+		};
+		std::unordered_map<uint64_t, uint32_t> cells;
+		std::vector<Sum> sums;
+		std::vector<uint32_t> to(corners);
+		for (size_t i = 0; i < corners; i++) {
+			const double x = this->pos[i * 3], y = this->pos[i * 3 + 1], z = this->pos[i * 3 + 2];
+			const double u = this->uv[i * 2], v = this->uv[i * 2 + 1];
+			const uint64_t key = cell(x, cell_xy, 13) | cell(y, cell_xy, 13) << 13 | cell(z, cell_z, 13) << 26 | cell(u, cell_uv, 12) << 39 | cell(v, cell_uv, 12) << 51;
+			auto [it, added] = cells.try_emplace(key, static_cast<uint32_t>(sums.size()));
+			if (added) sums.emplace_back();
+			Sum &sum = sums[it->second];
+			sum.x += x;
+			sum.y += y;
+			sum.z += z;
+			sum.u += u;
+			sum.v += v;
+			sum.l += lit ? this->light[i] : 256;
+			sum.n++;
+			to[i] = it->second;
+		}
+		auto shape = std::make_shared<ThreeDObjectShape>();
+		for (const Sum &sum : sums) {
+			shape->pos.insert(shape->pos.end(), {static_cast<float>(sum.x / sum.n), static_cast<float>(sum.y / sum.n), static_cast<float>(sum.z / sum.n)});
+			shape->uv.insert(shape->uv.end(), {static_cast<float>(sum.u / sum.n), static_cast<float>(sum.v / sum.n)});
+			if (lit) shape->light.push_back(static_cast<uint16_t>(sum.l / sum.n + 0.5));
+		}
+		std::set<std::array<uint32_t, 3>> had;
+		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
+			std::array<uint32_t, 3> c = {to[this->tri[t]], to[this->tri[t + 1]], to[this->tri[t + 2]]};
+			if (c[0] == c[1] || c[1] == c[2] || c[0] == c[2]) continue;
+			/* The same triangle however its corners are counted round. */
+			std::ranges::rotate(c, std::ranges::min_element(c));
+			if (!had.insert(c).second) continue;
+			shape->tri.insert(shape->tri.end(), c.begin(), c.end());
+			shape->facing.push_back(t / 3 < this->facing.size() ? this->facing[t / 3] : 0);
+		}
+		this->shapes[level] = std::move(shape);
+	}
+	const ThreeDObjectShape &s = *this->shapes[level];
+	return {s.pos, s.uv, s.light, s.tri, s.facing};
 }
 
 /**

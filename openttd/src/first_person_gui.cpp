@@ -592,7 +592,8 @@ double RigFirstPersonMeasure(int times, int threads)
 	_cab_threads = 0;
 	uint64_t sum = 0;
 	for (uint32_t p : w->picture.pixels) sum = sum * 1000003u + p;
-	Debug(misc, 0, "rig: first person picture checksum {:016x}", sum);
+	Debug(misc, 0, "rig: first person picture checksum {:016x}; stages ms: tiles {:.1f}, collect {:.1f}, ground texture {:.1f}, ground {:.1f}, bridges and objects {:.1f}, billboards and figures {:.1f}, haze and night {:.1f}", sum,
+			w->camera.stage[0], w->camera.stage[1], w->camera.stage[2], w->camera.stage[3], w->camera.stage[4], w->camera.stage[5], w->camera.stage[6]);
 	return total / times;
 }
 

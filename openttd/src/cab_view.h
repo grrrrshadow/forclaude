@@ -44,6 +44,7 @@ struct CabViewCamera {
 	double ms = 0.0;      ///< rig: how long the last picture took, milliseconds
 	int tiles = 0;        ///< rig: tiles drawn in the last picture
 	int billboards = 0;   ///< rig: billboards drawn in the last picture
+	double stage[7] = {}; ///< rig: the milliseconds of the stages of the last picture (DrawEyeView())
 };
 
 struct Vehicle;

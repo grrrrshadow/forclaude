@@ -79,6 +79,31 @@ struct ThreeDObjectDoor {
 	float width = 1;      ///< "sirka": metres
 };
 
+/**
+ * The shape of a building simplified for a level of detail (ThreeDObject::GetShape()), as its own: its corners
+ * closer than the level's cell merged into one, the triangles left without area gone.
+ */
+struct ThreeDObjectShape {
+	std::vector<float> pos;
+	std::vector<float> uv;
+	std::vector<uint16_t> light;
+	std::vector<uint32_t> tri;
+	std::vector<int8_t> facing;
+};
+
+/** A shape of a building to draw: its own (level 0) or simplified (ThreeDObject::GetShape()). */
+struct ThreeDObjectShapeView {
+	std::span<const float> pos;
+	std::span<const float> uv;
+	std::span<const uint16_t> light;
+	std::span<const uint32_t> tri;
+	std::span<const int8_t> facing;
+};
+
+/** The levels of the shapes: 0 the building's own, then its corners merged in cells of 5 cm, 10 cm, ... 3.2 m. */
+static constexpr int THREE_D_SHAPE_LEVELS = 8;
+int ThreeDShapeLevel(double pixels_per_metre);
+
 /** A building as a 3D object. */
 struct ThreeDObject {
 	std::string name;         ///< its name in the index
@@ -114,6 +139,7 @@ struct ThreeDObject {
 	float stop[3] = {};       ///< there, world units along x and y from the north corner, units of height up
 	float stop_turn = 0;      ///< facing, degrees, 0 along +x
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
+	mutable std::array<std::shared_ptr<const ThreeDObjectShape>, THREE_D_SHAPE_LEVELS> shapes; ///< its shape simplified, by level, made the first time it is asked for (GetShape())
 	IndustryType industry = 0xFF; ///< "prumysl" ("druh": "prumysl"): the game's own industry it is, 0xFF none or one the game has not yet
 	std::string industry_name; ///< "prumysl" as the index writes it ("IT_GYMNASIUM", "lihovar")
 	int8_t industry_variant = -1; ///< "varianta": the statue of stone 0 ("kamen") or bronze 1 ("bronz", the industry's random bit 0); -1 any
@@ -122,6 +148,7 @@ struct ThreeDObject {
 	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
+	ThreeDObjectShapeView GetShape(int level) const;
 	uint32_t PaintAt(TileIndex origin) const;
 };
 
