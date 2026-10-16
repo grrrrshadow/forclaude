@@ -102,7 +102,7 @@ struct ThreeDObjectShapeView {
 
 /** The levels of the shapes: 0 the building's own, then its corners merged in cells of 5 cm, 10 cm, ... 3.2 m. */
 static constexpr int THREE_D_SHAPE_LEVELS = 8;
-int ThreeDShapeLevel(double pixels_per_metre);
+int ThreeDShapeLevel(double pixels_per_metre, double shift);
 
 /** A building as a 3D object. */
 struct ThreeDObject {

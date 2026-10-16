@@ -1758,14 +1758,15 @@ static double ShapeCellMetres(int level)
 
 /**
  * The level of the shape of a building seen so near (the technologies of OpenMW, the player, 16. 10.: what is far
- * away it draws simpler): the corners merged while they move by at most a pixel and a half. A town of clay houses was
- * half a million triangles, most of them smaller than a pixel.
+ * away it draws simpler): the corners merged while they move by at most so many pixels. A town of houses was half a
+ * million triangles, most of them smaller than a pixel.
  * @param pixels_per_metre how many pixels of the picture a metre of the building's nearest part takes
+ * @param shift how far a corner may move, pixels: the map's houses are seen sharp, those far from the eyes in haze
  */
-int ThreeDShapeLevel(double pixels_per_metre)
+int ThreeDShapeLevel(double pixels_per_metre, double shift)
 {
 	int level = 0;
-	while (level + 1 < THREE_D_SHAPE_LEVELS && ShapeCellMetres(level + 1) * pixels_per_metre <= 1.5) level++;
+	while (level + 1 < THREE_D_SHAPE_LEVELS && ShapeCellMetres(level + 1) * pixels_per_metre <= shift) level++;
 	return level;
 }
 
@@ -1786,7 +1787,7 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 		const double cell_xy = ShapeCellMetres(level) * OBJECT_UNITS_PER_METRE;
 		const double cell_z = ShapeCellMetres(level) * OBJECT_HEIGHT_PER_METRE;
 		/* A texture about a tile across: a corner's place in it moves as far as the corner. */
-		const double cell_uv = 4 * cell_xy / TILE_SIZE;
+		const double cell_uv = cell_xy / TILE_SIZE;
 		auto cell = [](double v, double size, int bits) {
 			const int64_t half = int64_t{1} << (bits - 1);
 			return static_cast<uint64_t>(std::clamp<int64_t>(static_cast<int64_t>(std::floor(v / size)) + half, 0, 2 * half - 1));

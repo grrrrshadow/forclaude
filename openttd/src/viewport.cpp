@@ -3216,34 +3216,36 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	order.clear();
 	verts.clear();
 	const ThreeDObjectTexture *tex = nullptr;
-	if (o != nullptr && !o->tri.empty()) {
+	/* Its shape as simple as the zoom allows (ThreeDShapeLevel()): a metre up is the most pixels of the picture. */
+	const ThreeDObjectShapeView shape = o != nullptr ? o->GetShape(ThreeDShapeLevel(ZOOM_BASE * OBJECT_HEIGHT_PER_METRE * lay.scale, 0.75)) : ThreeDObjectShapeView{};
+	if (o != nullptr && !shape.tri.empty()) {
 		tex = o->GetTexture(to_underlying(lay.zoom), paint);
-		const bool lit = o->light.size() == o->pos.size() / 3;
-		const size_t corners = o->pos.size() / 3;
+		const bool lit = shape.light.size() == shape.pos.size() / 3;
+		const size_t corners = shape.pos.size() / 3;
 		verts.resize(corners);
 		for (size_t i = 0; i < corners; i++) {
 			double sx, sy, xr, yr;
-			lay.Project(ox + o->pos[i * 3], oy + o->pos[i * 3 + 1], oz + o->pos[i * 3 + 2], sx, sy);
-			lay.Turn(ox + o->pos[i * 3], oy + o->pos[i * 3 + 1], xr, yr);
-			verts[i] = {sx, sy, o->uv[i * 2] * tex->w, o->uv[i * 2 + 1] * tex->h, lit ? static_cast<double>(o->light[i]) : 256.0, xr + yr + 2 * o->pos[i * 3 + 2]};
+			lay.Project(ox + shape.pos[i * 3], oy + shape.pos[i * 3 + 1], oz + shape.pos[i * 3 + 2], sx, sy);
+			lay.Turn(ox + shape.pos[i * 3], oy + shape.pos[i * 3 + 1], xr, yr);
+			verts[i] = {sx, sy, shape.uv[i * 2] * tex->w, shape.uv[i * 2 + 1] * tex->h, lit ? static_cast<double>(shape.light[i]) : 256.0, xr + yr + 2 * shape.pos[i * 3 + 2]};
 		}
 		/* Far first: by the middle of each triangle, as the faces of the boxes. */
-		for (size_t t = 0; t + 2 < o->tri.size(); t += 3) {
-			const TurnedVertex &a = verts[o->tri[t]], &b = verts[o->tri[t + 1]], &c = verts[o->tri[t + 2]];
+		for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+			const TurnedVertex &a = verts[shape.tri[t]], &b = verts[shape.tri[t + 1]], &c = verts[shape.tri[t + 2]];
 			/* Not in the block being drawn: nothing to do (an object is drawn again for each block it is in). */
 			if (std::max({a.x, b.x, c.x}) < 0 || std::min({a.x, b.x, c.x}) >= fw || std::max({a.y, b.y, c.y}) < 0 || std::min({a.y, b.y, c.y}) >= fh) continue;
 			/* A triangle turned away from the view is a back wall: left out, else drawn by the middle it could come
 			 * through a front one. On the screen (y down) a triangle seen from outside goes round clockwise. */
-			const int8_t facing = _turned_cull && t / 3 < o->facing.size() ? o->facing[t / 3] : 0;
+			const int8_t facing = _turned_cull && t / 3 < shape.facing.size() ? shape.facing[t / 3] : 0;
 			if (facing != 0) {
 				double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 				if (area * facing >= 0) continue;
 			}
 			double sx = 0, sy = 0, sz = 0;
 			for (int k = 0; k < 3; k++) {
-				sx += o->pos[o->tri[t + k] * 3];
-				sy += o->pos[o->tri[t + k] * 3 + 1];
-				sz += o->pos[o->tri[t + k] * 3 + 2];
+				sx += shape.pos[shape.tri[t + k] * 3];
+				sy += shape.pos[shape.tri[t + k] * 3 + 1];
+				sz += shape.pos[shape.tri[t + k] * 3 + 2];
 			}
 			double xr, yr;
 			lay.Turn(ox + sx / 3, oy + sy / 3, xr, yr);
@@ -3259,7 +3261,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	};
 	static std::vector<OnIt> on_it;
 	on_it.clear();
-	const size_t tris = o != nullptr ? o->tri.size() : 0;
+	const size_t tris = shape.tri.size();
 	const TileIndex origin = TileXY(std::clamp<int>(static_cast<int>(ox) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(oy) / TILE_SIZE, 0, Map::MaxY()));
 	auto stand = [&](const ThreeDObjectFigure &f, bool plant) {
 		double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
@@ -3302,7 +3304,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			lay.Project(f.x, f.y, f.z, sx, sy);
 			cover(sx + f.pic->left, sy + f.pic->top, sx + f.pic->left + f.pic->width, sy + f.pic->top + f.pic->height);
 		} else {
-			const TurnedVertex &a = verts[o->tri[t]], &b = verts[o->tri[t + 1]], &c = verts[o->tri[t + 2]];
+			const TurnedVertex &a = verts[shape.tri[t]], &b = verts[shape.tri[t + 1]], &c = verts[shape.tri[t + 2]];
 			cover(std::min({a.x, b.x, c.x}), std::min({a.y, b.y, c.y}), std::max({a.x, b.x, c.x}), std::max({a.y, b.y, c.y}));
 		}
 	}
@@ -3343,7 +3345,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			}
 			continue;
 		}
-		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o->tri[t]], verts[o->tri[t + 1]], verts[o->tri[t + 2]], true, zb.data(), nullptr, row_lo, row_hi);
+		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[shape.tri[t]], verts[shape.tri[t + 1]], verts[shape.tri[t + 2]], true, zb.data(), nullptr, row_lo, row_hi);
 	}
 	};
 	const int rows = zy1 - zy0 + 1;
@@ -8081,7 +8083,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		/* Its shape as simple as its nearest part allows (ThreeDShapeLevel()). */
 		const double reach = TILE_SIZE * std::hypot(o.tiles_x, o.tiles_y) / 2 + o.top * CAB_Z_SCALE;
 		const double near_pixels_per_unit = eye.focal / std::max(c.f - reach, CAB_NEAR * 4);
-		const ThreeDObjectShapeView shape = o.GetShape(ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE));
+		const ThreeDObjectShapeView shape = o.GetShape(ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5));
 		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape});
 		wanted.push_back({&o, level, jobs.back().paint});
 	}
