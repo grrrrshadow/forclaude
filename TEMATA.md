@@ -31,6 +31,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **3. LOD domů** (hotovo `013b382`, `fdcfb9c`): kolegovy domy mají 12–25 tisíc trojúhelníků, město bylo půl
   milionu. Vzdálený dům má zjednodušený tvar (rohy sloučené v buňkách 5 cm až 3,2 m); v pohledu z očí se roh smí
   posunout o 1,5 pixelu (dálka je v oparu), na mapě o ¾ pixelu (při 1,5 mizely příčky oken).
+- Stálá vlákna kreslení (`baedec6`): založí se jednou a čekají na práci (na Windows je zakládání drahé). Malé domy
+  na mapě na víc jádrech pomalejší (synchronizace) – zůstávají na jednom, velké po pásech.
+- **2. Mezipaměť domů na otočené mapě** (hotovo `3bf95f4`, „object paging“): dům se pro úhel, zoom a místo vykreslí
+  jednou do obrázku s hloubkou, pak se jen kopíruje; postavy a noční okna přes něj. Nejvýš 256 MB. Při otáčení
+  a zoomu se neukládá (každý snímek jiný), naskočí 0,2 s po zastavení. Zoom 2: 106 → 22 ms, zoom 3: 141 → 17 ms.
+- **3. Vzdálená krajina** (hotovo `4f3fa98`): za 20 dlaždicemi zem až do 96 dlaždic v blocích 1–8 dlaždic, výšky
+  z mapy, barva z průměru skutečných spritů (tráva, voda, pole, poušť, popel, lesy), sukně proti škvírám. Domy
+  a průmysl jako 3D objekty do 64 dlaždic (zjednodušené), v noci jim svítí okna – města na obzoru. Opar plynule
+  s dálkou, mlha od 60 % dosahu.
 - Rig (4 vlákna): pohled z očí v městě 116/61 ms → 70/32 ms (1/4 vlákna); otočená mapa nejvíc oddálená
   102 → 68 ms. Na víc jádrech u hráče to bude rychlejší.
 
