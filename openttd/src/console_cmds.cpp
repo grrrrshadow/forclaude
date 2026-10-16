@@ -8864,7 +8864,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string DescribeFirstPerson();
 		extern void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch);
 		extern bool RigFirstPersonHold(bool out, float swing);
-		if (argv.size() > 2 && argv[2] == "kladivo") {
+		extern double RigFirstPersonMeasure(int times, int threads);
+		if (argv.size() > 2 && argv[2] == "mereni") {
+			/* 'chodec mereni <times> <threads>': how long a picture from the eyes takes, on so many threads (0 all). */
+			const int times = number(3).value_or(10), threads = number(4).value_or(0);
+			IConsolePrint(CC_DEFAULT, "test3d: obraz z oci {:.1f} ms na {} vlaknech", RigFirstPersonMeasure(times, threads), threads == 0 ? std::thread::hardware_concurrency() : static_cast<uint>(threads));
+		} else if (argv.size() > 2 && argv[2] == "kladivo") {
 			/* 'chodec kladivo [swing degrees]' the hammer in the hand, swung so far; 'chodec kladivo pryc' put away. */
 			const bool away = argv.size() > 3 && argv[3] == "pryc";
 			auto swing = argv.size() > 3 && !away ? number(3) : std::optional<int>(0);

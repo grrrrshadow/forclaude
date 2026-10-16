@@ -122,6 +122,8 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <cmath>
 #include <forward_list>
 #include <optional>
+#include <thread>
+#include <functional>
 #include <stack>
 
 #include "widgets/vehicle_widget.h"
@@ -6410,12 +6412,12 @@ static void CabClipNear(std::vector<CabPoint> &poly)
 }
 
 /**
- * Fill a triangle of the picture with a texture in perspective: 1/depth and the texture pixel over depth change
- * linearly across the picture, so each pixel's texture pixel is their quotient. A pixel is drawn where the
- * triangle is nearer than what is there.
+ * Fill a triangle of the picture with a texture in perspective, its rows from row_lo up to row_hi only (a stripe of
+ * the picture, CabFlushBatch()): 1/depth and the texture pixel over depth change linearly across the picture, so
+ * each pixel's texture pixel is their quotient. A pixel is drawn where the triangle is nearer than what is there.
  * @param fill_holes take the nearest drawn pixel of the texture where it has none (the diamonds of the ground)
  */
-static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes, uint light = 256)
+static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes, uint light, int row_lo, int row_hi)
 {
 	double area = (b.sx - a.sx) * (c.sy - a.sy) - (b.sy - a.sy) * (c.sx - a.sx);
 	if (std::abs(area) < 1e-9) return;
@@ -6428,8 +6430,8 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 	grad(a.uw, b.uw, c.uw, duw_dx, duw_dy);
 	grad(a.vw, b.vw, c.vw, dvw_dx, dvw_dy);
 	double sign = area > 0 ? 1.0 : -1.0;
-	int y0 = std::max(0, static_cast<int>(std::ceil(std::min({a.sy, b.sy, c.sy}) - 0.5)));
-	int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a.sy, b.sy, c.sy}) - 0.5)));
+	int y0 = std::max(row_lo, static_cast<int>(std::ceil(std::min({a.sy, b.sy, c.sy}) - 0.5)));
+	int y1 = std::min(std::min(h, row_hi) - 1, static_cast<int>(std::floor(std::max({a.sy, b.sy, c.sy}) - 0.5)));
 	for (int y = y0; y <= y1; y++) {
 		double yc = y + 0.5;
 		double xlo = -1e18, xhi = 1e18;
@@ -6480,6 +6482,83 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 			zrow[x] = static_cast<float>(iw);
 		}
 	}
+}
+
+/*
+ * Drawing the view from an eye on every core of the processor (the player, 16. 10.: "the technologies of OpenMW",
+ * which prepares its world in threads of their own): the triangles of a pass whose textures stay as they are until
+ * it ends -- the ground, the houses, the figures near the eye -- are first collected, then drawn at once by a thread
+ * for each stripe of the picture's rows, each thread all of them but only its rows. The depth decides what is seen,
+ * so the picture is the same as drawn one after the other.
+ */
+struct CabBatchTriangle {
+	uint32_t *dst;
+	float *zb;
+	int w, h;
+	const uint32_t *tex;
+	int tw, th;
+	CabVertex a, b, c;
+	bool fill_holes;
+	uint light;
+};
+static std::vector<CabBatchTriangle> _cab_batch;
+static bool _cab_batching = false;
+
+/**
+ * Run a job over the rows of a picture in stripes, a thread each, as many as the processor has cores (at most 16);
+ * one after the other when there is little to do.
+ * @param rows how many rows
+ * @param work the job for the rows from its first up to its second argument
+ * @param worth whether the job is worth the threads
+ */
+int _cab_threads = 0; ///< The rig: how many threads to draw on (test3d chodec mereni), 0 every core.
+
+static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true)
+{
+	static const int cores = std::clamp<int>(static_cast<int>(std::thread::hardware_concurrency()), 1, 16);
+	const int n = worth ? std::min(_cab_threads > 0 ? _cab_threads : cores, std::max(1, rows / 16)) : 1;
+	if (n <= 1) {
+		work(0, rows);
+		return;
+	}
+	std::vector<std::thread> threads;
+	threads.reserve(n - 1);
+	for (int i = 1; i < n; i++) threads.emplace_back(work, rows * i / n, rows * (i + 1) / n);
+	work(0, rows / n);
+	for (std::thread &t : threads) t.join();
+}
+
+/** Draw the triangles collected (CabBatchScope), a stripe of rows a thread. */
+static void CabFlushBatch()
+{
+	if (_cab_batch.empty()) return;
+	const int h = _cab_batch.front().h;
+	ParallelRows(h, [](int lo, int hi) {
+		for (const CabBatchTriangle &t : _cab_batch) CabRasterRows(t.dst, t.zb, t.w, t.h, t.tex, t.tw, t.th, t.a, t.b, t.c, t.fill_holes, t.light, lo, hi);
+	}, _cab_batch.size() >= 64);
+	_cab_batch.clear();
+}
+
+/** While it lives, the triangles drawn are collected; at its end drawn on every core (CabFlushBatch()). */
+struct CabBatchScope {
+	CabBatchScope() { _cab_batching = true; }
+	~CabBatchScope()
+	{
+		_cab_batching = false;
+		CabFlushBatch();
+	}
+	CabBatchScope(const CabBatchScope &) = delete;
+	CabBatchScope &operator=(const CabBatchScope &) = delete;
+};
+
+/** A triangle of the picture: drawn now, or collected to be drawn on every core (CabBatchScope). */
+static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes, uint light = 256)
+{
+	if (_cab_batching) {
+		_cab_batch.push_back({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light});
+		return;
+	}
+	CabRasterRows(dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, 0, h);
 }
 
 /** Draw a polygon of the eye's frame, cut to the near plane, as a fan of triangles. */
@@ -7390,10 +7469,12 @@ static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, 
  */
 static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int height, uint32_t *dst, const float *zb)
 {
-	for (size_t i = 0; i < static_cast<size_t>(width) * height; i++) {
-		Colour c(dst[i]);
-		dst[i] = Colour(static_cast<uint8_t>(c.r * NIGHT_R >> 8), static_cast<uint8_t>(c.g * NIGHT_G >> 8), static_cast<uint8_t>(c.b * NIGHT_B >> 8)).data;
-	}
+	ParallelRows(height, [&](int lo, int hi) {
+		for (size_t i = static_cast<size_t>(lo) * width; i < static_cast<size_t>(hi) * width; i++) {
+			Colour c(dst[i]);
+			dst[i] = Colour(static_cast<uint8_t>(c.r * NIGHT_R >> 8), static_cast<uint8_t>(c.g * NIGHT_G >> 8), static_cast<uint8_t>(c.b * NIGHT_B >> 8)).data;
+		}
+	});
 	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash) {
 		CabPoint p = CabToEye(eye, wx, wy, wz, 0, 0);
 		if (p.f < CAB_NEAR) return;
@@ -7833,6 +7914,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		static const Corner corners[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
 		static const int cxs[4] = {0, 0, TILE_SIZE, TILE_SIZE};
 		static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
+		CabBatchScope ground_batch; // the ground texture stays as it is: on every core
 		for (const CabTile &t : tiles) {
 			if (t.first >= t.end && !t.foundation) continue;
 			Slope s = RemoveHalftileSlope(t.slope);
@@ -7872,7 +7954,9 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x0, y1, z0), at(x1, y0, z0, x1, y1, z0), at(x1, y0, z1, x1, y1, z1), at(x0, y0, z1, x0, y1, z1)}, false);
 	}
 	/* The houses that are real 3D objects: their triangles with their texture, at the level of detail of their
-	 * distance -- about a texture pixel to a pixel of the picture. */
+	 * distance -- about a texture pixel to a pixel of the picture. Their textures stay: on every core. */
+	{
+	CabBatchScope objects_batch;
 	for (const CabObject &co : objects) {
 		const ThreeDObject &o = *co.obj;
 		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
@@ -7895,6 +7979,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false, light / 3);
 		}
 		camera.billboards++;
+	}
 	}
 	for (const CabBridgeSprites &bs : _cab_bridge_sprites) {
 		std::vector<const ParentSpriteToDraw *> list;
@@ -8008,9 +8093,15 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	for (const CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
-		if (foot.f < CAB_FIGURE_SOLID && CabDrawFigure(dst, zb, width, height, eye, fg)) {
-			camera.billboards++;
-			continue;
+		if (foot.f < CAB_FIGURE_SOLID) {
+			/* Its textures stay: collected, drawn on every core after the billboards (the depth sorts them out). */
+			_cab_batching = true;
+			const bool solid = CabDrawFigure(dst, zb, width, height, eye, fg);
+			_cab_batching = false;
+			if (solid) {
+				camera.billboards++;
+				continue;
+			}
 		}
 		if (foot.f < CAB_NEAR) continue;
 		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);
@@ -8031,6 +8122,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		CabDrawPolygon(dst, zb, width, height, pic->pixels.data(), pic->width, pic->height, std::move(quad), eye, false);
 		camera.billboards++;
 	}
+	CabFlushBatch(); // the figures near the eye, collected above
 	std::sort(bills.begin(), bills.end(), [](const CabBillboard &a, const CabBillboard &b) { return a.f > b.f; });
 	for (const CabBillboard &b : bills) {
 		const CabTexture *tex = CabSpriteTexture(b.ps);
@@ -8082,17 +8174,19 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		camera.billboards++;
 	}
 
-	/* 6. The haze: the far fades into the sky at the horizon. */
+	/* 6. The haze: the far fades into the sky at the horizon (a stripe of rows a core). */
 	const double haze_to = CAB_RANGE_TILES * TILE_SIZE;
-	for (size_t i = 0; i < out.pixels.size() && !in_tunnel.has_value(); i++) {
-		float z = zb[i];
-		if (z <= 0.0f) continue;
-		double dist = 1.0 / z;
-		if (dist <= CAB_HAZE_FROM) continue;
-		double t = std::min(1.0, (dist - CAB_HAZE_FROM) / (haze_to - CAB_HAZE_FROM)) * 0.75;
-		Colour c(out.pixels[i]);
-		out.pixels[i] = Colour(static_cast<uint8_t>(c.r + (haze.r - c.r) * t), static_cast<uint8_t>(c.g + (haze.g - c.g) * t), static_cast<uint8_t>(c.b + (haze.b - c.b) * t)).data;
-	}
+	if (!in_tunnel.has_value()) ParallelRows(height, [&](int lo, int hi) {
+		for (size_t i = static_cast<size_t>(lo) * width; i < static_cast<size_t>(hi) * width; i++) {
+			float z = zb[i];
+			if (z <= 0.0f) continue;
+			double dist = 1.0 / z;
+			if (dist <= CAB_HAZE_FROM) continue;
+			double t = std::min(1.0, (dist - CAB_HAZE_FROM) / (haze_to - CAB_HAZE_FROM)) * 0.75;
+			Colour c(out.pixels[i]);
+			out.pixels[i] = Colour(static_cast<uint8_t>(c.r + (haze.r - c.r) * t), static_cast<uint8_t>(c.g + (haze.g - c.g) * t), static_cast<uint8_t>(c.b + (haze.b - c.b) * t)).data;
+		}
+	});
 
 	if (_debug_misc_level >= 6) {
 		/* The rig: the picture as a PPM in the working directory. */
@@ -8125,7 +8219,8 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	{
 		const double fog_near = CAB_RANGE_TILES * TILE_SIZE * 0.45, fog_far = CAB_RANGE_TILES * TILE_SIZE * 0.95;
 		const Colour far_haze(150, 178, 205);
-		for (int y = 0; y < height; y++) {
+		ParallelRows(height, [&](int lo, int hi) {
+		for (int y = lo; y < hi; y++) {
 			for (int x = 0; x < width; x++) {
 				const size_t i = static_cast<size_t>(y) * width + x;
 				double f;
@@ -8140,6 +8235,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 				dst[i] = Colour(static_cast<uint8_t>(c.r + (far_haze.r - c.r) * f), static_cast<uint8_t>(c.g + (far_haze.g - c.g) * f), static_cast<uint8_t>(c.b + (far_haze.b - c.b) * f)).data;
 			}
 		}
+		});
 	}
 	/* What the walker holds (the hammer), before the night: the dark is over it too. */
 	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);

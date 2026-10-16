@@ -577,6 +577,25 @@ bool RigFirstPersonHold(bool out, float swing)
 	return w->hammer_out;
 }
 
+/** The rig: make the picture so many times on so many threads (0 every core); the milliseconds a picture took. */
+double RigFirstPersonMeasure(int times, int threads)
+{
+	extern int _cab_threads;
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || times <= 0) return 0;
+	_cab_threads = threads;
+	double total = 0;
+	for (int i = 0; i < times; i++) {
+		w->MakePicture();
+		total += w->camera.ms;
+	}
+	_cab_threads = 0;
+	uint64_t sum = 0;
+	for (uint32_t p : w->picture.pixels) sum = sum * 1000003u + p;
+	Debug(misc, 0, "rig: first person picture checksum {:016x}", sum);
+	return total / times;
+}
+
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 {
