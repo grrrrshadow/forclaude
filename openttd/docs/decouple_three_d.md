@@ -1142,15 +1142,21 @@ with its model, `WagonShape`) becomes a new vehicle of the game:
   `ST` and a number of the `.eng`'s name, the same on every computer; it is
   written again only when it changes. The player switches it on among the
   NewGRFs as "Simtrains: <name>".
-- The engine is drawn from its model (`ReadSimtrainsShape()`): the binary
-  `.s`, the nearest of its distances, every part through its matrix and those
+- Wagons too (`.wag`): a carriage ("Type ( Carriage )") carries passengers,
+  as many as its `PassengerCapacity`; a goods wagon any cargo but passengers,
+  30 of it (MSTS says nothing of it). Priced as the original game's wagons.
+  Left out: tenders, and a `.wag` whose model is that of an `.eng` of the same
+  folder (the engine hauled dead, "ms").
+- The vehicle is drawn from its model (`ReadSimtrainsShape()`): the `.s`,
+  binary (`JINX0s1b`) or text (`JINX0s1t`, the older models: the same written
+  out as names and brackets, a part named before its bracket as
+  `matrix RAM ( ... )`), the nearest of its distances, every part through its matrix and those
   above it, turned into the frame of the vehicle objects (x forward, y left,
   z up); the textures `.ace`, the first of their sizes no bigger than 1024:
   uncompressed (rows of red, green, blue, a mask and alpha) or packed as DXT1,
   DXT3 or DXT5 (a table of the sizes, each its length and its blocks of four by
   four). `PassengerCabinHeadPos` is the eye of the cab view.
-- Not read yet: text models (`JINX0s1t`), wagons (`.wag`), the freight
-  animation, lights and sounds.
+- Not read yet: the freight animation, lights and sounds.
 - The rig: `test3d ace <file.ace> <out.ppm>` writes a texture out as the game
   reads it.
 
@@ -1160,5 +1166,6 @@ to other simulators too. So they are never put in the repository, in grrrrf or
 in a build of the game, and the GRF the game writes holds only the figures of
 the `.eng`, no part of the model.
 
-The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid>` buys the engine of
-that GRF (`53542680`, the ŽSSK 750 031).
+The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid> [<wagon grfid>]`
+buys the engine of that GRF (`53542680`, the ŽSSK 750 031) and the wagons of
+the other (`53544EE5`, the ČD B 598).

@@ -116,8 +116,11 @@ struct TextNode {
 std::string TextOf(const std::vector<uint8_t> &data)
 {
 	std::string out;
-	if (data.size() >= 2 && data[0] == 0xFF && data[1] == 0xFE) {
-		for (size_t i = 2; i + 1 < data.size(); i += 2) {
+	const bool marked = data.size() >= 2 && data[0] == 0xFF && data[1] == 0xFE;
+	/* Unpacked text of a packed file may come without the mark: every second byte nought. */
+	const bool unmarked = !marked && data.size() >= 8 && data[1] == 0 && data[3] == 0 && data[5] == 0 && data[0] != 0;
+	if (marked || unmarked) {
+		for (size_t i = marked ? 2 : 0; i + 1 < data.size(); i += 2) {
 			char32_t c = data[i] | data[i + 1] << 8;
 			if (c >= 0xD800 && c < 0xE000) continue;
 			if (c < 0x80) {
@@ -500,7 +503,7 @@ uint32_t GrfIdOf(const std::string &eng)
 	return 'S' | 'T' << 8 | ((h ^ (h >> 16)) & 0xFFFF) << 16;
 }
 
-/** The .eng files in the folders "simtrains" of the NewGRF folders (not in tars: the player puts folders there). */
+/** The .eng and .wag files in the folders "simtrains" of the NewGRF folders (not in tars: the player puts folders there). */
 class EngScanner : public FileScanner {
 public:
 	std::vector<std::string> files;
@@ -516,7 +519,10 @@ public:
 	}
 };
 
-/** An engine of its .eng, if it is an engine with a model; nullopt else. */
+/**
+ * A vehicle of its .eng or .wag, if it is one with a model: an engine of an .eng; a carriage or a goods wagon of a
+ * .wag (a tender, and a .wag that is an engine of the same folder hauled dead, its model the engine's, are left out).
+ */
 std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 {
 	std::vector<uint8_t> data = ReadBytes(path);
@@ -527,7 +533,54 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 		if (StrEqualsIgnoreCase(n.name, "Wagon")) wagon = &n;
 		if (StrEqualsIgnoreCase(n.name, "Engine")) engine = &n;
 	}
-	if (wagon == nullptr || engine == nullptr) return std::nullopt;
+	const bool is_wag = path.size() > 4 && StrEqualsIgnoreCase(std::string_view(path).substr(path.size() - 4), ".wag");
+	if (wagon == nullptr || (engine == nullptr && !is_wag)) return std::nullopt;
+	if (is_wag) {
+		/* A wagon. */
+		SimtrainsEngine e;
+		size_t slash = path.find_last_of(PATHSEPCHAR);
+		e.folder = path.substr(0, slash + 1);
+		e.eng = path.substr(slash + 1, path.size() - slash - 1 - 4);
+		e.wagon = true;
+		const TextNode *type = wagon->Child("Type");
+		const std::string kind = type != nullptr ? type->Value() : std::string();
+		if (StrEqualsIgnoreCase(kind, "Tender") || StrEqualsIgnoreCase(kind, "Engine")) return std::nullopt;
+		e.passengers = StrEqualsIgnoreCase(kind, "Carriage");
+		const TextNode *shape = wagon->Child("WagonShape");
+		if (shape == nullptr) return std::nullopt;
+		e.shape = FindInFolder(e.folder, shape->Value());
+		if (e.shape.empty()) {
+			Debug(grf, 0, "Simtrains: {}: its model {} is not there", path, shape->Value());
+			return std::nullopt;
+		}
+		/* An engine of this folder with the same model: the engine hauled dead ("ms"), not a wagon. */
+		std::error_code ec;
+		for (const auto &entry : std::filesystem::directory_iterator(OTTD2FS(e.folder), ec)) {
+			std::string file = FS2OTTD(entry.path().filename().native());
+			if (file.size() < 5 || !StrEqualsIgnoreCase(std::string_view(file).substr(file.size() - 4), ".eng")) continue;
+			std::vector<uint8_t> other = ReadBytes(e.folder + file);
+			if (other.empty() || !Unpack(other)) continue;
+			for (const TextNode &n : ParseText(TextOf(other))) {
+				const TextNode *s = StrEqualsIgnoreCase(n.name, "Wagon") ? n.Child("WagonShape") : nullptr;
+				if (s != nullptr && StrEqualsIgnoreCase(s->Value(), shape->Value())) return std::nullopt;
+			}
+		}
+		const TextNode *name = wagon->Child("Name");
+		e.name = name != nullptr && !name->Value().empty() ? name->Value() : e.eng;
+		if (const TextNode *t = wagon->Child("Mass"); t != nullptr) e.mass_t = ParseFigure(t->Value(), {{"t", 1}, {"kg", 0.001}, {"t-uk", 1.016}, {"t-us", 0.907}, {"lb", 0.000454}}, 0.001);
+		if (e.passengers) {
+			const TextNode *seats = wagon->Child("PassengerCapacity");
+			e.capacity = seats != nullptr ? static_cast<int>(std::lround(ParseFigure(seats->Value(), {}))) : 0;
+			if (e.capacity <= 0) e.capacity = 40;
+		} else {
+			/* MSTS says nothing of what a goods wagon carries: as much as an original wagon of the game. */
+			e.capacity = 30;
+		}
+		e.capacity = Clamp(e.capacity, 1, 255);
+		if (e.mass_t <= 0) e.mass_t = 20;
+		e.grfid = GrfIdOf(e.eng);
+		return e;
+	}
 
 	SimtrainsEngine e;
 	size_t slash = path.find_last_of(PATHSEPCHAR);
@@ -590,7 +643,8 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		std::vector<uint8_t> a8 = {0x08, 0x08};
 		dword(a8, e.grfid);
 		text(a8, "Simtrains: " + e.name);
-		text(a8, "Vlak z Microsoft Train Simulatoru ze složky simtrains (" + e.eng + ".eng). Model a textury patří jejich autorům: jen pro tvou hru, nešířit.");
+		text(a8, std::string(e.wagon ? "Vůz" : "Vlak") + " z Microsoft Train Simulatoru ze složky simtrains (" + e.eng + (e.wagon ? ".wag" : ".eng") +
+				"). Model a textury patří jejich autorům: jen pro tvou hru, nešířit.");
 		sprites.push_back(std::move(a8));
 	}
 
@@ -612,7 +666,33 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		traction = 0x00;
 		running_base = 0x4C30;
 	}
-	{
+	if (e.wagon) {
+		/* A wagon: no power, no speed of its own; passengers, or goods of any kind but passengers. Priced as the
+		 * original game's wagons (its passenger carriage 247). */
+		std::vector<uint8_t> a0 = {0x00, 0x00, 0, 0x01, static_cast<uint8_t>(SIMTRAINS_ENGINE_ID)};
+		uint8_t props = 0;
+		auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
+		prop(0x00); word(a0, 0);                       // introduced 1920: there in every game
+		prop(0x02); a0.push_back(20);
+		prop(0x03); a0.push_back(40);
+		prop(0x04); a0.push_back(0xFF);
+		prop(0x06); a0.push_back(0x0F);
+		prop(0x07); a0.push_back(5);
+		prop(0x05); a0.push_back(0);
+		prop(0x09); word(a0, 0);                       // no speed limit of its own
+		prop(0x0B); word(a0, 0);                       // no power: a wagon
+		prop(0x0D); a0.push_back(0);
+		prop(0x12); a0.push_back(0xFD);                // drawn from its model
+		prop(0x14); a0.push_back(static_cast<uint8_t>(e.capacity));
+		prop(0x15); a0.push_back(e.passengers ? 0x00 : 0xFF); // passengers, or the first goods it takes
+		prop(0x28); word(a0, e.passengers ? 0x0001 : 0xFFFE); // the classes of cargo it may be refitted to
+		prop(0x29); word(a0, e.passengers ? 0x0000 : 0x0001);
+		prop(0x16); a0.push_back(weight & 0xFF);
+		prop(0x24); a0.push_back(static_cast<uint8_t>(weight >> 8));
+		prop(0x17); a0.push_back(e.passengers ? 247 : 200);
+		a0[2] = props;
+		sprites.push_back(std::move(a0));
+	} else {
 		std::vector<uint8_t> a0 = {0x00, 0x00, 0, 0x01, static_cast<uint8_t>(SIMTRAINS_ENGINE_ID)};
 		uint8_t props = 0;
 		auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
@@ -670,6 +750,7 @@ const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 	_simtrains_engines.clear();
 	EngScanner scanner;
 	scanner.Scan(".eng", Subdirectory::NewGrf, false);
+	scanner.Scan(".wag", Subdirectory::NewGrf, false);
 	std::sort(scanner.files.begin(), scanner.files.end());
 	for (const std::string &file : scanner.files) {
 		std::optional<SimtrainsEngine> e = ReadEng(file);
@@ -678,7 +759,8 @@ const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 			Debug(grf, 0, "Simtrains: {} has the same GRF id as another, left out", file);
 			continue;
 		}
-		Debug(grf, 1, "Simtrains: {} ({}): {:.0f} kW, {:.0f} km/h, {:.0f} t, GRF {:02X}{:02X}{:02X}{:02X}", e->name, e->eng, e->power_kw, e->speed_kmh, e->mass_t,
+		Debug(grf, 1, "Simtrains: {} ({}): {}{:.0f} kW, {:.0f} km/h, {:.0f} t, GRF {:02X}{:02X}{:02X}{:02X}", e->name, e->eng,
+				e->wagon ? fmt::format("{} {}, ", e->passengers ? "seats" : "goods", e->capacity) : std::string(), e->power_kw, e->speed_kmh, e->mass_t,
 				e->grfid & 0xFF, (e->grfid >> 8) & 0xFF, (e->grfid >> 16) & 0xFF, e->grfid >> 24);
 		_simtrains_engines.push_back(std::move(*e));
 	}
@@ -706,67 +788,77 @@ void PrepareSimtrainsGrfs()
 	}
 }
 
-/**
- * The model of an engine of MSTS (its .s) for drawing: the nearest of its distances, every part placed by its matrix
- * and those above it, turned into the frame of the game's vehicle objects; its textures beside it.
- */
-bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
-{
-	std::vector<uint8_t> d = ReadBytes(path);
-	if (d.empty() || !Unpack(d)) return false;
-	if (d.size() < 16 || std::string_view(reinterpret_cast<const char *>(d.data()), 8) != "JINX0s1b") {
-		Debug(grf, 0, "Simtrains: {} is not a binary model (text models are not read yet)", path);
-		return false;
-	}
-	ShapeReader r(d);
-	Block shape;
-	if (!r.BlockAt(16, d.size(), shape) || shape.token != TOK_SHAPE) return false;
+namespace {
 
+/** A model of MSTS as read, binary or text, before it is put together (BuildMesh()). */
+struct ShapeData {
 	std::vector<std::array<float, 3>> points, normals;
 	std::vector<std::array<float, 2>> uvs;
 	std::vector<Matrix> matrices;
+	std::vector<int32_t> hierarchy;         ///< of the nearest distance: the matrix above each, -1 none
 	std::vector<std::string> images;
-	std::vector<uint32_t> texture_image;
-	std::vector<int32_t> vtx_matrix;
-	struct PrimState { int32_t texture = -1; int32_t vtx_state = 0; };
+	std::vector<uint32_t> texture_image;    ///< the image of each texture
+	std::vector<int32_t> vtx_matrix;        ///< the matrix of each vertex state
+	struct PrimState {
+		int32_t texture = -1;
+		int32_t vtx_state = 0;
+	};
 	std::vector<PrimState> prim_states;
+	/** A part of the nearest distance: its vertices (point, normal, texture's point) and its lists of triangles by state. */
+	struct Sub {
+		struct Vertex {
+			uint32_t point = 0, normal = 0, uv = 0;
+		};
+		std::vector<Vertex> vertices;
+		std::vector<std::pair<int32_t, std::vector<uint32_t>>> lists;
+	};
+	std::vector<Sub> subs;
+	float distance = 1e30f;
+};
+
+/** The binary model ("JINX0s1b"): blocks by their numbers. */
+bool ReadBinaryShape(const std::vector<uint8_t> &d, ShapeData &out, const std::string &path)
+{
+	ShapeReader r(d);
+	Block shape;
+	if (!r.BlockAt(16, d.size(), shape) || shape.token != TOK_SHAPE) return false;
 	Block lods{};
 	for (const Block &b : r.Children(shape, false)) {
 		switch (b.token) {
 			case TOK_POINTS:
-				for (const Block &p : r.Children(b, true)) points.push_back({r.F32(p.start), r.F32(p.start + 4), r.F32(p.start + 8)});
+				for (const Block &p : r.Children(b, true)) out.points.push_back({r.F32(p.start), r.F32(p.start + 4), r.F32(p.start + 8)});
 				break;
 			case TOK_NORMALS:
-				for (const Block &p : r.Children(b, true)) normals.push_back({r.F32(p.start), r.F32(p.start + 4), r.F32(p.start + 8)});
+				for (const Block &p : r.Children(b, true)) out.normals.push_back({r.F32(p.start), r.F32(p.start + 4), r.F32(p.start + 8)});
 				break;
 			case TOK_UV_POINTS:
-				for (const Block &p : r.Children(b, true)) uvs.push_back({r.F32(p.start), r.F32(p.start + 4)});
+				for (const Block &p : r.Children(b, true)) out.uvs.push_back({r.F32(p.start), r.F32(p.start + 4)});
 				break;
 			case TOK_MATRICES:
 				for (const Block &p : r.Children(b, true)) {
 					Matrix m;
 					for (int k = 0; k < 12; k++) m.m[k] = r.F32(p.start + 4 * k);
-					matrices.push_back(m);
+					out.matrices.push_back(m);
 				}
 				break;
 			case TOK_IMAGES:
-				for (const Block &p : r.Children(b, true)) images.push_back(r.WString(p.start));
+				for (const Block &p : r.Children(b, true)) out.images.push_back(r.WString(p.start));
 				break;
 			case TOK_TEXTURES:
-				for (const Block &p : r.Children(b, true)) texture_image.push_back(r.U32(p.start));
+				for (const Block &p : r.Children(b, true)) out.texture_image.push_back(r.U32(p.start));
 				break;
 			case TOK_VTX_STATES:
-				for (const Block &p : r.Children(b, true)) vtx_matrix.push_back(r.I32(p.start + 4));
+				for (const Block &p : r.Children(b, true)) out.vtx_matrix.push_back(r.I32(p.start + 4));
 				break;
 			case TOK_PRIM_STATES:
 				for (const Block &p : r.Children(b, true)) {
-					PrimState ps;
+					ShapeData::PrimState ps;
 					/* flags, shader, then a block of the texture's indices, the bias of the depth, the vertex state. */
 					Block idx;
 					if (!r.BlockAt(p.start + 8, p.end, idx)) break;
 					if (r.U32(idx.start) > 0) ps.texture = r.I32(idx.start + 4);
 					ps.vtx_state = r.I32(idx.end + 4);
-					prim_states.push_back(ps);
+					out.prim_states.push_back(ps);
 				}
 				break;
 			case TOK_LOD_CONTROLS:
@@ -777,15 +869,13 @@ bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
 		}
 		if (!r.ok) break;
 	}
-	if (!r.ok || lods.end == 0 || points.empty()) {
+	if (!r.ok || lods.end == 0 || out.points.empty()) {
 		Debug(grf, 0, "Simtrains: {} cannot be read", path);
 		return false;
 	}
 
 	/* The nearest distance of the first control of distances. */
 	Block best{};
-	float best_distance = 1e30f;
-	std::vector<int32_t> hierarchy;
 	for (const Block &lod : r.Children(lods, true)) {
 		for (const Block &levels : r.Children(lod, false)) {
 			if (levels.token != TOK_DISTANCE_LEVELS) continue;
@@ -802,10 +892,10 @@ bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
 						}
 					}
 				}
-				if (distance < best_distance) {
-					best_distance = distance;
+				if (distance < out.distance) {
+					out.distance = distance;
 					best = level;
-					hierarchy = std::move(h);
+					out.hierarchy = std::move(h);
 				}
 			}
 		}
@@ -813,11 +903,214 @@ bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
 	}
 	if (best.end == 0) return false;
 
+	for (const Block &part : r.Children(best, false)) {
+		if (part.token != TOK_SUB_OBJECTS) continue;
+		for (const Block &sub : r.Children(part, true)) {
+			ShapeData::Sub so;
+			for (const Block &x : r.Children(sub, false)) {
+				if (x.token == TOK_VERTICES) {
+					for (const Block &v : r.Children(x, true)) {
+						ShapeData::Sub::Vertex vx{r.U32(v.start + 4), r.U32(v.start + 8), 0};
+						Block uvb;
+						if (r.BlockAt(v.start + 20, v.end, uvb) && r.U32(uvb.start) > 0) vx.uv = r.U32(uvb.start + 4);
+						so.vertices.push_back(vx);
+					}
+				}
+				if (x.token != TOK_PRIMITIVES) continue;
+				int32_t state = 0;
+				for (const Block &p : r.Children(x, true)) {
+					if (p.token == TOK_PRIM_STATE_IDX) {
+						state = r.I32(p.start);
+						continue;
+					}
+					if (p.token != TOK_INDEXED_TRILIST) continue;
+					for (const Block &l : r.Children(p, false)) {
+						if (l.token != TOK_VERTEX_IDXS) continue;
+						const uint32_t n = r.U32(l.start);
+						if (l.start + 4 + static_cast<size_t>(n) * 4 > l.end) break;
+						std::vector<uint32_t> idx(n);
+						for (uint32_t k = 0; k < n; k++) idx[k] = r.U32(l.start + 4 + 4 * k);
+						so.lists.emplace_back(state, std::move(idx));
+					}
+				}
+			}
+			out.subs.push_back(std::move(so));
+		}
+	}
+	if (!r.ok) Debug(grf, 0, "Simtrains: {} read only in part", path);
+	return true;
+}
+
+/** A number of the text: a whole one, or nought. */
+int64_t TextInt(const std::string &t)
+{
+	int64_t v = 0;
+	auto [p, ec] = std::from_chars(t.data(), t.data() + t.size(), v);
+	return ec == std::errc() ? v : 0;
+}
+
+/** A number of the text with a fraction, or nought. */
+float TextFloat(const std::string &t)
+{
+	float v = 0;
+	auto [p, ec] = std::from_chars(t.data(), t.data() + t.size(), v);
+	return ec == std::errc() && std::isfinite(v) ? v : 0.0f;
+}
+
+/**
+ * The text model ("JINX0s1t"): the same as the binary one written out as names and brackets, the older models'
+ * way. A part may be named before its bracket ("matrix RAM ( ... )"), so the inner names of a list are taken in
+ * their order whatever they are called.
+ */
+bool ReadTextShape(const std::string &text, ShapeData &out, const std::string &path)
+{
+	std::vector<TextNode> top = ParseText(text);
+	const TextNode *shape = nullptr;
+	for (const TextNode &n : top) {
+		if (StrEqualsIgnoreCase(n.name, "shape")) shape = &n;
+	}
+	if (shape == nullptr) {
+		Debug(grf, 0, "Simtrains: {}: no shape in the text", path);
+		return false;
+	}
+	auto floats = [](const TextNode &n, size_t count, float *into) {
+		for (size_t k = 0; k < count; k++) into[k] = TextFloat(n.Value(k));
+	};
+	const TextNode *lods = nullptr;
+	for (const TextNode &b : shape->children) {
+		const std::string &name = b.name;
+		if (StrEqualsIgnoreCase(name, "points")) {
+			for (const TextNode &p : b.children) {
+				std::array<float, 3> v{};
+				floats(p, 3, v.data());
+				out.points.push_back(v);
+			}
+		} else if (StrEqualsIgnoreCase(name, "normals")) {
+			for (const TextNode &p : b.children) {
+				std::array<float, 3> v{};
+				floats(p, 3, v.data());
+				out.normals.push_back(v);
+			}
+		} else if (StrEqualsIgnoreCase(name, "uv_points")) {
+			for (const TextNode &p : b.children) {
+				std::array<float, 2> v{};
+				floats(p, 2, v.data());
+				out.uvs.push_back(v);
+			}
+		} else if (StrEqualsIgnoreCase(name, "matrices")) {
+			for (const TextNode &p : b.children) {
+				Matrix m;
+				floats(p, 12, m.m);
+				out.matrices.push_back(m);
+			}
+		} else if (StrEqualsIgnoreCase(name, "images")) {
+			for (const TextNode &p : b.children) out.images.push_back(p.Value());
+		} else if (StrEqualsIgnoreCase(name, "textures")) {
+			for (const TextNode &p : b.children) out.texture_image.push_back(static_cast<uint32_t>(TextInt(p.Value())));
+		} else if (StrEqualsIgnoreCase(name, "vtx_states")) {
+			for (const TextNode &p : b.children) out.vtx_matrix.push_back(static_cast<int32_t>(TextInt(p.Value(1))));
+		} else if (StrEqualsIgnoreCase(name, "prim_states")) {
+			for (const TextNode &p : b.children) {
+				/* flags, shader, the texture's indices (a bracket of their own), the bias of the depth, the vertex state ... */
+				ShapeData::PrimState ps;
+				if (const TextNode *idx = p.Child("tex_idxs"); idx != nullptr && TextInt(idx->Value(0)) > 0) ps.texture = static_cast<int32_t>(TextInt(idx->Value(1)));
+				ps.vtx_state = static_cast<int32_t>(TextInt(p.Value(3)));
+				out.prim_states.push_back(ps);
+			}
+		} else if (StrEqualsIgnoreCase(name, "lod_controls")) {
+			lods = &b;
+		}
+	}
+	if (lods == nullptr || out.points.empty()) {
+		Debug(grf, 0, "Simtrains: {} cannot be read", path);
+		return false;
+	}
+
+	/* The nearest distance of the first control of distances. */
+	const TextNode *best = nullptr;
+	for (const TextNode &lod : lods->children) {
+		const TextNode *levels = lod.Child("distance_levels");
+		if (levels == nullptr) continue;
+		for (const TextNode &level : levels->children) {
+			float distance = 1e29f;
+			std::vector<int32_t> h;
+			if (const TextNode *head = level.Child("distance_level_header"); head != nullptr) {
+				if (const TextNode *sel = head->Child("dlevel_selection"); sel != nullptr) distance = TextFloat(sel->Value());
+				if (const TextNode *hier = head->Child("hierarchy"); hier != nullptr) {
+					const size_t n = std::min<size_t>(static_cast<size_t>(std::max<int64_t>(TextInt(hier->Value(0)), 0)), 4096);
+					for (size_t k = 0; k < n; k++) h.push_back(static_cast<int32_t>(TextInt(hier->Value(k + 1))));
+				}
+			}
+			if (distance < out.distance) {
+				out.distance = distance;
+				best = &level;
+				out.hierarchy = std::move(h);
+			}
+		}
+		break;
+	}
+	if (best == nullptr) return false;
+
+	const TextNode *subs = best->Child("sub_objects");
+	if (subs == nullptr) return false;
+	for (const TextNode &sub : subs->children) {
+		ShapeData::Sub so;
+		if (const TextNode *vertices = sub.Child("vertices"); vertices != nullptr) {
+			for (const TextNode &v : vertices->children) {
+				/* flags, point, normal, two colours, then its texture's points in a bracket. */
+				ShapeData::Sub::Vertex vx{static_cast<uint32_t>(TextInt(v.Value(1))), static_cast<uint32_t>(TextInt(v.Value(2))), 0};
+				if (const TextNode *uvs = v.Child("vertex_uvs"); uvs != nullptr && TextInt(uvs->Value(0)) > 0) vx.uv = static_cast<uint32_t>(TextInt(uvs->Value(1)));
+				so.vertices.push_back(vx);
+			}
+		}
+		if (const TextNode *prims = sub.Child("primitives"); prims != nullptr) {
+			int32_t state = 0;
+			for (const TextNode &p : prims->children) {
+				if (StrEqualsIgnoreCase(p.name, "prim_state_idx")) {
+					state = static_cast<int32_t>(TextInt(p.Value()));
+					continue;
+				}
+				if (!StrEqualsIgnoreCase(p.name, "indexed_trilist")) continue;
+				const TextNode *l = p.Child("vertex_idxs");
+				if (l == nullptr) continue;
+				const size_t n = std::min<size_t>(static_cast<size_t>(std::max<int64_t>(TextInt(l->Value(0)), 0)), l->values.empty() ? 0 : l->values.size() - 1);
+				std::vector<uint32_t> idx(n);
+				for (size_t k = 0; k < n; k++) idx[k] = static_cast<uint32_t>(TextInt(l->Value(k + 1)));
+				so.lists.emplace_back(state, std::move(idx));
+			}
+		}
+		out.subs.push_back(std::move(so));
+	}
+	return true;
+}
+
+} // namespace
+
+/**
+ * The model of an engine of MSTS (its .s) for drawing, binary or text: the nearest of its distances, every part
+ * placed by its matrix and those above it, turned into the frame of the game's vehicle objects; its textures beside it.
+ */
+bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
+{
+	std::vector<uint8_t> d = ReadBytes(path);
+	if (d.empty() || !Unpack(d)) return false;
+	ShapeData sd;
+	if (d.size() >= 16 && std::string_view(reinterpret_cast<const char *>(d.data()), 8) == "JINX0s1b") {
+		if (!ReadBinaryShape(d, sd, path)) return false;
+	} else {
+		std::string text = TextOf(d);
+		if (text.find("JINX0s1t") == std::string::npos && text.find("shape") == std::string::npos) {
+			Debug(grf, 0, "Simtrains: {} is not a model of MSTS", path);
+			return false;
+		}
+		if (!ReadTextShape(text, sd, path)) return false;
+	}
+
 	/* Where a point of a matrix's part is in the model: through the matrix and those above it. */
 	auto place = [&](int32_t matrix, float &x, float &y, float &z, bool is_point) {
-		for (int guard = 0; matrix >= 0 && static_cast<size_t>(matrix) < matrices.size() && guard < 64; guard++) {
-			matrices[matrix].Apply(x, y, z, is_point);
-			matrix = static_cast<size_t>(matrix) < hierarchy.size() ? hierarchy[matrix] : -1;
+		for (int guard = 0; matrix >= 0 && static_cast<size_t>(matrix) < sd.matrices.size() && guard < 64; guard++) {
+			sd.matrices[matrix].Apply(x, y, z, is_point);
+			matrix = static_cast<size_t>(matrix) < sd.hierarchy.size() ? sd.hierarchy[matrix] : -1;
 		}
 	};
 
@@ -825,13 +1118,13 @@ bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
 	std::map<uint32_t, uint8_t> tex_of_image;
 	const std::string folder = path.substr(0, path.find_last_of(PATHSEPCHAR) + 1);
 	auto texture_slot = [&](int32_t texture) -> uint8_t {
-		if (texture < 0 || static_cast<size_t>(texture) >= texture_image.size()) return 0;
-		uint32_t image = texture_image[texture];
+		if (texture < 0 || static_cast<size_t>(texture) >= sd.texture_image.size()) return 0;
+		uint32_t image = sd.texture_image[texture];
 		auto it = tex_of_image.find(image);
 		if (it != tex_of_image.end()) return it->second;
 		uint8_t slot = static_cast<uint8_t>(std::min<size_t>(mesh.textures.size(), 254));
 		SimtrainsMesh::Texture t;
-		t.name = image < images.size() ? images[image] : std::string();
+		t.name = image < sd.images.size() ? sd.images[image] : std::string();
 		std::string file = t.name.empty() ? std::string() : FindInFolder(folder, t.name);
 		if (file.empty() || !ReadAce(file, t)) Debug(grf, 0, "Simtrains: the texture {} of {} cannot be read", t.name, path);
 		mesh.textures.push_back(std::move(t));
@@ -839,77 +1132,54 @@ bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh)
 		return slot;
 	};
 
-	for (const Block &part : r.Children(best, false)) {
-		if (part.token != TOK_SUB_OBJECTS) continue;
-		for (const Block &sub : r.Children(part, true)) {
-			struct Vertex { uint32_t point, normal, uv; };
-			std::vector<Vertex> vertices;
-			Block prims{};
-			for (const Block &x : r.Children(sub, false)) {
-				if (x.token == TOK_VERTICES) {
-					for (const Block &v : r.Children(x, true)) {
-						Vertex vx{r.U32(v.start + 4), r.U32(v.start + 8), 0};
-						Block uvb;
-						if (r.BlockAt(v.start + 20, v.end, uvb) && r.U32(uvb.start) > 0) vx.uv = r.U32(uvb.start + 4);
-						vertices.push_back(vx);
+	for (const ShapeData::Sub &so : sd.subs) {
+		for (const auto &[state, idx] : so.lists) {
+			const ShapeData::PrimState ps = state >= 0 && static_cast<size_t>(state) < sd.prim_states.size() ? sd.prim_states[state] : ShapeData::PrimState{};
+			const int32_t matrix = ps.vtx_state >= 0 && static_cast<size_t>(ps.vtx_state) < sd.vtx_matrix.size() ? sd.vtx_matrix[ps.vtx_state] : -1;
+			const uint8_t slot = texture_slot(ps.texture);
+			for (size_t k = 0; k + 2 < idx.size(); k += 3) {
+				uint32_t corner[3];
+				bool good = true;
+				const size_t pos_before = mesh.pos.size(), nrm_before = mesh.nrm.size(), uv_before = mesh.uv.size();
+				for (int c = 0; c < 3; c++) {
+					const uint32_t vi = idx[k + c];
+					if (vi >= so.vertices.size() || so.vertices[vi].point >= sd.points.size()) {
+						good = false;
+						break;
+					}
+					const ShapeData::Sub::Vertex &v = so.vertices[vi];
+					float px = sd.points[v.point][0], py = sd.points[v.point][1], pz = sd.points[v.point][2];
+					place(matrix, px, py, pz, true);
+					float nx = 0, ny = 1, nz = 0;
+					if (v.normal < sd.normals.size()) {
+						nx = sd.normals[v.normal][0];
+						ny = sd.normals[v.normal][1];
+						nz = sd.normals[v.normal][2];
+						place(matrix, nx, ny, nz, false);
+					}
+					/* MSTS: x to the right, y up, z forward; the game's objects: x forward, y left, z up. */
+					corner[c] = static_cast<uint32_t>(mesh.pos.size() / 3);
+					mesh.pos.insert(mesh.pos.end(), {pz, -px, py});
+					mesh.nrm.insert(mesh.nrm.end(), {nz, -nx, ny});
+					if (v.uv < sd.uvs.size()) {
+						mesh.uv.insert(mesh.uv.end(), {sd.uvs[v.uv][0], sd.uvs[v.uv][1]});
+					} else {
+						mesh.uv.insert(mesh.uv.end(), {0.0f, 0.0f});
 					}
 				}
-				if (x.token == TOK_PRIMITIVES) prims = x;
-			}
-			if (prims.end == 0) continue;
-			int32_t state = 0;
-			for (const Block &p : r.Children(prims, true)) {
-				if (p.token == TOK_PRIM_STATE_IDX) {
-					state = r.I32(p.start);
+				if (!good) {
+					/* The corners of a triangle already put in, taken out again. */
+					mesh.pos.resize(pos_before);
+					mesh.nrm.resize(nrm_before);
+					mesh.uv.resize(uv_before);
 					continue;
 				}
-				if (p.token != TOK_INDEXED_TRILIST) continue;
-				const PrimState ps = state >= 0 && static_cast<size_t>(state) < prim_states.size() ? prim_states[state] : PrimState{};
-				const int32_t matrix = ps.vtx_state >= 0 && static_cast<size_t>(ps.vtx_state) < vtx_matrix.size() ? vtx_matrix[ps.vtx_state] : -1;
-				const uint8_t slot = texture_slot(ps.texture);
-				for (const Block &x : r.Children(p, false)) {
-					if (x.token != TOK_VERTEX_IDXS) continue;
-					const uint32_t n = r.U32(x.start);
-					if (x.start + 4 + static_cast<size_t>(n) * 4 > x.end) break;
-					for (uint32_t k = 0; k + 2 < n; k += 3) {
-						uint32_t corner[3];
-						bool good = true;
-						for (int c = 0; c < 3; c++) {
-							const uint32_t vi = r.U32(x.start + 4 + 4 * (k + c));
-							if (vi >= vertices.size() || vertices[vi].point >= points.size()) {
-								good = false;
-								break;
-							}
-							const Vertex &v = vertices[vi];
-							float px = points[v.point][0], py = points[v.point][1], pz = points[v.point][2];
-							place(matrix, px, py, pz, true);
-							float nx = 0, ny = 1, nz = 0;
-							if (v.normal < normals.size()) {
-								nx = normals[v.normal][0];
-								ny = normals[v.normal][1];
-								nz = normals[v.normal][2];
-								place(matrix, nx, ny, nz, false);
-							}
-							/* MSTS: x to the right, y up, z forward; the game's objects: x forward, y left, z up. */
-							corner[c] = static_cast<uint32_t>(mesh.pos.size() / 3);
-							mesh.pos.insert(mesh.pos.end(), {pz, -px, py});
-							mesh.nrm.insert(mesh.nrm.end(), {nz, -nx, ny});
-							if (v.uv < uvs.size()) {
-								mesh.uv.insert(mesh.uv.end(), {uvs[v.uv][0], uvs[v.uv][1]});
-							} else {
-								mesh.uv.insert(mesh.uv.end(), {0.0f, 0.0f});
-							}
-						}
-						if (!good) continue;
-						/* Mirrored into the game's frame, so the other way round. */
-						mesh.tri.insert(mesh.tri.end(), {corner[0], corner[2], corner[1]});
-						mesh.tri_tex.push_back(slot);
-					}
-				}
+				/* Mirrored into the game's frame, so the other way round. */
+				mesh.tri.insert(mesh.tri.end(), {corner[0], corner[2], corner[1]});
+				mesh.tri_tex.push_back(slot);
 			}
 		}
 	}
-	if (!r.ok) Debug(grf, 0, "Simtrains: {} read only in part", path);
-	Debug(grf, 1, "Simtrains: {}: {} triangles, {} textures (distance {:.0f} m)", path, mesh.tri.size() / 3, mesh.textures.size(), best_distance);
+	Debug(grf, 1, "Simtrains: {}: {} triangles, {} textures (distance {:.0f} m)", path, mesh.tri.size() / 3, mesh.textures.size(), sd.distance);
 	return !mesh.tri.empty();
 }

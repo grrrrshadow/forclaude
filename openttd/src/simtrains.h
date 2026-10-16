@@ -24,7 +24,7 @@
  */
 struct SimtrainsEngine {
 	std::string folder;           ///< the folder of its .eng, ending with the path separator
-	std::string eng;              ///< the .eng's name without ".eng"
+	std::string eng;              ///< the .eng's (or .wag's) name without its extension
 	std::string name;             ///< "Name"
 	std::string shape;            ///< "WagonShape": the .s, its path
 	enum class Traction : uint8_t { Steam, Diesel, Electric } traction = Traction::Diesel;
@@ -32,6 +32,9 @@ struct SimtrainsEngine {
 	double force_kn = 0;          ///< "MaxForce"
 	double speed_kmh = 0;         ///< "MaxVelocity"
 	double mass_t = 0;            ///< "Mass"
+	bool wagon = false;           ///< a wagon (a .wag): no power, carries
+	bool passengers = false;      ///< a wagon's "Type ( Carriage )": passengers, else goods of any kind
+	int capacity = 0;             ///< a wagon's: "PassengerCapacity", or a goods wagon's own
 	bool has_cab = false;         ///< "PassengerCabinHeadPos" given
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
 	uint32_t grfid = 0;           ///< the GRF's id, of its .eng's name
