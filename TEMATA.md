@@ -30,6 +30,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   zrychlování): vlak s vagony v těsné zatáčce (1 kus diagonály mezi rohy) smí jen 88 km/h, ze 128 km/h zabrzdí
   na jedné dlaždici. S kulatými oblouky vypnutými je to na tik stejné. Zatáčka s 5 kusy diagonály: limit 168,
   vlak nebrzdí. Čeká se, jestli hráč chce měnit pravidlo (musí to být volba hry v savu, vypnutá = vanilla).
+- Hráč: bez okna pískoviště je myš cukavá a všechno zpomalené. Příčina (`d608a9f`): otočený pohled při každém
+  pohybu čehokoli (vlak, Mat, holky, auto VB) překresloval skoro celou obrazovku, protože nevěděl, v jaké výšce
+  věc je. Teď každé označení nese místo ve světě. Rig 1000×700: vlak 670 000 → 61 000 px na snímek, město
+  186 000 → 4 300 px, bez duchů. Okno pískoviště jen zakrylo kus mapy (v rigu pomohlo málo).
+- Postavy jsou na mapě (mimo kabinu) schválně zvětšené, normální velikost jen v pohledu z první osoby.
+- Přepínač velikosti v nastavení grafik: jen „zvětšené / zmenšené“ (`3714835`).
+- Lokomotivy ŽSSK 750 (trainset.simtrains.eu, Miku031, modely Ondra Janiš): stránka neuvádí žádnou licenci,
+  tedy bez svolení autorů (modelu, skinů i fotek) do hry nesmí.
 
 ## 16. 10. – technologie z OpenMW (hráč: „1–9 ano“)
 
