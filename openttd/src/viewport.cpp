@@ -1957,7 +1957,9 @@ static bool _night_windows_now = false;
 static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
 static std::vector<std::array<double, 3>> _night_glows;
 
-static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true, float *zb = nullptr, std::vector<std::pair<uint32_t *, uint32_t>> *lit_pixels = nullptr)
+static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
+
+static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true, float *zb = nullptr, std::vector<std::pair<uint32_t *, uint32_t>> *lit_pixels = nullptr, int row_lo = 0, int row_hi = INT_MAX)
 {
 	double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 	if (std::abs(area) < 1e-9) return;
@@ -1977,8 +1979,8 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 		dd_dy = ((c.d - a.d) * (b.x - a.x) - (b.d - a.d) * (c.x - a.x)) / area;
 	}
 	double sign = area > 0 ? 1.0 : -1.0;
-	int y0 = std::max(0, static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
-	int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a.y, b.y, c.y}) - 0.5)));
+	int y0 = std::max(std::max(0, row_lo), static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
+	int y1 = std::min(std::min(h, row_hi) - 1, static_cast<int>(std::floor(std::max({a.y, b.y, c.y}) - 0.5)));
 	for (int y = y0; y <= y1; y++) {
 		double yc = y + 0.5;
 		double xlo = -1e18, xhi = 1e18;
@@ -2054,6 +2056,9 @@ struct TurnedTimes {
 	double collect = 0; ///< the tiles' draw procedures
 	double standing = 0; ///< the billboards
 	double models = 0;  ///< the buildings that are 3D objects: drawn
+	double models_project = 0; ///< of that: their corners projected and their triangles sorted
+	double models_raster = 0;  ///< of that: their pixels
+	int models_drawn = 0;      ///< objects drawn (an object in several blocks, once for each)
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
 };
@@ -2068,8 +2073,8 @@ static inline double TurnedNow()
 void TurnedTimingsPrint()
 {
 	const TurnedTimes &t = _turned_times;
-	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f}",
-			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models);
+	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
+			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
 	_turned_times = TurnedTimes();
 }
 
@@ -3205,6 +3210,8 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 {
 	static std::vector<TurnedVertex> verts;
 	static std::vector<std::pair<double, size_t>> order;
+	const double t_start = TurnedNow();
+	_turned_times.models_drawn++;
 	order.clear();
 	verts.clear();
 	const ThreeDObjectTexture *tex = nullptr;
@@ -3298,8 +3305,13 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			cover(std::min({a.x, b.x, c.x}), std::min({a.y, b.y, c.y}), std::max({a.x, b.x, c.x}), std::max({a.y, b.y, c.y}));
 		}
 	}
+	const double t_projected = TurnedNow();
+	_turned_times.models_project += t_projected - t_start;
 	if (zx1 < zx0 || zy1 < zy0) return;
-	for (int y = zy0; y <= zy1; y++) std::fill_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, -std::numeric_limits<float>::infinity());
+	/* Its triangles and figures in their order, a stripe of its rows a core (the technologies of OpenMW, the player,
+	 * 16. 10.): each stripe all of them in the same order, only its rows -- the picture as drawn one after the other. */
+	auto draw_rows = [&](int row_lo, int row_hi) {
+	for (int y = row_lo; y < row_hi; y++) std::fill_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, -std::numeric_limits<float>::infinity());
 	for (const auto &[near, t] : order) {
 		if (t >= tris) {
 			const OnIt &f = on_it[SIZE_MAX - t];
@@ -3308,7 +3320,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			const ThreeDModelPicture &pic = *f.pic;
 			int px = static_cast<int>(std::lround(sx)) + pic.left, py = static_cast<int>(std::lround(sy)) + pic.top;
 			int x0 = std::max(0, -px), x1 = std::min(pic.width, fw - px);
-			int y0 = std::max(0, -py), y1 = std::min(pic.height, fh - py);
+			int y0 = std::max(std::max(0, -py), row_lo - py), y1 = std::min(std::min(pic.height, fh - py), row_hi - py);
 			for (int y = y0; y < y1; y++) {
 				const uint32_t *src = &pic.pixels[static_cast<size_t>(y) * pic.width];
 				uint32_t *row = dst + static_cast<size_t>(py + y) * pitch + px;
@@ -3330,8 +3342,12 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			}
 			continue;
 		}
-		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o->tri[t]], verts[o->tri[t + 1]], verts[o->tri[t + 2]], true, zb.data());
+		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[o->tri[t]], verts[o->tri[t + 1]], verts[o->tri[t + 2]], true, zb.data(), nullptr, row_lo, row_hi);
 	}
+	};
+	const int rows = zy1 - zy0 + 1;
+	ParallelRows(rows, [&](int lo, int hi) { draw_rows(zy0 + lo, zy0 + hi); }, order.size() >= 4096 && rows >= 128);
+	_turned_times.models_raster += TurnedNow() - t_projected;
 	/* At night its lit windows over it, kept bright (DrawNight()), and the places of its glows. */
 	if (_night_windows_now && o != nullptr && tex != nullptr && !o->night_tri.empty()) {
 		static std::vector<TurnedVertex> night;
@@ -3428,6 +3444,13 @@ bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, fl
 /** Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot (box_kind 7). */
 static void AddTurnedObjectsToDraw()
 {
+	/* Their textures made on every core first, before they are drawn. */
+	std::vector<ThreeDTextureWanted> wanted;
+	for (const TurnedObject &to : _turned_objects) {
+		if (to.obj != nullptr) wanted.push_back({to.obj, to_underlying(_vd.dpi.zoom), to.obj->PaintAt(to.origin)});
+		if (to.ground != nullptr) wanted.push_back({to.ground, to_underlying(_vd.dpi.zoom), to.ground->PaintAt(to.origin)});
+	}
+	PrepareThreeDObjectTextures(wanted);
 	for (size_t m = 0; m < _turned_objects.size(); m++) {
 		const TurnedObject &to = _turned_objects[m];
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
@@ -6513,7 +6536,7 @@ static bool _cab_batching = false;
  */
 int _cab_threads = 0; ///< The rig: how many threads to draw on (test3d chodec mereni), 0 every core.
 
-static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true)
+static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth)
 {
 	static const int cores = std::clamp<int>(static_cast<int>(std::thread::hardware_concurrency()), 1, 16);
 	const int n = worth ? std::min(_cab_threads > 0 ? _cab_threads : cores, std::max(1, rows / 16)) : 1;

@@ -121,7 +121,7 @@ struct ThreeDObject {
 	std::array<std::vector<ThreeDObjectFigure>, 2> work;    ///< "prace" of the soil: the girls at work on a tile of marijuana [0], of potatoes [1]
 	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
 
-	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0) const;
+	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	uint32_t PaintAt(TileIndex origin) const;
 };
 
@@ -322,6 +322,13 @@ struct ThreeDModelPicture;
 bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, float yaw, ZoomLevel zoom, ThreeDModelPicture &out);
 const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme = 0);
 const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin);
+/** A texture of an object wanted for drawing: the object, the level of detail and the paint (PrepareThreeDObjectTextures()). */
+struct ThreeDTextureWanted {
+	const ThreeDObject *obj;
+	int level;
+	uint32_t paint;
+};
+void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted);
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();

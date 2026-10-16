@@ -36,6 +36,8 @@
 #include <set>
 #include <tuple>
 #include <unordered_map>
+#include <atomic>
+#include <thread>
 
 #ifdef WITH_PNG
 #include <png.h>
@@ -1722,7 +1724,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 }
 
 /** The painted textures kept, bytes; past PAINTED_BUDGET all are dropped and made again as they are drawn. */
-static size_t _painted_bytes = 0;
+static std::atomic<size_t> _painted_bytes = 0;
 static constexpr size_t PAINTED_BUDGET = static_cast<size_t>(192) << 20;
 
 /**
@@ -1752,7 +1754,12 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
  * (PaintAt()) as the vehicles' colour by number: each pixel of a part's mask the part's colour at the texture's
  * lightness, its own where the texture is "zacatek" light.
  */
-const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint) const
+/**
+ * The texture of the object at a level of detail, painted by number (PaintAt()), made the first time it is asked for.
+ * @param may_drop whether the painted textures of every object may be dropped here when they take too much memory;
+ *                 not while textures are made on several cores at once (PrepareThreeDObjectTextures())
+ */
+const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, bool may_drop) const
 {
 	if (this->levels.empty()) DecodeTextureLevels(this->png, this->levels);
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
@@ -1761,7 +1768,7 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint) c
 	auto it = this->painted.find({level, paint});
 	if (it != this->painted.end()) return &it->second;
 
-	if (_painted_bytes > PAINTED_BUDGET) {
+	if (may_drop && _painted_bytes > PAINTED_BUDGET) {
 		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
 		_painted_bytes = 0;
 	}
@@ -1797,6 +1804,46 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint) c
 	}
 	_painted_bytes += t.px.size() * sizeof(uint32_t);
 	return &this->painted.emplace(std::make_pair(level, paint), std::move(t)).first->second;
+}
+
+/**
+ * Make the textures of objects about to be drawn on every core of the processor at once, before they are drawn (the
+ * technologies of OpenMW, the player, 16. 10.: it makes its world ready in threads of its own): reading the PNG and
+ * painting it took the first picture of a town two seconds, one texture after the other. Each object's textures on
+ * one thread, the objects shared among the threads.
+ * @param wanted the textures: object, level of detail, paint
+ */
+void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
+{
+	/* What is not made yet, by object. */
+	std::vector<std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>> jobs;
+	for (const ThreeDTextureWanted &w : wanted) {
+		const ThreeDObject *o = w.obj;
+		if (o == nullptr) continue;
+		if (!o->levels.empty()) {
+			const int level = std::clamp<int>(w.level, 0, static_cast<int>(o->levels.size()) - 1);
+			if (w.paint == 0 || o->colours.empty() || o->painted.contains({level, w.paint})) continue;
+		}
+		auto it = std::ranges::find(jobs, o, &std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>::first);
+		if (it == jobs.end()) it = jobs.insert(jobs.end(), {o, {}});
+		if (std::ranges::find(it->second, std::make_pair(w.level, w.paint)) == it->second.end()) it->second.emplace_back(w.level, w.paint);
+	}
+	if (jobs.size() < 2) return; // as it comes, when drawn
+	if (_painted_bytes > PAINTED_BUDGET) {
+		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
+		_painted_bytes = 0;
+	}
+	std::atomic<size_t> next = 0;
+	auto work = [&]() {
+		for (size_t j; (j = next++) < jobs.size();) {
+			for (const auto &[level, paint] : jobs[j].second) jobs[j].first->GetTexture(level, paint, false);
+		}
+	};
+	const size_t cores = std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16);
+	std::vector<std::thread> threads;
+	for (size_t i = 1; i < std::min(cores, jobs.size()); i++) threads.emplace_back(work);
+	work();
+	for (std::thread &t : threads) t.join();
 }
 
 /** The rig: the objects read, a line each. */
