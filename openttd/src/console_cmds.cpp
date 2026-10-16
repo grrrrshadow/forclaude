@@ -160,6 +160,7 @@
 #include "timer/timer_game_calendar.h"
 
 #include "walker_cmd.h"
+#include "three_d_dragons.h"
 
 #include "safeguards.h"
 
@@ -8867,6 +8868,32 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			ShowFirstPersonWindow();
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeFirstPerson());
+	} else if (what == "draci") {
+		/* The dragons (three_d_dragons.h): 'draci' tells where they are; 'draci posli [jmeno]' sends one near the walker
+		 * of the view from the first person (or the middle of the main view); 'draci uder' a blow of the hammer. */
+		extern bool FirstPersonWalkerAt(double &x, double &y);
+		double wx = 0, wy = 0;
+		const bool walker = FirstPersonWalkerAt(wx, wy);
+		if (!walker) {
+			const Window *mw = GetMainWindow();
+			if (mw != nullptr && mw->viewport != nullptr) {
+				Point p = TranslateXYToTileCoord(*mw->viewport, mw->viewport->left + mw->viewport->width / 2, mw->viewport->top + mw->viewport->height / 2, true);
+				wx = p.x;
+				wy = p.y;
+			}
+		}
+		if (argv.size() > 2 && argv[2] == "posli") {
+			/* 'draci posli [jmeno] [dlazdic]': so many tiles ahead of the walker (4 without it). */
+			extern double FirstPersonWalkerHeading();
+			const std::string_view kind = argv.size() > 3 ? argv[3] : std::string_view{};
+			const double ahead = number(4).value_or(4) * static_cast<double>(TILE_SIZE), h = FirstPersonWalkerHeading();
+			const bool sent = SendThreeDDragon(kind, wx + std::cos(h) * ahead, wy + std::sin(h) * ahead);
+			IConsolePrint(CC_DEFAULT, "test3d: drak {}", sent ? "poslan" : "NEPOSLAN");
+		} else if (argv.size() > 2 && argv[2] == "uder" && walker) {
+			extern double FirstPersonWalkerHeading();
+			IConsolePrint(CC_DEFAULT, "test3d: uder {}", HitThreeDDragon(wx, wy, FirstPersonWalkerHeading(), 2.5) ? "zasahl" : "minul");
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDDragons());
 	} else if (what == "inventar") {
 		/* The walker's inventory (walker_inventory_gui.cpp): 'inventar' opens it and tells what it holds and what is sold
 		 * near the walker; 'inventar koupit <n>' buys thing n there, 'inventar pouzit <n>' uses it, 'inventar zdravi <n>'

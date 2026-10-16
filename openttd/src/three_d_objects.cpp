@@ -48,6 +48,8 @@ static std::vector<ThreeDObject> _three_d_objects;
 static bool _three_d_objects_read = false;
 /** The objects by the town theme (TownTheme, 0 every town), the house and the colour slot: the index into _three_d_objects. */
 static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objects;
+/** The creatures of the indices ("druh": "tvor", the colleague's dragons). */
+static std::vector<ThreeDCreature> _creatures;
 /** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
 
@@ -929,6 +931,32 @@ static void ReadThreeDVehicleObjects()
 					continue;
 				}
 				const std::string figure_kind = e.value("druh", std::string("dum"));
+				if (figure_kind == "tvor" && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object()) {
+					/* A creature: each of its animations a figure of its own, "<jmeno>/<animace>". */
+					ThreeDCreature creature;
+					creature.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+						for (int k = 0; k < 3; k++) creature.size[k] = e.at("rozmer_m").at(k).get<float>();
+					}
+					for (const auto &[anim, a] : e.at("animace").items()) {
+						if (!a.is_object()) continue;
+						ThreeDVehicleObject fig;
+						fig.package = package;
+						fig.file = folder + e.at("soubor").get<std::string>();
+						if (e.contains("textura") && e.at("textura").is_string()) fig.paint_file = folder + e.at("textura").get<std::string>();
+						fig.name = creature.Figure(anim);
+						fig.frame_prefix = a.value("uzly", anim + "_");
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+						fig.loop = a.value("smycka", true);
+						fig.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+						if (fig.frames < 2) fig.frame_prefix.clear();
+						_figure_objects.push_back(std::move(fig));
+						creature.animations.push_back(anim);
+					}
+					if (!creature.animations.empty()) _creatures.push_back(std::move(creature));
+					continue;
+				}
 				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom") && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
 					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
@@ -1220,6 +1248,7 @@ void ResetThreeDVehicleObjects()
 	_driving_objects.clear();
 	_vehicle_object_pieces.clear();
 	_three_d_theme_trees.clear();
+	_creatures.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -1607,6 +1636,13 @@ std::span<const std::string> GetThreeDThemeTrees(uint8_t theme)
 	auto it = _three_d_theme_trees.find(theme);
 	if (it == _three_d_theme_trees.end()) return {};
 	return it->second;
+}
+
+/** The creatures of the indices ("druh": "tvor", the colleague's dragons), read the first time they are asked for. */
+const std::vector<ThreeDCreature> &GetThreeDCreatures()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _creatures;
 }
 
 /**

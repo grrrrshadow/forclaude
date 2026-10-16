@@ -239,6 +239,7 @@ struct ThreeDVehicleObject {
 	int frames = 0;                 ///< "snimku": how many frames
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
 	float walk_step = 0;            ///< "chuze": "krok_m", metres a round of its frames walks; 0 when it does not walk
+	bool loop = true;               ///< "smycka": the frames go round; false, they run once and stay on the last (a creature's attack, its death)
 	int spin_ticks = 0;             ///< a thing that turns ("predmet" with "otaceni", the spit of the pub): game ticks a turn ("tiku_na_otacku"), 0 for none
 	float spin_axis[3] = {1, 0, 0}; ///< "osa": the axis it turns about, in its frame
 	float spin_centre[3] = {};      ///< "stred": a point of the axis, metres
@@ -267,6 +268,20 @@ private:
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+
+/**
+ * A creature of the indices ("druh": "tvor", the colleague's dragons, hra/3d/PROSBA-DRACI.md): its animations, each
+ * read as a figure of its own named "<jmeno>/<animace>" (frames as nodes, "uzly", "snimku", "tiku", "smycka", "krok_m").
+ */
+struct ThreeDCreature {
+	std::string name;                    ///< "jmeno"
+	std::vector<std::string> animations; ///< the names of its animations ("klid", "chuze", "utok", "smrt", "let")
+	float size[3] = {};                  ///< "rozmer_m": length, width and height, metres
+
+	bool Has(std::string_view animation) const { return std::ranges::find(this->animations, animation) != this->animations.end(); }
+	std::string Figure(std::string_view animation) const { return this->name + "/" + std::string(animation); }
+};
+const std::vector<ThreeDCreature> &GetThreeDCreatures();
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars();
 void ResetThreeDVehicleObjects();

@@ -105,6 +105,7 @@
 #include "three_d.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_dragons.h"
 #include "three_d_walkers.h"
 #include "cab_view.h"
 #include "cab_drive.h"
@@ -3934,6 +3935,7 @@ static void ViewportDoDrawTurned()
 	ViewportAddVehicles(&cdpi);
 	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */
 	AddThreeDWalkersToViewport(zoom);
+	AddThreeDDragonsToViewport(zoom);
 	AddThreeDDriversToViewport(zoom);
 	AddThreeDEffectsToViewport(zoom);
 
@@ -4211,6 +4213,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		AutoRestoreBackup north_objects_backup(_north_house_objects_now, _north_house_objects);
 		ViewportAddLandscape();
 		if (_north_house_objects) AddTurnedObjectsToDraw();
+		if (_north_house_objects) AddThreeDDragonsToViewport(_vd.dpi.zoom);
 		ViewportAddVehicles(&_vd.dpi);
 
 		ViewportAddKdtreeSigns(&_vd.dpi);
@@ -7177,13 +7180,49 @@ struct CabFigure {
 	float size;       ///< its scale
 	int x, y, z;      ///< where it stands, world units
 	float facing;     ///< which way it faces, degrees as the figures count it
+	int frame;        ///< its frame (a dragon's), 0 for one that does not move
 };
 static std::vector<CabFigure> _cab_figures;
 
 /** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
-void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing)
+void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame)
 {
-	_cab_figures.push_back({std::string(name), size, x, y, z, facing});
+	_cab_figures.push_back({std::string(name), size, x, y, z, facing, frame});
+}
+
+static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const CabFigure &fg)
+{
+	const ThreeDVehicleObject *fig = GetThreeDFigure(fg.name);
+	if (fig == nullptr) return false;
+	const ThreeDVehicleShape *shape = fig->GetShape(fg.frame);
+	if (shape == nullptr || shape->tri.empty()) return false;
+	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
+	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * OBJECT_HEIGHT_PER_METRE;
+	const bool lit = shape->nrm.size() == shape->pos.size();
+	/* The light from above, a little from the south-east of the map, as the houses have it. */
+	static constexpr double L[3] = {-0.45, 0.35, 0.82};
+	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, shape->pngs.size()));
+	for (size_t i = 0; i < texs.size(); i++) texs[i] = fig->GetTexture(0, static_cast<int>(i));
+	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
+		std::vector<CabPoint> poly;
+		double light = 0;
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = shape->tri[t + k];
+			const double px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
+			const double wx = fg.x + (px * ca - py * sa) * across, wy = fg.y + (px * sa + py * ca) * across, wz = fg.z + pz * up;
+			poly.push_back(CabToEye(eye, wx, wy, wz, shape->uv[i * 2] * tex->w, shape->uv[i * 2 + 1] * tex->h));
+			if (lit) {
+				const double nx = shape->nrm[i * 3] * ca - shape->nrm[i * 3 + 1] * sa, ny = shape->nrm[i * 3] * sa + shape->nrm[i * 3 + 1] * ca, nz = shape->nrm[i * 3 + 2];
+				light += 0.55 + 0.45 * std::max(0.0, nx * L[0] + ny * L[1] + nz * L[2]);
+			} else {
+				light += 1.0;
+			}
+		}
+		CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false, static_cast<uint>(light / 3 * 256));
+	}
+	return true;
 }
 
 /**
@@ -7238,6 +7277,17 @@ double FirstPersonGroundZ(double x, double y)
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
 	return GetSlopePixelZOutsideMap(ix, iy);
 }
+
+/** Nearer than this to the eye (world units) a figure is drawn by its triangles, not as a billboard. */
+static constexpr double CAB_FIGURE_SOLID = 3.0 * TILE_SIZE;
+
+/**
+ * A figure near the eye by its triangles (a dragon before the walker, a mushroom by the way): in the world where it
+ * stands, turned to where it faces, its frame, its textures, lit from its normals -- a billboard of its picture would
+ * be coarse this near, and seen from above as the map sees it.
+ * @return whether it was drawn (it has a shape)
+ */
+static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const struct CabFigure &fg);
 
 /**
  * The night sky in the view from an eye (the player, 15. 10.: "only the night sky", as OpenMW has it): the stars, fixed
@@ -7692,6 +7742,8 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	}
 	is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
 	ps_kind.resize(_vd.parent_sprites_to_draw.size(), 0);
+	/* The dragons about (three_d_dragons.h), among the figures. */
+	AddThreeDDragonsToEye();
 
 	/* 3. The ground of all of them, north-up, in one texture at the normal zoom. */
 	DrawPixelInfo bigdpi{};
@@ -7950,16 +8002,22 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			bills.push_back({c.f, static_cast<double>(u->x_pos), static_cast<double>(u->y_pos), static_cast<double>(u->z_pos), 0, 0.0, 0.0, ps});
 		}
 	}
-	/* The figures standing on the tiles (the clay town's mushrooms): billboards of their pictures as the turned map
-	 * shows them, from the eye's side (the angle in steps, so that a few pictures serve every heading). */
+	/* The figures standing on the tiles (the clay town's mushrooms, the dragons): near the eye their triangles as they
+	 * are, further billboards of their pictures as the turned map shows them, from the eye's side (the angle in steps,
+	 * so that a few pictures serve every heading). */
 	for (const CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
-		if (foot.f < CAB_NEAR || foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > foot.f * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		if (foot.f < CAB_FIGURE_SOLID && CabDrawFigure(dst, zb, width, height, eye, fg)) {
+			camera.billboards++;
+			continue;
+		}
+		if (foot.f < CAB_NEAR) continue;
 		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);
 		/* Near, a finer picture: about a pixel of it to a pixel of the view. */
 		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : ZoomLevel::Normal);
 		const double per = 1.0 / (1 << (to_underlying(ZoomLevel::Normal) - to_underlying(fine)));
-		const ThreeDModelPicture *pic = GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, 0, side);
+		const ThreeDModelPicture *pic = GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, fg.frame, side);
 		if (pic == nullptr || pic->width <= 0 || pic->height <= 0) continue;
 		const double left = foot.r + pic->left * CAB_PX_ACROSS * per, right = left + pic->width * CAB_PX_ACROSS * per;
 		const double top = foot.u - pic->top * CAB_PX_UP * per, bottom = top - pic->height * CAB_PX_UP * per;

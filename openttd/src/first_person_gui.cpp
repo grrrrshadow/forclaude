@@ -43,6 +43,7 @@
 #include "company_func.h"
 #include "command_func.h"
 #include "walker_cmd.h"
+#include "three_d_dragons.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -69,6 +70,9 @@ static constexpr int FIRST_PERSON_TICK_MS = 40;
 /** How long taking the hammer out or putting it away takes, and a swing of it, seconds. */
 static constexpr double FIRST_PERSON_DRAW_S = 0.35;
 static constexpr double FIRST_PERSON_SWING_S = 0.6;
+/** When in the swing the hammer strikes, seconds, and how far it reaches, metres. */
+static constexpr double FIRST_PERSON_BLOW_S = 0.27;
+static constexpr double FIRST_PERSON_REACH_M = 2.5;
 /** The thing of the indices the walker holds ("predmet", objekty/predmety/: the colleague's hammer). */
 static constexpr std::string_view FIRST_PERSON_HAMMER = "kladivo";
 
@@ -146,6 +150,7 @@ struct FirstPersonWindow : Window {
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
 	bool hammer_out = false;              ///< the hammer taken out (F), in the hand
 	double swing_time = -1;               ///< seconds into a swing of the hammer, -1 when it is not swung
+	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
 
 	/*
 	 * Moves while the keys are held and makes the picture anew, twenty-five times a second -- only here: a paint of
@@ -161,7 +166,14 @@ struct FirstPersonWindow : Window {
 			this->Close();
 			return;
 		}
+		/* The dragons' blows since the last step (three_d_dragons.h): the health through the command, the picture red a moment. */
+		const uint damage = TakeThreeDDragonDamage();
+		if (damage > 0 && c != nullptr) {
+			Command<Commands::HurtWalker>::Post(TileIndex{}, static_cast<uint8_t>(std::min(damage, 255u)));
+			this->hurt_steps = 6;
+		}
 		this->MakePicture();
+		if (this->hurt_steps > 0) this->hurt_steps--;
 		this->SetWidgetDirty(WID_FP_CANVAS);
 		this->SetWidgetDirty(WID_FP_PANEL);
 	}};
@@ -184,6 +196,14 @@ struct FirstPersonWindow : Window {
 		const int w = canvas->current_x, h = canvas->current_y;
 		if (w <= 0 || h <= 0) return;
 		this->picture_ok = DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
+		if (this->picture_ok && this->hurt_steps > 0) {
+			/* Hurt: red over the picture, fading. */
+			const uint a = 30 + this->hurt_steps * 18;
+			for (uint32_t &p : this->picture.pixels) {
+				Colour o(p);
+				p = Colour(static_cast<uint8_t>((o.r * (255 - a) + 220 * a) / 255), static_cast<uint8_t>(o.g * (255 - a) / 255), static_cast<uint8_t>(o.b * (255 - a) / 255)).data;
+			}
+		}
 	}
 
 	/** Over the whole screen between the toolbar and the status bar, or back where the window was. */
@@ -282,7 +302,10 @@ struct FirstPersonWindow : Window {
 		raise = target > raise ? std::min(target, raise + step) : std::max(target, raise - step);
 		this->walker.held = raise > 0 ? std::string(FIRST_PERSON_HAMMER) : std::string();
 		if (this->swing_time >= 0) {
+			/* The blow lands as the hammer comes down before the eyes: on a dragon there, if one is. */
+			const bool before = this->swing_time < FIRST_PERSON_BLOW_S;
 			this->swing_time += dt;
+			if (before && this->swing_time >= FIRST_PERSON_BLOW_S) HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, FIRST_PERSON_REACH_M);
 			this->walker.swing = SwingAngle(this->swing_time);
 			if (this->swing_time >= FIRST_PERSON_SWING_S) {
 				this->swing_time = -1;
@@ -488,6 +511,23 @@ TileIndex FirstPersonShopNearby()
 		}
 	}
 	return best;
+}
+
+/** The walker of the view from the first person: where it stands, world units; false when the view is not open (three_d_dragons.h). */
+bool FirstPersonWalkerAt(double &x, double &y)
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return false;
+	x = w->walker.x;
+	y = w->walker.y;
+	return true;
+}
+
+/** The rig: the direction the walker of the view from the first person faces, radians (0 without the window). */
+double FirstPersonWalkerHeading()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr ? w->walker.heading : 0.0;
 }
 
 /** The tile the walker of the view from the first person stands on, or INVALID_TILE without the window. */

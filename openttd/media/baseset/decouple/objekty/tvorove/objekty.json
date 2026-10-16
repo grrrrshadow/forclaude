@@ -1,0 +1,162 @@
+[
+ {
+  "soubor": "drak_hnedy.glb",
+  "jmeno": "drak_hnedy",
+  "druh": "tvor",
+  "rozmer_m": [
+   7.44,
+   4.37,
+   4.77
+  ],
+  "animace": {
+   "klid": {
+    "uzly": "klid_",
+    "snimku": 12,
+    "tiku": 13,
+    "smycka": true
+   },
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.96
+   },
+   "utok": {
+    "uzly": "utok_",
+    "snimku": 8,
+    "tiku": 9,
+    "smycka": false
+   },
+   "smrt": {
+    "uzly": "smrt_",
+    "snimku": 8,
+    "tiku": 13,
+    "smycka": false
+   }
+  },
+  "kostra": "drak_hnedy_kostra.glb",
+  "poza": "chodí (chuze), stojí (klid), útočí (utok), padne a zůstane ležet (smrt)",
+  "autor": "Cethiel's Dragon 3D, Drummyfish podle 2D draka Cethiela (OpenGameArt, obojí CC0); snímky z akcí modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC0 (volné dílo); autoři prosí nepovinně uvést Cethiela a Drummyfishe",
+  "zdroj": "https://opengameart.org/content/cethiels-dragon-3d",
+  "poznamka": "počátek na zemi pod tělem, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; textura modelu (hnědý drak); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_hnedy.glb",
+  "jmeno": "drak_cerny",
+  "druh": "tvor",
+  "textura": "drak_hnedy_cerny.png",
+  "rozmer_m": [
+   7.44,
+   4.37,
+   4.77
+  ],
+  "animace": {
+   "klid": {
+    "uzly": "klid_",
+    "snimku": 12,
+    "tiku": 13,
+    "smycka": true
+   },
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.96
+   },
+   "utok": {
+    "uzly": "utok_",
+    "snimku": 8,
+    "tiku": 9,
+    "smycka": false
+   },
+   "smrt": {
+    "uzly": "smrt_",
+    "snimku": 8,
+    "tiku": 13,
+    "smycka": false
+   }
+  },
+  "kostra": "drak_hnedy_kostra.glb",
+  "poza": "totéž co drak_hnedy, jiná textura",
+  "autor": "Cethiel's Dragon 3D, Drummyfish podle 2D draka Cethiela (OpenGameArt, obojí CC0); druhá textura modelu (dragon_black.png), snímky tvorove/draci.py, bez renderu",
+  "licence": "CC0 (volné dílo); autoři prosí nepovinně uvést Cethiela a Drummyfishe",
+  "zdroj": "https://opengameart.org/content/cethiels-dragon-3d",
+  "poznamka": "počátek na zemi pod tělem, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; druhá textura modelu (černý drak), stejný glb jako drak_hnedy; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_ledovy.glb",
+  "jmeno": "drak_ledovy",
+  "druh": "tvor",
+  "rozmer_m": [
+   16.48,
+   12.87,
+   9.63
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 10,
+    "smycka": true
+   }
+  },
+  "kostra": "drak_ledovy_kostra.glb",
+  "poza": "letí, mává křídly (let)",
+  "autor": "Low Poly Ice Dragon, xTerryx (OpenGameArt, CC0); snímky z akce modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC0 (volné dílo)",
+  "zdroj": "https://opengameart.org/content/low-poly-ice-dragon",
+  "poznamka": "počátek uprostřed těla, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 2474 trojúhelníků na snímek; barvy ledu naše (model odkazuje na Colors.png, která u něj není): modrý, světlé břicho a křídla, bílý zobák, žluté oči; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; drak_ledovy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_kraci.glb",
+  "jmeno": "drak_kraci",
+  "druh": "tvor",
+  "rozmer_m": [
+   13.49,
+   5.49,
+   5.08
+  ],
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 12,
+    "tiku": 10,
+    "smycka": true,
+    "krok_m": 2.88
+   }
+  },
+  "kostra": "drak_kraci_kostra.glb",
+  "poza": "kráčí (chuze), křídla složená na hřbetě",
+  "autor": "Animated 3D Dragon Model, Benjamin Marty (BlueMonkMN, OpenGameArt, CC BY 3.0); snímky z akce modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC BY 3.0: uvést autora Benjamin Marty (BlueMonkMN)",
+  "zdroj": "https://opengameart.org/content/animated-3d-dragon-model",
+  "poznamka": "počátek na zemi pod tělem, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 4034 trojúhelníků na snímek; barvy naše (textura modelu je zkušební mřížka UV): zelený, žlutavé břicho, rudá křídla, žluté oči; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), krok_m je, o kolik hra posune draka za jeden cyklus; drak_kraci_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_cinsky.glb",
+  "jmeno": "drak_cinsky",
+  "druh": "tvor",
+  "rozmer_m": [
+   24.75,
+   3.51,
+   5.67
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 16,
+    "tiku": 6,
+    "smycka": true,
+    "krok_m": 13.0
+   }
+  },
+  "poza": "letí jako had, tělem běží vlna od hlavy k ocasu (let)",
+  "autor": "Flying Dragon, peaznchips (OpenGameArt, CC0); model létá po smyčkách dráhy, tělo napózované po naší vlně (tvorove/draci.py), bez renderu",
+  "licence": "CC0 (volné dílo)",
+  "zdroj": "https://opengameart.org/content/flying-dragon",
+  "poznamka": "počátek v hlavě (prostředek kosti hlavy), tělo se táhne za ní, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 4999/5000 trojúhelníků na snímek; zlatý jako v modelu, rudý hřbet a ploutev ocasu (barvy naše, model má zlaté materiály s normálovými mapami); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; nikdy nebledne"
+ }
+]

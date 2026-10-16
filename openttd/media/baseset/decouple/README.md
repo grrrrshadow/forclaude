@@ -97,6 +97,11 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   `mirne`) a 4 obří houby (`druh: "strom"`). Hliněné město (`Town::theme`, nastavení „Hliněná města“, první tři Drakov,
   Houbovice, Čarodějov) staví domy mírného klimatu jako každé město; ve 3D pohledech je hra kreslí hliněnými modely
   a stromy na jeho území houbami. Tamriel Rebuilt jen vzor stylu, nic z něj.
+- `tvorove/` – **draci** (od kolegy, grrrrf `hra/3d/objekty/tvorove/`, `PROSBA-DRACI.md`; OpenGameArt, CC0, kráčející
+  CC BY 3.0 – autoři v `objekty.json`): `druh: "tvor"`, každá animace (klid, chůze, útok, smrt, let) jako snímky
+  v uzlech. Občas přiletí kamkoli na mapu, s otevřeným pohledem z první osoby spíš k chodci; hnědý a černý přistanou,
+  chodí, jdou po chodci a útočí, kladivem padnou; ledový a čínský přelétají a jednou se snesou (`three_d_dragons.cpp`).
+  Soubory `_kostra.glb` hra zatím nepotřebuje, nejsou tu.
 - `predmety/` – předměty chodce v pohledu z první osoby (od kolegy, grrrrf `hra/3d/objekty/predmety/`,
   `PROSBA-PREDMETY-KLADIVO-TRUHLA.md`): válečné kladivo a truhla z OpenMW Example Suite
   (gitlab.com/OpenMW/example-suite, modely **CC0**, volné dílo), `druh: "predmet"`. Kladivo chodec nese v inventáři
