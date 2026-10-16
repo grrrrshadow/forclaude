@@ -563,6 +563,18 @@ double _object_picture_ms = 0;
 uint64_t _object_pictures_made = 0;
 
 /** A picture of an object in the turned view at an angle and zoom, kept (RasterObject()). */
+/** The pictures asked for since this clock stay (PinThreeDPictures()). */
+static uint64_t _pictures_pinned_from = UINT64_MAX;
+
+/**
+ * Keep the pictures of the 3D objects asked for from now on until unpinned: a view that collects its triangles and
+ * draws them at once on every core (the view from the eyes) draws their pixels after it asked for more of them.
+ */
+void PinThreeDPictures(bool pin)
+{
+	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
+}
+
 static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
@@ -579,7 +591,8 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 		std::vector<uint64_t> ages;
 		for (const auto &e : _object_pictures) ages.push_back(e.second.used);
 		std::nth_element(ages.begin(), ages.begin() + ages.size() / 2, ages.end());
-		uint64_t limit = ages[ages.size() / 2];
+		/* Never those of the picture being drawn (PinThreeDPictures()): their pixels are still to be drawn. */
+		uint64_t limit = std::min(ages[ages.size() / 2], _pictures_pinned_from - 1);
 		for (auto i = _object_pictures.begin(); i != _object_pictures.end();) {
 			if (i->second.used <= limit) {
 				i = _object_pictures.erase(i);

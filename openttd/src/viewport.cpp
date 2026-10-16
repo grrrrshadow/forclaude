@@ -7609,6 +7609,8 @@ struct CabFigure {
 	int x, y, z;      ///< where it stands, world units
 	float facing;     ///< which way it faces, degrees as the figures count it
 	int frame;        ///< its frame (a dragon's), 0 for one that does not move
+	float stretch = 1.0f; ///< its height against its width (a plant's)
+	bool plant = false;   ///< a plant of a field: a picture of a few angles and sizes shared by all of its kind (GetThreeDPlantPicture())
 };
 static std::vector<CabFigure> _cab_figures;
 
@@ -7618,6 +7620,16 @@ void AddCabFigure(std::string_view name, float size, int x, int y, int z, float 
 	_cab_figures.push_back({std::string(name), size, x, y, z, facing, frame});
 }
 
+/**
+ * A plant of a field in the view from the eyes (the technologies of OpenMW, the player, 16. 10.: thousands of the
+ * same plant cheaply): one model and a few pictures of it for all of them, each drawn where it stands -- the
+ * pictures at a few angles and sizes (GetThreeDPlantPicture()), the model only for those at the walker's feet.
+ */
+static void AddCabPlant(std::string_view name, float scale, float stretch, double x, double y, double z, float facing)
+{
+	_cab_figures.push_back({std::string(name), scale, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, 0, stretch, true});
+}
+
 static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const CabFigure &fg)
 {
 	const ThreeDVehicleObject *fig = GetThreeDFigure(fg.name);
@@ -7625,30 +7637,55 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 	const ThreeDVehicleShape *shape = fig->GetShape(fg.frame);
 	if (shape == nullptr || shape->tri.empty()) return false;
 	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
-	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * OBJECT_HEIGHT_PER_METRE;
+	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * fg.stretch * OBJECT_HEIGHT_PER_METRE;
 	const bool lit = shape->nrm.size() == shape->pos.size();
 	/* The light from above, a little from the south-east of the map, as the houses have it. */
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
 	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, shape->pngs.size()));
 	for (size_t i = 0; i < texs.size(); i++) texs[i] = fig->GetTexture(0, static_cast<int>(i));
+	/* Every corner to the eye once, with its light (a plant of thousands of triangles at the walker's feet). */
+	const size_t corners = shape->pos.size() / 3;
+	static std::vector<CabPoint> pts;
+	static std::vector<CabVertex> scr;
+	static std::vector<double> lights;
+	pts.resize(corners);
+	scr.resize(corners);
+	lights.resize(corners);
+	for (size_t i = 0; i < corners; i++) {
+		const double px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
+		pts[i] = CabToEye(eye, fg.x + (px * ca - py * sa) * across, fg.y + (px * sa + py * ca) * across, fg.z + pz * up, shape->uv[i * 2], shape->uv[i * 2 + 1]);
+		if (pts[i].f >= CAB_NEAR) scr[i] = CabProject(eye, pts[i]);
+		if (lit) {
+			const double nx = shape->nrm[i * 3] * ca - shape->nrm[i * 3 + 1] * sa, ny = shape->nrm[i * 3] * sa + shape->nrm[i * 3 + 1] * ca, nz = shape->nrm[i * 3 + 2];
+			lights[i] = 0.55 + 0.45 * std::max(0.0, nx * L[0] + ny * L[1] + nz * L[2]);
+		} else {
+			lights[i] = 1.0;
+		}
+	}
 	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
 		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
-		std::vector<CabPoint> poly;
-		double light = 0;
-		for (int k = 0; k < 3; k++) {
-			const uint32_t i = shape->tri[t + k];
-			const double px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
-			const double wx = fg.x + (px * ca - py * sa) * across, wy = fg.y + (px * sa + py * ca) * across, wz = fg.z + pz * up;
-			poly.push_back(CabToEye(eye, wx, wy, wz, shape->uv[i * 2] * tex->w, shape->uv[i * 2 + 1] * tex->h));
-			if (lit) {
-				const double nx = shape->nrm[i * 3] * ca - shape->nrm[i * 3 + 1] * sa, ny = shape->nrm[i * 3] * sa + shape->nrm[i * 3 + 1] * ca, nz = shape->nrm[i * 3 + 2];
-				light += 0.55 + 0.45 * std::max(0.0, nx * L[0] + ny * L[1] + nz * L[2]);
-			} else {
-				light += 1.0;
-			}
+		const uint32_t ia = shape->tri[t], ib = shape->tri[t + 1], ic = shape->tri[t + 2];
+		const uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
+		/* The texture's place in pixels of the texture of the triangle (its tu, tv as the unit square). */
+		auto in_tex = [&](CabPoint p) {
+			p.tu *= tex->w;
+			p.tv *= tex->h;
+			return p;
+		};
+		if (pts[ia].f >= CAB_NEAR && pts[ib].f >= CAB_NEAR && pts[ic].f >= CAB_NEAR) {
+			auto v = [&](uint32_t i) {
+				CabVertex c = scr[i];
+				c.uw *= tex->w;
+				c.vw *= tex->h;
+				return c;
+			};
+			const CabVertex va = v(ia), vb = v(ib), vc = v(ic);
+			if (std::max({va.sx, vb.sx, vc.sx}) < 0 || std::min({va.sx, vb.sx, vc.sx}) >= width || std::max({va.sy, vb.sy, vc.sy}) < 0 || std::min({va.sy, vb.sy, vc.sy}) >= height) continue;
+			CabRasterTriangle(dst, zb, width, height, tex->px.data(), tex->w, tex->h, va, vb, vc, false, light);
+			continue;
 		}
-		CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false, static_cast<uint>(light / 3 * 256));
+		CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, {in_tex(pts[ia]), in_tex(pts[ib]), in_tex(pts[ic])}, eye, false, light);
 	}
 	return true;
 }
@@ -7708,6 +7745,8 @@ double FirstPersonGroundZ(double x, double y)
 
 /** Nearer than this to the eye (world units) a figure is drawn by its triangles, not as a billboard. */
 static constexpr double CAB_FIGURE_SOLID = 3.0 * TILE_SIZE;
+/** And a plant of a field (AddCabPlant()): only those at the walker's feet, the field has hundreds. */
+static constexpr double CAB_PLANT_SOLID = 0.6 * TILE_SIZE;
 
 /**
  * A figure near the eye by its triangles (a dragon before the walker, a mushroom by the way): in the world where it
@@ -8598,6 +8637,8 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			/* One of the game's own industries that is a real 3D object (the pub, the distillery, the gymnasium...): as a house. */
 			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
 			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+			ThreeDPlantationTile pt;
+			ThreeDFieldTile ft;
 			if (obj != nullptr) {
 				kind = 5;
 				const TileIndex origin = ind->location.tile;
@@ -8606,6 +8647,28 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 					if (co.origin == origin) known = true;
 				}
 				if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+			} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
+				/* A tile of a field as in the turned view (AddIndustryObjects()): on the game's ground its plants -- a
+				 * model of potatoes, or the marijuana plant by plant (AddCabPlant()) -- and the girl at work; the shed,
+				 * the haystack and the girls on the road tile behind. */
+				kind = 5;
+				const double ox = _cur_ti.x, oy = _cur_ti.y, oz = _cur_ti.z;
+				if (ft.plants != nullptr) {
+					objects.push_back({ft.plants, _cur_ti.tile, _cur_ti.z});
+					for (const ThreeDObjectFigure &f : ft.plants->plants) {
+						AddCabPlant(f.figure, f.scale, f.stretch, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
+					}
+				}
+				for (const ThreeDObjectFigure &f : ft.worker) AddCabFigure(f.figure, f.scale, static_cast<int>(ox + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(oy + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
+				if (ft.road != nullptr) {
+					const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
+					const int road_z = GetTilePixelZ(road_tile);
+					if (ft.shed != nullptr) objects.push_back({ft.shed, road_tile, road_z});
+					if (ft.hay != nullptr) objects.push_back({ft.hay, road_tile, road_z});
+					for (int edge = 0; edge < 2; edge++) {
+						for (const ThreeDObjectFigure &f : ft.girls[edge]) AddCabFigure(f.figure, f.scale, static_cast<int>(TileX(road_tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(TileY(road_tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(road_z + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
+					}
+				}
 			}
 		}
 		ps_kind.resize(_vd.parent_sprites_to_draw.size(), kind);
@@ -8965,10 +9028,12 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	/* The figures standing on the tiles (the clay town's mushrooms, the dragons): near the eye their triangles as they
 	 * are, further billboards of their pictures as the turned map shows them, from the eye's side (the angle in steps,
 	 * so that a few pictures serve every heading). */
+	/* All of them drawn at once on every core after the loop: their pictures kept till then (PinThreeDPictures()). */
+	PinThreeDPictures(true);
 	for (const CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
-		if (foot.f < CAB_FIGURE_SOLID) {
+		if (foot.f < (fg.plant ? CAB_PLANT_SOLID : CAB_FIGURE_SOLID)) {
 			/* Its textures stay: collected, drawn on every core after the billboards (the depth sorts them out). */
 			_cab_batching = true;
 			const bool solid = CabDrawFigure(dst, zb, width, height, eye, fg);
@@ -8983,7 +9048,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		/* Near, a finer picture: about a pixel of it to a pixel of the view. */
 		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : ZoomLevel::Normal);
 		const double per = 1.0 / (1 << (to_underlying(ZoomLevel::Normal) - to_underlying(fine)));
-		const ThreeDModelPicture *pic = GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, fg.frame, side);
+		const ThreeDModelPicture *pic = fg.plant ? GetThreeDPlantPicture(fg.name, fg.size, fg.stretch, fg.facing, fine, nullptr, side) : GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, fg.frame, side);
 		if (pic == nullptr || pic->width <= 0 || pic->height <= 0) continue;
 		const double left = foot.r + pic->left * CAB_PX_ACROSS * per, right = left + pic->width * CAB_PX_ACROSS * per;
 		const double top = foot.u - pic->top * CAB_PX_UP * per, bottom = top - pic->height * CAB_PX_UP * per;
@@ -8994,10 +9059,13 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 			{foot.f, right, top, tw, 0.0},
 			{foot.f, left, top, 0.0, 0.0},
 		};
+		_cab_batching = true;
 		CabDrawPolygon(dst, zb, width, height, pic->pixels.data(), pic->width, pic->height, std::move(quad), eye, false);
+		_cab_batching = false;
 		camera.billboards++;
 	}
-	CabFlushBatch(); // the figures near the eye, collected above
+	CabFlushBatch(); // the figures, collected above
+	PinThreeDPictures(false);
 	std::sort(bills.begin(), bills.end(), [](const CabBillboard &a, const CabBillboard &b) { return a.f > b.f; });
 	for (const CabBillboard &b : bills) {
 		const CabTexture *tex = CabSpriteTexture(b.ps);

@@ -9146,6 +9146,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d:   {}", line);
 		}
+	} else if (what == "pole") {
+		/* 'pole': where the fields are (the marijuana plantations, the potato fields), their north tiles. */
+		std::string text;
+		for (const Industry *ind : Industry::Iterate()) {
+			if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) continue;
+			text += fmt::format(" {}:{},{}", ind->type == IT_MARIJUANA_PLANTATION ? "mari" : "brambory", TileX(ind->location.tile), TileY(ind->location.tile));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: pole{}", text.empty() ? " zadna" : text);
 	} else if (what == "lampy") {
 		/* 'lampy <0|1>': at night the lamps and lit windows of the houses light what is about them (1) or not. */
 		extern bool _cab_lamp_light;
