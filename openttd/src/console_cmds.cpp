@@ -8846,7 +8846,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const auto tile : Map::Iterate()) {
 			if (left <= 0) break;
 			if (!IsTileType(tile, TileType::House) || GetTileSlope(tile) == SLOPE_FLAT) continue;
-			IConsolePrint(CC_DEFAULT, "test3d: dum {:#04x} na svahu {} na {},{}", GetHouseType(tile), to_underlying(GetTileSlope(tile)), TileX(tile), TileY(tile));
+			/* 'domynasvahu <n> voda': only those by the water (a coast or the sea next to them). */
+			bool water = false;
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dy = -1; dy <= 1; dy++) {
+					TileIndex t = TileAddXY(tile, dx, dy);
+					if (IsValidTile(t) && IsTileType(t, TileType::Water)) water = true;
+				}
+			}
+			if (argv.size() > 3 && argv[3] == "voda" && !water) continue;
+			IConsolePrint(CC_DEFAULT, "test3d: dum {:#04x} na svahu {} na {},{}{}", GetHouseType(tile), to_underlying(GetTileSlope(tile)), TileX(tile), TileY(tile), water ? " u vody" : "");
 			left--;
 		}
 	} else if (what == "chodec") {

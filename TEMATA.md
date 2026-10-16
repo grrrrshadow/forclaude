@@ -19,6 +19,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 16. 10. – oprava
+
+- Hráč: v buildu chyběl břeh pod domem na svahu u vody. Příčina v kódu (`9e6fdfc`): na sever s domy jako objekty
+  zůstala podezdívka, ale zem na ní (její děti) jsem vynechával – kolegovy domy vlastní zem nemají, tak byla díra
+  (černá, nebo prosvítala voda). Zem na podezdívce zůstává; otočený pohled byl v pořádku.
+
 ## 15. 10. – Z OpenMW dál (hráč vybral)
 
 - **Ano:** klávesa E „použít“ a interiéry za dveřmi (truhly, prodavač); noční obloha v pohledu z očí (hvězdy,

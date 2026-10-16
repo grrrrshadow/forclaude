@@ -3469,9 +3469,9 @@ static void LeaveOutTileSprites(size_t first_parent, bool keep_foundation)
 {
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		if (keep_foundation && (static_cast<int>(i) == _vd.foundation[FoundationPart::Normal] || static_cast<int>(i) == _vd.foundation[FoundationPart::Halftile])) {
-			/* Its walls stay; the ground on it goes, black where the building's sprite stood: the object lies there
-			 * with its own plot. */
-			_vd.parent_sprites_to_draw[i].first_child = -1;
+			/* Its walls stay, and the ground laid on it (its children): the objects have no ground of their own
+			 * under them -- without it the yard of a house on a slope by the water showed the water, elsewhere a
+			 * black hole (the player, 16. 10.). */
 			continue;
 		}
 		_vd.parent_sprites_to_draw[i].box_kind = 4;
