@@ -2355,6 +2355,145 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 	return {s.pos, s.uv, s.light, s.tri, s.facing};
 }
 
+/** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about half a metre. */
+static constexpr int FOOTPRINT_CELLS = 32;
+
+/**
+ * Whether a building stands at a place as high as a walker's body, from its knees to over its head (the
+ * technologies of OpenMW, the player, 16. 10.: what one bumps into is the shape itself, not its tile): a park, the
+ * square round a fountain, the space under a roof on pillars can be walked into, a wall cannot. Its triangles cut to
+ * that height, their outlines and their insides on a grid of cells, made the first time.
+ * @param x,y the place, world units from the building's north corner
+ */
+bool ThreeDObject::Blocks(double x, double y) const
+{
+	const int w = this->tiles_x * FOOTPRINT_CELLS, h = this->tiles_y * FOOTPRINT_CELLS;
+	const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_CELLS;
+	if (this->footprint_w == 0) {
+		this->footprint.assign(static_cast<size_t>(w) * h, 0);
+		this->footprint_w = w;
+		const double lo = 0.3 * OBJECT_HEIGHT_PER_METRE, hi = 2.0 * OBJECT_HEIGHT_PER_METRE;
+		auto mark = [&](double px, double py) {
+			const int cx = static_cast<int>(std::floor(px / cell)), cy = static_cast<int>(std::floor(py / cell));
+			if (cx >= 0 && cy >= 0 && cx < w && cy < h) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
+		};
+		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
+			/* The triangle cut to the height of a body (a polygon, cut by z >= lo and z <= hi). */
+			std::vector<std::array<double, 3>> poly;
+			for (int k = 0; k < 3; k++) {
+				const uint32_t i = this->tri[t + k];
+				poly.push_back({this->pos[i * 3], this->pos[i * 3 + 1], this->pos[i * 3 + 2]});
+			}
+			for (int side = 0; side < 2 && !poly.empty(); side++) {
+				const double limit = side == 0 ? lo : hi;
+				auto inside = [&](const std::array<double, 3> &p) { return side == 0 ? p[2] >= limit : p[2] <= limit; };
+				std::vector<std::array<double, 3>> cut;
+				for (size_t k = 0; k < poly.size(); k++) {
+					const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+					if (inside(a)) cut.push_back(a);
+					if (inside(a) != inside(b)) {
+						const double f = (limit - a[2]) / (b[2] - a[2]);
+						cut.push_back({a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, limit});
+					}
+				}
+				poly = std::move(cut);
+			}
+			if (poly.size() < 2) continue;
+			/* Its outline, half a cell a step: a wall seen from above is a line. */
+			double x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
+			for (size_t k = 0; k < poly.size(); k++) {
+				const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+				x0 = std::min(x0, a[0]);
+				x1 = std::max(x1, a[0]);
+				y0 = std::min(y0, a[1]);
+				y1 = std::max(y1, a[1]);
+				const int steps = std::max(1, static_cast<int>(std::ceil(std::hypot(b[0] - a[0], b[1] - a[1]) / (cell / 2))));
+				for (int s = 0; s <= steps; s++) mark(a[0] + (b[0] - a[0]) * s / steps, a[1] + (b[1] - a[1]) * s / steps);
+			}
+			/* And its inside, the middle of each cell under it (a table top, a low roof). */
+			for (int cy = std::max(0, static_cast<int>(y0 / cell)); cy <= std::min(h - 1, static_cast<int>(y1 / cell)); cy++) {
+				for (int cx = std::max(0, static_cast<int>(x0 / cell)); cx <= std::min(w - 1, static_cast<int>(x1 / cell)); cx++) {
+					const double px = (cx + 0.5) * cell, py = (cy + 0.5) * cell;
+					bool in = false;
+					for (size_t k = 0, l = poly.size() - 1; k < poly.size(); l = k++) {
+						const auto &a = poly[k], &b = poly[l];
+						if ((a[1] > py) != (b[1] > py) && px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0]) in = !in;
+					}
+					if (in) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
+				}
+			}
+		}
+		/*
+		 * Inside: the building is hollow, its walls only. What a walker cannot get to from outside -- its middle kept
+		 * a walker's half-width (WALKER_CELLS) from every wall, a door narrower than a walker shut -- is solid too.
+		 */
+		static constexpr int WALKER_CELLS = 3;
+		/* On a grid with a margin round the tiles, free: the walker comes from there. */
+		static constexpr int MARGIN = WALKER_CELLS + 1;
+		const int ew = w + 2 * MARGIN, eh = h + 2 * MARGIN;
+		const size_t cells = static_cast<size_t>(ew) * eh;
+		auto own = [&](size_t i) -> int {
+			const int x0 = static_cast<int>(i % ew) - MARGIN, y0 = static_cast<int>(i / ew) - MARGIN;
+			return x0 >= 0 && y0 >= 0 && x0 < w && y0 < h ? y0 * w + x0 : -1;
+		};
+		std::vector<int> wall_dist(cells, INT_MAX);
+		std::vector<size_t> queue;
+		for (size_t i = 0; i < cells; i++) {
+			const int o = own(i);
+			if (o >= 0 && this->footprint[o] != 0) {
+				wall_dist[i] = 0;
+				queue.push_back(i);
+			}
+		}
+		auto spread = [&](std::vector<size_t> &q, auto &&step) {
+			for (size_t at = 0; at < q.size(); at++) {
+				const int x0 = static_cast<int>(q[at] % ew), y0 = static_cast<int>(q[at] / ew);
+				for (int dy = -1; dy <= 1; dy++) {
+					for (int dx = -1; dx <= 1; dx++) {
+						const int nx = x0 + dx, ny = y0 + dy;
+						if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= ew || ny >= eh) continue;
+						const size_t n = static_cast<size_t>(ny) * ew + nx;
+						if (step(q[at], n)) q.push_back(n);
+					}
+				}
+			}
+		};
+		spread(queue, [&](size_t from, size_t n) {
+			if (wall_dist[n] <= wall_dist[from] + 1) return false;
+			wall_dist[n] = wall_dist[from] + 1;
+			return true;
+		});
+		/* Where the walker's middle can be, reached from the margin. */
+		std::vector<int> reach(cells, INT_MAX);
+		queue.clear();
+		for (size_t i = 0; i < cells; i++) {
+			const int x0 = static_cast<int>(i % ew), y0 = static_cast<int>(i / ew);
+			if ((x0 == 0 || y0 == 0 || x0 == ew - 1 || y0 == eh - 1) && wall_dist[i] > WALKER_CELLS) {
+				reach[i] = 0;
+				queue.push_back(i);
+			}
+		}
+		spread(queue, [&](size_t, size_t n) {
+			if (reach[n] == 0 || wall_dist[n] <= WALKER_CELLS) return false;
+			reach[n] = 0;
+			return true;
+		});
+		/* And the walker's body round it: up to its half-width from there. */
+		spread(queue, [&](size_t from, size_t n) {
+			if (wall_dist[n] == 0 || reach[n] <= reach[from] + 1 || reach[from] >= WALKER_CELLS) return false;
+			reach[n] = reach[from] + 1;
+			return true;
+		});
+		for (size_t i = 0; i < cells; i++) {
+			const int o = own(i);
+			if (o >= 0 && reach[i] == INT_MAX) this->footprint[o] = 1;
+		}
+	}
+	const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));
+	if (cx < 0 || cy < 0 || cx >= w || cy >= h) return false;
+	return this->footprint[static_cast<size_t>(cy) * w + cx] != 0;
+}
+
 /**
  * Make the shapes of objects about to be drawn on every core at once, as their textures
  * (PrepareThreeDObjectTextures()): a town seen for the first time from afar wanted thirty of them.

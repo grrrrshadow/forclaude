@@ -120,14 +120,27 @@ static bool FirstPersonWalkable(double x, double y)
 	TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
 	switch (GetTileType(tile)) {
 		case TileType::Void:
-		case TileType::House:
 		case TileType::Object:
 			return false;
+		case TileType::House: {
+			/* A house that is a 3D object: by its shape (ThreeDObject::Blocks()), into its park, under its roof. */
+			if (!IsHouseCompleted(tile)) return false;
+			HouseID north = GetHouseType(tile);
+			const TileIndex origin = tile + GetHouseNorthPart(north);
+			const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
+			return obj != nullptr && !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
+		}
 		case TileType::Water:
 			return IsCoast(tile);
 		case TileType::Industry: {
 			const IndustryGfx gfx = GetIndustryGfx(tile);
-			return gfx == GFX_MARIJUANA_PLANTATION || gfx == GFX_POTATO_FIELD;
+			if (gfx == GFX_MARIJUANA_PLANTATION || gfx == GFX_POTATO_FIELD) return true;
+			/* One of the game's own that is a 3D object (the pub, the distillery): by its shape, as a house. */
+			if (!IsIndustryCompleted(tile)) return false;
+			const Industry *ind = Industry::GetByTile(tile);
+			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+			const TileIndex origin = ind->location.tile;
+			return obj != nullptr && !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
 		}
 		case TileType::Station:
 			return HasStationRail(tile) || IsAnyRoadStop(tile);
@@ -273,10 +286,16 @@ struct FirstPersonWindow : Window {
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
 		const double rx = fy, ry = -fx;
 		const double dx = (fx * ahead + rx * aside) * speed, dy = (fy * ahead + ry * aside) * speed;
-		/* Along a wall, sliding: each way on its own where both together would go into it. */
+		/* Along a wall, sliding: each way on its own where both together would go into it. The walker a circle: its
+		 * middle and eight points round it, so that the thin walls of a house's shape (ThreeDObject::Blocks()) slip
+		 * between none of them. */
 		auto free = [](double x, double y) {
-			return FirstPersonWalkable(x + FIRST_PERSON_RADIUS, y) && FirstPersonWalkable(x - FIRST_PERSON_RADIUS, y) &&
-					FirstPersonWalkable(x, y + FIRST_PERSON_RADIUS) && FirstPersonWalkable(x, y - FIRST_PERSON_RADIUS);
+			if (!FirstPersonWalkable(x, y)) return false;
+			for (int k = 0; k < 8; k++) {
+				const double a = k * M_PI / 4;
+				if (!FirstPersonWalkable(x + FIRST_PERSON_RADIUS * std::cos(a), y + FIRST_PERSON_RADIUS * std::sin(a))) return false;
+			}
+			return true;
 		};
 		const double x = this->walker.x, y = this->walker.y;
 		if (free(x + dx, y + dy)) {

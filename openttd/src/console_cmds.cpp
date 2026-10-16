@@ -9113,6 +9113,39 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: postava {} snimek {}: {}x{} do {}", argv[2], *frame, pic->width, pic->height, file);
+	} else if (what == "pudorys" && argv.size() > 3) {
+		/* 'pudorys <x> <y>': what of the house on the tile stands as high as a walker (ThreeDObject::Blocks()), # a wall. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value() || static_cast<uint>(*x) >= Map::SizeX() || static_cast<uint>(*y) >= Map::SizeY()) return true;
+		const TileIndex tile = TileXY(*x, *y);
+		if (!IsTileType(tile, TileType::House)) {
+			IConsolePrint(CC_ERROR, "test3d: pudorys: na {},{} neni dum", *x, *y);
+			return true;
+		}
+		HouseID north = GetHouseType(tile);
+		const TileIndex origin = tile + GetHouseNorthPart(north);
+		const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
+		if (obj == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: pudorys: dum na {},{} neni 3D objekt", *x, *y);
+			return true;
+		}
+		const double step = TILE_SIZE / 16.0;
+		float zlo = 1e9f, zhi = -1e9f;
+		for (size_t i = 2; i < obj->pos.size(); i += 3) {
+			zlo = std::min(zlo, obj->pos[i]);
+			zhi = std::max(zhi, obj->pos[i]);
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: pudorys {} ({}x{} dlazdic, x doprava, y dolu, po {:.2f} m, vyska {:.1f}..{:.1f} m)", obj->name, obj->tiles_x, obj->tiles_y, step / OBJECT_UNITS_PER_METRE, zlo / OBJECT_HEIGHT_PER_METRE, zhi / OBJECT_HEIGHT_PER_METRE);
+		for (int r = 0; r < obj->tiles_y * 16; r++) {
+			std::string line;
+			for (int c = 0; c < obj->tiles_x * 16; c++) {
+				/* A character for four cells of the footprint (32 a tile). */
+				bool wall = false;
+				for (int k = 0; k < 4; k++) wall |= obj->Blocks((c + 0.25 + (k & 1) * 0.5) * step, (r + 0.25 + (k >> 1) * 0.5) * step);
+				line += wall ? '#' : '.';
+			}
+			IConsolePrint(CC_DEFAULT, "test3d:   {}", line);
+		}
 	} else if (what == "mezipamet") {
 		/* 'mezipamet <0|1>': the buildings of the turned view drawn once and kept (1, as the game draws), or drawn each time. */
 		extern bool _turned_object_pictures_on;

@@ -149,6 +149,10 @@ struct ThreeDObject {
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	ThreeDObjectShapeView GetShape(int level) const;
+	bool Blocks(double x, double y) const;
+
+	mutable std::vector<uint8_t> footprint; ///< what of it stands as high as a body, cells of a 32nd of a tile (Blocks()), made the first time
+	mutable int footprint_w = 0;            ///< the cells across x, 0 not made yet
 	uint32_t PaintAt(TileIndex origin) const;
 };
 
