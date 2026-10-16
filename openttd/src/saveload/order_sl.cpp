@@ -153,6 +153,13 @@ SaveLoadTable GetOrderDescription()
 		 SLE_CONDVARNAME(OldOrderSaveLoadItem, order.wait_time, "wait_time", VarTypes::U16, SaveLoadVersion::Timetables, SaveLoadVersion::MaxVersion),
 		 SLE_CONDVARNAME(OldOrderSaveLoadItem, order.travel_time, "travel_time", VarTypes::U16, SaveLoadVersion::Timetables, SaveLoadVersion::MaxVersion),
 		 SLE_CONDVARNAME(OldOrderSaveLoadItem, order.max_speed, "max_speed", VarTypes::U16, SaveLoadVersion::OrderMaxSpeed, SaveLoadVersion::MaxVersion),
+		/* The one byte a foreign fork's order record carries that ours does
+		 * not (see _sl_legacy_decouple_import, saveload.cpp). Named here so
+		 * that the legacy field list below can ask for it by name; reached
+		 * only through that list, so an ordinary save never looks for it.
+		 * Capped at the table-chunk version only so that it is never a field
+		 * this build writes: it is read, converted and emptied on load. */
+		 SLE_CONDVARNAME(OldOrderSaveLoadItem, order.legacy_decouple_flags, "legacy_decouple_flags", VarTypes::U8, SaveLoadVersion::MinVersion, SaveLoadVersion::TableChunks),
 	};
 
 	return _order_desc;
@@ -203,18 +210,13 @@ struct ORDRChunkHandler : ChunkHandler {
 			}
 		} else {
 			/* See the comment on _sl_legacy_decouple_import (saveload.cpp):
-			 * a foreign fork's Order records carry a field this list has no
-			 * member for, so the array is walked past by each item's own
-			 * stated length instead of decoded -- no old order comes out of
-			 * this, and nothing downstream should expect one to. */
+			 * a foreign fork's Order records carry one byte more than ours,
+			 * at the end, so they are read by a field list that knows about
+			 * it. The byte itself is turned into our own fields once the
+			 * whole game is in (AfterLoadLegacyDecoupleImportOrders()). */
 			extern bool _sl_legacy_decouple_import;
-			if (_sl_legacy_decouple_import) {
-				extern void SlSkipArray();
-				SlSkipArray();
-				return;
-			}
-
-			const std::vector<SaveLoad> slt = SlCompatTableHeader(GetOrderDescription(), _order_sl_compat);
+			const std::vector<SaveLoad> slt = SlCompatTableHeader(GetOrderDescription(),
+					_sl_legacy_decouple_import ? SaveLoadCompatTable(_order_sl_compat_legacy_decouple) : SaveLoadCompatTable(_order_sl_compat));
 
 			int index;
 
@@ -307,22 +309,6 @@ struct ORDLChunkHandler : ChunkHandler {
 
 	void Load() const override
 	{
-		/* See the comment on _sl_legacy_decouple_import (saveload.cpp). An
-		 * OrderList exists only to be a vehicle's or a shared group's list
-		 * of orders -- there is no such thing as one belonging to nothing.
-		 * VEHS and ORDR are already walked past unread in this mode, so no
-		 * OrderList created here would ever find the orders or the vehicle
-		 * it is meant to speak for; worse, FixPointers() below would then
-		 * try to resolve an old-format order reference into a pool that
-		 * was deliberately never populated, and assert. Walking past this
-		 * chunk too, the same way, leaves nothing dangling. */
-		extern bool _sl_legacy_decouple_import;
-		if (_sl_legacy_decouple_import) {
-			extern void SlSkipArray();
-			SlSkipArray();
-			return;
-		}
-
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(GetOrderListDescription(), _orderlist_sl_compat);
 
 		int index;

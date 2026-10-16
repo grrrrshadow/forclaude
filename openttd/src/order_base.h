@@ -114,6 +114,17 @@ private:
 	uint8_t decouple_count = 0;
 
 	/**
+	 * NOSAVE. The one byte a foreign fork's order record carries that ours
+	 * does not: its packed "decouple" byte, read in as it stands by a legacy
+	 * import and nothing else (see _sl_legacy_decouple_import, saveload.cpp).
+	 * It is carried from the file to the conversion in
+	 * AfterLoadLegacyDecoupleImportOrders() (afterload.cpp), which reads it,
+	 * turns it into the fields above and empties it. Never written to a save;
+	 * always zero outside that one load.
+	 */
+	uint8_t legacy_decouple_flags = 0;
+
+	/**
 	 * If true, delay leaving this station until a compatible stopped
 	 * train arrives immediately ahead to couple with (see
 	 * GetTrainCouplePartner() and FEATURE_DESIGN_COUPLING_TOW.md).
@@ -466,6 +477,12 @@ public:
 		this->decouple_count = 0;
 		return true;
 	}
+
+	/** The foreign fork's packed decouple byte a legacy import read in; see #legacy_decouple_flags. */
+	inline uint8_t GetLegacyDecoupleFlags() const { return this->legacy_decouple_flags; }
+
+	/** Empty the foreign fork's packed decouple byte, once it has been read; see #legacy_decouple_flags. */
+	inline void ClearLegacyDecoupleFlags() { this->legacy_decouple_flags = 0; }
 
 	/**
 	 * Turn the two old boarding flags into the one #board_mode field, once, on
@@ -970,6 +987,17 @@ public:
 	void InsertOrderAt(Order &&order, VehicleOrderID index);
 	void DeleteOrderAt(VehicleOrderID index);
 	void MoveOrder(VehicleOrderID from, VehicleOrderID to);
+
+	/**
+	 * Put a different set of orders into this list, wholesale, with nothing
+	 * recounted. Only for the conversion of a foreign fork's orders at load
+	 * (AfterLoadLegacyDecoupleImportOrders(), afterload.cpp), which runs
+	 * before Initialize() has counted anything about the list -- so there is
+	 * nothing yet to keep in step. Not for a running game: the counts and
+	 * the vehicles' order indices would be left behind.
+	 * @param orders the orders the list is to hold from now on
+	 */
+	void ReplaceOrders(std::vector<Order> &&orders) { this->orders = std::move(orders); }
 
 	/**
 	 * Is this a shared order list?

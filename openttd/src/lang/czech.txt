@@ -3835,9 +3835,9 @@ STR_SAVELOAD_LOAD_BUTTON                                        :{BLACK}Nahrát
 STR_SAVELOAD_LOAD_TOOLTIP                                       :{BLACK}Rozehrát vybranou hru
 STR_SAVELOAD_LOAD_HEIGHTMAP_TOOLTIP                             :{BLACK}Načíst označenou výškovou mapu
 STR_SAVELOAD_LOAD_TOWN_DATA_TOOLTIP                             :{BLACK}Načíst data vybraného města
-STR_SAVELOAD_LEGACY_IMPORT_OFF                                  :{BLACK}přenést svět ze starého save decouple 0.10.4, importuje se jen vzhled hrací plochy - mapa a infrastruktura bez dopravních prostředků
-STR_SAVELOAD_LEGACY_IMPORT_ON                                   :{ORANGE}přenést svět ze starého save decouple 0.10.4, importuje se jen vzhled hrací plochy - mapa a infrastruktura bez dopravních prostředků
-STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP                              :{BLACK}Pro starou hru, kterou tahle verze jinak neotevře: převezme se jen vzhled hrací plochy přesně tak, jak stojí - terén, města, stanice - bez vozidel a bez ekonomiky, jako by bylo právě nově postavené. Zapni tohle a zkus Načíst znovu.
+STR_SAVELOAD_LEGACY_IMPORT_OFF                                  :{BLACK}přenést hru ze starého save decouple 0.10.4: mapa, firmy, vozidla i jejich rozkazy. Vlaky se zastaví v nejbližším depu; auta, lodě a letadla jedou dál, jak jely
+STR_SAVELOAD_LEGACY_IMPORT_ON                                   :{ORANGE}přenést hru ze starého save decouple 0.10.4: mapa, firmy, vozidla i jejich rozkazy. Vlaky se zastaví v nejbližším depu; auta, lodě a letadla jedou dál, jak jely
+STR_SAVELOAD_LEGACY_IMPORT_TOOLTIP                              :{BLACK}Pro starou hru, kterou tahle verze jinak neotevře: rozkazy staré hry se přeloží na naše (co kde odpojit, kam jet spojit), každý vlak s mašinkou se zastaví v nejbližším depu, abys ho prohlédl a pustil po jednom, odstavené vozy čekají dál a auta, lodě a letadla jedou dál. Co nešlo přeložit přesně, je vypsané v konzoli. Zapni tohle a zkus Načíst znovu.
 STR_SAVELOAD_DETAIL_CAPTION                                     :{BLACK}Vlastnosti hry
 STR_SAVELOAD_DETAIL_SAVED_AT                                    :{BLACK}Uloženo: {STRING}
 STR_SAVELOAD_DETAIL_NOT_AVAILABLE                               :{BLACK}Není dostupná žádná informace

@@ -9350,9 +9350,15 @@ static void LeaveRakeWaitingAtStation(Train *rake, StationID station, OrderLoadT
  * At a station it waits the way a put-down rake waits; anywhere else the
  * wait alone is written on it, which is all a tow needs.
  *
- * @param chain head of the headless chain
+ * @param chain       head of the headless chain
+ * @param load_type   how the wagons load while they stand at a station (a
+ *                    coupling leaves them not loading; a legacy import keeps
+ *                    what the old game told them, see SettleLegacyImportedTrains())
+ * @param unload_type how they unload there
+ * @param cargo_dest  where the cargo they are to load is bound, or
+ *                    StationID::Invalid() for no such hint
  */
-void LeaveHeadlessChainWaiting(Train *chain)
+void LeaveHeadlessChainWaiting(Train *chain, OrderLoadType load_type, OrderUnloadType unload_type, StationID cargo_dest)
 {
 	assert(chain->First() == chain && !chain->IsFrontEngine());
 
@@ -9373,9 +9379,15 @@ void LeaveHeadlessChainWaiting(Train *chain)
 	 * that asks for the wait on whatever it finds outside a depot. */
 	SettleLoadingBeforeSplice(chain);
 
+	/* At a station only if its leading end really stands on a platform of
+	 * it: entering a station is asked of the leading end (BeginLoading()
+	 * insists on it), and a chain hanging off the end of its platform onto
+	 * the points, as a legacy import can bring in, has a leading end that
+	 * is not on one. That chain waits the open-track way instead. */
 	StationID at = StationUnderChain(chain);
+	if (at != StationID::Invalid() && !IsRailStationTileOfStation(chain->GetMovingFront()->tile, at)) at = StationID::Invalid();
 	if (at != StationID::Invalid()) {
-		LeaveRakeWaitingAtStation(chain, at, OrderLoadType::NoLoad, OrderUnloadType::NoUnload);
+		LeaveRakeWaitingAtStation(chain, at, load_type, unload_type, cargo_dest);
 		TrainEnterStation(chain, at);
 	} else {
 		chain->current_order.Free();
@@ -9392,6 +9404,203 @@ void LeaveHeadlessChainWaiting(Train *chain)
 				TileX(chain->tile), TileY(chain->tile),
 				at == StationID::Invalid() ? std::string("na siré trati") : fmt::format("u stanice {}", at));
 	}
+}
+
+/**
+ * The rail depot of the train's own company nearest to where it stands that
+ * it can run in and out of, for SettleLegacyImportedTrains().
+ * @param t the train
+ * @param[out] tier which reading of "can use" found it: 0 under its own
+ *                  power, 1 by the head engine's rails, 2 any depot at all
+ * @return the depot tile, or INVALID_TILE when the company has no rail depot
+ */
+static TileIndex NearestDepotForImportedTrain(const Train *t, int &tier)
+{
+	/* Three readings of "a depot it can use", tried in turn: one the whole
+	 * train can run in and out of under its own power; failing that, one on
+	 * the rails the head engine was built for -- a train led by a powerless
+	 * dummy engine (the Czech sets' "invisible" engine, with the power in a
+	 * wagon behind it) can run on nothing by the first reading, yet it ran in
+	 * the old game and stands on its rails now; failing that, any depot of
+	 * the company, so the train is at least somewhere the player can find
+	 * it. Which reading answered is reported, so he knows to look. */
+	for (tier = 0; tier < 3; tier++) {
+		TileIndex best = INVALID_TILE;
+		uint best_distance = UINT_MAX;
+		for (const Depot *d : Depot::Iterate()) {
+			TileIndex tile = d->xy;
+			if (!IsRailDepotTile(tile) || !IsTileOwner(tile, t->owner)) continue;
+			RailType rt = GetRailType(tile);
+			switch (tier) {
+				case 0: if (!t->compatible_railtypes.Test(rt) || !HasPowerOnRail(t->railtypes, rt)) continue; break;
+				case 1: if (!t->railtypes.Test(rt) && !HasPowerOnRail(t->railtypes, rt)) continue; break;
+				default: break;
+			}
+			uint distance = DistanceManhattan(t->tile, tile);
+			if (distance < best_distance) {
+				best_distance = distance;
+				best = tile;
+			}
+		}
+		if (best != INVALID_TILE) return best;
+	}
+	return INVALID_TILE;
+}
+
+/**
+ * Put the trains a legacy import brought in where the player asked for them:
+ * see the comment on _sl_legacy_decouple_import (saveload.cpp).
+ *
+ * Every train with an engine goes, stopped, into the nearest depot of its
+ * company that it can use -- the player wants to look each one's orders over
+ * and let it out himself, one at a time, rather than have a hundred trains
+ * set off at once under orders that were translated from another game's. A
+ * train that was mid-stop at a platform is taken out of the station's books
+ * first, the way a splice takes one out, so the station is not left waiting
+ * on a train that is no longer there. Its live order is emptied: starting
+ * from the depot it picks up the order its place in the list names, which
+ * is the one it was on, translated.
+ *
+ * Every headless rake -- wagons the old game had put down to be collected --
+ * stays exactly where it is and is given our wait where it stands, under
+ * the loading the old game had told it: a rake filling up goes on filling
+ * up and is collected when it is done, one standing ready is ready. Its own
+ * list of orders from the old game (that fork's rakes carried one) is let
+ * go: ours writes a rake's list afresh, in our shape, as it puts it down.
+ * Free wagons standing in a depot are left as they are, like any other.
+ *
+ * Road vehicles, ships and aircraft are not touched; they go on as they
+ * were. Everything done here is said in the console, train by train, so the
+ * player can find each one.
+ *
+ * Runs after the vehicles' caches are built (AfterLoadVehiclesPhase2(), which
+ * is what makes the rail types a train can use known) and after every rail
+ * reservation on the map has been let go (AfterLoadLegacyDecoupleImportMap()).
+ */
+void SettleLegacyImportedTrains()
+{
+	uint to_depot = 0;
+	uint stayed = 0;
+	uint rakes = 0;
+	uint rakes_in_depot = 0;
+	uint crashed = 0;
+
+	for (Train *t : Train::Iterate()) {
+		if (!t->IsFrontEngine() && !t->IsFreeWagon()) continue;
+
+		if (t->vehstatus.Test(VehState::Crashed)) {
+			crashed++;
+			continue;
+		}
+
+		if (!t->IsFrontEngine()) {
+			/* A rake. What the old game told its wagons to do where they
+			 * stand is read off its live order if that is a stop, else off
+			 * the first station order of its own list; and the first order
+			 * naming another station says where its load is bound. Then the
+			 * old list goes and the wait is written afresh. */
+			OrderLoadType load_type = OrderLoadType::NoLoad;
+			OrderUnloadType unload_type = OrderUnloadType::NoUnload;
+			StationID at = StationUnderChain(t);
+			StationID cargo_dest = StationID::Invalid();
+			bool from_live = t->current_order.IsType(OT_GOTO_STATION) || t->current_order.IsType(OT_LOADING);
+			if (from_live) {
+				load_type = t->current_order.GetLoadType();
+				unload_type = t->current_order.GetUnloadType();
+			}
+			if (t->orders != nullptr) {
+				for (const Order &o : t->orders->GetOrders()) {
+					if (!o.IsType(OT_GOTO_STATION) && !o.IsType(OT_IMPLICIT)) continue;
+					if (!from_live && o.IsType(OT_GOTO_STATION)) {
+						load_type = o.GetLoadType();
+						unload_type = o.GetUnloadType();
+						from_live = true;
+					}
+					if (cargo_dest == StationID::Invalid() && o.GetDestination().ToStationID() != at && Station::IsValidID(o.GetDestination().ToStationID())) {
+						cargo_dest = o.GetDestination().ToStationID();
+					}
+				}
+				DeleteVehicleOrders(t);
+			}
+
+			if (t->IsInDepot()) {
+				t->current_order.Free();
+				rakes_in_depot++;
+				continue;
+			}
+
+			LeaveHeadlessChainWaiting(t, load_type, unload_type, cargo_dest);
+			rakes++;
+			IConsolePrint(CC_INFO, "Prenos stare hry: rada vozu na ({},{}) {} ceka na spojeni{}.",
+					TileX(t->tile), TileY(t->tile),
+					at == StationID::Invalid() ? std::string("na siré trati") : fmt::format("ve stanici {}", GetString(STR_STATION_NAME, at)),
+					t->current_order.IsFullLoadOrder() ? std::string(", az se naplni") : std::string());
+			continue;
+		}
+
+		/* A train with an engine: into a depot, stopped. */
+		TileIndex from = t->tile;
+		int tier = 0;
+		TileIndex depot = t->IsInDepot() ? t->tile : NearestDepotForImportedTrain(t, tier);
+		if (depot == INVALID_TILE) {
+			/* The company has no rail depot at all: the train stays where it
+			 * is, stopped, and the player is told to see to it. */
+			SettleLoadingBeforeSplice(t);
+			if (t->current_order.IsType(OT_LOADING)) t->current_order.Free();
+			t->vehstatus.Set(VehState::Stopped);
+			t->cur_speed = 0;
+			t->subspeed = 0;
+			stayed++;
+			IConsolePrint(CC_WARNING, "Prenos stare hry: vlak {} ({}) na ({},{}): firma nema zadne depo - zastaven na miste.",
+					t->unitnumber, GetString(STR_ENGINE_NAME, t->engine_type), TileX(from), TileY(from));
+			continue;
+		}
+
+		/* Out of the station's books if it was mid-stop there. */
+		SettleLoadingBeforeSplice(t);
+
+		/* The same placing a freshly built engine gets (CmdBuildRailVehicle()). */
+		DiagDirection dir = GetRailDepotDirection(depot);
+		int x = TileX(depot) * TILE_SIZE + _vehicle_initial_x_fract[dir];
+		int y = TileY(depot) * TILE_SIZE + _vehicle_initial_y_fract[dir];
+		for (Train *u = t; u != nullptr; u = u->Next()) {
+			u->tile = depot;
+			u->direction = DiagDirToDir(dir);
+			u->x_pos = x;
+			u->y_pos = y;
+			u->z_pos = GetSlopePixelZ(x, y, true);
+			u->track = Track::Depot;
+			u->vehstatus.Set(VehState::Hidden);
+			u->cur_speed = 0;
+			u->subspeed = 0;
+			u->progress = 0;
+			u->flags.Reset(VehicleRailFlag::Reversing);
+			u->flags.Reset(VehicleRailFlag::Stuck);
+			u->flags.Reset(VehicleRailFlag::LeavingStation);
+			u->flags.Reset(VehicleRailFlag::Reversed);
+			u->UpdatePosition();
+			u->UpdateViewport(true, true);
+		}
+		/* And what arriving in a depot does to the head (VehicleEnterDepot()). */
+		t->vehstatus.Set(VehState::Stopped);
+		t->wait_counter = 0;
+		t->force_proceed = TFP_NONE;
+		t->current_order.Free();
+		t->SetDestTile(TileIndex{});
+		t->ConsistChanged(CCF_ARRANGE);
+		to_depot++;
+
+		if (from == depot) {
+			IConsolePrint(CC_INFO, "Prenos stare hry: vlak {} uz stal v depu ({},{}) - zastaven.", t->unitnumber, TileX(depot), TileY(depot));
+		} else {
+			std::string_view note = tier == 0 ? "" : tier == 1 ? " (vlak sam nema vykon - depo podle kolejí jeho masinky)" : " (zadne depo na jeho kolejich - nejblizsi depo firmy, zkontroluj)";
+			IConsolePrint(tier == 0 ? CC_INFO : CC_WARNING, "Prenos stare hry: vlak {} ({}) z ({},{}) do depa ({},{}), {} poli daleko - zastaven{}.",
+					t->unitnumber, GetString(STR_ENGINE_NAME, t->engine_type), TileX(from), TileY(from), TileX(depot), TileY(depot), DistanceManhattan(from, depot), note);
+		}
+	}
+
+	IConsolePrint(CC_INFO, "Prenos stare hry: {} vlaku zastaveno v depech, {} zastaveno na miste (bez depa), {} rad vozu ceka na spojeni, {} volnych vozu v depech, {} havarovanych ponechano.",
+			to_depot, stayed, rakes, rakes_in_depot, crashed);
 }
 
 /**

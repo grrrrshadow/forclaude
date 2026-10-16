@@ -561,63 +561,407 @@ static void StartScripts()
 	ShowScriptDebugWindowIfScriptError();
 }
 
-/**
- * Clear away everything the map still says about vehicles, after a legacy
- * import has read the map and left the vehicles behind.
+/*
+ * The legacy import: a foreign fork's orders, turned into ours.
  *
- * See the comment on _sl_legacy_decouple_import (saveload.cpp). The import
- * reads the land, the track and the buildings out of a foreign fork's
- * savegame and skips its vehicles, because those are the one part that
- * cannot be trusted to mean the same thing. What it cannot skip is the rest
- * of the game writing about them: a station keeps a list of the vehicles
- * standing at its platforms loading, a payment is open for every vehicle
- * part-way through delivering a load, and every metre of track a train was
- * standing on or driving towards is marked as reserved for it.
+ * See the comment on _sl_legacy_decouple_import (saveload.cpp). The fork is
+ * the player's old game, the 2018 "Decouple" branch, and its orders say the
+ * same things ours do in a different spelling:
  *
- * All of that named vehicles that this game does not have, and resolving
- * those names to "nothing" is not enough on its own. A list of nothings is
- * still a list, and the loading code walks it every single tick without ever
- * expecting to find a hole in it -- which is a crash on the first tick after
- * the game appears, not a wrong number somewhere. Reservations are quieter
- * and worse: track held for a train that was never imported is held for
- * good, and the player finds out weeks later that a junction nothing is
- * standing on will not let anything through.
+ *  - A station order with the low bit of its packed byte set decouples on
+ *    arrival, and is always followed by an order of its own kind (type 11,
+ *    "decouple") that carries the particulars: in the byte of the station
+ *    order, how many vehicles counted from the front stay on the train
+ *    (zero: the engines stay and every wagon goes); in the flags of the
+ *    decouple order, what each half does for orders afterwards. Ours is one
+ *    station order with the decouple switch on and the count of wagons that
+ *    stay, the engine not counted. The dropped wagons always wait to be
+ *    collected here, under the same loading the station order gave them.
+ *  - "Wait to be coupled" (type 10) was an order of its own: stand still
+ *    until something couples on. Ours is a switch on the station order
+ *    before it.
+ *  - "Go and couple" (type 9) had no destination at all: the train set off
+ *    and the pathfinder took it to the nearest platform anywhere with a rake
+ *    waiting on it that passed the order's filters (how full, what cargo, how
+ *    many vehicles). Ours is a station order with the couple switch on and
+ *    the same three filters -- so the station has to be worked out, from the
+ *    orders around it. Which is the one place this is a reading of the
+ *    player's intent rather than a translation, and every such reading is
+ *    said in the console so he can check it:
+ *      1. the order right after it is an implicit stop: that is where the
+ *         train stopped after coupling, so that is where the rake was;
+ *      2. the order right after it is a station the train stops at: the
+ *         rake was collected on the way in there;
+ *      3. the last station before it that decouples: the yard this train
+ *         puts wagons down in is the yard it picks them up from;
+ *      4. the last station before it the train stops at;
+ *      5. the next station after it the train stops at;
+ *      6. none of those: the order is dropped.
  *
- * The work is in two halves because they are wanted at two different moments.
- * Anything that is a dangling *name* has to go before a single line of the
- * ordinary post-load fixing runs, because that fixing walks straight into
- * them; anything that is map state can wait until the map has finished being
- * converted into its modern shape.
+ * The orders are converted in place in each list, before anything has
+ * counted them (AfterLoadVehiclesPhase1() does that), and every vehicle's
+ * place in its list is moved along with them so nobody is left pointing at
+ * an order that is gone. Each vehicle's live copy of its order loses the
+ * fork's byte the same way; the live copies that were of the fork's own
+ * types are emptied, because every train is about to be put in a depot
+ * (SettleLegacyImportedTrains()) and every headless rake given a fresh wait
+ * where it stands, and a vehicle starting from an empty live order simply
+ * picks up the order its index names.
  */
-static void AfterLoadLegacyDecoupleImportReferences()
-{
-	size_t cleared_loading = 0;
-	const size_t cleared_payments = CargoPayment::GetNumItems();
 
-	/* Vehicles standing at the platforms loading. */
-	for (Station *st : Station::Iterate()) {
-		cleared_loading += st->loading_vehicles.size();
-		st->loading_vehicles.clear();
+/* The fork's own order types, by the numbers they had there: after our
+ * last one (OT_IMPLICIT, 8). */
+static constexpr uint8_t LEGACY_OT_GOTO_COUPLE = 9;
+static constexpr uint8_t LEGACY_OT_WAIT_COUPLE = 10;
+static constexpr uint8_t LEGACY_OT_DECOUPLE = 11;
+
+/* What a decouple order's flags said each half was to do for orders
+ * afterwards (the front half in bits 0-2, the dropped half in bits 4-6). */
+static constexpr uint8_t LEGACY_ODOF_INHERIT_ORDERS = 2;
+static constexpr uint8_t LEGACY_ODOF_WAIT_FOR_COUPLE = 3;
+
+/** The fork's order type number of an order, including the three that are not ours. */
+static uint8_t LegacyOrderType(const Order &o)
+{
+	return static_cast<uint8_t>(o.GetType());
+}
+
+/**
+ * The fork packed its own small numbers into the bits our load and unload
+ * types live in, so they are read out through those accessors: bits 0-2 of
+ * the flags (the couple order's "how full", the decouple order's front-half
+ * answer) and bits 4-6 (the decouple order's dropped-half answer).
+ */
+static uint8_t LegacyFlagsLow(const Order &o) { return to_underlying(o.GetUnloadType()); }
+static uint8_t LegacyFlagsHigh(const Order &o) { return to_underlying(o.GetLoadType()); }
+
+/** The count the fork kept in bits 1-7 of its packed byte: vehicles that stay on (decoupling), or the rake's size (coupling). */
+static uint8_t LegacyPackedCount(const Order &o) { return GB(o.GetLegacyDecoupleFlags(), 1, 7); }
+
+/** Whether the fork's packed byte says this station order decouples on arrival. */
+static bool LegacyDecouples(const Order &o) { return HasBit(o.GetLegacyDecoupleFlags(), 0); }
+
+/** A station order the train actually stops at: not one it only passes through. */
+static bool IsLegacyStopAtStation(const Order &o)
+{
+	return o.IsType(OT_GOTO_STATION) && !o.GetNonStopType().Test(OrderNonStopFlag::GoVia);
+}
+
+/** A station a converted couple order may name: one that exists and has platforms. */
+static bool IsLegacyCoupleStationUsable(StationID station)
+{
+	if (!Station::IsValidID(station)) return false;
+	return Station::Get(station)->facilities.Test(StationFacility::Train);
+}
+
+/**
+ * Work out where a "go and couple" order was going, from the orders around
+ * it; see the rules in the file comment above.
+ * @param orders the fork's list as it was
+ * @param at     the index of the couple order in it
+ * @param[out] rule which of the rules answered, for the report (1-based); 0 for none
+ * @return the station, or StationID::Invalid() when nothing around it says
+ */
+static StationID GuessLegacyCoupleStation(std::span<const Order> orders, size_t at, int &rule)
+{
+	const size_t n = orders.size();
+	auto station_of = [](const Order &o) { return o.GetDestination().ToStationID(); };
+
+	if (n > 1) {
+		const Order &next = orders[(at + 1) % n];
+		if (next.IsType(OT_IMPLICIT) && IsLegacyCoupleStationUsable(station_of(next))) {
+			rule = 1;
+			return station_of(next);
+		}
+		if (IsLegacyStopAtStation(next) && IsLegacyCoupleStationUsable(station_of(next))) {
+			rule = 2;
+			return station_of(next);
+		}
 	}
 
-	/* A payment is opened when a vehicle starts unloading and closed when it
-	 * finishes. Every one of these belongs to a vehicle that is not here. The
-	 * pool is emptied rather than the items deleted one by one, because the
-	 * destructor reaches back through the vehicle to pay the company -- and
-	 * only the pool clean-up tells it not to.
-	 *
-	 * This is the one that has to happen early, and the reason the whole
-	 * function was split. A few dozen lines into AfterLoadGame() there is an
-	 * unconditional "fix the cache for cargo payments" loop that does
-	 * cp->front->cargo_payment = cp for every payment in the pool -- and
-	 * cp->front is the vehicle, which under an import is nothing at all. That
-	 * loop was the player's crash, found by the whereabouts marker the report
-	 * now carries: "afterload: ClearOldOrders", which is the marker set
-	 * immediately before it. */
-	_cargo_payment_pool.CleanPool();
+	/* Backwards, the whole way round: first a decoupling station, then any
+	 * station the train stops at. */
+	for (int pass = 0; pass < 2; pass++) {
+		for (size_t back = 1; back < n; back++) {
+			const Order &o = orders[(at + n - back) % n];
+			if (!IsLegacyStopAtStation(o)) continue;
+			if (pass == 0 && !LegacyDecouples(o)) continue;
+			if (!IsLegacyCoupleStationUsable(station_of(o))) continue;
+			rule = 3 + pass;
+			return station_of(o);
+		}
+	}
 
-	IConsolePrint(CC_INFO, "Prenos stare hry: zahozeno {} nakladajicich vozidel na nadrazich, {} rozdelanych plateb.",
-			cleared_loading, cleared_payments);
+	/* Forwards: the next station the train stops at. */
+	for (size_t ahead = 1; ahead < n; ahead++) {
+		const Order &o = orders[(at + ahead) % n];
+		if (!IsLegacyStopAtStation(o)) continue;
+		if (!IsLegacyCoupleStationUsable(station_of(o))) continue;
+		rule = 5;
+		return station_of(o);
+	}
+
+	rule = 0;
+	return StationID::Invalid();
+}
+
+/** What the console calls each of the rules in GuessLegacyCoupleStation(). */
+static std::string_view LegacyCoupleRuleName(int rule)
+{
+	switch (rule) {
+		case 1: return "po spojeni tam zastavil";
+		case 2: return "hned dalsi zastavka";
+		case 3: return "posledni odpojovani pred tim";
+		case 4: return "posledni zastavka pred tim";
+		case 5: return "dalsi zastavka za tim";
+		default: return "?";
+	}
+}
+
+/**
+ * Give a station order the decoupling the fork's packed byte and the
+ * decouple order after it described; see the file comment above.
+ * @param o              the station order, converted in place
+ * @param decouple_order the fork's decouple order that followed it, or nullptr when none did
+ * @param who            the train, for the report
+ * @param index          the order's place in the fork's list, for the report
+ */
+static void ConvertLegacyDecoupleOrder(Order &o, const Order *decouple_order, std::string_view who, size_t index)
+{
+	uint8_t stay = LegacyPackedCount(o);
+	o.SetDecouple(true);
+	/* The fork counted the engine among what stays on; ours does not. Zero
+	 * meant "work it out: the engines stay", which for a train with its
+	 * engine at the front is every wagon going -- the same as our zero. */
+	o.SetDecoupleCount(stay == 0 ? 0 : stay - 1);
+
+	if (decouple_order == nullptr) {
+		IConsolePrint(CC_WARNING, "Prenos stare hry: {} rozkaz {}: odpojovani bez navazujiciho rozkazu 'odpojit' - prevedeno jen podle poctu ({} zustava).", who, index, stay);
+		return;
+	}
+
+	uint8_t front = LegacyFlagsLow(*decouple_order);
+	if (front == LEGACY_ODOF_WAIT_FOR_COUPLE) {
+		/* The engine's own half was told to stand and wait to be coupled to
+		 * after dropping its wagons; ours says that on the station order. */
+		o.SetWaitForCouple(true);
+	} else if (front == LEGACY_ODOF_INHERIT_ORDERS && stay != 0) {
+		/* The front half inheriting a wait is the fork's way of saying the
+		 * engine was at the back, pushing: the front of the chain was wagons,
+		 * and the count said how many of them were left behind. Ours counts
+		 * from the engine, so the count cannot be carried over exactly. */
+		IConsolePrint(CC_WARNING, "Prenos stare hry: {} rozkaz {}: odpojovani vlaku s masinkou vzadu ({} vozu zepredu zustavalo) - prevedeno jako 'zustava {} vozu za masinkou', zkontroluj.", who, index, stay, stay - 1);
+	}
+}
+
+/**
+ * Turn the fork's "go and couple" order into our couple-at-station order.
+ * @param old     the fork's order
+ * @param station the station worked out for it
+ * @return the order as ours
+ */
+static Order ConvertLegacyCoupleOrder(const Order &old, StationID station)
+{
+	Order o;
+	o.MakeGoToStation(station);
+	o.SetGoToCouple(true);
+	/* A couple order is not a cargo stop; see AfterLoadDecoupleCounts(). */
+	o.SetLoadType(OrderLoadType::NoLoad);
+	o.SetUnloadType(OrderUnloadType::NoUnload);
+	o.SetNonStopType(old.GetNonStopType());
+
+	/* The three filters, the fork's spelling: how full in bits 0-2 of the
+	 * flags (any, empty, full), the cargo in the refit slot (0xFE for any),
+	 * the rake's exact size in the packed byte (0 for any). */
+	switch (LegacyFlagsLow(old)) {
+		case 1: o.SetCoupleLoad(OrderCoupleLoad::Empty); break;
+		case 2: o.SetCoupleLoad(OrderCoupleLoad::Full); break;
+		default: o.SetCoupleLoad(OrderCoupleLoad::Any); break;
+	}
+	CargoType cargo = old.GetRefitCargo();
+	o.SetCoupleCargo(cargo < NUM_CARGO ? cargo : INVALID_CARGO);
+	o.SetCoupleCount(LegacyPackedCount(old));
+
+	o.SetWaitTime(old.GetWaitTime());
+	o.SetTravelTime(old.GetTravelTime());
+	return o;
+}
+
+/**
+ * Convert one list of the fork's orders into ours; see the file comment.
+ * @param old   the fork's list
+ * @param who   the train, for the report
+ * @param[out] remap for each of the fork's orders, the index of the order
+ *                   in the converted list a vehicle standing on it is to
+ *                   stand on now: itself if it survived, otherwise the next
+ *                   one that did
+ * @return the converted list
+ */
+static std::vector<Order> ConvertLegacyOrderList(std::span<const Order> old, std::string_view who, std::vector<VehicleOrderID> &remap)
+{
+	std::vector<Order> result;
+	result.reserve(old.size());
+	remap.assign(old.size(), INVALID_VEH_ORDER_ID);
+
+	for (size_t i = 0; i < old.size(); i++) {
+		const Order &src = old[i];
+		switch (LegacyOrderType(src)) {
+			case LEGACY_OT_DECOUPLE: {
+				/* Its particulars were read when the station order before it
+				 * was converted; here it only has to go. One with no such
+				 * order before it said nothing anybody can act on. */
+				bool had_station = i > 0 && LegacyDecouples(old[i - 1]);
+				if (!had_station) IConsolePrint(CC_WARNING, "Prenos stare hry: {} rozkaz {}: osamely rozkaz 'odpojit' bez stanice pred nim - vypusten.", who, i);
+				break;
+			}
+
+			case LEGACY_OT_WAIT_COUPLE:
+				if (!result.empty() && IsLegacyStopAtStation(result.back())) {
+					result.back().SetWaitForCouple(true);
+				} else {
+					IConsolePrint(CC_WARNING, "Prenos stare hry: {} rozkaz {}: 'cekat na spojeni' bez stanice pred nim - vypusten.", who, i);
+				}
+				break;
+
+			case LEGACY_OT_GOTO_COUPLE: {
+				int rule = 0;
+				StationID station = GuessLegacyCoupleStation(old, i, rule);
+				if (station == StationID::Invalid()) {
+					IConsolePrint(CC_WARNING, "Prenos stare hry: {} rozkaz {}: 'jet spojit' - z okolnich rozkazu nejde poznat kde, vypusten.", who, i);
+					break;
+				}
+				remap[i] = static_cast<VehicleOrderID>(result.size());
+				result.push_back(ConvertLegacyCoupleOrder(src, station));
+				IConsolePrint(CC_INFO, "Prenos stare hry: {} rozkaz {}: 'jet spojit' -> spojit ve stanici {} ({}).", who, i, GetString(STR_STATION_NAME, station), LegacyCoupleRuleName(rule));
+				break;
+			}
+
+			default: {
+				Order o = src;
+				if (o.IsType(OT_GOTO_STATION) && LegacyDecouples(o)) {
+					const Order *decouple_order = (i + 1 < old.size() && LegacyOrderType(old[i + 1]) == LEGACY_OT_DECOUPLE) ? &old[i + 1] : nullptr;
+					ConvertLegacyDecoupleOrder(o, decouple_order, who, i);
+				}
+				o.ClearLegacyDecoupleFlags();
+				remap[i] = static_cast<VehicleOrderID>(result.size());
+				result.push_back(std::move(o));
+				break;
+			}
+		}
+	}
+
+	/* A vehicle standing on an order that went stands on the next one that
+	 * stayed, round the end of the list if need be; an empty list leaves it
+	 * at the start. */
+	for (size_t i = 0; i < old.size(); i++) {
+		if (remap[i] != INVALID_VEH_ORDER_ID) continue;
+		VehicleOrderID next = 0;
+		for (size_t j = 1; j < old.size(); j++) {
+			VehicleOrderID candidate = remap[(i + j) % old.size()];
+			if (candidate != INVALID_VEH_ORDER_ID) {
+				next = candidate;
+				break;
+			}
+		}
+		remap[i] = next;
+	}
+
+	return result;
+}
+
+/**
+ * The fork's own subtype bit on a train part: "first in a wagon chain outside
+ * a depot", its mark for the head of a rake standing on the line. Ours has
+ * one mark for the head of any engineless chain, in a depot or out of it
+ * (GVSF_FREE_WAGON), and nothing on this bit. Left as it is, such a rake
+ * would be the head of nothing: not a train, not a free wagon, invisible to
+ * every list and every search, with its wagons behind it.
+ */
+static constexpr uint8_t LEGACY_GVSF_FRONT_WAGON = 6;
+
+/** Convert the fork's orders, lists and live copies alike; see the file comment. */
+static void AfterLoadLegacyDecoupleImportOrders()
+{
+	/* The heads of the fork's rakes, before anything looks at the trains.
+	 * The fork numbered its rakes like trains, mostly with the number of the
+	 * train they were split off, so a rake and a train would answer to the
+	 * same number; ours leaves a rake unnumbered, as a free wagon chain
+	 * always was. Emptied here, before the numbers in use are counted
+	 * (AfterLoadVehiclesPhase2()), so the player's trains keep theirs. */
+	size_t rake_heads = 0;
+	for (Train *t : Train::Iterate()) {
+		if (HasBit(t->subtype, LEGACY_GVSF_FRONT_WAGON)) {
+			ClrBit(t->subtype, LEGACY_GVSF_FRONT_WAGON);
+			t->SetFreeWagon();
+			rake_heads++;
+		}
+		if (t->IsFreeWagon()) t->unitnumber = 0;
+	}
+	if (rake_heads != 0) IConsolePrint(CC_INFO, "Prenos stare hry: {} rad vozu stojicich na trati oznaceno jako volne vozy (nase cela rad), bez cisla vlaku.", rake_heads);
+
+	/* Who stands on which list, for the report and for moving everybody's
+	 * place along with the orders. The lists have not been initialised yet,
+	 * so this is asked of the vehicles, not of the lists. */
+	std::map<const OrderList *, std::vector<Vehicle *>> users;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		if (v->orders != nullptr) users[v->orders].push_back(v);
+	}
+
+	size_t lists = 0;
+	for (OrderList *list : OrderList::Iterate()) {
+		std::span<const Order> old = list->GetOrders();
+		bool foreign = false;
+		for (const Order &o : old) {
+			if (o.GetLegacyDecoupleFlags() != 0 || LegacyOrderType(o) >= OT_END) foreign = true;
+		}
+		if (!foreign) continue;
+		lists++;
+
+		auto it = users.find(list);
+		std::string who = "seznam rozkazu";
+		if (it != users.end() && !it->second.empty()) {
+			const Vehicle *v = it->second.front();
+			who = fmt::format("{} {}", v->type == VehicleType::Train ? "vlak" : "vozidlo", v->unitnumber);
+		}
+
+		std::vector<VehicleOrderID> remap;
+		std::vector<Order> converted = ConvertLegacyOrderList(old, who, remap);
+		list->ReplaceOrders(std::move(converted));
+
+		if (it == users.end()) continue;
+		for (Vehicle *v : it->second) {
+			v->cur_real_order_index = v->cur_real_order_index < remap.size() ? remap[v->cur_real_order_index] : 0;
+			v->cur_implicit_order_index = v->cur_implicit_order_index < remap.size() ? remap[v->cur_implicit_order_index] : 0;
+		}
+	}
+
+	/* The live copies. Every train is about to be stood in a depot or, for a
+	 * rake, given a fresh wait where it stands (SettleLegacyImportedTrains()),
+	 * so a live copy of one of the fork's own types is simply emptied; one of
+	 * ours keeps what it says, less the fork's byte. */
+	size_t live = 0;
+	for (Vehicle *v : Vehicle::Iterate()) {
+		Order &o = v->current_order;
+		if (LegacyOrderType(o) >= OT_END) {
+			o.Free();
+			live++;
+		} else if ((o.IsType(OT_GOTO_STATION) || o.IsType(OT_LOADING)) && LegacyDecouples(o)) {
+			uint8_t stay = LegacyPackedCount(o);
+			o.SetDecouple(true);
+			o.SetDecoupleCount(stay == 0 ? 0 : stay - 1);
+		}
+		o.ClearLegacyDecoupleFlags();
+	}
+
+	/* A backup of orders taken when a vehicle was sold in a depot is a list of
+	 * the fork's orders too, and it names nothing the player can see. Gone. */
+	size_t backups = 0;
+	for (OrderBackup *ob : OrderBackup::Iterate()) {
+		delete ob;
+		backups++;
+	}
+
+	IConsolePrint(CC_INFO, "Prenos stare hry: prevedeno {} seznamu rozkazu, {} rozdelanych rozkazu stare hry vyprazdneno, {} zaloh rozkazu zahozeno.", lists, live, backups);
 }
 
 /**
@@ -701,19 +1045,25 @@ static void AfterLoadDecoupleCounts()
 	}
 }
 
-/** @copydoc AfterLoadLegacyDecoupleImportReferences */
+/**
+ * Settle the legacy import's trains on the map, once the map is in its
+ * modern shape: see the comment on _sl_legacy_decouple_import (saveload.cpp).
+ *
+ * Every train with an engine is about to be stood in a depot and every
+ * headless rake left waiting where it is (SettleLegacyImportedTrains()), so
+ * no track anywhere is to stay held for where a train was going a moment
+ * ago: a reservation nobody is standing on would hold a junction shut for
+ * good. All of it is let go first, the way the ordinary loader does for a
+ * save written before path reservations existed; the rakes then take back
+ * the ground under themselves and nothing else.
+ */
 static void AfterLoadLegacyDecoupleImportMap()
 {
 	size_t cleared_reservations = 0;
 
-	/* Airport stands and taxiways held by aircraft that were not imported;
-	 * left set, an airport quietly refuses to handle any plane built later. */
-	for (Station *st : Station::Iterate()) st->airport.blocks = {};
-
-	/* Track reserved for trains that were not imported. The same sweep the
-	 * ordinary loader does for a savegame written before path reservations
-	 * existed, for the same reason: nothing on this map is entitled to hold
-	 * any track, so none of it is held. */
+	/* The same sweep the ordinary loader does for a savegame written before
+	 * path reservations existed, for the same reason: nothing on this map is
+	 * entitled to hold any track, so none of it is held. */
 	for (auto t : Map::Iterate()) {
 		switch (GetTileType(t)) {
 			case TileType::Railway:
@@ -751,16 +1101,17 @@ static void AfterLoadLegacyDecoupleImportMap()
 		}
 	}
 
-	/* A crossing whose barriers came down for a train that is not here would
-	 * stay down; recomputed from what is actually on the map, which is
-	 * nothing. */
+	IConsolePrint(CC_INFO, "Prenos stare hry: zruseno {} rezervaci koleji.", cleared_reservations);
+
+	CrashLog::SetStage("afterload: SettleLegacyImportedTrains");
+	SettleLegacyImportedTrains();
+
+	/* A crossing whose barriers came down for a train that has just been
+	 * stood in a depot would stay down; recomputed from what is actually on
+	 * the map now. */
 	for (const auto tile : Map::Iterate()) {
 		if (IsLevelCrossingTile(tile)) UpdateLevelCrossing(tile, false);
 	}
-	/* Said out loud: this is the one place where an import throws something
-	 * away that the file really did contain, and how much there was of it is
-	 * the difference between a quiet test save and somebody's running game. */
-	IConsolePrint(CC_INFO, "Prenos stare hry: zruseno {} rezervaci koleji.", cleared_reservations);
 }
 
 /**
@@ -774,13 +1125,13 @@ bool AfterLoadGame()
 	SetSignalHandlers();
 
 	/* First of all, before a single line of the ordinary post-load fixing
-	 * below: an import has left names of vehicles behind that resolve to
-	 * nothing, and that fixing walks straight into them without ever
-	 * expecting a hole. */
+	 * below: a legacy import's orders are still in the foreign fork's
+	 * spelling, with order types this build has no idea of, and the first
+	 * thing the ordinary fixing does with a list of orders is count them. */
 	{
-		CrashLog::SetStage("afterload: legacy import references");
+		CrashLog::SetStage("afterload: legacy import orders");
 		extern bool _sl_legacy_decouple_import;
-		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImportReferences();
+		if (_sl_legacy_decouple_import) AfterLoadLegacyDecoupleImportOrders();
 	}
 
 	extern TileIndex _cur_tileloop_tile; // From landscape.cpp.

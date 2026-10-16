@@ -110,6 +110,119 @@ const SaveLoadCompat _vehicle_train_sl_compat[] = {
 	SLC_NULL(11, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::ReorderUnmovableRemoveReserved),
 };
 
+/*
+ * The field order of a foreign fork's vehicle record, for a legacy import
+ * (see _sl_legacy_decouple_import, saveload.cpp). Ours, with the two places
+ * that fork shaped differently:
+ *  - the live order carries that fork's one packed "decouple" byte straight
+ *    after its destination (the same byte its order records carry at the
+ *    end; see _order_sl_compat_legacy_decouple);
+ *  - a train carries fourteen bytes of that fork's own between the waiting
+ *    counter and the acceleration flags: which train a part was split off
+ *    from, what it carried then, and the engine it had at the front. All of
+ *    it was bookkeeping for that fork's own decoupling and means nothing
+ *    here, so it is stepped over unread.
+ * Only ever used in that mode; the ordinary lists above are untouched.
+ */
+const SaveLoadCompat _vehicle_common_sl_compat_legacy_decouple[] = {
+	SLC_VAR("subtype"),
+	SLC_VAR("next"),
+	SLC_VAR("name"),
+	SLC_VAR("unitnumber"),
+	SLC_VAR("owner"),
+	SLC_VAR("tile"),
+	SLC_VAR("dest_tile"),
+	SLC_VAR("x_pos"),
+	SLC_VAR("y_pos"),
+	SLC_VAR("z_pos"),
+	SLC_VAR("direction"),
+	SLC_NULL(2, SaveLoadVersion::MinVersion, SaveLoadVersion::VeryLowTownIndustryNumber),
+	SLC_VAR("spritenum"),
+	SLC_NULL(5, SaveLoadVersion::MinVersion, SaveLoadVersion::VeryLowTownIndustryNumber),
+	SLC_VAR("engine_type"),
+	SLC_NULL(2, SaveLoadVersion::MinVersion, SaveLoadVersion::IndustryManagement),
+	SLC_VAR("cur_speed"),
+	SLC_VAR("subspeed"),
+	SLC_VAR("acceleration"),
+	SLC_VAR("motion_counter"),
+	SLC_VAR("progress"),
+	SLC_VAR("vehstatus"),
+	SLC_VAR("last_station_visited"),
+	SLC_VAR("last_loading_station"),
+	SLC_VAR("cargo_type"),
+	SLC_VAR("cargo_subtype"),
+	SLC_VAR("cargo_days"),
+	SLC_VAR("cargo_source"),
+	SLC_VAR("cargo_source_xy"),
+	SLC_VAR("cargo_cap"),
+	SLC_VAR("refit_cap"),
+	SLC_VAR("cargo_count"),
+	SLC_VAR("cargo.packets"),
+	SLC_VAR("cargo.action_counts"),
+	SLC_VAR("cargo_age_counter"),
+	SLC_VAR("day_counter"),
+	SLC_VAR("tick_counter"),
+	SLC_VAR("running_ticks"),
+	SLC_VAR("cur_implicit_order_index"),
+	SLC_VAR("cur_real_order_index"),
+	SLC_NULL(1, SaveLoadVersion::MinVersion, SaveLoadVersion::OrderList),
+	SLC_VAR("current_order.type"),
+	SLC_VAR("current_order.flags"),
+	SLC_VAR("current_order.dest"),
+	SLC_VAR("current_order.legacy_decouple_flags"),
+	SLC_VAR("current_order.refit_cargo"),
+	SLC_NULL(1, SaveLoadVersion::RefitOrders, SaveLoadVersion::GoalProgressPlaneAcceleration),
+	SLC_VAR("current_order.wait_time"),
+	SLC_VAR("current_order.travel_time"),
+	SLC_VAR("current_order.max_speed"),
+	SLC_VAR("timetable_start"),
+	SLC_VAR("orders"),
+	SLC_VAR("age"),
+	SLC_VAR("max_age"),
+	SLC_VAR("date_of_last_service"),
+	SLC_VAR("service_interval"),
+	SLC_VAR("reliability"),
+	SLC_VAR("reliability_spd_dec"),
+	SLC_VAR("breakdown_ctr"),
+	SLC_VAR("breakdown_delay"),
+	SLC_VAR("breakdowns_since_last_service"),
+	SLC_VAR("breakdown_chance"),
+	SLC_VAR("build_year"),
+	SLC_VAR("load_unload_ticks"),
+	SLC_VAR("cargo_paid_for"),
+	SLC_VAR("vehicle_flags"),
+	SLC_VAR("profit_this_year"),
+	SLC_VAR("profit_last_year"),
+	SLC_VAR("cargo_feeder_share"),
+	SLC_NULL(4, SaveLoadVersion::FeederShare, SaveLoadVersion::CargoPackets),
+	SLC_VAR("value"),
+	SLC_VAR("random_bits"),
+	SLC_VAR("waiting_triggers"),
+	SLC_VAR("next_shared"),
+	SLC_NULL(2, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::MoreCargoPackets),
+	SLC_NULL(4, SaveLoadVersion::MoreCargoPackets, SaveLoadVersion::NewGRFPalette),
+	SLC_VAR("group_id"),
+	SLC_VAR("current_order_time"),
+	SLC_VAR("lateness_counter"),
+	SLC_NULL(10, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::ReorderUnmovableRemoveReserved),
+};
+
+/** @copydoc _vehicle_common_sl_compat_legacy_decouple */
+const SaveLoadCompat _vehicle_train_sl_compat_legacy_decouple[] = {
+	SLC_VAR("common"),
+	SLC_VAR("crash_anim_pos"),
+	SLC_VAR("force_proceed"),
+	SLC_NULL(1, SaveLoadVersion::MinVersion, SaveLoadVersion::EngineMultiRailtype),
+	SLC_VAR("track"),
+	SLC_VAR("flags"),
+	SLC_NULL(2, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::VehicleGroups),
+	SLC_VAR("wait_counter"),
+	SLC_NULL(14, SaveLoadVersion::MinVersion, SaveLoadVersion::MaxVersion),
+	SLC_NULL(2, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::NoMultiheadReference),
+	SLC_VAR("gv_flags"),
+	SLC_NULL(11, SaveLoadVersion::VehicleCurrencyStationChanges, SaveLoadVersion::ReorderUnmovableRemoveReserved),
+};
+
 /** Original field order for SlVehicleRoadVeh. */
 const SaveLoadCompat _vehicle_roadveh_sl_compat[] = {
 	SLC_VAR("common"),

@@ -1114,3 +1114,25 @@ tak, aby všechny mířily k hlavě seznamu a hlava nosem ven. Hned za ní se
 nastaví, že vede hlava seznamu. **Nic z toho neměří skutečnost — nařizuje
 ji podle pořadí seznamu.** Je to předpoklad převlečený za výpočet a je to
 jmenování konce v nejčistší podobě.
+
+## Přenos staré hry (decouple 0.10.4, 2018): jak se překládají jejich rozkazy na naše
+
+Starý save (verze 200, větev `Decouple` z Palo123/OpenTTD-YPS) se načte
+s přepínačem v okně načtení nebo přes konzoli `legacyimport on` + `load`.
+Rozvržení je ze starého zdrojáku: jeden sbalený bajt u každého rozkazu
+(bit 0 odpojit, bity 1–7 počet), tři vlastní typy rozkazů a bit 6 podtypu
+vozu pro čelo odstavené řady. Překlad (`AfterLoadLegacyDecoupleImportOrders`,
+afterload.cpp) a usazení vlaků (`SettleLegacyImportedTrains`, train_cmd.cpp):
+
+| u nich | u nás |
+|---|---|
+| stanice s bitem odpojit + rozkaz „odpojit“ (typ 11) za ní | stanice s `decouple`, `decouple_keep_wagons = počet − 1` (0 = jen mašinka); „odpojit“ zmizí; přední půlka „čekat“ (3) → `wait_for_couple` |
+| „čekat na spojení“ (typ 10) | `wait_for_couple` na stanici před ním |
+| „jeď spojit“ (typ 9), bez cíle, filtry plné/prázdné (flags 0–2), náklad (refit), počet (bajt 1–7) | stanice s `go_to_couple`, `couple_load`, `couple_cargo`, `couple_count`, nenakládat/nevykládat; stanice odhadnuta z okolí: implicitní zastávka hned za ním → zastávka hned za ním → poslední odpojování před ním → poslední zastávka před ním → další zastávka; jinak vypuštěn |
+| čelo řady (bit 6 podtypu) | `GVSF_FREE_WAGON`, bez čísla vlaku; řada čeká, kde stojí, s nakládáním podle svého rozkazu; její starý seznam rozkazů zmizí (náš se píše při odstavení) |
+| vlak s mašinkou kdekoli | zastaven v nejbližším depu firmy (vhodné koleje; bez výkonu podle kolejí mašinky; jinak kterékoli), rozdělaný rozkaz vyprázdněn, pokračuje od svého místa v seznamu |
+| auta, lodě, letadla | beze změny |
+
+Každý odhad a každá nepřesnost se vypíše do konzole („Prenos stare hry: …“).
+Co nejde přeložit přesně: jejich „odpojit“ s mašinkou vzadu a počtem > 0
+(počítali zepředu), a řada, která u nich po odpojení neměla nakládat.

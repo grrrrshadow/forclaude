@@ -19,6 +19,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 16. 10. – přenos staré hry (decouple 0.10.4 = Palo123 Decouple 2018, save verze 200)
+
+- Hráč: „dokončíme import z decouple 0.10.4, máme stejný orders, naše příkazy jsou jen podrobnější. Nech vlaky
+  v depu a já je pustím po jednom. Auta, lodě, letadla nemusí do depa.“ Starý zdroják jsem si stáhl (povolil), takže
+  rozvržení savu i význam rozkazů jsou ze zdrojáku, ne odhad.
+- Co se ve starém savu liší od vanilly: jeden bajt navíc u každého rozkazu i u rozdělaného rozkazu vozidla (sbalené
+  odpojení/spojení), 14 bajtů navíc u každého dílu vlaku (jejich účetnictví rozdělování), tři vlastní typy rozkazů
+  (9 jeď spojit, 10 čekej na spojení, 11 odpojit) a bit 6 v podtypu vozu = čelo odstavené řady mimo depo.
+- Hotovo: záznamy se čtou vlastními tabulkami polí (ORDR, VEHS – jen v režimu přenosu), rozkazy se hned po
+  načtení přeloží na naše: stanice s odpojením + následný „odpojit“ → naše stanice s odpojením a počtem vozů (jejich
+  počet počítal i mašinku), „čekej na spojení“ → přepínač na stanici před ním, „jeď spojit“ (u nich bez cíle – vlak
+  hledal nejbližší čekající řadu po kolejích) → naše „spojit ve stanici“ se stejnými filtry (plné/prázdné, náklad,
+  počet vozů). Stanice se odhaduje z okolních rozkazů (kde po spojení zastavil → hned další zastávka → poslední
+  odpojování před tím → poslední/další zastávka) a každý odhad se vypíše do konzole. Čelo řady → náš volný vůz bez
+  čísla vlaku. Všechny vlaky s mašinkou stojí zastavené v nejbližším depu (podle kolejí, u „Neviditelné“ mašinky
+  bez výkonu podle kolejí mašinky), řady vozů čekají tam, kde stály, s nakládáním, jaké měly; auta, lodě, letadla
+  jedou dál.
+- Test naprázdno mimo rig (čistý HOME, GRF ze savu stažené z BaNaNaS, 3 hráčovy vlastní GRF chybí): 74 vlaků do
+  dep, 59 řad čeká, 301 rozkazů „jeď spojit“ přeloženo bez jediného vypuštění, hra běží, uložit a znovu načíst jde.
+  Varování „invalid length“ jsou od vozů z chybějícího CZTR_Wagons_cargo.grf (jen u mě).
+- Nepřesné (hra to vypíše): rozkaz „odpojit“ s mašinkou vzadu a počtem > 0 (u nich počet zepředu, u nás od
+  mašinky; v savu se nevyskytl); řada, která u nich po odpojení neměla nakládat (u nás nakládá podle rozkazu).
+- Vyzkoušet u hráče: načíst s jeho GRF přes tlačítko v okně načtení (nebo `legacyimport on` + `load`), projít
+  konzoli (hlášky „Prenos stare hry“), pouštět vlaky po jednom.
+
 ## 16. 10. – světla vozidel z modelu, levnější noc
 
 - Hráč: „auta musí mít vyznačená světla jako mají domy okna, kolem auta jsou světla metr daleko“. Kolega dal světla
@@ -288,3 +313,4 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Lampy u silnic v noci; svítící okna dalších domů (až je kolega dodá, hra je umí).
 - Kostra a animace glTF; draci; interiéry; boj.
 - Klínek sousedního domu přes průčelí (#41). Domy z GRF objektem z balíčku (MAXd, #47). Doplňky (maják) podle stavu GRF.
+- Přenos staré hry: hráč zkusí svůj save se svými GRF; podle konzole doladit odhady stanic u „jeď spojit“.

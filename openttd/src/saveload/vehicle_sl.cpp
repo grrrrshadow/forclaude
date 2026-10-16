@@ -768,6 +768,10 @@ public:
 		SLE_CONDVAR(Vehicle, current_order.type, VarTypes::U8, SaveLoadVersion::BigMap, SaveLoadVersion::MaxVersion),
 		SLE_CONDVAR(Vehicle, current_order.flags, VarTypes::U8, SaveLoadVersion::BigMap, SaveLoadVersion::MaxVersion),
 		SLE_CONDVAR(Vehicle, current_order.dest, VarTypes::U16, SaveLoadVersion::BigMap, SaveLoadVersion::MaxVersion),
+		/* A foreign fork's one extra byte in the live order, reached only
+		 * through the legacy field list (see _sl_legacy_decouple_import,
+		 * saveload.cpp, and the same entry in GetOrderDescription()). */
+		SLE_CONDVAR(Vehicle, current_order.legacy_decouple_flags, VarTypes::U8, SaveLoadVersion::MinVersion, SaveLoadVersion::TableChunks),
 
 		/* Refit in current order */
 		SLE_CONDVAR(Vehicle, current_order.refit_cargo, VarTypes::U8, SaveLoadVersion::RefitOrders, SaveLoadVersion::MaxVersion),
@@ -879,6 +883,17 @@ public:
 
 	static inline const SaveLoadCompatTable compat_description = _vehicle_common_sl_compat;
 
+	/* See the comment on _sl_legacy_decouple_import (saveload.cpp): a
+	 * foreign fork's vehicle record has one byte more in its live order,
+	 * so in that mode the record is read by the field list that knows
+	 * where it is. */
+	SaveLoadCompatTable GetCompatDescription() const override
+	{
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) return _vehicle_common_sl_compat_legacy_decouple;
+		return DefaultSaveLoadHandler<SlVehicleCommon, Vehicle>::GetCompatDescription();
+	}
+
 	void Save(Vehicle *v) const override
 	{
 		SlObject(v, this->GetDescription());
@@ -933,6 +948,17 @@ public:
 		     SLE_SSTR(Train, driver_name,      VarTypes::STR | StringValidationSetting::AllowControlCode),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
+
+	/* See the comment on _sl_legacy_decouple_import (saveload.cpp): a
+	 * foreign fork's train record carries fields of its own in the middle
+	 * of ours, so in that mode it is read by the field list that steps
+	 * over them. */
+	SaveLoadCompatTable GetCompatDescription() const override
+	{
+		extern bool _sl_legacy_decouple_import;
+		if (_sl_legacy_decouple_import) return _vehicle_train_sl_compat_legacy_decouple;
+		return DefaultSaveLoadHandler<SlVehicleTrain, Vehicle>::GetCompatDescription();
+	}
 
 	void Save(Vehicle *v) const override
 	{
@@ -1247,20 +1273,11 @@ struct VEHSChunkHandler : ChunkHandler {
 
 	void Load() const override
 	{
+		/* A legacy import (see _sl_legacy_decouple_import, saveload.cpp)
+		 * reads these records too: the parts of them a foreign fork shaped
+		 * differently have their own field lists, chosen inside the
+		 * handlers above (GetCompatDescription()). */
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(_vehicle_desc, _vehicle_sl_compat);
-
-		/* See the comment on _sl_legacy_decouple_import (saveload.cpp): a
-		 * foreign fork's vehicle records do not match this list field for
-		 * field, so decoding them is not attempted at all -- the whole
-		 * array is walked past by the length each item already states for
-		 * itself, same as an unrecognised chunk is. No Vehicle comes out of
-		 * this; nothing downstream should expect one to. */
-		extern bool _sl_legacy_decouple_import;
-		if (_sl_legacy_decouple_import) {
-			extern void SlSkipArray();
-			SlSkipArray();
-			return;
-		}
 
 		int index;
 

@@ -26,6 +26,25 @@ const SaveLoadCompat _order_sl_compat[] = {
 	SLC_NULL(10, SaveLoadVersion::BigMap, SaveLoadVersion::RefitOrders),
 };
 
+/**
+ * The field order of a foreign fork's order record, for a legacy import
+ * (see _sl_legacy_decouple_import, saveload.cpp): ours, with that fork's one
+ * packed "decouple" byte after the last field. Only ever used in that mode.
+ */
+const SaveLoadCompat _order_sl_compat_legacy_decouple[] = {
+	SLC_VAR("type"),
+	SLC_VAR("flags"),
+	SLC_VAR("dest"),
+	SLC_VAR("next"),
+	SLC_VAR("refit_cargo"),
+	SLC_NULL(1, SaveLoadVersion::RefitOrders, SaveLoadVersion::GoalProgressPlaneAcceleration),
+	SLC_VAR("wait_time"),
+	SLC_VAR("travel_time"),
+	SLC_VAR("max_speed"),
+	SLC_VAR("legacy_decouple_flags"),
+	SLC_NULL(10, SaveLoadVersion::BigMap, SaveLoadVersion::RefitOrders),
+};
+
 /** Original field order for _orderlist_desc. */
 const SaveLoadCompat _orderlist_sl_compat[] = {
 	SLC_VAR("first"),

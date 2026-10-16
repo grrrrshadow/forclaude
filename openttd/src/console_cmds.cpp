@@ -622,16 +622,17 @@ static bool ConCztrTest(std::span<std::string_view> argv)
  */
 /**
  * Toggle legacy-decouple import mode: on the next 'load', vehicle and order
- * records belonging to a save from a foreign fork (a shape this build has no
- * field for) are walked past instead of decoded, so the map and everything
- * else on it can still come in. Nothing is decoded into vehicles; there are
- * none afterwards. See the comment on _sl_legacy_decouple_import.
+ * records belonging to a save from the old "Decouple" fork (a shape this
+ * build's ordinary field lists do not know) are read by field lists that
+ * do, its orders are translated into ours, and its trains are stood in
+ * depots for the player to let out. See the comment on
+ * _sl_legacy_decouple_import.
  * @copydoc IConsoleCmdProc
  */
 static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Import an old foreign-fork save's map and infrastructure, discarding its vehicles.");
+		IConsolePrint(CC_HELP, "Import an old decouple 0.10.4 save: map, companies, vehicles and orders. Trains are put stopped into the nearest depot; road vehicles, ships and aircraft carry on.");
 		IConsolePrint(CC_HELP, "Usage: 'legacyimport' to flip it, or 'legacyimport on' / 'legacyimport off', then 'load <file>'.");
 		return true;
 	}
@@ -657,7 +658,7 @@ static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
 		want = !want;
 	}
 
-	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", want ? "ON - vehicles will be discarded on next load" : "off");
+	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", want ? "ON - the next load reads an old decouple save, trains go stopped into depots" : "off");
 	return true;
 }
 

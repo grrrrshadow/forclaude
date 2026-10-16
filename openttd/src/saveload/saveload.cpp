@@ -83,15 +83,28 @@ extern const SaveLoadVersion SAVEGAME_VERSION{to_underlying(SaveLoadVersion::Max
  * (the map, the industries, the stations, the towns, the companies) is
  * perfectly ordinary and would have read just fine on its own.
  *
- * This asks nothing of that unknown layout. Read on, an array chunk's own
- * items are each stapled to a length the file states for itself -- so a
- * chunk can be walked end to end by that length alone, sight unseen, same as
- * an already-unknown chunk from a NewGRF that isn't installed. Set this
- * before loading and the chunks a foreign vehicle format would otherwise
- * break on (VEHS, ORDR) are walked that way instead of decoded field by
- * field, so nothing after them is thrown off by a shape this build was never
- * taught -- at the cost of that fork's vehicles and their orders, which
- * never existed as far as the rest of the load is concerned.
+ * The fork in question is the player's old game: the 2018 "Decouple" branch
+ * of OpenTTD (savegame version 200), the one this project grew out of. Its
+ * layout is known exactly, from its source, and is small: one packed byte on
+ * every order and on every vehicle's live order (what that fork's decoupling
+ * and coupling orders meant), fourteen bytes of bookkeeping on every train
+ * part, and three order types of its own (go and couple, wait to be coupled,
+ * decouple) whose numbers mean nothing here. Set this before loading and
+ *  - the records that carry those fields are read by field lists that know
+ *    where they are (order_sl.cpp, vehicle_sl.cpp and their compat tables),
+ *    instead of by the ordinary ones, so the whole save comes in: map,
+ *    towns, stations, companies, vehicles and orders alike;
+ *  - that fork's orders are turned into ours once everything is in
+ *    (AfterLoadLegacyDecoupleImportOrders(), afterload.cpp): same ideas,
+ *    different spelling -- ours are only more particular about where;
+ *  - every train with an engine is put, stopped, into the nearest depot of
+ *    its company (SettleLegacyImportedTrains(), train_cmd.cpp), for the
+ *    player to let out one by one once he has looked its orders over, and
+ *    every headless rake is left standing where it is, waiting to be
+ *    collected. Road vehicles, ships and aircraft go on as they were.
+ * Some things that fork could say have no exact equivalent here and are
+ * brought across as the nearest thing, each one reported in the console as
+ * it happens, so the player knows what to look at.
  *
  * Left off (the default, always, for an ordinary load) an old but genuinely
  * unmodified OpenTTD save reads exactly as it always has: nothing here
@@ -1395,26 +1408,6 @@ static void *IntToReference(size_t index, SLRefType rt)
 	/* Correct index. Old vehicles were saved differently:
 	 * invalid vehicle was 0xFFFF, now we use 0x0000 for everything invalid. */
 	if (rt != SLRefType::OldVehicle) index--;
-
-	/* See the comment on _sl_legacy_decouple_import (saveload.cpp). VEHS,
-	 * ORDR and ORDL are walked past unread in this mode, so nothing else
-	 * that names a vehicle or an order list by reference -- a station's
-	 * list of vehicles currently loading, a cargo payment's vehicle, an
-	 * order backup's clone source -- can ever find what it names either.
-	 * Answering "nothing" is the only honest answer available here.
-	 *
-	 * It is not, on its own, a safe one, and it was once written down here
-	 * as if it were. A field that holds one vehicle copes with nothing --
-	 * that is the same gap a vehicle sold mid-journey leaves behind. A
-	 * *list* of vehicles does not: it keeps its length, the holes stay in
-	 * it, and the loading machinery walks that list every tick without ever
-	 * expecting one. That is a crash on the first tick after the game
-	 * appears, and it is what took down the player's first real import.
-	 * The leftovers are therefore cleared out wholesale once the load is
-	 * finished, in AfterLoadLegacyDecoupleImport() (afterload.cpp). */
-	if (_sl_legacy_decouple_import && (rt == SLRefType::OrderList || rt == SLRefType::OldVehicle || rt == SLRefType::Vehicle)) {
-		return nullptr;
-	}
 
 	switch (rt) {
 		case SLRefType::OrderList:
