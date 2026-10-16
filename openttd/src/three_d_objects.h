@@ -25,6 +25,7 @@
 #define THREE_D_OBJECTS_H
 
 #include "house_type.h"
+#include "slope_type.h"
 #include "industry_type.h"
 #include "engine_type.h"
 #include "tile_type.h"
@@ -148,6 +149,7 @@ struct ThreeDObject {
 	std::string field_part;    ///< "dil" of a field ("druh": "pole"): "zem", "cesta", "bouda", "seno", "mari_male", "brambory_vzrostle", ...
 	std::array<std::vector<ThreeDObjectFigure>, 2> work;    ///< "prace" of the soil: the girls at work on a tile of marijuana [0], of potatoes [1]
 	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
+	size_t texture_of = SIZE_MAX; ///< a part of the original industries placed on a tile ("dily"): the object of the part, whose texture it shares
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	ThreeDObjectShapeView GetShape(int level) const;
@@ -354,6 +356,21 @@ const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind);
 std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
+const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope);
+
+/**
+ * A tile of an industry of the original game drawn from the parts the industries share (the colleague's
+ * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, set prumysl_vanilla): the ground of the tile, the parts standing on it (of the
+ * whole building when the tile is the anchor of a block of tiles), and the plants (the forest, the plantations).
+ */
+struct ThreeDIndustryTileParts {
+	const ThreeDObject *ground = nullptr;          ///< "podklad": the yard, the soil
+	std::vector<const ThreeDObject *> parts;       ///< "dily", each placed where it stands
+	const ThreeDObject *plants = nullptr;          ///< "rostliny": an object of the plants alone
+	bool member = false;                           ///< a tile of a block its anchor draws ("soucast_bloku"): its ground only
+	int anchor_dx = 0, anchor_dy = 0;              ///< "posun": this tile's place from the anchor's, tiles
+};
+const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 
 struct ThreeDPlantationTile;
 /**

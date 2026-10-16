@@ -9195,6 +9195,36 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'zapomen [seconds]': the clock of the 3D objects on by so many seconds (120 without), what was not drawn since forgotten. */
 		extern std::string RigForgetThreeDObjects(uint seconds);
 		IConsolePrint(CC_DEFAULT, "test3d: {}", RigForgetThreeDObjects(static_cast<uint>(number(2).value_or(120))));
+	} else if (what == "puvodni") {
+		/* 'puvodni': the industries of the original game, where they are, and how many of their tiles are drawn from the
+		 * parts the industries share (GetThreeDOriginalIndustryTile()); then the fields of the farms and their wheat. */
+		for (const Industry *ind : Industry::Iterate()) {
+			int tiles = 0, drawn = 0;
+			for (TileIndex t : ind->location) {
+				if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != ind->index) continue;
+				tiles++;
+				const IndustryGfx gfx = GetIndustryGfx(t);
+				if (gfx < NEW_INDUSTRYTILEOFFSET && !GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile() && GetThreeDOriginalIndustryTile(gfx) != nullptr) drawn++;
+			}
+			if (drawn == 0) continue;
+			IConsolePrint(CC_DEFAULT, "test3d: puvodni {} typ {} na {},{} {}x{}: {} z {} dlazdic z dilu", ind->index.base(), ind->type, TileX(ind->location.tile), TileY(ind->location.tile), ind->location.w, ind->location.h, drawn, tiles);
+		}
+		int young = 0, ripe = 0, other = 0;
+		TileIndex first_young = INVALID_TILE, first_ripe = INVALID_TILE;
+		for (const auto t : Map::Iterate()) {
+			if (!IsTileType(t, TileType::Clear) || !IsClearGround(t, ClearGround::Fields)) continue;
+			const uint type = GetFieldType(t);
+			if (type >= 1 && type <= 3) {
+				if (young++ == 0) first_young = t;
+			} else if (type >= 4 && type <= 7) {
+				if (ripe++ == 0) first_ripe = t;
+			} else {
+				other++;
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: pole farem: psenice mlada {} (prvni {},{}), zrala {} (prvni {},{}), bez psenice {}", young,
+				first_young == INVALID_TILE ? 0 : TileX(first_young), first_young == INVALID_TILE ? 0 : TileY(first_young), ripe,
+				first_ripe == INVALID_TILE ? 0 : TileX(first_ripe), first_ripe == INVALID_TILE ? 0 : TileY(first_ripe), other);
 	} else if (what == "pole") {
 		/* 'pole': where the fields are (the marijuana plantations, the potato fields), their north tiles. */
 		std::string text;

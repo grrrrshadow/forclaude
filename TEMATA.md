@@ -55,6 +55,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   1,34 t. Kreslí se z modelu .dae, barvy z materiálů, lak jedna z 5 barev modu na každé auto, díry pro světla a
   masku z masky BC4, svítí skla podle glowMap, světla z props. Model zjednodušený na 110 tisíc trojúhelníků
   (bez rozdílu v obraze), šest Volg na obrazovce nic nezpomalí. Kabina z kamery řidiče.
+- Průmysly původní hry ve 3D (hráč: „máme hotový průmysl modulární“, kolega `PROSBA-PRUMYSL-VANILLA-3D.md`, sada
+  `objekty/prumysl_vanilla`): 46 společných dílů a 122 dlaždic podle gfx (128 gfx mírného, subarktického a
+  subtropického klimatu; Toyland zůstává ze spritů). Podklad, díly s polohou/otočením/měřítkem, stromy, bloky přes víc
+  dlaždic (kreslí kotva). Každý díl se čte jednou a textura je jen jedna (sdílí ji všechna umístění). Kreslí se na
+  otočené mapě, na sever (jako domy) i v pohledu z očí, v noci svítí okna. Pšenice na polích farmy: mladá při růstu,
+  zralá před sklizní, na svahu po terénu; v pohledu z očí do 10 dlaždic. Rozestavěný průmysl jen podklad, animované
+  dlaždice zatím jako klidné, okno průmyslu zatím bez 3D náhledu. Holky na polní cestě tu nejsou (pole farmy nemá cestu).
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 

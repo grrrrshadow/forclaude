@@ -119,6 +119,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include "console_func.h"
 #include "industry.h"
 #include "industry_map.h"
+#include "industrytype.h"
 
 #include <chrono>
 #include <cmath>
@@ -1293,6 +1294,10 @@ static int GetViewportY(Point tile)
 static bool _north_house_objects = false;
 static void AddNorthHouseObject(size_t first_parent);
 static void AddIndustryObjects(size_t first_parent, bool north);
+static void AddFieldWheat();
+static const ThreeDIndustryTileParts *OriginalIndustryTileParts(TileIndex tile);
+static TileIndex OriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts);
+static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTileParts &parts, bool built);
 
 static void ViewportAddLandscape()
 {
@@ -1403,6 +1408,7 @@ static void ViewportAddLandscape()
 				_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 				if (_north_house_objects && tile_type == TileType::House) AddNorthHouseObject(first_parent);
 				if (_north_house_objects && tile_type == TileType::Industry) AddIndustryObjects(first_parent, true);
+				if (_north_house_objects && tile_type == TileType::Clear) AddFieldWheat();
 				if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 			}
 		}
@@ -3697,11 +3703,19 @@ static void LeaveOutTileSprites(size_t first_parent, bool keep_foundation)
  */
 static void AddIndustryObjects(size_t first_parent, bool north)
 {
-	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries) || !IsIndustryCompleted(_cur_ti.tile)) return;
+	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries)) return;
+	const bool built = IsIndustryCompleted(_cur_ti.tile);
 	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
-	const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+	const ThreeDObject *obj = built ? GetThreeDIndustryObjectOf(ind) : nullptr;
 	ThreeDPlantationTile pt;
 	ThreeDFieldTile ft;
+	if (const ThreeDIndustryTileParts *parts = obj == nullptr ? OriginalIndustryTileParts(_cur_ti.tile) : nullptr; parts != nullptr) {
+		/* An industry of the original game, from the parts the industries share; being built, its ground only. */
+		LeaveOutTileSprites(first_parent, north);
+		AddOriginalIndustryTile(_cur_ti.tile, *parts, built);
+		return;
+	}
+	if (!built) return;
 	if (obj != nullptr) {
 		LeaveOutTileSprites(first_parent, north);
 		const TileIndex origin = ind->location.tile;
@@ -3730,6 +3744,67 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 		}
 		if (_turned_debug_tile == _cur_ti.tile) IConsolePrint(CC_DEFAULT, "ladeni: field tile x {} stage {} worker {} road behind {}: plants {}, worker {}", pt.x, pt.stage, pt.worker, pt.road_behind, ft.plants != nullptr ? ft.plants->name : "none", ft.worker.size());
 	}
+}
+
+/**
+ * The parts of a tile of an industry of the original game drawn from the parts the industries share (the colleague's
+ * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, GetThreeDOriginalIndustryTile()); nullptr for a tile of a set (NewGRF) or one
+ * the sets have none for (Toyland), drawn by its sprites as ever.
+ */
+static const ThreeDIndustryTileParts *OriginalIndustryTileParts(TileIndex tile)
+{
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	return GetThreeDOriginalIndustryTile(gfx);
+}
+
+/**
+ * The anchor of the block a tile of an original industry is of (a factory of 2 x 2 tiles: its north tile draws it
+ * whole) and its parts; the tile itself when it is no member of a block. INVALID_TILE when the anchor is not there.
+ */
+static TileIndex OriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts)
+{
+	if (!parts->member) return tile;
+	const TileIndex anchor = TileAddWrap(tile, -parts->anchor_dx, -parts->anchor_dy);
+	if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return INVALID_TILE;
+	parts = OriginalIndustryTileParts(anchor);
+	return parts != nullptr && !parts->member ? anchor : INVALID_TILE;
+}
+
+/**
+ * A tile of an original industry among the turned objects: its ground (flat and first, as the field road); when it is
+ * built, the parts and plants of its building, from the anchor of its block (once, whichever of its tiles is drawn).
+ */
+static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTileParts &parts, bool built)
+{
+	if (parts.ground != nullptr) _turned_objects.push_back({parts.ground, tile, GetTileMaxPixelZ(tile), nullptr, {}, -4 * static_cast<int>(TILE_HEIGHT)});
+	if (!built) return;
+	const ThreeDIndustryTileParts *of = &parts;
+	const TileIndex anchor = OriginalIndustryAnchor(tile, of);
+	if (anchor == INVALID_TILE) return;
+	const int z = GetTileMaxPixelZ(anchor);
+	auto add = [&](const ThreeDObject *obj) {
+		for (const TurnedObject &to : _turned_objects) {
+			if (to.origin == anchor && to.obj == obj) return;
+		}
+		_turned_objects.push_back({obj, anchor, z});
+	};
+	for (const ThreeDObject *p : of->parts) add(p);
+	if (of->plants != nullptr) add(of->plants);
+}
+
+/**
+ * Wheat on a field of a farm (the colleague's pv_pole_psenice_*, hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md): none on the
+ * ploughed field nor on the haystacks of the harvest, young while it grows (the field's type 1 to 3), ripe before the
+ * harvest (4 to 7), each plant on the field's slope. No girls in the field, nothing is hoed there.
+ */
+static void AddFieldWheat()
+{
+	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Clear) || !IsClearGround(_cur_ti.tile, ClearGround::Fields)) return;
+	const uint type = GetFieldType(_cur_ti.tile);
+	if (type == 0 || type >= 8) return;
+	const ThreeDObject *wheat = GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala");
+	if (wheat != nullptr) _turned_objects.push_back({GetThreeDSlopedPlants(wheat, _cur_ti.tileh), _cur_ti.tile, _cur_ti.z});
 }
 
 /**
@@ -3992,6 +4067,8 @@ static void ViewportDoDrawTurned()
 		}
 		/* One of the game's own industries as a real 3D object (AddIndustryObjects()). */
 		if (tile_type == TileType::Industry) AddIndustryObjects(first_parent, false);
+		/* Wheat on the farm's fields (AddFieldWheat()). */
+		if (tile_type == TileType::Clear) AddFieldWheat();
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
 		if (tile_type == TileType::House && _cur_ti.tile != INVALID_TILE && !IsTransparencySet(TransparencyOption::Houses)) {
 			HouseID house = GetHouseType(_cur_ti.tile);
@@ -7909,6 +7986,8 @@ double FirstPersonGroundZ(double x, double y)
 static constexpr double CAB_FIGURE_SOLID = 3.0 * TILE_SIZE;
 /** And a plant of a field (AddCabPlant()): only those at the walker's feet, the field has hundreds. */
 static constexpr double CAB_PLANT_SOLID = 0.6 * TILE_SIZE;
+/** The wheat of the farm's fields is drawn this many tiles about the eye; farther, the field's ground. */
+static constexpr double CAB_WHEAT_TILES = 10.0;
 
 /**
  * A figure near the eye by its triangles (a dragon before the walker, a mushroom by the way): in the world where it
@@ -8491,9 +8570,13 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 						if (obj != nullptr) far_object(obj, tile);
 					} else if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
 						const Industry *ind = Industry::GetByTile(tile);
-						if (ind->location.tile != tile) continue;
 						const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
-						if (obj != nullptr) far_object(obj, tile);
+						if (obj != nullptr) {
+							if (ind->location.tile == tile) far_object(obj, tile);
+						} else if (const ThreeDIndustryTileParts *parts = OriginalIndustryTileParts(tile); parts != nullptr && !parts->member) {
+							/* An industry of the original game from the shared parts: its buildings from their anchors. */
+							for (const ThreeDObject *p : parts->parts) far_object(p, tile);
+						}
 					}
 				}
 			}
@@ -8812,6 +8895,39 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 						if (co.origin == origin) known = true;
 					}
 					if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+				}
+			}
+		}
+		if (const ThreeDIndustryTileParts *parts = tile_type == TileType::Industry && GetThreeDIndustryObjectOf(Industry::GetByTile(_cur_ti.tile)) == nullptr ? OriginalIndustryTileParts(_cur_ti.tile) : nullptr; parts != nullptr) {
+			/* An industry of the original game from the parts the industries share (AddOriginalIndustryTile()): its
+			 * ground, and when it is built its building from the anchor of its block, the trees of the forest. */
+			kind = 5;
+			auto add = [&](const ThreeDObject *obj, TileIndex origin) {
+				for (const CabObject &co : objects) {
+					if (co.origin == origin && co.obj == obj) return;
+				}
+				objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+			};
+			if (parts->ground != nullptr) add(parts->ground, _cur_ti.tile);
+			const ThreeDIndustryTileParts *of = parts;
+			const TileIndex anchor = IsIndustryCompleted(_cur_ti.tile) ? OriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
+			if (anchor != INVALID_TILE) {
+				for (const ThreeDObject *p : of->parts) add(p, anchor);
+				if (of->plants != nullptr && anchor == _cur_ti.tile) {
+					const double oz = GetTileMaxPixelZ(anchor);
+					for (const ThreeDObjectFigure &f : of->plants->plants) {
+						AddCabPlant(f.figure, f.scale, f.stretch, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
+					}
+				}
+			}
+		}
+		if (tile_type == TileType::Clear && IsClearGround(_cur_ti.tile, ClearGround::Fields) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
+			/* Wheat on the farm's fields (AddFieldWheat()), near the eye: farther the field's ground says enough. */
+			const uint type = GetFieldType(_cur_ti.tile);
+			const ThreeDObject *wheat = type == 0 || type >= 8 ? nullptr : GetThreeDSlopedPlants(GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala"), _cur_ti.tileh);
+			if (wheat != nullptr) {
+				for (const ThreeDObjectFigure &f : wheat->plants) {
+					AddCabPlant(f.figure, f.scale, f.stretch, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, _cur_ti.z + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
 				}
 			}
 		}

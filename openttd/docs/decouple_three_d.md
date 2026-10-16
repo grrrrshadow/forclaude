@@ -442,6 +442,36 @@ too.
   industry of its size). The school, the distillery, the machine and the pub
   have their windows lit at night as the houses (`noc`, `svetlo_NN`). Rig:
   `test3d dovoz <x> <y> stud|mari|boom|nic`, `test3d budovy`.
+- **The industries of the original game** (16. 10., the colleague's set
+  `objekty/prumysl_vanilla/`, `hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md`; the
+  player: "we have the modular industry done"): one set of 46 parts
+  (`"druh": "dil"`: halls, chimneys, tanks, heaps, yards, trees, ...) shared by
+  all the industries of the temperate, sub-arctic and sub-tropical climates,
+  and 122 tiles (`"druh": "prumysl_dlazdice"`) that place them, each for the
+  `gfx` of the original industry tiles it stands for (128 of them; Toyland has
+  none and is drawn by its sprites): `podklad` the yard under it (a part drawn
+  as it is, flat and first, as the field road), `dily` the parts with
+  `poloha` (metres from the tile's north corner), `otoceni` and `meritko`,
+  `rostliny` its trees. A building bigger than a tile is a block: its anchor
+  (`blok` [x, y] tiles) draws it whole, the other tiles (`soucast_bloku`,
+  `posun` from the anchor) only their yards. A part of another set (the
+  haystack and the shed of our fields, `sada`) stands as it is. Each part is
+  read once (`ReadIndustryParts()`), its texture kept by its own object, and
+  placed on the tiles as objects of their own that draw with that texture
+  (`ThreeDObject::texture_of`, `PlaceIndustryPart()`), lit by their normals
+  turned with them, their windows lit at night (`noc`, `svetlo_NN`). Drawn on
+  the turned map, facing north as the houses (`gui.three_d_north_houses`) and
+  in the view from the eyes (`AddOriginalIndustryTile()`); an industry being
+  built shows its yards only, an animated tile (the mine's wheel, the oil
+  wells) the same as at rest; an industry tile of a set (NewGRF) keeps its
+  sprites. **Wheat on the farm's fields** (`"druh": "pole"`,
+  `psenice_mlada` 0.63 m, `psenice_zrala` 1.36 m): none on the ploughed field
+  nor on the haystacks of the harvest, young while it grows (the field's
+  type 1 to 3), ripe before the harvest (4 to 7), each plant lifted onto the
+  field's slope (`GetThreeDSlopedPlants()`); in the view from the eyes up to
+  10 tiles away (`CAB_WHEAT_TILES`), farther the field's ground says enough.
+  Rig: `test3d puvodni` lists the original industries drawn from the parts
+  and the fields with their first young and ripe tile.
 - **Plants** (`"rostliny"` of a building or a part: `soubor` a record
   `"druh": "rostlina"`, its foot at the origin and 1 m high, `poloha`,
   `otoceni`, `meritko` [x, y, z] metres): drawn as figures, a picture of the

@@ -29,6 +29,7 @@
 #include "town.h"
 #include "town_map.h"
 #include "tile_map.h"
+#include "slope_func.h"
 #include "language.h"
 #include "3rdparty/nlohmann/json.hpp"
 #include "timer/timer.h"
@@ -849,21 +850,15 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
  * Read one .glb into a building: its mesh (ReadGlbMesh()) from metres into units, the texture kept as it is.
  * @return whether there is something to draw
  */
-static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+/**
+ * Which side of each triangle faces out: its corners' order, or the other when its normals say so (a mirrored node);
+ * neither for a material seen from both sides. Drawn, the side facing away is left out, so the back walls never come
+ * through the front ones (DrawTurnedObject()).
+ */
+static std::vector<int8_t> TriangleFacing(const GlbMesh &mesh)
 {
-	GlbMesh mesh;
-	if (!ReadGlbMesh(path, mesh)) return false;
-	obj.pos.reserve(mesh.pos.size());
-	for (size_t i = 0; i < mesh.pos.size(); i += 3) {
-		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
-		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
-		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
-		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
-	}
-	/* Which side of each triangle faces out: its corners' order, or the other when its normals say so (a mirrored
-	 * node); neither for a material seen from both sides. Drawn, the side facing away is left out, so the back
-	 * walls never come through the front ones (DrawTurnedObject()). */
-	obj.facing.reserve(mesh.tri.size() / 3);
+	std::vector<int8_t> facing;
+	facing.reserve(mesh.tri.size() / 3);
 	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
 		size_t k = t / 3;
 		bool both = k < mesh.tri_tex.size() && mesh.tri_tex[k] < mesh.textures.size() && mesh.textures[mesh.tri_tex[k]].double_sided;
@@ -881,8 +876,40 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 			}
 			f = s > 0 ? 1 : (s < 0 ? -1 : 0);
 		}
-		obj.facing.push_back(f);
+		facing.push_back(f);
 	}
+	return facing;
+}
+
+/**
+ * The light of each corner from its normal: lit by the game as the vehicles are, by one light fixed to the world (the
+ * colleague's hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md); its axes are the world's. Without normals, the light is in the texture.
+ */
+static std::vector<uint16_t> CornerLight(const std::vector<float> &nrm)
+{
+	static const double L[3] = {-0.55, 0.35, 0.75};
+	const double ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+	std::vector<uint16_t> light;
+	light.reserve(nrm.size() / 3);
+	for (size_t i = 0; i + 2 < nrm.size(); i += 3) {
+		double d = (nrm[i] * L[0] + nrm[i + 1] * L[1] + nrm[i + 2] * L[2]) / ll;
+		light.push_back(static_cast<uint16_t>(std::lround(256.0 * (0.55 + 0.45 * std::max(0.0, d)))));
+	}
+	return light;
+}
+
+static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+{
+	GlbMesh mesh;
+	if (!ReadGlbMesh(path, mesh)) return false;
+	obj.pos.reserve(mesh.pos.size());
+	for (size_t i = 0; i < mesh.pos.size(); i += 3) {
+		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	obj.facing = TriangleFacing(mesh);
 	obj.uv = std::move(mesh.uv);
 	obj.tri = std::move(mesh.tri);
 	obj.png = std::move(mesh.png);
@@ -902,17 +929,7 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		obj.lights.push_back(static_cast<float>(lights[i + 1] * OBJECT_UNITS_PER_METRE));
 		obj.lights.push_back(static_cast<float>(lights[i + 2] * OBJECT_HEIGHT_PER_METRE));
 	}
-	if (!mesh.nrm.empty()) {
-		/* Normals: lit by the game as the vehicles are, by one light fixed to the world (the colleague's
-		 * hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md); its axes are the world's. Without, the light is in the texture. */
-		static const double L[3] = {-0.55, 0.35, 0.75};
-		const double ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
-		obj.light.reserve(mesh.nrm.size() / 3);
-		for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) {
-			double d = (mesh.nrm[i] * L[0] + mesh.nrm[i + 1] * L[1] + mesh.nrm[i + 2] * L[2]) / ll;
-			obj.light.push_back(static_cast<uint16_t>(std::lround(256.0 * (0.55 + 0.45 * std::max(0.0, d)))));
-		}
-	}
+	if (!mesh.nrm.empty()) obj.light = CornerLight(mesh.nrm);
 
 	/* It should lie on its plot: say so in the log when it does not. */
 	float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f, z0 = 1e9f;
@@ -1249,6 +1266,156 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 	_three_d_objects.push_back(std::move(obj));
 }
 
+/** A part of the original industries ("druh": "dil") as read, in metres, to be placed on the tiles. */
+struct IndustryPartMesh {
+	GlbMesh mesh;              ///< its day
+	std::vector<int8_t> facing; ///< its triangles' outer sides (TriangleFacing())
+	GlbMesh night;             ///< its lit windows (the node "noc")
+	std::vector<float> lights; ///< its glows ("svetlo_NN")
+	size_t holder = SIZE_MAX;  ///< the object of the part, keeping its texture
+};
+
+/** A tile of the original industries drawn from the parts ("druh": "prumysl_dlazdice"): the objects by their places. */
+struct OriginalIndustryTile {
+	std::string ground;          ///< "podklad": the name of its object
+	std::vector<size_t> parts;   ///< its parts placed
+	std::vector<std::string> whole; ///< parts of another set ("sada", the field's haystack and shed) standing as they are on the tile, by name
+	size_t plants = SIZE_MAX;    ///< "rostliny"
+	bool member = false;         ///< "soucast_bloku"
+	int anchor_dx = 0, anchor_dy = 0;
+};
+/** The tiles of the original industries by their gfx (GetThreeDOriginalIndustryTile()). */
+static std::map<IndustryGfx, OriginalIndustryTile> _original_industry_tiles;
+
+/**
+ * A part placed on a tile (the colleague's hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md): its origin in the middle of its
+ * ground plan, facing +x, turned ("otoceni", degrees about z, as the figures), sized ("meritko") and put where
+ * "poloha" says, metres from the north corner of the tile (of the block's anchor); lit by its normals turned with it.
+ * Its texture is the part's own object's (ThreeDObject::texture_of).
+ */
+static ThreeDObject PlaceIndustryPart(const IndustryPartMesh &part, std::string name, const float at[3], float turn, float scale, int tiles_x, int tiles_y)
+{
+	ThreeDObject obj;
+	obj.name = std::move(name);
+	obj.variants = 0; // no house's
+	obj.tiles_x = tiles_x;
+	obj.tiles_y = tiles_y;
+	obj.texture_of = part.holder;
+	const double a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	auto place = [&](const std::vector<float> &from, std::vector<float> &to) {
+		to.reserve(from.size());
+		for (size_t i = 0; i + 2 < from.size(); i += 3) {
+			const double x = from[i] * scale, y = from[i + 1] * scale, z = from[i + 2] * scale;
+			to.push_back(static_cast<float>((at[0] + x * c - y * s) * OBJECT_UNITS_PER_METRE));
+			to.push_back(static_cast<float>((at[1] + x * s + y * c) * OBJECT_UNITS_PER_METRE));
+			to.push_back(static_cast<float>((at[2] + z) * OBJECT_HEIGHT_PER_METRE));
+		}
+	};
+	place(part.mesh.pos, obj.pos);
+	for (size_t i = 2; i < obj.pos.size(); i += 3) obj.top = std::max(obj.top, obj.pos[i]);
+	obj.uv = part.mesh.uv;
+	obj.tri = part.mesh.tri;
+	obj.facing = part.facing;
+	if (!part.mesh.nrm.empty()) {
+		std::vector<float> turned(part.mesh.nrm.size());
+		for (size_t i = 0; i + 2 < turned.size(); i += 3) {
+			const float nx = part.mesh.nrm[i], ny = part.mesh.nrm[i + 1];
+			turned[i] = static_cast<float>(nx * c - ny * s);
+			turned[i + 1] = static_cast<float>(nx * s + ny * c);
+			turned[i + 2] = part.mesh.nrm[i + 2];
+		}
+		obj.light = CornerLight(turned);
+	}
+	place(part.night.pos, obj.night_pos);
+	obj.night_uv = part.night.uv;
+	obj.night_tri = part.night.tri;
+	place(part.lights, obj.lights);
+	return obj;
+}
+
+/**
+ * The parts of an index of the original industries ("druh": "dil"), each read once: its object (its own texture,
+ * and the yards drawn as they are as the ground of a tile), and its mesh in metres to be placed on the tiles.
+ */
+static std::map<std::string, IndustryPartMesh> ReadIndustryParts(const nlohmann::json &list, const std::string &folder)
+{
+	std::map<std::string, IndustryPartMesh> parts;
+	for (const auto &e : list) {
+		if (e.value("druh", std::string()) != "dil" || !e.contains("soubor")) continue;
+		const std::string file = e.at("soubor").get<std::string>();
+		const std::string path = folder + file;
+		IndustryPartMesh pm;
+		if (!ReadGlbMesh(path, pm.mesh)) continue;
+		ReadGlbMesh(path, pm.night, true, {}, 0, "noc", "svetlo_", &pm.lights);
+		pm.facing = TriangleFacing(pm.mesh);
+		ThreeDObject holder;
+		holder.file = file;
+		holder.name = e.value("jmeno", file);
+		holder.variants = 0; // no house's
+		if (!ReadGlb(path, holder)) continue;
+		pm.holder = _three_d_objects.size();
+		std::string name = holder.name;
+		_three_d_objects.push_back(std::move(holder));
+		parts.emplace(std::move(name), std::move(pm));
+	}
+	return parts;
+}
+
+/** A tile of the original industries ("druh": "prumysl_dlazdice"): its ground, its parts placed, its plants, for each of its gfx. */
+static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std::string, IndustryPartMesh> &parts)
+{
+	OriginalIndustryTile tile;
+	tile.ground = e.value("podklad", std::string());
+	const std::string name = e.value("jmeno", std::string("prumysl_dlazdice"));
+	int bx = 1, by = 1;
+	if (e.contains("blok") && e.at("blok").is_array() && e.at("blok").size() == 2) {
+		bx = std::clamp(e.at("blok").at(0).get<int>(), 1, 8);
+		by = std::clamp(e.at("blok").at(1).get<int>(), 1, 8);
+	}
+	if (e.contains("soucast_bloku") && e.at("soucast_bloku").is_object()) {
+		const auto &m = e.at("soucast_bloku");
+		tile.member = true;
+		if (m.contains("posun") && m.at("posun").is_array() && m.at("posun").size() == 2) {
+			tile.anchor_dx = m.at("posun").at(0).get<int>();
+			tile.anchor_dy = m.at("posun").at(1).get<int>();
+		}
+	}
+	if (e.contains("dily") && e.at("dily").is_array()) {
+		for (const auto &d : e.at("dily")) {
+			if (!d.is_object() || !d.contains("dil") || !d.contains("poloha") || !d.at("poloha").is_array() || d.at("poloha").size() != 3) continue;
+			const std::string part = d.at("dil").get<std::string>();
+			float at[3];
+			for (int k = 0; k < 3; k++) at[k] = d.at("poloha").at(k).get<float>();
+			auto it = parts.find(part);
+			if (it == parts.end()) {
+				/* A part of another set, a whole tile as it is (the haystack, the shed of the fields): found by its name
+				 * when every set is read. Placed elsewhere or turned it would need its mesh, which is not kept. */
+				if (d.contains("sada") && at[0] == 0 && at[1] == 0 && at[2] == 0 && d.value("otoceni", 0.0f) == 0 && d.value("meritko", 1.0f) == 1) {
+					tile.whole.push_back(part);
+				} else {
+					Debug(misc, 0, "3D objects {}: no part {}", name, part);
+				}
+				continue;
+			}
+			tile.parts.push_back(_three_d_objects.size());
+			_three_d_objects.push_back(PlaceIndustryPart(it->second, name + "/" + part, at, d.value("otoceni", 0.0f), d.value("meritko", 1.0f), bx, by));
+		}
+	}
+	ThreeDObject plants;
+	plants.name = name + "/rostliny";
+	plants.variants = 0; // no house's
+	ReadPlants(e, plants);
+	if (!plants.plants.empty()) {
+		tile.plants = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(plants));
+	}
+	if (e.contains("gfx") && e.at("gfx").is_array()) {
+		for (const auto &g : e.at("gfx")) {
+			if (!_original_industry_tiles.emplace(static_cast<IndustryGfx>(g.get<int>()), tile).second) Debug(misc, 0, "3D objects {}: gfx {} has two records", name, g.get<int>());
+		}
+	}
+}
+
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
 static void ReadThreeDObjects()
 {
@@ -1259,10 +1426,15 @@ static void ReadThreeDObjects()
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+			const std::map<std::string, IndustryPartMesh> parts = ReadIndustryParts(list, folder);
 			for (const auto &e : list) {
 				const std::string kind = e.value("druh", std::string("dum"));
 				if (kind == "prumysl" || kind == "pole") {
 					ReadIndustryObject(e, folder, kind == "pole");
+					continue;
+				}
+				if (kind == "prumysl_dlazdice") {
+					ReadOriginalIndustryTile(e, parts);
 					continue;
 				}
 				if (kind != "dum") continue;
@@ -2312,6 +2484,69 @@ const ThreeDObject *GetThreeDFieldPart(std::string_view part)
 }
 
 /**
+ * A tile of an industry of the original game drawn from the shared parts (set prumysl_vanilla): its ground, its parts,
+ * its plants; nullptr when the sets have none for the gfx (Toyland).
+ */
+const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static std::map<IndustryGfx, ThreeDIndustryTileParts> resolved;
+	static bool made = false;
+	if (!made) {
+		/* The objects by their places, now that all the indices are read and the list stays as it is. */
+		made = true;
+		for (const auto &[g, t] : _original_industry_tiles) {
+			ThreeDIndustryTileParts &r = resolved[g];
+			r.ground = t.ground.empty() ? nullptr : GetThreeDObjectByName(t.ground);
+			if (!t.ground.empty() && r.ground == nullptr) Debug(misc, 0, "3D objects: gfx {} has no ground {}", g, t.ground);
+			for (size_t i : t.parts) r.parts.push_back(&_three_d_objects[i]);
+			for (const std::string &w : t.whole) {
+				const ThreeDObject *o = GetThreeDObjectByName(w);
+				if (o != nullptr) r.parts.push_back(o); else Debug(misc, 0, "3D objects: gfx {} has no part {}", g, w);
+			}
+			if (t.plants != SIZE_MAX) r.plants = &_three_d_objects[t.plants];
+			r.member = t.member;
+			r.anchor_dx = t.anchor_dx;
+			r.anchor_dy = t.anchor_dy;
+		}
+	}
+	auto it = resolved.find(gfx);
+	return it == resolved.end() ? nullptr : &it->second;
+}
+
+/**
+ * The plants of a field (wheat on the farm's fields) on a sloped tile: each lifted to the ground under it, the heights
+ * of the tile's corners shared between them (an object of its own a slope, made the first time).
+ */
+const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope)
+{
+	if (plants == nullptr || slope == SLOPE_FLAT) return plants;
+	static std::map<std::pair<const ThreeDObject *, Slope>, std::unique_ptr<ThreeDObject>> sloped;
+	auto &made = sloped[{plants, slope}];
+	if (made == nullptr) {
+		made = std::make_unique<ThreeDObject>();
+		made->name = plants->name + fmt::format("/svah{}", to_underlying(slope));
+		made->variants = 0;
+		made->plants = plants->plants;
+		/* The corners' heights in metres: north (x 0, y 0), east (x 0, y 1), south (1, 1), west (1, 0). */
+		const double level = TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
+		const bool steep = IsSteepSlope(slope);
+		auto corner = [&](Corner c) -> double {
+			double h = (to_underlying(slope) & to_underlying(SlopeWithOneCornerRaised(c))) != 0 ? level : 0;
+			if (steep && GetHighestSlopeCorner(slope) == c) h = 2 * level;
+			return h;
+		};
+		const double n = corner(CORNER_N), e = corner(CORNER_E), s = corner(CORNER_S), w = corner(CORNER_W);
+		const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+		for (ThreeDObjectFigure &f : made->plants) {
+			const double u = std::clamp(f.at[0] / side, 0.0, 1.0), v = std::clamp(f.at[1] / side, 0.0, 1.0);
+			f.at[2] += static_cast<float>(n * (1 - u) * (1 - v) + e * (1 - u) * v + s * u * v + w * u * (1 - v));
+		}
+	}
+	return made.get();
+}
+
+/**
  * A tile of the marijuana plantation (and the potato field) laid from the parts of the fields: what
  * GetThreeDPlantationTile() says is on it and on the road tile behind it.
  * @return whether the fields have their parts at all (the soil)
@@ -2798,6 +3033,8 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
 const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, bool may_drop) const
 {
 	MarkThreeDUsed(this->used);
+	/* A part placed on a tile of an original industry: the part's texture, once for all its places. */
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].GetTexture(level, paint, may_drop);
 	if (this->levels.empty()) DecodeTextureLevels(this->png, this->levels);
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
 	const ThreeDObjectTexture *plain = &this->levels[level];
@@ -2857,6 +3094,8 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 	for (const ThreeDTextureWanted &w : wanted) {
 		const ThreeDObject *o = w.obj;
 		if (o == nullptr) continue;
+		/* A part placed on an industry's tile: its part's texture, made once for all its places (one thread a texture). */
+		if (o->texture_of < _three_d_objects.size()) o = &_three_d_objects[o->texture_of];
 		if (!o->levels.empty()) {
 			const int level = std::clamp<int>(w.level, 0, static_cast<int>(o->levels.size()) - 1);
 			if (w.paint == 0 || o->colours.empty() || o->painted.contains({level, w.paint})) continue;
