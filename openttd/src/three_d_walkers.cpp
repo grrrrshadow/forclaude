@@ -111,6 +111,14 @@ float WalkerScale()
 	return _settings_game.vehicle.object_original_size ? 1.2f : 1.0f;
 }
 
+/** How tall a thing of the game's own is drawn on the map, units of height: bigger than it is (WalkerScale()). */
+int DrawnTall(const ThreeDVehicleObject *o)
+{
+	const ThreeDVehicleShape *shape = o != nullptr ? o->GetShape(0) : nullptr;
+	if (shape == nullptr) return MAX_BUILDING_PIXELS;
+	return static_cast<int>(std::ceil(shape->z1 * WalkerScale() * OBJECT_HEIGHT_PER_METRE));
+}
+
 /** World units a round of the frames walks. */
 double RoundLength(const ThreeDVehicleObject *fig)
 {
@@ -388,8 +396,10 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 		TileIndex was = w.tile;
 		int frame = w.frame;
 		Place(w, fig);
-		if (w.tile != was) MarkTileDirtyByTile(was);
-		if (w.tile != was || w.frame != frame) MarkTileDirtyByTile(w.tile);
+		/* Only as high as it is drawn (the turned view: not a stripe of the screen up to the highest building). */
+		const int tall = DrawnTall(fig) + 2 * TILE_HEIGHT;
+		if (w.tile != was) MarkTileDirtyBetween(was, w.z - 2 * TILE_HEIGHT, w.z + tall);
+		if (w.tile != was || w.frame != frame) MarkTileDirtyBetween(w.tile, w.z - 2 * TILE_HEIGHT, w.z + tall);
 		++it;
 	}
 	if (now % 16 != 0) return;
@@ -556,16 +566,12 @@ void PlaceCar(Driver &d)
 	d.tile = TileVirtXY(ix, iy);
 }
 
-/** The tiles about a car drawn again: it is longer than a tile's quarter. */
-void MarkCarDirty(TileIndex t)
+/** The tiles about a car drawn again: it is longer than a tile's quarter. Only as high as it is drawn (the turned
+ * view: not a stripe of the screen up to the highest building, MarkTileDirtyBetween()). */
+void MarkCarDirty(const Driver &d, TileIndex t)
 {
 	if (t == INVALID_TILE) return;
-	for (int dy = -1; dy <= 1; dy++) {
-		for (int dx = -1; dx <= 1; dx++) {
-			TileIndex n = AddTileIndexDiffCWrap(t, {static_cast<int16_t>(dx), static_cast<int16_t>(dy)});
-			if (n != INVALID_TILE) MarkTileDirtyByTile(n);
-		}
-	}
+	MarkTileDirtyBetween(t, d.z - 2 * TILE_HEIGHT, d.z + DrawnTall(d.car) + 2 * TILE_HEIGHT, 1);
 }
 
 /** Send a car from the stop it stands at (or any, the first time) to another one the roads lead to; whether it went. */
@@ -595,7 +601,7 @@ bool Drive(Driver &d, TileIndex middle)
 		d.driven = 0;
 		d.house = others[pick]->house;
 		d.stand_until = 0;
-		MarkCarDirty(d.tile);
+		MarkCarDirty(d, d.tile);
 		PlaceCar(d);
 		Debug(misc, 1, "3D car {}: from the house at {},{} to the one at {},{}, {} road tiles", d.car->name, TileX(from->house), TileY(from->house), TileX(d.house), TileY(d.house), route.size());
 		return true;
@@ -608,14 +614,14 @@ const IntervalTimer<TimerGameTick> _drivers_timer({TimerGameTick::Priority::None
 	TileIndex middle = TurnedViewMiddle();
 	const std::vector<ThreeDVehicleObject> &cars = GetThreeDDrivingCars();
 	if (middle == INVALID_TILE || cars.empty()) {
-		for (const Driver &d : _drivers) MarkCarDirty(d.tile);
+		for (const Driver &d : _drivers) MarkCarDirty(d, d.tile);
 		_drivers.clear();
 		return;
 	}
 	const uint64_t now = TimerGameTick::counter;
 	/* One of each car of the index. */
 	if (_drivers.size() != cars.size()) {
-		for (const Driver &d : _drivers) MarkCarDirty(d.tile);
+		for (const Driver &d : _drivers) MarkCarDirty(d, d.tile);
 		_drivers.clear();
 		for (const ThreeDVehicleObject &car : cars) {
 			Driver d;
@@ -640,8 +646,8 @@ const IntervalTimer<TimerGameTick> _drivers_timer({TimerGameTick::Priority::None
 			d.stand_until = now + std::max(1, d.car->drive_stand);
 		}
 		PlaceCar(d);
-		MarkCarDirty(was);
-		if (d.tile != was) MarkCarDirty(d.tile);
+		MarkCarDirty(d, was);
+		if (d.tile != was) MarkCarDirty(d, d.tile);
 	}
 });
 

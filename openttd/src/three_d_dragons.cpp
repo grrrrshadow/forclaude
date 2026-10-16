@@ -17,6 +17,7 @@
 #include "map_func.h"
 #include "landscape.h"
 #include "viewport_func.h"
+#include "three_d.h"
 #include "core/random_func.hpp"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
@@ -153,6 +154,17 @@ void MarkDirty(const Dragon &d)
 	const Point pt = RemapCoords(static_cast<int>(d.x), static_cast<int>(d.y), d.z);
 	const int r = static_cast<int>(d.length_m * OBJECT_UNITS_PER_METRE * 4 * ZOOM_BASE) + 32 * ZOOM_BASE;
 	const int up = static_cast<int>(d.height_m * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE) + r;
+	/* Turned (three_d.h): the box it flies in, down to the ground for its shadow. */
+	DirtyPlace place;
+	place.kind = DirtyPlace::Kind::Box;
+	const double reach = d.length_m * OBJECT_UNITS_PER_METRE + TILE_SIZE;
+	place.x0 = d.x - reach;
+	place.x1 = d.x + reach;
+	place.y0 = d.y - reach;
+	place.y1 = d.y + reach;
+	place.z0 = 0;
+	place.z1 = d.z + d.height_m * OBJECT_HEIGHT_PER_METRE + reach;
+	DirtyPlaceScope scope(place);
 	MarkAllViewportsDirty(pt.x - r, pt.y - up, pt.x + r, pt.y + r);
 }
 

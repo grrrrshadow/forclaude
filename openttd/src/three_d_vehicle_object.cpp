@@ -752,6 +752,8 @@ struct MovingFigure {
 	TileIndex tile;
 	int ticks;     ///< the ticks a frame of it is held
 	uint64_t step; ///< the frame's step it was drawn in: the game's tick counter / ticks
+	int z0, z1;    ///< the heights it is between, units; z0 INT_MIN not known: its tile as high as a building may be
+	double x0, y0, x1, y1; ///< the ground it is over, world units, when its heights are known
 };
 static std::vector<MovingFigure> _moving_figures;
 
@@ -763,7 +765,11 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
 			++it;
 			continue;
 		}
-		MarkTileDirtyByTile(it->tile);
+		if (it->z0 == INT_MIN) {
+			MarkTileDirtyByTile(it->tile);
+		} else {
+			MarkWorldBoxDirty(it->x0, it->y0, it->x1, it->y1, it->z0, it->z1);
+		}
 		it = _moving_figures.erase(it);
 	}
 });
@@ -801,7 +807,7 @@ bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int 
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
 {
 	int height = 0;
-	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height, frame);
+	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y);
 	if (pic == nullptr) return false;
 	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
 	return true;
@@ -814,9 +820,11 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * @param[out] height how tall it is, units of height
  * @param frame the frame to draw (one walking: by the way walked, three_d_walkers.h); -1 by the game's tick
  * @param yaw the angle of the view it is seen from (the preview beside an industry's window), NaN the map's
+ * @param z the height it stands at, units, INT_MIN not known: its tile drawn again as high as a building may be
+ * @param x,y where it stands, world units, when z is known
  * @return the picture, or nullptr when the figure is not there
  */
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw)
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y)
 {
 	if (std::isnan(yaw)) yaw = GetViewYaw();
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
@@ -831,19 +839,40 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	float world_az = facing - 135.0f;
 	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step);
 	if (pic == nullptr) return nullptr;
-	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+	const int tall = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+	if (height != nullptr) *height = tall;
 	if (by_tick && (fig->frames > 1 || fig->spin_ticks > 0) && tile != INVALID_TILE) {
 		/* Its tile is drawn again as the picture changes: a frame, or a step of a turn. */
 		const int ticks = fig->spin_ticks > 0 ? std::max(1, fig->spin_ticks / SPIN_STEPS) : fig->frame_ticks;
 		uint64_t step = TimerGameTick::counter / ticks;
 		bool known = false;
+		/* Where it stands, as far as it reaches about (drawn bigger on the map than it is, its scale), a little below
+		 * its feet and above its head: where it reaches over as it moves. */
+		const double rx = std::max(std::abs(shape->x0), std::abs(shape->x1)), ry = std::max(std::abs(shape->y0), std::abs(shape->y1));
+		const double reach = std::hypot(rx, ry) * scale * OBJECT_UNITS_PER_METRE + 2;
+		MovingFigure f{tile, ticks, step, INT_MIN, INT_MIN, x - reach, y - reach, x + reach, y + reach};
+		if (z != INT_MIN) {
+			f.z0 = z - TILE_HEIGHT;
+			f.z1 = z + tall + TILE_HEIGHT;
+		}
 		for (MovingFigure &m : _moving_figures) {
 			if (m.tile != tile) continue;
 			if (m.ticks != ticks) continue;
 			m.step = step;
+			/* Two figures on one tile: the box of both, or the tile as high as a building when one is not known. */
+			if (m.z0 == INT_MIN || f.z0 == INT_MIN) {
+				m.z0 = INT_MIN;
+			} else {
+				m.z0 = std::min(m.z0, f.z0);
+				m.z1 = std::max(m.z1, f.z1);
+				m.x0 = std::min(m.x0, f.x0);
+				m.y0 = std::min(m.y0, f.y0);
+				m.x1 = std::max(m.x1, f.x1);
+				m.y1 = std::max(m.y1, f.y1);
+			}
 			known = true;
 		}
-		if (!known) _moving_figures.push_back({tile, ticks, step});
+		if (!known) _moving_figures.push_back(f);
 	}
 	return pic;
 }

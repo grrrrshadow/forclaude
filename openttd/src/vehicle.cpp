@@ -2185,6 +2185,17 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 	this->coord = new_coord;
 }
 
+/** Where a vehicle is drawn round, for the turned view to repaint only there (three_d.h). */
+static DirtyPlace VehicleDirtyPlace(const Vehicle *v)
+{
+	DirtyPlace place;
+	place.kind = DirtyPlace::Kind::Anchored;
+	place.ax = v->x_pos;
+	place.ay = v->y_pos;
+	place.az = v->z_pos;
+	return place;
+}
+
 /**
  * Update the vehicle on the viewport, updating the right hash and setting the new coordinates.
  * @param dirty Mark the (new and old) coordinates of the vehicle as dirty.
@@ -2206,6 +2217,12 @@ void Vehicle::UpdateViewport(bool dirty)
 		if (ignore_cached_coords) {
 			this->sprite_cache.is_viewport_candidate = this->MarkAllViewportsDirty();
 		} else {
+			/* Turned (three_d.h): drawn round its position, then and now -- unless it jumped (a tunnel, a depot):
+			 * then where it was is not known any more. */
+			const int jump = 32 * ZOOM_BASE;
+			const bool near = std::abs(this->sprite_cache.old_coord.left - this->coord.left) <= jump && std::abs(this->sprite_cache.old_coord.top - this->coord.top) <= jump &&
+					std::abs(this->sprite_cache.old_coord.right - this->coord.right) <= jump && std::abs(this->sprite_cache.old_coord.bottom - this->coord.bottom) <= jump;
+			DirtyPlaceScope place(near ? VehicleDirtyPlace(this) : DirtyPlace{});
 			this->sprite_cache.is_viewport_candidate = ::MarkAllViewportsDirty(
 				std::min(this->sprite_cache.old_coord.left, this->coord.left),
 				std::min(this->sprite_cache.old_coord.top, this->coord.top),
@@ -2230,6 +2247,7 @@ void Vehicle::UpdatePositionAndViewport()
  */
 bool Vehicle::MarkAllViewportsDirty() const
 {
+	DirtyPlaceScope place(VehicleDirtyPlace(this));
 	return ::MarkAllViewportsDirty(this->coord.left, this->coord.top, this->coord.right, this->coord.bottom);
 }
 

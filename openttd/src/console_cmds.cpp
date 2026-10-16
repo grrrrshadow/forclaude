@@ -9232,6 +9232,86 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern void TurnedTimingsPrint();
 		TurnedTimingsPrint();
 		return true;
+	} else if (what == "smycka" && argv.size() > 2) {
+		/* 'smycka <frames> [okno] [mys]': the game as the player has it, frame by frame: a tick of the game, the
+		 * input, the windows drawn (only what is dirty), a frame every 27 ms; with the sandbox window open ("okno"),
+		 * the pointer going over the map ("mys"). How long the drawing of each frame took. */
+		auto frames = number(2);
+		if (!frames.has_value()) return true;
+		bool window = false, mouse = false;
+		for (size_t i = 3; i < argv.size(); i++) {
+			if (argv[i] == "okno") window = true;
+			if (argv[i] == "mys") mouse = true;
+		}
+		CloseWindowByClass(WindowClass::ModalProgress);
+		CloseWindowByClass(WindowClass::ErrorMessage);
+		if (HasModalProgress()) SetModalProgress(false);
+		if (window) {
+			ShowCheatWindow();
+		} else {
+			CloseWindowByClass(WindowClass::Cheat);
+		}
+		MarkWholeScreenDirty();
+		extern uint64_t _redrawn_rects, _redrawn_pixels;
+		extern void TurnedTimingsPrint();
+		uint64_t rects = 0, pixels = 0;
+		std::string slow_frames;
+		using Clock = std::chrono::steady_clock;
+		std::vector<double> times;
+		Clock::time_point last = Clock::now();
+		for (int i = 0; i < *frames; i++) {
+			while (Clock::now() - last < std::chrono::milliseconds(27)) {}
+			last = Clock::now();
+			extern uint64_t _turned_dirty_count[3];
+			extern double _turned_dirty_area[3];
+			const uint64_t kinds_before[3] = {_turned_dirty_count[0], _turned_dirty_count[1], _turned_dirty_count[2]};
+			const double areas_before[3] = {_turned_dirty_area[0], _turned_dirty_area[1], _turned_dirty_area[2]};
+			StateGameLoop();
+			if (mouse) _cursor.UpdateCursorPosition(vp->left + (i * 13) % vp->width, vp->top + vp->height / 3 + (i * 7) % (vp->height / 3));
+			InputLoop();
+			if (i == 1) {
+				extern uint64_t _turned_dirty_count[3];
+				extern double _turned_dirty_area[3];
+				for (int k = 0; k < 3; k++) {
+					_turned_dirty_count[k] = 0;
+					_turned_dirty_area[k] = 0;
+				}
+				_redrawn_rects = _redrawn_pixels = 0;
+				TurnedTimingsPrint();
+			}
+			const uint64_t px_before = _redrawn_pixels, rects_before = _redrawn_rects;
+			const Clock::time_point start = Clock::now();
+			UpdateWindows();
+			times.push_back(std::chrono::duration<double, std::milli>(Clock::now() - start).count());
+			if (i > 0 && times.back() > 20) {
+				slow_frames += fmt::format(" {}:{:.0f}ms/{}px/{} [{} {:.0f}, {} {:.0f}, {} {:.0f}]", i, times.back(), _redrawn_pixels - px_before, _redrawn_rects - rects_before,
+						_turned_dirty_count[0] - kinds_before[0], _turned_dirty_area[0] - areas_before[0], _turned_dirty_count[1] - kinds_before[1], _turned_dirty_area[1] - areas_before[1],
+						_turned_dirty_count[2] - kinds_before[2], _turned_dirty_area[2] - areas_before[2]);
+			}
+		}
+		rects = _redrawn_rects;
+		pixels = _redrawn_pixels;
+		if (times.empty()) return true;
+		/* The first frame draws the whole screen. */
+		const double first = times.front();
+		times.erase(times.begin());
+		std::sort(times.begin(), times.end());
+		double sum = 0;
+		for (double t : times) sum += t;
+		const size_t slow = static_cast<size_t>(std::count_if(times.begin(), times.end(), [](double t) { return t > 20; }));
+		IConsolePrint(CC_DEFAULT, "test3d: smycka{}{} {} snimku: prvni {:.1f} ms, prumer {:.1f}, median {:.1f}, nejdelsi {:.1f} ms, nad 20 ms {}x",
+				window ? " okno" : "", mouse ? " mys" : "", times.size(), first, times.empty() ? 0.0 : sum / times.size(),
+				times.empty() ? 0.0 : times[times.size() / 2], times.empty() ? 0.0 : times.back(), slow);
+		IConsolePrint(CC_DEFAULT, "test3d: smycka na snimek {:.1f} kusu obrazovky, {:.0f} pixelu (obrazovka {})", static_cast<double>(rects) / times.size(),
+				static_cast<double>(pixels) / times.size(), _screen.width * _screen.height);
+		extern uint64_t _turned_dirty_count[3];
+		extern double _turned_dirty_area[3];
+		IConsolePrint(CC_DEFAULT, "test3d: smycka oznaceno otocene na snimek: nevim kde {:.1f}x {:.0f} px, krabice {:.1f}x {:.0f} px, kolem bodu {:.1f}x {:.0f} px",
+				_turned_dirty_count[0] / static_cast<double>(times.size()), _turned_dirty_area[0] / times.size(), _turned_dirty_count[1] / static_cast<double>(times.size()),
+				_turned_dirty_area[1] / times.size(), _turned_dirty_count[2] / static_cast<double>(times.size()), _turned_dirty_area[2] / times.size());
+		TurnedTimingsPrint();
+		if (!slow_frames.empty()) IConsolePrint(CC_DEFAULT, "test3d: smycka pomale snimky{}", slow_frames.substr(0, 400));
+		return true;
 	} else if (what == "vozidla") {
 		/* Every front, with the tile under it (its type: 1 is plain rail, 5 a station) and the number of parts: the rig picks one on plain track from this. */
 		int seen = 0;

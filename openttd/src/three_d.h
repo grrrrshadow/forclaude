@@ -170,6 +170,33 @@ void ProjectTurnedF(double x, double y, double z, double &vx, double &vy);
 Point ProjectTurned(int x, int y, int z);
 void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y);
 void TurnDirtyRect(int &left, int &top, int &right, int &bottom);
+
+/**
+ * Where in the world the thing the game marks dirty is (DirtyPlaceScope): the rectangle of the view facing north
+ * does not say how high it is, and turned, a place drawn higher or lower lands elsewhere on the screen. Known, the
+ * turned view repaints only round it (TurnDirtyRect()); unknown, far round the rectangle, for anything up to the
+ * heights aircraft fly at.
+ */
+struct DirtyPlace {
+	enum class Kind : uint8_t {
+		Unknown,  ///< not known: far round the rectangle
+		Box,      ///< in a box of the world: a tile and what stands on it, a creature
+		Anchored, ///< drawn round a point as in the view facing north: a vehicle at its position
+	};
+	Kind kind = Kind::Unknown;
+	double x0 = 0, y0 = 0, x1 = 0, y1 = 0; ///< Box: the ground it is over, world units
+	double z0 = 0, z1 = 0;                 ///< Box: the heights it is between, world units
+	double ax = 0, ay = 0, az = 0;         ///< Anchored: the point, world units
+};
+
+/** While it lives, what the game marks dirty is at this place (DirtyPlace). */
+class DirtyPlaceScope {
+public:
+	explicit DirtyPlaceScope(const DirtyPlace &place);
+	~DirtyPlaceScope();
+private:
+	DirtyPlace was;
+};
 Point InverseRemapCoordsTurned(int x, int y, bool clamp_to_map = false);
 
 #endif /* THREE_D_H */

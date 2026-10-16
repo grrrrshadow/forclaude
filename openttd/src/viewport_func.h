@@ -105,6 +105,9 @@ inline void MarkTileDirtyByTile(TileIndex tile, int bridge_level_offset = 0)
 	MarkTileDirtyByTile(tile, bridge_level_offset, TileHeight(tile));
 }
 
+void MarkTileDirtyBetween(TileIndex tile, int z0, int z1, int reach = 0);
+void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1);
+
 Point GetViewportStationMiddle(const Viewport &vp, const Station *st);
 
 struct Station;

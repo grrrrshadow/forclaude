@@ -3304,7 +3304,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			pic = GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw);
 		} else {
 			TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
-			pic = GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(on_it.size()), &height, -1, lay.yaw);
+			pic = GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(on_it.size()), &height, -1, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
 		}
 		if (pic == nullptr) return;
 		double xr, yr;
@@ -4729,12 +4729,73 @@ void ConstrainAllViewportsZoom()
  */
 void MarkTileDirtyByTile(TileIndex tile, int bridge_level_offset, int tile_height_override)
 {
+	/* Turned (three_d.h): the tile and what stands on it, up to the highest building and its bridge, and what
+	 * reaches a little over the next tiles. */
+	DirtyPlace place;
+	place.kind = DirtyPlace::Kind::Box;
+	place.x0 = static_cast<double>(TileX(tile) * TILE_SIZE) - TILE_SIZE / 2;
+	place.x1 = static_cast<double>((TileX(tile) + 1) * TILE_SIZE) + TILE_SIZE / 2;
+	place.y0 = static_cast<double>(TileY(tile) * TILE_SIZE) - TILE_SIZE / 2;
+	place.y1 = static_cast<double>((TileY(tile) + 1) * TILE_SIZE) + TILE_SIZE / 2;
+	place.z0 = static_cast<double>(tile_height_override * TILE_HEIGHT) - 2 * TILE_HEIGHT;
+	place.z1 = static_cast<double>(tile_height_override * TILE_HEIGHT) + MAX_BUILDING_PIXELS + (bridge_level_offset + 2) * TILE_HEIGHT;
+	DirtyPlaceScope scope(place);
 	Point pt = RemapCoords(TileX(tile) * TILE_SIZE, TileY(tile) * TILE_SIZE, tile_height_override * TILE_HEIGHT);
 	MarkAllViewportsDirty(
 			pt.x - MAX_TILE_EXTENT_LEFT,
 			pt.y - MAX_TILE_EXTENT_TOP - ZOOM_BASE * TILE_HEIGHT * bridge_level_offset,
 			pt.x + MAX_TILE_EXTENT_RIGHT,
 			pt.y + MAX_TILE_EXTENT_BOTTOM);
+}
+
+/**
+ * Something drawn on the turned map only as high as it is (a figure, a car of the game's own) drawn again: the
+ * tiles about it, between two heights -- not up to the highest building as a tile that changed
+ * (MarkTileDirtyByTile()), which in the turned view is a tall stripe of the screen drawn again.
+ * @param tile the tile it is on
+ * @param z0,z1 the heights it is between, units
+ * @param reach how many tiles about it too, 0 the tile alone
+ * @ingroup dirty
+ */
+void MarkTileDirtyBetween(TileIndex tile, int z0, int z1, int reach)
+{
+	MarkWorldBoxDirty(static_cast<double>((static_cast<int>(TileX(tile)) - reach) * static_cast<int>(TILE_SIZE)) - TILE_SIZE / 2,
+			static_cast<double>((static_cast<int>(TileY(tile)) - reach) * static_cast<int>(TILE_SIZE)) - TILE_SIZE / 2,
+			static_cast<double>((static_cast<int>(TileX(tile)) + 1 + reach) * static_cast<int>(TILE_SIZE)) + TILE_SIZE / 2,
+			static_cast<double>((static_cast<int>(TileY(tile)) + 1 + reach) * static_cast<int>(TILE_SIZE)) + TILE_SIZE / 2, z0, z1);
+}
+
+/**
+ * A box of the world drawn again: what stands in it (a figure that moves) and nothing else.
+ * @param x0,y0,x1,y1 the ground it is over, world units
+ * @param z0,z1 the heights it is between, units
+ * @ingroup dirty
+ */
+void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1)
+{
+	DirtyPlace place;
+	place.kind = DirtyPlace::Kind::Box;
+	place.x0 = x0;
+	place.x1 = x1;
+	place.y0 = y0;
+	place.y1 = y1;
+	place.z0 = z0;
+	place.z1 = z1;
+	DirtyPlaceScope scope(place);
+	/* The rectangle of the box in the view facing north, for a view not turned. */
+	int left = INT_MAX, top = INT_MAX, right = INT_MIN, bottom = INT_MIN;
+	for (double x : {place.x0, place.x1}) {
+		for (double y : {place.y0, place.y1}) {
+			for (int z : {z0, z1}) {
+				Point pt = RemapCoords(static_cast<int>(x), static_cast<int>(y), z);
+				left = std::min(left, pt.x);
+				right = std::max(right, pt.x);
+				top = std::min(top, pt.y);
+				bottom = std::max(bottom, pt.y);
+			}
+		}
+	}
+	MarkAllViewportsDirty(left, top, right, bottom);
 }
 
 /**

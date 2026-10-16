@@ -1431,9 +1431,14 @@ void DrawMouseCursor()
  * @ingroup dirty
  *
  */
+/** For the rig (test3d smycka): how many pieces of the screen were drawn again, and how many pixels. */
+uint64_t _redrawn_rects = 0, _redrawn_pixels = 0;
+
 void RedrawScreenRect(int left, int top, int right, int bottom)
 {
 	assert(right <= _screen.width && bottom <= _screen.height);
+	_redrawn_rects++;
+	_redrawn_pixels += static_cast<uint64_t>(std::max(0, right - left)) * std::max(0, bottom - top);
 	if (_cursor.visible) {
 		if (right > _cursor.draw_pos.x &&
 				left < _cursor.draw_pos.x + _cursor.draw_size.x &&

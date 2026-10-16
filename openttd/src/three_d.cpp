@@ -171,6 +171,22 @@ void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y)
 	UnturnWorldPoint(xr, yr, x, y);
 }
 
+/** Where what is being marked dirty is (DirtyPlaceScope). */
+static DirtyPlace _dirty_place;
+/** For the rig (test3d smycka): how many places of each kind were marked dirty turned, and how big (pixels at the usual zoom). */
+uint64_t _turned_dirty_count[3] = {};
+double _turned_dirty_area[3] = {};
+
+DirtyPlaceScope::DirtyPlaceScope(const DirtyPlace &place) : was(_dirty_place)
+{
+	_dirty_place = place;
+}
+
+DirtyPlaceScope::~DirtyPlaceScope()
+{
+	_dirty_place = this->was;
+}
+
 /**
  * Where a rectangle of the view facing north lands in the turned view: the
  * game marks what to repaint in the coordinates of the view facing north
@@ -179,35 +195,67 @@ void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y)
  * vehicle far from the pivot moved out of its old picture and was not drawn
  * at its new place until something else repainted it.
  *
- * The flat screen turns with the world: a point of the north view, taken as a
- * point of the ground, turned about the pivot and projected again. A height
- * above the ground is not known here; it moves a point by at most twice its
- * height either way under the turn, so the rectangle grows by that much for
- * anything up to the heights vehicles fly at.
+ * Where the thing is in the world is known (DirtyPlaceScope): a box of the
+ * world, its corners turned and projected; or a point it is drawn round, the
+ * rectangle moved with the point. Not known: a point of the north view, taken
+ * as a point of the ground, turned about the pivot and projected again. Its
+ * height is not known then; it moves a point by at most twice its height either
+ * way under the turn, so the rectangle grows by that much for anything up to
+ * the heights vehicles fly at -- most of the screen at the usual zoom (the
+ * player: the mouse jerky and everything slow while something moved).
  * @param[in,out] left,top,right,bottom the rectangle, virtual screen coordinates (ZoomLevel::Min)
  */
 void TurnDirtyRect(int &left, int &top, int &right, int &bottom)
 {
-	const double max_height = 256.0; // world units: higher than the ground and the aircraft go
 	double nl = std::numeric_limits<double>::infinity(), nt = nl, nr = -nl, nb = -nl;
-	const double xs[2] = {static_cast<double>(left), static_cast<double>(right)};
-	const double ys[2] = {static_cast<double>(top), static_cast<double>(bottom)};
-	for (double vx : xs) {
-		for (double vy : ys) {
-			/* The ground point the north view draws here (the inverse of RemapCoords() at z = 0). */
-			double sum = vy / ZOOM_BASE, diff = vx / (2.0 * ZOOM_BASE);
-			double x = (sum - diff) / 2, y = (sum + diff) / 2;
-			double tx, ty;
-			ProjectTurnedF(x, y, 0, tx, ty);
-			nl = std::min(nl, tx); nr = std::max(nr, tx);
-			nt = std::min(nt, ty); nb = std::max(nb, ty);
+	auto take = [&](double tx, double ty) {
+		nl = std::min(nl, tx); nr = std::max(nr, tx);
+		nt = std::min(nt, ty); nb = std::max(nb, ty);
+	};
+	const DirtyPlace &p = _dirty_place;
+	double margin;
+	if (p.kind == DirtyPlace::Kind::Box) {
+		for (double x : {p.x0, p.x1}) {
+			for (double y : {p.y0, p.y1}) {
+				for (double z : {p.z0, p.z1}) {
+					double tx, ty;
+					ProjectTurnedF(x, y, z, tx, ty);
+					take(tx, ty);
+				}
+			}
 		}
+		margin = 2 * ZOOM_BASE;
+	} else if (p.kind == DirtyPlace::Kind::Anchored) {
+		/* Drawn round its point in the turned view as round it in the north view (RemapCoords()). */
+		const double nx = (p.ay - p.ax) * 2 * ZOOM_BASE, ny = (p.ax + p.ay - p.az) * ZOOM_BASE;
+		double tx, ty;
+		ProjectTurnedF(p.ax, p.ay, p.az, tx, ty);
+		take(left + tx - nx, top + ty - ny);
+		take(right + tx - nx, bottom + ty - ny);
+		/* A step it made since it was drawn, and a round curve drawing it beside its point (round_track.cpp). */
+		margin = 16 * ZOOM_BASE;
+	} else {
+		const double max_height = 256.0; // world units: higher than the ground and the aircraft go
+		const double xs[2] = {static_cast<double>(left), static_cast<double>(right)};
+		const double ys[2] = {static_cast<double>(top), static_cast<double>(bottom)};
+		for (double vx : xs) {
+			for (double vy : ys) {
+				/* The ground point the north view draws here (the inverse of RemapCoords() at z = 0). */
+				double sum = vy / ZOOM_BASE, diff = vx / (2.0 * ZOOM_BASE);
+				double x = (sum - diff) / 2, y = (sum + diff) / 2;
+				double tx, ty;
+				ProjectTurnedF(x, y, 0, tx, ty);
+				take(tx, ty);
+			}
+		}
+		margin = 2 * max_height * ZOOM_BASE;
 	}
-	const double margin = 2 * max_height * ZOOM_BASE;
 	left = static_cast<int>(std::floor(nl - margin));
 	right = static_cast<int>(std::ceil(nr + margin));
 	top = static_cast<int>(std::floor(nt - margin));
 	bottom = static_cast<int>(std::ceil(nb + margin));
+	_turned_dirty_count[to_underlying(p.kind)]++;
+	_turned_dirty_area[to_underlying(p.kind)] += static_cast<double>(right - left) * (bottom - top) / (ZOOM_BASE * ZOOM_BASE);
 }
 
 /**
