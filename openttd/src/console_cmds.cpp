@@ -9021,11 +9021,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 	} else if (what == "auta" && argv.size() > 2) {
-		/* 'auta <jmeno> [pocet] [x y] [zatacka]': a straight road along x with a shed at each end and so many road vehicles
-		 * of the first engine whose name has the text in it, driving between them (3D cars of a GRF package); with
-		 * 'zatacka' the road turns along y halfway, a bend to drive through. */
+		/* 'auta <jmeno> [pocet] [x y] [zatacka] [naklad]': a straight road along x with a shed at each end and so many road
+		 * vehicles of the first engine whose name has the text in it, driving between them (3D cars of a GRF package); with
+		 * 'zatacka' the road turns along y halfway, a bend to drive through; a cargo's label (four letters) refits them to it. */
 		std::string wanted(argv[2]);
-		const bool bend = argv.size() > 6 && argv[6] == "zatacka";
+		bool bend = false;
+		CargoType refit_to = INVALID_CARGO;
+		for (size_t k = 6; k < argv.size(); k++) {
+			if (argv[k] == "zatacka") bend = true;
+			if (argv[k].size() == 4) refit_to = GetCargoTypeByLabel(CargoLabel{static_cast<uint32_t>(argv[k][0]) << 24 | static_cast<uint32_t>(argv[k][1]) << 16 | static_cast<uint32_t>(argv[k][2]) << 8 | static_cast<uint32_t>(argv[k][3])});
+		}
 		int count = std::clamp(number(3).value_or(4), 1, 16);
 		uint x0 = static_cast<uint>(number(4).value_or(static_cast<int>(Map::SizeX() / 2) - 8)), y0 = static_cast<uint>(number(5).value_or(static_cast<int>(Map::SizeY() / 2)));
 		if (!Company::IsValidID(CompanyID::Begin())) {
@@ -9083,6 +9088,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (int k = 0; k < count; k++) {
 			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, k % 2 == 0 ? depot_a : depot_b, engine->index, true, INVALID_CARGO, ClientID::Invalid);
 			if (cost.Failed()) continue;
+			if (IsValidCargoType(refit_to)) {
+				CommandCost refit = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, veh, refit_to, 0, false, false, 0));
+				if (refit.Failed()) IConsolePrint(CC_DEFAULT, "test3d: auta: prestavba {}", RefusalReason(refit));
+			}
 			Order there{};
 			there.MakeGoToDepot(DestinationID(Depot::GetByTile(k % 2 == 0 ? depot_b : depot_a)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, there);
@@ -9094,6 +9103,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		ScrollMainWindowToTile(TileXY(x0 + 8, y0), true);
 		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, TileX(depot_b), TileY(depot_b), bend ? " se zatackou" : "");
+	} else if (what == "stav") {
+		/* 'stav <n>': every vehicle object with states drawn in its state n, 0 as its GRF picks (the rig: a state the cars do not get here). */
+		extern int _three_d_rig_state;
+		_three_d_rig_state = std::max(0, number(2).value_or(0));
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stav {}", _three_d_rig_state);
 	} else if (what == "detail") {
 		/* 'detail <px> [textura]': how many pixels apart the corners of a model of the view from the eyes are (0 the
 		 * whole shape); with 'textura' its textures at their full size. */
@@ -9311,10 +9326,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		UpdateViewportPosition(w, 0);
 	} else if (what == "kresli" && argv.size() > 4) {
-		/* 'kresli <engine> <degrees> <px a metre> [state] [lights]': a vehicle's object alone and big, to kresli.ppm. */
+		/* 'kresli <engine> <degrees> <px a metre> [state] [lights] [name]': a vehicle's object alone and big, to <name>.ppm (kresli.ppm). */
 		auto engine = number(2), az = number(3), pxm = number(4);
 		if (!engine.has_value() || !az.has_value() || !pxm.has_value()) return true;
-		const bool ok = WriteThreeDVehicleObjectPPM(static_cast<EngineID>(*engine), static_cast<float>(*az), static_cast<float>(*pxm), number(5).value_or(0), number(6).value_or(0), "kresli.ppm");
+		const std::string out = argv.size() > 7 ? std::string(argv[7]) + ".ppm" : std::string("kresli.ppm");
+		const bool ok = WriteThreeDVehicleObjectPPM(static_cast<EngineID>(*engine), static_cast<float>(*az), static_cast<float>(*pxm), number(5).value_or(0), number(6).value_or(0), out);
 		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: kresli {}", ok ? "zapsano" : "ODMITNUTO");
 	} else if (what == "titulnoc") {
 		/* 'titulnoc <ms>': the title screen's day and night that much on (intro_gui.cpp), for its pictures. */

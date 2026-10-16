@@ -58,6 +58,8 @@ struct ThreeDEyeVehicle {
 	float facing = 0;           ///< degrees in the world, 0 along +x, 90 along +y, finer than the eight directions
 	int state = 0;              ///< its state its GRF picks (paint, fading, rust), 0 none
 	int lights = 0;             ///< its lights on at night (front 1, back 2)
+	double rolled = 0;          ///< how far it has gone, world units: its wheels turn by it ("kola_v_modelu")
+	double curvature = 0;       ///< how much its way turns, radians a world unit to the left: its front wheels steer by it
 };
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
 void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights);

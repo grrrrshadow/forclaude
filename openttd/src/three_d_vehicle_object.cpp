@@ -131,9 +131,13 @@ static float ObjectScale(const ThreeDVehicleObject *obj)
  * holds the number in the GRF of the first sprite of the set the GRF chooses for the vehicle, by its own rules.
  * @return the state's index plus one; 0 none: the object as it is, its paint new, no rust
  */
+/** The rig: 'test3d stav <n>' draws every vehicle object with states in its state n (0 as its GRF picks). */
+int _three_d_rig_state = 0;
+
 static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
 	if (obj->states.empty()) return 0;
+	if (_three_d_rig_state > 0 && static_cast<size_t>(_three_d_rig_state) <= obj->states.size()) return _three_d_rig_state;
 	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list. */
 	if (obj->paint_random) return v == nullptr ? 1 : 1 + static_cast<int>(v->random_bits % obj->states.size());
 	uint32_t id = GetVehicleSetSpriteLocalID(engine, v, image_type);
@@ -435,8 +439,10 @@ struct ObjectPaintOfState {
  * @param spin how far a thing that turns has turned about its axis, degrees (ThreeDVehicleObject::spin_axis)
  * @param lights at night the lights that are on (LIGHTS_FRONT, LIGHTS_BACK): their glass at full brightness over the
  *               body, its pixels marked lit, and the places they shine from (ThreeDVehicleShape::front_lights)
+ * @param state the state its GRF picks (StateStep()): the parts it shows -- an add-on's node, a group of the crew --
+ *              and the colours of the add-ons ("barvy_doplnku")
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f, int lights = 0)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f, int lights = 0, int state = 0)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
@@ -526,9 +532,33 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		for (size_t i = 0; i < texs.size() && i < shape->tex_names.size(); i++) tinted[i] = shape->tex_names[i] == obj.tint_material;
 	}
 
+	/* The parts the state shows; the add-ons' colours, each over its mask at the texture's lightness. */
+	const uint64_t parts = obj.PartsOf(state);
+	const ThreeDVehicleState *st = state > 0 && static_cast<size_t>(state) <= obj.states.size() ? &obj.states[state - 1] : nullptr;
+	struct AddonPaint {
+		const ThreeDObjectTexture *mask = nullptr;
+		Colour colour;
+		float start = 255.0f;
+	};
+	std::vector<AddonPaint> addon_paint(texs.size());
+	for (size_t i = 0; i < texs.size() && i < shape->tex_addon.size(); i++) {
+		const int a = shape->tex_addon[i];
+		if (a < 0 || st == nullptr || static_cast<size_t>(a) >= st->addon_colours.size() || st->addon_colours[a] == 0) continue;
+		addon_paint[i].mask = obj.GetAddonMask(a, level);
+		addon_paint[i].colour = Colour(st->addon_colours[a]);
+		addon_paint[i].start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
+	}
+	std::vector<size_t> glass_triangles;
+
 	std::vector<float> zb(static_cast<size_t>(width) * height, std::numeric_limits<float>::infinity());
 	std::vector<Colour> buf(static_cast<size_t>(width) * height, Colour(0, 0, 0, 0));
 	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+		const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
+		if (part == ThreeDVehicleShape::PART_GLASS) {
+			glass_triangles.push_back(t);
+			continue;
+		}
+		if (part != 0 && part != ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
 		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
 		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
@@ -560,6 +590,17 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				Colour col(texel);
 				float cr = col.r, cg = col.g, cb = col.b;
 				if (ti == 0) painted.Paint(u, v, cr, cg, cb);
+				if (static_cast<size_t>(ti) < addon_paint.size() && addon_paint[ti].mask != nullptr) {
+					const AddonPaint &ap = addon_paint[ti];
+					const int mx = std::min(ap.mask->w - 1, static_cast<int>(u * ap.mask->w)), my = std::min(ap.mask->h - 1, static_cast<int>(v * ap.mask->h));
+					const float m = Colour(ap.mask->px[static_cast<size_t>(my) * ap.mask->w + mx]).r / 255.0f;
+					if (m > 0) {
+						const float l = std::max({cr, cg, cb}) / ap.start;
+						cr += (std::min(255.0f, ap.colour.r * l) - cr) * m;
+						cg += (std::min(255.0f, ap.colour.g * l) - cg) * m;
+						cb += (std::min(255.0f, ap.colour.b * l) - cb) * m;
+					}
+				}
 				if (tint != 0 && static_cast<size_t>(ti) < tinted.size() && tinted[ti]) {
 					cr = cr * tint_colour.r / 255.0f;
 					cg = cg * tint_colour.g / 255.0f;
@@ -568,6 +609,50 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				if (ti == 0) painted.Rust(u, v, cr, cg, cb);
 				zb[at] = dz;
 				buf[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr * k)), static_cast<uint8_t>(std::min(255.0f, cg * k)), static_cast<uint8_t>(std::min(255.0f, cb * k)));
+			}
+		}
+	}
+
+	/* The glass of its windows ("sklo"), after all else: see-through, each layer of it laying its colour over what is
+	 * behind by its alpha, not hiding what is behind it (no depth written); over nothing, a pane of that alpha. */
+	const float glass_alpha = shape->glass_alpha;
+	for (size_t t : glass_triangles) {
+		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
+		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
+		const float ax = sx[a] - left, ay = sy[a] - top, bx = sx[b] - left, by = sy[b] - top, cx = sx[c] - left, cy = sy[c] - top;
+		const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+		if (std::abs(area) < 1e-6f) continue;
+		int x0 = std::max(0, static_cast<int>(std::floor(std::min({ax, bx, cx})))), x1 = std::min(width - 1, static_cast<int>(std::ceil(std::max({ax, bx, cx}))));
+		int y0 = std::max(0, static_cast<int>(std::floor(std::min({ay, by, cy})))), y1 = std::min(height - 1, static_cast<int>(std::ceil(std::max({ay, by, cy}))));
+		const float inv = 1.0f / area;
+		for (int py = y0; py <= y1; py++) {
+			const float qy = py + 0.5f;
+			for (int px = x0; px <= x1; px++) {
+				const float qx = px + 0.5f;
+				const float w0 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * inv;
+				const float w1 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * inv;
+				const float w2 = 1.0f - w0 - w1;
+				if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+				const size_t at = static_cast<size_t>(py) * width + px;
+				const float dz = w0 * depth[a] + w1 * depth[b] + w2 * depth[c];
+				if (dz >= zb[at]) continue;
+				float u = w0 * shape->uv[a * 2] + w1 * shape->uv[b * 2] + w2 * shape->uv[c * 2];
+				float v = w0 * shape->uv[a * 2 + 1] + w1 * shape->uv[b * 2 + 1] + w2 * shape->uv[c * 2 + 1];
+				u -= std::floor(u);
+				v -= std::floor(v);
+				const int tx = std::min(tex->w - 1, static_cast<int>(u * tex->w)), ty = std::min(tex->h - 1, static_cast<int>(v * tex->h));
+				const Colour g(tex->px[static_cast<size_t>(ty) * tex->w + tx]);
+				const float k = w0 * light[a] + w1 * light[b] + w2 * light[c];
+				const float gr = std::min(255.0f, g.r * k), gg = std::min(255.0f, g.g * k), gb = std::min(255.0f, g.b * k);
+				Colour &d = buf[at];
+				if (d.a == 0) {
+					d = Colour(static_cast<uint8_t>(gr), static_cast<uint8_t>(gg), static_cast<uint8_t>(gb), static_cast<uint8_t>(glass_alpha * 255.0f));
+				} else {
+					const float keep = 1.0f - glass_alpha;
+					const float da = d.a / 255.0f, na = da + glass_alpha * (1.0f - da);
+					d = Colour(static_cast<uint8_t>((d.r * da * keep + gr * glass_alpha) / na), static_cast<uint8_t>((d.g * da * keep + gg * glass_alpha) / na), static_cast<uint8_t>((d.b * da * keep + gb * glass_alpha) / na), static_cast<uint8_t>(std::min(255.0f, na * 255.0f)));
+				}
 			}
 		}
 	}
@@ -644,8 +729,8 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		}
 	}
 
-	/* Shrink: the mean of the covered subpixels, the alpha from how many are; lit where any of them is (a lamp far off
-	 * smaller than a pixel still shines). */
+	/* Shrink: the mean of the covered subpixels by their alpha, the alpha from how much they cover (a pane of glass over
+	 * nothing a part); lit where any of them is (a lamp far off smaller than a pixel still shines). */
 	out.width = width / ss;
 	out.height = height / ss;
 	out.left = left / ss;
@@ -654,18 +739,18 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	out.lit.assign(litbuf.empty() ? 0 : out.px.size(), 0);
 	for (int y = 0; y < out.height; y++) {
 		for (int x = 0; x < out.width; x++) {
-			uint r = 0, g = 0, bl = 0, cnt = 0, glass = 0;
+			uint r = 0, g = 0, bl = 0, cover = 0, glass = 0;
 			for (int dy = 0; dy < ss; dy++) {
 				for (int dx = 0; dx < ss; dx++) {
 					const size_t at = static_cast<size_t>(y * ss + dy) * width + (x * ss + dx);
 					Colour cc = buf[at];
 					if (cc.a == 0) continue;
-					r += cc.r; g += cc.g; bl += cc.b; cnt++;
+					r += cc.r * cc.a; g += cc.g * cc.a; bl += cc.b * cc.a; cover += cc.a;
 					if (!litbuf.empty() && litbuf[at] != 0) glass++;
 				}
 			}
-			if (cnt == 0) continue;
-			out.px[static_cast<size_t>(y) * out.width + x] = Colour(r / cnt, g / cnt, bl / cnt, static_cast<uint8_t>(cnt * 255 / (ss * ss)));
+			if (cover == 0) continue;
+			out.px[static_cast<size_t>(y) * out.width + x] = Colour(r / cover, g / cover, bl / cover, static_cast<uint8_t>(cover / (ss * ss)));
 			if (glass > 0) out.lit[static_cast<size_t>(y) * out.width + x] = 1;
 		}
 	}
@@ -693,7 +778,7 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 	if (req != nullptr && req->obj != nullptr) {
 		float along = (SqueezedType(req->obj->type) && (req->dir & 1)) ? SQUEEZE : 1.0f;
 		float az = ViewAzimuth(req->dir);
-		drawn = RasterObject(*req->obj, req->scale, az, az, along, PXM_16X, FadeAmount(req->obj, req->fade), r, 0, RustTime(req->obj, req->fade), 0, PaletteColour(req->obj, req->fade)) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
+		drawn = RasterObject(*req->obj, req->scale, az, az, along, PXM_16X, FadeAmount(req->obj, req->fade), r, 0, RustTime(req->obj, req->fade), 0, PaletteColour(req->obj, req->fade), 1.0f, 0.0f, 0.0f, 0.0f, 0, req->fade) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
 	}
 	if (!drawn) {
 		/* The empty picture, or an object that cannot be drawn: a transparent pixel. */
@@ -779,7 +864,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll), lights)) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll), lights, fade)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
@@ -947,6 +1032,9 @@ struct EyeTrail {
 	double target = 0;  ///< the heading its way gives, radians in the world, 0 along +x
 	double facing = 0;  ///< the heading it is drawn at, turning towards the target
 	uint64_t tick = 0;  ///< the game's tick of the last turn
+	double rolled = 0;  ///< how far it has gone, world units, back counting less (its wheels turn by it)
+	double curvature = 0; ///< how much its way turns, radians a world unit, to the left (its front wheels steer by it)
+	double since_turn = 0; ///< world units gone since its target last changed
 };
 static std::map<VehicleID, EyeTrail> _eye_trails;
 
@@ -976,16 +1064,10 @@ static inline float SqueezeAt(double facing)
  * in a depot, a vehicle that jumped): then its direction.
  * @param by_direction its direction's angle, radians (turned round when its object faces backwards)
  */
-static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *last, double by_direction)
+static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *last, double by_direction, double &rolled, double &curvature)
 {
 	auto off = [&](double a) { return std::abs(std::remainder(a - by_direction, 2 * M_PI)); };
 	auto ahead = [&](double a) { return off(a) > M_PI / 2 ? a + M_PI : a; };
-	if (front != last) {
-		const double dx = front->x_pos - last->x_pos, dy = front->y_pos - last->y_pos;
-		if (dx * dx + dy * dy < 4.0) return by_direction;
-		const double a = ahead(std::atan2(dy, dx));
-		return off(a) <= M_PI / 3 ? a : by_direction;
-	}
 	const uint64_t now = TimerGameTick::counter;
 	EyeTrail &e = _eye_trails[v->index];
 	const std::pair<int, int> here{v->x_pos, v->y_pos};
@@ -996,25 +1078,46 @@ static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *l
 		e.count = 1;
 		e.target = e.facing = by_direction;
 		e.tick = now;
-		return by_direction;
 	}
 	if (e.at[e.count - 1] != here) {
+		/* The way gone: forward along its heading, or back. */
+		const double dx = here.first - e.at[e.count - 1].first, dy = here.second - e.at[e.count - 1].second;
+		const double step = std::hypot(dx, dy);
+		e.rolled += (dx * std::cos(e.facing) + dy * std::sin(e.facing)) >= 0 ? step : -step;
+		e.since_turn += step;
 		if (e.count == static_cast<int>(e.at.size())) {
 			std::move(e.at.begin() + 1, e.at.end(), e.at.begin());
 			e.count--;
 		}
 		e.at[e.count++] = here;
 	}
-	/* The heading from the newest place far enough back. */
+	rolled = e.rolled;
+	if (front != last) {
+		/* Over several pieces: from its last to its first, as a body on its bogies. */
+		const double dx = front->x_pos - last->x_pos, dy = front->y_pos - last->y_pos;
+		curvature = 0;
+		if (dx * dx + dy * dy < 4.0) return by_direction;
+		const double a = ahead(std::atan2(dy, dx));
+		return off(a) <= M_PI / 3 ? a : by_direction;
+	}
+	/* The heading from the newest place far enough back; how much the way turns, from how far the heading moved. */
 	bool found = false;
 	for (int i = e.count - 2; i >= 0; i--) {
 		const double dx = here.first - e.at[i].first, dy = here.second - e.at[i].second;
 		if (dx * dx + dy * dy < EYE_TRAIL_UNITS * EYE_TRAIL_UNITS) continue;
 		const double a = ahead(std::atan2(dy, dx));
+		const double was = e.target;
 		e.target = off(a) <= M_PI / 3 ? a : by_direction;
+		if (e.since_turn > 0.5) {
+			const double bend = std::remainder(e.target - was, 2 * M_PI) / e.since_turn;
+			e.curvature += (std::clamp(bend, -0.3, 0.3) - e.curvature) * 0.5;
+			e.since_turn = 0;
+		}
 		found = true;
 		break;
 	}
+	if (!found) e.curvature *= 0.5;
+	curvature = e.curvature;
 	if (!found && off(e.target) > M_PI / 3) e.target = by_direction;
 	if (off(e.facing) > M_PI / 3) {
 		e.facing = e.target;
@@ -1055,7 +1158,10 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	const Vehicle *last = front;
 	while (last->HasArticulatedPart()) last = last->GetNextArticulatedPart();
 	const int d = to_underlying(reversed ? ReverseDir(v->direction) : v->direction) & 7;
-	const double facing = EyeFacing(v, reversed ? last : front, reversed ? front : last, DirectionAngle(d));
+	double rolled = 0, curvature = 0;
+	const double facing = EyeFacing(v, reversed ? last : front, reversed ? front : last, DirectionAngle(d), rolled, curvature);
+	out.rolled = reversed ? -rolled : rolled;
+	out.curvature = curvature;
 
 	out.obj = obj;
 	out.scale = ObjectScale(obj);
@@ -1121,8 +1227,8 @@ bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorld
 	return true;
 }
 
-/** The body's textures painted as their states have them, for the view from the eyes (GetThreeDEyeVehicleTexture()). */
-static std::map<std::tuple<const ThreeDVehicleObject *, int, int>, ThreeDObjectTexture> _eye_painted;
+/** The body's textures painted as their states have them, the add-ons' coloured, for the view from the eyes (GetThreeDEyeVehicleTexture()). */
+static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int>, ThreeDObjectTexture> _eye_painted;
 
 /** The objects are read anew: their painted textures go with them. */
 static void ForgetEyePainted()
@@ -1144,10 +1250,40 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 	int level = 0;
 	for (double d = TexelsPerMetre(*obj, *shape); d >= 2.0 * pixels_per_metre && level < 12; d /= 2.0) level++;
 	const ThreeDObjectTexture *raw = obj->GetTexture(level, index);
-	if (index != 0 || state == 0 || raw == nullptr) return raw;
+	if (state == 0 || raw == nullptr) return raw;
+	if (index != 0) {
+		/* An add-on's texture: the colour its state gives it over its mask, at the texture's lightness. */
+		const int addon = static_cast<size_t>(index) < shape->tex_addon.size() ? shape->tex_addon[index] : -1;
+		const ThreeDVehicleState *st = static_cast<size_t>(state) <= obj->states.size() ? &obj->states[state - 1] : nullptr;
+		if (addon < 0 || st == nullptr || static_cast<size_t>(addon) >= st->addon_colours.size() || st->addon_colours[addon] == 0) return raw;
+		const ThreeDObjectTexture *mask = obj->GetAddonMask(addon, level);
+		if (mask == nullptr) return raw;
+		ThreeDObjectTexture &t = _eye_painted[{obj, state, level, index}];
+		if (!t.px.empty()) return &t;
+		const Colour colour(st->addon_colours[addon]);
+		const float start = obj->addons[addon].start > 0 ? static_cast<float>(obj->addons[addon].start) : 255.0f;
+		t.w = raw->w;
+		t.h = raw->h;
+		t.px = raw->px;
+		for (int y = 0; y < raw->h; y++) {
+			const int my = std::min(mask->h - 1, static_cast<int>((y + 0.5f) / raw->h * mask->h));
+			for (int x = 0; x < raw->w; x++) {
+				uint32_t &texel = t.px[static_cast<size_t>(y) * raw->w + x];
+				if (texel == 0) continue;
+				const int mx = std::min(mask->w - 1, static_cast<int>((x + 0.5f) / raw->w * mask->w));
+				const float m = Colour(mask->px[static_cast<size_t>(my) * mask->w + mx]).r / 255.0f;
+				if (m <= 0) continue;
+				const Colour c(texel);
+				const float l = std::max({c.r, c.g, c.b}) / start;
+				auto mix = [&](uint8_t from, uint8_t to) { return static_cast<uint8_t>(from + (std::min(255.0f, to * l) - from) * m); };
+				texel = Colour(mix(c.r, colour.r), mix(c.g, colour.g), mix(c.b, colour.b), c.a).data;
+			}
+		}
+		return &t;
+	}
 	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
 	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr) return raw;
-	ThreeDObjectTexture &t = _eye_painted[{obj, state, level}];
+	ThreeDObjectTexture &t = _eye_painted[{obj, state, level, 0}];
 	if (!t.px.empty()) return &t;
 	t.w = raw->w;
 	t.h = raw->h;
@@ -1540,7 +1676,7 @@ bool WriteThreeDVehicleObjectPPM(EngineID engine, float az, float pxm, int state
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, &piece);
 	if (obj == nullptr) return false;
 	ObjectRaster r;
-	if (!RasterObject(*obj, 1.0f, az, az, 1.0f, pxm, 0, r, 0, 0, 0, PaletteColour(obj, state), 1.0f, 0, 0, 0, lights)) return false;
+	if (!RasterObject(*obj, 1.0f, az, az, 1.0f, pxm, FadeAmount(obj, state), r, 0, RustTime(obj, state), 0, PaletteColour(obj, state), 1.0f, 0, 0, 0, lights, state)) return false;
 	auto f = FileHandle::Open(path, "wb");
 	if (!f.has_value()) return false;
 	std::string head = fmt::format("P6\n{} {}\n255\n", r.width, r.height);

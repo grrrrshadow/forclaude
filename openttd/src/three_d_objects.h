@@ -32,6 +32,7 @@
 #include "vehicle_type.h"
 #include "zoom_type.h"
 
+#include <algorithm>
 #include <array>
 #include <map>
 #include <memory>
@@ -187,6 +188,17 @@ struct ThreeDVehicleShape {
 	std::vector<float> front_lights;    ///< x, y, z of each headlight, metres
 	std::vector<float> back_lights;     ///< x, y, z of each red light at the back, metres
 	bool paint_whole = false;           ///< the body's texture (the first) painted all over in the state's colour, without a mask (a car of BeamNG)
+	/* Its parts (the colleague's hra/3d/PROSBA-V3S-3D.md): what is drawn only as the state shows it, the glass, the
+	 * driver, the wheels that turn, the crew drawn bigger than they are. */
+	static constexpr uint8_t PART_DRIVER = 254; ///< tri_part: the driver, not drawn from the own cab's eye
+	static constexpr uint8_t PART_GLASS = 255;  ///< tri_part: the glass, drawn see-through after the rest
+	std::vector<uint8_t> tri_part;      ///< each triangle's part: 0 always, n the part n of the object's states (ThreeDVehicleObject::part_names), or PART_*; empty all 0
+	std::vector<int8_t> tex_addon;      ///< each texture's add-on (ThreeDVehicleObject::addons), -1 none
+	std::vector<uint8_t> corner_wheel;  ///< each corner's wheel that turns, n the wheel n - 1 of ThreeDVehicleObject::model_wheels, 0 none; empty none
+	std::vector<uint8_t> corner_crew;   ///< each corner's figure of the crew drawn bigger than it is, n crew_feet[n - 1], 0 none; empty none
+	std::vector<std::array<float, 4>> crew_feet; ///< such a figure: where its feet stand (x, y, z) and how much bigger it is
+	float glass_alpha = 0.15f;          ///< how much of the glass's colour a layer of it lays over
+	bool HasPart(uint8_t part) const { return std::ranges::find(this->tri_part, part) != this->tri_part.end(); }
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }
 
 	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
@@ -258,6 +270,8 @@ struct ThreeDVehicleState {
 	uint32_t colour = 0;        ///< "barva": the paint's colour (Colour::data), over its mask; 0 the texture's own
 	float fade = 0;             ///< "lak": how far the paint has faded to its target, 0 to 1
 	float rust = 0;             ///< "rez": how far it has rusted, 0 to 1
+	uint64_t parts = 0;         ///< the parts it shows ("doplnky" its nodes, "posadka" a group of the crew): bit n the part n (ThreeDVehicleObject::part_names)
+	std::vector<uint32_t> addon_colours; ///< "barvy_doplnku": each add-on's colour (Colour::data), 0 its texture's own
 };
 
 /** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
@@ -265,6 +279,29 @@ struct ThreeDVehicleCrew {
 	std::string figure;         ///< "postava": the figure's name
 	float at[3] = {};           ///< "poloha": where its feet stand, metres in the vehicle's frame
 	float turn = 0;             ///< "otoceni": degrees about z, 0 facing forward as the vehicle
+	float scale = 1.0f;         ///< "meritko": its size against its true one (the girls on a lorry's back twice, as at a stop)
+};
+
+/**
+ * Things laid on a vehicle object from a file of their own ("doplnky", the colleague's hra/3d/ROZHRANI-GRF-STAVY.md):
+ * of its nodes only the one the state its GRF picks names, with its children; without a state none.
+ */
+struct ThreeDVehicleAddon {
+	std::string key;            ///< "soubor" as the states name it
+	std::string file;           ///< its path
+	float at[3] = {};           ///< "poloha": shifted so in the vehicle's frame, metres
+	std::vector<std::string> nodes; ///< "uzly": the nodes the states pick from
+	std::string mask_file;      ///< "barva" "maska": where it takes the state's colour ("barvy_doplnku"), its path; empty nowhere
+	int start = 0;              ///< "barva" "zacatek": the texture's lightness where the colour is its own
+};
+
+/** A wheel of the vehicle's own model that turns as it goes ("kola_v_modelu"), the front ones steering. */
+struct ThreeDModelWheel {
+	std::string node;           ///< "uzel": the wheel's node
+	float centre[3] = {};       ///< "stred": its middle, metres in the vehicle's frame
+	float radius = 0.5f;        ///< "polomer_m"
+	bool steers = false;        ///< "rizeni"
+	float max_angle = 35;       ///< "max_uhel": how far it steers at most, degrees
 };
 
 /** Wheels of a vehicle object from a file of their own ("kola"): one wheel, at every place it is. */
@@ -301,6 +338,12 @@ struct ThreeDVehicleObject {
 	int drive_stand = 400;          ///< "stoji_tiku": ticks it stands at a stop
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
+	std::vector<std::pair<std::string, std::vector<ThreeDVehicleCrew>>> crew_groups; ///< "posadky": named groups of the crew, each shown by the states naming it ("posadka")
+	std::vector<ThreeDVehicleAddon> addons;  ///< "doplnky"
+	std::vector<std::string> part_names;     ///< the parts the states show: each add-on's nodes ("<soubor>/<uzel>"), then the crew's groups ("posadky/<jmeno>"); part n is bit n of a state's parts
+	std::vector<ThreeDModelWheel> model_wheels; ///< "kola_v_modelu"
+	std::string glass_node;         ///< "sklo" "uzel": the windows, drawn see-through over what is behind them
+	float glass_alpha = 0.15f;      ///< "sklo" "alfa": how much of the glass's colour a layer of it lays over
 	std::string frame_prefix;       ///< a figure that moves ("animace"): its frames are the nodes whose names start so ("uzly"), followed by their number; empty for none
 	int frames = 0;                 ///< "snimku": how many frames
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
@@ -325,6 +368,8 @@ struct ThreeDVehicleObject {
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
+	const ThreeDObjectTexture *GetAddonMask(size_t addon, int level) const;
+	uint64_t PartsOf(int state) const;
 	void Forget() const;
 
 	mutable uint32_t used = 0;      ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
@@ -341,6 +386,8 @@ private:
 	mutable bool mask_tried = false;
 	mutable std::vector<ThreeDObjectTexture> rust_levels;         ///< the rust mask likewise
 	mutable bool rust_tried = false;
+	mutable std::vector<std::vector<ThreeDObjectTexture>> addon_mask_levels; ///< each add-on's colour mask likewise
+	mutable std::vector<bool> addon_mask_tried;
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);

@@ -618,8 +618,30 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   pseudo sprite a line on, `GetSpriteLocalID()`; not yagl's `sprite_id`) is in the range
   (`GetVehicleSetSpriteLocalID()`, `StateStep()`). Without `stavy`, or a set in no range: the object as it is, the
   paint new, no rust. A sprite and a picture of the turned view for each state, made when first drawn. Rig:
-  `test3d stavy` prints each vehicle's sprite number and state. (Later: `dily`, a node turned, the lid; `doplnky`,
-  which node of an add-on shows, the beacon.)
+  `test3d stavy` prints each vehicle's sprite number and state; `test3d stav <n>` draws every such vehicle in its
+  state n (0 as its GRF picks). (Later: `dily`, a node turned, the lid.)
+- **Add-ons and groups of the crew by the state** (16. 10., the colleague's `hra/3d/PROSBA-V3S-3D.md`, the Praga V3S
+  `V3S_3D`, `MAX4`): `"doplnky": [{"soubor", "poloha", "uzly": [...], "barva": {"maska", "zacatek"}}]` of the record
+  are files laid on the vehicle, of which only the node a state names (`"doplnky": {"<soubor>": "<uzel>"}`) is drawn,
+  with its children; without a state none. `"barvy_doplnku": {"<soubor>": "RRGGBB"}` colours the add-on where its
+  mask is, at the texture's lightness as the paint (`zacatek`), not fading. `"posadky": {"<jmeno>": [crew...]}` are
+  groups of the crew a state shows by `"posadka": "<jmeno>"`; a figure of the crew may be `meritko` times its size
+  (the girls on the back twice). Each node and group is a part of the shape (`ThreeDVehicleShape::tri_part`, at most
+  63; `ThreeDVehicleObject::part_names`, `PartsOf()`); the add-ons' textures are marked as theirs (`tex_addon`). The
+  load and the groups are not of the vehicle's length on the map. The beacon of the Tatra 613 VB goes so too.
+- **Glass** (`"sklo": {"uzel", "alfa"}`): the windows' node, drawn after the rest, each layer laying its colour over
+  what is behind it by `alfa`, not hiding it; over nothing a pane of that alpha (the map's pictures keep partial alpha).
+- **Wheels of the model that turn** (`"kola_v_modelu": [{"uzel", "stred", "polomer_m", "rizeni", "max_uhel"}]`):
+  in the view from the eyes each turns about its middle by the way gone over its radius (`ThreeDEyeVehicle::rolled`),
+  the steering ones steer by how the way bends (the angle whose tangent is the wheelbase times the curvature, at most
+  `max_uhel`); on the map they stand as they are.
+- **The cab of the model** (`"kabina"`): the view from the cab has its eye there, in the driver's head, the model
+  drawn round it -- the windows' holes or glass, the passenger -- without the driver (the figure of the crew sitting
+  under the eye, `PART_DRIVER`), the near plane a few centimetres off; the eye turns as the model faces.
+- **The first texture is the file's first material**: the paint is for texture 0; a vehicle's nodes were read last
+  first, and the V3S's glass came first.
+- In the view from the eyes the girls drawn bigger than they are (`meritko`) are at their true size again, each about
+  where its feet stand or it sits (`corner_crew`, `crew_feet`).
 - **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the body's texture's layout (the texture of
   the file, or `textura`), 255 where it is paint; `cil` RRGGBB the colour it fades to, as far as the state's `lak`
   says; `barva` RRGGBB a fixed colour by number (a state's `barva` instead), the paint that colour at the texture's

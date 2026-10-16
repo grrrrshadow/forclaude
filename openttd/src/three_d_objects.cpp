@@ -163,6 +163,7 @@ struct GlbMesh {
 	std::vector<uint8_t> tri_tex;      ///< the texture of each triangle, an index into textures
 	std::vector<GlbTexture> textures;  ///< the textures of the materials
 	std::vector<uint8_t> png;  ///< the first material's texture as it is in the file (a building's one texture)
+	std::vector<uint16_t> tri_group;   ///< with groups, each triangle's: n the node groups[n - 1] it is under, 0 none
 };
 
 /**
@@ -180,8 +181,9 @@ struct GlbMesh {
  * @param points where the places go, metres in the game's axes as the corners
  * @param skip_node with all_nodes, the node so named and its children are left out (a vehicle's "noc", drawn only at night)
  * @return whether there is something to draw
+ * @param groups with all_nodes, the nodes whose triangles (and their children's) are marked (GlbMesh::tri_group)
  */
-static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr, std::string_view skip_node = {})
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr, std::string_view skip_node = {}, const std::vector<std::string> *groups = nullptr)
 {
 	std::vector<uint8_t> d = ReadWholeFile(path);
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
@@ -307,7 +309,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 		bool normals = true;
 		int first_material = -1;
 		/* One mesh's primitives, transformed. */
-		auto add_mesh = [&](int mesh_index, const Matrix &m) {
+		auto add_mesh = [&](int mesh_index, const Matrix &m, uint16_t group) {
 			const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
 			for (const auto &p : prims) {
 				if (p.value("mode", 4) != 4) continue; // triangles only
@@ -355,11 +357,15 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 					mesh.tri.push_back(base + b);
 					mesh.tri.push_back(base + c);
 					mesh.tri_tex.push_back(tex);
+					if (groups != nullptr) mesh.tri_group.push_back(group);
 				}
 			}
 		};
 
 		const Matrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+		/* The file's first material is the first texture -- a vehicle's body, the one its paint is for -- whatever
+		 * node is read first (the V3S's glass was, and its paint went on the glass). */
+		if (all_nodes && j.contains("materials") && !j.at("materials").empty()) texture_of(0);
 		if (all_nodes && j.contains("nodes")) {
 			/* The scene's nodes, each with its parents' transforms; a node only reached as a child is not a root. */
 			const auto &nodes = j.at("nodes");
@@ -374,16 +380,20 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 				}
 				for (size_t i = 0; i < nodes.size(); i++) if (!child[i]) roots.push_back(static_cast<int>(i));
 			}
-			std::vector<std::tuple<int, Matrix, bool>> todo;
-			for (int r : roots) todo.emplace_back(r, identity, only_node.empty());
+			std::vector<std::tuple<int, Matrix, bool, uint16_t>> todo;
+			for (int r : roots) todo.emplace_back(r, identity, only_node.empty(), 0);
 			size_t visited = 0;
 			while (!todo.empty() && visited++ < 100000) {
-				auto [n, parent, inside] = todo.back();
+				auto [n, parent, inside, group] = todo.back();
 				todo.pop_back();
 				const auto &node = nodes.at(n);
 				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
 				if (!skip_node.empty() && node_name == skip_node) continue;
 				if (!only_node.empty() && node_name == only_node) inside = true;
+				if (groups != nullptr) {
+					auto g = std::ranges::find(*groups, node_name);
+					if (g != groups->end()) group = static_cast<uint16_t>(g - groups->begin() + 1);
+				}
 				if (!frame_prefix.empty() && node.contains("name") && node.at("name").is_string()) {
 					std::string name = node.at("name").get<std::string>();
 					if (name.starts_with(frame_prefix)) {
@@ -398,8 +408,8 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 					points->push_back(static_cast<float>(-m[14]));
 					points->push_back(static_cast<float>(m[13]));
 				}
-				if (inside && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m);
-				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m, inside);
+				if (inside && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group);
+				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m, inside, group);
 			}
 		} else {
 			/* The first node with a mesh, its own transform. */
@@ -413,7 +423,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 					break;
 				}
 			}
-			add_mesh(mesh_index, m);
+			add_mesh(mesh_index, m, 0);
 		}
 		if (!normals || mesh.nrm.size() != mesh.pos.size()) mesh.nrm.clear();
 		/* A building's one texture: the first material's. */
@@ -1795,6 +1805,83 @@ static void ReadThreeDVehicleObjects()
 						}
 					}
 				}
+				/* The crew: figures riding in it, never fading; bigger than they are by "meritko" (the girls on a lorry's back). */
+				auto read_crew = [](const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out) {
+					if (!list.is_array()) return;
+					for (const auto &c : list) {
+						if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
+						ThreeDVehicleCrew crew;
+						crew.figure = c.at("postava").get<std::string>();
+						const auto &at = c.at("poloha");
+						if (!at.is_array() || at.size() != 3) continue;
+						for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
+						crew.turn = c.value("otoceni", 0.0f);
+						crew.scale = std::clamp(c.value("meritko", 1.0f), 0.1f, 10.0f);
+						out.push_back(std::move(crew));
+					}
+				};
+				if (e.contains("posadka")) read_crew(e.at("posadka"), obj.crew);
+				/* The parts a state shows (the colleague's hra/3d/PROSBA-V3S-3D.md): each node of each add-on, then each
+				 * group of the crew; part 0 is what is always drawn. */
+				obj.part_names.assign(1, std::string());
+				if (e.contains("doplnky") && e.at("doplnky").is_array()) {
+					for (const auto &a : e.at("doplnky")) {
+						if (!a.is_object() || !a.contains("soubor") || !a.at("soubor").is_string()) continue;
+						ThreeDVehicleAddon addon;
+						addon.key = a.at("soubor").get<std::string>();
+						addon.file = folder + addon.key;
+						if (a.contains("poloha") && a.at("poloha").is_array() && a.at("poloha").size() == 3) {
+							for (int k = 0; k < 3; k++) addon.at[k] = a.at("poloha").at(k).get<float>();
+						}
+						if (a.contains("uzly") && a.at("uzly").is_array()) {
+							for (const auto &n : a.at("uzly")) {
+								if (n.is_string()) addon.nodes.push_back(n.get<std::string>());
+							}
+						}
+						if (a.contains("barva") && a.at("barva").is_object()) {
+							const auto &b = a.at("barva");
+							if (b.contains("maska") && b.at("maska").is_string()) addon.mask_file = folder + b.at("maska").get<std::string>();
+							addon.start = std::clamp(b.value("zacatek", 0), 0, 255);
+						}
+						for (const std::string &n : addon.nodes) obj.part_names.push_back(addon.key + "/" + n);
+						obj.addons.push_back(std::move(addon));
+					}
+				}
+				if (e.contains("posadky") && e.at("posadky").is_object()) {
+					for (const auto &[group, list] : e.at("posadky").items()) {
+						std::vector<ThreeDVehicleCrew> crew;
+						read_crew(list, crew);
+						obj.part_names.push_back("posadky/" + group);
+						obj.crew_groups.emplace_back(group, std::move(crew));
+					}
+				}
+				if (obj.part_names.size() > 64) {
+					Debug(misc, 0, "3D vehicle {}: {} parts shown by the states, only 63 can be", obj.name, obj.part_names.size() - 1);
+					obj.part_names.resize(64);
+				}
+				auto part_of = [&](const std::string &name) {
+					auto it = std::ranges::find(obj.part_names, name);
+					return it == obj.part_names.end() || it == obj.part_names.begin() ? 0 : static_cast<int>(it - obj.part_names.begin());
+				};
+				/* The wheels of its own model that turn as it goes, the front ones steering. */
+				if (e.contains("kola_v_modelu") && e.at("kola_v_modelu").is_array()) {
+					for (const auto &k : e.at("kola_v_modelu")) {
+						if (!k.is_object() || !k.contains("uzel") || !k.contains("stred") || !k.at("stred").is_array() || k.at("stred").size() != 3) continue;
+						ThreeDModelWheel w;
+						w.node = k.at("uzel").get<std::string>();
+						for (int a = 0; a < 3; a++) w.centre[a] = k.at("stred").at(a).get<float>();
+						w.radius = std::clamp(k.value("polomer_m", 0.5f), 0.05f, 5.0f);
+						w.steers = k.value("rizeni", false);
+						w.max_angle = std::clamp(k.value("max_uhel", 35.0f), 0.0f, 80.0f);
+						obj.model_wheels.push_back(std::move(w));
+						if (obj.model_wheels.size() >= 254) break;
+					}
+				}
+				/* Its windows: see-through. */
+				if (e.contains("sklo") && e.at("sklo").is_object()) {
+					obj.glass_node = e.at("sklo").value("uzel", std::string());
+					obj.glass_alpha = std::clamp(e.at("sklo").value("alfa", 0.15f), 0.0f, 1.0f);
+				}
 				/* The states its GRF picks by its sprites ("stavy"): a colour of the paint, how far it has faded and rusted. */
 				if (e.contains("stavy") && e.at("stavy").is_array()) {
 					for (const auto &st : e.at("stavy")) {
@@ -1812,6 +1899,29 @@ static void ReadThreeDVehicleObjects()
 						}
 						state.fade = std::clamp(st.value("lak", 0.0f), 0.0f, 1.0f);
 						state.rust = std::clamp(st.value("rez", 0.0f), 0.0f, 1.0f);
+						/* The node of each add-on it shows, the colour each takes, the group of the crew it shows. */
+						if (st.contains("doplnky") && st.at("doplnky").is_object()) {
+							for (const auto &[file, node] : st.at("doplnky").items()) {
+								const int part = node.is_string() ? part_of(file + "/" + node.get<std::string>()) : 0;
+								if (part > 0) state.parts |= uint64_t{1} << part;
+							}
+						}
+						if (st.contains("barvy_doplnku") && st.at("barvy_doplnku").is_object()) {
+							state.addon_colours.assign(obj.addons.size(), 0);
+							for (const auto &[file, value] : st.at("barvy_doplnku").items()) {
+								if (!value.is_string()) continue;
+								std::string c = value.get<std::string>();
+								if (c.starts_with("#")) c = c.substr(1);
+								auto n = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
+								for (size_t a = 0; a < obj.addons.size(); a++) {
+									if (n.has_value() && obj.addons[a].key == file) state.addon_colours[a] = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+								}
+							}
+						}
+						if (st.contains("posadka") && st.at("posadka").is_string()) {
+							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
+							if (part > 0) state.parts |= uint64_t{1} << part;
+						}
 						obj.states.push_back(state);
 						if (obj.states.size() >= 255) break;
 					}
@@ -1842,19 +1952,6 @@ static void ReadThreeDVehicleObjects()
 							if (v.has_value() && scale.is_number() && scale.get<float>() > 0.1f) obj.size.values.emplace_back(*v, std::clamp(scale.get<float>(), 0.25f, 4.0f));
 						}
 						if (!obj.size.values.empty()) obj.size.param = static_cast<int>(*param);
-					}
-				}
-				/* The crew: figures riding in it, never fading. */
-				if (e.contains("posadka") && e.at("posadka").is_array()) {
-					for (const auto &c : e.at("posadka")) {
-						if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
-						ThreeDVehicleCrew crew;
-						crew.figure = c.at("postava").get<std::string>();
-						const auto &at = c.at("poloha");
-						if (!at.is_array() || at.size() != 3) continue;
-						for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
-						crew.turn = c.value("otoceni", 0.0f);
-						obj.crew.push_back(std::move(crew));
 					}
 				}
 				/* Wheels from a file of their own: one wheel at every place, mirrored to the other side. */
@@ -2092,12 +2189,20 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 	const double cell = 0.02 * (1 << level);
 	const size_t corners = this->pos.size() / 3;
 	const bool has_nrm = this->nrm.size() == this->pos.size(), has_uv = this->uv.size() == corners * 2;
-	/* Each corner's texture: its first triangle's. */
-	std::vector<uint8_t> material(corners, 0);
+	/* Each corner's texture and part: its first triangle's. */
+	std::vector<uint8_t> material(corners, 0), part(corners, 0);
 	for (size_t t = this->tri.size(); t >= 3; t -= 3) {
 		const uint8_t m = (t - 3) / 3 < this->tri_tex.size() ? this->tri_tex[(t - 3) / 3] : 0;
-		for (int k = 0; k < 3; k++) material[this->tri[t - 3 + k]] = m;
+		const uint8_t p = (t - 3) / 3 < this->tri_part.size() ? this->tri_part[(t - 3) / 3] : 0;
+		for (int k = 0; k < 3; k++) {
+			material[this->tri[t - 3 + k]] = m;
+			part[this->tri[t - 3 + k]] = p;
+		}
 	}
+	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, their figure. */
+	auto apart_of = [&](size_t i) {
+		return static_cast<uint32_t>(part[i]) | (i < this->corner_wheel.size() ? this->corner_wheel[i] : 0u) << 8 | (i < this->corner_crew.size() ? this->corner_crew[i] : 0u) << 16;
+	};
 	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
 	auto key_of = [&](size_t i) {
 		uint64_t k = 0;
@@ -2111,17 +2216,23 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 		return (k * 8 + face) * 256 + material[i];
 	};
 	auto out = std::make_shared<ThreeDVehicleShape>();
-	std::unordered_map<uint64_t, uint32_t> cells;
+	struct CellHash {
+		size_t operator()(const std::pair<uint64_t, uint32_t> &k) const { return std::hash<uint64_t>{}(k.first * 0x9E3779B97F4A7C15ull ^ k.second); }
+	};
+	std::unordered_map<std::pair<uint64_t, uint32_t>, uint32_t, CellHash> cells;
 	std::vector<uint32_t> joined(corners);
 	std::vector<uint32_t> count;
+	const bool wheels = !this->corner_wheel.empty(), crew = !this->corner_crew.empty();
 	for (size_t i = 0; i < corners; i++) {
-		auto [it, added] = cells.emplace(key_of(i), static_cast<uint32_t>(count.size()));
+		auto [it, added] = cells.emplace(std::make_pair(key_of(i), apart_of(i)), static_cast<uint32_t>(count.size()));
 		joined[i] = it->second;
 		if (added) {
 			count.push_back(0);
 			out->pos.insert(out->pos.end(), 3, 0.0f);
 			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
 			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
+			if (wheels) out->corner_wheel.push_back(this->corner_wheel[i]);
+			if (crew) out->corner_crew.push_back(i < this->corner_crew.size() ? this->corner_crew[i] : 0);
 		}
 		const uint32_t c = it->second;
 		count[c]++;
@@ -2143,7 +2254,11 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 		if (a == b || b == c || a == c) continue;
 		out->tri.insert(out->tri.end(), {a, b, c});
 		out->tri_tex.push_back(t / 3 < this->tri_tex.size() ? this->tri_tex[t / 3] : 0);
+		if (!this->tri_part.empty()) out->tri_part.push_back(t / 3 < this->tri_part.size() ? this->tri_part[t / 3] : 0);
 	}
+	out->tex_addon = this->tex_addon;
+	out->crew_feet = this->crew_feet;
+	out->glass_alpha = this->glass_alpha;
 	out->x0 = this->x0; out->x1 = this->x1; out->y0 = this->y0; out->y1 = this->y1; out->z0 = this->z0; out->z1 = this->z1;
 	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, this->tri.size() / 3);
 	made = std::move(out);
@@ -2233,7 +2348,18 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
 		for (const auto &at : w.at) key += fmt::format(",{},{},{}", at[0], at[1], at[2]);
 	}
-	for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn);
+	for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
+	for (const auto &[group, list] : this->crew_groups) {
+		key += "|=" + group;
+		for (const ThreeDVehicleCrew &c : list) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
+	}
+	for (const ThreeDVehicleAddon &a : this->addons) {
+		key += fmt::format("|+{}@{},{},{}", a.file, a.at[0], a.at[1], a.at[2]);
+		for (const std::string &n : a.nodes) key += "/" + n;
+	}
+	for (const ThreeDModelWheel &w : this->model_wheels) key += "|o" + w.node;
+	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
+	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	auto it = _vehicle_shapes.find(key);
 	if (it != _vehicle_shapes.end()) return it->second;
 	GlbMesh mesh;
@@ -2304,8 +2430,11 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			}
 			mesh.textures.push_back(std::move(g));
 		}
-	} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, {}, {}, nullptr, "noc")) {
-		return nullptr;
+	} else {
+		/* Its glass and the wheels of its model that turn, each its nodes marked (tri_group: 1 the glass, then the wheels). */
+		std::vector<std::string> marked{this->glass_node.empty() ? std::string("\x01") : this->glass_node};
+		for (const ThreeDModelWheel &w : this->model_wheels) marked.push_back(w.node);
+		if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, {}, {}, nullptr, "noc", &marked)) return nullptr;
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	if (!this->file.ends_with(".s") && !this->file.ends_with(".S")) {
@@ -2332,6 +2461,26 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->flats.push_back(t.flat);
 		made->tex_names.push_back(std::move(t.name));
 	}
+	/* The glass and the wheels that turn (the colleague's hra/3d/PROSBA-V3S-3D.md). */
+	made->glass_alpha = this->glass_alpha;
+	if (!mesh.tri_group.empty() && std::ranges::any_of(mesh.tri_group, [](uint16_t g) { return g != 0; })) {
+		made->tri_part.assign(made->tri.size() / 3, 0);
+		for (size_t t = 0; t < mesh.tri_group.size() && t < made->tri_part.size(); t++) {
+			const uint16_t g = mesh.tri_group[t];
+			if (g == 1) {
+				made->tri_part[t] = ThreeDVehicleShape::PART_GLASS;
+			} else if (g >= 2) {
+				if (made->corner_wheel.empty()) made->corner_wheel.assign(made->pos.size() / 3, 0);
+				for (int k = 0; k < 3; k++) made->corner_wheel[made->tri[t * 3 + k]] = static_cast<uint8_t>(g - 1);
+			}
+		}
+	}
+	/* Each triangle's part as the others are added: those so far are of the body, part 0. */
+	auto mark_part = [&made](uint8_t part, size_t first_triangle) {
+		if (part == 0 && made->tri_part.empty()) return;
+		made->tri_part.resize(first_triangle, 0);
+		made->tri_part.resize(made->tri.size() / 3, part);
+	};
 	/* The wheels of their own files: each place a copy, the other side mirrored (y the other way, its normals too). */
 	size_t wheel_triangles = 0;
 	for (const ThreeDVehicleWheels &w : this->wheels) {
@@ -2374,14 +2523,18 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			}
 		}
 	}
-	/* The crew: each figure's shape turned about z and stood at its place, its textures after the others. */
-	for (const ThreeDVehicleCrew &c : this->crew) {
+	/* The crew: each figure's shape sized, turned about z and stood at its place, its textures after the others. The
+	 * driver -- the one sitting at the eye of the cab -- is not drawn from that eye; a figure bigger than it is is
+	 * marked, for the view from the eyes to draw it at its true size. */
+	auto add_crew = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
 		const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
 		if (fs == nullptr) {
 			Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
-			continue;
+			return;
 		}
+		if (part == 0 && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) part = ThreeDVehicleShape::PART_DRIVER;
+		const size_t first_triangle = made->tri.size() / 3;
 		const bool lit = !made->nrm.empty() && !fs->nrm.empty();
 		if (!lit) made->nrm.clear();
 		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
@@ -2390,17 +2543,22 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->flats.push_back(fs->flats[t]);
 			made->tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
 		}
-		const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a);
+		const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a), s = c.scale;
 		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
 		for (size_t i = 0; i < fs->pos.size(); i += 3) {
-			made->pos.push_back(c.at[0] + fs->pos[i] * ca - fs->pos[i + 1] * sa);
-			made->pos.push_back(c.at[1] + fs->pos[i] * sa + fs->pos[i + 1] * ca);
-			made->pos.push_back(c.at[2] + fs->pos[i + 2]);
+			made->pos.push_back(c.at[0] + (fs->pos[i] * ca - fs->pos[i + 1] * sa) * s);
+			made->pos.push_back(c.at[1] + (fs->pos[i] * sa + fs->pos[i + 1] * ca) * s);
+			made->pos.push_back(c.at[2] + fs->pos[i + 2] * s);
 			if (lit) {
 				made->nrm.push_back(fs->nrm[i] * ca - fs->nrm[i + 1] * sa);
 				made->nrm.push_back(fs->nrm[i] * sa + fs->nrm[i + 1] * ca);
 				made->nrm.push_back(fs->nrm[i + 2]);
 			}
+		}
+		if (s != 1.0f && made->crew_feet.size() < 254) {
+			made->crew_feet.push_back({c.at[0], c.at[1], c.at[2], s});
+			made->corner_crew.resize(base, 0);
+			made->corner_crew.resize(made->pos.size() / 3, static_cast<uint8_t>(made->crew_feet.size()));
 		}
 		made->uv.insert(made->uv.end(), fs->uv.begin(), fs->uv.end());
 		for (size_t t = 0; t < fs->tri.size(); t += 3) {
@@ -2409,10 +2567,63 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->tri.push_back(base + fs->tri[t + 2]);
 			made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + (t / 3 < fs->tri_tex.size() ? fs->tri_tex[t / 3] : 0))));
 		}
+		mark_part(part, first_triangle);
+	};
+	for (const ThreeDVehicleCrew &c : this->crew) add_crew(c, 0);
+	/* What a state shows -- a group of the crew, the load -- is not of the vehicle's size (its length on the map). */
+	const size_t extent_floats = made->pos.size();
+	auto part_of = [&](const std::string &name) {
+		auto p = std::ranges::find(this->part_names, name);
+		return p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= 64 ? uint8_t{0} : static_cast<uint8_t>(p - this->part_names.begin());
+	};
+	for (const auto &[group, list] : this->crew_groups) {
+		const uint8_t part = part_of("posadky/" + group);
+		if (part == 0) continue;
+		for (const ThreeDVehicleCrew &c : list) add_crew(c, part);
 	}
+	/* The add-ons: of each, only the nodes a state may show, each its part, its textures after the others (marked as
+	 * the add-on's, for the colour a state gives it). */
+	for (size_t ai = 0; ai < this->addons.size(); ai++) {
+		const ThreeDVehicleAddon &addon = this->addons[ai];
+		GlbMesh am;
+		if (!ReadGlbMesh(addon.file, am, true, {}, 0, {}, {}, nullptr, {}, &addon.nodes)) {
+			Debug(misc, 0, "3D vehicle {}: the add-on {} cannot be read", this->name, addon.file);
+			continue;
+		}
+		const bool lit = !made->nrm.empty() && !am.nrm.empty();
+		if (!lit) made->nrm.clear();
+		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
+		made->tex_addon.resize(made->pngs.size(), -1);
+		for (GlbTexture &tx : am.textures) {
+			if (made->pngs.size() >= 255) break;
+			made->pngs.push_back(std::move(tx.png));
+			made->flats.push_back(tx.flat);
+			made->tex_names.push_back(std::move(tx.name));
+			made->tex_addon.push_back(static_cast<int8_t>(std::min<size_t>(ai, 127)));
+		}
+		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
+		for (size_t i = 0; i + 2 < am.pos.size(); i += 3) {
+			for (int k = 0; k < 3; k++) made->pos.push_back(am.pos[i + k] + addon.at[k]);
+			if (lit) for (int k = 0; k < 3; k++) made->nrm.push_back(am.nrm[i + k]);
+		}
+		made->uv.insert(made->uv.end(), am.uv.begin(), am.uv.end());
+		for (size_t t = 0; t + 2 < am.tri.size(); t += 3) {
+			const uint16_t g = t / 3 < am.tri_group.size() ? am.tri_group[t / 3] : 0;
+			const uint8_t part = g > 0 && g <= addon.nodes.size() ? part_of(addon.key + "/" + addon.nodes[g - 1]) : 0;
+			if (part == 0) continue; // a node no state shows
+			const size_t first_triangle = made->tri.size() / 3;
+			for (int k = 0; k < 3; k++) made->tri.push_back(base + am.tri[t + k]);
+			made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + am.tri_tex[t / 3])));
+			mark_part(part, first_triangle);
+		}
+	}
+	if (!made->corner_crew.empty()) made->corner_crew.resize(made->pos.size() / 3, 0);
+	if (!made->corner_wheel.empty()) made->corner_wheel.resize(made->pos.size() / 3, 0);
+	if (!made->tex_addon.empty()) made->tex_addon.resize(made->pngs.size(), -1);
+	if (!made->tri_part.empty()) made->tri_part.resize(made->tri.size() / 3, 0);
 	made->x0 = made->y0 = made->z0 = 1e9f;
 	made->x1 = made->y1 = made->z1 = -1e9f;
-	for (size_t i = 0; i < made->pos.size(); i += 3) {
+	for (size_t i = 0; i + 2 < extent_floats; i += 3) {
 		made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
 		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
 		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
@@ -2472,6 +2683,34 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 	}
 	if (this->mask_levels.empty()) return nullptr;
 	return &this->mask_levels[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels.size()) - 1)];
+}
+
+/** An add-on's colour mask ("doplnky" "barva" "maska") at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int level) const
+{
+	if (addon >= this->addons.size() || this->addons[addon].mask_file.empty()) return nullptr;
+	if (this->addon_mask_levels.size() < this->addons.size()) {
+		this->addon_mask_levels.resize(this->addons.size());
+		this->addon_mask_tried.resize(this->addons.size(), false);
+	}
+	if (!this->addon_mask_tried[addon]) {
+		this->addon_mask_tried[addon] = true;
+		std::vector<uint8_t> png = ReadWholeFile(this->addons[addon].mask_file);
+		if (!png.empty()) DecodeTextureLevels(png, this->addon_mask_levels[addon], Colour(0, 0, 0).data);
+	}
+	const std::vector<ThreeDObjectTexture> &lv = this->addon_mask_levels[addon];
+	if (lv.empty()) return nullptr;
+	return &lv[std::clamp<int>(level, 0, static_cast<int>(lv.size()) - 1)];
+}
+
+/**
+ * The parts drawn in a state (its step, StateStep() of three_d_vehicle_object.cpp: 0 none): what is always drawn (bit
+ * 0) and what the state shows -- an add-on's node, a group of the crew. Without a state no add-on and no group.
+ */
+uint64_t ThreeDVehicleObject::PartsOf(int state) const
+{
+	const ThreeDVehicleState *s = state > 0 && static_cast<size_t>(state) <= this->states.size() ? &this->states[state - 1] : nullptr;
+	return 1 | (s != nullptr ? s->parts : 0);
 }
 
 /** The rig: the vehicle objects of the indices, a line each. */
@@ -3248,6 +3487,8 @@ void ThreeDVehicleObject::Forget() const
 	this->mask_tried = false;
 	this->rust_levels.clear();
 	this->rust_tried = false;
+	this->addon_mask_levels.clear();
+	this->addon_mask_tried.clear();
 	this->frame_shapes.clear();
 	this->frame_shapes.shrink_to_fit();
 	this->shape.reset();

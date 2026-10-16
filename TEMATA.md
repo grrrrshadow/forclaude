@@ -79,6 +79,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Délka vozidel v pohledu z očí: na rovné silnici či koleji zkrácená na 0,71 jako na mapě (hra řadí po krocích, na
   úhlopříčce je krok √2 delší). Hráč chtěl plnou délku bez překryvu, po vysvětlení: „nebudem tu délku měnit, už to
   chápu s tou úhlopříčkou“. Zůstává.
+- Praga V3S jako 3D objekt od kolegy (`hra/3d/PROSBA-V3S-3D.md`, GRF `V3S_3D` MAX4, strom přestaveb jako v3s.grf).
+  Hotovo ve hře: doplňky podle stavu (na korbě jen uzel, který stav jmenuje: uhlí, pytle, plachta, marihuana, zvířata,
+  lavice…), barva doplňku číslem přes masku, skupiny posádky podle stavu (studentky stojí / sedí), měřítko postav
+  (na mapě dvakrát, v pohledu z očí pravá velikost), sklo průhledné, kola v modelu se v pohledu z očí točí a přední
+  zatáčí, kabina zevnitř (oko v hlavě řidičky, řidička se nekreslí, spolujezdkyně ano). Stejně jde maják Tatry VB.
+  Opraveno: první textura je první materiál souboru (u V3S bylo první sklo a lak šel na sklo). Hráč: „kolegovi musíš
+  říct, jestli má něco blbě, protože tak udělá i další“ – odpověď v `hra/3d/ODPOVED-V3S-3D.md`.
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 
