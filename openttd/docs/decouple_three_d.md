@@ -1128,20 +1128,31 @@ keep their numbers and sets 5 to 8 stand as they are.
 
 ## Trains of Microsoft Train Simulator (simtrains)
 
-The player puts trains of Microsoft Train Simulator (MSTS), as he downloaded
-them, in a folder `simtrains` anywhere in the NewGRF folders, for example
-`newgrf/simtrains/Trains/Trainset/<vehicle>/`. Each engine there (an `.eng`
-with its model, `WagonShape`) becomes a new vehicle of the game:
+The player downloads trains of Microsoft Train Simulator (MSTS) and keeps
+them where such trains are kept, not among the game's folders (so they never
+go out with the game by mistake). The game looks for them in:
+
+- the `Trains/Trainset` folder of MSTS: where MSTS was installed (the
+  registry of Windows), the folders Open Rails was given (its `Folders` in the
+  registry), and where MSTS usually is (`C:\Program Files (x86)\Microsoft
+  Games\Train Simulator`, `C:\Train Simulator`, `C:\MSTS`, `D:\MSTS` ...);
+- the folders named by `simtrains_path` in `[misc]` of `openttd.cfg`
+  (separated by `;`; the folder of MSTS, its `Trains` or its `Trainset`);
+- `newgrf/simtrains/` of the game's folders, for a player without MSTS.
+
+Each vehicle there (an `.eng` with its model, `WagonShape`) becomes a new
+vehicle of the game:
 
 - Before the NewGRFs are looked for (`PrepareSimtrainsGrfs()`), the game
-  writes beside the `.eng` a NewGRF of one engine, `<vehicle>.grf`, from the
-  figures of the `.eng`: `Name`, `Type` (diesel, electric, steam),
-  `MaxPower`, `MaxVelocity`, `Mass`, `MaxForce` (the tractive effort, at most
-  the original engines' 0.3). Introduced in 1920 and never retired, every
-  climate, the prices of the original diesel of the same power. Its id is
-  `ST` and a number of the `.eng`'s name, the same on every computer; it is
-  written again only when it changes. The player switches it on among the
-  NewGRFs as "Simtrains: <name>".
+  writes a NewGRF of one vehicle, `newgrf/simtrains/<vehicle>.grf` of the
+  player's own folder, from the figures of the `.eng`: `Name`, `Type` (diesel,
+  electric, steam), `MaxPower`, `MaxVelocity`, `Mass`, `MaxForce` (the
+  tractive effort, at most the original engines' 0.3). Introduced in 1920 and
+  never retired, every climate, the prices of the original diesel of the same
+  power. Its id is `ST` and a number of the file's name, the same on every
+  computer; it is written again only when it changes, and goes when its
+  vehicle is no longer there. The player switches it on among the NewGRFs as
+  "Simtrains: <name>".
 - Wagons too (`.wag`): a carriage ("Type ( Carriage )") carries passengers,
   as many as its `PassengerCapacity`; a goods wagon any cargo but passengers,
   30 of it (MSTS says nothing of it). Priced as the original game's wagons.

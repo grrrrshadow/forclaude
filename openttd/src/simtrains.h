@@ -14,13 +14,15 @@
 #include <vector>
 
 /**
- * An engine of Microsoft Train Simulator (MSTS) the player put in a folder "simtrains" of the NewGRF folders, as he
- * downloaded it (the player, 16. 10.: "a folder simtrains in newgrf, and we put them there; a new vehicle"): its
- * .eng read, and the game makes of it a NewGRF of one engine (PrepareSimtrainsGrfs()) drawn from its model.
+ * A vehicle of Microsoft Train Simulator (MSTS) as the player downloaded it, where such trains are kept: the
+ * Trains/Trainset folder of MSTS (or of Open Rails, or the folder the player names, "simtrains_path"; the player,
+ * 16. 10.: "let the game look for the simtrains models in their usual folder" -- so they are never among the game's
+ * own folders, to go out with the game by mistake). Its .eng or .wag read, the game makes of it a NewGRF of one
+ * vehicle (PrepareSimtrainsGrfs()) in newgrf/simtrains/, drawn from its model.
  *
  * Nothing of it is ever the game's: the files are the player's own download and the authors'. Their readmes forbid
- * spreading the models or their textures to other simulators, so the game only reads them where the player put
- * them, and the GRF it writes beside them holds the figures of the .eng and no part of the model.
+ * spreading the models or their textures to other simulators, so the game only reads them where they are, and the
+ * GRF it writes holds the figures of the .eng and no part of the model.
  */
 struct SimtrainsEngine {
 	std::string folder;           ///< the folder of its .eng, ending with the path separator
@@ -39,12 +41,13 @@ struct SimtrainsEngine {
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
 	uint32_t grfid = 0;           ///< the GRF's id, of its .eng's name
 
-	std::string GrfPath() const { return this->folder + this->eng + ".grf"; }
+	std::string grf_path;         ///< where the GRF made of it is: newgrf/simtrains/ of the player's own folder
 };
 
 /** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. */
 static constexpr uint16_t SIMTRAINS_ENGINE_ID = 200;
 
+extern std::string _simtrains_path;
 const std::vector<SimtrainsEngine> &FindSimtrainsEngines();
 void PrepareSimtrainsGrfs();
 

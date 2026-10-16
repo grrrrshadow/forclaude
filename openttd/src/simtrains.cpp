@@ -34,6 +34,9 @@
 #if defined(WITH_ZLIB)
 #	include <zlib.h>
 #endif
+#ifdef _WIN32
+#	include <windows.h>
+#endif
 
 #include "safeguards.h"
 
@@ -503,7 +506,7 @@ uint32_t GrfIdOf(const std::string &eng)
 	return 'S' | 'T' << 8 | ((h ^ (h >> 16)) & 0xFFFF) << 16;
 }
 
-/** The .eng and .wag files in the folders "simtrains" of the NewGRF folders (not in tars: the player puts folders there). */
+/** The .eng and .wag files of a Trains/Trainset folder of MSTS. */
 class EngScanner : public FileScanner {
 public:
 	std::vector<std::string> files;
@@ -511,13 +514,115 @@ public:
 	bool AddFile(const std::string &filename, size_t, const std::string &tar_filename) override
 	{
 		if (!tar_filename.empty()) return false;
-		std::string lower = filename;
-		strtolower(lower);
-		if (lower.find(PATHSEP "simtrains" PATHSEP) == std::string::npos) return false;
 		this->files.push_back(filename);
 		return true;
 	}
 };
+
+#ifdef _WIN32
+/** A text of the registry of Windows, or nothing. */
+std::string RegistryText(HKEY root, const wchar_t *key, const wchar_t *value, REGSAM view)
+{
+	HKEY k;
+	if (RegOpenKeyExW(root, key, 0, KEY_READ | view, &k) != ERROR_SUCCESS) return {};
+	wchar_t buf[MAX_PATH * 2] = {};
+	DWORD size = static_cast<DWORD>(sizeof(buf) - sizeof(wchar_t));
+	DWORD type = 0;
+	std::string out;
+	if (RegQueryValueExW(k, value, nullptr, &type, reinterpret_cast<LPBYTE>(buf), &size) == ERROR_SUCCESS && (type == REG_SZ || type == REG_EXPAND_SZ)) out = FS2OTTD(buf);
+	RegCloseKey(k);
+	return out;
+}
+
+/** Every text of a key of the registry of Windows. */
+void RegistryTexts(HKEY root, const wchar_t *key, std::vector<std::string> &out)
+{
+	HKEY k;
+	if (RegOpenKeyExW(root, key, 0, KEY_READ, &k) != ERROR_SUCCESS) return;
+	for (DWORD i = 0; i < 256; i++) {
+		wchar_t name[256] = {};
+		DWORD name_len = static_cast<DWORD>(std::size(name));
+		wchar_t data[MAX_PATH * 2] = {};
+		DWORD data_size = static_cast<DWORD>(sizeof(data) - sizeof(wchar_t));
+		DWORD type = 0;
+		LONG r = RegEnumValueW(k, i, name, &name_len, nullptr, &type, reinterpret_cast<LPBYTE>(data), &data_size);
+		if (r == ERROR_NO_MORE_ITEMS) break;
+		if (r == ERROR_SUCCESS && type == REG_SZ) out.push_back(FS2OTTD(data));
+	}
+	RegCloseKey(k);
+}
+#endif
+
+/** A folder of a folder by its name whatever the case of its letters, with the separator at the end; empty when there is none. */
+std::string SubFolder(const std::string &folder, std::string_view name)
+{
+	std::error_code ec;
+	for (const auto &entry : std::filesystem::directory_iterator(OTTD2FS(folder), ec)) {
+		if (!entry.is_directory(ec)) continue;
+		std::string sub = FS2OTTD(entry.path().filename().native());
+		if (StrEqualsIgnoreCase(sub, name)) return folder + sub + PATHSEP;
+	}
+	return {};
+}
+
+/**
+ * The folders the trains are looked for in: newgrf/simtrains/ of the game's folders, for a player without MSTS (the
+ * player: "in newgrf simtrains too, what if the player has no simtrains at all"); and the folders MSTS keeps its
+ * trains in, Trains/Trainset of each that is there: the folders the player names ("simtrains_path" of the
+ * configuration, separated by ';'), the one MSTS was installed in and those Open Rails was given (the registry of
+ * Windows), and where MSTS usually is.
+ */
+std::vector<std::string> TrainsetFolders()
+{
+	std::vector<std::string> folders;
+	auto add = [&folders](const std::string &folder) {
+		std::string key = folder;
+		strtolower(key);
+		if (std::ranges::any_of(folders, [&key](const std::string &f) { std::string k = f; strtolower(k); return k == key; })) return;
+		folders.push_back(folder);
+	};
+	for (Searchpath sp : _valid_searchpaths) {
+		std::string dir = FioGetDirectory(sp, Subdirectory::NewGrf);
+		if (dir.empty()) continue;
+		std::string own = SubFolder(dir, "simtrains");
+		if (!own.empty()) add(own);
+	}
+	std::vector<std::string> roots;
+	for (std::string_view rest = _simtrains_path; !rest.empty();) {
+		size_t semi = rest.find(';');
+		std::string one(rest.substr(0, semi));
+		StrTrimInPlace(one);
+		if (!one.empty()) roots.push_back(one);
+		rest = semi == std::string_view::npos ? std::string_view() : rest.substr(semi + 1);
+	}
+#ifdef _WIN32
+	std::string msts = RegistryText(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Microsoft Games\\Train Simulator\\1.0", L"Path", KEY_WOW64_32KEY);
+	if (!msts.empty()) roots.push_back(msts);
+	RegistryTexts(HKEY_CURRENT_USER, L"Software\\OpenRails\\ORTS\\Folders", roots);
+	for (const char *usual : {"C:\\Program Files (x86)\\Microsoft Games\\Train Simulator", "C:\\Program Files\\Microsoft Games\\Train Simulator",
+			"C:\\Train Simulator", "C:\\MSTS", "D:\\Train Simulator", "D:\\MSTS"}) {
+		roots.emplace_back(usual);
+	}
+#endif
+	for (std::string root : roots) {
+		if (root.empty()) continue;
+		if (root.back() != PATHSEPCHAR) root += PATHSEP;
+		std::string trains = SubFolder(root, "Trains");
+		std::string trainset = trains.empty() ? std::string() : SubFolder(trains, "Trainset");
+		/* The player may name the Trainset folder itself, or Trains. */
+		if (trainset.empty()) trainset = SubFolder(root, "Trainset");
+		if (!trainset.empty()) add(trainset);
+	}
+	return folders;
+}
+
+/** The folder the GRFs made of the trains go in: newgrf/simtrains/ of the player's own folder (the NewGRFs are looked for there). */
+std::string GrfFolder()
+{
+	std::string dir = FioGetDirectory(Searchpath::PersonalDir, Subdirectory::NewGrf);
+	if (dir.empty()) return {};
+	return dir + "simtrains" PATHSEP;
+}
 
 /**
  * A vehicle of its .eng or .wag, if it is one with a model: an engine of an .eng; a carriage or a goods wagon of a
@@ -643,8 +748,8 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		std::vector<uint8_t> a8 = {0x08, 0x08};
 		dword(a8, e.grfid);
 		text(a8, "Simtrains: " + e.name);
-		text(a8, std::string(e.wagon ? "Vůz" : "Vlak") + " z Microsoft Train Simulatoru ze složky simtrains (" + e.eng + (e.wagon ? ".wag" : ".eng") +
-				"). Model a textury patří jejich autorům: jen pro tvou hru, nešířit.");
+		text(a8, std::string(e.wagon ? "Vůz" : "Vlak") + " z Microsoft Train Simulatoru (" + e.eng + (e.wagon ? ".wag" : ".eng") +
+				"). Model a textury patří jejich autorům a zůstávají ve své složce: jen pro tvou hru, nešířit.");
 		sprites.push_back(std::move(a8));
 	}
 
@@ -742,6 +847,13 @@ bool _simtrains_scanned = false;
 
 } // namespace
 
+/** "simtrains_path" of the configuration: folders of MSTS the player keeps trains in besides the usual ones, separated by ';'. */
+std::string _simtrains_path;
+
+namespace {
+
+} // namespace
+
 /** The engines of MSTS in the folders "simtrains" of the NewGRF folders, looked for once (and again by PrepareSimtrainsGrfs()). */
 const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 {
@@ -749,12 +861,17 @@ const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 	_simtrains_scanned = true;
 	_simtrains_engines.clear();
 	EngScanner scanner;
-	scanner.Scan(".eng", Subdirectory::NewGrf, false);
-	scanner.Scan(".wag", Subdirectory::NewGrf, false);
+	for (const std::string &folder : TrainsetFolders()) {
+		Debug(grf, 1, "Simtrains: trains looked for in {}", folder);
+		scanner.Scan(".eng", folder, true);
+		scanner.Scan(".wag", folder, true);
+	}
 	std::sort(scanner.files.begin(), scanner.files.end());
+	const std::string grf_folder = GrfFolder();
 	for (const std::string &file : scanner.files) {
 		std::optional<SimtrainsEngine> e = ReadEng(file);
-		if (!e.has_value()) continue;
+		if (!e.has_value() || grf_folder.empty()) continue;
+		e->grf_path = grf_folder + e->eng + ".grf";
 		if (std::ranges::any_of(_simtrains_engines, [&e](const SimtrainsEngine &o) { return o.grfid == e->grfid; })) {
 			Debug(grf, 0, "Simtrains: {} has the same GRF id as another, left out", file);
 			continue;
@@ -768,16 +885,42 @@ const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 }
 
 /**
- * Before the NewGRFs are looked for: a NewGRF beside every engine of MSTS in a folder "simtrains", of the figures of
- * its .eng (written only when it changed, so its checksum stays). The player then has it among the NewGRFs as any
- * other, by the engine's name.
+ * Before the NewGRFs are looked for: a NewGRF in newgrf/simtrains/ for every vehicle of MSTS, of the figures of its
+ * .eng or .wag (written only when it changed, so its checksum stays). The player then has it among the NewGRFs as
+ * any other, by the vehicle's name. One made by the game whose vehicle is no longer there goes.
  */
 void PrepareSimtrainsGrfs()
 {
 	_simtrains_scanned = false;
-	for (const SimtrainsEngine &e : FindSimtrainsEngines()) {
+	const std::vector<SimtrainsEngine> &found = FindSimtrainsEngines();
+	const std::string folder = GrfFolder();
+	if (folder.empty()) return;
+	if (!found.empty()) FioCreateDirectory(folder);
+	std::error_code ec;
+	for (const auto &entry : std::filesystem::directory_iterator(OTTD2FS(folder), ec)) {
+		std::string file = FS2OTTD(entry.path().filename().native());
+		if (file.size() < 5 || !StrEqualsIgnoreCase(std::string_view(file).substr(file.size() - 4), ".grf")) continue;
+		if (std::ranges::any_of(found, [&](const SimtrainsEngine &e) { return StrEqualsIgnoreCase(e.eng + ".grf", file); })) continue;
+		/* Only one the game made: small, with its words. */
+		std::vector<uint8_t> old = ReadBytes(folder + file);
+		static constexpr std::string_view MARK = "Microsoft Train Simulatoru";
+		if (old.empty() || old.size() > 4096 || std::search(old.begin(), old.end(), MARK.begin(), MARK.end()) == old.end()) continue;
+		std::filesystem::remove(entry.path(), ec);
+		Debug(grf, 1, "Simtrains: {} removed, its vehicle is no longer there", folder + file);
+	}
+	for (const SimtrainsEngine &e : found) {
+		/* Made beside the .eng by the game before: the same set twice. */
+		const std::string beside = e.folder + e.eng + ".grf";
+		if (beside != e.grf_path) {
+			std::vector<uint8_t> old = ReadBytes(beside);
+			static constexpr std::string_view MARK = "Microsoft Train Simulatoru";
+			if (!old.empty() && old.size() <= 4096 && std::search(old.begin(), old.end(), MARK.begin(), MARK.end()) != old.end()) {
+				std::filesystem::remove(OTTD2FS(beside), ec);
+				Debug(grf, 1, "Simtrains: {} removed, the GRF is in {} now", beside, folder);
+			}
+		}
 		std::vector<uint8_t> grf = MakeGrf(e);
-		const std::string path = e.GrfPath();
+		const std::string &path = e.grf_path;
 		if (ReadBytes(path) == grf) continue;
 		auto f = FileHandle::Open(path, "wb");
 		if (!f.has_value() || fwrite(grf.data(), 1, grf.size(), *f) != grf.size()) {
