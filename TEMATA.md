@@ -32,8 +32,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   vlak nebrzdí. Hráč: rychlosti podle vanilly (ostrý oblouk míň, pozvolný víc), nakreslené oblouky jim fyzikálně
   odpovídají (87/130/168 km/h). Hotovo `18d0164`: volba hry „Vlak brzdí plynule už před zatáčkou“ (vypnutá =
   vanilla) – strojvedoucí vidí ohyby dopředu a brzdí podle brzdné tabulky, do těsné zatáčky vjede 88 km/h.
-- Simtrains: hráč by chtěl, aby jejich vlaky (formát pro jiný simulátor) jezdily v naší hře – jejich mod by si
-  hráč stáhl sám, my bychom jen uměli ten formát číst. Čeká na rozhodnutí.
+- Simtrains (hotovo `74f95d1`): hráč dá stažené MSTS vlaky do `newgrf/simtrains/`, hra vedle každého `.eng`
+  napíše GRF jedné lokomotivy (čísla z „chování“: výkon, rychlost, váha) a kreslí ji z jejího modelu `.s` a
+  textur `.ace`. Nové vozidlo, ne převzetí vzhledu. Soubory MSTS nikdy do repa, grrrrf ani buildu (readme autorů
+  zakazuje šíření i do jiných simulátorů). Zatím nečte: textové modely, DXT textury, vagony `.wag`.
 - Hráč: bez okna pískoviště je myš cukavá a všechno zpomalené. Příčina (`d608a9f`): otočený pohled při každém
   pohybu čehokoli (vlak, Mat, holky, auto VB) překresloval skoro celou obrazovku, protože nevěděl, v jaké výšce
   věc je. Teď každé označení nese místo ve světě. Rig 1000×700: vlak 670 000 → 61 000 px na snímek, město
