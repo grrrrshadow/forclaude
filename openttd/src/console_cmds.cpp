@@ -131,6 +131,7 @@
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_navigation.h"
+#include "round_track.h"
 #include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
@@ -9804,6 +9805,133 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		UpdateSignalsInBuffer();
 		IConsolePrint(failed == 0 ? CC_DEFAULT : CC_ERROR, "test3d: oblouky u {},{}, diagonala dilu:roh{}; nepostaveno {}", x0, y0, where, failed);
+		return true;
+	} else if (what == "obloukjizda" && argv.size() > 4) {
+		/* 'obloukjizda <n> <wagons> <ticks>': a train of the fastest engine and so many wagons out of a depot, along
+		 * twenty tiles of X, a quarter turn with n pieces of diagonal between its corners (as 'oblouky') and twelve
+		 * tiles of Y. For each tile its front goes over: the ticks it took, its speed, the curve's speed limit, how far
+		 * it went on the track and how far it was drawn (on the arc where the curve is round, 'o'). */
+		auto n = number(2), wagons = number(3), ticks = number(4);
+		if (!n.has_value() || !wagons.has_value() || !ticks.has_value() || *n < 1 || *n % 2 == 0) return true;
+		const uint L = 20, LY = 12, D = static_cast<uint>(*n);
+		const uint W = L + 4 + D / 2, H = D / 2 + LY + 2;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		uint x0 = 0, y0 = 0;
+		for (uint ty = 2; ty + H + 2 < Map::SizeY() && x0 == 0; ty++) {
+			for (uint tx = 2; tx + W + 2 < Map::SizeX() && x0 == 0; tx++) {
+				bool good = true;
+				for (uint dy = 0; dy < H && good; dy++) {
+					for (uint dx = 0; dx < W && good; dx++) {
+						TileIndex t = TileXY(tx + dx, ty + dy);
+						if (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) good = false;
+					}
+				}
+				if (good) {
+					x0 = tx;
+					y0 = ty;
+				}
+			}
+		}
+		if (x0 == 0) {
+			IConsolePrint(CC_ERROR, "test3d obloukjizda: no clear land of {} by {} tiles on the map.", W, H);
+			return true;
+		}
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + W - 1, y0 + H - 1), TileXY(x0, y0), false, LevelMode::Level);
+		int failed = 0;
+		auto lay = [&](uint x, uint y, Track tr) {
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x, y), RAILTYPE_RAIL, tr, false).Failed()) failed++;
+		};
+		const TileIndex depot = TileXY(x0, y0);
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW).Failed()) failed++;
+		for (uint i = 1; i <= L; i++) lay(x0 + i, y0, Track::X);
+		const uint a = x0 + L + 1, b = y0;
+		for (uint j = 0; j < D; j++) lay(a + j / 2, b + (j + 1) / 2, j % 2 == 0 ? Track::Right : Track::Left);
+		const uint yx = a + (D - 1) / 2, yy = b + (D - 1) / 2;
+		for (uint i = 1; i <= LY; i++) lay(yx, yy + i, Track::Y);
+		/* The fastest engine for plain rail, and any wagon. */
+		const Engine *engine = nullptr, *wagon = nullptr;
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company) || !HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL)) continue;
+			if (e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon) {
+				if (wagon == nullptr) wagon = e;
+			} else if (engine == nullptr || e->GetDisplayMaxSpeed() > engine->GetDisplayMaxSpeed()) {
+				engine = e;
+			}
+		}
+		VehicleID train = VehicleID::Invalid();
+		if (engine != nullptr) {
+			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, engine->index, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Succeeded()) train = veh;
+		}
+		if (train == VehicleID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d obloukjizda: vlak nejde koupit");
+			return true;
+		}
+		for (int i = 0; i < *wagons && wagon != nullptr; i++) {
+			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, wagon->index, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Succeeded()) Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh, train, false);
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, train, false);
+		UpdateSignalsInBuffer();
+		if (HasModalProgress()) SetModalProgress(false);
+		{
+			const Train *t = Train::Get(train);
+			IConsolePrint(failed == 0 ? CC_DEFAULT : CC_ERROR, "test3d: jizda u {},{}, roh {},{}; vlak {} ({} km/h), delka {}, nepostaveno {}",
+					x0, y0, yx, b, engine->index, engine->GetDisplayMaxSpeed(), t->gcache.cached_total_length, failed);
+		}
+		RoundTrackPass pass(true);
+		struct Over {
+			TileIndex tile = INVALID_TILE;
+			int ticks = 0, vmin = INT_MAX, vmax = 0, limit = INT_MAX;
+			double real = 0, drawn = 0;
+			bool round = false;
+		} over;
+		double px = -1, py = -1, dx0 = -1, dy0 = -1;
+		std::string line;
+		auto flush = [&]() {
+			if (over.tile == INVALID_TILE || over.ticks == 0) return;
+			line += fmt::format(" {},{}{}:{}t/{:.0f}/{:.0f}/v{}-{}", TileX(over.tile), TileY(over.tile), over.round ? "o" : "", over.ticks, over.real, over.drawn, over.vmin, over.vmax);
+			if (over.limit < UINT16_MAX) line += fmt::format("/max{}", over.limit);
+			if (line.size() > 160) {
+				IConsolePrint(CC_DEFAULT, "test3d: jizda{}", line);
+				line.clear();
+			}
+		};
+		for (int i = 0; i < *ticks; i++) {
+			StateGameLoop();
+			const Train *t = Train::GetIfValid(train);
+			if (t == nullptr) break;
+			if (t->tile != over.tile) {
+				flush();
+				over = Over{};
+				over.tile = t->tile;
+			}
+			RoundTrackPose pose;
+			const bool on = GetRoundTrackPose(t, pose);
+			const double dx = on ? pose.x : t->x_pos, dy = on ? pose.y : t->y_pos;
+			if (px >= 0) {
+				over.real += std::hypot(t->x_pos - px, t->y_pos - py);
+				over.drawn += std::hypot(dx - dx0, dy - dy0);
+			}
+			over.ticks++;
+			over.vmin = std::min<int>(over.vmin, t->cur_speed);
+			over.vmax = std::max<int>(over.vmax, t->cur_speed);
+			over.limit = std::min<int>(over.limit, t->tcache.cached_max_curve_speed);
+			over.round |= on;
+			px = t->x_pos;
+			py = t->y_pos;
+			dx0 = dx;
+			dy0 = dy;
+			if (t->tile == TileXY(yx, yy + LY)) break;
+		}
+		flush();
+		if (!line.empty()) IConsolePrint(CC_DEFAULT, "test3d: jizda{}", line);
 		return true;
 	} else if (what == "typsilnice" && argv.size() > 2) {
 		/* The rig: every road of the map made a road type by its label, 'test3d typsilnice RT14' (CZTR's first-class
