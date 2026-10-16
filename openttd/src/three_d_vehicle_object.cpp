@@ -327,7 +327,7 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
  * @param stretch its height against its width (a plant of a list, "meritko" [x, y, z])
  * @param spin how far a thing that turns has turned about its axis, degrees (ThreeDVehicleObject::spin_axis)
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
@@ -354,6 +354,21 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		vy = vy * sc + cy * sn + k[1] * d * (1 - sc);
 		vz = vz * sc + cz * sn + k[2] * d * (1 - sc);
 	};
+	/* Up a hill its front higher (pitch), in a curve leaning in (roll, its left side down): about its middle on the rail. */
+	const float pp = pitch * static_cast<float>(M_PI) / 180.0f, pc = std::cos(pp), ps = std::sin(pp);
+	const float rp = roll * static_cast<float>(M_PI) / 180.0f, rc = std::cos(rp), rs = std::sin(rp);
+	auto lean = [&](float &vx, float &vy, float &vz) {
+		if (pitch != 0.0f) {
+			const float x = vx * pc - vz * ps, z = vx * ps + vz * pc;
+			vx = x;
+			vz = z;
+		}
+		if (roll != 0.0f) {
+			const float y = vy * rc + vz * rs, z = vz * rc - vy * rs;
+			vy = y;
+			vz = z;
+		}
+	};
 	for (size_t i = 0; i < n; i++) {
 		float px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
 		if (spin != 0.0f) {
@@ -361,6 +376,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 			turn(px, py, pz);
 			px += kc[0]; py += kc[1]; pz += kc[2];
 		}
+		lean(px, py, pz);
 		float x = px * scale * along, y = py * scale, z = pz * scale * stretch;
 		float xr = x * ca - y * sa, yr = x * sa + y * ca;
 		sx[i] = xr * p;
@@ -371,6 +387,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		if (lit) {
 			float nx = shape->nrm[i * 3], ny = shape->nrm[i * 3 + 1], nz = shape->nrm[i * 3 + 2];
 			if (spin != 0.0f) turn(nx, ny, nz);
+			lean(nx, ny, nz);
 			float wx = nx * fx + ny * lx, wy = nx * fy + ny * ly;
 			float d = (wx * L[0] + wy * L[1] + nz * L[2]) / ll;
 			light[i] = 0.55f + 0.45f * std::max(0.0f, d);
@@ -575,11 +592,13 @@ void PinThreeDPictures(bool pin)
 	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
 }
 
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0)
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), fade, frame | spin_step << 8 | (tint_index + 1) << 16, static_cast<int>(std::lround(stretch * 1000)));
+	pitch = std::clamp(pitch, -60, 60);
+	roll = std::clamp(roll, -60, 60);
+	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16, static_cast<int>(std::lround(stretch * 1000)));
 	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
@@ -610,7 +629,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS)) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll))) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
