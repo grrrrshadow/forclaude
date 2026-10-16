@@ -19,6 +19,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 16. 10. – co dál z Morrowindu
+
+- Hráč vybral: nastoupit do vozidla (ano), kouzla bez teleportů (léčení, levitace), dovednosti rostoucí používáním,
+  kompas a malá mapa; zbroj až potom; výdrž, plavání, zvuky ne; truhly později. Kytky už jsou.
+- **Mapa pod pohledem z první osoby přes celou obrazovku se nekreslí vůbec** (hotovo `fc46c5c`).
+- Hráč: **„já chci technologie z OpenMW, ne spánek a plavání“** – tedy techniky enginu (kreslení, výkon, animace,
+  pohyb), ne herní nápady. Kód dál nebrat (GPL 3), jen principy.
+
 ## 16. 10. – oprava
 
 - Hráč: v buildu chyběl břeh pod domem na svahu u vody. Příčina v kódu (`9e6fdfc`): na sever s domy jako objekty
