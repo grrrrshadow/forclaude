@@ -781,6 +781,14 @@ way ahead, two red lights at the back of its last part, an aircraft's landing
 light and its red beacon blinking. At 32bpp only; the 8bpp blitter keeps the
 day.
 
+- **How light the night is** (`gui.night_light`, Settings, Graphics, under
+  Night; the player, 16. 10.: "a nice dark, but sometimes too much; not only a
+  bright full moon but nearly the dawn too"): dark night (70, 82, 128 of 256,
+  as it was), moonlight, full moon, bright full moon, nearly the dawn (188,
+  180, 200, a little warm) -- `GetNightLight()`, on the map and in the views
+  from the eyes and the cab; the lighter, the fewer stars. The night itself
+  stays switched in the help menu.
+
 - **The lights marked in the model** (16. 10., the colleague's
   `hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md`; the player: "the cars must have
   their lights marked as the houses their windows; about the car there are

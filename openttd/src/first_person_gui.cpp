@@ -151,6 +151,7 @@ static bool FirstPersonWalkable(double x, double y)
 
 void ShowWalkerInventoryWindow();
 TileIndex FirstPersonShopNearby();
+void RedrawFirstPersonPicture();
 
 /** The window of the view from the first person; there is one, number 0. */
 struct FirstPersonWindow : Window {
@@ -617,6 +618,15 @@ double RigFirstPersonMeasure(int times, int threads)
 }
 
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
+/** The picture from the eyes made again at once, as it is drawn only as the walker steps (a setting of the night changed). */
+void RedrawFirstPersonPicture()
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return;
+	w->MakePicture();
+	w->SetDirty();
+}
+
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));

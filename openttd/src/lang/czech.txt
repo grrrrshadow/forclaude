@@ -2339,6 +2339,13 @@ STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, stejně jak
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :původní obrázky
 STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
+STR_CONFIG_SETTING_NIGHT_LIGHT                                  :Světlo v noci: {STRING}
+STR_CONFIG_SETTING_NIGHT_LIGHT_HELPTEXT                         :Jak tmavá je noc (zapíná se v nabídce nápovědy u konzole): od tmavé noci po skoro svítání, víc světla na koukání. Na herní ploše i v pohledu z očí a z kabiny
+STR_CONFIG_SETTING_NIGHT_LIGHT_DARK                             :tmavá noc
+STR_CONFIG_SETTING_NIGHT_LIGHT_MOON                             :měsíc
+STR_CONFIG_SETTING_NIGHT_LIGHT_FULL_MOON                        :úplněk
+STR_CONFIG_SETTING_NIGHT_LIGHT_BRIGHT_MOON                      :jasný úplněk
+STR_CONFIG_SETTING_NIGHT_LIGHT_DAWN                             :skoro svítání
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Kulaté zatáčky kolejí: {STRING}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :Zatáčka kolejí -- rovně, kus na šikmo, rovně -- se v otočeném pohledu nakreslí jako jeden kulatý oblouk přes asi dvě dlaždice a vlak na ní se nakreslí natočený podél oblouku jako svá 3D podoba. U výhybky se zakulatí odbočka, přímá kolej zůstane rovná. Jen vzhled: kolej se staví a jezdí se po ní jako vždycky. Při pohledu na sever (úhel 0, na stavění) jsou zatáčky jako vždycky. Potřebuje 32bpp blitter. Vypnuto: zatáčky jsou, jaké vždycky byly, do pixelu
 STR_FIRST_PERSON_CAPTION                                        :{WHITE}Pohled z první osoby

@@ -4240,8 +4240,25 @@ static void ViewportDoDrawTurned()
 	_turned_times.standing += TurnedNow() - tb0;
 }
 
-/** The night's moonlight (gui.night): how much of red, green and blue stays, 256ths. */
-static constexpr uint NIGHT_R = 70, NIGHT_G = 82, NIGHT_B = 128;
+/**
+ * The night's light (gui.night): how much of red, green and blue stays, 256ths, as light as the night is set
+ * (gui.night_light; the player, 16. 10.: "not only a bright full moon but nearly the dawn too, a nice dark, but
+ * sometimes too much"): a dark night, the moon, the full moon, a bright full moon, nearly the dawn (a little warmer).
+ */
+struct NightLight {
+	uint r, g, b;
+};
+static NightLight GetNightLight()
+{
+	static constexpr NightLight LEVELS[] = {
+		{70, 82, 128},   // a dark night
+		{95, 108, 150},  // the moon
+		{122, 134, 172}, // the full moon
+		{152, 162, 194}, // a bright full moon
+		{188, 180, 200}, // nearly the dawn
+	};
+	return LEVELS[std::min<size_t>(_settings_client.gui.night_light, std::size(LEVELS) - 1)];
+}
 
 /**
  * Add a light to the pixels of the block being drawn: a soft spot, round or flat as the ground shows a circle, its
@@ -4284,7 +4301,8 @@ static void DrawNight(bool turned)
 	if (w <= 0 || h <= 0) return;
 	/* The lit windows that are still as they were drawn: nothing came over them since. */
 	std::erase_if(_night_lit, [](const auto &p) { return *p.first != p.second; });
-	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, NIGHT_R, NIGHT_G, NIGHT_B);
+	const NightLight moon = GetNightLight();
+	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, moon.r, moon.g, moon.b);
 	for (const auto &[at, colour] : _night_lit) *at = colour;
 
 	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
@@ -7930,11 +7948,13 @@ static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, 
 		return true;
 	};
 	const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
+	/* The lighter the night (gui.night_light), the fewer stars are seen: towards the dawn only the brightest. */
+	const double seen = 1.0 - 0.2 * std::min<int>(_settings_client.gui.night_light, 4);
 	for (const Star &st : stars) {
 		double sx, sy;
 		if (!place(st.az, st.el, sx, sy)) continue;
 		const int x = static_cast<int>(sx), y = static_cast<int>(sy);
-		const uint a = static_cast<uint>(st.bright * (0.8 + 0.2 * std::sin(t + st.phase)));
+		const uint a = static_cast<uint>(st.bright * (0.8 + 0.2 * std::sin(t + st.phase)) * seen);
 		const Colour c = st.warm > 200 ? Colour(255, 235, 200) : (st.warm < 60 ? Colour(200, 215, 255) : Colour(240, 240, 255));
 		put(x, y, c, a);
 		if (st.bright > 200) {
@@ -7981,10 +8001,11 @@ static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, 
  */
 static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int height, uint32_t *dst, const float *zb)
 {
+	const NightLight moon = GetNightLight();
 	ParallelRows(height, [&](int lo, int hi) {
 		for (size_t i = static_cast<size_t>(lo) * width; i < static_cast<size_t>(hi) * width; i++) {
 			Colour c(dst[i]);
-			dst[i] = Colour(static_cast<uint8_t>(c.r * NIGHT_R >> 8), static_cast<uint8_t>(c.g * NIGHT_G >> 8), static_cast<uint8_t>(c.b * NIGHT_B >> 8)).data;
+			dst[i] = Colour(static_cast<uint8_t>(c.r * moon.r >> 8), static_cast<uint8_t>(c.g * moon.g >> 8), static_cast<uint8_t>(c.b * moon.b >> 8)).data;
 		}
 	});
 	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash) {
@@ -8241,6 +8262,7 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
 	static constexpr double REACH = 6.0 * OBJECT_UNITS_PER_METRE;
 	static constexpr size_t CAB_LAMPS_LIT = 48;
 	const Colour warm(255, 214, 150);
+	const NightLight moon = GetNightLight();
 	auto far = [&](const std::array<double, 3> &l) { return (l[0] - eye.x) * (l[0] - eye.x) + (l[1] - eye.y) * (l[1] - eye.y); };
 	/* Those whose light may be seen: ahead, within the view. */
 	std::erase_if(lights, [&](const std::array<double, 3> &l) {
@@ -8283,7 +8305,7 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
 						const double own = std::min(255.0, now * 256.0 / night);
 						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
 					};
-					dst[i] = Colour(add(o.r, NIGHT_R, warm.r), add(o.g, NIGHT_G, warm.g), add(o.b, NIGHT_B, warm.b)).data;
+					dst[i] = Colour(add(o.r, moon.r, warm.r), add(o.g, moon.g, warm.g), add(o.b, moon.b, warm.b)).data;
 				}
 			}
 		}, (y1 - y0) * (x1 - x0) > 20000);

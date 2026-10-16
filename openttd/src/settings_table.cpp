@@ -464,6 +464,14 @@ static void NightChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
+/** How light the night is changed: every view drawn anew, the one from the eyes too. */
+static void NightLightChanged(int32_t)
+{
+	extern void RedrawFirstPersonPicture();
+	RedrawFirstPersonPicture();
+	MarkWholeScreenDirty();
+}
+
 /** The round curves of rails switched on or off (round_track.h): every view drawn anew. */
 static void RoundTrackCurvesChanged(int32_t)
 {

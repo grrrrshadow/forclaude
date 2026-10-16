@@ -28,7 +28,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: „zlevni noční světla zblízka“. Dřív si v noci každý díl vozidla (i každý vagon) zvětšil rámeček o půldruhé
   dlaždice. Teď jen čelo a konec o kousek a kužel před autem se značí sám. V rigu zblízka (otočeno 30°): den 15,9 ms,
   noc dřív 28,7 ms a teď 20,0 ms na snímek, bez duchů.
-- 3D částice z OpenLoco: hráč na to zatím neodpověděl.
+- Světlo v noci (hráč: „zapínání noci necháme, kde je, v nastavení budeme nastavovat velikost tmy… nejen úplněk jasný,
+  ale i skoro svítání“): Nastavení → Grafika, pod Nocí: tmavá noc (jako dosud), měsíc, úplněk, jasný úplněk, skoro
+  svítání. Platí na mapě i v pohledu z očí a z kabiny, čím světleji, tím míň hvězd.
+- 3D částice z OpenLoco: odloženo (hráč: „bojujeme se zpomalením hry, po buildu ti řeknu“).
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 
