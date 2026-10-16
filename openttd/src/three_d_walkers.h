@@ -23,6 +23,7 @@
 #include "tile_type.h"
 #include "zoom_type.h"
 
+#include <functional>
 #include <string>
 
 void AddThreeDWalkersToViewport(ZoomLevel zoom);
@@ -32,6 +33,8 @@ struct Town;
 bool IsThreeDWalkway(TileIndex t, const Town *town);
 bool ThreeDWalkerAt(int &x, int &y, int &z);
 void AddThreeDDriversToViewport(ZoomLevel zoom);
+struct ThreeDPictureLight;
+void ForEachThreeDDriverLight(ZoomLevel zoom, const std::function<void(int x, int y, int z, const ThreeDPictureLight &light)> &fn);
 std::string DescribeThreeDDrivers();
 
 #endif /* THREE_D_WALKERS_H */

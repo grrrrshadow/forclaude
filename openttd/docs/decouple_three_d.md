@@ -778,9 +778,40 @@ would light up at its next step) -- before the signs, which stay as they are.
 Then the vehicles' lights are added: two white headlights at the front of a
 road vehicle, a train's engine or a ship with the pool of their light on the
 way ahead, two red lights at the back of its last part, an aircraft's landing
-light and its red beacon blinking. A vehicle's box has room for them at night
-(`Vehicle::UpdateBoundingBoxCoordinates()`), so its lights go with it. At
-32bpp only; the 8bpp blitter keeps the day.
+light and its red beacon blinking. At 32bpp only; the 8bpp blitter keeps the
+day.
+
+- **The lights marked in the model** (16. 10., the colleague's
+  `hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md`; the player: "the cars must have
+  their lights marked as the houses their windows; about the car there are
+  lights a metre away"): a vehicle drawn from its object whose `.glb` has the
+  node `noc` -- the glass of its lights, materials `svetlo_predni` (warm
+  white) and `svetlo_zadni` (red) -- and the empty nodes `svetlo_predni_NN`,
+  `svetlo_zadni_NN` in the middle of its lamps. By day `noc` is left out of
+  its shape (`ReadGlbMesh()`'s `skip_node`). At night its picture has the
+  glass of the lights that are on drawn over the body unshaded in its
+  material's colour, through the depth, its pixels marked lit and kept bright
+  by the night (`ThreeDModelPicture::lit`, `BlitTurnedPicture()`); the
+  headlights when it leads, the red ones when nothing follows it, none for
+  one turned round (`VehicleObjectLightsOn()`). The glows shine from the
+  places in the model as the picture is drawn (`GetThreeDVehicleObjectLights()`,
+  the picture's `lights`), a lamp only where its glass is seen; the pool on
+  the ground before the lamps. Facing north such a vehicle is drawn at night
+  from its picture too, not its sprite (`ThreeDVehicleObjectLitAtNight()`),
+  in the same place. The cars of the game's own (the Tatra VB) the same way
+  (`ForEachThreeDDriverLight()`); in the view from the eyes the glows from the
+  model's places in the world (`GetThreeDVehicleObjectWorldLights()`). A
+  vehicle without them as before. Rig: `test3d svetla`, `test3d auta3d stred`.
+- **Cheaper up close** (the player, 16. 10.: "make the night lights up close
+  cheaper"): a vehicle's box grew a tile and a half on every side at night,
+  every part of every train, and the turned view drew all that again at each
+  step. Now only the front and the last part grow, by the glow of a lamp
+  (`Vehicle::UpdateBoundingBoxCoordinates()`), and the pool of the headlights
+  is marked by itself where it is, where it was and where it is now, as a box
+  of the world (`MarkVehicleLightPoolDirty()`). Rig, 1000x700 at the closest
+  zoom, turned 30 degrees, a train of 20 wagons and two cars: by day 15.9 ms a
+  frame and 145 000 pixels drawn; at night 28.7 ms and 298 000 before, 20.0 ms
+  and 189 000 now; no ghosts.
 
 ## The previews that turn
 

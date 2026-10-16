@@ -176,9 +176,10 @@ struct GlbMesh {
  * @param only_node with all_nodes, only the meshes of the node so named and its children (a building's "noc")
  * @param point_prefix with all_nodes and points, the nodes whose names start so are places: their origins go to points
  * @param points where the places go, metres in the game's axes as the corners
+ * @param skip_node with all_nodes, the node so named and its children are left out (a vehicle's "noc", drawn only at night)
  * @return whether there is something to draw
  */
-static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr)
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr, std::string_view skip_node = {})
 {
 	std::vector<uint8_t> d = ReadWholeFile(path);
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
@@ -379,6 +380,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 				todo.pop_back();
 				const auto &node = nodes.at(n);
 				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+				if (!skip_node.empty() && node_name == skip_node) continue;
 				if (!only_node.empty() && node_name == only_node) inside = true;
 				if (!frame_prefix.empty() && node.contains("name") && node.at("name").is_string()) {
 					std::string name = node.at("name").get<std::string>();
@@ -1974,10 +1976,24 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			}
 			mesh.textures.push_back(std::move(g));
 		}
-	} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame)) {
+	} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, {}, {}, nullptr, "noc")) {
 		return nullptr;
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
+	if (!this->file.ends_with(".s") && !this->file.ends_with(".S")) {
+		/* Its lights: the glass of "noc" in the colours of its materials, and the places they shine from. */
+		GlbMesh night, none;
+		ReadGlbMesh(this->file, night, true, {}, 0, "noc", "svetlo_predni_", &made->front_lights);
+		ReadGlbMesh(this->file, none, true, {}, 0, "\x01", "svetlo_zadni_", &made->back_lights);
+		made->night_pos = std::move(night.pos);
+		made->night_tri = std::move(night.tri);
+		for (uint8_t t : night.tri_tex) {
+			const GlbTexture *tex = t < night.textures.size() ? &night.textures[t] : nullptr;
+			made->night_colour.push_back(tex != nullptr ? tex->flat : Colour(255, 244, 216).data);
+			made->night_back.push_back(tex != nullptr && tex->name.find("zadni") != std::string::npos ? 1 : 0);
+		}
+		if (made->HasLights()) Debug(misc, 2, "3D vehicle {}: lights, {} triangles of glass, {} ahead, {} at the back", this->name, made->night_tri.size() / 3, made->front_lights.size() / 3, made->back_lights.size() / 3);
+	}
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
 	made->uv = std::move(mesh.uv);

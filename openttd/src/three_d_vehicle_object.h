@@ -29,6 +29,7 @@
 #include "spriteloader/spriteloader.hpp"
 
 #include <cmath>
+#include <vector>
 
 struct VehicleSpriteSeq;
 struct Vehicle;
@@ -41,12 +42,18 @@ uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineIma
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
+bool ThreeDVehicleObjectLitAtNight(const Vehicle *v);
+struct ThreeDPictureLight;
+bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, std::vector<ThreeDPictureLight> &lights, int &ax, int &ay, int &az);
+struct ThreeDWorldLight;
+bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
 std::string DescribeThreeDVehicleObjectSprites();
 void QueueThreeDFireworks(TileIndex hut_front);
 void AddThreeDEffectsToViewport(ZoomLevel zoom);
-bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom);
+bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit = false);
+const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const struct ThreeDVehicleObject *obj, float scale, float facing, ZoomLevel zoom);
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0, int frame = -1);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1, float yaw = NAN, int z = INT_MIN, int x = 0, int y = 0);

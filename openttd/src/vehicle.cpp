@@ -15,6 +15,7 @@
 #include "timetable.h"
 #include "viewport_func.h"
 #include "three_d.h"
+#include "three_d_vehicle_object.h"
 #include "blitter/factory.hpp"
 #include "news_func.h"
 #include "command_func.h"
@@ -70,6 +71,8 @@
 #include "road_on_rail.h"
 
 #include "round_track.h"
+
+#include <unordered_map>
 
 #include "safeguards.h"
 
@@ -1338,6 +1341,13 @@ static void DoDrawVehicle(const Vehicle *v)
 		if (to != TransparencyOption::Invalid && (IsTransparencySet(to) || IsInvisibilitySet(to))) return;
 	}
 
+	/* At night a vehicle drawn from its object whose model has its lights is drawn so facing north too: its picture
+	 * keeps the glass of its lights lit through the night (ThreeDModelPicture::lit), a sprite would not. */
+	if (!ViewportDrawingTurned() && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && !shadowed && v->direction != Direction::Invalid &&
+			!v->vehstatus.Test(VehState::Crashed) && !v->IsWrecked() && v->type != VehicleType::Effect && v->type != VehicleType::Disaster && ThreeDVehicleObjectLitAtNight(v)) {
+		if (AddThreeDVehicleObjectToViewport(v, _cur_dpi->zoom, nullptr)) return;
+	}
+
 	/* An articulated road vehicle facing north is drawn whole, its parts in a fixed order within one hull
 	 * (DrawRoadVehicleWhole()), once however many of its parts the block holds. Turned, each part is its own
 	 * cut of the likeness below; crashed, the parts lie as they fell. */
@@ -2147,13 +2157,16 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 		new_coord.bottom += h + 8 * ZOOM_BASE;
 	}
 
-	/* At night (gui.night) its lights shine beyond it, a tile and a half ahead: room for them (DrawNight()). */
-	if (_settings_client.gui.night) {
-		const int reach = 48 * ZOOM_BASE;
+	/* At night (gui.night) the glows of its lamps reach a little beyond it, only of the parts that have them: the front
+	 * and the back (DrawNight()); an aircraft's landing light further ahead. The pool of the headlights on the way
+	 * ahead is marked by itself where it is (MarkVehicleLightPoolDirty()): not a tile and a half round every part of
+	 * every train, all drawn again at every step (the player: "make the night lights up close cheaper"). */
+	if (_settings_client.gui.night && (this->Previous() == nullptr || this->Next() == nullptr)) {
+		const int reach = (this->type == VehicleType::Aircraft ? 24 : 6) * ZOOM_BASE;
 		new_coord.left -= reach;
 		new_coord.right += reach;
-		new_coord.top -= reach / 2;
-		new_coord.bottom += reach / 2;
+		new_coord.top -= reach;
+		new_coord.bottom += reach;
 	}
 
 	extern bool _draw_bounding_boxes;
@@ -2196,6 +2209,37 @@ static DirtyPlace VehicleDirtyPlace(const Vehicle *v)
 	return place;
 }
 
+/** The pools of light of the headlights last marked (MarkVehicleLightPoolDirty()): world units, by the vehicle. */
+static std::unordered_map<uint32_t, std::array<int, 4>> _light_pools;
+
+/**
+ * At night the pool of a vehicle's headlights on the way ahead (DrawNight()), drawn again as it moves: the box of
+ * the ground it lights, where it was and where it is now -- as it turns, the old one is another way.
+ */
+static void MarkVehicleLightPoolDirty(const Vehicle *v)
+{
+	const bool lit = _settings_client.gui.night && v->Previous() == nullptr && v->direction != Direction::Invalid &&
+			(v->type == VehicleType::Road || v->type == VehicleType::Ship || (v->type == VehicleType::Train && (Train::From(v)->IsEngine() || Train::From(v)->IsFrontEngine())));
+	auto it = _light_pools.find(v->index.base());
+	if (!lit) {
+		if (it != _light_pools.end()) {
+			MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8);
+			_light_pools.erase(it);
+		}
+		return;
+	}
+	/* Its middle about a tile ahead, as wide: the pool of the lamps of its box, or of its model's (three_d_vehicle_object.h). */
+	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
+	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
+	const int d = to_underlying(v->direction) & 7;
+	const int ahead = v->type == VehicleType::Ship ? 20 : 15, half = 12;
+	const int cx = v->x_pos + dir_dx[d] * ahead, cy = v->y_pos + dir_dy[d] * ahead;
+	const std::array<int, 4> box{cx - half, cy - half, cx + half, cy + half};
+	if (it != _light_pools.end() && it->second != box) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8);
+	MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8);
+	_light_pools[v->index.base()] = box;
+}
+
 /**
  * Update the vehicle on the viewport, updating the right hash and setting the new coordinates.
  * @param dirty Mark the (new and old) coordinates of the vehicle as dirty.
@@ -2229,6 +2273,7 @@ void Vehicle::UpdateViewport(bool dirty)
 				std::max(this->sprite_cache.old_coord.right, this->coord.right),
 				std::max(this->sprite_cache.old_coord.bottom, this->coord.bottom));
 		}
+		MarkVehicleLightPoolDirty(this);
 	}
 }
 

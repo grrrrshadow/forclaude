@@ -41,6 +41,7 @@
 #include "gfx_type.h"
 
 #include <cmath>
+#include <functional>
 #include <map>
 #include <unordered_map>
 
@@ -660,8 +661,33 @@ void AddThreeDDriversToViewport(ZoomLevel zoom)
 	const float scale = WalkerScale();
 	for (const Driver &d : _drivers) {
 		if (d.path.empty() || d.tile == INVALID_TILE) continue;
-		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom);
+		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, _settings_client.gui.night);
 	}
+}
+
+/** At night the lights of the cars of the game's own, for the night over the turned view (DrawNight()): each with where its car stands. */
+void ForEachThreeDDriverLight(ZoomLevel zoom, const std::function<void(int x, int y, int z, const ThreeDPictureLight &light)> &fn)
+{
+	if (_drivers.empty()) return;
+	const float scale = WalkerScale();
+	for (const Driver &d : _drivers) {
+		if (d.path.empty() || d.tile == INVALID_TILE) continue;
+		const std::vector<ThreeDPictureLight> *lights = GetThreeDObjectLights(d.car, scale, d.facing, zoom);
+		if (lights == nullptr) continue;
+		for (const ThreeDPictureLight &l : *lights) fn(static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, l);
+	}
+}
+
+/** The rig: where the first car of the game's own is, world units; false when none drives. */
+bool GetFirstThreeDDriverPlace(int &x, int &y)
+{
+	for (const Driver &d : _drivers) {
+		if (d.path.empty() || d.tile == INVALID_TILE) continue;
+		x = static_cast<int>(std::lround(d.x));
+		y = static_cast<int>(std::lround(d.y));
+		return true;
+	}
+	return false;
 }
 
 /** The rig: the cars driving, a line each. */

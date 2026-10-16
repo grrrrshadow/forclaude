@@ -1806,7 +1806,7 @@ static void ViewportSortParentSprites(ParentSpriteToSortVector *psdv)
 
 
 static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps);
-static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps);
+static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, bool north);
 
 static void ViewportDrawParentSprites(const ParentSpriteToSortVector *psd, const ChildScreenSpriteToDrawVector *csstdv)
 {
@@ -1820,7 +1820,7 @@ static void ViewportDrawParentSprites(const ParentSpriteToSortVector *psd, const
 		}
 		/* A figure among them as its likeness (the clay town's mushrooms, ViewportDrawingNorthObjects()). */
 		if (ps->box_kind == 5) {
-			DrawTurnedVehicle(*_cur_dpi, *ps);
+			DrawTurnedVehicle(*_cur_dpi, *ps, true);
 			continue;
 		}
 		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
@@ -3114,12 +3114,20 @@ bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int 
 	return true;
 }
 
-/** Draw a picture of the turned view hung from a world point (a vehicle's likeness, a figure). */
-static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPicture &picture, double wx, double wy, double wz)
+/**
+ * Draw a picture of the turned view hung from a world point (a vehicle's likeness, a figure); at night the pixels of
+ * its lit glass kept bright (ThreeDModelPicture::lit, DrawNight()).
+ * @param north drawn on a view facing north (a figure, a vehicle with lights at night): the point projected as the map
+ */
+static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPicture &picture, double wx, double wy, double wz, bool north = false)
 {
 	const ThreeDModelPicture *pic = &picture;
 	double vx, vy;
-	ProjectTurnedF(wx, wy, wz, vx, vy);
+	if (north) {
+		RemapCoordsF(wx, wy, wz, vx, vy);
+	} else {
+		ProjectTurnedF(wx, wy, wz, vx, vy);
+	}
 	double scale = 1.0 / (1 << to_underlying(frame.zoom));
 	int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + pic->left;
 	int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + pic->top;
@@ -3142,13 +3150,21 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 			}
 		}
 	}
+	if (_night_windows_now) {
+		for (uint32_t i : pic->lit) {
+			const int x = static_cast<int>(i % pic->width), y = static_cast<int>(i / pic->width);
+			if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
+			uint32_t *at = dst + static_cast<size_t>(oy + y) * frame.pitch + ox + x;
+			_night_lit.emplace_back(at, *at);
+		}
+	}
 }
 
-/** Draw a vehicle's likeness (box_kind 5): the picture hung from its point, turned. */
-static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+/** Draw a vehicle's likeness (box_kind 5): the picture hung from its point, turned (or facing north, north). */
+static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, bool north)
 {
 	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
-	BlitTurnedPicture(frame, *_turned_vehicle_pictures[ps.box_dx], ps.box_ox, ps.box_oy, ps.box_oz);
+	BlitTurnedPicture(frame, *_turned_vehicle_pictures[ps.box_dx], ps.box_ox, ps.box_oy, ps.box_oz, north);
 }
 
 /**
@@ -4178,7 +4194,7 @@ static void ViewportDoDrawTurned()
 		}
 		if (ps->box_kind == 4) continue; // a tile of a building that is a 3D object: drawn whole (box_kind 7)
 		if (ps->box_kind == 5) {
-			DrawTurnedVehicle(frame, *ps);
+			DrawTurnedVehicle(frame, *ps, false);
 			continue;
 		}
 		if (ps->box_kind == 6) {
@@ -4288,44 +4304,88 @@ static void DrawNight(bool turned)
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
-	/* The glows of the houses' lights (their "svetlo_NN"): small and warm, only at a lit window or lamp that is seen
-	 * -- one on the far side of a house, or hidden behind another, has none of its pixels left lit. */
-	const Colour window(255, 200, 110);
-	if (!_night_glows.empty()) {
-		std::vector<uint8_t> seen(static_cast<size_t>(w) * h, 0);
-		for (const auto &[at, colour] : _night_lit) {
-			const ptrdiff_t i = at - dst;
-			if (i < 0) continue;
-			const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
-			if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
-		}
-		auto lit_near = [&](int cx, int cy) {
-			for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
-				for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
-					if (seen[static_cast<size_t>(y) * w + x]) return true;
-				}
+	/* The pixels of the lit glass left lit (the windows of the houses, the lights of the vehicles' models): the glow of
+	 * a light only where they are seen -- one on the far side of a house, or hidden behind another, has none left. */
+	std::vector<uint8_t> seen;
+	auto lit_near = [&](int cx, int cy) {
+		if (seen.empty()) {
+			seen.assign(static_cast<size_t>(w) * h, 0);
+			for (const auto &[at, colour] : _night_lit) {
+				const ptrdiff_t i = at - dst;
+				if (i < 0) continue;
+				const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
+				if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
 			}
-			return false;
-		};
-		for (const auto &g : _night_glows) {
-			double px, py;
-			project(g[0], g[1], g[2], px, py);
-			if (px < 0 || py < 0 || px >= w || py >= h) continue;
-			if (!lit_near(static_cast<int>(px), static_cast<int>(py))) continue;
-			AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit, 1.4 * unit, window, 0.35);
 		}
+		for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
+			for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
+				if (seen[static_cast<size_t>(y) * w + x]) return true;
+			}
+		}
+		return false;
+	};
+	/* The glows of the houses' lights (their "svetlo_NN"): small and warm. */
+	const Colour window(255, 200, 110);
+	for (const auto &g : _night_glows) {
+		double px, py;
+		project(g[0], g[1], g[2], px, py);
+		if (px < 0 || py < 0 || px >= w || py >= h) continue;
+		if (!lit_near(static_cast<int>(px), static_cast<int>(py))) continue;
+		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit, 1.4 * unit, window, 0.35);
 	}
+	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block. */
+	auto model_light = [&](double hx, double hy, const ThreeDPictureLight &l) {
+		const double px = hx + l.x, py = hy + l.y;
+		switch (l.kind) {
+			case ThreeDPictureLight::Kind::Front:
+				if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, 1.2 * unit, 1.2 * unit, lamp, 0.55);
+				break;
+			case ThreeDPictureLight::Kind::Back:
+				if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
+				break;
+			case ThreeDPictureLight::Kind::PoolNear:
+				AddNightLight(dst, dpi.pitch, w, h, px, py, 4 * unit, 2 * unit, pool, 0.4);
+				break;
+			case ThreeDPictureLight::Kind::Pool:
+				AddNightLight(dst, dpi.pitch, w, h, px, py, 8 * unit, 4 * unit, pool, 0.4);
+				break;
+		}
+	};
+	/* The cars of the game's own driving about (three_d_walkers.h), only on the turned view. */
+	if (turned) {
+		ForEachThreeDDriverLight(dpi.zoom, [&](int x, int y, int z, const ThreeDPictureLight &l) {
+			double hx, hy;
+			project(x, y, z, hx, hy);
+			model_light(hx, hy, l);
+		});
+	}
+	std::vector<ThreeDPictureLight> model_lights;
 	for (const Vehicle *v : Vehicle::Iterate()) {
 		if (v->vehstatus.Test(VehState::Hidden)) continue;
 		const bool front = v->Previous() == nullptr;
 		const bool last = v->Next() == nullptr;
 		if (v->type != VehicleType::Road && v->type != VehicleType::Train && v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) continue;
 		if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft()) continue;
-		if (!front && !last) continue;
 		double cx, cy;
 		project(v->x_pos, v->y_pos, v->z_pos, cx, cy);
 		const double margin = 60 * unit;
 		if (cx < -margin || cy < -margin || cx > w + margin || cy > h + margin) continue;
+		/* A vehicle drawn from its object whose model has its lights (the colleague's
+		 * hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md, the player: "the cars must have their lights marked as the houses their
+		 * windows; about the car there are lights a metre away"): they shine from where they are in the model, its
+		 * picture as drawn, the glow of a lamp where its glass is seen. */
+		if (ThreeDEnabled() && !v->vehstatus.Test(VehState::Crashed) && v->direction != Direction::Invalid) {
+			RoundTrackPose pose;
+			const bool round = turned && GetRoundTrackPose(v, pose);
+			int ax, ay, az;
+			if (GetThreeDVehicleObjectLights(v, dpi.zoom, round ? &pose : nullptr, model_lights, ax, ay, az)) {
+				double hx, hy;
+				project(ax, ay, az, hx, hy);
+				for (const ThreeDPictureLight &l : model_lights) model_light(hx, hy, l);
+				continue;
+			}
+		}
+		if (!front && !last) continue;
 		const int d = to_underlying(v->direction) & 7;
 		double fx = dir_dx[d], fy = dir_dy[d];
 		const double len = std::sqrt(fx * fx + fy * fy);
@@ -7943,14 +8003,29 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
 	const double reach = CAB_RANGE_TILES * TILE_SIZE;
+	std::vector<ThreeDWorldLight> model_lights;
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
 		if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship && u->type != VehicleType::Aircraft) continue;
 		if (u->type == VehicleType::Aircraft && !Aircraft::From(u)->IsNormalAircraft()) continue;
 		const bool front = u->Previous() == nullptr, last = u->Next() == nullptr;
-		if (!front && !last) continue;
 		const double dx = u->x_pos - eye.x, dy = u->y_pos - eye.y;
 		if (dx * dx + dy * dy > reach * reach) continue;
+		/* A vehicle drawn from its object whose model has its lights: they shine from where they are in it (the
+		 * colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md). Not the own one's, seen from inside. */
+		const bool own_one = own != nullptr && u->First() == own;
+		if (!own_one && ThreeDEnabled() && !u->vehstatus.Test(VehState::Crashed) && u->direction != Direction::Invalid && GetThreeDVehicleObjectWorldLights(u, model_lights)) {
+			for (const ThreeDWorldLight &l : model_lights) {
+				switch (l.kind) {
+					case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0); break;
+					case ThreeDPictureLight::Kind::Back: glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0); break;
+					case ThreeDPictureLight::Kind::PoolNear: glow(l.x, l.y, l.z, 3, pool, 0.3, 0.4); break;
+					case ThreeDPictureLight::Kind::Pool: glow(l.x, l.y, l.z, 6, pool, 0.3, 0.4); break;
+				}
+			}
+			continue;
+		}
+		if (!front && !last) continue;
 		const int d = to_underlying(u->direction) & 7;
 		double fx = dir_dx[d], fy = dir_dy[d];
 		const double len = std::sqrt(fx * fx + fy * fy);

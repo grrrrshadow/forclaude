@@ -9074,6 +9074,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (int i = 0; i < n; i++) StateGameLoop();
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: {} tiku", n);
+	} else if (what == "svetla") {
+		/* 'svetla': each vehicle drawn as an object whose model has its lights, the lights on and where (DrawNight()). */
+		std::vector<ThreeDPictureLight> lights;
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (v->type != VehicleType::Road && v->type != VehicleType::Train) continue;
+			int ax = 0, ay = 0, az = 0;
+			const bool model = GetThreeDVehicleObjectLights(v, ZoomLevel::Normal, nullptr, lights, ax, ay, az);
+			std::string list;
+			for (const ThreeDPictureLight &l : lights) list += fmt::format(" {}@{:.0f},{:.0f}", to_underlying(l.kind), l.x, l.y);
+			IConsolePrint(CC_DEFAULT, "test3d: svetla vozidla {} dil {}: {}{}{}", v->unitnumber, v->index.base(), model ? "z modelu" : "z obdelniku", lights.empty() ? "" : fmt::format(" od {},{},{}:", ax, ay, az), list);
+		}
 	} else if (what == "stavy") {
 		/* 'stavy': each vehicle drawn as a 3D object, the sprite number its GRF picks and the state it means ("stavy"). */
 		for (const Vehicle *v : Vehicle::Iterate()) {
@@ -9088,7 +9099,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: stav vozidla {} ({}): sprite GRF {} stav {} z {}", v->unitnumber, obj->name, id == UINT32_MAX ? -1 : static_cast<int64_t>(id), state, obj->states.size());
 		}
 	} else if (what == "auta3d") {
-		/* 'auta3d': the cars of the game's own driving about (three_d_walkers.h) and the stops near the view. */
+		/* 'auta3d [stred]': the cars of the game's own driving about (three_d_walkers.h) and the stops near the view;
+		 * with "stred" the view on the first of them. */
+		extern bool GetFirstThreeDDriverPlace(int &x, int &y);
+		int car_x, car_y;
+		if (argv.size() > 2 && argv[2] == "stred" && GetFirstThreeDDriverPlace(car_x, car_y)) {
+			ScrollMainWindowToTile(TileVirtXY(car_x, car_y), true);
+			UpdateViewportPosition(w, 0);
+		}
 		std::string all = DescribeThreeDDrivers();
 		for (size_t at = 0; at < all.size();) {
 			size_t end = all.find('\n', at);

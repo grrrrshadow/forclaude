@@ -81,6 +81,24 @@ struct ThreeDHouse {
 const ThreeDHouse *GetThreeDHouse(HouseID house);
 const ThreeDPart *GetThreeDHouseParts(const ThreeDHouse *house);
 
+/** A light of a vehicle's picture at night (its "svetlo_predni_NN", "svetlo_zadni_NN"): where it is, pixels of the zoom from the model's origin. */
+struct ThreeDPictureLight {
+	enum class Kind : uint8_t {
+		Front, ///< a headlight
+		Back,  ///< a red light at the back
+		PoolNear, ///< the pool of the headlights' light on the way, near
+		Pool,     ///< and further on, on the ground
+	};
+	float x = 0, y = 0;
+	Kind kind = Kind::Front;
+};
+
+/** A light of a vehicle's model in the world (the view from the eyes): world units. */
+struct ThreeDWorldLight {
+	double x = 0, y = 0, z = 0;
+	ThreeDPictureLight::Kind kind = ThreeDPictureLight::Kind::Front;
+};
+
 /** A picture of the turned view at an angle and a zoom: a vehicle or a figure drawn from its object, the preview of an industry. */
 struct ThreeDModelPicture {
 	int width = 0;
@@ -88,6 +106,8 @@ struct ThreeDModelPicture {
 	int left = 0; ///< where the top-left pixel goes from the model's origin (the north corner of its north tile at the ground, ProjectTurned()), pixels of the zoom
 	int top = 0;
 	std::vector<uint32_t> pixels; ///< Colour::data, alpha 0 where there is nothing
+	std::vector<uint32_t> lit;    ///< at night the pixels of the lit glass of its lights (its "noc"): kept bright when the night darkens the map
+	std::vector<ThreeDPictureLight> lights; ///< at night its lights that are on
 };
 
 /**

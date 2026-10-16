@@ -313,7 +313,12 @@ void NoteThreeDVehicleWithoutObject(EngineID engine, const Vehicle *v, EngineIma
 struct ObjectRaster {
 	int left = 0, top = 0, width = 0, height = 0;
 	std::vector<Colour> px;
+	std::vector<uint8_t> lit;                ///< at night, whether a pixel is of the lit glass of its lights
+	std::vector<ThreeDPictureLight> lights;  ///< at night, the lights that are on, pixels from its origin
 };
+
+/** The lights of a vehicle object on at night (RasterObject()): its headlights, its red lights at the back. */
+static constexpr int LIGHTS_FRONT = 1, LIGHTS_BACK = 2;
 
 /** The texels to a metre of a shape's texture at its full size: how fine a level of it a picture needs. */
 static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape)
@@ -354,8 +359,10 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
  * @param paint_colour the vehicle's colour of its palette ("barvy", PaletteColour()), 0 the paint's own
  * @param stretch its height against its width (a plant of a list, "meritko" [x, y, z])
  * @param spin how far a thing that turns has turned about its axis, degrees (ThreeDVehicleObject::spin_axis)
+ * @param lights at night the lights that are on (LIGHTS_FRONT, LIGHTS_BACK): their glass at full brightness over the
+ *               body, its pixels marked lit, and the places they shine from (ThreeDVehicleShape::front_lights)
  */
-static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f)
+static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f, int lights = 0)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape(frame);
 	if (shape == nullptr) return false;
@@ -527,24 +534,101 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		}
 	}
 
-	/* Shrink: the mean of the covered subpixels, the alpha from how many are. */
+	/* At night the glass of its lights that are on (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): over the
+	 * body as it is turned and leant, in its material's colour unshaded, through the depth (it lies a few millimetres
+	 * before the body), each subpixel of it marked lit; and where its lights are, the pool of the headlights ahead. */
+	auto place = [&](float px, float py, float pz, float &osx, float &osy, float &od) {
+		lean(px, py, pz);
+		const float x = px * scale * along, y = py * scale, z = pz * scale * stretch;
+		const float xr = x * ca - y * sa, yr = x * sa + y * ca;
+		osx = xr * p;
+		osy = (-yr * CAM_SIN - z * CAM_COS) * p;
+		od = yr * CAM_COS - z * CAM_SIN;
+	};
+	std::vector<uint8_t> litbuf;
+	if (lights != 0 && !shape->night_tri.empty()) {
+		litbuf.assign(static_cast<size_t>(width) * height, 0);
+		const size_t corners = shape->night_pos.size() / 3;
+		std::vector<float> nx(corners), ny(corners), nd(corners);
+		for (size_t i = 0; i < corners; i++) place(shape->night_pos[i * 3], shape->night_pos[i * 3 + 1], shape->night_pos[i * 3 + 2], nx[i], ny[i], nd[i]);
+		const float bias = 0.03f * scale; // a few centimetres: the glass is drawn over the lamp it lies on
+		for (size_t t = 0; t + 2 < shape->night_tri.size(); t += 3) {
+			const size_t tn = t / 3;
+			if ((lights & (tn < shape->night_back.size() && shape->night_back[tn] ? LIGHTS_BACK : LIGHTS_FRONT)) == 0) continue;
+			const Colour glass(tn < shape->night_colour.size() ? shape->night_colour[tn] : Colour(255, 244, 216).data);
+			const uint32_t a = shape->night_tri[t], b = shape->night_tri[t + 1], c = shape->night_tri[t + 2];
+			if (a >= corners || b >= corners || c >= corners) continue;
+			const float ax = nx[a] - left, ay = ny[a] - top, bx = nx[b] - left, by = ny[b] - top, cx = nx[c] - left, cy = ny[c] - top;
+			const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+			if (std::abs(area) < 1e-6f) continue;
+			const float inv = 1.0f / area;
+			int x0 = std::max(0, static_cast<int>(std::floor(std::min({ax, bx, cx})))), x1 = std::min(width - 1, static_cast<int>(std::ceil(std::max({ax, bx, cx}))));
+			int y0 = std::max(0, static_cast<int>(std::floor(std::min({ay, by, cy})))), y1 = std::min(height - 1, static_cast<int>(std::ceil(std::max({ay, by, cy}))));
+			for (int py = y0; py <= y1; py++) {
+				const float qy = py + 0.5f;
+				for (int px = x0; px <= x1; px++) {
+					const float qx = px + 0.5f;
+					const float w0 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * inv;
+					const float w1 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * inv;
+					const float w2 = 1.0f - w0 - w1;
+					if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+					const size_t at = static_cast<size_t>(py) * width + px;
+					const float dz = w0 * nd[a] + w1 * nd[b] + w2 * nd[c];
+					if (dz >= zb[at] + bias) continue;
+					zb[at] = std::min(zb[at], dz);
+					buf[at] = Colour(glass.r, glass.g, glass.b);
+					litbuf[at] = 1;
+				}
+			}
+		}
+	}
+	out.lights.clear();
+	if (lights != 0) {
+		auto add_light = [&](float px, float py, float pz, ThreeDPictureLight::Kind kind) {
+			float lx, ly, ld;
+			place(px, py, pz, lx, ly, ld);
+			out.lights.push_back({lx / ss, ly / ss, kind});
+		};
+		if ((lights & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
+			float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
+			const size_t n_front = shape->front_lights.size() / 3;
+			for (size_t i = 0; i < n_front; i++) {
+				add_light(shape->front_lights[i * 3], shape->front_lights[i * 3 + 1], shape->front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
+				ahead = std::max(ahead, shape->front_lights[i * 3]);
+				mid += shape->front_lights[i * 3 + 1] / n_front;
+			}
+			/* The pool on the way, on the ground before the lamps (not over the bonnet): near, and further on. */
+			add_light(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+			add_light(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+		}
+		if ((lights & LIGHTS_BACK) != 0) {
+			for (size_t i = 0; i + 2 < shape->back_lights.size(); i += 3) add_light(shape->back_lights[i], shape->back_lights[i + 1], shape->back_lights[i + 2], ThreeDPictureLight::Kind::Back);
+		}
+	}
+
+	/* Shrink: the mean of the covered subpixels, the alpha from how many are; lit where any of them is (a lamp far off
+	 * smaller than a pixel still shines). */
 	out.width = width / ss;
 	out.height = height / ss;
 	out.left = left / ss;
 	out.top = top / ss;
 	out.px.assign(static_cast<size_t>(out.width) * out.height, Colour(0, 0, 0, 0));
+	out.lit.assign(litbuf.empty() ? 0 : out.px.size(), 0);
 	for (int y = 0; y < out.height; y++) {
 		for (int x = 0; x < out.width; x++) {
-			uint r = 0, g = 0, bl = 0, cnt = 0;
+			uint r = 0, g = 0, bl = 0, cnt = 0, glass = 0;
 			for (int dy = 0; dy < ss; dy++) {
 				for (int dx = 0; dx < ss; dx++) {
-					Colour cc = buf[static_cast<size_t>(y * ss + dy) * width + (x * ss + dx)];
+					const size_t at = static_cast<size_t>(y * ss + dy) * width + (x * ss + dx);
+					Colour cc = buf[at];
 					if (cc.a == 0) continue;
 					r += cc.r; g += cc.g; bl += cc.b; cnt++;
+					if (!litbuf.empty() && litbuf[at] != 0) glass++;
 				}
 			}
 			if (cnt == 0) continue;
 			out.px[static_cast<size_t>(y) * out.width + x] = Colour(r / cnt, g / cnt, bl / cnt, static_cast<uint8_t>(cnt * 255 / (ss * ss)));
+			if (glass > 0) out.lit[static_cast<size_t>(y) * out.width + x] = 1;
 		}
 	}
 	return true;
@@ -620,13 +704,13 @@ void PinThreeDPictures(bool pin)
 	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
 }
 
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0)
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
 	pitch = std::clamp(pitch, -60, 60);
 	roll = std::clamp(roll, -60, 60);
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16, static_cast<int>(std::lround(stretch * 1000)));
+	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)));
 	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
@@ -657,7 +741,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll))) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll), lights)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		e.picture.width = r.width;
@@ -666,23 +750,52 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 		e.picture.top = r.top;
 		e.picture.pixels.resize(r.px.size());
 		for (size_t i = 0; i < r.px.size(); i++) e.picture.pixels[i] = r.px[i].a == 0 ? 0 : r.px[i].data;
+		e.picture.lit.clear();
+		for (size_t i = 0; i < r.lit.size(); i++) {
+			if (r.lit[i] != 0) e.picture.lit.push_back(static_cast<uint32_t>(i));
+		}
+		e.picture.lights = std::move(r.lights);
 	}
 	timed();
 	return e.picture.width > 0 ? &e.picture : nullptr;
 }
 
 /**
- * Put a vehicle drawn as an object on the turned map (AddThreeDVehicleToViewport()): the object at the angle of
- * the view, hung from the middle of its chain, sorted by the box of its pieces; its other pieces draw nothing.
- * @param pose where and at what angle to draw it instead (a round curve, round_track.h), or nullptr
- * @return whether the vehicle is drawn as an object (a piece drawn with its anchor piece counts)
+ * Which lights of a vehicle drawn as an object are on at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md):
+ * the headlights of its front, +x, when it leads, the red ones of its back when nothing follows it. One turned round
+ * has its red lights ahead and its headlights at the back of where it goes: none then.
+ * @param front,last its first and its last piece
  */
-bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose)
+static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed)
+{
+	if (!_settings_client.gui.night || reversed) return 0;
+	const ThreeDVehicleShape *shape = obj->GetShape();
+	if (shape == nullptr || !shape->HasLights()) return 0;
+	int lights = 0;
+	if (front->Previous() == nullptr) lights |= LIGHTS_FRONT;
+	if (last->Next() == nullptr) lights |= LIGHTS_BACK;
+	return lights;
+}
+
+/** Where a vehicle drawn as an object is drawn on the map (PlaceVehicleObject()). */
+struct VehicleObjectPlace {
+	const ThreeDModelPicture *pic = nullptr; ///< its picture at the view's angle, nullptr when it has none
+	int ax = 0, ay = 0, az = 0;              ///< the world point the picture hangs from
+	int xmin = 0, ymin = 0, zmin = 0, xmax = 0, ymax = 0, zmax = 0; ///< the box of its pieces, for the sorting
+};
+
+/**
+ * Where and as which picture a vehicle drawn as an object is drawn on the map: the object at the angle of the view,
+ * hung from the middle of its chain, sorted by the box of its pieces; its other pieces draw nothing.
+ * @param pose where and at what angle to draw it instead (a round curve, round_track.h), or nullptr
+ * @param[out] place where, filled for the anchor piece only
+ * @return the object, nullptr for a vehicle not drawn as one; for a piece drawn with its anchor piece, the object with no picture
+ */
+static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place)
 {
 	int piece = 0;
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
-	if (obj == nullptr) return false;
-	if (piece != obj->anchor) return true;
+	if (obj == nullptr || piece != obj->anchor) return obj;
 
 	/* The way it faces: a train turned round, the rear head of a double-headed engine, the other way. */
 	bool reversed = false;
@@ -694,18 +807,13 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	Direction dir = reversed ? ReverseDir(v->direction) : v->direction;
 	int d = to_underlying(dir) & 7;
 
-	std::vector<int> lengths = PieceLengths(obj);
-	float scale = ObjectScale(obj);
-	double along = MiddleFromPiece(obj, lengths, piece);
-	float world_az = pose != nullptr ? pose->azimuth + (reversed ? 180.0f : 0.0f) : ViewAzimuth(d);
-	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, SqueezedType(obj->type), StateStep(obj, v->engine_type, v, EngineImageType::OnMap));
-	if (pic == nullptr) return true;
-
 	/* The box of the pieces for the sorting. */
 	const Vehicle *front = v;
 	while (front->IsArticulatedPart() && front->Previous() != nullptr) front = front->Previous();
+	const Vehicle *last = front;
 	int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
 	for (const Vehicle *u = front; u != nullptr; u = u->HasArticulatedPart() ? u->GetNextArticulatedPart() : nullptr) {
+		last = u;
 		xmin = std::min(xmin, u->x_pos + u->bounds.origin.x);
 		ymin = std::min(ymin, u->y_pos + u->bounds.origin.y);
 		zmin = std::min(zmin, u->z_pos + u->bounds.origin.z);
@@ -714,15 +822,133 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 		zmax = std::max(zmax, u->z_pos + u->bounds.origin.z + u->bounds.extent.z - 1);
 	}
 
+	const int lights = VehicleObjectLightsOn(obj, front, last, reversed);
+
+	std::vector<int> lengths = PieceLengths(obj);
+	float scale = ObjectScale(obj);
+	double along = MiddleFromPiece(obj, lengths, piece);
+	float world_az = pose != nullptr ? pose->azimuth + (reversed ? 180.0f : 0.0f) : ViewAzimuth(d);
+	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, SqueezedType(obj->type), StateStep(obj, v->engine_type, v, EngineImageType::OnMap), 0, -1, 1.0f, 0, 0, 0, lights);
+
 	/* Hung from the middle of the chain: from the anchor piece that far along. */
-	int ax = v->x_pos + static_cast<int>(std::lround(along * DIR_DX[d])), ay = v->y_pos + static_cast<int>(std::lround(along * DIR_DY[d]));
+	place.ax = v->x_pos + static_cast<int>(std::lround(along * DIR_DX[d]));
+	place.ay = v->y_pos + static_cast<int>(std::lround(along * DIR_DY[d]));
+	place.az = v->z_pos;
 	if (pose != nullptr) {
 		int nx = static_cast<int>(std::lround(pose->x)), ny = static_cast<int>(std::lround(pose->y));
 		xmin += nx - v->x_pos; xmax += nx - v->x_pos; ymin += ny - v->y_pos; ymax += ny - v->y_pos;
-		ax = nx;
-		ay = ny;
+		place.ax = nx;
+		place.ay = ny;
 	}
-	AddTurnedVehiclePicture(pic, ax, ay, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
+	place.xmin = xmin; place.ymin = ymin; place.zmin = zmin;
+	place.xmax = xmax; place.ymax = ymax; place.zmax = zmax;
+	return obj;
+}
+
+/**
+ * Put a vehicle drawn as an object on the turned map (AddThreeDVehicleToViewport()), or facing north at night when
+ * its model has its lights (DoDrawVehicle()): the object at the angle of the view (PlaceVehicleObject()).
+ * @param pose where and at what angle to draw it instead (a round curve, round_track.h), or nullptr
+ * @return whether the vehicle is drawn as an object (a piece drawn with its anchor piece counts)
+ */
+bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose)
+{
+	VehicleObjectPlace place;
+	if (PlaceVehicleObject(v, zoom, pose, place) == nullptr) return false;
+	if (place.pic != nullptr) AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
+	return true;
+}
+
+/**
+ * Whether a vehicle is drawn facing north from its object at night, not from its sprites: its model has its lights
+ * (their glass lit, kept bright by the night, as only the pictures of the turned view keep them).
+ */
+bool ThreeDVehicleObjectLitAtNight(const Vehicle *v)
+{
+	if (!_settings_client.gui.night) return false;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type);
+	if (obj == nullptr) return false;
+	const ThreeDVehicleShape *shape = obj->GetShape();
+	return shape != nullptr && shape->HasLights();
+}
+
+/**
+ * The lights of a vehicle drawn as an object whose model has them, where its picture is drawn (the colleague's
+ * hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md: "the lights marked in the model as the windows of the houses").
+ * @param pose its round curve, or nullptr
+ * @param[out] lights the lights that are on, pixels of the zoom from the world point hung from
+ * @param[out] ax,ay,az that point
+ * @return whether its lights are its model's (none, for a piece drawn with its anchor piece); false: drawn about its box as always
+ */
+bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, std::vector<ThreeDPictureLight> &lights, int &ax, int &ay, int &az)
+{
+	lights.clear();
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type);
+	if (obj == nullptr) return false;
+	const ThreeDVehicleShape *shape = obj->GetShape();
+	if (shape == nullptr || !shape->HasLights()) return false;
+	VehicleObjectPlace place;
+	PlaceVehicleObject(v, zoom, pose, place);
+	if (place.pic == nullptr) return true;
+	lights = place.pic->lights;
+	ax = place.ax;
+	ay = place.ay;
+	az = place.az;
+	return true;
+}
+
+/**
+ * The lights of a vehicle drawn as an object whose model has them, in the world (the view from the eyes): where its
+ * lamps are, its object turned as it faces and as big as it is drawn; the pool of its headlights on the way ahead.
+ * @return whether its lights are its model's (none, for a piece drawn with its anchor piece); false: about its box as always
+ */
+bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights)
+{
+	lights.clear();
+	int piece = 0;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
+	if (obj == nullptr) return false;
+	const ThreeDVehicleShape *shape = obj->GetShape();
+	if (shape == nullptr || !shape->HasLights()) return false;
+	if (piece != obj->anchor) return true;
+	bool reversed = false;
+	if (v->type == VehicleType::Train) {
+		const Train *t = Train::From(v);
+		if (t->flags.Test(VehicleRailFlag::Flipped)) reversed = !reversed;
+		if (t->spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) reversed = !reversed;
+	}
+	const Vehicle *front = v;
+	while (front->IsArticulatedPart() && front->Previous() != nullptr) front = front->Previous();
+	const Vehicle *last = front;
+	while (last->HasArticulatedPart()) last = last->GetNextArticulatedPart();
+	const int on = VehicleObjectLightsOn(obj, front, last, reversed);
+	if (on == 0) return true;
+
+	const int d = to_underlying(reversed ? ReverseDir(v->direction) : v->direction) & 7;
+	const float scale = ObjectScale(obj);
+	const double along = MiddleFromPiece(obj, PieceLengths(obj), piece);
+	const double ax = v->x_pos + along * DIR_DX[d], ay = v->y_pos + along * DIR_DY[d];
+	/* The object's front and left in the world, as RasterObject() lights it. */
+	const double wa = (ViewAzimuth(d) + 135.0) * M_PI / 180.0;
+	const double fx = std::cos(wa), fy = std::sin(wa), lx = -fy, ly = fx;
+	auto add = [&](float px, float py, float pz, ThreeDPictureLight::Kind kind) {
+		const double x = px * scale * UNITS_PER_METRE, y = py * scale * UNITS_PER_METRE;
+		lights.push_back({ax + x * fx + y * lx, ay + x * fy + y * ly, v->z_pos + pz * scale * OBJECT_HEIGHT_PER_METRE, kind});
+	};
+	if ((on & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
+		float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
+		const size_t n = shape->front_lights.size() / 3;
+		for (size_t i = 0; i < n; i++) {
+			add(shape->front_lights[i * 3], shape->front_lights[i * 3 + 1], shape->front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
+			ahead = std::max(ahead, shape->front_lights[i * 3]);
+			mid += shape->front_lights[i * 3 + 1] / n;
+		}
+		add(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+		add(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+	}
+	if ((on & LIGHTS_BACK) != 0) {
+		for (size_t i = 0; i + 2 < shape->back_lights.size(); i += 3) add(shape->back_lights[i], shape->back_lights[i + 1], shape->back_lights[i + 2], ThreeDPictureLight::Kind::Back);
+	}
 	return true;
 }
 
@@ -819,17 +1045,32 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
  * A vehicle object of no vehicle on the turned map (a car of the game's own driving about, three_d_walkers.h): at a
  * place, facing a way (degrees, 0 along +x), sorted by a box about it as long as it is.
  */
-bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom)
+bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit)
 {
 	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
 	if (shape == nullptr) return false;
 	float world_az = facing - 135.0f;
-	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0);
+	/* At night (lit) with its lights on, front and back, when its model has them. */
+	const int lights = lit && shape->HasLights() ? LIGHTS_FRONT | LIGHTS_BACK : 0;
+	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, lights);
 	if (pic == nullptr) return false;
 	int half = std::max(1, static_cast<int>(std::lround(std::max(shape->x1 - shape->x0, shape->y1 - shape->y0) * scale * OBJECT_UNITS_PER_METRE / 2)));
 	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	AddTurnedVehiclePicture(pic, x, y, z, x - half, y - half, z, x + half, y + half, z + height);
 	return true;
+}
+
+/**
+ * The lights of an object drawn by itself at night (AddThreeDObjectToViewport() lit, a car of the game's own), pixels of
+ * the zoom from where it stands; nullptr when its model has none.
+ */
+const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const ThreeDVehicleObject *obj, float scale, float facing, ZoomLevel zoom)
+{
+	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
+	if (shape == nullptr || !shape->HasLights()) return nullptr;
+	float world_az = facing - 135.0f;
+	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, LIGHTS_FRONT | LIGHTS_BACK);
+	return pic != nullptr ? &pic->lights : nullptr;
 }
 
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)

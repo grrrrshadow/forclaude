@@ -176,6 +176,15 @@ struct ThreeDVehicleShape {
 	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
 	std::vector<std::string> tex_names; ///< for each texture, the name of its material
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
+	/* Its lights at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): the glass of the node "noc" of its
+	 * file, never drawn by day, and the places "svetlo_predni_NN" and "svetlo_zadni_NN" the light shines from. */
+	std::vector<float> night_pos;       ///< x, y, z of each corner of the glass, metres
+	std::vector<uint32_t> night_tri;    ///< three corners a triangle
+	std::vector<uint32_t> night_colour; ///< each triangle's colour, its material's (Colour::data)
+	std::vector<uint8_t> night_back;    ///< whether a triangle is of a light at the back (its material "svetlo_zadni")
+	std::vector<float> front_lights;    ///< x, y, z of each headlight, metres
+	std::vector<float> back_lights;     ///< x, y, z of each red light at the back, metres
+	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }
 };
 
 /** The paint of a vehicle object ("lak"): which pixels of the body's texture are paint, how they fade with age, a colour by number. */
