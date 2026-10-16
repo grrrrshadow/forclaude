@@ -41,6 +41,8 @@
 #include "walker_inventory.h"
 #include "company_base.h"
 #include "company_func.h"
+#include "command_func.h"
+#include "walker_cmd.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -138,16 +140,28 @@ struct FirstPersonWindow : Window {
 	FirstPersonEye walker{};             ///< where the walker is and looks
 	mutable CabViewCamera camera{};      ///< the eye between frames
 	mutable CabViewPicture picture{};    ///< the last picture
-	bool full = false;                    ///< over the whole screen
+	mutable bool picture_ok = true;       ///< whether the last picture could be made (32 bpp)
+	bool full = false;                    ///< over the whole screen, between the toolbar and the status bar
 	Rect before_full{};                   ///< where it was before that
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
 	bool hammer_out = false;              ///< the hammer taken out (F), in the hand
 	double swing_time = -1;               ///< seconds into a swing of the hammer, -1 when it is not swung
 
-	/* Moves while the keys are held and draws the picture anew, twenty-five times a second. */
+	/*
+	 * Moves while the keys are held and makes the picture anew, twenty-five times a second -- only here: a paint of
+	 * the window (the map under it marks the screen dirty as its vehicles move, in several pieces a frame) puts the
+	 * picture made on the screen and nothing more.
+	 */
 	IntervalTimer<TimerWindow> step{std::chrono::milliseconds(FIRST_PERSON_TICK_MS), [this](auto) {
 		this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
 		this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
+		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
+		const Company *c = Company::GetIfValid(_local_company);
+		if (c != nullptr && c->walker_health == 0) {
+			this->Close();
+			return;
+		}
+		this->MakePicture();
 		this->SetWidgetDirty(WID_FP_CANVAS);
 		this->SetWidgetDirty(WID_FP_PANEL);
 	}};
@@ -159,6 +173,37 @@ struct FirstPersonWindow : Window {
 		this->walker.eye_z = FIRST_PERSON_EYES_M * OBJECT_HEIGHT_PER_METRE;
 		this->walker.heading = std::atan2(1.0, 1.0); // looking south-east, down the screen of the map facing north
 		this->PutWhereTheMainViewLooks();
+		/* Opened over the whole screen (the player, 15. 10.); the button makes it a window again. */
+		this->ToggleFull();
+	}
+
+	/** The picture from the walker's eyes, as big as the canvas is now. */
+	void MakePicture() const
+	{
+		const NWidgetBase *canvas = this->GetWidget<NWidgetBase>(WID_FP_CANVAS);
+		const int w = canvas->current_x, h = canvas->current_y;
+		if (w <= 0 || h <= 0) return;
+		this->picture_ok = DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
+	}
+
+	/** Over the whole screen between the toolbar and the status bar, or back where the window was. */
+	void ToggleFull()
+	{
+		if (!this->full) {
+			this->before_full = {this->left, this->top, this->left + this->width, this->top + this->height};
+			this->full = true;
+			const int top = GetMainViewTop(), bottom = GetMainViewBottom();
+			this->left = 0;
+			this->top = top;
+			ResizeWindow(this, _screen.width - this->width, bottom - top - this->height, false);
+		} else {
+			this->full = false;
+			this->left = this->before_full.left;
+			this->top = this->before_full.top;
+			ResizeWindow(this, this->before_full.Width() - this->width, this->before_full.Height() - this->height, false);
+		}
+		this->MakePicture();
+		MarkWholeScreenDirty();
 	}
 
 	/** The walker to where the middle of the main view is, on the ground; it steps aside to the nearest place it can stand. */
@@ -296,6 +341,14 @@ struct FirstPersonWindow : Window {
 		this->SetWidgetDirty(WID_FP_CANVAS);
 	}
 
+	/** The walker's health changed (a dragon's blow, CmdHurtWalker()): with none left, back to the map at once. */
+	void OnInvalidateData([[maybe_unused]] int data = 0, bool gui_scope = true) override
+	{
+		if (!gui_scope) return;
+		const Company *c = Company::GetIfValid(_local_company);
+		if (c != nullptr && c->walker_health == 0) this->Close();
+	}
+
 	void OnPaint() override
 	{
 		this->SetWidgetLoweredState(WID_FP_RUN, this->running);
@@ -325,7 +378,9 @@ struct FirstPersonWindow : Window {
 			case WID_FP_CANVAS: {
 				int w = r.Width(), h = r.Height();
 				if (w <= 0 || h <= 0) return;
-				if (!DrawFirstPersonView(this->walker, w, h, this->camera, this->picture)) {
+				/* Made by the step; anew here only when the window changed its size since. */
+				if (this->picture.width != w || this->picture.height != h) this->MakePicture();
+				if (!this->picture_ok) {
 					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
 					DrawString(r.left, r.right, r.top + h / 2, STR_FIRST_PERSON_NEEDS_32BPP, TextColour::White, AlignmentH::Centre);
 					return;
@@ -383,20 +438,7 @@ struct FirstPersonWindow : Window {
 				ShowWalkerInventoryWindow();
 				break;
 			case WID_FP_FULL:
-				/* Over the whole screen, and back where it was. */
-				if (!this->full) {
-					this->before_full = {this->left, this->top, this->left + this->width, this->top + this->height};
-					this->full = true;
-					this->left = 0;
-					this->top = 0;
-					ResizeWindow(this, _screen.width - this->width, _screen.height - this->height, false);
-				} else {
-					this->full = false;
-					this->left = this->before_full.left;
-					this->top = this->before_full.top;
-					ResizeWindow(this, this->before_full.Width() - this->width, this->before_full.Height() - this->height, false);
-				}
-				MarkWholeScreenDirty();
+				this->ToggleFull();
 				break;
 			default:
 				break;
@@ -414,6 +456,9 @@ static WindowDesc _first_person_desc(
 /** Open the view from the first person, or bring it to the front; the walker stands where the main view looks. */
 void ShowFirstPersonWindow()
 {
+	/* After the walker had no health left, it comes back whole. */
+	const Company *c = Company::GetIfValid(_local_company);
+	if (c != nullptr && c->walker_health == 0) Command<Commands::ReviveWalker>::Post(TileIndex{}, WALKER_HEALTH_MAX);
 	AllocateWindowDescFront<FirstPersonWindow>(_first_person_desc, 0);
 }
 
@@ -478,6 +523,7 @@ bool RigFirstPersonHold(bool out, float swing)
 	w->walker.raise = w->hammer_out ? 1.0f : 0.0f;
 	w->walker.held = w->hammer_out ? std::string(FIRST_PERSON_HAMMER) : std::string();
 	w->walker.swing = swing;
+	w->MakePicture();
 	w->SetDirty();
 	return w->hammer_out;
 }
@@ -499,5 +545,6 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 			w->walker.y = ny;
 		}
 	}
+	w->MakePicture();
 	w->SetDirty();
 }

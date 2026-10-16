@@ -138,3 +138,40 @@ CommandCost CmdUseWalkerItem(DoCommandFlags flags, WalkerItem item)
 	}
 	return CommandCost();
 }
+
+/**
+ * Hurt the walker of the view from the first person: a dragon's blow (the player, 15. 10.: "they attack the player").
+ * At no health left the view closes and the player is back on the map (first_person_gui.cpp).
+ * @param flags operation to perform
+ * @param damage how much health it takes
+ * @return nothing, or an error
+ */
+CommandCost CmdHurtWalker(DoCommandFlags flags, uint8_t damage)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_health = static_cast<uint8_t>(c->walker_health > damage ? c->walker_health - damage : 0);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
+ * The walker of the view from the first person back, after it had no health left: the view opened again.
+ * @param flags operation to perform
+ * @param health the health it comes back with (the view gives it all)
+ * @return nothing, or an error when it has health still
+ */
+CommandCost CmdReviveWalker(DoCommandFlags flags, uint8_t health)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr || c->walker_health != 0 || health == 0) return CMD_ERROR;
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_health = std::min<uint8_t>(health, WALKER_HEALTH_MAX);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}

@@ -8886,7 +8886,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		const TileIndex shop = FirstPersonShopNearby();
 		auto n = number(3);
-		if (argv.size() > 3 && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
+		if (argv.size() > 3 && argv[2] == "zdravi" && n.has_value()) {
+			c->walker_health = static_cast<uint8_t>(std::clamp(*n, 0, static_cast<int>(WALKER_HEALTH_MAX)));
+		} else if (argv.size() > 3 && argv[2] == "zraneni" && n.has_value()) {
+			/* A dragon's blow, through the command, as the game deals it. */
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			Command<Commands::HurtWalker>::Do(DoCommandFlag::Execute, static_cast<uint8_t>(std::clamp(*n, 0, 255)));
+		} else if (argv.size() > 3 && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
 			const WalkerItem item = static_cast<WalkerItem>(*n);
 			AutoRestoreBackup cur_company(_current_company, _local_company);
 			CommandCost res;
@@ -8897,8 +8903,6 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				res = Command<Commands::UseWalkerItem>::Do(DoCommandFlag::Execute, item);
 			}
 			IConsolePrint(CC_DEFAULT, "test3d: inventar {} {}: {} cena {}", argv[2], *n, res.Succeeded() ? "ok" : "chyba", res.GetCost());
-		} else if (argv.size() > 3 && argv[2] == "zdravi" && n.has_value()) {
-			c->walker_health = static_cast<uint8_t>(std::clamp(*n, 0, static_cast<int>(WALKER_HEALTH_MAX)));
 		} else {
 			ShowWalkerInventoryWindow();
 		}
