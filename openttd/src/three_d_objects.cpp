@@ -1717,7 +1717,9 @@ static void ReadThreeDVehicleObjects()
 		obj.file = e.shape;
 		obj.type = VehicleType::Train;
 		obj.grfid = e.grfid;
-		obj.pieces.push_back(SIMTRAINS_ENGINE_ID);
+		/* A long one is articulated (ReadSize()): its parts are pieces, the model hung from the middle one. */
+		for (int k = 0; k < e.parts; k++) obj.pieces.push_back(static_cast<uint16_t>(SIMTRAINS_ENGINE_ID + k));
+		obj.anchor = (e.parts - 1) / 2;
 		if (e.has_cab) {
 			std::copy(std::begin(e.cab), std::end(e.cab), obj.cab);
 			obj.has_cab = true;

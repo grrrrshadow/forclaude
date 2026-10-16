@@ -745,9 +745,10 @@ the curves are vanilla to the pixel.
 
 The player (15. 10.), after looking at OpenMW: "let's make Morrowind, the
 inventory, the first person view", "don't forget anything, the lights". The
-map menu has *View from the first person* (`first_person_gui.cpp`): a walker
-stands where the main view looks (on the nearest ground it can stand on) and
-the world is drawn from its eyes, 1.55 m over the ground, as from a cab
+map menu has *View from the first person* (`first_person_gui.cpp`; the help
+menu too, right after the night, the player: "put it beside the night and day
+switch"): a walker stands where the main view looks (on the nearest ground
+it can stand on) and the world is drawn from its eyes, 1.55 m over the ground, as from a cab
 (`DrawEyeView()` in `viewport.cpp`, the cab view's renderer with the eye of a
 vehicle or of the walker; `DrawCabView()` and `DrawFirstPersonView()` call
 it). W and S or the arrows up and down walk (1.6 m/s; Shift or *Run* 6.5 m/s),
@@ -1233,6 +1234,17 @@ vehicle of the game:
   uncompressed (rows of red, green, blue, a mask and alpha) or packed as DXT1,
   DXT3 or DXT5 (a table of the sizes, each its length and its blocks of four by
   four). `PassengerCabinHeadPos` is the eye of the cab view.
+- Its length: the third figure of `Size` of its `Wagon` (`ReadSize()`). A
+  vehicle of the game is at most eight steps of the chain, a step of diagonal
+  track (a tile 14.84 m, as the vehicle objects): about 10.5 m. A longer one
+  would be drawn over the next (the player, 16. 10.: "the wagon and the engine
+  are pressed into each other, no gap"), so its GRF makes it articulated: the
+  parts are the numbers after its own (`SIMTRAINS_ENGINE_ID` + 1 ...), in no
+  climate, with nothing but their length (no power, weight or load), given by
+  callback 16 (the callback mask 0x10, a varaction2 of variable 0C going to
+  one of variable 10). The model is one object over all the parts, hung from
+  the middle one, as long as the model makes it (the ŽSSK 750, 16.24 m: two
+  parts, 6 + 7; the ČD B 598, 24.2 m: three, 6 + 7 + 6).
 - Not read yet: the freight animation, lights and sounds.
 - The rig: `test3d ace <file.ace> <out.ppm>` writes a texture out as the game
   reads it.

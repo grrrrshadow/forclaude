@@ -625,6 +625,23 @@ std::string GrfFolder()
 }
 
 /**
+ * Its length of the "Size" of its wagon (width, height, length), and the vehicles of the game it is made of: a
+ * vehicle of the game is at most a step of the chain of eight, a step of diagonal track (as the vehicle objects,
+ * three_d_vehicle_object.cpp, a tile 14.84 m), so a longer one is articulated -- else its model is longer than the
+ * place the game keeps for it and the next vehicle's runs into it (the player, 16. 10.: "they are pressed into each
+ * other, no gap").
+ */
+void ReadSize(const TextNode *wagon, SimtrainsEngine &e)
+{
+	const TextNode *size = wagon->Child("Size");
+	if (size == nullptr) return;
+	e.length_m = ParseFigure(size->Value(2), {{"m", 1}, {"cm", 0.01}, {"mm", 0.001}, {"ft", 0.3048}, {"in", 0.0254}});
+	static constexpr double STEPS_PER_METRE = 16.0 / 14.83765 / 1.41421356;
+	const int steps = static_cast<int>(std::lround(e.length_m * STEPS_PER_METRE));
+	e.parts = Clamp((steps + 7) / 8, 1, 8);
+}
+
+/**
  * A vehicle of its .eng or .wag, if it is one with a model: an engine of an .eng; a carriage or a goods wagon of a
  * .wag (a tender, and a .wag that is an engine of the same folder hauled dead, its model the engine's, are left out).
  */
@@ -683,6 +700,7 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 		}
 		e.capacity = Clamp(e.capacity, 1, 255);
 		if (e.mass_t <= 0) e.mass_t = 20;
+		ReadSize(wagon, e);
 		e.grfid = GrfIdOf(e.eng);
 		return e;
 	}
@@ -724,13 +742,14 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 		Debug(grf, 0, "Simtrains: {}: no power, speed or mass", path);
 		return std::nullopt;
 	}
+	ReadSize(wagon, e);
 	e.grfid = GrfIdOf(e.eng);
 	return e;
 }
 
 /* ---- The GRF ---- */
 
-/** The bytes of a NewGRF of one engine (container version 1, GRF version 8: Actions 8, 0 and 4, no sprites). */
+/** The bytes of a NewGRF of one engine (container version 1, GRF version 8: Actions 8, 0, 2 and 3 for its articulated parts, and 4; no sprites). */
 std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 {
 	std::vector<std::vector<uint8_t>> sprites;
@@ -795,6 +814,7 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		prop(0x16); a0.push_back(weight & 0xFF);
 		prop(0x24); a0.push_back(static_cast<uint8_t>(weight >> 8));
 		prop(0x17); a0.push_back(e.passengers ? 247 : 200);
+		if (e.parts > 1) { prop(0x1E); a0.push_back(0x10); } // its articulated parts by callback 16
 		a0[2] = props;
 		sprites.push_back(std::move(a0));
 	} else {
@@ -820,8 +840,56 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		prop(0x24); a0.push_back(static_cast<uint8_t>(weight >> 8));
 		prop(0x17); a0.push_back(cost);
 		prop(0x1F); a0.push_back(static_cast<uint8_t>(effort));
+		if (e.parts > 1) { prop(0x1E); a0.push_back(0x10); } // its articulated parts by callback 16
 		a0[2] = props;
 		sprites.push_back(std::move(a0));
+	}
+	/* A vehicle longer than one of the game: the parts after it, the numbers after its own (ReadSize()). Each is
+	 * nothing but its length -- no power, weight or load, in no climate so never bought alone; the model is drawn
+	 * over them all from the middle one. */
+	for (int k = 1; k < e.parts; k++) {
+		std::vector<uint8_t> a0 = {0x00, 0x00, 0, 0x01, static_cast<uint8_t>(SIMTRAINS_ENGINE_ID + k)};
+		uint8_t props = 0;
+		auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
+		prop(0x00); word(a0, 0);
+		prop(0x06); a0.push_back(0x00);                // no climate: a part only
+		prop(0x05); a0.push_back(0);
+		prop(0x09); word(a0, 0);
+		prop(0x0B); word(a0, 0);
+		prop(0x0D); a0.push_back(0);
+		prop(0x12); a0.push_back(0xFD);                // drawn with the model (GetThreeDVehicleObjectSprite())
+		prop(0x14); a0.push_back(0);
+		if (e.wagon) {
+			prop(0x15); a0.push_back(e.passengers ? 0x00 : 0xFF);
+			prop(0x28); word(a0, e.passengers ? 0x0001 : 0xFFFE);
+			prop(0x29); word(a0, e.passengers ? 0x0000 : 0x0001);
+		}
+		prop(0x16); a0.push_back(0);
+		a0[2] = props;
+		sprites.push_back(std::move(a0));
+	}
+	if (e.parts > 1) {
+		/* Callback 16 (the articulated parts): for the part asked for (variable 10, from 1) its number, after the
+		 * last 7FFF; any other callback fails, and so does the picture (the model is drawn instead). */
+		std::vector<uint8_t> parts = {0x02, 0x00, 0x00, 0x81, 0x10, 0x00, 0xFF, static_cast<uint8_t>(e.parts - 1)};
+		for (int k = 1; k < e.parts; k++) {
+			word(parts, 0x8000 | (SIMTRAINS_ENGINE_ID + k));
+			parts.push_back(static_cast<uint8_t>(k));
+			parts.push_back(static_cast<uint8_t>(k));
+		}
+		word(parts, 0xFFFF);
+		sprites.push_back(std::move(parts));
+		std::vector<uint8_t> which = {0x02, 0x00, 0x01, 0x89, 0x0C, 0x00};
+		dword(which, 0xFFFF);
+		which.push_back(1);
+		word(which, 0x0000);
+		dword(which, 0x16);
+		dword(which, 0x16);
+		word(which, 0x7FFF);
+		sprites.push_back(std::move(which));
+		std::vector<uint8_t> a3 = {0x03, 0x00, 0x01, static_cast<uint8_t>(SIMTRAINS_ENGINE_ID), 0x00};
+		word(a3, 0x0001);
+		sprites.push_back(std::move(a3));
 	}
 	{
 		std::vector<uint8_t> a4 = {0x04, 0x00, 0x7F, 0x01, static_cast<uint8_t>(SIMTRAINS_ENGINE_ID)};
@@ -876,9 +944,9 @@ const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 			Debug(grf, 0, "Simtrains: {} has the same GRF id as another, left out", file);
 			continue;
 		}
-		Debug(grf, 1, "Simtrains: {} ({}): {}{:.0f} kW, {:.0f} km/h, {:.0f} t, GRF {:02X}{:02X}{:02X}{:02X}", e->name, e->eng,
+		Debug(grf, 1, "Simtrains: {} ({}): {}{:.0f} kW, {:.0f} km/h, {:.0f} t, {:.2f} m in {} parts, GRF {:02X}{:02X}{:02X}{:02X}", e->name, e->eng,
 				e->wagon ? fmt::format("{} {}, ", e->passengers ? "seats" : "goods", e->capacity) : std::string(), e->power_kw, e->speed_kmh, e->mass_t,
-				e->grfid & 0xFF, (e->grfid >> 8) & 0xFF, (e->grfid >> 16) & 0xFF, e->grfid >> 24);
+				e->length_m, e->parts, e->grfid & 0xFF, (e->grfid >> 8) & 0xFF, (e->grfid >> 16) & 0xFF, e->grfid >> 24);
 		_simtrains_engines.push_back(std::move(*e));
 	}
 	return _simtrains_engines;

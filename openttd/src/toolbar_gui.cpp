@@ -1144,6 +1144,8 @@ static CallBackFunction PlaceLandBlockInfo()
 
 /** The help menu's item of the night (gui.night), after the console's: its value, past the others. */
 static constexpr int HELP_MENU_NIGHT = 11;
+/** The help menu's item of the view from the first person, after the night's (the player: "put it beside the night and day"). */
+static constexpr int HELP_MENU_FIRST_PERSON = 12;
 
 static CallBackFunction ToolbarHelpClick(Window *w)
 {
@@ -1156,7 +1158,10 @@ static CallBackFunction ToolbarHelpClick(Window *w)
 		} else {
 			list.push_back(MakeDropDownListStringItem(string, i++));
 		}
-		if (string == STR_ABOUT_MENU_TOGGLE_CONSOLE) list.push_back(MakeDropDownListCheckedItem(_settings_client.gui.night, STR_ABOUT_MENU_NIGHT, HELP_MENU_NIGHT));
+		if (string == STR_ABOUT_MENU_TOGGLE_CONSOLE) {
+			list.push_back(MakeDropDownListCheckedItem(_settings_client.gui.night, STR_ABOUT_MENU_NIGHT, HELP_MENU_NIGHT));
+			if (_game_mode == GameMode::Normal) list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_FIRST_PERSON, HELP_MENU_FIRST_PERSON));
+		}
 	};
 	for (StringID string : {STR_ABOUT_MENU_LAND_BLOCK_INFO, STR_ABOUT_MENU_HELP, STR_NULL, STR_ABOUT_MENU_TOGGLE_CONSOLE, STR_ABOUT_MENU_AI_DEBUG,
 			STR_ABOUT_MENU_SCREENSHOT, STR_ABOUT_MENU_SHOW_FRAMERATE, STR_ABOUT_MENU_ABOUT_OPENTTD}) {
@@ -1266,6 +1271,7 @@ static CallBackFunction MenuClickHelp(int index)
 		case  9: ToggleDirtyBlocks();              break;
 		case 10: ToggleWidgetOutlines();           break;
 		case HELP_MENU_NIGHT: ToggleNight();       break;
+		case HELP_MENU_FIRST_PERSON: ShowFirstPersonWindow(); break;
 	}
 	return CallBackFunction::None;
 }

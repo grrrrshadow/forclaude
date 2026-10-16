@@ -35,6 +35,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Windows build 278 spadl na `M_SQRT2` (MSVC ho nezná) – opraveno (`91c7b4d`). Při tom tři skutečné chyby z
   `-TILE_SIZE` (neznaménkové, vyšlo přes 4 miliardy): stěny základů v pohledu z očí se nekreslily, Mat nevybíral
   chodník u dveří, polní cesta v náhledu průmyslu ležela navrchu.
+- Pohled z první osoby je i v nabídce nápovědy hned pod nocí (hráč: „dej to vedle přepínače noc a den“). V menu
+  mapy zůstal.
+- Simtrains: vůz a mašina byly natlačené do sebe. Příčina: hra dává vozidlu nejvýš 8/8 (asi 10,5 m), model 750 má
+  16,24 m a B 598 24,2 m, takže se kreslily přes sebe. Teď GRF podle `Size` z .eng/.wag udělá dlouhé vozidlo kloubové
+  (750 ze 2 dílů, B 598 ze 3) a model se kreslí přes všechny díly. V rigu jsou mezi vozy mezery.
+- Úvodní hra (pozadí menu) je v 16.0-beta2 arktická, 15.3 měla toyland. Hráč chce mírné klima. Ptám se, jestli dá
+  vlastní save, nebo ji mám postavit sám.
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 

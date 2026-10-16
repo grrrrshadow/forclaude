@@ -40,11 +40,14 @@ struct SimtrainsEngine {
 	bool has_cab = false;         ///< "PassengerCabinHeadPos" given
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
 	uint32_t grfid = 0;           ///< the GRF's id, of its .eng's name
+	double length_m = 0;          ///< the length of its "Size", 0 when not given
+	int parts = 1;                ///< the vehicles of the game it is made of, an articulated one when longer than one (ReadSize())
 
 	std::string grf_path;         ///< where the GRF made of it is: newgrf/simtrains/ of the player's own folder
 };
 
-/** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. */
+/** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. Its
+ * articulated parts are the numbers after it. */
 static constexpr uint16_t SIMTRAINS_ENGINE_ID = 200;
 
 extern std::string _simtrains_path;
