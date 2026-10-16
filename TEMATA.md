@@ -37,7 +37,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   chodci a útočí (rána 12 zdraví), po 6 ranách kladivem padnou a chvíli leží, za zabití nic. Ledový a čínský
   přelétají a jednou se snesou (8 zdraví). Rány jdou přes příkaz `HurtWalker`, obraz při zásahu zčervená. Na mapě
   (otočený pohled, na sever s objekty) i v pohledu z očí, zblízka (do 3 dlaždic) jako skutečná 3D síť, ne obrázek.
-- Čeká na odpověď hráče: spánek a čas, kdo dává úkoly, tráva a kytky.
+- Hráč: **spánek nebude vůbec**. Úkoly může dávat kdokoli, až je vymyslíme. Trávu a kytky domluví hráč s kolegou.
 
 ## 15. 10. – Morrowind: tématická města
 
