@@ -29,6 +29,7 @@
 #include "tar_type.h"
 #include "fios.h"
 #include "simtrains.h"
+#include "beamng.h"
 
 #include "safeguards.h"
 
@@ -689,6 +690,8 @@ void DoScanNewGRFFiles(NewGRFScanCallback *callback)
 	CrashTrace("newgrf scan");
 	/* The trains of MSTS in newgrf/simtrains/: a GRF beside each, found by the scan as any other (simtrains.h). */
 	PrepareSimtrainsGrfs();
+	/* The cars of the mods of BeamNG.drive: a GRF of each in newgrf/beamng/ (beamng.h). */
+	PrepareBeamngGrfs();
 	uint num = GRFFileScanner::DoScan();
 
 	Debug(grf, 1, "Scan complete, found {} files", num);

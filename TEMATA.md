@@ -47,6 +47,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   okruhu, aby město a vlaky byly vidět vedle menu. Pozadí menu: minuta den, 4 s soumrak, 15 s noc, 4 s svítání,
   dokola; noc menu je vlastní, hráčovo nastavení noci nemění. Za 20 000 tiků se nic nesrazilo.
 
+- Mody BeamNG (hráč: „zkusíme jezdit módama z BeamNG?“, poslal GAZ Volga 24 z Automation, CC BY-NC-SA 4.0). Domluva:
+  osobní auto veze 4 cestující, nákladní cokoli kromě cestujících; barva z modu; světla podle modu („BeamNG má
+  světla vyznačená a propracované jízdní vlastnosti“). Hotovo: hra čte mody rovnou ze .zip (složky modů BeamNG,
+  `beamng_path`, `newgrf/beamng/`), nic z nich nejde do repa ani buildu. GRF v `newgrf/beamng/` jen s čísly:
+  výkon z křivky momentu, hmotnost z uzlů, rychlost z převodů a vzduchu, tah z jedničky. Volga 103 kW, 142 km/h,
+  1,34 t. Kreslí se z modelu .dae, barvy z materiálů, lak jedna z 5 barev modu na každé auto, díry pro světla a
+  masku z masky BC4, svítí skla podle glowMap, světla z props. Model zjednodušený na 110 tisíc trojúhelníků
+  (bez rozdílu v obraze), šest Volg na obrazovce nic nezpomalí. Kabina z kamery řidiče.
+
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 
 - Hráč kolegovi řekl, ať jsou holky v hospodě větší. Kolega proto zvětšil celou hospodu na 2×2 (hráč: „zvětšil

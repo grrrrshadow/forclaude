@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "three_d_objects.h"
 #include "simtrains.h"
+#include "beamng.h"
 #include "industry.h"
 #include "climate_industries.h"
 #include "three_d_vehicle_object.h"
@@ -1726,6 +1727,28 @@ static void ReadThreeDVehicleObjects()
 		}
 		_vehicle_objects.push_back(std::move(obj));
 	}
+	/* The cars of the mods of BeamNG (beamng.h): each the one road vehicle of the GRF made of it, drawn from its model,
+	 * one of its mod's paints each car (the player, 16. 10.: "the colour of the mod"). */
+	for (const BeamngVehicle &b : FindBeamngVehicles()) {
+		ThreeDVehicleObject obj;
+		obj.name = b.name;
+		obj.package = b.Package();
+		obj.file = "beamng:" + b.Package() + "|" + b.folder;
+		obj.type = VehicleType::Road;
+		obj.grfid = b.grfid;
+		obj.pieces.push_back(BEAMNG_ENGINE_ID);
+		for (uint32_t colour : b.paints) {
+			ThreeDVehicleState st;
+			st.colour = colour;
+			obj.states.push_back(st);
+		}
+		obj.paint_random = true;
+		if (b.has_cab) {
+			std::copy(std::begin(b.cab), std::end(b.cab), obj.cab);
+			obj.has_cab = true;
+		}
+		_vehicle_objects.push_back(std::move(obj));
+	}
 	/* A piece is the first object's that has it -- unless another package of the same set lies beside the GRF loaded. */
 	for (size_t i = 0; i < _vehicle_objects.size(); i++) {
 		const ThreeDVehicleObject &o = _vehicle_objects[i];
@@ -1957,6 +1980,52 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	auto it = _vehicle_shapes.find(key);
 	if (it != _vehicle_shapes.end()) return it->second;
 	GlbMesh mesh;
+	if (this->file.starts_with("beamng:")) {
+		/* A car of a mod of BeamNG (beamng.h): its materials as they are, the paint first, white; its lights of the mod. */
+		const BeamngVehicle *car = nullptr;
+		for (const BeamngVehicle &b : FindBeamngVehicles()) {
+			if (this->file == "beamng:" + b.Package() + "|" + b.folder) car = &b;
+		}
+		BeamngMesh bm;
+		if (car == nullptr || !ReadBeamngShape(*car, bm)) return nullptr;
+		auto made = std::make_shared<ThreeDVehicleShape>();
+		made->pos = std::move(bm.pos);
+		made->nrm = std::move(bm.nrm);
+		made->uv = std::move(bm.uv);
+		made->tri = std::move(bm.tri);
+		made->tri_tex = std::move(bm.tri_tex);
+		for (BeamngMesh::Material &m : bm.materials) {
+			std::vector<uint8_t> png = std::move(m.png);
+			if (png.empty() && !m.rgba.empty()) {
+				png.assign(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
+				for (uint32_t v : {static_cast<uint32_t>(m.w), static_cast<uint32_t>(m.h)}) {
+					for (int k = 0; k < 4; k++) png.push_back(static_cast<uint8_t>(v >> (8 * k)));
+				}
+				png.insert(png.end(), m.rgba.begin(), m.rgba.end());
+			}
+			made->pngs.push_back(std::move(png));
+			made->flats.push_back(m.flat);
+			made->tex_names.push_back(std::move(m.name));
+		}
+		made->paint_whole = true;
+		made->night_pos = std::move(bm.night_pos);
+		made->night_tri = std::move(bm.night_tri);
+		made->night_colour = std::move(bm.night_colour);
+		made->night_back = std::move(bm.night_back);
+		made->front_lights = std::move(bm.front_lights);
+		made->back_lights = std::move(bm.back_lights);
+		made->x0 = made->y0 = made->z0 = 1e9f;
+		made->x1 = made->y1 = made->z1 = -1e9f;
+		for (size_t i = 0; i + 2 < made->pos.size(); i += 3) {
+			made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
+			made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
+			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
+		}
+		Debug(misc, 1, "3D vehicle {}: {} triangles, {} materials, {:.2f}..{:.2f} x {:.2f}..{:.2f} x {:.2f}..{:.2f} m", this->name, made->tri.size() / 3, made->pngs.size(),
+				made->x0, made->x1, made->y0, made->y1, made->z0, made->z1);
+		_vehicle_shapes.emplace(key, made);
+		return made;
+	}
 	if (this->file.ends_with(".s") || this->file.ends_with(".S")) {
 		/* A model of MSTS (simtrains.h): its textures as they are, RGBA, marked so (DecodeTextureLevels()). */
 		SimtrainsMesh msts;

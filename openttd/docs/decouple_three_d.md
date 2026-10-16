@@ -1289,3 +1289,75 @@ the `.eng`, no part of the model.
 The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid> [<wagon grfid>]`
 buys the engine of that GRF (`53542680`, the ŽSSK 750 031) and the wagons of
 the other (`53544EE5`, the ČD B 598).
+
+## Cars of BeamNG.drive mods (beamng)
+
+The player (16. 10.): "shall we drive mods of BeamNG?", sending a mod, the GAZ
+Volga 24 (made in Automation, CC BY-NC-SA 4.0 by its author). As the trains of
+MSTS, the mods stay where the player has them and are read there, straight
+from their `.zip` (`beamng.cpp`); no part of them goes in the repository, in
+grrrrf or in a build -- each mod has its own licence, and the official cars of
+BeamNG may not go to another game at all. Looked for in:
+
+- `newgrf/beamng/` of the game's folders (`.zip` files, or unpacked mods with
+  their `vehicles/` folder), for a player without BeamNG;
+- the folders of `beamng_path` in `[misc]` of `openttd.cfg` (separated by `;`:
+  a folder of mods, or the user folder of BeamNG);
+- BeamNG's user folders: each version under `%LOCALAPPDATA%\BeamNG.drive`
+  and the older `Documents\BeamNG.drive`, their `mods`, `mods\repo` and the
+  mods unpacked in `mods\unpacked`.
+
+A car is a folder `vehicles/<name>/` of a mod with a `.jbeam` whose part has
+`"slotType": "main"`, a model `.dae` and an engine; a folder of configurations
+only (for a car of BeamNG) is left out, so are props and trailers. Read:
+
+- The `.jbeam` files, JSON written loosely (comments, commas left out or left
+  over, words without quotes). The main part, then for each slot ("slots" or
+  "slots2") the part the `.pc` names (info.json's `default_pc`, else the only
+  one), else its default.
+- The figures, as BeamNG drives the car: the power is the most of the
+  engine's torque curve (`torque` rows of rpm and Nm); the weight the nodes'
+  (`nodeWeight` before a row or in it, 25 kg otherwise) and the wheels' nodes
+  (`pressureWheels`, `hubWheels`); the top speed the lesser of what the top
+  gear and the final drive allow at the most revolutions (`gearRatios`, a
+  differential's `gearRatio`, the wheels' `radius`) and what the power gives
+  against the air (its frontal area from its nodes, Cd 0.4) and the road; the
+  tractive effort the first gear's force at the wheels against the weight.
+  The Volga: 103 kW, 142 km/h, 1.34 t, 0.71.
+- What it carries: four passengers; a bus ("Body Style") thirty; a lorry
+  ("truck", or over 3.5 t) goods of any kind but passengers.
+- `info.json`: `Name` with `Brand`, `Author`, the paints (`colors` with
+  `default_color`, or `paints` with `defaultPaintName1`), the default first.
+- The driver's eye for the cab view: `camerasInternal`, the row "driver",
+  else "dash", else one with "driver" in it.
+
+Before the NewGRFs are looked for (`PrepareBeamngGrfs()`) the game writes a
+GRF of one road vehicle of these figures, `newgrf/beamng/<name>.grf` of the
+player's own folder (id `BN` and a number of the mod's and the folder's
+names): introduced in 1920, never retired, every climate, priced by the
+original bus (a car half). The player switches it on as "BeamNG: <name>".
+
+Drawn from its model (`ReadBeamngShape()`): the meshes the flexbodies of its
+parts name, each through its node's matrix in the `.dae` (its unit and up),
+then the flexbody's `scale`, `rot` (degrees about x, then y, then z) and
+`pos`; then turned into the frame of the vehicle objects (BeamNG's x is the
+car's left, its y backwards: x forward = -y, y left = x), the middle of its
+nodes along it at 0 and the bottoms of its wheels on the ground. Materials of
+`materials.cs` (Torque's `singleton Material`) and `*.materials.json`: the
+colour and texture of the first layer (`.dds` BC1, BC2, BC3, BC4, plain;
+`.png`), the paint (`instanceDiffuse`, the material drawn white and painted),
+and the mask that cuts the body (`opacityMap` on the second coordinates: a
+triangle goes where the mask is dark at its middle -- the openings of the
+lamps and the grille). Each car one of its mod's paints by its random bits
+(`paint_random`, the player: "the colour of the mod"), the first in the
+purchase list. Its lights as its mod has them: the glass of the materials of
+`glowMap` with "lowbeam"/"highbeam" (ahead) or "brake" (at the back), and the
+places of its `props` of lights ("lowbeam", "brake") -- then night as for the
+other vehicle objects. The model made lighter on reading (`Simplify()`): the
+corners of a material in a cell of 2 cm that face about the same way made one;
+the Volga 207 000 triangles to 110 000, the closest zoom of the map has a
+pixel of 4 cm. Six Volgas on the screen, turned: the same 50 to 64 ms a
+redraw as without them.
+
+Rig: `test3d kresli <engine> <degrees> <px a metre> [state] [lights]` draws a
+vehicle's object alone and big to `kresli.ppm`; `test3d auta Volga 6 20 20`.

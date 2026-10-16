@@ -35,6 +35,8 @@
 #include <map>
 #include <set>
 
+#include "fileio_func.h"
+
 #include "safeguards.h"
 
 /** Pixels to a metre at 16x: the camera of the sprites of this game's sets. */
@@ -128,6 +130,8 @@ static float ObjectScale(const ThreeDVehicleObject *obj)
 static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
 	if (obj->states.empty()) return 0;
+	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list. */
+	if (obj->paint_random) return v == nullptr ? 1 : 1 + static_cast<int>(v->random_bits % obj->states.size());
 	uint32_t id = GetVehicleSetSpriteLocalID(engine, v, image_type);
 	if (id == UINT32_MAX) return 0;
 	for (size_t i = 0; i < obj->states.size(); i++) {
@@ -446,6 +450,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	const ThreeDVehiclePaint &paint = obj.paint;
 	const bool coloured = paint.coloured || paint_colour != 0;
 	const ThreeDObjectTexture *mask = (paint.fades || coloured) ? obj.GetPaintMask(level) : nullptr;
+	const bool whole = coloured && shape->paint_whole;
 	const Colour target(paint.target), colour(paint_colour != 0 ? paint_colour : paint.colour);
 	const float start = paint.start > 0 ? static_cast<float>(paint.start) : 255.0f;
 	/* The rust, after the paint has faded (the colleague: the paint fades, the rust grows over it). */
@@ -493,9 +498,12 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				float k = w0 * light[a] + w1 * light[b] + w2 * light[c];
 				Colour col(texel);
 				float cr = col.r, cg = col.g, cb = col.b;
-				if (tri_mask != nullptr) {
-					int mx = std::min(tri_mask->w - 1, static_cast<int>(u * tri_mask->w)), my = std::min(tri_mask->h - 1, static_cast<int>(v * tri_mask->h));
-					float m = Colour(tri_mask->px[static_cast<size_t>(my) * tri_mask->w + mx]).r / 255.0f;
+				if (tri_mask != nullptr || (whole && ti == 0)) {
+					float m = 1.0f;
+					if (tri_mask != nullptr) {
+						int mx = std::min(tri_mask->w - 1, static_cast<int>(u * tri_mask->w)), my = std::min(tri_mask->h - 1, static_cast<int>(v * tri_mask->h));
+						m = Colour(tri_mask->px[static_cast<size_t>(my) * tri_mask->w + mx]).r / 255.0f;
+					}
 					if (m > 0) {
 						if (coloured) {
 							/* The colour at the texture's lightness: its own where the texture is "zacatek" light. */
@@ -1293,4 +1301,34 @@ std::string DescribeThreeDVehicleObjectSprites()
 		out += fmt::format("\n  {} piece {} direction {}: sprite {}", std::get<0>(key)->name, std::get<1>(key), std::get<2>(key), sprite);
 	}
 	return out;
+}
+
+/**
+ * The rig: a vehicle's object as a picture of its own, big, written as a PPM over grey ('test3d kresli').
+ * @param az the angle the camera sees it at (ViewAzimuth()), degrees
+ * @param pxm pixels to a metre
+ * @param state its state (StateStep()): 0 as it is
+ * @param lights its lights on (LIGHTS_FRONT, LIGHTS_BACK)
+ */
+bool WriteThreeDVehicleObjectPPM(EngineID engine, float az, float pxm, int state, int lights, const std::string &path)
+{
+	int piece = 0;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, &piece);
+	if (obj == nullptr) return false;
+	ObjectRaster r;
+	if (!RasterObject(*obj, 1.0f, az, az, 1.0f, pxm, 0, r, 0, 0, 0, PaletteColour(obj, state), 1.0f, 0, 0, 0, lights)) return false;
+	auto f = FileHandle::Open(path, "wb");
+	if (!f.has_value()) return false;
+	std::string head = fmt::format("P6\n{} {}\n255\n", r.width, r.height);
+	fwrite(head.data(), 1, head.size(), *f);
+	std::vector<uint8_t> row;
+	for (size_t i = 0; i < r.px.size(); i++) {
+		const Colour c = r.px[i];
+		const int a = c.a;
+		row.push_back(static_cast<uint8_t>((c.r * a + 96 * (255 - a)) / 255));
+		row.push_back(static_cast<uint8_t>((c.g * a + 96 * (255 - a)) / 255));
+		row.push_back(static_cast<uint8_t>((c.b * a + 104 * (255 - a)) / 255));
+	}
+	fwrite(row.data(), 1, row.size(), *f);
+	return true;
 }

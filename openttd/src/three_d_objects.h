@@ -184,6 +184,7 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> night_back;    ///< whether a triangle is of a light at the back (its material "svetlo_zadni")
 	std::vector<float> front_lights;    ///< x, y, z of each headlight, metres
 	std::vector<float> back_lights;     ///< x, y, z of each red light at the back, metres
+	bool paint_whole = false;           ///< the body's texture (the first) painted all over in the state's colour, without a mask (a car of BeamNG)
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }
 };
 
@@ -275,6 +276,7 @@ struct ThreeDVehicleObject {
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
+	bool paint_random = false;      ///< a car of a mod of BeamNG (beamng.h): its states the paints of the mod, one of them each car by its random bits
 	HouseID drive_house = UINT16_MAX; ///< a car of the game's own ("auto" with "jizda"): drives between the houses of this original house, from stop ("stani") to stop
 	float drive_kmh = 60;           ///< "rychlost_kmh"
 	int drive_stand = 400;          ///< "stoji_tiku": ticks it stands at a stop

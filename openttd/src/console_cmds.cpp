@@ -9238,6 +9238,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (!DoZoomInOutWindow(vp->zoom > want ? ZOOM_IN : ZOOM_OUT, w)) break;
 		}
 		UpdateViewportPosition(w, 0);
+	} else if (what == "kresli" && argv.size() > 4) {
+		/* 'kresli <engine> <degrees> <px a metre> [state] [lights]': a vehicle's object alone and big, to kresli.ppm. */
+		auto engine = number(2), az = number(3), pxm = number(4);
+		if (!engine.has_value() || !az.has_value() || !pxm.has_value()) return true;
+		const bool ok = WriteThreeDVehicleObjectPPM(static_cast<EngineID>(*engine), static_cast<float>(*az), static_cast<float>(*pxm), number(5).value_or(0), number(6).value_or(0), "kresli.ppm");
+		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: kresli {}", ok ? "zapsano" : "ODMITNUTO");
 	} else if (what == "titulnoc") {
 		/* 'titulnoc <ms>': the title screen's day and night that much on (intro_gui.cpp), for its pictures. */
 		extern void AdvanceTitleDayAndNight(uint delta_ms);

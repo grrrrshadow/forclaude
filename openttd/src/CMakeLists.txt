@@ -85,6 +85,8 @@ add_files(
     base_media_music.h
     base_media_sounds.h
     base_station_base.h
+    beamng.cpp
+    beamng.h
     bitmap_type.h
     blueprint.cpp
     blueprint.h
