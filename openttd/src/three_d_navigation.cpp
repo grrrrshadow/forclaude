@@ -15,6 +15,7 @@
 #include "slope_func.h"
 
 #include <cmath>
+#include <numbers>
 #include <queue>
 #include <unordered_map>
 
@@ -143,7 +144,7 @@ std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int
 	std::priority_queue<Open, std::vector<Open>, std::greater<>> open;
 	auto h = [&](int x, int y) {
 		const int ddx = std::abs(x - gx), ddy = std::abs(y - gy);
-		return std::max(ddx, ddy) + (M_SQRT2 - 1) * std::min(ddx, ddy);
+		return std::max(ddx, ddy) + (std::numbers::sqrt2 - 1) * std::min(ddx, ddy);
 	};
 	seen[start.base()] = {0, start};
 	open.emplace(h(sx, sy), start.base());
@@ -176,7 +177,7 @@ std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int
 			if (!NavStep(t, n)) continue;
 			/* Diagonally only past two walkable tiles: not through the corner of a house. */
 			if (k >= 4 && (!NavWalkable(TileXY(x + DX[k], y)) || !NavWalkable(TileXY(x, y + DY[k])))) continue;
-			const double cost = (k >= 4 ? M_SQRT2 : 1.0) + (NavHeight(t) != NavHeight(n) ? 0.5 : 0.0);
+			const double cost = (k >= 4 ? std::numbers::sqrt2 : 1.0) + (NavHeight(t) != NavHeight(n) ? 0.5 : 0.0);
 			const double g = node.g + cost;
 			auto it = seen.find(n.base());
 			if (it != seen.end() && it->second.g <= g) continue;

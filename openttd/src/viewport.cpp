@@ -122,6 +122,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 
 #include <chrono>
 #include <cmath>
+#include <numbers>
 #include <forward_list>
 #include <optional>
 #include <thread>
@@ -8425,14 +8426,14 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 	auto visible = [&](int x, int y, int size) {
 		const double half = size * TILE_SIZE / 2.0;
 		CabPoint c = CabToEye(eye, x * TILE_SIZE + half, y * TILE_SIZE + half, eye.z, 0, 0);
-		const double radius = half * M_SQRT2;
+		const double radius = half * std::numbers::sqrt2;
 		return c.f > -radius && std::abs(c.r) <= std::max(c.f, 0.0) * CAB_FOV_TAN + radius + TILE_SIZE;
 	};
 	std::function<void(int, int, int)> split = [&](int x, int y, int size) {
 		if (x >= static_cast<int>(Map::SizeX()) || y >= static_cast<int>(Map::SizeY()) || x + size <= 0 || y + size <= 0) return;
 		if (!visible(x, y, size)) return;
 		const double d = std::hypot(x + size / 2.0 - ex, y + size / 2.0 - ey);
-		if (d - size * M_SQRT2 / 2 > CAB_FAR_TILES) return;
+		if (d - size * std::numbers::sqrt2 / 2 > CAB_FAR_TILES) return;
 		const double split_within = size == 8 ? 80 : size == 4 ? 40 : 26;
 		if (size > 1 && d < split_within) {
 			const int half = size / 2;
@@ -8992,7 +8993,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		if (!is_foundation[i]) continue;
 		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 		CabPoint c = CabToEye(eye, (ps.xmin + ps.xmax + 1) * 0.5, (ps.ymin + ps.ymax + 1) * 0.5, ps.zmin, 0, 0);
-		if (c.f < -TILE_SIZE * 1.0) continue;
+		if (c.f < -static_cast<double>(TILE_SIZE)) continue;
 		static CabTexture found;
 		CabCompositeTexture(found, {&ps});
 		const double x0 = ps.xmin, x1 = ps.xmax + 1, y0 = ps.ymin, y1 = ps.ymax + 1, z0 = ps.zmin, z1 = ps.zmax + 1;

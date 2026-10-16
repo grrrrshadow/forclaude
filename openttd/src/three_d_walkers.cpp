@@ -219,7 +219,7 @@ void TownDoors(const Town *town, std::vector<Door> &doors)
 						TileIndex n = TileXY(nx, ny);
 						if (!IsWalkway(n, town)) continue;
 						Point2 c = Middle(n);
-						double dist = std::hypot(c.x - door.edge.x, c.y - door.edge.y) + (n == TileXY(std::max(rx, 0), std::max(ry, 0)) ? -TILE_SIZE : 0);
+						double dist = std::hypot(c.x - door.edge.x, c.y - door.edge.y) + (n == TileXY(std::max(rx, 0), std::max(ry, 0)) ? -static_cast<double>(TILE_SIZE) : 0.0);
 						if (dist < best) {
 							best = dist;
 							door.road = n;

@@ -403,7 +403,7 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		lay(tile, ft.plants != nullptr ? ft.plants : ft.soil, ft.plants != nullptr ? ft.soil : nullptr, ft.worker, 0);
 		if (ft.road != nullptr) {
 			const TileIndex road_tile = TileAddXY(tile, 0, 1);
-			lay(road_tile, ft.road, nullptr, {}, -TILE_SIZE);
+			lay(road_tile, ft.road, nullptr, {}, -static_cast<double>(TILE_SIZE));
 			if (ft.shed != nullptr) lay(road_tile, ft.shed, nullptr, {}, 0);
 			if (ft.hay != nullptr) lay(road_tile, ft.hay, nullptr, {}, 0);
 			for (int edge = 0; edge < 2; edge++) {
