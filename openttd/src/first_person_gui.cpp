@@ -451,6 +451,8 @@ struct FirstPersonWindow : Window {
 				this->SetDirty();
 				break;
 			case WID_FP_CENTRE:
+				/* The map shows again: the view a window. */
+				if (this->full) this->ToggleFull();
 				ScrollMainWindowTo(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y), static_cast<int>(FirstPersonGroundZ(this->walker.x, this->walker.y)));
 				break;
 			case WID_FP_RUN:
@@ -511,6 +513,13 @@ TileIndex FirstPersonShopNearby()
 		}
 	}
 	return best;
+}
+
+/** Whether the view from the first person is open over the whole screen: the map under it is then not drawn (widget.cpp). */
+bool FirstPersonCoversMap()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr && w->full;
 }
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (three_d_dragons.h). */

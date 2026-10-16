@@ -2401,9 +2401,20 @@ void NWidgetViewport::SetupSmallestSize(Window *)
 	this->ApplyAspectRatio();
 }
 
+/** Whether the view from the first person covers the map, over the whole screen (first_person_gui.cpp). */
+bool FirstPersonCoversMap();
+
 void NWidgetViewport::Draw(const Window *w)
 {
 	if (this->current_x == 0 || this->current_y == 0) return;
+
+	/* The map under the view from the first person over the whole screen is not drawn at all (the player, 16. 10.:
+	 * "the big map should stop being drawn while the first person window is open, it need not take the power"):
+	 * the bits of it beside the toolbar and the status bar black. */
+	if (w->window_class == WindowClass::MainWindow && FirstPersonCoversMap()) {
+		GfxFillRect(this->GetCurrentRect(), PC_BLACK);
+		return;
+	}
 
 	if (this->disp_flags.Test(NWidgetDisplayFlag::NoTransparency)) {
 		AutoRestoreBackup to_backup(_transparency_opt);
