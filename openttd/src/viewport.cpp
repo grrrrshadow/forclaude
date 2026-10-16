@@ -7877,6 +7877,241 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 	}
 }
 
+/** Where a pixel of the view from the eyes is in the world: x, y, and its height as x and y (CAB_Z_SCALE). */
+static inline void CabPixelInWorld(const CabEye &eye, double sx, double sy, float iw, double &x, double &y, double &zu)
+{
+	const double f = 1.0 / iw;
+	const double r = (sx - eye.cx) * f / eye.focal, u = (eye.cy - sy) * f / eye.focal;
+	x = eye.x + f * eye.fx + r * eye.rx;
+	y = eye.y + f * eye.fy + r * eye.ry;
+	zu = eye.z * CAB_Z_SCALE + u;
+}
+
+/** How far from the eye the buildings cast their shadows, tiles. */
+static constexpr int CAB_SHADOW_TILES = 24;
+bool _cab_shadows = true; ///< The rig: 'test3d stiny 0' draws the view from the eyes without the sun's shadows.
+bool _cab_lamp_light = true; ///< The rig: 'test3d lampy 0' without the light of the houses' lamps on what is about them.
+
+/** A building casting its shadow (DrawEyeShadows()): what, and where its north corner is. */
+struct CabShadowCaster {
+	const ThreeDObject *obj;
+	double ox, oy, oz;
+};
+
+/**
+ * The map of the sun's shadows (DrawEyeShadows()): the buildings seen from the sun, on a plane across its light,
+ * each texel how near to the sun the nearest of them is there. Made again only when the buildings about the eye
+ * change.
+ */
+struct CabShadowMap {
+	uint64_t key = 0;
+	int nu = 0, nv = 0;
+	double u0 = 0, v0 = 0, texel = 1;
+	std::vector<float> nearest;
+};
+static CabShadowMap _cab_shadow_map;
+
+/** The sun: whence the houses are lit (their normals, three_d_objects.cpp), x and y and z as x and y; a unit long. */
+static const std::array<double, 3> &CabSun()
+{
+	static const std::array<double, 3> sun = [] {
+		const double x = -0.55, y = 0.35, z = 0.75, l = std::sqrt(x * x + y * y + z * z);
+		return std::array<double, 3>{x / l, y / l, z / l};
+	}();
+	return sun;
+}
+
+/**
+ * The sun's shadows of the buildings (the technologies of OpenMW, the player, 16. 10.): a pixel the sun does not
+ * reach for a building between it and the sun is darker -- the ground, the walls of the next house. Each pixel's
+ * place in the world from its depth, seen from the sun on the map of the shadows (CabShadowMap); a surface turned
+ * away from the sun is dark of its own light already, and is left as it is.
+ */
+static void DrawEyeShadows(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::span<const CabShadowCaster> casters)
+{
+	if (casters.empty()) return;
+	const std::array<double, 3> &s = CabSun();
+	const double al = std::hypot(s[0], s[1]);
+	const std::array<double, 3> a = {-s[1] / al, s[0] / al, 0.0};
+	const std::array<double, 3> b = {s[1] * a[2] - s[2] * a[1], s[2] * a[0] - s[0] * a[2], s[0] * a[1] - s[1] * a[0]};
+	auto dot = [](const std::array<double, 3> &v, double x, double y, double z) { return v[0] * x + v[1] * y + v[2] * z; };
+
+	/* The map again when the buildings are others. */
+	uint64_t key = 1469598103934665603ULL;
+	for (const CabShadowCaster &c : casters) {
+		for (uint64_t v : {reinterpret_cast<uintptr_t>(c.obj), static_cast<uint64_t>(c.ox), static_cast<uint64_t>(c.oy), static_cast<uint64_t>(c.oz)}) key = (key ^ v) * 1099511628211ULL;
+	}
+	CabShadowMap &map = _cab_shadow_map;
+	if (map.key != key) {
+		map.key = key;
+		/* Their shapes as simple as a texel of the map allows, made first (on every core). */
+		static constexpr double TEXEL = 0.35 * OBJECT_UNITS_PER_METRE;
+		const int level = ThreeDShapeLevel(OBJECT_UNITS_PER_METRE / TEXEL, 1.0);
+		std::vector<std::pair<const ThreeDObject *, int>> wanted;
+		for (const CabShadowCaster &c : casters) wanted.emplace_back(c.obj, level);
+		PrepareThreeDObjectShapes(wanted);
+		/* Every triangle as the sun sees it. */
+		struct SunTri {
+			float u[3], v[3], d[3];
+		};
+		std::vector<SunTri> tris;
+		double u0 = 1e18, v0 = 1e18, u1 = -1e18, v1 = -1e18;
+		for (const CabShadowCaster &c : casters) {
+			const ThreeDObjectShapeView shape = c.obj->GetShape(level);
+			for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+				SunTri st;
+				for (int k = 0; k < 3; k++) {
+					const uint32_t i = shape.tri[t + k];
+					const double x = c.ox + shape.pos[i * 3], y = c.oy + shape.pos[i * 3 + 1], z = (c.oz + shape.pos[i * 3 + 2]) * CAB_Z_SCALE;
+					st.u[k] = static_cast<float>(dot(a, x, y, z));
+					st.v[k] = static_cast<float>(dot(b, x, y, z));
+					st.d[k] = static_cast<float>(dot(s, x, y, z));
+					u0 = std::min<double>(u0, st.u[k]);
+					u1 = std::max<double>(u1, st.u[k]);
+					v0 = std::min<double>(v0, st.v[k]);
+					v1 = std::max<double>(v1, st.v[k]);
+				}
+				tris.push_back(st);
+			}
+		}
+		map.texel = std::max(TEXEL, std::max(u1 - u0, v1 - v0) / 2048);
+		map.u0 = u0;
+		map.v0 = v0;
+		map.nu = static_cast<int>((u1 - u0) / map.texel) + 2;
+		map.nv = static_cast<int>((v1 - v0) / map.texel) + 2;
+		map.nearest.assign(static_cast<size_t>(map.nu) * map.nv, -std::numeric_limits<float>::infinity());
+		const float iu = static_cast<float>(1.0 / map.texel);
+		const float fu0 = static_cast<float>(u0), fv0 = static_cast<float>(v0);
+		/* Filled by bands of its rows, a core each. */
+		ParallelBands(map.nv, [&](int lo, int hi) {
+			for (const SunTri &st : tris) {
+				float tu[3], tv[3];
+				for (int k = 0; k < 3; k++) {
+					tu[k] = (st.u[k] - fu0) * iu;
+					tv[k] = (st.v[k] - fv0) * iu;
+				}
+				const int y0 = std::max(lo, static_cast<int>(std::ceil(std::min({tv[0], tv[1], tv[2]}) - 0.5f)));
+				const int y1 = std::min(hi - 1, static_cast<int>(std::floor(std::max({tv[0], tv[1], tv[2]}) - 0.5f)));
+				if (y0 > y1) continue;
+				const float area = (tu[1] - tu[0]) * (tv[2] - tv[0]) - (tv[1] - tv[0]) * (tu[2] - tu[0]);
+				if (std::abs(area) < 1e-6f) continue;
+				const int x0 = std::max(0, static_cast<int>(std::ceil(std::min({tu[0], tu[1], tu[2]}) - 0.5f)));
+				const int x1 = std::min(map.nu - 1, static_cast<int>(std::floor(std::max({tu[0], tu[1], tu[2]}) - 0.5f)));
+				for (int y = y0; y <= y1; y++) {
+					const float py = y + 0.5f;
+					float *row = &map.nearest[static_cast<size_t>(y) * map.nu];
+					for (int x = x0; x <= x1; x++) {
+						const float px = x + 0.5f;
+						const float w0 = ((tu[1] - px) * (tv[2] - py) - (tv[1] - py) * (tu[2] - px)) / area;
+						const float w1 = ((tu[2] - px) * (tv[0] - py) - (tv[2] - py) * (tu[0] - px)) / area;
+						const float w2 = 1 - w0 - w1;
+						if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+						row[x] = std::max(row[x], w0 * st.d[0] + w1 * st.d[1] + w2 * st.d[2]);
+					}
+				}
+			}
+		}, tris.size() >= 1024);
+	}
+
+	/* Each pixel: in the shadow when something is nearer to the sun there, by more than a texel or two. */
+	const float bias = static_cast<float>(2.0 * map.texel);
+	ParallelRows(height, [&](int lo, int hi) {
+		for (int py = lo; py < std::min(hi, height - 1); py++) {
+			for (int px = 0; px < width - 1; px++) {
+				const size_t i = static_cast<size_t>(py) * width + px;
+				const float iw = zb[i];
+				if (iw <= 0.0f) continue;
+				double x, y, zu;
+				CabPixelInWorld(eye, px + 0.5, py + 0.5, iw, x, y, zu);
+				const double u = (dot(a, x, y, zu) - map.u0) / map.texel, v = (dot(b, x, y, zu) - map.v0) / map.texel;
+				if (u < 0 || v < 0 || u >= map.nu || v >= map.nv) continue;
+				const float nearest = map.nearest[static_cast<size_t>(v) * map.nu + static_cast<size_t>(u)];
+				if (nearest <= static_cast<float>(dot(s, x, y, zu)) + bias) continue;
+				/* Its surface from its neighbours: turned away from the sun, it is dark of its own light. */
+				const float iw_r = zb[i + 1], iw_d = zb[i + width];
+				if (iw_r > 0.0f && iw_d > 0.0f && std::abs(iw_r - iw) < iw * 0.05f && std::abs(iw_d - iw) < iw * 0.05f) {
+					double xr, yr, zr, xd, yd, zd;
+					CabPixelInWorld(eye, px + 1.5, py + 0.5, iw_r, xr, yr, zr);
+					CabPixelInWorld(eye, px + 0.5, py + 1.5, iw_d, xd, yd, zd);
+					const double ex = xr - x, ey = yr - y, ez = zr - zu, gx = xd - x, gy = yd - y, gz = zd - zu;
+					double nx = ey * gz - ez * gy, ny = ez * gx - ex * gz, nz = ex * gy - ey * gx;
+					/* Towards the eye. */
+					if (nx * (eye.x - x) + ny * (eye.y - y) + nz * (eye.z * CAB_Z_SCALE - zu) < 0) {
+						nx = -nx;
+						ny = -ny;
+						nz = -nz;
+					}
+					const double nl = std::sqrt(nx * nx + ny * ny + nz * nz);
+					if (nl > 0 && (nx * s[0] + ny * s[1] + nz * s[2]) / nl < 0.05) continue;
+				}
+				Colour c(dst[i]);
+				dst[i] = Colour(static_cast<uint8_t>(c.r * 160 >> 8), static_cast<uint8_t>(c.g * 165 >> 8), static_cast<uint8_t>(c.b * 180 >> 8)).data;
+			}
+		}
+	});
+}
+
+/**
+ * The lights of the houses at night lighting what is about them (the technologies of OpenMW, the player, 16. 10.:
+ * light by the pixel): each pixel within a few metres below a lamp or a lit window -- the pavement, the wall under
+ * it -- takes its warm light, the more the nearer, its own colour coming back out of the dark. The nearest lights
+ * only (CAB_LAMPS_LIT).
+ * @param lights the places of the lights, world units (z in units of height)
+ */
+static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::vector<std::array<double, 3>> lights)
+{
+	static constexpr double REACH = 6.0 * OBJECT_UNITS_PER_METRE;
+	static constexpr size_t CAB_LAMPS_LIT = 48;
+	const Colour warm(255, 214, 150);
+	auto far = [&](const std::array<double, 3> &l) { return (l[0] - eye.x) * (l[0] - eye.x) + (l[1] - eye.y) * (l[1] - eye.y); };
+	/* Those whose light may be seen: ahead, within the view. */
+	std::erase_if(lights, [&](const std::array<double, 3> &l) {
+		const CabPoint c = CabToEye(eye, l[0], l[1], l[2], 0, 0);
+		return c.f < -REACH || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + REACH;
+	});
+	if (lights.size() > CAB_LAMPS_LIT) {
+		std::ranges::nth_element(lights, lights.begin() + CAB_LAMPS_LIT, {}, far);
+		lights.resize(CAB_LAMPS_LIT);
+	}
+	for (const auto &l : lights) {
+		const CabPoint c = CabToEye(eye, l[0], l[1], l[2], 0, 0);
+		/* The pixels it may reach: its sphere on the picture (all of it when the eye is in the sphere or the light behind). */
+		int x0 = 0, x1 = width - 1, y0 = 0, y1 = height - 1;
+		if (c.f > REACH + CAB_NEAR) {
+			const CabVertex v = CabProject(eye, c);
+			const double r = REACH * eye.focal / (c.f - REACH);
+			x0 = std::max(0, static_cast<int>(v.sx - r));
+			x1 = std::min(width - 1, static_cast<int>(v.sx + r));
+			y0 = std::max(0, static_cast<int>(v.sy - r));
+			y1 = std::min(height - 1, static_cast<int>(v.sy + r));
+		}
+		if (x0 > x1 || y0 > y1) continue;
+		const double lzu = l[2] * CAB_Z_SCALE;
+		ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
+			for (int py = y0 + lo; py < y0 + hi; py++) {
+				for (int px = x0; px <= x1; px++) {
+					const size_t i = static_cast<size_t>(py) * width + px;
+					if (zb[i] <= 0.0f) continue;
+					double x, y, zu;
+					CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
+					/* Down from it: what is above it it does not light (a lamp shines down, a window out and down). */
+					if (zu > lzu + 0.5) continue;
+					const double d = std::sqrt((x - l[0]) * (x - l[0]) + (y - l[1]) * (y - l[1]) + (zu - lzu) * (zu - lzu));
+					if (d >= REACH) continue;
+					const double k = (1.0 - d / REACH) * (1.0 - d / REACH) * 0.7;
+					/* Its own colour out of the dark (DrawEyeNight()), in the warm light. */
+					const Colour o(dst[i]);
+					auto add = [&](uint8_t now, uint night, uint8_t light) {
+						const double own = std::min(255.0, now * 256.0 / night);
+						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
+					};
+					dst[i] = Colour(add(o.r, NIGHT_R, warm.r), add(o.g, NIGHT_G, warm.g), add(o.b, NIGHT_B, warm.b)).data;
+				}
+			}
+		}, (y1 - y0) * (x1 - x0) > 20000);
+	}
+}
+
 /** How far the far land reaches (DrawEyeFarLand()), tiles. */
 static constexpr int CAB_FAR_TILES = 96;
 /** How far the houses and industries that are 3D objects are drawn on it, tiles. */
@@ -8814,6 +9049,17 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		camera.billboards++;
 	}
 
+	/* 5b. The sun's shadows of the buildings about the eye, by day (DrawEyeShadows()). */
+	if (!in_tunnel.has_value() && !_settings_client.gui.night && _cab_shadows) {
+		std::vector<CabShadowCaster> casters;
+		for (const CabObject &co : objects) {
+			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
+			if (std::hypot(ox - eye.x, oy - eye.y) > CAB_SHADOW_TILES * TILE_SIZE) continue;
+			casters.push_back({co.obj, ox, oy, static_cast<double>(co.z)});
+		}
+		DrawEyeShadows(eye, dst, zb, width, height, casters);
+	}
+
 	eye_stage(5);
 	/* 6. The haze: the far fades into the sky at the horizon, the more the farther, to the far land's end (a stripe
 	 * of rows a core). */
@@ -8883,6 +9129,14 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
 	if (_settings_client.gui.night) {
 		DrawEyeNight(eye, own, width, height, dst, zb);
+		/* The lamps and lit windows of the houses lighting what is about them (DrawEyeLampLight()). */
+		std::vector<std::array<double, 3>> lamps;
+		for (const CabObject &co : objects) {
+			const ThreeDObject &o = *co.obj;
+			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
+			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.z + o.lights[i + 2]});
+		}
+		if (_cab_lamp_light) DrawEyeLampLight(eye, dst, zb, width, height, std::move(lamps));
 		DrawEyeSky(eye, width, height, dst, zb);
 		/* The lit windows of the houses (their "noc") over the dark, as they were drawn, and the glows of their
 		 * lights ("svetlo_NN"): seen where nothing nearer is in front of them. */
