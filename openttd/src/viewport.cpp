@@ -125,6 +125,8 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <map>
+#include <tuple>
 #include <atomic>
 #include <functional>
 #include <stack>
@@ -3205,14 +3207,37 @@ static ObjectLay MapLay(const DrawPixelInfo &frame)
 }
 
 /**
+ * A building drawn once for the turned view as it is now, its triangles only (GetTurnedObjectPicture()): drawn
+ * again only copied, its figures and its night over it (the technologies of OpenMW, the player, 16. 10.: what does
+ * not move, it makes ready once and keeps).
+ */
+struct TurnedObjectPicture {
+	std::vector<uint32_t> pixels; ///< 0 where it is not
+	std::vector<float> depth;     ///< how near each pixel is (TurnedVertex::d), -infinity where it is not
+	int width = 0, height = 0;
+	double left = 0, top = 0;     ///< its top left corner, virtual coordinates of the view
+	uint64_t used = 0;            ///< when it was drawn last (_turned_object_clock)
+};
+
+/** The shape of an object at the level of detail of the turned view's zoom (ThreeDShapeLevel()): a metre up is the most pixels of the picture. */
+static ThreeDObjectShapeView TurnedObjectShape(const ThreeDObject *o, const ObjectLay &lay)
+{
+	return o->GetShape(ThreeDShapeLevel(ZOOM_BASE * OBJECT_HEIGHT_PER_METRE * lay.scale, 0.75));
+}
+
+/**
  * Draw a 3D object into pixels: its triangles turned with the view, far first, each filled with its texture at the
  * level of detail of the zoom -- the texture's 1024 pixels for a tile's width at the closest zoom, halved with every
  * zoom level out -- and the figures and plants standing on it among them by the middle of their height.
  * @param o the object, nullptr for only the figures of more
  * @param ox,oy,oz its north corner, world units
  * @param more figures on it besides its own
+ * @param picture the object's triangles already drawn (GetTurnedObjectPicture()): copied, its figures and its night
+ *                over them; nullptr to draw them
+ * @param triangles_only only its triangles, their depth to depth_out (a picture of it, GetTurnedObjectPicture())
+ * @param depth_out the depth of each pixel of the frame, -infinity where it is not
  */
-static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const ObjectLay &lay, const ThreeDObject *o, double ox, double oy, double oz, uint32_t paint, std::span<const ThreeDObjectFigure> more)
+static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const ObjectLay &lay, const ThreeDObject *o, double ox, double oy, double oz, uint32_t paint, std::span<const ThreeDObjectFigure> more, const TurnedObjectPicture *picture = nullptr, bool triangles_only = false, std::vector<float> *depth_out = nullptr)
 {
 	static std::vector<TurnedVertex> verts;
 	static std::vector<std::pair<double, size_t>> order;
@@ -3221,8 +3246,9 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	order.clear();
 	verts.clear();
 	const ThreeDObjectTexture *tex = nullptr;
-	/* Its shape as simple as the zoom allows (ThreeDShapeLevel()): a metre up is the most pixels of the picture. */
-	const ThreeDObjectShapeView shape = o != nullptr ? o->GetShape(ThreeDShapeLevel(ZOOM_BASE * OBJECT_HEIGHT_PER_METRE * lay.scale, 0.75)) : ThreeDObjectShapeView{};
+	/* Its shape as simple as the zoom allows; none of it when it is drawn already. */
+	const ThreeDObjectShapeView shape = o != nullptr && picture == nullptr ? TurnedObjectShape(o, lay) : ThreeDObjectShapeView{};
+	if (o != nullptr && picture != nullptr) tex = o->GetTexture(to_underlying(lay.zoom), paint);
 	if (o != nullptr && !shape.tri.empty()) {
 		tex = o->GetTexture(to_underlying(lay.zoom), paint);
 		const bool lit = shape.light.size() == shape.pos.size() / 3;
@@ -3285,11 +3311,13 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 		order.emplace_back(near, SIZE_MAX - on_it.size());
 		on_it.push_back({pic, wx, wy, wz, static_cast<float>(near)});
 	};
-	if (o != nullptr) {
-		for (const ThreeDObjectFigure &f : o->figures) stand(f, false);
-		for (const ThreeDObjectFigure &f : o->plants) stand(f, true);
+	if (!triangles_only) {
+		if (o != nullptr) {
+			for (const ThreeDObjectFigure &f : o->figures) stand(f, false);
+			for (const ThreeDObjectFigure &f : o->plants) stand(f, true);
+		}
+		for (const ThreeDObjectFigure &f : more) stand(f, false);
 	}
-	for (const ThreeDObjectFigure &f : more) stand(f, false);
 	std::sort(order.begin(), order.end());
 	/* The depth of its pixels (#45 of the player's list: the flags of the ÚV KSČ building through its front, the
 	 * field road through the grass under it): over the rectangle it covers, nothing there yet. */
@@ -3313,6 +3341,14 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			cover(std::min({a.x, b.x, c.x}), std::min({a.y, b.y, c.y}), std::max({a.x, b.x, c.x}), std::max({a.y, b.y, c.y}));
 		}
 	}
+	/* Its picture: where it is in the frame, whole pixels (the frame's corner is on a whole pixel of its zoom). */
+	int pic_x = 0, pic_y = 0;
+	if (picture != nullptr) {
+		pic_x = static_cast<int>(std::lround((picture->left - lay.left) * lay.scale));
+		pic_y = static_cast<int>(std::lround((picture->top - lay.top) * lay.scale));
+		cover(pic_x, pic_y, pic_x + picture->width - 1, pic_y + picture->height - 1);
+	}
+	if (depth_out != nullptr) depth_out->assign(static_cast<size_t>(fw) * fh, -std::numeric_limits<float>::infinity());
 	const double t_projected = TurnedNow();
 	_turned_times.models_project += t_projected - t_start;
 	if (zx1 < zx0 || zy1 < zy0) return;
@@ -3320,6 +3356,21 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	 * 16. 10.): each stripe all of them in the same order, only its rows -- the picture as drawn one after the other. */
 	auto draw_rows = [&](int row_lo, int row_hi) {
 	for (int y = row_lo; y < row_hi; y++) std::fill_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, -std::numeric_limits<float>::infinity());
+	/* Its picture first, its depth with it: the figures go behind its walls as among its triangles. */
+	if (picture != nullptr) {
+		const int x0 = std::max(0, pic_x), x1 = std::min(fw, pic_x + picture->width);
+		for (int y = std::max(row_lo, pic_y); y < std::min(row_hi, pic_y + picture->height); y++) {
+			const size_t from = static_cast<size_t>(y - pic_y) * picture->width - pic_x;
+			uint32_t *row = dst + static_cast<size_t>(y) * pitch;
+			float *zrow = &zb[static_cast<size_t>(y) * fw];
+			for (int x = x0; x < x1; x++) {
+				const uint32_t p = picture->pixels[from + x];
+				if (p == 0) continue;
+				row[x] = p;
+				zrow[x] = picture->depth[from + x];
+			}
+		}
+	}
 	for (const auto &[near, t] : order) {
 		if (t >= tris) {
 			const OnIt &f = on_it[SIZE_MAX - t];
@@ -3355,7 +3406,11 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	};
 	const int rows = zy1 - zy0 + 1;
 	ParallelBands(rows, [&](int lo, int hi) { draw_rows(zy0 + lo, zy0 + hi); }, order.size() >= 4096 && rows >= 128);
+	if (depth_out != nullptr) {
+		for (int y = zy0; y <= zy1; y++) std::copy_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, &(*depth_out)[static_cast<size_t>(y) * fw + zx0]);
+	}
 	_turned_times.models_raster += TurnedNow() - t_projected;
+	if (triangles_only) return;
 	/* At night its lit windows over it, kept bright (DrawNight()), and the places of its glows. */
 	if (_night_windows_now && o != nullptr && tex != nullptr && !o->night_tri.empty()) {
 		static std::vector<TurnedVertex> night;
@@ -3378,6 +3433,108 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	}
 }
 
+/** The pictures of the buildings drawn (GetTurnedObjectPicture()), by object, place and the view's turn and zoom. */
+struct TurnedObjectKey {
+	const ThreeDObject *obj;
+	TileIndex origin;
+	int z;
+	uint32_t paint;
+	double c, s, px, py;
+	ZoomLevel zoom;
+	bool cull;
+
+	auto operator<=>(const TurnedObjectKey &) const = default;
+};
+static std::map<TurnedObjectKey, TurnedObjectPicture> _turned_object_pictures;
+static size_t _turned_object_bytes = 0;
+static uint64_t _turned_object_clock = 0;
+/** The memory the pictures may take; the least lately drawn go first. */
+static constexpr size_t TURNED_OBJECT_BUDGET = 256u << 20;
+/** The largest picture kept, pixels; a larger one (a big house close) is drawn each time. */
+static constexpr size_t TURNED_OBJECT_MOST_PIXELS = 4u << 20;
+bool _turned_object_pictures_on = true; ///< The rig: 'test3d mezipamet 0' draws every building each time.
+
+/**
+ * Whether the turned view at a turn and zoom has stood a while: while it turns or zooms each frame is another view,
+ * and a building drawn whole for a picture costs more than the part of it on the screen.
+ */
+static bool TurnedViewStands(const ObjectLay &lay)
+{
+	using Clock = std::chrono::steady_clock;
+	static std::map<std::tuple<double, double, double, double, ZoomLevel>, std::pair<Clock::time_point, Clock::time_point>> views; // first and last seen
+	const Clock::time_point now = Clock::now();
+	auto [it, added] = views.try_emplace({lay.c, lay.s, lay.px, lay.py, lay.zoom}, now, now);
+	it->second.second = now;
+	if (added && views.size() > 16) {
+		/* Those not seen for a while forgotten: those of turning. */
+		for (auto v = views.begin(); v != views.end();) v = now - v->second.second > std::chrono::seconds(2) ? views.erase(v) : std::next(v);
+	}
+	return now - it->second.first >= std::chrono::milliseconds(200);
+}
+
+/**
+ * The picture of a building's triangles as the turned view is now, drawn the first time it is wanted: the view
+ * drawn again (another part of the screen, a moving vehicle, the next frame) only copies it.
+ * @return nullptr when it is not kept (too large, or the view is turning)
+ */
+static const TurnedObjectPicture *GetTurnedObjectPicture(const ObjectLay &lay, const ThreeDObject *o, TileIndex origin, int z, uint32_t paint)
+{
+	const TurnedObjectKey key{o, origin, z, paint, lay.c, lay.s, lay.px, lay.py, lay.zoom, _turned_cull};
+	auto it = _turned_object_pictures.find(key);
+	if (it != _turned_object_pictures.end()) {
+		it->second.used = ++_turned_object_clock;
+		return &it->second;
+	}
+	if (!TurnedViewStands(lay)) return nullptr;
+	/* Its extent: every corner of its shape, whole pixels of the view. */
+	const ThreeDObjectShapeView shape = TurnedObjectShape(o, lay);
+	if (shape.tri.empty()) return nullptr;
+	const double ox = TileX(origin) * TILE_SIZE, oy = TileY(origin) * TILE_SIZE;
+	double x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
+	for (size_t i = 0; i + 2 < shape.pos.size(); i += 3) {
+		double sx, sy;
+		lay.Project(ox + shape.pos[i], oy + shape.pos[i + 1], z + shape.pos[i + 2], sx, sy);
+		x0 = std::min(x0, sx);
+		x1 = std::max(x1, sx);
+		y0 = std::min(y0, sy);
+		y1 = std::max(y1, sy);
+	}
+	const int left = static_cast<int>(std::floor(x0)) - 2, top = static_cast<int>(std::floor(y0)) - 2;
+	const int width = static_cast<int>(std::ceil(x1)) - left + 3, height = static_cast<int>(std::ceil(y1)) - top + 3;
+	if (width <= 0 || height <= 0 || static_cast<size_t>(width) * height > TURNED_OBJECT_MOST_PIXELS) return nullptr;
+
+	TurnedObjectPicture pic;
+	pic.width = width;
+	pic.height = height;
+	pic.left = lay.left + left / lay.scale;
+	pic.top = lay.top + top / lay.scale;
+	pic.pixels.assign(static_cast<size_t>(width) * height, 0);
+	ObjectLay own = lay;
+	own.left = pic.left;
+	own.top = pic.top;
+	DrawObjectInto(pic.pixels.data(), width, width, height, own, o, ox, oy, z, paint, {}, nullptr, true, &pic.depth);
+
+	const size_t bytes = static_cast<size_t>(width) * height * (sizeof(uint32_t) + sizeof(float));
+	while (_turned_object_bytes + bytes > TURNED_OBJECT_BUDGET && !_turned_object_pictures.empty()) {
+		auto oldest = std::ranges::min_element(_turned_object_pictures, {}, [](const auto &e) { return e.second.used; });
+		_turned_object_bytes -= static_cast<size_t>(oldest->second.width) * oldest->second.height * (sizeof(uint32_t) + sizeof(float));
+		_turned_object_pictures.erase(oldest);
+	}
+	_turned_object_bytes += bytes;
+	pic.used = ++_turned_object_clock;
+	return &_turned_object_pictures.emplace(key, std::move(pic)).first->second;
+}
+
+/** Draw a part of a building drawn as a 3D object: from its picture when it is kept (GetTurnedObjectPicture()). */
+static void DrawTurnedObjectPart(const DrawPixelInfo &frame, const ObjectLay &lay, const ThreeDObject *o, TileIndex origin, int z, uint32_t paint, std::span<const ThreeDObjectFigure> more)
+{
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	const double ox = TileX(origin) * TILE_SIZE, oy = TileY(origin) * TILE_SIZE;
+	const TurnedObjectPicture *picture = o != nullptr && _turned_object_pictures_on ? GetTurnedObjectPicture(lay, o, origin, z, paint) : nullptr;
+	DrawObjectInto(dst, frame.pitch, fw, fh, lay, o, ox, oy, z, paint, more, picture);
+}
+
 /**
  * Draw a building as a real 3D object (box_kind 7, DrawObjectInto()): once, whole; the sprites of its tiles are left
  * out (box_kind 4). A field's soil is drawn whole first, under its plants.
@@ -3388,11 +3545,8 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 	const TurnedObject &to = _turned_objects[ps.box_dx];
 	double t0 = TurnedNow();
 	const ObjectLay lay = MapLay(frame);
-	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
-	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
-	const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
-	if (to.ground != nullptr) DrawObjectInto(dst, frame.pitch, fw, fh, lay, to.ground, ox, oy, to.z, to.ground->PaintAt(to.origin), {});
-	DrawObjectInto(dst, frame.pitch, fw, fh, lay, to.obj, ox, oy, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more);
+	if (to.ground != nullptr) DrawTurnedObjectPart(frame, lay, to.ground, to.origin, to.z, to.ground->PaintAt(to.origin), {});
+	DrawTurnedObjectPart(frame, lay, to.obj, to.origin, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more);
 	_turned_times.models += TurnedNow() - t0;
 }
 

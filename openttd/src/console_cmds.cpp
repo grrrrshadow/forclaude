@@ -9080,6 +9080,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_cull = argv.size() < 3 || argv[2] != "0";
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: zadni steny {}", _turned_cull ? "vynechane" : "kreslene");
+	} else if (what == "mezipamet") {
+		/* 'mezipamet <0|1>': the buildings of the turned view drawn once and kept (1, as the game draws), or drawn each time. */
+		extern bool _turned_object_pictures_on;
+		_turned_object_pictures_on = argv.size() < 3 || argv[2] != "0";
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: mezipamet domu {}", _turned_object_pictures_on ? "zapnuta" : "vypnuta");
 	} else if (what == "stred") {
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) {
