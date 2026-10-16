@@ -19,6 +19,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 16. 10. – světla vozidel z modelu, levnější noc
+
+- Hráč: „auta musí mít vyznačená světla jako mají domy okna, kolem auta jsou světla metr daleko“. Kolega dal světla
+  do modelů (Tatra v7, Sergej v6, herní Tatra VB): skla v uzlu `noc`, místa světel `svetlo_predni_NN`/`svetlo_zadni_NN`.
+  Hotovo (`cd92535`): ve dne se skla nekreslí, v noci svítí, záře a kužel jsou z míst v modelu. Platí na otočené mapě,
+  na sever i v pohledu z očí. Přední svítí, když vozidlo jede v čele, zadní, když za ním nic nejede.
+- Hráč: „zlevni noční světla zblízka“. Dřív si v noci každý díl vozidla (i každý vagon) zvětšil rámeček o půldruhé
+  dlaždice. Teď jen čelo a konec o kousek a kužel před autem se značí sám. V rigu zblízka (otočeno 30°): den 15,9 ms,
+  noc dřív 28,7 ms a teď 20,0 ms na snímek, bez duchů.
+- 3D částice z OpenLoco: hráč na to zatím neodpověděl.
+
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 
 - Hráč kolegovi řekl, ať jsou holky v hospodě větší. Kolega proto zvětšil celou hospodu na 2×2 (hráč: „zvětšil
