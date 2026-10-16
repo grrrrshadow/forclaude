@@ -123,6 +123,8 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <forward_list>
 #include <optional>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <atomic>
 #include <functional>
 #include <stack>
@@ -1959,9 +1961,14 @@ static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
 static std::vector<std::array<double, 3>> _night_glows;
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
+static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth);
 
 static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const uint32_t *tex, int tw, int th, const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c, bool fill = true, float *zb = nullptr, std::vector<std::pair<uint32_t *, uint32_t>> *lit_pixels = nullptr, int row_lo = 0, int row_hi = INT_MAX)
 {
+	/* Its rows first: of a band of the picture (ParallelBands()) most triangles have none. */
+	int y0 = std::max(std::max(0, row_lo), static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
+	int y1 = std::min(std::min(h, row_hi) - 1, static_cast<int>(std::floor(std::max({a.y, b.y, c.y}) - 0.5)));
+	if (y0 > y1) return;
 	double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 	if (std::abs(area) < 1e-9) return;
 	double du_dx = ((b.u - a.u) * (c.y - a.y) - (c.u - a.u) * (b.y - a.y)) / area;
@@ -1980,8 +1987,6 @@ static void DrawTexturedTriangle(uint32_t *dst, int pitch, int w, int h, const u
 		dd_dy = ((c.d - a.d) * (b.x - a.x) - (b.d - a.d) * (c.x - a.x)) / area;
 	}
 	double sign = area > 0 ? 1.0 : -1.0;
-	int y0 = std::max(std::max(0, row_lo), static_cast<int>(std::ceil(std::min({a.y, b.y, c.y}) - 0.5)));
-	int y1 = std::min(std::min(h, row_hi) - 1, static_cast<int>(std::floor(std::max({a.y, b.y, c.y}) - 0.5)));
 	for (int y = y0; y <= y1; y++) {
 		double yc = y + 0.5;
 		double xlo = -1e18, xhi = 1e18;
@@ -3349,7 +3354,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	}
 	};
 	const int rows = zy1 - zy0 + 1;
-	ParallelRows(rows, [&](int lo, int hi) { draw_rows(zy0 + lo, zy0 + hi); }, order.size() >= 4096 && rows >= 128);
+	ParallelBands(rows, [&](int lo, int hi) { draw_rows(zy0 + lo, zy0 + hi); }, order.size() >= 4096 && rows >= 128);
 	_turned_times.models_raster += TurnedNow() - t_projected;
 	/* At night its lit windows over it, kept bright (DrawNight()), and the places of its glows. */
 	if (_night_windows_now && o != nullptr && tex != nullptr && !o->night_tri.empty()) {
@@ -6532,34 +6537,129 @@ struct CabBatchTriangle {
 static std::vector<CabBatchTriangle> _cab_batch;
 static bool _cab_batching = false;
 
-/**
- * Run a job over the rows of a picture in stripes, a thread each, as many as the processor has cores (at most 16);
- * one after the other when there is little to do.
- * @param rows how many rows
- * @param work the job for the rows from its first up to its second argument
- * @param worth whether the job is worth the threads
- */
 int _cab_threads = 0; ///< The rig: how many threads to draw on (test3d chodec mereni), 0 every core.
+
+/** How many cores the drawing has: the processor's, at most 16. */
+static int DrawingCores()
+{
+	static const int cores = std::clamp<int>(static_cast<int>(std::thread::hardware_concurrency()), 1, 16);
+	return cores;
+}
 
 /** How many threads ParallelRows() runs a job on. */
 static int ParallelThreads(int rows, bool worth)
 {
-	static const int cores = std::clamp<int>(static_cast<int>(std::thread::hardware_concurrency()), 1, 16);
-	return worth ? std::min(_cab_threads > 0 ? _cab_threads : cores, std::max(1, rows / 16)) : 1;
+	return worth ? std::min(_cab_threads > 0 ? _cab_threads : DrawingCores(), std::max(1, rows / 16)) : 1;
 }
 
+/**
+ * The threads of the drawing, a core each but the game's own, started the first time and waiting for work (as the
+ * worker threads of OpenMW): a thread started for each house drawn cost more than it saved.
+ */
+class DrawingWorkers {
+public:
+	/** Run a job, the stripe i of n on the worker i - 1 (the caller runs stripe 0); back when all are done. */
+	void Run(int n, int rows, const std::function<void(int, int)> &work)
+	{
+		std::unique_lock lock(this->mutex);
+		while (static_cast<int>(this->threads.size()) < n - 1) {
+			const int index = static_cast<int>(this->threads.size()) + 1;
+			this->threads.emplace_back([this, index] { this->Serve(index); });
+		}
+		this->work = &work;
+		this->rows = rows;
+		this->n = n;
+		this->remaining = n - 1;
+		this->round++;
+		lock.unlock();
+		this->start.notify_all();
+		work(0, rows / n);
+		lock.lock();
+		this->finished.wait(lock, [this] { return this->remaining == 0; });
+		this->work = nullptr;
+	}
+
+	~DrawingWorkers()
+	{
+		{
+			std::lock_guard lock(this->mutex);
+			this->stop = true;
+		}
+		this->start.notify_all();
+		for (std::thread &t : this->threads) t.join();
+	}
+
+private:
+	void Serve(int index)
+	{
+		uint64_t seen = 0;
+		std::unique_lock lock(this->mutex);
+		for (;;) {
+			this->start.wait(lock, [&] { return this->stop || this->round != seen; });
+			if (this->stop) return;
+			seen = this->round;
+			if (index >= this->n) continue;
+			const std::function<void(int, int)> &job = *this->work;
+			const int lo = this->rows * index / this->n, hi = this->rows * (index + 1) / this->n;
+			lock.unlock();
+			job(lo, hi);
+			lock.lock();
+			if (--this->remaining == 0) this->finished.notify_one();
+		}
+	}
+
+	std::mutex mutex;
+	std::condition_variable start;
+	std::condition_variable finished;
+	std::vector<std::thread> threads;
+	const std::function<void(int, int)> *work = nullptr;
+	int rows = 0;
+	int n = 0;
+	int remaining = 0;
+	uint64_t round = 0;
+	bool stop = false;
+};
+
+/**
+ * Run a job over the rows of a picture in stripes, a thread each, as many as the processor has cores (at most 16);
+ * one after the other when there is little to do, or when a job of the threads runs it.
+ * @param rows how many rows
+ * @param work the job for the rows from its first up to its second argument
+ * @param worth whether the job is worth the threads
+ */
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth)
 {
+	static DrawingWorkers workers;
+	static std::atomic<bool> busy = false;
 	const int n = ParallelThreads(rows, worth);
-	if (n <= 1) {
+	if (n <= 1 || busy.exchange(true)) {
 		work(0, rows);
 		return;
 	}
-	std::vector<std::thread> threads;
-	threads.reserve(n - 1);
-	for (int i = 1; i < n; i++) threads.emplace_back(work, rows * i / n, rows * (i + 1) / n);
-	work(0, rows / n);
-	for (std::thread &t : threads) t.join();
+	workers.Run(n, rows, work);
+	busy = false;
+}
+
+/**
+ * Run a job over the rows of a picture in bands of rows, a few a thread, handed out one by one: where the work is
+ * about the horizon or in a house, the threads still share it.
+ * @param rows how many rows
+ * @param work the job for the rows from its first up to its second argument
+ * @param worth whether the job is worth the threads
+ */
+static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth)
+{
+	const int threads = ParallelThreads(rows, worth);
+	if (threads <= 1) {
+		work(0, rows);
+		return;
+	}
+	const int band = std::max(8, (rows + threads * 4 - 1) / (threads * 4));
+	const int bands = (rows + band - 1) / band;
+	std::atomic<int> next_band = 0;
+	ParallelRows(rows, [&](int, int) {
+		for (int b; (b = next_band++) < bands;) work(b * band, std::min(rows, (b + 1) * band));
+	}, true);
 }
 
 /**
