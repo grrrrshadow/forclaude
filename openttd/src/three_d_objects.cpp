@@ -679,26 +679,20 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 				if (child < sk->nodes.size()) sk->nodes[child].parent = static_cast<int>(i);
 			}
 		}
-		/* The first node with a mesh and a skin. */
-		int mesh_index = -1, skin_index = -1;
-		for (const auto &n : nodes) {
-			if (n.contains("mesh") && n.contains("skin")) {
-				mesh_index = n.at("mesh").get<int>();
-				skin_index = n.at("skin").get<int>();
-				break;
+		/* The joints of every skin, one after the other; a skin's joints from where its first is. */
+		std::vector<size_t> skin_first;
+		if (j.contains("skins")) {
+			for (const auto &skin : j.at("skins")) {
+				skin_first.push_back(sk->joints.size());
+				const size_t first = sk->joints.size();
+				for (const auto &jn : skin.at("joints")) sk->joints.push_back(jn.get<int>());
+				sk->inverse_bind.resize(sk->joints.size(), BoneMatrix{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+				if (skin.contains("inverseBindMatrices")) {
+					std::vector<double> m;
+					ReadGlbAccessor(j, bin, skin.at("inverseBindMatrices").get<int>(), 16, m);
+					for (size_t k = 0; first + k < sk->joints.size() && (k + 1) * 16 <= m.size(); k++) std::copy_n(&m[k * 16], 16, sk->inverse_bind[first + k].begin());
+				}
 			}
-		}
-		if (mesh_index < 0) {
-			Debug(misc, 0, "3D skeleton {}: no mesh with a skin", path);
-			return nullptr;
-		}
-		const auto &skin = j.at("skins").at(skin_index);
-		for (const auto &jn : skin.at("joints")) sk->joints.push_back(jn.get<int>());
-		sk->inverse_bind.assign(sk->joints.size(), BoneMatrix{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
-		if (skin.contains("inverseBindMatrices")) {
-			std::vector<double> m;
-			ReadGlbAccessor(j, bin, skin.at("inverseBindMatrices").get<int>(), 16, m);
-			for (size_t k = 0; k < sk->joints.size() && (k + 1) * 16 <= m.size(); k++) std::copy_n(&m[k * 16], 16, sk->inverse_bind[k].begin());
 		}
 		/* The textures by the material: the picture in the buffer, else its colour. */
 		std::map<int, uint8_t> material_texture;
@@ -712,6 +706,11 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 				t.name = mat.value("name", std::string());
 				if (mat.contains("pbrMetallicRoughness")) {
 					const auto &pbr = mat.at("pbrMetallicRoughness");
+					if (pbr.contains("baseColorFactor")) {
+						const auto &f = pbr.at("baseColorFactor");
+						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f.at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+						t.flat = Colour(c(0), c(1), c(2)).data;
+					}
 					if (pbr.contains("baseColorTexture") && j.contains("textures") && j.contains("images")) {
 						const int image = j.at("textures").at(pbr.at("baseColorTexture").at("index").get<int>()).at("source").get<int>();
 						const auto &img = j.at("images").at(image);
@@ -728,51 +727,61 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 			material_texture.emplace(material, index);
 			return index;
 		};
-		for (const auto &p : j.at("meshes").at(mesh_index).at("primitives")) {
-			if (p.value("mode", 4) != 4) continue;
-			const auto &attr = p.at("attributes");
-			if (!attr.contains("JOINTS_0") || !attr.contains("WEIGHTS_0")) continue;
-			std::vector<double> pos, nrm, uv, idx, jn, wt;
-			ReadGlbAccessor(j, bin, attr.at("POSITION").get<int>(), 3, pos);
-			if (attr.contains("NORMAL")) ReadGlbAccessor(j, bin, attr.at("NORMAL").get<int>(), 3, nrm);
-			if (attr.contains("TEXCOORD_0")) ReadGlbAccessor(j, bin, attr.at("TEXCOORD_0").get<int>(), 2, uv);
-			ReadGlbAccessor(j, bin, attr.at("JOINTS_0").get<int>(), 4, jn);
-			ReadGlbAccessor(j, bin, attr.at("WEIGHTS_0").get<int>(), 4, wt);
-			const size_t corners = pos.size() / 3;
-			if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
-			if (jn.size() != corners * 4 || wt.size() != corners * 4) continue;
-			/* Weights stored as whole numbers are fractions of their largest. */
-			const int wtype = j.at("accessors").at(attr.at("WEIGHTS_0").get<int>()).at("componentType").get<int>();
-			const double wscale = wtype == 5121 ? 1.0 / 255 : wtype == 5123 ? 1.0 / 65535 : 1.0;
-			if (p.contains("indices")) {
-				ReadGlbAccessor(j, bin, p.at("indices").get<int>(), 1, idx);
-			} else {
-				for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
-			}
-			const uint8_t tex = texture_of(p.value("material", -1));
-			const uint32_t base = static_cast<uint32_t>(sk->pos.size() / 3);
-			const bool normals = nrm.size() == corners * 3 && (sk->pos.empty() || !sk->nrm.empty());
-			if (!normals) sk->nrm.clear();
-			sk->pos.insert(sk->pos.end(), pos.begin(), pos.end());
-			if (normals) sk->nrm.insert(sk->nrm.end(), nrm.begin(), nrm.end());
-			sk->uv.insert(sk->uv.end(), uv.begin(), uv.end());
-			for (size_t i = 0; i < corners; i++) {
-				std::array<uint16_t, 4> js;
-				std::array<float, 4> ws;
-				float sum = 0;
-				for (int k = 0; k < 4; k++) {
-					js[k] = static_cast<uint16_t>(jn[i * 4 + k]);
-					ws[k] = static_cast<float>(wt[i * 4 + k] * wscale);
-					sum += ws[k];
+		/* Every node with a mesh and a skin (the body, its eyes). */
+		for (const auto &node : nodes) {
+			if (!node.contains("mesh") || !node.contains("skin")) continue;
+			const size_t skin_index = node.at("skin").get<size_t>();
+			if (skin_index >= skin_first.size()) continue;
+			for (const auto &p : j.at("meshes").at(node.at("mesh").get<int>()).at("primitives")) {
+				if (p.value("mode", 4) != 4) continue;
+				const auto &attr = p.at("attributes");
+				if (!attr.contains("JOINTS_0") || !attr.contains("WEIGHTS_0")) continue;
+				std::vector<double> pos, nrm, uv, idx, jn, wt;
+				ReadGlbAccessor(j, bin, attr.at("POSITION").get<int>(), 3, pos);
+				if (attr.contains("NORMAL")) ReadGlbAccessor(j, bin, attr.at("NORMAL").get<int>(), 3, nrm);
+				if (attr.contains("TEXCOORD_0")) ReadGlbAccessor(j, bin, attr.at("TEXCOORD_0").get<int>(), 2, uv);
+				ReadGlbAccessor(j, bin, attr.at("JOINTS_0").get<int>(), 4, jn);
+				ReadGlbAccessor(j, bin, attr.at("WEIGHTS_0").get<int>(), 4, wt);
+				const size_t corners = pos.size() / 3;
+				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
+				if (jn.size() != corners * 4 || wt.size() != corners * 4) continue;
+				/* Weights stored as whole numbers are fractions of their largest. */
+				const int wtype = j.at("accessors").at(attr.at("WEIGHTS_0").get<int>()).at("componentType").get<int>();
+				const double wscale = wtype == 5121 ? 1.0 / 255 : wtype == 5123 ? 1.0 / 65535 : 1.0;
+				if (p.contains("indices")) {
+					ReadGlbAccessor(j, bin, p.at("indices").get<int>(), 1, idx);
+				} else {
+					for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
 				}
-				if (sum > 0) for (float &w : ws) w /= sum;
-				sk->joint_of.push_back(js);
-				sk->weight_of.push_back(ws);
+				const uint8_t tex = texture_of(p.value("material", -1));
+				const uint32_t base = static_cast<uint32_t>(sk->pos.size() / 3);
+				const bool normals = nrm.size() == corners * 3 && (sk->pos.empty() || !sk->nrm.empty());
+				if (!normals) sk->nrm.clear();
+				sk->pos.insert(sk->pos.end(), pos.begin(), pos.end());
+				if (normals) sk->nrm.insert(sk->nrm.end(), nrm.begin(), nrm.end());
+				sk->uv.insert(sk->uv.end(), uv.begin(), uv.end());
+				for (size_t i = 0; i < corners; i++) {
+					std::array<uint16_t, 4> js;
+					std::array<float, 4> ws;
+					float sum = 0;
+					for (int k = 0; k < 4; k++) {
+						js[k] = static_cast<uint16_t>(skin_first[skin_index] + static_cast<size_t>(jn[i * 4 + k]));
+						ws[k] = static_cast<float>(wt[i * 4 + k] * wscale);
+						sum += ws[k];
+					}
+					if (sum > 0) for (float &w : ws) w /= sum;
+					sk->joint_of.push_back(js);
+					sk->weight_of.push_back(ws);
+				}
+				for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+					for (int k = 0; k < 3; k++) sk->tri.push_back(base + static_cast<uint32_t>(idx[t + k]));
+					sk->tri_tex.push_back(tex);
+				}
 			}
-			for (size_t t = 0; t + 2 < idx.size(); t += 3) {
-				for (int k = 0; k < 3; k++) sk->tri.push_back(base + static_cast<uint32_t>(idx[t + k]));
-				sk->tri_tex.push_back(tex);
-			}
+		}
+		if (sk->tri.empty()) {
+			Debug(misc, 0, "3D skeleton {}: no mesh with a skin", path);
+			return nullptr;
 		}
 		if (j.contains("animations")) {
 			for (const auto &a : j.at("animations")) {
