@@ -319,6 +319,68 @@ struct Matrix {
 
 /* ---- The .ace ---- */
 
+/** A colour of 5, 6 and 5 bits as red, green and blue of 8. */
+void Rgb565(uint16_t c, uint8_t *out)
+{
+	const uint8_t r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
+	out[0] = static_cast<uint8_t>(r << 3 | r >> 2);
+	out[1] = static_cast<uint8_t>(g << 2 | g >> 4);
+	out[2] = static_cast<uint8_t>(b << 3 | b >> 2);
+}
+
+/**
+ * A block of four by four pixels packed as DXT (S3TC): DXT1 is its colours, eight bytes; DXT3 and DXT5 have eight
+ * bytes of alpha before them (four bits a pixel; or two alphas and three bits a pixel between them).
+ * @param b the block
+ * @param kind 1, 3 or 5
+ * @param[out] out the sixteen pixels, RGBA, rows of four
+ */
+void DecodeDxtBlock(const uint8_t *b, int kind, uint8_t out[16][4])
+{
+	const uint8_t *colours = kind == 1 ? b : b + 8;
+	const uint16_t c0 = colours[0] | colours[1] << 8, c1 = colours[2] | colours[3] << 8;
+	uint8_t palette[4][4];
+	Rgb565(c0, palette[0]);
+	Rgb565(c1, palette[1]);
+	palette[0][3] = palette[1][3] = palette[2][3] = palette[3][3] = 255;
+	if (c0 > c1 || kind != 1) {
+		for (int k = 0; k < 3; k++) {
+			palette[2][k] = static_cast<uint8_t>((2 * palette[0][k] + palette[1][k]) / 3);
+			palette[3][k] = static_cast<uint8_t>((palette[0][k] + 2 * palette[1][k]) / 3);
+		}
+	} else {
+		/* Three colours and transparent. */
+		for (int k = 0; k < 3; k++) {
+			palette[2][k] = static_cast<uint8_t>((palette[0][k] + palette[1][k]) / 2);
+			palette[3][k] = 0;
+		}
+		palette[3][3] = 0;
+	}
+	const uint32_t bits = colours[4] | colours[5] << 8 | colours[6] << 16 | static_cast<uint32_t>(colours[7]) << 24;
+	for (int i = 0; i < 16; i++) std::copy_n(palette[(bits >> (2 * i)) & 3], 4, out[i]);
+
+	if (kind == 3) {
+		for (int i = 0; i < 16; i++) {
+			const uint8_t a = (b[i / 2] >> (4 * (i % 2))) & 0x0F;
+			out[i][3] = static_cast<uint8_t>(a << 4 | a);
+		}
+	} else if (kind == 5) {
+		uint8_t alpha[8];
+		alpha[0] = b[0];
+		alpha[1] = b[1];
+		if (alpha[0] > alpha[1]) {
+			for (int k = 1; k < 7; k++) alpha[k + 1] = static_cast<uint8_t>(((7 - k) * alpha[0] + k * alpha[1]) / 7);
+		} else {
+			for (int k = 1; k < 5; k++) alpha[k + 1] = static_cast<uint8_t>(((5 - k) * alpha[0] + k * alpha[1]) / 5);
+			alpha[6] = 0;
+			alpha[7] = 255;
+		}
+		uint64_t abits = 0;
+		for (int k = 0; k < 6; k++) abits |= static_cast<uint64_t>(b[2 + k]) << (8 * k);
+		for (int i = 0; i < 16; i++) out[i][3] = alpha[(abits >> (3 * i)) & 7];
+	}
+}
+
 /**
  * A texture of MSTS as RGBA: of its sizes halved, the first no wider or higher than a thousand pixels -- the game
  * draws vehicles small, and four textures of two thousand pixels would take a quarter of a gigabyte to keep.
@@ -328,12 +390,8 @@ bool ReadAce(const std::string &path, SimtrainsMesh::Texture &tex)
 	std::vector<uint8_t> d = ReadBytes(path);
 	if (d.empty() || !Unpack(d) || d.size() < 152) return false;
 	auto i32 = [&d](size_t p) { return p + 4 <= d.size() ? static_cast<int32_t>(d[p] | d[p + 1] << 8 | d[p + 2] << 16 | static_cast<uint32_t>(d[p + 3]) << 24) : 0; };
-	const int32_t flags = i32(4), w = i32(8), h = i32(12), channels = i32(20);
+	const int32_t flags = i32(4), w = i32(8), h = i32(12), format = i32(16), channels = i32(20);
 	if (w <= 0 || h <= 0 || w > 8192 || h > 8192 || channels <= 0 || channels > 8) return false;
-	if ((flags & 0x10) != 0) {
-		Debug(grf, 0, "Simtrains: {} is a compressed texture (DXT), not read yet", path);
-		return false;
-	}
 	/* The channels: their size in bits, their kind (2 the mask, 3 red, 4 green, 5 blue, 6 alpha). */
 	std::vector<std::pair<int, int>> chans;
 	size_t pos = 24 + 128;
@@ -341,19 +399,60 @@ bool ReadAce(const std::string &path, SimtrainsMesh::Texture &tex)
 		chans.emplace_back(i32(pos), i32(pos + 8));
 		pos += 16;
 	}
-	/* The table of where each row begins, for every size; the size wanted. */
+	/* Of the sizes halved, the one wanted: which it is and its size. */
 	const bool mips = (flags & 0x01) != 0;
-	int lw = w, lh = h;
+	int lw = w, lh = h, level = 0;
 	size_t row_index = 0;
 	while (mips && (lw > 1024 || lh > 1024) && (lw > 1 || lh > 1)) {
 		row_index += lh;
 		lw = std::max(1, lw / 2);
 		lh = std::max(1, lh / 2);
+		level++;
 	}
 	if (!mips && (lw > 2048 || lh > 2048)) return false;
 	tex.w = lw;
 	tex.h = lh;
 	tex.rgba.assign(static_cast<size_t>(lw) * lh * 4, 255);
+
+	if ((flags & 0x10) != 0) {
+		/* Packed as DXT: a table of where each size begins, then each size as its length and its blocks. */
+		const int kind = format == 0x16 ? 5 : format == 0x14 ? 3 : 1;
+		int levels = 1;
+		for (int lw2 = w, lh2 = h; mips && (lw2 > 1 || lh2 > 1); lw2 = std::max(1, lw2 / 2), lh2 = std::max(1, lh2 / 2)) levels++;
+		const size_t bw = static_cast<size_t>(std::max(1, (lw + 3) / 4)), bh = static_cast<size_t>(std::max(1, (lh + 3) / 4));
+		const size_t block = kind == 1 ? 8 : 16, expected = bw * bh * block;
+		/* Where the blocks of the wanted size are: after its length where the table says, or walking the sizes
+		 * one after the other; both checked by the length the size must have. */
+		size_t at = SIZE_MAX;
+		const size_t table = pos;
+		const size_t listed = static_cast<uint32_t>(i32(table + 4 * level));
+		if (listed + 4 + expected <= d.size() && static_cast<size_t>(static_cast<uint32_t>(i32(listed))) == expected) at = listed + 4;
+		if (at == SIZE_MAX) {
+			size_t p = table + 4 * static_cast<size_t>(levels);
+			for (int k = 0; k <= level && p + 4 <= d.size(); k++) {
+				const size_t len = static_cast<uint32_t>(i32(p));
+				if (k == level && len == expected && p + 4 + len <= d.size()) at = p + 4;
+				p += 4 + len;
+			}
+		}
+		if (at == SIZE_MAX && listed + expected <= d.size()) at = listed;
+		if (at == SIZE_MAX) {
+			Debug(grf, 0, "Simtrains: {}: the packed texture's size {}x{} is not where it should be", path, lw, lh);
+			return false;
+		}
+		uint8_t px[16][4];
+		for (size_t by = 0; by < bh; by++) {
+			for (size_t bx = 0; bx < bw; bx++) {
+				DecodeDxtBlock(&d[at + (by * bw + bx) * block], kind, px);
+				for (int i = 0; i < 16; i++) {
+					const size_t x = bx * 4 + i % 4, y = by * 4 + i / 4;
+					if (x < static_cast<size_t>(lw) && y < static_cast<size_t>(lh)) std::copy_n(px[i], 4, &tex.rgba[(y * lw + x) * 4]);
+				}
+			}
+		}
+		return true;
+	}
+
 	for (int y = 0; y < lh; y++) {
 		size_t row = static_cast<uint32_t>(i32(pos + (row_index + y) * 4));
 		for (const auto &[bits, kind] : chans) {
@@ -374,6 +473,21 @@ bool ReadAce(const std::string &path, SimtrainsMesh::Texture &tex)
 	}
 	return true;
 }
+
+} // namespace
+
+/** A texture of MSTS (.ace) as RGBA, of its sizes halved the first no bigger than 1024 (for the rig, test3d ace). */
+bool ReadSimtrainsTexture(const std::string &path, int &w, int &h, std::vector<uint8_t> &rgba)
+{
+	SimtrainsMesh::Texture t;
+	if (!ReadAce(path, t)) return false;
+	w = t.w;
+	h = t.h;
+	rgba = std::move(t.rgba);
+	return true;
+}
+
+namespace {
 
 /** The GRF's id of an engine: "ST" and a number of its .eng's name, the same on every computer. */
 uint32_t GrfIdOf(const std::string &eng)

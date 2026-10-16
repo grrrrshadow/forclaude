@@ -132,6 +132,7 @@
 #include "three_d_vehicle_object.h"
 #include "three_d_navigation.h"
 #include "round_track.h"
+#include "simtrains.h"
 #include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
@@ -9885,6 +9886,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		UpdateSignalsInBuffer();
 		IConsolePrint(failed == 0 ? CC_DEFAULT : CC_ERROR, "test3d: oblouky u {},{}, diagonala dilu:roh{}; nepostaveno {}", x0, y0, where, failed);
+		return true;
+	} else if (what == "ace" && argv.size() > 3) {
+		/* 'ace <file.ace> <out.ppm>': a texture of MSTS as the game reads it (simtrains.h), written out to look at. */
+		int w = 0, h = 0;
+		std::vector<uint8_t> rgba;
+		if (!ReadSimtrainsTexture(std::string(argv[2]), w, h, rgba)) {
+			IConsolePrint(CC_ERROR, "test3d ace: {} cannot be read", argv[2]);
+			return true;
+		}
+		auto f = FileHandle::Open(std::string(argv[3]), "wb");
+		if (f.has_value()) {
+			std::string head = fmt::format("P6 {} {} 255\n", w, h);
+			fwrite(head.data(), 1, head.size(), *f);
+			std::vector<uint8_t> rgb;
+			rgb.reserve(static_cast<size_t>(w) * h * 3);
+			size_t transparent = 0;
+			for (size_t i = 0; i < rgba.size(); i += 4) {
+				rgb.insert(rgb.end(), {rgba[i], rgba[i + 1], rgba[i + 2]});
+				if (rgba[i + 3] < 128) transparent++;
+			}
+			fwrite(rgb.data(), 1, rgb.size(), *f);
+			IConsolePrint(CC_DEFAULT, "test3d: ace {}x{}, pruhlednych {}", w, h, transparent);
+		}
 		return true;
 	} else if (what == "obloukjizda" && argv.size() > 4) {
 		/* 'obloukjizda <n> <wagons> <ticks>': a train of the fastest engine and so many wagons out of a depot, along

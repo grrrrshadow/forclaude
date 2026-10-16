@@ -1145,10 +1145,14 @@ with its model, `WagonShape`) becomes a new vehicle of the game:
 - The engine is drawn from its model (`ReadSimtrainsShape()`): the binary
   `.s`, the nearest of its distances, every part through its matrix and those
   above it, turned into the frame of the vehicle objects (x forward, y left,
-  z up); the textures `.ace` (uncompressed, the first of their sizes no
-  bigger than 1024). `PassengerCabinHeadPos` is the eye of the cab view.
-- Not read yet: text models (`JINX0s1t`), compressed textures (DXT), wagons
-  (`.wag`), the freight animation, lights and sounds.
+  z up); the textures `.ace`, the first of their sizes no bigger than 1024:
+  uncompressed (rows of red, green, blue, a mask and alpha) or packed as DXT1,
+  DXT3 or DXT5 (a table of the sizes, each its length and its blocks of four by
+  four). `PassengerCabinHeadPos` is the eye of the cab view.
+- Not read yet: text models (`JINX0s1t`), wagons (`.wag`), the freight
+  animation, lights and sounds.
+- The rig: `test3d ace <file.ace> <out.ppm>` writes a texture out as the game
+  reads it.
 
 Nothing of these files is ever the game's. They are the player's own download
 and their authors'; the readmes forbid spreading the models or their textures,

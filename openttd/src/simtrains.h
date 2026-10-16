@@ -61,5 +61,6 @@ struct SimtrainsMesh {
 	std::vector<Texture> textures;
 };
 bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh);
+bool ReadSimtrainsTexture(const std::string &path, int &w, int &h, std::vector<uint8_t> &rgba);
 
 #endif /* SIMTRAINS_H */
