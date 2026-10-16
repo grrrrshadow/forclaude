@@ -34,7 +34,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (488 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_25_domy_0.glb",
@@ -69,7 +75,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (78 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_25_domy_1.glb",
@@ -104,7 +116,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 26,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (52 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_2c_byty.glb",
@@ -141,7 +159,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (76 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_2e_domy.glb",
@@ -178,7 +202,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (80 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_30_domy.glb",
@@ -215,7 +245,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (74 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_32_vysoky.glb",
@@ -252,7 +288,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (692 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_34_vysoky.glb",
@@ -289,7 +331,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (906 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_36_vysoky.glb",
@@ -326,7 +374,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (1308 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_38_domy_0.glb",
@@ -361,7 +415,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (80 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_38_domy_1.glb",
@@ -396,7 +456,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 19,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (38 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_3a_obchody.glb",
@@ -433,7 +499,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (408 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_3c_kostel.glb",
@@ -470,7 +542,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (282 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_3e_domy.glb",
@@ -507,7 +585,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (76 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_40_obchody.glb",
@@ -544,7 +628,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (534 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_42_hotel.glb",
@@ -581,7 +671,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (460 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_46_obchody.glb",
@@ -618,7 +714,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (960 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_48_vysoky.glb",
@@ -655,7 +757,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (680 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_4a_vysoky.glb",
@@ -692,6 +800,12 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (902 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  }
 ]

@@ -29,7 +29,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 25,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (50 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_0_inhab_bydleni_b.glb",
@@ -61,7 +67,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 23,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (46 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_1_inhab_byty_a.glb",
@@ -93,7 +105,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (78 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_1_inhab_byty_b.glb",
@@ -125,7 +143,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (70 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_2_inhab_kondominium_a.glb",
@@ -157,7 +181,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (130 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_2_inhab_kondominium_b.glb",
@@ -189,7 +219,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (136 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_3_inhab_vez_a.glb",
@@ -221,7 +257,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (220 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_3_inhab_vez_b.glb",
@@ -253,7 +295,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (208 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_4_luxurehab_arkologie.glb",
@@ -287,7 +335,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (296 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_5_inhab_namesti.glb",
@@ -353,7 +407,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (208 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "mars_6_luxurehab_hotel_b.glb",
@@ -385,6 +445,12 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (210 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  }
 ]

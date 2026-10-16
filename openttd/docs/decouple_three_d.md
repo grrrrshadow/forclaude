@@ -425,6 +425,23 @@ too.
   `AddIndustryObjects()`): the potatoes, the distillery and the pub have no
   pictures of their own (without the objects: the soil, a warehouse in a
   concrete yard, an old house).
+- **The girls of the industry** (16. 10., the colleague's
+  `hra/3d/PROSBA-PRUMYSL-HOLKY-NOC.md`; the player: "the statue of Karel, where
+  the studentky are when I bring them"): `postavy_s_holkami` of the statue, the
+  school and the machine are drawn while `HasGirls()` (30 days after the
+  studentky, the machine's after the marijuana), the hut's `postavy_stoji` and
+  `postavy_sedi` as `HutGirlsAt()` says (`GetThreeDIndustryGirls()`), on the
+  map, in the preview beside the industry's window and in the view from the
+  eyes; on the day they go the industry is drawn again (`LetGirlsGo()`). Their
+  `meritko` 2 as all girls outside a cab; in the view from the eyes at their
+  true size (`CAB_FIGURE_SCALE`), a thing among the figures (`"druh":
+  "predmet"`, the spit) as big as the building. The pub is **2x2** (the whole
+  scene twice as big): its north tile the old house (`GFX_PUB`), the three
+  others its garden (`GFX_PUB_YARD`); a pub of one tile from before keeps it,
+  drawn by its sprite (`GetThreeDIndustryObjectOf()`: an object only on an
+  industry of its size). The school, the distillery, the machine and the pub
+  have their windows lit at night as the houses (`noc`, `svetlo_NN`). Rig:
+  `test3d dovoz <x> <y> stud|mari|boom|nic`, `test3d budovy`.
 - **Plants** (`"rostliny"` of a building or a part: `soubor` a record
   `"druh": "rostlina"`, its foot at the origin and 1 m high, `poloha`,
   `otoceni`, `meritko` [x, y, z] metres): drawn as figures, a picture of the
@@ -477,7 +494,16 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   needs no build either. Tried with the colleague's `M62_Sergej_3D-v1.tar`
   (GRF `MAX3`, every sprite empty): as a tar and unpacked, Sergej on the map,
   in the depot, the purchase list and the turned view, its driver from the
-  package.
+  package. **Two versions** of a set side by side (16. 10., the colleague's
+  `hra/3d/PROSBA-TATRA-V6.md`): the package beside the GRF loaded wins
+  (`PackageBesideLoadedGrf()`, the GRF's folder, as the game names it in a
+  folder or a tar, is the package's), else the first in the order of the paths.
+  A set whose engine has **empty pictures** (one pixel, in the purchase list or
+  at a vehicle's front) and no object is said once in the log at level 0, with
+  the folders the game looked in (`NoteThreeDVehicleWithoutObject()`): its
+  package was not found, and nothing at all would be seen. Tried with the
+  colleague's `Tatra_osobni_3D-v6.tar` in `newgrf/` beside v3 (v6's objects
+  drawn, states 1 to 64 found), in `baseset/decouple/`, and its GRF alone.
 - **Index**: entries `"druh": "vozidlo"` of any `objekty/<set>/objekty.json`
   of a package: `soubor` (.glb), `typ` (`vlak`,
   `auto`, `lod`, `letadlo`), `grf` (the set's id: four characters as in the set,
@@ -558,7 +584,8 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   nothing of how a vehicle looks by itself -- no colour by its number, no fading or rust by its age. The GRF picks a
   set of its sprites for the vehicle by its own rules as always (random bits, age, breakdown, load, a counter to
   blink), and `"stavy"` of the record says what a set means: `{"sprity": [first, last], "barva": "RRGGBB", "lak":
-  0..1, "rez": 0..1}`, the set whose first sprite (its number in the GRF, `GetSpriteLocalID()`) is in the range
+  0..1, "rez": 0..1}`, the set whose first sprite (its line in the GRF, the sprite count line 0 and every sprite and
+  pseudo sprite a line on, `GetSpriteLocalID()`; not yagl's `sprite_id`) is in the range
   (`GetVehicleSetSpriteLocalID()`, `StateStep()`). Without `stavy`, or a set in no range: the object as it is, the
   paint new, no rust. A sprite and a picture of the turned view for each state, made when first drawn. Rig:
   `test3d stavy` prints each vehicle's sprite number and state. (Later: `dily`, a node turned, the lid; `doplnky`,

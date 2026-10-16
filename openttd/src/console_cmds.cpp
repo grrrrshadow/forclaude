@@ -8682,8 +8682,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "budovy") {
 		/* Where the game's own industries drawn as 3D objects stand on the map, and the plantations. */
 		for (const Industry *ind : Industry::Iterate()) {
-			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
-			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{}{}", obj->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), IsIndustryCompleted(ind->location.tile) ? "" : " (being built)");
+			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{} {}x{}{}, girls {}", obj->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), ind->location.w, ind->location.h, IsIndustryCompleted(ind->location.tile) ? "" : " (being built)", GetThreeDIndustryGirls(ind, obj).size());
 			ThreeDPlantationTile pt;
 			if ((ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDPlantationTile(ind->location.tile, pt)) {
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
@@ -8796,6 +8796,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
+	} else if (what == "dovoz" && argv.size() > 4) {
+		/* A delivery today to the industry at a tile, for the rig: 'dovoz <x> <y> <stud|mari|boom|nic>...' -- nic forgets them all. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value() || !IsTileType(TileXY(*x, *y), TileType::Industry)) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d dovoz <x> <y> <stud|mari|boom|nic>...' on a tile of an industry.");
+			return true;
+		}
+		Industry *ind = Industry::GetByTile(TileXY(*x, *y));
+		for (size_t a = 4; a < argv.size(); a++) {
+			for (CargoLabel label : {CT_STUDENTKY, CT_MARIJUANA, CT_EXPLOSIVES}) {
+				const bool today = (argv[a] == "stud" && label == CT_STUDENTKY) || (argv[a] == "mari" && label == CT_MARIJUANA) || (argv[a] == "boom" && label == CT_EXPLOSIVES);
+				if (!today && argv[a] != "nic") continue;
+				CargoType cargo = GetCargoTypeByLabel(label);
+				auto it = IsValidCargoType(cargo) ? ind->GetCargoAccepted(cargo) : std::end(ind->accepted);
+				if (it != std::end(ind->accepted)) it->last_accepted = today ? TimerGameEconomy::date : TimerGameEconomy::Date{};
+			}
+		}
+		for (TileIndex t : ind->location) {
+			if (IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index) MarkTileDirtyByTile(t);
+		}
+		const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+		IConsolePrint(CC_DEFAULT, "test3d: dovoz {} at {},{}: girls {}", obj != nullptr ? obj->name : std::string("(no object)"), TileX(ind->location.tile), TileY(ind->location.tile), GetThreeDIndustryGirls(ind, obj).size());
 	} else if (what == "plantaz" && argv.size() > 4) {
 		/* The state of a marijuana plantation, for the rig: 'plantaz <x> <y> <care> [holky]' -- care 0 bare, 1 small plants, 28 grown; holky brings the girls. */
 		auto x = number(2), y = number(3), care = number(4);

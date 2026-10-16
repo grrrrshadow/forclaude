@@ -3682,7 +3682,7 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 {
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries) || !IsIndustryCompleted(_cur_ti.tile)) return;
 	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
-	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+	const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 	ThreeDPlantationTile pt;
 	ThreeDFieldTile ft;
 	if (obj != nullptr) {
@@ -3692,7 +3692,8 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 		for (const TurnedObject &to : _turned_objects) {
 			if (to.origin == origin && to.obj == obj) known = true;
 		}
-		if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+		/* With the girls that came with the deliveries, when they are there. */
+		if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDIndustryGirls(ind, obj)});
 	} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
 		LeaveOutTileSprites(first_parent, north);
 		if (ft.plants != nullptr) {
@@ -7674,6 +7675,8 @@ struct CabFigure {
 	bool plant = false;   ///< a plant of a field: a picture of a few angles and sizes shared by all of its kind (GetThreeDPlantPicture())
 };
 static std::vector<CabFigure> _cab_figures;
+/** The size of the figures standing on the buildings and fields in the view from the eyes: true, as they are (twice it outside). */
+static constexpr float CAB_FIGURE_SCALE = 1.0f;
 
 /** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
 void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame)
@@ -8372,7 +8375,7 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 					} else if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
 						const Industry *ind = Industry::GetByTile(tile);
 						if (ind->location.tile != tile) continue;
-						const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+						const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 						if (obj != nullptr) far_object(obj, tile);
 					}
 				}
@@ -8636,6 +8639,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		const ThreeDObject *obj;
 		TileIndex origin;
 		int z;
+		std::span<const ThreeDObjectFigure> more = {}; ///< an industry's girls that are there now (GetThreeDIndustryGirls())
 	};
 	std::vector<CabObject> objects;
 	AutoRestoreBackup collecting_backup(_cab_collecting, true);
@@ -8697,7 +8701,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		if (tile_type == TileType::Industry && IsIndustryCompleted(_cur_ti.tile)) {
 			/* One of the game's own industries that is a real 3D object (the pub, the distillery, the gymnasium...): as a house. */
 			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
-			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 			ThreeDPlantationTile pt;
 			ThreeDFieldTile ft;
 			if (obj != nullptr) {
@@ -8707,7 +8711,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 				for (const CabObject &co : objects) {
 					if (co.origin == origin) known = true;
 				}
-				if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+				if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDIndustryGirls(ind, obj)});
 			} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
 				/* A tile of a field as in the turned view (AddIndustryObjects()): on the game's ground its plants -- a
 				 * model of potatoes, or the marijuana plant by plant (AddCabPlant()) -- and the girl at work; the shed,
@@ -8720,14 +8724,14 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 						AddCabPlant(f.figure, f.scale, f.stretch, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
 					}
 				}
-				for (const ThreeDObjectFigure &f : ft.worker) AddCabFigure(f.figure, f.scale, static_cast<int>(ox + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(oy + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
+				for (const ThreeDObjectFigure &f : ft.worker) AddCabFigure(f.figure, CAB_FIGURE_SCALE, static_cast<int>(ox + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(oy + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
 				if (ft.road != nullptr) {
 					const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
 					const int road_z = GetTilePixelZ(road_tile);
 					if (ft.shed != nullptr) objects.push_back({ft.shed, road_tile, road_z});
 					if (ft.hay != nullptr) objects.push_back({ft.hay, road_tile, road_z});
 					for (int edge = 0; edge < 2; edge++) {
-						for (const ThreeDObjectFigure &f : ft.girls[edge]) AddCabFigure(f.figure, f.scale, static_cast<int>(TileX(road_tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(TileY(road_tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(road_z + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
+						for (const ThreeDObjectFigure &f : ft.girls[edge]) AddCabFigure(f.figure, CAB_FIGURE_SCALE, static_cast<int>(TileX(road_tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(TileY(road_tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(road_z + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
 					}
 				}
 			}
@@ -8741,6 +8745,20 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	}
 	is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
 	ps_kind.resize(_vd.parent_sprites_to_draw.size(), 0);
+	/* The figures standing on the buildings -- the girls at the doors and on the balconies, at the pub's tables, at the
+	 * school after the studentky came: at their true size, as the eyes see them (the colleague's rule 12: twice it
+	 * outside a cab, as they are in it; the player: "only the first person view normal"). A thing among them (the
+	 * pub's spit over the grill) stays as big as the building it is on. */
+	for (const CabObject &co : objects) {
+		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+		auto add = [&](const ThreeDObjectFigure &f) {
+			const ThreeDVehicleObject *fig = GetThreeDFigure(f.figure);
+			AddCabFigure(f.figure, fig != nullptr && fig->thing ? f.scale : CAB_FIGURE_SCALE, static_cast<int>(std::lround(ox + f.at[0] * OBJECT_UNITS_PER_METRE)), static_cast<int>(std::lround(oy + f.at[1] * OBJECT_UNITS_PER_METRE)),
+					static_cast<int>(std::lround(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE)), f.facing, -1);
+		};
+		for (const ThreeDObjectFigure &f : co.obj->figures) add(f);
+		for (const ThreeDObjectFigure &f : co.more) add(f);
+	}
 	/* The dragons about (three_d_dragons.h), among the figures. */
 	AddThreeDDragonsToEye();
 

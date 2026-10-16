@@ -6,9 +6,87 @@
   "prumysl": "IT_GYMNASIUM",
   "dlazdic_x": 2,
   "dlazdic_y": 2,
+  "postavy_s_holkami": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     13.89,
+     21.84,
+     0.7
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     13.89,
+     23.04,
+     0.7
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     19.55,
+     18.95,
+     0.7
+    ],
+    "otoceni": 45.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     20.95,
+     13.37,
+     0.03
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     15.35,
+     12.77,
+     0.03
+    ],
+    "otoceni": 131.6,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     14.56,
+     13.66,
+     0.03
+    ],
+    "otoceni": 311.6,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_hazi",
+    "poloha": [
+     24.54,
+     5.39,
+     0.03
+    ],
+    "otoceni": 14.6,
+    "meritko": 2.0
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 17,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (444 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_16 jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model gymnazium/render_gymnazium.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dívčí gymnázium 2 × 2: nízká budova s průčelím, hřiště, park s lavičkami; 27729 trojúhelníků (model 27729), atlas 2048 px jen barva bez světla, s normálami, výška 12.37 m"
+  "poznamka": "dívčí gymnázium 2 × 2: nízká budova s průčelím, hřiště, park s lavičkami; 27285 trojúhelníků (model 27729), atlas 2048 px jen barva bez světla, s normálami, výška 12.37 m"
  },
  {
   "soubor": "socha_kamen.glb",
@@ -172,6 +250,58 @@
      1.994,
      2.593
     ]
+   }
+  ],
+  "postavy_s_holkami": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     8.24,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     6.64,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     3.01,
+     7.64,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "bikini_jde",
+    "poloha": [
+     11.7,
+     8.65,
+     0.06
+    ],
+    "otoceni": 70.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_objima",
+    "poloha": [
+     7.31,
+     8.39,
+     2.79
+    ],
+    "otoceni": 275.2,
+    "meritko": 2.0
    }
   ],
   "autor": "grrrrf: vlastní model socha/render_socha.py (SOCHA=kamen)",
@@ -342,6 +472,58 @@
     ]
    }
   ],
+  "postavy_s_holkami": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     8.24,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     6.64,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     3.01,
+     7.64,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "bikini_jde",
+    "poloha": [
+     11.7,
+     8.65,
+     0.06
+    ],
+    "otoceni": 70.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_objima",
+    "poloha": [
+     7.31,
+     8.39,
+     2.79
+    ],
+    "otoceni": 275.2,
+    "meritko": 2.0
+   }
+  ],
   "autor": "grrrrf: vlastní model socha/render_socha.py (SOCHA=bronz)",
   "licence": "GPL-2.0 (vlastní geometrie i textura); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
   "poznamka": "socha Karla Máchy z bronzu, jinak jako kamenná; 36000 trojúhelníků (model 69212), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny)"
@@ -353,9 +535,47 @@
   "prumysl": "IT_WEED_MACHINE",
   "dlazdic_x": 1,
   "dlazdic_y": 1,
+  "postavy_s_holkami": [
+   {
+    "postava": "college_girl_plati",
+    "poloha": [
+     4.09,
+     3.35,
+     0.06
+    ],
+    "otoceni": 180.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     5.98,
+     2.49,
+     0.94
+    ],
+    "otoceni": 180.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     5.19,
+     7.28,
+     0.06
+    ],
+    "otoceni": 40.0,
+    "meritko": 2.0
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (2 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_00 jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model automat/render_automat.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "automat na marihuanu CBD MAT s lavičkou a košem v severním rohu, zbytek políčka zarostlé křovím; 36000 trojúhelníků (model 99188), atlas 2048 px jen barva bez světla, s normálami, výška 3.65 m"
+  "poznamka": "automat na marihuanu CBD MAT s lavičkou a košem v severním rohu, zbytek políčka zarostlé křovím; 35998 trojúhelníků (model 99188), atlas 2048 px jen barva bez světla, s normálami, výška 3.65 m"
  },
  {
   "soubor": "chatka.glb",
@@ -1066,6 +1286,70 @@
     ]
    }
   ],
+  "postavy_stoji": [
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     17.4,
+     6.18,
+     0.01
+    ],
+    "otoceni": 325.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     9.21,
+     6.29,
+     0.01
+    ],
+    "otoceni": 45.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     24.57,
+     7.38,
+     0.01
+    ],
+    "otoceni": 120.0,
+    "meritko": 2.0
+   }
+  ],
+  "postavy_sedi": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     16.3,
+     8.74,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     16.3,
+     10.37,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     22.78,
+     1.5,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   }
+  ],
   "autor": "domek A little happy hut, Tigran Safaryan (Sketchfab, CC BY 4.0), dvorek a nepořádek vlastní (chatka/render_chatka.py)",
   "licence": "CC BY 4.0 (uvést Tigran Safaryan); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
   "poznamka": "hulírna 2 × 1 podél x: zadní políčko domek, přední dvorek s lavicemi a nepořádkem, plot z kytek marihuany s dírami; 21439 trojúhelníků (model 21439), atlas 2048 px jen barva bez světla, s normálami, výška 12.39 m, 50 kytek zvlášť (rostliny)"
@@ -1083,17 +1367,23 @@
   "dava": [
    "BEER"
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 26,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (1304 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_25 jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model lihovar/render_lihovar.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "lihovar 3 × 3: kotelna s komínem, hlavní budova s nápisem LIHOVAR, žlab s bramborami, sklady, nádrže; 26914 trojúhelníků (model 26914), atlas 2048 px jen barva bez světla, s normálami, výška 27.49 m"
+  "poznamka": "lihovar 3 × 3: kotelna s komínem, hlavní budova s nápisem LIHOVAR, žlab s bramborami, sklady, nádrže; 25610 trojúhelníků (model 26914), atlas 2048 px jen barva bez světla, s normálami, výška 27.49 m"
  },
  {
   "soubor": "hospoda.glb",
   "jmeno": "hospoda",
   "druh": "prumysl",
   "prumysl": "hospoda",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
   "bere": [
    "BEER"
   ],
@@ -1104,57 +1394,68 @@
    {
     "postava": "mat_toci",
     "poloha": [
-     8.28,
-     10.27,
+     16.56,
+     20.55,
      0.0
     ],
     "otoceni": 90,
+    "meritko": 2.0,
     "poznamka": "Mat točí pivo z pípy, trubka vede ze sudu (hráč: „mat za vyčep … ten moment jak tocí pivo, kouka na holku“)"
    },
    {
     "postava": "college_girl_pro_pivo",
     "poloha": [
-     8.7,
-     10.79,
+     17.4,
+     21.59,
      0.0
     ],
     "otoceni": 214.8,
+    "meritko": 2.0,
     "poznamka": "natahuje ruce pro pivo (hráč: „holku ktera natuhuje ruce pro to pivo, si přišla pro pivo“)"
    },
    {
     "postava": "college_girl_sedi",
     "poloha": [
-     9.97,
-     10.62,
-     0.47
+     19.95,
+     21.25,
+     0.94
     ],
     "otoceni": 90,
+    "meritko": 2.0,
     "poznamka": "sedí u stolu s pivem"
    },
    {
     "postava": "people_girl_sedi",
     "poloha": [
-     10.87,
-     11.92,
-     0.47
+     21.74,
+     23.84,
+     0.94
     ],
     "otoceni": 270,
+    "meritko": 2.0,
     "poznamka": "sedí u stolu s pivem"
    },
    {
     "postava": "rozen",
     "poloha": [
-     10.97,
-     2.19,
-     0.95
+     21.94,
+     4.39,
+     1.9
     ],
     "otoceni": 90,
+    "meritko": 2.0,
     "poznamka": "rožeň nad grilem: čuník, kravička a ovečka se střídají (hráč: „grilovat tvyho čunika z auta a kravičku a ovečku“)"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 25,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (5676 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_24 jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/hospoda.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "hospoda se zahrádkou: velké květináče, úzké slunečníky u budovy, výčep se sudem, gril s rožněm, girlanda; 30828 trojúhelníků (model 30828), atlas 2048 px jen barva bez světla, s normálami, výška 6.68 m"
+  "poznamka": "hospoda se zahrádkou: velké květináče, úzké slunečníky u budovy, výčep se sudem, gril s rožněm, girlanda (celá scéna dvakrát větší, 2 × 2 políčka, holky 2×); 25152 trojúhelníků (model 30828), atlas 4096 px jen barva bez světla, s normálami, výška 13.37 m"
  },
  {
   "soubor": "kytka_mari_mlada.glb",

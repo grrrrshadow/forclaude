@@ -354,7 +354,7 @@ struct IndustryPiece {
 };
 
 /** The pictures of the industries' objects at the angles the previews were at, by the industry, the angle (tenths of a degree) and the zoom. */
-static std::map<std::tuple<uint, int, int>, ThreeDModelPicture> _preview_object_pictures;
+static std::map<std::tuple<uint, int, int, size_t>, ThreeDModelPicture> _preview_object_pictures;
 
 /**
  * The 3D objects an industry of the game's own is laid from at an angle (three_d_objects.h): its building, or the
@@ -370,11 +370,12 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 	tiles_y = ind->location.h;
 	top = 0;
 	const int base_z = GetTileMaxPixelZ(ind->location.tile);
-	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+	const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 	if (obj != nullptr) {
 		ThreeDObjectPlacement &p = parts.emplace_back();
 		p.obj = obj;
 		p.paint = obj->PaintAt(ind->location.tile);
+		p.more = GetThreeDIndustryGirls(ind, obj);
 		tiles_x = obj->tiles_x;
 		tiles_y = obj->tiles_y;
 		top = static_cast<int>(std::ceil(obj->top));
@@ -433,7 +434,10 @@ static bool IndustryPieces(const Industry *ind, float yaw, ZoomLevel &zoom, std:
 	/* The zoom it fits the preview at: its plot across, and its height. */
 	const int span = (tiles_x + tiles_y) * TILE_SIZE;
 	zoom = PreviewZoomFor(span * 2 * ZOOM_BASE, (span + top) * ZOOM_BASE);
-	const auto key = std::make_tuple(ind->index.base(), static_cast<int>(std::lround(std::fmod(yaw + 720.0f, 360.0f) * 10)), to_underlying(zoom));
+	/* Which figures are there (the girls come and go with the deliveries), so a picture without them is not drawn for one with them. */
+	size_t figures = 0;
+	for (const ThreeDObjectPlacement &p : parts) figures = figures * 31 + reinterpret_cast<uintptr_t>(p.more.data()) + p.more.size();
+	const auto key = std::make_tuple(ind->index.base(), static_cast<int>(std::lround(std::fmod(yaw + 720.0f, 360.0f) * 10)), to_underlying(zoom), figures);
 	auto it = _preview_object_pictures.find(key);
 	if (it == _preview_object_pictures.end()) {
 		if (_preview_object_pictures.size() > 64) _preview_object_pictures.clear();
@@ -620,7 +624,7 @@ void ShowThreeDIndustryPreview(IndustryID industry)
 {
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
-	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) == nullptr && ((ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) || GetThreeDFieldPart("zem") == nullptr)) return;
+	if (GetThreeDIndustryObjectOf(ind) == nullptr && ((ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) || GetThreeDFieldPart("zem") == nullptr)) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
 }
 

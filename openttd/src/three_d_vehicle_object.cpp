@@ -29,9 +29,11 @@
 #include "timer/timer_game_tick.h"
 #include "timer/timer.h"
 
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <map>
+#include <set>
 
 #include "safeguards.h"
 
@@ -279,6 +281,32 @@ bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction d
 	if (sprite == 0) return false;
 	result->Set(sprite);
 	return true;
+}
+
+/**
+ * An engine of a set drawn from the set's own pictures, as no 3D object was found for it: when those pictures are
+ * empty -- a set whose vehicles are drawn from the objects of its package -- the package was not found, and nothing at
+ * all would be seen. Said once a set in the log, at level 0, with where the game looked (the colleague's
+ * hra/3d/PROSBA-TATRA-V6.md: "v5 was seen neither in the purchase list nor on the road"). Only by the pictures of the
+ * purchase list and of the front of a vehicle: a part of an articulated vehicle no one is meant to see has empty ones.
+ */
+void NoteThreeDVehicleWithoutObject(EngineID engine, const Vehicle *v, EngineImageType image_type, const VehicleSpriteSeq &seq)
+{
+	if (image_type != EngineImageType::Purchase && (v == nullptr || !v->IsPrimaryVehicle())) return;
+	const Engine *e = Engine::GetIfValid(engine);
+	if (e == nullptr || e->grf_prop.grffile == nullptr) return;
+	static std::set<uint32_t> told;
+	static std::set<std::pair<uint32_t, uint16_t>> looked;
+	const uint32_t grfid = e->grf_prop.grfid;
+	if (told.contains(grfid) || !looked.insert({grfid, e->grf_prop.local_id}).second) return;
+	for (uint i = 0; i < seq.count; i++) {
+		/* A pixel at the normal zoom: ZOOM_BASE square as the cache keeps it, at the finest. */
+		const Sprite *s = GetSprite(seq.seq[i].sprite, SpriteType::Normal);
+		if (s != nullptr && (s->width > ZOOM_BASE || s->height > ZOOM_BASE)) return;
+	}
+	told.insert(grfid);
+	Debug(misc, 0, "3D vehicles: the set {} ({:08X}) draws its engine {} with empty pictures, and no package of its 3D objects was found (looked in {}: <package>/objekty/<set>/objekty.json, a folder or a tar, with \"grf\": \"{:08X}\")",
+			e->grf_prop.grffile->filename, std::byteswap(grfid), e->grf_prop.local_id, ThreeDPackagePlaces(), std::byteswap(grfid));
 }
 
 /** An object drawn into pixels about its origin. */

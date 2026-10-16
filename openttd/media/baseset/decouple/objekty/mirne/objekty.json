@@ -28,7 +28,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (760 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_1c_vysoky_2.glb",
@@ -59,7 +65,13 @@
     "sirka": 1.5,
     "odhad": true
    }
-  ]
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (576 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
  },
  {
   "soubor": "dum_03_kostel.glb",
@@ -247,7 +259,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -258,7 +270,7 @@
      3.24
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
    }
   ],
@@ -357,7 +369,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -368,7 +380,7 @@
      0.0
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u králíkárny"
    }
   ],
@@ -469,7 +481,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodním domem"
    }
   ],
@@ -570,7 +582,7 @@
      0.0
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří pekařství"
    }
   ],
@@ -671,7 +683,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před kancelářemi"
    }
   ],
@@ -769,7 +781,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -780,7 +792,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u prádla na zahradě"
    }
   ],
@@ -862,7 +874,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -873,7 +885,7 @@
      0.0
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u studny"
    }
   ],
@@ -971,7 +983,7 @@
      3.24
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
    },
    {
@@ -982,7 +994,7 @@
      0.0
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u klepače s kobercem"
    }
   ],
@@ -1080,7 +1092,7 @@
      0.0
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -1091,7 +1103,7 @@
      0.0
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
    }
   ],
@@ -1204,7 +1216,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří první chalupy"
    },
    {
@@ -1215,7 +1227,7 @@
      0.0
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří druhé chalupy"
    }
   ],
@@ -1325,7 +1337,7 @@
      0.0
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -1336,7 +1348,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří přístavku"
    }
   ],
@@ -1434,7 +1446,7 @@
      3.24
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
    },
    {
@@ -1445,7 +1457,7 @@
      0.0
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
    }
   ],
@@ -1527,7 +1539,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -1538,7 +1550,7 @@
      0.0
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u klepače s kobercem"
    }
   ],
@@ -1636,7 +1648,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
    },
    {
@@ -1647,7 +1659,7 @@
      0.0
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
    }
   ],
@@ -1746,7 +1758,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodem"
    }
   ],
@@ -1830,7 +1842,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodem"
    }
   ],
@@ -1955,7 +1967,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; pod markýzou kina"
    },
    {
@@ -1966,7 +1978,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u plakátu"
    }
   ],
@@ -2243,7 +2255,7 @@
      0.47
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí u stolku pod slunečníkem na terase kavárny"
    },
    {
@@ -2254,7 +2266,7 @@
      0.47
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí u stolku pod slunečníkem na terase kavárny"
    },
    {
@@ -2265,7 +2277,7 @@
      26.23
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na střešní terase"
    },
    {
@@ -2276,7 +2288,7 @@
      25.76
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše"
    },
    {
@@ -2287,7 +2299,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří kavárny"
    }
   ],
@@ -2411,7 +2423,7 @@
      13.96
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v bistru na střeše křídla"
    },
    {
@@ -2422,7 +2434,7 @@
      13.96
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v bistru na střeše křídla"
    },
    {
@@ -2433,7 +2445,7 @@
      13.49
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše křídla"
    },
    {
@@ -2444,7 +2456,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu"
    }
   ],
@@ -2542,7 +2554,7 @@
      0.47
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na zahrádce cukrárny"
    },
    {
@@ -2553,7 +2565,7 @@
      0.47
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na zahrádce cukrárny"
    },
    {
@@ -2564,7 +2576,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kupuje zmrzlinu u vozíku"
    },
    {
@@ -2575,7 +2587,7 @@
      19.3
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u lehátek"
    }
   ],
@@ -2676,7 +2688,7 @@
      3.91
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí na balkoně u deštníku, co se suší"
    },
    {
@@ -2687,7 +2699,7 @@
      6.7
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na balkoně"
    },
    {
@@ -2698,7 +2710,7 @@
      0.0
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u pískoviště"
    },
    {
@@ -2709,7 +2721,7 @@
      0.47
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na dvorku"
    }
   ],
@@ -2810,7 +2822,7 @@
      18.55
     ],
     "otoceni": 300,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně TERASA na střeše"
    },
    {
@@ -2821,7 +2833,7 @@
      18.55
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně TERASA na střeše"
    },
    {
@@ -2832,7 +2844,7 @@
      18.08
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše"
    },
    {
@@ -2843,7 +2855,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu pod podloubím"
    }
   ],
@@ -2944,7 +2956,7 @@
      0.0
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u okénka stánku se zmrzlinou"
    },
    {
@@ -2955,7 +2967,7 @@
      0.47
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem před domem"
    },
    {
@@ -2966,7 +2978,7 @@
      13.21
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; klečí u bazénku na střeše s telefonem"
    },
    {
@@ -2977,7 +2989,7 @@
      13.21
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u plážového slunečníku"
    }
   ],
@@ -3078,7 +3090,7 @@
      1.1
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; na rampě u beden s deštníky"
    },
    {
@@ -3089,7 +3101,7 @@
      0.47
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
    },
    {
@@ -3100,7 +3112,7 @@
      0.47
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
    }
   ],
@@ -3186,7 +3198,7 @@
      19.95
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v baru na střeše"
    },
    {
@@ -3197,7 +3209,7 @@
      19.95
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v baru na střeše"
    },
    {
@@ -3208,7 +3220,7 @@
      19.48
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u obřího koktejlu"
    },
    {
@@ -3219,7 +3231,7 @@
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; pod markýzou obchodního domu"
    }
   ],
@@ -3317,7 +3329,7 @@
      2.41
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na hlavní tribuně"
    },
    {
@@ -3328,7 +3340,7 @@
      2.91
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na hlavní tribuně"
    },
    {
@@ -3339,7 +3351,7 @@
      1.86
     ],
     "otoceni": 180,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na přední tribuně mezi deštníky"
    },
    {
@@ -3350,7 +3362,7 @@
      0.0
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u stánku s občerstvením"
    }
   ],
@@ -3451,7 +3463,7 @@
      36.47
     ],
     "otoceni": 330,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně na střeše věže"
    },
    {
@@ -3462,7 +3474,7 @@
      36.0
     ],
     "otoceni": 330,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše věže"
    },
    {
@@ -3473,7 +3485,7 @@
      0.47
     ],
     "otoceni": 0,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na náměstíčku"
    },
    {
@@ -3484,7 +3496,7 @@
      0.0
     ],
     "otoceni": 270,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u kašny"
    }
   ],
@@ -3570,7 +3582,7 @@
      15.71
     ],
     "otoceni": 90,
-    "meritko": 1.0,
+    "meritko": 2.0,
     "poznamka": "hráč 15. 10.: kouřící holka u slunečníků na střeše hotelu (terasa před bazénem, slunečníky x 9,9, y 20,4 až 25,8)"
    }
   ],

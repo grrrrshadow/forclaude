@@ -1269,6 +1269,8 @@ static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction d
 	for (uint i = 0; colours != 0 && i < result->count; i++) {
 		result->seq[i].sprite = TrueColourSprite(result->seq[i].sprite, colours);
 	}
+	/* Empty pictures of a set whose package was not found: said in the log. */
+	NoteThreeDVehicleWithoutObject(engine, v, image_type, *result);
 }
 
 void GetCustomVehicleSprite(const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)

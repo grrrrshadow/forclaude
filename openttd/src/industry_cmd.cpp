@@ -812,7 +812,13 @@ static void SetupPotatoChain()
 	distillery.production_rate[0] = 0;
 	distillery.input_cargo_multiplier[0][0] = 256;
 
-	SetupTownIndustry(IT_PUB, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_PUB}}, STR_INDUSTRY_NAME_PUB, 0xB8);
+	/* Two by two, the colleague's pub with its garden (16. 10.: "the whole scene twice as big, 2 x 2 tiles"). */
+	SetupTownIndustry(IT_PUB, {
+			IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_PUB},
+			IndustryTileLayoutTile{TileIndexDiffC{1, 0}, GFX_PUB_YARD},
+			IndustryTileLayoutTile{TileIndexDiffC{0, 1}, GFX_PUB_YARD},
+			IndustryTileLayoutTile{TileIndexDiffC{1, 1}, GFX_PUB_YARD},
+		}, STR_INDUSTRY_NAME_PUB, 0xB8);
 	IndustrySpec &pub = _industry_specs[IT_PUB];
 	pub.produced_cargo_label[0] = CT_PASSENGERS;
 	pub.production_rate[0] = 0;
@@ -867,6 +873,7 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE_ON(SPR_CONCRETE_GROUND, 0, 0),      // GFX_DISTILLERY_YARD
 	OWN_TILE_ON(SPR_CONCRETE_GROUND, 0x5C3, 31), // GFX_DISTILLERY: the warehouse (house 0x12)
 	OWN_TILE(0x5D4, 22),                // GFX_PUB: the old house (house 0x18)
+	OWN_TILE(0, 0),                     // GFX_PUB_YARD: its garden, grass
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
@@ -1043,6 +1050,22 @@ static void TendMarijuanaPlantations()
 		}
 		/* The plants and the girls change with the day; drawn afresh, cheaply. */
 		MarkGameOwnIndustryDirty(i);
+	}
+}
+
+/**
+ * A day at the school, the machine, the statue and the coffeeshop: on the day the girls of a delivery go
+ * (GIRLS_DAYS after it), drawn afresh without them; a delivery draws them coming (DeliverGoodsToIndustry()).
+ */
+static void LetGirlsGo()
+{
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP}) for (IndustryID id : Industry::industries[type]) {
+		const Industry *i = Industry::Get(id);
+		for (const Industry::AcceptedCargo &a : i->accepted) {
+			if (a.last_accepted == TimerGameEconomy::Date{} || TimerGameEconomy::date.base() - a.last_accepted.base() != GIRLS_DAYS) continue;
+			MarkGameOwnIndustryDirty(i);
+			break;
+		}
 	}
 }
 
@@ -5055,6 +5078,7 @@ static void ChangeIndustryProduction(Industry *i, bool monthly)
 static const IntervalTimer<TimerGameEconomy> _economy_industries_daily({TimerGameEconomy::Trigger::Day, TimerGameEconomy::Priority::Industry}, [](auto)
 {
 	TendMarijuanaPlantations();
+	LetGirlsGo();
 
 	_economy.industry_daily_change_counter += _economy.industry_daily_increment;
 

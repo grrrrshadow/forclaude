@@ -10,6 +10,8 @@
 #include "stdafx.h"
 #include "three_d_objects.h"
 #include "simtrains.h"
+#include "industry.h"
+#include "climate_industries.h"
 #include "three_d_vehicle_object.h"
 #include "debug.h"
 #include "fileio_func.h"
@@ -1002,6 +1004,54 @@ static std::vector<std::string> FindObjectIndices()
 	return indices;
 }
 
+/**
+ * Where the game looks for the packages of GRFs, for the log: the NewGRF folders and baseset/decouple/ of each place
+ * the game reads its data from, folders and tars in them.
+ */
+std::string ThreeDPackagePlaces()
+{
+	std::string places;
+	for (Searchpath sp : _valid_searchpaths) {
+		for (const std::string &dir : {FioGetDirectory(sp, Subdirectory::NewGrf), FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP}) {
+			if (!FileExists(dir) || places.find(dir) != std::string::npos) continue;
+			if (!places.empty()) places += ", ";
+			places += dir;
+		}
+	}
+	return places.empty() ? std::string("no folder") : places;
+}
+
+/**
+ * Whether a package lies beside the GRF of an id the game has loaded: the GRF's folder, as the game names it (in a
+ * NewGRF folder, or in a tar), is the package's. The player may keep an old and a new version of a set side by side
+ * (the colleague's hra/3d/PROSBA-TATRA-V6.md: "the one beside the loaded GRF wins"). The names in a tar are the
+ * game's in small letters, so compared so.
+ */
+static bool PackageBesideLoadedGrf(std::string package, uint32_t grfid)
+{
+	auto plain = [](std::string &s) {
+		for (char &ch : s) {
+			if (ch == '\\') ch = '/';
+			if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+		}
+	};
+	for (const auto &c : _grfconfig) {
+		if (c->ident.grfid != grfid) continue;
+		std::string grf = c->filename;
+		plain(grf);
+		const size_t sep = grf.find_last_of('/');
+		if (sep == std::string::npos) return false;
+		const std::string folder = grf.substr(0, sep + 1);
+		if (package.starts_with(IN_TAR)) package.erase(0, IN_TAR.size());
+		if (package.starts_with(IN_BASESET_TAR)) package.erase(0, IN_BASESET_TAR.size());
+		plain(package);
+		/* The package's folder is the one its objekty/ is in, beside the GRF. */
+		if (package.ends_with("objekty/")) package.resize(package.size() - std::string_view("objekty/").size());
+		return package.ends_with(folder) && (package.size() == folder.size() || package[package.size() - folder.size() - 1] == '/');
+	}
+	return false;
+}
+
 /** The package an index is of: the folder its set's folder is in (.../objekty/), the figures of a vehicle found there first. */
 static std::string PackageOf(const std::string &index)
 {
@@ -1175,6 +1225,17 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 			}
 		}
 	} else {
+		/* Its girls when they are there (the colleague's hra/3d/PROSBA-PRUMYSL-HOLKY-NOC.md): after the deliveries. */
+		auto list = [&e](const char *key, std::vector<ThreeDObjectFigure> &into) {
+			if (!e.contains(key) || !e.at(key).is_array()) return;
+			for (const auto &f : e.at(key)) {
+				ThreeDObjectFigure fig;
+				if (ReadFigure(f, fig)) into.push_back(std::move(fig));
+			}
+		};
+		list("postavy_s_holkami", obj.girls);
+		list("postavy_stoji", obj.hut_girls[0]);
+		list("postavy_sedi", obj.hut_girls[1]);
 		obj.industry_name = e.value("prumysl", std::string());
 		obj.industry = IndexIndustryType(obj.industry_name);
 		const std::string variant = e.value("varianta", std::string());
@@ -1414,6 +1475,7 @@ static void ReadThreeDVehicleObjects()
 					fig.package = package;
 					fig.file = folder + e.at("soubor").get<std::string>();
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					fig.thing = figure_kind == "predmet";
 					if (e.value("druh", std::string()) == "rostlina") {
 						fig.name = e.at("soubor").get<std::string>();
 						if (fig.name.ends_with(".glb")) fig.name.resize(fig.name.size() - 4);
@@ -1660,10 +1722,15 @@ static void ReadThreeDVehicleObjects()
 		}
 		_vehicle_objects.push_back(std::move(obj));
 	}
+	/* A piece is the first object's that has it -- unless another package of the same set lies beside the GRF loaded. */
 	for (size_t i = 0; i < _vehicle_objects.size(); i++) {
 		const ThreeDVehicleObject &o = _vehicle_objects[i];
+		const bool here = PackageBesideLoadedGrf(o.package, o.grfid);
 		for (size_t k = 0; k < o.pieces.size(); k++) {
-			_vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
+			auto [it, added] = _vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
+			if (added || !here || PackageBesideLoadedGrf(_vehicle_objects[it->second.first].package, o.grfid)) continue;
+			Debug(misc, 1, "3D vehicles: {} of {} beside its loaded GRF, not of {}", o.name, o.package, _vehicle_objects[it->second.first].package);
+			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
 		}
 	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures", _vehicle_objects.size(), _figure_objects.size());
@@ -1677,10 +1744,14 @@ static void ReadThreeDVehicleObjects()
 const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	const ThreeDVehicleSize *first = nullptr;
 	for (const ThreeDVehicleObject &o : _vehicle_objects) {
-		if (o.grfid == grfid && o.size.param >= 0) return &o.size;
+		if (o.grfid != grfid || o.size.param < 0) continue;
+		/* Of the package beside the GRF loaded, when there are more (an old and a new version). */
+		if (PackageBesideLoadedGrf(o.package, grfid)) return &o.size;
+		if (first == nullptr) first = &o.size;
 	}
-	return nullptr;
+	return first;
 }
 
 /**
@@ -2078,6 +2149,10 @@ std::string DescribeThreeDVehicleObjects()
 				o.size.param < 0 ? "" : fmt::format(" size param {}", o.size.param), lengths.empty() ? "" : fmt::format(" lengths{}", lengths));
 		if (!o.paint.mask_file.empty()) out += fmt::format(" paint mask {} fades {} start {}", o.paint.mask_file.substr(o.paint.mask_file.rfind('/') + 1), o.paint.fades, o.paint.start);
 		if (!o.states.empty()) out += fmt::format(" states {}", o.states.size());
+		/* The package it is of, and whether its pieces are drawn from it (of two versions, the one beside the GRF loaded). */
+		auto drawn = o.pieces.empty() ? _vehicle_object_pieces.end() : _vehicle_object_pieces.find(VehiclePieceKey(o.grfid, o.type, o.pieces[0]));
+		const bool used = drawn != _vehicle_object_pieces.end() && &_vehicle_objects[drawn->second.first] == &o;
+		out += fmt::format(" package {}{}", o.package, used ? "" : " (not used)");
 	}
 	return out;
 }
@@ -2097,6 +2172,38 @@ const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant)
 	auto it = _three_d_industry_objects.find(std::make_pair(type, static_cast<int8_t>(variant ? 1 : 0)));
 	if (it == _three_d_industry_objects.end()) it = _three_d_industry_objects.find(std::make_pair(type, static_cast<int8_t>(-1)));
 	return it == _three_d_industry_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The 3D object an industry is drawn as: its type's, if the industry is as big as the object -- a pub of one tile
+ * built before the pub was two by two (the colleague, 16. 10.: "the pub twice as big, on 2 x 2 tiles"), or a
+ * coffeeshop of one tile from before the hut, stays as it was drawn then rather than lie over its neighbours.
+ */
+const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind)
+{
+	if (ind == nullptr) return nullptr;
+	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+	if (obj == nullptr || obj->tiles_x != ind->location.w || obj->tiles_y != ind->location.h) return nullptr;
+	return obj;
+}
+
+/**
+ * The girls of an industry's object that are there now (the colleague's hra/3d/PROSBA-PRUMYSL-HOLKY-NOC.md): those
+ * that come with the deliveries ("postavy_s_holkami", while HasGirls()), or those of the hut standing about the yard
+ * or sitting on the benches (HutGirlsAt()). Its own "postavy" (the pub's) are always there besides.
+ */
+std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj)
+{
+	if (ind == nullptr || obj == nullptr) return {};
+	if (!obj->girls.empty() && HasGirls(ind)) return obj->girls;
+	if (!obj->hut_girls[0].empty() || !obj->hut_girls[1].empty()) {
+		switch (HutGirlsAt(ind)) {
+			case HutGirls::Standing: return obj->hut_girls[0];
+			case HutGirls::Sitting: return obj->hut_girls[1];
+			default: break;
+		}
+	}
+	return {};
 }
 
 /** A building's object by its name in the index ("jmeno"), for the rig; nullptr when there is none. */

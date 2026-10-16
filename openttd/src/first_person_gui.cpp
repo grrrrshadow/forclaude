@@ -138,7 +138,7 @@ static bool FirstPersonWalkable(double x, double y)
 			/* One of the game's own that is a 3D object (the pub, the distillery): by its shape, as a house. */
 			if (!IsIndustryCompleted(tile)) return false;
 			const Industry *ind = Industry::GetByTile(tile);
-			const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 			const TileIndex origin = ind->location.tile;
 			return obj != nullptr && !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
 		}

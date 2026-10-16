@@ -112,10 +112,14 @@ static const IndustryGfx  GFX_POTATO_FIELD = NUM_INDUSTRYTILES - 11;
 /** The tiles of the distillery (IT_DISTILLERY): its yard, and its building in the middle. */
 static const IndustryGfx  GFX_DISTILLERY_YARD = NUM_INDUSTRYTILES - 12;
 static const IndustryGfx  GFX_DISTILLERY = NUM_INDUSTRYTILES - 13;
-/** The tile of the pub (IT_PUB). */
+/**
+ * The tiles of the pub (IT_PUB), 2x2: the north one with the old house, the
+ * three others its garden. A pub built before the garden keeps its one tile.
+ */
 static const IndustryGfx  GFX_PUB = NUM_INDUSTRYTILES - 14;
+static const IndustryGfx  GFX_PUB_YARD = NUM_INDUSTRYTILES - 15;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_PUB;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_PUB_YARD;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

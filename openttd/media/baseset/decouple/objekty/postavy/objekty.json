@@ -210,5 +210,65 @@
   "autor": "Chill girl, tr.onurdk1 (Sketchfab, CC BY 4.0); póza jako na poli (pole/render_dlazdice.py), převod bez renderu (postavy/postavy_objekty.py, glb_zmensi.py, glb_pro_hru.py)",
   "licence": "CC BY 4.0 (uvést tr.onurdk1)",
   "poznamka": "počátek, kde ji měl render pole (u stojící mezi chodidly), čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; na poli dvakrát větší (meritko 2 v seznamu prace a u_cesty); nikdy nebledne"
+ },
+ {
+  "soubor": "galaxia_sedi.glb",
+  "jmeno": "galaxia_sedi",
+  "druh": "postava",
+  "vyska_m": 1.58,
+  "poza": "sedí, ruce podél těla, předloktí na stehnech (posazená kostrou)",
+  "autor": "Galaxia anime girl, Tatenashi (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
+  "licence": "CC BY 4.0 (uvést Tatenashi)",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole): poloha z = výška sedáku, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
+ },
+ {
+  "soubor": "anime_girl_sedi.glb",
+  "jmeno": "anime_girl_sedi",
+  "druh": "postava",
+  "vyska_m": 1.6,
+  "poza": "sedí (nohy ohnuté v síti), bez vlastního svícení",
+  "autor": "Anime Girl, demidrew (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
+  "licence": "CC BY 4.0 (uvést demidrew)",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole): poloha z = výška sedáku, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
+ },
+ {
+  "soubor": "bikini_jde.glb",
+  "jmeno": "bikini_jde",
+  "druh": "postava",
+  "vyska_m": 1.66,
+  "poza": "kráčí krátkým klidným krokem, hlava dopředu (u sochy přes náměstíčko)",
+  "autor": "Girl Bikini, squalll_999 (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
+  "licence": "CC BY 4.0 (uvést squalll_999)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_objima.glb",
+  "jmeno": "college_girl_objima",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "objímá: ruce dopředu kolem něj, hlava zvednutá (na podstavci objímá Karla)",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_hazi.glb",
+  "jmeno": "college_girl_hazi",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "hází na koš: obě ruce nahoru dopředu, míč nad rukama (hřiště gymnázia)",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
+ },
+ {
+  "soubor": "college_girl_plati.glb",
+  "jmeno": "college_girl_plati",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "platí u automatu: pravá ruka ke čtečce karet, levá podél těla",
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
  }
 ]

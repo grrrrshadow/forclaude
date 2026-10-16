@@ -131,6 +131,8 @@ struct ThreeDObject {
 	std::vector<uint16_t> light; ///< the light of each corner from its normal, 256 for 1 (lit as the vehicles); empty when the file has no normals, its light in its texture
 	std::vector<ThreeDObjectColourPart> colours; ///< "barvy": parts painted a colour by number
 	std::vector<ThreeDObjectFigure> figures;     ///< "postavy": figures standing on it, drawn among its triangles
+	std::vector<ThreeDObjectFigure> girls;       ///< "postavy_s_holkami" of an industry: drawn so too while its girls are there (HasGirls(): the statue, the school, the machine)
+	std::array<std::vector<ThreeDObjectFigure>, 2> hut_girls; ///< "postavy_stoji" [0] and "postavy_sedi" [1] of the hut: drawn as HutGirlsAt() says
 	std::vector<ThreeDObjectFigure> plants;      ///< "rostliny": plants standing on it ("druh": "rostlina" of the index, a figure 1 m high), drawn so too
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
 	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
@@ -274,6 +276,7 @@ struct ThreeDVehicleObject {
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
 	float walk_step = 0;            ///< "chuze": "krok_m", metres a round of its frames walks; 0 when it does not walk
 	bool loop = true;               ///< "smycka": the frames go round; false, they run once and stay on the last (a creature's attack, its death)
+	bool thing = false;             ///< a thing among the figures ("druh": "predmet", the spit): as big as the building it is on, also in the view from the eyes
 	int spin_ticks = 0;             ///< a thing that turns ("predmet" with "otaceni", the spit of the pub): game ticks a turn ("tiku_na_otacku"), 0 for none
 	float spin_axis[3] = {1, 0, 0}; ///< "osa": the axis it turns about, in its frame
 	float spin_centre[3] = {};      ///< "stred": a point of the axis, metres
@@ -334,6 +337,10 @@ std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, uint8_t theme = 0);
 const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant);
+std::string ThreeDPackagePlaces();
+struct Industry;
+const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind);
+std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 
