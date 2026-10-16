@@ -62,555 +62,6 @@
   ]
  },
  {
-  "soubor": "dum_07_hotel.glb",
-  "jmeno": "dum_07_hotel",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 2,
-  "klima": "mirne",
-  "nahrazuje_house": 7,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "strecha",
-    "maska": "dum_07_hotel_maska_strecha.png",
-    "zacatek": 94,
-    "paleta": [
-     "8E3C28",
-     "6E4A3A",
-     "707478",
-     "A03028",
-     "4C6E4C",
-     "B8602A",
-     "3A3C40",
-     "8A3C5A",
-     "5A4A8A"
-    ]
-   },
-   {
-    "cast": "omitka",
-    "maska": "dum_07_hotel_maska_omitka.png",
-    "zacatek": 198,
-    "paleta": [
-     "E8E6DE",
-     "F0DCB0",
-     "E0ECFF",
-     "F4D2C4",
-     "E4F0D8",
-     "F2E6C8",
-     "E8DCF0",
-     "F0C8B0",
-     "D8E4EC"
-    ]
-   }
-  ],
-  "dvere": [
-   {
-    "poloha": [
-     10.57,
-     14.81,
-     0.0
-    ],
-    "smer": [
-     1,
-     0
-    ],
-    "sirka": 1.99
-   }
-  ],
-  "interier": true,
-  "postavy": [
-   {
-    "postava": "college_girl_kouri",
-    "poloha": [
-     9.47,
-     18.05,
-     15.71
-    ],
-    "otoceni": 90,
-    "meritko": 1.0,
-    "poznamka": "hráč 15. 10.: kouřící holka u slunečníků na střeše hotelu (terasa před bazénem, slunečníky x 9,9, y 20,4 až 25,8)"
-   }
-  ],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23960 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
- },
- {
-  "soubor": "dum_09_socha.glb",
-  "jmeno": "dum_09_socha",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 9,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "plot",
-    "maska": "dum_09_socha_maska_plot.png",
-    "zacatek": 137,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [],
-  "interier": false,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py; socha College Girl, Rotmill (Sketchfab, CC BY 4.0)",
-  "licence": "GPL-2.0 (vlastní geometrie i textura); socha CC BY 4.0, uvést Rotmill",
-  "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17594 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m"
- },
- {
-  "soubor": "dum_0a_fontana.glb",
-  "jmeno": "dum_0a_fontana",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 10,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "plot",
-    "maska": "dum_0a_fontana_maska_plot.png",
-    "zacatek": 137,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [],
-  "interier": false,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 9620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
- },
- {
-  "soubor": "dum_0b_park_rybnik.glb",
-  "jmeno": "dum_0b_park_rybnik",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 11,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "plot",
-    "maska": "dum_0b_park_rybnik_maska_plot.png",
-    "zacatek": 224,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [],
-  "interier": false,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m"
- },
- {
-  "soubor": "dum_0c_park_kopec.glb",
-  "jmeno": "dum_0c_park_kopec",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 12,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "plot",
-    "maska": "dum_0c_park_kopec_maska_plot.png",
-    "zacatek": 137,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [],
-  "interier": false,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m"
- },
- {
-  "soubor": "dum_11_kancelare_moderni.glb",
-  "jmeno": "dum_11_kancelare_moderni",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 17,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "strecha",
-    "maska": "dum_11_kancelare_moderni_maska_strecha.png",
-    "zacatek": 94,
-    "paleta": [
-     "8E3C28",
-     "6E4A3A",
-     "707478",
-     "A03028",
-     "4C6E4C",
-     "B8602A",
-     "3A3C40",
-     "8A3C5A",
-     "5A4A8A"
-    ]
-   },
-   {
-    "cast": "omitka",
-    "maska": "dum_11_kancelare_moderni_maska_omitka.png",
-    "zacatek": 236,
-    "paleta": [
-     "E8E6DE",
-     "F0DCB0",
-     "E0ECFF",
-     "F4D2C4",
-     "E4F0D8",
-     "F2E6C8",
-     "E8DCF0",
-     "F0C8B0",
-     "D8E4EC"
-    ]
-   },
-   {
-    "cast": "plot",
-    "maska": "dum_11_kancelare_moderni_maska_plot.png",
-    "zacatek": 137,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [
-   {
-    "poloha": [
-     11.27,
-     6.08,
-     0.0
-    ],
-    "smer": [
-     1,
-     0
-    ],
-    "sirka": 2.39
-   }
-  ],
-  "interier": true,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 18172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
- },
- {
-  "soubor": "dum_13_kancelarsky_blok.glb",
-  "jmeno": "dum_13_kancelarsky_blok",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 19,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "strecha",
-    "maska": "dum_13_kancelarsky_blok_maska_strecha.png",
-    "zacatek": 144,
-    "paleta": [
-     "8E3C28",
-     "6E4A3A",
-     "707478",
-     "A03028",
-     "4C6E4C",
-     "B8602A",
-     "3A3C40",
-     "8A3C5A",
-     "5A4A8A"
-    ]
-   },
-   {
-    "cast": "omitka",
-    "maska": "dum_13_kancelarsky_blok_maska_omitka.png",
-    "zacatek": 237,
-    "paleta": [
-     "E8E6DE",
-     "F0DCB0",
-     "E0ECFF",
-     "F4D2C4",
-     "E4F0D8",
-     "F2E6C8",
-     "E8DCF0",
-     "F0C8B0",
-     "D8E4EC"
-    ]
-   }
-  ],
-  "dvere": [
-   {
-    "poloha": [
-     11.97,
-     7.38,
-     0.0
-    ],
-    "smer": [
-     1,
-     0
-    ],
-    "sirka": 1.8
-   }
-  ],
-  "interier": true,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 14224 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
- },
- {
-  "soubor": "dum_1b_byty_cihlove.glb",
-  "jmeno": "dum_1b_byty_cihlove",
-  "druh": "dum",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nahrazuje_house": 27,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "strecha",
-    "maska": "dum_1b_byty_cihlove_maska_strecha.png",
-    "zacatek": 93,
-    "paleta": [
-     "8E3C28",
-     "6E4A3A",
-     "707478",
-     "A03028",
-     "4C6E4C",
-     "B8602A",
-     "3A3C40",
-     "8A3C5A",
-     "5A4A8A"
-    ]
-   },
-   {
-    "cast": "omitka",
-    "maska": "dum_1b_byty_cihlove_maska_omitka.png",
-    "zacatek": 232,
-    "paleta": [
-     "E8E6DE",
-     "F0DCB0",
-     "E0ECFF",
-     "F4D2C4",
-     "E4F0D8",
-     "F2E6C8",
-     "E8DCF0",
-     "F0C8B0",
-     "D8E4EC"
-    ]
-   },
-   {
-    "cast": "plot",
-    "maska": "dum_1b_byty_cihlove_maska_plot.png",
-    "zacatek": 224,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [
-   {
-    "poloha": [
-     3.39,
-     10.57,
-     0.0
-    ],
-    "smer": [
-     0,
-     1
-    ],
-    "sirka": 1.4
-   }
-  ],
-  "interier": true,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19540 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
- },
- {
-  "soubor": "dum_28_obchodni_stredisko.glb",
-  "jmeno": "dum_28_obchodni_stredisko",
-  "druh": "dum",
-  "dlazdic_x": 2,
-  "dlazdic_y": 2,
-  "klima": "mirne",
-  "nahrazuje_house": 40,
-  "varianty": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "barvy": [
-   {
-    "cast": "strecha",
-    "maska": "dum_28_obchodni_stredisko_maska_strecha.png",
-    "zacatek": 94,
-    "paleta": [
-     "8E3C28",
-     "6E4A3A",
-     "707478",
-     "A03028",
-     "4C6E4C",
-     "B8602A",
-     "3A3C40",
-     "8A3C5A",
-     "5A4A8A"
-    ]
-   },
-   {
-    "cast": "omitka",
-    "maska": "dum_28_obchodni_stredisko_maska_omitka.png",
-    "zacatek": 232,
-    "paleta": [
-     "E8E6DE",
-     "F0DCB0",
-     "E0ECFF",
-     "F4D2C4",
-     "E4F0D8",
-     "F2E6C8",
-     "E8DCF0",
-     "F0C8B0",
-     "D8E4EC"
-    ]
-   },
-   {
-    "cast": "plot",
-    "maska": "dum_28_obchodni_stredisko_maska_plot.png",
-    "zacatek": 137,
-    "paleta": [
-     "E2DED2",
-     "8E6A4C",
-     "EAEAF0",
-     "5A7A4C",
-     "4A4A50",
-     "B4A890",
-     "A05A3C",
-     "7A8A9A"
-    ]
-   }
-  ],
-  "dvere": [
-   {
-    "poloha": [
-     27.93,
-     14.81,
-     0.0
-    ],
-    "smer": [
-     1,
-     0
-    ],
-    "sirka": 5.19
-   }
-  ],
-  "interier": true,
-  "postavy": [],
-  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 25288 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
- },
- {
   "soubor": "dum_03_kostel.glb",
   "jmeno": "dum_03_kostel",
   "druh": "dum",
@@ -689,9 +140,15 @@
   ],
   "interier": true,
   "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (144 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kostel s věží; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo u zdi, dvě lavičky u vchodu; 9558 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 22.14 m"
+  "poznamka": "Kostel s věží; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo u zdi, dvě lavičky u vchodu; 9414 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 22.14 m"
  },
  {
   "soubor": "dum_06_mestske_0.glb",
@@ -805,9 +262,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 10,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (120 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Městský dvojdům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dámské kolo s košíkem, popelnice, prádlo, klepač s kobercem, kočárek; 15740 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.07 m"
+  "poznamka": "Městský dvojdům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dámské kolo s košíkem, popelnice, prádlo, klepač s kobercem, kočárek; 15620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.07 m"
  },
  {
   "soubor": "dum_06_mestske_2.glb",
@@ -909,9 +372,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u králíkárny"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (84 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Přízemní městský dům do L; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo, králíkárna, konev, okenice; 21328 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 7.08 m"
+  "poznamka": "Přízemní městský dům do L; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo, králíkárna, konev, okenice; 21244 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 7.08 m"
  },
  {
   "soubor": "dum_0e_obchody.glb",
@@ -1004,9 +473,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodním domem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 55,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (660 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchodní dům s výkladními skříněmi a mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u výloh; 16620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.26 m"
+  "poznamka": "Obchodní dům s výkladními skříněmi a mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u výloh; 15960 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.26 m"
  },
  {
   "soubor": "dum_0f_obchody_kridlo.glb",
@@ -1099,9 +574,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří pekařství"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 42,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (504 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kanceláře s pekařstvím v křídle; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice; 14700 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.17 m"
+  "poznamka": "Kanceláře s pekařstvím v křídle; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice; 14196 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.17 m"
  },
  {
   "soubor": "dum_10_obchody_vez.glb",
@@ -1194,9 +675,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před kancelářemi"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 59,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (708 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kanceláře, šestipatrový dům s mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 16162 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
+  "poznamka": "Kanceláře, šestipatrový dům s mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 15454 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
  },
  {
   "soubor": "dum_18_stare_0.glb",
@@ -1297,9 +784,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u prádla na zahradě"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 8,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (96 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý bílý dům s valbovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, lavička, prádlo, dříví, popelnice, trpaslík; 17966 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+  "poznamka": "Starý bílý dům s valbovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, lavička, prádlo, dříví, popelnice, trpaslík; 17870 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
  },
  {
   "soubor": "dum_18_stare_1.glb",
@@ -1384,9 +877,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u studny"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 6,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (72 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý kamenný dům s okenicemi a studnou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, prádlo, psí bouda, dříví, konev, trpaslík, okenice; 16174 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.18 m"
+  "poznamka": "Starý kamenný dům s okenicemi a studnou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, prádlo, psí bouda, dříví, konev, trpaslík, okenice; 16102 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.18 m"
  },
  {
   "soubor": "dum_18_stare_2.glb",
@@ -1487,9 +986,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u klepače s kobercem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (156 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý cihlový dům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, popelnice, prádlo, klepač s kobercem; 21556 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+  "poznamka": "Starý cihlový dům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, popelnice, prádlo, klepač s kobercem; 21400 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
  },
  {
   "soubor": "dum_18_stare_3.glb",
@@ -1590,9 +1095,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 6,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (72 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý bílý dům se zimní zahradou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dámské kolo, lavička, kočárek, sud na dešťovku, okenice; 20144 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.38 m"
+  "poznamka": "Starý bílý dům se zimní zahradou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dámské kolo, lavička, kočárek, sud na dešťovku, okenice; 20072 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.38 m"
  },
  {
   "soubor": "dum_19_chatky.glb",
@@ -1708,9 +1219,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří druhé chalupy"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (48 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Dvě vybílené chalupy s doškovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, dříví, králíkárna, prádlo, psí bouda, konev, trpaslík, sud, okenice; 18654 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.98 m"
+  "poznamka": "Dvě vybílené chalupy s doškovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, dříví, králíkárna, prádlo, psí bouda, konev, trpaslík, sud, okenice; 18606 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.98 m"
  },
  {
   "soubor": "dum_1a_domy_0.glb",
@@ -1823,9 +1340,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří přístavku"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 10,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (120 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Krémový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo; 17236 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+  "poznamka": "Krémový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo; 17116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
  },
  {
   "soubor": "dum_1a_domy_1.glb",
@@ -1926,9 +1449,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 11,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (132 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Bílý dům s balkonem a okenicemi; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, kočárek, prádlo, okenice; 20304 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+  "poznamka": "Bílý dům s balkonem a okenicemi; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, kočárek, prádlo, okenice; 20172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
  },
  {
   "soubor": "dum_1a_domy_2.glb",
@@ -2013,9 +1542,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u klepače s kobercem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 9,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (108 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Cihlový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice, prádlo, klepač; 17572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+  "poznamka": "Cihlový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice, prádlo, klepač; 17464 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
  },
  {
   "soubor": "dum_1a_domy_3.glb",
@@ -2116,9 +1651,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 9,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (108 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Bílý dům s přístavkem a předzahrádkou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, kočárek, prádlo, žebřík; 16848 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+  "poznamka": "Bílý dům s přístavkem a předzahrádkou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, kočárek, prádlo, žebřík; 16740 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
  },
  {
   "soubor": "dum_1d_obchody_0.glb",
@@ -2209,9 +1750,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 44,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (528 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchody a kanceláře se dvěma štíty; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 8100 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 18.65 m"
+  "poznamka": "Obchody a kanceláře se dvěma štíty; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 7572 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 18.65 m"
  },
  {
   "soubor": "dum_1d_obchody_2.glb",
@@ -2287,9 +1834,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodem"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 65,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (780 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchody a kanceláře s věží a štíty; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 12050 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
+  "poznamka": "Obchody a kanceláře s věží a štíty; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 11270 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
  },
  {
   "soubor": "dum_27_kino.glb",
@@ -2417,9 +1970,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u plakátu"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 16,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (192 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 11888 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
+  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 11696 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
  },
  {
   "soubor": "dum_14_stadion_stary.glb",
@@ -2493,14 +2052,13 @@
   "soubor": "dum_1f_uv_ksc.glb",
   "jmeno": "dum_1f_uv_ksc",
   "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
   "nazev": {
    "cs": "ÚV KSČ",
    "en": "ÚV KSČ (Central Committee)"
   },
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "klima": "mirne",
-  "nazev": "ÚV KSČ",
   "nahrazuje_house": 31,
   "varianty": [
    0,
@@ -2582,6 +2140,12 @@
   ],
   "interier": true,
   "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 47,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (660 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "stani": {
    "poloha": [
     12.87,
@@ -2593,7 +2157,7 @@
   },
   "autor": "grrrrf: vlastní model domy/uv_ksc.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Budova ÚV KSČ s rudou hvězdou na omítce a na střeše (domy/uv_ksc.py, hra/3d/PROSBA-UV-KSC.md); budova ÚV KSČ místo domu 0x1F (hráč 15. 10.: „budova napis uv ksč s rudou hvězdou na omítce a na střeše“); blbosti: tribuna nad vchodem s nápisem ÚV KSČ, rudé prapory, československá a rudá vlajka na stožárech, záhony s rudými květy, lípy, lampy, schody, asfaltové stání pro auto; 25740 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 20.26 m"
+  "poznamka": "Budova ÚV KSČ s rudou hvězdou na omítce a na střeše (domy/uv_ksc.py, hra/3d/PROSBA-UV-KSC.md); budova ÚV KSČ místo domu 0x1F (hráč 15. 10.: „budova napis uv ksč s rudou hvězdou na omítce a na střeše“); blbosti: tribuna nad vchodem s nápisem ÚV KSČ, rudé prapory, československá a rudá vlajka na stožárech, záhony s rudými květy, lípy, lampy, schody, asfaltové stání pro auto; 25080 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 20.26 m"
  },
  {
   "soubor": "dum_00_vysoky_0.glb",
@@ -2727,9 +2291,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří kavárny"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 17,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (204 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Vysoký kancelářský blok s kavárnou v přízemí a terasou na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna se třemi čtvercovými slunečníky v pruzích a stolky se židlemi a šálky, na střeše terasa s dřevěnou palubou, třemi kulatými slunečníky, stolky a lehátky, květináče, antény, stojan s deštníky u dveří, tabule s nabídkou, tři kola pod převisem, truhlíky s květinami, strom; 20520 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 32.22 m"
+  "poznamka": "Vysoký kancelářský blok s kavárnou v přízemí a terasou na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna se třemi čtvercovými slunečníky v pruzích a stolky se židlemi a šálky, na střeše terasa s dřevěnou palubou, třemi kulatými slunečníky, stolky a lehátky, květináče, antény, stojan s deštníky u dveří, tabule s nabídkou, tři kola pod převisem, truhlíky s květinami, strom; 20316 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 32.22 m"
  },
  {
   "soubor": "dum_00_vysoky_1.glb",
@@ -2878,9 +2448,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 65,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (1052 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Vysoký kancelářský blok s nižším křídlem, bistro na střeše křídla, neon DŮM SLUŽEB; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: bistro na střeše křídla se třemi čtvercovými slunečníky, stolky a girlandou žárovek, květináče, neon DŮM SLUŽEB, anténa, markýzy v pruzích nad lahůdkami a papírnictvím, stojan s deštníky, lavička a na ní zapomenutý otevřený deštník, dvě kola; 24840 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 28.88 m"
+  "poznamka": "Vysoký kancelářský blok s nižším křídlem, bistro na střeše křídla, neon DŮM SLUŽEB; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: bistro na střeše křídla se třemi čtvercovými slunečníky, stolky a girlandou žárovek, květináče, neon DŮM SLUŽEB, anténa, markýzy v pruzích nad lahůdkami a papírnictvím, stojan s deštníky, lavička a na ní zapomenutý otevřený deštník, dvě kola; 23788 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 28.88 m"
  },
  {
   "soubor": "dum_01_kancelare.glb",
@@ -3003,9 +2579,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u lehátek"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 20,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Panelová kancelářská věž s mozaikou, vpředu cukrárna se zahrádkou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: zahrádka cukrárny se třemi slunečníky v pruzích a stolky, vozík se zmrzlinou a slunečníkem, markýza v pruzích, mozaika na čele věže, na střeše plážový slunečník, dvě lehátka, ručník, nádrž na vodu, anténa, stojan s deštníky, kolo, květináče, strom; 16380 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 25.44 m"
+  "poznamka": "Panelová kancelářská věž s mozaikou, vpředu cukrárna se zahrádkou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: zahrádka cukrárny se třemi slunečníky v pruzích a stolky, vozík se zmrzlinou a slunečníkem, markýza v pruzích, mozaika na čele věže, na střeše plážový slunečník, dvě lehátka, ručník, nádrž na vodu, anténa, stojan s deštníky, kolo, květináče, strom; 16140 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 25.44 m"
  },
  {
   "soubor": "dum_02_bytovky.glb",
@@ -3131,9 +2713,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na dvorku"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 19,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (252 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Malá panelová bytovka s balkony a dvorkem s pískovištěm; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: balkony s oranžovými parapety: otevřené deštníky se suší, slunečník se židlí, sušák s prádlem; pískoviště se slunečníkem, kyblíkem a bábovkou, houpačka, prádlo, klepač, stolek se slunečníkem, popelnice, dvě kola, králíkárna, lavička, anténa, muškáty, dva stromy; 18804 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 12.27 m"
+  "poznamka": "Malá panelová bytovka s balkony a dvorkem s pískovištěm; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: balkony s oranžovými parapety: otevřené deštníky se suší, slunečník se židlí, sušák s prádlem; pískoviště se slunečníkem, kyblíkem a bábovkou, houpačka, prádlo, klepač, stolek se slunečníkem, popelnice, dvě kola, králíkárna, lavička, anténa, muškáty, dva stromy; 18552 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 12.27 m"
  },
  {
   "soubor": "dum_04_velky.glb",
@@ -3259,9 +2847,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu pod podloubím"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 21,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (252 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Velký kancelářský dům s prosklenou fasádou, podloubím a kavárnou TERASA na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna TERASA na střeše: pavilon, sedm velkých slunečníků v pruzích se stolky, stromky v květináčích, tři vlajky; v podloubí stojan s deštníky, dvě kola, lavička, truhlíky s květinami; 15624 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.07 m"
+  "poznamka": "Velký kancelářský dům s prosklenou fasádou, podloubím a kavárnou TERASA na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna TERASA na střeše: pavilon, sedm velkých slunečníků v pruzích se stolky, stromky v květináčích, tři vlajky; v podloubí stojan s deštníky, dvě kola, lavička, truhlíky s květinami; 15372 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.07 m"
  },
  {
   "soubor": "dum_0d_kancelare.glb",
@@ -3387,9 +2981,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u plážového slunečníku"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 10,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (120 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kanceláře se slunolamy, na střeše lehátka a bazének, dole stánek se zmrzlinou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: stánek se zmrzlinou s markýzou v pruzích a velkým kornoutem na střeše, dva stolky se slunečníky, na střeše nafukovací bazének, dva plážové slunečníky, tři lehátka, ručník a tranzistorák, záhony, lavičky, kolo, stojan s deštníky, strom; 14558 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 16.47 m"
+  "poznamka": "Kanceláře se slunolamy, na střeše lehátka a bazének, dole stánek se zmrzlinou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: stánek se zmrzlinou s markýzou v pruzích a velkým kornoutem na střeše, dva stolky se slunečníky, na střeše nafukovací bazének, dva plážové slunečníky, tři lehátka, ručník a tranzistorák, záhony, lavičky, kolo, stojan s deštníky, strom; 14438 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 16.47 m"
  },
  {
   "soubor": "dum_12_skladiste.glb",
@@ -3504,9 +3104,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (116 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Cihlové skladiště deštníků a slunečníků s rampou a vysokozdvižným vozíkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: nakládací rampa se stříškou, bedny a kartony deštníků na paletách, tři otevřené deštníky se suší na rampě, rudl, vysokozdvižný vozík, stoh palet, pytle, sudy, svačina pod velkým slunečníkem se stolkem a termoskou, drátěný plot, lampa; 13412 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.56 m"
+  "poznamka": "Cihlové skladiště deštníků a slunečníků s rampou a vysokozdvižným vozíkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: nakládací rampa se stříškou, bedny a kartony deštníků na paletách, tři otevřené deštníky se suší na rampě, rudl, vysokozdvižný vozík, stoh palet, pytle, sudy, svačina pod velkým slunečníkem se stolkem a termoskou, drátěný plot, lampa; 13296 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.56 m"
  },
  {
   "soubor": "dum_1e_obchody_vysoke.glb",
@@ -3617,9 +3223,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; pod markýzou obchodního domu"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 18,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (524 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchodní dům s markýzami a vývěsním deštníkem, na střeše bar s obřím koktejlem s paraplíčkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: markýzy v pruzích nad výlohami, vývěsní deštník na konzole, stojan s deštníky; na střeše bar: pavilon s neonem BAR, pult s barovými stoličkami, koktejly s paraplíčky, šest slunečníků se stolky, obří koktejl s paraplíčkem, brčkem, višní a kolečkem pomeranče, květináče; kolo; 29056 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 24.37 m"
+  "poznamka": "Obchodní dům s markýzami a vývěsním deštníkem, na střeše bar s obřím koktejlem s paraplíčkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: markýzy v pruzích nad výlohami, vývěsní deštník na konzole, stojan s deštníky; na střeše bar: pavilon s neonem BAR, pult s barovými stoličkami, koktejly s paraplíčky, šest slunečníků se stolky, obří koktejl s paraplíčkem, brčkem, višní a kolečkem pomeranče, květináče; kolo; 28532 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 24.37 m"
  },
  {
   "soubor": "dum_20_stadion.glb",
@@ -3742,9 +3354,15 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u stánku s občerstvením"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 60,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (720 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Nový stadion s krytou tribunou, stožáry světel a stánky (2×2, HouseID 0x20–0x23); domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: čtyři stožáry světel, reklamní tabule kolem hřiště, branky, rohové praporky, lavičky střídačů, světelná tabule DOMÁCÍ 1:0 HOSTÉ, deštníky fanoušků na přední tribuně, stánek OBČERSTVENÍ s markýzou, stánek PIVO se čtvercovým slunečníkem, pět stolků se slunečníky, tři kola; 27188 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 21.35 m"
+  "poznamka": "Nový stadion s krytou tribunou, stožáry světel a stánky (2×2, HouseID 0x20–0x23); domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: čtyři stožáry světel, reklamní tabule kolem hřiště, branky, rohové praporky, lavičky střídačů, světelná tabule DOMÁCÍ 1:0 HOSTÉ, deštníky fanoušků na přední tribuně, stánek OBČERSTVENÍ s markýzou, stánek PIVO se čtvercovým slunečníkem, pět stolků se slunečníky, tři kola; 26468 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 21.35 m"
  },
  {
   "soubor": "dum_24_valec.glb",
@@ -3870,8 +3488,617 @@
     "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u kašny"
    }
   ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (3076 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kulatá kancelářská věž s kavárnou na střeše a dvěma žlutými stožáry; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna na střeše věže: kulatý pavilon, pět slunečníků se stolky, dva žluté příhradové stožáry s červeným světlem; náměstíčko s kašnou, dvěma vlajkami, třemi stolky se slunečníky, stojanem s deštníky, lavičkou, lampami a stromy; 32000 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 44.14 m"
+  "poznamka": "Kulatá kancelářská věž s kavárnou na střeše a dvěma žlutými stožáry; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna na střeše věže: kulatý pavilon, pět slunečníků se stolky, dva žluté příhradové stožáry s červeným světlem; náměstíčko s kašnou, dvěma vlajkami, třemi stolky se slunečníky, stojanem s deštníky, lavičkou, lampami a stromy; 28924 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 44.14 m"
+ },
+ {
+  "soubor": "dum_07_hotel.glb",
+  "jmeno": "dum_07_hotel",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 7,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_07_hotel_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_07_hotel_maska_omitka.png",
+    "zacatek": 198,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.57,
+     14.81,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.99
+   }
+  ],
+  "interier": true,
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.47,
+     18.05,
+     15.71
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: kouřící holka u slunečníků na střeše hotelu (terasa před bazénem, slunečníky x 9,9, y 20,4 až 25,8)"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 69,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (924 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23036 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
+ },
+ {
+  "soubor": "dum_09_socha.glb",
+  "jmeno": "dum_09_socha",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 9,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_09_socha_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py; socha College Girl, Rotmill (Sketchfab, CC BY 4.0)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura); socha CC BY 4.0, uvést Rotmill",
+  "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17354 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m"
+ },
+ {
+  "soubor": "dum_0a_fontana.glb",
+  "jmeno": "dum_0a_fontana",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 10,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0a_fontana_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 9380 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
+ },
+ {
+  "soubor": "dum_0b_park_rybnik.glb",
+  "jmeno": "dum_0b_park_rybnik",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 11,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0b_park_rybnik_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (60 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24056 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m"
+ },
+ {
+  "soubor": "dum_0c_park_kopec.glb",
+  "jmeno": "dum_0c_park_kopec",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 12,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0c_park_kopec_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (60 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19512 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m"
+ },
+ {
+  "soubor": "dum_11_kancelare_moderni.glb",
+  "jmeno": "dum_11_kancelare_moderni",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 17,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_11_kancelare_moderni_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_11_kancelare_moderni_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_11_kancelare_moderni_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.27,
+     6.08,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.39
+   }
+  ],
+  "interier": true,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (1000 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 17172 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
+ },
+ {
+  "soubor": "dum_13_kancelarsky_blok.glb",
+  "jmeno": "dum_13_kancelarsky_blok",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 19,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_13_kancelarsky_blok_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_13_kancelarsky_blok_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.97,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
+   }
+  ],
+  "interier": true,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 46,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (552 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 13672 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
+ },
+ {
+  "soubor": "dum_1b_byty_cihlove.glb",
+  "jmeno": "dum_1b_byty_cihlove",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 27,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1b_byty_cihlove_maska_strecha.png",
+    "zacatek": 93,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1b_byty_cihlove_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1b_byty_cihlove_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     3.39,
+     10.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.4
+   }
+  ],
+  "interier": true,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 19,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (228 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19312 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
+ },
+ {
+  "soubor": "dum_28_obchodni_stredisko.glb",
+  "jmeno": "dum_28_obchodni_stredisko",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 40,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_28_obchodni_stredisko_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_28_obchodni_stredisko_maska_omitka.png",
+    "zacatek": 231,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_28_obchodni_stredisko_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     27.93,
+     14.81,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 5.19
+   }
+  ],
+  "interier": true,
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 24,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (740 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24548 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
  }
 ]

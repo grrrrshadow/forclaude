@@ -47,7 +47,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   a 4 dlaždice kolem) jsou houby podle růstu stromu.
 - **Svítící okna** (hotovo): kolega dal do hliněných domů uzel `noc` (svítící okna a lucerny), prázdný `den`
   a body `svetlo_NN`. Hra v noci kreslí `noc` přes dům a nechá ho svítit (noc ho nezatmí), u `svetlo_NN` přidá
-  teplou záři; na mapě i v pohledu z očí. Další domy (1950, ÚV KSČ) kolega dodá stejně.
+  teplou záři; na mapě i v pohledu z očí. Kolega (`PROSBA-NOC-DOMY.md`) dodal noc i do 38 mírných domů (1950,
+  ÚV KSČ, po 1955, bývalé budovy3d) – převzato. Záře jen u okna, které je opravdu vidět.
 - **Popelavá zem** (hotovo): tráva a hrubá zem na území hliněného města ve 3D šedá (paleta vraků). Houby i v pohledu
   z očí (plakáty z jejich obrázků, zblízka jemnější).
 - **Poušť** (hotovo): pouštní tématické město (staví jen pouštní domy v jiném klimatu) má na svém území písek

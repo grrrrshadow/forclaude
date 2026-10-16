@@ -4096,13 +4096,32 @@ static void DrawNight(bool turned)
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
-	/* The glows of the houses' lights (their "svetlo_NN"): small and warm. */
+	/* The glows of the houses' lights (their "svetlo_NN"): small and warm, only at a lit window or lamp that is seen
+	 * -- one on the far side of a house, or hidden behind another, has none of its pixels left lit. */
 	const Colour window(255, 200, 110);
-	for (const auto &g : _night_glows) {
-		double px, py;
-		project(g[0], g[1], g[2], px, py);
-		if (px < -8 * unit || py < -8 * unit || px > w + 8 * unit || py > h + 8 * unit) continue;
-		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit, 1.4 * unit, window, 0.35);
+	if (!_night_glows.empty()) {
+		std::vector<uint8_t> seen(static_cast<size_t>(w) * h, 0);
+		for (const auto &[at, colour] : _night_lit) {
+			const ptrdiff_t i = at - dst;
+			if (i < 0) continue;
+			const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
+			if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
+		}
+		auto lit_near = [&](int cx, int cy) {
+			for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
+				for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
+					if (seen[static_cast<size_t>(y) * w + x]) return true;
+				}
+			}
+			return false;
+		};
+		for (const auto &g : _night_glows) {
+			double px, py;
+			project(g[0], g[1], g[2], px, py);
+			if (px < 0 || py < 0 || px >= w || py >= h) continue;
+			if (!lit_near(static_cast<int>(px), static_cast<int>(py))) continue;
+			AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit, 1.4 * unit, window, 0.35);
+		}
 	}
 	for (const Vehicle *v : Vehicle::Iterate()) {
 		if (v->vehstatus.Test(VehState::Hidden)) continue;
