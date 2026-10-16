@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <array>
+#include <deque>
 #include <map>
 #include <memory>
 #include <optional>
@@ -270,6 +271,14 @@ struct ThreeDVehicleState {
 	float rust = 0;             ///< "rez": how far it has rusted, 0 to 1
 	uint64_t parts = 0;         ///< the parts it shows ("doplnky" its nodes, "posadka" a group of the crew): bit n the part n (ThreeDVehicleObject::part_names)
 	std::vector<uint32_t> addon_colours; ///< "barvy_doplnku": each add-on's colour (Colour::data), 0 its texture's own
+	/* A state of layers (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): the GRF picks a set for each layer of its
+	 * sprites, as for its pictures, and the states of the layers make one (ThreeDVehicleObject::ComposeState()). */
+	int layer = 0;              ///< "vrstva": the layer of the GRF's sprites it is of
+	float turn = 0;             ///< "otoceni": the whole object turned so many degrees about z at its origin (a cart pushed: the cart pulled turned round)
+	uint8_t given = 0;          ///< the keys it gives (GIVEN_*): those of a later layer replace an earlier one's
+	std::vector<int16_t> addon_parts; ///< "doplnky": the part of each add-on it shows (its node), -1 where it names none of the add-on
+	int crew_part = -1;         ///< "posadka": the part of the group of the crew it shows, -1 none named
+	static constexpr uint8_t GIVEN_COLOUR = 1, GIVEN_FADE = 2, GIVEN_RUST = 4, GIVEN_TURN = 8;
 };
 
 /** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
@@ -278,6 +287,19 @@ struct ThreeDVehicleCrew {
 	float at[3] = {};           ///< "poloha": where its feet stand, metres in the vehicle's frame
 	float turn = 0;             ///< "otoceni": degrees about z, 0 facing forward as the vehicle
 	float scale = 1.0f;         ///< "meritko": its size against its true one (the girls on a lorry's back twice, as at a stop)
+};
+
+/**
+ * A figure of the crew that walks as the vehicle goes (its figure's "animace" with "chuze", the colleague's
+ * hra/3d/PROSBA-SPECIAL-3D.md: the girls pulling and pushing the cart): not in the vehicle's shape, drawn with it on
+ * its own, its frame by the way gone (ThreeDVehicleObject::WalkingCrew()).
+ */
+struct ThreeDWalkingCrew {
+	const struct ThreeDVehicleObject *figure = nullptr; ///< the figure, its frames the steps of a round of "krok_m"
+	float at[3] = {};           ///< "poloha": where its feet stand, metres in the vehicle's frame
+	float turn = 0;             ///< "otoceni": degrees about z
+	float scale = 1.0f;         ///< "meritko"
+	uint8_t part = 0;           ///< the part that shows it: 0 always ("posadka"), else its group of the crew ("posadky")
 };
 
 /**
@@ -346,6 +368,7 @@ struct ThreeDVehicleObject {
 	int frames = 0;                 ///< "snimku": how many frames
 	int frame_ticks = 1;            ///< "tiku": game ticks a frame is held
 	float walk_step = 0;            ///< "chuze": "krok_m", metres a round of its frames walks; 0 when it does not walk
+	bool Walks() const { return this->walk_step > 0 && this->frames > 1 && !this->frame_prefix.empty(); }
 	bool loop = true;               ///< "smycka": the frames go round; false, they run once and stay on the last (a creature's attack, its death)
 	bool thing = false;             ///< a thing among the figures ("druh": "predmet", the spit): as big as the building it is on, also in the view from the eyes
 	int spin_ticks = 0;             ///< a thing that turns ("predmet" with "otaceni", the spit of the pub): game ticks a turn ("tiku_na_otacku"), 0 for none
@@ -368,6 +391,9 @@ struct ThreeDVehicleObject {
 	const ThreeDObjectTexture *GetRustMask(int level) const;
 	const ThreeDObjectTexture *GetAddonMask(size_t addon, int level) const;
 	uint64_t PartsOf(int state) const;
+	const ThreeDVehicleState *State(int step) const;
+	int ComposeState(const std::vector<int> &layers) const;
+	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void Forget() const;
 
 	mutable uint32_t used = 0;      ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
@@ -375,6 +401,10 @@ struct ThreeDVehicleObject {
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
+	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
+	mutable std::map<std::vector<int>, int> composed_steps; ///< the step each was made for, by the steps of its layers
+	mutable std::vector<ThreeDWalkingCrew> walking; ///< its crew that walks (WalkingCrew()), found the first time asked for
+	mutable bool walking_found = false;
 
 private:
 	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame) const;

@@ -7877,6 +7877,7 @@ struct CabFigure {
 	bool own_car = false; ///< a car of the game's own driving about (its lights are not a vehicle's of the game)
 	bool solid = false;   ///< drawn by its triangles this picture (not as a picture of it)
 	double rolled = 0;    ///< a vehicle's way gone, world units: its wheels turn by it
+	uint64_t walk = 0;    ///< the frames of a vehicle's crew that walks
 	double curvature = 0; ///< how much its way turns, radians a world unit: its front wheels steer by it
 	bool own_cab = false; ///< the vehicle whose cab the eye is in: drawn round the eye, its driver not
 };
@@ -7907,6 +7908,7 @@ static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
 	f.lights = ev.lights;
 	f.own_car = own_car;
 	f.rolled = ev.rolled;
+	f.walk = ev.walk;
 	f.curvature = ev.curvature;
 	_cab_figures.push_back(std::move(f));
 }
@@ -7940,6 +7942,7 @@ static ThreeDEyeVehicle CabFigureVehicle(const CabFigure &fg)
 	ev.facing = fg.facing;
 	ev.state = fg.state;
 	ev.lights = fg.lights;
+	ev.walk = fg.walk;
 	return ev;
 }
 
@@ -7978,8 +7981,16 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 		texs[i] = GetThreeDEyeVehicleTexture(fig, fg.state, _cab_full_textures ? 1e9 : pixels_per_metre, static_cast<int>(i));
 		if (texs[i] == nullptr) texs[i] = fig->GetTexture(0, static_cast<int>(i));
 	}
-	/* The parts its state shows (an add-on's node, a group of the crew; the colleague's hra/3d/PROSBA-V3S-3D.md). */
+	/* The parts its state shows (an add-on's node, a group of the crew; the colleague's hra/3d/PROSBA-V3S-3D.md), and
+	 * how far it turns the whole model about its origin (the colleague's hra/3d/PROSBA-SPECIAL-3D.md: a cart pushed). */
 	const uint64_t parts = fig->PartsOf(fg.state);
+	const ThreeDVehicleState *st = fig->State(fg.state);
+	const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
+	auto turned = [&](double &x, double &y) {
+		const double tx = x * tc - y * ts, ty = x * ts + y * tc;
+		x = tx;
+		y = ty;
+	};
 	/* Its wheels that turn as it goes, the front ones steering as its way turns (Ackermann's: the angle whose tangent
 	 * is the wheelbase times the curvature), each about its middle. */
 	struct WheelTurn {
@@ -7996,7 +8007,8 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 		}
 		const double wheelbase_m = backs > 0 && front > -1e8 ? front - back_sum / backs : 0;
 		for (const ThreeDModelWheel &w : fig->model_wheels) {
-			const double turn = fg.rolled / (w.radius * across);
+			/* Turned round by its state (a cart pushed), it goes back in its own frame: its wheels the other way. */
+			const double turn = fg.rolled * tc / (w.radius * across);
 			double steer = 0;
 			if (w.steers && wheelbase_m > 0) {
 				steer = std::clamp(std::atan(fg.curvature * wheelbase_m * across), -w.max_angle * M_PI / 180.0, w.max_angle * M_PI / 180.0);
@@ -8004,7 +8016,7 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 			wheel_turn.push_back({{w.centre[0], w.centre[1], w.centre[2]}, std::cos(turn), std::sin(turn), std::cos(steer), std::sin(steer)});
 		}
 	}
-	/* A corner where it is drawn: its wheel turned. */
+	/* A corner of the model where it is drawn: its wheel turned. */
 	auto place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
 		px = shape->pos[i * 3]; py = shape->pos[i * 3 + 1]; pz = shape->pos[i * 3 + 2];
 		if (lit) { nx = shape->nrm[i * 3]; ny = shape->nrm[i * 3 + 1]; nz = shape->nrm[i * 3 + 2]; }
@@ -8026,64 +8038,102 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 			}
 		}
 	};
-	/* The corners to the eye as the triangles drawn ask for them, each once, with its light (an add-on not shown, a
-	 * group of the crew not riding: never). */
-	const size_t corners = shape->pos.size() / 3;
+	/* A shape's corners to the eye as the triangles drawn ask for them, each once, with its light (an add-on not
+	 * shown, a group of the crew not riding: never): the model's, then those of its crew that walks; each corner in the
+	 * model's frame (to_model), turned as the state turns the model. */
 	static std::vector<CabPoint> pts;
 	static std::vector<CabVertex> scr;
 	static std::vector<double> lights;
 	static std::vector<uint8_t> ready;
-	pts.resize(corners);
-	scr.resize(corners);
-	lights.resize(corners);
-	ready.assign(corners, 0);
-	auto corner = [&](uint32_t i) {
-		if (ready[i]) return;
-		ready[i] = 1;
-		double px, py, pz, nx = 0, ny = 0, nz = 1;
-		place(i, px, py, pz, nx, ny, nz);
-		pts[i] = CabToEye(eye, fg.x + px * length * ca - py * across * sa, fg.y + px * length * sa + py * across * ca, fg.z + pz * up, shape->uv[i * 2], shape->uv[i * 2 + 1]);
-		if (pts[i].f >= _cab_near) scr[i] = CabProject(eye, pts[i]);
-		if (lit) {
-			const double wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
-			lights[i] = 0.55 + 0.45 * std::max(0.0, wx * L[0] + wy * L[1] + nz * L[2]);
-		} else {
-			lights[i] = 1.0;
+	auto draw = [&](const ThreeDVehicleShape &s, auto &&to_model, const std::vector<const ThreeDObjectTexture *> &tx) {
+		const size_t corners = s.pos.size() / 3;
+		const bool shape_lit = s.nrm.size() == s.pos.size();
+		pts.resize(corners);
+		scr.resize(corners);
+		lights.resize(corners);
+		ready.assign(corners, 0);
+		auto corner = [&](uint32_t i) {
+			if (ready[i]) return;
+			ready[i] = 1;
+			double px, py, pz, nx = 0, ny = 0, nz = 1;
+			to_model(i, px, py, pz, nx, ny, nz);
+			turned(px, py);
+			turned(nx, ny);
+			pts[i] = CabToEye(eye, fg.x + px * length * ca - py * across * sa, fg.y + px * length * sa + py * across * ca, fg.z + pz * up, s.uv[i * 2], s.uv[i * 2 + 1]);
+			if (pts[i].f >= _cab_near) scr[i] = CabProject(eye, pts[i]);
+			if (shape_lit) {
+				const double wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
+				lights[i] = 0.55 + 0.45 * std::max(0.0, wx * L[0] + wy * L[1] + nz * L[2]);
+			} else {
+				lights[i] = 1.0;
+			}
+		};
+		const uint glass_alpha = static_cast<uint>(std::clamp(s.glass_alpha, 0.0f, 1.0f) * 256);
+		for (size_t t = 0; t + 2 < s.tri.size(); t += 3) {
+			const uint8_t part = t / 3 < s.tri_part.size() ? s.tri_part[t / 3] : 0;
+			if (part == ThreeDVehicleShape::PART_DRIVER && fg.own_cab) continue;
+			if (part != 0 && part < ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
+			const int ti = t / 3 < s.tri_tex.size() ? s.tri_tex[t / 3] : 0;
+			const ThreeDObjectTexture *tex = tx[static_cast<size_t>(ti) < tx.size() ? ti : 0];
+			const uint32_t ia = s.tri[t], ib = s.tri[t + 1], ic = s.tri[t + 2];
+			corner(ia);
+			corner(ib);
+			corner(ic);
+			const uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
+			/* The glass: see-through, laid over the rest after it (CabFlushGlass()). */
+			_cab_glass_alpha = part == ThreeDVehicleShape::PART_GLASS ? std::max(1u, glass_alpha) : 256;
+			/* The texture's place in pixels of the texture of the triangle (its tu, tv as the unit square). */
+			auto in_tex = [&](CabPoint p) {
+				p.tu *= tex->w;
+				p.tv *= tex->h;
+				return p;
+			};
+			if (pts[ia].f >= _cab_near && pts[ib].f >= _cab_near && pts[ic].f >= _cab_near) {
+				auto v = [&](uint32_t i) {
+					CabVertex c = scr[i];
+					c.uw *= tex->w;
+					c.vw *= tex->h;
+					return c;
+				};
+				const CabVertex va = v(ia), vb = v(ib), vc = v(ic);
+				if (std::max({va.sx, vb.sx, vc.sx}) < 0 || std::min({va.sx, vb.sx, vc.sx}) >= width || std::max({va.sy, vb.sy, vc.sy}) < 0 || std::min({va.sy, vb.sy, vc.sy}) >= height) continue;
+				CabRasterTriangle(dst, zb, width, height, tex->px.data(), tex->w, tex->h, va, vb, vc, false, light);
+				continue;
+			}
+			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, {in_tex(pts[ia]), in_tex(pts[ib]), in_tex(pts[ic])}, eye, false, light);
 		}
 	};
-	const uint glass_alpha = static_cast<uint>(std::clamp(shape->glass_alpha, 0.0f, 1.0f) * 256);
-	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
-		const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
-		if (part == ThreeDVehicleShape::PART_DRIVER && fg.own_cab) continue;
-		if (part != 0 && part < ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
-		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
-		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
-		const uint32_t ia = shape->tri[t], ib = shape->tri[t + 1], ic = shape->tri[t + 2];
-		corner(ia);
-		corner(ib);
-		corner(ic);
-		const uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
-		/* The glass: see-through, laid over the rest after it (CabFlushGlass()). */
-		_cab_glass_alpha = part == ThreeDVehicleShape::PART_GLASS ? std::max(1u, glass_alpha) : 256;
-		/* The texture's place in pixels of the texture of the triangle (its tu, tv as the unit square). */
-		auto in_tex = [&](CabPoint p) {
-			p.tu *= tex->w;
-			p.tv *= tex->h;
-			return p;
-		};
-		if (pts[ia].f >= _cab_near && pts[ib].f >= _cab_near && pts[ic].f >= _cab_near) {
-			auto v = [&](uint32_t i) {
-				CabVertex c = scr[i];
-				c.uw *= tex->w;
-				c.vw *= tex->h;
-				return c;
-			};
-			const CabVertex va = v(ia), vb = v(ib), vc = v(ic);
-			if (std::max({va.sx, vb.sx, vc.sx}) < 0 || std::min({va.sx, vb.sx, vc.sx}) >= width || std::max({va.sy, vb.sy, vc.sy}) < 0 || std::min({va.sy, vb.sy, vc.sy}) >= height) continue;
-			CabRasterTriangle(dst, zb, width, height, tex->px.data(), tex->w, tex->h, va, vb, vc, false, light);
-			continue;
+	draw(*shape, place, texs);
+	/* Its crew that walks (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): each figure the state shows at its frame of the
+	 * way gone, turned, sized and stood at its place in the model's frame, as detailed as it is big on the picture. */
+	const std::vector<ThreeDWalkingCrew> &walking = fig->WalkingCrew();
+	for (size_t k = 0; k < walking.size(); k++) {
+		const ThreeDWalkingCrew &w = walking[k];
+		if (w.part != 0 && (w.part >= 64 || ((parts >> w.part) & 1) == 0)) continue;
+		const ThreeDVehicleShape *frame_shape = w.figure->GetShape(k < 8 ? static_cast<int>((fg.walk >> (8 * k)) & 0xFF) : 0);
+		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
+		const double crew_ppm = pixels_per_metre * w.scale;
+		const ThreeDVehicleShape &cs = fg.own_cab ? *frame_shape : *frame_shape->Simpler(_cab_detail_pixels / crew_ppm);
+		std::vector<const ThreeDObjectTexture *> crew_texs(std::max<size_t>(1, frame_shape->pngs.size()));
+		for (size_t i = 0; i < crew_texs.size(); i++) {
+			crew_texs[i] = GetThreeDEyeVehicleTexture(w.figure, 0, _cab_full_textures ? 1e9 : crew_ppm, static_cast<int>(i));
+			if (crew_texs[i] == nullptr) crew_texs[i] = w.figure->GetTexture(0, static_cast<int>(i));
 		}
-		CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, {in_tex(pts[ia]), in_tex(pts[ib]), in_tex(pts[ic])}, eye, false, light);
+		const double wa = w.turn * M_PI / 180.0, wc = std::cos(wa), ws = std::sin(wa);
+		const bool crew_lit = cs.nrm.size() == cs.pos.size();
+		auto crew_place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
+			const double fx0 = cs.pos[i * 3], fy0 = cs.pos[i * 3 + 1];
+			px = w.at[0] + (fx0 * wc - fy0 * ws) * w.scale;
+			py = w.at[1] + (fx0 * ws + fy0 * wc) * w.scale;
+			pz = w.at[2] + cs.pos[i * 3 + 2] * w.scale;
+			if (crew_lit) {
+				const double n0 = cs.nrm[i * 3], n1 = cs.nrm[i * 3 + 1];
+				nx = n0 * wc - n1 * ws;
+				ny = n0 * ws + n1 * wc;
+				nz = cs.nrm[i * 3 + 2];
+			}
+		};
+		draw(cs, crew_place, crew_texs);
 	}
 	_cab_glass_alpha = 256;
 	return true;
@@ -8903,11 +8953,14 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		eye.y = walker->y;
 		eye.z = FirstPersonGroundZ(walker->x, walker->y) + walker->eye_z;
 	} else if (in_model_cab) {
-		/* In the driver's head of the model, as big as the model is drawn. */
+		/* In the driver's head of the model, as big as the model is drawn, turned as its state turns it. */
 		const double across = own_model.scale * OBJECT_UNITS_PER_METRE, ahead = across * own_model.along;
 		const ThreeDVehicleObject &m = *own_model.obj;
-		eye.x = own_model.x + m.cab[0] * ahead * eye.fx - m.cab[1] * across * eye.fy;
-		eye.y = own_model.y + m.cab[0] * ahead * eye.fy + m.cab[1] * across * eye.fx;
+		const ThreeDVehicleState *st = m.State(own_model.state);
+		const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0;
+		const double cx = m.cab[0] * std::cos(ta) - m.cab[1] * std::sin(ta), cy = m.cab[0] * std::sin(ta) + m.cab[1] * std::cos(ta);
+		eye.x = own_model.x + cx * ahead * eye.fx - cy * across * eye.fy;
+		eye.y = own_model.y + cx * ahead * eye.fy + cy * across * eye.fx;
 		eye.z = own_model.z + m.cab[2] * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {

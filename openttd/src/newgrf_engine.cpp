@@ -1207,6 +1207,28 @@ uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineIma
 	return GetSpriteLocalID(group->sprite);
 }
 
+/**
+ * The numbers in its GRF of the first sprites of the sets a vehicle's GRF chooses for it, one for each layer of its
+ * pictures, asked for as they are drawn (GetCustomEngineSprite(): a set of the sprite stack asks for a next layer by
+ * bit 31 of register 0x100): what picks the state of its 3D object layer by layer ("stavy", "vrstva", the colleague's
+ * hra/3d/PROSBA-SPECIAL-3D.md). UINT32_MAX for a layer it chooses no set for.
+ * @param v the vehicle, nullptr for the purchase list
+ * @param[out] ids the number of each layer, the first layer first
+ */
+void GetVehicleSetSpriteLocalIDs(EngineID engine, const Vehicle *v, EngineImageType image_type, std::vector<uint32_t> &ids)
+{
+	ids.clear();
+	VehicleResolverObject object(engine, v, VehicleResolverObject::WagonOverride::Cached, false, CBID_NO_CALLBACK);
+	const bool sprite_stack = EngInfo(engine)->misc_flags.Test(EngineMiscFlag::SpriteStack);
+	const uint max_stack = sprite_stack ? static_cast<uint>(std::size(VehicleSpriteSeq{}.seq)) : 1;
+	for (uint stack = 0; stack < max_stack; ++stack) {
+		object.callback_param1 = to_underlying(image_type) | (stack << 8);
+		const auto *group = object.Resolve<ResultSpriteGroup>();
+		ids.push_back(group == nullptr || group->num_sprites == 0 ? UINT32_MAX : GetSpriteLocalID(group->sprite));
+		if (!sprite_stack || !HasBit(object.GetRegister(0x100), 31)) break;
+	}
+}
+
 static void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result, bool on_map = false)
 {
 	/* An engine with a 3D object is drawn from it, not from its set's sprites (three_d_vehicle_object.h). */

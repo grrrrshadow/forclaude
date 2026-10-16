@@ -89,6 +89,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Holky na korbě V3S jsem v pohledu z očí zmenšoval na pravou velikost. Hráč: lavice jsou velké naschvál, je to
   pajda V3S s velkými lavicemi pro velké holky, „nezmenšujte mi ty holky pořád“, a to ani v pohledu z první osoby,
   když jsou jen náklad. Zmenšování je pryč, holky s `meritko` jsou dvakrát všude.
+- Special do 3D (kolegova `hra/3d/PROSBA-SPECIAL-3D.md`, GRF `SPECIAL_3D` MAX5: dvoukolák a stavební kolečko, hráč:
+  „teď předělame special do 3D“, „mužou kráčet holky“). Hotovo ve hře:
+  - holky kráčí podle ujeté dráhy, každá svým krokem (`krok_m`). Kreslí se zvlášť, ne ve tvaru vozíku, protože
+    tahající a pomocnice mají jiný krok. Platí to na mapě, v otočeném pohledu i z očí. Když vozík stojí, holka zůstane
+    v kroku;
+  - `otoceni` ve stavu otočí celý model (tlačený vozík je tažený otočený o 180°);
+  - stav z vrstev GRF: hra se zeptá na každou vrstvu jako při kreslení a stavy složí, takže kolečko má barvu korby
+    i rámu z konfigurátoru.
+  Rig: `auta … plny v1:1` (náklad a volba konfigurátoru v depu), `stav a b c` (vrstvy), `kresli … vrstvy … cm`.
 
 ## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
 

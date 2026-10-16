@@ -616,7 +616,7 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   blink), and `"stavy"` of the record says what a set means: `{"sprity": [first, last], "barva": "RRGGBB", "lak":
   0..1, "rez": 0..1}`, the set whose first sprite (its line in the GRF, the sprite count line 0 and every sprite and
   pseudo sprite a line on, `GetSpriteLocalID()`; not yagl's `sprite_id`) is in the range
-  (`GetVehicleSetSpriteLocalID()`, `StateStep()`). Without `stavy`, or a set in no range: the object as it is, the
+  (`GetVehicleSetSpriteLocalIDs()`, `StateStep()`; of each layer, below). Without `stavy`, or a set in no range: the object as it is, the
   paint new, no rust. A sprite and a picture of the turned view for each state, made when first drawn. Rig:
   `test3d stavy` prints each vehicle's sprite number and state; `test3d stav <n>` draws every such vehicle in its
   state n (0 as its GRF picks). (Later: `dily`, a node turned, the lid.)
@@ -642,6 +642,26 @@ grrrrf `hra/3d/PROSBA-VOZIDLA-3D.md`, the answer `hra/3d/ODPOVED-VOZIDLA-3D.md`.
   first, and the V3S's glass came first.
 - The girls drawn bigger than they are (`meritko`) stay that big in the view from the eyes too: the benches of the
   students' V3S are built for girls twice as big, on purpose (the player: never shrink them).
+- **A state of layers** (16. 10., the colleague's `hra/3d/PROSBA-SPECIAL-3D.md`, the special's hand cart and
+  wheelbarrow `SPECIAL_3D`, `MAX5`): a state may name its layer of the set's sprites (`"vrstva": n`, 0 if not). The
+  game asks the set for each layer as it does to draw it (variable 10 bits 8 to 15 the layer, a next one while
+  register 0x100 has bit 31, `GetVehicleSetSpriteLocalIDs()`) and takes for each the state of that layer whose range
+  holds the first sprite of the set it chooses. The states of the layers make one (`ComposeState()`, kept, its step
+  after those of `stavy`): the keys a later layer gives replace an earlier one's (`barva`, `lak`, `rez`, `otoceni`,
+  `posadka`), `doplnky` and `barvy_doplnku` each add-on by itself. The wheelbarrow: layer 0 the crew and the load,
+  1 the body's colour, 2 the frame's -- 12 x 12 colours without a state for each. Rig: `test3d stav <n> <n> ...`
+  draws the states of the layers made one, `test3d stavy` prints each layer's sprite and state.
+- **The whole object turned** (`"otoceni"` of a state, degrees about z at its origin): the cart pushed is the cart
+  pulled turned round, its load and its crew with it. On the map, in the turned view, in the view from the eyes (its
+  lights, the eye of its cab); its wheels turn by the way gone along its own x, the other way round when turned back.
+- **The crew that walks** (a figure of the crew whose `animace` has `chuze` `krok_m`): not of the vehicle's shape but
+  drawn with it on its own (`WalkingCrew()`), each figure the state shows at its frame of the way gone: a round of
+  its frames each `krok_m` as big as it is drawn, forward as it faces (one facing back as the vehicle goes walks back);
+  standing, it stays in its step. The way is that of the vehicle as drawn -- each step over its foreshortening along
+  it (`EyeTrail::walked`, `TrailOf()`), so the feet keep to the ground on the straight and on the diagonal alike --
+  kept for every vehicle drawn from its object, on the map too. Its frames are in the key of the sprites and of the
+  pictures (`WalkCode()`, eight bits a figure, of the first eight); the cart's girls pulling and helping behind each
+  their own step (2.14 and 1.41 m), so the shape is not made for each frame.
 - **The paint** (`"lak"`, the colleague's point 6): `maska` a grey PNG of the body's texture's layout (the texture of
   the file, or `textura`), 255 where it is paint; `cil` RRGGBB the colour it fades to, as far as the state's `lak`
   says; `barva` RRGGBB a fixed colour by number (a state's `barva` instead), the paint that colour at the texture's
@@ -864,9 +884,10 @@ the walker's feet by their triangles).
   Mat at his true size, the cars at the vehicles' size.
 - The posed shapes of the creatures (`MakePosedShape()`) know their extent.
 
-Rig: `test3d auta <jmeno> [pocet] [x y] zatacka` (a road with a bend to drive
-through; the sheds are built before the roads, else a long road leaves their
-ways off), `test3d plnost <px>`, `test3d detail <px> [textura]` (0 the whole
+Rig: `test3d auta <jmeno> [pocet] [x y] zatacka [naklad] [plny] [v1:1 ...]` (a
+road with a bend to drive through; the sheds are built before the roads, else a
+long road leaves their ways off; refitted to a cargo's label, filled with it,
+options of the configurator chosen in the shed), `test3d plnost <px>`, `test3d detail <px> [textura]` (0 the whole
 shape; with `textura` the textures at their full size), `test3d vozidla`
 (also the speed, the order and the state of a road vehicle).
 
@@ -1464,5 +1485,7 @@ the Volga 207 000 triangles to 110 000, the closest zoom of the map has a
 pixel of 4 cm. Six Volgas on the screen, turned: the same 50 to 64 ms a
 redraw as without them.
 
-Rig: `test3d kresli <engine> <degrees> <px a metre> [state] [lights]` draws a
-vehicle's object alone and big to `kresli.ppm`; `test3d auta Volga 6 20 20`.
+Rig: `test3d kresli <engine> <degrees> <px a metre> [state] [lights] [name] [cm]`
+draws a vehicle's object alone and big to `kresli.ppm` (state `vrstvy`: the
+states of the layers `test3d stav` set; its crew that walks at the frames of so
+many centimetres gone); `test3d auta Volga 6 20 20`.

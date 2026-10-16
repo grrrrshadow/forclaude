@@ -1896,14 +1896,27 @@ static void ReadThreeDVehicleObjects()
 							if (t.starts_with("#")) t = t.substr(1);
 							auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
 							if (n.has_value()) state.colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+							state.given |= ThreeDVehicleState::GIVEN_COLOUR;
 						}
 						state.fade = std::clamp(st.value("lak", 0.0f), 0.0f, 1.0f);
 						state.rust = std::clamp(st.value("rez", 0.0f), 0.0f, 1.0f);
+						if (st.contains("lak")) state.given |= ThreeDVehicleState::GIVEN_FADE;
+						if (st.contains("rez")) state.given |= ThreeDVehicleState::GIVEN_RUST;
+						/* Its layer of the GRF's sprites; the whole object turned. */
+						state.layer = std::clamp(st.value("vrstva", 0), 0, 255);
+						if (st.contains("otoceni") && st.at("otoceni").is_number()) {
+							state.turn = static_cast<float>(std::remainder(st.at("otoceni").get<double>(), 360.0));
+							state.given |= ThreeDVehicleState::GIVEN_TURN;
+						}
 						/* The node of each add-on it shows, the colour each takes, the group of the crew it shows. */
 						if (st.contains("doplnky") && st.at("doplnky").is_object()) {
+							state.addon_parts.assign(obj.addons.size(), -1);
 							for (const auto &[file, node] : st.at("doplnky").items()) {
 								const int part = node.is_string() ? part_of(file + "/" + node.get<std::string>()) : 0;
 								if (part > 0) state.parts |= uint64_t{1} << part;
+								for (size_t a = 0; a < obj.addons.size(); a++) {
+									if (obj.addons[a].key == file) state.addon_parts[a] = static_cast<int16_t>(part);
+								}
 							}
 						}
 						if (st.contains("barvy_doplnku") && st.at("barvy_doplnku").is_object()) {
@@ -1921,6 +1934,7 @@ static void ReadThreeDVehicleObjects()
 						if (st.contains("posadka") && st.at("posadka").is_string()) {
 							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
 							if (part > 0) state.parts |= uint64_t{1} << part;
+							state.crew_part = part;
 						}
 						obj.states.push_back(state);
 						if (obj.states.size() >= 255) break;
@@ -2523,9 +2537,11 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	}
 	/* The crew: each figure's shape sized, turned about z and stood at its place, its textures after the others. The
 	 * driver -- the one sitting at the eye of the cab -- is not drawn from that eye. A figure bigger than it is ("meritko")
-	 * stays that big everywhere, the view from the eyes too. */
+	 * stays that big everywhere, the view from the eyes too. A figure that walks is not of the shape: it is drawn on its
+	 * own, its frame by the way gone (WalkingCrew()). */
 	auto add_crew = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
+		if (fig != nullptr && fig->Walks()) return; // drawn on its own, a frame by the way gone (WalkingCrew())
 		const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
 		if (fs == nullptr) {
 			Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
@@ -2701,8 +2717,96 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int l
  */
 uint64_t ThreeDVehicleObject::PartsOf(int state) const
 {
-	const ThreeDVehicleState *s = state > 0 && static_cast<size_t>(state) <= this->states.size() ? &this->states[state - 1] : nullptr;
+	const ThreeDVehicleState *s = this->State(state);
 	return 1 | (s != nullptr ? s->parts : 0);
+}
+
+/**
+ * A state by its step (StateStep() of three_d_vehicle_object.cpp): 1 to the count of "stavy" those, after them the
+ * states made of the states of layers (ComposeState()); nullptr for 0, none.
+ */
+const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
+{
+	if (step <= 0) return nullptr;
+	if (static_cast<size_t>(step) <= this->states.size()) return &this->states[step - 1];
+	const size_t k = static_cast<size_t>(step) - this->states.size() - 1;
+	return k < this->composed.size() ? &this->composed[k] : nullptr;
+}
+
+/**
+ * The state of the states the GRF picks for the layers of its sprites (the colleague's hra/3d/PROSBA-SPECIAL-3D.md):
+ * the keys of a later layer replace those of an earlier one, the add-ons' nodes ("doplnky") and colours
+ * ("barvy_doplnku") each add-on by itself. Made the first time, kept by the steps of the layers.
+ * @param layers the step of each layer's state, the first layer first, 0 for a layer of no state
+ * @return its step: the one state itself when only one layer has a state, 0 when none has
+ */
+int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers) const
+{
+	int only = 0, count = 0;
+	for (int step : layers) {
+		if (step > 0 && static_cast<size_t>(step) <= this->states.size()) {
+			only = step;
+			count++;
+		}
+	}
+	if (count <= 1) return only;
+	auto it = this->composed_steps.find(layers);
+	if (it != this->composed_steps.end()) return it->second;
+	ThreeDVehicleState made;
+	made.addon_parts.assign(this->addons.size(), -1);
+	made.addon_colours.assign(this->addons.size(), 0);
+	for (int step : layers) {
+		if (step <= 0 || static_cast<size_t>(step) > this->states.size()) continue;
+		const ThreeDVehicleState &s = this->states[step - 1];
+		if (s.given & ThreeDVehicleState::GIVEN_COLOUR) made.colour = s.colour;
+		if (s.given & ThreeDVehicleState::GIVEN_FADE) made.fade = s.fade;
+		if (s.given & ThreeDVehicleState::GIVEN_RUST) made.rust = s.rust;
+		if (s.given & ThreeDVehicleState::GIVEN_TURN) made.turn = s.turn;
+		made.given |= s.given;
+		for (size_t a = 0; a < s.addon_parts.size() && a < made.addon_parts.size(); a++) {
+			if (s.addon_parts[a] >= 0) made.addon_parts[a] = s.addon_parts[a];
+		}
+		for (size_t a = 0; a < s.addon_colours.size() && a < made.addon_colours.size(); a++) {
+			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
+		}
+		if (s.crew_part >= 0) made.crew_part = s.crew_part;
+	}
+	for (int16_t part : made.addon_parts) {
+		if (part > 0 && part < 64) made.parts |= uint64_t{1} << part;
+	}
+	if (made.crew_part > 0 && made.crew_part < 64) made.parts |= uint64_t{1} << made.crew_part;
+	this->composed.push_back(std::move(made));
+	const int step = static_cast<int>(this->states.size() + this->composed.size());
+	this->composed_steps.emplace(layers, step);
+	return step;
+}
+
+/**
+ * The crew that walks as the vehicle goes (ThreeDWalkingCrew): of its crew and its groups the figures whose frames are
+ * steps ("animace" with "chuze"), each drawn on its own, not in its shape (MakeShape()).
+ */
+const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
+{
+	if (this->walking_found) return this->walking;
+	this->walking_found = true;
+	auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
+		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
+		if (fig == nullptr || !fig->Walks()) return;
+		ThreeDWalkingCrew w;
+		w.figure = fig;
+		std::copy(std::begin(c.at), std::end(c.at), w.at);
+		w.turn = c.turn;
+		w.scale = c.scale;
+		w.part = part;
+		this->walking.push_back(w);
+	};
+	for (const ThreeDVehicleCrew &c : this->crew) add(c, 0);
+	for (const auto &[group, list] : this->crew_groups) {
+		auto p = std::ranges::find(this->part_names, "posadky/" + group);
+		if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= 64) continue;
+		for (const ThreeDVehicleCrew &c : list) add(c, static_cast<uint8_t>(p - this->part_names.begin()));
+	}
+	return this->walking;
 }
 
 /** The rig: the vehicle objects of the indices, a line each. */

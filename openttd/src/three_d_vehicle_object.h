@@ -38,8 +38,9 @@ struct RoundTrackPose;
 int ThreeDVehicleObjectPieceLength(EngineID engine, int set_length);
 bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
 void NoteThreeDVehicleWithoutObject(EngineID engine, const Vehicle *v, EngineImageType image_type, const VehicleSpriteSeq &seq);
-bool WriteThreeDVehicleObjectPPM(EngineID engine, float az, float pxm, int state, int lights, const std::string &path);
+bool WriteThreeDVehicleObjectPPM(EngineID engine, float az, float pxm, int state, int lights, const std::string &path, double walked_m = 0);
 uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineImageType image_type);
+void GetVehicleSetSpriteLocalIDs(EngineID engine, const Vehicle *v, EngineImageType image_type, std::vector<uint32_t> &ids);
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
@@ -59,6 +60,7 @@ struct ThreeDEyeVehicle {
 	int state = 0;              ///< its state its GRF picks (paint, fading, rust), 0 none
 	int lights = 0;             ///< its lights on at night (front 1, back 2)
 	double rolled = 0;          ///< how far it has gone, world units: its wheels turn by it ("kola_v_modelu")
+	uint64_t walk = 0;          ///< the frames of its crew that walks (WalkCode() of three_d_vehicle_object.cpp)
 	double curvature = 0;       ///< how much its way turns, radians a world unit to the left: its front wheels steer by it
 };
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
