@@ -19,6 +19,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 16. 10. – OpenLoco, luk, průjezd obloukem
+
+- OpenLoco je MIT: jeho kód smí do hry (s poznámkou MIT), původní obrázky z Locomotion ne. Hráč vybral:
+  1. podvozky ano, 2. naklánění ano (i auta, ale jen ta z objektu: Sergej a Tatra VB), 3. efekty jako 3D částice
+  ano, 5. víc tvarů trati ne; 4. (cíle scénářů) bez odpovědi – nedělám.
+- Luk a šíp: objekt je v Example Suite hotový (CC0), vezmu si ho sám, nečekám na kolegu.
+- Průjezd obloukem pomalý: změřeno v rigu (`test3d obloukjizda`, `19f8ff4`). Kreslení po oblouku jde stejně
+  rychle jako vlak po koleji (rozdíl pod 1 jednotku na dlaždici). Zpomalení je pravidlo hry (realistické
+  zrychlování): vlak s vagony v těsné zatáčce (1 kus diagonály mezi rohy) smí jen 88 km/h, ze 128 km/h zabrzdí
+  na jedné dlaždici. S kulatými oblouky vypnutými je to na tik stejné. Zatáčka s 5 kusy diagonály: limit 168,
+  vlak nebrzdí. Čeká se, jestli hráč chce měnit pravidlo (musí to být volba hry v savu, vypnutá = vanilla).
+
 ## 16. 10. – technologie z OpenMW (hráč: „1–9 ano“)
 
 - Schváleno všech 9: kreslení na více jádrech, mezipaměť nehybných objektů kusu mapy, LOD (vzdálené věci
