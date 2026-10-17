@@ -44,6 +44,7 @@ uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineIma
 void GetVehicleSetSpriteLocalIDs(EngineID engine, const Vehicle *v, EngineImageType image_type, std::vector<uint32_t> &ids);
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
 bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds);
+SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request);
 void TrimThreeDEyePainted();
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
@@ -74,6 +75,8 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const struct ThreeDVehi
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy);
+bool ThreeDVehicleObjectPreviewFitMade(EngineID engine, int side, float azimuth);
+void ForgetThreeDVehicleObjectPreviews();
 const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev, ZoomLevel zoom, float yaw);
 std::string DescribeThreeDVehicleObjectSprites();
 void QueueThreeDFireworks(TileIndex hut_front);

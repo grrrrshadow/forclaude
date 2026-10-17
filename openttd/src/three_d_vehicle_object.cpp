@@ -34,8 +34,10 @@
 #include "timer/timer_window.h"
 #include "cab_view.h"
 #include "thread.h"
+#include "window_func.h"
 
 #include <array>
+#include <atomic>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -88,9 +90,10 @@ struct ObjectSpriteRequest {
 	int bounds_of = 0;                        ///< what its bounds before it is made were worked out of (ThreeDVehicleObjectSpriteBounds()): 0 not yet, 1 a guess, 2 its object's extent
 	uint32_t extent_version = 0;              ///< with 2, of which extent of the object (ThreeDVehicleObject::KnownExtent()): it grows as parts are added
 	Rect bounds{};
+	bool gui = false;                         ///< for the windows (the purchase list, the news): made at the zoom of the interface, on the thread in the background (ThreeDVehicleObjectSpriteStandIn())
 };
 static std::vector<ObjectSpriteRequest> _object_sprite_requests;
-/** The sprites made: by the object, the piece it is hung from, the direction, its scale (thousandths), its state (StateStep()) and the frames of its crew that walks. */
+/** The sprites made: by the object, the piece it is hung from (and whether for the windows), the direction, its scale (thousandths), its state (StateStep()) and the frames of its crew that walks. */
 static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, uint64_t>, SpriteID> _object_sprites;
 static SpriteID _object_empty_sprite = 0;
 
@@ -105,6 +108,7 @@ static std::map<ObjectPictureKey, ObjectPictureEntry> _object_pictures;
 static uint64_t _object_pictures_clock = 0;
 
 static void ForgetEyePainted();
+static void ForgetGuiSpritesAndPreviews();
 
 /** Forget the sprites made: the sprite cache they were in is gone (GfxInitSpriteMem()). */
 void ResetThreeDVehicleObjectSprites()
@@ -117,6 +121,7 @@ void ResetThreeDVehicleObjectSprites()
 	_object_empty_sprite = 0;
 	_object_pictures.clear();
 	ForgetEyePainted();
+	ForgetGuiSpritesAndPreviews();
 	/* The GRFs are loaded anew: their packages read again the next time they are looked at, one put into the NewGRF
 	 * folders meanwhile among them (three_d_objects.h). */
 	ResetThreeDVehicleObjects();
@@ -629,12 +634,13 @@ static SpriteID EmptyObjectSprite()
  * The sprite of an object facing a direction, hung from one of its pieces, its crew that walks at its frames: made when it is first drawn.
  * @param along how far along its direction from the piece its origin is, steps of the chain (MiddleFromPiece(), ObjectAlongOnMap())
  * @param length the piece's length on the map, eighths of a tile
+ * @param gui for the windows (ObjectSpriteRequest::gui)
  */
-static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir, int fade, uint64_t walk, double along, int length)
+static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir, int fade, uint64_t walk, double along, int length, bool gui)
 {
 	/* (The piece and the place along in eighths of a step: the article of a train of lorries is hung where its
 	 * coupling puts it, and a refit changes its pieces' lengths.) */
-	const uint32_t where = static_cast<uint32_t>(piece & 0xFF) | (static_cast<uint32_t>(std::lround(along * 8)) & 0xFFFF) << 8 | static_cast<uint32_t>(length & 0x7F) << 24;
+	const uint32_t where = static_cast<uint32_t>(piece & 0xFF) | (static_cast<uint32_t>(std::lround(along * 8)) & 0xFFFF) << 8 | static_cast<uint32_t>(length & 0x7F) << 24 | (gui ? 1U << 31 : 0U);
 	auto key = std::make_tuple(obj, static_cast<int>(where), dir, static_cast<int>(std::lround(ObjectScale(obj) * 1000)), fade, walk);
 	auto it = _object_sprites.find(key);
 	if (it != _object_sprites.end()) return it->second;
@@ -645,6 +651,7 @@ static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir,
 	req.scale = ObjectScale(obj);
 	req.fade = fade;
 	req.walk = walk;
+	req.gui = gui;
 	Point anchor = ThreeDSpriteAnchor(obj->type, length, static_cast<Direction>(dir));
 	req.off_x = static_cast<float>(along * DIR_DX[dir] - anchor.x);
 	req.off_y = static_cast<float>(along * DIR_DY[dir] - anchor.y);
@@ -680,7 +687,10 @@ bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction d
 		 * lorries on the map); alone from its first piece as its set's lengths make it. */
 		const std::vector<int> lengths = ObjectLengths(obj, alone ? nullptr : v, from);
 		const double along = !alone && image_type == EngineImageType::OnMap ? ObjectAlongOnMap(obj, v, d) : MiddleFromPiece(obj, lengths, from);
-		sprite = ObjectSprite(obj, from, d, state, walk, along, lengths[std::clamp<int>(from, 0, static_cast<int>(lengths.size()) - 1)]);
+		/* The purchase list and the news: a small picture at the interface's zoom, made in the background (the player,
+		 * 17. 10.: "the picture in the purchase menu is tiny, what are you photographing there"). */
+		const bool gui = image_type == EngineImageType::Purchase || image_type == EngineImageType::Preview;
+		sprite = ObjectSprite(obj, from, d, state, walk, along, lengths[std::clamp<int>(from, 0, static_cast<int>(lengths.size()) - 1)], gui);
 	}
 	if (sprite == 0) return false;
 	result->Set(sprite);
@@ -1314,15 +1324,142 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	return true;
 }
 
+/** The pixels of a sprite for the windows (ObjectSpriteRequest::gui): the object at a zoom of the interface, not at 16x and shrunk. On either thread. */
+static bool RasterGuiSprite(const ObjectSpriteRequest &req, ZoomLevel zoom, float fade, float rust_time, uint32_t paint_colour, ObjectRaster &r)
+{
+	const float along = (SqueezedType(req.obj->type) && (req.dir & 1)) ? SQUEEZE : 1.0f;
+	const float az = ViewAzimuth(req.dir);
+	return RasterObject(*req.obj, req.scale, az, az, along, PXM_16X / (1 << to_underlying(zoom)), fade, r, 0, rust_time, 0, paint_colour, 1.0f, 0.0f, 0.0f, 0.0f, 0, req.fade, req.walk) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
+}
+
+/** A sprite for the windows made on the thread (ThreeDVehicleObjectSpriteStandIn()), for MakeThreeDVehicleObjectSprite() to take. */
+struct GuiSpriteMade {
+	ObjectRaster raster;
+	ZoomLevel zoom = ZoomLevel::Normal; ///< the zoom of the interface it was made at
+	bool drawn = false;                 ///< false: not a pixel of the object seen
+};
+/** The sprites for the windows made on the thread, by their request; those asked of it. Under _gui_sprites_mutex. */
+static std::map<uint32_t, GuiSpriteMade> _gui_sprites_made;
+static std::set<uint32_t> _gui_sprites_asked;
+static std::mutex _gui_sprites_mutex;
+/** Some came: the windows that draw them are drawn again (_owed_pictures_timer). */
+static std::atomic<bool> _gui_sprites_came = false;
+
+/**
+ * What the sprite cache draws for a sprite of an object for the windows not made yet (ObjectSpriteRequest::gui; the
+ * main thread, GetRawSprite()): it is made on the thread in the background -- the object read, tenths of a second, the
+ * first of a set seconds; the purchase list stood still as it scrolled, for a picture of a few pixels (the player,
+ * 17. 10.: "the picture in the purchase menu is tiny, what are you photographing there") --, the empty picture till
+ * then, and the windows drawn again when it comes. The rig makes it now.
+ * @return the sprite to draw instead; 0: make it now (it is made, or it is not one of those)
+ */
+SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request)
+{
+	if (request < 1 || request > _object_sprite_requests.size()) return 0;
+	const ObjectSpriteRequest &req = _object_sprite_requests[request - 1];
+	if (!req.gui || req.obj == nullptr || _three_d_load_at_once) return 0;
+	const ZoomLevel zoom = _gui_zoom;
+	{
+		std::lock_guard lock(_gui_sprites_mutex);
+		auto it = _gui_sprites_made.find(request);
+		if (it != _gui_sprites_made.end() && it->second.zoom == zoom) return 0;
+		if (!_gui_sprites_asked.insert(request).second) return EmptyObjectSprite(); // asked already
+	}
+	/* What the game's state gives it now (its paint faded by the date), for the thread. */
+	const float fade = FadeAmount(req.obj, req.fade), rust_time = RustTime(req.obj, req.fade);
+	const uint32_t paint_colour = PaletteColour(req.obj, req.fade);
+	ThreeDLoadInBackground([req, request, zoom, fade, rust_time, paint_colour] {
+		{
+			std::lock_guard lock(_gui_sprites_mutex);
+			if (!_gui_sprites_asked.contains(request)) return; // forgotten meanwhile (the objects read anew)
+		}
+		GuiSpriteMade made;
+		made.zoom = zoom;
+		made.drawn = RasterGuiSprite(req, zoom, fade, rust_time, paint_colour, made.raster);
+		std::lock_guard lock(_gui_sprites_mutex);
+		if (_gui_sprites_asked.erase(request) == 0) return;
+		_gui_sprites_made[request] = std::move(made);
+		_gui_sprites_came = true;
+	});
+	/* Without the thread it was made now. */
+	std::lock_guard lock(_gui_sprites_mutex);
+	return _gui_sprites_made.contains(request) ? 0 : EmptyObjectSprite();
+}
+
+/**
+ * Make a sprite of an object for the windows (ObjectSpriteRequest::gui): at the zoom of the interface, the levels
+ * finer made from it as the sprite cache makes them (ResizeSprites()); from the thread's pixels when it made them.
+ */
+static ZoomLevels MakeGuiSprite(uint32_t request, const ObjectSpriteRequest &req, SpriteLoader::SpriteCollection &sprite)
+{
+	const ZoomLevel zoom = _gui_zoom;
+	auto start = std::chrono::steady_clock::now();
+	GuiSpriteMade made;
+	bool found = false;
+	{
+		std::lock_guard lock(_gui_sprites_mutex);
+		auto it = _gui_sprites_made.find(request);
+		if (it != _gui_sprites_made.end()) {
+			if (it->second.zoom == zoom) {
+				made = std::move(it->second);
+				found = true;
+			}
+			_gui_sprites_made.erase(it);
+		}
+	}
+	if (!found) {
+		made.zoom = zoom;
+		made.drawn = RasterGuiSprite(req, zoom, FadeAmount(req.obj, req.fade), RustTime(req.obj, req.fade), PaletteColour(req.obj, req.fade), made.raster);
+	}
+	ZoomLevels avail;
+	const ObjectRaster &r = made.raster;
+	if (!made.drawn) {
+		/* Not a pixel of it seen: a transparent pixel. */
+		SpriteLoader::Sprite &s = sprite[ZoomLevel::Min];
+		s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
+		s.width = 1;
+		s.height = 1;
+		s.x_offs = 0;
+		s.y_offs = 0;
+		s.AllocateData(ZoomLevel::Min, 1);
+		avail.Set(ZoomLevel::Min);
+		return avail;
+	}
+	SpriteLoader::Sprite &s = sprite[zoom];
+	s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
+	/* The object's origin from the point the sprite is drawn about, in pixels of the zoom (RemapCoords()). */
+	const double ox = (req.off_y - req.off_x) * 2.0 * ZOOM_BASE / (1 << to_underlying(zoom)), oy = (req.off_x + req.off_y) * static_cast<double>(ZOOM_BASE) / (1 << to_underlying(zoom));
+	s.width = static_cast<uint16_t>(r.width);
+	s.height = static_cast<uint16_t>(r.height);
+	s.x_offs = static_cast<int16_t>(r.left + std::lround(ox));
+	s.y_offs = static_cast<int16_t>(r.top + std::lround(oy));
+	s.AllocateData(zoom, static_cast<size_t>(r.width) * r.height);
+	for (size_t i = 0; i < r.px.size(); i++) {
+		SpriteLoader::CommonPixel &d = s.data[i];
+		d.r = r.px[i].r;
+		d.g = r.px[i].g;
+		d.b = r.px[i].b;
+		d.a = r.px[i].a;
+		d.m = 0;
+	}
+	avail.Set(zoom);
+	Debug(sprite, 3, "3D vehicle {}: sprite for the windows of direction {}, state {}, {}x{} at zoom {}, {}, {} ms", req.obj->name, req.dir, req.fade, r.width, r.height, to_underlying(zoom),
+			found ? "made in the background" : "made now", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+	return avail;
+}
+
 /**
  * Make a sprite of an object (ReadSprite()): the object drawn at 16x with the camera of the sprites, facing the
  * direction asked, about the point the game draws the sprite about; the coarser levels are made from it as from a
- * set's zin16 (ResizeSprites()).
+ * set's zin16 (ResizeSprites()). One for the windows at the zoom of the interface (MakeGuiSprite()).
  * @param request the sprite's request, counted from 1
  * @return the levels made: 16x
  */
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite)
 {
+	const ObjectSpriteRequest *req = (request >= 1 && request <= _object_sprite_requests.size()) ? &_object_sprite_requests[request - 1] : nullptr;
+	if (req != nullptr && req->obj != nullptr && req->gui) return MakeGuiSprite(request, *req, sprite);
+
 	ZoomLevels avail;
 	avail.Set(ZoomLevel::Min);
 	SpriteLoader::Sprite &s = sprite[ZoomLevel::Min];
@@ -1330,7 +1467,6 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 
 	ObjectRaster r;
 	auto start = std::chrono::steady_clock::now();
-	const ObjectSpriteRequest *req = (request >= 1 && request <= _object_sprite_requests.size()) ? &_object_sprite_requests[request - 1] : nullptr;
 	bool drawn = false;
 	if (req != nullptr && req->obj != nullptr) {
 		float along = (SqueezedType(req->obj->type) && (req->dir & 1)) ? SQUEEZE : 1.0f;
@@ -1698,6 +1834,10 @@ static bool _object_picture_waited = false;
 
 /** The pictures made come in, and the vehicles that waited for them are drawn again. */
 static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::milliseconds(30), [](auto) {
+	/* The sprites for the windows made in the background (ThreeDVehicleObjectSpriteStandIn()): the windows that draw them. */
+	if (_gui_sprites_came.exchange(false)) {
+		for (WindowClass wc : {WindowClass::BuildVehicle, WindowClass::ReplaceVehicle, WindowClass::EnginePreview}) SetWindowClassesDirty(wc);
+	}
 	if (!TakePicturesMade() || _vehicles_owed_pictures.empty()) return;
 	std::set<VehicleID> owed;
 	owed.swap(_vehicles_owed_pictures);
@@ -2375,28 +2515,69 @@ const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, 
 	return ObjectPicture(obj, ObjectScale(obj), zoom, azimuth, azimuth, SqueezedType(obj->type), StateStep(obj, engine, nullptr, EngineImageType::Purchase));
 }
 
+/** A frame of the turning preview beside the purchase window (GetThreeDVehicleObjectPreviewFit()). */
+struct PreviewFrame {
+	ThreeDModelPicture picture; ///< width 0: nothing of it seen
+	int cx = 0, cy = 0;         ///< where the middle of its plan, half its height up, is on the picture, pixels from its top left
+};
+/** What a frame of the preview is of: the object, its state, the side of the square, the angle in whole degrees. */
+using PreviewFrameKey = std::tuple<const ThreeDVehicleObject *, int, int, int>;
 /**
- * The picture of an engine's 3D object for the turning preview beside the purchase window, as big as a square beside
- * it (the player, 17. 10.: "imagine the window is there, the model as big as from one edge of that window to the
- * other"), turning about the middle of its plan, not its origin (a semi-trailer's is its kingpin at the front: it
- * turned about its front). Drawn as it is, not foreshortened as the map spaces its vehicles.
- * @param side the square's side, pixels: the plan's diagonal fills it, so that it fits at every angle
- * @param azimuth the angle, as the likeness counts it (ViewAzimuth())
- * @param[out] cx,cy where the middle of its plan, half its height up, is on the picture, pixels from its top left
- * @return the picture, nullptr for an engine without an object
+ * The frames of the preview of the engine chosen, made on the thread in the background a few ahead of the turn (the
+ * player, 17. 10.: "what has the preview got in common with the rest, it is only to turn there, no wonder it bites"),
+ * and those asked: of the one engine only, they go when another is chosen. The main thread draws from them without
+ * the lock: a frame stays where it is till the main thread lets it go. Under _preview_mutex.
  */
-const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy)
+static std::map<PreviewFrameKey, PreviewFrame> _preview_frames;
+static std::set<PreviewFrameKey> _preview_frames_asked;
+/** The extent of an object in a state (the parts it shows), for its middle and its size in the square. Under _preview_mutex. */
+static std::map<std::pair<const ThreeDVehicleObject *, int>, std::array<float, 6>> _preview_extents;
+static std::mutex _preview_mutex;
+
+/** The sprites for the windows and the frames of the previews go with the objects (ResetThreeDVehicleObjectSprites(), the thread stopped). */
+static void ForgetGuiSpritesAndPreviews()
 {
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
-	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
-	if (shape == nullptr || side <= 0) return nullptr;
-	const int state = StateStep(obj, engine, nullptr, EngineImageType::Purchase);
-	/* Its extent as its state shows it, the parts shown (the colleague's lorries: the main file only their length, the
-	 * cab, the body and the trailer add-ons), once for the object and the state. */
-	static std::map<std::pair<const ThreeDVehicleObject *, int>, std::array<float, 6>> extents;
-	auto [known, added] = extents.try_emplace({obj, state});
-	std::array<float, 6> &e = known->second;
-	if (added) {
+	{
+		std::lock_guard lock(_gui_sprites_mutex);
+		_gui_sprites_made.clear();
+		_gui_sprites_asked.clear();
+	}
+	ForgetThreeDVehicleObjectPreviews();
+	std::lock_guard lock(_preview_mutex);
+	_preview_extents.clear();
+}
+
+/** The frames of the previews made go: no preview of a vehicle is shown (three_d_preview_gui.cpp). */
+void ForgetThreeDVehicleObjectPreviews()
+{
+	std::lock_guard lock(_preview_mutex);
+	_preview_frames.clear();
+	_preview_frames_asked.clear();
+}
+
+/**
+ * Make a frame of the preview (the thread): the object as big as the square beside the purchase window (the player,
+ * 17. 10.: "imagine the window is there, the model as big as from one edge of that window to the other"), turning about
+ * the middle of its plan, not its origin (a semi-trailer's is its kingpin at the front: it turned about its front);
+ * drawn as it is, not foreshortened as the map spaces its vehicles. Its extent is that of the parts its state shows
+ * (the colleague's lorries: the main file only their length, the cab, the body and the trailer add-ons).
+ */
+static void MakePreviewFrame(const PreviewFrameKey &key, float fade, float rust_time, uint32_t paint_colour, PreviewFrame &f)
+{
+	const auto [obj, state, side, step] = key;
+	const ThreeDVehicleShape *shape = obj->GetShape(0, obj->PartsOf(state));
+	if (shape == nullptr) return;
+	std::array<float, 6> e;
+	bool known = false;
+	{
+		std::lock_guard lock(_preview_mutex);
+		auto it = _preview_extents.find({obj, state});
+		if (it != _preview_extents.end()) {
+			e = it->second;
+			known = true;
+		}
+	}
+	if (!known) {
 		const uint64_t parts = obj->PartsOf(state);
 		e = {std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
 		for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
@@ -2411,22 +2592,95 @@ const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int 
 			}
 		}
 		if (!(e[0] <= e[1])) e = {shape->x0, shape->x1, shape->y0, shape->y1, shape->z0, shape->z1};
+		std::lock_guard lock(_preview_mutex);
+		_preview_extents[{obj, state}] = e;
 	}
 	const float diagonal = std::hypot(e[1] - e[0], e[3] - e[2]);
-	if (diagonal <= 0.0f) return nullptr;
+	if (diagonal <= 0.0f) return;
 	constexpr ZoomLevel zoom = ZoomLevel::In4x;
 	const float pxm = PXM_16X / (1 << to_underlying(zoom));
-	/* In steps of a thousandth, as the pictures are kept (ObjectPicture()). */
-	const float scale = std::max(0.001f, std::round(side * 0.94f / (diagonal * pxm) * 1000.0f) / 1000.0f);
-	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, azimuth, azimuth, false, state);
-	if (pic == nullptr) return nullptr;
-	/* Its middle as RasterObject() places a point: turned by the angle (in whole degrees, as the picture), seen from above. */
-	const float a = std::round(azimuth) * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a);
+	/* The plan's diagonal fills the square, so that it fits at every angle. */
+	const float scale = std::max(0.001f, side * 0.94f / (diagonal * pxm));
+	const float az = static_cast<float>(step);
+	ObjectRaster r;
+	if (!RasterObject(*obj, scale, az, az, 1.0f, pxm, fade, r, 0, rust_time, 0, paint_colour, 1.0f, 0.0f, 0.0f, 0.0f, 0, state, 0)) return;
+	PictureOfRaster(f.picture, r);
+	/* Its middle as RasterObject() places a point: turned by the angle, seen from above. */
+	const float a = az * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a);
 	const float mx = (e[0] + e[1]) / 2 * scale, my = (e[2] + e[3]) / 2 * scale, mz = (e[4] + e[5]) / 2 * scale;
 	const float xr = mx * ca - my * sa, yr = mx * sa + my * ca;
-	cx = static_cast<int>(std::lround(xr * pxm)) - pic->left;
-	cy = static_cast<int>(std::lround((-yr * CAM_SIN - mz * CAM_COS) * pxm)) - pic->top;
-	return pic;
+	f.cx = static_cast<int>(std::lround(xr * pxm)) - f.picture.left;
+	f.cy = static_cast<int>(std::lround((-yr * CAM_SIN - mz * CAM_COS) * pxm)) - f.picture.top;
+}
+
+/** The frame of the preview of an engine at an angle (whole degrees): whether it is made; asked of the thread if not. */
+static bool AskPreviewFrame(EngineID engine, int side, float azimuth, PreviewFrameKey &key)
+{
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
+	if (obj == nullptr || side <= 0) return false;
+	const int state = StateStep(obj, engine, nullptr, EngineImageType::Purchase);
+	key = PreviewFrameKey(obj, state, side, static_cast<int>(std::lround(std::fmod(azimuth + 720.0f, 360.0f))) % 360);
+	{
+		std::lock_guard lock(_preview_mutex);
+		if (_preview_frames.contains(key)) return true;
+		/* Another engine, or the square another size: the frames of the one before go. */
+		auto other = [&key](const PreviewFrameKey &k) { return std::get<0>(k) != std::get<0>(key) || std::get<1>(k) != std::get<1>(key) || std::get<2>(k) != std::get<2>(key); };
+		if ((!_preview_frames.empty() && other(_preview_frames.begin()->first)) || (!_preview_frames_asked.empty() && other(*_preview_frames_asked.begin()))) {
+			_preview_frames.clear();
+			_preview_frames_asked.clear();
+		}
+		if (!_preview_frames_asked.insert(key).second) return false; // asked already
+	}
+	/* What the game's state gives it now (its paint faded by the date), for the thread. */
+	const float fade = FadeAmount(obj, state), rust_time = RustTime(obj, state);
+	const uint32_t paint_colour = PaletteColour(obj, state);
+	ThreeDLoadInBackground([key, fade, rust_time, paint_colour] {
+		{
+			std::lock_guard lock(_preview_mutex);
+			if (!_preview_frames_asked.contains(key)) return; // another engine chosen meanwhile
+		}
+		PreviewFrame f;
+		MakePreviewFrame(key, fade, rust_time, paint_colour, f);
+		std::lock_guard lock(_preview_mutex);
+		if (_preview_frames_asked.erase(key) == 0) return;
+		_preview_frames.emplace(key, std::move(f));
+	});
+	/* Without the thread it was made now. */
+	std::lock_guard lock(_preview_mutex);
+	return _preview_frames.contains(key);
+}
+
+/**
+ * Whether the frame of the turning preview of an engine's 3D object at an angle is made (GetThreeDVehicleObjectPreviewFit());
+ * if not, it is asked of the thread in the background: the preview asks a few ahead of its turn and turns on when the
+ * next is there.
+ * @param side the square's side, pixels
+ * @param azimuth the angle, as the likeness counts it (ViewAzimuth())
+ */
+bool ThreeDVehicleObjectPreviewFitMade(EngineID engine, int side, float azimuth)
+{
+	PreviewFrameKey key;
+	return AskPreviewFrame(engine, side, azimuth, key);
+}
+
+/**
+ * The picture of an engine's 3D object for the turning preview beside the purchase window, as big as a square beside
+ * it, turning about the middle of its plan (MakePreviewFrame()); made on the thread in the background.
+ * @param side the square's side, pixels: the plan's diagonal fills it, so that it fits at every angle
+ * @param azimuth the angle, as the likeness counts it (ViewAzimuth())
+ * @param[out] cx,cy where the middle of its plan, half its height up, is on the picture, pixels from its top left
+ * @return the picture; nullptr for an engine without an object, or while it is being made
+ */
+const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy)
+{
+	PreviewFrameKey key;
+	if (!AskPreviewFrame(engine, side, azimuth, key)) return nullptr;
+	std::lock_guard lock(_preview_mutex);
+	auto it = _preview_frames.find(key);
+	if (it == _preview_frames.end() || it->second.picture.width <= 0) return nullptr;
+	cx = it->second.cx;
+	cy = it->second.cy;
+	return &it->second.picture;
 }
 
 /** The huts whose fireworks this drawing of the turned view puts on (QueueThreeDFireworks()). */

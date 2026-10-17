@@ -69,6 +69,11 @@ static constexpr float PREVIEW_DEG_PER_S = 30.0f;
  * where you have not got that angle"). */
 static constexpr int PREVIEW_HOLD_MS = 1500;
 static constexpr float PREVIEW_TURN_DEG_PER_S = 60.0f;
+/** A vehicle drawn from its 3D object turns this many degrees a frame (the player, 17. 10.: "the turning is too jerky,
+ * leave out every third frame, it will turn faster": 4.5 for 3), each frame made in the background beforehand. */
+static constexpr float PREVIEW_OBJECT_STEP = 4.5f;
+/** And this many frames ahead of the one shown are asked of the thread. */
+static constexpr int PREVIEW_OBJECT_AHEAD = 6;
 /** The gap between the window and its preview, pixels. */
 static constexpr int PREVIEW_GAP = 40; // the player: the things turning almost touched the purchase window
 /** A preview whose frame is wider or taller than this is drawn at the next coarser zoom (the player: a long wagon at 2x, not 4x). */
@@ -88,6 +93,7 @@ struct ThreeDPreview {
 	Rect frame{};               ///< the rectangle the pictures fit in, about the axis
 	ZoomLevel zoom = ZoomLevel::Normal; ///< the zoom the pictures are drawn at
 	EngineID frame_engine = EngineID::Invalid(); ///< the engine the frame is for
+	bool object_frame_made = false; ///< a vehicle drawn from its 3D object: the frame of its angle is made (drawn)
 };
 
 static std::vector<ThreeDPreview> _previews;
@@ -105,7 +111,11 @@ static void DirtyPreview(ThreeDPreview &p)
 	AddDirtyBlock(p.drawn.left, p.drawn.top, p.drawn.right, p.drawn.bottom);
 }
 
-/** Draw a picture with its alpha onto the screen, through the clipping of the window being drawn. */
+/**
+ * Draw a picture with its alpha onto the screen, through the clipping of the window being drawn. Its pixels are no
+ * more of the palette's animation: the water of the map under it was drawn over it again as the palette went round
+ * (the player, 17. 10.: "the water on the ground is shown over the car of the preview").
+ */
 static void BlitPicture(const ThreeDModelPicture &pic, int px, int py)
 {
 	const DrawPixelInfo *dpi = _cur_dpi;
@@ -118,13 +128,17 @@ static void BlitPicture(const ThreeDModelPicture &pic, int px, int py)
 		for (int x = x0; x < x1; x++, dst++) {
 			Colour sc(src[x - px]);
 			if (sc.a == 0) continue;
+			uint32_t out;
 			if (sc.a == 255) {
-				*dst = Colour(sc.r, sc.g, sc.b).data;
+				out = Colour(sc.r, sc.g, sc.b).data;
 			} else {
 				Colour d(*dst);
 				uint al = sc.a, na = 255 - al;
-				*dst = Colour(static_cast<uint8_t>((sc.r * al + d.r * na + 127) / 255), static_cast<uint8_t>((sc.g * al + d.g * na + 127) / 255), static_cast<uint8_t>((sc.b * al + d.b * na + 127) / 255)).data;
+				out = Colour(static_cast<uint8_t>((sc.r * al + d.r * na + 127) / 255), static_cast<uint8_t>((sc.g * al + d.g * na + 127) / 255), static_cast<uint8_t>((sc.b * al + d.b * na + 127) / 255)).data;
 			}
+			/* Colour 0 of the palette is not animated: the pixel set to it, then to its own colour. */
+			if (sc.a >= 128) blitter->SetPixel(dpi->dst_ptr, x - dpi->left, y - dpi->top, PixelColour{0});
+			*dst = out;
 		}
 	}
 }
@@ -185,20 +199,27 @@ static void PreviewHeadOffsets(Direction dir, ZoomLevel zoom, int &fx, int &fy)
 	fy = static_cast<int>(std::lround((wy + wx) * ZOOM_BASE * scale));
 }
 
-/** The direction a vehicle without a likeness shows: the map view's, turned on by its own turning. */
+/**
+ * The direction a vehicle without a likeness shows: by its own turning alone. The previews have nothing of the map's
+ * view (the player, 17. 10.: "I turn the map to the left and they turn to the left; what has the preview got in common
+ * with the rest, it is only to turn there").
+ */
 static Direction PreviewDirection(const ThreeDPreview &p)
 {
 	int steps = static_cast<int>(std::lround(p.yaw / 45.0f));
-	return static_cast<Direction>((to_underlying(Direction::W) - TurnedDirectionStep() + steps) & 7);
+	return static_cast<Direction>((to_underlying(Direction::W) + steps) & 7);
 }
 
-/**
- * The angle a vehicle's likeness is drawn at: the sprite of direction d shows at
- * 90 - 45 d degrees, the map view's turn and the preview's own on top.
- */
+/** The angle a vehicle's likeness is drawn at at a turn of the preview: the sprite of direction d shows at 90 - 45 d degrees. */
+static float PreviewAzimuthAt(float yaw)
+{
+	return std::fmod(180.0f - yaw + 720.0f, 360.0f);
+}
+
+/** The angle a vehicle's likeness is drawn at: by the preview's own turning alone (PreviewDirection()). */
 static float PreviewAzimuth(const ThreeDPreview &p)
 {
-	return std::fmod(180.0f + GetViewYaw() - p.yaw + 720.0f, 360.0f);
+	return PreviewAzimuthAt(p.yaw);
 }
 
 /**
@@ -522,8 +543,8 @@ static Rect DrawIndustryPreview(ThreeDPreview &p, bool draw)
 	if (r.right <= r.left) return {};
 	if (!draw) return r;
 
-	/* The angle: the map view's, and the preview's own turn on top of it. */
-	float yaw = std::fmod(GetViewYaw() + p.yaw, 360.0f);
+	/* The angle: the preview's own turn, nothing of the map's view (PreviewDirection()). */
+	float yaw = std::fmod(p.yaw, 360.0f);
 	if (!IndustryPieces(ind, yaw, zoom, pieces, axis)) return r;
 	int ax = r.left - p.frame.left - axis.x, ay = r.top - p.frame.top - axis.y;
 	for (const IndustryPiece &pc : pieces) BlitPicture(*pc.pic, ax + pc.dx + pc.pic->left, ay + pc.dy + pc.pic->top);
@@ -544,6 +565,8 @@ static void PreviewTick()
 		if (PreviewParent(p) == nullptr || !ThreeDEnabled()) {
 			DirtyPreview(p);
 			it = _previews.erase(it);
+			/* No vehicle shown: the frames of its turn go. */
+			if (std::ranges::none_of(_previews, [](const ThreeDPreview &q) { return q.vehicle; })) ForgetThreeDVehicleObjectPreviews();
 			continue;
 		}
 		bool changed = false;
@@ -552,24 +575,40 @@ static void PreviewTick()
 			if (engine != p.engine) {
 				p.engine = engine;
 				p.frame_ok = false;
+				p.object_frame_made = false;
 				changed = true;
 			}
-			if (PreviewVehicleModel(p) != nullptr) {
+			const int side = BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && GetThreeDVehicleObject(p.engine) != nullptr ? PreviewObjectSide(p) : 0;
+			if (side > 0) {
+				/* A vehicle drawn from its 3D object (DrawVehiclePreview()): no likeness made of its sprites (it was,
+				 * a second and its eight sprites at 16x each time one was chosen, for nothing drawn). Its frames are
+				 * made in the background a few ahead; it turns on to the next when it is there, and waits for it
+				 * else -- never the game standing while one is drawn. */
+				if (changed) p.yaw = std::fmod(PREVIEW_OBJECT_STEP * std::round(p.yaw / PREVIEW_OBJECT_STEP), 360.0f);
+				bool here = false, next = false;
+				for (int k = 0; k <= PREVIEW_OBJECT_AHEAD; k++) {
+					const bool made = ThreeDVehicleObjectPreviewFitMade(p.engine, side, PreviewAzimuthAt(p.yaw + k * PREVIEW_OBJECT_STEP));
+					if (k == 0) here = made;
+					if (k == 1) next = made;
+				}
+				if (here && !p.object_frame_made) {
+					p.object_frame_made = true;
+					changed = true;
+				}
+				if (here && next) {
+					p.yaw = std::fmod(p.yaw + PREVIEW_OBJECT_STEP, 360.0f);
+					changed = true;
+				}
+			} else if (PreviewVehicleModel(p) != nullptr) {
 				/* Held in each direction of a sprite (its own picture), turned on to the next (the likeness). The
 				 * angle drawn falls as the preview turns, so the next direction is the multiple of 45 below it. */
-				/* A vehicle drawn from its 3D object has no pictures of a set to show: it turns on evenly (the player:
-				 * "the Sergej object stops at the sprites' directions too, a pause added for nothing"). */
-				const bool object = GetThreeDVehicleObject(p.engine) != nullptr;
-				if (object) p.hold = 0;
 				if (p.hold > 0) {
 					p.hold -= PREVIEW_TICK_MS;
 				} else {
 					float turn = PREVIEW_TURN_DEG_PER_S * PREVIEW_TICK_MS / 1000.0f;
 					float off = std::fmod(PreviewAzimuth(p), 45.0f);
 					float to_next = off < 0.01f ? 45.0f : off;
-					if (object) {
-						p.yaw = std::fmod(p.yaw + turn, 360.0f);
-					} else if (turn >= to_next - 0.01f) {
+					if (turn >= to_next - 0.01f) {
 						p.yaw = std::fmod(p.yaw + to_next, 360.0f);
 						p.hold = PREVIEW_HOLD_MS;
 					} else {
@@ -678,6 +717,11 @@ std::string DescribeThreeDPreviews()
 		Rect r = PreviewRect(p);
 		s += fmt::format("{}{} at {},{}..{},{} yaw {:.0f} zoom {}; ", p.vehicle ? "vehicle " : "industry ", p.vehicle ? static_cast<int32_t>(p.engine.base()) : static_cast<int32_t>(p.parent), r.left, r.top, r.right, r.bottom, p.yaw, to_underlying(p.zoom));
 		if (p.vehicle && p.engine != EngineID::Invalid()) {
+			/* (A vehicle drawn from its 3D object has no likeness: none made for it here either.) */
+			if (GetThreeDVehicleObject(p.engine) != nullptr) {
+				s += "3D object; ";
+				continue;
+			}
 			s += fmt::format("model: {}; ", DescribeThreeDVehicleModel(PreviewVehicleModel(p)));
 			/* The sprites of every direction, with their size: a set whose chain needs a vehicle gives empty ones. */
 			for (int d = 0; d < 8; d++) {

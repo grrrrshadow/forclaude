@@ -8942,6 +8942,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		if (!chosen) IConsolePrint(CC_ERROR, "test3d: no engine with '{}' in its name, or no purchase window", wanted);
 		ThreeDPreviewsTick();
+	} else if (what == "dokresli") {
+		/* The rig: wait for the thread in the background to make all it was asked (the pictures of the purchase list,
+		 * the frames of the preview), at most a minute; the next frames draw them. */
+		const auto start = std::chrono::steady_clock::now();
+		while (ThreeDPicturesWaiting() > 0 && std::chrono::steady_clock::now() - start < std::chrono::seconds(60)) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		IConsolePrint(CC_DEFAULT, "test3d: dokresleno za {} ms, ve fronte {}", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), ThreeDPicturesWaiting());
 	} else if (what == "nahledy") {
 		ThreeDPreviewsTick();
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());

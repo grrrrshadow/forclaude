@@ -1405,6 +1405,18 @@ bool GetThreeDObjectSpriteBounds(SpriteID sprite, Rect &bounds)
 }
 
 /**
+ * Have a sprite of a vehicle drawn from its 3D object for the windows made in the background before it is drawn
+ * (ThreeDVehicleObjectSpriteStandIn()); nothing for the other sprites, or one made already.
+ */
+void PrepareThreeDObjectSprite(SpriteID sprite)
+{
+	if (sprite >= _spritecache.size()) return;
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->object_sprite == 0 || sc->ptr != nullptr) return;
+	ThreeDVehicleObjectSpriteStandIn(sc->object_sprite);
+}
+
+/**
  * Make a sprite the picture of a vehicle drawn from its 3D object (three_d_vehicle_object.h): no file, made when
  * it is read (MakeThreeDVehicleObjectSprite()), and made again when the cache has let it go.
  * @param sprite the sprite to make (AllocateDerivedSpriteID())
@@ -1834,6 +1846,12 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 
 		/* Load the sprite, if it is not loaded, yet */
 		if (sc->ptr == nullptr) {
+			/* A vehicle's 3D object for the windows not made yet: made in the background, drawn as nothing till then
+			 * and not kept so (three_d_vehicle_object.cpp). */
+			if (sc->object_sprite != 0) {
+				const SpriteID stand_in = ThreeDVehicleObjectSpriteStandIn(sc->object_sprite);
+				if (stand_in != 0) return GetRawSprite(stand_in, type, allocator, encoder);
+			}
 			UniquePtrSpriteAllocator cache_allocator;
 			if (sc->type == SpriteType::Recolour) {
 				ReadRecolourSprite(*sc->file, sc->file_pos, sc->length, cache_allocator);

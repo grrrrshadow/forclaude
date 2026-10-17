@@ -35,6 +35,7 @@
 #include "dropdown_type.h"
 #include "dropdown_func.h"
 #include "engine_gui.h"
+#include "spritecache.h"
 #include "three_d.h"
 #include "cargotype.h"
 #include "core/geometry_func.hpp"
@@ -1011,6 +1012,31 @@ static void DrawEngineBadgeColumn(const Rect &r, int column_group, const GUIBadg
  * @param badge_classes The badges associated with the drawn engine.
  * @param sort_criteria The sort criteria to use for the engines.
  */
+/**
+ * Ask for the pictures of the engines of a list a page above and below those shown: those of a vehicle drawn from its
+ * 3D object are made in the background (ThreeDVehicleObjectSpriteStandIn()), and are there as the list scrolls (the
+ * player, 17. 10.: "how come such trifles are not prepared").
+ */
+static void PrepareEngineListPictures(VehicleType type, const GUIEngineList &eng_list, const Scrollbar &sb)
+{
+	const size_t page = sb.GetCapacity();
+	const size_t pos = sb.GetPosition();
+	const size_t to = std::min(eng_list.size(), pos + 2 * page);
+	for (size_t i = pos >= page ? pos - page : 0; i < to; i++) {
+		VehicleSpriteSeq seq;
+		int y = 0;
+		const EngineID engine = eng_list[i].engine_id;
+		switch (type) {
+			case VehicleType::Train: GetTrainIcon(engine, false, Direction::W, y, EngineImageType::Purchase, &seq); break;
+			case VehicleType::Road: GetRoadVehIcon(engine, Direction::W, EngineImageType::Purchase, &seq); break;
+			case VehicleType::Ship: GetShipIcon(engine, Direction::W, EngineImageType::Purchase, &seq); break;
+			case VehicleType::Aircraft: GetAircraftIcon(engine, Direction::W, EngineImageType::Purchase, &seq); break;
+			default: return;
+		}
+		for (uint k = 0; k < seq.count; k++) PrepareThreeDObjectSprite(seq.seq[k].sprite);
+	}
+}
+
 void DrawEngineList(VehicleType type, const Rect &r, const GUIEngineList &eng_list, const Scrollbar &sb, EngineID selected_id, bool show_count, GroupID selected_group, const GUIBadgeClasses &badge_classes, uint8_t sort_criteria)
 {
 	static const VehicleTypeIndexArray<int8_t> sprite_y_offsets = { 0, 0, -1, -1 };
@@ -1238,6 +1264,8 @@ void DrawEngineList(VehicleType type, const Rect &r, const GUIEngineList &eng_li
 
 		ir = ir.Translate(0, step_size);
 	}
+
+	PrepareEngineListPictures(type, eng_list, sb);
 }
 
 /**

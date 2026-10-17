@@ -23,6 +23,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 17. 10. – kostičky v pohledu z očí, nákupní menu připravené
+
+- **Auta z kostiček, divně natočená** (hráč v #283): v pohledu z očí se textura, kterou stav nijak nemaluje (kola,
+  sklo, doplněk bez barvy), nikdy nezapsala – úloha na pozadí ji našla „holou“ a skončila, další snímek se ptal znovu.
+  Model nikdy nebyl hotový, kreslil se plakát (obrázek po 5°). V rigu to nebylo vidět, protože rig načítá hned. Teď
+  si hra holé textury pamatuje: 355 úloh místo 1880 za 1500 snímků, medián snímku 2,1 ms místo 5,0. Rig: `casy`
+  ukazuje „úloh zadáno“.
+- **Ikonka v seznamu nákupu** (hráč: „to je malinký obrys auta, co tam fotíš“): dělala se v zoomu 16x (456×179 px)
+  z celého modelu a pak se zmenšila na 25×13 px; první Tatra 138 (692 tisíc trojúhelníků, 136 textur) 8,4 s, každá
+  další 200–270 ms, jeden snímek okna 10,7 s. Teď se dělá rovnou v zoomu rozhraní, na vlákně na pozadí; do té doby
+  prázdné místo, okno se překreslí, až přijde. Ikonky stránku nad a pod viditelnými se zadají dopředu.
+- **Výběr vozidla cukal**: i pro vozidla z 3D objektu se při každém výběru stavěla stará „podoba“ z 8 spritů
+  (8 spritů v 16x + model 1,3 s) a vůbec se nekreslila. Pryč.
+- **Náhled se točí ze snímků z vlákna**: dřív se každý úhel kreslil na hlavním vlákně (22–45 ms). Teď vlákno dělá
+  6 úhlů dopředu, náhled se pootočí, až je další hotový (nikdy nečeká hra). Krok 4,5° místo 3° (hráč: „vynech každý
+  třetí snímek, bude se točit rychleji“). Snímek okna s náhledem 3–5 ms; Tatra 148 jeden úhel na vlákně ~57 ms.
+- **Náhled nemá nic společného s mapou**: netočí se s pohledem mapy (dřív točení mapou doleva = náhled doleva).
+  Průmysl taky. Rozměr náhledu se počítá z dílů stavu nákupu (po „tvarech po dílech“ by se jinak točil mimo střed).
+- **Voda přes auto náhledu**: pixely náhledu zůstávaly v animaci palety, takže je voda mapy pod nimi při každém kroku
+  animace překreslila. Teď je náhled z animace vyjmutý.
+- Hráč dál: glb domů číst až při prvním kreslení (start čte 170 souborů, 178 MB), pokrytí atlasu (50–80 ms na atlas),
+  obrázky aut při 0° na vlákně (první auto typu 2–3,5 s na hlavním vlákně).
+- Nejasné: „vez navěsu bez tahaču“ – zeptat se.
+
 ## 17. 10. – zpracování 3D objektů zrychlené (hráč: „až potom, co optimalizuješ celý ten proces“)
 
 - Hráč k hranicím: **„nemůžeš vzít čísla, co má nejvíc, a tam ubrat… musí vycházet z technických možností hry… až
