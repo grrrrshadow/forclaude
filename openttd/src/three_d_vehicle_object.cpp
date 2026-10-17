@@ -31,6 +31,7 @@
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_tick.h"
 #include "timer/timer.h"
+#include "timer/timer_window.h"
 #include "cab_view.h"
 
 #include <array>
@@ -1359,6 +1360,35 @@ void PinThreeDPictures(bool pin)
 	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
 }
 
+/*
+ * The pictures of the vehicles on the map made a few at a time (the player, 17. 10.: "it bites as the trailer bends in a
+ * curve"): each a few or tens of milliseconds, the first of an object seconds (its textures read), all made the moment
+ * they were asked for -- a lorry with its trailer through a curve asked for a dozen at once. In every frame (a window of
+ * PICTURES_WINDOW) only PICTURES_BUDGET of them are made for those that may wait; the others are drawn as the nearest
+ * one made, and their vehicles drawn again a moment later (_vehicles_owed_pictures).
+ */
+static constexpr auto PICTURES_WINDOW = std::chrono::milliseconds(40);
+static constexpr double PICTURES_BUDGET_MS = 12.0;
+static std::chrono::steady_clock::time_point _pictures_window_start{};
+static double _pictures_window_ms = 0;
+/** Whether the picture asked for now may wait (a vehicle on the map), and whether it waited: the nearest made was given. */
+static bool _object_picture_may_wait = false;
+static bool _object_picture_waited = false;
+/** The vehicles drawn with a picture that waited: drawn again in a moment. */
+static std::vector<VehicleID> _vehicles_owed_pictures;
+
+static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::milliseconds(30), [](auto) {
+	if (_vehicles_owed_pictures.empty()) return;
+	std::vector<VehicleID> owed;
+	owed.swap(_vehicles_owed_pictures);
+	std::sort(owed.begin(), owed.end());
+	owed.erase(std::unique(owed.begin(), owed.end()), owed.end());
+	for (VehicleID id : owed) {
+		const Vehicle *v = Vehicle::GetIfValid(id);
+		if (v != nullptr) v->MarkAllViewportsDirty();
+	}
+});
+
 static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0, float along_given = 0.0f, uint64_t walk = 0)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
@@ -1371,6 +1401,28 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	if (it != _object_pictures.end()) {
 		it->second.used = ++_object_pictures_clock;
 		return it->second.picture.width > 0 ? &it->second.picture : nullptr;
+	}
+	/* Out of the frame's time: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
+	const auto now = std::chrono::steady_clock::now();
+	if (now - _pictures_window_start > PICTURES_WINDOW) {
+		_pictures_window_start = now;
+		_pictures_window_ms = 0;
+	}
+	if (_object_picture_may_wait && _pictures_window_ms >= PICTURES_BUDGET_MS) {
+		const ThreeDModelPicture *nearest = nullptr;
+		int best = INT_MAX;
+		for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, to_underlying(zoom), INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
+				n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == to_underlying(zoom); ++n) {
+			if (std::get<4>(n->first) != std::get<4>(key) || (std::get<5>(n->first) & 0xFFFF) != (std::get<5>(key) & 0xFFFF) || n->second.picture.width <= 0) continue;
+			auto apart = [](int a, int b) { const int d = std::abs(a - b) % 360; return std::min(d, 360 - d); };
+			const int off = apart(std::get<2>(n->first), cam_step) * 4 + apart(std::get<3>(n->first), world_step);
+			if (off < best) {
+				best = off;
+				nearest = &n->second.picture;
+			}
+		}
+		_object_picture_waited = true;
+		return nearest;
 	}
 	if (_object_pictures.size() >= PICTURES_KEPT) {
 		/* The older half goes. */
@@ -1412,6 +1464,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 		e.picture.lights = std::move(r.lights);
 	}
 	timed();
+	_pictures_window_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 	return e.picture.width > 0 ? &e.picture : nullptr;
 }
 
@@ -1460,6 +1513,8 @@ struct VehicleObjectPlace {
  * @param[out] place where, filled for the anchor piece only
  * @return the object, nullptr for a vehicle not drawn as one; for a piece drawn with its anchor piece, the object with no picture
  */
+static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, double &x, double &y, double &facing, double &rolled, double &curvature, int depth = 0);
+
 static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place)
 {
 	int piece = 0;
@@ -1489,13 +1544,28 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	const int lights = VehicleObjectLightsOn(obj, front, last, reversed, zoom);
 
 	float scale = ObjectScale(obj);
-	float world_az = pose != nullptr ? pose->azimuth + (reversed ? 180.0f : 0.0f) : ViewAzimuth(d);
 	const int state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
-	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, SqueezedType(obj->type), state, 0, -1, 1.0f, 0, 0, 0, lights, 0.0f, WalkCode(obj, state, WalkedOf(v, obj), scale));
-
-	/* Hung from the middle of its pieces (or where its coupling puts it, ObjectOriginOnMap()). */
+	/* Hung from the middle of its pieces (or where its coupling puts it), facing the way it goes: on a round curve as
+	 * the curve has it; else smoothly as its way turns, as the view from the eyes has it (EyeOrigin(); the player,
+	 * 17. 10.: "why do we turn in 45 degrees as the sprites, they can turn smoothly"), in steps of 5 degrees, its trailer
+	 * bending on its coupling. */
 	double ox, oy;
-	ObjectOriginOnMap(obj, v, d, ox, oy);
+	float world_az;
+	float along = 0.0f;
+	if (pose != nullptr) {
+		world_az = pose->azimuth + (reversed ? 180.0f : 0.0f);
+		ObjectOriginOnMap(obj, v, d, ox, oy);
+	} else {
+		double facing, rolled, curvature;
+		EyeOrigin(obj, v, ox, oy, facing, rolled, curvature);
+		world_az = std::round((static_cast<float>(facing * 180.0 / M_PI) - 135.0f) / 5.0f) * 5.0f;
+		if (SqueezedType(obj->type)) along = std::round(SqueezeAt(facing) * 20.0f) / 20.0f;
+	}
+	_object_picture_may_wait = true;
+	_object_picture_waited = false;
+	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, 0, 0, lights, along, WalkCode(obj, state, WalkedOf(v, obj), scale));
+	_object_picture_may_wait = false;
+	if (_object_picture_waited) _vehicles_owed_pictures.push_back(v->index);
 	place.ax = static_cast<int>(std::lround(ox));
 	place.ay = static_cast<int>(std::lround(oy));
 	place.az = v->z_pos;
@@ -1657,7 +1727,7 @@ static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *l
  * @param[out] facing its heading, radians
  * @param depth how many articles before it are placed so (a few at most)
  */
-static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, double &x, double &y, double &facing, double &rolled, double &curvature, int depth = 0)
+static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, double &x, double &y, double &facing, double &rolled, double &curvature, int depth)
 {
 	const bool reversed = PieceReversed(anchor);
 	const Vehicle *front, *last;
@@ -1883,6 +1953,60 @@ const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, 
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
 	if (obj == nullptr) return nullptr;
 	return ObjectPicture(obj, ObjectScale(obj), zoom, azimuth, azimuth, SqueezedType(obj->type), StateStep(obj, engine, nullptr, EngineImageType::Purchase));
+}
+
+/**
+ * The picture of an engine's 3D object for the turning preview beside the purchase window, as big as a square beside
+ * it (the player, 17. 10.: "imagine the window is there, the model as big as from one edge of that window to the
+ * other"), turning about the middle of its plan, not its origin (a semi-trailer's is its kingpin at the front: it
+ * turned about its front). Drawn as it is, not foreshortened as the map spaces its vehicles.
+ * @param side the square's side, pixels: the plan's diagonal fills it, so that it fits at every angle
+ * @param azimuth the angle, as the likeness counts it (ViewAzimuth())
+ * @param[out] cx,cy where the middle of its plan, half its height up, is on the picture, pixels from its top left
+ * @return the picture, nullptr for an engine without an object
+ */
+const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy)
+{
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
+	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
+	if (shape == nullptr || side <= 0) return nullptr;
+	const int state = StateStep(obj, engine, nullptr, EngineImageType::Purchase);
+	/* Its extent as its state shows it, the parts shown (the colleague's lorries: the main file only their length, the
+	 * cab, the body and the trailer add-ons), once for the object and the state. */
+	static std::map<std::pair<const ThreeDVehicleObject *, int>, std::array<float, 6>> extents;
+	auto [known, added] = extents.try_emplace({obj, state});
+	std::array<float, 6> &e = known->second;
+	if (added) {
+		const uint64_t parts = obj->PartsOf(state);
+		e = {std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
+		for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+			const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
+			if (part != 0 && part < ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
+			for (int k = 0; k < 3; k++) {
+				const float *v = &shape->pos[static_cast<size_t>(shape->tri[t + k]) * 3];
+				for (int a = 0; a < 3; a++) {
+					e[a * 2] = std::min(e[a * 2], v[a]);
+					e[a * 2 + 1] = std::max(e[a * 2 + 1], v[a]);
+				}
+			}
+		}
+		if (!(e[0] <= e[1])) e = {shape->x0, shape->x1, shape->y0, shape->y1, shape->z0, shape->z1};
+	}
+	const float diagonal = std::hypot(e[1] - e[0], e[3] - e[2]);
+	if (diagonal <= 0.0f) return nullptr;
+	constexpr ZoomLevel zoom = ZoomLevel::In4x;
+	const float pxm = PXM_16X / (1 << to_underlying(zoom));
+	/* In steps of a thousandth, as the pictures are kept (ObjectPicture()). */
+	const float scale = std::max(0.001f, std::round(side * 0.94f / (diagonal * pxm) * 1000.0f) / 1000.0f);
+	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, azimuth, azimuth, false, state);
+	if (pic == nullptr) return nullptr;
+	/* Its middle as RasterObject() places a point: turned by the angle (in whole degrees, as the picture), seen from above. */
+	const float a = std::round(azimuth) * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a);
+	const float mx = (e[0] + e[1]) / 2 * scale, my = (e[2] + e[3]) / 2 * scale, mz = (e[4] + e[5]) / 2 * scale;
+	const float xr = mx * ca - my * sa, yr = mx * sa + my * ca;
+	cx = static_cast<int>(std::lround(xr * pxm)) - pic->left;
+	cy = static_cast<int>(std::lround((-yr * CAM_SIN - mz * CAM_COS) * pxm)) - pic->top;
+	return pic;
 }
 
 /** The huts whose fireworks this drawing of the turned view puts on (QueueThreeDFireworks()). */

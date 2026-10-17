@@ -8029,7 +8029,8 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 		double sc, ss, tc, ts; // its turn about its axle (y) and its steer about z
 	};
 	std::vector<WheelTurn> wheel_turn;
-	if (!shape->corner_wheel.empty() && !fig->model_wheels.empty()) {
+	/* Only as the player has them turning (gui.three_d_wheels, off by default): else they stand in the model. */
+	if (_settings_client.gui.three_d_wheels && !shape->corner_wheel.empty() && !fig->model_wheels.empty()) {
 		double front = -1e9, back_sum = 0;
 		int backs = 0;
 		for (const ThreeDModelWheel &w : fig->model_wheels) {

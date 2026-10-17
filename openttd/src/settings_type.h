@@ -255,6 +255,7 @@ struct GUISettings {
 	bool sprite_mitchell; ///< The 8x and the 4x a 32bpp set has not got made straight from its finest level with Mitchell's filter (DownscaleMitchell()), not by halves with a 2x2 mean: sharper, and about twice the time to load a sprite.
 	bool three_d; ///< The 3D of this game (three_d.h): the previews that turn and the map view turned to any angle. Off, nothing of it is there.
 	uint8_t three_d_north_houses; ///< The houses that are 3D objects facing north (angle 0): 0 drawn as the objects, the same as in the turned view; 1 the original pictures.
+	bool three_d_wheels;          ///< The wheels of the 3D vehicles turn as they go and the front ones steer; off, they stand still in the model.
 	bool night;                   ///< The night (the player's dark mode, in the help menu by the console): the map darkened, the vehicles' lights on.
 	uint8_t night_light;          ///< How light the night is: 0 a dark night, then the moon, the full moon, a bright full moon, 4 nearly the dawn.
 	bool round_track_curves; ///< In the turned view a curve of rails drawn as a round arc, the trains on it turned along it (round_track.h). Off, the curves are as they always were.

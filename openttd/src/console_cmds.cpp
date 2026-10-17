@@ -8988,6 +8988,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const bool away = argv.size() > 3 && argv[3] == "pryc";
 			auto swing = argv.size() > 3 && !away ? number(3) : std::optional<int>(0);
 			IConsolePrint(CC_DEFAULT, "test3d: kladivo {}", RigFirstPersonHold(!away, static_cast<float>(swing.value_or(0))) ? "v ruce" : "schovane");
+		} else if (argv.size() > 5 && argv[2] == "na") {
+			/* 'chodec na <n> <metres> <degrees>': the walker so far from the n-th visible vehicle, at the angle from its
+			 * front (0 before it, 90 on its left, 180 behind it), looking at it. */
+			extern void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg);
+			int want = number(3).value_or(0), seen = 0;
+			const Vehicle *at = nullptr;
+			for (const Vehicle *u : Vehicle::Iterate()) {
+				if (!u->IsPrimaryVehicle() || u->vehstatus.Test(VehState::Hidden)) continue;
+				if (seen++ == want) {
+					at = u;
+					break;
+				}
+			}
+			RigFirstPersonLookAt(at, number(4).value_or(5), number(5).value_or(0));
 		} else if (argv.size() > 3 && argv[2] == "zbran") {
 			/* 'chodec zbran <1-5> [draw ms] [steps|drzet]': a weapon in the hand (the hammer, the bow, the crossbow, the
 			 * sword, the two-handed sword); with draw ms a shot (the bow drawn so long, or held drawn) and its arrow let fly

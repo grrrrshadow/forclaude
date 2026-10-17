@@ -70,6 +70,7 @@ struct ThreeDObjectTexture;
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
+const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy);
 const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev, ZoomLevel zoom, float yaw);
 std::string DescribeThreeDVehicleObjectSprites();
 void QueueThreeDFireworks(TileIndex hut_front);

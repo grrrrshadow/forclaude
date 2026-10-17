@@ -1155,6 +1155,24 @@ VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e)
 	return w->riding;
 }
 
+/**
+ * The rig: the walker so many metres from a vehicle, at an angle from its front (0 before it, 90 on its left, 180
+ * behind it), looking at it.
+ */
+void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || v == nullptr) return;
+	const int yaw = v->cab_free ? v->cab_yaw : DirectionToCabYaw(v->direction);
+	const double a = yaw * 2 * M_PI / CAB_YAW_TURN + angle_deg * M_PI / 180.0, d = metres * OBJECT_UNITS_PER_METRE;
+	w->walker.x = v->x_pos + std::cos(a) * d;
+	w->walker.y = v->y_pos + std::sin(a) * d;
+	w->walker.heading = std::atan2(v->y_pos - w->walker.y, v->x_pos - w->walker.x);
+	w->walker.pitch = 0;
+	w->MakePicture();
+	w->SetDirty();
+}
+
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 {

@@ -2337,6 +2337,8 @@ STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Domy a průmysl
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :Jak vypadají domy a průmysl hry (gymnázium, socha, plantáž, bramborové pole, lihovar, hospoda…), které mají 3D objekt, když je herní plocha natočená na sever (úhel 0, jako při stavění): jako 3D objekty, stejně jako při otáčení; nebo jejich obrázky (sprity), jak je hra kreslila dřív. Ty bez 3D objektu mají svoje obrázky vždycky. Potřebuje zapnuté 3D a 32bpp blitter
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, stejně jako při otáčení
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :původní obrázky
+STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :Kola vozidel kreslených z 3D objektů se za jízdy točí a přední v zatáčkách zatáčí (vidět zblízka, z kabiny a z první osoby). Vypnuto: kola stojí
 STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
 STR_CONFIG_SETTING_NIGHT_LIGHT                                  :Světlo v noci: {STRING}

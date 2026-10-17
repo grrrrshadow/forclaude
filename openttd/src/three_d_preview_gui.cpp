@@ -307,9 +307,34 @@ static Rect DrawVehicleSprites(const ThreeDPreview &p, bool draw)
 	return r;
 }
 
+/**
+ * The side of the square beside the purchase window a vehicle of a 3D object fills (the player, 17. 10.: "imagine the
+ * window is there"): as tall as the window, as wide as there is room beside it on the screen.
+ */
+static int PreviewObjectSide(const ThreeDPreview &p)
+{
+	const Window *w = PreviewParent(p);
+	if (w == nullptr) return 0;
+	const int room = std::max(_screen.width - (w->left + w->width) - PREVIEW_GAP, w->left - PREVIEW_GAP);
+	return std::min({std::max(w->height, 160), room, _screen.height});
+}
+
 /** Draw a vehicle preview: its likeness at the angle, turning about its middle; returns where it was drawn. */
 static Rect DrawVehiclePreview(ThreeDPreview &p, bool draw)
 {
+	/* A vehicle of a 3D object: the object itself, filling the square beside the window, turning about its middle. */
+	if (GetThreeDVehicleObject(p.engine) != nullptr && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32) {
+		const int side = PreviewObjectSide(p);
+		if (side > 0) {
+			Rect r = PreviewPlace(p, side, side);
+			if (r.right <= r.left || !draw) return r;
+			int cx, cy;
+			if (const ThreeDModelPicture *op = GetThreeDVehicleObjectPreviewFit(p.engine, side, PreviewAzimuth(p), cx, cy); op != nullptr) {
+				BlitPicture(*op, r.left + side / 2 - cx, r.top + side / 2 - cy);
+			}
+			return r;
+		}
+	}
 	const ThreeDVehicleModel *model = PreviewVehicleModel(p);
 	if (model == nullptr) return DrawVehicleSprites(p, draw);
 

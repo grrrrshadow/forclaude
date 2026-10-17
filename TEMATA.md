@@ -19,6 +19,36 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – tmavá auta v dálce, plynulé zatáčení na mapě, škubání, kolečka, náhled v nákupu
+
+- Hráč: **auta moc tmavá, 2 m od auta ještě modrá, dál černá (Tatra 603, 613); Tatry nad 4 m černé linky na předku;
+  Liaz bez návěsu úplně špatně** (Liaz jedoucí proti mně na 5, 8, 14 m). Dvě chyby v kódu:
+  - Zjednodušování modelu podle vzdálenosti (`Simpler()`) slučovalo rohy jen podle místa v prostoru: rohy jednoho
+    místa modelu ze dvou kousků atlasu dostaly souřadnice textury jednoho z nich a trojúhelníky mezi nimi kreslily
+    z čehokoli mezi kousky – černé a tečkované. Teď rohy z jiného místa textury (po 1/128) sloučené nejsou.
+  - Kolegovy atlasy mají každý trojúhelník na vlastním kousku na černém pozadí (u 603 81 % textury). Hra si teď
+    z celého souboru modelu spočítá, které texely trojúhelníky kreslí (`TextureCover()`), ostatní vyplní barvou
+    nejbližšího kousku (i masky laku a podrobností) a zmenšené textury pro dálku průměruje jen z kreslených texelů.
+    Pryč jsou černé čáry na hranách i zčernání v dálce.
+- Hráč: **škube to, když se přívěs nebo návěs v zatáčce láme; proč zatáčíme po 45° jako sprity**. Na mapě se vozidla
+  kreslila obrázky z modelu v 8 směrech a každý nový obrázek se kreslil hned (prvních 36 obrázků 2,6 s – načítání
+  textur, další 15–60 ms za kus). Teď vozidla na mapě mají plynulé natočení ze stopy jízdy jako pohled z očí
+  (`EyeOrigin()`), po 5°, návěs se láme na točnici postupně. Nových obrázků se za snímek (40 ms) kreslí nejvýš 12 ms;
+  ostatní se do té doby kreslí nejbližším hotovým úhlem a vozidlo se překreslí o chvíli později. První objevení
+  nového vozidla (načtení jeho textur) dál stojí asi půl vteřiny.
+- Hráč: **točení koleček do nastavení, výchozí vypnuto** – Nastavení › Grafika › „Kola 3D vozidel se točí“
+  (`gui.three_d_wheels`), vypnuto: kola v modelu stojí (pohled z očí a z kabiny).
+- Hráč: **3D částice efektů nejsou možné** – úkol zrušen.
+- Hráč: **náhled v nákupu přes celé pomyslné okénko** – vozidlo z 3D objektu vyplní čtverec vedle okna nákupu (strana
+  jako výška okna, kolik je místa), úhlopříčka půdorysu dílů, které stav nákupu ukazuje, přes celou šířku.
+- Hráč: **střed otáčení uprostřed objektu, ne přední nárazník (návěs Tatry)** – náhled se točí kolem středu půdorysu
+  (návěs měl počátek v čepu vpředu).
+- Hráč: **proč nemám vodu, mám mít všechny průmysly všech klimat** – průmysly jiných klimat jsou nastavení nové hry
+  (Prostředí › Průmysl › Průmysl mírného / arktického / pouštního klimatu / toylandu), výchozí vypnutá; voda je
+  pouštní (vodárna a vodojem). Se zapnutým pouštním průmyslem je WATR a Tatra na vodu má cisternu (ověřeno v rigu).
+  Do rozehrané hry se přidat nedají.
+- Rig: `test3d chodec na <n> <m> <stupně>` (chodec u vozidla, čelem k němu).
+
 ## 17. 10. – luk, kuše a meče (kolegovy `LUK-SIP-PRO-HRU.md`)
 
 - Hráč: **„je tam luk a kuše“**. Kolega poslal vlastní luk a šíp (ve stylu Example Suite, GPL-2.0), kuši z Example

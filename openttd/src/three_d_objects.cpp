@@ -81,7 +81,7 @@ static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house
 static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objects;
 static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true);
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr);
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
 static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
 
@@ -210,7 +210,27 @@ static std::map<std::pair<const std::vector<uint8_t> *, uint32_t>, TextureLevels
 static std::map<std::pair<std::string, uint32_t>, std::weak_ptr<const std::vector<ThreeDObjectTexture>>> _file_texture_levels;
 /** The masks of details made (DetailMaskOfFile()), by their file. */
 static std::map<std::string, std::weak_ptr<const ThreeDDetailMask>, std::less<>> _detail_masks_made;
+/**
+ * Where the triangles of the files draw from each picture (TextureCover()): u and v of the three corners of each
+ * triangle of a material of the picture, all of the file's meshes, by the picture.
+ */
+using TextureCoverTriangles = std::shared_ptr<const std::vector<float>>;
+struct TextureCoverMade {
+	std::weak_ptr<const std::vector<uint8_t>> bytes; ///< its picture, while anything has it
+	TextureCoverTriangles cover;
+};
+static std::map<const std::vector<uint8_t> *, TextureCoverMade> _texture_covers;
 static std::mutex _texture_bytes_mutex;
+
+/** Where the triangles draw from a picture (the cover of its bytes as the files using it were read), nullptr not known. */
+static TextureCoverTriangles TextureCover(const ThreeDTextureBytes &png)
+{
+	if (png == nullptr) return nullptr;
+	std::lock_guard lock(_texture_bytes_mutex);
+	auto it = _texture_covers.find(png.get());
+	if (it == _texture_covers.end() || it->second.bytes.lock() != png) return nullptr;
+	return it->second.cover;
+}
 
 /**
  * A texture's picture as one copy for all that have the same: the materials of an add-on of the colleague's lorries are
@@ -242,6 +262,7 @@ ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes)
  */
 static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat)
 {
+	const TextureCoverTriangles cover = TextureCover(png);
 	const auto key = std::make_pair(png.get(), flat);
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
@@ -253,7 +274,7 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 	}
 	static const std::vector<uint8_t> none;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
-	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat);
+	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get());
 	std::lock_guard lock(_texture_bytes_mutex);
 	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
 	_texture_levels[key] = TextureLevelsMade{png, made};
@@ -261,11 +282,12 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 }
 
 /**
- * A texture of a file of its own (a paint, "textura"), one for all the objects that have the file.
+ * A texture of a file of its own (a paint, "textura"; a mask), one for all the objects that have the file.
  * @param flat the colour of the pixels the picture has not
+ * @param of the picture of the model whose layout it has (the body's, an add-on's): where its triangles draw from (TextureCover())
  * @return nullptr when it cannot be read
  */
-static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat)
+static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat, const ThreeDTextureBytes &of = nullptr)
 {
 	const auto key = std::make_pair(file, flat);
 	{
@@ -278,20 +300,27 @@ static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t
 	std::vector<uint8_t> png = ReadWholeFile(file);
 	if (png.empty()) return nullptr;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
-	DecodeTextureLevels(png, *made, flat);
+	const TextureCoverTriangles cover = TextureCover(of);
+	DecodeTextureLevels(png, *made, flat, true, cover.get());
 	std::lock_guard lock(_texture_bytes_mutex);
 	_file_texture_levels[key] = made;
 	return made;
 }
 
-/** A mask of a file ("lak" "maska", "rez" "maska", an add-on's "barva" "maska"), its grey in the red; nullptr without it. */
-static ThreeDTextureLevels MaskLevelsOfFile(const std::string &file)
+/**
+ * A mask of a file ("lak" "maska", "rez" "maska", an add-on's "barva" "maska"), its grey in the red; nullptr without it.
+ * @param of the picture of the model it is the mask of (TextureLevelsOfFile())
+ */
+static ThreeDTextureLevels MaskLevelsOfFile(const std::string &file, const ThreeDTextureBytes &of = nullptr)
 {
-	return TextureLevelsOfFile(file, Colour(0, 0, 0).data);
+	return TextureLevelsOfFile(file, Colour(0, 0, 0).data, of);
 }
 
-/** A mask of details of a file (ThreeDDetailMask), one for all the objects that have it; nullptr when it cannot be read. */
-static std::shared_ptr<const ThreeDDetailMask> DetailMaskOfFile(const std::string &file)
+/**
+ * A mask of details of a file (ThreeDDetailMask), one for all the objects that have it; nullptr when it cannot be read.
+ * @param of the picture of the model it is the mask of (TextureLevelsOfFile())
+ */
+static std::shared_ptr<const ThreeDDetailMask> DetailMaskOfFile(const std::string &file, const ThreeDTextureBytes &of = nullptr)
 {
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
@@ -302,8 +331,9 @@ static std::shared_ptr<const ThreeDDetailMask> DetailMaskOfFile(const std::strin
 	}
 	std::vector<ThreeDObjectTexture> levels;
 	std::vector<uint8_t> png = ReadWholeFile(file);
-	/* Only as it is: a mask index is not halved. */
-	if (!png.empty()) DecodeTextureLevels(png, levels, Colour(0, 0, 0).data, false);
+	/* Only as it is: a mask index is not halved; where no triangle draws from it, the index nearest. */
+	const TextureCoverTriangles cover = TextureCover(of);
+	if (!png.empty()) DecodeTextureLevels(png, levels, Colour(0, 0, 0).data, false, cover.get());
 	if (levels.empty() || levels[0].w <= 1) return nullptr;
 	auto mask = std::make_shared<ThreeDDetailMask>();
 	mask->w = levels[0].w;
@@ -680,6 +710,44 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				}
 			}
 			add_mesh(mesh_index, m, 0);
+		}
+		/* Where in each of its pictures read now all the file's triangles draw from, whatever nodes were read: an
+		 * atlas is shared by the vehicles of a package, each showing other nodes of it (TextureCover()). */
+		auto image_of = [&](int material) {
+			if (material < 0 || !j.contains("materials") || !j.contains("textures")) return -1;
+			const auto &mat = j.at("materials").at(material);
+			if (!mat.contains("pbrMetallicRoughness") || !mat.at("pbrMetallicRoughness").contains("baseColorTexture")) return -1;
+			const int tex = mat.at("pbrMetallicRoughness").at("baseColorTexture").at("index").get<int>();
+			return j.at("textures").at(tex).value("source", -1);
+		};
+		for (const auto &[image, bytes] : image_bytes) {
+			if (bytes == nullptr || TextureCover(bytes) != nullptr || !j.contains("meshes")) continue;
+			auto cover = std::make_shared<std::vector<float>>();
+			for (const auto &me : j.at("meshes")) {
+				for (const auto &p : me.at("primitives")) {
+					if (p.value("mode", 4) != 4 || !p.at("attributes").contains("TEXCOORD_0") || image_of(p.value("material", -1)) != image) continue;
+					std::vector<double> uv, idx;
+					read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
+					const size_t corners = uv.size() / 2;
+					if (p.contains("indices")) {
+						read(p.at("indices").get<int>(), 1, idx);
+					} else {
+						for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
+					}
+					for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+						for (int k = 0; k < 3; k++) {
+							const size_t c = static_cast<size_t>(idx[i + k]);
+							if (c >= corners) break;
+							cover->push_back(static_cast<float>(uv[c * 2]));
+							cover->push_back(static_cast<float>(uv[c * 2 + 1]));
+						}
+						cover->resize(cover->size() / 6 * 6);
+					}
+				}
+			}
+			std::lock_guard lock(_texture_bytes_mutex);
+			if (_texture_covers.size() > 256) std::erase_if(_texture_covers, [](const auto &e) { return e.second.bytes.expired(); });
+			_texture_covers[bytes.get()] = TextureCoverMade{bytes, std::move(cover)};
 		}
 		if (!normals || mesh.nrm.size() != mesh.pos.size()) mesh.nrm.clear();
 		/* A building's one texture: the first material's. */
@@ -2639,9 +2707,18 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 			part[this->tri[t - 3 + k]] = p;
 		}
 	}
-	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel. */
+	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and where they
+	 * are in the texture, in steps of a 128th of it: corners of one place of the model in two places of the texture
+	 * (the islands of an atlas, a seam) joined took one's place for both, and the triangles between them drew from
+	 * anywhere between the islands -- a car black and speckled from a few metres on (the player, 17. 10.). */
 	auto apart_of = [&](size_t i) {
-		return static_cast<uint32_t>(part[i]) | (i < this->corner_wheel.size() ? this->corner_wheel[i] : 0u) << 8;
+		uint32_t uv_cell = 0;
+		if (has_uv) {
+			const uint32_t u = static_cast<uint32_t>(static_cast<int32_t>(std::floor(this->uv[i * 2] * 128.0f))) & 127;
+			const uint32_t v = static_cast<uint32_t>(static_cast<int32_t>(std::floor(this->uv[i * 2 + 1] * 128.0f))) & 127;
+			uv_cell = u | v << 7;
+		}
+		return static_cast<uint32_t>(part[i]) | (i < this->corner_wheel.size() ? this->corner_wheel[i] : 0u) << 8 | uv_cell << 16;
 	};
 	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
 	auto key_of = [&](size_t i) {
@@ -2677,11 +2754,12 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 		count[c]++;
 		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] += this->pos[i * 3 + a];
 		if (has_nrm) for (int a = 0; a < 3; a++) out->nrm[c * 3 + a] += this->nrm[i * 3 + a];
-		/* The place in the texture of its first corner: a middle of two places of a texture may be neither. */
-		if (has_uv && added) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] = this->uv[i * 2 + a];
+		/* The places in the texture of its corners, all in one small piece of it (apart_of()): their middle. */
+		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] += this->uv[i * 2 + a];
 	}
 	for (size_t c = 0; c < count.size(); c++) {
 		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] /= count[c];
+		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] /= count[c];
 		if (has_nrm) {
 			float *n = &out->nrm[c * 3];
 			const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
@@ -3162,6 +3240,21 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 }
 
 /**
+ * The picture of the model a mask or a paint of its own file lays over (TextureLevelsOfFile()): its body's (the first
+ * texture) or an add-on's, nullptr not known.
+ * @param addon -1 the body, else the add-on
+ */
+static ThreeDTextureBytes PictureUnder(const ThreeDVehicleShape *s, int addon)
+{
+	if (s == nullptr) return nullptr;
+	if (addon < 0) return s->pngs.empty() ? nullptr : s->pngs[0];
+	for (size_t i = 0; i < s->pngs.size() && i < s->tex_addon.size(); i++) {
+		if (s->tex_addon[i] == addon) return s->pngs[i];
+	}
+	return nullptr;
+}
+
+/**
  * One of the object's textures at a level of detail, read the first time: the body's (0) is the paint
  * ("textura") when there is one, else the file's; the others the file's and the wheels'.
  */
@@ -3176,7 +3269,7 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 	if (lv == nullptr) {
 		ThreeDTextureBytes png;
 		uint32_t flat = 0;
-		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0);
+		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0, PictureUnder(s, -1));
 		if (lv == nullptr && s != nullptr && static_cast<size_t>(index) < s->pngs.size()) {
 			png = s->pngs[index];
 			flat = s->flats[index];
@@ -3192,7 +3285,7 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 	if (this->rust.mask_file.empty()) return nullptr;
 	if (!this->rust_tried) {
 		this->rust_tried = true;
-		this->rust_levels = MaskLevelsOfFile(this->rust.mask_file);
+		this->rust_levels = MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1));
 	}
 	if (this->rust_levels == nullptr) return nullptr;
 	return &(*this->rust_levels)[std::clamp<int>(level, 0, static_cast<int>(this->rust_levels->size()) - 1)];
@@ -3203,7 +3296,7 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 	if (this->paint.mask_file.empty()) return nullptr;
 	if (!this->mask_tried) {
 		this->mask_tried = true;
-		this->mask_levels = MaskLevelsOfFile(this->paint.mask_file);
+		this->mask_levels = MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1));
 	}
 	if (this->mask_levels == nullptr) return nullptr;
 	return &(*this->mask_levels)[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels->size()) - 1)];
@@ -3219,7 +3312,7 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int l
 	}
 	if (!this->addon_mask_tried[addon]) {
 		this->addon_mask_tried[addon] = true;
-		this->addon_mask_levels[addon] = MaskLevelsOfFile(this->addons[addon].mask_file);
+		this->addon_mask_levels[addon] = MaskLevelsOfFile(this->addons[addon].mask_file, PictureUnder(this->GetShape(), static_cast<int>(addon)));
 	}
 	const ThreeDTextureLevels &lv = this->addon_mask_levels[addon];
 	if (lv == nullptr) return nullptr;
@@ -3244,7 +3337,7 @@ const ThreeDDetailMask *ThreeDVehicleObject::GetDetailMask(int addon) const
 	std::shared_ptr<const ThreeDDetailMask> &mask = this->detail_masks[at];
 	if (!this->detail_tried[at]) {
 		this->detail_tried[at] = true;
-		mask = DetailMaskOfFile(file);
+		mask = DetailMaskOfFile(file, PictureUnder(this->GetShape(), addon));
 		if (mask == nullptr) Debug(misc, 0, "3D vehicle {}: the mask of details {} cannot be read", this->name, file);
 	}
 	return mask.get();
@@ -3653,7 +3746,85 @@ std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
  * a pixel transparent when most of its four are). A texture that cannot be read is a plain grey, so the shape still
  * shows.
  */
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved)
+/**
+ * Which texels of a texture its model's triangles draw from: those whose middles are in a triangle of the cover
+ * (TextureCover()), and the one under each triangle's middle (a triangle smaller than a texel).
+ */
+static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<float> &cover)
+{
+	std::vector<uint8_t> drawn(static_cast<size_t>(w) * h, 0);
+	auto mark = [&](double x, double y) {
+		const int px = static_cast<int>(std::floor(x)), py = static_cast<int>(std::floor(y));
+		if (px >= 0 && py >= 0 && px < w && py < h) drawn[static_cast<size_t>(py) * w + px] = 1;
+	};
+	for (size_t t = 0; t + 5 < cover.size(); t += 6) {
+		double x[3], y[3];
+		for (int k = 0; k < 3; k++) {
+			x[k] = cover[t + k * 2] * w;
+			y[k] = cover[t + k * 2 + 1] * h;
+		}
+		/* A texture repeated: the triangle where its first corner is. */
+		const double ox = std::floor(x[0] / w) * w, oy = std::floor(y[0] / h) * h;
+		for (int k = 0; k < 3; k++) {
+			x[k] -= ox;
+			y[k] -= oy;
+		}
+		mark((x[0] + x[1] + x[2]) / 3, (y[0] + y[1] + y[2]) / 3);
+		const double area = (x[1] - x[0]) * (y[2] - y[0]) - (y[1] - y[0]) * (x[2] - x[0]);
+		if (std::abs(area) < 1e-9) continue;
+		const int x0 = std::max(0, static_cast<int>(std::floor(std::min({x[0], x[1], x[2]})))), x1 = std::min(w - 1, static_cast<int>(std::ceil(std::max({x[0], x[1], x[2]}))));
+		const int y0 = std::max(0, static_cast<int>(std::floor(std::min({y[0], y[1], y[2]})))), y1 = std::min(h - 1, static_cast<int>(std::ceil(std::max({y[0], y[1], y[2]}))));
+		for (int py = y0; py <= y1; py++) {
+			const double cy = py + 0.5;
+			for (int px = x0; px <= x1; px++) {
+				const double cx = px + 0.5;
+				const double w0 = ((x[2] - x[1]) * (cy - y[1]) - (y[2] - y[1]) * (cx - x[1])) / area;
+				const double w1 = ((x[0] - x[2]) * (cy - y[2]) - (y[0] - y[2]) * (cx - x[2])) / area;
+				const double w2 = 1.0 - w0 - w1;
+				if (w0 >= -1e-6 && w1 >= -1e-6 && w2 >= -1e-6) drawn[static_cast<size_t>(py) * w + px] = 1;
+			}
+		}
+	}
+	return drawn;
+}
+
+/**
+ * The texels no triangle draws from filled from the nearest that one does, its colour (or its index, a mask's) --
+ * the colleague's atlases put every triangle on a piece of its own on black, and a triangle drew black at its edges
+ * (a texel's middle just past it) and in the smaller textures of the distance (the black mixed in): the cars black
+ * lines, then black from a few metres on (the player, 17. 10.).
+ * @param drawn which texels are drawn from (TextureTexelsDrawn())
+ */
+static void FillTexelsNotDrawn(ThreeDObjectTexture &t, const std::vector<uint8_t> &drawn)
+{
+	const size_t n = t.px.size();
+	std::vector<uint8_t> done(n, 0);
+	std::vector<uint32_t> queue;
+	queue.reserve(n / 4);
+	for (size_t i = 0; i < n; i++) {
+		if (drawn[i] && t.px[i] != 0) {
+			done[i] = 1;
+			queue.push_back(static_cast<uint32_t>(i));
+		} else if (drawn[i]) {
+			done[i] = 1; // a hole of the texture where it is drawn: stays one, gives nothing
+		}
+	}
+	for (size_t q = 0; q < queue.size(); q++) {
+		const uint32_t i = queue[q];
+		const int x = static_cast<int>(i % t.w), y = static_cast<int>(i / t.w);
+		const int nx[4] = {x - 1, x + 1, x, x}, ny[4] = {y, y, y - 1, y + 1};
+		for (int k = 0; k < 4; k++) {
+			if (nx[k] < 0 || ny[k] < 0 || nx[k] >= t.w || ny[k] >= t.h) continue;
+			const size_t j = static_cast<size_t>(ny[k]) * t.w + nx[k];
+			if (done[j]) continue;
+			done[j] = 1;
+			t.px[j] = t.px[i];
+			queue.push_back(static_cast<uint32_t>(j));
+		}
+	}
+}
+
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved, const std::vector<float> *cover)
 {
 	ThreeDObjectTexture t;
 	if (png.size() >= RAW_TEXTURE_MARK.size() + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), png.begin())) {
@@ -3695,6 +3866,12 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		t.w = t.h = 1;
 		t.px.assign(1, flat != 0 ? flat : Colour(150, 150, 150).data);
 	}
+	/* Where the model draws from it, when that is known (a texture of a .glb, a mask of its layout): the rest filled. */
+	std::vector<uint8_t> drawn;
+	if (cover != nullptr && !cover->empty() && t.w > 1) {
+		drawn = TextureTexelsDrawn(t.w, t.h, *cover);
+		FillTexelsNotDrawn(t, drawn);
+	}
 	levels.push_back(std::move(t));
 	while (halved && (levels.back().w > 1 || levels.back().h > 1)) {
 		const ThreeDObjectTexture &a = levels.back();
@@ -3702,22 +3879,41 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		b.w = std::max(1, a.w / 2);
 		b.h = std::max(1, a.h / 2);
 		b.px.resize(static_cast<size_t>(b.w) * b.h);
+		/* A texel of the smaller texture is the mean of the four it covers -- of those drawn from, when that is known:
+		 * the filled ones are not mixed in, and it is drawn from when any of them is (then filled again). */
+		std::vector<uint8_t> drawn_b;
+		if (!drawn.empty()) drawn_b.assign(b.px.size(), 0);
 		for (int y = 0; y < b.h; y++) {
 			for (int x = 0; x < b.w; x++) {
-				uint r = 0, g = 0, bl = 0, n = 0;
+				uint r = 0, g = 0, bl = 0, n = 0, holes = 0;
+				bool any_drawn = false;
 				for (int k = 0; k < 4; k++) {
 					int sx = std::min(a.w - 1, x * 2 + (k & 1)), sy = std::min(a.h - 1, y * 2 + (k >> 1));
-					uint32_t p = a.px[static_cast<size_t>(sy) * a.w + sx];
-					if (p == 0) continue;
+					const size_t at = static_cast<size_t>(sy) * a.w + sx;
+					if (!drawn.empty() && !drawn[at]) continue;
+					any_drawn = true;
+					uint32_t p = a.px[at];
+					if (p == 0) {
+						holes++;
+						continue;
+					}
 					Colour c(p);
 					r += c.r;
 					g += c.g;
 					bl += c.b;
 					n++;
 				}
-				b.px[static_cast<size_t>(y) * b.w + x] = n >= 2 ? Colour(r / n, g / n, bl / n).data : 0;
+				const size_t to = static_cast<size_t>(y) * b.w + x;
+				if (drawn.empty()) {
+					b.px[to] = n >= 2 ? Colour(r / n, g / n, bl / n).data : 0;
+				} else {
+					drawn_b[to] = any_drawn ? 1 : 0;
+					b.px[to] = n > 0 && n >= holes ? Colour(r / n, g / n, bl / n).data : 0;
+				}
 			}
 		}
+		if (!drawn.empty()) FillTexelsNotDrawn(b, drawn_b);
+		drawn = std::move(drawn_b);
 		levels.push_back(std::move(b));
 	}
 }

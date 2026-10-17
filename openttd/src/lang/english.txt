@@ -2232,6 +2232,8 @@ STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Houses and the 
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :How the houses and the game's own industries (the school, the statue, the plantation, the potato field, the distillery, the pub...) that have a 3D object look when the map view faces north (angle 0, as for building): as 3D objects, the same as when the view turns; or their pictures (sprites), as the game drew them before. Those without a 3D object always keep their pictures. Needs 3D on and the 32bpp blitter
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, the same as when turning
 STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :the original pictures
+STR_CONFIG_SETTING_THREE_D_WHEELS                               :Wheels of 3D vehicles turn: {STRING2}
+STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :The wheels of vehicles drawn from 3D objects turn as they go and the front ones steer in the curves (seen up close, from the cab and the first person). Off, the wheels stand still
 STR_CONFIG_SETTING_NIGHT                                        :Night: {STRING2}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :The map as at night: darkened, the lights of the vehicles on. Only the picture changes, nothing of the game. Also in the help menu, by the console. Needs the 32bpp blitter
 STR_CONFIG_SETTING_NIGHT_LIGHT                                  :Light at night: {STRING2}
