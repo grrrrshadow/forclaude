@@ -6562,14 +6562,14 @@ static bool ConIddqd(std::span<std::string_view> argv)
 	std::string given;
 	for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
 		const WalkerItem item = static_cast<WalkerItem>(i);
-		const uint16_t now = c->walker_items[i], after = WalkerCheatCount(item, now, WALKER_ARROWS_FULL);
+		const uint16_t now = c->walker_items[i], after = WalkerCheatCount(item, now, WALKER_AMMUNITION_FULL);
 		if (after > now) given += fmt::format("{}{} +{}", given.empty() ? "" : ", ", GetString(GetWalkerItemSpec(item).name), after - now);
 	}
 	if (given.empty()) {
 		IConsolePrint(CC_DEFAULT, "iddqd: nothing to give, every weapon is carried and the arrows are full.");
 		return true;
 	}
-	Command<Commands::WalkerCheat>::Post(WALKER_ARROWS_FULL);
+	Command<Commands::WalkerCheat>::Post(WALKER_AMMUNITION_FULL);
 	IConsolePrint(CC_DEFAULT, "iddqd: {}", given);
 	return true;
 }
@@ -8602,7 +8602,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	std::string_view what = argv[1];
 	auto number = [&](size_t i) -> std::optional<int> {
 		if (argv.size() <= i) return std::nullopt;
-		return ParseInteger(argv[i]);
+		return ParseInteger<int>(argv[i]);
 	};
 
 	if (what == "uhel" && argv.size() > 2) {
@@ -8988,6 +8988,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const bool away = argv.size() > 3 && argv[3] == "pryc";
 			auto swing = argv.size() > 3 && !away ? number(3) : std::optional<int>(0);
 			IConsolePrint(CC_DEFAULT, "test3d: kladivo {}", RigFirstPersonHold(!away, static_cast<float>(swing.value_or(0))) ? "v ruce" : "schovane");
+		} else if (argv.size() > 3 && argv[2] == "zbran") {
+			/* 'chodec zbran <1-5> [draw ms] [steps|drzet]': a weapon in the hand (the hammer, the bow, the crossbow, the
+			 * sword, the two-handed sword); with draw ms a shot (the bow drawn so long, or held drawn) and its arrow let fly
+			 * so many steps. */
+			extern std::string RigFirstPersonWeapon(int key, int draw_ms, int steps);
+			IConsolePrint(CC_DEFAULT, "test3d: zbran {}", RigFirstPersonWeapon(number(3).value_or(1), number(4).value_or(0), argv.size() > 5 && argv[5] == "drzet" ? -1 : number(5).value_or(0)));
 		} else if (argv.size() > 2 && (argv[2] == "u" || argv[2] == "e")) {
 			/* 'chodec u <n>': the walker beside the n-th visible vehicle (as 'vozidlo' counts them); 'chodec e': E pressed
 			 * (into the vehicle near, or out of it). */

@@ -60,6 +60,8 @@ bool ViewportDrawingNorthObjects();
 bool ViewportDrawingEye();
 bool ViewportDrawing3D();
 void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame = 0);
+void AddCabMissile(std::string_view name, double x, double y, double z, float facing, float pitch);
+void AddFirstPersonMissilesToEye();
 struct ThreeDVehicleObject;
 void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit);
 bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int ax, int ay, int az, Point anchor, const Rect &screen);

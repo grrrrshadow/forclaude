@@ -107,7 +107,12 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
 - `predmety/` – předměty chodce v pohledu z první osoby (od kolegy, grrrrf `hra/3d/objekty/predmety/`,
   `PROSBA-PREDMETY-KLADIVO-TRUHLA.md`): válečné kladivo a truhla z OpenMW Example Suite
   (gitlab.com/OpenMW/example-suite, modely **CC0**, volné dílo), `druh: "predmet"`. Kladivo chodec nese v inventáři
-  od začátku; F ho tasí a schová, levé tlačítko nebo mezerník s ním máchne (`first_person_gui.cpp`).
+  od začátku; F ho tasí a schová, levé tlačítko nebo mezerník s ním máchne (`first_person_gui.cpp`). Od 17. 10.
+  (`LUK-SIP-PRO-HRU.md`) i luk a šíp (kolegovy vlastní, GPL-2.0), kuše (Example Suite, CC0) a šipka (kolegova),
+  meč a obouruční meč (Example Suite, CC0) a zvuky luku `luk_napnuti.wav` a `luk_vystrel.wav` (Example Suite, CC0).
+  Stavy předmětu (`stavy`: luk `volno`/`napnuto`, kuše `natazeno`/`vystreleno`) hra čte jako figury
+  `<jmeno>/<stav>` (jen ten uzel), úchyt z uzlu `uchyt`, zářez z uzlu `zarez_<stav>`, zvuky z klíče `zvuky`.
+  Klávesy 1–5 zbraň, cheat `iddqd` v konzoli dá zbraně, které chybí, a doplní šípy a šipky na 50.
 - Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
   `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
   nový dům nepotřebuje build.

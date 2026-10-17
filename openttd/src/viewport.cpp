@@ -7892,6 +7892,8 @@ struct CabFigure {
 	uint64_t walk = 0;    ///< the frames of a vehicle's crew that walks
 	double curvature = 0; ///< how much its way turns, radians a world unit: its front wheels steer by it
 	bool own_cab = false; ///< the vehicle whose cab the eye is in: drawn round the eye, its driver not
+	double pitch = 0;     ///< degrees its +x is raised over the level (an arrow flying, AddCabMissile())
+	bool missile = false; ///< an arrow or a bolt: always by its triangles, however small
 };
 static std::vector<CabFigure> _cab_figures;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
@@ -7905,6 +7907,22 @@ static constexpr float CAB_FIGURE_SCALE = 1.0f;
 void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame)
 {
 	_cab_figures.push_back({std::string(name), size, static_cast<double>(x), static_cast<double>(y), static_cast<double>(z), facing, frame});
+}
+
+/**
+ * An arrow or a bolt of the walker in the view from the eyes (first_person_gui.cpp), flying or stuck where it hit:
+ * by its triangles, along its way.
+ * @param name the thing of the indices ("sip", "sipka"), its +x its tip
+ * @param x,y,z its origin (the nock), world units and units of height
+ * @param facing degrees in the world its tip points to, 0 along +x, 90 along +y
+ * @param pitch degrees its tip is raised over the level
+ */
+void AddCabMissile(std::string_view name, double x, double y, double z, float facing, float pitch)
+{
+	CabFigure f{std::string(name), 1.0f, x, y, z, facing, 0};
+	f.pitch = pitch;
+	f.missile = true;
+	_cab_figures.push_back(std::move(f));
 }
 
 /**
@@ -7975,12 +7993,13 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 	const ThreeDVehicleShape *whole = fig->GetShape(fg.frame);
 	if (whole == nullptr || whole->tri.empty()) return false;
 	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
+	const double pa = fg.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
 	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * fg.stretch * OBJECT_HEIGHT_PER_METRE;
 	/* As detailed as it is big on the picture: its corners joined about two pixels apart (Simpler()); the cab the eye
-	 * is in whole. */
+	 * is in whole, and an arrow (its shaft thinner than that would leave nothing of it). */
 	const CabPoint mid = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 	const double pixels_per_metre = eye.focal * across / std::max(mid.f, CAB_NEAR);
-	const ThreeDVehicleShape *shape = fg.own_cab ? whole : whole->Simpler(_cab_detail_pixels / pixels_per_metre);
+	const ThreeDVehicleShape *shape = fg.own_cab || fg.missile ? whole : whole->Simpler(_cab_detail_pixels / pixels_per_metre);
 	/* A vehicle foreshortened along itself as the game spaces its vehicles. */
 	const double length = across * fg.along;
 	const bool lit = shape->nrm.size() == shape->pos.size();
@@ -8069,6 +8088,15 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 			ready[i] = 1;
 			double px, py, pz, nx = 0, ny = 0, nz = 1;
 			to_model(i, px, py, pz, nx, ny, nz);
+			if (fg.pitch != 0) {
+				/* Raised about its y: its +x up. */
+				const double qx = px * pc - pz * ps, qz = px * ps + pz * pc;
+				px = qx;
+				pz = qz;
+				const double mx = nx * pc - nz * ps, mz = nx * ps + nz * pc;
+				nx = mx;
+				nz = mz;
+			}
 			turned(px, py);
 			turned(nx, ny);
 			pts[i] = CabToEye(eye, fg.x + px * length * ca - py * across * sa, fg.y + px * length * sa + py * across * ca, fg.z + pz * up, s.uv[i * 2], s.uv[i * 2 + 1]);
@@ -9011,8 +9039,10 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	eye.focal = (width / 2.0) / CAB_FOV_TAN;
 	eye.cx = width / 2.0;
 	eye.cy = height * 0.5;
-	/* Inside a model's cab its windscreen is a step from the eye: the near plane a few centimetres off. */
-	_cab_near = in_model_cab ? 0.15 : CAB_NEAR;
+	/* Inside a model's cab its windscreen is a step from the eye: the near plane a few centimetres off. The walker
+	 * looking down sees the ground at its feet, nearer than the cab's near plane: a ground cut off there showed the
+	 * sky under it at the bottom of the picture. */
+	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.4 : CAB_NEAR);
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
 	if (walker != nullptr) eye.cy += std::tan(walker->pitch) * eye.focal;
@@ -9304,6 +9334,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 	/* The dragons about (three_d_dragons.h), among the figures; Mat walking in the town and the cars of the game's own
 	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
 	AddThreeDDragonsToEye();
+	AddFirstPersonMissilesToEye();
 	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);
 	AddThreeDDriversToEye();
 
@@ -9675,7 +9706,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		const ThreeDVehicleShape *model_shape = model != nullptr ? model->GetShape(fg.frame) : nullptr;
 		const double extent = model_shape == nullptr ? 0.0 : std::max({(model_shape->x1 - model_shape->x0) * fg.along, model_shape->y1 - model_shape->y0, model_shape->z1 - model_shape->z0}) * fg.size * OBJECT_UNITS_PER_METRE;
 		if (foot.f < -extent) continue; // all of it behind the eye
-		fg.solid = fg.own_cab || (fg.plant ? foot.f < CAB_PLANT_SOLID : extent * eye.focal >= _cab_solid_pixels * std::max(foot.f, CAB_NEAR));
+		fg.solid = fg.own_cab || fg.missile || (fg.plant ? foot.f < CAB_PLANT_SOLID : extent * eye.focal >= _cab_solid_pixels * std::max(foot.f, CAB_NEAR));
 		if (fg.solid) {
 			/* Its textures stay: collected, drawn on every core after the billboards (the depth sorts them out). */
 			_cab_batching = true;
@@ -9840,7 +9871,7 @@ static bool DrawEyeView(const Vehicle *v, const FirstPersonEye *walker, int widt
 		});
 	}
 	/* What the walker holds (the hammer), before the night: the dark is over it too. */
-	if (walker != nullptr && !walker->held.empty()) DrawThreeDHeldThing(walker->held, walker->swing, walker->raise, dst, zb, width, height, eye.focal);
+	if (walker != nullptr && !walker->held.thing.empty()) DrawThreeDHeldThing(walker->held, dst, zb, width, height, eye.focal);
 	if (IsNightNow()) {
 		DrawEyeNight(eye, own, width, height, dst, zb);
 		DrawEyeVehicleGlass(eye, dst, zb, width, height);

@@ -46,6 +46,7 @@
 #include "three_d_dragons.h"
 #include "vehicle_base.h"
 #include "cab_drive.h"
+#include "sound_func.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -69,16 +70,69 @@ static constexpr double FIRST_PERSON_MOUSE = 0.005;
 static constexpr double FIRST_PERSON_RADIUS = 1.5;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
-/** How long taking the hammer out or putting it away takes, and a swing of it, seconds. */
+/** How long taking a weapon out or putting it away takes, and a swing of it, seconds. */
 static constexpr double FIRST_PERSON_DRAW_S = 0.35;
 static constexpr double FIRST_PERSON_SWING_S = 0.6;
-/** When in the swing the hammer strikes, seconds, and how far it reaches, metres. */
+/** When in the swing the weapon strikes, seconds. */
 static constexpr double FIRST_PERSON_BLOW_S = 0.27;
-static constexpr double FIRST_PERSON_REACH_M = 2.5;
-/** The thing of the indices the walker holds ("predmet", objekty/predmety/: the colleague's hammer). */
-static constexpr std::string_view FIRST_PERSON_HAMMER = "kladivo";
+/** How long the bow is drawn fully, how long a new arrow is set on its string, how long the crossbow is drawn again, seconds. */
+static constexpr double FIRST_PERSON_BOW_DRAW_S = 0.8;
+static constexpr double FIRST_PERSON_NOCK_S = 0.5;
+static constexpr double FIRST_PERSON_RELOAD_S = 1.5;
+/** How long a shot kicks the bow or the crossbow back, seconds. */
+static constexpr double FIRST_PERSON_KICK_S = 0.15;
+/** An arrow's fall, metres a second each second; how long one flies at most and stays stuck where it hit, seconds; how many there are at most. */
+static constexpr double FIRST_PERSON_GRAVITY = 9.81;
+static constexpr double FIRST_PERSON_FLY_S = 8.0;
+static constexpr double FIRST_PERSON_STUCK_S = 20.0;
+static constexpr size_t FIRST_PERSON_MISSILES = 40;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
+
+/** How a weapon of the walker is used. */
+enum class WeaponUse : uint8_t {
+	Swing,    ///< swung: the hammer, the swords
+	Bow,      ///< drawn while held, shot let go
+	Crossbow, ///< shot, then drawn again
+};
+
+/**
+ * A weapon of the walker, by its key 1 to 5 (the player, 15. 10.: the big hammer; 17. 10.: "the bow and the crossbow
+ * are there", and the colleague's swords): the thing of the inventory, and the colleague's thing of the indices
+ * (objekty/predmety/, hra/3d/LUK-SIP-PRO-HRU.md).
+ */
+struct FirstPersonWeapon {
+	WalkerItem item;        ///< the thing of the inventory
+	std::string_view thing; ///< its thing of the indices
+	WeaponUse use;          ///< swung or shot
+	double reach_m;         ///< swung: how far it reaches, metres
+	int damage;             ///< the health a blow or a hit takes of a dragon
+	WalkerItem ammo = WalkerItem::End; ///< shot: what it shoots ...
+	std::string_view missile = {};     ///< ... and its thing of the indices
+	double speed_ms = 0;    ///< how fast that flies, metres a second (the bow drawn fully)
+	float twist = 0;        ///< swung: degrees it is turned about its handle in the hand (a sword's flat to the eye, not its edge)
+};
+static const FirstPersonWeapon _first_person_weapons[] = {
+	{WalkerItem::Hammer, "kladivo", WeaponUse::Swing, 2.5, 1},
+	{WalkerItem::Bow, "luk", WeaponUse::Bow, 0, 1, WalkerItem::Arrows, "sip", 55},
+	{WalkerItem::Crossbow, "kuse", WeaponUse::Crossbow, 0, 2, WalkerItem::Bolts, "sipka", 70},
+	{WalkerItem::Sword, "mec", WeaponUse::Swing, 2.2, 1, WalkerItem::End, {}, 0, 65},
+	{WalkerItem::TwoHandedSword, "mec_obourucni", WeaponUse::Swing, 2.8, 2, WalkerItem::End, {}, 0, 65},
+};
+
+/** An arrow or a bolt the walker shot: flying, or stuck where it hit. Only the screen, never saved. */
+struct FirstPersonMissile {
+	std::string_view thing; ///< its thing of the indices, its +x its tip, its origin its nock
+	int damage = 1;         ///< the health it takes of a dragon it hits
+	double x = 0, y = 0, z = 0;    ///< its origin, world units and units of height
+	double vx = 0, vy = 0, vz = 0; ///< how fast it goes, metres a second
+	double length_m = 0.75; ///< from its nock to its tip
+	double age = 0;         ///< seconds flying, or since it stuck
+	bool stuck = false;     ///< stuck in the ground or a wall
+	bool gone = false;      ///< in a dragon, in the water or off the map: gone
+	float facing = 0;       ///< degrees in the world its tip points to
+	float pitch = 0;        ///< degrees its tip is raised
+};
 
 /**
  * The angle of a swing of the hammer a time into it, degrees (DrawThreeDHeldThing()): raised back over the shoulder,
@@ -180,8 +234,15 @@ struct FirstPersonWindow : Window {
 	bool full = false;                    ///< over the whole screen, between the toolbar and the status bar
 	Rect before_full{};                   ///< where it was before that
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
-	bool hammer_out = false;              ///< the hammer taken out (F), in the hand
-	double swing_time = -1;               ///< seconds into a swing of the hammer, -1 when it is not swung
+	bool weapon_out = false;              ///< the weapon taken out (F, or its key), in the hand
+	int weapon = 0;                       ///< the weapon in the hand or put away (_first_person_weapons)
+	int wanted = 0;                       ///< the weapon asked for (its key): the one in the hand is put away first
+	double swing_time = -1;               ///< seconds into a swing of the weapon, -1 when it is not swung
+	double draw_time = -1;                ///< seconds the bow is drawn, -1 when it is not
+	bool mouse_draw = false;              ///< the bow drawn with the left button held: let go, it shoots
+	double reload_time = 0;               ///< seconds till the next arrow is on the string, the crossbow drawn again
+	float kick = 0;                       ///< a shot's kick, 1 as it is shot to 0
+	std::vector<FirstPersonMissile> missiles; ///< the arrows and the bolts shot
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
 	/*
 	 * In a vehicle (the player, 17. 10.: "in the first person game, E gets into the car, into the cab view; no other
@@ -220,12 +281,13 @@ struct FirstPersonWindow : Window {
 		return best;
 	}
 
-	/** Into a vehicle: the picture from its cab from now on, the hammer away. */
+	/** Into a vehicle: the picture from its cab from now on, the weapon away. */
 	void GetIn(const Vehicle *v)
 	{
 		this->riding = v->index;
-		this->hammer_out = false;
+		this->weapon_out = false;
 		this->swing_time = -1;
+		this->draw_time = -1;
 		this->arrows = {};
 		this->camera = {};
 		this->walker.x = v->x_pos;
@@ -308,6 +370,7 @@ struct FirstPersonWindow : Window {
 		for (uint i = 0; i < steps; i++) {
 			if (rv == nullptr) this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
+			this->Fly(FIRST_PERSON_TICK_MS / 1000.0);
 		}
 		if (rv != nullptr) {
 			this->walker.x = rv->x_pos;
@@ -458,36 +521,241 @@ struct FirstPersonWindow : Window {
 		}
 	}
 
+	/** How many of a thing the walker carries. */
+	static uint Carried(WalkerItem item)
+	{
+		const Company *c = Company::GetIfValid(_local_company);
+		return c != nullptr && item < WalkerItem::End ? c->walker_items[to_underlying(item)] : 0;
+	}
+
 	/**
-	 * The hammer in the hand (the player, 15. 10.: "I went through the whole of Morrowind with a big hammer"): taken
-	 * out and put away with F, swung with the left button or Space -- as long as the walker carries one.
+	 * The weapon in the hand (the player, 15. 10.: "I went through the whole of Morrowind with a big hammer"; 17. 10.:
+	 * the bow and the crossbow): taken out and put away with F or chosen with its key, another put away first; a
+	 * hammer or a sword swung with the left button or Space, the bow drawn while the button is held and shot as it is
+	 * let go, the crossbow shot and drawn again -- as long as the walker carries it.
 	 */
 	void Hold(double dt)
 	{
-		const Company *c = Company::GetIfValid(_local_company);
-		if (c == nullptr || c->walker_items[to_underlying(WalkerItem::Hammer)] == 0) this->hammer_out = false;
-		const float target = this->hammer_out ? 1.0f : 0.0f, step = static_cast<float>(dt / FIRST_PERSON_DRAW_S);
-		float &raise = this->walker.raise;
-		raise = target > raise ? std::min(target, raise + step) : std::max(target, raise - step);
-		this->walker.held = raise > 0 ? std::string(FIRST_PERSON_HAMMER) : std::string();
+		if (Carried(_first_person_weapons[this->wanted].item) == 0) this->wanted = this->weapon;
+		if (Carried(_first_person_weapons[this->weapon].item) == 0 && this->wanted == this->weapon) this->weapon_out = false;
+		const bool changing = this->wanted != this->weapon;
+		ThreeDHeldThing &held = this->walker.held;
+		const float target = this->weapon_out && !changing ? 1.0f : 0.0f, step = static_cast<float>(dt / FIRST_PERSON_DRAW_S);
+		held.raise = target > held.raise ? std::min(target, held.raise + step) : std::max(target, held.raise - step);
+		if (changing && held.raise <= 0) {
+			this->weapon = this->wanted;
+			this->swing_time = -1;
+			this->draw_time = -1;
+			held.swing = 0;
+		}
+		const FirstPersonWeapon &w = _first_person_weapons[this->weapon];
 		if (this->swing_time >= 0) {
-			/* The blow lands as the hammer comes down before the eyes: on a dragon there, if one is. */
+			/* The blow lands as the weapon comes down before the eyes: on a dragon there, if one is. */
 			const bool before = this->swing_time < FIRST_PERSON_BLOW_S;
 			this->swing_time += dt;
-			if (before && this->swing_time >= FIRST_PERSON_BLOW_S) HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, FIRST_PERSON_REACH_M);
-			this->walker.swing = SwingAngle(this->swing_time);
+			if (before && this->swing_time >= FIRST_PERSON_BLOW_S) HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage);
+			held.swing = SwingAngle(this->swing_time);
 			if (this->swing_time >= FIRST_PERSON_SWING_S) {
 				this->swing_time = -1;
-				this->walker.swing = 0;
+				held.swing = 0;
 			}
 		}
+		if (this->draw_time >= 0) {
+			/* The bow drawn: put away or out of arrows, let down; drawn with the button, shot as it is let go. */
+			if (held.raise < 1.0f || Carried(w.ammo) == 0) {
+				this->draw_time = -1;
+				this->mouse_draw = false;
+			} else {
+				this->draw_time += dt;
+				if (this->mouse_draw && !_left_button_down) this->Release();
+			}
+		}
+		this->reload_time = std::max(0.0, this->reload_time - dt);
+		this->kick = std::max(0.0f, this->kick - static_cast<float>(dt / FIRST_PERSON_KICK_S));
+		this->Dress();
 	}
 
-	/** A swing of the hammer, when it is in the hand and not swung already. */
-	void Swing()
+	/**
+	 * What the walker holds as it is drawn (DrawThreeDHeldThing()): the weapon in its state -- the bow drawn or not,
+	 * the crossbow drawn or shot -- held by its grip ("uchyt"), the arrow on the string or the bolt in the groove at
+	 * its nock ("zarez_<stav>") while there is one to shoot.
+	 */
+	void Dress()
 	{
-		if (!this->hammer_out || this->walker.raise < 1.0f || this->swing_time >= 0) return;
-		this->swing_time = 0;
+		ThreeDHeldThing &held = this->walker.held;
+		const FirstPersonWeapon &w = _first_person_weapons[this->weapon];
+		if (held.raise <= 0) {
+			held.thing.clear();
+			held.loaded.clear();
+			return;
+		}
+		std::string_view state;
+		switch (w.use) {
+			case WeaponUse::Swing: held.hold = ThreeDHold::Swung; break;
+			case WeaponUse::Bow: held.hold = ThreeDHold::Bow; state = this->draw_time >= FIRST_PERSON_BOW_DRAW_S * 0.4 ? "napnuto" : "volno"; break;
+			case WeaponUse::Crossbow: held.hold = ThreeDHold::Crossbow; state = this->reload_time > 0 ? "vystreleno" : "natazeno"; break;
+		}
+		held.thing = state.empty() ? std::string(w.thing) : fmt::format("{}/{}", w.thing, state);
+		const auto grip = GetThreeDThingPlace(w.thing, "uchyt");
+		const std::array<float, 3> at = grip.value_or(w.use == WeaponUse::Swing ? std::array<float, 3>{0, 0, 0.22f} : std::array<float, 3>{0, 0, 0});
+		std::copy(at.begin(), at.end(), held.grip);
+		held.loaded.clear();
+		if (!w.missile.empty() && this->reload_time <= 0 && Carried(w.ammo) > 0) {
+			auto nock = GetThreeDThingPlace(w.thing, fmt::format("zarez_{}", state));
+			if (!nock.has_value()) nock = GetThreeDThingPlace(w.thing, "zarez");
+			if (nock.has_value()) {
+				held.loaded = std::string(w.missile);
+				std::copy(nock->begin(), nock->end(), held.nock);
+			}
+		}
+		held.kick = this->kick;
+		held.drawn = this->draw_time >= 0 ? static_cast<float>(std::min(1.0, this->draw_time / FIRST_PERSON_BOW_DRAW_S)) : 0.0f;
+		held.twist = w.twist;
+	}
+
+	/**
+	 * The left button or Space: a swing of the hammer or the sword in the hand; the bow drawn (with the button: shot as
+	 * it is let go; Space again shoots); the crossbow shot.
+	 * @param mouse with the left button
+	 */
+	void Attack(bool mouse)
+	{
+		if (this->Riding() != nullptr || !this->weapon_out || this->wanted != this->weapon || this->walker.held.raise < 1.0f) return;
+		const FirstPersonWeapon &w = _first_person_weapons[this->weapon];
+		switch (w.use) {
+			case WeaponUse::Swing:
+				if (this->swing_time < 0) this->swing_time = 0;
+				break;
+			case WeaponUse::Bow:
+				if (this->draw_time >= 0) {
+					if (!mouse) this->Release();
+					break;
+				}
+				if (this->reload_time > 0 || Carried(w.ammo) == 0) break;
+				this->draw_time = 0;
+				this->mouse_draw = mouse;
+				if (auto sound = GetThreeDThingSound(w.thing, "napnuti"); sound.has_value()) SndPlayFx(*sound);
+				break;
+			case WeaponUse::Crossbow:
+				if (this->reload_time > 0 || Carried(w.ammo) == 0) break;
+				this->Shoot(w, 1.0);
+				this->reload_time = FIRST_PERSON_RELOAD_S;
+				break;
+		}
+		this->Dress();
+	}
+
+	/** The bow let go: the arrow flies as fast as the bow was drawn, the next one set on the string a moment after. */
+	void Release()
+	{
+		const double drawn = std::clamp(this->draw_time / FIRST_PERSON_BOW_DRAW_S, 0.0, 1.0);
+		this->draw_time = -1;
+		this->mouse_draw = false;
+		this->Shoot(_first_person_weapons[this->weapon], 0.25 + 0.75 * drawn);
+		this->reload_time = FIRST_PERSON_NOCK_S;
+	}
+
+	/**
+	 * An arrow or a bolt shot where the walker looks (the dot in the middle), from just below its eyes: one less of it
+	 * in the inventory (the command), flying along its arc (Fly()).
+	 * @param power how fast, of the weapon's speed
+	 */
+	void Shoot(const FirstPersonWeapon &w, double power)
+	{
+		if (Carried(w.ammo) == 0) return;
+		Command<Commands::ShootWalkerItem>::Post(w.ammo);
+		const double h = this->walker.heading, p = this->walker.pitch;
+		const double fx = std::cos(h) * std::cos(p), fy = std::sin(h) * std::cos(p), fz = std::sin(p);
+		const double speed = w.speed_ms * power;
+		FirstPersonMissile m;
+		m.thing = w.missile;
+		m.damage = w.damage;
+		const ThreeDVehicleObject *fig = GetThreeDFigure(w.missile);
+		const ThreeDVehicleShape *shape = fig != nullptr ? fig->GetShape(0) : nullptr;
+		if (shape != nullptr) m.length_m = shape->x1;
+		m.x = this->walker.x + fx * 0.3 * OBJECT_UNITS_PER_METRE;
+		m.y = this->walker.y + fy * 0.3 * OBJECT_UNITS_PER_METRE;
+		m.z = FirstPersonGroundZ(this->walker.x, this->walker.y) + this->walker.eye_z + (fz * 0.3 - 0.12) * OBJECT_HEIGHT_PER_METRE;
+		m.vx = fx * speed;
+		m.vy = fy * speed;
+		m.vz = fz * speed;
+		m.facing = static_cast<float>(h * 180.0 / M_PI);
+		m.pitch = static_cast<float>(p * 180.0 / M_PI);
+		this->missiles.push_back(m);
+		if (this->missiles.size() > FIRST_PERSON_MISSILES) this->missiles.erase(this->missiles.begin());
+		this->kick = 1.0f;
+		if (auto sound = GetThreeDThingSound(w.thing, "vystrel"); sound.has_value()) SndPlayFx(*sound);
+	}
+
+	/**
+	 * The arrows and the bolts on: each along its arc, falling, turned along its way, in steps of half a metre so that
+	 * none passes through a dragon; its tip in a dragon (the dragon takes it, HitThreeDDragonAt()), in the water or off
+	 * the map, it is gone; in the ground or a wall, it stays stuck a while.
+	 */
+	void Fly(double dt)
+	{
+		for (FirstPersonMissile &m : this->missiles) {
+			m.age += dt;
+			if (m.stuck || m.gone) continue;
+			const int n = std::max(1, static_cast<int>(std::ceil(std::sqrt(m.vx * m.vx + m.vy * m.vy + m.vz * m.vz) * dt / 0.5)));
+			const double sub = dt / n;
+			/* How high its tip was over the ground before the step (where it went in, when it goes in). */
+			double above = -1;
+			for (int k = 0; k < n && !m.stuck && !m.gone; k++) {
+				const double px = m.x, py = m.y, pz = m.z;
+				m.vz -= FIRST_PERSON_GRAVITY * sub;
+				m.x += m.vx * sub * OBJECT_UNITS_PER_METRE;
+				m.y += m.vy * sub * OBJECT_UNITS_PER_METRE;
+				m.z += m.vz * sub * OBJECT_HEIGHT_PER_METRE;
+				const double level = std::hypot(m.vx, m.vy), all = std::hypot(level, m.vz);
+				const double ux = m.vx / all, uy = m.vy / all, uz = m.vz / all;
+				m.facing = static_cast<float>(std::atan2(m.vy, m.vx) * 180.0 / M_PI);
+				m.pitch = static_cast<float>(std::atan2(m.vz, level) * 180.0 / M_PI);
+				const double tx = m.x + ux * m.length_m * OBJECT_UNITS_PER_METRE, ty = m.y + uy * m.length_m * OBJECT_UNITS_PER_METRE;
+				const double tz = m.z + uz * m.length_m * OBJECT_HEIGHT_PER_METRE;
+				if (tx < TILE_SIZE || ty < TILE_SIZE || tx >= (Map::SizeX() - 1) * TILE_SIZE || ty >= (Map::SizeY() - 1) * TILE_SIZE) {
+					m.gone = true;
+					continue;
+				}
+				if (HitThreeDDragonAt(tx, ty, tz, m.damage)) {
+					m.gone = true;
+					continue;
+				}
+				const double ground = FirstPersonGroundZ(tx, ty);
+				const TileIndex tile = TileVirtXY(static_cast<int>(tx), static_cast<int>(ty));
+				if (tz <= ground) {
+					if (IsTileType(tile, TileType::Water) && !IsCoast(tile)) {
+						m.gone = true;
+						continue;
+					}
+					/* Into the ground where its tip met it, and a few centimetres in -- not as far as the step went. */
+					const double t = above > 0 ? above / (above + (ground - tz)) : 0.0;
+					m.x = px + (m.x - px) * t + ux * 0.06 * OBJECT_UNITS_PER_METRE;
+					m.y = py + (m.y - py) * t + uy * 0.06 * OBJECT_UNITS_PER_METRE;
+					m.z = pz + (m.z - pz) * t + uz * 0.06 * OBJECT_HEIGHT_PER_METRE;
+					m.stuck = true;
+				} else if (tz - ground < 12 * OBJECT_HEIGHT_PER_METRE && !FirstPersonWalkable(tx, ty) && !IsTileType(tile, TileType::Water)) {
+					/* A house or a building as high as it is: stuck in its wall, where it was before the step. */
+					m.x = px;
+					m.y = py;
+					m.z = pz;
+					m.stuck = true;
+				}
+				above = tz - ground;
+			}
+			if (m.stuck) m.age = 0;
+		}
+		std::erase_if(this->missiles, [](const FirstPersonMissile &m) {
+			return m.gone || m.age > (m.stuck ? FIRST_PERSON_STUCK_S : FIRST_PERSON_FLY_S);
+		});
+	}
+
+	/** A weapon by its key, out in the hand (another put away first), when the walker carries it. */
+	void Choose(int k)
+	{
+		if (k < 0 || k >= static_cast<int>(std::size(_first_person_weapons)) || Carried(_first_person_weapons[k].item) == 0) return;
+		this->wanted = k;
+		this->weapon_out = true;
 	}
 
 	EventState OnKeyPress(char32_t key, uint16_t keycode) override
@@ -527,13 +795,18 @@ struct FirstPersonWindow : Window {
 			ShowWalkerInventoryWindow();
 			return EventState::Handled;
 		}
-		/* F: the hammer out or away (as the weapon in Morrowind); Space: a swing of it. */
+		/* 1 to 5: a weapon (the hammer, the bow, the crossbow, the sword, the two-handed sword); F: it out or away (as
+		 * the weapon in Morrowind); Space: a swing of it, a shot. */
+		if (key >= '1' && key <= '5') {
+			this->Choose(static_cast<int>(key - '1'));
+			return EventState::Handled;
+		}
 		if (key == 'f' || key == 'F') {
-			this->hammer_out = !this->hammer_out;
+			this->weapon_out = !this->weapon_out;
 			return EventState::Handled;
 		}
 		if (key == ' ' || (keycode & ~WKC_SPECIAL_KEYS) == WKC_SPACE) {
-			this->Swing();
+			this->Attack(false);
 			return EventState::Handled;
 		}
 		return EventState::NotHandled;
@@ -602,6 +875,13 @@ struct FirstPersonWindow : Window {
 				/* A dot in the middle, where it looks. */
 				const int cx = r.left + w / 2, cy = r.top + h / 2;
 				GfxFillRect(cx - 1, cy - 1, cx + 1, cy + 1, GetColourGradient(Colours::White, Shade::Lightest));
+				/* The weapon out, and how many arrows or bolts there are for it. */
+				if (this->weapon_out && this->Riding() == nullptr) {
+					const FirstPersonWeapon &wp = _first_person_weapons[this->weapon];
+					const StringID name = GetWalkerItemSpec(wp.item).name;
+					const std::string text = wp.ammo != WalkerItem::End ? GetString(STR_FIRST_PERSON_WEAPON_AMMO, name, GetWalkerItemSpec(wp.ammo).name, Carried(wp.ammo)) : GetString(name);
+					DrawString(r.left, r.right - WidgetDimensions::scaled.framerect.right * 2, r.bottom - GetCharacterHeight(FontSize::Normal) - WidgetDimensions::scaled.framerect.bottom * 2, text, TextColour::White, AlignmentH::End);
+				}
 				break;
 			}
 			case WID_FP_PANEL: {
@@ -645,7 +925,7 @@ struct FirstPersonWindow : Window {
 	{
 		switch (widget) {
 			case WID_FP_CANVAS:
-				this->Swing();
+				this->Attack(true);
 				break;
 			case WID_FP_HERE:
 				/* Out of a vehicle first. */
@@ -771,14 +1051,57 @@ bool RigFirstPersonHold(bool out, float swing)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return false;
-	w->hammer_out = out;
+	w->weapon = w->wanted = 0;
+	w->weapon_out = out;
 	w->Hold(0);
-	w->walker.raise = w->hammer_out ? 1.0f : 0.0f;
-	w->walker.held = w->hammer_out ? std::string(FIRST_PERSON_HAMMER) : std::string();
-	w->walker.swing = swing;
+	w->walker.held.raise = w->weapon_out ? 1.0f : 0.0f;
+	w->Dress();
+	w->walker.held.swing = swing;
 	w->MakePicture();
 	w->SetDirty();
-	return w->hammer_out;
+	return w->weapon_out;
+}
+
+/**
+ * The rig: a weapon by its key (1 to 5) in the hand at once; then a shot -- the bow drawn so many milliseconds and let
+ * go, the crossbow shot, a sword swung (0 ms: only in the hand) -- and the arrows let fly so many steps.
+ * @return what is held and where the arrows are
+ */
+std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	w->Choose(key - 1);
+	w->weapon = w->wanted;
+	w->walker.held.raise = w->weapon_out ? 1.0f : 0.0f;
+	w->reload_time = 0;
+	w->Dress();
+	const double dt = FIRST_PERSON_TICK_MS / 1000.0;
+	if (draw_ms > 0) {
+		w->Attack(false);
+		for (int t = 0; t < draw_ms; t += FIRST_PERSON_TICK_MS) w->Hold(dt);
+		if (w->draw_time >= 0 && steps >= 0) w->Attack(false);
+	}
+	std::string held = fmt::format("drzi {} ({}) nabito {} zarez {:.3f},{:.3f},{:.3f} uchyt {:.3f},{:.3f},{:.3f}", w->walker.held.thing, w->weapon_out ? "venku" : "schovano",
+			w->walker.held.loaded.empty() ? "-" : w->walker.held.loaded, w->walker.held.nock[0], w->walker.held.nock[1], w->walker.held.nock[2], w->walker.held.grip[0], w->walker.held.grip[1], w->walker.held.grip[2]);
+	for (int i = 0; i < steps; i++) {
+		w->Hold(dt);
+		w->Fly(dt);
+	}
+	for (const FirstPersonMissile &m : w->missiles) {
+		held += fmt::format("; {} na {:.1f},{:.1f} vyska {:.1f} m nad zemi, smer {:.0f} sklon {:.0f}{}", m.thing, m.x, m.y, (m.z - FirstPersonGroundZ(m.x, m.y)) / OBJECT_HEIGHT_PER_METRE, m.facing, m.pitch, m.stuck ? " zabodnuty" : "");
+	}
+	w->MakePicture();
+	w->SetDirty();
+	return held;
+}
+
+/** The arrows and the bolts of the walker in the view from the eyes (AddCabMissile()). */
+void AddFirstPersonMissilesToEye()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return;
+	for (const FirstPersonMissile &m : w->missiles) AddCabMissile(m.thing, m.x, m.y, m.z, m.facing, m.pitch);
 }
 
 /** The rig: make the picture so many times on so many threads (0 every core); the milliseconds a picture took. */

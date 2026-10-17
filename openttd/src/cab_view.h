@@ -84,14 +84,33 @@ void CabToggleRoute(const Vehicle *v, CabArrows &arrows);
  * The walker of the view from the first person (first_person_gui.cpp; the player, 15. 10.: "let's make Morrowind,
  * the inventory, the first person view"): where it stands and where it looks. Only the picture: nothing of the game.
  */
+/** How a thing is held in the walker's hands (DrawThreeDHeldThing()). */
+enum class ThreeDHold : uint8_t {
+	Swung,    ///< a hammer, a sword: in the right hand by its handle, swung
+	Bow,      ///< a bow: upright in the left hand, its string to the eye
+	Crossbow, ///< a crossbow: at the right shoulder, along the look
+};
+
+/** The thing in the walker's hands, as it is drawn over the picture from its eyes (DrawThreeDHeldThing()). */
+struct ThreeDHeldThing {
+	std::string thing;   ///< the thing of the indices ("predmet": "kladivo", a state of it: "luk/napnuto"), empty for none
+	ThreeDHold hold = ThreeDHold::Swung; ///< how it is held
+	float grip[3] = {0, 0, 0.22f}; ///< where the hand holds it, metres in its frame (its node "uchyt")
+	std::string loaded;  ///< the arrow on its string, the bolt in its groove ("sip", "sipka"), empty for none
+	float nock[3] = {};  ///< where the loaded one's origin (its nock) is, metres in the thing's frame (its "zarez_<stav>")
+	float swing = 0;     ///< how far it is swung, degrees: 0 at rest, below 0 raised back, above 0 struck forward and down
+	float raise = 0;     ///< how far up in the hand it is: 0 put away under the picture, 1 held
+	float kick = 0;      ///< a shot's kick, 1 as it is shot to 0
+	float drawn = 0;     ///< a bow: how far it is drawn, 0 to 1 (brought before the eye, the arrow at the dot)
+	float twist = 0;     ///< swung: degrees it is turned about its handle (a sword's flat to the eye)
+};
+
 struct FirstPersonEye {
 	double x = 0, y = 0;  ///< where it stands, world units
 	double heading = 0;   ///< radians, the world direction it looks along (atan2 of y, x)
 	double pitch = 0;     ///< radians, looking up (positive) or down
 	double eye_z = 0;     ///< its eyes over the ground, units of height
-	std::string held;     ///< the thing in its hands ("predmet" of the indices, the hammer), empty for none
-	float swing = 0;      ///< how far the thing is swung, degrees (DrawThreeDHeldThing())
-	float raise = 0;      ///< how far up in the hand the thing is, 0 put away to 1 held
+	ThreeDHeldThing held; ///< the thing in its hands
 };
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);

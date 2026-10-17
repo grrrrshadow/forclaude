@@ -2253,7 +2253,8 @@ STR_FIRST_PERSON_RUN                                            :Run
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
 STR_FIRST_PERSON_WHERE_HEALTH                                   :Health {NUM} · near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
-STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · E: get into a vehicle beside you · F: the hammer out and away · left button or Space: swing it
+STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
+STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · E: get into a vehicle beside you · 1-5: hammer, bow, crossbow, sword, two-handed sword · F: the weapon out and away · left button or Space: swing it, shoot (the bow: hold to draw, let go to shoot; Space draws and shoots)
 STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
@@ -2282,6 +2283,10 @@ STR_WALKER_ITEM_MARIJUANA                                       :Marijuana
 STR_WALKER_ITEM_GOODS                                           :Goods
 STR_WALKER_ITEM_BOW                                             :Bow
 STR_WALKER_ITEM_ARROWS                                          :Arrows
+STR_WALKER_ITEM_CROSSBOW                                        :Crossbow
+STR_WALKER_ITEM_BOLTS                                           :Crossbow bolts
+STR_WALKER_ITEM_SWORD                                           :Sword
+STR_WALKER_ITEM_TWO_HANDED_SWORD                                :Two-handed sword
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

@@ -13,6 +13,10 @@
 #include "sound_type.h"
 #include "vehicle_type.h"
 #include "tile_type.h"
+#include "fileio_type.h"
+
+#include <optional>
+#include <string>
 
 void ChangeSoundSet(int index);
 
@@ -23,5 +27,7 @@ void SndCopyToPool();
 
 void SndClickBeep();
 void SndConfirmBeep();
+
+std::optional<SoundID> GetGameOwnSound(const std::string &file, Subdirectory subdir);
 
 #endif /* SOUND_FUNC_H */

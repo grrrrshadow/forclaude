@@ -16,6 +16,7 @@
 #include "three_d_vehicle_object.h"
 #include "debug.h"
 #include "fileio_func.h"
+#include "sound_func.h"
 #include "newgrf_config.h"
 #include "tar_type.h"
 #include "gfx_type.h"
@@ -89,6 +90,10 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+/** The sounds of the things of the indices ("zvuky"): "<jmeno>/<zvuk>" to its file (a path, or in a tar: IN_TAR, IN_BASESET_TAR). */
+static std::map<std::string, std::string> _thing_sounds;
+/** The places of the things asked for (GetThreeDThingPlace()): "<jmeno>/<uzel>" to where it is, nothing when it has none. */
+static std::map<std::string, std::optional<std::array<float, 3>>> _thing_places;
 
 /** The clock of the objects, seconds (ForgetUnusedThreeDObjects()): what was drawn when. */
 static uint32_t _three_d_clock = 1;
@@ -1921,6 +1926,24 @@ static void ReadThreeDVehicleObjects()
 					fig.thing = figure_kind == "predmet";
 					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
 					if (e.contains("uzel") && e.at("uzel").is_string()) fig.only_node = e.at("uzel").get<std::string>();
+					if (fig.thing) {
+						/* A thing's states, each a whole thing in a node of its own (the colleague's bow, "volno" and
+						 * "napnuto"; the crossbow, "natazeno" and "vystreleno"): a figure each, "<jmeno>/<stav>", that node
+						 * only. And its sounds ("zvuky": the string drawn, the shot), files beside it. */
+						if (e.contains("stavy") && e.at("stavy").is_object()) {
+							for (const auto &[state, about] : e.at("stavy").items()) {
+								ThreeDVehicleObject one = fig;
+								one.name = fig.name + "/" + state;
+								one.only_node = state;
+								_figure_objects.push_back(std::move(one));
+							}
+						}
+						if (e.contains("zvuky") && e.at("zvuky").is_object()) {
+							for (const auto &[sound, file] : e.at("zvuky").items()) {
+								if (file.is_string()) _thing_sounds[fig.name + "/" + sound] = folder + file.get<std::string>();
+							}
+						}
+					}
 					if (e.value("druh", std::string()) == "rostlina") {
 						fig.name = e.at("soubor").get<std::string>();
 						if (fig.name.ends_with(".glb")) fig.name.resize(fig.name.size() - 4);
@@ -2451,6 +2474,8 @@ void ResetThreeDVehicleObjects()
 	_vehicle_object_shared_pieces.clear();
 	_three_d_theme_trees.clear();
 	_creatures.clear();
+	_thing_sounds.clear();
+	_thing_places.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -2477,6 +2502,51 @@ static std::map<std::string, std::unique_ptr<ThreeDVehicleObject>, std::less<>> 
 
 /** How many ticks a creature passes from one animation to the next (GetThreeDFigure()). */
 static constexpr int CREATURE_BLEND_TICKS = 8;
+
+/**
+ * A place of a thing of the indices: an empty node of its file (the colleague's things: "uchyt" where the hand holds
+ * it, "zarez_napnuto" where the arrow's nock sits on the string drawn), metres in the thing's frame.
+ * @param thing the thing ("jmeno", or "<jmeno>/<stav>": the same file)
+ * @param node the node
+ * @return where, or nothing when the thing or the node is not there
+ */
+std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node)
+{
+	const std::string key = fmt::format("{}/{}", thing, node);
+	auto known = _thing_places.find(key);
+	if (known != _thing_places.end()) return known->second;
+	std::optional<std::array<float, 3>> found;
+	const ThreeDVehicleObject *fig = GetThreeDFigure(thing);
+	if (fig != nullptr) {
+		GlbMesh mesh;
+		std::vector<float> points;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = fig->only_node.empty() ? std::string_view(node) : std::string_view(fig->only_node);
+		o.point_prefix = node;
+		o.points = &points;
+		ReadGlbMesh(fig->file, mesh, o);
+		if (points.size() >= 3) found = std::array<float, 3>{points[0], points[1], points[2]};
+	}
+	_thing_places.emplace(key, found);
+	return found;
+}
+
+/**
+ * A sound of a thing of the indices ("zvuky": the bow's string drawn, "napnuti", and its shot, "vystrel"), read once
+ * (GetGameOwnSound()).
+ * @return the sound, or nothing when the thing has none so named or its file cannot be read
+ */
+std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _thing_sounds.find(fmt::format("{}/{}", thing, sound));
+	if (it == _thing_sounds.end()) return std::nullopt;
+	const std::string &path = it->second;
+	if (path.starts_with(IN_TAR)) return GetGameOwnSound(path.substr(IN_TAR.size()), Subdirectory::NewGrf);
+	if (path.starts_with(IN_BASESET_TAR)) return GetGameOwnSound(path.substr(IN_BASESET_TAR.size()), Subdirectory::Baseset);
+	return GetGameOwnSound(path, Subdirectory::None);
+}
 
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)
 {

@@ -81,7 +81,8 @@ struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1, float yaw = NAN, int z = INT_MIN, int x = 0, int y = 0);
 void PinThreeDPictures(bool pin);
 const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN);
-bool DrawThreeDHeldThing(std::string_view name, float swing, float raise, uint32_t *dst, float *zb, int width, int height, double focal);
+struct ThreeDHeldThing;
+bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, int width, int height, double focal);
 
 /* three_d_vehicle.cpp */
 int ThreeDEngineLength(EngineID engine);

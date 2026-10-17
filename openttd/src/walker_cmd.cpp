@@ -36,6 +36,10 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_GOODS, 40, 0, WalkerItemKind::Thing},
 	{STR_WALKER_ITEM_BOW, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_ARROWS, 0, 0, WalkerItemKind::Ammunition},
+	{STR_WALKER_ITEM_CROSSBOW, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_BOLTS, 0, 0, WalkerItemKind::Ammunition},
+	{STR_WALKER_ITEM_SWORD, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_TWO_HANDED_SWORD, 0, 0, WalkerItemKind::Weapon},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -142,6 +146,26 @@ CommandCost CmdUseWalkerItem(DoCommandFlags flags, WalkerItem item)
 }
 
 /**
+ * An arrow or a bolt shot from the walker's bow or crossbow (first_person_gui.cpp): one less of it.
+ * @param flags operation to perform
+ * @param item the ammunition
+ * @return nothing, or an error
+ */
+CommandCost CmdShootWalkerItem(DoCommandFlags flags, WalkerItem item)
+{
+	if (item >= WalkerItem::End || GetWalkerItemSpec(item).kind != WalkerItemKind::Ammunition) return CMD_ERROR;
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	if (c->walker_items[to_underlying(item)] == 0) return CommandCost(STR_ERROR_WALKER_HAS_NONE);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[to_underlying(item)]--;
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
  * Hurt the walker of the view from the first person: a dragon's blow (the player, 15. 10.: "they attack the player").
  * At no health left the view closes and the player is back on the map (first_person_gui.cpp).
  * @param flags operation to perform
@@ -198,7 +222,7 @@ uint16_t WalkerCheatCount(WalkerItem item, uint16_t carried, uint16_t quiver)
 /**
  * The cheat iddqd (the console): every weapon the walker has not, the arrows filled up (WalkerCheatCount()).
  * @param flags operation to perform
- * @param quiver the arrows filled up to (WALKER_ARROWS_FULL)
+ * @param quiver the arrows filled up to (WALKER_AMMUNITION_FULL)
  * @return nothing, or an error
  */
 CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver)

@@ -32,8 +32,12 @@ enum class WalkerItem : uint8_t {
 	Cigarettes, ///< cigarettes
 	Marijuana,  ///< marijuana: heals more
 	Goods,      ///< goods bought in a town
-	Bow,        ///< the bow (shot when the colleague's model is in, objekty/predmety/)
-	Arrows,     ///< arrows for the bow
+	Bow,        ///< the bow (the colleague's, objekty/predmety/luk.glb): drawn and shot
+	Arrows,     ///< arrows for the bow, used up as they are shot
+	Crossbow,   ///< the crossbow: shot, then drawn again
+	Bolts,      ///< bolts for the crossbow
+	Sword,      ///< the sword, swung as the hammer
+	TwoHandedSword, ///< the two-handed sword, swung as the hammer
 	End,        ///< the end of the known things
 };
 
@@ -48,8 +52,8 @@ enum class WalkerItemKind : uint8_t {
 static constexpr size_t WALKER_ITEM_SLOTS = 32;
 /** The most of one thing carried. */
 static constexpr uint16_t WALKER_ITEM_MAX = 999;
-/** The arrows the cheat fills the quiver up to. */
-static constexpr uint16_t WALKER_ARROWS_FULL = 50;
+/** The arrows and the bolts the cheat fills up to. */
+static constexpr uint16_t WALKER_AMMUNITION_FULL = 50;
 /** The walker's full health. */
 static constexpr uint8_t WALKER_HEALTH_MAX = 100;
 

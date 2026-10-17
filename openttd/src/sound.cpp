@@ -19,6 +19,9 @@
 #include "vehicle_base.h"
 #include "base_media_func.h"
 #include "base_media_sounds.h"
+#include "fileio_func.h"
+
+#include <map>
 
 #include "safeguards.h"
 
@@ -306,3 +309,50 @@ template <>
 }
 
 template class BaseMedia<SoundsSet>;
+
+/**
+ * A sound of the game's own from a WAV file (the car's horn, the bow's string): read once by the loaders of the sets'
+ * sounds, and put in the pool beside the sets' (AllocateSound()); the pool is made anew with the sets
+ * (InitializeSoundPool()), and the sound with it then.
+ * @param file the file, in the folder subdir (Subdirectory::None: a path on the disk)
+ * @param subdir where it is
+ * @return the sound, or nothing when the file cannot be read
+ */
+std::optional<SoundID> GetGameOwnSound(const std::string &file, Subdirectory subdir)
+{
+	struct Known {
+		SoundEntry read{}; ///< as read, its data shared with the pool's entry
+		SoundID id = 0;    ///< its entry in the pool, 0 not yet
+		bool failed = false;
+	};
+	static std::map<std::pair<std::string, Subdirectory>, Known> known;
+	Known &k = known[{file, subdir}];
+	if (k.failed) return std::nullopt;
+	if (k.read.data == nullptr) {
+		if (!FioCheckFileExists(file, subdir)) {
+			k.failed = true;
+			return std::nullopt;
+		}
+		RandomAccessFile f(file, subdir);
+		k.read.file = &f;
+		k.read.file_offset = f.GetStartPos();
+		k.read.file_size = f.GetEndPos() - f.GetStartPos();
+		k.read.source = SoundSource::BasesetNewFormat;
+		const bool loaded = LoadSoundData(k.read, true, 0, file);
+		k.read.file = nullptr;
+		if (!loaded) {
+			k.read.data = nullptr;
+			k.failed = true;
+			return std::nullopt;
+		}
+	}
+	const SoundEntry *in_pool = GetSound(k.id);
+	if (k.id == 0 || in_pool == nullptr || in_pool->data != k.read.data) {
+		k.id = static_cast<SoundID>(GetNumSounds());
+		SoundEntry *made = AllocateSound(1);
+		*made = k.read;
+		made->volume = 0x80;
+		made->priority = 0;
+	}
+	return k.id;
+}

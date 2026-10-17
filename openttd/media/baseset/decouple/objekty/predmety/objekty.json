@@ -43,5 +43,175 @@
   "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/predmety_example_suite.py bez renderu",
   "licence": "CC0 1.0 (volné dílo)",
   "poznamka": "dřevěná truhla s kováním a zámkem, stojí ve světě (do inventáře se nenosí, váha prázdné truhly); dva uzly zavreno a otevreno (celá truhla v každém, hra ukáže jeden); šev víka ve výšce 0.379 m; počátek uprostřed dna, zámek k +x; barvy z modelu (tmavé dřevo, tmavé železo), bez textury; 496 trojúhelníků na uzel, normály z modelu"
+ },
+ {
+  "soubor": "luk.glb",
+  "jmeno": "luk",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Luk",
+   "en": "Bow"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 1.0,
+  "rozmer_m": [
+   0.2,
+   0.039,
+   1.442
+  ],
+  "uchyt": "uchyt",
+  "strelivo": "sip",
+  "stavy": {
+   "volno": "tětiva v klidu 0.17 m za úchopem",
+   "napnuto": "tětiva natažená na 0.7 m, ramena víc ohnutá"
+  },
+  "zarez": {
+   "volno": [
+    -0.17,
+    0.021,
+    0.03
+   ],
+   "napnuto": [
+    -0.7,
+    0.021,
+    0.03
+   ]
+  },
+  "natazeni_m": 0.7,
+  "zvuky": {
+   "napnuti": "luk_napnuti.wav",
+   "vystrel": "luk_vystrel.wav"
+  },
+  "zdroj": "vlastní (Example Suite luk nemá)",
+  "autor": "grrrrf: vlastní model predmety/luk_kuse.py (ve stylu Example Suite)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy bez textury)",
+  "zvuky_zdroj": "bow_pull.wav a bow_shoot.wav z Example Suite (the_hub/data/sound, CC0)",
+  "poznamka": "dřevěný luk 1.5 m, kožený úchop, rohové konce ramen, lněná tětiva; počátek ve středu úchopu (levá ruka), luk svisle po +z, tětiva k −x, šíp letí po +x; dva uzly volno a napnuto (celý luk v každém, hra ukáže jeden); prázdné uzly uchyt (počátek), zarez (tětiva v klidu, kde sedí zářez šípu, 0.03 m nad středem úchopu a 0.021 m vlevo (+y), aby šíp po +x šel vedle úchopu), zarez_volno a zarez_napnuto pod uzly stavů (polohy i v klíči zarez); šíp v zarez_napnuto míří hrotem 0.05 m před úchop; 908 trojúhelníků na uzel; zvuky napnuti (při držení tlačítka) a vystrel (puštění)"
+ },
+ {
+  "soubor": "sip.glb",
+  "jmeno": "sip",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Šíp",
+   "en": "Arrow"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 0.03,
+  "rozmer_m": [
+   0.75,
+   0.027,
+   0.028
+  ],
+  "zbran": "luk",
+  "zdroj": "vlastní",
+  "autor": "grrrrf: vlastní model predmety/luk_kuse.py (ve stylu Example Suite)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy bez textury)",
+  "poznamka": "šíp 0.75 m: dřevěný dřík, ocelový listový hrot, tři pera (dvě světlá, vodicí červené k +y), tmavý zářez; leží po +x, hrot na +x, počátek v zářezu (zadní konec na tětivě); 180 trojúhelníků"
+ },
+ {
+  "soubor": "kuse.glb",
+  "jmeno": "kuse",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Kuše",
+   "en": "Crossbow"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 4.0,
+  "rozmer_m": [
+   1.183,
+   0.74,
+   0.122
+  ],
+  "uchyt": "uchyt",
+  "strelivo": "sipka",
+  "stavy": {
+   "natazeno": "tětiva natažená na ořech, šipka může ležet v drážce",
+   "vystreleno": "tětiva rovně mezi konci lučiště"
+  },
+  "zarez": {
+   "natazeno": [
+    0.1904,
+    0.0,
+    0.0222
+   ],
+   "vystreleno": [
+    0.3168,
+    0.0,
+    0.0222
+   ]
+  },
+  "natazeni_m": 0.126,
+  "zvuky": {
+   "vystrel": "luk_vystrel.wav"
+  },
+  "zdroj": "the_hub/data/meshes/weapons/basic_crossbow.dae (crossbow, kosti string a arrowbone)",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "kuše; šipka letí po +x, nahoru +z, lučiště napříč (±y), počátek v úchopu pravé ruky (pažba nad spouští); dva uzly natazeno a vystreleno (celá kuše v každém, hra ukáže jeden): kuše v modelu natahuje tětivu kostí string, vystreleno je model, jak je, natazeno má tětivu posunutou o 0.126 m dozadu na ořech, ke kosti arrowbone (tam leží šipka); prázdné uzly uchyt (počátek), zarez (zadní konec šipky v natažené kuši), zarez_natazeno a zarez_vystreleno pod uzly stavů; model bez materiálu, barvy naše (dřevěná pažba, ocelové lučiště, tmavé kování, třmen a spoušť, tětiva), bez textury; 572 trojúhelníků na uzel, normály z modelu; zvuk výstřelu jako u luku (Example Suite zvuk kuše nemá)"
+ },
+ {
+  "soubor": "sipka.glb",
+  "jmeno": "sipka",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Šipka do kuše",
+   "en": "Crossbow Bolt"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 0.05,
+  "rozmer_m": [
+   0.4,
+   0.029,
+   0.013
+  ],
+  "zbran": "kuse",
+  "zdroj": "vlastní (Example Suite šipku nemá)",
+  "autor": "grrrrf: vlastní model predmety/luk_kuse.py (ve stylu Example Suite)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy bez textury)",
+  "poznamka": "šipka 0.4 m: dřevěný dřík, ocelový čtyřhranný hrot, dvě plochá kožená pera (±y, leží v drážce); leží po +x, hrot na +x, počátek na zadním konci (na tětivě, v uzlu zarez kuše); 136 trojúhelníků"
+ },
+ {
+  "soubor": "mec.glb",
+  "jmeno": "mec",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Meč",
+   "en": "Sword"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 1.3,
+  "rozmer_m": [
+   0.2,
+   0.063,
+   1.101
+  ],
+  "uchyt": "uchyt",
+  "zdroj": "the_hub/data/meshes/weapons/basic_sword1h.dae",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "jednoruční meč, čepel 0.86 m; jako kladivo: počátek na konci hlavice, čepel po +z, ostří do ±x; prázdný uzel uchyt uprostřed rukojeti 0.128 m nad koncem; model bez materiálu, barvy naše (ocelová čepel, tmavá záštita a hlavice, kožená rukojeť 0.171 m), bez textury; 318 trojúhelníků, normály z modelu"
+ },
+ {
+  "soubor": "mec_obourucni.glb",
+  "jmeno": "mec_obourucni",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Obouruční meč",
+   "en": "Two-handed Sword"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 3.0,
+  "rozmer_m": [
+   0.364,
+   0.052,
+   1.606
+  ],
+  "uchyt": "uchyt",
+  "zdroj": "the_hub/data/meshes/weapons/basic_sword2h.dae",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "obouruční meč, čepel 1.222 m; jako kladivo: počátek na konci hlavice, čepel po +z, ostří do ±x; prázdný uzel uchyt uprostřed rukojeti 0.214 m nad koncem; model bez materiálu, barvy naše (ocelová čepel, tmavá záštita a hlavice, kožená rukojeť 0.301 m), bez textury; 288 trojúhelníků, normály z modelu"
  }
 ]

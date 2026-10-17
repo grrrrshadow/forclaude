@@ -47,9 +47,6 @@
 #include "engine_base.h"
 #include "sound_func.h"
 #include "newgrf_sound.h"
-#include "fileio_func.h"
-#include "random_access_file_type.h"
-#include "soundloader_func.h"
 #include "widgets/cab_view_widget.h"
 
 #include "table/strings.h"
@@ -165,37 +162,11 @@ void CabStartStop(const Vehicle *v)
 /**
  * The horn of a car (the player, 17. 10.: "can the car honk?"; the sound from him: "a horn for the car"): the sounds
  * of the sets have none, only the engines starting at a stop, so it is the game's own, baseset/decouple/zvuky/
- * klakson.wav, read once by the loaders of the sets' sounds. It is a sound of the pool beside the sets'
- * (AllocateSound()); the pool is made anew with the sets (InitializeSoundPool()), and so is the horn then. Without the
- * file the car has no horn.
+ * klakson.wav (GetGameOwnSound()). Without the file the car has no horn.
  */
 static std::optional<SoundID> CarHornSound()
 {
-	static const std::string name = "decouple" PATHSEP "zvuky" PATHSEP "klakson.wav";
-	static std::shared_ptr<std::vector<std::byte>> pcm;
-	static SoundEntry read{};
-	static SoundID id = 0;
-	if (pcm == nullptr) {
-		if (!FioCheckFileExists(name, Subdirectory::Baseset)) return std::nullopt;
-		RandomAccessFile file(name, Subdirectory::Baseset);
-		read.file = &file;
-		read.file_offset = file.GetStartPos();
-		read.file_size = file.GetEndPos() - file.GetStartPos();
-		read.source = SoundSource::BasesetNewFormat;
-		bool loaded = LoadSoundData(read, true, 0, "klakson");
-		read.file = nullptr;
-		if (!loaded) return std::nullopt;
-		pcm = read.data;
-	}
-	const SoundEntry *known = GetSound(id);
-	if (id == 0 || known == nullptr || known->data != pcm) {
-		id = static_cast<SoundID>(GetNumSounds());
-		SoundEntry *made = AllocateSound(1);
-		*made = read;
-		made->volume = 0x80;
-		made->priority = 0;
-	}
-	return id;
+	return GetGameOwnSound("decouple" PATHSEP "zvuky" PATHSEP "klakson.wav", Subdirectory::Baseset);
 }
 
 /**

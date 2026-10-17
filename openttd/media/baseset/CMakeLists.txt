@@ -114,9 +114,10 @@ foreach(BUILTIN_GRAPHICS_FILE IN LISTS BASESET_BUILTIN_GRAPHICS_FILES)
 endforeach()
 
 # Buildings as real 3D objects (src/three_d_objects.h): every object set in
-# decouple/objekty/<set>/ -- its .glb files, the snowy textures beside them and its index objekty.json -- is
+# decouple/objekty/<set>/ -- its .glb files, the snowy textures beside them, the sounds of its things (.wav) and its
+# index objekty.json -- is
 # read by the game from baseset/decouple/objekty/<set>/, drawn in the 3D views.
-file(GLOB BASESET_OBJECT_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.glb ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.png ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/objekty.json)
+file(GLOB BASESET_OBJECT_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.glb ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.png ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/*.wav ${CMAKE_CURRENT_SOURCE_DIR}/decouple/objekty/*/objekty.json)
 foreach(OBJECT_FILE IN LISTS BASESET_OBJECT_FILES)
     file(RELATIVE_PATH OBJECT_RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${OBJECT_FILE}")
     get_filename_component(OBJECT_DIR "${OBJECT_RELATIVE}" DIRECTORY)

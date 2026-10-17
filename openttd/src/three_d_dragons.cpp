@@ -433,35 +433,71 @@ void AddThreeDDragonsToEye()
 	}
 }
 
+namespace {
+
+/** Whether a dragon can be hit: not falling, dead or leaving. */
+bool Hittable(const Dragon &d)
+{
+	return d.state != State::Dying && d.state != State::Dead && d.state != State::Leave;
+}
+
+/** A dragon hit: so much less health; a walking dragon falls after its last, a flying one flies off. */
+void Strike(Dragon &d, int damage)
+{
+	d.health -= damage;
+	if (d.health > 0) return;
+	const ThreeDCreature *c = Creature(d.kind);
+	if (d.state == State::Fly) {
+		d.swooped = true;
+	} else if (c != nullptr && c->Has("smrt")) {
+		d.state = State::Dying;
+		SetAnim(d, "smrt", TimerGameTick::counter, 1.0, true);
+	} else {
+		d.state = State::Leave;
+	}
+}
+
+} // namespace
+
 /**
- * A blow of the walker's hammer: the dragon it reaches in front of it takes it. A walking dragon falls after its
- * last; a flying one, low over the walker, flies off.
+ * A blow of the walker's hammer or sword: the dragon it reaches in front of it takes it (Strike()).
  * @param x,y where the walker stands, world units
  * @param heading the direction it faces, radians
- * @param reach_m how far the hammer reaches, metres
+ * @param reach_m how far the weapon reaches, metres
+ * @param damage how much health the blow takes
  * @return whether a dragon was hit
  */
-bool HitThreeDDragon(double x, double y, double heading, double reach_m)
+bool HitThreeDDragon(double x, double y, double heading, double reach_m, int damage)
 {
-	const uint64_t now = TimerGameTick::counter;
 	for (Dragon &d : _dragons) {
-		if (d.state == State::Dying || d.state == State::Dead || d.state == State::Leave || d.lift > 4.0) continue;
+		if (!Hittable(d) || d.lift > 4.0) continue;
 		const double dx = d.x - x, dy = d.y - y;
 		const double gap_m = std::hypot(dx, dy) / OBJECT_UNITS_PER_METRE - d.length_m * 0.4;
 		if (gap_m > reach_m) continue;
 		const double off = std::abs(std::remainder(std::atan2(dy, dx) - heading, 2 * M_PI));
 		if (off > 70.0 * M_PI / 180.0) continue;
-		d.health--;
-		if (d.health > 0) return true;
-		const ThreeDCreature *c = Creature(d.kind);
-		if (d.state == State::Fly) {
-			d.swooped = true;
-		} else if (c != nullptr && c->Has("smrt")) {
-			d.state = State::Dying;
-			SetAnim(d, "smrt", now, 1.0, true);
-		} else {
-			d.state = State::Leave;
-		}
+		Strike(d, damage);
+		return true;
+	}
+	return false;
+}
+
+/**
+ * An arrow or a bolt of the walker (the player, 17. 10.: the bow and the crossbow) at a point: the dragon whose body
+ * it is in takes it (Strike()) -- a flying one too, however high.
+ * @param x,y,z the point, world units and units of height
+ * @param damage how much health it takes
+ * @return whether a dragon was hit
+ */
+bool HitThreeDDragonAt(double x, double y, double z, int damage)
+{
+	for (Dragon &d : _dragons) {
+		if (!Hittable(d)) continue;
+		/* Its body: about as wide as half its length, as high as it is tall, from its feet. */
+		const double r = std::max(1.0, d.length_m * 0.3) * OBJECT_UNITS_PER_METRE;
+		if (std::hypot(d.x - x, d.y - y) > r) continue;
+		if (z < d.z - 0.3 * OBJECT_HEIGHT_PER_METRE || z > d.z + d.height_m * OBJECT_HEIGHT_PER_METRE) continue;
+		Strike(d, damage);
 		return true;
 	}
 	return false;

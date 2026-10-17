@@ -19,6 +19,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – luk, kuše a meče (kolegovy `LUK-SIP-PRO-HRU.md`)
+
+- Hráč: **„je tam luk a kuše“**. Kolega poslal vlastní luk a šíp (ve stylu Example Suite, GPL-2.0), kuši z Example
+  Suite se svou šipkou, oba meče z Example Suite a zvuky luku (CC0). Jsou v sadě hry `objekty/predmety/`, CMake bere
+  i `.wav` sad objektů.
+- **Klávesy 1–5**: kladivo, luk, kuše, meč, obouruční meč (jen ty, které chodec nese); druhá zbraň se tasí, až se
+  první schová. F tasí a schová. Meče se máchají jako kladivo (dosah 2,2 a 2,8 m, obouruční bere drakovi 2), držené
+  za úchyt z uzlu `uchyt` a pootočené plochou čepele k oku.
+- **Luk**: levé tlačítko držet = napnout (zvuk napnutí, za 0,8 s plně, stav `napnuto`, luk se přesune před oko),
+  pustit = výstřel (zvuk, rychlost 14–55 m/s podle napnutí); mezerník napne a podruhé vystřelí. Nový šíp na tětivě
+  za 0,5 s. **Kuše**: výstřel 70 m/s, šipka bere drakovi 2, za 1,5 s natažená znovu (stav `vystreleno`, pak
+  `natazeno` se šipkou v drážce).
+- **Šíp letí obloukem** (gravitace), natočený po dráze a kreslený v pohledu z očí trojúhelníky s náklonem (nikdy ne
+  zjednodušený, tenký dřík by zmizel). Špička v drakovi: drak dostane zásah (i letící, v jakékoli výšce); v zemi:
+  zabodne se tam, kde ji špička protne, 6 cm hluboko, a zůstane 20 s; ve zdi domu se zastaví; ve vodě zmizí.
+  Každý výstřel ubere šíp nebo šipku příkazem `ShootWalkerItem`. Vpravo dole je zbraň a kolik k ní zbývá střel.
+- Hra čte stavy předmětu jako figury `<jmeno>/<stav>` (jen ten uzel), polohy prázdných uzlů (`GetThreeDThingPlace()`)
+  a zvuky předmětu (`GetThreeDThingSound()`); zvuky hry (klakson i luk) jdou přes jednu funkci `GetGameOwnSound()`.
+- `iddqd` dá i kuši, šipky a oba meče (inventář má nové věci na konci).
+- Při pohledu dolů byl dole na obrázku pruh oblohy: zem blíž než 1,9 m od oka se ořízla. Chodec má teď blízkou rovinu
+  0,4 jednotky.
+- Rig: `test3d chodec zbran <1-5> [ms napnutí] [kroků|drzet]`, `test3d draci posli drak_hnedy 2`; `test3d` čte
+  i záporná čísla (sklon pohledu dolů). Ověřeno: drak dostal šípy 6 → 5 → 4, šipky 4 → 2 → 0 a padl.
+
 ## 17. 10. – úvod bez pohybu kamery, cheat iddqd, luk a šípy v inventáři
 
 - Hráč: **úvodní obrazovka bez pohybu kamery, jen občas otočit plochu**. Kamera se postaví jednou na první místo
@@ -26,8 +50,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: **cheat `iddqd` v konzoli dá všechny zbraně**; co už je v inventáři, nedá podruhé, šípy doplní, luk dá, když
   chybí. Inventář má nové věci `Luk` a `Šípy` (na konci, čísla věcí se ukládají) a druh věci (zbraň, střelivo, věc).
   `iddqd` (příkaz `WalkerCheat`, jen hra pro jednoho) dá zbraň, která chybí, a šípy doplní na 50; napíše, co dal.
-- **Luk zatím nestřílí**: model luku a šípu od kolegy ještě není (`PROSBA-LUK-SIP.md` z 16. 10., 17. 10. jsem dopsal
-  stav). Střelba (napnout, pustit, šíp obloukem, zásah draka, ubývání šípů) přijde s modelem. Otevřené #75.
+- Luk zatím nestřílel: model od kolegy přišel o chvíli později (viz výš, střelba hotová).
 
 ## 17. 10. – po nástupu hned řídíš, „Jeď svou trasu“, letadlo, klakson, světla, otáčení úvodu
 

@@ -31,6 +31,7 @@
 #include "tile_type.h"
 #include "vehicle_type.h"
 #include "zoom_type.h"
+#include "sound_type.h"
 
 #include <algorithm>
 #include <array>
@@ -492,6 +493,8 @@ private:
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node);
+std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound);
 
 /**
  * A creature of the indices ("druh": "tvor", the colleague's dragons, hra/3d/PROSBA-DRACI.md): its animations, each
