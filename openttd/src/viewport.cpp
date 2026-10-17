@@ -8144,7 +8144,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, CabFigureMode
 {
 	const ThreeDVehicleObject *fig = fg.obj != nullptr ? fg.obj : GetThreeDFigure(fg.name);
 	if (fig == nullptr) return false;
-	const ThreeDVehicleShape *whole = fig->TryGetShape(fg.frame);
+	const ThreeDVehicleShape *whole = fig->TryGetShape(fg.frame, fig->PartsOf(fg.state));
 	if (whole == nullptr || whole->tri.empty()) return false;
 	const double across = fg.size * OBJECT_UNITS_PER_METRE;
 	/* As detailed as it is big on the picture: its corners joined about two pixels apart (Simpler()); the cab the eye

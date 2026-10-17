@@ -86,6 +86,7 @@ struct ObjectSpriteRequest {
 	int fade = 0;                             ///< its state (StateStep())
 	uint64_t walk = 0;                        ///< the frames of its crew that walks (WalkCode())
 	int bounds_of = 0;                        ///< what its bounds before it is made were worked out of (ThreeDVehicleObjectSpriteBounds()): 0 not yet, 1 a guess, 2 its object's extent
+	uint32_t extent_version = 0;              ///< with 2, of which extent of the object (ThreeDVehicleObject::KnownExtent()): it grows as parts are added
 	Rect bounds{};
 };
 static std::vector<ObjectSpriteRequest> _object_sprite_requests;
@@ -727,11 +728,13 @@ static constexpr int LIGHTS_FRONT = 1, LIGHTS_BACK = 2;
 static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape)
 {
 	/* Asked on the thread making the pictures of the vehicles too (RasterObject()). */
-	static std::map<const ThreeDVehicleShape *, float> known;
+	/* (By the shape and its triangles: a shape made again with more parts may be where one let go of was.) */
+	static std::map<std::pair<const ThreeDVehicleShape *, size_t>, float> known;
 	static std::mutex known_mutex;
+	const auto key = std::make_pair(&shape, shape.tri.size());
 	{
 		std::lock_guard lock(known_mutex);
-		auto it = known.find(&shape);
+		auto it = known.find(key);
 		if (it != known.end()) return it->second;
 	}
 	/* The texture's size at its finest, not the texture: its finest level is made only when drawn (the textures by need). */
@@ -750,7 +753,7 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 	}
 	float density = area > 0 ? static_cast<float>(std::sqrt(uv_area / area)) : 1.0f;
 	std::lock_guard lock(known_mutex);
-	known.emplace(&shape, density);
+	known.emplace(key, density);
 	return density;
 }
 
@@ -900,7 +903,7 @@ struct ObjectDetailPaint {
  */
 static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f, int lights = 0, int state = 0, uint64_t walk = 0)
 {
-	const ThreeDVehicleShape *whole = obj.GetShape(frame);
+	const ThreeDVehicleShape *whole = obj.GetShape(frame, obj.PartsOf(state));
 	if (whole == nullptr) return false;
 	/* As detailed as the picture is fine (the colleague's lorries and wagons are in full detail, PROSBA point 12: "the
 	 * game makes fewer triangles when it is far"): its corners joined about one and a half pixels apart (Simpler()).
@@ -1390,13 +1393,14 @@ bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds)
 		bounds = {0, 0, 0, 0};
 		return true;
 	}
-	if (req.bounds_of == 2) {
+	const ThreeDVehicleObject &obj = *req.obj;
+	float e[6];
+	uint32_t version = 0;
+	const bool known = obj.KnownExtent(e, &version);
+	if (req.bounds_of == 2 && version == req.extent_version) {
 		bounds = req.bounds;
 		return true;
 	}
-	const ThreeDVehicleObject &obj = *req.obj;
-	float e[6];
-	const bool known = obj.KnownExtent(e);
 	if (!known && req.bounds_of == 1) {
 		bounds = req.bounds;
 		return true;
@@ -1440,6 +1444,7 @@ bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds)
 	req.bounds.right = static_cast<int>(std::ceil(maxx)) + static_cast<int>(std::lround(ox)) + pad;
 	req.bounds.bottom = static_cast<int>(std::ceil(maxy)) + static_cast<int>(std::lround(oy)) + pad;
 	req.bounds_of = known ? 2 : 1;
+	req.extent_version = version;
 	bounds = req.bounds;
 	return true;
 }

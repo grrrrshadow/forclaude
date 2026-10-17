@@ -469,9 +469,11 @@ struct ThreeDVehicleObject {
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
+	const ThreeDVehicleShape *GetShape(int frame, uint64_t parts) const;
 	const ThreeDVehicleShape *TryGetShape(int frame = 0) const;
+	const ThreeDVehicleShape *TryGetShape(int frame, uint64_t parts) const;
 	bool ShapeKnown() const;
-	bool KnownExtent(float extent[6]) const;
+	bool KnownExtent(float extent[6], uint32_t *version = nullptr) const;
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, int index = 0) const;
@@ -493,8 +495,10 @@ struct ThreeDVehicleObject {
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
+	mutable uint64_t shape_parts = 0; ///< the parts of its states the shape has (PartsOf()): only those of the states drawn, the others added as they are drawn
 	mutable float extent[6] = {};   ///< its shape's extent of all its corners (ThreeDVehicleShape::all), kept when the shape is forgotten
 	mutable bool extent_known = false;
+	mutable uint32_t extent_version = 0; ///< each time the extent grew (a part added to the shape)
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
 	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
 	mutable std::map<std::pair<std::vector<int>, uint16_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers and the vehicle's colours
@@ -502,7 +506,7 @@ struct ThreeDVehicleObject {
 	mutable bool walking_found = false;
 
 private:
-	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame) const;
+	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame, uint64_t parts = UINT64_MAX) const;
 	std::shared_ptr<const ThreeDVehicleShape> MakePosedShape(int frame) const;
 	mutable std::vector<ThreeDTextureLevels> levels; ///< the textures, each halved for each level of detail
 	mutable ThreeDTextureLevels mask_levels;         ///< the paint mask likewise (its grey in the red)

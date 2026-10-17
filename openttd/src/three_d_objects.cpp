@@ -564,6 +564,9 @@ struct GlbReadOptions {
 	const std::vector<std::string> *marks = nullptr; ///< a second marking of nodes by name, as groups (GlbMesh::tri_mark): a part's wheels
 	std::string_view glass_suffix; ///< the nodes whose names end so (and their children) are glass (GlbMesh::tri_glass)
 	bool points_only = false;     ///< only the places (points), no mesh read: the lights at the back of an add-on's parts
+	/** With groups and only_groups, the nodes whose materials are taken as textures first, in the order they are met, before
+	 * only those of groups are read: the textures of an add-on the same whatever of its nodes are read. */
+	const std::vector<std::string> *material_groups = nullptr;
 };
 
 /** Whether a node is of the lights at night: "noc", or "noc_<part>" of an add-on's part. */
@@ -857,6 +860,26 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				bool glass;
 			};
 			std::vector<NodeToVisit> todo;
+			if (o.material_groups != nullptr && o.only_groups && !o.points_only) {
+				/* The textures of all the nodes of material_groups first, in the order the meshes are met. */
+				std::vector<std::pair<int, bool>> seen;
+				for (int r : roots) seen.emplace_back(r, false);
+				size_t walked = 0;
+				while (!seen.empty() && walked++ < 100000) {
+					auto [n, in] = seen.back();
+					seen.pop_back();
+					const auto &node = nodes.at(n);
+					const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+					if (o.skip_night && IsNightNode(node_name)) continue;
+					if (std::ranges::find(*o.material_groups, node_name) != o.material_groups->end()) in = true;
+					if (in && node.contains("mesh")) {
+						for (const auto &p : j.at("meshes").at(node.at("mesh").get<int>()).at("primitives")) {
+							if (p.value("mode", 4) == 4) texture_of(p.value("material", -1));
+						}
+					}
+					if (node.contains("children")) for (const auto &c : node.at("children")) seen.emplace_back(c.get<int>(), in);
+				}
+			}
 			const bool inside_at_first = only_node.empty() && !o.only_night && !(o.only_groups && groups != nullptr);
 			for (int r : roots) todo.push_back({r, identity, inside_at_first, 0, 0, false});
 			size_t visited = 0;
@@ -3029,30 +3052,63 @@ int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
 	return static_cast<int>((tick / this->frame_ticks + phase) % this->frames);
 }
 
-/** The object's shape, read from its .glb the first time (on either thread, MakeOnce()); nullptr when it cannot be. A figure that moves: its first frame. */
+/**
+ * The shapes made again with more parts in the place of others (ThreeDVehicleObject::GetShape()): a thread may draw from
+ * those yet, so they are let go of only between the frames (TrimThreeDTextures()). Under _lazy_mutex.
+ */
+static std::vector<std::shared_ptr<const ThreeDVehicleShape>> _shapes_replaced;
+
+/** The object's shape as it is now, read from its .glb the first time (only what is always drawn); nullptr when it cannot be. A figure that moves: its first frame. */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 {
+	return this->GetShape(0, 1);
+}
+
+/**
+ * The object's shape with the parts of its states asked for (PartsOf(); on either thread, MakeOnce()). It has only
+ * the parts of the states drawn (the player, 17. 10.: "optimise the whole process with the objects first"): the
+ * colleague's trailer of a Tatra is one object of all its ten bodies, three quarters of a million triangles, and a
+ * state shows one. A part not in it yet is added: the shape is made again with it, the one before kept till nothing
+ * draws from it. A figure that moves: its frame (GetShape(int)).
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame, uint64_t parts) const
+{
+	if (this->frames >= 2 && (frame > 0 || this->blend_from != nullptr)) return this->GetShape(frame);
 	MarkThreeDUsed(this->used);
-	MakeOnce(this, LAZY_SHAPE, [this] { return this->shape != nullptr || this->shape_tried; }, [this] { return this->MakeShape(0); }, [this](std::shared_ptr<const ThreeDVehicleShape> made) {
-		this->shape = std::move(made);
+	parts |= 1;
+	MakeOnce(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || (this->shape_parts & parts) == parts); }, [this, parts] {
+		uint64_t want = parts;
+		{
+			std::lock_guard lock(_lazy_mutex);
+			want |= this->shape_parts;
+		}
+		return std::make_pair(this->MakeShape(0, want), want);
+	}, [this](std::pair<std::shared_ptr<const ThreeDVehicleShape>, uint64_t> made) {
+		if (this->shape != nullptr) _shapes_replaced.push_back(std::move(this->shape));
+		this->shape = std::move(made.first);
+		this->shape_parts = this->shape != nullptr ? made.second : 0;
 		this->shape_tried = true;
 		if (this->shape != nullptr && this->shape->all[1] > this->shape->all[0]) {
 			std::copy(std::begin(this->shape->all), std::end(this->shape->all), this->extent);
 			this->extent_known = true;
+			this->extent_version++;
 		}
 	});
+	std::lock_guard lock(_lazy_mutex);
 	return this->shape.get();
 }
 
 /**
  * The extent of all the corners of the object's shape (ThreeDVehicleShape::all) if it was ever read: how big its
  * sprite is before it is made (ThreeDVehicleObjectSpriteBounds()). Never reads it: asked in the game's tick.
+ * @param[out] version each time it grew another (a part added to the shape)
  */
-bool ThreeDVehicleObject::KnownExtent(float extent[6]) const
+bool ThreeDVehicleObject::KnownExtent(float extent[6], uint32_t *version) const
 {
 	std::lock_guard lock(_lazy_mutex);
 	if (!this->extent_known) return false;
 	std::copy(std::begin(this->extent), std::end(this->extent), extent);
+	if (version != nullptr) *version = this->extent_version;
 	return true;
 }
 
@@ -3063,15 +3119,24 @@ bool ThreeDVehicleObject::ShapeKnown() const
 	return this->shape != nullptr || this->shape_tried;
 }
 
-/**
- * The object's shape (a frame of it) if it is read already; else nullptr, and it is read in the background
- * (MadeOrAsked()). A figure's frame that cannot be read: its shape, as GetShape(int) gives it.
- */
+/** The object's shape (a frame of it) if it is read already; else nullptr, and it is read in the background (TryGetShape(int, uint64_t)). */
 const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame) const
+{
+	return this->TryGetShape(frame, 1);
+}
+
+/**
+ * The object's shape (a frame of it) if it is read already, with the parts asked for if they are added already: the
+ * parts it has not yet are added in the background (MadeOrAsked()), the shape as it is till then; nullptr when there
+ * is none yet. A figure's frame that cannot be read: its shape, as GetShape(int) gives it.
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame, uint64_t parts) const
 {
 	MarkThreeDUsed(this->used);
 	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) {
-		if (!MadeOrAsked(this, LAZY_SHAPE, [this] { return this->shape != nullptr || this->shape_tried; }, [this] { this->GetShape(); })) return nullptr;
+		parts |= 1;
+		MadeOrAsked(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || (this->shape_parts & parts) == parts); }, [this, parts] { this->GetShape(0, parts); });
+		std::lock_guard lock(_lazy_mutex);
 		return this->shape.get();
 	}
 	frame = std::max(frame, 0);
@@ -3274,7 +3339,13 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 }
 
 /** Read the object's shape (a frame of it), or the one read already for the same file, wheels, crew and frame. */
-std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame) const
+/**
+ * Make the object's shape (a frame of it): its file, its wheels, its crew, and of its add-ons the nodes of the parts
+ * asked for (GetShape(int, uint64_t)) -- the textures of all its add-ons all the same, in the same order whatever parts
+ * are asked for (a texture is asked for by its index: ThreeDVehicleObject::GetTexture()).
+ * @param parts the parts of its states (PartsOf()), bit n the part n
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame, uint64_t parts) const
 {
 	GlbFilesScope files;
 	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
@@ -3298,6 +3369,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
 	if (!this->only_node.empty()) key += "|u" + this->only_node;
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
+	if (!this->addons.empty()) key += fmt::format("|p{:x}", parts);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
 	GlbMesh mesh;
 	if (this->file.starts_with("beamng:")) {
@@ -3536,18 +3608,26 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			wheel_nodes.push_back(this->model_wheels[w].node);
 			wheel_of.push_back(static_cast<uint8_t>(std::min<size_t>(w + 1, 255)));
 		}
-		/* Each node's part (once: the triangles of an add-on are a million). */
+		/* Only the nodes of the parts asked for, each with its part (once: the triangles of an add-on are a million);
+		 * the textures of all its nodes, in the order they are met (ReadGlbMesh(): material_groups). */
+		std::vector<std::string> nodes;
 		std::vector<uint8_t> node_part;
-		for (const std::string &node : addon.nodes) node_part.push_back(part_of(addon.key + "/" + node));
+		for (const std::string &node : addon.nodes) {
+			const uint8_t part = part_of(addon.key + "/" + node);
+			if (part == 0 || ((parts >> part) & 1) == 0) continue;
+			nodes.push_back(node);
+			node_part.push_back(part);
+		}
 		GlbReadOptions read;
 		read.all_nodes = true;
-		read.groups = &addon.nodes;
+		read.groups = &nodes;
+		read.material_groups = &addon.nodes;
 		read.only_groups = true;
 		read.skip_night = true;
 		read.marks = &wheel_nodes;
 		read.glass_suffix = "_sklo";
 		GlbMesh am;
-		if (!ReadGlbMesh(addon.file, am, read)) {
+		if (!ReadGlbMesh(addon.file, am, read) && am.textures.empty()) {
 			Debug(misc, 0, "3D vehicle {}: the add-on {} cannot be read", this->name, addon.file);
 			continue;
 		}
@@ -3555,7 +3635,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		{
 			GlbReadOptions lamps;
 			lamps.all_nodes = true;
-			lamps.groups = &addon.nodes;
+			lamps.groups = &nodes;
 			lamps.only_groups = true;
 			lamps.only_night = true;
 			std::vector<float> front, back;
@@ -3604,8 +3684,9 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			add_points(front, front_group, made->front_lights, made->front_part);
 			add_points(back, back_group, made->back_lights, made->back_part);
 		}
+		/* (An add-on of none of the parts asked for adds its textures only.) */
 		const bool lit = !made->nrm.empty() && !am.nrm.empty();
-		if (!lit) made->nrm.clear();
+		if (!lit && !am.pos.empty()) made->nrm.clear();
 		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
 		made->tex_addon.resize(made->pngs.size(), -1);
 		for (GlbTexture &tx : am.textures) {
@@ -3882,6 +3963,7 @@ static void TrimThreeDTextures()
 {
 	std::lock_guard lock(_lazy_mutex);
 	_textures_replaced.clear();
+	_shapes_replaced.clear();
 	std::set<const void *> seen;
 	size_t freed = 0;
 	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
@@ -5017,6 +5099,7 @@ void ThreeDVehicleObject::Forget() const
 	this->frame_shapes.shrink_to_fit();
 	this->shape.reset();
 	this->shape_tried = false;
+	this->shape_parts = 0;
 }
 
 /** How long a thing not drawn keeps what was made of it, seconds. */
