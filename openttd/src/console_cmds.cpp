@@ -9600,6 +9600,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d: pudorys: dum na {},{} neni 3D objekt", *x, *y);
 			return true;
 		}
+		obj->Read();
 		const double step = TILE_SIZE / 16.0;
 		float zlo = 1e9f, zhi = -1e9f;
 		for (size_t i = 2; i < obj->pos.size(); i += 3) {
@@ -9629,6 +9630,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto times = number(2);
 		extern std::string RigTimeThreeDObjectRaster(int times);
 		IConsolePrint(CC_DEFAULT, "test3d: kresli {}", RigTimeThreeDObjectRaster(times.value_or(10)));
+	} else if (what == "domyprecti") {
+		/* The rig: every house's .glb read now, as the start of the game read them all (ThreeDObject::Read()). */
+		extern std::string RigReadAllThreeDHouses();
+		IConsolePrint(CC_DEFAULT, "test3d: {}", RigReadAllThreeDHouses());
 	} else if (what == "zapomen") {
 		/* 'zapomen [seconds]': the clock of the 3D objects on by so many seconds (120 without), what was not drawn since forgotten. */
 		extern std::string RigForgetThreeDObjects(uint seconds);

@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <map>
@@ -129,10 +130,28 @@ struct ThreeDObjectShapeView {
 static constexpr int THREE_D_SHAPE_LEVELS = 8;
 int ThreeDShapeLevel(double pixels_per_metre, double shift);
 
+/** A state kept as an atomic and copied as its value (ThreeDObject::glb_state: the objects are copied as they are read). */
+struct ThreeDCopyableState {
+	std::atomic<uint8_t> value{0};
+	ThreeDCopyableState() = default;
+	ThreeDCopyableState(const ThreeDCopyableState &other) : value(other.value.load()) {}
+	ThreeDCopyableState &operator=(const ThreeDCopyableState &other)
+	{
+		this->value.store(other.value.load());
+		return *this;
+	}
+};
+
 /** A building as a 3D object. */
 struct ThreeDObject {
 	std::string name;         ///< its name in the index
 	std::string file;         ///< the .glb it came from
+	/* A house's shape and texture are read the first time it is drawn (Read()), not all the houses at the start of the
+	 * game (the player, 17. 10.: 170 files, 178 MB): till then pos, uv, tri, facing, light, png, the night and top
+	 * are empty. */
+	std::string glb_path;     ///< its .glb to read so; empty: read with the index (an industry)
+	std::string snow_path;    ///< the snowy texture over it (a house above the snow line), read with it
+	mutable ThreeDCopyableState glb_state; ///< 0 not read yet, 1 read, 2 cannot be read
 	HouseID house = UINT16_MAX; ///< the house of the original game it is (its north tile's); UINT16_MAX for a set's house
 	uint32_t grfid = 0;       ///< a house of a set (NewGRF): the set's id as the game keeps it, 0 for an original house
 	uint16_t grf_house = 0;   ///< and the house's number in the set (its Action 0 id, the north tile's)
@@ -175,6 +194,10 @@ struct ThreeDObject {
 	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
 	size_t texture_of = SIZE_MAX; ///< a part of the original industries placed on a tile ("dily"): the object of the part, whose texture it shares
 
+	bool Read() const;
+	bool TryRead() const;
+	/** Whether its shape and texture are read (Read()): what is read of it may be looked at then, on any thread. */
+	bool IsRead() const { return this->glb_path.empty() || this->glb_state.value.load(std::memory_order_acquire) == 1; }
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	ThreeDObjectShapeView GetShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;

@@ -3610,6 +3610,7 @@ bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, fl
 	for (const ThreeDObjectPlacement &p : parts) {
 		for (const ThreeDObject *o : {p.ground, p.obj}) {
 			if (o == nullptr) continue;
+			o->Read();
 			for (size_t i = 0; i + 2 < o->pos.size(); i += 3) grow(p.x + o->pos[i], p.y + o->pos[i + 1], p.z + o->pos[i + 2]);
 			grow(p.x, p.y, p.z + 6 * OBJECT_HEIGHT_PER_METRE);
 		}
@@ -3654,6 +3655,8 @@ static void AddTurnedObjectsToDraw()
 		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
 		/* Only figures (the girls by the field road): the box of the tile, as tall as a girl twice the size. */
 		const int tiles_x = to.obj != nullptr ? to.obj->tiles_x : 1, tiles_y = to.obj != nullptr ? to.obj->tiles_y : 1;
+		/* (Its height as read: read now if the textures made above did not read it, ThreeDObject::Read().) */
+		if (to.obj != nullptr) to.obj->Read();
 		const int top = to.obj != nullptr ? static_cast<int>(std::ceil(to.obj->top)) : 2 * TILE_HEIGHT;
 		ps.xmin = ox;
 		ps.xmax = ox + tiles_x * TILE_SIZE - 1;
@@ -10084,6 +10087,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		std::vector<std::array<double, 3>> lamps;
 		for (const CabObject &co : objects) {
 			const ThreeDObject &o = *co.obj;
+			if (!o.IsRead()) continue; // read in the background, its lamps the next frames
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.z + o.lights[i + 2]});
 		}
@@ -10104,7 +10108,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		std::vector<WindowGlow> window_glows;
 		for (const CabObject &co : objects) {
 			const ThreeDObject &o = *co.obj;
-			if (o.night_tri.empty() && o.lights.empty()) continue;
+			if (!o.IsRead() || (o.night_tri.empty() && o.lights.empty())) continue;
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
 			const CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
 			/* Near and on the far land: the lights of the towns on the horizon. */

@@ -1988,6 +1988,7 @@ static void ReadThreeDObjects()
 {
 	_three_d_objects_read = true;
 	GlbFilesScope files;
+	const auto start = std::chrono::steady_clock::now();
 	std::vector<std::string> indices = FindObjectIndices();
 	for (const std::string &index : indices) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
@@ -2023,7 +2024,7 @@ static void ReadThreeDObjects()
 						obj.variants = 0;
 						for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
 					}
-					if (!ReadGlb(folder + obj.file, obj)) continue;
+					obj.glb_path = folder + obj.file;
 					ReadColourParts(e, folder, obj);
 					ReadBuildingFigures(e, obj);
 					ReadBuildingTitle(e, obj);
@@ -2050,18 +2051,18 @@ static void ReadThreeDObjects()
 					obj.variants = 0;
 					for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
 				}
-				if (!ReadGlb(folder + obj.file, obj)) continue;
+				/* Its shape and texture read the first time it is drawn (ThreeDObject::Read()). */
+				obj.glb_path = folder + obj.file;
 				ReadColourParts(e, folder, obj);
 				ReadBuildingFigures(e, obj);
 				ReadBuildingTitle(e, obj);
-				std::vector<uint8_t> snow;
-				if (houses.size() > 1 && e.contains("snih")) snow = ReadWholeFile(folder + e.at("snih").get<std::string>());
+				const std::string snow = houses.size() > 1 && e.contains("snih") ? folder + e.at("snih").get<std::string>() : std::string();
 				for (size_t k = 1; k < houses.size(); k++) {
 					/* The same shape for the next house of the list; the last ones (above the snow) in the snowy texture. */
 					ThreeDObject other = obj;
 					other.house = houses[k];
 					other.name = obj.name + (snow.empty() ? "" : " snih");
-					if (!snow.empty()) other.png = snow;
+					other.snow_path = snow;
 					_three_d_objects.push_back(std::move(other));
 				}
 				_three_d_objects.push_back(std::move(obj));
@@ -2094,7 +2095,7 @@ static void ReadThreeDObjects()
 			if (!first) Debug(misc, 0, "3D objects: house {:#04x} variant {} has two records, {} is drawn and {} not", o.grfid != 0 ? o.grf_house : o.house, slot, _three_d_objects[drawn].name, o.name);
 		}
 	}
-	Debug(misc, 1, "3D objects: {} read from {} index(es)", _three_d_objects.size(), indices.size());
+	Debug(misc, 1, "3D objects: {} read from {} index(es) in {} ms, the houses' shapes as they are drawn", _three_d_objects.size(), indices.size(), std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
 /**
@@ -2911,6 +2912,7 @@ enum LazyThing : int {
 	LAZY_PAINT_MASK = 2,
 	LAZY_RUST_MASK = 3,
 	LAZY_HOUSE_LEVELS = 4,   ///< a building's texture at all its levels
+	LAZY_HOUSE_GLB = 5,      ///< a house's shape and texture from its .glb (ThreeDObject::Read())
 	LAZY_FRAME = 1000,       ///< + the frame
 	LAZY_TEXTURE = 2000,     ///< + the texture's index
 	LAZY_ADDON_MASK = 3000,  ///< + the add-on
@@ -4711,9 +4713,62 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
  * @param level 0 its own shape, else simplified: made the first time (not on several cores at once but by
  *              PrepareThreeDObjectShapes())
  */
+/**
+ * Read the house's shape and texture from its .glb (glb_path) the first time they are wanted, on whichever thread asks
+ * first (MakeOnce()); after that they are never written again, and may be looked at on any thread.
+ * @return whether it has them
+ */
+bool ThreeDObject::Read() const
+{
+	if (this->IsRead()) return true;
+	MakeOnce(this, LAZY_HOUSE_GLB, [this] { return this->glb_state.value.load() != 0; }, [this] {
+		GlbFilesScope files;
+		const auto start = std::chrono::steady_clock::now();
+		ThreeDObject read;
+		read.name = this->name;
+		read.tiles_x = this->tiles_x;
+		read.tiles_y = this->tiles_y;
+		bool ok = ReadGlb(this->glb_path, read);
+		if (ok && !this->snow_path.empty()) {
+			std::vector<uint8_t> snow = ReadWholeFile(this->snow_path);
+			if (!snow.empty()) read.png = std::move(snow);
+		}
+		Debug(misc, 2, "3D object {}: {} triangles read in {} ms", this->name, read.tri.size() / 3, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+		return std::make_pair(ok, std::move(read));
+	}, [this](std::pair<bool, ThreeDObject> made) {
+		/* (The objects are in _three_d_objects, never const themselves: what is read is put into them once.) */
+		ThreeDObject &self = const_cast<ThreeDObject &>(*this);
+		if (made.first) {
+			ThreeDObject &r = made.second;
+			self.pos = std::move(r.pos);
+			self.night_pos = std::move(r.night_pos);
+			self.night_uv = std::move(r.night_uv);
+			self.night_tri = std::move(r.night_tri);
+			self.lights = std::move(r.lights);
+			self.uv = std::move(r.uv);
+			self.tri = std::move(r.tri);
+			self.facing = std::move(r.facing);
+			self.top = r.top;
+			self.png = std::move(r.png);
+			self.light = std::move(r.light);
+		}
+		self.glb_state.value.store(made.first ? 1 : 2, std::memory_order_release);
+	});
+	return this->IsRead();
+}
+
+/** Whether the house's shape and texture are read (Read()); if not, they are read in the background, there a frame or two on. */
+bool ThreeDObject::TryRead() const
+{
+	if (this->IsRead()) return true;
+	MadeOrAsked(this, LAZY_HOUSE_GLB, [this] { return this->glb_state.value.load() != 0; }, [this] { this->Read(); });
+	return this->IsRead();
+}
+
 ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 {
 	MarkThreeDUsed(this->used);
+	if (!this->Read()) return {};
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	/* Its own: wanted so, or too many corners to count the triangles below. */
 	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
@@ -4726,6 +4781,7 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 {
 	MarkThreeDUsed(this->used);
+	if (!this->TryRead()) return {};
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
 	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing};
@@ -4745,6 +4801,7 @@ static constexpr int FOOTPRINT_CELLS = 64;
  */
 bool ThreeDObject::Blocks(double x, double y) const
 {
+	this->Read();
 	const int w = this->tiles_x * FOOTPRINT_CELLS, h = this->tiles_y * FOOTPRINT_CELLS;
 	const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_CELLS;
 	if (this->footprint_w == 0) {
@@ -4884,7 +4941,8 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
 	{
 		std::lock_guard lock(_lazy_mutex);
 		for (const auto &[o, level] : wanted) {
-			if (o == nullptr || level <= 0 || level >= THREE_D_SHAPE_LEVELS || o->shapes[level] != nullptr) continue;
+			/* Not read yet: read on a core of its own too (ThreeDObject::Read()). */
+			if (o == nullptr || level < 0 || level >= THREE_D_SHAPE_LEVELS || (o->IsRead() && (level == 0 || o->shapes[level] != nullptr))) continue;
 			if (std::ranges::find(jobs, std::make_pair(o, level)) == jobs.end()) jobs.emplace_back(o, level);
 		}
 	}
@@ -4944,6 +5002,7 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
 	MarkThreeDUsed(this->used);
 	/* A part placed on a tile of an original industry: the part's texture, once for all its places. */
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].GetTexture(level, paint, may_drop);
+	this->Read();
 	MakeHouseLevels(*this);
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
 	const ThreeDObjectTexture *plain = &this->levels[level];
@@ -4968,6 +5027,7 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint
 {
 	MarkThreeDUsed(this->used);
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetTexture(level, paint);
+	if (!this->TryRead()) return nullptr;
 	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this] { return !this->levels.empty(); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return nullptr;
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
 	const ThreeDObjectTexture *plain = &this->levels[level];
@@ -5232,10 +5292,15 @@ std::string DescribeThreeDObjectMemory()
 		}
 	}
 	const size_t glb_files = _glb_files_kept_bytes;
-	size_t houses = 0, house_count = 0;
+	size_t houses = 0, house_count = 0, house_glb = 0, houses_read = 0;
 	{
 		std::lock_guard lock(_lazy_mutex);
 		for (const ThreeDObject &o : _three_d_objects) {
+			/* What is read of its .glb (ThreeDObject::Read()): its shape and its texture's picture. */
+			if (!o.glb_path.empty() && o.IsRead()) {
+				houses_read++;
+				house_glb += VectorBytes(o.pos) + VectorBytes(o.uv) + VectorBytes(o.tri) + VectorBytes(o.facing) + VectorBytes(o.light) + VectorBytes(o.png) + VectorBytes(o.night_pos) + VectorBytes(o.night_uv) + VectorBytes(o.night_tri);
+			}
 			size_t b = 0;
 			for (const ThreeDObjectTexture &t : o.levels) b += VectorBytes(t.px);
 			for (const auto &[key, t] : o.painted) b += VectorBytes(t.px);
@@ -5247,8 +5312,23 @@ std::string DescribeThreeDObjectMemory()
 			house_count++;
 		}
 	}
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({})",
-			mb(shapes), shape_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count);
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({})",
+			mb(shapes), shape_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read);
+}
+
+/** The rig: every house read now (ThreeDObject::Read()), as the start of the game read them all before. */
+std::string RigReadAllThreeDHouses()
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	const auto start = std::chrono::steady_clock::now();
+	size_t read = 0, bytes = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.glb_path.empty() || o.IsRead()) continue;
+		if (!o.Read()) continue;
+		read++;
+		bytes += VectorBytes(o.pos) + VectorBytes(o.uv) + VectorBytes(o.tri) + VectorBytes(o.facing) + VectorBytes(o.light) + VectorBytes(o.png);
+	}
+	return fmt::format("domu precteno {} za {} ms, {:.1f} MB", read, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), bytes / (1024.0 * 1024.0));
 }
 
 /** The rig: the clock of the objects on by so many seconds, and what is not drawn since forgotten. */
