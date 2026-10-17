@@ -23,6 +23,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 17. 10. – zpracování 3D objektů zrychlené (hráč: „až potom, co optimalizuješ celý ten proces“)
+
+- Hráč k hranicím: **„nemůžeš vzít čísla, co má nejvíc, a tam ubrat… musí vycházet z technických možností hry… až
+  potom, co optimalizuješ celý ten proces s objekty. nech si dělat 3D GRF tak, aby to odsejpalo.“** Hranice kolegovi
+  odvolané (`hra/3d/HRANICE-PODROBNOSTI.md`: dělej dál jako dosud). Nejdřív hra:
+- **Glb po kouscích** (`GlbFile`): z glb se čte obsah (JSON, jednou) a jen ty kusy, které čtené sítě a obrázky
+  potřebují; čísla rovnou (bez převodu přes double); zadní světla dílů jen místa, ne znovu celé sítě. Tahač 148: 21+22
+  MB místo 43+39 MB, 250 ms místo 527 ms (teplý disk); holky v kabinách 11–15 ms místo 16–47. Obraz pixel po pixelu
+  stejný.
+- **Tvar jen s díly ukázaných stavů**: dřív měl tvar všechny díly všech stavů (návěs Tatry = všech deset nástaveb, 775
+  tisíc trojúhelníků). Teď jen díly stavů, které se kreslí; další díl se přidá, když se objeví stav s ním (tvar se
+  udělá znovu, starý se pustí mezi snímky). Pořadí textur stejné vždycky. Návěs: 61 549 trojúhelníků za 35 ms místo
+  775 309 za 597 ms; s druhým druhem návěsu na mapě 246 797. Tvary v paměti (rig `pamet`): 218 → 104 MB.
+- **Zjednodušení pro malý zoom spojuje rohy v rámci ostrůvku textury** (rohy spojené trojúhelníky), ne jen v 1/128
+  textury: Tatra 148 při 16 cm 59 tisíc místo 374 tisíc trojúhelníků; kreslení při 1× 3,5 ms místo 11, při 2× 9 místo
+  21. Obraz na všech zoomech stejný (rig `test3d kresli` nechá obrázek každého zoomu `kresli_<objekt>_<zoom>.ppm`).
+- Technické možnosti (podklad pro pozdější rozhodnutí o ubírání, jedno jádro, textury hotové): obrázek Tatry 603
+  (12 tisíc trojúhelníků) při 4× 2,5 ms; Tatry 148 (692 tisíc) 21 ms při 4×, 134 ms při 16×. Načtení tvaru asi
+  1 ms na 1 200 trojúhelníků (teplý disk). V zatáčce je nový obrázek po každých 5° otočení.
+
 ## 17. 10. – 3D GRF: rychlejší načítání a menší balíčky (návrh), hranice podrobnosti kolegovi
 
 - Hráč: **„potřebujem GRF optimalizovat, aby je hra načítala snadno, připravený musí být, a šetřit při tom místo“**,
