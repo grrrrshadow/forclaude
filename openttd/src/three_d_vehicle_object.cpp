@@ -1597,10 +1597,13 @@ static bool StartPictureThread()
 }
 
 bool _three_d_load_at_once = false;
+/** How many jobs were asked of the thread in the background, for the rig (test3d casy). */
+uint64_t _three_d_loads_asked = 0;
 
 /** A job for the thread in the background (three_d_objects.h): what the view from the eyes has not got yet is made; without the thread (or for the rig), here. */
 void ThreeDLoadInBackground(std::function<void()> job)
 {
+	_three_d_loads_asked++;
 	if (_three_d_load_at_once || !StartPictureThread()) {
 		job();
 		return;
@@ -2156,6 +2159,13 @@ static std::mutex _eye_painted_mutex;
 static std::set<std::tuple<const ThreeDVehicleObject *, int, int, int>> _eye_painted_asked;
 /** Those drawn since the last trimming (TrimThreeDEyePainted()). */
 static std::set<std::tuple<const ThreeDVehicleObject *, int, int, int>> _eye_painted_seen;
+/**
+ * Those whose state paints nothing over them: the object's own texture is drawn. Without knowing it, the asking for
+ * them went on for ever -- each frame another job for the thread in the background, the model never ready (its
+ * billboard drawn, blocky and at the angle of another picture close by) and the pictures of the vehicles waiting
+ * behind the jobs (the player, 17. 10.: "the cars are blocks now, strangely turned").
+ */
+static std::set<std::tuple<const ThreeDVehicleObject *, int, int, int>> _eye_painted_plain;
 
 /** The objects are read anew: their painted textures go with them. */
 static void ForgetEyePainted()
@@ -2164,6 +2174,7 @@ static void ForgetEyePainted()
 	_eye_painted.clear();
 	_eye_painted_asked.clear();
 	_eye_painted_seen.clear();
+	_eye_painted_plain.clear();
 	_eye_trails.clear();
 }
 
@@ -2225,6 +2236,13 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		_eye_painted_seen.insert(key);
 		return &_eye_painted.emplace(key, std::move(t)).first->second;
 	};
+	/* Nothing to paint: the object's own, and known so (TryGetThreeDEyeVehicleTexture()). */
+	auto plain = [&]() {
+		std::lock_guard lock(_eye_painted_mutex);
+		_eye_painted_asked.erase(key);
+		_eye_painted_plain.insert(key);
+		return raw;
+	};
 	const ThreeDVehicleState *st = obj->State(state);
 	/* The mask of details of the texture in the vehicle's colours of its set (callback 1C1), as RasterObject() paints it. */
 	const ObjectDetailPaint details(*obj, *shape, st, std::max<size_t>(1, shape->pngs.size()));
@@ -2234,7 +2252,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		const int addon = static_cast<size_t>(index) < shape->tex_addon.size() ? shape->tex_addon[index] : -1;
 		const bool coloured = addon >= 0 && st != nullptr && static_cast<size_t>(addon) < st->addon_colours.size() && st->addon_colours[addon] != 0;
 		const ThreeDObjectTexture *mask = coloured ? obj->GetAddonMask(addon, level) : nullptr;
-		if (mask == nullptr && detail == nullptr) return raw;
+		if (mask == nullptr && detail == nullptr) return plain();
 		const Colour colour(coloured ? st->addon_colours[addon] : 0);
 		const float start = addon >= 0 && obj->addons[addon].start > 0 ? static_cast<float>(obj->addons[addon].start) : 255.0f;
 		t.w = raw->w;
@@ -2265,7 +2283,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		return keep();
 	}
 	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
-	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr && detail == nullptr) return raw;
+	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr && detail == nullptr) return plain();
 	t.w = raw->w;
 	t.h = raw->h;
 	t.px.resize(raw->px.size());
@@ -2307,6 +2325,7 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObje
 			_eye_painted_seen.insert(key);
 			return &it->second;
 		}
+		if (_eye_painted_plain.contains(key)) return raw;
 		if (!_eye_painted_asked.insert(key).second) return nullptr; // asked already
 	}
 	ThreeDLoadInBackground([obj, state, pixels_per_metre, index, key] {
